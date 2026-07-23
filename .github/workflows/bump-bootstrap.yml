@@ -1,0 +1,128 @@
+name: bump-bootstrap
+
+# Rebuild the skiplang bootstrap compiler from the current main, verify it, push
+# the new IR to SkipLabs/skiplang-bootstrap, and open a PR bumping the submodule
+# pointer here. Manual only: whether to bump is a judgement call (the prelude
+# needs a language feature the current bootstrap lacks), so a human triggers it;
+# the automation just removes the toil and guarantees the verification runs.
+#
+# The bump is only ever published if the rebuilt compiler passes the self-hosting
+# fixpoint and the full test suite (see bin/bump_bootstrap.sh). Merging the
+# resulting PR -- the step that actually changes what everyone builds from --
+# stays a human decision.
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and verify only; do not push or open a PR'
+        type: boolean
+        default: false
+
+# The pushes and the PR use BOOTSTRAP_BUMP_TOKEN, not GITHUB_TOKEN, so no repo
+# write is needed from the workflow token itself.
+permissions:
+  contents: read
+
+concurrency:
+  group: bump-bootstrap
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # Never publish a bootstrap from a fork.
+    if: github.repository == 'SkipLabs/skip'
+    # Gate the cross-repo token behind an environment whose deployment-branch
+    # policy allows only main. workflow_dispatch runs this workflow AND the
+    # scripts it calls from the SELECTED ref with full access to secrets, so
+    # without this a user with write access could dispatch a crafted branch that
+    # exfiltrates BOOTSTRAP_BUMP_TOKEN (which can write the compiler everyone
+    # builds from). The main-only policy blocks the job -- and the secret -- for
+    # any other ref. The token MUST be stored as an environment secret here, not
+    # a repo/org secret (a repo secret is not gated by the environment).
+    environment: bootstrap-publish
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # Cross-repo token. Persisted so the branch push to this repo's origin
+          # and the PR use it (the skiplang-bootstrap push uses its own explicit
+          # URL). A PR opened under a real token, not GITHUB_TOKEN, runs CI --
+          # which is what validates the bump end to end.
+          token: ${{ secrets.BOOTSTRAP_BUMP_TOKEN }}
+          # The bootstrap IR and libbacktrace both live in submodules.
+          submodules: recursive
+          # Full history so the compiler's own git-describe versioning is sane.
+          fetch-depth: 0
+      - name: Check the token can push before building
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.BOOTSTRAP_BUMP_TOKEN }}
+        run: ./bin/check_bootstrap_token.sh
+      - name: Install the skiplang build toolchain
+        shell: bash
+        run: sudo ./bin/apt-install.sh skiplang-build-deps
+      - name: Rebuild and verify the bootstrap
+        shell: bash
+        run: ./bin/bump_bootstrap.sh
+      - name: Push the new bootstrap IR
+        id: push
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.BOOTSTRAP_BUMP_TOKEN }}
+        run: |
+          commit=$(git rev-parse --short HEAD)
+          # Explicit tokenised URL rather than the persisted submodule remote, so
+          # this does not depend on how checkout wires submodule credentials.
+          url="https://x-access-token:${TOKEN}@github.com/SkipLabs/skiplang-bootstrap.git"
+          cd skiplang/compiler/bootstrap
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          # Reparent the promoted IR onto the CURRENT remote main tip so the push
+          # is always a fast-forward. The submodule is checked out at the SHA skip
+          # pins, which may be BEHIND bootstrap main -- e.g. an earlier bump whose
+          # skip PR has not merged -- and committing on top of it would push a
+          # sibling of main, be rejected non-fast-forward, and wedge every future
+          # run. IR snapshots are self-contained, so the parent commit does not
+          # affect what the bootstrap does; only its content (the promoted files)
+          # matters.
+          git fetch --depth 1 "$url" main
+          git reset --soft FETCH_HEAD
+          git add -A
+          git commit -m "Update to $commit"
+          git push "$url" HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Open the submodule-bump PR
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.BOOTSTRAP_BUMP_TOKEN }}
+          PR_BODY: |
+            Rebuilds the bootstrap compiler from ${{ github.sha }} and bumps the
+            `skiplang/compiler/bootstrap` submodule to
+            `SkipLabs/skiplang-bootstrap@${{ steps.push.outputs.short }}`.
+
+            Produced by the `bump-bootstrap` workflow, which published the new IR
+            only after it passed, on a clean rebuild from that IR:
+
+            - the self-hosting **fixpoint** (`stage2` and `stage3` `skc.ll` identical), and
+            - the **full compiler test suite**.
+
+            Merging is the human gate: CI re-runs both against this pointer before it lands.
+        run: |
+          commit=$(git rev-parse --short HEAD)
+          branch="bump-bootstrap-$commit"
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          # The submodule's HEAD advanced when its IR was committed above; record
+          # the moved pointer.
+          git switch -c "$branch"
+          git add skiplang/compiler/bootstrap
+          git commit -m "Update bootstrap compiler to $commit"
+          git push origin "$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Update bootstrap compiler to $commit" \
+            --body "$PR_BODY"
