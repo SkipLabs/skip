@@ -6,8 +6,8 @@ name: bump-bootstrap
 # needs a language feature the current bootstrap lacks), so a human triggers it;
 # the automation just removes the toil and guarantees the verification runs.
 #
-# The bump is only ever published if the rebuilt compiler passes the self-hosting
-# fixpoint and the full test suite (see bin/bump_bootstrap.sh). Merging the
+# The bump is only ever published if the rebuilt compiler rebuilds clean through
+# stage3 and passes the full test suite (see bin/bump_bootstrap.sh). Merging the
 # resulting PR -- the step that actually changes what everyone builds from --
 # stays a human decision.
 on:
@@ -118,7 +118,7 @@ jobs:
             Produced by the `bump-bootstrap` workflow, which published the new IR
             only after it passed, on a clean rebuild from that IR:
 
-            - the self-hosting **fixpoint** (`stage2` and `stage3` `skc.ll` identical), and
+            - a clean self-hosting rebuild through **stage3**, and
             - the **full compiler test suite**.
 
             Merging is the human gate: CI re-runs both against this pointer before it lands.
