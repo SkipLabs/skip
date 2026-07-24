@@ -1,6 +1,25 @@
 export type * from "../skiplang-json/internal.js";
 import type { T, CJSON } from "../skiplang-json/internal.js";
 export type { Exception } from "../skiplang-std/internal.js";
+import type {
+  SkipService,
+  NamedInputDefinitions,
+  NamedEagerCollections,
+} from "./api.js";
+
+/**
+ * Type-erased SkipService, for use in internal runtime code and consumers
+ * that don't need specific type parameters. Not part of the public
+ * `@skipruntime/core` surface: assigning a concrete SkipService<...> to it
+ * is unsound (Resource<C>.instantiate is contravariant in C), so user code
+ * should use a generic function parameterized over InputDefs/Inputs/
+ * ResourceInputs instead of erasing to this type.
+ */
+export type AnySkipService = SkipService<
+  NamedInputDefinitions,
+  NamedEagerCollections,
+  NamedEagerCollections
+>;
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 

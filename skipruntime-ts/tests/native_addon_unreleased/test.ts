@@ -1,4 +1,4 @@
-import type { AnySkipService } from "@skipruntime/core";
+import type { AnySkipService } from "@skipruntime/core/internal.js";
 import { initService } from "@skipruntime/native";
 
 const emptyService: AnySkipService = {

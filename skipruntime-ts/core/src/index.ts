@@ -21,6 +21,7 @@ import {
 import { sknative } from "../skiplang-std/index.js";
 
 import type * as Internal from "./internal.js";
+import { type AnySkipService } from "./internal.js";
 import {
   type AbstractEagerCollection,
   type CollectionUpdate,
@@ -35,7 +36,6 @@ import {
   type DepSafe,
   type Reducer,
   type Resource,
-  type AnySkipService,
   type Watermark,
   type ExternalService,
   InputDefinition,

@@ -1,4 +1,7 @@
-import type { Exception as IException } from "@skipruntime/core/internal.js";
+import type {
+  Exception as IException,
+  AnySkipService,
+} from "@skipruntime/core/internal.js";
 import { ServiceInstance, ToBinding } from "@skipruntime/core";
 import type { FromBinding as SkipRuntimeFromBinding } from "@skipruntime/core/binding.js";
 import {
@@ -18,8 +21,6 @@ type AddOn = {
 };
 
 const skip_runtime: AddOn = require("../build/Release/skip_runtime.node");
-
-import type { AnySkipService } from "@skipruntime/core";
 
 const jsonBinding: JsonBinding = skip_runtime.getJsonBinding();
 const jsonConverter = buildJsonConverter(jsonBinding);
