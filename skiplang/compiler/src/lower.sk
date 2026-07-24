@@ -386,25 +386,22 @@ mutable class .Lower{
       true,
     );
 
-    // call wrapper for llvm.memcpy intrinsic
-    // The wrapper returns its `dest` argument (like C `memcpy`), so the call
-    // site is typed as a (non-GC) pointer rather than void; the result is
-    // unused. Matching the callee's return type lets the always-inliner inline
-    // the preamble's `SKIP_llvm_memcpy` definition even at -O0 (a void call of
-    // a ptr-returning function is left un-inlined). See #1472.
+    // Emit the llvm.memcpy intrinsic directly. Skip only ever copies between
+    // freshly-allocated, non-overlapping obstack memory, so plain (non-volatile)
+    // memcpy semantics apply. The trailing `isvolatile` operand must be an
+    // immediate (immarg); a ConstantBool lowers to an inline `i1 0`.
     _ = this.emitNamedCall{
       args => Array[
-        mem.id,
-        v.value,
+        mem.id, // dest
+        v.value, // src
         numBytes.id, // bytes to copy
-        // alignment = vtableByteSize
-        // volatile = false
+        this.constantBool(false).id, // isvolatile = false
       ],
-      typ => tNonGCPointer,
+      typ => tVoid,
       pos,
       canThrow => false,
       allocAmount => AllocNothing(),
-      name => "SKIP_llvm_memcpy",
+      name => "llvm.memcpy.p0.p0.i64",
     }
   }
 
