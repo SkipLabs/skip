@@ -15,19 +15,27 @@ export const sk_managed: unique symbol = Symbol.for("Skip.managed");
  *
  * `Managed` values are important because they can be used in code that will be executed by the reactive computation system without introducing the possibility of stale or unreproducible results.
  */
-export type Managed = {
+export abstract class Managed {
   /**
+   * The mark is `private`, which makes `Managed` nominal rather than structural.
+   * That is deliberate: it is installed non-enumerably, so it does not survive an
+   * object spread at runtime, and a structural mark would survive that spread in
+   * the *type* -- letting `{...managed, k: v}` claim to be dependency-safe when it
+   * is not. TypeScript drops private members from spread results, so a nominal
+   * mark models the runtime faithfully.
+   *
+   * `declare` because the mark is installed by `Object.defineProperty` rather
+   * than by field initialization.
+   *
    * @ignore
    * @hidden
    */
-  [sk_managed]: true;
-};
+  declare private readonly [sk_managed]: true;
+}
 
-export abstract class Frozen implements Managed {
-  // tsc misses that Object.defineProperty in the constructor inits this
-  [sk_managed]!: true;
-
+export abstract class Frozen extends Managed {
   constructor() {
+    super();
     this.freeze();
   }
 
@@ -40,6 +48,13 @@ function tagSkManaged<T extends object>(x: T): T & Managed {
     writable: false,
     value: true,
   }) as T & Managed;
+}
+
+// `Object.freeze` returns `Readonly<T>`, a mapped type, and mapped types drop the
+// private mark that makes `Managed` nominal. Freezing does not remove the mark at
+// runtime -- `tagSkManaged` has already installed it -- so restore it in the type.
+function freezeSkManaged<T extends object>(x: T & Managed): T & Managed {
+  return Object.freeze(x) as T & Managed;
 }
 
 export function isSkManaged(x: any): x is Managed {
@@ -74,6 +89,21 @@ export type DepSafe =
   | symbol
   | Managed;
 
+/**
+ * The dependency-safe form of `T`.
+ *
+ * Object types are marked `Managed`, while primitives are already dependency-safe and pass through unchanged.
+ *
+ * This exists because `DepSafe` is a union, so it cannot usefully be intersected with an object type: for an object type `T`, `T & DepSafe` keeps arms such as `T & string`, which TypeScript does not consider object types, and so it rejects spreading or destructuring the result.
+ * `DepSafeOf<T>` narrows to `T & Managed` instead, which spreads.
+ *
+ * Spreading a dependency-safe object gives back a plain object, not a dependency-safe one: the `Managed` mark is nominal, and TypeScript drops it from the spread result just as the runtime does.
+ * That is intended -- `{...deps, k: v}` is a fresh, unfrozen object -- so pass it to `deepFreeze` before using it as a `Mapper` or `Reducer` parameter.
+ *
+ * @typeParam T - Type of the value.
+ */
+export type DepSafeOf<T> = T extends object ? T & Managed : T;
+
 export function checkOrCloneParam<T>(value: T): T {
   if (
     typeof value == "boolean" ||
@@ -106,6 +136,9 @@ export function checkOrCloneParam<T>(value: T): T {
  * @param value - The object to deep-freeze.
  * @returns The same object that was passed in.
  */
+export function deepFreeze<T>(value: T): DepSafeOf<T>;
+// The implementation signature keeps the intersection form: TypeScript cannot
+// check a function body against a deferred conditional return type.
 export function deepFreeze<T>(value: T): T & DepSafe {
   if (
     typeof value == "boolean" ||
@@ -126,12 +159,12 @@ export function deepFreeze<T>(value: T): T & DepSafe {
       for (const elt of value) {
         deepFreeze(elt);
       }
-      return Object.freeze(tagSkManaged(value));
+      return freezeSkManaged(tagSkManaged(value));
     } else {
       for (const val of Object.values(value)) {
         deepFreeze(val);
       }
-      return Object.freeze(tagSkManaged(value));
+      return freezeSkManaged(tagSkManaged(value));
     }
   } else {
     // typeof value == "function" || typeof value == "undefined"
@@ -176,14 +209,17 @@ export type Exportable =
   | ObjectProxy<{ [k: string]: Exportable }>
   | (readonly Exportable[] & Managed);
 
+// `Managed` rather than an `[sk_managed]: true` field: the mark is nominal, so
+// declaring the field structurally would no longer make a proxy `Managed`. The
+// proxy does answer to the mark at runtime -- see `reactiveObject.get`.
 export type ObjectProxy<Base extends { [k: string]: Exportable }> = {
   [sk_isObjectProxy]: true;
-  [sk_managed]: true;
   __pointer: Pointer<Internal.CJSON>;
   clone: () => ObjectProxy<Base>;
   toJSON: () => Base;
   keys: IterableIterator<keyof Base>;
-} & Base;
+} & Base &
+  Managed;
 
 export function isObjectProxy(
   x: any,
