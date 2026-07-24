@@ -8,9 +8,11 @@
 module String;
 
 @cpp_extern
+@no_alloc
 native fun getByte(String, Int): UInt8;
 
 @cpp_extern
+@no_alloc
 native fun byteSize(String): UInt32;
 
 @cpp_extern
@@ -18,10 +20,8 @@ native fun unsafeSlice(str: String, Int, Int): String;
 
 native class .String uses Hashable, Show, Orderable, AsBytes {
   @cpp_extern
-  @may_alloc
   native static fun fromChars(chars: readonly Array<Char>): String;
   @cpp_extern
-  @may_alloc
   native static fun fromUtf8(bytes: readonly Array<UInt8>): String;
 
   private static fun fromGenerator(gen: () -> mutable Iterator<Char>): String {
@@ -31,8 +31,10 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
   @intrinsic
   private native fun concat(String): String;
   @cpp_extern
+  @no_alloc
   native private fun toFloat_raw(): Float;
   @intrinsic
+  @no_alloc
   native fun compare_raw(other: String): Int;
 
   fun take(len: Int): String {
@@ -422,6 +424,7 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
   }
 
   @intrinsic
+  @no_alloc
   native fun hash(): Int;
 
   fun getIter(): mutable StringIterator {

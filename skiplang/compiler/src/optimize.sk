@@ -530,12 +530,15 @@ private fun optimizeAll(
               inlineComplexity => Int::max,
               returns => !annotationsContain(f.annotations, "@no_return", pos),
               canThrow => !annotationsContain(f.annotations, "@no_throw", pos),
+              // Default to the safe side: a native is assumed to allocate
+              // unless it opts out with @no_alloc. Forgetting the annotation
+              // is then a missed optimization, not a wrong-code risk.
               allocAmount => if (
-                annotationsContain(f.annotations, "@may_alloc", pos)
+                annotationsContain(f.annotations, "@no_alloc", pos)
               ) {
-                AllocUnbounded()
-              } else {
                 AllocNothing()
+              } else {
+                AllocUnbounded()
               },
             },
           },

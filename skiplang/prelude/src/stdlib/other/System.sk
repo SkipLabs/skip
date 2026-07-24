@@ -41,7 +41,6 @@
 //    collected (very roughly corresponding to a "generation" in traditional
 //    GC terms).
 @cpp_runtime
-@may_alloc
 fun intern<T: frozen>(x: T): T {
   x
 }
@@ -64,27 +63,32 @@ fun print_string<T: readonly Show>(value: T): void {
 @debug
 @no_throw
 @cpp_extern
+@no_alloc
 native fun print_raw(String): void;
 
 @debug
 @no_throw
 @cpp_extern
+@no_alloc
 native fun print_error_raw(String): void;
 
 @debug
 @no_throw
 @cpp_extern
+@no_alloc
 native fun print_debug_raw(String): void;
 
 // Prints to stderr
 @debug
 @no_throw
 @cpp_extern
+@no_alloc
 native fun print_error(String): void;
 
 @debug
 @no_throw
 @cpp_extern
+@no_alloc
 native fun print_debug(String): void;
 
 fun print_error_ln<T: readonly Show>(value: T): void {
@@ -102,11 +106,13 @@ fun throwEndOfFile(): void {
 @debug
 @no_throw
 @cpp_runtime
+@no_alloc
 native fun print_stack_trace(): void;
 
 @debug
 @no_return
 @cpp_runtime
+@no_alloc
 native fun print_last_exception_stack_trace_and_exit(Exception): void;
 
 @debug
@@ -119,6 +125,7 @@ fun skipExit<T>(res: Int): T {
 @debug
 @no_return
 @cpp_extern
+@no_alloc
 native fun exit(Int): void;
 
 class DivisionByZeroException() extends Exception {
@@ -169,27 +176,26 @@ module Debug;
 
 @debug
 @intrinsic
+@no_alloc
 native fun getMemoryFrameUsage(): Int;
 
 module end;
 
 @allow_tracked_call
 @cpp_extern
-@may_alloc
 untracked native fun read_line(): ?String;
 
 @allow_tracked_call
 @cpp_extern
-@may_alloc
 untracked native fun read_to_end(): String;
 
 @allow_tracked_call
 @cpp_extern("SKIP_flush_stdout")
+@no_alloc
 untracked native fun flushStdout(): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_system")
-@may_alloc
 untracked native fun system(cmd: String): Int;
 
 module System;
