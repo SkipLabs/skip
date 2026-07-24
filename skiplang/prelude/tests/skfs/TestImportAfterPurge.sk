@@ -1,0 +1,73 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// After a purge removes a dir's tombstone, a later import from an older tick
+// must still turn that dir into a DeletedDir on the target (deduction by absence).
+@test
+fun testImportAfterPurge(): void {
+  _ = SK.newObstack();
+  aName = SK.DirName::create("/a/");
+  bName = SK.DirName::create("/b/");
+
+  source = SK.Context::create{}.mclone();
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    aName,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  _ = source.mkdir(
+    SK.IID::keyType,
+    SK.IntFile::type,
+    bName,
+    Array[(SK.IID(0), SK.IntFile(0))],
+  );
+  source.update();
+
+  // Tick before deletion: a lagging reader is stuck here.
+  tickBefore = source.getTick();
+
+  // Clone a target that still sees both /a/ and /b/ (the lagging reader).
+  target = source.mclone();
+  T.expectTrue(
+    target.maybeGetDir(aName) is Some _ && target.maybeGetDir(bName) is Some _,
+    "Target starts with both dirs",
+  );
+
+  // Delete /b/ in source: this leaves a DeletedDir tombstone.
+  source.removeDir(bName);
+  source.update();
+  T.expectTrue(
+    source.maybeGetDir(bName) is Some(SK.DeletedDir _),
+    "Source has a tombstone for /b/",
+  );
+
+  // Move forward, then purge with a low limit so the tombstone is collected
+  // and dirsTombLimit advances past tickBefore.
+  source.update();
+  purged = source.purgeDeletedDirs(source.getTick());
+  T.expectTrue(purged > 0, "Tombstone for /b/ was purged");
+  T.expectTrue(
+    source.maybeGetDir(bName) is None _,
+    "Tombstone is gone from source after purge",
+  );
+
+  // Import into the lagging target from tickBefore (older than the purge).
+  // Without the fix the deletion is invisible and /b/ stays a phantom.
+  // With the fix import deduces it by absence.
+
+  SK.import(target, tickBefore, source);
+
+  T.expectTrue(
+    target.maybeGetDir(bName) is Some(SK.DeletedDir _),
+    "Deletion of /b/ propagated to lagging target",
+  );
+  T.expectTrue(
+    target.maybeGetDir(aName) is Some(SK.EagerDir _),
+    "/a/ still present in target",
+  );
+}
+
+module end;

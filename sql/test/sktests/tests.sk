@@ -1,0 +1,27 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+module SKDBTest;
+
+untracked fun main(): void {
+  // If SKTEST_RANK doesn't exist, it means that we are in main process, and not a child
+  if (Environ.varOpt("SKTEST_RANK") is None()) {
+    print_string(
+      "*******************************************************************************\n" +
+        "* SKDB SKIPLANG TESTS *\n" +
+        "*******************************************************************************",
+    );
+  };
+  tests = mutable Map[];
+  tests.set(
+    "SKDBTest",
+    mutable Vector[
+      SKTest.Test{
+        name => "testImportNextAfterPurge",
+        func => () ~> testImportNextAfterPurge(),
+      },
+    ],
+  );
+  SKTest.test_harness(tests)
+}
+
+module end;
