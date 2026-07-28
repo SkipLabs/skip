@@ -22,6 +22,15 @@ build/%.ll: bootstrap/%.ll.gz | check-bootstrap
 	mkdir -p $(@D)
 	gunzip -c $< > $@
 
+# The real inputs of the stage0 artifacts. The recursive makes that produce the
+# runtime archives and the stdlib cannot report whether they changed anything,
+# so their targets are .PHONY and their mtimes bump on every invocation; a
+# stage0 rule that took them as ordinary prerequisites would relink on every
+# invocation too. Depend on the sources instead, and see stage0/bin/skc for how
+# the archives themselves are kept up to date without forcing that relink.
+RUNTIME_SRC := $(wildcard ../prelude/runtime/*.c ../prelude/runtime/*.cpp ../prelude/runtime/*.h)
+PRELUDE_SRC := $(shell find ../prelude/src -name '*.sk')
+
 # The compiler is bootstrapped from the pre-compiled IR shipped in the
 # `bootstrap` submodule. If that submodule is not at the commit recorded in this
 # checkout, skc gets built from mismatched IR and typically crashes at runtime
@@ -44,23 +53,31 @@ check-bootstrap:
 build/libskip_runtime64.a build/libbacktrace.a:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
 
-# Depends on stage0/bin/skc: this recipe puts stage0/bin on PATH and compiles
-# the stdlib with whatever `skc` it finds there. Without the dependency an
-# already-present but outdated stage0/bin/skc was used as-is, and the bootstrap
-# IR it should have been rebuilt from was never even unpacked -- so a stage0
-# left over from an older checkout silently compiled the current prelude and
-# reported errors for language features it predates (a stage0 older than
-# `@allow_tracked_call` rejects it with 47 "Cannot call an untracked function
-# from a tracked context"). It also means the check-bootstrap guard, which hangs
-# off unpacking that IR, now actually runs on this path.
-.PHONY: stage0/lib/libstd.sklib
-stage0/lib/libstd.sklib: stage0/bin/skc
+# Real prerequisites rather than .PHONY. This recipe puts stage0/bin on PATH and
+# compiles the stdlib with whatever `skc` it finds there, so stage0/bin/skc is a
+# genuine input; without it an already-present but outdated stage0/bin/skc was
+# used as-is and the bootstrap IR it should have been rebuilt from was never
+# even unpacked. A stage0 left over from an older checkout then silently
+# compiled the current prelude and reported errors for language features it
+# predates -- a stage0 older than `@allow_tracked_call` rejects it with 47
+# "Cannot call an untracked function from a tracked context", which reads
+# exactly like the stdlib being broken. It also means the check-bootstrap guard,
+# which hangs off unpacking that IR, now actually runs on this path.
+#
+# Being a real file target also stops stage0/bin/{skargo,skfmt}, which link
+# against it, from relinking on every invocation.
+stage0/lib/libstd.sklib: stage0/bin/skc $(PRELUDE_SRC)
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
-stage0/bin/skc: build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
+# The archives are order-only prerequisites: they are always brought up to date
+# before the link, but being .PHONY they are never a reason to relink. The
+# relink decision comes from the bootstrap IR and the runtime sources, which are
+# what actually determine this binary. As ordinary prerequisites they forced a
+# ~2.5min -O3 link of a 72MB IR module on every single invocation.
+stage0/bin/skc: build/skc_out64.ll $(RUNTIME_SRC) | build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
+	clang++ -no-pie $(CXXFLAGS) -o $@ build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a -lpthread -g3
 
 stage0/bin/skargo: build/skargo_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
