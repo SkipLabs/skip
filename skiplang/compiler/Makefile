@@ -14,7 +14,19 @@ libdir   ?= $(exec_prefix)/lib
 .PHONY: default
 default: stage$(STAGE)
 
-stage%:
+# Each stage target names a *directory*, so as a file target with no
+# prerequisites make considers it up to date the moment the directory exists:
+# once you had built a stage, `make stageN` printed "'stageN' is up to date" and
+# recursed into nothing, leaving however stale a skc was already sitting there.
+# They are aggregates, so make them phony and always recurse; the rules they
+# recurse into now key off real inputs, so an up-to-date tree still does nothing.
+#
+# The stages have to be listed explicitly rather than matched with `stage%`:
+# make skips implicit-rule search for phony targets, so a phony target built by
+# a pattern rule gets "Nothing to be done" instead. Naming them also turns a
+# typo like `make stage7` into an error rather than a successful no-op.
+.PHONY: stage0 stage1 stage2 stage3 stageD
+stage0 stage1 stage2 stage3 stageD:
 	mkdir -p $@
 	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
 
