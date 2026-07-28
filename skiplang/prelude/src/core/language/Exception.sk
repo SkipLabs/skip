@@ -81,6 +81,7 @@ class RuntimeError(msg: String) extends Exception {
 // two getExn() reads that straddle a write silently yields the stale value.
 @allow_tracked_call
 @cpp_extern("SKIP_getExn")
+@no_alloc
 untracked native fun getExn(): Exception;
 
 @export("SKIP_call0")
@@ -90,10 +91,12 @@ fun call0(f: () -> void): void {
 
 @allow_tracked_call
 @cpp_runtime
+@no_alloc
 untracked native fun saveExn(exn: Exception): void;
 
 @allow_tracked_call
 @cpp_extern
+@no_alloc
 untracked native fun replaceExn(exn: Exception): void;
 
 class ExternalException(
@@ -111,9 +114,11 @@ class ExternalException(
 }
 
 @cpp_extern("SKIP_external_exception_message")
+@may_alloc
 native fun getExternalExceptionMessage(actor: UInt32): String;
 
 @cpp_extern("SKIP_delete_external_exception")
+@no_alloc
 native fun deleteExternalException(actor: UInt32): void;
 
 @wasm_export("SKIP_callWithException")
@@ -124,6 +129,7 @@ fun callWithException(f: () -> void, exc: UInt32): void {
 
 // TODO: Deprecate vtry/etry once they are not used downstream anymore.
 @cpp_runtime
+@may_alloc
 native fun etry<T>(f: () -> void, onError: () -> void): void;
 
 fun vtry<T>(f: () -> T, onError: Exception -> T): T {
