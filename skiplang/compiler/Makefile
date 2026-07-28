@@ -127,11 +127,13 @@ stage3/bin/skargo: stage2
 # compiler; skargo and skfmt are built using the skargo found in PATH and the
 # stageD compiler
 
-stageD/bin/skc:
+STAGED_SRC := $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
+
+stageD/bin/skc: $(STAGED_SRC) $(RUNTIME_SRC)
 	mkdir -p $(@D)
 	OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude default
-	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
-	mkdir -p stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/ && mv stage$(STAGE)/bin/skc.ll stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
+	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(STAGED_SRC)
+	mkdir -p stageD/target/host/$(SKARGO_PROFILE)/deps/ && mv stageD/bin/skc.ll stageD/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
 
 stageD/lib/libstd.sklib: stageD/bin/skc
 	mkdir -p $(@D)
