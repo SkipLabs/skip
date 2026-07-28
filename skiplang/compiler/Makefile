@@ -44,8 +44,17 @@ check-bootstrap:
 build/libskip_runtime64.a build/libbacktrace.a:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
 
+# Depends on stage0/bin/skc: this recipe puts stage0/bin on PATH and compiles
+# the stdlib with whatever `skc` it finds there. Without the dependency an
+# already-present but outdated stage0/bin/skc was used as-is, and the bootstrap
+# IR it should have been rebuilt from was never even unpacked -- so a stage0
+# left over from an older checkout silently compiled the current prelude and
+# reported errors for language features it predates (a stage0 older than
+# `@allow_tracked_call` rejects it with 47 "Cannot call an untracked function
+# from a tracked context"). It also means the check-bootstrap guard, which hangs
+# off unpacking that IR, now actually runs on this path.
 .PHONY: stage0/lib/libstd.sklib
-stage0/lib/libstd.sklib:
+stage0/lib/libstd.sklib: stage0/bin/skc
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
