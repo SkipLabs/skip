@@ -1,6 +1,7 @@
 module SkipRuntime;
 
 @cpp_extern("SkipRuntime_pushContext")
+@no_alloc
 native fun pushContext(context: mutable SKStore.Context): void;
 
 // Untracked because it pops the host context stack: it takes no arguments and
@@ -9,9 +10,11 @@ native fun pushContext(context: mutable SKStore.Context): void;
 // already blocks CSE.)
 @allow_tracked_call
 @cpp_extern("SkipRuntime_popContext")
+@no_alloc
 untracked native fun popContext(): void;
 
 @cpp_extern("SkipRuntime_getContext")
+@may_alloc
 native fun getContext(): ?mutable SKStore.Context;
 
 // Untracked because it reads host state that the TS side reassigns via
@@ -20,6 +23,7 @@ native fun getContext(): ?mutable SKStore.Context;
 // accident — its ?mutable Context return already blocks CSE.)
 @allow_tracked_call
 @cpp_extern("SkipRuntime_getFork")
+@may_alloc
 untracked native fun getFork(): ?String;
 
 module end;
