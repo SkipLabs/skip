@@ -10,12 +10,11 @@ import type {
 } from "../../skipwasm-std/index.js";
 import type * as Internal from "@skipruntime/core/internal.js";
 import type {
-  AnySkipService,
   Reducer,
+  SkipService,
   Mapper,
   LazyCompute,
   ExternalService,
-  NamedEagerCollections,
   Resource,
   Watermark,
   HandlerInfo,
@@ -81,9 +80,7 @@ export interface FromWasm {
 
   // Resource
 
-  SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
-  ): ptr<Internal.Resource>;
+  SkipRuntime_createResource(ref: Handle<Resource>): ptr<Internal.Resource>;
 
   // Service
 
@@ -284,13 +281,11 @@ interface ToWasm {
   // Resource
 
   SkipRuntime_Resource__instantiate(
-    resource: Handle<Resource<NamedEagerCollections>>,
+    resource: Handle<Resource>,
     collections: ptr<Internal.CJObject>,
   ): ptr<Internal.String>;
 
-  SkipRuntime_deleteResource(
-    resource: Handle<Resource<NamedEagerCollections>>,
-  ): void;
+  SkipRuntime_deleteResource(resource: Handle<Resource>): void;
 
   // ServiceDefinition
 
@@ -461,7 +456,7 @@ export class WasmFromBinding implements FromBinding {
   }
 
   SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
+    ref: Handle<Resource>,
   ): Pointer<Internal.Resource> {
     return this.fromWasm.SkipRuntime_createResource(ref);
   }
@@ -872,7 +867,7 @@ class LinksImpl implements Links {
   // Resource
 
   instantiateOfResource(
-    skresource: Handle<Resource<NamedEagerCollections>>,
+    skresource: Handle<Resource>,
     skcollections: ptr<Internal.CJObject>,
   ): ptr<Internal.String> {
     return this.utils.exportString(
@@ -883,7 +878,7 @@ class LinksImpl implements Links {
     );
   }
 
-  deleteResource(resource: Handle<Resource<NamedEagerCollections>>) {
+  deleteResource(resource: Handle<Resource>) {
     this.tobinding.SkipRuntime_deleteResource(resource);
   }
 
@@ -1096,12 +1091,10 @@ class LinksImpl implements Links {
 
 export class ServiceInstanceFactory implements Shared {
   constructor(
-    private readonly init: (
-      service: AnySkipService,
-    ) => Promise<ServiceInstance>,
+    private readonly init: (service: SkipService) => Promise<ServiceInstance>,
   ) {}
 
-  initService(service: AnySkipService): Promise<ServiceInstance> {
+  initService(service: SkipService): Promise<ServiceInstance> {
     return this.init(service);
   }
 

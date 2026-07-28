@@ -4,7 +4,6 @@ import type {
   Resource,
   Values,
 } from "@skipruntime/core";
-import { InputDefinition } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -61,7 +60,7 @@ class Sub implements Resource<Collections> {
 }
 
 const service = {
-  inputs: { input1: new InputDefinition(), input2: new InputDefinition() },
+  initialData: { input1: [], input2: [] },
   resources: { add: Add, sub: Sub },
   createGraph: (inputs: Collections) => inputs,
 };

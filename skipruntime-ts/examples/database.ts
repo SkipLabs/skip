@@ -1,10 +1,9 @@
 import type {
   EagerCollection,
-  AnySkipService,
+  SkipService,
   Resource,
   Entry,
 } from "@skipruntime/core";
-import { InputDefinition } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
 
@@ -64,9 +63,11 @@ class UsersResource implements Resource<UsersCollection> {
 // Setting up the service
 /*****************************************************************************/
 
-function serviceWithInitialData(users: Entry<string, User>[]): AnySkipService {
+function serviceWithInitialData(
+  users: Entry<string, User>[],
+): SkipService<UsersCollection, UsersCollection> {
   return {
-    inputs: { users: new InputDefinition(users) },
+    initialData: { users },
     resources: { users: UsersResource },
     createGraph: (inputCollections) => inputCollections,
   };

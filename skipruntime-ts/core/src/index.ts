@@ -22,7 +22,6 @@ import { sknative } from "../skiplang-std/index.js";
 
 import type * as Internal from "./internal.js";
 import {
-  type AbstractEagerCollection,
   type CollectionUpdate,
   type Context,
   type EagerCollection,
@@ -30,15 +29,14 @@ import {
   type LazyCollection,
   type LazyCompute,
   type Mapper,
-  type NamedEagerCollections,
+  type NamedCollections,
   type Values,
   type DepSafe,
   type Reducer,
   type Resource,
-  type AnySkipService,
+  type SkipService,
   type Watermark,
   type ExternalService,
-  InputDefinition,
 } from "./api.js";
 
 import {
@@ -60,18 +58,15 @@ export type JSONOperator = JSONMapper | JSONLazyCompute | Reducer<Json, Json>;
 export type HandlerInfo<P> = {
   object: P;
   name: string;
-  params: readonly DepSafe[];
+  params: DepSafe[];
 };
 
-function instantiateUserObject<
-  Params extends readonly DepSafe[],
-  Result extends object,
->(
+function instantiateUserObject<Params extends DepSafe[], Result extends object>(
   what: string,
   ctor: new (...params: Params) => Result,
   params: Params,
 ): HandlerInfo<Result> {
-  const checkedParams = params.map(checkOrCloneParam) as unknown as Params;
+  const checkedParams = params.map(checkOrCloneParam) as Params;
   const obj = new ctor(...checkedParams);
   Object.freeze(obj);
   if (!obj.constructor.name) {
@@ -103,43 +98,37 @@ export interface ChangeManager {
 
 export class ServiceDefinition {
   constructor(
-    private service: AnySkipService,
+    private service: SkipService,
     private readonly externals: Map<string, ExternalService> = new Map(),
   ) {}
 
-  buildResource(
-    name: string,
-    parameters: Json,
-  ): Resource<NamedEagerCollections> {
-    const builder = (
-      this.service.resources as {
-        readonly [name: string]: new (
-          params: Json,
-        ) => Resource<NamedEagerCollections>;
-      }
-    )[name];
+  buildResource(name: string, parameters: Json): Resource {
+    const builder = this.service.resources[name];
     if (!builder) throw new Error(`Resource '${name}' not exist.`);
     return new builder(parameters);
   }
 
   inputs(): string[] {
-    return Object.keys(this.service.inputs);
+    return this.service.initialData
+      ? Object.keys(this.service.initialData)
+      : [];
   }
 
   resources(): string[] {
-    return Object.keys(this.service.resources as object);
+    return Object.keys(this.service.resources);
   }
 
   initialData(name: string): Entry<Json, Json>[] {
-    const inputDef = this.service.inputs[name];
-    if (!inputDef) throw new Error(`Input definition '${name}' not exist.`);
-    return (inputDef as InputDefinition<Json, Json>).initial;
+    if (!this.service.initialData) throw new Error(`No initial data defined.`);
+    const data = this.service.initialData[name];
+    if (!data) throw new Error(`Initial data '${name}' not exist.`);
+    return data;
   }
 
   createGraph(
-    inputCollections: NamedEagerCollections,
+    inputCollections: NamedCollections,
     context: Context,
-  ): NamedEagerCollections {
+  ): NamedCollections {
     return this.service.createGraph(inputCollections, context);
   }
 
@@ -194,7 +183,7 @@ export class ServiceDefinition {
     await Promise.all(promises);
   }
 
-  derive(service: AnySkipService): ServiceDefinition {
+  derive(service: SkipService): ServiceDefinition {
     return new ServiceDefinition(service, new Map(this.externals));
   }
 }
@@ -249,8 +238,6 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements LazyCollection<K, V>
 {
-  readonly __sk_lazyCollectionBrand: undefined;
-
   constructor(
     readonly lazyCollection: string,
     private readonly refs: ToBinding,
@@ -289,8 +276,6 @@ class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements EagerCollection<K, V>
 {
-  readonly __sk_collectionBrand: undefined;
-
   constructor(
     public readonly collection: string,
     private readonly refs: ToBinding,
@@ -350,7 +335,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K, V>(skcollection);
   }
 
-  map<K2 extends Json, V2 extends Json, Params extends readonly DepSafe[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafe[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2> {
@@ -365,15 +350,11 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return this.derive<K2, V2>(mapped);
   }
 
-  mapReduce<
-    K2 extends Json,
-    V2 extends Json,
-    MapperParams extends readonly DepSafe[],
-  >(
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends DepSafe[]>(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
   ) {
-    return <Accum extends Json, ReducerParams extends readonly DepSafe[]>(
+    return <Accum extends Json, ReducerParams extends DepSafe[]>(
       reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
       ...reducerParams: ReducerParams
     ) => {
@@ -414,7 +395,7 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     };
   }
 
-  reduce<Accum extends Json, Params extends readonly DepSafe[]>(
+  reduce<Accum extends Json, Params extends DepSafe[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum> {
@@ -538,7 +519,7 @@ class ContextImpl implements Context {
   createLazyCollection<
     K extends Json,
     V extends Json,
-    Params extends readonly DepSafe[],
+    Params extends DepSafe[],
   >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
@@ -578,9 +559,9 @@ class ContextImpl implements Context {
 }
 
 export class ServiceInstanceFactory {
-  constructor(private init: (service: AnySkipService) => ServiceInstance) {}
+  constructor(private init: (service: SkipService) => ServiceInstance) {}
 
-  initService(service: AnySkipService): ServiceInstance {
+  initService(service: SkipService): ServiceInstance {
     return this.init(service);
   }
 }
@@ -824,7 +805,7 @@ export class ServiceInstance {
     }
   }
 
-  async reload(service: AnySkipService, changes: ChangeManager): Promise<void> {
+  async reload(service: SkipService, changes: ChangeManager): Promise<void> {
     if (this.forkName) {
       throw new SkipError("Reload cannot be called in transaction.");
     }
@@ -1118,12 +1099,12 @@ export class ToBinding {
   // Resource
 
   SkipRuntime_Resource__instantiate(
-    skresource: Handle<Resource<NamedEagerCollections>>,
+    skresource: Handle<Resource>,
     skcollections: Pointer<Internal.CJObject>,
   ): string {
     const skjson = this.getJsonConverter();
     const resource = this.handles.get(skresource);
-    const collections: { [key: string]: AbstractEagerCollection } = {};
+    const collections: NamedCollections = {};
     const keysIds = skjson.importJSON(skcollections) as {
       [key: string]: string;
     };
@@ -1131,14 +1112,10 @@ export class ToBinding {
       collections[key] = new EagerCollectionImpl<Json, Json>(name, this);
     }
     const collection = resource.instantiate(collections, new ContextImpl(this));
-    return EagerCollectionImpl.getName(
-      collection as EagerCollection<Json, Json>,
-    );
+    return EagerCollectionImpl.getName(collection);
   }
 
-  SkipRuntime_deleteResource(
-    resource: Handle<Resource<NamedEagerCollections>>,
-  ): void {
+  SkipRuntime_deleteResource(resource: Handle<Resource>): void {
     this.handles.deleteHandle(resource);
   }
 
@@ -1150,7 +1127,7 @@ export class ToBinding {
   ): Pointer<Internal.CJObject> {
     const skjson = this.getJsonConverter();
     const service = this.handles.get(skservice);
-    const collections: { [key: string]: AbstractEagerCollection } = {};
+    const collections: NamedCollections = {};
     const keysIds = skjson.importJSON(skcollections) as {
       [key: string]: string;
     };
@@ -1160,9 +1137,7 @@ export class ToBinding {
     const result = service.createGraph(collections, new ContextImpl(this));
     const collectionsNames: { [name: string]: string } = {};
     for (const [name, collection] of Object.entries(result)) {
-      collectionsNames[name] = EagerCollectionImpl.getName(
-        collection as EagerCollection<Json, Json>,
-      );
+      collectionsNames[name] = EagerCollectionImpl.getName(collection);
     }
     return skjson.exportJSON(collectionsNames);
   }
@@ -1374,7 +1349,7 @@ export class ToBinding {
     this.handles.deleteHandle(reducer);
   }
 
-  async initService(service: AnySkipService): Promise<ServiceInstance> {
+  async initService(service: SkipService): Promise<ServiceInstance> {
     this.setFork(null);
     const uuid = crypto.randomUUID();
     this.fork(uuid);

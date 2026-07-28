@@ -1,10 +1,10 @@
 import {
   type EagerCollection,
+  type InitialData,
   type Json,
   type Mapper,
   type Resource,
   type Values,
-  InputDefinition,
 } from "@skipruntime/core";
 
 import { runService } from "@skipruntime/server";
@@ -90,22 +90,22 @@ class ActiveFriends implements Resource<ResourceInputs> {
 }
 
 // Load initial data from a source-of-truth database (mocked for simplicity)
-const inputs = {
-  users: new InputDefinition<UserID, User>([
+const initialData: InitialData<ServiceInputs> = {
+  users: [
     [0, [{ name: "Bob", active: true, friends: [1, 2] }]],
     [1, [{ name: "Alice", active: true, friends: [0, 2] }]],
     [2, [{ name: "Carol", active: false, friends: [0, 1] }]],
     [3, [{ name: "Eve", active: true, friends: [] }]],
-  ]),
-  groups: new InputDefinition<GroupID, Group>([
+  ],
+  groups: [
     [1001, [{ name: "Group 1", members: [1, 2, 3] }]],
     [1002, [{ name: "Group 2", members: [0, 2] }]],
-  ]),
+  ],
 };
 
 // Specify and run the reactive service
 const service = {
-  inputs,
+  initialData,
   resources: { active_friends: ActiveFriends },
   createGraph(input: ServiceInputs): ResourceInputs {
     const users = input.users;
