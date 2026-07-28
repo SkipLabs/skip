@@ -61,9 +61,16 @@ check-bootstrap:
 	  exit 1; \
 	fi
 
+# One recursive make produces both archives, so only one of them carries the
+# recipe and the other depends on it. Written as a single `a b:` rule, make --
+# which treats that as two rules sharing a recipe, not one recipe with two
+# outputs -- would run the recursive make twice, and under -j run both copies
+# concurrently against the same ../prelude build dirs, whose libbacktrace recipe
+# rm -rf's state inside the shared submodule checkout.
 .PHONY: build/libskip_runtime64.a build/libbacktrace.a
-build/libskip_runtime64.a build/libbacktrace.a:
+build/libskip_runtime64.a:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
+build/libbacktrace.a: build/libskip_runtime64.a
 
 # Real prerequisites rather than .PHONY. This recipe puts stage0/bin on PATH and
 # compiles the stdlib with whatever `skc` it finds there, so stage0/bin/skc is a
@@ -99,23 +106,28 @@ stage0/bin/skfmt: build/skfmt_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage1/bin/skc stage1/bin/skfmt: stage0
+# skc and skfmt come out of one `skargo build --bins`, so skfmt hangs off skc
+# rather than sharing the rule -- see build/libskip_runtime64.a above for why.
+stage1/bin/skc: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target
+stage1/bin/skfmt: stage1/bin/skc
 stage1/lib/libstd.sklib: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
 stage1/bin/skargo: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
-stage2/bin/skc stage2/bin/skfmt: stage1
+stage2/bin/skc: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target
+stage2/bin/skfmt: stage2/bin/skc
 stage2/lib/libstd.sklib: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
 stage2/bin/skargo: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
-stage3/bin/skc stage3/bin/skfmt: stage2
+stage3/bin/skc: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
+stage3/bin/skfmt: stage3/bin/skc
 stage3/lib/libstd.sklib: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2
