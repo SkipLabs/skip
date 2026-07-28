@@ -96,7 +96,6 @@ class DirSub(
 untracked native fun genSym(Int): Int;
 
 @intrinsic
-@no_alloc
 native fun const_typed_symbol<T>(): Int;
 
 /*****************************************************************************/
@@ -1565,6 +1564,7 @@ private native base class Page
 // exception path. Reach for these directly only to build another such wrapper.
 @debug
 @cpp_extern("SKIP_new_Obstack")
+@may_alloc
 private native fun newObstack(): Obstack;
 
 @debug
@@ -1574,6 +1574,7 @@ private native fun destroyObstack(Obstack): void;
 
 @debug
 @cpp_extern("SKIP_destroy_Obstack_with_value")
+@may_alloc
 private native fun destroyObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
 
 @always_inline
@@ -1583,6 +1584,7 @@ fun destroyObstackWithValue<T>(obstack: Obstack, value: T): T {
 
 @debug
 @cpp_extern("SKIP_copy_value_to_Obstack")
+@may_alloc
 private native fun copyValueToObstack<T>(Page, List<T>): List<T>;
 
 @debug
@@ -1597,6 +1599,7 @@ private native fun restoreFromParent(Obstack, Page): void;
 
 @debug
 @cpp_extern("SKIP_context_sync")
+@may_alloc
 private native fun gContextSync(
   Tick,
   Contexts,
@@ -1609,6 +1612,7 @@ private native fun gContextSync(
 
 @debug
 @cpp_extern("SKIP_context_sync_no_lock")
+@may_alloc
 private native fun gContextSyncNoLock(
   Tick,
   Contexts,

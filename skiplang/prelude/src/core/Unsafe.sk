@@ -36,13 +36,10 @@ module Unsafe;
 // than using truly uninitialized memory.
 native value class RawStorage<+T> {
   @intrinsic
-  @no_alloc
   static native fun uninitialized(): RawStorage<T>;
   @intrinsic
-  @no_alloc
   static native fun make(value: T): RawStorage<T>;
   @intrinsic
-  @no_alloc
   static native fun unsafeGet(value: readonly this): T;
 
   fun inspect(): Inspect {
@@ -79,13 +76,11 @@ native fun array_make<T>(size: Int): mutable Array<T>;
 // Native function to get the element of a vector at the given index
 // Equivalent to calling Array.unsafe_get()
 @intrinsic
-@no_alloc
 native fun array_get<T>(v: readonly Array<T>, i: Int): T;
 
 // Native function to set the element of a vector at the given index
 // Equivalent to calling Array.unsafe_set()
 @intrinsic
-@no_alloc
 native fun array_set<T>(v: mutable Array<T>, i: Int, x: T): void;
 
 @cpp_extern

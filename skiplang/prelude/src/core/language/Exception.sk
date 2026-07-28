@@ -114,6 +114,7 @@ class ExternalException(
 }
 
 @cpp_extern("SKIP_external_exception_message")
+@may_alloc
 native fun getExternalExceptionMessage(actor: UInt32): String;
 
 @cpp_extern("SKIP_delete_external_exception")
@@ -128,6 +129,7 @@ fun callWithException(f: () -> void, exc: UInt32): void {
 
 // TODO: Deprecate vtry/etry once they are not used downstream anymore.
 @cpp_runtime
+@may_alloc
 native fun etry<T>(f: () -> void, onError: () -> void): void;
 
 fun vtry<T>(f: () -> T, onError: Exception -> T): T {

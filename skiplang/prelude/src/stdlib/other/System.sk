@@ -41,6 +41,7 @@
 //    collected (very roughly corresponding to a "generation" in traditional
 //    GC terms).
 @cpp_runtime
+@may_alloc
 fun intern<T: frozen>(x: T): T {
   x
 }
@@ -176,17 +177,18 @@ module Debug;
 
 @debug
 @intrinsic
-@no_alloc
 native fun getMemoryFrameUsage(): Int;
 
 module end;
 
 @allow_tracked_call
 @cpp_extern
+@may_alloc
 untracked native fun read_line(): ?String;
 
 @allow_tracked_call
 @cpp_extern
+@may_alloc
 untracked native fun read_to_end(): String;
 
 @allow_tracked_call
@@ -196,6 +198,7 @@ untracked native fun flushStdout(): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_system")
+@may_alloc
 untracked native fun system(cmd: String): Int;
 
 module System;
