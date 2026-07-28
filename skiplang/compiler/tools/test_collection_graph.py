@@ -124,8 +124,10 @@ class CollectionGraphTests(unittest.TestCase):
     def test_native_aliases_survive_edit_and_retraction(self):
         declarations = (
             '@cpp_extern("SKIP_print_raw")\n'
+            "@no_alloc\n"
             "untracked native fun printOne(String): void;\n"
             '@cpp_extern("SKIP_print_raw")\n'
+            "@no_alloc\n"
             "untracked native fun printTwo(String): void;\n"
         )
         main = 'untracked fun main(): void { printOne("a"); printTwo("b") }\n'

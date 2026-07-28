@@ -286,8 +286,8 @@ fun helper(): Int { 42 }
 ```
 
 This matters because several annotations are load-bearing for correctness — a
-typo in `@debug` silently restores CSE, and a missing `@may_alloc` is a silent
-wrong-code risk (see below).
+typo in `@debug` silently restores CSE, quietly reintroducing exactly the merge
+of side-effecting calls it exists to prevent.
 
 The openness is deliberate, though: the compiler indexes every function by the
 annotations it carries, and `#forEachFunction (@foo, ...)` enumerates them. That
@@ -412,23 +412,55 @@ it means the body you see is not the code that runs.
 
 ### Contracts on native functions
 
-| Annotation | Effect | Default if absent |
+| Annotation | Effect | If absent |
 | --- | --- | --- |
-| `@may_alloc` | The function may allocate without bound. | **Allocates nothing** |
+| `@no_alloc` / `@may_alloc` | The function allocates nothing / may allocate without bound. | **Error** on an external native; derived on an `@intrinsic` |
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
-These three are **only read for functions with no body** — that is, `native`,
+These are **only read for functions with no body** — that is, `native`,
 `@cpp_extern` or `@cpp_runtime` declarations. On a function with a body they are
 silently ignored, and the compiler derives the answer from the body instead. The
 prelude contains dead examples of exactly this: `print_string` carries `@no_throw`
 and `skipExit` carries `@no_return`, but both have bodies, so both annotations do
 nothing.
 
-`@no_throw` and `@no_return` default to the safe answer when absent.
-**`@may_alloc` does not.** A native function without it is assumed to allocate
-nothing, so forgetting it on an allocating runtime function is a silent
-wrong-code risk with no diagnostic.
+`@no_throw` and `@no_return` default to the safe answer when absent, so
+forgetting one costs an optimization, never correctness.
+
+**The allocation contract is not defaulted at all — it is mandatory.** Every
+external native (`@cpp_extern` / `@cpp_runtime`) must declare exactly one of
+`@no_alloc` or `@may_alloc`; declaring neither, or both, is an error:
+
+```skip
+@cpp_extern("SKIP_some_native")
+native fun f(): Int;              // error: Native functions must declare
+                                  //        @no_alloc or @may_alloc
+```
+
+This one is mandatory rather than defaulted because it is the contract where
+being wrong is a memory-safety miscompile rather than a missed optimization, so
+it is worth forcing the author to state an intent instead of letting silence
+pick an answer.
+
+The optimizer consumes the value: `@no_alloc`'s `AllocNothing` is what lets a
+caller skip the GC safepoint it would otherwise insert after the call
+(`gc.sk`'s `shouldGC`, fed via `calleeAllocAmount`/`instrAllocAmount`), so it must
+only go on a function that genuinely does not grow the obstack on the path that
+returns to its caller. Allocating *only* on an error path that throws or aborts
+(rather than returning) does not disqualify it, since that path never returns to
+the caller.
+
+On an `@intrinsic`, both annotations are **rejected**: an intrinsic never runs as
+a function — the inliner replaces every call with the IR it lowers to, so any
+allocation is attributed to the caller's own instructions — which means its
+allocation behaviour is *derived* from the lowering. Declaring it would be a
+hand-maintained duplicate of `intrinsics.sk`, free to drift out of sync.
+
+Historically this was a single `@may_alloc` that defaulted to "allocates
+nothing", which put the *unsafe* answer on the forgotten annotation. It was
+first inverted to `@no_alloc` (safe default), then made mandatory so there is no
+default to forget.
 
 ### Exports
 

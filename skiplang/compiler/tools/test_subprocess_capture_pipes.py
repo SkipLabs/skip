@@ -280,6 +280,7 @@ class SkipCapturePipeTests(unittest.TestCase):
     ):
         source = r"""
 @cpp_extern("SKIP_parallel_map_worker_id")
+@no_alloc
 native fun captureWorkerId(): Int;
 untracked fun main(): void {
   context = SKStore.Context::mcreate{};
