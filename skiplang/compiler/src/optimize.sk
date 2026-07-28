@@ -530,10 +530,17 @@ private fun optimizeAll(
               inlineComplexity => Int::max,
               returns => !annotationsContain(f.annotations, "@no_return", pos),
               canThrow => !annotationsContain(f.annotations, "@no_throw", pos),
-              // Default to the safe side: a native is assumed to allocate
-              // unless it opts out with @no_alloc. Forgetting the annotation
-              // is then a missed optimization, not a wrong-code risk.
+              // An @intrinsic never runs as a function: IntrinsicsInliner
+              // (a kOptPrerequisites pass, so it always runs) replaces every
+              // call with the IR it lowers to, and any allocation is then
+              // attributed to the caller's own instructions. So its allocation
+              // is derived here rather than declared, and naming rejects an
+              // alloc annotation on it.
+              //
+              // An external native must declare @no_alloc or @may_alloc
+              // (naming enforces it). Anything else falls to the safe side.
               allocAmount => if (
+                annotationsContain(f.annotations, "@intrinsic", pos) ||
                 annotationsContain(f.annotations, "@no_alloc", pos)
               ) {
                 AllocNothing()
