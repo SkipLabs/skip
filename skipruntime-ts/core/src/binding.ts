@@ -6,7 +6,6 @@ import {
   type ExternalService,
   type LazyCompute,
   type Mapper,
-  type NamedEagerCollections,
   type Reducer,
   type Resource,
 } from "./api.js";
@@ -15,13 +14,9 @@ import type { HandlerInfo, ServiceDefinition } from "./index.js";
 export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
 
 export class ResourceBuilder {
-  constructor(
-    private readonly builder: new (
-      params: Json,
-    ) => Resource<NamedEagerCollections>,
-  ) {}
+  constructor(private readonly builder: new (params: Json) => Resource) {}
 
-  build(parameters: Json): Resource<NamedEagerCollections> {
+  build(parameters: Json): Resource {
     const builder = this.builder;
     return new builder(parameters);
   }
@@ -75,9 +70,7 @@ export interface FromBinding {
 
   // Resource
 
-  SkipRuntime_createResource(
-    ref: Handle<Resource<NamedEagerCollections>>,
-  ): Pointer<Internal.Resource>;
+  SkipRuntime_createResource(ref: Handle<Resource>): Pointer<Internal.Resource>;
 
   // Service
 

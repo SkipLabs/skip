@@ -1818,6 +1818,7 @@ fun method_def(
       "Native methods must be declared with @cpp_extern, @cpp_runtime, or @intrinsic",
     )
   };
+  check_alloc_contract(met.annotations, met.name.i0, "methods");
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2266,6 +2267,7 @@ fun fun_def(
       "Native functions must be declared with @cpp_extern, @cpp_runtime, or @intrinsic",
     )
   };
+  check_alloc_contract(fd.annotations, fd.name.i0, "functions");
   if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
     if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
       SkipError.error(
@@ -2322,6 +2324,43 @@ fun fun_def(
 
 /* Function checking that default values for parameters appear last in a
  * function with positional parameters. */
+// An external native's allocation behaviour cannot be derived — it has no body
+// to analyse — so it must be declared: exactly one of @no_alloc / @may_alloc.
+// An @intrinsic is the opposite case: the inliner replaces every call with the
+// IR it lowers to, so its allocation *is* derived and declaring it would be a
+// hand-maintained duplicate of the lowering, free to drift.
+fun check_alloc_contract(
+  annotations: SSet,
+  pos: FileRange,
+  what: String,
+): void {
+  noAlloc = annotationsContain(annotations, "@no_alloc", pos);
+  mayAlloc = annotationsContain(annotations, "@may_alloc", pos);
+  if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
+    if (noAlloc || mayAlloc) {
+      SkipError.error(
+        pos,
+        `@intrinsic ${what} must not declare @no_alloc or @may_alloc: the allocation behaviour is derived from the intrinsic's lowering`,
+      )
+    }
+  } else if (
+    annotationsContainParam(annotations, "@cpp_extern", pos).isSome() ||
+    annotationsContainParam(annotations, "@cpp_runtime", pos).isSome()
+  ) {
+    if (noAlloc && mayAlloc) {
+      SkipError.error(
+        pos,
+        `Native ${what} cannot declare both @no_alloc and @may_alloc`,
+      )
+    } else if (!noAlloc && !mayAlloc) {
+      SkipError.error(
+        pos,
+        `Native ${what} must declare @no_alloc or @may_alloc`,
+      )
+    }
+  }
+}
+
 fun check_default_last(x: Parameters<A.Parameter>): void {
   x match {
   | Positional(args) -> check_default_last_array(args)

@@ -1664,6 +1664,7 @@ class Evaluator{options: Options, user: ?UserFile} {
 }
 
 @cpp_extern("SKIP_String_concatN")
+@may_alloc
 native fun concatArray(Array<String>): String;
 
 fun getLine(buffer: Buffer, pos: Int): Int {
@@ -2406,9 +2407,11 @@ fun printResult(
 }
 
 @cpp_extern("SKIP_js_delete_fun")
+@no_alloc
 native fun jsDeleteUserFun(queryID32: Int32): void;
 
 @cpp_extern("SKIP_js_mark_query")
+@no_alloc
 native fun jsMarkQuery(queryID32: Int32): void;
 
 @wasm_export("SKIP_reactive_query")
@@ -2690,6 +2693,7 @@ extension base class EagerDir {
 }
 
 @cpp_extern("SKIP_physEq")
+@no_alloc
 native fun unsafeCompareSets(
   SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,
   SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>>,

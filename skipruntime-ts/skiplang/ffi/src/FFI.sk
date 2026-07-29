@@ -2,6 +2,7 @@ module SkipRuntime;
 
 @cpp_extern("SkipRuntime_getErrorHdl")
 @debug
+@may_alloc
 native fun getErrorHdl(exn: .Exception): Float;
 
 /************  NonEmptyIterator ****************/
@@ -17,6 +18,7 @@ fun nextOfNonEmptyIterator(
 
 @cpp_extern("SkipRuntime_Mapper__mapEntry")
 @debug
+@may_alloc
 native fun mapEntryOfMapper(
   mapper: UInt32,
   key: SKJSON.CJSON,
@@ -25,14 +27,17 @@ native fun mapEntryOfMapper(
 
 @cpp_extern("SkipRuntime_Mapper__getInfo")
 @debug
+@may_alloc
 native fun getInfoOfMapper(mapper: UInt32): SKJSON.CJObject;
 
 @cpp_extern("SkipRuntime_Mapper__isEquals")
 @debug
+@may_alloc
 native fun isEqualsOfMapper(mapper: UInt32, other: UInt32): UInt32;
 
 @cpp_extern("SkipRuntime_deleteMapper")
 @debug
+@no_alloc
 native fun deleteMapper(mapper: UInt32): void;
 
 @export("SkipRuntime_createMapper")
@@ -82,6 +87,7 @@ class ExternMapper(eptr: SKStore.ExternalPointer) extends Mapper {
 
 @cpp_extern("SkipRuntime_LazyCompute__compute")
 @debug
+@may_alloc
 native fun computeOfLazyCompute(
   lazyCompute: UInt32,
   self: String,
@@ -90,14 +96,17 @@ native fun computeOfLazyCompute(
 
 @cpp_extern("SkipRuntime_LazyCompute__getInfo")
 @debug
+@may_alloc
 native fun getInfoOfLazyCompute(lazyCompute: UInt32): SKJSON.CJObject;
 
 @cpp_extern("SkipRuntime_LazyCompute__isEquals")
 @debug
+@may_alloc
 native fun isEqualsOfLazyCompute(lazyCompute: UInt32, other: UInt32): UInt32;
 
 @cpp_extern("SkipRuntime_deleteLazyCompute")
 @debug
+@no_alloc
 native fun deleteLazyCompute(lazyCompute: UInt32): void;
 
 @export("SkipRuntime_createLazyCompute")
@@ -159,6 +168,7 @@ fun updateOfCollectionWriter(
 
 @cpp_extern("SkipRuntime_Resource__instantiate")
 @debug
+@may_alloc
 native fun instantiateOfResource(
   resource: UInt32,
   collections: SKJSON.CJObject,
@@ -166,6 +176,7 @@ native fun instantiateOfResource(
 
 @cpp_extern("SkipRuntime_deleteResource")
 @debug
+@no_alloc
 native fun deleteResource(resource: UInt32): void;
 
 @export("SkipRuntime_createResource")
@@ -192,10 +203,12 @@ fun createService(service: UInt32): ExternService {
 
 @cpp_extern("SkipRuntime_deleteService")
 @debug
+@no_alloc
 native fun deleteService(service: UInt32): void;
 
 @cpp_extern("SkipRuntime_ServiceDefinition__createGraph")
 @debug
+@may_alloc
 native fun createGraphOfService(
   service: UInt32,
   collections: SKJSON.CJObject,
@@ -203,18 +216,22 @@ native fun createGraphOfService(
 
 @cpp_extern("SkipRuntime_ServiceDefinition__inputs")
 @debug
+@may_alloc
 native fun inputsOfService(service: UInt32): SKJSON.CJArray;
 
 @cpp_extern("SkipRuntime_ServiceDefinition__initialData")
 @debug
+@may_alloc
 native fun initialDataOfService(service: UInt32, input: String): SKJSON.CJArray;
 
 @cpp_extern("SkipRuntime_ServiceDefinition__resources")
 @debug
+@may_alloc
 native fun resourcesOfService(service: UInt32): SKJSON.CJArray;
 
 @cpp_extern("SkipRuntime_ServiceDefinition__buildResource")
 @debug
+@may_alloc
 native fun buildResourceOfService(
   service: UInt32,
   resource: String,
@@ -223,6 +240,7 @@ native fun buildResourceOfService(
 
 @cpp_extern("SkipRuntime_ServiceDefinition__subscribe")
 @debug
+@no_alloc
 native fun subscribeOfService(
   service: UInt32,
   supplier: String,
@@ -234,6 +252,7 @@ native fun subscribeOfService(
 
 @cpp_extern("SkipRuntime_ServiceDefinition__unsubscribe")
 @debug
+@may_alloc
 native fun unsubscribeOfService(
   service: UInt32,
   supplier: String,
@@ -242,6 +261,7 @@ native fun unsubscribeOfService(
 
 @cpp_extern("SkipRuntime_ServiceDefinition__shutdown")
 @debug
+@may_alloc
 native fun shutdownOfService(service: UInt32): Float;
 
 class ExternService(eptr: SKStore.ExternalPointer) extends Service {
@@ -331,10 +351,12 @@ class ExternService(eptr: SKStore.ExternalPointer) extends Service {
 
 @cpp_extern("SkipRuntime_getChangeManager")
 @debug
+@no_alloc
 native fun getChangeManager(): UInt32;
 
 @cpp_extern("SkipRuntime_ChangeManager__needResourceReload")
 @debug
+@may_alloc
 native fun needResourceReloadOfChangeManager(
   manager: UInt32,
   name: String,
@@ -342,6 +364,7 @@ native fun needResourceReloadOfChangeManager(
 
 @cpp_extern("SkipRuntime_ChangeManager__needInputReload")
 @debug
+@may_alloc
 native fun needInputReloadOfChangeManager(
   manager: UInt32,
   name: String,
@@ -349,6 +372,7 @@ native fun needInputReloadOfChangeManager(
 
 @cpp_extern("SkipRuntime_ChangeManager__needExternalServiceReload")
 @debug
+@may_alloc
 native fun needExternalServiceReloadOfChangeManager(
   manager: UInt32,
   name: String,
@@ -464,10 +488,12 @@ fun getArrayOfLazyCollection(lazy: String, key: SKJSON.CJSON): SKJSON.CJArray {
 
 @cpp_extern("SkipRuntime_Notifier__subscribed")
 @debug
+@may_alloc
 native fun subscribedOfNotifier(notifier: UInt32): void;
 
 @cpp_extern("SkipRuntime_Notifier__notify")
 @debug
+@may_alloc
 native fun notifyOfNotifier(
   notifier: UInt32,
   values: SKJSON.CJArray,
@@ -477,10 +503,12 @@ native fun notifyOfNotifier(
 
 @cpp_extern("SkipRuntime_Notifier__close")
 @debug
+@may_alloc
 native fun closeOfNotifier(notifier: UInt32): void;
 
 @cpp_extern("SkipRuntime_deleteNotifier")
 @debug
+@no_alloc
 native fun deleteNotifier(notifier: UInt32): void;
 
 @export("SkipRuntime_createNotifier")
@@ -517,10 +545,12 @@ class ExternNotifier(eptr: SKStore.ExternalPointer) extends Notifier {
 
 @cpp_extern("SkipRuntime_Reducer__init")
 @debug
+@may_alloc
 native fun initOfReducer(reducer: UInt32): SKJSON.CJSON;
 
 @cpp_extern("SkipRuntime_Reducer__add")
 @debug
+@may_alloc
 native fun addOfReducer(
   reducer: UInt32,
   acc: SKJSON.CJSON,
@@ -529,6 +559,7 @@ native fun addOfReducer(
 
 @cpp_extern("SkipRuntime_Reducer__remove")
 @debug
+@may_alloc
 native fun removeOfReducer(
   reducer: UInt32,
   acc: SKJSON.CJSON,
@@ -537,14 +568,17 @@ native fun removeOfReducer(
 
 @cpp_extern("SkipRuntime_Reducer__getInfo")
 @debug
+@may_alloc
 native fun getInfoOfReducer(mapper: UInt32): SKJSON.CJObject;
 
 @cpp_extern("SkipRuntime_Reducer__isEquals")
 @debug
+@may_alloc
 native fun isEqualsOfReducer(reducer: UInt32, other: UInt32): UInt32;
 
 @cpp_extern("SkipRuntime_deleteReducer")
 @debug
+@no_alloc
 native fun deleteReducer(reducer: UInt32): void;
 
 @export("SkipRuntime_createReducer")

@@ -18,30 +18,6 @@ export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
 
 /**
- * Type-erased base for eager collections, enabling sound typing in collection maps.
- *
- * Under sound subtyping, `EagerCollection<K, V>` is not assignable to
- * `EagerCollection<Json, Json>` because `EagerCollection` uses `K` and `V`
- * in both covariant and contravariant positions. This abstract base class
- * erases the type parameters so that collections with different key/value
- * types can be stored together in a `NamedEagerCollections` map.
- *
- * Uses a branded field to ensure nominal (not structural) typing.
- */
-export abstract class AbstractEagerCollection {
-  readonly __sk_collectionBrand: undefined;
-}
-
-/**
- * Type-erased base for lazy collections, enabling sound typing in collection maps.
- *
- * Uses a branded field to ensure nominal (not structural) typing.
- */
-export abstract class AbstractLazyCollection {
-  readonly __sk_lazyCollectionBrand: undefined;
-}
-
-/**
  * Reactive function that can be mapped over a collection.
  *
  * `EagerCollection.map` accepts a constructor function of a top-level class that implements this `Mapper` interface.
@@ -82,7 +58,7 @@ export interface Reducer<V extends Json, A extends Json> {
   /**
    * Initial accumulated value, providing the accumulated value for keys that are not associated to any values.
    */
-  initial: A | null;
+  initial: Nullable<A>;
 
   /**
    * Include a new value into the accumulated value.
@@ -91,7 +67,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
-  add(accum: A | null, value: V & DepSafe): A;
+  add(accum: Nullable<A>, value: V & DepSafe): A;
 
   /**
    * Exclude a previously added value from the accumulated value.
@@ -105,7 +81,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The removed value.
    * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
-  remove(accum: A, value: V & DepSafe): A | null;
+  remove(accum: A, value: V & DepSafe): Nullable<A>;
 }
 
 /**
@@ -136,8 +112,7 @@ export interface Values<T> extends Iterable<T & DepSafe> {
  * @typeParam V - Type of values.
  */
 export interface LazyCollection<K extends Json, V extends Json>
-  extends AbstractLazyCollection,
-    Managed {
+  extends Managed {
   /**
    * Get (and potentially compute) all values associated to `key`.
    * @param key - The key to query.
@@ -169,8 +144,7 @@ export interface LazyCollection<K extends Json, V extends Json>
  * @typeParam V - Type of values.
  */
 export interface EagerCollection<K extends Json, V extends Json>
-  extends AbstractEagerCollection,
-    Managed {
+  extends Managed {
   /**
    * Get all values associated to a key.
    *
@@ -216,7 +190,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param params - Additional parameters to `mapper`.
    * @returns The resulting eager collection.
    */
-  map<K2 extends Json, V2 extends Json, Params extends readonly DepSafe[]>(
+  map<K2 extends Json, V2 extends Json, Params extends DepSafe[]>(
     mapper: new (...params: Params) => Mapper<K, V, K2, V2>,
     ...params: Params
   ): EagerCollection<K2, V2>;
@@ -245,7 +219,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param params - Additional parameters to `reducer`
    * @returns The resulting eager collection.
    */
-  reduce<Accum extends Json, Params extends readonly DepSafe[]>(
+  reduce<Accum extends Json, Params extends DepSafe[]>(
     reducer: new (...params: Params) => Reducer<V, Accum>,
     ...params: Params
   ): EagerCollection<K, Accum>;
@@ -263,11 +237,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param mapper - Constructor of `Mapper` class to transform each entry of this collection.
    * @param mapperParams - Additional parameters to `mapper`.
    */
-  mapReduce<
-    K2 extends Json,
-    V2 extends Json,
-    MapperParams extends readonly DepSafe[],
-  >(
+  mapReduce<K2 extends Json, V2 extends Json, MapperParams extends DepSafe[]>(
     mapper: new (...params: MapperParams) => Mapper<K, V, K2, V2>,
     ...mapperParams: MapperParams
   ): //
@@ -278,7 +248,7 @@ export interface EagerCollection<K extends Json, V extends Json>
    * @param reducerParams - Additional parameters to `reducer`
    * @returns The resulting eager collection.
    */
-  <Accum extends Json, ReducerParams extends readonly DepSafe[]>(
+  <Accum extends Json, ReducerParams extends DepSafe[]>(
     reducer: new (...params: ReducerParams) => Reducer<V2, Accum>,
     ...reducerParams: ReducerParams
   ) => EagerCollection<K2, Accum>;
@@ -370,7 +340,7 @@ export interface Context {
   createLazyCollection<
     K extends Json,
     V extends Json,
-    Params extends readonly DepSafe[],
+    Params extends DepSafe[],
   >(
     compute: new (...params: Params) => LazyCompute<K, V>,
     ...params: Params
@@ -487,19 +457,8 @@ export interface ExternalService {
 
 /**
  * Association of names to collections.
- * @deprecated Use `NamedEagerCollections` instead for sound typing.
  */
 export type NamedCollections = { [name: string]: EagerCollection<Json, Json> };
-
-/**
- * Association of names to type-erased eager collections.
- *
- * Uses `readonly` fields to enable covariant checking under sound subtyping,
- * allowing concrete collection maps to be assignable to this type.
- */
-export type NamedEagerCollections = {
-  readonly [name: string]: AbstractEagerCollection;
-};
 
 /**
  * Resource provided by a `SkipService`.
@@ -508,7 +467,9 @@ export type NamedEagerCollections = {
  *
  * @typeParam Collections - Collections provided to the resource computation by the service's `createGraph`.
  */
-export interface Resource<Collections extends NamedEagerCollections> {
+export interface Resource<
+  Collections extends NamedCollections = NamedCollections,
+> {
   /**
    * Build the reactive compute graph of the reactive resource.
    *
@@ -519,22 +480,8 @@ export interface Resource<Collections extends NamedEagerCollections> {
   instantiate(
     collections: Collections,
     context: Context,
-  ): AbstractEagerCollection;
+  ): EagerCollection<Json, Json>;
 }
-
-/**
- * Constructor type for a `Resource`, enabling sound typing of resource constructor parameters.
- *
- * Using `never` for the `Params` position leverages function parameter contravariance:
- * `new (params: SpecificType) => R` is assignable to `new (params: never) => R`.
- *
- * @typeParam Collections - Collections provided to the resource computation.
- * @typeParam Params - Type of the constructor parameter.
- */
-export type ResourceClass<
-  Collections extends NamedEagerCollections,
-  Params extends Json,
-> = new (params: Params) => Resource<Collections>;
 
 /**
  * Initial data for a service's input collections.
@@ -542,46 +489,11 @@ export type ResourceClass<
  * The initial data to populate a service's input collections is provided as an association from collection names to arrays of entries.
  *
  * @typeParam Inputs - Collections provided to the service's `createGraph`.
- * @deprecated Use `InputDefinition` and `NamedInputDefinitions` instead.
  */
-export type InitialData<Inputs extends NamedEagerCollections> = {
+export type InitialData<Inputs extends NamedCollections> = {
   [Name in keyof Inputs]: Inputs[Name] extends EagerCollection<infer K, infer V>
     ? Entry<K, V>[]
     : Entry<Json, Json>[];
-};
-
-/**
- * Type-erased base for input definitions, enabling sound typing in input maps.
- *
- * Uses a branded field to ensure nominal (not structural) typing.
- */
-export abstract class AbstractInputDefinition {
-  readonly __sk_inputDefBrand: undefined;
-}
-
-/**
- * Definition of an input collection, including its initial data.
- *
- * @typeParam K - Type of keys.
- * @typeParam V - Type of values.
- */
-export class InputDefinition<
-  K extends Json,
-  V extends Json,
-> extends AbstractInputDefinition {
-  readonly initial: Entry<K, V>[];
-
-  constructor(initial: Entry<K, V>[] = []) {
-    super();
-    this.initial = initial;
-  }
-}
-
-/**
- * Association of names to type-erased input definitions.
- */
-export type NamedInputDefinitions = {
-  readonly [name: string]: AbstractInputDefinition;
 };
 
 /**
@@ -630,23 +542,22 @@ export type NamedInputDefinitions = {
  * @typeParam ResourceInputs - Collections provided to the resource computation by the service's `createGraph`.
  */
 export interface SkipService<
-  InputDefs extends NamedInputDefinitions,
-  Inputs extends NamedEagerCollections,
-  ResourceInputs extends NamedEagerCollections,
+  Inputs extends NamedCollections = NamedCollections,
+  ResourceInputs extends NamedCollections = NamedCollections,
 > {
   /**
-   * Input definitions for this service's input collections, including initial data.
+   * Initial data for this service's input collections.
    *
-   * @remarks While the initial data is not required to have a `DepSafe` type (only a subtype of `Json` is required); note that any modifications made to any objects passed as initial data will *not* be seen by a service once started.
+   * @remarks While the initial data is not required to have a `DepSafe` type (only a subtype of `Json` is required); note that any modifications made to any objects passed as `initialData` will *not* be seen by a service once started.
    */
-  readonly inputs: InputDefs;
+  initialData?: InitialData<Inputs>;
 
   /** External services that may be used by this service's reactive computation. */
-  readonly externalServices?: { readonly [name: string]: ExternalService };
+  externalServices?: { [name: string]: ExternalService };
 
   /** Reactive resources which constitute the public interface of this reactive service. */
-  readonly resources: {
-    readonly [name: string]: ResourceClass<ResourceInputs, never>;
+  resources: {
+    [name: string]: new (params: Json) => Resource<ResourceInputs>;
   };
 
   /**
@@ -658,13 +569,3 @@ export interface SkipService<
    */
   createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
 }
-
-/**
- * Type-erased SkipService, for use in internal runtime code and consumers
- * that don't need specific type parameters.
- */
-export type AnySkipService = SkipService<
-  NamedInputDefinitions,
-  NamedEagerCollections,
-  NamedEagerCollections
->;
