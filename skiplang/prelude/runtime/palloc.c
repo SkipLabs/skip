@@ -745,6 +745,10 @@ void SKIP_print_persistent_size() {
   printf("%ld\n", ginfo->total_palloc_size);
 }
 
+int64_t SKIP_get_persistent_size() {
+  return (int64_t)ginfo->total_palloc_size;
+}
+
 void* sk_palloc(size_t size) {
   sk_check_has_lock();
   slot_t slot = sk_slot_of_size(size);

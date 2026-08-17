@@ -377,6 +377,7 @@ char* sk_new_const(char* cst);
 void sk_obstack_attach_page(sk_obstack_t* lpage, sk_obstack_t* next);
 size_t sk_page_size(sk_obstack_t* page);
 void* sk_palloc(size_t size);
+int64_t SKIP_get_persistent_size();
 void sk_persist_consts();
 void sk_pfree_size(void*, size_t);
 size_t sk_pow2_size(size_t);

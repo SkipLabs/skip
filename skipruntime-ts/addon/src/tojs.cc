@@ -58,6 +58,7 @@ double SkipRuntime_Runtime__abortFork();
 uint32_t SkipRuntime_Runtime__forkExists(char* input);
 CJSON SkipRuntime_Runtime__reload(SKService service);
 double SkipRuntime_Runtime__closeResourceStreams(CJArray streams);
+int64_t SkipRuntime_getSkipPersistentSize();
 }
 
 using skbinding::AddFunction;
@@ -777,6 +778,16 @@ Napi::Value CloseResourceStreamsOfRuntime(const Napi::CallbackInfo& info) {
   return result;
 }
 
+Napi::Value GetSkipPersistentSize(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  Napi::Value result;
+  NatTryCatch(env, [&result, env](Napi::Env) {
+    int64_t skresult = SkipRuntime_getSkipPersistentSize();
+    result = Napi::Number::New(env, skresult);
+  });
+  return result;
+}
+
 /* Assemble the binding object exposed to JS. */
 
 Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
@@ -850,7 +861,8 @@ Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
   AddFunction(env, binding, "SkipRuntime_Runtime__reload", ReloadOfRuntime);
   AddFunction(env, binding, "SkipRuntime_Runtime__closeResourceStreams",
               CloseResourceStreamsOfRuntime);
-
+  AddFunction(env, binding, "SkipRuntime_getSkipPersistentSize",
+              GetSkipPersistentSize);
   return binding;
 }
 
