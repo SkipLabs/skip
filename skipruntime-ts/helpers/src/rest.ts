@@ -194,6 +194,26 @@ export class SkipServiceBroker {
   }
 
   /**
+   * Write multiple entries to several collections atomically.
+   *
+   * The whole batch is applied in a single update: subscribers observe one
+   * notification instead of one per collection, and no intermediate state in
+   * which only part of the collections has been written. If any collection
+   * cannot be written, none of them are.
+   *
+   * @param inputs - Entries to write, keyed by the name of the input collection to update; each name must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @returns {void}
+   */
+  async updateAll(inputs: {
+    [name: string]: Entry<Json, Json>[];
+  }): Promise<void> {
+    await fetchJSON(`${this.entrypoint}/v1/inputs`, "PATCH", {
+      body: inputs,
+      timeout: this.timeout,
+    });
+  }
+
+  /**
    * Remove all values associated with a key in a collection.
    *
    * @typeParam K - Type of keys.

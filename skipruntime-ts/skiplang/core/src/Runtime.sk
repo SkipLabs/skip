@@ -1040,6 +1040,7 @@ private fun writeInCollection(
   dirName: SKStore.DirName,
   values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
   isInit: Bool = false,
+  update: Bool = true,
 ): Array<Waitable> {
   chdl = SKStore.EHandle(JSONID::keyType, JSONFile::type, dirName);
   keys = if (isInit) {
@@ -1059,9 +1060,13 @@ private fun writeInCollection(
   });
   toAdd.each(added -> chdl.writeArray(context, added.i0, added.i1));
   keys.each(key -> chdl.writeArray(context, key, Array[]));
-  // Do not check garbage collection to prevent closing resources
-  context.update();
-  getSubscriptions(context);
+  if (update) {
+    // Do not check garbage collection to prevent closing resources
+    context.update();
+    getSubscriptions(context);
+  } else {
+    Array[]
+  }
 }
 
 fun update(
@@ -1070,6 +1075,24 @@ fun update(
   values: Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>,
 ): Array<Waitable> {
   writeInCollection(context, SKStore.DirName::create(`/${collection}/`), values)
+}
+
+fun updateAll(
+  context: mutable SKStore.Context,
+  collections: Array<(String, Array<(SKJSON.CJSON, Array<SKJSON.CJSON>)>)>,
+): Array<Waitable> {
+  for (collection in collections) {
+    _ = writeInCollection(
+      context,
+      SKStore.DirName::create(`/${collection.i0}/`),
+      collection.i1,
+      /* isInit */ false,
+      /* update */ false,
+    );
+  };
+  // Do not check garbage collection to prevent closing resources
+  context.update();
+  getSubscriptions(context);
 }
 
 fun delete(

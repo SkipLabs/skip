@@ -126,6 +126,10 @@ export class ServiceDefinition {
     return Object.keys(this.service.inputs);
   }
 
+  hasInput(name: string): boolean {
+    return name in this.service.inputs;
+  }
+
   resources(): string[] {
     return Object.keys(this.service.resources as object);
   }
@@ -785,6 +789,9 @@ export class ServiceInstance {
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
+    if (!this.definition.hasInput(collection)) {
+      throw new SkipUnknownCollectionError(`Unknown input '${collection}'`);
+    }
     this.refs.setFork(this.forkName);
     const result = this.refs.runWithGC(() => {
       const json = this.refs.json();
@@ -792,6 +799,62 @@ export class ServiceInstance {
         this.refs.binding.SkipRuntime_Runtime__update(
           collection,
           this.refs.json().exportJSON(entries),
+        ),
+        true,
+      );
+    });
+    if (Array.isArray(result)) {
+      const handles = result as Handle<Promise<void>>[];
+      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      await Promise.all(promises);
+    } else {
+      const errorHdl = result as Handle<Error>;
+      throw this.refs.handles.deleteHandle(errorHdl);
+    }
+  }
+
+  /**
+   * Update multiple inputs collection
+   * @param collections - The collections to update with the values
+   */
+  async updateAll(collections: {
+    [name: string]: Entry<Json, Json>[];
+  }): Promise<void> {
+    for (const input of Object.keys(collections)) {
+      if (!this.definition.hasInput(input)) {
+        throw new SkipUnknownCollectionError(`Unknown input '${input}'`);
+      }
+    }
+    this.refs.setFork(this.forkName);
+    const uuid = crypto.randomUUID();
+    const fork = this.fork(uuid);
+    try {
+      await fork.updateAll_(collections);
+      fork.merge([]);
+    } catch (ex: unknown) {
+      fork.abortFork();
+      if (ex instanceof Error) {
+        const matches =
+          /^(?:InvariantViolation: )?Invariant violation: Directory not found: \/([^/]+)\/$/.exec(
+            ex.message,
+          );
+        if (matches?.length === 2) {
+          throw new SkipUnknownCollectionError(`Unknown input '${matches[1]}'`);
+        }
+      }
+      throw ex;
+    }
+  }
+
+  private async updateAll_(collections: {
+    [name: string]: Entry<Json, Json>[];
+  }): Promise<void> {
+    this.refs.setFork(this.forkName);
+    const result = this.refs.runWithGC(() => {
+      const json = this.refs.json();
+      return json.importJSON(
+        this.refs.binding.SkipRuntime_Runtime__updateAll(
+          this.refs.json().exportJSON(collections),
         ),
         true,
       );

@@ -20,7 +20,11 @@ import type {
   Reducer,
   ChangeManager,
 } from "@skipruntime/core";
-import { LoadStatus, InputDefinition } from "@skipruntime/core";
+import {
+  LoadStatus,
+  InputDefinition,
+  SkipUnknownCollectionError,
+} from "@skipruntime/core";
 import { Count, Sum } from "@skipruntime/helpers";
 
 import { it as mit, type AsyncFunc } from "mocha";
@@ -1294,6 +1298,72 @@ export function initTests(
     }
   });
 
+  it("testUpdateFailure", async () => {
+    const service = await initService(map1Service);
+    try {
+      const resource = "map1";
+      try {
+        await service.update("input1", [["1", [10]]]);
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(SkipUnknownCollectionError);
+        expect((e as Error).message).toEqual("Unknown input 'input1'");
+      }
+      expect(await service.getAll(resource)).toEqual([]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testUpdateAll1", async () => {
+    const service = await initService(map2Service);
+    try {
+      const resource = "map2";
+      const constantResourceId1 = "unsafe.identifier.1";
+      await service.instantiateResource(constantResourceId1, resource, {});
+      const notifier = new Notifier(service, constantResourceId1);
+      notifier.checkInit([]);
+      await service.updateAll({
+        input1: [["1", [10]]],
+        input2: [["1", [20]]],
+      });
+      const values1: Entry<string, number>[] = [["1", [30]]];
+      notifier.checkUpdate(values1);
+      expect(await service.getAll(resource)).toEqual(values1);
+      await service.updateAll({
+        input1: [["2", [3]]],
+        input2: [["2", [7]]],
+      });
+      const values2: Entry<string, number>[] = [["2", [10]]];
+      notifier.checkUpdate(values2);
+      expect(await service.getArray(resource, "2")).toEqual([10]);
+      notifier.close();
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testUpdateAllFailure", async () => {
+    const service = await initService(map2Service);
+    try {
+      const resource = "map2";
+      try {
+        await service.updateAll({
+          input1: [["1", [10]]],
+          input2: [["1", [20]]],
+          input3: [["1", [30]]],
+        });
+        throw new Error("Error was not thrown");
+      } catch (e: unknown) {
+        expect(e).toBeA(SkipUnknownCollectionError);
+        expect((e as Error).message).toEqual("Unknown input 'input3'");
+      }
+      expect(await service.getAll(resource)).toEqual([]);
+    } finally {
+      await service.close();
+    }
+  });
+
   it("testMap3", async () => {
     const service = await initService(map3Service);
     try {
@@ -1311,6 +1381,29 @@ export function initTests(
       await service.close();
     }
   });
+
+  it("testUpdateAll2", async () => {
+    const service = await initService(map3Service);
+    try {
+      const resource = "map3";
+      await service.updateAll({
+        input1: [["1", [1, 2, 3]]],
+        input2: [["1", [10]]],
+      });
+      expect(await service.getArray(resource, "1")).toEqual([36]);
+      await service.updateAll({
+        input1: [["2", [3]]],
+        input2: [["2", [7]]],
+      });
+      expect(await service.getAll(resource)).toEqual([
+        ["1", [36]],
+        ["2", [10]],
+      ]);
+    } finally {
+      await service.close();
+    }
+  });
+
   it("valueMapper", async () => {
     const service = await initService(oneToOneMapperService);
     try {

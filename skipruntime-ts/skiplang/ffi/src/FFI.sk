@@ -698,6 +698,34 @@ fun updateOfRuntime(input: String, values: SKJSON.CJArray): SKJSON.CJSON {
   }
 }
 
+@export("SkipRuntime_Runtime__updateAll")
+fun updateAllOfRuntime(collections: SKJSON.CJObject): SKJSON.CJSON {
+  runWithResult(context ~> {
+    handles = updateAll(
+      context,
+      collections match {
+      | SKJSON.CJObject(fields) ->
+        fields
+          .items()
+          .map(item ->
+            (
+              item.i0,
+              SKJSON.expectArray(item.i1).map(v -> {
+                e = SKJSON.expectArray(v);
+                (e[0], SKJSON.expectArray(e[1]))
+              }),
+            )
+          )
+          .collect(Array)
+      },
+    );
+    SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  }) match {
+  | Success(result) -> result
+  | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
+  }
+}
+
 @export("SkipRuntime_Runtime__fork")
 fun forkOfRuntime(name: String): Float {
   try {

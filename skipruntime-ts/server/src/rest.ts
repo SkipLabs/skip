@@ -83,6 +83,25 @@ export function registerControlServiceRoutes(
   });
 
   // WRITES
+  app.patch("/v1/inputs", (req, res) => {
+    if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+      res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
+      return;
+    }
+
+    service
+      .updateAll(req.body as { [name: string]: Entry<Json, Json>[] })
+      .then(() => res.sendStatus(200))
+      .catch((e: unknown) => {
+        if (e instanceof SkipUnknownCollectionError) {
+          res.sendStatus(404);
+        } else {
+          console.error(e);
+          res.status(500).json({ error: "Internal server error" });
+        }
+      });
+  });
+
   app.patch("/v1/inputs/:collection", (req, res) => {
     if (!Array.isArray(req.body)) {
       res.status(400).json(`Bad request body ${JSON.stringify(req.body)}`);
