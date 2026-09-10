@@ -2,16 +2,18 @@
 // in nodejs LTS.
 import { EventSource } from "eventsource";
 
-import type {
-  AbstractEagerCollection,
-  AnySkipService,
-  Context,
-  EagerCollection,
-  Entry,
-  ExternalService,
-  Json,
-  NamedEagerCollections,
-  Resource,
+import {
+  type AnySkipService,
+  type AbstractEagerCollection,
+  type AbstractLazyCollection,
+  type Entry,
+  type ExternalService,
+  type Json,
+  type NamedEagerCollections,
+  type Resource,
+  type SharedCollections,
+  type Context,
+  EagerCollectionImpl,
 } from "@skipruntime/core";
 import { SkipError } from "@skipruntime/core";
 
@@ -112,7 +114,7 @@ export class SkipExternalService implements ExternalService {
   }
 }
 
-class LeaderResource implements Resource<NamedEagerCollections> {
+class LeaderResource implements Resource<SharedCollections> {
   private collection: string;
 
   constructor(param: Json) {
@@ -123,8 +125,15 @@ class LeaderResource implements Resource<NamedEagerCollections> {
       );
   }
 
-  instantiate(collections: NamedEagerCollections): AbstractEagerCollection {
-    if (this.collection in collections) return collections[this.collection]!;
+  instantiate(collections: SharedCollections): AbstractEagerCollection {
+    if (this.collection in collections) {
+      const maybeEagerCollection = collections[this.collection]!;
+      if (maybeEagerCollection instanceof EagerCollectionImpl)
+        return maybeEagerCollection;
+      throw new SkipError(
+        `Unknown eager shared collection in leader: ${this.collection}`,
+      );
+    }
     throw new SkipError(
       `Unknown shared collection in leader: ${this.collection}`,
     );
@@ -151,13 +160,18 @@ export function asLeader(service: AnySkipService): AnySkipService {
  *
  * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
  *
- * @returns The *follower* component to run `service` in such a configuration, given the leader's address and the names of the shared computation graph collections to be mirrored from it (typically the `ResourceInputs` of `service`).
+ * The two kinds of shared collection are obtained differently. Eager collections, named in `collections`, are *mirrored* from the leader: the leader maintains them and streams their updates to the follower. Lazy collections cannot be mirrored, since they hold no maintained state to stream; each is instead *rebuilt locally* by the follower, `lazies` mapping its shared name to a function which, given the follower's `Context`, produces the corresponding lazy collection. Together, the two are expected to cover the `ResourceInputs` of `service`.
+ *
+ * @returns The *follower* component to run `service` in such a configuration.
  */
 export function asFollower(
   service: AnySkipService,
   leader: {
     leader: { host: string; streaming_port: number; control_port: number };
     collections: string[];
+    lazies?: {
+      [name: string]: (context: Context) => AbstractLazyCollection;
+    };
   },
 ): AnySkipService {
   return {
@@ -170,9 +184,9 @@ export function asFollower(
     createGraph(
       _inputs: NamedEagerCollections,
       context: Context,
-    ): NamedEagerCollections {
+    ): SharedCollections {
       const mirroredCollections: {
-        [key: string]: EagerCollection<Json, Json>;
+        [name: string]: AbstractEagerCollection | AbstractLazyCollection;
       } = {};
       for (const collection of leader.collections) {
         mirroredCollections[collection] = context.useExternalResource({
@@ -180,6 +194,13 @@ export function asFollower(
           identifier: "leader",
           params: collection,
         });
+      }
+      if (leader.lazies) {
+        for (const [collection, lCollectionGetter] of Object.entries(
+          leader.lazies,
+        )) {
+          mirroredCollections[collection] = lCollectionGetter(context);
+        }
       }
       return mirroredCollections;
     },

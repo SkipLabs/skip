@@ -370,6 +370,35 @@ const lazyService: AnySkipService = {
   },
 };
 
+//// testSharedLazy
+
+type Lazy_NN = {
+  input: EagerCollection<number, number>;
+  lazy: LazyCollection<number, number>;
+};
+
+class SharedLazyResource implements Resource<Lazy_NN> {
+  instantiate(cs: Lazy_NN): EagerCollection<number, number> {
+    return cs.input.map(MapLazy, cs.lazy);
+  }
+}
+
+const sharedLazyService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { lazy: SharedLazyResource },
+
+  createGraph(inputCollections: Input_NN, context: Context) {
+    const lazy = context.createLazyCollection(
+      TestLazyAdd,
+      inputCollections.input,
+    );
+    return {
+      ...inputCollections,
+      lazy,
+    };
+  },
+};
+
 //// testMapReduce
 
 class TestOddEven implements Mapper<number, number, number, number> {
@@ -1390,6 +1419,34 @@ export function initTests(
 
   it("testLazy", async () => {
     const service = await initService(lazyService);
+    try {
+      const resource = "lazy";
+      await service.update("input", [
+        [0, [10]],
+        [1, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+      ]);
+      await service.update("input", [[2, [4]]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+        [2, [2]],
+      ]);
+      await service.update("input", [[2, []]]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [2]],
+      ]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testSharedLazy", async () => {
+    const service = await initService(sharedLazyService);
     try {
       const resource = "lazy";
       await service.update("input", [

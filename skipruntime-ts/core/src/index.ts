@@ -22,7 +22,6 @@ import { sknative } from "../skiplang-std/index.js";
 
 import type * as Internal from "./internal.js";
 import {
-  type AbstractEagerCollection,
   type CollectionUpdate,
   type Context,
   type EagerCollection,
@@ -39,6 +38,9 @@ import {
   type Watermark,
   type ExternalService,
   InputDefinition,
+  AbstractEagerCollection,
+  AbstractLazyCollection,
+  type SharedCollections,
 } from "./api.js";
 
 import {
@@ -139,7 +141,7 @@ export class ServiceDefinition {
   createGraph(
     inputCollections: NamedEagerCollections,
     context: Context,
-  ): NamedEagerCollections {
+  ): SharedCollections {
     return this.service.createGraph(inputCollections, context);
   }
 
@@ -283,9 +285,13 @@ class LazyCollectionImpl<K extends Json, V extends Json>
         throw new SkipNonUniqueValueError();
     }
   }
+
+  static getName(coll: AbstractLazyCollection): string {
+    return (coll as LazyCollectionImpl<Json, Json>).lazyCollection;
+  }
 }
 
-class EagerCollectionImpl<K extends Json, V extends Json>
+export class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements EagerCollection<K, V>
 {
@@ -459,10 +465,8 @@ class EagerCollectionImpl<K extends Json, V extends Json>
     return new EagerCollectionImpl<K2, V2>(collection, this.refs);
   }
 
-  static getName<K extends Json, V extends Json>(
-    coll: EagerCollection<K, V>,
-  ): string {
-    return (coll as EagerCollectionImpl<K, V>).collection;
+  static getName(coll: AbstractEagerCollection): string {
+    return (coll as EagerCollectionImpl<Json, Json>).collection;
   }
 }
 
@@ -1118,17 +1122,23 @@ export class ToBinding {
   // Resource
 
   SkipRuntime_Resource__instantiate(
-    skresource: Handle<Resource<NamedEagerCollections>>,
+    skresource: Handle<Resource<SharedCollections>>,
     skcollections: Pointer<Internal.CJObject>,
   ): string {
     const skjson = this.getJsonConverter();
     const resource = this.handles.get(skresource);
-    const collections: { [key: string]: AbstractEagerCollection } = {};
+    const collections: {
+      [key: string]: AbstractEagerCollection | AbstractLazyCollection;
+    } = {};
     const keysIds = skjson.importJSON(skcollections) as {
-      [key: string]: string;
+      [key: string]: { name: string; type: string };
     };
-    for (const [key, name] of Object.entries(keysIds)) {
-      collections[key] = new EagerCollectionImpl<Json, Json>(name, this);
+    for (const [key, info] of Object.entries(keysIds)) {
+      if (info.type === "eager")
+        collections[key] = new EagerCollectionImpl<Json, Json>(info.name, this);
+      else if (info.type === "lazy")
+        collections[key] = new LazyCollectionImpl<Json, Json>(info.name, this);
+      else throw new Error(`Unknown collection type ${info.type}`);
     }
     const collection = resource.instantiate(collections, new ContextImpl(this));
     return EagerCollectionImpl.getName(
@@ -1150,7 +1160,9 @@ export class ToBinding {
   ): Pointer<Internal.CJObject> {
     const skjson = this.getJsonConverter();
     const service = this.handles.get(skservice);
-    const collections: { [key: string]: AbstractEagerCollection } = {};
+    const collections: {
+      [key: string]: AbstractEagerCollection;
+    } = {};
     const keysIds = skjson.importJSON(skcollections) as {
       [key: string]: string;
     };
@@ -1158,11 +1170,20 @@ export class ToBinding {
       collections[key] = new EagerCollectionImpl<Json, Json>(name, this);
     }
     const result = service.createGraph(collections, new ContextImpl(this));
-    const collectionsNames: { [name: string]: string } = {};
+    const collectionsNames: { [name: string]: { type: string; name: string } } =
+      {};
     for (const [name, collection] of Object.entries(result)) {
-      collectionsNames[name] = EagerCollectionImpl.getName(
-        collection as EagerCollection<Json, Json>,
-      );
+      if (collection instanceof EagerCollectionImpl)
+        collectionsNames[name] = {
+          type: "eager",
+          name: EagerCollectionImpl.getName(collection),
+        };
+      else if (collection instanceof LazyCollectionImpl) {
+        collectionsNames[name] = {
+          type: "lazy",
+          name: LazyCollectionImpl.getName(collection),
+        };
+      } else throw new Error(`Invalid collection type`);
     }
     return skjson.exportJSON(collectionsNames);
   }

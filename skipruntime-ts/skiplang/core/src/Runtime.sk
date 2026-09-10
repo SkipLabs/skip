@@ -55,7 +55,7 @@ class ResourceDef(
 }
 
 class ServiceFile(
-  value: Map<String, Collection>,
+  value: Map<String, CollectionBase>,
   inputs: Map<String, Collection>,
 ) extends SKStore.File
 
@@ -533,7 +533,11 @@ fun useExternalCollection(
   }
 }
 
-class Collection(dirName: SKStore.DirName) {
+base class CollectionBase {
+  fun getId(): String;
+}
+
+class Collection(dirName: SKStore.DirName) extends CollectionBase {
   //
   static fun forName(name: String): Collection {
     Collection(SKStore.DirName::create(name))
@@ -786,7 +790,7 @@ class Collection(dirName: SKStore.DirName) {
   }
 }
 
-class LazyCollection(private dirName: SKStore.DirName) {
+class LazyCollection(private dirName: SKStore.DirName) extends CollectionBase {
   //
   static fun forName(name: String): LazyCollection {
     LazyCollection(SKStore.DirName::create(name))

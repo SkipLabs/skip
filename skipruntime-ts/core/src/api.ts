@@ -501,6 +501,10 @@ export type NamedEagerCollections = {
   readonly [name: string]: AbstractEagerCollection;
 };
 
+export type SharedCollections = {
+  readonly [name: string]: AbstractEagerCollection | AbstractLazyCollection;
+};
+
 /**
  * Resource provided by a `SkipService`.
  *
@@ -508,7 +512,7 @@ export type NamedEagerCollections = {
  *
  * @typeParam Collections - Collections provided to the resource computation by the service's `createGraph`.
  */
-export interface Resource<Collections extends NamedEagerCollections> {
+export interface Resource<Collections extends SharedCollections> {
   /**
    * Build the reactive compute graph of the reactive resource.
    *
@@ -532,7 +536,7 @@ export interface Resource<Collections extends NamedEagerCollections> {
  * @typeParam Params - Type of the constructor parameter.
  */
 export type ResourceClass<
-  Collections extends NamedEagerCollections,
+  Collections extends SharedCollections,
   Params extends Json,
 > = new (params: Params) => Resource<Collections>;
 
@@ -632,7 +636,7 @@ export type NamedInputDefinitions = {
 export interface SkipService<
   InputDefs extends NamedInputDefinitions,
   Inputs extends NamedEagerCollections,
-  ResourceInputs extends NamedEagerCollections,
+  ResourceInputs extends SharedCollections,
 > {
   /**
    * Input definitions for this service's input collections, including initial data.
@@ -666,5 +670,5 @@ export interface SkipService<
 export type AnySkipService = SkipService<
   NamedInputDefinitions,
   NamedEagerCollections,
-  NamedEagerCollections
+  SharedCollections
 >;

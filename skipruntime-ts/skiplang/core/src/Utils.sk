@@ -96,10 +96,39 @@ fun lazyForName(name: String): LazyCollection {
   LazyCollection::forName(name)
 }
 
-fun collectionsByName(collections: Map<String, Collection>): SKJSON.CJObject {
+fun collectionsByName(
+  collections: Map<String, CollectionBase>,
+): SKJSON.CJObject {
   fields = mutable Vector[];
   collections.each((k, c) -> fields.push((k, SKJSON.CJString(c.getId()))));
   SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
+}
+
+fun collectionsByNameAndType(
+  collections: Map<String, CollectionBase>,
+): SKJSON.CJObject {
+  fields = mutable Vector[];
+  collections.each((k, c) -> {
+    name = SKJSON.CJString(c.getId());
+    nameAndType = c match {
+    | LazyCollection _ ->
+      Array[("name", name), ("type", SKJSON.CJString("lazy"))]
+    | _ -> Array[("name", name), ("type", SKJSON.CJString("eager"))]
+    };
+    nameAndTypeObj = SKJSON.CJObject(
+      SKJSON.CJFields::create(nameAndType, x -> x),
+    );
+    fields.push((k, nameAndTypeObj));
+  });
+  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x));
+}
+
+fun collectionForNameAndType(name: String, type: String): CollectionBase {
+  type match {
+  | "eager" -> Collection::forName(name)
+  | "lazy" -> LazyCollection::forName(name)
+  | _ -> invariant_violation(`Unknown collection type '${type}'`)
+  }
 }
 
 fun runWithResult<T>(f: mutable SKStore.Context ~> T): Result<T, .Exception> {
