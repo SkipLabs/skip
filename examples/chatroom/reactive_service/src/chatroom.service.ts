@@ -51,6 +51,7 @@ class JoinUniqueLikers
   implements Mapper<number, Message, number, LikedMessage>
 {
   constructor(private likersByMessage: EagerCollection<number, string>) {}
+
   mapEntry(
     id: number,
     messages: Values<Message>,
@@ -78,11 +79,18 @@ class MessagesResource implements Resource<ResourceInputs> {
   }
 }
 
-export const service: SkipService<{}, ResourceInputs> = {
-  initialData: {},
+type ChatServiceInputs = Record<string, never>;
+type ChatServiceInputDefs = Record<string, never>;
+
+export const service: SkipService<
+  ChatServiceInputDefs,
+  ChatServiceInputs,
+  ResourceInputs
+> = {
+  inputs: {},
   resources: { messages: MessagesResource },
   externalServices: { kafka },
-  createGraph(_: {}, context: Context): ResourceInputs {
+  createGraph(_: ChatServiceInputs, context: Context): ResourceInputs {
     const messages = context.useExternalResource<number, Message>({
       service: "kafka",
       identifier: "skip-chatroom-messages",

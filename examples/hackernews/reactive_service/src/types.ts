@@ -1,4 +1,4 @@
-import type { EagerCollection } from "@skipruntime/core";
+import type { EagerCollection, InputDefinition } from "@skipruntime/core";
 
 type Post = {
   author_id: number;
@@ -34,6 +34,10 @@ type PostsServiceInputs = {
   sessions: EagerCollection<string, Session>;
 };
 
+type PostsServiceInputDefs = {
+  sessions: InputDefinition<string, Session>;
+};
+
 type PostsResourceInputs = {
   postsWithUpvotes: EagerCollection<[number, number], PostWithUpvoteIds>;
   sessions: EagerCollection<string, Session>;
@@ -55,5 +59,6 @@ export type {
   PostsResourceInputs,
   PostsResourceParams,
   Session,
+  PostsServiceInputDefs,
   PostsServiceInputs,
 };
