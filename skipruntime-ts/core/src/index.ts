@@ -252,22 +252,24 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   implements LazyCollection<K, V>
 {
   readonly __sk_lazyCollectionBrand: undefined;
+  readonly #refs: ToBinding;
 
   constructor(
     readonly lazyCollection: string,
-    private readonly refs: ToBinding,
+    refs: ToBinding,
   ) {
     super();
+    this.#refs = refs;
     Object.freeze(this);
   }
 
   getArray(key: K): (V & DepSafe)[] {
-    return this.refs
+    return this.#refs
       .json()
       .importJSON(
-        this.refs.binding.SkipRuntime_LazyCollection__getArray(
+        this.#refs.binding.SkipRuntime_LazyCollection__getArray(
           this.lazyCollection,
-          this.refs.json().exportJSON(key),
+          this.#refs.json().exportJSON(key),
         ),
       ) as (V & DepSafe)[];
   }
@@ -296,22 +298,24 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   implements EagerCollection<K, V>
 {
   readonly __sk_collectionBrand: undefined;
+  readonly #refs: ToBinding;
 
   constructor(
     public readonly collection: string,
-    private readonly refs: ToBinding,
+    refs: ToBinding,
   ) {
     super();
+    this.#refs = refs;
     Object.freeze(this);
   }
 
   getArray(key: K): (V & DepSafe)[] {
-    return this.refs
+    return this.#refs
       .json()
       .importJSON(
-        this.refs.binding.SkipRuntime_Collection__getArray(
+        this.#refs.binding.SkipRuntime_Collection__getArray(
           this.collection,
-          this.refs.json().exportJSON(key),
+          this.#refs.json().exportJSON(key),
         ),
       ) as (V & DepSafe)[];
   }
@@ -332,7 +336,7 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
 
   size = () => {
     return Number(
-      this.refs.binding.SkipRuntime_Collection__size(this.collection),
+      this.#refs.binding.SkipRuntime_Collection__size(this.collection),
     );
   };
 
@@ -341,15 +345,15 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   }
 
   slices(...ranges: [K, K][]): EagerCollection<K, V> {
-    const skcollection = this.refs.binding.SkipRuntime_Collection__slice(
+    const skcollection = this.#refs.binding.SkipRuntime_Collection__slice(
       this.collection,
-      this.refs.json().exportJSON(ranges),
+      this.#refs.json().exportJSON(ranges),
     );
     return this.derive<K, V>(skcollection);
   }
 
   take(limit: number): EagerCollection<K, V> {
-    const skcollection = this.refs.binding.SkipRuntime_Collection__take(
+    const skcollection = this.#refs.binding.SkipRuntime_Collection__take(
       this.collection,
       BigInt(limit),
     );
@@ -361,10 +365,10 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
     ...params: Params
   ): EagerCollection<K2, V2> {
     const mapperObj = instantiateUserObject("Mapper", mapper, params);
-    const skmapper = this.refs.binding.SkipRuntime_createMapper(
-      this.refs.handles.register(mapperObj),
+    const skmapper = this.#refs.binding.SkipRuntime_createMapper(
+      this.#refs.handles.register(mapperObj),
     );
-    const mapped = this.refs.binding.SkipRuntime_Collection__map(
+    const mapped = this.#refs.binding.SkipRuntime_Collection__map(
       this.collection,
       skmapper,
     );
@@ -390,8 +394,8 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
         reducerParams,
       );
 
-      const skmapper = this.refs.binding.SkipRuntime_createMapper(
-        this.refs.handles.register(mapperObj),
+      const skmapper = this.#refs.binding.SkipRuntime_createMapper(
+        this.#refs.handles.register(mapperObj),
       );
 
       if (
@@ -399,18 +403,18 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
         typeof reducerObj.object[sknative] == "string"
       ) {
         return this.derive<K2, Accum>(
-          this.refs.binding.SkipRuntime_Collection__nativeMapReduce(
+          this.#refs.binding.SkipRuntime_Collection__nativeMapReduce(
             this.collection,
             skmapper,
             reducerObj.object[sknative],
           ),
         );
       } else {
-        const skreducer = this.refs.binding.SkipRuntime_createReducer(
-          this.refs.handles.register(reducerObj),
+        const skreducer = this.#refs.binding.SkipRuntime_createReducer(
+          this.#refs.handles.register(reducerObj),
         );
         return this.derive<K2, Accum>(
-          this.refs.binding.SkipRuntime_Collection__mapReduce(
+          this.#refs.binding.SkipRuntime_Collection__mapReduce(
             this.collection,
             skmapper,
             skreducer,
@@ -430,17 +434,17 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
       typeof reducerObj.object[sknative] == "string"
     ) {
       return this.derive<K, Accum>(
-        this.refs.binding.SkipRuntime_Collection__nativeReduce(
+        this.#refs.binding.SkipRuntime_Collection__nativeReduce(
           this.collection,
           reducerObj.object[sknative],
         ),
       );
     } else {
-      const skreducer = this.refs.binding.SkipRuntime_createReducer(
-        this.refs.handles.register(reducerObj),
+      const skreducer = this.#refs.binding.SkipRuntime_createReducer(
+        this.#refs.handles.register(reducerObj),
       );
       return this.derive<K, Accum>(
-        this.refs.binding.SkipRuntime_Collection__reduce(
+        this.#refs.binding.SkipRuntime_Collection__reduce(
           this.collection,
           skreducer,
         ),
@@ -452,9 +456,9 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
     const otherNames = others.map((other) =>
       EagerCollectionImpl.getName(other),
     );
-    const mapped = this.refs.binding.SkipRuntime_Collection__merge(
+    const mapped = this.#refs.binding.SkipRuntime_Collection__merge(
       this.collection,
-      this.refs.json().exportJSON(otherNames),
+      this.#refs.json().exportJSON(otherNames),
     );
     return this.derive<K, V>(mapped);
   }
@@ -462,7 +466,7 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   private derive<K2 extends Json, V2 extends Json>(
     collection: string,
   ): EagerCollection<K2, V2> {
-    return new EagerCollectionImpl<K2, V2>(collection, this.refs);
+    return new EagerCollectionImpl<K2, V2>(collection, this.#refs);
   }
 
   static getName(coll: AbstractEagerCollection): string {
@@ -471,14 +475,20 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
 }
 
 class CollectionWriter<K extends Json, V extends Json> {
+  readonly #refs: ToBinding;
+  #forkName: Nullable<string>;
+
   constructor(
     public readonly collection: string,
-    private readonly refs: ToBinding,
-    private forkName: Nullable<string>,
-  ) {}
+    refs: ToBinding,
+    forkName: Nullable<string>,
+  ) {
+    this.#refs = refs;
+    this.#forkName = forkName;
+  }
 
   async update(values: Entry<K, V>[], isInit: boolean): Promise<void> {
-    this.refs.setFork(this.getForkName());
+    this.#refs.setFork(this.getForkName());
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
     try {
@@ -491,53 +501,57 @@ class CollectionWriter<K extends Json, V extends Json> {
   }
 
   private update_(values: Entry<K, V>[], isInit: boolean): Promise<void> {
-    this.refs.setFork(this.forkName);
-    if (!this.refs.needGC()) {
+    this.#refs.setFork(this.#forkName);
+    if (!this.#refs.needGC()) {
       throw new SkipError("CollectionWriter.update cannot be performed.");
     }
-    return this.refs.runAsync(() =>
-      this.refs.binding.SkipRuntime_CollectionWriter__update(
+    return this.#refs.runAsync(() =>
+      this.#refs.binding.SkipRuntime_CollectionWriter__update(
         this.collection,
-        this.refs.json().exportJSON(values),
+        this.#refs.json().exportJSON(values),
         isInit,
       ),
     );
   }
 
   private fork(name: string): CollectionWriter<K, V> {
-    this.refs.setFork(this.forkName);
-    this.refs.fork(name);
-    return new CollectionWriter(this.collection, this.refs, name);
+    this.#refs.setFork(this.#forkName);
+    this.#refs.fork(name);
+    return new CollectionWriter(this.collection, this.#refs, name);
   }
 
   private merge(): void {
-    if (!this.forkName) throw new Error("Unable to merge fork on main.");
-    this.refs.setFork(this.forkName);
-    this.refs.merge();
+    if (!this.#forkName) throw new Error("Unable to merge fork on main.");
+    this.#refs.setFork(this.#forkName);
+    this.#refs.merge();
   }
 
   private abortFork(): void {
-    if (!this.forkName) throw new Error("Unable to abord fork on main.");
-    this.refs.setFork(this.forkName);
-    this.refs.abortFork();
+    if (!this.#forkName) throw new Error("Unable to abord fork on main.");
+    this.#refs.setFork(this.#forkName);
+    this.#refs.abortFork();
   }
 
   private getForkName(): Nullable<string> {
-    const forkName = this.forkName;
+    const forkName = this.#forkName;
     if (!forkName) return null;
     if (
-      !this.refs.runWithGC(() =>
-        this.refs.binding.SkipRuntime_Runtime__forkExists(forkName),
+      !this.#refs.runWithGC(() =>
+        this.#refs.binding.SkipRuntime_Runtime__forkExists(forkName),
       )
     ) {
-      this.forkName = null;
+      this.#forkName = null;
     }
-    return this.forkName;
+    return this.#forkName;
   }
 }
 
 class ContextImpl implements Context {
-  constructor(private readonly refs: ToBinding) {}
+  readonly #refs: ToBinding;
+
+  constructor(refs: ToBinding) {
+    this.#refs = refs;
+  }
 
   createLazyCollection<
     K extends Json,
@@ -548,12 +562,12 @@ class ContextImpl implements Context {
     ...params: Params
   ): LazyCollection<K, V> {
     const computeObj = instantiateUserObject("LazyCompute", compute, params);
-    const skcompute = this.refs.binding.SkipRuntime_createLazyCompute(
-      this.refs.handles.register(computeObj),
+    const skcompute = this.#refs.binding.SkipRuntime_createLazyCompute(
+      this.#refs.handles.register(computeObj),
     );
     const lazyCollection =
-      this.refs.binding.SkipRuntime_Context__createLazyCollection(skcompute);
-    return new LazyCollectionImpl<K, V>(lazyCollection, this.refs);
+      this.#refs.binding.SkipRuntime_Context__createLazyCollection(skcompute);
+    return new LazyCollectionImpl<K, V>(lazyCollection, this.#refs);
   }
 
   useExternalResource<K extends Json, V extends Json>(resource: {
@@ -562,18 +576,18 @@ class ContextImpl implements Context {
     params?: Json;
   }): EagerCollection<K, V> {
     const collection =
-      this.refs.binding.SkipRuntime_Context__useExternalResource(
+      this.#refs.binding.SkipRuntime_Context__useExternalResource(
         resource.service,
         resource.identifier,
-        this.refs.json().exportJSON(resource.params ?? {}),
+        this.#refs.json().exportJSON(resource.params ?? {}),
       );
-    return new EagerCollectionImpl<K, V>(collection, this.refs);
+    return new EagerCollectionImpl<K, V>(collection, this.#refs);
   }
 
   jsonExtract(value: JsonObject, pattern: string): Json[] {
-    const skjson = this.refs.json();
+    const skjson = this.#refs.json();
     return skjson.importJSON(
-      this.refs.binding.SkipRuntime_Context__jsonExtract(
+      this.#refs.binding.SkipRuntime_Context__jsonExtract(
         skjson.exportJSON(value),
         pattern,
       ),
@@ -596,11 +610,19 @@ export type SubscriptionID = Opaque<string, "subscription">;
  * and operations to manage subscriptions and the service itself.
  */
 export class ServiceInstance {
+  readonly #refs: ToBinding;
+  #definition: ServiceDefinition;
+  readonly #forkName: Nullable<string>;
+
   constructor(
-    private readonly refs: ToBinding,
-    readonly forkName: Nullable<string>,
-    private definition: ServiceDefinition,
-  ) {}
+    refs: ToBinding,
+    forkName: Nullable<string>,
+    definition: ServiceDefinition,
+  ) {
+    this.#refs = refs;
+    this.#forkName = forkName;
+    this.#definition = definition;
+  }
 
   /**
    * Instantiate a resource with some parameters and client session authentication token
@@ -614,12 +636,12 @@ export class ServiceInstance {
     resource: string,
     params: Json,
   ): Promise<void> {
-    this.refs.setFork(this.forkName);
-    return this.refs.runAsync(() =>
-      this.refs.binding.SkipRuntime_Runtime__createResource(
+    this.#refs.setFork(this.#forkName);
+    return this.#refs.runAsync(() =>
+      this.#refs.binding.SkipRuntime_Runtime__createResource(
         identifier,
         resource,
-        this.refs.json().exportJSON(params),
+        this.#refs.json().exportJSON(params),
       ),
     );
   }
@@ -637,20 +659,20 @@ export class ServiceInstance {
     const uuid = crypto.randomUUID();
     await this.instantiateResource(uuid, resource, params);
     try {
-      this.refs.setFork(this.forkName);
-      const result = this.refs.runWithGC(() => {
-        return this.refs
+      this.#refs.setFork(this.#forkName);
+      const result = this.#refs.runWithGC(() => {
+        return this.#refs
           .json()
           .importJSON(
-            this.refs.binding.SkipRuntime_Runtime__getAll(
+            this.#refs.binding.SkipRuntime_Runtime__getAll(
               resource,
-              this.refs.json().exportJSON(params),
+              this.#refs.json().exportJSON(params),
             ),
             true,
           );
       });
       if (typeof result == "number")
-        throw this.refs.handles.deleteHandle(result as Handle<Error>);
+        throw this.#refs.handles.deleteHandle(result as Handle<Error>);
       return result as Entry<K, V>[];
     } finally {
       this.closeResourceInstance(uuid);
@@ -672,11 +694,11 @@ export class ServiceInstance {
     const uuid = crypto.randomUUID();
     await this.instantiateResource(uuid, resource, params);
     try {
-      this.refs.setFork(this.forkName);
-      const skjson = this.refs.json();
-      const result = this.refs.runWithGC(() => {
+      this.#refs.setFork(this.#forkName);
+      const skjson = this.#refs.json();
+      const result = this.#refs.runWithGC(() => {
         return skjson.importJSON(
-          this.refs.binding.SkipRuntime_Runtime__getForKey(
+          this.#refs.binding.SkipRuntime_Runtime__getForKey(
             resource,
             skjson.exportJSON(params),
             skjson.exportJSON(key),
@@ -685,7 +707,7 @@ export class ServiceInstance {
         );
       });
       if (typeof result == "number")
-        throw this.refs.handles.deleteHandle(result as Handle<Error>);
+        throw this.#refs.handles.deleteHandle(result as Handle<Error>);
       return result as V[];
     } finally {
       this.closeResourceInstance(uuid);
@@ -697,13 +719,13 @@ export class ServiceInstance {
    * @param resourceInstanceId - The resource identifier
    */
   closeResourceInstance(resourceInstanceId: string): void {
-    this.refs.setFork(this.forkName);
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__closeResource(
+    this.#refs.setFork(this.#forkName);
+    const errorHdl = this.#refs.runWithGC(() => {
+      return this.#refs.binding.SkipRuntime_Runtime__closeResource(
         resourceInstanceId,
       );
     });
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+    if (errorHdl) throw this.#refs.handles.deleteHandle(errorHdl);
   }
 
   /**
@@ -725,12 +747,12 @@ export class ServiceInstance {
     },
     watermark?: string,
   ): SubscriptionID {
-    this.refs.setFork(this.forkName);
-    const session = this.refs.runWithGC(() => {
-      const sknotifier = this.refs.binding.SkipRuntime_createNotifier(
-        this.refs.handles.register(notifier),
+    this.#refs.setFork(this.#forkName);
+    const session = this.#refs.runWithGC(() => {
+      const sknotifier = this.#refs.binding.SkipRuntime_createNotifier(
+        this.#refs.handles.register(notifier),
       );
-      return this.refs.binding.SkipRuntime_Runtime__subscribe(
+      return this.#refs.binding.SkipRuntime_Runtime__subscribe(
         resourceInstanceId,
         sknotifier,
         watermark ?? null,
@@ -745,7 +767,7 @@ export class ServiceInstance {
         `Resource instance '${resourceInstanceId}' cannot be subscribed twice.`,
       );
     } else if (session < 0n) {
-      throw this.refs.handles.deleteHandle(Number(-session) as Handle<Error>);
+      throw this.#refs.handles.deleteHandle(Number(-session) as Handle<Error>);
     }
     return resourceInstanceId as SubscriptionID;
   }
@@ -755,12 +777,12 @@ export class ServiceInstance {
    * @param id - The subscription identifier returned by a call to `subscribe`
    */
   unsubscribe(id: SubscriptionID): void {
-    this.refs.setFork(this.forkName);
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__unsubscribe(id);
+    this.#refs.setFork(this.#forkName);
+    const errorHdl = this.#refs.runWithGC(() => {
+      return this.#refs.binding.SkipRuntime_Runtime__unsubscribe(id);
     });
     if (errorHdl) {
-      throw this.refs.handles.deleteHandle(errorHdl);
+      throw this.#refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -773,7 +795,7 @@ export class ServiceInstance {
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
-    this.refs.setFork(this.forkName);
+    this.#refs.setFork(this.#forkName);
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
     try {
@@ -789,24 +811,24 @@ export class ServiceInstance {
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
-    this.refs.setFork(this.forkName);
-    const result = this.refs.runWithGC(() => {
-      const json = this.refs.json();
+    this.#refs.setFork(this.#forkName);
+    const result = this.#refs.runWithGC(() => {
+      const json = this.#refs.json();
       return json.importJSON(
-        this.refs.binding.SkipRuntime_Runtime__update(
+        this.#refs.binding.SkipRuntime_Runtime__update(
           collection,
-          this.refs.json().exportJSON(entries),
+          this.#refs.json().exportJSON(entries),
         ),
         true,
       );
     });
     if (Array.isArray(result)) {
       const handles = result as Handle<Promise<void>>[];
-      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      const promises = handles.map((h) => this.#refs.handles.deleteHandle(h));
       await Promise.all(promises);
     } else {
       const errorHdl = result as Handle<Error>;
-      throw this.refs.handles.deleteHandle(errorHdl);
+      throw this.#refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -816,24 +838,26 @@ export class ServiceInstance {
    * @returns The promise of externals services shutdowns
    */
   close(): Promise<unknown> {
-    this.refs.setFork(this.forkName);
-    const result = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_closeService();
+    this.#refs.setFork(this.#forkName);
+    const result = this.#refs.runWithGC(() => {
+      return this.#refs.binding.SkipRuntime_closeService();
     });
     if (result >= 0) {
-      return this.refs.handles.deleteHandle(result as Handle<Promise<unknown>>);
+      return this.#refs.handles.deleteHandle(
+        result as Handle<Promise<unknown>>,
+      );
     } else {
       const errorHdl = -(result as number) as Handle<Error>;
-      return Promise.reject(this.refs.handles.deleteHandle(errorHdl));
+      return Promise.reject(this.#refs.handles.deleteHandle(errorHdl));
     }
   }
 
   async reload(service: AnySkipService, changes: ChangeManager): Promise<void> {
-    if (this.forkName) {
+    if (this.#forkName) {
       throw new SkipError("Reload cannot be called in transaction.");
     }
-    const definition = this.definition.derive(service);
-    this.refs.setFork(this.forkName);
+    const definition = this.#definition.derive(service);
+    this.#refs.setFork(this.#forkName);
     const uuid = crypto.randomUUID();
     const fork = this.fork(uuid);
     let merged = false;
@@ -842,7 +866,7 @@ export class ServiceInstance {
       fork.merge(streamsToClose);
       merged = true;
       this.closeResourceStreams(streamsToClose);
-      this.definition = definition;
+      this.#definition = definition;
     } catch (ex: unknown) {
       if (!merged) fork.abortFork();
       throw ex;
@@ -853,25 +877,25 @@ export class ServiceInstance {
     definition: ServiceDefinition,
     changes: ChangeManager,
   ): Promise<string[]> {
-    this.refs.setFork(this.forkName);
-    const result = this.refs.runWithGC(() => {
-      this.refs.changes = this.refs.handles.register(changes);
-      const skservicehHdl = this.refs.handles.register(definition);
+    this.#refs.setFork(this.#forkName);
+    const result = this.#refs.runWithGC(() => {
+      this.#refs.changes = this.#refs.handles.register(changes);
+      const skservicehHdl = this.#refs.handles.register(definition);
       const skservice =
-        this.refs.binding.SkipRuntime_createService(skservicehHdl);
-      const res = this.refs.binding.SkipRuntime_Runtime__reload(skservice);
-      this.refs.handles.deleteHandle(this.refs.changes);
-      this.refs.changes = null;
-      return this.refs.json().importJSON(res, true);
+        this.#refs.binding.SkipRuntime_createService(skservicehHdl);
+      const res = this.#refs.binding.SkipRuntime_Runtime__reload(skservice);
+      this.#refs.handles.deleteHandle(this.#refs.changes);
+      this.#refs.changes = null;
+      return this.#refs.json().importJSON(res, true);
     });
     if (Array.isArray(result)) {
       const [handles, res] = result as [Handle<Promise<void>>[], string[]];
-      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
+      const promises = handles.map((h) => this.#refs.handles.deleteHandle(h));
       await Promise.all(promises);
       return res;
     } else {
       const errorHdl = result as Handle<Error>;
-      throw this.refs.handles.deleteHandle(errorHdl);
+      throw this.#refs.handles.deleteHandle(errorHdl);
     }
   }
 
@@ -881,32 +905,32 @@ export class ServiceInstance {
    * @returns The forked ServiceInstance
    */
   private fork(name: string): ServiceInstance {
-    if (this.forkName) throw new Error(`Unable to fork ${this.forkName}.`);
-    this.refs.setFork(this.forkName);
-    this.refs.fork(name);
-    return new ServiceInstance(this.refs, name, this.definition);
+    if (this.#forkName) throw new Error(`Unable to fork ${this.#forkName}.`);
+    this.#refs.setFork(this.#forkName);
+    this.#refs.fork(name);
+    return new ServiceInstance(this.#refs, name, this.#definition);
   }
 
   private merge(ignore: string[]): void {
-    if (!this.forkName) throw new Error("Unable to merge fork on main.");
-    this.refs.setFork(this.forkName);
-    this.refs.merge(ignore);
+    if (!this.#forkName) throw new Error("Unable to merge fork on main.");
+    this.#refs.setFork(this.#forkName);
+    this.#refs.merge(ignore);
   }
 
   private abortFork(): void {
-    if (!this.forkName) throw new Error("Unable to abord fork on main.");
-    this.refs.setFork(this.forkName);
-    this.refs.abortFork();
+    if (!this.#forkName) throw new Error("Unable to abord fork on main.");
+    this.#refs.setFork(this.#forkName);
+    this.#refs.abortFork();
   }
 
   private closeResourceStreams(streams: string[]): void {
-    this.refs.setFork(this.forkName);
-    const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__closeResourceStreams(
-        this.refs.json().exportJSON(streams),
+    this.#refs.setFork(this.#forkName);
+    const errorHdl = this.#refs.runWithGC(() => {
+      return this.#refs.binding.SkipRuntime_Runtime__closeResourceStreams(
+        this.#refs.json().exportJSON(streams),
       );
     });
-    if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
+    if (errorHdl) throw this.#refs.handles.deleteHandle(errorHdl);
   }
 }
 
@@ -983,10 +1007,10 @@ class ValuesImpl<T> implements Values<T> {
 }
 
 export class ToBinding {
-  private readonly stack: Stack;
-  private skjson?: JsonConverter;
-  private forkName: Nullable<string>;
-  private initializing: boolean;
+  readonly #stack: Stack;
+  #skjson?: JsonConverter;
+  #forkName: Nullable<string>;
+  #initializing: boolean;
   readonly handles: Handles;
   changes: Nullable<Handle<ChangeManager>>;
 
@@ -996,11 +1020,11 @@ export class ToBinding {
     private getConverter: () => JsonConverter,
     private getError: (skExc: Pointer<Internal.Exception>) => Error,
   ) {
-    this.stack = new Stack();
+    this.#stack = new Stack();
     this.handles = new Handles();
-    this.forkName = null;
+    this.#forkName = null;
     this.changes = null;
-    this.initializing = false;
+    this.#initializing = false;
   }
 
   register<T>(v: T): Handle<T> {
@@ -1016,19 +1040,19 @@ export class ToBinding {
   }
 
   SkipRuntime_pushContext(context: Pointer<Internal.Context>): void {
-    this.stack.push(context);
+    this.#stack.push(context);
   }
 
   SkipRuntime_popContext(): void {
-    this.stack.pop();
+    this.#stack.pop();
   }
 
   SkipRuntime_getContext(): Nullable<Pointer<Internal.Context>> {
-    return this.stack.get();
+    return this.#stack.get();
   }
 
   SkipRuntime_getFork(): Nullable<string> {
-    return this.forkName;
+    return this.#forkName;
   }
 
   SkipRuntime_getChangeManager(): number {
@@ -1036,7 +1060,7 @@ export class ToBinding {
   }
 
   setFork(name: Nullable<string>): void {
-    this.forkName = name;
+    this.#forkName = name;
   }
 
   // Mapper
@@ -1239,7 +1263,7 @@ export class ToBinding {
   ): Handle<Promise<void>> {
     const skjson = this.getJsonConverter();
     const service = this.handles.get(skservice);
-    const writer = new CollectionWriter(writerId, this, this.forkName);
+    const writer = new CollectionWriter(writerId, this, this.#forkName);
     const params = skjson.importJSON(skparams, true) as Json;
     return this.handles.register(
       service.subscribe(external, writer, instance, resource, params),
@@ -1263,7 +1287,7 @@ export class ToBinding {
   }
 
   SkipRuntime_deleteService(service: Handle<ServiceDefinition>): void {
-    if (!this.initializing) this.handles.deleteHandle(service);
+    if (!this.#initializing) this.handles.deleteHandle(service);
   }
 
   // Change manager
@@ -1402,7 +1426,7 @@ export class ToBinding {
     const definition = new ServiceDefinition(service);
     const skservicehHdl = this.handles.register(definition);
     try {
-      this.initializing = true;
+      this.#initializing = true;
       this.setFork(uuid);
       await this.runAsync(() => {
         const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
@@ -1417,14 +1441,14 @@ export class ToBinding {
       this.handles.deleteHandle(skservicehHdl);
       throw ex;
     } finally {
-      this.initializing = false;
+      this.#initializing = false;
     }
   }
 
   //
   public getJsonConverter() {
-    this.skjson ??= this.getConverter();
-    return this.skjson;
+    this.#skjson ??= this.getConverter();
+    return this.#skjson;
   }
 
   public needGC() {
