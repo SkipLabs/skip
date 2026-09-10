@@ -230,6 +230,15 @@ base class DMap<K: Orderable, +V> {
     | GT() -> right.maybeGet(k)
     }
 
+  fun maybeGetWithTick(k: K): ?(V, Tick)
+  | Nil() -> None()
+  | Node{tick, key, value, left, right} ->
+    k.compare(key) match {
+    | LT() -> left.maybeGetWithTick(k)
+    | EQ() -> Some((value, tick.current))
+    | GT() -> right.maybeGetWithTick(k)
+    }
+
   fun get(k: K): V {
     this.maybeGet(k).fromSome()
   }
