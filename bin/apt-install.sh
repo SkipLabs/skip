@@ -72,8 +72,11 @@ for step in "${steps[@]}"; do
     case "$step" in
         skiplang-build-deps)
             _ensure_base_deps
-            wget -qO /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
-            echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] http://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
+            # wget treats a failed DNS lookup as fatal unless told otherwise,
+            # and resolving apt.llvm.org is intermittently flaky.
+            wget -q --tries=5 --waitretry=5 --retry-on-host-error \
+                -O /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
+            echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt_update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION llvm-$LLVM_VERSION-dev make openssh-client
             # gzip and tar ship in the ubuntu base with fixable CVEs; the base
