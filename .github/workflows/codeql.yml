@@ -45,7 +45,9 @@ jobs:
       shell: bash
       run: |
         sudo install -d -m 0755 /etc/apt/keyrings
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+        # Retry failed DNS lookups too: resolving apt.llvm.org is flaky.
+        wget -q --tries=5 --waitretry=5 --retry-on-host-error \
+          -O- https://apt.llvm.org/llvm-snapshot.gpg.key \
           | sudo tee /etc/apt/keyrings/llvm.asc >/dev/null
         UBUNTU_CODENAME=$(lsb_release -cs)
         echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] https://apt.llvm.org/${UBUNTU_CODENAME}/ llvm-toolchain-${UBUNTU_CODENAME}-20 main" \
