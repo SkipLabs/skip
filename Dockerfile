@@ -4,6 +4,7 @@ ARG TARGETARCH
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=bind,source=./bin/apt-install.sh,target=/tmp/apt-install.sh \
+    --mount=type=bind,source=./bin/llvm-snapshot.gpg.key,target=/tmp/llvm-snapshot.gpg.key \
     --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     /tmp/apt-install.sh skiplang-build-deps

@@ -5,6 +5,7 @@ set -e
 default_steps=(skiplang-build-deps skipruntime-deps)
 LLVM_VERSION=20
 PRIORITY=101
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 # apt-get update fails transiently in two distinct ways during these image
 # builds, and they need different remedies:
@@ -72,10 +73,18 @@ for step in "${steps[@]}"; do
     case "$step" in
         skiplang-build-deps)
             _ensure_base_deps
-            # wget treats a failed DNS lookup as fatal unless told otherwise,
-            # and resolving apt.llvm.org is intermittently flaky.
-            wget -q --tries=5 --waitretry=5 --retry-on-host-error \
-                -O /etc/apt/keyrings/llvm.asc https://apt.llvm.org/llvm-snapshot.gpg.key
+            # The LLVM signing key is committed next to this script instead of
+            # being downloaded: it is a fixed trust anchor (fingerprint
+            # 6084F3CF814B57C1CF12EFD515CF4D18AF4F7421, no expiry), and the
+            # one-shot download from apt.llvm.org kept failing image builds on
+            # transient network errors that wget will not retry. Dockerfiles
+            # that run this step must bind-mount the key alongside the script.
+            llvm_key="$SCRIPT_DIR/llvm-snapshot.gpg.key"
+            if [ ! -f "$llvm_key" ]; then
+                echo "Error: $llvm_key not found; it must sit next to apt-install.sh" >&2
+                exit 1
+            fi
+            install -D -m 0644 "$llvm_key" /etc/apt/keyrings/llvm.asc
             echo "deb [signed-by=/etc/apt/keyrings/llvm.asc] https://apt.llvm.org/noble/ llvm-toolchain-noble-$LLVM_VERSION main" >> /etc/apt/sources.list.d/llvm.list
             apt_update
             apt-get install -q -y --no-install-recommends automake clang-$LLVM_VERSION file gawk git lld-$LLVM_VERSION llvm-$LLVM_VERSION llvm-$LLVM_VERSION-dev make openssh-client
