@@ -35,11 +35,20 @@ wasm: $(OUT_DIR)/libskip_runtime32.a preamble/preamble32.ll
 .PHONY: bootstrap
 bootstrap: $(OUT_DIR)/libstd.sklib
 
+# These archive targets are .PHONY -- their recipes delegate to a recursive make
+# that cannot report whether it changed anything -- so a plain `cp` would bump
+# the mtime on every invocation even when the bytes are identical. Everything
+# downstream keys off that mtime: the stage0 link, and skargo, which fingerprints
+# the link libraries its build script reports and rebuilds the whole compiler
+# when they move. Copy only on a content difference, so an unchanged archive
+# stays unchanged.
+COPY_IF_DIFFERENT = cmp -s $(1) $(2) || cp $(1) $(2)
+
 .PHONY: $(OUT_DIR)/libbacktrace.a
 ifeq ($(LBT_EXISTS), 1)
 $(OUT_DIR)/libbacktrace.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
-	cp $(LIB_DIR)/libbacktrace.a $@
+	$(call COPY_IF_DIFFERENT,$(LIB_DIR)/libbacktrace.a,$@)
 else
 LBT_SOURCE=$(realpath libbacktrace)
 LBT_BUILD=$(OUT_DIR)/libbacktrace-build
@@ -55,20 +64,20 @@ $(OUT_DIR)/libbacktrace.a:
 	@if [ ! -f $(LBT_BUILD)/Makefile ]; then mkdir -p $(LBT_BUILD) && cd $(LBT_BUILD) && CC=clang $(LBT_SOURCE)/configure; fi
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	$(MAKE) -C $(LBT_BUILD)
-	cp $(LBT_BUILD)/.libs/libbacktrace.a $@
+	$(call COPY_IF_DIFFERENT,$(LBT_BUILD)/.libs/libbacktrace.a,$@)
 endif
 
 .PHONY: $(OUT_DIR)/libskip_runtime64.a
 $(OUT_DIR)/libskip_runtime64.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	CFLAGS="$(CFLAGS)" $(MAKE) -C runtime/ libskip_runtime64.a
-	cp runtime/libskip_runtime64.a $@
+	$(call COPY_IF_DIFFERENT,runtime/libskip_runtime64.a,$@)
 
 .PHONY: $(OUT_DIR)/libskip_runtime32.bc
 $(OUT_DIR)/libskip_runtime32.bc:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	CFLAGS="$(CFLAGS)" $(MAKE) -C runtime/ libskip_runtime32.bc
-	cp runtime/libskip_runtime32.bc $@
+	$(call COPY_IF_DIFFERENT,runtime/libskip_runtime32.bc,$@)
 
 $(OUT_DIR)/libskip_runtime32.o: $(OUT_DIR)/libskip_runtime32.bc
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
