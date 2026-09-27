@@ -52,6 +52,7 @@ CJSON SkipRuntime_Runtime__getAll(char* resource, CJObject jsonParams);
 CJSON SkipRuntime_Runtime__getForKey(char* resource, CJObject jsonParams,
                                      CJSON key);
 CJSON SkipRuntime_Runtime__update(char* input, CJSON values);
+CJSON SkipRuntime_Runtime__updateAll(CJSON collections);
 double SkipRuntime_Runtime__fork(char* input);
 double SkipRuntime_Runtime__merge(CJArray);
 double SkipRuntime_Runtime__abortFork();
@@ -682,6 +683,20 @@ Napi::Value UpdateOfRuntime(const Napi::CallbackInfo& info) {
   return result;
 }
 
+Napi::Value UpdateAllOfRuntime(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (!info[0].IsExternal()) {
+    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJSON skcollections = info[0].As<Napi::External<void>>().Data();
+    CJSON skresult = SkipRuntime_Runtime__updateAll(skcollections);
+    result = Napi::External<void>::New(env, skresult);
+  });
+  return result;
+}
+
 Napi::Value ForkOfRuntime(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
   if (info.Length() != 1) {
@@ -850,6 +865,8 @@ Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
   AddFunction(env, binding, "SkipRuntime_Runtime__reload", ReloadOfRuntime);
   AddFunction(env, binding, "SkipRuntime_Runtime__closeResourceStreams",
               CloseResourceStreamsOfRuntime);
+  AddFunction(env, binding, "SkipRuntime_Runtime__updateAll",
+              UpdateAllOfRuntime);
 
   return binding;
 }

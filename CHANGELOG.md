@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - `ServiceInstance.updateAll` and `SkipServiceBroker.updateAll` to write to
+   several input collections atomically, along with the `PATCH /v1/inputs`
+   control route backing them
+
 ## [0.0.19] - 2025-11-16
 
 ### Added

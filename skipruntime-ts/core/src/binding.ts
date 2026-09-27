@@ -178,6 +178,10 @@ export interface FromBinding {
     values: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): Pointer<Internal.CJSON>;
 
+  SkipRuntime_Runtime__updateAll(
+    collections: Pointer<Internal.CJObject>,
+  ): Pointer<Internal.CJSON>;
+
   SkipRuntime_Runtime__fork(name: string): Handle<Error>;
   SkipRuntime_Runtime__merge(
     ignore: Pointer<Internal.CJArray<Internal.CJString>>,

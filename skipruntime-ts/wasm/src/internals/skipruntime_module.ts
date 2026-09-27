@@ -189,6 +189,10 @@ export interface FromWasm {
     values: ptr<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
   ): ptr<Internal.CJSON>;
 
+  SkipRuntime_Runtime__updateAll(
+    collections: ptr<Internal.CJObject>,
+  ): ptr<Internal.CJSON>;
+
   SkipRuntime_Runtime__fork(name: ptr<Internal.String>): Handle<Error>;
   SkipRuntime_Runtime__merge(
     ignore: ptr<Internal.CJArray<Internal.CJString>>,
@@ -667,6 +671,12 @@ export class WasmFromBinding implements FromBinding {
       this.utils.exportString(input),
       toPtr(values),
     );
+  }
+
+  SkipRuntime_Runtime__updateAll(
+    collections: Pointer<Internal.CJObject>,
+  ): ptr<Internal.CJSON> {
+    return this.fromWasm.SkipRuntime_Runtime__updateAll(toPtr(collections));
   }
 
   SkipRuntime_Runtime__fork(name: string): Handle<Error> {
