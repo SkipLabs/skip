@@ -44,6 +44,7 @@ mutable class EnsureOuterIstVisitor(new_id: () -> Int) extends OU.Visitor {
     b match {
     | O.TypedBody(expr) -> (true, SkipMakeOuterIst.body(this.new_id, expr))
     | O.OuterBody _ -> (false, b)
+    | O.SignatureBody _ -> b.getPos().die("Method body not resolved before lowering")
     }
   }
 }

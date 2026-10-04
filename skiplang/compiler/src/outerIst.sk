@@ -55,18 +55,87 @@ base class Visibility uses Equality {
   | VProtected()
 }
 
-class Program private (program: SKStore.EHandle<SKStore.SID, DefFile>) {
-  static fun create(program: SKStore.EHandle<SKStore.SID, DefFile>): this {
-    static(program)
+class MethodDefKey(
+  className: String,
+  name: String,
+  isStatic: Bool,
+) extends SKStore.Key
+
+class Program private (
+  program: SKStore.EHandle<SKStore.SID, DefFile>,
+  declarations: SKStore.EHandle<SKStore.Key, SKStore.File>,
+) {
+  static fun create(
+    context: mutable SKStore.Context,
+    program: SKStore.EHandle<SKStore.SID, DefFile>,
+  ): this {
+    // Compare each declaration before propagating changes. A lazy projection
+    // would invalidate all readers before discovering that a sibling body
+    // was unchanged.
+    declarations = program.map(
+      SKStore.Key::unTyped,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/outerDeclarations/"),
+      (_context, writer, key, files) ~> {
+        files.first.value match {
+        | DClass(cls) ->
+          for (method in cls.methods) {
+            writer.set(
+              MethodDefKey(
+                cls.name.id,
+                method.name.id,
+                method.kind is SkipNamedAst.FKStatic _,
+              ),
+              CallableDefFile(method),
+            );
+          };
+          header = cls with {
+            methods => cls.methods.map((_, method) -> method.declaration()),
+          };
+          writer.set(key, ClassDefFile(header))
+        | DFun _
+        | DConst _ ->
+          void
+        }
+      },
+    );
+    static(program, declarations)
+  }
+
+  fun maybeGetClass(
+    context: mutable SKStore.Context,
+    className: String,
+  ): ?ClassDef {
+    values = this.declarations.getArray(context, SKStore.SID(className));
+    if (values.isEmpty()) return None();
+    values[0] match {
+    | ClassDefFile(cls) -> Some(cls)
+    | _ -> None()
+    }
+  }
+
+  fun maybeGetMethod(
+    context: mutable SKStore.Context,
+    className: String,
+    name: String,
+    isStatic: Bool,
+  ): ?MethodDef {
+    values = this.declarations.getArray(
+      context,
+      MethodDefKey(className, name, isStatic),
+    );
+    if (values.isEmpty()) return None();
+    values[0] match {
+    | CallableDefFile(md @ MethodDef _) -> Some(md)
+    | _ -> invariant_violation("Unexpected method definition")
+    }
   }
 
   fun getClass(context: mutable SKStore.Context, className: String): ClassDef {
-    key = SKStore.SID(className);
-    arr = this.program.getArray(context, key);
-    invariant(arr.size() == 1);
-    arr[0].value match {
-    | DClass(x) -> x
-    | _ -> invariant_violation("Unexpected type")
+    this.maybeGetClass(context, className) match {
+    | Some(cls) -> cls
+    | None() -> invariant_violation("Class definition not found: " + className)
     }
   }
 
@@ -245,22 +314,29 @@ base class Body {
   children =
   | TypedBody(expr: T.Expr)
   | OuterBody(stmt: Stmt)
+  // Class metadata records whether a method is implemented. Its executable
+  // body must be retrieved separately through Program.maybeGetMethod.
+  | SignatureBody(pos: FileRange)
 
   fun getPos(): FileRange
   | TypedBody(expr) -> TU.expr_pos(expr)
   | OuterBody(stmt) -> stmt.getPos()
+  | SignatureBody(pos) -> pos
 
   fun asTyped(): T.Expr
   | TypedBody(t) -> t
   | OuterBody _ -> this.getPos().die(`asTyped() called on OuterBody`)
+  | SignatureBody _ -> this.getPos().die(`Method body not resolved`)
 
   fun asOuter(): Stmt
   | TypedBody _ -> this.getPos().die(`asOuter() called on TypedBody`)
   | OuterBody(o) -> o
+  | SignatureBody _ -> this.getPos().die(`Method body not resolved`)
 
   fun isOuter(): Bool
   | TypedBody _ -> false
   | OuterBody _ -> true
+  | SignatureBody _ -> false
 
   fun mapOuter(f: Stmt -> Stmt): OuterBody {
     OuterBody(f(this.asOuter()))
@@ -289,6 +365,14 @@ base class CallableDef{
   yields: ?FileRange,
   xhash: Int,
 } extends SymbolDef {
+  fun declaration(): this {
+    this with {
+      body => this.body.map(_ -> SignatureBody(this.name.pos)),
+      // The original hash includes the implementation.
+      xhash => 0,
+    }
+  }
+
   fun getParams(): Parameters<Parameter> {
     this.params
   }
