@@ -497,151 +497,161 @@ fun getOrInitializeBackend(
       specializerAllDir = specializerInitDir;
       phaseNumber = 0;
 
-      while (
-        specializerAllDir.unsafeGetArray(context, SKStore.IID(0)).size() > 0
-      ) {
+      while (!specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {
         phaseNumberCopy = phaseNumber;
         specializerAllDirCopy = specializerAllDir;
         // Class creation inherits discovered methods, and method discovery
         // visits existing subclasses. Run them in separate rounds so each
         // sees the other's merged writes.
-        classPhase = specializerAllDir
-          .unsafeGetArray(context, SKStore.IID(0))
+        classPhase = specializerAllDirCopy
+          .getArray(context, SKStore.IID(0))
           .any(value -> value is O.CStackElement _);
-        !specializerAllDir = specializerAllDir
-          .map(
-            x ~> x,
-            x ~> x,
-            context,
-            SKStore.DirName::create(
-              "/specializer/reduced1/" + phaseNumber + "/",
-            ),
-            (context, writer, key, values) ~> {
-              key match {
-              | SKStore.IID _ if (!classPhase) ->
-                debug(("KK", phaseNumberCopy));
-                for (value in values) {
-                  invariant(value is SKStore.IntFile _);
+        // Collect temporary allocations once the complete round is evaluated.
+        // withRegion preserves the context, including its dependencies.
+        !specializerAllDir = SKStore.withRegion(context, (_, context) ~> {
+          nextDir = specializerAllDirCopy
+            .map(
+              x ~> x,
+              x ~> x,
+              context,
+              SKStore.DirName::create(
+                "/specializer/reduced1/" + phaseNumberCopy + "/",
+              ),
+              (context, writer, key, values) ~> {
+                key match {
+                | SKStore.IID _ if (!classPhase) ->
+                  debug(("KK", phaseNumberCopy));
+                  for (value in values) {
+                    invariant(value is SKStore.IntFile _);
+                  };
+                  return void
+                | O.FStackElement _ if (classPhase) ->
+                  // These are still pending work, including any continuations.
+                  // Forward them directly so mergeFun keeps them over new
+                  // requests for the same function from class creation.
+                  writer.setArray(key, values.collect(Array));
+                  writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
+                  return void
+                | SKStore.IID _
+                | O.FStackElement _ ->
+                  void
+                | _ -> return writer.set(key, OldFile(values.collect(Array)))
                 };
-                return void
-              | O.FStackElement _ if (classPhase) ->
-                // These are still pending work, including any continuations.
-                // Forward them directly so mergeFun keeps them over new
-                // requests for the same function from class creation.
-                writer.setArray(key, values.collect(Array));
-                writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
-                return void
-              | SKStore.IID _
-              | O.FStackElement _ ->
-                void
-              | _ -> return writer.set(key, OldFile(values.collect(Array)))
-              };
 
-              config = backendDir.getArray(context, SKStore.IID(0))[0].value;
-              specializer = O.Specializer::make(
-                specializerAllDirCopy,
-                context,
-                config,
-                converter,
-              );
-              invariant(specializer.funStack is List.Nil());
-              invariant(specializer.classStack is List.Nil());
+                config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+                specializer = O.Specializer::make(
+                  specializerAllDirCopy,
+                  context,
+                  config,
+                  converter,
+                );
+                invariant(specializer.funStack is List.Nil());
+                invariant(specializer.classStack is List.Nil());
 
-              key match {
-              | SKStore.IID _ ->
-                debug(("KK", phaseNumberCopy));
-                for (value in values) {
-                  value match {
-                  | SKStore.IntFile _ -> void
-                  | classElt @ O.CStackElement _ ->
-                    specializer.!pos = classElt.pos;
-                    _sclassInfo = O.Specializer::getSClass2CPS(
-                      context,
-                      specializer,
-                      classElt.hc,
-                      classElt.k,
-                    )
-                  | _ -> invariant_violation("Unexpected IID key")
-                  }
-                };
-                if (specializer.funStack is List.Cons _) {
-                  for (f in specializer.funStack) {
-                    writer.setArray(f, Array[f]);
+                key match {
+                | SKStore.IID _ ->
+                  debug(("KK", phaseNumberCopy));
+                  for (value in values) {
+                    value match {
+                    | SKStore.IntFile _ -> void
+                    | classElt @ O.CStackElement _ ->
+                      specializer.!pos = classElt.pos;
+                      _sclassInfo = O.Specializer::getSClass2CPS(
+                        context,
+                        specializer,
+                        classElt.hc,
+                        classElt.k,
+                      )
+                    | _ -> invariant_violation("Unexpected IID key")
+                    }
+                  };
+                  if (specializer.funStack is List.Cons _) {
+                    for (f in specializer.funStack) {
+                      writer.setArray(f, Array[f]);
+                      writer.setArray(
+                        SKStore.IID(0),
+                        Array[SKStore.IntFile(1)],
+                      );
+                    };
+                    specializer.!funStack = List.Nil();
+                  };
+                  specializer.writeDiff(writer)
+
+                | origin @ O.FStackElement _ ->
+                  needsIID = false;
+                  for (value in values) {
+                    specializer.!pauseOnSClassCreation = true;
+                    value match {
+                    | f @ O.FStackElement _ ->
+                      specializer.specializePendingFun(f)
+
+                    | c @ O.ContinuationFile _ ->
+                      for (pending in c.pending) {
+                        invariant(pending.origin == origin);
+                        specializer.!pos = pending.pos;
+                        try {
+                          specializer.!fstackOrigin = Some(origin);
+                          _ = O.Specializer::getSClass2CPS(
+                            context,
+                            specializer,
+                            pending.hc,
+                            pending.k,
+                          );
+                          specializer.!fstackOrigin = None();
+                        } catch {
+                        | O.SClassCreatedExn() ->
+                          specializer.!fstackOrigin = None();
+                          void
+                        | x ->
+                          specializer.!fstackOrigin = None();
+                          throw x
+                        }
+                      }
+                    | _ -> invariant_violation("Unexpected type (compile.sh)")
+                    };
+                  };
+                  if (specializer.funStack is List.Cons _) {
+                    for (f in specializer.funStack) {
+                      writer.setArray(f, Array[f]);
+                    };
+                    !needsIID = true;
+                    specializer.!funStack = List.Nil();
+                  };
+                  specializer.!pauseOnSClassCreation = false;
+                  if (specializer.classStack is List.Cons _) {
+                    pending = specializer.classStack.reversed().toArray();
+                    writer.setArray(
+                      SKStore.IID(0),
+                      pending.map(classElt ->
+                        classElt with {k => (_, _, _) ~> void}
+                      ),
+                    );
+                    writer.setArray(
+                      origin,
+                      Array[O.ContinuationFile(origin, pending)],
+                    );
+                    specializer.!classStack = List.Nil();
+                  } else if (needsIID) {
                     writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
                   };
-                  specializer.!funStack = List.Nil();
-                };
-                specializer.writeDiff(writer)
+                  specializer.writeDiff(writer)
 
-              | origin @ O.FStackElement _ ->
-                needsIID = false;
-                for (value in values) {
-                  specializer.!pauseOnSClassCreation = true;
-                  value match {
-                  | f @ O.FStackElement _ -> specializer.specializePendingFun(f)
-
-                  | c @ O.ContinuationFile _ ->
-                    for (pending in c.pending) {
-                      invariant(pending.origin == origin);
-                      specializer.!pos = pending.pos;
-                      try {
-                        specializer.!fstackOrigin = Some(origin);
-                        _ = O.Specializer::getSClass2CPS(
-                          context,
-                          specializer,
-                          pending.hc,
-                          pending.k,
-                        );
-                        specializer.!fstackOrigin = None();
-                      } catch {
-                      | O.SClassCreatedExn() ->
-                        specializer.!fstackOrigin = None();
-                        void
-                      | x ->
-                        specializer.!fstackOrigin = None();
-                        throw x
-                      }
-                    }
-                  | _ -> invariant_violation("Unexpected type (compile.sh)")
-                  };
-                };
-                if (specializer.funStack is List.Cons _) {
-                  for (f in specializer.funStack) {
-                    writer.setArray(f, Array[f]);
-                  };
-                  !needsIID = true;
-                  specializer.!funStack = List.Nil();
-                };
-                specializer.!pauseOnSClassCreation = false;
-                if (specializer.classStack is List.Cons _) {
-                  pending = specializer.classStack.reversed().toArray();
-                  writer.setArray(
-                    SKStore.IID(0),
-                    pending.map(classElt ->
-                      classElt with {k => (_, _, _) ~> void}
-                    ),
-                  );
-                  writer.setArray(
-                    origin,
-                    Array[O.ContinuationFile(origin, pending)],
-                  );
-                  specializer.!classStack = List.Nil();
-                } else if (needsIID) {
-                  writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
-                };
-                specializer.writeDiff(writer)
-
-              | _ -> invariant_violation("Unexpected specializer work key")
-              }
-            },
-          )
-          .map(
-            x ~> x,
-            x ~> x,
-            context,
-            SKStore.DirName::create("/specializer/merge1/" + phaseNumber + "/"),
-            mergeFun,
-          );
+                | _ -> invariant_violation("Unexpected specializer work key")
+                }
+              },
+            )
+            .map(
+              x ~> x,
+              x ~> x,
+              context,
+              SKStore.DirName::create(
+                "/specializer/merge1/" + phaseNumberCopy + "/",
+              ),
+              mergeFun,
+            );
+          _ = nextDir.getArray(context, SKStore.IID(0));
+          nextDir
+        });
 
         !phaseNumber = phaseNumber + 1;
       };
