@@ -256,6 +256,25 @@ private class SClassInfo{
   // parallel to GClass::extends_
   extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
 } {
+  fun merge(other: SClassInfo): SClassInfo {
+    !this.supertypes = this.supertypes.union(other.supertypes);
+    !this.subtypes = this.subtypes.union(other.subtypes);
+    !this.methods = other.methods.reduce(
+      (acc, k, v) ~> {
+        !acc[k] = acc.maybeGet(k) match {
+        | None() -> v
+        | Some(old) ->
+          if (old != v) {
+            invariant_violation("Unexpected inequality in SClassInfo")
+          };
+          v
+        };
+        acc
+      },
+      this.methods,
+    );
+    this
+  }
   fun setSClass(specializer: mutable Specializer, value: SClass): this {
     !this.sclass = value;
     specializer.sclassSet(this.sclass.id, this);
@@ -418,6 +437,23 @@ mutable class SPMapDiff<K: Orderable, V>{
   > = None(),
   mutable data: SortedMap<K, V> = SortedMap[],
 } extends SPMap<K, V> {
+  static fun merge(
+    map1: SPMapDiff<K, V>,
+    map2: SPMapDiff<K, V>,
+    union: (V, V) ~> V,
+  ): SPMapDiff<K, V> {
+    !map1.data = map2.data.reduce(
+      (acc, k, v) ~> {
+        !acc[k] = acc.maybeGet(k) match {
+        | None() -> v
+        | Some(x) -> union(x, v)
+        };
+        acc
+      },
+      map1.data,
+    );
+    map1
+  }
   readonly fun chill(): SPMap<K, V> {
     SPMapDiff{
       k2Key => this.k2Key,
@@ -569,6 +605,46 @@ class SpecializerState{
   verifyChanged: Bool,
   pos: Pos,
 } {
+  fun merge(other: SpecializerState): SpecializerState {
+    !this.gclassMap = (this.gclassMap, other.gclassMap) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> x.union(y))
+    | _ -> invariant_violation("Unexpected gclassMap type for merge")
+    };
+    !this.sclassMap = (this.sclassMap, other.sclassMap) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> {
+        if (x != y) {
+          invariant_violation(
+            "Unexpected inequality in SpecializerState::merge",
+          );
+        };
+        y
+      })
+    | _ -> invariant_violation("Unexpected sclassMap type for merge")
+    };
+    !this.sclasses = (this.sclasses, other.sclasses) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> x.merge(y))
+    | _ -> invariant_violation("Unexpected sclasses type for merge")
+    };
+    !this.funsNeeded = (this.funsNeeded, other.funsNeeded) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> {
+        if (x != y) {
+          invariant_violation(
+            "Unexpected inequality in SpecializerState::merge",
+          );
+        };
+        y
+      })
+    | _ -> invariant_violation("Unexpected funsNeeded type for merge")
+    };
+    !this.funSet = this.funSet.union(other.funSet);
+    !this.funStack = this.funStack.concat(other.funStack);
+    this
+  }
+
   fun mclone(context: mutable SKStore.Context): mutable Specializer {
     mutable Specializer{
       context => context,
