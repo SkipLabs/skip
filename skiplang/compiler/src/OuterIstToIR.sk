@@ -5015,7 +5015,7 @@ fun createSpecializer(
   config: Config.Config,
   converter: Converter,
   roots: RootsIR,
-): Specializer {
+): SpecializerState {
   // Find every relevant type and function in the program.
   specializer = Specializer::make(context, config, converter);
   forceCompile = roots.forceCompile;
@@ -5032,9 +5032,9 @@ fun createIR(
   context: mutable SKStore.Context,
   config: Config.Config,
   roots: RootsIR,
-  frozenSpecializer: Specializer,
+  frozenSpecializer: SpecializerState,
 ): GlobalEnv {
-  specializer = frozenSpecializer.mclone();
+  specializer = frozenSpecializer.mclone(context);
 
   // Latch the sub- and supertypes.
   for (info in specializer.getSClasses()) {
