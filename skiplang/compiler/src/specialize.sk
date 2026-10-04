@@ -1119,11 +1119,19 @@ mutable class Specializer{
   // implementing the method actually takes one. In such a case we need to
   // use the tparamInherit field to determine the targ values based on
   // information from the class which the method call was compiled against.
+  // Public entry points require class discovery to be complete and finish
+  // with an identity continuation. Calls within
+  // the pending-function CPS walk must use the private CPS implementations
+  // so the rest of the walk remains in k, including across class creation.
   mutable fun computeMethodTargs(
     context: mutable SKStore.Context,
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "computeMethodTargs requires canCreateNewSClasses to be false; use computeMethodTargsCPS during class discovery",
+    );
     static::computeMethodTargsCPS(context, this, call, tparamEnv, (_, _, x) ~>
       x
     )
@@ -1257,10 +1265,12 @@ mutable class Specializer{
 
     for (tt in builtinTypes) {
       (t, lazyGClass) = tt;
-      sc = this.getSClass2(
+      sc = static::getSClass2CPS(
         context,
+        this,
         HalfClass(lazyGClass, Array[], DeepFrozen()),
-      ).sclass;
+        (_, _, info) ~> info.sclass,
+      );
       if (sc.id != t.sclassID) {
         sc.pos.die(`sclass ID mismatch: ${sc.id} != ${t.sclassID}`)
       }
@@ -1304,11 +1314,13 @@ mutable class Specializer{
       | List.Cons(hd, tl) -> (tl, hd)
       };
       this.withRegion(this.context, (context, specializer) ~> {
-        specializer.specializePendingFun(
+        static::specializePendingFunCPS(
           context,
+          specializer,
           stackElt.lazyGFun,
           stackElt.methodTargs,
           stackElt.classTargs,
+          (_, _, _) ~> void,
         );
       })
     }
@@ -1330,11 +1342,13 @@ mutable class Specializer{
         };
         if (filter(stackElt)) {
           this.withRegion(context, (context, specializer) ~> {
-            specializer.specializePendingFun(
+            static::specializePendingFunCPS(
               context,
+              specializer,
               stackElt.lazyGFun,
               stackElt.methodTargs,
               stackElt.classTargs,
+              (_, _, _) ~> void,
             );
           })
         } else {
@@ -1345,118 +1359,235 @@ mutable class Specializer{
     this.!funStack = newStack;
   }
 
-  mutable fun specializePendingFun(
+  private static fun specializePendingFunCPS<T>(
     context: mutable SKStore.Context,
+    sp: mutable this,
     fname: LazyGFun,
     methodTargs: Array<Tclass>,
     classTargs: Array<Tclass>,
-  ): void {
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
     superposition = FunSuperpositionID(
       ClassSuperpositionID(classTargs),
       MethodSuperpositionID(methodTargs),
     );
     gfunKey = GFunKey(fname, superposition);
 
-    if (!this.funsNeededContains(gfunKey)) {
-      this.funsNeededSet(gfunKey);
+    if (!sp.funsNeededContains(gfunKey)) {
+      sp.funsNeededSet(gfunKey);
     };
 
     targs = classTargs.concat(methodTargs);
-    f = this.converter.getGFunction(context, fname);
+    f = sp.converter.getGFunction(context, fname);
     if (f.funInfo.tparams.size() != targs.size()) {
-      this.pos.die(
+      sp.pos.die(
         `tparam count mismatch in requestFunction for ${f}; ` +
           `expected ${f.funInfo.tparams}, but got ${targs}`,
       )
     };
 
-    oldPos = this.pos;
+    oldPos = sp.pos;
 
     tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
+    // Deduplicate type requests before the CPS walk so its continuations
+    // only capture immutable scan data, not the mutable seen-types set.
     seenTypes = mutable UnorderedSet[];
-    noteType = (t, literalType) -> {
-      // For speed look up the parametric version of the type in the cache,
-      // and only if that fails run applyTparams and look up the real type.
-      key = (t, literalType);
-      if (seenTypes.maybeInsert(key)) {
-        _ = this.getTclass3(context, t, tparamEnv, this.pos, literalType)
+    instrs = mutable Vector[];
+    for (instr in f.params) {
+      instrs.push(
+        (
+          (instr : GNonConstantInstr),
+          seenTypes.maybeInsert((instr.getType(), false)),
+          false,
+        ),
+      );
+    };
+    for (block in f.blocks) {
+      for (instr in block.instrs) {
+        noteType = seenTypes.maybeInsert((instr.getType(), false));
+        noteLiteralType =
+          instr is GObject _ &&
+          seenTypes.maybeInsert((instr.getType(), true));
+        instrs.push(((instr : GNonConstantInstr), noteType, noteLiteralType));
       }
     };
+    scan = instrs.toArray();
 
     // Ensure the stub for a generator's "next" method exists,
     // so we can find it when we provide a body for it later.
-    returnType = this.getTclass3(
+    static::getTclass3CPS(
       context,
+      sp,
       f.funInfo.funType.returnType,
       tparamEnv,
-    );
-    if (f.funInfo.isGenerator) {
-      this.requestMethod(context, "next", returnType, Array[])
-    };
+      sp.pos,
+      false,
+      (context, sp, returnType) ~> {
+        if (f.funInfo.isGenerator) {
+          sp.requestMethod(context, "next", returnType, Array[])
+        };
+        static::specializePendingInstrsCPS(
+          context,
+          sp,
+          tparamEnv,
+          scan,
+          0,
+          (context, sp, _) ~> {
+            sp.!pos = oldPos;
+            k(context, sp, void)
+          },
+        )
+      },
+    )
+  }
 
-    // Process parameters.
-    for (instr in f.params) {
-      this.!pos = instr.pos;
-      noteType(instr.getType(), false);
-    };
-
-    // Process the body of the function.
-    for (b in f.blocks) {
-      for (instr in b.instrs) {
-        this.!pos = instr.pos;
-
-        noteType(instr.getType(), false);
-
-        instr match {
-        | GCallFunctionBase{name, targs => innerTargs} ->
-          _ = this.requestFunction(
-            name,
-            innerTargs.map(t -> this.getTclass3(context, t, tparamEnv)),
+  private static fun specializePendingInstrsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    instrs: Array<(GNonConstantInstr, Bool, Bool)>,
+    index: Int,
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
+    if (index == instrs.size()) return k(context, sp, void);
+    (instr, noteType, noteLiteralType) = instrs[index];
+    sp.!pos = instr.pos;
+    afterType = (
+      context: mutable SKStore.Context,
+      sp: mutable this,
+      _type: Tclass,
+    ) ~> {
+      static::specializePendingInstrCPS(
+        context,
+        sp,
+        tparamEnv,
+        instr,
+        noteLiteralType,
+        (context, sp, _) ~> {
+          static::specializePendingInstrsCPS(
+            context,
+            sp,
+            tparamEnv,
+            instrs,
+            index + 1,
+            k,
           )
-        | call @ GCallMethodBase{method} ->
-          objType = this.getTclass3(context, call.args[0].getType(), tparamEnv);
-          innerTargs = this.computeMethodTargs(context, call, tparamEnv);
-          this.requestMethod(context, method, objType, innerTargs)
-
-        | GTypeSwitch{value} ->
-          // TypeSwitch on an Option type will generate an "isSome()"
-          // call, so we need to force that method to get compiled.
-          valType = this.getTclass3(context, value.getType(), tparamEnv);
-
-          if (this.trackedSClassGet(valType.sclassID).optionStyle.isSome()) {
-            this.requestMethod(context, "isSome", valType, Array[])
-          }
-
-        | obj @ GObject _ -> noteType(obj.getType(), true)
-
-        // These do not cause any additional types or code to be needed.
-        | GAsyncReturn _
-        | GCast _
-        | GEArray _
-        | GFreeze _
-        | GGetConst _
-        | GGetCurrentAwaitable _
-        | GGetField _
-        | GIf _
-        | GIntSwitch _
-        | GJump _
-        | GLandingPad _
-        | GReturn _
-        | GSetField _
-        | GStringSwitch _
-        | GSuspend _
-        | GThrow _
-        | GUnreachable _
-        | GWith _
-        | GYield _
-        | GYieldBreak _
-        | GZeroExtend _ ->
-          void
-        }
-      }
+        },
+      )
     };
+    if (noteType) {
+      static::getTclass3CPS(
+        context,
+        sp,
+        instr.getType(),
+        tparamEnv,
+        sp.pos,
+        false,
+        afterType,
+      )
+    } else {
+      afterType(context, sp, tVoid)
+    }
+  }
 
-    this.!pos = oldPos;
+  private static fun specializePendingInstrCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    instr: GNonConstantInstr,
+    noteLiteralType: Bool,
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
+    instr match {
+    | GCallFunctionBase{name, targs => innerTargs} ->
+      static::getTclass3GTargsCPS(
+        context,
+        sp,
+        tparamEnv,
+        sp.pos,
+        List::createFromItems(innerTargs),
+        (context, sp, innerTargs) ~> {
+          sp.requestFunction(name, innerTargs.toArray());
+          k(context, sp, void)
+        },
+      )
+    | call @ GCallMethodBase{method} ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        call.args[0].getType(),
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, objType) ~> {
+          static::computeMethodTargsCPS(
+            context,
+            sp,
+            call,
+            tparamEnv,
+            (context, sp, innerTargs) ~> {
+              sp.requestMethod(context, method, objType, innerTargs);
+              k(context, sp, void)
+            },
+          )
+        },
+      )
+    | GTypeSwitch{value} ->
+      // TypeSwitch on an Option type generates an isSome() call.
+      static::getTclass3CPS(
+        context,
+        sp,
+        value.getType(),
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, valType) ~> {
+          if (sp.trackedSClassGet(valType.sclassID).optionStyle.isSome()) {
+            sp.requestMethod(context, "isSome", valType, Array[])
+          };
+          k(context, sp, void)
+        },
+      )
+    | obj @ GObject _ ->
+      if (noteLiteralType) {
+        static::getTclass3CPS(
+          context,
+          sp,
+          obj.getType(),
+          tparamEnv,
+          sp.pos,
+          true,
+          (context, sp, _) ~> k(context, sp, void),
+        )
+      } else {
+        k(context, sp, void)
+      }
+
+    // Parameters and these instructions need only their result type.
+    | GFunParam _
+    | GAsyncReturn _
+    | GCast _
+    | GEArray _
+    | GFreeze _
+    | GGetConst _
+    | GGetCurrentAwaitable _
+    | GGetField _
+    | GIf _
+    | GIntSwitch _
+    | GJump _
+    | GLandingPad _
+    | GReturn _
+    | GSetField _
+    | GStringSwitch _
+    | GSuspend _
+    | GThrow _
+    | GUnreachable _
+    | GWith _
+    | GYield _
+    | GYieldBreak _
+    | GZeroExtend _ ->
+      k(context, sp, void)
+    }
   }
 
   readonly fun exampleSClass(t: Type): SClass {
@@ -1692,6 +1823,10 @@ mutable class Specializer{
     mutability: Mutability,
     literalType: Bool = false,
   ): Tclass {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getTclass2 requires canCreateNewSClasses to be false; use getTclass2CPS during class discovery",
+    );
     static::getTclass2CPS(
       context,
       this,
@@ -1742,6 +1877,10 @@ mutable class Specializer{
     pos: Pos = this.pos,
     literalType: Bool = false,
   ): Tclass {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getTclass3 requires canCreateNewSClasses to be false; use getTclass3CPS during class discovery",
+    );
     static::getTclass3CPS(
       context,
       this,
@@ -2120,6 +2259,10 @@ mutable class Specializer{
     context: mutable SKStore.Context,
     hc: HalfClass,
   ): SClassInfo {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getSClass2 requires canCreateNewSClasses to be false; use getSClass2CPS during class discovery",
+    );
     static::getSClass2CPS(context, this, hc, (_, _, x) ~> x)
   }
 
