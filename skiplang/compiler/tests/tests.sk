@@ -271,11 +271,103 @@ private fun incrementalFrontendErrors(): void {
   T.expectTrue(removed.success(), removed.stderr);
 }
 
+// Exercise persisted relationships through generic variance, removals, and
+// changes to inheritance, method bodies, methods, and layouts.
+private fun incrementalRelationships(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  baseline =
+    "base class RelationBase { fun value(): Int { 7 } }\n" +
+    "class RelationChild(extra: Int = 2) extends RelationBase\n" +
+    "class RelationBox<+T>(value: T) { fun get(): T { this.value } }\n" +
+    "untracked fun main(): void {\n" +
+    "  x: RelationBase = RelationChild();\n" +
+    "  b: RelationBox<RelationBase> = RelationBox<RelationChild>(RelationChild());\n" +
+    "  opt: ?RelationBox<RelationBase> = Some(b);\n" +
+    "  print_raw((x.value() + opt.fromSome().get().value()).toString());\n" +
+    "}\n";
+  try {
+    for ((text, expected, timestamp, initialize) in Array[
+      (baseline, "14", "200001010000.01", true),
+      (
+        baseline.replace("Int { 7 }", "Int { 9 }"),
+        "18",
+        "200001010000.02",
+        false,
+      ),
+      (
+        baseline.replace("fun value()", "fun unused(): Int { 3 } fun value()"),
+        "14",
+        "200001010000.03",
+        false,
+      ),
+      (
+        baseline.replace(
+          "extra: Int = 2",
+          "extra: Int = 2, another: String = \"hello\"",
+        ),
+        "14",
+        "200001010000.04",
+        false,
+      ),
+      (
+        baseline
+          .replace(
+            "class RelationBox",
+            "class RelationOther() extends RelationBase\nclass RelationBox",
+          )
+          .replace(
+            "x: RelationBase = RelationChild()",
+            "x: RelationBase = RelationOther()",
+          ),
+        "14",
+        "200001010000.05",
+        false,
+      ),
+      (
+        baseline.replace("RelationChild", "RelationReplacement"),
+        "14",
+        "200001010000.06",
+        false,
+      ),
+      (baseline, "14", "200001010000.07", false),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      compiled = System.subprocess(
+        compile_cmd(Array[source], output).concat(
+          Array[if (initialize) "--init" else "--data", data],
+        ),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      result = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(result.success(), result.stderr);
+      T.expectEq(result.stdout, expected);
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
   tests.set(
     "incremental",
     mutable Vector[
+      T.Test{name => "relationships", func => () ~> incrementalRelationships()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),
