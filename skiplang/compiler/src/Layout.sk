@@ -251,7 +251,7 @@ mutable private class FieldLayoutChooser(
 
       // Visit all supertypes and constrain those with this field to
       // use the same offset as this type.
-      for (superID in info.supertypes) {
+      for (superID in this.specializer.supertypesGet(sid)) {
         fkey = FieldKey(superID, name);
         if (!this.fieldsDone.contains(fkey)) {
           this.!fieldsDone = this.fieldsDone.set(fkey);
@@ -263,7 +263,7 @@ mutable private class FieldLayoutChooser(
       };
 
       // Same as above, but for all subtypes.
-      for (subID in info.subtypes) {
+      for (subID in this.specializer.subtypesGet(sid)) {
         subInfo = this.specializer.sclassGet(subID);
         fkey = FieldKey(subID, name);
         if (!this.fieldsDone.contains(fkey)) {
