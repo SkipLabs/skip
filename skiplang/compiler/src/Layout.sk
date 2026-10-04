@@ -182,7 +182,7 @@ mutable private class FieldLayoutChooser(
     flc = mutable FieldLayoutChooser(specializer, config, SortedSet[]);
 
     // Process all the fixed layout classes first
-    for (info in specializer.untrackedSClasses()) {
+    for (info in specializer.getSClasses()) {
       sc = info.sclass;
       if (
         annotationsContainParam(sc.annotations, "@cpp_export", sc.pos).isSome()
@@ -191,13 +191,13 @@ mutable private class FieldLayoutChooser(
         !info.sclass = sc with {
           layout => Some(layoutCppExportClass(specializer, sc.fields)),
         };
-        specializer.untrackedSClassSet(info.sclass.id, info);
+        specializer.sclassSet(info.sclass.id, info);
       }
     };
 
     emptyLayout = Some(Array[]);
 
-    for (info in specializer.untrackedSClasses()) {
+    for (info in specializer.getSClasses()) {
       sc = info.sclass;
       if (!sc.isArray() && !sc.kind.isValueClass()) {
         if (sc.fields.isEmpty()) {
@@ -207,7 +207,7 @@ mutable private class FieldLayoutChooser(
           // is that with no fields, no field layout constraints get created
           // by the colorer, and those are what trigger assigning to 'layout'.
           !info.sclass = sc with {layout => emptyLayout};
-          specializer.untrackedSClassSet(info.sclass.id, info);
+          specializer.sclassSet(info.sclass.id, info);
         } else if (!flc.classAlreadyProcessed.contains(sc.id)) {
           flc.!classAlreadyProcessed = flc.classAlreadyProcessed.set(sc.id);
           constraints = flc.buildConstraintsForConnectedClasses(sc);
@@ -215,7 +215,7 @@ mutable private class FieldLayoutChooser(
             flc.assignFieldOffsets(constraints)
           } else {
             !info.sclass = sc with {layout => emptyLayout};
-            specializer.untrackedSClassSet(info.sclass.id, info);
+            specializer.sclassSet(info.sclass.id, info);
           }
         }
       }
@@ -412,7 +412,7 @@ mutable private class FieldLayoutChooser(
       sc.pos.invariant(sc.fields.size() == layout.size(), "Layout mismatch");
 
       !info.sclass = sc with {layout => Some(layout.toArray())};
-      this.specializer.untrackedSClassSet(info.sclass.id, info);
+      this.specializer.sclassSet(info.sclass.id, info);
     }
   }
 }
@@ -451,7 +451,7 @@ private fun layoutCppExportClass(
     .map(field -> {
       // Get this field's primitive type. We don't have legal GlobalEnv
       // yet so we can't use Type::getScalarType().
-      fieldSClass = s.untrackedSClassGet(field.typ.sclassID).sclass;
+      fieldSClass = s.sclassGet(field.typ.sclassID).sclass;
       scalarType = fieldSClass.getScalarType();
 
       // Naturally align the bit offsets

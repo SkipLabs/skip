@@ -397,20 +397,23 @@ mutable class Specializer{
   mutable tick: SKStore.Tick,
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  mutable gclassMap: SortedMap<GClassName, SortedSet<SClassID>> = SortedMap[],
+  private mutable gclassMap: SortedMap<
+    GClassName,
+    SortedSet<SClassID>,
+  > = SortedMap[],
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
-  mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
+  private mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
 
   // Maps SClassID.id to information about that class.
-  mutable sclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
+  private mutable sclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
-  mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
+  private mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
 
   // Functions we still need to analyze with a new set of Targs.
-  mutable funStack: List<(GFunction, Array<Tclass>)> = List[],
+  private mutable funStack: List<(GFunction, Array<Tclass>)> = List[],
 
   converter: Converter,
 
@@ -478,15 +481,7 @@ mutable class Specializer{
     this.!sclasses = this.sclasses.set(key, value);
   }
 
-  readonly fun untrackedSClassGet(key: SClassID): SClassInfo {
-    this.sclasses[key]
-  }
-
-  mutable fun untrackedSClassSet(key: SClassID, value: SClassInfo): void {
-    this.!sclasses = this.sclasses.set(key, value);
-  }
-
-  mutable fun untrackedSClasses(): SortedMap<SClassID, SClassInfo> {
+  mutable fun getSClasses(): SortedMap<SClassID, SClassInfo> {
     this.sclasses
   }
 
@@ -562,10 +557,6 @@ mutable class Specializer{
     this.!pos = other.pos;
   }
 
-  readonly fun untrackedGetSClass(sid: SClassID): SClass {
-    this.untrackedSClassGet(sid).sclass
-  }
-
   readonly fun getSClass(sid: SClassID): SClass {
     this.sclassGet(sid).sclass
   }
@@ -577,7 +568,7 @@ mutable class Specializer{
   // If t is Awaitable<T>, returns Some(T), else None().
   readonly fun awaitableType(t: Tclass): ?Tclass {
     // Get the SClassInfo for the "Awaitable" type (maybe a base class).
-    info = this.untrackedSClassGet(t.sclassID);
+    info = this.sclassGet(t.sclassID);
     baseInfo = if (info.sclass.gclassName == GClassName("Awaitable")) {
       info
     } else {
@@ -585,14 +576,14 @@ mutable class Specializer{
       // createAwaitableClass)
       // TODO: Warn against user created ones
       info.extends_.maybeGet(FrontEndLazyGClass("Awaitable")) match {
-      | Some(id) -> this.untrackedSClassGet(id)
+      | Some(id) -> this.sclassGet(id)
       | _ -> return None()
       }
     };
 
     // Return the type of awaitable.value.value.
     rawType = baseInfo.getUnscalarizedField("value", info.sclass.pos).typ;
-    rawInfo = this.untrackedSClassGet(rawType.sclassID);
+    rawInfo = this.sclassGet(rawType.sclassID);
     Some(rawInfo.getUnscalarizedField("value", rawInfo.sclass.pos).typ)
   }
 
@@ -713,33 +704,6 @@ mutable class Specializer{
 
     // Keep specializing functions and types until we hit a fixed point.
     while (this.specializePendingFuns(context)) void;
-
-    if (false) {
-      // Debug support for dumping out the back end's understanding of
-      // the inheritance graph.
-      sortedClasses = Array::mcreateFromIterator(
-        this.untrackedSClasses().values(),
-      );
-      sortedClasses.sortBy(a ~> a.sclass.id);
-
-      for (info in sortedClasses) {
-        print_error(`${info.sclass}:\n`);
-
-        print_error("    supertypes:\n");
-        v1 = info.supertypes
-          .toArray()
-          .map(x -> this.untrackedSClassGet(x).sclass.toString())
-          .sorted();
-        for (x in v1) print_error_ln(`        ${x}`);
-
-        print_error("    subtypes:\n");
-        v2 = info.subtypes
-          .toArray()
-          .map(x -> this.untrackedSClassGet(x).sclass.toString())
-          .sorted();
-        for (x in v2) print_error_ln(`        ${x}`);
-      }
-    };
 
     // TODO: Set "canInstantiate" to false for KBase with no KClass.
 
@@ -1024,7 +988,7 @@ mutable class Specializer{
       };
 
       !info.sclass = sclass with {fields => buf.toArray(), arraySlot};
-      this.untrackedSClassSet(info.sclass.id, info);
+      this.sclassSet(info.sclass.id, info);
     }
   }
 
@@ -1874,7 +1838,7 @@ mutable class Specializer{
         // coroutine state object, that has the "next" method that
         // we need to update to be an "UnfinishedNext".
         _ = f.funType.returnType[0].forEachTclass(tc -> {
-          nextMethodID = this.untrackedSClassGet(tc.sclassID).sclass.getMethod(
+          nextMethodID = this.sclassGet(tc.sclassID).sclass.getMethod(
             "next",
             MethodSuperpositionID::empty,
             f.pos,
@@ -1975,7 +1939,7 @@ mutable class Specializer{
     reportMemoryStatistics("native/partitionFunctions after sfuns");
 
     // Populate each SClass.methods with the SFunctionIDs for its code.
-    for (info in this.untrackedSClasses()) {
+    for (info in this.getSClasses()) {
       this.withRegion(context, (_, specializer) ~> {
         specializer.populateSFunctionIDs(info, sids);
       })
@@ -2023,7 +1987,7 @@ mutable class Specializer{
     if (!info.methods.isEmpty()) {
       newMethods = UnorderedMap::mcreate(info.methods.size());
       for (mkey => hostID in info.methods) {
-        host = this.untrackedSClassGet(hostID).sclass;
+        host = this.sclassGet(hostID).sclass;
         methodFunName = FrontEndLazyGFun{
           frontEndName => host.gclassName.id + "::" + mkey.name,
         };
@@ -2045,7 +2009,7 @@ mutable class Specializer{
       sclass = info.sclass;
       !sclass.methods = newMethods.chill();
       !info.sclass = sclass;
-      this.untrackedSClassSet(info.sclass.id, info);
+      this.sclassSet(info.sclass.id, info);
     }
   }
 }
@@ -2277,11 +2241,7 @@ mutable class FunSpecializer{
     }
   }
 
-  readonly fun untrackedGetSClass(sid: SClassID): SClass {
-    this.specializer.untrackedSClassGet(sid).sclass
-  }
-
-  mutable fun getSClass(sid: SClassID): SClass {
+  readonly fun getSClass(sid: SClassID): SClass {
     this.specializer.sclassGet(sid).sclass
   }
 

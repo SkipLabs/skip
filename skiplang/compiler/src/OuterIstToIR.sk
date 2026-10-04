@@ -5007,17 +5007,19 @@ fun createIR(
   reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
 
   // Latch the sub- and supertypes.
-  for (info in specializer.untrackedSClasses()) {
+  for (info in specializer.getSClasses()) {
     !info.sclass = info.sclass with {
       subtypes => info.subtypes,
       supertypes => info.supertypes,
     };
-    specializer.untrackedSClassSet(info.sclass.id, info);
+    specializer.sclassSet(info.sclass.id, info);
   };
   reportMemoryStatistics("native/createIR after latch sub/super");
 
   // Flatten value class fields into scalars.
-  specializer.scalarizeAllFields(specializer.sclasses.items().map(x -> x.i1));
+  specializer.scalarizeAllFields(
+    specializer.getSClasses().items().map(x -> x.i1),
+  );
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
   specializer.withRegion(context, (_context, specializer) ~> {
