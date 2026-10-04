@@ -355,12 +355,11 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
     x ~> x,
     context,
     SKStore.DirName::create("/specializer/roots/"),
-    (context, writer, _, values) ~> {
+    (_context, writer, _, values) ~> {
       prevPhase = BackendPhase1File::type(values.first);
       roots = prevPhase.rootsIR;
       for (root in roots.forceCompile) {
-        function = converter.getGFunction(context, root);
-        elt = OuterIstToIR.FStackElement(function, Array[]);
+        elt = OuterIstToIR.FStackElement(root, Array[], Array[]);
         writer.set(elt, elt);
       }
     },
