@@ -209,7 +209,9 @@ class BackendPhase1File(
   rootsIR: OuterIstToIR.RootsIR,
 ) extends SKStore.File
 
-class SpecializerFile(value: OuterIstToIR.Specializer) extends SKStore.File
+class SpecializerFile(
+  value: OuterIstToIR.SpecializerState,
+) extends SKStore.File
 
 // Sink of the backend mapper: for each unit, the compile errors it produced
 // (empty/absent on success). The mapper *emits its outcome* here rather than
@@ -345,6 +347,22 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
         defsProj,
       );
       writer.set(key, BackendPhase1File(conf, defsIR))
+    },
+  );
+
+  _specializerRootsDir = backendPhase1.map(
+    OuterIstToIR.FStackElement::keyType,
+    OuterIstToIR.FStackElement::type,
+    context,
+    SKStore.DirName::create("/specializer/roots/"),
+    (context, writer, _, values) ~> {
+      prevPhase = BackendPhase1File::type(values.first);
+      roots = prevPhase.rootsIR;
+      for (root in roots.forceCompile) {
+        function = converter.getGFunction(context, root);
+        elt = OuterIstToIR.FStackElement(function, Array[]);
+        writer.set(elt, elt);
+      }
     },
   );
 
