@@ -5014,21 +5014,11 @@ fun createSpecializer(
   context: mutable SKStore.Context,
   config: Config.Config,
   converter: Converter,
-  roots: RootsIR,
   handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ): SpecializerState {
   // Find every relevant type and function in the program.
   specializer = Specializer::make(handle, context, config, converter);
   specializer.builtins();
-  forceCompile = roots.forceCompile;
-
-  for (gid in forceCompile) {
-    _ = specializer.requestFunction(gid, Array[])
-  };
-
-  specializer.findAllFunctionsAndSClasses();
-  specializer.toFixed(context);
-  specializer.!canCreateNewSClasses = false;
   specializer.chill()
 }
 
@@ -5036,10 +5026,8 @@ fun createIR(
   context: mutable SKStore.Context,
   config: Config.Config,
   roots: RootsIR,
-  frozenSpecializer: SpecializerState,
+  specializer: mutable Specializer,
 ): GlobalEnv {
-  specializer = frozenSpecializer.mclone(context);
-
   // Latch the sub- and supertypes.
   for (info in specializer.getSClasses()) {
     !info.sclass = info.sclass with {
