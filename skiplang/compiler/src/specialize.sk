@@ -399,6 +399,7 @@ mutable base class SPMap<K: Orderable, V>{} {
   readonly fun readonlyGet(k: K): V;
   mutable fun get(context: mutable SKStore.Context, k: K): V;
   mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V;
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool;
   mutable fun set(k: K, v: V): void;
   mutable fun replace(other: readonly SPMap<K, V>): void;
   readonly fun toFixed(): readonly SPMapFixed<K, V>;
@@ -411,6 +412,10 @@ mutable class SPMapDiff<K: Orderable, V>{
   v2File: V ~> SKStore.File,
   file2V: SKStore.File ~> V,
   mutable handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  mutable handlePresence: ?SKStore.EHandle<
+    SKStore.Key,
+    SKStore.BoolFile,
+  > = None(),
   mutable data: SortedMap<K, V> = SortedMap[],
 } extends SPMap<K, V> {
   readonly fun chill(): SPMap<K, V> {
@@ -420,6 +425,7 @@ mutable class SPMapDiff<K: Orderable, V>{
       v2File => this.v2File,
       file2V => this.file2V,
       handle => this.handle,
+      handlePresence => this.handlePresence,
       data => this.data,
     }
   }
@@ -430,6 +436,7 @@ mutable class SPMapDiff<K: Orderable, V>{
       v2File => this.v2File,
       file2V => this.file2V,
       handle => this.handle,
+      handlePresence => this.handlePresence,
       data => this.data,
     }
   }
@@ -464,6 +471,18 @@ mutable class SPMapDiff<K: Orderable, V>{
     }
   }
 
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+    this.data.maybeGet(k) match {
+    | None() ->
+      this.handlePresence match {
+      | None() -> this.handle.getArray(context, this.k2Key(k)).size() != 0
+      | Some(handle) -> handle.getArray(context, this.k2Key(k)).size() != 0
+      }
+
+    | Some(_) -> true
+    }
+  }
+
   mutable fun set(k: K, v: V): void {
     this.!data[k] = v;
   }
@@ -491,7 +510,6 @@ mutable class SPMapFixed<K: Orderable, V>{
   readonly fun getDiff(): SortedMap<K, V> {
     invariant_violation("Cannot call getDiff on SPMapFixed");
   }
-
   readonly fun chill(): SPMap<K, V> {
     SPMapFixed{data => this.data}
   }
@@ -509,6 +527,10 @@ mutable class SPMapFixed<K: Orderable, V>{
 
   mutable fun maybeGet(_context: mutable SKStore.Context, k: K): ?V {
     this.data.maybeGet(k)
+  }
+
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+    this.maybeGet(context, k) is Some _
   }
 
   mutable fun set(k: K, v: V): void {
@@ -710,14 +732,63 @@ mutable class Specializer{
         v2File => convGFunKey2File,
         file2V => convFile2GFunKey,
         handle,
+        handlePresence => Some(
+          handle.map(
+            x ~> x,
+            SKStore.BoolFile::type,
+            context,
+            SKStore.DirName::create(
+              handle.dirName.toString() + "funsNeededBool/",
+            ),
+            (_context, writer, key, _values) ~> {
+              key match {
+              | GFunKeyKey _ -> writer.set(key, SKStore.BoolFile(true))
+              | _ -> void
+              }
+            },
+          ),
+        ),
       },
     }
   }
 
-  mutable fun toFixed(
-    context: mutable SKStore.Context,
-    handleName: SKStore.DirName,
-  ): void {
+  mutable fun toFixed(context: mutable SKStore.Context): void {
+    handleName = this.gclassMap match {
+    | SPMapDiff{handle} -> handle.dirName
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    this.sclassMap match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    this.sclasses match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    this.funsNeeded match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
     gclassMap = SortedMap[];
     sclassMap = SortedMap[];
     sclasses = SortedMap[];
@@ -759,8 +830,8 @@ mutable class Specializer{
           }
         }
 
-      | FStackElement _ -> // for now that is ok, but we should get rid of it
-        void
+      | FStackElement _
+      | SKStore.IID _ -> void
 
       | _ -> invariant_violation("Unexpected key type")
       }
@@ -782,6 +853,106 @@ mutable class Specializer{
     this.!sclassMap = SPMapFixed::mcreate(sclassMap);
     this.!sclasses = SPMapFixed::mcreate(sclasses);
     this.!funsNeeded = SPMapFixed::mcreate(funsNeeded);
+  }
+
+  readonly fun changedSomething(): Bool {
+    gclassMapChanged = this.gclassMap match {
+    | sp @ SPMapDiff _ -> !sp.data.isEmpty()
+    | _ -> invariant_violation("Invalid call for changedSomething")
+    };
+    sclassMapChanged = this.sclassMap match {
+    | sc @ SPMapDiff _ -> !sc.data.isEmpty()
+    | _ -> invariant_violation("Invalid call for changedSomething")
+    };
+    sclassesChanged = this.sclasses match {
+    | sc @ SPMapDiff _ -> !sc.data.isEmpty()
+    | _ -> invariant_violation("Invalid call for changedSomething")
+    };
+    /*    funsNeededChanged = this.funsNeeded match {
+        | funs @ SPMapDiff _ -> !funs.data.isEmpty()
+        | _ -> invariant_violation("Invalid call for changedSomething")
+        };
+    */
+    gclassMapChanged || sclassMapChanged || sclassesChanged
+  }
+
+  readonly fun writeDiff(
+    writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+    specializer2: ?readonly Specializer = None(),
+  ): void {
+    for (k => v in this.gclassMap.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.gclassMap.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (v != v2) {
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+      writer.set(GClassNameKey(k), SortedSetSClassIDFile(v));
+    };
+    for (k => v in this.sclassMap.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.sclassMap.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (v != v2) {
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(HalfSClassKey(k), SClassIDFile(v));
+    };
+    for (k => v in this.sclasses.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.sclasses.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (inspect(v).toString() != inspect(v2).toString()) {
+            debug(v);
+            debug(v2);
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(SClassIDKey(k), SClassInfoFile(v));
+    };
+    for (k => v in this.funsNeeded.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.funsNeeded.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (v != v2) {
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(GFunKeyKey(k), GFunKeyFile(v));
+    };
   }
 
   mutable fun gclassMapGet(key: GClassName): SortedSet<SClassID> {
@@ -834,12 +1005,11 @@ mutable class Specializer{
   }
 
   mutable fun funsNeededContains(key: GFunKey): Bool {
-    result = this.funsNeeded.maybeGet(this.context, key) is Some _;
-    result
+    this.funsNeeded.contains(this.context, key)
   }
 
   mutable fun funsNeededSet(key: GFunKey): void {
-    if (this.funsNeeded.maybeGet(this.context, key) is None()) {
+    if (!this.funsNeededContains(key)) {
       this.funsNeeded.set(key, key);
     }
   }
@@ -996,7 +1166,6 @@ mutable class Specializer{
   // reachable from our original root set so we can compile them all.
   mutable fun findAllFunctionsAndSClasses(
     context: mutable SKStore.Context,
-    dirName: SKStore.DirName,
   ): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
@@ -1036,7 +1205,7 @@ mutable class Specializer{
     // ??? visit all interesting const types in converter
 
     // We had better not see any new ones we missed during this phase!
-    this.toFixed(context, dirName);
+    this.toFixed(context);
     this.!canCreateNewSClasses = false
   }
 
