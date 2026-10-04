@@ -1956,7 +1956,6 @@ mutable class Specializer{
     hc: HalfClass,
   ): SClassInfo {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
-    origHC = hc;
     !hc = this.maybeConvertMetaClass(context, hc);
     targs = hc.targs;
 
@@ -2220,18 +2219,6 @@ mutable class Specializer{
           }
         }
       };
-
-      // Go ahead and create the frozen variant of this type now,
-      // since it could be sneakily created at runtime via the freeze()
-      // operation, and we need to know about every type that might exist
-      // at runtime.
-      _ = this.getSClass2(
-        context,
-        origHC with {
-          targs => origHC.targs.map(t -> t.mapMutability(_ -> DeepFrozen())),
-          mutability => DeepFrozen(),
-        },
-      );
 
       info
     }
