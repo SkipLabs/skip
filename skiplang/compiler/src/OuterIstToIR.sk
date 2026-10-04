@@ -1013,14 +1013,17 @@ class Converter private (
     ref match {
     | FunctionDefRef(name) -> this.program.getFun(context, name)
     | MethodDefRef(className, name, isStatic) ->
+      this.program.maybeGetMethod(context, className, name, isStatic) match {
+      | Some(method) -> return method
+      | None() -> void
+      };
+      // Class-constant getters are generated from class metadata rather than
+      // declared source methods.
       cd = this.program.getClass(context, className);
       methods = if (isStatic) {
-        // Includes generated class-constant getters.
         this.getFrontEndStaticMethods(cd)
       } else {
-        cd.methods.values().filter(md ->
-          md.kind is SkipNamedAst.FKDynamic _
-        ).collect(Array)
+        Array<I.MethodDef>[]
       };
       methods.find(md -> md.name.id == name) match {
       | Some(md) -> md
