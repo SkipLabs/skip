@@ -263,7 +263,7 @@ base class Type uses Show, Equality, Hashable {
         if (!seen.maybeInsert(t)) {
           true
         } else {
-          sub = env.untrackedGetSClass(t);
+          sub = env.getSClass(t);
           !sub.kind.isFinal() || func(sub)
         }
       })
@@ -280,7 +280,7 @@ class Tclass(
   mutability: Mutability,
 ) extends Type uses Orderable {
   fun sclass(env: readonly ClassLookupEnv): SClass {
-    env.untrackedGetSClass(this.sclassID)
+    env.getSClass(this.sclassID)
   }
 
   fun ==(other: Type): Bool {
