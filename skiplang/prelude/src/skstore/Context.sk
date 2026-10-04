@@ -171,12 +171,32 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 /*****************************************************************************/
+// Synthetic read paths reuse ordinary reader registration and cleanup. The
+// source key remains separate so projections never change stored collection keys.
+class FilteredReadKey(source: Key, projectionHash: Int, id: Int) extends Key
+
+class ReadFilter(
+  id: Int,
+  projectionHash: Int,
+  project: File ~> File,
+  value: Array<File>,
+) {
+  fun path(source: Path): Path {
+    Path::create(
+      source.dirName,
+      FilteredReadKey(source.baseName, this.projectionHash, this.id),
+    )
+  }
+}
+
 /* Dependencies tracking. */
 /*****************************************************************************/
 
 value class Deps private (
   private data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
   private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+  filters: SortedMap<Path, SortedMap<Int, Array<ReadFilter>>> = SortedMap[],
+  nextFilterID: Int = 0,
 ) {
   static fun empty(): this {
     Deps()
@@ -184,6 +204,34 @@ value class Deps private (
 
   fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
     this.data.maybeGet(path)
+  }
+
+  fun addFilter(
+    path: Path,
+    project: File ~> File,
+    value: Array<File>,
+  ): (this, Path) {
+    // Captures can distinguish thousands of predicates on a single key.
+    // Index by structural hash, then check equality inside the collision bucket.
+    projectionHash = hash(project);
+    groups = this.filters.maybeGet(path).default(
+      SortedMap<Int, Array<ReadFilter>>[],
+    );
+    filters = groups.maybeGet(projectionHash).default(Array<ReadFilter>[]);
+    for (filter in filters) {
+      // A replaced directory may be read again before its old readers run.
+      // Share only readers that observed the same projected array.
+      if (native_eq(filter.project, project) == 0 && native_eq(filter.value, value) == 0) {
+        return (this, filter.path(path))
+      };
+    };
+    filter = ReadFilter(this.nextFilterID, projectionHash, project, value);
+    !this.nextFilterID = this.nextFilterID + 1;
+    !this.filters[path] = groups.set(
+      projectionHash,
+      filters.concat(Array[filter]),
+    );
+    (this, filter.path(path))
   }
 
   fun set(path: Path, arrowKey: ArrowKey): this {
@@ -241,6 +289,21 @@ value class Deps private (
     this
   }
 
+  private fun removeFilter(path: Path, projectionHash: Int, id: Int): this {
+    this.filters.maybeGet(path).each(groups -> {
+      groups.maybeGet(projectionHash).each(bucket -> {
+        remaining = bucket.filter(filter -> filter.id != id);
+        groups2 = if (remaining.isEmpty()) groups.remove(projectionHash) else {
+          groups.set(projectionHash, remaining)
+        };
+        !this.filters = if (groups2.isEmpty()) this.filters.remove(path) else {
+          this.filters.set(path, groups2)
+        };
+      });
+    });
+    this
+  }
+
   fun remove(path: Path, arrowKey: ArrowKey): this {
     set = this.data.maybeGet(path) match {
     | None() -> SortedSet[]
@@ -248,7 +311,13 @@ value class Deps private (
     };
     !set = set.remove(arrowKey);
     if (set.isEmpty()) {
-      !this.data = this.data.remove(path)
+      !this.data = this.data.remove(path);
+      path.baseName match {
+      | FilteredReadKey(source, projectionHash, id) ->
+        sourcePath = Path::create(path.dirName, source);
+        !this = this.removeFilter(sourcePath, projectionHash, id)
+      | _ -> void
+      }
     } else {
       !this.data[path] = set
     };
@@ -271,6 +340,20 @@ value class Deps private (
       }
     };
     !this.idata = this.idata.remove(dirName);
+    for (path in paths) {
+      path.baseName match {
+      | FilteredReadKey(source, projectionHash, id) ->
+        if (
+          this.data.maybeGet(path)
+            .map(readers -> readers.isEmpty())
+            .default(true)
+        ) {
+          sourcePath = Path::create(path.dirName, source);
+          !this = this.removeFilter(sourcePath, projectionHash, id);
+        }
+      | _ -> void
+      }
+    };
     this
   }
 }
@@ -686,7 +769,14 @@ mutable class Context private {
    * - dirty are files that are made dirty because of a Map.
    */
   /*****************************************************************************/
-  mutable fun updateDirtyReaders(path: Path): void {
+  readonly fun hasReadFilters(path: Path): Bool {
+    this.deps.filters.containsKey(path)
+  }
+
+  mutable fun updateDirtyReaders(
+    path: Path,
+    newValues: ?Array<File> = None(),
+  ): void {
     for (reader in this.getDeps(path)) {
       child = this.unsafeMaybeGetDir(reader.childName) match {
       | None() -> continue
@@ -720,6 +810,30 @@ mutable class Context private {
       };
       arrow = Arrow(reader.parentName, reader.childName);
       this.addToUpdate(time, parent.getTime(), arrow);
+    };
+
+    if (!this.deps.filters.isEmpty()) {
+      this.deps.filters.maybeGet(path).each(filters -> {
+        updated = filters.map((_, bucket) ->
+          bucket.map(filter -> {
+            values = newValues.map(values -> values.map(filter.project));
+            changed = values match {
+            | None() -> true
+            | Some(v) -> native_eq(v, filter.value) != 0
+            };
+            if (changed) {
+              this.updateDirtyReaders(filter.path(path));
+            };
+            values match {
+            | None() -> filter
+            | Some(v) -> filter with {value => v}
+            }
+          })
+        );
+        this.!deps = this.deps with {
+          filters => this.deps.filters.set(path, updated),
+        };
+      });
     };
   }
 
@@ -1186,6 +1300,16 @@ mutable class Context private {
     if (!this.reads.contains(path)) {
       this.!reads = this.reads.set(path);
     };
+  }
+
+  mutable fun addFilteredDep(
+    path: Path,
+    project: File ~> File,
+    value: Array<File>,
+  ): void {
+    (deps, read) = this.deps.addFilter(path, project, value);
+    this.!deps = deps;
+    this.addRead(read);
   }
 
   mutable fun setGlobal(name: String, file: File): void {

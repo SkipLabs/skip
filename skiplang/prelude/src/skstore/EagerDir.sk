@@ -1708,6 +1708,18 @@ base class EagerDir protected {
     this.getIter(context, key).collect(Array);
   }
 
+  fun getArrayFilter<R: File>(
+    context: mutable Context,
+    key: Key,
+    project: File ~> R,
+  ): Array<R> {
+    values = this.getArrayRaw(key).map(project);
+    context.addFilteredDep(Path::create(this.dirName, key), project, values);
+    // A replaced collection can change its implementation without a row write.
+    context.addRead(Path::dirTag(this.dirName));
+    values
+  }
+
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
     path = Path::create(this.dirName, key);
     context.addRead(path);
@@ -1804,7 +1816,12 @@ base class EagerDir protected {
 
     !this = this with {totalSize, reducer};
 
-    context.updateDirtyReaders(path);
+    projectedValues = if (context.hasReadFilters(path)) {
+      Some(this.getArrayRaw(k))
+    } else {
+      None()
+    };
+    context.updateDirtyReaders(path, projectedValues);
 
     parentTime = this.getTime();
     childDirs = SortedSet[];
