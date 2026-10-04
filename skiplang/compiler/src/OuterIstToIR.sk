@@ -5019,14 +5019,14 @@ fun createSpecializer(
 ): SpecializerState {
   // Find every relevant type and function in the program.
   specializer = Specializer::make(handle, context, config, converter);
-  specializer.builtins(context);
+  specializer.builtins();
   forceCompile = roots.forceCompile;
 
   for (gid in forceCompile) {
     _ = specializer.requestFunction(gid, Array[])
   };
 
-  specializer.findAllFunctionsAndSClasses(context);
+  specializer.findAllFunctionsAndSClasses();
   specializer.toFixed(context);
   specializer.!canCreateNewSClasses = false;
   specializer.chill()

@@ -9,6 +9,12 @@ module alias I = OuterIst;
 
 module OuterIstToIR;
 
+class SClassCreatedExn() extends Exception {
+  fun message(): String {
+    "A new class was found!"
+  }
+}
+
 // Keys for specializing generic types/functions into specialized ones.
 class GFunKey(
   i0: LazyGFun,
@@ -57,7 +63,7 @@ value class HalfClass(
   // instance of the metaclass. But to be able to create an instance of the
   // metaclass, Base<Foo> needs to be concrete.
   literalType: Bool = false,
-) uses Hashable, Equality, Show {
+) uses Hashable, Orderable, Show {
   fun toString(): String {
     name = `${this.mutability} ${this.generic.nameStr()}`;
     if (this.targs.isEmpty()) {
@@ -592,20 +598,39 @@ class FStackElement(
   classTargs: Array<Tclass>,
 ) extends SKStore.Key, SKStore.File
 
+class CStackElement(
+  origin: FStackElement,
+  hc: HalfClass,
+  k: (mutable SKStore.Context, mutable Specializer, SClassInfo) ~> void,
+) extends SKStore.File
+
 class SpecializerState{
+  fstackOrigin: ?FStackElement,
   gclassMap: SPMap<GClassName, SortedSet<SClassID>>,
   sclassMap: SPMap<HalfSClass, SClassID>,
   sclasses: SPMap<SClassID, SClassInfo>,
   funsNeeded: SPMap<GFunKey, GFunKey>,
   funSet: SortedSet<FStackElement>,
   funStack: List<FStackElement>,
+  classStack: List<CStackElement>,
   converter: Converter,
   config: Config.Config,
   canCreateNewSClasses: Bool,
   verifyChanged: Bool,
+  pauseOnSClassCreation: Bool,
   pos: Pos,
 } {
   fun merge(other: SpecializerState): SpecializerState {
+    if (this.funStack.size() != 0) {
+      invariant_violation(
+        "You are trying to merge states with non-empty funStacks",
+      );
+    };
+    if (this.classStack.size() != 0) {
+      invariant_violation(
+        "You are trying to merge states with non-empty classStacks",
+      );
+    };
     !this.gclassMap = (this.gclassMap, other.gclassMap) match {
     | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
       SPMapDiff::merge(map1, map2, (x, y) ~> x.union(y))
@@ -641,22 +666,24 @@ class SpecializerState{
     | _ -> invariant_violation("Unexpected funsNeeded type for merge")
     };
     !this.funSet = this.funSet.union(other.funSet);
-    !this.funStack = this.funStack.concat(other.funStack);
     this
   }
 
   fun mclone(context: mutable SKStore.Context): mutable Specializer {
     mutable Specializer{
       context => context,
+      fstackOrigin => this.fstackOrigin,
       gclassMap => this.gclassMap.mclone(),
       sclassMap => this.sclassMap.mclone(),
       sclasses => this.sclasses.mclone(),
       funsNeeded => this.funsNeeded.mclone(),
       funStack => this.funStack,
+      classStack => this.classStack,
       converter => this.converter,
       config => this.config,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
+      pauseOnSClassCreation => this.pauseOnSClassCreation,
       pos => this.pos,
     }
   }
@@ -673,6 +700,10 @@ class SClassIDKey(value: SClassID) extends SKStore.Key
 class SClassInfoFile(value: SClassInfo) extends SKStore.File
 class GFunKeyKey(value: GFunKey) extends SKStore.Key
 class GFunKeyFile(value: GFunKey) extends SKStore.File
+class ContinuationFile(
+  origin: FStackElement,
+  value: (mutable SKStore.Context, mutable Specializer) ~> void,
+) extends SKStore.File
 
 fun convGClassName2Key(x: GClassName): SKStore.Key {
   GClassNameKey(x)
@@ -751,6 +782,8 @@ fun convFile2GFunKey(x: SKStore.File): GFunKey {
 mutable class Specializer{
   context: mutable SKStore.Context,
 
+  mutable fstackOrigin: ?FStackElement = None(),
+
   // For each FrontEndLazyGClass, what are all its SClass instances?
   mutable gclassMap: mutable SPMap<GClassName, SortedSet<SClassID>>,
 
@@ -770,6 +803,9 @@ mutable class Specializer{
   // Functions we still need to analyze with a new set of Targs.
   mutable funStack: List<FStackElement> = List[],
 
+  // New SClasses that need to be created.
+  mutable classStack: List<CStackElement> = List[],
+
   converter: Converter,
 
   config: Config.Config,
@@ -777,6 +813,7 @@ mutable class Specializer{
   // Once it's too late to make new SClasses we turn this off.
   mutable canCreateNewSClasses: Bool = true,
   mutable verifyChanged: Bool = false,
+  mutable pauseOnSClassCreation: Bool = false,
 
   // Updated as we go to point to something related to what we are specializing.
   mutable pos: Pos,
@@ -819,22 +856,22 @@ mutable class Specializer{
         v2File => convGFunKey2File,
         file2V => convFile2GFunKey,
         handle,
-        handlePresence => Some(
-          handle.map(
-            x ~> x,
-            SKStore.BoolFile::type,
-            context,
-            SKStore.DirName::create(
-              handle.dirName.toString() + "funsNeededBool/",
-            ),
-            (_context, writer, key, _values) ~> {
-              key match {
-              | GFunKeyKey _ -> writer.set(key, SKStore.BoolFile(true))
-              | _ -> void
-              }
-            },
-          ),
-        ),
+        /*        handlePresence => Some(
+                  handle.map(
+                    x ~> x,
+                    SKStore.BoolFile::type,
+                    context,
+                    SKStore.DirName::create(
+                      handle.dirName.toString() + "funsNeededBool/",
+                    ),
+                    (_context, writer, key, _values) ~> {
+                      key match {
+                      | GFunKeyKey _ -> writer.set(key, SKStore.BoolFile(true))
+                      | _ -> void
+                      }
+                    },
+                  ),
+                ),*/
       },
     }
   }
@@ -920,7 +957,9 @@ mutable class Specializer{
       | FStackElement _
       | SKStore.IID _ -> void
 
-      | _ -> invariant_violation("Unexpected key type")
+      | k ->
+        debug(k);
+        invariant_violation("Unexpected key type")
       }
     };
     for (k => v in this.gclassMap.getDiff()) {
@@ -1126,29 +1165,35 @@ mutable class Specializer{
 
   readonly fun chill(): SpecializerState {
     SpecializerState{
+      fstackOrigin => this.fstackOrigin,
       gclassMap => this.gclassMap.chill(),
       sclassMap => this.sclassMap.chill(),
       sclasses => this.sclasses.chill(),
       funsNeeded => this.funsNeeded.chill(),
       funSet => this.funSet,
       funStack => this.funStack,
+      classStack => this.classStack,
       converter => this.converter,
       config => this.config,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
+      pauseOnSClassCreation => this.pauseOnSClassCreation,
       pos => this.pos,
     }
   }
 
   mutable fun replace(other: SpecializerState): void {
+    this.!fstackOrigin = other.fstackOrigin;
     this.gclassMap.replace(other.gclassMap);
     this.sclassMap.replace(other.sclassMap);
     this.sclasses.replace(other.sclasses);
     this.funsNeeded.replace(other.funsNeeded);
     this.!funSet = other.funSet;
     this.!funStack = other.funStack;
+    this.!classStack = other.classStack;
     this.!canCreateNewSClasses = other.canCreateNewSClasses;
-    this.!verifyChanged = this.verifyChanged;
+    this.!verifyChanged = other.verifyChanged;
+    this.!pauseOnSClassCreation = other.pauseOnSClassCreation;
     this.!pos = other.pos;
   }
 
@@ -1319,7 +1364,7 @@ mutable class Specializer{
     }
   }
 
-  mutable fun builtins(context: mutable SKStore.Context): void {
+  mutable fun builtins(): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
     builtinTypes = Array[
@@ -1342,7 +1387,7 @@ mutable class Specializer{
     for (tt in builtinTypes) {
       (t, lazyGClass) = tt;
       sc = static::getSClass2CPS(
-        context,
+        this.context,
         this,
         HalfClass(lazyGClass, Array[], DeepFrozen()),
         (_, _, info) ~> info.sclass,
@@ -1353,16 +1398,14 @@ mutable class Specializer{
     };
 
     // Keep specializing functions and types until we hit a fixed point.
-    this.specializePendingFuns(context);
+    this.specializePendingFuns();
   }
 
   // Find the transitive closure of functions and classes
   // reachable from our original root set so we can compile them all.
-  mutable fun findAllFunctionsAndSClasses(
-    context: mutable SKStore.Context,
-  ): void {
+  mutable fun findAllFunctionsAndSClasses(): void {
     // Keep specializing functions and types until we hit a fixed point.
-    this.specializePendingFuns(context);
+    this.specializePendingFuns();
     // TODO: Set "canInstantiate" to false for KBase with no KClass.
     // ??? visit all interesting const types in converter
   }
@@ -1389,8 +1432,15 @@ mutable class Specializer{
       | List.Nil() -> invariant_violation("Impossible")
       | List.Cons(hd, tl) -> (tl, hd)
       };
-      this.withRegion(this.context, (context, specializer) ~> {
-        static::specializePendingFunCPS(
+      this.specializePendingFun(stackElt);
+    }
+  }
+
+  mutable fun specializePendingFun(stackElt: FStackElement): void {
+    this.withRegion(this.context, (context, specializer) ~> {
+      try {
+        specializer.!fstackOrigin = Some(stackElt);
+        result = static::specializePendingFunCPS(
           context,
           specializer,
           stackElt.lazyGFun,
@@ -1398,13 +1448,21 @@ mutable class Specializer{
           stackElt.classTargs,
           (_, _, _) ~> void,
         );
-      })
-    }
+        specializer.!fstackOrigin = None();
+        result
+      } catch {
+      | SClassCreatedExn() ->
+        specializer.!fstackOrigin = None();
+        void
+      | x ->
+        specializer.!fstackOrigin = None();
+        throw x
+      }
+    })
   }
 
   // Specializes pending functions. Returns true if anything changed.
   mutable fun specializePendingFuns(
-    context: mutable SKStore.Context,
     filter: FStackElement -> Bool = _ -> true,
   ): void {
     newStack = List[];
@@ -1417,16 +1475,7 @@ mutable class Specializer{
         | List.Cons(hd, tl) -> (tl, hd)
         };
         if (filter(stackElt)) {
-          this.withRegion(context, (context, specializer) ~> {
-            static::specializePendingFunCPS(
-              context,
-              specializer,
-              stackElt.lazyGFun,
-              stackElt.methodTargs,
-              stackElt.classTargs,
-              (_, _, _) ~> void,
-            );
-          })
+          this.specializePendingFun(stackElt);
         } else {
           !newStack = List.Cons(stackElt, newStack)
         }
@@ -2342,7 +2391,17 @@ mutable class Specializer{
     static::getSClass2CPS(context, this, hc, (_, _, x) ~> x)
   }
 
-  private static fun getSClass2CPS<T>(
+  readonly fun getFStackOrigin(): FStackElement {
+    this.fstackOrigin match {
+    | None() ->
+      invariant_violation(
+        "Trying to access the fstack origin when it is not defined",
+      )
+    | Some(x) -> x
+    }
+  }
+
+  static fun getSClass2CPS<T>(
     context: mutable SKStore.Context,
     sp: mutable this,
     hc: HalfClass,
@@ -2354,6 +2413,14 @@ mutable class Specializer{
       hsc = HalfSClass(hc.generic, hc.targs);
       sp.sclassMapMaybeGet(hsc) match {
       | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
+      | None() if (sp.pauseOnSClassCreation) ->
+        sp.!classStack = List.Cons(
+          CStackElement(sp.getFStackOrigin(), hc, (ctx, sp, sc) ~> {
+            _ = k(ctx, sp, sc);
+          }),
+          sp.classStack,
+        );
+        throw SClassCreatedExn()
       | None() -> static::createSClassCPS(context, sp, hc, k)
       }
     })
