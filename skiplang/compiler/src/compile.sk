@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+module alias O = OuterIstToIR;
+
 fun createOptimizedFunctions(
   context: mutable SKStore.Context,
   env: GlobalEnv,
@@ -228,6 +230,94 @@ const backendSinkDir: SKStore.EHandle<
   SkipError.ErrorsFile::type,
   backendSinkDirName,
 );
+
+class Left(Array<SKStore.File>) extends SKStore.File
+class Right(Array<SKStore.File>) extends SKStore.File
+class OldFile(files: Array<SKStore.File>) extends SKStore.File
+class TickFile(tick: SKStore.Tick) extends SKStore.File
+
+const maxNbrFunsPerPhase: Int = 100;
+
+fun mergeSpecializerFiles(
+  key: SKStore.Key,
+  left: SKStore.File,
+  right: SKStore.File,
+): SKStore.File {
+  (key, left, right) match {
+  | (
+    O.GClassNameKey _,
+    O.SortedSetSClassIDFile(x),
+    O.SortedSetSClassIDFile(y),
+  ) ->
+    O.SortedSetSClassIDFile(x.union(y))
+  | (O.SupertypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y))
+  | (O.SubtypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y)) ->
+    O.SortedSetSClassIDFile(x.union(y))
+  | (O.HalfSClassKey _, O.SClassIDFile(x), O.SClassIDFile(y)) ->
+    if (x != y) {
+      invariant_violation("Unexpected inequality in sclassMap merge")
+    };
+    right
+  | (O.SClassIDKey _, O.SClassInfoFile(x), O.SClassInfoFile(y)) ->
+    O.SClassInfoFile(x.merge(y))
+  | (O.GFunKeyKey _, O.GFunKeyFile(x), O.GFunKeyFile(y)) ->
+    if (x != y) {
+      invariant_violation("Unexpected inequality in funsNeeded merge")
+    };
+    right
+  | _ -> invariant_violation("Unexpected key or file type in specializer merge")
+  }
+}
+
+fun mergeFun(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+): void {
+  files = mutable Vector[];
+  oldFiles = mutable Vector[];
+  for (file in values) {
+    file match {
+    | OldFile(x) -> oldFiles.extend(x)
+    | x -> files.push(x)
+    }
+  };
+  if (files.isEmpty()) {
+    return writer.setArray(key, oldFiles.toArray())
+  };
+  key match {
+  | O.FStackElement _ ->
+    // Continuations already represent a started function. Keep every bundle
+    // of blocked operations and discard duplicate requests to start it again.
+    continuations = mutable Vector[];
+    for (elt in files) {
+      elt match {
+      | c @ O.ContinuationFile _ -> continuations.push(c)
+      | O.FStackElement _ -> void
+      | _ -> invariant_violation("Unexpected function work file")
+      }
+    };
+    if (continuations.isEmpty()) {
+      writer.setArray(key, Array[files.first()])
+    } else {
+      writer.setArray(key, continuations.toArray())
+    }
+  | SKStore.IID(0) -> writer.setArray(key, files.toArray())
+  | _ ->
+    merged: ?SKStore.File = None();
+    for (file in files) {
+      !merged = merged match {
+      | None() -> Some(file)
+      | Some(previous) -> Some(mergeSpecializerFiles(key, previous, file))
+      }
+    };
+    merged match {
+    | Some(file) -> writer.set(key, file)
+    | None() -> invariant_violation("Expected files to merge")
+    }
+  }
+}
 
 fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
   backendDirName = SKStore.DirName::create("/backend/");
