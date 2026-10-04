@@ -289,6 +289,22 @@ fun mergeFun(
     return writer.setArray(key, oldFiles.toArray())
   };
   key match {
+  | O.GClassNameKey _
+  | O.SubtypesKey _
+  | O.SupertypesKey _ ->
+    // Each writer contributes only its newly discovered relationships. Keep
+    // the previous round's set as another contribution; SKStore retracts a
+    // writer's old contributions when that writer is recomputed or removed.
+    ids = SortedSet<SClassID>[];
+    oldFiles.extend(files);
+    for (file in oldFiles) {
+      file match {
+      | O.SortedSetSClassIDFile(previousIDs) -> !ids = ids.union(previousIDs)
+      | O.SClassIDFile(id) -> !ids = ids.set(id)
+      | _ -> invariant_violation("Unexpected relationship contribution")
+      }
+    };
+    writer.set(key, O.SortedSetSClassIDFile(ids))
   | O.FStackElement _ ->
     // Continuations already represent a started function. Keep every bundle
     // of blocked operations and discard duplicate requests to start it again.
@@ -487,6 +503,14 @@ fun getOrInitializeBackend(
     },
   );
 
+  specializerInitMerged = specializerInitDir.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/init-merged/"),
+    mergeFun,
+  );
+
   specializerDir = backendDir.map(
     SKStore.IID::keyType,
     SpecializerDirFile::type,
@@ -494,7 +518,7 @@ fun getOrInitializeBackend(
     SKStore.DirName::create("/specializer/"),
     (context, writer, _, _) ~> {
       if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) return void;
-      specializerAllDir = specializerInitDir;
+      specializerAllDir = specializerInitMerged;
       phaseNumber = 0;
 
       while (!specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {

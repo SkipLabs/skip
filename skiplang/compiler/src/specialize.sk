@@ -715,9 +715,9 @@ class CStackElement(
 
 class SpecializerState{
   fstackOrigin: ?FStackElement,
-  gclassMap: SPMap<GClassName, SortedSet<SClassID>>,
-  subtypes: SPMap<SClassID, SortedSet<SClassID>>,
-  supertypes: SPMap<SClassID, SortedSet<SClassID>>,
+  gclassMap: SPRelations<GClassName>,
+  subtypes: SPRelations<SClassID>,
+  supertypes: SPRelations<SClassID>,
   sclassMap: SPMap<HalfSClass, SClassID>,
   sclasses: SPMap<SClassID, SClassInfo>,
   funsNeeded: SPMap<GFunKey, GFunKey>,
@@ -742,21 +742,9 @@ class SpecializerState{
         "You are trying to merge states with non-empty classStacks",
       );
     };
-    !this.gclassMap = (this.gclassMap, other.gclassMap) match {
-    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
-      SPMapDiff::merge(map1, map2, (x, y) ~> x.union(y))
-    | _ -> invariant_violation("Unexpected gclassMap type for merge")
-    };
-    !this.supertypes = (this.supertypes, other.supertypes) match {
-    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
-      SPMapDiff::merge(map1, map2, (x, y) ~> x.union(y))
-    | _ -> invariant_violation("Unexpected supertypes type for merge")
-    };
-    !this.subtypes = (this.subtypes, other.subtypes) match {
-    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
-      SPMapDiff::merge(map1, map2, (x, y) ~> x.union(y))
-    | _ -> invariant_violation("Unexpected subtypes type for merge")
-    };
+    !this.gclassMap = this.gclassMap.merge(other.gclassMap);
+    !this.supertypes = this.supertypes.merge(other.supertypes);
+    !this.subtypes = this.subtypes.merge(other.subtypes);
     !this.sclassMap = (this.sclassMap, other.sclassMap) match {
     | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
       SPMapDiff::merge(map1, map2, (x, y) ~> {
@@ -934,12 +922,12 @@ mutable class Specializer{
   mutable fstackOrigin: ?FStackElement = None(),
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  mutable gclassMap: mutable SPMap<GClassName, SortedSet<SClassID>>,
+  mutable gclassMap: mutable SPRelations<GClassName>,
 
   // Track hierarchy changes independently of the class definition.
   // Each class is included in both its own subtype and supertype sets.
-  mutable subtypes: mutable SPMap<SClassID, SortedSet<SClassID>>,
-  mutable supertypes: mutable SPMap<SClassID, SortedSet<SClassID>>,
+  mutable subtypes: mutable SPRelations<SClassID>,
+  mutable supertypes: mutable SPRelations<SClassID>,
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
   mutable sclassMap: mutable SPMap<HalfSClass, SClassID>,
@@ -983,26 +971,17 @@ mutable class Specializer{
       converter,
       config,
       pos => FileRange.builtin,
-      gclassMap => mutable SPMapDiff{
+      gclassMap => mutable SPRelations{
         k2Key => convGClassName2Key,
-        key2K => convKey2GClassName,
-        v2File => convSortedSetSClassID2File,
-        file2V => convFile2SortedSetSClassID,
-        handle,
+        handle => Some(handle),
       },
-      subtypes => mutable SPMapDiff{
+      subtypes => mutable SPRelations{
         k2Key => convSClassID2SubtypesKey,
-        key2K => convSubtypesKey2SClassID,
-        v2File => convSortedSetSClassID2File,
-        file2V => convFile2SortedSetSClassID,
-        handle,
+        handle => Some(handle),
       },
-      supertypes => mutable SPMapDiff{
+      supertypes => mutable SPRelations{
         k2Key => convSClassID2SupertypesKey,
-        key2K => convSupertypesKey2SClassID,
-        v2File => convSortedSetSClassID2File,
-        file2V => convFile2SortedSetSClassID,
-        handle,
+        handle => Some(handle),
       },
       sclassMap => mutable SPMapDiff{
         k2Key => convHalfSClass2Key,
@@ -1045,31 +1024,9 @@ mutable class Specializer{
   }
 
   mutable fun toFixed(context: mutable SKStore.Context): void {
-    handleName = this.gclassMap match {
-    | SPMapDiff{handle} -> handle.dirName
-    | _ ->
-      invariant_violation("Cannot call toFixed on this kind of specializer")
-    };
-
-    this.supertypes match {
-    | SPMapDiff{handle} ->
-      invariant(
-        handleName == handle.dirName,
-        "Handle names in specializer must all be the same",
-      )
-    | _ ->
-      invariant_violation("Cannot call toFixed on this kind of specializer")
-    };
-
-    this.subtypes match {
-    | SPMapDiff{handle} ->
-      invariant(
-        handleName == handle.dirName,
-        "Handle names in specializer must all be the same",
-      )
-    | _ ->
-      invariant_violation("Cannot call toFixed on this kind of specializer")
-    };
+    handleName = this.gclassMap.handle.fromSome().dirName;
+    invariant(handleName == this.subtypes.handle.fromSome().dirName);
+    invariant(handleName == this.supertypes.handle.fromSome().dirName);
 
     this.sclassMap match {
     | SPMapDiff{handle} ->
@@ -1167,13 +1124,13 @@ mutable class Specializer{
       }
     };
     for (k => v in this.gclassMap.getDiff()) {
-      !gclassMap[k] = v
+      !gclassMap[k] = gclassMap.maybeGet(k).default(kEmptySClassSet).union(v)
     };
     for (k => v in this.subtypes.getDiff()) {
-      !subtypes[k] = v
+      !subtypes[k] = subtypes.maybeGet(k).default(kEmptySClassSet).union(v)
     };
     for (k => v in this.supertypes.getDiff()) {
-      !supertypes[k] = v
+      !supertypes[k] = supertypes.maybeGet(k).default(kEmptySClassSet).union(v)
     };
     for (k => v in this.sclassMap.getDiff()) {
       !sclassMap[k] = v
@@ -1185,27 +1142,30 @@ mutable class Specializer{
       !funsNeeded[k] = v
     };
 
-    this.!gclassMap = SPMapFixed::mcreate(gclassMap);
-    this.!subtypes = SPMapFixed::mcreate(subtypes);
-    this.!supertypes = SPMapFixed::mcreate(supertypes);
+    this.!gclassMap = mutable SPRelations{
+      k2Key => convGClassName2Key,
+      handle => None(),
+      data => gclassMap,
+    };
+    this.!subtypes = mutable SPRelations{
+      k2Key => convSClassID2SubtypesKey,
+      handle => None(),
+      data => subtypes,
+    };
+    this.!supertypes = mutable SPRelations{
+      k2Key => convSClassID2SupertypesKey,
+      handle => None(),
+      data => supertypes,
+    };
     this.!sclassMap = SPMapFixed::mcreate(sclassMap);
     this.!sclasses = SPMapFixed::mcreate(sclasses);
     this.!funsNeeded = SPMapFixed::mcreate(funsNeeded);
   }
 
   readonly fun changedSomething(): Bool {
-    gclassMapChanged = this.gclassMap match {
-    | sp @ SPMapDiff _ -> !sp.data.isEmpty()
-    | _ -> invariant_violation("Invalid call for changedSomething")
-    };
-    supertypesChanged = this.supertypes match {
-    | sp @ SPMapDiff _ -> !sp.data.isEmpty()
-    | _ -> invariant_violation("Invalid call for changedSomething")
-    };
-    subtypesChanged = this.subtypes match {
-    | sp @ SPMapDiff _ -> !sp.data.isEmpty()
-    | _ -> invariant_violation("Invalid call for changedSomething")
-    };
+    gclassMapChanged = !this.gclassMap.getDiff().isEmpty();
+    supertypesChanged = !this.supertypes.getDiff().isEmpty();
+    subtypesChanged = !this.subtypes.getDiff().isEmpty();
     sclassMapChanged = this.sclassMap match {
     | sc @ SPMapDiff _ -> !sc.data.isEmpty()
     | _ -> invariant_violation("Invalid call for changedSomething")
@@ -1230,57 +1190,23 @@ mutable class Specializer{
     writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
     specializer2: ?readonly Specializer = None(),
   ): void {
-    for (k => v in this.gclassMap.getDiff()) {
-      specializer2 match {
-      | None() -> void
-      | Some(sp2) ->
-        sp2.gclassMap.getDiff().maybeGet(k) match {
-        | None() ->
-          invariant_violation("Key not found: " + inspect(k).toString())
-        | Some(v2) ->
-          if (v != v2) {
-            invariant_violation(
-              "Not writing the same thing for key: " + inspect(k).toString(),
-            )
-          }
-        }
-      };
-      writer.set(GClassNameKey(k), SortedSetSClassIDFile(v));
-    };
-    for (k => v in this.supertypes.getDiff()) {
-      specializer2 match {
-      | None() -> void
-      | Some(sp2) ->
-        sp2.supertypes.getDiff().maybeGet(k) match {
-        | None() ->
-          invariant_violation("Key not found: " + inspect(k).toString())
-        | Some(v2) ->
-          if (v != v2) {
-            invariant_violation(
-              "Not writing the same thing for key: " + inspect(k).toString(),
-            )
-          }
-        }
-      };
-      writer.set(SupertypesKey(k), SortedSetSClassIDFile(v));
-    };
-    for (k => v in this.subtypes.getDiff()) {
-      specializer2 match {
-      | None() -> void
-      | Some(sp2) ->
-        sp2.subtypes.getDiff().maybeGet(k) match {
-        | None() ->
-          invariant_violation("Key not found: " + inspect(k).toString())
-        | Some(v2) ->
-          if (v != v2) {
-            invariant_violation(
-              "Not writing the same thing for key: " + inspect(k).toString(),
-            )
-          }
-        }
-      };
-      writer.set(SubtypesKey(k), SortedSetSClassIDFile(v));
-    };
+    specializer2.each(other -> {
+      invariant(
+        this.gclassMap.getDiff() == other.gclassMap.getDiff(),
+        "Different generic instance contributions",
+      );
+      invariant(
+        this.supertypes.getDiff() == other.supertypes.getDiff(),
+        "Different supertype contributions",
+      );
+      invariant(
+        this.subtypes.getDiff() == other.subtypes.getDiff(),
+        "Different subtype contributions",
+      );
+    });
+    this.gclassMap.writeDiff(writer);
+    this.supertypes.writeDiff(writer);
+    this.subtypes.writeDiff(writer);
     for (k => v in this.sclassMap.getDiff()) {
       specializer2 match {
       | None() -> void
@@ -1356,8 +1282,8 @@ mutable class Specializer{
     this.supertypes.get(this.context, key)
   }
 
-  mutable fun supertypesSet(key: SClassID, value: SortedSet<SClassID>): void {
-    this.supertypes.set(key, value)
+  mutable fun supertypesAdd(key: SClassID, value: SClassID): void {
+    this.supertypes.add(key, value)
   }
 
   readonly fun subtypesGet(key: SClassID): SortedSet<SClassID> {
@@ -1371,8 +1297,8 @@ mutable class Specializer{
     this.subtypes.get(this.context, key)
   }
 
-  mutable fun subtypesSet(key: SClassID, value: SortedSet<SClassID>): void {
-    this.subtypes.set(key, value)
+  mutable fun subtypesAdd(key: SClassID, value: SClassID): void {
+    this.subtypes.add(key, value)
   }
 
   mutable fun gclassMapGet(key: GClassName): SortedSet<SClassID> {
@@ -1385,8 +1311,8 @@ mutable class Specializer{
     result
   }
 
-  mutable fun gclassMapSet(key: GClassName, value: SortedSet<SClassID>): void {
-    this.gclassMap.set(key, value)
+  mutable fun gclassMapAdd(key: GClassName, value: SClassID): void {
+    this.gclassMap.add(key, value)
   }
 
   mutable fun sclassMapGet(key: HalfSClass): SClassID {
@@ -2163,12 +2089,7 @@ mutable class Specializer{
   //
   // TODO: We could literally use an intrusive linked list, would that be bad?
   private mutable fun noteGClassInstance(instance: SClassInfo): void {
-    // Note that another instance of this GClass exists.
-    l = this.gclassMapMaybeGet(instance.sclass.gclassName) match {
-    | None() -> SortedSet[]
-    | Some(l) -> l
-    };
-    this.gclassMapSet(instance.sclass.gclassName, l.set(instance.sclass.id));
+    this.gclassMapAdd(instance.sclass.gclassName, instance.sclass.id);
   }
 
   // Indicate that 'sub' is a subtype of 'super'. This could mean direct or
@@ -2180,15 +2101,9 @@ mutable class Specializer{
     super: SClassInfo,
     sub: SClassInfo,
   ): (SClassInfo, SClassInfo) {
-    if (!this.trackedSubtypesGet(super.sclass.id).contains(sub.sclass.id)) {
-      this.subtypesSet(
-        super.sclass.id,
-        this.trackedSubtypesGet(super.sclass.id).set(sub.sclass.id),
-      );
-      this.supertypesSet(
-        sub.sclass.id,
-        this.trackedSupertypesGet(sub.sclass.id).set(super.sclass.id),
-      );
+    if (!this.subtypes.containsValue(context, super.sclass.id, sub.sclass.id)) {
+      this.subtypesAdd(super.sclass.id, sub.sclass.id);
+      this.supertypesAdd(sub.sclass.id, super.sclass.id);
 
       for (t in this.trackedSupertypesGet(super.sclass.id)) {
         (_, !sub) = this.inherit(context, this.trackedSClassGet(t), sub);
@@ -2418,6 +2333,8 @@ mutable class Specializer{
     | (Mutable(), _)
     | (Readonly(), DeepFrozen())
     | (DeepFrozen(), DeepFrozen()) ->
+      // Variance compares many pairs of type arguments. Sharing one set read
+      // avoids recording a separate predicate for every pair in that scan.
       this.trackedSupertypesGet(t1.sclassID).contains(t2.sclassID)
     | _ -> false
     }
@@ -2950,8 +2867,8 @@ mutable class Specializer{
 
       // Record this class.
       sp.sclassSet(sid, info);
-      sp.supertypesSet(sid, SortedSet[sid]);
-      sp.subtypesSet(sid, SortedSet[sid]);
+      sp.supertypesAdd(sid, sid);
+      sp.subtypesAdd(sid, sid);
       sp.sclassMapSet(hsc, sid);
       sp.noteGClassInstance(info);
 
