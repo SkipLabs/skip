@@ -335,6 +335,19 @@ private fun incrementalRelationships(): void {
         false,
       ),
       (baseline, "14", "200001010000.07", false),
+      // A declared descendant changes frontend hierarchy metadata even when
+      // it never becomes a specialized class. Its removal must leave the
+      // existing class, metaclass, and variance relationships usable.
+      (
+        baseline.replace(
+          "class RelationBox",
+          "class RelationUnused() extends RelationBase\nclass RelationBox",
+        ),
+        "14",
+        "200001010000.08",
+        false,
+      ),
+      (baseline, "14", "200001010000.09", false),
     ]) {
       FileSystem.writeTextFile(source, text);
       T.expectTrue(

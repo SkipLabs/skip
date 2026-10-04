@@ -139,6 +139,25 @@ class Program private (
     }
   }
 
+  fun getClassFilter<R: SKStore.File>(
+    context: mutable SKStore.Context,
+    className: String,
+    project: ClassDef ~> R,
+  ): R {
+    values = this.declarations.getArrayFilter(
+      context,
+      SKStore.SID(className),
+      file ~> file match {
+      | ClassDefFile(cls) -> project(cls)
+      | _ -> invariant_violation("Expected class definition")
+      },
+    );
+    if (values.isEmpty()) {
+      invariant_violation("Class definition not found: " + className)
+    };
+    values[0]
+  }
+
   fun getFun(context: mutable SKStore.Context, funName: String): FunDef {
     key = SKStore.SID(funName);
     arr = this.program.getArray(context, key);
