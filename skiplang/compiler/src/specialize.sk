@@ -393,27 +393,68 @@ private base class OptionStyle uses Equality, Show {
   | SentinelOptionStyle _ -> "SentinelOptionStyle"
 }
 
-mutable class Specializer{
-  mutable tick: SKStore.Tick,
+mutable class SPMap<K: Orderable, V>(
+  mutable data: SortedMap<K, V> = SortedMap[],
+) {
+  readonly fun chill(): SPMap<K, V> {
+    SPMap(this.data)
+  }
+  readonly fun mclone(): mutable SPMap<K, V> {
+    mutable SPMap(this.data)
+  }
 
+  readonly fun readonlyGet(k: K): V {
+    this.data[k]
+  }
+
+  mutable fun get(k: K): V {
+    this.data[k]
+  }
+
+  mutable fun maybeGet(k: K): ?V {
+    this.data.maybeGet(k)
+  }
+
+  mutable fun set(k: K, v: V): void {
+    this.!data[k] = v;
+  }
+
+  mutable fun replace(other: readonly SPMap<K, V>): void {
+    this.!data = other.data
+  }
+  mutable fun map(f: (K, V) ~> Array<(K, V)>): mutable this {
+    result = SortedMap[];
+    for (k => v in this.data) {
+      for (kv2 in f(k, v)) {
+        (k2, v2) = kv2;
+        !result[k2] = v2
+      }
+    };
+    mutable static(result)
+  }
+}
+
+class FStackElement(GFunction, Array<Tclass>) uses Orderable
+
+mutable class Specializer{
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  private mutable gclassMap: SortedMap<
+  private gclassMap: mutable SPMap<
     GClassName,
     SortedSet<SClassID>,
-  > = SortedMap[],
+  > = mutable SPMap(),
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
-  private mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
+  private sclassMap: mutable SPMap<HalfSClass, SClassID> = mutable SPMap(),
 
   // Maps SClassID.id to information about that class.
-  private mutable sclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
+  private sclasses: mutable SPMap<SClassID, SClassInfo> = mutable SPMap(),
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
-  private mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
+  private funsNeeded: mutable SPMap<GFunKey, GFunKey> = mutable SPMap(),
 
   // Functions we still need to analyze with a new set of Targs.
-  private mutable funStack: List<(GFunction, Array<Tclass>)> = List[],
+  private mutable funStack: List<FStackElement> = List[],
 
   converter: Converter,
 
@@ -444,13 +485,13 @@ mutable class Specializer{
     result
   }
 
-  readonly fun gclassMapMaybeGet(key: GClassName): ?SortedSet<SClassID> {
+  mutable fun gclassMapMaybeGet(key: GClassName): ?SortedSet<SClassID> {
     result = this.gclassMap.maybeGet(key);
     result
   }
 
   mutable fun gclassMapSet(key: GClassName, value: SortedSet<SClassID>): void {
-    this.!gclassMap = this.gclassMap.set(key, value)
+    this.gclassMap.set(key, value)
   }
 
   mutable fun sclassMapGet(key: HalfSClass): SClassID {
@@ -458,17 +499,17 @@ mutable class Specializer{
     result
   }
 
-  readonly fun sclassMapMaybeGet(key: HalfSClass): ?SClassID {
+  mutable fun sclassMapMaybeGet(key: HalfSClass): ?SClassID {
     result = this.sclassMap.maybeGet(key);
     result
   }
 
   mutable fun sclassMapSet(key: HalfSClass, value: SClassID): void {
-    this.!sclassMap = this.sclassMap.set(key, value);
+    this.sclassMap.set(key, value);
   }
 
   readonly fun sclassGet(key: SClassID): SClassInfo {
-    result = this.sclasses[key];
+    result = this.sclasses.readonlyGet(key);
     result
   }
 
@@ -478,21 +519,21 @@ mutable class Specializer{
   }
 
   mutable fun sclassSet(key: SClassID, value: SClassInfo): void {
-    this.!sclasses = this.sclasses.set(key, value);
+    this.sclasses.set(key, value);
   }
 
   mutable fun getSClasses(): SortedMap<SClassID, SClassInfo> {
-    this.sclasses
+    this.sclasses.data
   }
 
   mutable fun funsNeededContains(key: GFunKey): Bool {
-    result = this.funsNeeded.contains(key);
+    result = this.funsNeeded.maybeGet(key) is Some _;
     result
   }
 
   mutable fun funsNeededSet(key: GFunKey): void {
-    if (!this.funsNeeded.contains(key)) {
-      this.!funsNeeded = this.funsNeeded.set(key);
+    if (this.funsNeeded.maybeGet(key) is None()) {
+      this.funsNeeded.set(key, key);
     }
   }
 
@@ -500,7 +541,7 @@ mutable class Specializer{
     this.funStack.isEmpty()
   }
 
-  mutable fun funStackPop(): (GFunction, Array<Tclass>) {
+  mutable fun funStackPop(): FStackElement {
     this.funStack match {
     | List.Nil() -> invariant_violation("Cannot pop an empty funStack")
     | List.Cons(x, rl) ->
@@ -509,17 +550,16 @@ mutable class Specializer{
     }
   }
 
-  mutable fun funStackPush(elt: (GFunction, Array<Tclass>)): void {
+  mutable fun funStackPush(elt: FStackElement): void {
     this.!funStack = List.Cons(elt, this.funStack);
   }
 
   readonly fun chill(): this {
     static{
-      tick => this.tick,
-      gclassMap => this.gclassMap,
-      sclassMap => this.sclassMap,
-      sclasses => this.sclasses,
-      funsNeeded => this.funsNeeded,
+      gclassMap => this.gclassMap.chill(),
+      sclassMap => this.sclassMap.chill(),
+      sclasses => this.sclasses.chill(),
+      funsNeeded => this.funsNeeded.chill(),
       funStack => this.funStack,
       converter => this.converter,
       config => this.config,
@@ -531,11 +571,10 @@ mutable class Specializer{
 
   readonly fun mclone(): mutable this {
     mutable static{
-      tick => this.tick,
-      gclassMap => this.gclassMap,
-      sclassMap => this.sclassMap,
-      sclasses => this.sclasses,
-      funsNeeded => this.funsNeeded,
+      gclassMap => this.gclassMap.mclone(),
+      sclassMap => this.sclassMap.mclone(),
+      sclasses => this.sclasses.mclone(),
+      funsNeeded => this.funsNeeded.mclone(),
       funStack => this.funStack,
       converter => this.converter,
       config => this.config,
@@ -546,11 +585,10 @@ mutable class Specializer{
   }
 
   mutable fun replace(other: this): void {
-    this.!tick = other.tick;
-    this.!gclassMap = other.gclassMap;
-    this.!sclassMap = other.sclassMap;
-    this.!sclasses = other.sclasses;
-    this.!funsNeeded = other.funsNeeded;
+    this.gclassMap.replace(other.gclassMap);
+    this.sclassMap.replace(other.sclassMap);
+    this.sclasses.replace(other.sclasses);
+    this.funsNeeded.replace(other.funsNeeded);
     this.!funStack = other.funStack;
     this.!canCreateNewSClasses = other.canCreateNewSClasses;
     this.!verifyChanged = this.verifyChanged;
@@ -562,7 +600,7 @@ mutable class Specializer{
   }
 
   readonly fun createNewSClassesMap(): SortedMap<SClassID, SClass> {
-    this.sclasses.map((_, info) -> info.sclass)
+    this.sclasses.data.map((_, info) -> info.sclass)
   }
 
   // If t is Awaitable<T>, returns Some(T), else None().
@@ -686,10 +724,7 @@ mutable class Specializer{
       (tVoid, gtVoid.generic),
     ];
 
-    tickCopy = this.tick;
-
     for (tt in builtinTypes) {
-      this.!tick = SKStore.Tick(-128);
       (t, lazyGClass) = tt;
       sc = this.getSClass2(
         context,
@@ -699,8 +734,6 @@ mutable class Specializer{
         sc.pos.die(`sclass ID mismatch: ${sc.id} != ${t.sclassID}`)
       }
     };
-
-    this.!tick = tickCopy;
 
     // Keep specializing functions and types until we hit a fixed point.
     while (this.specializePendingFuns(context)) void;
@@ -734,10 +767,12 @@ mutable class Specializer{
     changed = false;
     while (!this.funStackIsEmpty()) {
       !changed = true;
-      (f, targs) = this.funStackPop();
-      this.withRegion(context, (context, specializer) ~> {
-        specializer.specializePendingFun(context, f, targs);
-      })
+      this.funStackPop() match {
+      | FStackElement(f, targs) ->
+        this.withRegion(context, (context, specializer) ~> {
+          specializer.specializePendingFun(context, f, targs);
+        })
+      }
     };
 
     changed
@@ -1811,7 +1846,7 @@ mutable class Specializer{
             `expected ${function.funInfo.tparams}, but got ${newTargs}`,
         )
       };
-      this.funStackPush((function, newTargs))
+      this.funStackPush(FStackElement(function, newTargs))
     }
   }
 
@@ -1877,7 +1912,7 @@ mutable class Specializer{
     funToInsts = mutable Vector[];
 
     // First dealing with all the symbols found at initialization time
-    for (key in this.funsNeeded) {
+    for (key => _ in this.funsNeeded.data) {
       gf = this.converter.getGFunction(context, key.i0);
       funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(key);
     };
@@ -1890,7 +1925,9 @@ mutable class Specializer{
     // Partition functions into superpositions and give them SFunctionIDs.
     // We need to assign SFunctionIDs now so that when we specialize them
     // below, Call Instrs know the SFunctionIDs to use to refer to other funs.
-    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(this.funsNeeded.size());
+    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(
+      this.funsNeeded.data.size(),
+    );
     for (gfAndInsts in funToInsts) {
       (_, insts) = gfAndInsts;
       // For now, stupidly give every unique set of parameters its own
