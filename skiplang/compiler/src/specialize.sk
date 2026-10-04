@@ -402,6 +402,7 @@ mutable base class SPMap<K: Orderable, V>{} {
   mutable fun set(k: K, v: V): void;
   mutable fun replace(other: readonly SPMap<K, V>): void;
   readonly fun toFixed(): readonly SPMapFixed<K, V>;
+  readonly fun getDiff(): SortedMap<K, V>;
 }
 
 mutable class SPMapDiff<K: Orderable, V>{
@@ -431,6 +432,10 @@ mutable class SPMapDiff<K: Orderable, V>{
       handle => this.handle,
       data => this.data,
     }
+  }
+
+  readonly fun getDiff(): SortedMap<K, V> {
+    this.data
   }
 
   readonly fun readonlyGet(_k: K): V {
@@ -480,6 +485,13 @@ mutable class SPMapDiff<K: Orderable, V>{
 mutable class SPMapFixed<K: Orderable, V>{
   mutable data: SortedMap<K, V> = SortedMap[],
 } extends SPMap<K, V> {
+  static fun mcreate(data: SortedMap<K, V>): mutable SPMap<K, V> {
+    mutable SPMapFixed{data}
+  }
+  readonly fun getDiff(): SortedMap<K, V> {
+    invariant_violation("Cannot call getDiff on SPMapFixed");
+  }
+
   readonly fun chill(): SPMap<K, V> {
     SPMapFixed{data => this.data}
   }
@@ -543,24 +555,108 @@ class SpecializerState{
   }
 }
 
+/*****************************************************************************/
+// Conversion functions
+/*****************************************************************************/
+
+class GClassNameKey(value: GClassName) extends SKStore.Key
+class SClassIDFile(value: SClassID) extends SKStore.File
+class SortedSetSClassIDFile(value: SortedSet<SClassID>) extends SKStore.File
+class HalfSClassKey(value: HalfSClass) extends SKStore.Key
+class SClassIDKey(value: SClassID) extends SKStore.Key
+class SClassInfoFile(value: SClassInfo) extends SKStore.File
+class GFunKeyKey(value: GFunKey) extends SKStore.Key
+class GFunKeyFile(value: GFunKey) extends SKStore.File
+
+fun convGClassName2Key(x: GClassName): SKStore.Key {
+  GClassNameKey(x)
+}
+fun convKey2GClassName(x: SKStore.Key): GClassName {
+  x match {
+  | GClassNameKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2File(x: SClassID): SKStore.File {
+  SClassIDFile(x)
+}
+fun convSortedSetSClassID2File(x: SortedSet<SClassID>): SKStore.File {
+  SortedSetSClassIDFile(x)
+}
+fun convFile2SClassID(x: SKStore.File): SClassID {
+  x match {
+  | SClassIDFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convFile2SortedSetSClassID(x: SKStore.File): SortedSet<SClassID> {
+  x match {
+  | SortedSetSClassIDFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+
+fun convHalfSClass2Key(x: HalfSClass): SKStore.Key {
+  HalfSClassKey(x)
+}
+fun convKey2HalSClass(x: SKStore.Key): HalfSClass {
+  x match {
+  | HalfSClassKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2Key(x: SClassID): SKStore.Key {
+  SClassIDKey(x)
+}
+fun convKey2SClassID(x: SKStore.Key): SClassID {
+  x match {
+  | SClassIDKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassInfo2File(x: SClassInfo): SKStore.File {
+  SClassInfoFile(x)
+}
+fun convFile2SClassInfo(x: SKStore.File): SClassInfo {
+  x match {
+  | SClassInfoFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convGFunKey2Key(x: GFunKey): SKStore.Key {
+  GFunKeyKey(x)
+}
+fun convKey2GFunKey(x: SKStore.Key): GFunKey {
+  x match {
+  | GFunKeyKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convGFunKey2File(x: GFunKey): SKStore.File {
+  GFunKeyFile(x)
+}
+fun convFile2GFunKey(x: SKStore.File): GFunKey {
+  x match {
+  | GFunKeyFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+
 mutable class Specializer{
   context: mutable SKStore.Context,
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  private gclassMap: mutable SPMap<
-    GClassName,
-    SortedSet<SClassID>,
-  > = mutable SPMapFixed{},
+  private mutable gclassMap: mutable SPMap<GClassName, SortedSet<SClassID>>,
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
-  private sclassMap: mutable SPMap<HalfSClass, SClassID> = mutable SPMapFixed{},
+  private mutable sclassMap: mutable SPMap<HalfSClass, SClassID>,
 
   // Maps SClassID.id to information about that class.
-  private sclasses: mutable SPMap<SClassID, SClassInfo> = mutable SPMapFixed{},
+  private mutable sclasses: mutable SPMap<SClassID, SClassInfo>,
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
-  private funsNeeded: mutable SPMap<GFunKey, GFunKey> = mutable SPMapFixed{},
+  private mutable funsNeeded: mutable SPMap<GFunKey, GFunKey>,
 
   // Functions we still need to analyze with a new set of Targs.
   private mutable funStack: List<FStackElement> = List[],
@@ -577,11 +673,115 @@ mutable class Specializer{
   mutable pos: Pos,
 } extends ClassLookupEnv {
   static fun make(
+    handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
     context: mutable SKStore.Context,
     config: Config.Config,
     converter: Converter,
   ): mutable Specializer {
-    mutable Specializer{context, converter, config, pos => FileRange.builtin}
+    mutable Specializer{
+      context,
+      converter,
+      config,
+      pos => FileRange.builtin,
+      gclassMap => mutable SPMapDiff{
+        k2Key => convGClassName2Key,
+        key2K => convKey2GClassName,
+        v2File => convSortedSetSClassID2File,
+        file2V => convFile2SortedSetSClassID,
+        handle,
+      },
+      sclassMap => mutable SPMapDiff{
+        k2Key => convHalfSClass2Key,
+        key2K => convKey2HalSClass,
+        v2File => convSClassID2File,
+        file2V => convFile2SClassID,
+        handle,
+      },
+      sclasses => mutable SPMapDiff{
+        k2Key => convSClassID2Key,
+        key2K => convKey2SClassID,
+        v2File => convSClassInfo2File,
+        file2V => convFile2SClassInfo,
+        handle,
+      },
+      funsNeeded => mutable SPMapDiff{
+        k2Key => convGFunKey2Key,
+        key2K => convKey2GFunKey,
+        v2File => convGFunKey2File,
+        file2V => convFile2GFunKey,
+        handle,
+      },
+    }
+  }
+
+  mutable fun toFixed(
+    context: mutable SKStore.Context,
+    handleName: SKStore.DirName,
+  ): void {
+    gclassMap = SortedMap[];
+    sclassMap = SortedMap[];
+    sclasses = SortedMap[];
+    funsNeeded = SortedMap[];
+    fileIter = context.unsafeGetEagerDir(handleName).unsafeGetFileIter();
+
+    for (entry in fileIter) {
+      (entryKey, values) = entry;
+      entryKey match {
+      | GClassNameKey(key) ->
+        for (v in values) {
+          v match {
+          | SortedSetSClassIDFile(file) -> !gclassMap[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | HalfSClassKey(key) ->
+        for (v in values) {
+          v match {
+          | SClassIDFile(file) -> !sclassMap[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | SClassIDKey(key) ->
+        for (v in values) {
+          v match {
+          | SClassInfoFile(file) -> !sclasses[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | GFunKeyKey(key) ->
+        for (v in values) {
+          v match {
+          | GFunKeyFile(file) -> !funsNeeded[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | FStackElement _ -> // for now that is ok, but we should get rid of it
+        void
+
+      | _ -> invariant_violation("Unexpected key type")
+      }
+    };
+    for (k => v in this.gclassMap.getDiff()) {
+      !gclassMap[k] = v
+    };
+    for (k => v in this.sclassMap.getDiff()) {
+      !sclassMap[k] = v
+    };
+    for (k => v in this.sclasses.getDiff()) {
+      !sclasses[k] = v
+    };
+    for (k => v in this.funsNeeded.getDiff()) {
+      !funsNeeded[k] = v
+    };
+
+    this.!gclassMap = SPMapFixed::mcreate(gclassMap);
+    this.!sclassMap = SPMapFixed::mcreate(sclassMap);
+    this.!sclasses = SPMapFixed::mcreate(sclasses);
+    this.!funsNeeded = SPMapFixed::mcreate(funsNeeded);
   }
 
   mutable fun gclassMapGet(key: GClassName): SortedSet<SClassID> {
@@ -796,6 +996,7 @@ mutable class Specializer{
   // reachable from our original root set so we can compile them all.
   mutable fun findAllFunctionsAndSClasses(
     context: mutable SKStore.Context,
+    dirName: SKStore.DirName,
   ): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
@@ -835,6 +1036,7 @@ mutable class Specializer{
     // ??? visit all interesting const types in converter
 
     // We had better not see any new ones we missed during this phase!
+    this.toFixed(context, dirName);
     this.!canCreateNewSClasses = false
   }
 
