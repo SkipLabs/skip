@@ -788,15 +788,26 @@ class AsyncCoroutineLazyGFun{
   }
 }
 
-// functions and methods backed by an OuterIst def
-class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
+// A source-free recipe for retrieving a definition through tracked reads.
+base class CallableDefRef extends SKStore.Key {
+  children =
+  | FunctionDefRef(name: String)
+  | MethodDefRef(className: String, name: String, isStatic: Bool)
+  | FactoryDefRef(className: String, returnsMutable: Bool, isAbstract: Bool)
+}
+
+// Functions and methods backed by an OuterIst definition, resolved on demand.
+class DefLazyGFun{defRef: CallableDefRef} extends BodyProvidingLazyGFun {
   static fun make{
     funInfo: GFunInfo,
-    def: I.CallableDef,
+    defRef: CallableDefRef,
     params: Array<ParameterInfo>,
     useOptionalMask: Bool,
   }: LazyGFun {
-    d = DefLazyGFun{funInfo, def, params, useOptionalMask};
+    // Default expressions are refreshed by getParams after lowering. Do not
+    // retain their source trees in the lazy function reference either.
+    !params = params.map(p -> p with {value => None()});
+    d = DefLazyGFun{funInfo, defRef, params, useOptionalMask};
     if (funInfo.isAsync) {
       AsyncCoroutineLazyGFun{
         funInfo,
@@ -812,18 +823,12 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
   private fun getLoweredDef(
     context: mutable SKStore.Context,
     converter: Converter,
-    def: I.CallableDef,
   ): I.CallableDef {
-    result = if (def.isLowered()) {
-      def
-    } else {
-      converter.lower.get(context, I.CallableDefFile(def)).value
-    };
-    result
+    converter.lower.get(context, this.defRef).value
   }
 
   fun getBody(context: mutable SKStore.Context, converter: Converter): I.Stmt {
-    this.getLoweredDef(context, converter, this.def).getBody().asOuter()
+    this.getLoweredDef(context, converter).getBody().asOuter()
   }
 
   // get our lowered def, and patch our params array with the fresh info.
@@ -833,7 +838,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     context: mutable SKStore.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
-    def = this.getLoweredDef(context, converter, this.def);
+    def = this.getLoweredDef(context, converter);
     defParams = def.getParams();
     this.params.map(p -> {
       if (p.index < 0) {
@@ -973,15 +978,21 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      I.CallableDefFile::keyType,
+      SKStore.Key::unTyped,
       I.CallableDefFile::type,
       context,
       lowerDirName,
       (context, _self, key) ~> {
-        def = key match {
-        | I.CallableDefFile(x) -> x
+        defRef = key match {
+        | x @ CallableDefRef _ -> x
+        | _ -> invariant_violation("Unexpected key type")
         };
-        lowered = def.lower(context, program);
+        def = converter.resolveCallableDef(context, defRef);
+        lowered = if (def.isLowered()) {
+          def
+        } else {
+          def.lower(context, program)
+        };
         if (shouldDebugSymbol(def.getName())) {
           debug(def.getName() + " unlowered");
           debug(def);
@@ -993,6 +1004,33 @@ class Converter private (
       },
     );
     converter
+  }
+
+  fun resolveCallableDef(
+    context: mutable SKStore.Context,
+    ref: CallableDefRef,
+  ): I.CallableDef {
+    ref match {
+    | FunctionDefRef(name) -> this.program.getFun(context, name)
+    | MethodDefRef(className, name, isStatic) ->
+      cd = this.program.getClass(context, className);
+      methods = if (isStatic) {
+        // Includes generated class-constant getters.
+        this.getFrontEndStaticMethods(cd)
+      } else {
+        cd.methods.values().filter(md ->
+          md.kind is SkipNamedAst.FKDynamic _
+        ).collect(Array)
+      };
+      methods.find(md -> md.name.id == name) match {
+      | Some(md) -> md
+      | None() ->
+        cd.name.pos.die(`Method definition not found: ${className}::${name}`)
+      }
+    | FactoryDefRef(className, returnsMutable, isAbstract) ->
+      cd = this.program.getClass(context, className);
+      this.createFactory(context, returnsMutable, isAbstract, cd, cd.name.pos)
+    }
   }
 
   fun getGFunction(
@@ -1619,6 +1657,7 @@ class Converter private (
       (mname, mf) = this.convertMethodDef(
         context,
         md,
+        MethodDefRef(cd.name.id, md.name.id, true),
         phys,
         orig.name,
         gc.tparams,
@@ -1933,6 +1972,7 @@ class Converter private (
         (mname, mf) = this.convertMethodDef(
           context,
           factory,
+          FactoryDefRef(fegc.name.id, factoryIsMutable, true),
           name.name(),
           gc.name,
           gc.tparams,
@@ -2004,6 +2044,7 @@ class Converter private (
               (mname, mf) = this.convertMethodDef(
                 context,
                 factory,
+                FactoryDefRef(fegc.name.id, factoryIsMutable, false),
                 name.name(),
                 gc.name,
                 gc.tparams,
@@ -2278,7 +2319,14 @@ class Converter private (
 
     methods = UnorderedMap::mcreate(nonStaticMethods.size());
     for (v in nonStaticMethods) {
-      (mname, mf) = this.convertMethodDef(context, v, name, name, tparams);
+      (mname, mf) = this.convertMethodDef(
+        context,
+        v,
+        MethodDefRef(classname, v.name.id, false),
+        name,
+        name,
+        tparams,
+      );
       methods.add(mname, mf)
     };
 
@@ -2439,7 +2487,12 @@ class Converter private (
     } else {
       in_.body match {
       | Some _ ->
-        DefLazyGFun::make{funInfo, def => in_, params, useOptionalMask}
+        DefLazyGFun::make{
+          funInfo,
+          defRef => FunctionDefRef(name),
+          params,
+          useOptionalMask,
+        }
       | None() -> NativeLazyGFun{funInfo, params}
       }
     };
@@ -2450,6 +2503,7 @@ class Converter private (
   private fun convertMethodDef(
     context: mutable SKStore.Context,
     in_: I.MethodDef,
+    defRef: CallableDefRef,
     physicalClassName: GClassName,
     // Usually the same as physicalClassName, but for static methods
     // moved to metaclasses it's the original class, not the metaclass
@@ -2553,7 +2607,7 @@ class Converter private (
       // If a function (or method) is native then ignore any body it might have.
       Some(NativeLazyGFun{funInfo, params})
     } else if (in_.body is Some _) {
-      Some(DefLazyGFun::make{funInfo, def => in_, params, useOptionalMask})
+      Some(DefLazyGFun::make{funInfo, defRef, params, useOptionalMask})
     } else {
       // Do nothing with regular abstract methods.
       None()
@@ -2932,6 +2986,7 @@ mutable class OuterIstEmitter{
   mutable funInfo: GFunInfo,
   lazy: ConcreteLazyGFun,
   mutable nextBlockID: Int = 0,
+  // Reset for every enclosing function, keeping closure names reproducible.
   mutable nextClosureID: Int = 0,
   mutable nextInstrID: Int = 0,
   mutable nextTryID: Int = 0,
