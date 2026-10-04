@@ -602,6 +602,7 @@ class CStackElement(
   origin: FStackElement,
   hc: HalfClass,
   k: (mutable SKStore.Context, mutable Specializer, SClassInfo) ~> void,
+  pos: Pos,
 ) extends SKStore.File
 
 class SpecializerState{
@@ -702,7 +703,7 @@ class GFunKeyKey(value: GFunKey) extends SKStore.Key
 class GFunKeyFile(value: GFunKey) extends SKStore.File
 class ContinuationFile(
   origin: FStackElement,
-  value: (mutable SKStore.Context, mutable Specializer) ~> void,
+  pending: Array<CStackElement>,
 ) extends SKStore.File
 
 fun convGClassName2Key(x: GClassName): SKStore.Key {
@@ -1556,7 +1557,6 @@ mutable class Specializer{
           sp,
           tparamEnv,
           scan,
-          0,
           (context, sp, _) ~> {
             sp.!pos = oldPos;
             k(context, sp, void)
@@ -1571,48 +1571,47 @@ mutable class Specializer{
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     instrs: Array<(GNonConstantInstr, Bool, Bool)>,
-    index: Int,
     k: (mutable SKStore.Context, mutable this, void) ~> T,
   ): T {
-    if (index == instrs.size()) return k(context, sp, void);
-    (instr, noteType, noteLiteralType) = instrs[index];
-    sp.!pos = instr.pos;
-    afterType = (
-      context: mutable SKStore.Context,
-      sp: mutable this,
-      _type: Tclass,
-    ) ~> {
-      static::specializePendingInstrCPS(
-        context,
-        sp,
-        tparamEnv,
-        instr,
-        noteLiteralType,
-        (context, sp, _) ~> {
-          static::specializePendingInstrsCPS(
+    for (entry in instrs) {
+      (instr, noteType, noteLiteralType) = entry;
+      sp.!pos = instr.pos;
+      // Each continuation finishes only this instruction. A missing class
+      // saves that work in classStack while the loop visits other instructions.
+      afterType = (
+        context: mutable SKStore.Context,
+        sp: mutable this,
+        _type: Tclass,
+      ) ~> {
+        static::specializePendingInstrCPS(
+          context,
+          sp,
+          tparamEnv,
+          instr,
+          noteLiteralType,
+          (_, _, _) ~> void,
+        )
+      };
+      try {
+        if (noteType) {
+          static::getTclass3CPS(
             context,
             sp,
+            instr.getType(),
             tparamEnv,
-            instrs,
-            index + 1,
-            k,
+            sp.pos,
+            false,
+            afterType,
           )
-        },
-      )
+        } else {
+          afterType(context, sp, tVoid)
+        }
+      } catch {
+      | SClassCreatedExn() -> void
+      | ex -> throw ex
+      }
     };
-    if (noteType) {
-      static::getTclass3CPS(
-        context,
-        sp,
-        instr.getType(),
-        tparamEnv,
-        sp.pos,
-        false,
-        afterType,
-      )
-    } else {
-      afterType(context, sp, tVoid)
-    }
+    k(context, sp, void)
   }
 
   private static fun specializePendingInstrCPS<T>(
@@ -2415,9 +2414,14 @@ mutable class Specializer{
       | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
       | None() if (sp.pauseOnSClassCreation) ->
         sp.!classStack = List.Cons(
-          CStackElement(sp.getFStackOrigin(), hc, (ctx, sp, sc) ~> {
-            _ = k(ctx, sp, sc);
-          }),
+          CStackElement(
+            sp.getFStackOrigin(),
+            hc,
+            (ctx, sp, sc) ~> {
+              _ = k(ctx, sp, sc);
+            },
+            sp.pos,
+          ),
           sp.classStack,
         );
         throw SClassCreatedExn()
