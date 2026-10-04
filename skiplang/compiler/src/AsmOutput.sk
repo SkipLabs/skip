@@ -979,6 +979,7 @@ fun writeOutputFiles(
   inputFiles: Array<String>,
   output: String,
   config: Config.Config,
+  positions: SourcePositions.Table,
 ): void {
   // Complexity of each def to be emitted.
   real = mutable Vector[];
@@ -1024,6 +1025,7 @@ fun writeOutputFiles(
       // FIXME: This is dirty.
       "TODO"
     },
+    positions,
   );
 
   fileEmpty = true;
@@ -1668,13 +1670,15 @@ mutable class Metadata{
   moduleFlags: mutable Vector<Int> = mutable Vector[],
 
   defs: readonly AsmDefIDToAsmDef,
+  positions: SourcePositions.Table,
 } {
   static fun create(
     defs: readonly AsmDefIDToAsmDef,
     cwd: Config.WorkingDirectory,
     compilationUnit: String,
+    positions: SourcePositions.Table,
   ): mutable Metadata {
-    metadata = mutable Metadata{defs, cwd};
+    metadata = mutable Metadata{defs, cwd, positions};
 
     // Reserve the slot for kEmptyBlockIndex since we may have already
     // handed it out.
@@ -1753,7 +1757,7 @@ mutable class Metadata{
             funPos.name,
             file,
             file,
-            funPos.pos.startPosition().line() + 1,
+            funPos.pos.startPosition(this.positions).line() + 1,
             this.diSubroutineTypeCache,
             this.diCompileUnit,
           );
@@ -1769,7 +1773,7 @@ mutable class Metadata{
     inlinedAt: DILocation = DILocation::none,
   ): DILocation {
     scope = this.diSubprogram(funPos);
-    start = pos.startPosition();
+    start = pos.startPosition(this.positions);
 
     // Correct 0-based internal convention to 1-based LLVM convention.
     line = start.line() + 1;
@@ -3835,7 +3839,7 @@ fun llvmWriteFunctionDefinition(
       asm.print(";;; @disasm_function: (%r" % name);
 
       if (pos.file != FileRange.builtin.file) {
-        start = pos.startPosition();
+        start = pos.startPosition(common.env.sourcePositions);
         asm.print(
           ", %r, %s, %s" %
             // FIXME: Use absolute path.

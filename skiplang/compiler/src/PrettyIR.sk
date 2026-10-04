@@ -1125,9 +1125,13 @@ mutable class Metadata{
   moduleFlags: mutable Vector<Int> = mutable Vector[],
 
   defs: readonly PrettyDefIDToPrettyDef,
+  positions: SourcePositions.Table,
 } {
-  static fun create(defs: readonly PrettyDefIDToPrettyDef): mutable Metadata {
-    metadata = mutable Metadata{defs};
+  static fun create(
+    defs: readonly PrettyDefIDToPrettyDef,
+    positions: SourcePositions.Table,
+  ): mutable Metadata {
+    metadata = mutable Metadata{defs, positions};
 
     // Reserve the slot for kEmptyBlockIndex since we may have already
     // handed it out.
@@ -1217,7 +1221,7 @@ mutable class Metadata{
             funPos.name,
             file,
             file,
-            funPos.pos.startPosition().line() + 1,
+            funPos.pos.startPosition(this.positions).line() + 1,
             this.diSubroutineTypeCache,
             unit,
           );
@@ -1233,7 +1237,7 @@ mutable class Metadata{
     inlinedAt: DILocation = DILocation::none,
   ): DILocation {
     scope = this.diSubprogram(funPos);
-    start = pos.startPosition();
+    start = pos.startPosition(this.positions);
 
     // Correct 0-based internal convention to 1-based LLVM convention.
     line = start.line() + 1;
@@ -2135,7 +2139,7 @@ private fun debugWrite(instr: Stmt, out: mutable PrettyDefBuilder): void {
     optinfo,
   );
   debugWriteExtraOperands(instr, out, sep);
-  out.print(" ; %s\n" / instr.pos.toString());
+  out.print(" ; %s\n" / out.env().sourcePositions.format(instr.pos));
 }
 
 private fun debugWriteBlockName(b: Block, out: mutable PrettyDefBuilder): void {
@@ -2241,7 +2245,7 @@ fun debugWriteFunction(
   out.print(
     "): %s { ; %s\n" /
       f.funType.aggregateReturnType.toString() /
-      f.pos.toString(),
+      env.sourcePositions.format(f.pos),
   );
 
   if (true) {
@@ -2260,7 +2264,10 @@ fun debugWriteFunction(
   sstr = mutable TextOutputStream.StringTextOutputStream{};
   sstr.write("\n\n");
 
-  metadata = mutable Metadata{defs => common.defs};
+  metadata = mutable Metadata{
+    defs => common.defs,
+    positions => env.sourcePositions,
+  };
 
   def.write(sstr, metadata);
 

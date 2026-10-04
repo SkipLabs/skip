@@ -188,7 +188,9 @@ private fun isMutableType(tt: I.Type): Bool {
 }
 
 private fun getLineStr(pos: FileRange): String {
-  (pos.start().line() + 1).toString()
+  // Block labels only need a stable, readable suffix; resolving an absolute
+  // line here would make conversion depend on unrelated source movement.
+  (pos.range.start.line + 1).toString()
 }
 
 mutable private class JumpBlockInfo{
@@ -5127,7 +5129,9 @@ fun createIR(
 
   // Split up functions based on which ones can share machine code.
   sclasses = specializer.createNewSClassesMap();
-  env = GlobalEnv::make(sclasses);
+  env = GlobalEnv::make(sclasses) with {
+    sourcePositions => SourcePositions.Table::read(context),
+  };
   !env = specializer.partitionFunctions(
     context,
     roots.runtimeFunctions,

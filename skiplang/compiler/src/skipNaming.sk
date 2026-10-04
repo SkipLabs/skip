@@ -3914,8 +3914,9 @@ fun expandForEachFunctionMacro(
   List::createFromItems(
     funsByAnnotationDir
       .getArray(context, SKStore.SID(annotation.i1))
-      .map(f -> f.value)
-      .sorted(),
+      .map(f -> (f.value, SourcePositions.sourceOrder(context, f.value.i0)))
+      .sortedBy(entry ~> (entry.i1, entry.i0.i1))
+      .map(entry -> entry.i0),
   ) match {
   | List.Nil() -> N.Literal(SkipAst.VoidLiteral())
   | List.Cons(hd, tl) ->
@@ -4179,7 +4180,10 @@ fun expr_(
       "Unnecessary usage of 'while' since the 'else' branch is never taken.\nReplace 'while (true)' with 'loop' to make the non-terminating loop explicit.\nUnlike 'while', 'loop' has the type of the value in 'break', or any type needed when there is no 'break'.",
       Some(
         SkipError.Fix{
-          oldRange => TextRange::create(pos.range.start, pos2.range.end),
+          oldRange => SourcePositions.Range{
+            start => pos.range.start,
+            end => pos2.range.end,
+          },
           newText => "loop",
         },
       ),

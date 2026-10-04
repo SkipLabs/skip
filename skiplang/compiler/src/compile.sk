@@ -710,7 +710,9 @@ fun getOrInitializeBackend(
       specializer.toFixed(context);
       specializer.!canCreateNewSClasses = false;
       debug(("specializer created"));
-      //      if (true) return void;
+      // Return from the callback so context.update() and database persistence
+      // still finish normally in specialization-only experiments.
+      if (config.stopAfterSpecialization) return void;
 
       roots = prevPhase.rootsIR;
       env = O.createIR(context, config, roots, specializer);
@@ -736,7 +738,7 @@ fun getOrInitializeBackend(
       debug("symbols");
 
       config.emit match {
-      | "llvm-ir" -> compile_llvm_ir(defs, config)
+      | "llvm-ir" -> compile_llvm_ir(defs, config, env.sourcePositions)
       | "link" | "cdylib" ->
         // TODO: Remove exports stuff once --emit=cdylib is supported.
         wasm_exports = outerIst
@@ -754,7 +756,7 @@ fun getOrInitializeBackend(
               ).isSome()
           )
           .map(exportName);
-        compile_binary(defs, config, wasm_exports)
+        compile_binary(defs, config, wasm_exports, env.sourcePositions)
       | "sklib" ->
         invariant_violation("--emit=sklib should have been handled earlier")
       | _ ->
@@ -811,7 +813,7 @@ fun compile(
     )
   });
 
-  if (config.output != "-" && !FileSystem.exists(config.output)) {
+  if (!config.stopAfterSpecialization && config.output != "-" && !FileSystem.exists(config.output)) {
     // Output files are external side effects. Replay the final backend map
     // when the output disappears, preserving cached specialization work.
     context.invalidateReader(SKStore.TArrowKey::create{
@@ -930,9 +932,16 @@ fun compile_batch(
 fun compile_llvm_ir(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   conf: Config.Config,
+  positions: SourcePositions.Table,
 ): void {
   runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, conf.input_files, conf.output, conf)
+    AsmOutput.writeOutputFiles(
+      defs,
+      conf.input_files,
+      conf.output,
+      conf,
+      positions,
+    )
   })
 }
 
@@ -940,11 +949,12 @@ fun compile_binary(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   conf: Config.Config,
   exports: Array<String>,
+  positions: SourcePositions.Table,
 ): void {
   // TODO: Use `mkstemp()` instead.
   llFile = conf.output + ".ll";
   runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf)
+    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf, positions)
   });
 
   debug("wrote asm files");

@@ -1,0 +1,295 @@
+/** Source locations kept separate from the semantic compiler inputs. */
+module SourcePositions;
+
+// The path includes declaration kinds, names, and duplicate occurrence numbers.
+// It is local to a file and does not depend on preceding unrelated declarations.
+type Symbol = Array<String>;
+
+// Lines are signed offsets from the marker. Columns are relative on the
+// marker line, and absolute on other lines (so moving a declaration sideways
+// does not move the indentation of its following lines).
+value class Point{
+  symbol: Symbol = Array[],
+  line: Int,
+  column: Int,
+} uses Hashable, Orderable, Show {
+  static fun absolute(pos: Position): Point {
+    Point{line => pos.line(), column => pos.column()}
+  }
+
+  fun resolve(symbols: Map<Symbol, Position>): Position {
+    origin = if (this.symbol.isEmpty()) Position.start else {
+      symbols[this.symbol]
+    };
+    Position.create(
+      origin.line() + this.line,
+      this.column + if (this.line == 0) origin.column() else 0,
+    )
+  }
+
+  fun toString(): String {
+    if (this.symbol.isEmpty()) {
+      Position.create(this.line, this.column).toString()
+    } else {
+      `[${this.symbol.join("/")} + ${this.line}:${this.column}]`
+    }
+  }
+}
+
+// Ordering is structural (for keys), not chronological. Source-order consumers
+// must use sourceOrder() or resolve against the current marker table.
+value class Range{start: Point, end: Point} uses Hashable, Orderable, Show {
+  static fun absolute(range: TextRange): Range {
+    Range{
+      start => Point::absolute(range.start),
+      end => Point::absolute(range.end),
+    }
+  }
+
+  fun resolve(symbols: Map<Symbol, Position>): TextRange {
+    TextRange.create(this.start.resolve(symbols), this.end.resolve(symbols))
+  }
+
+  fun toString(): String {
+    if (this == static::absolute(TextRange.none)) "" else {
+      `${this.start}-${this.end}`
+    }
+  }
+}
+
+class Marker{symbol: Symbol, origin: Position}
+
+class Index{
+  markers: Array<(Position, Marker)>,
+  symbols: Map<Symbol, Position>,
+} {
+  static fun create(tree: ParseTree.ParseTree): Index {
+    builder = mutable Builder{};
+    builder.visit(tree, Array[]);
+    Index{
+      // getChildren() visits source order, and Map preserves insertion order.
+      markers => builder.markers.items().collect(Array),
+      symbols => builder.symbols.chill(),
+    }
+  }
+
+  fun point(pos: Position): Point {
+    // Upper bound: a declaration beginning exactly here owns the position.
+    lo = 0;
+    hi = this.markers.size();
+    while (lo < hi) {
+      mid = (lo + hi) / 2;
+      if (this.markers[mid].i0 <= pos) !lo = mid + 1 else !hi = mid;
+    };
+    if (lo == 0) return Point::absolute(pos);
+    marker = this.markers[lo - 1].i1;
+    line = pos.line() - marker.origin.line();
+    Point{
+      symbol => marker.symbol,
+      line,
+      column => pos.column() - if (line == 0) marker.origin.column() else 0,
+    }
+  }
+
+  fun range(range: TextRange): Range {
+    if (range.isNone()) return Range::absolute(range);
+    Range{start => this.point(range.start), end => this.point(range.end)}
+  }
+}
+
+mutable class Builder{
+  markers: mutable Map<Position, Marker> = mutable Map[],
+  symbols: mutable Map<Symbol, Position> = mutable Map[],
+  counts: mutable Map<Symbol, Int> = mutable Map[],
+} {
+  mutable fun mark(at: Position, origin: Position, symbol: Symbol): void {
+    this.markers.set(at, Marker{symbol, origin});
+    this.symbols.set(symbol, origin);
+  }
+
+  mutable fun visit(
+    tree: ParseTree.ParseTree,
+    parent: Symbol,
+    constructorFieldIndex: Int = -1,
+  ): void {
+    // Bodies have no independently named declarations. In particular, do not
+    // force LazyTree here (doing so would parse every method body twice).
+    nameOpt = tree match {
+    | ParseTree.ModuleTree{name}
+    | ParseTree.ModuleAliasTree{name}
+    | ParseTree.ClassDeclarationTree{name}
+    | ParseTree.TraitDeclarationTree{name}
+    | ParseTree.ChildClassTree{name}
+    | ParseTree.FunctionDeclarationTree{name}
+    | ParseTree.MethodDeclarationTree{name}
+    | ParseTree.ConstantTree{name}
+    | ParseTree.GlobalConstantTree{name}
+    | ParseTree.TypeConstantTree{name}
+    | ParseTree.TypeAliasDeclarationTree{name} ->
+      Some(name)
+    | ParseTree.NamedParameterTree{name} if (constructorFieldIndex >= 0) ->
+      Some(name)
+    | ParseTree.PositionalParameterTree{
+      nameColon => ParseTree.ParameterNameColonTree{name},
+    } if (constructorFieldIndex >= 0) ->
+      Some(name)
+    | _ -> None()
+    };
+    anchorOpt = nameOpt match {
+    | Some(name) ->
+      Some((name.getTokens().map(t -> t.value).join(""), name.range.start))
+    | None() ->
+      tree match {
+      | ParseTree.PositionalParameterTree{
+        typeSpecifier,
+      } if (constructorFieldIndex >= 0) ->
+        // Unnamed fields already have positional identities in the AST.
+        Some(("@param" + constructorFieldIndex, typeSpecifier.range.start))
+      | _ -> None()
+      }
+    };
+    scope = anchorOpt match {
+    | None() -> parent
+    | Some((spelling, origin)) ->
+      kind =
+        tree.getKind() +
+        (tree match {
+        | ParseTree.MethodDeclarationTree{modifiers} ->
+          if (modifiers.hasModifier(TokenKind.STATIC())) ":static" else {
+            ":instance"
+          }
+        | _ -> ""
+        });
+      key = parent.concat(Array[kind, spelling]);
+      count = this.counts.maybeGet(key).default(0);
+      this.counts.set(key, count + 1);
+      symbol = key.concat(Array[count.toString()]);
+      this.mark(tree.range.start, origin, symbol.concat(Array["start"]));
+      symbol
+    };
+    tree match {
+    | ParseTree.ClassConstructorDeclarationTree{parameters} ->
+      // Named fields have identities independent of their order. Keep the
+      // constructor boundaries stable too, including when its first or last
+      // field changes.
+      constructor = scope.concat(Array["constructor"]);
+      this.mark(
+        tree.range.start,
+        tree.range.start,
+        constructor.concat(Array["start"]),
+      );
+      fields = parameters match {
+      | ParseTree.NamedParametersTree{parameters => entries}
+      | ParseTree.PositionalParametersTree{parameters => entries} ->
+        entries.getList()
+      | _ -> invariant_violation("Unexpected constructor parameters")
+      };
+      fields.eachWithIndex((i, field) -> this.visit(field, constructor, i));
+      this.mark(
+        tree.range.end,
+        tree.range.end,
+        constructor.concat(Array["end"]),
+      )
+    | ParseTree.FunctionDeclarationTree _
+    | ParseTree.MethodDeclarationTree _
+    | ParseTree.NamedParameterTree _
+    | ParseTree.PositionalParameterTree _
+    | ParseTree.ConstantTree _
+    | ParseTree.GlobalConstantTree _
+    | ParseTree.TypeConstantTree _
+    | ParseTree.TypeAliasDeclarationTree _
+    | ParseTree.LazyTree _ ->
+      void
+    | _ -> for (child in tree.getChildren()) this.visit(child, scope)
+    };
+    if (anchorOpt.isSome()) {
+      // Separate end markers keep enclosing class/module ranges stable when a
+      // method grows. A range may therefore have different endpoint symbols.
+      this.mark(tree.range.end, tree.range.end, scope.concat(Array["end"]));
+    }
+  }
+}
+
+class SymbolsFile(
+  value: Map<Symbol, Position>,
+  order: Map<Symbol, Int>,
+) extends SKStore.File
+
+class OrderFile(value: Map<Symbol, Int>) extends SKStore.File
+
+// Some language features deliberately enumerate definitions in source order.
+// Their dependency is on that order, not on the absolute marker coordinates.
+fun sourceOrder(
+  context: mutable SKStore.Context,
+  pos: FileRange,
+): (FileCache.InputSource, Int, Int, Int) {
+  point = pos.range.start;
+  rank = if (point.symbol.isEmpty()) 0 else {
+    dir.getArrayFilter(context, pos.file, symbols ~> OrderFile(symbols.order))[
+      0,
+    ].value[point.symbol] + 1
+  };
+  (pos.file, rank, point.line, point.column)
+}
+
+const dir: SKStore.EHandle<
+  FileCache.InputSource,
+  SymbolsFile,
+> = SKStore.EHandle(
+  FileCache.InputSource::keyType,
+  SymbolsFile::type,
+  SKStore.DirName::create("/sourcePositions/"),
+);
+
+fun populate(
+  context: mutable SKStore.Context,
+  parsed: SKStore.EHandle<FileCache.InputSource, SkipParse.DefsFile>,
+): void {
+  _ = parsed.map(
+    FileCache.InputSource::keyType,
+    SymbolsFile::type,
+    context,
+    dir.dirName,
+    (_context, writer, key, values) ~> {
+      symbols = values.first.symbols;
+      order = symbols
+        .items()
+        .collect(Array)
+        .sortedBy(entry ~> (entry.i1, entry.i0))
+        .mapWithIndex((i, entry) -> (entry.i0, i))
+        .collect(Map);
+      writer.set(key, SymbolsFile(symbols, order))
+    },
+  );
+}
+
+class Table{files: Map<FileCache.InputSource, Map<Symbol, Position>> = Map[]} {
+  static fun read(context: mutable SKStore.Context): Table {
+    Table{
+      files => dir
+        .items(context)
+        .map(entry -> (entry.i0, entry.i1.next().fromSome().value))
+        .collect(Map),
+    }
+  }
+
+  fun resolve(pos: Pos): TextRange {
+    if (pos.range.start.symbol.isEmpty() && pos.range.end.symbol.isEmpty()) {
+      return pos.range.resolve(Map[])
+    };
+    pos.range.resolve(this.files[pos.file])
+  }
+
+  fun format(pos: Pos): String {
+    location = pos.file.toString() + this.resolve(pos).toString();
+    pos match {
+    | InlinedPos{origFun, inlinedAt} ->
+      `${location} fun=${origFun.name}, FID#${
+        origFun.id
+      } (inlined at ${this.format(inlinedAt)})`
+    | _ -> location
+    }
+  }
+}
+
+module end;

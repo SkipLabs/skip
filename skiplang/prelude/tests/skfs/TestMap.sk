@@ -290,4 +290,129 @@ fun testMultiMapSameParent(): void {
   );
 }
 
+// Exercise single-map writes as their keys, dependencies, and cardinality
+// change. Arrays must retain both ordering and repeated values.
+@test
+fun testMapWriteTransitions(): void {
+  inputName = SKStore.DirName::create("/write-transitions-input/");
+  depsName = SKStore.DirName::create("/write-transitions-deps/");
+  outputName = SKStore.DirName::create("/write-transitions-output/");
+  context = SKStore.run(context ~> {
+    deps = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      depsName,
+      Array[
+        (SKStore.IID(0), SKStore.IntFile(10)),
+        (SKStore.IID(1), SKStore.IntFile(20)),
+      ],
+    );
+    input = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+    _ = input.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (ctx, writer, _, values) ~> {
+        count = ctx
+          .getGlobal("transition-calls")
+          .map(SKStore.IntFile::type)
+          .map(v -> v.value)
+          .default(0);
+        ctx.setGlobal("transition-calls", SKStore.IntFile(count + 1));
+        mode = values.first.value;
+        if (mode == 3) {
+          writer.remove(SKStore.IID(2));
+          return void
+        };
+        if (mode == 4) return void;
+        dep = deps.getArray(ctx, SKStore.IID(if (mode == 0) 0 else 1))[0];
+        writer.setArray(
+          SKStore.IID(mode),
+          Array[dep, SKStore.IntFile(99), dep],
+        );
+        if (mode == 2) writer.set(SKStore.IID(3), dep);
+      },
+    );
+  });
+  output = id -> getData(context, outputName, SKStore.IID(id)).map(toInt);
+  calls = () ->
+    SKStore.IntFile::type(context.getGlobal("transition-calls").fromSome())
+      .value;
+  T.expectEq(output(0), Array[10, 99, 10]);
+  write(context, depsName, SKStore.IID(0), Array[SKStore.IntFile(11)]);
+  context.update();
+  T.expectEq(output(0), Array[11, 99, 11]);
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(1)]);
+  context.update();
+  T.expectEq(output(0), Array[]);
+  T.expectEq(output(1), Array[20, 99, 20]);
+  before = calls();
+  write(context, depsName, SKStore.IID(0), Array[SKStore.IntFile(12)]);
+  context.update();
+  T.expectEq(calls(), before, "The obsolete dependency was removed");
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+  context.update();
+  T.expectEq(output(1), Array[]);
+  T.expectEq(output(2), Array[20, 99, 20]);
+  T.expectEq(output(3), Array[20]);
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(3)]);
+  context.update();
+  T.expectEq(output(2), Array[]);
+  T.expectEq(output(3), Array[]);
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(4)]);
+  context.update();
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(0)]);
+  context.update();
+  T.expectEq(output(0), Array[12, 99, 12]);
+  write(context, inputName, SKStore.IID(0), Array[]);
+  context.update();
+  T.expectEq(output(0), Array[]);
+  removedCalls = calls();
+  write(context, depsName, SKStore.IID(0), Array[SKStore.IntFile(13)]);
+  context.update();
+  T.expectEq(
+    calls(),
+    removedCalls,
+    "A removed input no longer reads dependencies",
+  );
+}
+
+@test
+fun testMapSharedOutputRemoval(): void {
+  inputName = SKStore.DirName::create("/shared-output-input/");
+  outputName = SKStore.DirName::create("/shared-output-result/");
+  context = SKStore.run(context ~> {
+    input = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      Array[
+        (SKStore.IID(0), SKStore.IntFile(7)),
+        (SKStore.IID(1), SKStore.IntFile(7)),
+      ],
+    );
+    _ = input.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (_, writer, _, values) ~> writer.set(SKStore.IID(0), values.first),
+    );
+  });
+  output = () -> getData(context, outputName, SKStore.IID(0)).map(toInt);
+  T.expectEq(output(), Array[7, 7]);
+  write(context, inputName, SKStore.IID(0), Array[]);
+  context.update();
+  T.expectEq(output(), Array[7], "The second producer still contributes");
+  write(context, inputName, SKStore.IID(1), Array[]);
+  context.update();
+  T.expectEq(output(), Array[]);
+}
+
 module end;

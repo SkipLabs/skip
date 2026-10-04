@@ -352,9 +352,8 @@ fun lowerAllConsts(env: GlobalEnv, config: Config.Config): GlobalEnv {
       allConsts.push(f)
     }
   };
-  allConsts.sortBy(x ~>
-    Orderable.create(x, (a, b) ~> (a.pos, a.id).compare((b.pos, b.id)))
-  );
+  positions = env.sourcePositions;
+  allConsts.sortBy(x ~> (x.pos.file, positions.resolve(x.pos), x.id));
 
   // Build up fields for our global storage.
   fieldsBuf = mutable Vector[];
