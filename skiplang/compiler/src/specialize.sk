@@ -400,6 +400,9 @@ mutable base class SPMap<K: Orderable, V>{} {
   readonly fun mclone(): mutable SPMap<K, V>;
   readonly fun readonlyGet(k: K): V;
   mutable fun get(context: mutable SKStore.Context, k: K): V;
+  mutable fun getFilter<R: SKStore.File>(
+    context: mutable SKStore.Context, k: K, project: V ~> R,
+  ): R;
   mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V;
   mutable fun contains(context: mutable SKStore.Context, k: K): Bool;
   mutable fun set(k: K, v: V): void;
@@ -479,6 +482,21 @@ mutable class SPMapDiff<K: Orderable, V>{
     }
   }
 
+  mutable fun getFilter<R: SKStore.File>(
+    context: mutable SKStore.Context, k: K, project: V ~> R,
+  ): R {
+    this.data.maybeGet(k) match {
+    | Some(value) -> project(value)
+    | None() ->
+      convert = this.file2V;
+      values = this.handle.getArrayFilter(
+        context, this.k2Key(k), file ~> project(convert(file)),
+      );
+      invariant(!values.isEmpty(), "Not found");
+      values[0]
+    }
+  }
+
   mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V {
     this.data.maybeGet(k) match {
     | None() ->
@@ -543,6 +561,12 @@ mutable class SPMapFixed<K: Orderable, V>{
 
   mutable fun get(_context: mutable SKStore.Context, k: K): V {
     this.data[k]
+  }
+
+  mutable fun getFilter<R: SKStore.File>(
+    _context: mutable SKStore.Context, k: K, project: V ~> R,
+  ): R {
+    project(this.data[k])
   }
 
   mutable fun maybeGet(_context: mutable SKStore.Context, k: K): ?V {
@@ -693,6 +717,12 @@ class SortedSetSClassIDFile(value: SortedSet<SClassID>) extends SKStore.File
 class HalfSClassKey(value: HalfSClass) extends SKStore.Key
 class SClassIDKey(value: SClassID) extends SKStore.Key
 class SClassInfoFile(value: SClassInfo) extends SKStore.File
+class OptionLayoutFile(
+  optionStyle: ?OptionStyle,
+  kind: ClassKind,
+  isNative: Bool,
+  fields: Array<SField>,
+) extends SKStore.File
 class GFunKeyKey(value: GFunKey) extends SKStore.Key
 class GFunKeyFile(value: GFunKey) extends SKStore.File
 class ContinuationFile(
@@ -2145,14 +2175,18 @@ mutable class Specializer{
       mutability
     };
 
-    static::getSClass2CPS(
-      context,
-      sp,
-      HalfClass(generic, targs, m, literalType),
-      (context, sp, info) ~> {
-        k(context, sp, Tclass(info.sclass.id, m))
-      },
-    )
+    hc = HalfClass(generic, targs, m, literalType);
+    static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
+      // The canonical mapping already supplies the ID. Reading SClassInfo
+      // here would depend on unrelated discovered methods and class metadata.
+      sp.sclassMapMaybeGet(HalfSClass(hc.generic, hc.targs)) match {
+      | Some(id) -> k(context, sp, Tclass(id, m))
+      | None() ->
+        static::getSClass2CPS(context, sp, hc, (context, sp, info) ~> {
+          k(context, sp, Tclass(info.sclass.id, m))
+        })
+      }
+    })
   }
 
   mutable fun getTclass3(
@@ -2311,7 +2345,10 @@ mutable class Specializer{
     // TODO: If an SClass in a KBase with no concrete subclasses, we can
     // say it's not instantiable.
     !t.forEachTclass(tc ->
-      !this.trackedSClassGet(tc.sclassID).sclass.canInstantiate
+      !this.sclasses.getFilter(
+        this.context, tc.sclassID,
+        info ~> SKStore.BoolFile(info.sclass.canInstantiate),
+      ).value
     )
   }
 
@@ -2379,7 +2416,18 @@ mutable class Specializer{
   // Helper for getOptionStyle2(): takes the T in Option<T>, which must
   // not be parametric, and returns the style to use.
   private mutable fun getOptionStyleHelper2(tc: Tclass, pos: Pos): OptionStyle {
-    info = this.trackedSClassGet(tc.sclassID);
+    info = this.sclasses.getFilter(this.context, tc.sclassID, info ~>
+      OptionLayoutFile(
+        info.optionStyle,
+        info.sclass.kind,
+        info.sclass.isNative,
+        if (info.sclass.kind.isValueClass() && !info.sclass.isNative) {
+          info.unscalarizedFields
+        } else {
+          Array<SField>[]
+        },
+      )
+    );
     info.optionStyle match {
     | Some(FlagOptionStyle _) ->
       // Option<Option<T>> etc. where the inner Option already needed
@@ -2392,21 +2440,20 @@ mutable class Specializer{
       SentinelOptionStyle(dotJoin("valueIfSome.value", path), ptr - 1)
     | None() ->
       // Option<T> where T is not itself an Option.
-      sc = info.sclass;
-      if (!sc.kind.isValueClass()) {
+      if (!info.kind.isValueClass()) {
         // All KClass and KBase can just use a null pointer sentinel.
         SentinelOptionStyle("", 0)
       } else {
         // Default to giving up and using FlagOptionStyle.
         result = (FlagOptionStyle() : OptionStyle);
 
-        if (!sc.isNative) {
+        if (!info.isNative) {
           // A null sentinel can yield slightly tighter machine code,
           // so prefer a sentinel field where we can use 0 rather
           // than -1 or -2 etc. by keeping the max.
           bestPtr = Int::min;
 
-          _ = info.unscalarizedFields.any(field -> {
+          _ = info.fields.any(field -> {
             this.getOptionStyleHelper2(field.typ, pos) match {
             | SentinelOptionStyle(path, ptr) if (ptr > bestPtr) ->
               // We found a value class field that itself has a legal
