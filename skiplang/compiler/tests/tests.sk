@@ -210,12 +210,33 @@ private fun incrementalFrontendErrors(): void {
     initial = System.subprocess(
       args.concat(Array["--init", data]),
     ).fromSuccess();
-    T.expectTrue(initial.success(), initial.stderr);
+    T.expectTrue(initial.success(), "Initial compile: " + initial.stderr);
     T.expectTrue(
       System.subprocess(Array["test", "-f", output]).fromSuccess().success(),
+      "Initial compile did not create output",
     );
+    initialOutput = FileSystem.readTextFile(output);
     removed = System.subprocess(Array["rm", output]).fromSuccess();
     T.expectTrue(removed.success(), removed.stderr);
+
+    // Recreate a deleted output without rediscovering classes/functions.
+    replayed = System.subprocess(
+      args.concat(Array["--data", data]),
+    ).fromSuccess();
+    T.expectTrue(replayed.success(), "Output replay: " + replayed.stderr);
+    T.expectEq(FileSystem.readTextFile(output), initialOutput);
+    T.expectFalse(replayed.stderr.contains("\"KK\""), replayed.stderr);
+    T.expectFalse(replayed.stderr.contains("phase1 updated"), replayed.stderr);
+
+    // An existing output still permits a fully cached update.
+    cached = System.subprocess(
+      args.concat(Array["--data", data]),
+    ).fromSuccess();
+    T.expectTrue(cached.success(), "Cached compile: " + cached.stderr);
+    T.expectFalse(cached.stderr.contains("specializer created"), cached.stderr);
+
+    removedBeforeErrors = System.subprocess(Array["rm", output]).fromSuccess();
+    T.expectTrue(removedBeforeErrors.success(), removedBeforeErrors.stderr);
 
     // A method-body-only error leaves backendPhase1 cached. Also check that
     // multiple failing definitions still produce all of their diagnostics.
@@ -258,9 +279,10 @@ private fun incrementalFrontendErrors(): void {
     recovered = System.subprocess(
       args.concat(Array["--data", data]),
     ).fromSuccess();
-    T.expectTrue(recovered.success(), recovered.stderr);
+    T.expectTrue(recovered.success(), "Recovery compile: " + recovered.stderr);
     T.expectTrue(
       System.subprocess(Array["test", "-f", output]).fromSuccess().success(),
+      "Recovery compile did not create output",
     );
   } catch {
   | exn ->

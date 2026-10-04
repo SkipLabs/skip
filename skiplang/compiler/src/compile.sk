@@ -764,9 +764,8 @@ fun getOrInitializeBackend(
   );
 
   context.setDir(
-    backendEmitDir.dirName,
     context.unsafeGetEagerDir(backendEmitDir.dirName) with {
-      time => SKStore.Time(Int::max),
+      timeStack => SKStore.TimeStack::create(context, SKStore.Time(Int::max)),
     },
   );
 
@@ -811,6 +810,16 @@ fun compile(
       make_input_source_path,
     )
   });
+
+  if (config.output != "-" && !FileSystem.exists(config.output)) {
+    // Output files are external side effects. Replay the final backend map
+    // when the output disappears, preserving cached specialization work.
+    context.invalidateReader(SKStore.TArrowKey::create{
+      parentName => backendDir.dirName,
+      childName => SKStore.DirName::create("/backendPhase2/"),
+      key => SKStore.IID(0),
+    });
+  };
 
   runCompilerPhase("frontend/update", () -> context.update());
 
