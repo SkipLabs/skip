@@ -696,6 +696,11 @@ mutable class Context private {
       | None() -> continue
       | Some(x) -> x
       };
+      if (this.debugMode) {
+        print_string(
+          `DIRTY READER: ${reader} (dependency: ${path})`,
+        );
+      };
       this.!dirtyReaders[reader.parentName] = {
         map = this.dirtyReaders.maybeGet(reader.parentName).default(
           SortedMap[],
