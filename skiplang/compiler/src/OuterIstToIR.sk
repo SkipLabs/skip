@@ -936,6 +936,7 @@ class LazyGClassKey(value: LazyGClass) extends SKStore.Key {
   }
 }
 class GClassFile(value: GClass) extends SKStore.File
+private class GClassKindFile(value: GClassKind) extends SKStore.File
 
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
@@ -943,6 +944,18 @@ class Converter private (
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
   lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
 ) {
+  fun getClassForConversion(
+    context: mutable SKStore.Context,
+    className: String,
+  ): I.ClassDef {
+    // Conversion does not use the front end's list of concrete descendants.
+    // Filter the eager declaration read so hierarchy-only changes do not
+    // invalidate the lazy converter and all of its specialization readers.
+    this.program.getClassFilter(context, className, cls ~>
+      I.ClassDefFile(cls with {concrete_children => SSet[]})
+    ).value
+  }
+
   fun getConsts(
     context: mutable SKStore.Context,
     constsProj: SKStore.EHandle<SKStore.UnitID, I.ConstDefFile>,
@@ -1019,7 +1032,7 @@ class Converter private (
       };
       // Class-constant getters are generated from class metadata rather than
       // declared source methods.
-      cd = this.program.getClass(context, className);
+      cd = this.getClassForConversion(context, className);
       methods = if (isStatic) {
         this.getFrontEndStaticMethods(cd)
       } else {
@@ -1031,7 +1044,7 @@ class Converter private (
         cd.name.pos.die(`Method definition not found: ${className}::${name}`)
       }
     | FactoryDefRef(className, returnsMutable, isAbstract) ->
-      cd = this.program.getClass(context, className);
+      cd = this.getClassForConversion(context, className);
       this.createFactory(context, returnsMutable, isAbstract, cd, cd.name.pos)
     }
   }
@@ -1072,7 +1085,7 @@ class Converter private (
         gid match {
         | LiteralLazyGClass(cls) -> cls
         | name @ FrontEndLazyGClass _ ->
-          classDef = this.program.getClass(context, name.id);
+          classDef = this.getClassForConversion(context, name.id);
           this.convertClassDef(context, classDef, name, classDef.name.pos)
         | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(context, meta)
         | meta @ BaseMetaImplLazyGClass _ ->
@@ -1265,7 +1278,9 @@ class Converter private (
     ref match {
     | LiteralLazyGClass(cls) -> cls.kind
     | FrontEndLazyGClass(nameStr) ->
-      this.convertClassKind(this.program.getClass(context, nameStr))
+      this.program.getClassFilter(context, nameStr, cls ~>
+        GClassKindFile(Converter::convertClassKind(cls))
+      ).value
     | BaseMetaLazyGClass _
     | ClassMetaLazyGClass _
     | ConcreteMetaLazyGClass _
@@ -1651,7 +1666,7 @@ class Converter private (
     };
 
     // Get the front end methods.
-    cd = this.program.getClass(context, gc.name.id);
+    cd = this.getClassForConversion(context, gc.name.id);
     fem = this.getFrontEndStaticMethods(cd);
 
     methods = UnorderedMap::mcreate(fem.size());
@@ -1962,7 +1977,7 @@ class Converter private (
 
     if (gc.isFrontEndClass && gc.fieldsFinal) {
       // Create abstract declarations for the factories.
-      fegc = this.program.getClass(context, gc.name.id);
+      fegc = this.getClassForConversion(context, gc.name.id);
       for (factoryIndex in Range(0, 2)) {
         factoryIsMutable = (factoryIndex == 0);
         factory = this.createFactory(
@@ -2034,7 +2049,7 @@ class Converter private (
 
           if (gc.isFrontEndClass && gc.fieldsFinal) {
             // Create factories.
-            fegc = this.program.getClass(context, gc.name.id);
+            fegc = this.getClassForConversion(context, gc.name.id);
             for (factoryIndex in Range(0, 2)) {
               factoryIsMutable = (factoryIndex == 0);
               factory = this.createFactory(
@@ -2147,7 +2162,9 @@ class Converter private (
       // This back end does not care about traits, so throw them away.
       isTrait = tapply match {
       | GTapply(FrontEndLazyGClass(id), _, _) ->
-        this.program.getClass(context, id).kind is I.KTrait _
+        this.program.getClassFilter(context, id, cls ~>
+          SKStore.BoolFile(cls.kind is I.KTrait _)
+        ).value
       | GTapply _
       | GTparam _ ->
         false
@@ -2236,7 +2253,7 @@ class Converter private (
     })
   }
 
-  private fun convertClassKind(cd: I.ClassDef): GClassKind {
+  private static fun convertClassKind(cd: I.ClassDef): GClassKind {
     (cd.kind, cd.value) match {
     | (I.KClass(), Some _) -> KValue()
     | (I.KClass(), None()) -> KClass()
@@ -2252,7 +2269,7 @@ class Converter private (
     classID: FrontEndLazyGClass,
     pos: FileRange,
   ): GClass {
-    kind = this.convertClassKind(in_);
+    kind = static::convertClassKind(in_);
 
     classname = classID.id;
     name = GClassName(classname);
@@ -3926,7 +3943,7 @@ mutable class OuterIstEmitter{
     } else {
       // See which fields are optional.
       fields = getFields(
-        this.converter.program.getClass(context, name.id),
+        this.converter.getClassForConversion(context, name.id),
         pos,
       );
       optional = mutable Vector[];
@@ -4055,7 +4072,7 @@ mutable class OuterIstEmitter{
           pos,
         )
       } else {
-        cd = this.converter.program.getClass(context, name.id);
+        cd = this.converter.getClassForConversion(context, name.id);
         args = this.emitParams(
           context,
           params,
