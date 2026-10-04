@@ -518,6 +518,9 @@ fun getOrInitializeBackend(
                 "/specializer/reduced1/" + phaseNumberCopy + "/",
               ),
               (context, writer, key, values) ~> {
+                if (!backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()) {
+                  return void
+                };
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
                   debug(("KK", phaseNumberCopy));

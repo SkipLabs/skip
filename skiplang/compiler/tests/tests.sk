@@ -182,8 +182,106 @@ private macro fun addExpTestFunctions(
   coveredModules
 }
 
+private fun incrementalFrontendErrors(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/output.ll";
+  data = dir + "/data";
+  valid =
+    "mutable class ErrorGateExample{} {\n" +
+    "  fun foo(_x: Int): void { debug(\"foo\") }\n" +
+    "  readonly fun run(): void { debug(\"before\") }\n" +
+    "}\n" +
+    "fun unused(): Int { 42 }\n" +
+    "fun main(): void { (mutable ErrorGateExample{}).run() }\n";
+  args = compile_cmd(Array[source], output).concat(Array["--emit=llvm-ir"]);
+  writeSource = (contents, timestamp) -> {
+    FileSystem.writeTextFile(source, contents);
+    // FileCache uses second-resolution mtimes to discover edits.
+    touched = System.subprocess(
+      Array["touch", "-t", timestamp, source],
+    ).fromSuccess();
+    T.expectTrue(touched.success(), touched.stderr);
+  };
+  try {
+    writeSource(valid, "200001010000.01");
+    initial = System.subprocess(
+      args.concat(Array["--init", data]),
+    ).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectTrue(
+      System.subprocess(Array["test", "-f", output]).fromSuccess().success(),
+    );
+    removed = System.subprocess(Array["rm", output]).fromSuccess();
+    T.expectTrue(removed.success(), removed.stderr);
+
+    // A method-body-only error leaves backendPhase1 cached. Also check that
+    // multiple failing definitions still produce all of their diagnostics.
+    invalid = valid.replace("debug(\"before\")", "this.foo(9)");
+    for ((contents, timestamp, diagnostic) in Array[
+      (invalid, "200001010000.02", "Try annotating 'foo' method as 'readonly'"),
+      (
+        invalid.replace(
+          "fun unused(): Int { 42 }",
+          "fun unused(): Int { \"bad\" }",
+        ),
+        "200001010000.03",
+        "incompatible with the return type 'Int'",
+      ),
+    ]) {
+      writeSource(contents, timestamp);
+      failed = System.subprocess(
+        args.concat(Array["--data", data]),
+      ).fromSuccess();
+      T.expectEq(failed.exitcode(), 2, failed.stderr);
+      T.expectTrue(
+        failed.stderr.contains("Cannot call this method on a readonly object"),
+        failed.stderr,
+      );
+      T.expectTrue(failed.stderr.contains(diagnostic), failed.stderr);
+      T.expectFalse(
+        failed.stderr.contains("Invariant violation"),
+        failed.stderr,
+      );
+      T.expectFalse(failed.stdout.contains("\"KK\""), failed.stdout);
+      T.expectFalse(failed.stdout.contains("phase1 updated"), failed.stdout);
+      T.expectFalse(
+        System.subprocess(Array["test", "-f", output]).fromSuccess().success(),
+        "Failed frontend update emitted output",
+      );
+    };
+
+    // The failed update must leave the last successful database usable.
+    writeSource(valid.replace("before", "after"), "200001010000.04");
+    recovered = System.subprocess(
+      args.concat(Array["--data", data]),
+    ).fromSuccess();
+    T.expectTrue(recovered.success(), recovered.stderr);
+    T.expectTrue(
+      System.subprocess(Array["test", "-f", output]).fromSuccess().success(),
+    );
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  removed = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+  T.expectTrue(removed.success(), removed.stderr);
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
+  tests.set(
+    "incremental",
+    mutable Vector[
+      T.Test{
+        name => "frontend_errors",
+        func => () ~> incrementalFrontendErrors(),
+      },
+    ],
+  );
 
   // Escape hatches for the fast paths, both compiling one `skc` per test:
   //   SKC_SUBPROCESS=1 — force *all* tests to subprocess mode (no @exptest,
