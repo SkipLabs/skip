@@ -1124,15 +1124,71 @@ mutable class Specializer{
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
+    static::computeMethodTargsCPS(context, this, call, tparamEnv, (_, _, x) ~>
+      x
+    )
+  }
+
+  private static fun computeMethodTargsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    call: GCallMethodBase,
+    tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
+    k: (mutable SKStore.Context, mutable this, Array<Tclass>) ~> T,
+  ): T {
     pos = call.pos;
 
     obj = call.args[0];
-    objType = this.getTclass3(context, obj.getType(), tparamEnv);
-    objTypeInfo = this.trackedSClassGet(objType.sclassID);
+    static::getTclass3CPS(
+      context,
+      sp,
+      obj.getType(),
+      tparamEnvOrig,
+      sp.pos,
+      false,
+      (context, sp, objType) ~>
+        static::computeMethodTargsForObjTypeCPS(
+          context,
+          sp,
+          call,
+          tparamEnvOrig,
+          pos,
+          objType,
+          (context, sp, pair) ~> {
+            (realGTargs, tparamEnv) = pair;
+            static::getTclass3GTargsCPS(
+              context,
+              sp,
+              tparamEnv,
+              sp.pos,
+              List::createFromItems(realGTargs),
+              (context, sp, targs) ~> k(context, sp, targs.toArray()),
+            );
+          },
+        )
+      ,
+    )
+  }
+
+  private static fun computeMethodTargsForObjTypeCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    call: GCallMethodBase,
+    tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
+    pos: FileRange,
+    objType: Tclass,
+    k: (
+      mutable SKStore.Context,
+      mutable this,
+      (Array<GType>, UnorderedMap<GTparam, Tclass>),
+    ) ~> T,
+  ): T {
+    tparamEnv = tparamEnvOrig;
+    objTypeInfo = sp.trackedSClassGet(objType.sclassID);
     objTypeGClass = objTypeInfo.gclass;
 
     gtargs = call.targs;
-    realGTargs = objTypeGClass.methods.maybeGet(call.method) match {
+    objTypeGClass.methods.maybeGet(call.method) match {
     | Some(gmethod) ->
       gmethod.tparamInherit.maybeGet(call.source) match {
       | Some(replacement) ->
@@ -1141,14 +1197,13 @@ mutable class Specializer{
         // needs one. So we use this table to figure out what
         // the actual targs are.
 
-        env2 = makeTypeMap(objTypeGClass.tparams, this.getTargs(objType), pos);
-
-        !tparamEnv = if (gtargs.isEmpty()) {
-          env2
+        env2 = makeTypeMap(objTypeGClass.tparams, sp.getTargs(objType), pos);
+        if (gtargs.isEmpty()) {
+          k(context, sp, (replacement, env2))
         } else {
           // Look up the source method so we can add its tparams
           // to the environment.
-          sourceGClass = this.converter.getGClass(context, call.source, pos);
+          sourceGClass = sp.converter.getGClass(context, call.source, pos);
           sm = sourceGClass.methods.maybeGet(call.method) match {
           | Some(cm) -> cm
           | None() ->
@@ -1161,24 +1216,23 @@ mutable class Specializer{
             sm.tparams.size() == gtargs.size(),
             "Wrong number of source tparams",
           );
-          env3 = env2.clone();
-          env3.extend(
-            makeTypeMap(
-              sm.tparams,
-              gtargs.map(t -> this.getTclass3(context, t, tparamEnv)),
-              pos,
-            ),
-          );
-          env3.chill()
-        };
-
-        replacement
-      | None() -> gtargs
+          static::getTclass3GTargsCPS(
+            context,
+            sp,
+            tparamEnv,
+            sp.pos,
+            List::createFromItems(gtargs),
+            (context, sp, gtargsList) ~> {
+              env3 = env2.clone();
+              env3.extend(makeTypeMap(sm.tparams, gtargsList.toArray(), pos));
+              k(context, sp, (replacement, env3.chill()))
+            },
+          )
+        }
+      | None() -> k(context, sp, (gtargs, tparamEnv))
       }
-    | None() -> gtargs
-    };
-
-    realGTargs.map(t -> this.getTclass3(context, t, tparamEnv))
+    | None() -> k(context, sp, (gtargs, tparamEnv))
+    }
   }
 
   mutable fun builtins(context: mutable SKStore.Context): void {
@@ -1638,23 +1692,47 @@ mutable class Specializer{
     mutability: Mutability,
     literalType: Bool = false,
   ): Tclass {
+    static::getTclass2CPS(
+      context,
+      this,
+      generic,
+      targs,
+      mutability,
+      literalType,
+      (_, _, x) ~> x,
+    )
+  }
+
+  private static fun getTclass2CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    generic: LazyGClass,
+    targs: Array<Tclass>,
+    mutability: Mutability,
+    literalType: Bool,
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
     // Correct the lie that the type is frozen even though its
     // tparams are not (meaning it is merely "chilled").
     //
     // TODO: Use a different mutability AST w/"chilled" (T29988983).
-    if (
+    m = if (
       mutability == DeepFrozen() &&
       targs.any(ta -> ta.mutability != DeepFrozen())
     ) {
-      !mutability = Readonly()
+      Readonly()
+    } else {
+      mutability
     };
 
-    info = this.getSClass2(
+    static::getSClass2CPS(
       context,
-      HalfClass(generic, targs, mutability, literalType),
-    );
-
-    Tclass(info.sclass.id, mutability)
+      sp,
+      HalfClass(generic, targs, m, literalType),
+      (context, sp, info) ~> {
+        k(context, sp, Tclass(info.sclass.id, m))
+      },
+    )
   }
 
   mutable fun getTclass3(
@@ -1664,15 +1742,80 @@ mutable class Specializer{
     pos: Pos = this.pos,
     literalType: Bool = false,
   ): Tclass {
-    gt match {
-    | tp @ GTparam _ -> typeMapGet(tparamEnv, tp, pos)
-    | GTapply(lazyGClass, mutability, gtargs) ->
-      this.getTclass2(
+    static::getTclass3CPS(
+      context,
+      this,
+      gt,
+      tparamEnv,
+      pos,
+      literalType,
+      (_, _, x) ~> x,
+    )
+  }
+
+  private static fun getTclass3GTargsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    pos: Pos,
+    gtargs: List<GType>,
+    k: (mutable SKStore.Context, mutable this, List<Tclass>) ~> T,
+  ): T {
+    gtargs match {
+    | List.Nil() -> k(context, sp, List.Nil())
+    | List.Cons(gt, tl) ->
+      static::getTclass3CPS(
         context,
-        lazyGClass,
-        gtargs.map(gt -> this.getTclass3(context, gt, tparamEnv, pos)),
-        mutability,
-        literalType,
+        sp,
+        gt,
+        tparamEnv,
+        pos,
+        false,
+        (context, sp, tclass) ~> {
+          static::getTclass3GTargsCPS(
+            context,
+            sp,
+            tparamEnv,
+            pos,
+            tl,
+            (context, sp, rl) ~> {
+              k(context, sp, List.Cons(tclass, rl))
+            },
+          )
+        },
+      )
+    }
+  }
+
+  private static fun getTclass3CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    gt: GType,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    pos: Pos,
+    literalType: Bool,
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
+    gt match {
+    | tp @ GTparam _ -> k(context, sp, typeMapGet(tparamEnv, tp, pos))
+    | GTapply(lazyGClass, mutability, gtargs) ->
+      static::getTclass3GTargsCPS(
+        context,
+        sp,
+        tparamEnv,
+        pos,
+        List::createFromItems(gtargs),
+        (context, sp, gtargs) ~> {
+          static::getTclass2CPS(
+            context,
+            sp,
+            lazyGClass,
+            gtargs.toArray(),
+            mutability,
+            literalType,
+            k,
+          )
+        },
       )
     }
   }
@@ -2141,6 +2284,16 @@ mutable class Specializer{
 
       info
     }
+  }
+
+  // Class construction is still synchronous until its CPS conversion.
+  private static fun getSClass2CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    hc: HalfClass,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    k(context, sp, sp.getSClass2(context, hc))
   }
 
   // Look for super- and subtypes based on co- and contravariance.
