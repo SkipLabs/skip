@@ -397,11 +397,210 @@ private fun incrementalRelationships(): void {
   );
 }
 
+// Moving declarations must update diagnostics and debug metadata without
+// replaying serialized class discovery. Exercise both file-wide shifts and
+// changes confined to an earlier method in the same class.
+private fun incrementalSourcePositions(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/output.ll";
+  data = dir + "/data";
+  baseline =
+    "class PositionExample() {\n" +
+    "  fun first(): Int { 1 }\n" +
+    "  fun second(): Int { 23456789101 }\n" +
+    "}\n" +
+    "untracked fun main(): void { print_raw((PositionExample().first() + PositionExample().second()).toString()) }\n";
+  args = compile_cmd(Array[source], output).concat(Array["--emit=llvm-ir"]);
+  write = (contents, timestamp) -> {
+    FileSystem.writeTextFile(source, contents);
+    result = System.subprocess(
+      Array["touch", "-t", timestamp, source],
+    ).fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+  };
+  try {
+    for ((contents, timestamp, line, initialize, expectCached) in Array[
+      (baseline, "200001010000.01", 3, true, false),
+      ("// moved\n\n\n" + baseline, "200001010000.02", 6, false, true),
+      (
+        baseline.replace("Int { 1 }", "Int {\n    1 }"),
+        "200001010000.03",
+        4,
+        false,
+        true,
+      ),
+      (
+        baseline.replace(
+          "  fun first(): Int { 1 }\n  fun second(): Int { 23456789101 }",
+          "  fun second(): Int { 23456789101 }\n  fun first(): Int { 1 }",
+        ),
+        "200001010000.04",
+        2,
+        false,
+        false,
+      ),
+    ]) {
+      write(contents, timestamp);
+      compiled = System.subprocess(
+        args.concat(Array[if (initialize) "--init" else "--data", data]),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      if (expectCached) {
+        T.expectFalse(compiled.stderr.contains("\"KK\""), compiled.stderr);
+      };
+      metadata = FileSystem.readTextFile(output)
+        .split("\n")
+        .filter(s ->
+          s.contains("!DISubprogram(") &&
+            s.contains("PositionExample") &&
+            s.contains("second")
+        )
+        .collect(Array);
+      T.expectFalse(metadata.isEmpty(), "Missing debug metadata for second");
+      for (entry in metadata) {
+        T.expectTrue(entry.contains(`line: ${line},`), entry)
+      };
+    };
+    // Relative locations must also resolve correctly in frontend diagnostics,
+    // including a multiline method and the same-line column offset.
+    invalid = baseline.replace("Int { 23456789101 }", "Int {\n    \"bad\" }");
+    for ((contents, timestamp, line) in Array[
+      (invalid, "200001010000.05", 4),
+      ("// moved\n\n" + invalid, "200001010000.06", 6),
+    ]) {
+      write(contents, timestamp);
+      compiled = System.subprocess(
+        args.concat(Array["--data", data]),
+      ).fromSuccess();
+      T.expectEq(compiled.exitcode(), 2, compiled.stderr);
+      T.expectTrue(
+        compiled.stderr.contains(`line ${line}, characters 5-9:`),
+        compiled.stderr,
+      );
+      T.expectTrue(
+        compiled.stderr.contains("incompatible with the return type 'Int'"),
+        compiled.stderr,
+      );
+      T.expectFalse(compiled.stderr.contains("\"KK\""), compiled.stderr);
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+private fun incrementalConstructorPositions(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/output.ll";
+  data = dir + "/data";
+  baseline =
+    "class NamedPositionExample{\n" +
+    "  first: Int = 1,\n" +
+    "  second: Int = 2,\n" +
+    "} { fun sum(): Int { this.first + this.second } }\n" +
+    "class PositionalPositionExample(\n" +
+    "  first: Int,\n" +
+    "  second: Int,\n" +
+    ") { fun sum(): Int { this.first + this.second } }\n" +
+    "class UnnamedPositionExample(\n" +
+    "  Int,\n" +
+    "  Int,\n" +
+    ") {}\n" +
+    "untracked fun main(): void { print_raw((NamedPositionExample{}.sum() + PositionalPositionExample(1, 2).sum()).toString()); _ = UnnamedPositionExample(1, 2) }\n";
+  args = compile_cmd(Array[source], output).concat(Array["--emit=llvm-ir"]);
+  write = (contents, timestamp) -> {
+    FileSystem.writeTextFile(source, contents);
+    touched = System.subprocess(
+      Array["touch", "-t", timestamp, source],
+    ).fromSuccess();
+    T.expectTrue(touched.success(), touched.stderr);
+  };
+  try {
+    for ((contents, timestamp, initialize, expectCached) in Array[
+      (baseline, "200001010000.01", true, false),
+      (
+        baseline
+          .replace("  first:", "\n  first:")
+          .replace("  Int,", "\n  Int,"),
+        "200001010000.02",
+        false,
+        true,
+      ),
+      (
+        baseline
+          .replace("  second:", "\n\n  second:")
+          .replace("  Int,", "\n\n  Int,"),
+        "200001010000.03",
+        false,
+        true,
+      ),
+      (
+        baseline.replace(
+          "  first: Int = 1,",
+          "  extra: Int = 0,\n  first: Int = 1,",
+        ),
+        "200001010000.04",
+        false,
+        false,
+      ),
+      (baseline, "200001010000.05", false, false),
+    ]) {
+      write(contents, timestamp);
+      compiled = System.subprocess(
+        args.concat(Array[if (initialize) "--init" else "--data", data]),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      if (expectCached) {
+        T.expectFalse(compiled.stderr.contains("\"KK\""), compiled.stderr);
+      };
+    };
+    // A field's type and initializer resolve through its own anchor.
+    invalid = baseline.replace("second: Int = 2", "second: Int = \"bad\"");
+    for ((contents, timestamp, line) in Array[
+      (invalid, "200001010000.06", 3),
+      (invalid.replace("  second:", "\n\n  second:"), "200001010000.07", 5),
+    ]) {
+      write(contents, timestamp);
+      compiled = System.subprocess(
+        args.concat(Array["--data", data]),
+      ).fromSuccess();
+      T.expectEq(compiled.exitcode(), 2, compiled.stderr);
+      T.expectTrue(compiled.stderr.contains(`line ${line},`), compiled.stderr);
+      T.expectFalse(compiled.stderr.contains("\"KK\""), compiled.stderr);
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
   tests.set(
     "incremental",
     mutable Vector[
+      T.Test{
+        name => "source_positions",
+        func => () ~> incrementalSourcePositions(),
+      },
+      T.Test{
+        name => "constructor_positions",
+        func => () ~> incrementalConstructorPositions(),
+      },
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
       T.Test{
         name => "frontend_errors",
