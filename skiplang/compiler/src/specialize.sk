@@ -2137,93 +2137,96 @@ mutable class Specializer{
         );
       };
 
-      // Now look for super- and subtypes based on co- and contravariance.
-      //
-      // We need to do this because if someone calls a method on an object
-      // cast to some other type via covariance, the rest of the compiler
-      // would like to know that this method can be called on instances of
-      // the original type.
-      //
-      // As an optimization, if none of the GTparams have variance we don't
-      // need to do anything, the "extends" check already found all
-      // super- and subtypes.
-      hasAnyVariance = gclass.variances.any(v ->
-        v match {
-        | I.Vnone _ -> false
-        | I.Vplus _
-        | I.Vminus _ ->
-          true
-        }
-      );
-
-      if (hasAnyVariance) {
-        for (otherID in this.gclassMapGet(hc.generic.name())) {
-          if (otherID != sid) {
-            other = this.trackedSClassGet(otherID);
-
-            // Is 'newClass' a supertype of 'other'?
-            isSuperType = true;
-
-            // Is 'newClass' a subtype of 'other'?
-            isSubType = true;
-
-            otherTargs = other.sclass.superposition.id;
-            this.pos.invariant(
-              targs.size() == otherTargs.size(),
-              "targs size mismatch",
-            );
-
-            i = -1;
-            if (
-              gclass.variances.all(v -> {
-                !i = i + 1;
-                t1 = targs[i];
-                t2 = otherTargs[i];
-                s1 = this.isRuntimeSubType(t1, t2);
-                s2 = this.isRuntimeSubType(t2, t1);
-
-                if (!(s1 && s2)) {
-                  v match {
-                  | I.Vnone _ ->
-                    !isSubType = false;
-                    !isSuperType = false
-                  | I.Vplus _ ->
-                    if (!s1) {
-                      !isSubType = false
-                    };
-                    if (!s2) {
-                      !isSuperType = false
-                    }
-                  | I.Vminus _ ->
-                    if (!s2) {
-                      !isSubType = false
-                    };
-                    if (!s1) {
-                      !isSuperType = false
-                    }
-                  }
-                };
-
-                // Stop as soon as neither is a supertype of the other.
-                isSubType || isSuperType
-              })
-            ) {
-              if (isSubType) {
-                (!other, !info) = this.inherit(context, other, info)
-              };
-
-              if (isSuperType) {
-                (!info, !other) = this.inherit(context, info, other)
-              }
-            }
-          }
-        }
-      };
+      this.createVariance(context, hc, sid, info);
 
       info
     }
   }
 
+  // Look for super- and subtypes based on co- and contravariance.
+  //
+  // We need to do this because if someone calls a method on an object
+  // cast to some other type via covariance, the rest of the compiler
+  // would like to know that this method can be called on instances of
+  // the original type.
+  //
+  // As an optimization, if none of the GTparams have variance we don't
+  // need to do anything, the "extends" check already found all
+  // super- and subtypes.
+
+  mutable fun createVariance(
+    context: mutable SKStore.Context,
+    hc: HalfClass,
+    sid: SClassID,
+    info: SClassInfo,
+  ): void {
+    gclass = this.converter.getGClass(context, hc.generic, this.pos);
+    hasAnyVariance = gclass.variances.any(v ->
+      v match {
+      | I.Vnone _ -> false
+      | I.Vplus _
+      | I.Vminus _ ->
+        true
+      }
+    );
+
+    if (!hasAnyVariance) return void;
+
+    targs = hc.targs;
+
+    for (otherID in this.gclassMapGet(hc.generic.name())) {
+      if (otherID != sid) {
+        other = this.trackedSClassGet(otherID);
+        otherTargs = other.sclass.superposition.id;
+        this.pos.invariant(
+          targs.size() == otherTargs.size(),
+          "targs size mismatch",
+        );
+
+        isSubType = for (i => v in gclass.variances) {
+          t1 = targs[i];
+          t2 = otherTargs[i];
+          if (
+            v match {
+            | I.Vnone _ ->
+              this.isRuntimeSubType(t1, t2) && this.isRuntimeSubType(t2, t1)
+            | I.Vplus _ -> this.isRuntimeSubType(t1, t2)
+            | I.Vminus _ -> this.isRuntimeSubType(t2, t1)
+            }
+          ) continue else {
+            break false
+          }
+        } else {
+          true
+        };
+
+        isSuperType = for (i => v in gclass.variances) {
+          t1 = targs[i];
+          t2 = otherTargs[i];
+          if (
+            v match {
+            | I.Vnone _ ->
+              this.isRuntimeSubType(t1, t2) && this.isRuntimeSubType(t2, t1)
+            | I.Vplus _ -> this.isRuntimeSubType(t2, t1)
+            | I.Vminus _ -> this.isRuntimeSubType(t1, t2)
+            }
+          ) continue else {
+            break false
+          }
+        } else {
+          true
+        };
+
+        if (isSubType) {
+          (!other, !info) = this.inherit(context, other, info)
+        };
+
+        if (isSuperType) {
+          (!info, !other) = this.inherit(context, info, other)
+        }
+      }
+    }
+  }
   // method lookup:
   // 1. if a method is defined on the receiver class itself, use that
   // definition uncoditionally
