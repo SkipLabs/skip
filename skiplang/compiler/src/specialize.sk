@@ -2019,13 +2019,15 @@ mutable class Specializer{
   // Apply the rules documented on createMetaClass() to convert
   // Base<T>, Concrete<T> and Class<T> to the corresponding metaclass,
   // or return 'hc' if no such conversion is possible.
-  private mutable fun maybeConvertMetaClass(
+  private static fun maybeConvertMetaClassCPS<T>(
     context: mutable SKStore.Context,
+    sp: mutable this,
     hc: HalfClass,
-  ): HalfClass {
+    k: (mutable SKStore.Context, mutable this, HalfClass) ~> T,
+  ): T {
     (gid, targ) = hc.generic match {
     | FrontEndLazyGClass("Base") ->
-      tArgInfo = this.trackedSClassGet(hc.targs[0].sclassID);
+      tArgInfo = sp.trackedSClassGet(hc.targs[0].sclassID);
       g = tArgInfo.lazyGClass;
 
       lg = if (hc.literalType) {
@@ -2037,7 +2039,7 @@ mutable class Specializer{
 
     | FrontEndLazyGClass("Class")
     | FrontEndLazyGClass("Concrete") ->
-      tArgInfo = this.trackedSClassGet(hc.targs[0].sclassID);
+      tArgInfo = sp.trackedSClassGet(hc.targs[0].sclassID);
       g = tArgInfo.lazyGClass;
 
       lg = tArgInfo.sclass.kind match {
@@ -2053,7 +2055,7 @@ mutable class Specializer{
       };
       (lg, tArgInfo)
 
-    | _ -> return hc
+    | _ -> return k(context, sp, hc)
     };
 
     opthc = hc with {
@@ -2067,66 +2069,195 @@ mutable class Specializer{
     //
     // Since the FastOption types are value classes, we always
     // use Concrete here.
-    this.getOptionStyle2(hc, this.pos) match {
+    sp.getOptionStyle2(hc, sp.pos) match {
     | Some(x) ->
-      tag = this.getOptionTagType(context, hc.generic);
-      opthc with {
-        generic => ConcreteMetaImplLazyGClass(x.fastClass()),
-        targs => hc.targs.concat(Array[tag]),
-        mutability => DeepFrozen(),
-      }
+      static::getOptionTagTypeCPS(
+        context,
+        sp,
+        hc.generic,
+        (context, sp, tag) ~> {
+          k(
+            context,
+            sp,
+            opthc with {
+              generic => ConcreteMetaImplLazyGClass(x.fastClass()),
+              targs => hc.targs.concat(Array[tag]),
+              mutability => DeepFrozen(),
+            },
+          )
+        },
+      )
     | None() ->
       // Normal metaclass case.
-      opthc
+      k(context, sp, opthc)
     }
   }
 
-  private mutable fun getOptionTagType(
+  private static fun getOptionTagTypeCPS<T>(
     context: mutable SKStore.Context,
+    sp: mutable this,
     optionGClass: LazyGClass,
-  ): Tclass {
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
     lazyGClass = optionGClass match {
     | FrontEndLazyGClass("Option") -> FrontEndLazyGClass("FastOption.OptionTag")
     | FrontEndLazyGClass("Some") -> FrontEndLazyGClass("FastOption.SomeTag")
     | FrontEndLazyGClass("None") -> FrontEndLazyGClass("FastOption.NoneTag")
-    | _ -> this.pos.die(`Bad option type ${optionGClass.nameStr()}`)
+    | _ -> sp.pos.die(`Bad option type ${optionGClass.nameStr()}`)
     };
-    this.getTclass2(context, lazyGClass, Array[], DeepFrozen())
+    static::getTclass2CPS(
+      context,
+      sp,
+      lazyGClass,
+      Array[],
+      DeepFrozen(),
+      false,
+      k,
+    )
   }
 
   mutable fun getSClass2(
     context: mutable SKStore.Context,
     hc: HalfClass,
   ): SClassInfo {
+    static::getSClass2CPS(context, this, hc, (_, _, x) ~> x)
+  }
+
+  private static fun getSClass2CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    hc: HalfClass,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
-    !hc = this.maybeConvertMetaClass(context, hc);
+    static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
+      // We only care about some of the fields.
+      hsc = HalfSClass(hc.generic, hc.targs);
+      sp.sclassMapMaybeGet(hsc) match {
+      | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
+      | None() -> static::createSClassCPS(context, sp, hc, k)
+      }
+    })
+  }
+
+  private static fun gclassFieldsMapCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    fields: List<GField>,
+    k: (mutable SKStore.Context, mutable this, List<SField>) ~> T,
+  ): T {
+    fields match {
+    | List.Nil() -> k(context, sp, List.Nil())
+    | List.Cons(f, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        f.typ,
+        tparamEnv,
+        f.pos,
+        false,
+        (context, sp, typ) ~>
+          static::gclassFieldsMapCPS(
+            context,
+            sp,
+            tparamEnv,
+            rl,
+            (context, sp, rl) ~>
+              k(
+                context,
+                sp,
+                List.Cons(
+                  SField{
+                    name => f.name,
+                    typ,
+                    isAssignable => f.isAssignable,
+                    pos => f.pos,
+                    index => f.index,
+                  },
+                  rl,
+                ),
+              )
+            ,
+          )
+        ,
+      )
+    }
+  }
+
+  private static fun gclassExtendsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    gclassList: List<GTapply>,
+    info: SClassInfo,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    gclassList match {
+    | List.Nil() -> k(context, sp, info)
+    | List.Cons(gta, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        gta,
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, super) ~> {
+          static::gclassExtendsCPS(
+            context,
+            sp,
+            tparamEnv,
+            rl,
+            info.setExtends(sp, info.extends_.set(gta.generic, super.sclassID)),
+            k,
+          )
+        },
+      )
+    }
+  }
+
+  private static fun gclassExtendsInheritCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    gclassList: List<GTapply>,
+    info: SClassInfo,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    gclassList match {
+    | List.Nil() -> k(context, sp, info)
+    | List.Cons(gta, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        gta,
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, super) ~> {
+          (_, info2) = sp.inherit(
+            context,
+            sp.trackedSClassGet(super.sclassID),
+            info,
+          );
+          static::gclassExtendsInheritCPS(context, sp, tparamEnv, rl, info2, k)
+        },
+      )
+    }
+  }
+
+  private static fun createSClassCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    hc: HalfClass,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
     targs = hc.targs;
-
-    // We only care about some of the fields.
     hsc = HalfSClass(hc.generic, targs);
-
-    this.sclassMapMaybeGet(hsc) match {
-    | Some(sc) -> this.trackedSClassGet(sc)
+    sp.getOptionStyle2(hc, sp.pos) match {
     | None() ->
-      this.getOptionStyle2(hc, this.pos) match {
-      | None() -> void
-      | Some(style) ->
-        // Create the underlying implementation type. See comments
-        // in FastOption.sk.
-        tag = this.getOptionTagType(context, hc.generic);
-
-        implInfo = this.getSClass2(
-          context,
-          HalfClass(style.fastClass(), Array[targs[0], tag], hc.mutability),
-        );
-
-        // Redirect Option<T> etc. to the implementation type.
-        this.sclassMapSet(hsc, implInfo.sclass.id);
-
-        return implInfo
-      };
-
-      gclass = this.converter.getGClass(context, hc.generic, this.pos);
+      gclass = sp.converter.getGClass(context, hc.generic, sp.pos);
 
       kind = gclass.kind match {
       | ck @ ClassKind _ -> ck
@@ -2139,14 +2270,14 @@ mutable class Specializer{
         gclass.name.id + "<" + targs.join(", ") + ">"
       };
 
-      if (!this.canCreateNewSClasses && !gclass.isReturnTuple) {
+      if (!sp.canCreateNewSClasses && !gclass.isReturnTuple) {
         debug(
           "Creating new SClass " +
             name +
             " that was not found during initial type scan; " +
             "now it's too late.",
         );
-        this.pos.die(
+        sp.pos.die(
           "Creating new SClass " +
             name +
             " that was not found during initial type scan; " +
@@ -2170,7 +2301,7 @@ mutable class Specializer{
         annotations => gclass.annotations,
         fields => Array[], // Computed later after being scalarized
         canInstantiate => gclass.canInstantiate,
-        ptrBitSize => this.config.ptrBitSize,
+        ptrBitSize => sp.config.ptrBitSize,
         // Magically poke in some LLVM type names for native types.
         scalarType => gclass.name.id match {
         | "Bool" -> Some(ScalarType(1, 1, "i1", IntegerScalarKind()))
@@ -2181,16 +2312,16 @@ mutable class Specializer{
         | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
         | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
         | "Runtime.GCPointer" ->
-          Some(ScalarType::gcPointer(this.config.ptrBitSize))
+          Some(ScalarType::gcPointer(sp.config.ptrBitSize))
         | "Runtime.NonGCPointer" ->
-          Some(ScalarType::nonGCPointer(this.config.ptrBitSize))
-        | "String" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
+          Some(ScalarType::nonGCPointer(sp.config.ptrBitSize))
+        | "String" -> Some(ScalarType::gcPointer(sp.config.ptrBitSize))
 
         | _ ->
           kind match {
           | KBase()
           | KClass() ->
-            Some(ScalarType::gcPointer(this.config.ptrBitSize))
+            Some(ScalarType::gcPointer(sp.config.ptrBitSize))
           | KValue() -> None()
           }
         },
@@ -2200,7 +2331,7 @@ mutable class Specializer{
       optionStyle = hc.generic match {
       | FrontEndLazyGClass("FastOption.FlagOption") -> Some(FlagOptionStyle())
       | FrontEndLazyGClass("FastOption.SentinelOption") ->
-        Some(this.getOptionStyleHelper2(targs[0], this.pos))
+        Some(sp.getOptionStyleHelper2(targs[0], sp.pos))
       | _ -> None()
       };
 
@@ -2216,84 +2347,94 @@ mutable class Specializer{
       };
 
       // Record this class.
-      this.sclassSet(sid, info);
-      this.sclassMapSet(hsc, sid);
-      this.noteGClassInstance(info);
+      sp.sclassSet(sid, info);
+      sp.sclassMapSet(hsc, sid);
+      sp.noteGClassInstance(info);
 
       // Now that the type is registered we can do things that may go
       // reentrant.
 
       // Create the fields. We will flatten them to scalars later.
-      tparamEnv = makeTypeMap(gclass.tparams, targs, this.pos);
-      !info = info.setUnscalarizedFields(
-        this,
-        gclass.fields.map(f ->
-          SField{
-            name => f.name,
-            typ => this.getTclass3(context, f.typ, tparamEnv, f.pos),
-            isAssignable => f.isAssignable,
-            pos => f.pos,
-            index => f.index,
-          }
-        ),
-      );
+      tparamEnv = makeTypeMap(gclass.tparams, targs, sp.pos);
 
-      // populate sclass extends_ after registration, but before inherits pass
-      for (gta in gclass.extends_) {
-        super = this.getTclass3(context, gta, tparamEnv);
-        !info = info.setExtends(
-          this,
-          info.extends_.set(gta.generic, super.sclassID),
-        );
-      };
+      static::gclassFieldsMapCPS(
+        context,
+        sp,
+        tparamEnv,
+        List::createFromItems(gclass.fields),
+        (context, sp, fieldList) ~> {
+          gclassFields = fieldList.toArray();
+          info2 = info.setUnscalarizedFields(sp, gclassFields);
 
-      // This class can be instantiated only if all fields can.
-      canInstantiate = (
-        (info.sclass.canInstantiate &&
-          info.unscalarizedFields.all(field ->
-            this.canInstantiate(field.typ)
-          )) ||
-        gclass.name.idValue() == "Unsafe.RawStorage"
-      );
+          // populate sclass extends_ after registration, but before inherits pass
+          static::gclassExtendsCPS(
+            context,
+            sp,
+            tparamEnv,
+            List::createFromItems(gclass.extends_),
+            info2,
+            (context, sp, info2) ~> {
+              // This class can be instantiated only if all fields can.
+              canInstantiate = (
+                (info2.sclass.canInstantiate &&
+                  info2.unscalarizedFields.all(field ->
+                    sp.canInstantiate(field.typ)
+                  )) ||
+                gclass.name.idValue() == "Unsafe.RawStorage"
+              );
 
-      !info = info.setSClass(
-        this,
-        info.sclass with {
-          canInstantiate,
-          fields => if (gclass.isReturnTuple) {
-            // We need to record these right away since the scalarizing
-            // phase is over.
-            info.unscalarizedFields
-          } else {
-            info.sclass.fields
-          },
+              info3 = info2.setSClass(
+                sp,
+                info2.sclass with {
+                  canInstantiate,
+                  fields => if (gclass.isReturnTuple) {
+                    // We need to record these right away since the scalarizing
+                    // phase is over.
+                    info2.unscalarizedFields
+                  } else {
+                    info2.sclass.fields
+                  },
+                },
+              );
+
+              // Connect super- and subtypes in the "extends" hierarchy.
+              static::gclassExtendsInheritCPS(
+                context,
+                sp,
+                tparamEnv,
+                List::createFromItems(gclass.extends_),
+                info3,
+                (context, sp, info2) ~> {
+                  sp.createVariance(context, hc, sid, info2);
+                  k(context, sp, info2)
+                },
+              )
+            },
+          )
         },
-      );
+      )
 
-      // Connect super- and subtypes in the "extends" hierarchy.
-      for (ta in gclass.extends_) {
-        super = this.getTclass3(context, ta, tparamEnv);
-        (_, !info) = this.inherit(
-          context,
-          this.trackedSClassGet(super.sclassID),
-          info,
-        );
-      };
-
-      this.createVariance(context, hc, sid, info);
-
-      info
+    | Some(style) ->
+      // Create the underlying implementation type. See comments
+      // in FastOption.sk.
+      static::getOptionTagTypeCPS(
+        context,
+        sp,
+        hc.generic,
+        (context, sp, tag) ~> {
+          static::getSClass2CPS(
+            context,
+            sp,
+            HalfClass(style.fastClass(), Array[targs[0], tag], hc.mutability),
+            (context, sp, implInfo) ~> {
+              // Redirect Option<T> etc. to the implementation type.
+              sp.sclassMapSet(hsc, implInfo.sclass.id);
+              k(context, sp, implInfo)
+            },
+          )
+        },
+      )
     }
-  }
-
-  // Class construction is still synchronous until its CPS conversion.
-  private static fun getSClass2CPS<T>(
-    context: mutable SKStore.Context,
-    sp: mutable this,
-    hc: HalfClass,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
-  ): T {
-    k(context, sp, sp.getSClass2(context, hc))
   }
 
   // Look for super- and subtypes based on co- and contravariance.
