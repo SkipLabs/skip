@@ -459,6 +459,19 @@ type TMapFun<K, V, K2, V2> = (
 ) ~> void;
 
 class EHandle<K: Key, V: File> extends Handle<K, V> {
+  // Depend on the projected array, including its ordering and multiplicity.
+  // Only eager collections can validate projections at the point of a write.
+  fun getArrayFilter<R: File>(
+    context: mutable Context,
+    key: K,
+    project: V ~> R,
+  ): Array<R> {
+    type = this.type;
+    dir = context.unsafeGetEagerDir(this.dirName);
+    dir.getArrayFilter(context, key, file ~> project(type(file)))
+  }
+
+
   private static fun genMultiMapReduce<K2: Key, V2: File, V3: File>(
     typeOutputKey: Key ~> K2,
     typeOutput: File ~> V3,
