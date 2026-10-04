@@ -590,6 +590,112 @@ mutable class SPMapFixed<K: Orderable, V>{
   }
 }
 
+// Relations are emitted as individual contributions. Only the additions made
+// by this callback are retained here; inserting one never reads the old set.
+// The round merger reduces the contributions to a set for enumeration, and
+// membership reads depend only on the requested relationship.
+mutable class SPRelations<K: Orderable>{
+  k2Key: K ~> SKStore.Key,
+  mutable handle: ?SKStore.EHandle<SKStore.Key, SKStore.File>,
+  mutable data: SortedMap<K, SortedSet<SClassID>> = SortedMap[],
+} {
+  readonly fun chill(): SPRelations<K> {
+    SPRelations{k2Key => this.k2Key, handle => this.handle, data => this.data}
+  }
+
+  readonly fun mclone(): mutable SPRelations<K> {
+    mutable SPRelations{
+      k2Key => this.k2Key,
+      handle => this.handle,
+      data => this.data,
+    }
+  }
+
+  mutable fun replace(other: readonly SPRelations<K>): void {
+    this.!handle = other.handle;
+    this.!data = other.data;
+  }
+
+  fun merge(other: SPRelations<K>): this {
+    for (key => values in other.data) {
+      !this.data[key] = this.data.maybeGet(key)
+        .default(kEmptySClassSet)
+        .union(values);
+    };
+    this
+  }
+
+  readonly fun getDiff(): SortedMap<K, SortedSet<SClassID>> {
+    this.data
+  }
+
+  readonly fun readonlyGet(key: K): SortedSet<SClassID> {
+    invariant(
+      this.handle.isNone(),
+      "Relations must be fixed for readonly access",
+    );
+    this.data[key]
+  }
+
+  mutable fun get(
+    context: mutable SKStore.Context,
+    key: K,
+  ): SortedSet<SClassID> {
+    additions = this.data.maybeGet(key).default(kEmptySClassSet);
+    this.handle match {
+    | None() -> additions
+    | Some(handle) ->
+      values = handle.getArray(context, this.k2Key(key));
+      if (values.isEmpty()) additions else {
+        convFile2SortedSetSClassID(values[0]).union(additions)
+      }
+    }
+  }
+
+  mutable fun maybeGet(
+    context: mutable SKStore.Context,
+    key: K,
+  ): ?SortedSet<SClassID> {
+    values = this.get(context, key);
+    if (values.isEmpty()) None() else Some(values)
+  }
+
+  mutable fun containsValue(
+    context: mutable SKStore.Context,
+    key: K,
+    value: SClassID,
+  ): Bool {
+    if (this.data.maybeGet(key).default(kEmptySClassSet).contains(value)) {
+      return true
+    };
+    this.handle match {
+    | None() -> false
+    | Some(handle) ->
+      values = handle.getArrayFilter(context, this.k2Key(key), file ~>
+        SKStore.BoolFile(convFile2SortedSetSClassID(file).contains(value))
+      );
+      !values.isEmpty() && values[0].value
+    }
+  }
+
+  mutable fun add(key: K, value: SClassID): void {
+    this.!data[key] = this.data.maybeGet(key)
+      .default(kEmptySClassSet)
+      .set(value);
+  }
+
+  readonly fun writeDiff(
+    writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  ): void {
+    for (key => additions in this.data) {
+      writer.setArray(
+        this.k2Key(key),
+        additions.values().map(value -> SClassIDFile(value)).collect(Array),
+      );
+    };
+  }
+}
+
 class TodoFile(value: Todo) extends SKStore.Key, SKStore.File
 
 base class Todo uses Orderable
