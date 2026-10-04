@@ -1178,7 +1178,9 @@ mutable class Context private {
   }
 
   mutable fun addRead(path: Path): void {
-    this.!reads = this.reads.set(path);
+    if (!this.reads.contains(path)) {
+      this.!reads = this.reads.set(path);
+    };
   }
 
   mutable fun setGlobal(name: String, file: File): void {
