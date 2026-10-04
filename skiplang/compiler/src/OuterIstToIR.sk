@@ -5015,16 +5015,17 @@ fun createSpecializer(
   config: Config.Config,
   converter: Converter,
   roots: RootsIR,
+  handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ): SpecializerState {
   // Find every relevant type and function in the program.
-  specializer = Specializer::make(context, config, converter);
+  specializer = Specializer::make(handle, context, config, converter);
   forceCompile = roots.forceCompile;
 
   for (gid in forceCompile) {
     _ = specializer.requestFunction(context, gid, Array[])
   };
 
-  specializer.findAllFunctionsAndSClasses(context);
+  specializer.findAllFunctionsAndSClasses(context, handle.dirName);
   specializer.chill()
 }
 
