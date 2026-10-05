@@ -944,7 +944,7 @@ private class GClassKindFile(value: GClassKind) extends SKStore.File
 class Converter private (
   program: I.Program,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
-  lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
+  lower: SKStore.LHandle<CallableDefRef, I.CallableDefFile>,
 ) {
   fun getClassForConversion(
     context: mutable SKStore.Context,
@@ -979,7 +979,7 @@ class Converter private (
     );
     lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
     lower = SKStore.LHandle(
-      I.CallableDefFile::keyType,
+      CallableDefRef::keyType,
       I.CallableDefFile::type,
       lowerDirName,
     );
@@ -993,16 +993,12 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      SKStore.Key::unTyped,
+      CallableDefRef::keyType,
       I.CallableDefFile::type,
       context,
       lowerDirName,
       (context, _self, key) ~> {
-        defRef = key match {
-        | x @ CallableDefRef _ -> x
-        | _ -> invariant_violation("Unexpected key type")
-        };
-        def = converter.resolveCallableDef(context, defRef);
+        def = converter.resolveCallableDef(context, key);
         lowered = if (def.isLowered()) {
           def
         } else {

@@ -287,9 +287,9 @@ fun testReadFilterCapturedPredicates(): void {
 
 @test
 fun testReadFilterObservedValues(): void {
-  path = SKStore.Path(SKStore.DirName::create("/source/"), SKStore.IID(0));
+  path = SKStore.Path::create(SKStore.DirName::create("/source/"), SKStore.IID(0));
   project = file ~> SKStore.IntFile::type(file);
-  (deps, first) = SKStore.Deps().addFilter(path, project, Array[SKStore.IntFile(1)]);
+  (deps, first) = SKStore.Deps::empty().addFilter(path, project, Array[SKStore.IntFile(1)]);
   (deps2, same) = deps.addFilter(path, project, Array[SKStore.IntFile(1)]);
   (_, changed) = deps2.addFilter(path, project, Array[SKStore.IntFile(2)]);
   T.expectEq(first, same);
