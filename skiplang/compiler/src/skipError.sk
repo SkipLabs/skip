@@ -71,7 +71,7 @@ fun errorsToString(
       } else {
         symbols.getOrAdd(file, () ->
           SourcePositions.Index::create(
-            SkipParser.parseSource(contents, true).tree,
+            SkipParser.parseSource(contents, true).i0.tree,
           ).symbols
         )
       };
@@ -286,7 +286,7 @@ private fun render_pos(
   if (source.path.startsWith(cwd)) {
     !path = path.stripPrefix(cwd + "/");
   };
-  file = pos.file.pkg_opt match {
+  file = source.pkg_opt match {
   | Some(pkg) if (pkg != FileCache.kAnonymousPackageName) ->
     `File "${path}" (package ${pkg})`
   | _ -> `File "${path}"`
