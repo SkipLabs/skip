@@ -79,7 +79,11 @@ jobs:
             mkdir -p ~/test-results
             root="$PWD"
             cd skiplang/compiler && make STAGE=1
+            # The dev profile merges skc, skfmt and every test into one binary;
+            # incremental specialization of that combined graph exceeds this
+            # job's memory budget. Release builds the same tests separately.
             PATH=$(realpath ./stage1/bin):$PATH \
+              GIT_COMMIT_HASH=$(git rev-parse --short HEAD) SKTEST_PROFILE=release \
               SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
               "$root/bin/run-sktest.sh"
       - store_test_results:

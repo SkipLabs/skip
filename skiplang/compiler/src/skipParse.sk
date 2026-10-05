@@ -75,7 +75,7 @@ const packageEnvAccessDir: SKStore.EHandle<
   SKStore.SID,
   SKStore.StringFile,
 > = SKStore.EHandle(
-  FileCache.InputSource::keyType,
+  SKStore.SID::keyType,
   SKStore.StringFile::type,
   packageEnvAccessDirName,
 );
@@ -230,7 +230,7 @@ fun packageEnvDir(
   pkg_opt: ?String,
 ): SKStore.EHandle<SKStore.SID, SKStore.StringFile> {
   SKStore.EHandle(
-    FileCache.InputSource::keyType,
+    SKStore.SID::keyType,
     SKStore.StringFile::type,
     packageEnvDirName(pkg_opt),
   )
@@ -269,11 +269,10 @@ module end;
 module SkipParse;
 
 const astDirName: SKStore.DirName = SKStore.DirName::create("/astCache/");
-const astDir: SKStore.EHandle<FileCache.InputSource, DefsFile> = SKStore.EHandle(
-  FileCache.InputSource::keyType,
-  DefsFile::type,
-  astDirName,
-);
+const astDir: SKStore.EHandle<
+  FileCache.InputSource,
+  DefsFile,
+> = SKStore.EHandle(FileCache.InputSource::keyType, DefsFile::type, astDirName);
 
 class DefsFile(
   value: List<SkipAst.Definition>,
