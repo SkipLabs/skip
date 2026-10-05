@@ -82,6 +82,102 @@ Re-run the full validations described at the end of this document after these
 integration checks. The historical cleaned commits were checked on their old
 base; that does not establish that each rebased commit type-checks.
 
+## Current-container validation follow-up: 2026-10-05
+
+The current LLVM 20 container can build the rebased sources after adapting the
+remaining typed-handle, iterator, and private-constructor interfaces. The older
+handoff above describes the previous container's limitations.
+
+The removal regression exposed a scheduling problem in SKStore. Reusing nested
+directories changes their `TimeStack`, but pending updates retain the priorities
+computed before reuse. A downstream reader can therefore run before an
+intermediate map retracts its old output. In the compiler, the recomputed `main`
+requests `RelationReplacement`, while the next class round still tries to create
+the removed `RelationOther`. SKStore correctly invalidates the class definition;
+the incorrect ordering causes the invariant failure.
+
+`Context.updateWithStatus` now checks a queued update's priority against the
+directory's current scheduling order and requeues outdated entries before
+executing them. `testReusedDirectoryUpdateOrder` exercises this independently of
+the compiler with reused selection, forwarding, and lookup maps. The old
+scheduler transiently reads a deleted key; the corrected scheduler does not.
+All four incremental compiler regressions also pass without a compiler-side
+guard for removed declarations.
+
+Other integration fixes refresh a callable's signature together with its body,
+restore discovery of deep-frozen class variants, and import projected-read
+filter definitions with collision-safe identities when contexts are imported.
+The prelude includes regressions for the filter import and identity cases.
+
+To rebuild, explicitly invoke the bootstrap tools: `make STAGE=1` can report
+"Nothing to be done" when the stage directory already exists.
+
+```bash
+git submodule update --init skiplang/compiler/bootstrap skiplang/prelude/libbacktrace
+cd skiplang/compiler
+make stage0/bin/skc stage0/bin/skfmt stage0/bin/skargo stage0/lib/libstd.sklib
+PATH="$(realpath stage0/bin):$PATH" skargo build --profile release \
+  --skcopt --canonize-paths --bins --out-dir stage1/bin --target-dir stage1/target
+PATH="$(realpath stage0/bin):$PATH" skargo build --profile release \
+  --lib --manifest-path ../prelude/Skargo.toml \
+  --out-dir stage1/lib --target-dir stage1/target
+PATH="$(realpath stage0/bin):$PATH" skargo build --profile release \
+  --bins --manifest-path ../skargo/Skargo.toml \
+  --out-dir stage1/bin --target-dir stage1/target
+export PATH="$(realpath stage1/bin):$PATH"
+GIT_COMMIT_HASH="$(git rev-parse --short HEAD)" \
+  SKTEST_PROFILE=release SKTEST_JOBS=8 ../../bin/run-sktest.sh
+```
+
+Use a fresh target directory, or move aside its compiler `*_state.db` caches,
+when switching compiler binaries. Those databases serialize compiler state and
+are not interchangeable across compiler builds. Do not remove the persisted
+input databases used by the incremental regressions. Export the newly built
+prelude as shown above: the top-level `target/host/release/libstd.sklib` can be an
+older export even when the hashed library in `deps/` has been rebuilt.
+
+The release test profile keeps the compiler tests within this container's memory
+limit; the development profile merges compiler and formatter roots into the test
+build and exhausted memory here. CircleCI's compiler invocation now explicitly
+uses the release profile and supplies `GIT_COMMIT_HASH` for the test target.
+
+Validation in this container, with the rebuilt compiler:
+
+| Check | Result |
+| --- | --- |
+| Compiler tests, including persisted incremental updates | 1,742 passed |
+| Prelude tests, including the standalone scheduling regression | 80 passed |
+| Native SKDB SQL, differential, replication, concurrency, and memory suites | Passed |
+| SKDB/Wasm Playwright tests, including gateway and mux clients | 283 passed |
+| Node runtime unit tests, with PostgreSQL and Kafka required | 65 passed |
+| Bun runtime unit tests | 33 passed |
+| Node/Wasm/native and Bun runtime examples; error-type checks | Passed |
+| Twelve package test/build targets | Passed |
+| TypeScript 5.7, 5.8, and 6.0 checks; lint | Passed |
+| Formatting and shell checks | Passed |
+| Packed native addon, rebuilt against a locally installed versioned runtime | Passed |
+
+The package targets are `cli`, `toml`, `skjson`, `arparser`, `skargo`, `sktest`,
+`semver`, `skdate`, `sqlparser`, `cc`, `pkg-config`, and `skipruntime-core`.
+Use the default development profile for the `skargo` tests, matching CircleCI;
+their manifest-directory environment is provided to the merged library target.
+
+Java 21 runs the SKDB gateway and mux integration servers; it is not involved in
+specialization. PostgreSQL 18 and Kafka 4.1.1 provided the runtime test services.
+The container's `date` was the Rust coreutils implementation, which formats
+`%Q` differently; the SQL date comparisons passed using GNU `date`. Browser
+installation required `PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-arm64`
+because Playwright does not recognize this Ubuntu 26.04 ARM64 host yet.
+
+There is no usable Docker daemon in this container. CircleCI's native-addon
+packaging Docker job could not run as written. Its packed-package install,
+addon rebuild, and `test.ts` service initialization/close smoke test passed
+locally, including loading `libskipruntime-0.0.23.so` from an isolated prefix.
+This does not validate the Docker image's older glibc environment.
+
+Detailed build logs, test logs, and JUnit reports are under
+`/tmp/skip-pr1541-validation/` in this session's container.
+
 ## Why class creation is serialized
 
 A function specialization can discover classes, methods, generic instances, and

@@ -792,6 +792,12 @@ class AsyncCoroutineLazyGFun{
 
 // A source-free recipe for retrieving a definition through tracked reads.
 base class CallableDefRef extends SKStore.Key {
+  macro static fun callableKeyType(key: SKStore.Key): CallableDefRef {
+    key match {
+    | ref @ CallableDefRef _ -> ref
+    | _ -> invariant_violation("Expected CallableDefRef")
+    }
+  }
   children =
   | FunctionDefRef(name: String)
   | MethodDefRef(className: String, name: String, isStatic: Bool)
@@ -979,7 +985,7 @@ class Converter private (
     );
     lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
     lower = SKStore.LHandle(
-      CallableDefRef::keyType,
+      CallableDefRef::callableKeyType,
       I.CallableDefFile::type,
       lowerDirName,
     );
@@ -993,7 +999,7 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      CallableDefRef::keyType,
+      CallableDefRef::callableKeyType,
       I.CallableDefFile::type,
       context,
       lowerDirName,
@@ -1047,6 +1053,33 @@ class Converter private (
     }
   }
 
+  fun refreshCallable(
+    context: mutable SKStore.Context,
+    ref: CallableDefRef,
+    previous: GFunInfo,
+  ): LazyGFun {
+    ref match {
+    | FunctionDefRef(name) ->
+      this.convertFunDef(context, this.program.getFun(context, name))
+    | MethodDefRef(className, _, _)
+    | FactoryDefRef(className, _, _) ->
+      cls = this.getClassForConversion(context, className);
+      def = this.resolveCallableDef(context, ref) match {
+      | method @ I.MethodDef _ -> method
+      | _ -> invariant_violation("Expected method definition")
+      };
+      (_, method) = this.convertMethodDef(
+        context,
+        def,
+        ref,
+        GClassName(previous.gfunction.id.splitLast("::").i0),
+        GClassName(className),
+        this.convertTypeParameters(cls.tparams),
+      );
+      method.function.fromSome()(context, FrontEndLazyGClass(className))
+    }
+  }
+
   fun getGFunction(
     context: mutable SKStore.Context,
     lazy: LazyGFun,
@@ -1058,7 +1091,15 @@ class Converter private (
     context: mutable SKStore.Context,
     key: LazyGFunKey,
   ): Array<GFunctionFile> {
-    file = GFunctionFile(key.value.compile(context, this));
+    // Work keys retain a callable's stable identity across updates. Resolve
+    // its current signature as well as its body before binding parameters.
+    lazy = key.value match {
+    | DefLazyGFun{defRef, funInfo}
+    | AsyncCoroutineLazyGFun{bodyProvider => DefLazyGFun{defRef, funInfo}} ->
+      this.refreshCallable(context, defRef, funInfo)
+    | other -> other
+    };
+    file = GFunctionFile(lazy.compile(context, this));
     Array[file]
   }
 

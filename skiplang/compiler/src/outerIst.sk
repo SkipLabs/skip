@@ -73,7 +73,7 @@ class Program private (
     // would invalidate all readers before discovering that a sibling body
     // was unchanged.
     declarations = program.map(
-      SKStore.Key::unTyped,
+      x ~> x,
       x ~> x,
       context,
       SKStore.DirName::create("/outerDeclarations/"),
@@ -147,10 +147,12 @@ class Program private (
     values = this.declarations.getArrayFilter(
       context,
       SKStore.SID(className),
-      file ~> file match {
-      | ClassDefFile(cls) -> project(cls)
-      | _ -> invariant_violation("Expected class definition")
-      },
+      file ~>
+        file match {
+        | ClassDefFile(cls) -> project(cls)
+        | _ -> invariant_violation("Expected class definition")
+        }
+      ,
     );
     if (values.isEmpty()) {
       invariant_violation("Class definition not found: " + className)
@@ -231,9 +233,7 @@ class Program private (
     context: mutable SKStore.Context,
     constsDir: SKStore.EHandle<SKStore.UnitID, ConstDefFile>,
   ): Array<ConstDef> {
-    constsDir.getArray(context, SKStore.UnitID::singleton).map(x ->
-      x.value
-    )
+    constsDir.getArray(context, SKStore.UnitID::singleton).map(x -> x.value)
   }
 
   fun getFuns(

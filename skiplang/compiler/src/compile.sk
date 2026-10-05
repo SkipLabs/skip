@@ -233,8 +233,6 @@ const backendSinkDir: SKStore.EHandle<
   backendSinkDirName,
 );
 
-class Left(Array<SKStore.File>) extends SKStore.File
-class Right(Array<SKStore.File>) extends SKStore.File
 class OldFile(files: Array<SKStore.File>) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
 
@@ -392,9 +390,12 @@ fun getOrInitializeBackend(
       context.getGlobal("ERRORS") match {
       | None() -> void
       | Some(errors) ->
-        writer.set(SKStore.UnitID::singleton, SkipError.ErrorsFile(
-          SkipError.ErrorsFile::type(errors).value.reversed(),
-        ))
+        writer.set(
+          SKStore.UnitID::singleton,
+          SkipError.ErrorsFile(
+            SkipError.ErrorsFile::type(errors).value.reversed(),
+          ),
+        )
       }
     },
   );
@@ -407,7 +408,9 @@ fun getOrInitializeBackend(
     (context, writer, key, values) ~> {
       conf = values.first.value;
 
-      if (!backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()) {
+      if (
+        !backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()
+      ) {
         return void
       };
 
@@ -481,7 +484,9 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/specializer/init/"),
     (context, writer, _key, _values) ~> {
-      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) return void;
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
       prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
       conf = prevPhase.conf;
       specializer = O.createSpecializer(
@@ -517,7 +522,9 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/specializer/"),
     (context, writer, _, _) ~> {
-      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) return void;
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
       specializerAllDir = specializerInitMerged;
       phaseNumber = 0;
 
@@ -542,7 +549,11 @@ fun getOrInitializeBackend(
                 "/specializer/reduced1/" + phaseNumberCopy + "/",
               ),
               (context, writer, key, values) ~> {
-                if (!backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()) {
+                if (
+                  !backendSinkDir
+                    .getArray(context, SKStore.UnitID::singleton)
+                    .isEmpty()
+                ) {
                   return void
                 };
                 key match {
@@ -556,13 +567,13 @@ fun getOrInitializeBackend(
                   // These are still pending work, including any continuations.
                   // Forward them directly so mergeFun keeps them over new
                   // requests for the same function from class creation.
-                  writer.setArray(key, values.collect(Array));
+                  writer.setArray(key, values.toArray());
                   writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
                   return void
                 | SKStore.IID _
                 | O.FStackElement _ ->
                   void
-                | _ -> return writer.set(key, OldFile(values.collect(Array)))
+                | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
 
                 config = backendDir.getArray(context, SKStore.IID(0))[0].value;
@@ -692,7 +703,9 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/backendPhase2/"),
     (context, _writer, _key, _values) ~> {
-      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) return void;
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
       prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
       partialConfig = prevPhase.conf;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
@@ -766,9 +779,11 @@ fun getOrInitializeBackend(
   );
 
   context.setDir(
-    context.unsafeGetEagerDir(backendEmitDir.dirName) with {
-      timeStack => SKStore.TimeStack::create(context, SKStore.Time(Int::max)),
-    },
+    context
+      .unsafeGetEagerDir(backendEmitDir.dirName)
+      .withTimeStack(
+        SKStore.TimeStack::create(context, SKStore.Time(Int::max)),
+      ),
   );
 
   (backendDir, tickDir)
@@ -793,7 +808,11 @@ fun compile(
 
   (backendDir, tickDir) = getOrInitializeBackend(context);
   backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)]);
-  tickDir.writeArray(context, SKStore.IID(0), Array[TickFile(context.getTick())]);
+  tickDir.writeArray(
+    context,
+    SKStore.IID(0),
+    Array[TickFile(context.getTick())],
+  );
 
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
@@ -813,14 +832,20 @@ fun compile(
     )
   });
 
-  if (!config.stopAfterSpecialization && config.output != "-" && !FileSystem.exists(config.output)) {
+  if (
+    !config.stopAfterSpecialization &&
+    config.output != "-" &&
+    !FileSystem.exists(config.output)
+  ) {
     // Output files are external side effects. Replay the final backend map
     // when the output disappears, preserving cached specialization work.
-    context.invalidateReader(SKStore.TArrowKey::create{
+    key: SKStore.Key = SKStore.IID(0);
+    reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
       parentName => backendDir.dirName,
       childName => SKStore.DirName::create("/backendPhase2/"),
-      key => SKStore.IID(0),
-    });
+      key,
+    };
+    context.invalidateReader(reader);
   };
 
   runCompilerPhase("frontend/update", () -> context.update());

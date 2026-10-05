@@ -206,6 +206,11 @@ value class Deps private (
     this.data.maybeGet(path)
   }
 
+  fun setFilters(path: Path, filters: SortedMap<Int, Array<ReadFilter>>): this {
+    !this.filters[path] = filters;
+    this
+  }
+
   fun addFilter(
     path: Path,
     project: File ~> File,
@@ -221,17 +226,43 @@ value class Deps private (
     for (filter in filters) {
       // A replaced directory may be read again before its old readers run.
       // Share only readers that observed the same projected array.
-      if (native_eq(filter.project, project) == 0 && native_eq(filter.value, value) == 0) {
+      if (
+        native_eq(filter.project, project) == 0 &&
+        native_eq(filter.value, value) == 0
+      ) {
         return (this, filter.path(path))
       };
     };
-    filter = ReadFilter(this.nextFilterID, projectionHash, project, value);
-    !this.nextFilterID = this.nextFilterID + 1;
+    // Context forks may register projections independently and later import
+    // each other's readers. Allocate identities from the shared counter.
+    id = genSym(this.nextFilterID + 1);
+    filter = ReadFilter(id, projectionHash, project, value);
+    !this.nextFilterID = id;
     !this.filters[path] = groups.set(
       projectionHash,
       filters.concat(Array[filter]),
     );
     (this, filter.path(path))
+  }
+
+  fun importFilter(from: this, read: Path): this {
+    read.baseName match {
+    | FilteredReadKey(source, projectionHash, id) ->
+      path = Path::create(read.dirName, source);
+      bucket = from.filters.get(path).get(projectionHash);
+      filter = bucket.find(filter -> filter.id == id).fromSome();
+      groups = this.filters.maybeGet(path).default(SortedMap[]);
+      current = groups.maybeGet(projectionHash).default(Array[]);
+      if (!current.any(filter -> filter.id == id)) {
+        !this.filters[path] = groups.set(
+          projectionHash,
+          current.concat(Array[filter]),
+        );
+      };
+      !this.nextFilterID = max(this.nextFilterID, id)
+    | _ -> void
+    };
+    this
   }
 
   fun set(path: Path, arrowKey: ArrowKey): this {
@@ -733,6 +764,16 @@ mutable class Context private {
     };
   }
 
+  mutable fun importDeps(
+    from: Context,
+    reader: ArrowKey,
+    reads: SortedSet<Path>,
+  ): void {
+    for (path in reads) {
+      this.!deps = this.deps.importFilter(from.deps, path).set(path, reader);
+    };
+  }
+
   mutable fun removeDeps(
     reader: ArrowKey,
     reads: mutable Iterator<Path>,
@@ -783,15 +824,10 @@ mutable class Context private {
     | Some(x) -> x
     };
     this.!dirtyReaders[reader.parentName] = {
-      map = this.dirtyReaders.maybeGet(reader.parentName).default(
-        SortedMap[],
-      );
+      map = this.dirtyReaders.maybeGet(reader.parentName).default(SortedMap[]);
       map.set(
         reader.childName,
-        parent.addReaderKeyToKeySetOpt(
-          reader,
-          map.maybeGet(reader.childName),
-        ),
+        parent.addReaderKeyToKeySetOpt(reader, map.maybeGet(reader.childName)),
       )
     };
     time = if (reader.parentName == reader.childName) {
@@ -809,9 +845,7 @@ mutable class Context private {
   ): void {
     for (reader in this.getDeps(path)) {
       if (this.debugMode) {
-        print_string(
-          `DIRTY READER: ${reader} (dependency: ${path})`,
-        );
+        print_string(`DIRTY READER: ${reader} (dependency: ${path})`);
       };
       this.invalidateReader(reader);
     };
@@ -834,9 +868,7 @@ mutable class Context private {
             }
           })
         );
-        this.!deps = this.deps with {
-          filters => this.deps.filters.set(path, updated),
-        };
+        this.!deps = this.deps.setFilters(path, updated);
       });
     };
   }
@@ -944,8 +976,25 @@ mutable class Context private {
         this.!tick = this.tick.next();
         this.!fromContext = None();
         break withChanges
-      | Some((_time, Arrow(parentName, childName), toUpdate)) ->
+      | Some((queuedTime, arrow @ Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
+        // Reusing a nested directory gives it a new TimeStack. Updates that
+        // were queued before reuse must follow the directory's current order.
+        currentTimeOpt = this.unsafeMaybeGetDir(childName).map(child -> {
+          parent = this.unsafeGetDir(parentName);
+          time = if (parentName == childName) {
+            -child.getTimeStack()
+          } else {
+            child.getTimeStack()
+          };
+          (time, parent.getTime())
+        });
+        currentTimeOpt match {
+        | Some((time, parentTime)) if (queuedTime != (time, parentTime)) ->
+          this.addToUpdate(time, parentTime, arrow);
+          continue
+        | _ -> void
+        };
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->

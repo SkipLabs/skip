@@ -777,6 +777,10 @@ base class EagerDir protected {
   protected tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
+  fun withTimeStack(timeStack: TimeStack): this {
+    this with {timeStack}
+  }
+
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -1372,7 +1376,7 @@ base class EagerDir protected {
     dir.parents.items().each(kv ->
       // TODO: Import Mapper from 'from' context env
       from.maybeGetReads(kv.i0, childName).each((arrow, reads) ->
-        context.updateNewDeps(arrow, reads)
+        context.importDeps(from, arrow, reads)
       )
     );
     // Import sub dir (shared sub dir)

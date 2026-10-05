@@ -401,7 +401,9 @@ mutable base class SPMap<K: Orderable, V>{} {
   readonly fun readonlyGet(k: K): V;
   mutable fun get(context: mutable SKStore.Context, k: K): V;
   mutable fun getFilter<R: SKStore.File>(
-    context: mutable SKStore.Context, k: K, project: V ~> R,
+    context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
   ): R;
   mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V;
   mutable fun contains(context: mutable SKStore.Context, k: K): Bool;
@@ -483,14 +485,16 @@ mutable class SPMapDiff<K: Orderable, V>{
   }
 
   mutable fun getFilter<R: SKStore.File>(
-    context: mutable SKStore.Context, k: K, project: V ~> R,
+    context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
   ): R {
     this.data.maybeGet(k) match {
     | Some(value) -> project(value)
     | None() ->
       convert = this.file2V;
-      values = this.handle.getArrayFilter(
-        context, this.k2Key(k), file ~> project(convert(file)),
+      values = this.handle.getArrayFilter(context, this.k2Key(k), file ~>
+        project(convert(file))
       );
       invariant(!values.isEmpty(), "Not found");
       values[0]
@@ -564,7 +568,9 @@ mutable class SPMapFixed<K: Orderable, V>{
   }
 
   mutable fun getFilter<R: SKStore.File>(
-    _context: mutable SKStore.Context, k: K, project: V ~> R,
+    _context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
   ): R {
     project(this.data[k])
   }
@@ -2368,9 +2374,8 @@ mutable class Specializer{
     // TODO: If an SClass in a KBase with no concrete subclasses, we can
     // say it's not instantiable.
     !t.forEachTclass(tc ->
-      !this.sclasses.getFilter(
-        this.context, tc.sclassID,
-        info ~> SKStore.BoolFile(info.sclass.canInstantiate),
+      !this.sclasses.getFilter(this.context, tc.sclassID, info ~>
+        SKStore.BoolFile(info.sclass.canInstantiate)
       ).value
     )
   }
@@ -2927,7 +2932,23 @@ mutable class Specializer{
                 info3,
                 (context, sp, info2) ~> {
                   sp.createVariance(context, hc, sid, info2);
-                  k(context, sp, info2)
+                  // Freezing a value can introduce frozen type arguments
+                  // during code generation. Discover those variants while
+                  // class creation is still allowed, as in the sequential
+                  // specializer.
+                  static::getSClass2CPS(
+                    context,
+                    sp,
+                    hc with {
+                      targs => hc.targs.map(t ->
+                        t.mapMutability(_ -> DeepFrozen())
+                      ),
+                      mutability => DeepFrozen(),
+                    },
+                    (context, sp, _) ~>
+                      k(context, sp, sp.trackedSClassGet(sid))
+                    ,
+                  )
                 },
               )
             },

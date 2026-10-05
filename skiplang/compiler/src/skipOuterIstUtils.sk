@@ -710,7 +710,8 @@ mutable base class Visitor {
   overridable mutable fun body(b: O.Body): (Bool, O.Body) {
     b match {
     | O.TypedBody _
-    | O.SignatureBody _ -> (false, b)
+    | O.SignatureBody _ ->
+      (false, b)
     | O.OuterBody(s) ->
       this.stmt(s) match {
       | (false, _) -> (false, b)

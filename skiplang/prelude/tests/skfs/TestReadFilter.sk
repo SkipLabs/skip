@@ -1,6 +1,84 @@
 module alias T = SKTest;
 module SKStoreTest;
 
+@test
+fun testReusedDirectoryUpdateOrder(): void {
+  sourceName = SKStore.DirName::create("/reuse-order-source/");
+  outputName = SKStore.DirName::create("/reuse-order-output/");
+  context = SKStore.run(context ~> {
+    // Force reuse of the same map recipes so queued downstream readers keep
+    // their old priorities until the scheduler refreshes them.
+    context.!canReuse = SKStore.CRAlways(SortedSet[]);
+    source = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      sourceName,
+      Array[
+        (SKStore.IID(0), SKStore.IntFile(1)),
+        (SKStore.IID(1), SKStore.IntFile(11)),
+      ],
+    );
+    roots = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      SKStore.DirName::create("/reuse-order-roots/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+    _ = roots.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (context, writer, key, _) ~> {
+        selector = source.getArray(context, SKStore.IID(0))[0];
+        selected = roots.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          SKStore.DirName::create("/reuse-order-selected/"),
+          (context, writer, key, _) ~> {
+            writer.setArray(key, source.getArray(context, SKStore.IID(0)));
+          },
+        );
+        forwarded = selected.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          SKStore.DirName::create("/reuse-order-forwarded/"),
+          (_context, writer, key, values) ~> writer.set(key, values.first),
+        );
+        _resolved = forwarded.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          SKStore.DirName::create("/reuse-order-resolved/"),
+          (context, writer, key, values) ~> {
+            result = source.getArray(context, SKStore.IID(values.first.value));
+            if (result.isEmpty()) {
+              context.setGlobal("reuse-order-stale-read", SKStore.IntFile(1));
+            };
+            writer.setArray(key, result);
+          },
+        );
+        writer.set(key, selector);
+      },
+    );
+  });
+  write(context, sourceName, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+  write(context, sourceName, SKStore.IID(1), Array[]);
+  write(context, sourceName, SKStore.IID(2), Array[SKStore.IntFile(22)]);
+  context.update();
+  T.expectEq(
+    Array[22],
+    getData(
+      context,
+      SKStore.DirName::create("/reuse-order-resolved/"),
+      SKStore.IID(0),
+    ).map(toInt),
+  );
+  T.expectTrue(context.getGlobal("reuse-order-stale-read").isNone());
+}
+
 class ReadFilterPair(first: Int, second: Int) extends SKStore.File {
   static fun type(file: SKStore.File): this {
     file match {
@@ -161,17 +239,11 @@ fun testReadFilterLazy(): void {
   });
   write(context, sourceName, SKStore.IID(0), Array[ReadFilterPair(1, 11)]);
   context.update();
-  T.expectEq(
-    Array[1],
-    getLazyData(context, lazyName, SKStore.IID(0)).map(toInt),
-  );
+  T.expectEq(Array[1], getData(context, lazyName, SKStore.IID(0)).map(toInt));
   T.expectEq(1, readFilterCount(context, 0));
   write(context, sourceName, SKStore.IID(0), Array[ReadFilterPair(2, 11)]);
   context.update();
-  T.expectEq(
-    Array[2],
-    getLazyData(context, lazyName, SKStore.IID(0)).map(toInt),
-  );
+  T.expectEq(Array[2], getData(context, lazyName, SKStore.IID(0)).map(toInt));
   T.expectEq(2, readFilterCount(context, 0));
 }
 // The projection must see the reducer result across every producer, not just
@@ -257,9 +329,9 @@ fun testReadFilterCapturedPredicates(): void {
       SKStore.IID::keyType,
       SKStore.IntFile::type,
       SKStore.DirName::create("/filter-queries/"),
-      Range(0, 256)
-        .map(id -> (SKStore.IID(id), SKStore.IntFile(id)))
-        .collect(Array),
+      Range(0, 256).map(id -> (SKStore.IID(id), SKStore.IntFile(id))).collect(
+        Array,
+      ),
     );
     _ = queries.map(
       SKStore.IID::keyType,
@@ -287,13 +359,104 @@ fun testReadFilterCapturedPredicates(): void {
 
 @test
 fun testReadFilterObservedValues(): void {
-  path = SKStore.Path::create(SKStore.DirName::create("/source/"), SKStore.IID(0));
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/source/"),
+    SKStore.IID(0),
+  );
   project = file ~> SKStore.IntFile::type(file);
-  (deps, first) = SKStore.Deps::empty().addFilter(path, project, Array[SKStore.IntFile(1)]);
+  (deps, first) = SKStore.Deps::empty().addFilter(
+    path,
+    project,
+    Array[SKStore.IntFile(1)],
+  );
   (deps2, same) = deps.addFilter(path, project, Array[SKStore.IntFile(1)]);
   (_, changed) = deps2.addFilter(path, project, Array[SKStore.IntFile(2)]);
   T.expectEq(first, same);
-  T.expectTrue(first != changed, "Readers of different directory versions must retain their own observed values");
+  T.expectTrue(
+    first != changed,
+    "Readers of different directory versions must retain their own observed values",
+  );
+}
+
+@test
+fun testReadFilterForkIdentities(): void {
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/source/"),
+    SKStore.IID(0),
+  );
+  project = file ~> SKStore.IntFile::type(file);
+  deps = SKStore.Deps::empty();
+  (_, first) = deps.addFilter(path, project, Array[SKStore.IntFile(1)]);
+  (_, second) = deps.addFilter(path, project, Array[SKStore.IntFile(2)]);
+  T.expectTrue(
+    first != second,
+    "Independent forks must allocate distinct projection identities",
+  );
+}
+
+@test
+fun testReadFilterImport(): void {
+  sourceName = SKStore.DirName::create("/filter-source/");
+  queriesName = SKStore.DirName::create("/filter-queries/");
+  outputName = SKStore.DirName::create("/filter-output/");
+  context = SKStore.run(context ~> {
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      ReadFilterPair::type,
+      sourceName,
+      Array[(SKStore.IID(0), ReadFilterPair(1, 10))],
+    );
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      queriesName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+  });
+  from = context.mclone();
+  source = SKStore.EHandle(
+    SKStore.IID::keyType,
+    ReadFilterPair::type,
+    sourceName,
+  );
+  queries = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    queriesName,
+  );
+  _ = queries.map(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    from,
+    outputName,
+    (context, writer, key, _) ~> {
+      recordReadFilter(context, 0);
+      writer.setArray(
+        key,
+        source.getArrayFilter(context, key, pair ~>
+          SKStore.IntFile(pair.first)
+        ),
+      );
+    },
+  );
+  from.update();
+  T.expectTrue(context.copyDir(from.clone(), outputName));
+  context.update();
+  write(context, sourceName, SKStore.IID(0), Array[ReadFilterPair(1, 11)]);
+  context.update();
+  T.expectEq(
+    0,
+    readFilterCount(context, 0),
+    "Imported projection ignores unobserved fields",
+  );
+  write(context, sourceName, SKStore.IID(0), Array[ReadFilterPair(2, 11)]);
+  context.update();
+  T.expectEq(
+    1,
+    readFilterCount(context, 0),
+    "Imported projection invalidates its reader",
+  );
+  T.expectEq(Array[2], getData(context, outputName, SKStore.IID(0)).map(toInt));
 }
 
 module end;
