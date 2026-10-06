@@ -41,11 +41,13 @@ import {
   AbstractEagerCollection,
   AbstractLazyCollection,
   type SharedCollections,
+  type AsyncFunction,
 } from "./api.js";
 
 import {
   SkipClassNameError,
   SkipError,
+  SkipAsyncCallPendingError,
   SkipNonUniqueValueError,
   SkipResourceInstanceInUseError,
   SkipUnknownCollectionError,
@@ -64,6 +66,19 @@ export type HandlerInfo<P> = {
   name: string;
   params: readonly DepSafe[];
 };
+
+/* One suspended async call, as Skip serializes it in an aborted write's result.
+    `function` is the handle id, not a name: only Skip can compute the name. */
+type PendingCall = {
+  callId: string;
+  function: number;
+  input: Json;
+};
+
+/* Upper bound on the attempts one write may take to converge. Each attempt only replays
+    because a new call appeared, so this many means calls keep changing: the mapper is
+    issuing a different call on every replay instead of the same one. */
+const MAX_ASYNC_REPLAYS = 100;
 
 function instantiateUserObject<
   Params extends readonly DepSafe[],
@@ -570,6 +585,28 @@ class ContextImpl implements Context {
     return new EagerCollectionImpl<K, V>(collection, this.refs);
   }
 
+  /* Ask Skip for the result of an async call. A "pending" outcome means the call has not
+      resolved: we throw, which unwinds the user's mapper and lets the write collect it. */
+  asyncCall<K extends Json, V extends Json, Params extends DepSafe[]>(
+    fn: new (...params: Params) => AsyncFunction<K, V>,
+    key: K,
+    ...params: Params
+  ): V {
+    const fnObj = instantiateUserObject("AsyncFunction", fn, params);
+    const handle = this.refs.handles.register(fnObj);
+    this.refs.rememberAsyncFunction(handle, fnObj.object);
+    const skjson = this.refs.json();
+    const result = this.refs.binding.SkipRuntime_Context__asyncCall(
+      handle,
+      skjson.exportJSON(key),
+    );
+    const outcome = skjson.importJSON(result) as
+      | { status: "pending" }
+      | { status: "ok"; value: V };
+    if (outcome.status === "pending") throw new SkipAsyncCallPendingError();
+    return outcome.value;
+  }
+
   jsonExtract(value: JsonObject, pattern: string): Json[] {
     const skjson = this.refs.json();
     return skjson.importJSON(
@@ -785,29 +822,18 @@ export class ServiceInstance {
     }
   }
 
-  private async update_<K extends Json, V extends Json>(
+  /* Runs the write through runAsync, which replays it until no async call is pending. */
+  private update_<K extends Json, V extends Json>(
     collection: string,
     entries: Entry<K, V>[],
   ): Promise<void> {
     this.refs.setFork(this.forkName);
-    const result = this.refs.runWithGC(() => {
-      const json = this.refs.json();
-      return json.importJSON(
-        this.refs.binding.SkipRuntime_Runtime__update(
-          collection,
-          this.refs.json().exportJSON(entries),
-        ),
-        true,
-      );
-    });
-    if (Array.isArray(result)) {
-      const handles = result as Handle<Promise<void>>[];
-      const promises = handles.map((h) => this.refs.handles.deleteHandle(h));
-      await Promise.all(promises);
-    } else {
-      const errorHdl = result as Handle<Error>;
-      throw this.refs.handles.deleteHandle(errorHdl);
-    }
+    return this.refs.runAsync(() =>
+      this.refs.binding.SkipRuntime_Runtime__update(
+        collection,
+        this.refs.json().exportJSON(entries),
+      ),
+    );
   }
 
   /**
@@ -1049,12 +1075,25 @@ export class ToBinding {
     const skjson = this.getJsonConverter();
     const mapper = this.handles.get(skmapper);
     const context = new ContextImpl(this);
-    const result = mapper.object.mapEntry(
-      skjson.importJSON(key) as Json,
-      new ValuesImpl<Json>(skjson, this.binding, values),
-      context,
-    );
-    return skjson.exportJSON(Array.from(result));
+    let entries;
+    try {
+      entries = Array.from(
+        mapper.object.mapEntry(
+          skjson.importJSON(key) as Json,
+          new ValuesImpl<Json>(skjson, this.binding, values),
+          context,
+        ),
+      );
+    } catch (ex: unknown) {
+      /* A suspended async call, not a failure. Caught here so no exception crosses the
+         boundary: the two backends convert exceptions differently, and only the native
+         one preserves the error name. No entries is what EagerDir produces when it
+         catches AsyncCallPending itself, and the write aborts anyway once the collected
+         calls surface, so this row's output is discarded. */
+      if (ex instanceof SkipAsyncCallPendingError) return skjson.exportJSON([]);
+      throw ex;
+    }
+    return skjson.exportJSON(entries);
   }
 
   SkipRuntime_Mapper__getInfo(
@@ -1076,6 +1115,72 @@ export class ToBinding {
 
   SkipRuntime_deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>): void {
     this.handles.deleteHandle(mapper);
+  }
+
+  // AsyncFunction
+
+  /* Resolved async results, keyed by "<fnHash>:<inputHash>" as Skip builds them.
+      Filled by the replay loop between two write attempts, read by Skip during a write. */
+  private readonly asyncResults = new Map<string, JsonObject>();
+
+  /* Async functions seen during the current write, by handle id. Skip returns those ids
+      in the pending list; the replay loop looks them up here. Kept separately from
+      `handles` because Skip frees its handle when the aborted transaction is torn down,
+      while we still need the object afterwards. */
+  private readonly asyncFunctions = new Map<
+    number,
+    AsyncFunction<Json, Json>
+  >();
+
+  SkipRuntime_AsyncFunction__getInfo(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+  ): Pointer<Internal.CJObject> {
+    return this.getInfo(fn);
+  }
+
+  SkipRuntime_deleteAsyncFunction(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+  ): void {
+    this.handles.deleteHandle(fn);
+  }
+
+  SkipRuntime_AsyncCache__get(
+    callId: string,
+  ): Nullable<Pointer<Internal.CJSON>> {
+    const entry = this.asyncResults.get(callId);
+    if (entry === undefined) return null;
+    return this.getJsonConverter().exportJSON(entry);
+  }
+
+  /* Keep an async function reachable by handle id for the replay loop. Skip frees its own
+    handle when the aborted transaction is torn down, so we hold a second reference. */
+  rememberAsyncFunction(
+    handle: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+    fn: AsyncFunction<Json, Json>,
+  ): void {
+    // Handle is an opaque number; the map only needs its numeric identity.
+    this.asyncFunctions.set(handle as unknown as number, fn);
+  }
+
+  /* Run every pending call and store its result. One rejection fails the
+      whole write, and nothing is cached for it. Same all-or-nothing rule as Skip. */
+  async runPendingCalls(pending: PendingCall[]): Promise<void> {
+    const settled = await Promise.allSettled(
+      pending.map(async (call) => {
+        const fn = this.asyncFunctions.get(call.function);
+        if (fn === undefined) {
+          throw new Error(`Unknown async function handle ${call.function}.`);
+        }
+        return { callId: call.callId, value: await fn.compute(call.input) };
+      }),
+    );
+    const failure = settled.find((s) => s.status === "rejected");
+    if (failure !== undefined) throw failure.reason;
+    for (const s of settled) {
+      if (s.status === "fulfilled") {
+        this.asyncResults.set(s.value.callId, { ok: s.value.value });
+      }
+    }
   }
 
   // LazyCompute
@@ -1456,17 +1561,52 @@ export class ToBinding {
     if (errorHdl) throw this.handles.deleteHandle(errorHdl);
   }
 
+  /* Run one Skip call, replaying it as long as it comes back suspended on async calls.
+      Terminates because a resolved call is never re-issued: the cache answers it. */
   async runAsync(fn: () => Pointer<Internal.CJSON>): Promise<void> {
-    const result = this.runWithGC(() => {
-      return this.json().importJSON(fn(), true);
-    });
-    if (Array.isArray(result)) {
-      const handles = result as Handle<Promise<void>>[];
-      const promises = handles.map((h) => this.handles.deleteHandle(h));
-      await Promise.all(promises);
-    } else {
-      const errorHdl = result as Handle<Error>;
-      throw this.handles.deleteHandle(errorHdl);
+    /* Every caller sets the fork right before calling us, but forkName is shared by all
+       instances and the replay loop yields to other callers between attempts. Capture it
+       now and restore it before each attempt, so a replay never runs on someone else's
+       fork. */
+    const fork = this.forkName;
+    try {
+      let pending: PendingCall[] | null = [];
+      let attempts = 0;
+      while (pending !== null) {
+        attempts++;
+        if (attempts > MAX_ASYNC_REPLAYS) {
+          throw new SkipError(
+            `Async calls did not converge after ${MAX_ASYNC_REPLAYS} attempts: ` +
+              "a mapper keeps issuing new async calls on every replay, " +
+              "which means it is probably not deterministic " +
+              "(for instance, an asyncCall key or parameter that changes between runs).",
+          );
+        }
+        // Only await when there is something to run: the first attempt must stay
+        // synchronous with the caller's setFork, like before the replay loop existed.
+        if (pending.length > 0) await this.runPendingCalls(pending);
+        this.setFork(fork);
+        const result = this.runWithGC(() => {
+          return this.json().importJSON(fn(), true);
+        });
+        if (Array.isArray(result)) {
+          const handles = result as Handle<Promise<void>>[];
+          const promises = handles.map((h) => this.handles.deleteHandle(h));
+          await Promise.all(promises);
+          pending = null;
+        } else if (typeof result === "object" && result !== null) {
+          pending = (result as { pendingCalls: PendingCall[] }).pendingCalls;
+        } else {
+          const errorHdl = result as Handle<Error>;
+          throw this.handles.deleteHandle(errorHdl);
+        }
+      }
+    } finally {
+      /* Both maps are scoped to one converging write: results are only there to make
+         replays terminate, and functions only to reach them from the pending list.
+         Keeping either past the write would grow without bound as keys renew. */
+      this.asyncResults.clear();
+      this.asyncFunctions.clear();
     }
   }
 
