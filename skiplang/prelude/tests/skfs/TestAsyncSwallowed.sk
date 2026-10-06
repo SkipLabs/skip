@@ -1,0 +1,77 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// A mapper that defensively wraps its async call in a try/catch and writes a default value
+// on ANY exception, including our internal AsyncCallPending, which it swallows without
+// knowing. This is the realistic footgun: a user writing defensive code, not an attacker.
+@test
+fun testAsyncCallSwallowedException(): void {
+  inputsDirName = SK.DirName::create("/swallow_inputs/");
+  mappedDirName = SK.DirName::create("/swallow_mapped/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsDirName,
+      Array[],
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedDirName,
+      (context, writer, k, _it) ~> {
+        // The user swallows everything and writes a default. AsyncCallPending gets caught
+        // here instead of bubbling to skstore's own catch.
+        try {
+          context.asyncCall(DoubleAsyncFn(), k) match {
+          | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+          | SK.AError(_) -> void
+          }
+        } catch {
+        | _ ->
+          writer.set(k, SK.IntFile(999)) // default value on any error
+        }
+      },
+    )
+  });
+
+  // Single write, single update. What happens?
+  cache: TestAsyncCache = emptyCache;
+  result = asyncTestWrite(cache, context ~> {
+    inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+    inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+    context.update()
+  });
+
+  // The question this test answers: does the swallowed exception let the default (999) get
+  // committed, or does skstore's end-of-update calls check still abort?
+  result match {
+  | Success _ ->
+    // If we reach here, the write committed WITH the swallowed call. Check what landed.
+    v = SK.withContext(context ~> {
+      mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedDirName);
+      mapped.unsafeMaybeGet(context, SK.IID(2))
+    });
+    v match {
+    | Some(f) ->
+      T.fail(
+        `BUG: swallowed async call committed default value ${
+          SK.IntFile::type(f).value
+        }`,
+      )
+    | None() ->
+      T.fail("BUG: write committed but mapped is empty -- unexpected state")
+    }
+  | Failure(SK.AsyncCallsCollected(_)) ->
+    // skstore detected the pending call via `calls` despite the swallow -> abort. Good.
+    void
+  | Failure(exn) -> T.fail(`unexpected failure: ${exn.getMessage()}`)
+  }
+}
+
+module end;

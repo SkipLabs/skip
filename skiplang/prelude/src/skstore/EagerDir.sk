@@ -1381,9 +1381,16 @@ base class EagerDir protected {
     context.!reads = SortedSet<Path>[];
 
     writer = mutable Writer{};
-    mapper.map(context, writer, key, valueIter);
-
-    writes = writer.writes;
+    /* Context.asyncCall recorded the call before throwing. Swallow it so the caller
+       carries on and collects the remaining calls. This row gets no output: an empty entry
+       is what a pending value looks like. Reads made before the call stay registered below. */
+    writes = try {
+      mapper.map(context, writer, key, valueIter);
+      writer.writes
+    } catch {
+    | AsyncCallPending() -> SortedMap[]
+    | exn -> throw exn
+    };
     newDirs = context.newDirs;
     reads = context.getReads();
     context.!newDirs = newDirsCopy;
@@ -1834,29 +1841,43 @@ base class EagerDir protected {
           ctx.!newDirs = SortedSet<DirName>[];
           ctx.!reads = SortedSet<Path>[];
 
+          /* Context.asyncCall recorded the call before throwing. Swallow it so the
+             cascade carries on and collects the remaining calls instead of aborting on
+             the first. A suspended row gets no output: an empty entry is what a pending
+             value looks like. */
           writes = if (preparedMaps.size() == 1) {
             // A single map already groups its writes by output key. Reuse its
             // arrays instead of collecting them into vectors and copying again.
             writer = mutable Writer{};
-            preparedMaps[0].mapper.map(
-              ctx,
-              writer,
-              key,
-              parent.getIterRaw(key),
-            );
-            writer.writes
+            try {
+              preparedMaps[0].mapper.map(
+                ctx,
+                writer,
+                key,
+                parent.getIterRaw(key),
+              );
+              writer.writes
+            } catch {
+            | AsyncCallPending() -> SortedMap[]
+            | exn -> throw exn
+            }
           } else {
             // Multiple maps from the same parent contribute in callback order.
             mvalues = SortedMap<Key, mutable Vector<File>>[];
             for (p in preparedMaps) {
               writer = mutable Writer{};
-              p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
-              for (k => rvalues in writer.writes) {
-                if (!mvalues.containsKey(k)) {
-                  !mvalues = mvalues.set(k, mutable Vector[]);
+              try {
+                p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
+                for (k => rvalues in writer.writes) {
+                  if (!mvalues.containsKey(k)) {
+                    !mvalues = mvalues.set(k, mutable Vector[]);
+                  };
+                  mvalues[k].extend(rvalues);
                 };
-                mvalues[k].extend(rvalues);
-              };
+              } catch {
+              | AsyncCallPending() -> void
+              | exn -> throw exn
+              }
             };
             mvalues.map((_, values) -> values.toArray())
           };

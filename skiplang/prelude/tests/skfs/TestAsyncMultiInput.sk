@@ -1,0 +1,125 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// A mapper whose async input is computed from TWO source dirs: input1[k] + input2[k].
+// input2 may be absent (treated as 0). Proves (A) an async call can depend on several
+// inputs, and (B) changing one input re-triggers the mapper -> a NEW async call.
+@test
+fun testAsyncCallMultiInput(): void {
+  input1DirName = SK.DirName::create("/multi_input1/");
+  input2DirName = SK.DirName::create("/multi_input2/");
+  mappedDirName = SK.DirName::create("/multi_mapped/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Build the graph. /mapped/ derives from /input1/; its mapper ALSO reads /input2/,
+  // registering a cross-dir dependency so a later change to input2 re-runs the mapper.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    input1 = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      input1DirName,
+      Array[],
+    );
+    _ = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      input2DirName,
+      Array[],
+    );
+    _ = input1.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedDirName,
+      (context, writer, k, it) ~> {
+        v1 = it.next() match {
+        | Some(file) -> SK.IntFile::type(file).value
+        | None() -> return void
+        };
+        input2 = SK.EHandle(SK.IID::keyType, SK.IntFile::type, input2DirName);
+        v2 = input2.maybeGet(context, k) match {
+        | Some(file) -> SK.IntFile::type(file).value
+        | None() -> 0
+        };
+        context.asyncCall(DoubleAsyncFn(), SK.IID(v1 + v2)) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    )
+  });
+
+  cache: TestAsyncCache = emptyCache;
+
+  // (A): input1[1]=10, input2 absent -> sum 10 -> Double(10)=20.
+  done1 = false;
+  rounds1 = 0;
+  while (!done1) {
+    !rounds1 = rounds1 + 1;
+    T.expectTrue(rounds1 < 10, `phase 1 stuck, rounds=${rounds1}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      i1 = SK.EHandle(SK.IID::keyType, SK.IntFile::type, input1DirName);
+      i1.writeArray(context, SK.IID(1), Array[SK.IntFile(10)]);
+      context.update()
+    }) match {
+    | Success _ -> !done1 = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  r1 = SK.withContext(context ~> {
+    mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedDirName);
+    mapped.unsafeGet(context, SK.IID(1)).value
+  });
+  T.expectEq(r1, 20, "phase 1: Double(10+0)=20");
+
+  // (B): write input2[1]=5 -> mapper re-runs -> sum 15 -> Double(15)=30.
+  done2 = false;
+  rounds2 = 0;
+  while (!done2) {
+    !rounds2 = rounds2 + 1;
+    T.expectTrue(rounds2 < 10, `phase 2 stuck, rounds=${rounds2}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      i2 = SK.EHandle(SK.IID::keyType, SK.IntFile::type, input2DirName);
+      i2.writeArray(context, SK.IID(1), Array[SK.IntFile(5)]);
+      context.update()
+    }) match {
+    | Success _ -> !done2 = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  r2 = SK.withContext(context ~> {
+    mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedDirName);
+    mapped.unsafeGet(context, SK.IID(1)).value
+  });
+  T.expectEq(r2, 30, "phase 2: input2 change re-triggered Double(10+5)=30");
+}
+
+module end;
