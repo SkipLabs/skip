@@ -1125,8 +1125,7 @@ mutable class Specializer{
       | SKStore.IID _ -> void
 
       | k ->
-        debug(k);
-        invariant_violation("Unexpected key type")
+        invariant_violation("Unexpected key type: " + inspect(k).toString())
       }
     };
     for (k => v in this.gclassMap.getDiff()) {
@@ -1240,8 +1239,6 @@ mutable class Specializer{
           invariant_violation("Key not found: " + inspect(k).toString())
         | Some(v2) ->
           if (inspect(v).toString() != inspect(v2).toString()) {
-            debug(v);
-            debug(v2);
             invariant_violation(
               "Not writing the same thing for key: " + inspect(k).toString(),
             )

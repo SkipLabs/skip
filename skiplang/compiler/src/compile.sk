@@ -468,7 +468,6 @@ fun getOrInitializeBackend(
         constsProj,
         defsProj,
       );
-      debug(("phase1 updated", defsIR.forceCompile.size()));
       writer.set(key, BackendPhase1File(conf, defsIR))
     },
   );
@@ -499,7 +498,6 @@ fun getOrInitializeBackend(
       roots = prevPhase.rootsIR.forceCompile.map(root ->
         O.FStackElement(root, Array[], Array[])
       );
-      debug("Updating roots");
 
       for (root in roots) {
         writer.setArray(root, Array[root]);
@@ -558,7 +556,6 @@ fun getOrInitializeBackend(
                 };
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
-                  debug(("KK", phaseNumberCopy));
                   for (value in values) {
                     invariant(value is SKStore.IntFile _);
                   };
@@ -588,7 +585,6 @@ fun getOrInitializeBackend(
 
                 key match {
                 | SKStore.IID _ ->
-                  debug(("KK", phaseNumberCopy));
                   for (value in values) {
                     value match {
                     | SKStore.IntFile _ -> void
@@ -722,33 +718,24 @@ fun getOrInitializeBackend(
 
       specializer.toFixed(context);
       specializer.!canCreateNewSClasses = false;
-      debug(("specializer created"));
       // Return from the callback so context.update() and database persistence
       // still finish normally in specialization-only experiments.
       if (config.stopAfterSpecialization) return void;
 
       roots = prevPhase.rootsIR;
       env = O.createIR(context, config, roots, specializer);
-      debug("rest of outer");
       !env = createOptimizedFunctions(context, env, config);
-      debug("optims");
       defs = runCompilerPhase("native/create_asm_graph", () -> {
         AsmOutput.createAsmDefGraph(env, config)
       });
-
-      debug("asm graph");
 
       runCompilerPhase("native/merge_asm_graph", () -> {
         AsmOutput.mergeIdenticalAsmDefs(defs, config.debug)
       });
 
-      debug("merged_asm_graph");
-
       runCompilerPhase("native/create_asm_symbols", () -> {
         AsmOutput.assignFinalSymbols(defs)
       });
-
-      debug("symbols");
 
       config.emit match {
       | "llvm-ir" -> compile_llvm_ir(defs, config, env.sourcePositions)
@@ -981,8 +968,6 @@ fun compile_binary(
   runCompilerPhase("native/write_asm_files", () -> {
     AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf, positions)
   });
-
-  debug("wrote asm files");
 
   runCompilerPhase("native/link", () -> {
     getLinkArgs(llFile, conf, exports).each(args -> {

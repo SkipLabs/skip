@@ -445,10 +445,11 @@ combine them with these numbers into an exact memory ratio.
 
 ## Reading traces and reproducing experiments
 
-`("KK", n)` logs IID(0) callback execution for round `n`. It does not count all
-function callbacks, unique classes, or newly added rounds on an update. Existing
-rounds can replay. An update without `KK` may still respecialize functions. The
-`specializer created` marker can be absent when final materialization stays cached.
+The historical `("KK", n)` trace logged IID(0) callback execution for round `n`.
+It did not count all function callbacks, unique classes, or newly added rounds
+on an update. Existing rounds can replay. These temporary traces and the
+`specializer created` marker have been removed from normal compiler output.
+Use `--debug-skstore` for new dependency investigations.
 
 Use `--stop-after-specialization` for this work. It returns after specialization
 while allowing SKStore update and persistence to finish. Use `--debug-skstore`
