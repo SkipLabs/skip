@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+ - `SkipService` takes a third type parameter, for the definitions of its input
+   collections, and seeds those collections through `inputs` — one
+   `InputDefinition` per collection — in place of `initialData` (#1162)
+
+## [0.0.23] - 2026-05-28
+
+### Security
+ - Fix world-writable file creation (#1250), information exposure through stack
+   traces (#1240, #1241) and log injection from unsanitized user input in the
+   Flask examples (#1254), all reported by code scanning
+ - Create the SQL server notify pipe through `Files.createTempFile` (#1253)
+
+## [0.0.21] - 2026-05-22
+
+### Security
+ - Dependency updates across published packages and examples, covering
+   advisories in `ws`, `brace-expansion`, `minimatch`, `path-to-regexp`,
+   `qs`/`body-parser`, `ajv`, `glob` and `picomatch`
+
+## [0.0.20] - 2026-04-10
+
+### Changed
+ - TypeScript 5.8 and 6.0 compatibility: fix `Uint8Array`/`ArrayBuffer` type
+   mismatches, and set explicit `rootDir` and `types` in `@skiplabs/tsconfig`
+
+### Security
+ - Dependency updates, covering advisories in `node-forge`, `lodash`, `vite`,
+   `yaml` and `flatted`
+
 ## [0.0.19] - 2025-11-16
 
 ### Added
