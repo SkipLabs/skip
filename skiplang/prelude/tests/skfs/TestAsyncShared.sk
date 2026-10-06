@@ -1,0 +1,97 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+@test
+fun testAsyncCallShared(): void {
+  // One input, two independant views A and B, both mapping through the same async function
+  // on the same key. They produce the same CallId, so the call must be recorded once and
+  // compute() must run once, with both mappers sharing the single cached result.
+  inputsDirName = SK.DirName::create("/shared_inputs/");
+  mappedADirName = SK.DirName::create("/shared_mappedA/");
+  mappedBDirName = SK.DirName::create("/shared_mappedB/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Build the graph: A and B both = input through DoubleAsyncFn. Input empty -> commits.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsDirName,
+      Array[],
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedADirName,
+      (context, writer, k, _it) ~> {
+        context.asyncCall(DoubleAsyncFn(), k) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedBDirName,
+      (context, writer, k, _it) ~> {
+        context.asyncCall(DoubleAsyncFn(), k) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    )
+  });
+
+  // Replay loop, counting how many times compute() actually runs.
+  cache: TestAsyncCache = emptyCache;
+  computeCount = 0;
+  done = false;
+  rounds = 0;
+  while (!done) {
+    !rounds = rounds + 1;
+    T.expectTrue(rounds < 10, `loop did not converge, rounds=${rounds}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+      inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+      context.update()
+    }) match {
+    | Success _ -> !done = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            !computeCount = computeCount + 1;
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  // Both views got the shared result...
+  (a, b) = SK.withContext(context ~> {
+    mappedA = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedADirName);
+    mappedB = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedBDirName);
+    (
+      mappedA.unsafeGet(context, SK.IID(2)).value,
+      mappedB.unsafeGet(context, SK.IID(2)).value,
+    )
+  });
+  T.expectEq(a, 4, "A value");
+  T.expectEq(b, 4, "B value");
+  // ...and the shared call ran exactly once despite two mappers requesting it.
+  T.expectEq(computeCount, 1, "compute must run once for a shared CallId");
+  T.expectEq(rounds, 2, "rounds")
+}
+
+module end;

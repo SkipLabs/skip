@@ -1,0 +1,162 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+@test
+fun testAsyncCallInterleaved(): void {
+  inputsADirName = SK.DirName::create("/inter_inputsA/");
+  mappedADirName = SK.DirName::create("/inter_mappedA/");
+  inputsBDirName = SK.DirName::create("/inter_inputsB/");
+  mappedBDirName = SK.DirName::create("/inter_mappedB/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Build both graphs: each is input -(DoubleAsyncFn)-> mapped. Both empty -> commits.
+  buildGraph = (inN, outN) ~> {
+    _ = asyncTestWrite(emptyCache, context ~> {
+      inputs = context.mkdir(SK.IID::keyType, SK.IntFile::type, inN, Array[]);
+      _ = inputs.map(
+        SK.IID::keyType,
+        SK.IntFile::type,
+        context,
+        outN,
+        (context, writer, k, _it) ~> {
+          context.asyncCall(DoubleAsyncFn(), k) match {
+          | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+          | SK.AError(_) -> void
+          }
+        },
+      )
+    })
+  };
+  buildGraph(inputsADirName, mappedADirName);
+  buildGraph(inputsBDirName, mappedBDirName);
+
+  // One cache per converging write, mirroring the TS runtime: it scopes the cache to a
+  // single write and drops it afterwards. A and B therefore share nothing.
+  cacheA: TestAsyncCache = emptyCache;
+  cacheB: TestAsyncCache = emptyCache;
+  doubleSevenCount: Int = 0;
+
+  // Writes the given keys into an input dir and runs update. Returns the write result so
+  // the caller can inspect Success/Failure and resolve calls selectively.
+  runStep = (currentCache, inputsDirName, keys) ~> {
+    asyncTestWrite(currentCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+      for (kv in keys) {
+        inputs.writeArray(context, SK.IID(kv), Array[SK.IntFile(kv)])
+      };
+      context.update()
+    })
+  };
+
+  // A round 1. Suspends on Double(2) and Double(7); resolve ONLY Double(2).
+  runStep(cacheA, inputsADirName, Array[2, 7]) match {
+  | Failure(SK.AsyncCallsCollected(calls)) ->
+    for (_arrow => callList in calls) {
+      for (call in callList) {
+        call match {
+        | SK.PendingCall(callId, f, input) ->
+          if (SK.IID::keyType(input).value != 7) {
+            computeByName(f.getName(), input, res -> {
+              !cacheA = cacheA.with(callId, res)
+            })
+          }
+        }
+      }
+    }
+  | _ -> T.fail("step 1 (A): expected AsyncCallsCollected")
+  };
+
+  // B round 1. Suspends on Double(3) and Double(7); resolve ONLY Double(3).
+  runStep(cacheB, inputsBDirName, Array[3, 7]) match {
+  | Failure(SK.AsyncCallsCollected(calls)) ->
+    for (_arrow => callList in calls) {
+      for (call in callList) {
+        call match {
+        | SK.PendingCall(callId, f, input) ->
+          if (SK.IID::keyType(input).value != 7) {
+            computeByName(f.getName(), input, res -> {
+              !cacheB = cacheB.with(callId, res)
+            })
+          }
+        }
+      }
+    }
+  | _ -> T.fail("step 2 (B): expected AsyncCallsCollected")
+  };
+
+  // A round 2. Double(2) hits; re-suspends on Double(7). Resolve it now, this is A's
+  // own execution of Double(7); B will run its own later.
+  runStep(cacheA, inputsADirName, Array[2, 7]) match {
+  | Failure(SK.AsyncCallsCollected(calls)) ->
+    for (_arrow => callList in calls) {
+      for (call in callList) {
+        call match {
+        | SK.PendingCall(callId, f, input) ->
+          if (SK.IID::keyType(input).value == 7) {
+            !doubleSevenCount = doubleSevenCount + 1
+          };
+          computeByName(f.getName(), input, res -> {
+            !cacheA = cacheA.with(callId, res)
+          })
+        }
+      }
+    }
+  | _ -> T.fail("step 3 (A): expected AsyncCallsCollected")
+  };
+
+  // B round 2. Double(3) hits from B's own cache, but Double(7) does not: A resolved it
+  // into A's cache, which B cannot see. B re-suspends and computes Double(7) itself.
+  runStep(cacheB, inputsBDirName, Array[3, 7]) match {
+  | Failure(SK.AsyncCallsCollected(calls)) ->
+    for (_arrow => callList in calls) {
+      for (call in callList) {
+        call match {
+        | SK.PendingCall(callId, f, input) ->
+          if (SK.IID::keyType(input).value == 7) {
+            !doubleSevenCount = doubleSevenCount + 1
+          };
+          computeByName(f.getName(), input, res -> {
+            !cacheB = cacheB.with(callId, res)
+          })
+        }
+      }
+    }
+  | _ -> T.fail("step 4 (B): expected AsyncCallsCollected")
+  };
+
+  // A round 3. Double(2) and Double(7) both hit -> A converges.
+  runStep(cacheA, inputsADirName, Array[2, 7]) match {
+  | Success _ -> void
+  | _ -> T.fail("step 5 (A): expected Success (A should converge)")
+  };
+
+  // B round 3. Everything hits -> B converges.
+  runStep(cacheB, inputsBDirName, Array[3, 7]) match {
+  | Success _ -> void
+  | _ -> T.fail("step 5 (B): expected Success (B should converge)")
+  };
+
+  // Isolation: each graph's own key resolved without disturbing the other.
+  (a2, a7, b3, b7) = SK.withContext(context ~> {
+    mA = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedADirName);
+    mB = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedBDirName);
+    (
+      mA.unsafeGet(context, SK.IID(2)).value,
+      mA.unsafeGet(context, SK.IID(7)).value,
+      mB.unsafeGet(context, SK.IID(3)).value,
+      mB.unsafeGet(context, SK.IID(7)).value,
+    )
+  });
+  T.expectEq(a2, 4, "A key 2");
+  T.expectEq(b3, 6, "B key 3");
+  // Both graphs reach 7*2=14, each having computed it on its own: the cache is scoped to
+  // one write, so a key shared between two writes is computed once per write. If this
+  // ever drops to 1, the cache lifetime changed -- make it a conscious decision.
+  T.expectEq(a7, 14, "A key 7");
+  T.expectEq(b7, 14, "B key 7");
+  T.expectEq(doubleSevenCount, 2, "Double(7) computed once per write");
+}
+
+module end;
