@@ -1,0 +1,96 @@
+name: docs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'skipruntime-ts/**/src/**'
+      - 'skiplang/**/ts/**/src/**'
+      - '.github/workflows/docs.yml'
+  pull_request:
+    paths:
+      - 'www/**'
+      - 'skipruntime-ts/**/src/**'
+      - 'skiplang/**/ts/**/src/**'
+      - '.github/workflows/docs.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  # Deploys serialize on main; a PR build gets its own lane.
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # The blog derives last-updated times from git history.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            www/package-lock.json
+
+      # Asks Pages where the site will live: https://skiplabs.github.io + /skip
+      # until a custom domain is set, then https://skiplabs.io + "".
+      - id: pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v6
+
+      # TypeDoc only needs the TypeScript sources and the .d.ts of their
+      # workspace dependencies, so skip the native libskipruntime/wasm builds
+      # (cf. install-all-no-native in skipruntime-ts/Makefile).
+      - name: Build TypeScript packages
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          for w in skiplang/prelude/ts/wasm skiplang/prelude/ts/worker \
+                   skiplang/skdate/ts skiplang/skjson/ts/wasm \
+                   skipruntime-ts/core skipruntime-ts/helpers skipruntime-ts/addon; do
+            npm run build -w "$w"
+          done
+          npm run typecheck -w skipruntime-ts/wasm
+          npm run build -w skipruntime-ts/server
+          npm run build -w skipruntime-ts/adapters/postgres
+
+      - name: Build site
+        working-directory: www
+        env:
+          DOCS_URL: ${{ steps.pages.outputs.origin }}
+          DOCS_BASE_URL: ${{ steps.pages.outcome == 'success' && format('{0}/', steps.pages.outputs.base_path) || '' }}
+        run: |
+          # Empty values fall back to the defaults in docusaurus.config.ts.
+          [ -n "$DOCS_URL" ] || unset DOCS_URL
+          [ -n "$DOCS_BASE_URL" ] || unset DOCS_BASE_URL
+          npm ci --no-audit --no-fund
+          rm -rf docs/api
+          npx docusaurus generate-typedoc
+          npm run build
+
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: www/build
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
