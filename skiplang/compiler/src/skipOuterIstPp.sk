@@ -108,6 +108,7 @@ fun fun_def(o: mutable BufferedPrinter.Out, fd: O.FunDef): void {
     o.out("{");
     body match {
     | O.TypedBody _ -> o.out("<unlowered>")
+    | O.SignatureBody _ -> o.out("<body reference>")
     | O.OuterBody(s) -> indent_stmt(o, s)
     };
     o.out("}");
@@ -305,6 +306,7 @@ fun method_body(o: mutable BufferedPrinter.Out, x: ?O.Body): void {
     o.out("{");
     body match {
     | O.TypedBody _ -> o.out("<unlowered>")
+    | O.SignatureBody _ -> o.out("<body reference>")
     | O.OuterBody(s) -> indent_stmt(o, s)
     };
     o.out("}");

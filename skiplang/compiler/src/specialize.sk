@@ -9,6 +9,12 @@ module alias I = OuterIst;
 
 module OuterIstToIR;
 
+class SClassCreatedExn() extends Exception {
+  fun message(): String {
+    "A new class was found!"
+  }
+}
+
 // Keys for specializing generic types/functions into specialized ones.
 class GFunKey(
   i0: LazyGFun,
@@ -57,7 +63,7 @@ value class HalfClass(
   // instance of the metaclass. But to be able to create an instance of the
   // metaclass, Base<Foo> needs to be concrete.
   literalType: Bool = false,
-) uses Hashable, Equality, Show {
+) uses Hashable, Orderable, Show {
   fun toString(): String {
     name = `${this.mutability} ${this.generic.nameStr()}`;
     if (this.targs.isEmpty()) {
@@ -233,9 +239,6 @@ private class SClassInfo{
   gclass: GClass,
   lazyGClass: LazyGClass,
 
-  supertypes: SortedSet<SClassID>,
-  subtypes: SortedSet<SClassID>,
-
   // If a non-final class, keys are all methods called on something
   // whose compile-time type was this class, but not necessarily methods
   // called on super- or subclasses.
@@ -256,26 +259,25 @@ private class SClassInfo{
   // parallel to GClass::extends_
   extends_: SortedMap<LazyGClass, SClassID> = SortedMap[],
 } {
+  fun merge(other: SClassInfo): SClassInfo {
+    !this.methods = other.methods.reduce(
+      (acc, k, v) ~> {
+        !acc[k] = acc.maybeGet(k) match {
+        | None() -> v
+        | Some(old) ->
+          if (old != v) {
+            invariant_violation("Unexpected inequality in SClassInfo")
+          };
+          v
+        };
+        acc
+      },
+      this.methods,
+    );
+    this
+  }
   fun setSClass(specializer: mutable Specializer, value: SClass): this {
     !this.sclass = value;
-    specializer.sclassSet(this.sclass.id, this);
-    this
-  }
-
-  fun setSuperTypes(
-    specializer: mutable Specializer,
-    value: SortedSet<SClassID>,
-  ): this {
-    !this.supertypes = value;
-    specializer.sclassSet(this.sclass.id, this);
-    this
-  }
-
-  fun setSubTypes(
-    specializer: mutable Specializer,
-    value: SortedSet<SClassID>,
-  ): this {
-    !this.subtypes = value;
     specializer.sclassSet(this.sclass.id, this);
     this
   }
@@ -393,24 +395,564 @@ private base class OptionStyle uses Equality, Show {
   | SentinelOptionStyle _ -> "SentinelOptionStyle"
 }
 
+mutable base class SPMap<K: Orderable, V>{} {
+  readonly fun chill(): SPMap<K, V>;
+  readonly fun mclone(): mutable SPMap<K, V>;
+  readonly fun readonlyGet(k: K): V;
+  mutable fun get(context: mutable SKStore.Context, k: K): V;
+  mutable fun getFilter<R: SKStore.File>(
+    context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
+  ): R;
+  mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V;
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool;
+  mutable fun set(k: K, v: V): void;
+  mutable fun replace(other: readonly SPMap<K, V>): void;
+  readonly fun toFixed(): readonly SPMapFixed<K, V>;
+  readonly fun getDiff(): SortedMap<K, V>;
+}
+
+mutable class SPMapDiff<K: Orderable, V>{
+  k2Key: K ~> SKStore.Key,
+  key2K: SKStore.Key ~> K,
+  v2File: V ~> SKStore.File,
+  file2V: SKStore.File ~> V,
+  mutable handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  mutable handlePresence: ?SKStore.EHandle<
+    SKStore.Key,
+    SKStore.BoolFile,
+  > = None(),
+  mutable data: SortedMap<K, V> = SortedMap[],
+} extends SPMap<K, V> {
+  static fun merge(
+    map1: SPMapDiff<K, V>,
+    map2: SPMapDiff<K, V>,
+    union: (V, V) ~> V,
+  ): SPMapDiff<K, V> {
+    !map1.data = map2.data.reduce(
+      (acc, k, v) ~> {
+        !acc[k] = acc.maybeGet(k) match {
+        | None() -> v
+        | Some(x) -> union(x, v)
+        };
+        acc
+      },
+      map1.data,
+    );
+    map1
+  }
+  readonly fun chill(): SPMap<K, V> {
+    SPMapDiff{
+      k2Key => this.k2Key,
+      key2K => this.key2K,
+      v2File => this.v2File,
+      file2V => this.file2V,
+      handle => this.handle,
+      handlePresence => this.handlePresence,
+      data => this.data,
+    }
+  }
+  readonly fun mclone(): mutable SPMap<K, V> {
+    mutable SPMapDiff{
+      k2Key => this.k2Key,
+      key2K => this.key2K,
+      v2File => this.v2File,
+      file2V => this.file2V,
+      handle => this.handle,
+      handlePresence => this.handlePresence,
+      data => this.data,
+    }
+  }
+
+  readonly fun getDiff(): SortedMap<K, V> {
+    this.data
+  }
+
+  readonly fun readonlyGet(_k: K): V {
+    invariant_violation("Cannot call readonlyGet from SPMapDiff")
+  }
+
+  mutable fun get(context: mutable SKStore.Context, k: K): V {
+    this.data.maybeGet(k) match {
+    | None() ->
+      arr = this.handle.getArray(context, this.k2Key(k));
+      if (arr.size() == 0) invariant_violation("Not found") else {
+        this.file2V(arr[0])
+      }
+    | Some(x) -> x
+    }
+  }
+
+  mutable fun getFilter<R: SKStore.File>(
+    context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
+  ): R {
+    this.data.maybeGet(k) match {
+    | Some(value) -> project(value)
+    | None() ->
+      convert = this.file2V;
+      values = this.handle.getArrayFilter(context, this.k2Key(k), file ~>
+        project(convert(file))
+      );
+      invariant(!values.isEmpty(), "Not found");
+      values[0]
+    }
+  }
+
+  mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V {
+    this.data.maybeGet(k) match {
+    | None() ->
+      arr = this.handle.getArray(context, this.k2Key(k));
+      if (arr.size() == 0) None() else {
+        Some(this.file2V(arr[0]))
+      }
+    | x @ Some(_) -> x
+    }
+  }
+
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+    this.data.maybeGet(k) match {
+    | None() ->
+      this.handlePresence match {
+      | None() -> this.handle.getArray(context, this.k2Key(k)).size() != 0
+      | Some(handle) -> handle.getArray(context, this.k2Key(k)).size() != 0
+      }
+
+    | Some(_) -> true
+    }
+  }
+
+  mutable fun set(k: K, v: V): void {
+    this.!data[k] = v;
+  }
+
+  readonly fun toFixed(): readonly SPMapFixed<K, V> {
+    invariant_violation("Cannot vall toFixed from SPMapDiff")
+  }
+
+  mutable fun replace(other: readonly SPMap<K, V>): void {
+    other match {
+    | SPMapFixed _ -> invariant_violation("Cannot replace")
+    | o @ SPMapDiff _ ->
+      this.!handle = o.handle;
+      this.!data = o.data
+    }
+  }
+}
+
+mutable class SPMapFixed<K: Orderable, V>{
+  mutable data: SortedMap<K, V> = SortedMap[],
+} extends SPMap<K, V> {
+  static fun mcreate(data: SortedMap<K, V>): mutable SPMap<K, V> {
+    mutable SPMapFixed{data}
+  }
+  readonly fun getDiff(): SortedMap<K, V> {
+    invariant_violation("Cannot call getDiff on SPMapFixed");
+  }
+
+  readonly fun chill(): SPMap<K, V> {
+    SPMapFixed{data => this.data}
+  }
+  readonly fun mclone(): mutable SPMap<K, V> {
+    mutable SPMapFixed{data => this.data}
+  }
+
+  readonly fun readonlyGet(k: K): V {
+    this.data[k]
+  }
+
+  mutable fun get(_context: mutable SKStore.Context, k: K): V {
+    this.data[k]
+  }
+
+  mutable fun getFilter<R: SKStore.File>(
+    _context: mutable SKStore.Context,
+    k: K,
+    project: V ~> R,
+  ): R {
+    project(this.data[k])
+  }
+
+  mutable fun maybeGet(_context: mutable SKStore.Context, k: K): ?V {
+    this.data.maybeGet(k)
+  }
+
+  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+    this.maybeGet(context, k) is Some _
+  }
+
+  mutable fun set(k: K, v: V): void {
+    this.!data[k] = v;
+  }
+
+  readonly fun toFixed(): readonly SPMapFixed<K, V> {
+    this
+  }
+
+  mutable fun replace(other: readonly SPMap<K, V>): void {
+    this.!data = other.toFixed().data;
+  }
+}
+
+// Relations are emitted as individual contributions. Only the additions made
+// by this callback are retained here; inserting one never reads the old set.
+// The round merger reduces the contributions to a set for enumeration, and
+// membership reads depend only on the requested relationship.
+mutable class SPRelations<K: Orderable>{
+  k2Key: K ~> SKStore.Key,
+  mutable handle: ?SKStore.EHandle<SKStore.Key, SKStore.File>,
+  mutable data: SortedMap<K, SortedSet<SClassID>> = SortedMap[],
+} {
+  readonly fun chill(): SPRelations<K> {
+    SPRelations{k2Key => this.k2Key, handle => this.handle, data => this.data}
+  }
+
+  readonly fun mclone(): mutable SPRelations<K> {
+    mutable SPRelations{
+      k2Key => this.k2Key,
+      handle => this.handle,
+      data => this.data,
+    }
+  }
+
+  mutable fun replace(other: readonly SPRelations<K>): void {
+    this.!handle = other.handle;
+    this.!data = other.data;
+  }
+
+  fun merge(other: SPRelations<K>): this {
+    for (key => values in other.data) {
+      !this.data[key] = this.data.maybeGet(key)
+        .default(kEmptySClassSet)
+        .union(values);
+    };
+    this
+  }
+
+  readonly fun getDiff(): SortedMap<K, SortedSet<SClassID>> {
+    this.data
+  }
+
+  readonly fun readonlyGet(key: K): SortedSet<SClassID> {
+    invariant(
+      this.handle.isNone(),
+      "Relations must be fixed for readonly access",
+    );
+    this.data[key]
+  }
+
+  mutable fun get(
+    context: mutable SKStore.Context,
+    key: K,
+  ): SortedSet<SClassID> {
+    additions = this.data.maybeGet(key).default(kEmptySClassSet);
+    this.handle match {
+    | None() -> additions
+    | Some(handle) ->
+      values = handle.getArray(context, this.k2Key(key));
+      if (values.isEmpty()) additions else {
+        convFile2SortedSetSClassID(values[0]).union(additions)
+      }
+    }
+  }
+
+  mutable fun maybeGet(
+    context: mutable SKStore.Context,
+    key: K,
+  ): ?SortedSet<SClassID> {
+    values = this.get(context, key);
+    if (values.isEmpty()) None() else Some(values)
+  }
+
+  mutable fun containsValue(
+    context: mutable SKStore.Context,
+    key: K,
+    value: SClassID,
+  ): Bool {
+    if (this.data.maybeGet(key).default(kEmptySClassSet).contains(value)) {
+      return true
+    };
+    this.handle match {
+    | None() -> false
+    | Some(handle) ->
+      values = handle.getArrayFilter(context, this.k2Key(key), file ~>
+        SKStore.BoolFile(convFile2SortedSetSClassID(file).contains(value))
+      );
+      !values.isEmpty() && values[0].value
+    }
+  }
+
+  mutable fun add(key: K, value: SClassID): void {
+    this.!data[key] = this.data.maybeGet(key)
+      .default(kEmptySClassSet)
+      .set(value);
+  }
+
+  readonly fun writeDiff(
+    writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  ): void {
+    for (key => additions in this.data) {
+      writer.setArray(
+        this.k2Key(key),
+        additions.values().map(value -> SClassIDFile(value)).collect(Array),
+      );
+    };
+  }
+}
+
+class TodoFile(value: Todo) extends SKStore.Key, SKStore.File
+
+base class Todo uses Orderable
+
+class FStackElement(
+  lazyGFun: LazyGFun,
+  methodTargs: Array<Tclass>,
+  classTargs: Array<Tclass>,
+) extends SKStore.Key, SKStore.File
+
+class CStackElement(
+  origin: FStackElement,
+  hc: HalfClass,
+  k: (mutable SKStore.Context, mutable Specializer, SClassInfo) ~> void,
+  pos: Pos,
+) extends SKStore.File
+
+class SpecializerState{
+  fstackOrigin: ?FStackElement,
+  gclassMap: SPRelations<GClassName>,
+  subtypes: SPRelations<SClassID>,
+  supertypes: SPRelations<SClassID>,
+  sclassMap: SPMap<HalfSClass, SClassID>,
+  sclasses: SPMap<SClassID, SClassInfo>,
+  funsNeeded: SPMap<GFunKey, GFunKey>,
+  funSet: SortedSet<FStackElement>,
+  funStack: List<FStackElement>,
+  classStack: List<CStackElement>,
+  converter: Converter,
+  config: Config.Config,
+  canCreateNewSClasses: Bool,
+  verifyChanged: Bool,
+  pauseOnSClassCreation: Bool,
+  pos: Pos,
+} {
+  fun merge(other: SpecializerState): SpecializerState {
+    if (this.funStack.size() != 0) {
+      invariant_violation(
+        "You are trying to merge states with non-empty funStacks",
+      );
+    };
+    if (this.classStack.size() != 0) {
+      invariant_violation(
+        "You are trying to merge states with non-empty classStacks",
+      );
+    };
+    !this.gclassMap = this.gclassMap.merge(other.gclassMap);
+    !this.supertypes = this.supertypes.merge(other.supertypes);
+    !this.subtypes = this.subtypes.merge(other.subtypes);
+    !this.sclassMap = (this.sclassMap, other.sclassMap) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> {
+        if (x != y) {
+          invariant_violation(
+            "Unexpected inequality in SpecializerState::merge",
+          );
+        };
+        y
+      })
+    | _ -> invariant_violation("Unexpected sclassMap type for merge")
+    };
+    !this.sclasses = (this.sclasses, other.sclasses) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> x.merge(y))
+    | _ -> invariant_violation("Unexpected sclasses type for merge")
+    };
+    !this.funsNeeded = (this.funsNeeded, other.funsNeeded) match {
+    | (map1 @ SPMapDiff _, map2 @ SPMapDiff _) ->
+      SPMapDiff::merge(map1, map2, (x, y) ~> {
+        if (x != y) {
+          invariant_violation(
+            "Unexpected inequality in SpecializerState::merge",
+          );
+        };
+        y
+      })
+    | _ -> invariant_violation("Unexpected funsNeeded type for merge")
+    };
+    !this.funSet = this.funSet.union(other.funSet);
+    this
+  }
+
+  fun mclone(context: mutable SKStore.Context): mutable Specializer {
+    mutable Specializer{
+      context => context,
+      fstackOrigin => this.fstackOrigin,
+      gclassMap => this.gclassMap.mclone(),
+      subtypes => this.subtypes.mclone(),
+      supertypes => this.supertypes.mclone(),
+      sclassMap => this.sclassMap.mclone(),
+      sclasses => this.sclasses.mclone(),
+      funsNeeded => this.funsNeeded.mclone(),
+      funStack => this.funStack,
+      classStack => this.classStack,
+      converter => this.converter,
+      config => this.config,
+      canCreateNewSClasses => this.canCreateNewSClasses,
+      verifyChanged => this.verifyChanged,
+      pauseOnSClassCreation => this.pauseOnSClassCreation,
+      pos => this.pos,
+    }
+  }
+}
+
+/*****************************************************************************/
+// Conversion functions
+/*****************************************************************************/
+class GClassNameKey(value: GClassName) extends SKStore.Key
+class SubtypesKey(value: SClassID) extends SKStore.Key
+class SupertypesKey(value: SClassID) extends SKStore.Key
+class SClassIDFile(value: SClassID) extends SKStore.File
+class SortedSetSClassIDFile(value: SortedSet<SClassID>) extends SKStore.File
+class HalfSClassKey(value: HalfSClass) extends SKStore.Key
+class SClassIDKey(value: SClassID) extends SKStore.Key
+class SClassInfoFile(value: SClassInfo) extends SKStore.File
+class OptionLayoutFile(
+  optionStyle: ?OptionStyle,
+  kind: ClassKind,
+  isNative: Bool,
+  fields: Array<SField>,
+) extends SKStore.File
+class GFunKeyKey(value: GFunKey) extends SKStore.Key
+class GFunKeyFile(value: GFunKey) extends SKStore.File
+class ContinuationFile(
+  origin: FStackElement,
+  pending: Array<CStackElement>,
+) extends SKStore.File
+
+fun convGClassName2Key(x: GClassName): SKStore.Key {
+  GClassNameKey(x)
+}
+fun convKey2GClassName(x: SKStore.Key): GClassName {
+  x match {
+  | GClassNameKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2SupertypesKey(x: SClassID): SKStore.Key {
+  SupertypesKey(x)
+}
+fun convSupertypesKey2SClassID(x: SKStore.Key): SClassID {
+  x match {
+  | SupertypesKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2SubtypesKey(x: SClassID): SKStore.Key {
+  SubtypesKey(x)
+}
+fun convSubtypesKey2SClassID(x: SKStore.Key): SClassID {
+  x match {
+  | SubtypesKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2File(x: SClassID): SKStore.File {
+  SClassIDFile(x)
+}
+fun convSortedSetSClassID2File(x: SortedSet<SClassID>): SKStore.File {
+  SortedSetSClassIDFile(x)
+}
+fun convFile2SClassID(x: SKStore.File): SClassID {
+  x match {
+  | SClassIDFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convFile2SortedSetSClassID(x: SKStore.File): SortedSet<SClassID> {
+  x match {
+  | SortedSetSClassIDFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+
+fun convHalfSClass2Key(x: HalfSClass): SKStore.Key {
+  HalfSClassKey(x)
+}
+fun convKey2HalSClass(x: SKStore.Key): HalfSClass {
+  x match {
+  | HalfSClassKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassID2Key(x: SClassID): SKStore.Key {
+  SClassIDKey(x)
+}
+fun convKey2SClassID(x: SKStore.Key): SClassID {
+  x match {
+  | SClassIDKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convSClassInfo2File(x: SClassInfo): SKStore.File {
+  SClassInfoFile(x)
+}
+fun convFile2SClassInfo(x: SKStore.File): SClassInfo {
+  x match {
+  | SClassInfoFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convGFunKey2Key(x: GFunKey): SKStore.Key {
+  GFunKeyKey(x)
+}
+fun convKey2GFunKey(x: SKStore.Key): GFunKey {
+  x match {
+  | GFunKeyKey(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+fun convGFunKey2File(x: GFunKey): SKStore.File {
+  GFunKeyFile(x)
+}
+fun convFile2GFunKey(x: SKStore.File): GFunKey {
+  x match {
+  | GFunKeyFile(v) -> v
+  | _ -> invariant_violation("Unexpected key conversion")
+  }
+}
+
 mutable class Specializer{
-  mutable tick: SKStore.Tick,
+  context: mutable SKStore.Context,
+
+  mutable fstackOrigin: ?FStackElement = None(),
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
-  mutable gclassMap: SortedMap<GClassName, SortedSet<SClassID>> = SortedMap[],
+  mutable gclassMap: mutable SPRelations<GClassName>,
+
+  // Track hierarchy changes independently of the class definition.
+  // Each class is included in both its own subtype and supertype sets.
+  mutable subtypes: mutable SPRelations<SClassID>,
+  mutable supertypes: mutable SPRelations<SClassID>,
 
   // Maps (FrontEndLazyGClass, GTargs) to SClassID.
-  mutable sclassMap: SortedMap<HalfSClass, SClassID> = SortedMap[],
+  mutable sclassMap: mutable SPMap<HalfSClass, SClassID>,
 
   // Maps SClassID.id to information about that class.
-  mutable sclasses: SortedMap<SClassID, SClassInfo> = SortedMap[],
+  mutable sclasses: mutable SPMap<SClassID, SClassInfo>,
 
   // Specialized functions we already know we're going to need.
   // Everything in here was pushed on funStack at some point.
-  mutable funsNeeded: SortedSet<GFunKey> = SortedSet[],
+  mutable funsNeeded: mutable SPMap<GFunKey, GFunKey>,
+
+  // The set of functions present in funStack
+  mutable funSet: SortedSet<FStackElement> = SortedSet[],
 
   // Functions we still need to analyze with a new set of Targs.
-  mutable funStack: List<(GFunction, Array<Tclass>)> = List[],
+  mutable funStack: List<FStackElement> = List[],
+
+  // New SClasses that need to be created.
+  mutable classStack: List<CStackElement> = List[],
 
   converter: Converter,
 
@@ -419,85 +961,408 @@ mutable class Specializer{
   // Once it's too late to make new SClasses we turn this off.
   mutable canCreateNewSClasses: Bool = true,
   mutable verifyChanged: Bool = false,
+  mutable pauseOnSClassCreation: Bool = false,
 
   // Updated as we go to point to something related to what we are specializing.
   mutable pos: Pos,
 } extends ClassLookupEnv {
   static fun make(
+    handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
     context: mutable SKStore.Context,
     config: Config.Config,
     converter: Converter,
   ): mutable Specializer {
     mutable Specializer{
-      tick => context.getTick(),
+      context,
       converter,
       config,
       pos => FileRange.builtin,
+      gclassMap => mutable SPRelations{
+        k2Key => convGClassName2Key,
+        handle => Some(handle),
+      },
+      subtypes => mutable SPRelations{
+        k2Key => convSClassID2SubtypesKey,
+        handle => Some(handle),
+      },
+      supertypes => mutable SPRelations{
+        k2Key => convSClassID2SupertypesKey,
+        handle => Some(handle),
+      },
+      sclassMap => mutable SPMapDiff{
+        k2Key => convHalfSClass2Key,
+        key2K => convKey2HalSClass,
+        v2File => convSClassID2File,
+        file2V => convFile2SClassID,
+        handle,
+      },
+      sclasses => mutable SPMapDiff{
+        k2Key => convSClassID2Key,
+        key2K => convKey2SClassID,
+        v2File => convSClassInfo2File,
+        file2V => convFile2SClassInfo,
+        handle,
+      },
+      funsNeeded => mutable SPMapDiff{
+        k2Key => convGFunKey2Key,
+        key2K => convKey2GFunKey,
+        v2File => convGFunKey2File,
+        file2V => convFile2GFunKey,
+        handle,
+        /*        handlePresence => Some(
+                  handle.map(
+                    x ~> x,
+                    SKStore.BoolFile::type,
+                    context,
+                    SKStore.DirName::create(
+                      handle.dirName.toString() + "funsNeededBool/",
+                    ),
+                    (_context, writer, key, _values) ~> {
+                      key match {
+                      | GFunKeyKey _ -> writer.set(key, SKStore.BoolFile(true))
+                      | _ -> void
+                      }
+                    },
+                  ),
+                ),*/
+      },
     }
   }
 
+  mutable fun toFixed(context: mutable SKStore.Context): void {
+    handleName = this.gclassMap.handle.fromSome().dirName;
+    invariant(handleName == this.subtypes.handle.fromSome().dirName);
+    invariant(handleName == this.supertypes.handle.fromSome().dirName);
+
+    this.sclassMap match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    this.sclasses match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    this.funsNeeded match {
+    | SPMapDiff{handle} ->
+      invariant(
+        handleName == handle.dirName,
+        "Handle names in specializer must all be the same",
+      )
+    | _ ->
+      invariant_violation("Cannot call toFixed on this kind of specializer")
+    };
+
+    gclassMap = SortedMap[];
+    subtypes = SortedMap[];
+    supertypes = SortedMap[];
+    sclassMap = SortedMap[];
+    sclasses = SortedMap[];
+    funsNeeded = SortedMap[];
+    fileIter = context.unsafeGetEagerDir(handleName).unsafeGetFileIter();
+
+    for (entry in fileIter) {
+      (entryKey, values) = entry;
+      entryKey match {
+      | GClassNameKey(key) ->
+        for (v in values) {
+          v match {
+          | SortedSetSClassIDFile(file) -> !gclassMap[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | SubtypesKey(key) ->
+        for (v in values) {
+          v match {
+          | SortedSetSClassIDFile(file) -> !subtypes[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | SupertypesKey(key) ->
+        for (v in values) {
+          v match {
+          | SortedSetSClassIDFile(file) -> !supertypes[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+      | HalfSClassKey(key) ->
+        for (v in values) {
+          v match {
+          | SClassIDFile(file) -> !sclassMap[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | SClassIDKey(key) ->
+        for (v in values) {
+          v match {
+          | SClassInfoFile(file) -> !sclasses[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | GFunKeyKey(key) ->
+        for (v in values) {
+          v match {
+          | GFunKeyFile(file) -> !funsNeeded[key] = file
+          | _ -> invariant_violation("Unexpected file type")
+          }
+        }
+
+      | SKStore.IID _ -> void
+
+      | k ->
+        debug(k);
+        invariant_violation("Unexpected key type")
+      }
+    };
+    for (k => v in this.gclassMap.getDiff()) {
+      !gclassMap[k] = gclassMap.maybeGet(k).default(kEmptySClassSet).union(v)
+    };
+    for (k => v in this.subtypes.getDiff()) {
+      !subtypes[k] = subtypes.maybeGet(k).default(kEmptySClassSet).union(v)
+    };
+    for (k => v in this.supertypes.getDiff()) {
+      !supertypes[k] = supertypes.maybeGet(k).default(kEmptySClassSet).union(v)
+    };
+    for (k => v in this.sclassMap.getDiff()) {
+      !sclassMap[k] = v
+    };
+    for (k => v in this.sclasses.getDiff()) {
+      !sclasses[k] = v
+    };
+    for (k => v in this.funsNeeded.getDiff()) {
+      !funsNeeded[k] = v
+    };
+
+    this.!gclassMap = mutable SPRelations{
+      k2Key => convGClassName2Key,
+      handle => None(),
+      data => gclassMap,
+    };
+    this.!subtypes = mutable SPRelations{
+      k2Key => convSClassID2SubtypesKey,
+      handle => None(),
+      data => subtypes,
+    };
+    this.!supertypes = mutable SPRelations{
+      k2Key => convSClassID2SupertypesKey,
+      handle => None(),
+      data => supertypes,
+    };
+    this.!sclassMap = SPMapFixed::mcreate(sclassMap);
+    this.!sclasses = SPMapFixed::mcreate(sclasses);
+    this.!funsNeeded = SPMapFixed::mcreate(funsNeeded);
+  }
+
+  readonly fun changedSomething(): Bool {
+    gclassMapChanged = !this.gclassMap.getDiff().isEmpty();
+    supertypesChanged = !this.supertypes.getDiff().isEmpty();
+    subtypesChanged = !this.subtypes.getDiff().isEmpty();
+    sclassMapChanged = this.sclassMap match {
+    | sc @ SPMapDiff _ -> !sc.data.isEmpty()
+    | _ -> invariant_violation("Invalid call for changedSomething")
+    };
+    sclassesChanged = this.sclasses match {
+    | sc @ SPMapDiff _ -> !sc.data.isEmpty()
+    | _ -> invariant_violation("Invalid call for changedSomething")
+    };
+    /*    funsNeededChanged = this.funsNeeded match {
+        | funs @ SPMapDiff _ -> !funs.data.isEmpty()
+        | _ -> invariant_violation("Invalid call for changedSomething")
+        };
+    */
+    subtypesChanged ||
+      supertypesChanged ||
+      gclassMapChanged ||
+      sclassMapChanged ||
+      sclassesChanged
+  }
+
+  readonly fun writeDiff(
+    writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+    specializer2: ?readonly Specializer = None(),
+  ): void {
+    specializer2.each(other -> {
+      invariant(
+        this.gclassMap.getDiff() == other.gclassMap.getDiff(),
+        "Different generic instance contributions",
+      );
+      invariant(
+        this.supertypes.getDiff() == other.supertypes.getDiff(),
+        "Different supertype contributions",
+      );
+      invariant(
+        this.subtypes.getDiff() == other.subtypes.getDiff(),
+        "Different subtype contributions",
+      );
+    });
+    this.gclassMap.writeDiff(writer);
+    this.supertypes.writeDiff(writer);
+    this.subtypes.writeDiff(writer);
+    for (k => v in this.sclassMap.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.sclassMap.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (v != v2) {
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(HalfSClassKey(k), SClassIDFile(v));
+    };
+    for (k => v in this.sclasses.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.sclasses.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (inspect(v).toString() != inspect(v2).toString()) {
+            debug(v);
+            debug(v2);
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(SClassIDKey(k), SClassInfoFile(v));
+    };
+    for (k => v in this.funsNeeded.getDiff()) {
+      specializer2 match {
+      | None() -> void
+      | Some(sp2) ->
+        sp2.funsNeeded.getDiff().maybeGet(k) match {
+        | None() ->
+          invariant_violation("Key not found: " + inspect(k).toString())
+        | Some(v2) ->
+          if (v != v2) {
+            invariant_violation(
+              "Not writing the same thing for key: " + inspect(k).toString(),
+            )
+          }
+        }
+      };
+
+      writer.set(GFunKeyKey(k), GFunKeyFile(v));
+    };
+  }
+
+  mutable fun requestFunctions(roots: Array<LazyGFun>): void {
+    for (gid in roots) {
+      _ = this.requestFunction(gid, Array[])
+    };
+  }
+
+  readonly fun supertypesGet(key: SClassID): SortedSet<SClassID> {
+    if (this.canCreateNewSClasses) {
+      invariant_violation("supertypesGet should not be called in this phase");
+    };
+    this.supertypes.readonlyGet(key)
+  }
+
+  mutable fun trackedSupertypesGet(key: SClassID): SortedSet<SClassID> {
+    this.supertypes.get(this.context, key)
+  }
+
+  mutable fun supertypesAdd(key: SClassID, value: SClassID): void {
+    this.supertypes.add(key, value)
+  }
+
+  readonly fun subtypesGet(key: SClassID): SortedSet<SClassID> {
+    if (this.canCreateNewSClasses) {
+      invariant_violation("subtypesGet should not be called in this phase");
+    };
+    this.subtypes.readonlyGet(key)
+  }
+
+  mutable fun trackedSubtypesGet(key: SClassID): SortedSet<SClassID> {
+    this.subtypes.get(this.context, key)
+  }
+
+  mutable fun subtypesAdd(key: SClassID, value: SClassID): void {
+    this.subtypes.add(key, value)
+  }
+
   mutable fun gclassMapGet(key: GClassName): SortedSet<SClassID> {
-    result = this.gclassMap[key];
+    result = this.gclassMap.get(this.context, key);
     result
   }
 
-  readonly fun gclassMapMaybeGet(key: GClassName): ?SortedSet<SClassID> {
-    result = this.gclassMap.maybeGet(key);
+  mutable fun gclassMapMaybeGet(key: GClassName): ?SortedSet<SClassID> {
+    result = this.gclassMap.maybeGet(this.context, key);
     result
   }
 
-  mutable fun gclassMapSet(key: GClassName, value: SortedSet<SClassID>): void {
-    this.!gclassMap = this.gclassMap.set(key, value)
+  mutable fun gclassMapAdd(key: GClassName, value: SClassID): void {
+    this.gclassMap.add(key, value)
   }
 
   mutable fun sclassMapGet(key: HalfSClass): SClassID {
-    result = this.sclassMap[key];
+    result = this.sclassMap.get(this.context, key);
     result
   }
 
-  readonly fun sclassMapMaybeGet(key: HalfSClass): ?SClassID {
-    result = this.sclassMap.maybeGet(key);
+  mutable fun sclassMapMaybeGet(key: HalfSClass): ?SClassID {
+    result = this.sclassMap.maybeGet(this.context, key);
     result
   }
 
   mutable fun sclassMapSet(key: HalfSClass, value: SClassID): void {
-    this.!sclassMap = this.sclassMap.set(key, value);
+    this.sclassMap.set(key, value);
   }
 
   readonly fun sclassGet(key: SClassID): SClassInfo {
-    result = this.sclasses[key];
+    if (this.canCreateNewSClasses) {
+      invariant_violation("sclassGet should not be called in this phase");
+    };
+    result = this.sclasses.readonlyGet(key);
     result
   }
 
-  mutable fun sclassMaybeGet(key: SClassID): ?SClassInfo {
-    result = this.sclasses.maybeGet(key);
+  mutable fun trackedSClassGet(key: SClassID): SClassInfo {
+    result = this.sclasses.get(this.context, key);
     result
   }
 
   mutable fun sclassSet(key: SClassID, value: SClassInfo): void {
-    this.!sclasses = this.sclasses.set(key, value);
+    this.sclasses.set(key, value);
   }
 
-  readonly fun untrackedSClassGet(key: SClassID): SClassInfo {
-    this.sclasses[key]
-  }
-
-  mutable fun untrackedSClassSet(key: SClassID, value: SClassInfo): void {
-    this.!sclasses = this.sclasses.set(key, value);
-  }
-
-  mutable fun untrackedSClasses(): SortedMap<SClassID, SClassInfo> {
-    this.sclasses
+  mutable fun getSClasses(): SortedMap<SClassID, SClassInfo> {
+    this.sclasses.toFixed().data
   }
 
   mutable fun funsNeededContains(key: GFunKey): Bool {
-    result = this.funsNeeded.contains(key);
-    result
+    this.funsNeeded.contains(this.context, key)
   }
 
   mutable fun funsNeededSet(key: GFunKey): void {
-    if (!this.funsNeeded.contains(key)) {
-      this.!funsNeeded = this.funsNeeded.set(key);
+    if (!this.funsNeededContains(key)) {
+      this.funsNeeded.set(key, key);
     }
   }
 
@@ -505,7 +1370,7 @@ mutable class Specializer{
     this.funStack.isEmpty()
   }
 
-  mutable fun funStackPop(): (GFunction, Array<Tclass>) {
+  mutable fun funStackPop(): FStackElement {
     this.funStack match {
     | List.Nil() -> invariant_violation("Cannot pop an empty funStack")
     | List.Cons(x, rl) ->
@@ -514,56 +1379,46 @@ mutable class Specializer{
     }
   }
 
-  mutable fun funStackPush(elt: (GFunction, Array<Tclass>)): void {
+  mutable fun funStackPush(elt: FStackElement): void {
     this.!funStack = List.Cons(elt, this.funStack);
   }
 
-  readonly fun chill(): this {
-    static{
-      tick => this.tick,
-      gclassMap => this.gclassMap,
-      sclassMap => this.sclassMap,
-      sclasses => this.sclasses,
-      funsNeeded => this.funsNeeded,
+  readonly fun chill(): SpecializerState {
+    SpecializerState{
+      fstackOrigin => this.fstackOrigin,
+      gclassMap => this.gclassMap.chill(),
+      subtypes => this.subtypes.chill(),
+      supertypes => this.supertypes.chill(),
+      sclassMap => this.sclassMap.chill(),
+      sclasses => this.sclasses.chill(),
+      funsNeeded => this.funsNeeded.chill(),
+      funSet => this.funSet,
       funStack => this.funStack,
+      classStack => this.classStack,
       converter => this.converter,
       config => this.config,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
+      pauseOnSClassCreation => this.pauseOnSClassCreation,
       pos => this.pos,
     }
   }
 
-  readonly fun mclone(): mutable this {
-    mutable static{
-      tick => this.tick,
-      gclassMap => this.gclassMap,
-      sclassMap => this.sclassMap,
-      sclasses => this.sclasses,
-      funsNeeded => this.funsNeeded,
-      funStack => this.funStack,
-      converter => this.converter,
-      config => this.config,
-      canCreateNewSClasses => this.canCreateNewSClasses,
-      verifyChanged => this.verifyChanged,
-      pos => this.pos,
-    }
-  }
-
-  mutable fun replace(other: this): void {
-    this.!tick = other.tick;
-    this.!gclassMap = other.gclassMap;
-    this.!sclassMap = other.sclassMap;
-    this.!sclasses = other.sclasses;
-    this.!funsNeeded = other.funsNeeded;
+  mutable fun replace(other: SpecializerState): void {
+    this.!fstackOrigin = other.fstackOrigin;
+    this.gclassMap.replace(other.gclassMap);
+    this.subtypes.replace(other.subtypes);
+    this.supertypes.replace(other.supertypes);
+    this.sclassMap.replace(other.sclassMap);
+    this.sclasses.replace(other.sclasses);
+    this.funsNeeded.replace(other.funsNeeded);
+    this.!funSet = other.funSet;
     this.!funStack = other.funStack;
+    this.!classStack = other.classStack;
     this.!canCreateNewSClasses = other.canCreateNewSClasses;
-    this.!verifyChanged = this.verifyChanged;
+    this.!verifyChanged = other.verifyChanged;
+    this.!pauseOnSClassCreation = other.pauseOnSClassCreation;
     this.!pos = other.pos;
-  }
-
-  readonly fun untrackedGetSClass(sid: SClassID): SClass {
-    this.untrackedSClassGet(sid).sclass
   }
 
   readonly fun getSClass(sid: SClassID): SClass {
@@ -571,13 +1426,13 @@ mutable class Specializer{
   }
 
   readonly fun createNewSClassesMap(): SortedMap<SClassID, SClass> {
-    this.sclasses.map((_, info) -> info.sclass)
+    this.sclasses.toFixed().data.map((_, info) -> info.sclass)
   }
 
   // If t is Awaitable<T>, returns Some(T), else None().
   readonly fun awaitableType(t: Tclass): ?Tclass {
     // Get the SClassInfo for the "Awaitable" type (maybe a base class).
-    info = this.untrackedSClassGet(t.sclassID);
+    info = this.sclassGet(t.sclassID);
     baseInfo = if (info.sclass.gclassName == GClassName("Awaitable")) {
       info
     } else {
@@ -585,19 +1440,19 @@ mutable class Specializer{
       // createAwaitableClass)
       // TODO: Warn against user created ones
       info.extends_.maybeGet(FrontEndLazyGClass("Awaitable")) match {
-      | Some(id) -> this.untrackedSClassGet(id)
+      | Some(id) -> this.sclassGet(id)
       | _ -> return None()
       }
     };
 
     // Return the type of awaitable.value.value.
     rawType = baseInfo.getUnscalarizedField("value", info.sclass.pos).typ;
-    rawInfo = this.untrackedSClassGet(rawType.sclassID);
+    rawInfo = this.sclassGet(rawType.sclassID);
     Some(rawInfo.getUnscalarizedField("value", rawInfo.sclass.pos).typ)
   }
 
   mutable fun getTargs(tc: Tclass): Array<Tclass> {
-    this.sclassGet(tc.sclassID).sclass.superposition.id
+    this.trackedSClassGet(tc.sclassID).sclass.superposition.id
   }
 
   // Determine the actual targs to be passed to a method call.
@@ -609,20 +1464,84 @@ mutable class Specializer{
   // implementing the method actually takes one. In such a case we need to
   // use the tparamInherit field to determine the targ values based on
   // information from the class which the method call was compiled against.
+  // Public entry points require class discovery to be complete and finish
+  // with an identity continuation. Calls within
+  // the pending-function CPS walk must use the private CPS implementations
+  // so the rest of the walk remains in k, including across class creation.
   mutable fun computeMethodTargs(
     context: mutable SKStore.Context,
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "computeMethodTargs requires canCreateNewSClasses to be false; use computeMethodTargsCPS during class discovery",
+    );
+    static::computeMethodTargsCPS(context, this, call, tparamEnv, (_, _, x) ~>
+      x
+    )
+  }
+
+  private static fun computeMethodTargsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    call: GCallMethodBase,
+    tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
+    k: (mutable SKStore.Context, mutable this, Array<Tclass>) ~> T,
+  ): T {
     pos = call.pos;
 
     obj = call.args[0];
-    objType = this.getTclass3(context, obj.getType(), tparamEnv);
-    objTypeInfo = this.sclassGet(objType.sclassID);
+    static::getTclass3CPS(
+      context,
+      sp,
+      obj.getType(),
+      tparamEnvOrig,
+      sp.pos,
+      false,
+      (context, sp, objType) ~>
+        static::computeMethodTargsForObjTypeCPS(
+          context,
+          sp,
+          call,
+          tparamEnvOrig,
+          pos,
+          objType,
+          (context, sp, pair) ~> {
+            (realGTargs, tparamEnv) = pair;
+            static::getTclass3GTargsCPS(
+              context,
+              sp,
+              tparamEnv,
+              sp.pos,
+              List::createFromItems(realGTargs),
+              (context, sp, targs) ~> k(context, sp, targs.toArray()),
+            );
+          },
+        )
+      ,
+    )
+  }
+
+  private static fun computeMethodTargsForObjTypeCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    call: GCallMethodBase,
+    tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
+    pos: FileRange,
+    objType: Tclass,
+    k: (
+      mutable SKStore.Context,
+      mutable this,
+      (Array<GType>, UnorderedMap<GTparam, Tclass>),
+    ) ~> T,
+  ): T {
+    tparamEnv = tparamEnvOrig;
+    objTypeInfo = sp.trackedSClassGet(objType.sclassID);
     objTypeGClass = objTypeInfo.gclass;
 
     gtargs = call.targs;
-    realGTargs = objTypeGClass.methods.maybeGet(call.method) match {
+    objTypeGClass.methods.maybeGet(call.method) match {
     | Some(gmethod) ->
       gmethod.tparamInherit.maybeGet(call.source) match {
       | Some(replacement) ->
@@ -631,14 +1550,13 @@ mutable class Specializer{
         // needs one. So we use this table to figure out what
         // the actual targs are.
 
-        env2 = makeTypeMap(objTypeGClass.tparams, this.getTargs(objType), pos);
-
-        !tparamEnv = if (gtargs.isEmpty()) {
-          env2
+        env2 = makeTypeMap(objTypeGClass.tparams, sp.getTargs(objType), pos);
+        if (gtargs.isEmpty()) {
+          k(context, sp, (replacement, env2))
         } else {
           // Look up the source method so we can add its tparams
           // to the environment.
-          sourceGClass = this.converter.getGClass(context, call.source, pos);
+          sourceGClass = sp.converter.getGClass(context, call.source, pos);
           sm = sourceGClass.methods.maybeGet(call.method) match {
           | Some(cm) -> cm
           | None() ->
@@ -651,31 +1569,26 @@ mutable class Specializer{
             sm.tparams.size() == gtargs.size(),
             "Wrong number of source tparams",
           );
-          env3 = env2.clone();
-          env3.extend(
-            makeTypeMap(
-              sm.tparams,
-              gtargs.map(t -> this.getTclass3(context, t, tparamEnv)),
-              pos,
-            ),
-          );
-          env3.chill()
-        };
-
-        replacement
-      | None() -> gtargs
+          static::getTclass3GTargsCPS(
+            context,
+            sp,
+            tparamEnv,
+            sp.pos,
+            List::createFromItems(gtargs),
+            (context, sp, gtargsList) ~> {
+              env3 = env2.clone();
+              env3.extend(makeTypeMap(sm.tparams, gtargsList.toArray(), pos));
+              k(context, sp, (replacement, env3.chill()))
+            },
+          )
+        }
+      | None() -> k(context, sp, (gtargs, tparamEnv))
       }
-    | None() -> gtargs
-    };
-
-    realGTargs.map(t -> this.getTclass3(context, t, tparamEnv))
+    | None() -> k(context, sp, (gtargs, tparamEnv))
+    }
   }
 
-  // Find the transitive closure of functions and classes
-  // reachable from our original root set so we can compile them all.
-  mutable fun findAllFunctionsAndSClasses(
-    context: mutable SKStore.Context,
-  ): void {
+  mutable fun builtins(): void {
     // Make sure our builtin types exist so we can spontaneously create
     // instances later, e.g. during lowering.
     builtinTypes = Array[
@@ -695,58 +1608,30 @@ mutable class Specializer{
       (tVoid, gtVoid.generic),
     ];
 
-    tickCopy = this.tick;
-
     for (tt in builtinTypes) {
-      this.!tick = SKStore.Tick(-128);
       (t, lazyGClass) = tt;
-      sc = this.getSClass2(
-        context,
+      sc = static::getSClass2CPS(
+        this.context,
+        this,
         HalfClass(lazyGClass, Array[], DeepFrozen()),
-      ).sclass;
+        (_, _, info) ~> info.sclass,
+      );
       if (sc.id != t.sclassID) {
         sc.pos.die(`sclass ID mismatch: ${sc.id} != ${t.sclassID}`)
       }
     };
 
-    this.!tick = tickCopy;
-
     // Keep specializing functions and types until we hit a fixed point.
-    while (this.specializePendingFuns(context)) void;
+    this.specializePendingFuns();
+  }
 
-    if (false) {
-      // Debug support for dumping out the back end's understanding of
-      // the inheritance graph.
-      sortedClasses = Array::mcreateFromIterator(
-        this.untrackedSClasses().values(),
-      );
-      sortedClasses.sortBy(a ~> a.sclass.id);
-
-      for (info in sortedClasses) {
-        print_error(`${info.sclass}:\n`);
-
-        print_error("    supertypes:\n");
-        v1 = info.supertypes
-          .toArray()
-          .map(x -> this.untrackedSClassGet(x).sclass.toString())
-          .sorted();
-        for (x in v1) print_error_ln(`        ${x}`);
-
-        print_error("    subtypes:\n");
-        v2 = info.subtypes
-          .toArray()
-          .map(x -> this.untrackedSClassGet(x).sclass.toString())
-          .sorted();
-        for (x in v2) print_error_ln(`        ${x}`);
-      }
-    };
-
+  // Find the transitive closure of functions and classes
+  // reachable from our original root set so we can compile them all.
+  mutable fun findAllFunctionsAndSClasses(): void {
+    // Keep specializing functions and types until we hit a fixed point.
+    this.specializePendingFuns();
     // TODO: Set "canInstantiate" to false for KBase with no KClass.
-
     // ??? visit all interesting const types in converter
-
-    // We had better not see any new ones we missed during this phase!
-    this.!canCreateNewSClasses = false
   }
 
   mutable fun withRegion<T>(
@@ -755,7 +1640,7 @@ mutable class Specializer{
   ): T {
     frozenSpecializer = this.chill();
     (newSpecializer, result) = SKStore.withRegion(context, (_, context) ~> {
-      specializer = frozenSpecializer.mclone();
+      specializer = frozenSpecializer.mclone(context);
       result = f(context, specializer);
       (specializer.chill(), result)
     });
@@ -763,115 +1648,293 @@ mutable class Specializer{
     result
   }
 
-  // Specializes pending functions. Returns true if anything changed.
-  private mutable fun specializePendingFuns(
-    context: mutable SKStore.Context,
-  ): Bool {
-    changed = false;
-    while (!this.funStackIsEmpty()) {
-      !changed = true;
-      (f, targs) = this.funStackPop();
-      this.withRegion(context, (context, specializer) ~> {
-        specializer.specializePendingFun(context, f, targs);
-      })
-    };
-
-    changed
+  mutable fun specializeOneRoundOfPendingFuns(): void {
+    stack = this.funStack;
+    this.!funStack = List[];
+    while (stack is List.Cons _) {
+      (!stack, stackElt) = stack match {
+      | List.Nil() -> invariant_violation("Impossible")
+      | List.Cons(hd, tl) -> (tl, hd)
+      };
+      this.specializePendingFun(stackElt);
+    }
   }
 
-  private mutable fun specializePendingFun(
-    context: mutable SKStore.Context,
-    f: GFunction,
-    targs: Array<Tclass>,
-  ): void {
-    oldPos = this.pos;
-
-    tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
-    seenTypes = mutable UnorderedSet[];
-    noteType = (t, literalType) -> {
-      // For speed look up the parametric version of the type in the cache,
-      // and only if that fails run applyTparams and look up the real type.
-      key = (t, literalType);
-      if (seenTypes.maybeInsert(key)) {
-        _ = this.getTclass3(context, t, tparamEnv, this.pos, literalType)
+  mutable fun specializePendingFun(stackElt: FStackElement): void {
+    this.withRegion(this.context, (context, specializer) ~> {
+      try {
+        specializer.!fstackOrigin = Some(stackElt);
+        result = static::specializePendingFunCPS(
+          context,
+          specializer,
+          stackElt.lazyGFun,
+          stackElt.methodTargs,
+          stackElt.classTargs,
+          (_, _, _) ~> void,
+        );
+        specializer.!fstackOrigin = None();
+        result
+      } catch {
+      | SClassCreatedExn() ->
+        specializer.!fstackOrigin = None();
+        void
+      | x ->
+        specializer.!fstackOrigin = None();
+        throw x
       }
-    };
+    })
+  }
 
-    // Ensure the stub for a generator's "next" method exists,
-    // so we can find it when we provide a body for it later.
-    returnType = this.getTclass3(
-      context,
-      f.funInfo.funType.returnType,
-      tparamEnv,
-    );
-    if (f.funInfo.isGenerator) {
-      this.requestMethod(context, "next", returnType, Array[])
-    };
-
-    // Process parameters.
-    for (instr in f.params) {
-      this.!pos = instr.pos;
-      noteType(instr.getType(), false);
-    };
-
-    // Process the body of the function.
-    for (b in f.blocks) {
-      for (instr in b.instrs) {
-        this.!pos = instr.pos;
-
-        noteType(instr.getType(), false);
-
-        instr match {
-        | GCallFunctionBase{name, targs => innerTargs} ->
-          _ = this.requestFunction(
-            context,
-            name,
-            innerTargs.map(t -> this.getTclass3(context, t, tparamEnv)),
-          )
-        | call @ GCallMethodBase{method} ->
-          objType = this.getTclass3(context, call.args[0].getType(), tparamEnv);
-          innerTargs = this.computeMethodTargs(context, call, tparamEnv);
-          this.requestMethod(context, method, objType, innerTargs)
-
-        | GTypeSwitch{value} ->
-          // TypeSwitch on an Option type will generate an "isSome()"
-          // call, so we need to force that method to get compiled.
-          valType = this.getTclass3(context, value.getType(), tparamEnv);
-
-          if (this.sclassGet(valType.sclassID).optionStyle.isSome()) {
-            this.requestMethod(context, "isSome", valType, Array[])
-          }
-
-        | obj @ GObject _ -> noteType(obj.getType(), true)
-
-        // These do not cause any additional types or code to be needed.
-        | GAsyncReturn _
-        | GCast _
-        | GEArray _
-        | GFreeze _
-        | GGetConst _
-        | GGetCurrentAwaitable _
-        | GGetField _
-        | GIf _
-        | GIntSwitch _
-        | GJump _
-        | GLandingPad _
-        | GReturn _
-        | GSetField _
-        | GStringSwitch _
-        | GSuspend _
-        | GThrow _
-        | GUnreachable _
-        | GWith _
-        | GYield _
-        | GYieldBreak _
-        | GZeroExtend _ ->
-          void
+  // Specializes pending functions. Returns true if anything changed.
+  mutable fun specializePendingFuns(
+    filter: FStackElement -> Bool = _ -> true,
+  ): void {
+    newStack = List[];
+    while (!this.funStackIsEmpty()) {
+      stack = this.funStack;
+      this.!funStack = List[];
+      while (stack is List.Cons _) {
+        (!stack, stackElt) = stack match {
+        | List.Nil() -> invariant_violation("Impossible")
+        | List.Cons(hd, tl) -> (tl, hd)
+        };
+        if (filter(stackElt)) {
+          this.specializePendingFun(stackElt);
+        } else {
+          !newStack = List.Cons(stackElt, newStack)
         }
       }
     };
+    this.!funStack = newStack;
+  }
 
-    this.!pos = oldPos;
+  private static fun specializePendingFunCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    fname: LazyGFun,
+    methodTargs: Array<Tclass>,
+    classTargs: Array<Tclass>,
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
+    superposition = FunSuperpositionID(
+      ClassSuperpositionID(classTargs),
+      MethodSuperpositionID(methodTargs),
+    );
+    gfunKey = GFunKey(fname, superposition);
+
+    if (!sp.funsNeededContains(gfunKey)) {
+      sp.funsNeededSet(gfunKey);
+    };
+
+    targs = classTargs.concat(methodTargs);
+    f = sp.converter.getGFunction(context, fname);
+    if (f.funInfo.tparams.size() != targs.size()) {
+      sp.pos.die(
+        `tparam count mismatch in requestFunction for ${f}; ` +
+          `expected ${f.funInfo.tparams}, but got ${targs}`,
+      )
+    };
+
+    oldPos = sp.pos;
+
+    tparamEnv = makeTypeMap(f.funInfo.tparams, targs, f.funInfo.pos);
+    // Deduplicate type requests before the CPS walk so its continuations
+    // only capture immutable scan data, not the mutable seen-types set.
+    seenTypes = mutable UnorderedSet[];
+    instrs = mutable Vector[];
+    for (instr in f.params) {
+      instrs.push(
+        (
+          (instr : GNonConstantInstr),
+          seenTypes.maybeInsert((instr.getType(), false)),
+          false,
+        ),
+      );
+    };
+    for (block in f.blocks) {
+      for (instr in block.instrs) {
+        noteType = seenTypes.maybeInsert((instr.getType(), false));
+        noteLiteralType =
+          instr is GObject _ &&
+          seenTypes.maybeInsert((instr.getType(), true));
+        instrs.push(((instr : GNonConstantInstr), noteType, noteLiteralType));
+      }
+    };
+    scan = instrs.toArray();
+
+    // Ensure the stub for a generator's "next" method exists,
+    // so we can find it when we provide a body for it later.
+    static::getTclass3CPS(
+      context,
+      sp,
+      f.funInfo.funType.returnType,
+      tparamEnv,
+      sp.pos,
+      false,
+      (context, sp, returnType) ~> {
+        if (f.funInfo.isGenerator) {
+          sp.requestMethod(context, "next", returnType, Array[])
+        };
+        static::specializePendingInstrsCPS(
+          context,
+          sp,
+          tparamEnv,
+          scan,
+          (context, sp, _) ~> {
+            sp.!pos = oldPos;
+            k(context, sp, void)
+          },
+        )
+      },
+    )
+  }
+
+  private static fun specializePendingInstrsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    instrs: Array<(GNonConstantInstr, Bool, Bool)>,
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
+    for (entry in instrs) {
+      (instr, noteType, noteLiteralType) = entry;
+      sp.!pos = instr.pos;
+      // Each continuation finishes only this instruction. A missing class
+      // saves that work in classStack while the loop visits other instructions.
+      afterType = (
+        context: mutable SKStore.Context,
+        sp: mutable this,
+        _type: Tclass,
+      ) ~> {
+        static::specializePendingInstrCPS(
+          context,
+          sp,
+          tparamEnv,
+          instr,
+          noteLiteralType,
+          (_, _, _) ~> void,
+        )
+      };
+      try {
+        if (noteType) {
+          static::getTclass3CPS(
+            context,
+            sp,
+            instr.getType(),
+            tparamEnv,
+            sp.pos,
+            false,
+            afterType,
+          )
+        } else {
+          afterType(context, sp, tVoid)
+        }
+      } catch {
+      | SClassCreatedExn() -> void
+      | ex -> throw ex
+      }
+    };
+    k(context, sp, void)
+  }
+
+  private static fun specializePendingInstrCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    instr: GNonConstantInstr,
+    noteLiteralType: Bool,
+    k: (mutable SKStore.Context, mutable this, void) ~> T,
+  ): T {
+    instr match {
+    | GCallFunctionBase{name, targs => innerTargs} ->
+      static::getTclass3GTargsCPS(
+        context,
+        sp,
+        tparamEnv,
+        sp.pos,
+        List::createFromItems(innerTargs),
+        (context, sp, innerTargs) ~> {
+          sp.requestFunction(name, innerTargs.toArray());
+          k(context, sp, void)
+        },
+      )
+    | call @ GCallMethodBase{method} ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        call.args[0].getType(),
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, objType) ~> {
+          static::computeMethodTargsCPS(
+            context,
+            sp,
+            call,
+            tparamEnv,
+            (context, sp, innerTargs) ~> {
+              sp.requestMethod(context, method, objType, innerTargs);
+              k(context, sp, void)
+            },
+          )
+        },
+      )
+    | GTypeSwitch{value} ->
+      // TypeSwitch on an Option type generates an isSome() call.
+      static::getTclass3CPS(
+        context,
+        sp,
+        value.getType(),
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, valType) ~> {
+          if (sp.trackedSClassGet(valType.sclassID).optionStyle.isSome()) {
+            sp.requestMethod(context, "isSome", valType, Array[])
+          };
+          k(context, sp, void)
+        },
+      )
+    | obj @ GObject _ ->
+      if (noteLiteralType) {
+        static::getTclass3CPS(
+          context,
+          sp,
+          obj.getType(),
+          tparamEnv,
+          sp.pos,
+          true,
+          (context, sp, _) ~> k(context, sp, void),
+        )
+      } else {
+        k(context, sp, void)
+      }
+
+    // Parameters and these instructions need only their result type.
+    | GFunParam _
+    | GAsyncReturn _
+    | GCast _
+    | GEArray _
+    | GFreeze _
+    | GGetConst _
+    | GGetCurrentAwaitable _
+    | GGetField _
+    | GIf _
+    | GIntSwitch _
+    | GJump _
+    | GLandingPad _
+    | GReturn _
+    | GSetField _
+    | GStringSwitch _
+    | GSuspend _
+    | GThrow _
+    | GUnreachable _
+    | GWith _
+    | GYield _
+    | GYieldBreak _
+    | GZeroExtend _ ->
+      k(context, sp, void)
+    }
   }
 
   readonly fun exampleSClass(t: Type): SClass {
@@ -913,7 +1976,7 @@ mutable class Specializer{
       // Minor optimization: reuse this table each time through the loop.
       smap = mutable UnorderedMap[];
 
-      info = this.sclassGet(example.id);
+      info = this.trackedSClassGet(example.id);
 
       NamedInner(
         info.unscalarizedFields.map(exampleField -> {
@@ -925,7 +1988,7 @@ mutable class Specializer{
 
               for (caller in callers) {
                 tc = typ.typeInSuperposition(caller);
-                subinfo = this.sclassGet(tc.sclassID);
+                subinfo = this.trackedSClassGet(tc.sclassID);
                 field = subinfo.getUnscalarizedField(fname, pos);
 
                 fieldType = if (tc.isDeepFrozen()) {
@@ -1024,7 +2087,7 @@ mutable class Specializer{
       };
 
       !info.sclass = sclass with {fields => buf.toArray(), arraySlot};
-      this.untrackedSClassSet(info.sclass.id, info);
+      this.sclassSet(info.sclass.id, info);
     }
   }
 
@@ -1032,12 +2095,7 @@ mutable class Specializer{
   //
   // TODO: We could literally use an intrusive linked list, would that be bad?
   private mutable fun noteGClassInstance(instance: SClassInfo): void {
-    // Note that another instance of this GClass exists.
-    l = this.gclassMapMaybeGet(instance.sclass.gclassName) match {
-    | None() -> SortedSet[]
-    | Some(l) -> l
-    };
-    this.gclassMapSet(instance.sclass.gclassName, l.set(instance.sclass.id));
+    this.gclassMapAdd(instance.sclass.gclassName, instance.sclass.id);
   }
 
   // Indicate that 'sub' is a subtype of 'super'. This could mean direct or
@@ -1049,15 +2107,15 @@ mutable class Specializer{
     super: SClassInfo,
     sub: SClassInfo,
   ): (SClassInfo, SClassInfo) {
-    if (!super.subtypes.contains(sub.sclass.id)) {
-      !super = super.setSubTypes(this, super.subtypes.set(sub.sclass.id));
-      !sub = sub.setSuperTypes(this, sub.supertypes.set(super.sclass.id));
+    if (!this.subtypes.containsValue(context, super.sclass.id, sub.sclass.id)) {
+      this.subtypesAdd(super.sclass.id, sub.sclass.id);
+      this.supertypesAdd(sub.sclass.id, super.sclass.id);
 
-      for (t in super.supertypes) {
-        (_, !sub) = this.inherit(context, this.sclassGet(t), sub);
+      for (t in this.trackedSupertypesGet(super.sclass.id)) {
+        (_, !sub) = this.inherit(context, this.trackedSClassGet(t), sub);
       };
-      for (t in sub.subtypes) {
-        (!super, _) = this.inherit(context, super, this.sclassGet(t))
+      for (t in this.trackedSubtypesGet(sub.sclass.id)) {
+        (!super, _) = this.inherit(context, super, this.trackedSClassGet(t))
       };
 
       // Track all methods callable on concrete classes (by casting to some
@@ -1107,23 +2165,55 @@ mutable class Specializer{
     mutability: Mutability,
     literalType: Bool = false,
   ): Tclass {
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getTclass2 requires canCreateNewSClasses to be false; use getTclass2CPS during class discovery",
+    );
+    static::getTclass2CPS(
+      context,
+      this,
+      generic,
+      targs,
+      mutability,
+      literalType,
+      (_, _, x) ~> x,
+    )
+  }
+
+  private static fun getTclass2CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    generic: LazyGClass,
+    targs: Array<Tclass>,
+    mutability: Mutability,
+    literalType: Bool,
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
     // Correct the lie that the type is frozen even though its
     // tparams are not (meaning it is merely "chilled").
     //
     // TODO: Use a different mutability AST w/"chilled" (T29988983).
-    if (
+    m = if (
       mutability == DeepFrozen() &&
       targs.any(ta -> ta.mutability != DeepFrozen())
     ) {
-      !mutability = Readonly()
+      Readonly()
+    } else {
+      mutability
     };
 
-    info = this.getSClass2(
-      context,
-      HalfClass(generic, targs, mutability, literalType),
-    );
-
-    Tclass(info.sclass.id, mutability)
+    hc = HalfClass(generic, targs, m, literalType);
+    static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
+      // The canonical mapping already supplies the ID. Reading SClassInfo
+      // here would depend on unrelated discovered methods and class metadata.
+      sp.sclassMapMaybeGet(HalfSClass(hc.generic, hc.targs)) match {
+      | Some(id) -> k(context, sp, Tclass(id, m))
+      | None() ->
+        static::getSClass2CPS(context, sp, hc, (context, sp, info) ~> {
+          k(context, sp, Tclass(info.sclass.id, m))
+        })
+      }
+    })
   }
 
   mutable fun getTclass3(
@@ -1133,15 +2223,84 @@ mutable class Specializer{
     pos: Pos = this.pos,
     literalType: Bool = false,
   ): Tclass {
-    gt match {
-    | tp @ GTparam _ -> typeMapGet(tparamEnv, tp, pos)
-    | GTapply(lazyGClass, mutability, gtargs) ->
-      this.getTclass2(
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getTclass3 requires canCreateNewSClasses to be false; use getTclass3CPS during class discovery",
+    );
+    static::getTclass3CPS(
+      context,
+      this,
+      gt,
+      tparamEnv,
+      pos,
+      literalType,
+      (_, _, x) ~> x,
+    )
+  }
+
+  private static fun getTclass3GTargsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    pos: Pos,
+    gtargs: List<GType>,
+    k: (mutable SKStore.Context, mutable this, List<Tclass>) ~> T,
+  ): T {
+    gtargs match {
+    | List.Nil() -> k(context, sp, List.Nil())
+    | List.Cons(gt, tl) ->
+      static::getTclass3CPS(
         context,
-        lazyGClass,
-        gtargs.map(gt -> this.getTclass3(context, gt, tparamEnv, pos)),
-        mutability,
-        literalType,
+        sp,
+        gt,
+        tparamEnv,
+        pos,
+        false,
+        (context, sp, tclass) ~> {
+          static::getTclass3GTargsCPS(
+            context,
+            sp,
+            tparamEnv,
+            pos,
+            tl,
+            (context, sp, rl) ~> {
+              k(context, sp, List.Cons(tclass, rl))
+            },
+          )
+        },
+      )
+    }
+  }
+
+  private static fun getTclass3CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    gt: GType,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    pos: Pos,
+    literalType: Bool,
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
+    gt match {
+    | tp @ GTparam _ -> k(context, sp, typeMapGet(tparamEnv, tp, pos))
+    | GTapply(lazyGClass, mutability, gtargs) ->
+      static::getTclass3GTargsCPS(
+        context,
+        sp,
+        tparamEnv,
+        pos,
+        List::createFromItems(gtargs),
+        (context, sp, gtargs) ~> {
+          static::getTclass2CPS(
+            context,
+            sp,
+            lazyGClass,
+            gtargs.toArray(),
+            mutability,
+            literalType,
+            k,
+          )
+        },
       )
     }
   }
@@ -1180,7 +2339,9 @@ mutable class Specializer{
     | (Mutable(), _)
     | (Readonly(), DeepFrozen())
     | (DeepFrozen(), DeepFrozen()) ->
-      this.sclassGet(t1.sclassID).supertypes.contains(t2.sclassID)
+      // Variance compares many pairs of type arguments. Sharing one set read
+      // avoids recording a separate predicate for every pair in that scan.
+      this.trackedSupertypesGet(t1.sclassID).contains(t2.sclassID)
     | _ -> false
     }
   }
@@ -1212,7 +2373,11 @@ mutable class Specializer{
   mutable fun canInstantiate(t: Type): Bool {
     // TODO: If an SClass in a KBase with no concrete subclasses, we can
     // say it's not instantiable.
-    !t.forEachTclass(tc -> !this.sclassGet(tc.sclassID).sclass.canInstantiate)
+    !t.forEachTclass(tc ->
+      !this.sclasses.getFilter(this.context, tc.sclassID, info ~>
+        SKStore.BoolFile(info.sclass.canInstantiate)
+      ).value
+    )
   }
 
   // Create a type for Call Instrs that return multiple values. To regularize
@@ -1279,7 +2444,18 @@ mutable class Specializer{
   // Helper for getOptionStyle2(): takes the T in Option<T>, which must
   // not be parametric, and returns the style to use.
   private mutable fun getOptionStyleHelper2(tc: Tclass, pos: Pos): OptionStyle {
-    info = this.sclassGet(tc.sclassID);
+    info = this.sclasses.getFilter(this.context, tc.sclassID, info ~>
+      OptionLayoutFile(
+        info.optionStyle,
+        info.sclass.kind,
+        info.sclass.isNative,
+        if (info.sclass.kind.isValueClass() && !info.sclass.isNative) {
+          info.unscalarizedFields
+        } else {
+          Array<SField>[]
+        },
+      )
+    );
     info.optionStyle match {
     | Some(FlagOptionStyle _) ->
       // Option<Option<T>> etc. where the inner Option already needed
@@ -1292,21 +2468,20 @@ mutable class Specializer{
       SentinelOptionStyle(dotJoin("valueIfSome.value", path), ptr - 1)
     | None() ->
       // Option<T> where T is not itself an Option.
-      sc = info.sclass;
-      if (!sc.kind.isValueClass()) {
+      if (!info.kind.isValueClass()) {
         // All KClass and KBase can just use a null pointer sentinel.
         SentinelOptionStyle("", 0)
       } else {
         // Default to giving up and using FlagOptionStyle.
         result = (FlagOptionStyle() : OptionStyle);
 
-        if (!sc.isNative) {
+        if (!info.isNative) {
           // A null sentinel can yield slightly tighter machine code,
           // so prefer a sentinel field where we can use 0 rather
           // than -1 or -2 etc. by keeping the max.
           bestPtr = Int::min;
 
-          _ = info.unscalarizedFields.any(field -> {
+          _ = info.fields.any(field -> {
             this.getOptionStyleHelper2(field.typ, pos) match {
             | SentinelOptionStyle(path, ptr) if (ptr > bestPtr) ->
               // We found a value class field that itself has a legal
@@ -1343,13 +2518,15 @@ mutable class Specializer{
   // Apply the rules documented on createMetaClass() to convert
   // Base<T>, Concrete<T> and Class<T> to the corresponding metaclass,
   // or return 'hc' if no such conversion is possible.
-  private mutable fun maybeConvertMetaClass(
+  private static fun maybeConvertMetaClassCPS<T>(
     context: mutable SKStore.Context,
+    sp: mutable this,
     hc: HalfClass,
-  ): HalfClass {
+    k: (mutable SKStore.Context, mutable this, HalfClass) ~> T,
+  ): T {
     (gid, targ) = hc.generic match {
     | FrontEndLazyGClass("Base") ->
-      tArgInfo = this.sclassGet(hc.targs[0].sclassID);
+      tArgInfo = sp.trackedSClassGet(hc.targs[0].sclassID);
       g = tArgInfo.lazyGClass;
 
       lg = if (hc.literalType) {
@@ -1361,7 +2538,7 @@ mutable class Specializer{
 
     | FrontEndLazyGClass("Class")
     | FrontEndLazyGClass("Concrete") ->
-      tArgInfo = this.sclassGet(hc.targs[0].sclassID);
+      tArgInfo = sp.trackedSClassGet(hc.targs[0].sclassID);
       g = tArgInfo.lazyGClass;
 
       lg = tArgInfo.sclass.kind match {
@@ -1377,7 +2554,7 @@ mutable class Specializer{
       };
       (lg, tArgInfo)
 
-    | _ -> return hc
+    | _ -> return k(context, sp, hc)
     };
 
     opthc = hc with {
@@ -1391,67 +2568,222 @@ mutable class Specializer{
     //
     // Since the FastOption types are value classes, we always
     // use Concrete here.
-    this.getOptionStyle2(hc, this.pos) match {
+    sp.getOptionStyle2(hc, sp.pos) match {
     | Some(x) ->
-      tag = this.getOptionTagType(context, hc.generic);
-      opthc with {
-        generic => ConcreteMetaImplLazyGClass(x.fastClass()),
-        targs => hc.targs.concat(Array[tag]),
-        mutability => DeepFrozen(),
-      }
+      static::getOptionTagTypeCPS(
+        context,
+        sp,
+        hc.generic,
+        (context, sp, tag) ~> {
+          k(
+            context,
+            sp,
+            opthc with {
+              generic => ConcreteMetaImplLazyGClass(x.fastClass()),
+              targs => hc.targs.concat(Array[tag]),
+              mutability => DeepFrozen(),
+            },
+          )
+        },
+      )
     | None() ->
       // Normal metaclass case.
-      opthc
+      k(context, sp, opthc)
     }
   }
 
-  private mutable fun getOptionTagType(
+  private static fun getOptionTagTypeCPS<T>(
     context: mutable SKStore.Context,
+    sp: mutable this,
     optionGClass: LazyGClass,
-  ): Tclass {
+    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+  ): T {
     lazyGClass = optionGClass match {
     | FrontEndLazyGClass("Option") -> FrontEndLazyGClass("FastOption.OptionTag")
     | FrontEndLazyGClass("Some") -> FrontEndLazyGClass("FastOption.SomeTag")
     | FrontEndLazyGClass("None") -> FrontEndLazyGClass("FastOption.NoneTag")
-    | _ -> this.pos.die(`Bad option type ${optionGClass.nameStr()}`)
+    | _ -> sp.pos.die(`Bad option type ${optionGClass.nameStr()}`)
     };
-    this.getTclass2(context, lazyGClass, Array[], DeepFrozen())
+    static::getTclass2CPS(
+      context,
+      sp,
+      lazyGClass,
+      Array[],
+      DeepFrozen(),
+      false,
+      k,
+    )
   }
 
   mutable fun getSClass2(
     context: mutable SKStore.Context,
     hc: HalfClass,
   ): SClassInfo {
-    // Canonicalize a Concrete<T>, etc. to the right metaclass.
-    origHC = hc;
-    !hc = this.maybeConvertMetaClass(context, hc);
-    targs = hc.targs;
+    this.pos.invariant(
+      !this.canCreateNewSClasses,
+      "getSClass2 requires canCreateNewSClasses to be false; use getSClass2CPS during class discovery",
+    );
+    static::getSClass2CPS(context, this, hc, (_, _, x) ~> x)
+  }
 
-    // We only care about some of the fields.
-    hsc = HalfSClass(hc.generic, targs);
-
-    this.sclassMapMaybeGet(hsc) match {
-    | Some(sc) -> this.sclassGet(sc)
+  readonly fun getFStackOrigin(): FStackElement {
+    this.fstackOrigin match {
     | None() ->
-      this.getOptionStyle2(hc, this.pos) match {
-      | None() -> void
-      | Some(style) ->
-        // Create the underlying implementation type. See comments
-        // in FastOption.sk.
-        tag = this.getOptionTagType(context, hc.generic);
+      invariant_violation(
+        "Trying to access the fstack origin when it is not defined",
+      )
+    | Some(x) -> x
+    }
+  }
 
-        implInfo = this.getSClass2(
-          context,
-          HalfClass(style.fastClass(), Array[targs[0], tag], hc.mutability),
+  static fun getSClass2CPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    hc: HalfClass,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    // Canonicalize a Concrete<T>, etc. to the right metaclass.
+    static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
+      // We only care about some of the fields.
+      hsc = HalfSClass(hc.generic, hc.targs);
+      sp.sclassMapMaybeGet(hsc) match {
+      | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
+      | None() if (sp.pauseOnSClassCreation) ->
+        sp.!classStack = List.Cons(
+          CStackElement(
+            sp.getFStackOrigin(),
+            hc,
+            (ctx, sp, sc) ~> {
+              _ = k(ctx, sp, sc);
+            },
+            sp.pos,
+          ),
+          sp.classStack,
         );
+        throw SClassCreatedExn()
+      | None() -> static::createSClassCPS(context, sp, hc, k)
+      }
+    })
+  }
 
-        // Redirect Option<T> etc. to the implementation type.
-        this.sclassMapSet(hsc, implInfo.sclass.id);
+  private static fun gclassFieldsMapCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    fields: List<GField>,
+    k: (mutable SKStore.Context, mutable this, List<SField>) ~> T,
+  ): T {
+    fields match {
+    | List.Nil() -> k(context, sp, List.Nil())
+    | List.Cons(f, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        f.typ,
+        tparamEnv,
+        f.pos,
+        false,
+        (context, sp, typ) ~>
+          static::gclassFieldsMapCPS(
+            context,
+            sp,
+            tparamEnv,
+            rl,
+            (context, sp, rl) ~>
+              k(
+                context,
+                sp,
+                List.Cons(
+                  SField{
+                    name => f.name,
+                    typ,
+                    isAssignable => f.isAssignable,
+                    pos => f.pos,
+                    index => f.index,
+                  },
+                  rl,
+                ),
+              )
+            ,
+          )
+        ,
+      )
+    }
+  }
 
-        return implInfo
-      };
+  private static fun gclassExtendsCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    gclassList: List<GTapply>,
+    info: SClassInfo,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    gclassList match {
+    | List.Nil() -> k(context, sp, info)
+    | List.Cons(gta, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        gta,
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, super) ~> {
+          static::gclassExtendsCPS(
+            context,
+            sp,
+            tparamEnv,
+            rl,
+            info.setExtends(sp, info.extends_.set(gta.generic, super.sclassID)),
+            k,
+          )
+        },
+      )
+    }
+  }
 
-      gclass = this.converter.getGClass(context, hc.generic, this.pos);
+  private static fun gclassExtendsInheritCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    tparamEnv: UnorderedMap<GTparam, Tclass>,
+    gclassList: List<GTapply>,
+    info: SClassInfo,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    gclassList match {
+    | List.Nil() -> k(context, sp, info)
+    | List.Cons(gta, rl) ->
+      static::getTclass3CPS(
+        context,
+        sp,
+        gta,
+        tparamEnv,
+        sp.pos,
+        false,
+        (context, sp, super) ~> {
+          (_, info2) = sp.inherit(
+            context,
+            sp.trackedSClassGet(super.sclassID),
+            info,
+          );
+          static::gclassExtendsInheritCPS(context, sp, tparamEnv, rl, info2, k)
+        },
+      )
+    }
+  }
+
+  private static fun createSClassCPS<T>(
+    context: mutable SKStore.Context,
+    sp: mutable this,
+    hc: HalfClass,
+    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+  ): T {
+    targs = hc.targs;
+    hsc = HalfSClass(hc.generic, targs);
+    sp.getOptionStyle2(hc, sp.pos) match {
+    | None() ->
+      gclass = sp.converter.getGClass(context, hc.generic, sp.pos);
 
       kind = gclass.kind match {
       | ck @ ClassKind _ -> ck
@@ -1464,14 +2796,14 @@ mutable class Specializer{
         gclass.name.id + "<" + targs.join(", ") + ">"
       };
 
-      if (!this.canCreateNewSClasses && !gclass.isReturnTuple) {
+      if (!sp.canCreateNewSClasses && !gclass.isReturnTuple) {
         debug(
           "Creating new SClass " +
             name +
             " that was not found during initial type scan; " +
             "now it's too late.",
         );
-        this.pos.die(
+        sp.pos.die(
           "Creating new SClass " +
             name +
             " that was not found during initial type scan; " +
@@ -1489,13 +2821,13 @@ mutable class Specializer{
         isNative => gclass.isNative,
         isLambda => gclass.isLambda,
         kind,
-        subtypes => kEmptySClassSet, // Computed later from SClassInfo
-        supertypes => kEmptySClassSet, // Computed later from SClassInfo
+        subtypes => kEmptySClassSet, // Computed later from Specializer
+        supertypes => kEmptySClassSet, // Computed later from Specializer
         methods => kEmptyMethods, // Computed later from SClassInfo
         annotations => gclass.annotations,
         fields => Array[], // Computed later after being scalarized
         canInstantiate => gclass.canInstantiate,
-        ptrBitSize => this.config.ptrBitSize,
+        ptrBitSize => sp.config.ptrBitSize,
         // Magically poke in some LLVM type names for native types.
         scalarType => gclass.name.id match {
         | "Bool" -> Some(ScalarType(1, 1, "i1", IntegerScalarKind()))
@@ -1506,16 +2838,16 @@ mutable class Specializer{
         | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
         | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
         | "Runtime.GCPointer" ->
-          Some(ScalarType::gcPointer(this.config.ptrBitSize))
+          Some(ScalarType::gcPointer(sp.config.ptrBitSize))
         | "Runtime.NonGCPointer" ->
-          Some(ScalarType::nonGCPointer(this.config.ptrBitSize))
-        | "String" -> Some(ScalarType::gcPointer(this.config.ptrBitSize))
+          Some(ScalarType::nonGCPointer(sp.config.ptrBitSize))
+        | "String" -> Some(ScalarType::gcPointer(sp.config.ptrBitSize))
 
         | _ ->
           kind match {
           | KBase()
           | KClass() ->
-            Some(ScalarType::gcPointer(this.config.ptrBitSize))
+            Some(ScalarType::gcPointer(sp.config.ptrBitSize))
           | KValue() -> None()
           }
         },
@@ -1525,7 +2857,7 @@ mutable class Specializer{
       optionStyle = hc.generic match {
       | FrontEndLazyGClass("FastOption.FlagOption") -> Some(FlagOptionStyle())
       | FrontEndLazyGClass("FastOption.SentinelOption") ->
-        Some(this.getOptionStyleHelper2(targs[0], this.pos))
+        Some(sp.getOptionStyleHelper2(targs[0], sp.pos))
       | _ -> None()
       };
 
@@ -1536,174 +2868,201 @@ mutable class Specializer{
         gclass,
         lazyGClass => hc.generic,
         optionStyle,
-        supertypes => SortedSet[sid],
-        subtypes => SortedSet[sid],
       };
 
       // Record this class.
-      this.sclassSet(sid, info);
-      this.sclassMapSet(hsc, sid);
-      this.noteGClassInstance(info);
+      sp.sclassSet(sid, info);
+      sp.supertypesAdd(sid, sid);
+      sp.subtypesAdd(sid, sid);
+      sp.sclassMapSet(hsc, sid);
+      sp.noteGClassInstance(info);
 
       // Now that the type is registered we can do things that may go
       // reentrant.
 
       // Create the fields. We will flatten them to scalars later.
-      tparamEnv = makeTypeMap(gclass.tparams, targs, this.pos);
-      !info = info.setUnscalarizedFields(
-        this,
-        gclass.fields.map(f ->
-          SField{
-            name => f.name,
-            typ => this.getTclass3(context, f.typ, tparamEnv, f.pos),
-            isAssignable => f.isAssignable,
-            pos => f.pos,
-            index => f.index,
-          }
-        ),
-      );
+      tparamEnv = makeTypeMap(gclass.tparams, targs, sp.pos);
 
-      // populate sclass extends_ after registration, but before inherits pass
-      for (gta in gclass.extends_) {
-        super = this.getTclass3(context, gta, tparamEnv);
-        !info = info.setExtends(
-          this,
-          info.extends_.set(gta.generic, super.sclassID),
-        );
-      };
-
-      // This class can be instantiated only if all fields can.
-      canInstantiate = (
-        (info.sclass.canInstantiate &&
-          info.unscalarizedFields.all(field ->
-            this.canInstantiate(field.typ)
-          )) ||
-        gclass.name.idValue() == "Unsafe.RawStorage"
-      );
-
-      !info = info.setSClass(
-        this,
-        info.sclass with {
-          canInstantiate,
-          fields => if (gclass.isReturnTuple) {
-            // We need to record these right away since the scalarizing
-            // phase is over.
-            info.unscalarizedFields
-          } else {
-            info.sclass.fields
-          },
-        },
-      );
-
-      // Connect super- and subtypes in the "extends" hierarchy.
-      for (ta in gclass.extends_) {
-        super = this.getTclass3(context, ta, tparamEnv);
-        (_, !info) = this.inherit(
-          context,
-          this.sclassGet(super.sclassID),
-          info,
-        );
-      };
-
-      // Now look for super- and subtypes based on co- and contravariance.
-      //
-      // We need to do this because if someone calls a method on an object
-      // cast to some other type via covariance, the rest of the compiler
-      // would like to know that this method can be called on instances of
-      // the original type.
-      //
-      // As an optimization, if none of the GTparams have variance we don't
-      // need to do anything, the "extends" check already found all
-      // super- and subtypes.
-      hasAnyVariance = gclass.variances.any(v ->
-        v match {
-        | I.Vnone _ -> false
-        | I.Vplus _
-        | I.Vminus _ ->
-          true
-        }
-      );
-
-      if (hasAnyVariance) {
-        for (otherID in this.gclassMapGet(hc.generic.name())) {
-          if (otherID != sid) {
-            other = this.sclassGet(otherID);
-
-            // Is 'newClass' a supertype of 'other'?
-            isSuperType = true;
-
-            // Is 'newClass' a subtype of 'other'?
-            isSubType = true;
-
-            otherTargs = other.sclass.superposition.id;
-            this.pos.invariant(
-              targs.size() == otherTargs.size(),
-              "targs size mismatch",
-            );
-
-            i = -1;
-            if (
-              gclass.variances.all(v -> {
-                !i = i + 1;
-                t1 = targs[i];
-                t2 = otherTargs[i];
-                s1 = this.isRuntimeSubType(t1, t2);
-                s2 = this.isRuntimeSubType(t2, t1);
-
-                if (!(s1 && s2)) {
-                  v match {
-                  | I.Vnone _ ->
-                    !isSubType = false;
-                    !isSuperType = false
-                  | I.Vplus _ ->
-                    if (!s1) {
-                      !isSubType = false
-                    };
-                    if (!s2) {
-                      !isSuperType = false
-                    }
-                  | I.Vminus _ ->
-                    if (!s2) {
-                      !isSubType = false
-                    };
-                    if (!s1) {
-                      !isSuperType = false
-                    }
-                  }
-                };
-
-                // Stop as soon as neither is a supertype of the other.
-                isSubType || isSuperType
-              })
-            ) {
-              if (isSubType) {
-                (!other, !info) = this.inherit(context, other, info)
-              };
-
-              if (isSuperType) {
-                (!info, !other) = this.inherit(context, info, other)
-              }
-            }
-          }
-        }
-      };
-
-      // Go ahead and create the frozen variant of this type now,
-      // since it could be sneakily created at runtime via the freeze()
-      // operation, and we need to know about every type that might exist
-      // at runtime.
-      _ = this.getSClass2(
+      static::gclassFieldsMapCPS(
         context,
-        origHC with {
-          targs => origHC.targs.map(t -> t.mapMutability(_ -> DeepFrozen())),
-          mutability => DeepFrozen(),
-        },
-      );
+        sp,
+        tparamEnv,
+        List::createFromItems(gclass.fields),
+        (context, sp, fieldList) ~> {
+          gclassFields = fieldList.toArray();
+          info2 = info.setUnscalarizedFields(sp, gclassFields);
 
-      info
+          // populate sclass extends_ after registration, but before inherits pass
+          static::gclassExtendsCPS(
+            context,
+            sp,
+            tparamEnv,
+            List::createFromItems(gclass.extends_),
+            info2,
+            (context, sp, info2) ~> {
+              // This class can be instantiated only if all fields can.
+              canInstantiate = (
+                (info2.sclass.canInstantiate &&
+                  info2.unscalarizedFields.all(field ->
+                    sp.canInstantiate(field.typ)
+                  )) ||
+                gclass.name.idValue() == "Unsafe.RawStorage"
+              );
+
+              info3 = info2.setSClass(
+                sp,
+                info2.sclass with {
+                  canInstantiate,
+                  fields => if (gclass.isReturnTuple) {
+                    // We need to record these right away since the scalarizing
+                    // phase is over.
+                    info2.unscalarizedFields
+                  } else {
+                    info2.sclass.fields
+                  },
+                },
+              );
+
+              // Connect super- and subtypes in the "extends" hierarchy.
+              static::gclassExtendsInheritCPS(
+                context,
+                sp,
+                tparamEnv,
+                List::createFromItems(gclass.extends_),
+                info3,
+                (context, sp, info2) ~> {
+                  sp.createVariance(context, hc, sid, info2);
+                  // Freezing a value can introduce frozen type arguments
+                  // during code generation. Discover those variants while
+                  // class creation is still allowed, as in the sequential
+                  // specializer.
+                  static::getSClass2CPS(
+                    context,
+                    sp,
+                    hc with {
+                      targs => hc.targs.map(t ->
+                        t.mapMutability(_ -> DeepFrozen())
+                      ),
+                      mutability => DeepFrozen(),
+                    },
+                    (context, sp, _) ~>
+                      k(context, sp, sp.trackedSClassGet(sid))
+                    ,
+                  )
+                },
+              )
+            },
+          )
+        },
+      )
+
+    | Some(style) ->
+      // Create the underlying implementation type. See comments
+      // in FastOption.sk.
+      static::getOptionTagTypeCPS(
+        context,
+        sp,
+        hc.generic,
+        (context, sp, tag) ~> {
+          static::getSClass2CPS(
+            context,
+            sp,
+            HalfClass(style.fastClass(), Array[targs[0], tag], hc.mutability),
+            (context, sp, implInfo) ~> {
+              // Redirect Option<T> etc. to the implementation type.
+              sp.sclassMapSet(hsc, implInfo.sclass.id);
+              k(context, sp, implInfo)
+            },
+          )
+        },
+      )
     }
   }
 
+  // Look for super- and subtypes based on co- and contravariance.
+  //
+  // We need to do this because if someone calls a method on an object
+  // cast to some other type via covariance, the rest of the compiler
+  // would like to know that this method can be called on instances of
+  // the original type.
+  //
+  // As an optimization, if none of the GTparams have variance we don't
+  // need to do anything, the "extends" check already found all
+  // super- and subtypes.
+
+  mutable fun createVariance(
+    context: mutable SKStore.Context,
+    hc: HalfClass,
+    sid: SClassID,
+    info: SClassInfo,
+  ): void {
+    gclass = this.converter.getGClass(context, hc.generic, this.pos);
+    hasAnyVariance = gclass.variances.any(v ->
+      v match {
+      | I.Vnone _ -> false
+      | I.Vplus _
+      | I.Vminus _ ->
+        true
+      }
+    );
+
+    if (!hasAnyVariance) return void;
+
+    targs = hc.targs;
+
+    for (otherID in this.gclassMapGet(hc.generic.name())) {
+      if (otherID != sid) {
+        other = this.trackedSClassGet(otherID);
+        otherTargs = other.sclass.superposition.id;
+        this.pos.invariant(
+          targs.size() == otherTargs.size(),
+          "targs size mismatch",
+        );
+
+        isSubType = for (i => v in gclass.variances) {
+          t1 = targs[i];
+          t2 = otherTargs[i];
+          if (
+            v match {
+            | I.Vnone _ ->
+              this.isRuntimeSubType(t1, t2) && this.isRuntimeSubType(t2, t1)
+            | I.Vplus _ -> this.isRuntimeSubType(t1, t2)
+            | I.Vminus _ -> this.isRuntimeSubType(t2, t1)
+            }
+          ) continue else {
+            break false
+          }
+        } else {
+          true
+        };
+
+        isSuperType = for (i => v in gclass.variances) {
+          t1 = targs[i];
+          t2 = otherTargs[i];
+          if (
+            v match {
+            | I.Vnone _ ->
+              this.isRuntimeSubType(t1, t2) && this.isRuntimeSubType(t2, t1)
+            | I.Vplus _ -> this.isRuntimeSubType(t2, t1)
+            | I.Vminus _ -> this.isRuntimeSubType(t1, t2)
+            }
+          ) continue else {
+            break false
+          }
+        } else {
+          true
+        };
+
+        if (isSubType) {
+          (!other, !info) = this.inherit(context, other, info)
+        };
+
+        if (isSuperType) {
+          (!info, !other) = this.inherit(context, info, other)
+        }
+      }
+    }
+  }
   // method lookup:
   // 1. if a method is defined on the receiver class itself, use that
   // definition uncoditionally
@@ -1728,7 +3087,7 @@ mutable class Specializer{
       | None() -> sc.pos.die(`No source entry for method ${name} on ${sc}`)
       };
       info.extends_.maybeGet(source).map(superID -> {
-        scinfo = this.sclassGet(superID);
+        scinfo = this.trackedSClassGet(superID);
         (scinfo.sclass.id, scinfo.gclass.methods[name])
       })
     }
@@ -1756,10 +3115,9 @@ mutable class Specializer{
     if (requestImpl) {
       gmethod.function match {
       | Some(getLazyGFun) ->
-        hostInfo = this.sclassGet(hostID);
+        hostInfo = this.trackedSClassGet(hostID);
         host = hostInfo.sclass;
         this.requestFunction(
-          context,
           getLazyGFun(context, hostInfo.lazyGClass),
           m.targs.id,
           host.superposition.id,
@@ -1798,8 +3156,8 @@ mutable class Specializer{
       if (receiver.sclass.kind.isFinal()) {
         !receiver = this.addMethod(context, receiver, m, true)
       } else {
-        for (subID in receiver.subtypes) {
-          info = this.sclassGet(subID);
+        for (subID in this.trackedSubtypesGet(receiver.sclass.id)) {
+          info = this.trackedSClassGet(subID);
           if (!info.methods.containsKey(m)) {
             _ = this.addMethod(context, info, m, info.sclass.kind.isFinal())
           }
@@ -1815,7 +3173,7 @@ mutable class Specializer{
     objType: Tclass,
     targs: Array<Tclass>,
   ): void {
-    info = this.sclassGet(objType.sclassID);
+    info = this.trackedSClassGet(objType.sclassID);
     sposn = MethodSuperpositionID(targs);
     _ = this.noteCalledMethod(context, info, MethodKey(method, sposn))
   }
@@ -1823,31 +3181,20 @@ mutable class Specializer{
   // Ask that the requested function be compiled to machine code compatible
   // with the given targs.
   mutable fun requestFunction(
-    context: mutable SKStore.Context,
     name: LazyGFun,
     methodTargs: Array<Tclass>,
     classTargs: Array<Tclass> = Array[],
   ): void {
+    fstackElement = FStackElement(name, methodTargs, classTargs);
     superposition = FunSuperpositionID(
       ClassSuperpositionID(classTargs),
       MethodSuperpositionID(methodTargs),
     );
     key = GFunKey(name, superposition);
 
-    converter = this.converter;
-    function = converter.getGFunction(context, name);
-
-    if (!this.funsNeededContains(key)) {
-      this.funsNeededSet(key);
-
-      newTargs = classTargs.concat(methodTargs);
-      if (function.funInfo.tparams.size() != newTargs.size()) {
-        this.pos.die(
-          `tparam count mismatch in requestFunction for ${function}; ` +
-            `expected ${function.funInfo.tparams}, but got ${newTargs}`,
-        )
-      };
-      this.funStackPush((function, newTargs))
+    if (!this.funSet.contains(fstackElement) && !this.funsNeededContains(key)) {
+      this.!funSet = this.funSet.add(fstackElement);
+      this.funStackPush(fstackElement)
     }
   }
 
@@ -1874,7 +3221,7 @@ mutable class Specializer{
         // coroutine state object, that has the "next" method that
         // we need to update to be an "UnfinishedNext".
         _ = f.funType.returnType[0].forEachTclass(tc -> {
-          nextMethodID = this.untrackedSClassGet(tc.sclassID).sclass.getMethod(
+          nextMethodID = this.sclassGet(tc.sclassID).sclass.getMethod(
             "next",
             MethodSuperpositionID::empty,
             f.pos,
@@ -1902,7 +3249,7 @@ mutable class Specializer{
   // and other referenced functions to decide what needs to be partitioned.
   mutable fun partitionFunctions(
     context: mutable SKStore.Context,
-    runtimeFunctionsVec: readonly Vector<FrontEndLazyGFun>,
+    runtimeFunctionsVec: Array<FrontEndLazyGFun>,
     env: GlobalEnv,
     config: Config.Config,
     lconsts: Array<ConstLazyGFun>,
@@ -1913,9 +3260,9 @@ mutable class Specializer{
     funToInsts = mutable Vector[];
 
     // First dealing with all the symbols found at initialization time
-    for (key in this.funsNeeded) {
-      gf = this.converter.getGFunction(context, key.i0);
-      funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(key);
+    for (_ => f in this.funsNeeded.toFixed().data) {
+      gf = this.converter.getGFunction(context, f.i0);
+      funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(f);
     };
     for (gf => insts in funToInstsMap) {
       funToInsts.push((gf, insts.toArray()));
@@ -1926,7 +3273,9 @@ mutable class Specializer{
     // Partition functions into superpositions and give them SFunctionIDs.
     // We need to assign SFunctionIDs now so that when we specialize them
     // below, Call Instrs know the SFunctionIDs to use to refer to other funs.
-    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(this.funsNeeded.size());
+    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(
+      this.funsNeeded.toFixed().data.size(),
+    );
     for (gfAndInsts in funToInsts) {
       (_, insts) = gfAndInsts;
       // For now, stupidly give every unique set of parameters its own
@@ -1975,7 +3324,7 @@ mutable class Specializer{
     reportMemoryStatistics("native/partitionFunctions after sfuns");
 
     // Populate each SClass.methods with the SFunctionIDs for its code.
-    for (info in this.untrackedSClasses()) {
+    for (info in this.getSClasses()) {
       this.withRegion(context, (_, specializer) ~> {
         specializer.populateSFunctionIDs(info, sids);
       })
@@ -2023,7 +3372,7 @@ mutable class Specializer{
     if (!info.methods.isEmpty()) {
       newMethods = UnorderedMap::mcreate(info.methods.size());
       for (mkey => hostID in info.methods) {
-        host = this.untrackedSClassGet(hostID).sclass;
+        host = this.trackedSClassGet(hostID).sclass;
         methodFunName = FrontEndLazyGFun{
           frontEndName => host.gclassName.id + "::" + mkey.name,
         };
@@ -2045,7 +3394,7 @@ mutable class Specializer{
       sclass = info.sclass;
       !sclass.methods = newMethods.chill();
       !info.sclass = sclass;
-      this.untrackedSClassSet(info.sclass.id, info);
+      this.sclassSet(info.sclass.id, info);
     }
   }
 }
@@ -2277,11 +3626,7 @@ mutable class FunSpecializer{
     }
   }
 
-  readonly fun untrackedGetSClass(sid: SClassID): SClass {
-    this.specializer.untrackedSClassGet(sid).sclass
-  }
-
-  mutable fun getSClass(sid: SClassID): SClass {
+  readonly fun getSClass(sid: SClassID): SClass {
     this.specializer.sclassGet(sid).sclass
   }
 
@@ -2395,7 +3740,7 @@ mutable class FunSpecializer{
     s = this.specializer;
     result = (None() : ?OptionStyle);
     this.typemaps.eachWithIndex((i, tm) -> {
-      optionStyle = s.sclassGet(
+      optionStyle = s.trackedSClassGet(
         s.getTclass3(context, gt, tm).sclassID,
       ).optionStyle;
       if (i == 0) {
@@ -2759,11 +4104,11 @@ mutable class FunSpecializer{
     msmap = this.getMethodSMap(targs);
     for (c in this.callers) {
       tc = objType.typeInSuperposition(c);
-      info = this.specializer.sclassGet(tc.sclassID);
+      info = this.specializer.trackedSClassGet(tc.sclassID);
       msposn = msmap[c];
       methodKey = MethodKey(method, msposn);
       sclassID = info.methods[methodKey];
-      hostInfo = this.specializer.sclassGet(sclassID);
+      hostInfo = this.specializer.trackedSClassGet(sclassID);
       hostName match {
       | Some(name) ->
         if (hostInfo.sclass.gclassName != name) {
@@ -2899,7 +4244,7 @@ mutable class FunSpecializer{
   ): void {
     thisType = this.specializeType(context, args[0].getType());
     sc = this.specializer.exampleSClass(thisType);
-    style = this.specializer.sclassGet(sc.id).optionStyle match {
+    style = this.specializer.trackedSClassGet(sc.id).optionStyle match {
     | Some(s @ SentinelOptionStyle _) -> s
     | _ -> pos.die(`Expected SentinelOptionStyle for ${thisType}`)
     };
@@ -3296,7 +4641,9 @@ mutable class FunSpecializer{
               this.emitObject{args, typ, pos, prettyName => o.prettyName}.id,
             )
           } else {
-            fields = this.specializer.sclassGet(sc.id).unscalarizedFields;
+            fields = this.specializer.trackedSClassGet(
+              sc.id,
+            ).unscalarizedFields;
             if (fields.size() != o.args.size()) {
               o.die(
                 "Arg count mismatch for " +

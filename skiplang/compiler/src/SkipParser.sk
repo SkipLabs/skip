@@ -124,7 +124,9 @@ mutable class SkipParser{
     fix = if (expected.isSimple()) {
       Some(
         SkipError.Fix{
-          oldRange => TextRange.empty(this.peekToken().range.start),
+          oldRange => SourcePositions.Range::absolute(
+            TextRange.empty(this.peekToken().range.start),
+          ),
           newText => expected.toString(),
         },
       );
@@ -1124,7 +1126,9 @@ mutable class SkipParser{
       };
       fix = typeFromToken.map(ty ->
         SkipError.Fix{
-          oldRange => TextRange.empty(this.peekTokenOffset(-1).range.end),
+          oldRange => SourcePositions.Range::absolute(
+            TextRange.empty(this.peekTokenOffset(-1).range.end),
+          ),
           newText => ": " + ty,
         }
       );

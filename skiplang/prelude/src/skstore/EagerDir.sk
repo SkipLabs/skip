@@ -777,6 +777,10 @@ base class EagerDir protected {
   protected tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
+  fun withTimeStack(timeStack: TimeStack): this {
+    this with {timeStack}
+  }
+
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -1255,7 +1259,7 @@ base class EagerDir protected {
     writer = mutable Writer{};
     mapper.map(context, writer, key, valueIter);
 
-    kvArray = writer.getWrites();
+    writes = writer.writes;
     newDirs = context.newDirs;
     reads = context.getReads();
     context.!newDirs = newDirsCopy;
@@ -1265,22 +1269,33 @@ base class EagerDir protected {
 
     source = Path::create(parentName, key);
 
-    for (kv in kvArray) {
-      (k, v) = kv;
-      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
-    };
-
-    if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
-      oldVec.push(
-        (
-          source,
-          MInfo::create(
-            kvArray.map(kv -> kv.i0),
-            newDirs.toArray(),
-            reads.toArray(),
+    if (writes.size() == 1) {
+      // Most initial rows forward a single key. Avoid materializing the
+      // writer as an array of pairs and then allocating another key array.
+      (k, v) = writes.minimum().fromSome();
+      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())));
+      minfo = if (newDirs.isEmpty() && reads.isEmpty()) {
+        MInfoSingle(k)
+      } else {
+        MInfo::create(Array[k], newDirs.toArray(), reads.toArray())
+      };
+      oldVec.push((source, minfo));
+    } else {
+      for (k => v in writes) {
+        acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
+      };
+      if (!writes.isEmpty() || !newDirs.isEmpty()) {
+        oldVec.push(
+          (
+            source,
+            MInfo::create(
+              writes.keys().collect(Array),
+              newDirs.toArray(),
+              reads.toArray(),
+            ),
           ),
-        ),
-      );
+        );
+      };
     };
 
     context.leave(arrow);
@@ -1361,7 +1376,7 @@ base class EagerDir protected {
     dir.parents.items().each(kv ->
       // TODO: Import Mapper from 'from' context env
       from.maybeGetReads(kv.i0, childName).each((arrow, reads) ->
-        context.updateNewDeps(arrow, reads)
+        context.importDeps(from, arrow, reads)
       )
     );
     // Import sub dir (shared sub dir)
@@ -1626,32 +1641,31 @@ base class EagerDir protected {
         ctx.enter(arrow, timeStack);
         path = Path::create(parentName, key);
         oldInfo = child.getOld(path);
-        oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
         newDirsCopy = ctx.newDirs;
         readsCopy = ctx.reads;
         ctx.!newDirs = SortedSet[];
         ctx.!reads = SortedSet[];
 
-        keys = mutable Vector<Key>[];
-        mvalues = SortedMap<Key, mutable Vector<File>>[];
-
-        for (p in parentMaps) {
+        writes = if (parentMaps.size() == 1) {
+          // A single map already groups its writes by output key. Reuse its
+          // arrays instead of collecting them into vectors and copying again.
           writer = mutable Writer{};
-          p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
-          mapped = writer.getWrites();
-          for (kv in mapped) {
-            (k, rvalues) = kv;
-
-            keys.push(k);
-            if (oldKeys.contains(k)) {
-              !oldKeys = oldKeys.remove(k);
+          parentMaps[0].mapper.map(ctx, writer, key, parent.getIterRaw(key));
+          writer.writes
+        } else {
+          // Multiple maps from the same parent contribute in callback order.
+          mvalues = SortedMap<Key, mutable Vector<File>>[];
+          for (p in parentMaps) {
+            writer = mutable Writer{};
+            p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
+            for (k => rvalues in writer.writes) {
+              if (!mvalues.containsKey(k)) {
+                !mvalues = mvalues.set(k, mutable Vector[]);
+              };
+              mvalues[k].extend(rvalues);
             };
-
-            if (!mvalues.containsKey(k)) {
-              !mvalues = mvalues.set(k, mutable Vector[]);
-            };
-            mvalues[k].extend(rvalues);
           };
+          mvalues.map((_, values) -> values.toArray())
         };
 
         newDirs = ctx.newDirs;
@@ -1670,22 +1684,32 @@ base class EagerDir protected {
           ),
         );
 
-        for (k => v in mvalues) {
-          !child = child.writeEntry(ctx, path, path, k, v.toArray());
+        for (k => values in writes) {
+          !child = child.writeEntry(ctx, path, path, k, values);
         };
 
         // Let's remove the keys that no longer exist.
-        for (k in oldKeys) {
-          !child = child.writeEntry(ctx, path, path, k, Array[]);
+        for (k in oldInfo.getKeys()) {
+          if (!writes.containsKey(k)) {
+            !child = child.writeEntry(ctx, path, path, k, Array[]);
+          };
         };
 
         // We need to remember what keys we produced for the next
-        // time around.
-        minfo = MInfo::create(
-          keys.toArray(),
-          newDirs.toArray(),
-          reads.toArray(),
-        );
+        // time around. Forwarding a single key needs no temporary key array.
+        minfo = if (
+          writes.size() == 1 &&
+          newDirs.isEmpty() &&
+          reads.isEmpty()
+        ) {
+          MInfoSingle(writes.minimum().fromSome().i0)
+        } else {
+          MInfo::create(
+            writes.keys().collect(Array),
+            newDirs.toArray(),
+            reads.toArray(),
+          )
+        };
         // The source cannot be removed from old here
         // => prevent getting fixed data minfo on multiple call during update
         !child.old[path] = minfo;
@@ -1706,6 +1730,18 @@ base class EagerDir protected {
 
   fun getArray(context: mutable Context, key: Key): Array<File> {
     this.getIter(context, key).collect(Array);
+  }
+
+  fun getArrayFilter<R: File>(
+    context: mutable Context,
+    key: Key,
+    project: File ~> R,
+  ): Array<R> {
+    values = this.getArrayRaw(key).map(project);
+    context.addFilteredDep(Path::create(this.dirName, key), project, values);
+    // A replaced collection can change its implementation without a row write.
+    context.addRead(Path::dirTag(this.dirName));
+    values
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
@@ -1804,7 +1840,12 @@ base class EagerDir protected {
 
     !this = this with {totalSize, reducer};
 
-    context.updateDirtyReaders(path);
+    projectedValues = if (context.hasReadFilters(path)) {
+      Some(this.getArrayRaw(k))
+    } else {
+      None()
+    };
+    context.updateDirtyReaders(path, projectedValues);
 
     parentTime = this.getTime();
     childDirs = SortedSet[];
@@ -1840,7 +1881,7 @@ base class EagerDir protected {
     };
 
     if (context.debugMode) {
-      print_string(`WRITTEN:  ${this.dirName}${k}`);
+      print_string(`WRITTEN:  ${this.dirName}${k}`.take(130));
     };
 
     if (purgeCount >= PURGE_LIMIT) {

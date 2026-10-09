@@ -41,6 +41,11 @@ fun main(): void {
         .about("Use verbose output."),
     )
     .arg(Cli.Arg::bool("debug").about("Print debug information."))
+    .arg(
+      Cli.Arg::bool("debug-skstore").about(
+        "Trace SKStore dependencies and updates.",
+      ),
+    )
     // Optimization config flags
     // .arg(Cli.Arg::bool("localopts").default(true).negatable())
     .arg(Cli.Arg::bool("dce").default(true).negatable())
@@ -64,6 +69,11 @@ fun main(): void {
         .about(
           "Link the output binary (use --no-link to print link command instead).",
         ),
+    )
+    .arg(
+      Cli.Arg::bool("stop-after-specialization").about(
+        "Stop after specialization for performance experiments; save incremental state without emitting code.",
+      ),
     )
     .arg(
       Cli.Arg::string("sklib-name")
@@ -121,6 +131,7 @@ fun main(): void {
   };
 
   config = Config.Config::make(results);
+  debugSKStore = results.getBool("debug-skstore");
 
   batchManifest = results.maybeGetString("batch");
 
@@ -133,6 +144,9 @@ fun main(): void {
     _context ~> {
       SKStore.CStop(
         Some((context, _, _) ~> {
+          // Tracing is an invocation option, even when the saved context has
+          // debugging enabled and all compiler collections remain cached.
+          context.!debugMode = debugSKStore;
           try {
             batchManifest match {
             | Some(manifest) -> compile_batch(config, context, manifest)

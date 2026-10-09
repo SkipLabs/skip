@@ -173,27 +173,22 @@ char* SKIP_String_concatN(char** arr) {
 }
 
 SkipInt SKIP_String_cmp(unsigned char* str1, unsigned char* str2) {
+  if (str1 == str2) return 0;
   SkipInt size1 = SKIP_String_byteSize((char*)str1);
   SkipInt size2 = SKIP_String_byteSize((char*)str2);
-  unsigned char* end1 = str1 + size1;
-  unsigned char* end2 = str2 + size2;
-  while (1) {
-    if (str1 == end1 && str2 == end2) {
-      return 0;
-    }
-    if (str1 == end1) {
-      return (SkipInt)-1;
-    }
-    if (str2 == end2) {
-      return 1;
-    }
-    unsigned char c1 = *str1;
-    unsigned char c2 = *str2;
-    SkipInt diff = c1 - c2;
-    if (diff != 0) return diff;
-    str1++;
-    str2++;
+  SkipInt size = size1 < size2 ? size1 : size2;
+#ifdef SKIP64
+  int order = memcmp(str1, str2, size);
+  if (order != 0) return (SkipInt)order;
+#else
+  // The wasm runtime's memcmp compares signed chars. Keep unsigned byte
+  // ordering here, including for UTF-8 strings.
+  for (SkipInt i = 0; i < size; ++i) {
+    int order = str1[i] - str2[i];
+    if (order != 0) return (SkipInt)order;
   }
+#endif
+  return size1 < size2 ? (SkipInt)-1 : size1 > size2 ? 1 : 0;
 }
 
 /* 8 bytes with all bits set, which is not valid utf8, but is larger than

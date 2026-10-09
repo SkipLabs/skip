@@ -135,6 +135,10 @@ class TLazyDir{
       for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
         for (key in this.castKeySet(dirtyReaderKeys)) {
           oldValue = this.data.maybeGet(key);
+          if (context.debugMode && oldValue.isSome()) {
+            path = Path::create(dirtyReaderDirName, key);
+            print_string(`INVALIDATED LAZY: ${path} (dependency changed)`);
+          };
           !this.data = this.data.remove(key);
           context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
           oldValue match {
@@ -271,6 +275,12 @@ class TLazyDir{
       context.setDir(ldir);
       ldir
     | _ ->
+      if (
+        context.debugMode &&
+        context.unsafeMaybeGetLazyDir(dirName).isSome()
+      ) {
+        print_string(`INVALIDATED LAZY DIR: ${dirName} (callback changed)`);
+      };
       time = context.timeStamp();
       newDir = static{
         timeStack => TimeStack::create(context, time),

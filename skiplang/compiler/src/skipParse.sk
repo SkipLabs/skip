@@ -269,15 +269,18 @@ module end;
 module SkipParse;
 
 const astDirName: SKStore.DirName = SKStore.DirName::create("/astCache/");
-const astDir: SKStore.EHandle<SKStore.SID, DefsFile> = SKStore.EHandle(
-  SKStore.SID::keyType,
-  DefsFile::type,
-  astDirName,
-);
+const astDir: SKStore.EHandle<
+  FileCache.InputSource,
+  DefsFile,
+> = SKStore.EHandle(FileCache.InputSource::keyType, DefsFile::type, astDirName);
 
-class DefsFile(value: List<SkipAst.Definition>) extends SKStore.File
+class DefsFile(
+  value: List<SkipAst.Definition>,
+  symbols: Map<SourcePositions.Symbol, Position>,
+) extends SKStore.File
 class DefsWithAccessedEnvVarsFile(
   defs: List<SkipAst.Definition>,
+  symbols: Map<SourcePositions.Symbol, Position>,
   accessed_env_vars: SortedSet<String>,
 ) extends SKStore.File
 
@@ -286,8 +289,12 @@ fun parseFile(
   source: String,
 ): DefsWithAccessedEnvVarsFile {
   (fileResult, accessed_env_vars) = SkipParser.parseSource(source, true);
-  defs = parseToAst(file, fileResult);
-  DefsWithAccessedEnvVarsFile(defs, accessed_env_vars)
+  fileResult.throwOnError(file);
+  positions = SourcePositions.Index::create(fileResult.tree);
+  defs = List::createFromItems(
+    ConvertTree.Converter{file, positions}.convertTree(fileResult.tree),
+  );
+  DefsWithAccessedEnvVarsFile(defs, positions.symbols, accessed_env_vars)
 }
 
 fun parseToAst(
@@ -296,7 +303,10 @@ fun parseToAst(
 ): List<SkipAst.Definition> {
   parseResults.throwOnError(file);
   List::createFromItems(
-    ConvertTree.Converter{file}.convertTree(parseResults.tree),
+    ConvertTree.Converter{
+      file,
+      positions => SourcePositions.Index::create(parseResults.tree),
+    }.convertTree(parseResults.tree),
   );
 }
 

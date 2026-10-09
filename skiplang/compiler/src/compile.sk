@@ -5,6 +5,8 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+module alias O = OuterIstToIR;
+
 fun createOptimizedFunctions(
   context: mutable SKStore.Context,
   env: GlobalEnv,
@@ -203,7 +205,17 @@ fun ensureCompatibleLLVMVersion(): void {
   }
 }
 
-class TickConfigFile(value: (Int, Config.Config)) extends SKStore.File
+class ConfigFile(value: Config.Config) extends SKStore.File
+class BackendPhase1File(
+  conf: Config.Config,
+  rootsIR: O.RootsIR,
+) extends SKStore.File
+
+class SpecializerFile(value: O.SpecializerState) extends SKStore.File
+
+class SpecializerDirFile(
+  value: SKStore.EHandle<SKStore.Key, SKStore.File>,
+) extends SKStore.File
 
 // Sink of the backend mapper: for each unit, the compile errors it produced
 // (empty/absent on success). The mapper *emits its outcome* here rather than
@@ -221,10 +233,122 @@ const backendSinkDir: SKStore.EHandle<
   backendSinkDirName,
 );
 
-fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
+class OldFile(files: Array<SKStore.File>) extends SKStore.File
+class TickFile(tick: SKStore.Tick) extends SKStore.File
+
+const maxNbrFunsPerPhase: Int = 100;
+
+fun mergeSpecializerFiles(
+  key: SKStore.Key,
+  left: SKStore.File,
+  right: SKStore.File,
+): SKStore.File {
+  (key, left, right) match {
+  | (
+    O.GClassNameKey _,
+    O.SortedSetSClassIDFile(x),
+    O.SortedSetSClassIDFile(y),
+  ) ->
+    O.SortedSetSClassIDFile(x.union(y))
+  | (O.SupertypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y))
+  | (O.SubtypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y)) ->
+    O.SortedSetSClassIDFile(x.union(y))
+  | (O.HalfSClassKey _, O.SClassIDFile(x), O.SClassIDFile(y)) ->
+    if (x != y) {
+      invariant_violation("Unexpected inequality in sclassMap merge")
+    };
+    right
+  | (O.SClassIDKey _, O.SClassInfoFile(x), O.SClassInfoFile(y)) ->
+    O.SClassInfoFile(x.merge(y))
+  | (O.GFunKeyKey _, O.GFunKeyFile(x), O.GFunKeyFile(y)) ->
+    if (x != y) {
+      invariant_violation("Unexpected inequality in funsNeeded merge")
+    };
+    right
+  | _ -> invariant_violation("Unexpected key or file type in specializer merge")
+  }
+}
+
+fun mergeFun(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+): void {
+  files = mutable Vector[];
+  oldFiles = mutable Vector[];
+  for (file in values) {
+    file match {
+    | OldFile(x) -> oldFiles.extend(x)
+    | x -> files.push(x)
+    }
+  };
+  if (files.isEmpty()) {
+    return writer.setArray(key, oldFiles.toArray())
+  };
+  key match {
+  | O.GClassNameKey _
+  | O.SubtypesKey _
+  | O.SupertypesKey _ ->
+    // Each writer contributes only its newly discovered relationships. Keep
+    // the previous round's set as another contribution; SKStore retracts a
+    // writer's old contributions when that writer is recomputed or removed.
+    ids = SortedSet<SClassID>[];
+    oldFiles.extend(files);
+    for (file in oldFiles) {
+      file match {
+      | O.SortedSetSClassIDFile(previousIDs) -> !ids = ids.union(previousIDs)
+      | O.SClassIDFile(id) -> !ids = ids.set(id)
+      | _ -> invariant_violation("Unexpected relationship contribution")
+      }
+    };
+    writer.set(key, O.SortedSetSClassIDFile(ids))
+  | O.FStackElement _ ->
+    // Continuations already represent a started function. Keep every bundle
+    // of blocked operations and discard duplicate requests to start it again.
+    continuations = mutable Vector[];
+    for (elt in files) {
+      elt match {
+      | c @ O.ContinuationFile _ -> continuations.push(c)
+      | O.FStackElement _ -> void
+      | _ -> invariant_violation("Unexpected function work file")
+      }
+    };
+    if (continuations.isEmpty()) {
+      writer.setArray(key, Array[files.first()])
+    } else {
+      writer.setArray(key, continuations.toArray())
+    }
+  | SKStore.IID(0) -> writer.setArray(key, files.toArray())
+  | _ ->
+    merged: ?SKStore.File = None();
+    for (file in files) {
+      !merged = merged match {
+      | None() -> Some(file)
+      | Some(previous) -> Some(mergeSpecializerFiles(key, previous, file))
+      }
+    };
+    merged match {
+    | Some(file) -> writer.set(key, file)
+    | None() -> invariant_violation("Expected files to merge")
+    }
+  }
+}
+
+fun getOrInitializeBackend(
+  context: mutable SKStore.Context,
+): (
+  SKStore.EHandle<SKStore.IID, ConfigFile>,
+  SKStore.EHandle<SKStore.IID, TickFile>,
+) {
   backendDirName = SKStore.DirName::create("/backend/");
+  tickDirName = SKStore.DirName::create("/tick/");
   context.unsafeMaybeGetEagerDir(backendDirName) match {
-  | Some(dir) -> return dir
+  | Some _ ->
+    return (
+      SKStore.EHandle(SKStore.IID::keyType, ConfigFile::type, backendDirName),
+      SKStore.EHandle(SKStore.IID::keyType, TickFile::type, tickDirName),
+    )
   | None() -> void
   };
 
@@ -239,42 +363,54 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
     FileCache.packageDirName,
   );
   backendDir = context.mkdir(
-    SKStore.UnitID::keyType,
-    TickConfigFile::type,
+    SKStore.IID::keyType,
+    ConfigFile::type,
     backendDirName,
   );
 
-  outerIst = OuterIstToIR.makeOuterIst(context);
+  tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
+
+  outerIst = O.makeOuterIst(context);
 
   defsProj = outerIst.getFunsProj(context);
   constsProj = outerIst.getConstsProj(context);
 
-  converter = OuterIstToIR.Converter::create(
+  converter = O.Converter::create(
     context,
     SKStore.DirName::create("/converter/"),
     outerIst,
   );
 
-  _ = backendDir.map(
+  _ = tickDir.map(
     SKStore.UnitID::keyType,
     SkipError.ErrorsFile::type,
     context,
     backendSinkDirName,
-    (context, writer, key, values) ~> {
-      (_, conf) = values.first.value;
-
+    (context, writer, _key, _values) ~> {
       context.getGlobal("ERRORS") match {
       | None() -> void
       | Some(errors) ->
-        // A compile error: emit it as this unit's outcome and stop. Reporting
-        // (or, in batch mode, recovering) is `compile()`'s job — doing control
-        // flow from inside the reactive mapper would corrupt the context.
         writer.set(
-          key,
+          SKStore.UnitID::singleton,
           SkipError.ErrorsFile(
             SkipError.ErrorsFile::type(errors).value.reversed(),
           ),
-        );
+        )
+      }
+    },
+  );
+
+  backendPhase1 = backendDir.map(
+    SKStore.IID::keyType,
+    BackendPhase1File::type,
+    context,
+    SKStore.DirName::create("/backendPhase1/"),
+    (context, writer, key, values) ~> {
+      conf = values.first.value;
+
+      if (
+        !backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()
+      ) {
         return void
       };
 
@@ -286,7 +422,6 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
         compile_sklib(context, conf);
         return void
       };
-
       // Create a filter for what functions to compile.
       shouldRuntimeExport = (
         funDef ~>
@@ -324,37 +459,299 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
                 )))
       );
 
-      // The frontend (naming/typing of the stdlib) is computed lazily and
-      // realized here as createIR forces the typed defs, so this phase
-      // dominates compile time.
-      env = runCompilerPhase("frontend+ir", () -> {
-        OuterIstToIR.createIR(
-          context,
-          conf,
-          shouldDisasm,
-          shouldRuntimeExport,
-          outerIst,
-          converter,
-          constsProj,
-          defsProj,
-        )
+      defsIR = O.prepareCreateIR(
+        context,
+        shouldDisasm,
+        shouldRuntimeExport,
+        outerIst,
+        converter,
+        constsProj,
+        defsProj,
+      );
+      debug(("phase1 updated", defsIR.forceCompile.size()));
+      writer.set(key, BackendPhase1File(conf, defsIR))
+    },
+  );
+
+  specializerEmptyDir = context.mkdir(
+    x ~> x,
+    x ~> x,
+    SKStore.DirName::create("/specializer/empty/"),
+  );
+  specializerInitDir = backendDir.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/init/"),
+    (context, writer, _key, _values) ~> {
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
+      prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
+      conf = prevPhase.conf;
+      specializer = O.createSpecializer(
+        context,
+        conf,
+        converter,
+        specializerEmptyDir,
+      );
+      specializer.mclone(context).writeDiff(writer);
+      roots = prevPhase.rootsIR.forceCompile.map(root ->
+        O.FStackElement(root, Array[], Array[])
+      );
+      debug("Updating roots");
+
+      for (root in roots) {
+        writer.setArray(root, Array[root]);
+      };
+      writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
+    },
+  );
+
+  specializerInitMerged = specializerInitDir.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/init-merged/"),
+    mergeFun,
+  );
+
+  specializerDir = backendDir.map(
+    SKStore.IID::keyType,
+    SpecializerDirFile::type,
+    context,
+    SKStore.DirName::create("/specializer/"),
+    (context, writer, _, _) ~> {
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
+      specializerAllDir = specializerInitMerged;
+      phaseNumber = 0;
+
+      while (!specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {
+        phaseNumberCopy = phaseNumber;
+        specializerAllDirCopy = specializerAllDir;
+        // Class creation inherits discovered methods, and method discovery
+        // visits existing subclasses. Run them in separate rounds so each
+        // sees the other's merged writes.
+        classPhase = specializerAllDirCopy
+          .getArray(context, SKStore.IID(0))
+          .any(value -> value is O.CStackElement _);
+        // Collect temporary allocations once the complete round is evaluated.
+        // withRegion preserves the context, including its dependencies.
+        !specializerAllDir = SKStore.withRegion(context, (_, context) ~> {
+          nextDir = specializerAllDirCopy
+            .map(
+              x ~> x,
+              x ~> x,
+              context,
+              SKStore.DirName::create(
+                "/specializer/reduced1/" + phaseNumberCopy + "/",
+              ),
+              (context, writer, key, values) ~> {
+                if (
+                  !backendSinkDir
+                    .getArray(context, SKStore.UnitID::singleton)
+                    .isEmpty()
+                ) {
+                  return void
+                };
+                key match {
+                | SKStore.IID _ if (!classPhase) ->
+                  debug(("KK", phaseNumberCopy));
+                  for (value in values) {
+                    invariant(value is SKStore.IntFile _);
+                  };
+                  return void
+                | O.FStackElement _ if (classPhase) ->
+                  // These are still pending work, including any continuations.
+                  // Forward them directly so mergeFun keeps them over new
+                  // requests for the same function from class creation.
+                  writer.setArray(key, values.toArray());
+                  writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
+                  return void
+                | SKStore.IID _
+                | O.FStackElement _ ->
+                  void
+                | _ -> return writer.set(key, OldFile(values.toArray()))
+                };
+
+                config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+                specializer = O.Specializer::make(
+                  specializerAllDirCopy,
+                  context,
+                  config,
+                  converter,
+                );
+                invariant(specializer.funStack is List.Nil());
+                invariant(specializer.classStack is List.Nil());
+
+                key match {
+                | SKStore.IID _ ->
+                  debug(("KK", phaseNumberCopy));
+                  for (value in values) {
+                    value match {
+                    | SKStore.IntFile _ -> void
+                    | classElt @ O.CStackElement _ ->
+                      specializer.!pos = classElt.pos;
+                      _sclassInfo = O.Specializer::getSClass2CPS(
+                        context,
+                        specializer,
+                        classElt.hc,
+                        classElt.k,
+                      )
+                    | _ -> invariant_violation("Unexpected IID key")
+                    }
+                  };
+                  if (specializer.funStack is List.Cons _) {
+                    for (f in specializer.funStack) {
+                      writer.setArray(f, Array[f]);
+                      writer.setArray(
+                        SKStore.IID(0),
+                        Array[SKStore.IntFile(1)],
+                      );
+                    };
+                    specializer.!funStack = List.Nil();
+                  };
+                  specializer.writeDiff(writer)
+
+                | origin @ O.FStackElement _ ->
+                  needsIID = false;
+                  for (value in values) {
+                    specializer.!pauseOnSClassCreation = true;
+                    value match {
+                    | f @ O.FStackElement _ ->
+                      specializer.specializePendingFun(f)
+
+                    | c @ O.ContinuationFile _ ->
+                      for (pending in c.pending) {
+                        invariant(pending.origin == origin);
+                        specializer.!pos = pending.pos;
+                        try {
+                          specializer.!fstackOrigin = Some(origin);
+                          _ = O.Specializer::getSClass2CPS(
+                            context,
+                            specializer,
+                            pending.hc,
+                            pending.k,
+                          );
+                          specializer.!fstackOrigin = None();
+                        } catch {
+                        | O.SClassCreatedExn() ->
+                          specializer.!fstackOrigin = None();
+                          void
+                        | x ->
+                          specializer.!fstackOrigin = None();
+                          throw x
+                        }
+                      }
+                    | _ -> invariant_violation("Unexpected type (compile.sh)")
+                    };
+                  };
+                  if (specializer.funStack is List.Cons _) {
+                    for (f in specializer.funStack) {
+                      writer.setArray(f, Array[f]);
+                    };
+                    !needsIID = true;
+                    specializer.!funStack = List.Nil();
+                  };
+                  specializer.!pauseOnSClassCreation = false;
+                  if (specializer.classStack is List.Cons _) {
+                    pending = specializer.classStack.reversed().toArray();
+                    writer.setArray(
+                      SKStore.IID(0),
+                      pending.map(classElt ->
+                        classElt with {k => (_, _, _) ~> void}
+                      ),
+                    );
+                    writer.setArray(
+                      origin,
+                      Array[O.ContinuationFile(origin, pending)],
+                    );
+                    specializer.!classStack = List.Nil();
+                  } else if (needsIID) {
+                    writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
+                  };
+                  specializer.writeDiff(writer)
+
+                | _ -> invariant_violation("Unexpected specializer work key")
+                }
+              },
+            )
+            .map(
+              x ~> x,
+              x ~> x,
+              context,
+              SKStore.DirName::create(
+                "/specializer/merge1/" + phaseNumberCopy + "/",
+              ),
+              mergeFun,
+            );
+          _ = nextDir.getArray(context, SKStore.IID(0));
+          nextDir
+        });
+
+        !phaseNumber = phaseNumber + 1;
+      };
+      writer.set(SKStore.IID(0), SpecializerDirFile(specializerAllDir));
+    },
+  );
+
+  backendEmitDir = backendDir.map(
+    SKStore.IID::keyType,
+    ConfigFile::type,
+    context,
+    SKStore.DirName::create("/backendPhase2/"),
+    (context, _writer, _key, _values) ~> {
+      if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
+        return void
+      };
+      prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
+      partialConfig = prevPhase.conf;
+      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+      specializerDataDir = specializerDir.getArray(context, SKStore.IID(0))[
+        0,
+      ].value;
+      specializer = O.Specializer::make(
+        specializerDataDir,
+        context,
+        partialConfig,
+        converter,
+      );
+      specializer.specializePendingFuns();
+
+      specializer.toFixed(context);
+      specializer.!canCreateNewSClasses = false;
+      debug(("specializer created"));
+      // Return from the callback so context.update() and database persistence
+      // still finish normally in specialization-only experiments.
+      if (config.stopAfterSpecialization) return void;
+
+      roots = prevPhase.rootsIR;
+      env = O.createIR(context, config, roots, specializer);
+      debug("rest of outer");
+      !env = createOptimizedFunctions(context, env, config);
+      debug("optims");
+      defs = runCompilerPhase("native/create_asm_graph", () -> {
+        AsmOutput.createAsmDefGraph(env, config)
       });
 
-      !env = createOptimizedFunctions(context, env, conf);
-      defs = runCompilerPhase("native/create_asm_graph", () -> {
-        AsmOutput.createAsmDefGraph(env, conf)
-      });
+      debug("asm graph");
 
       runCompilerPhase("native/merge_asm_graph", () -> {
-        AsmOutput.mergeIdenticalAsmDefs(defs, conf.debug)
+        AsmOutput.mergeIdenticalAsmDefs(defs, config.debug)
       });
+
+      debug("merged_asm_graph");
 
       runCompilerPhase("native/create_asm_symbols", () -> {
         AsmOutput.assignFinalSymbols(defs)
       });
 
-      conf.emit match {
-      | "llvm-ir" -> compile_llvm_ir(defs, conf)
+      debug("symbols");
+
+      config.emit match {
+      | "llvm-ir" -> compile_llvm_ir(defs, config, env.sourcePositions)
       | "link" | "cdylib" ->
         // TODO: Remove exports stuff once --emit=cdylib is supported.
         wasm_exports = outerIst
@@ -372,15 +769,24 @@ fun getOrInitializeBackend(context: mutable SKStore.Context): SKStore.EagerDir {
               ).isSome()
           )
           .map(exportName);
-        compile_binary(defs, conf, wasm_exports)
+        compile_binary(defs, config, wasm_exports, env.sourcePositions)
       | "sklib" ->
         invariant_violation("--emit=sklib should have been handled earlier")
-      | _ -> invariant_violation("Unsupported value for `--emit`: " + conf.emit)
+      | _ ->
+        invariant_violation("Unsupported value for `--emit`: " + config.emit)
       }
     },
   );
 
-  context.unsafeGetEagerDir(backendDirName)
+  context.setDir(
+    context
+      .unsafeGetEagerDir(backendEmitDir.dirName)
+      .withTimeStack(
+        SKStore.TimeStack::create(context, SKStore.Time(Int::max)),
+      ),
+  );
+
+  (backendDir, tickDir)
 }
 
 fun compile(
@@ -400,13 +806,13 @@ fun compile(
     SkipError.setBatchMode(context)
   };
 
-  runCompilerPhase("backend/init", () -> {
-    getOrInitializeBackend(context).writeArray(
-      context,
-      SKStore.UnitID::singleton,
-      Array[TickConfigFile((context.getTick().value, config))],
-    )
-  });
+  (backendDir, tickDir) = getOrInitializeBackend(context);
+  backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)]);
+  tickDir.writeArray(
+    context,
+    SKStore.IID(0),
+    Array[TickFile(context.getTick())],
+  );
 
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
@@ -425,6 +831,22 @@ fun compile(
       make_input_source_path,
     )
   });
+
+  if (
+    !config.stopAfterSpecialization &&
+    config.output != "-" &&
+    !FileSystem.exists(config.output)
+  ) {
+    // Output files are external side effects. Replay the final backend map
+    // when the output disappears, preserving cached specialization work.
+    key: SKStore.Key = SKStore.IID(0);
+    reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
+      parentName => backendDir.dirName,
+      childName => SKStore.DirName::create("/backendPhase2/"),
+      key,
+    };
+    context.invalidateReader(reader);
+  };
 
   runCompilerPhase("frontend/update", () -> context.update());
 
@@ -535,9 +957,16 @@ fun compile_batch(
 fun compile_llvm_ir(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   conf: Config.Config,
+  positions: SourcePositions.Table,
 ): void {
   runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, conf.input_files, conf.output, conf)
+    AsmOutput.writeOutputFiles(
+      defs,
+      conf.input_files,
+      conf.output,
+      conf,
+      positions,
+    )
   })
 }
 
@@ -545,12 +974,15 @@ fun compile_binary(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   conf: Config.Config,
   exports: Array<String>,
+  positions: SourcePositions.Table,
 ): void {
   // TODO: Use `mkstemp()` instead.
   llFile = conf.output + ".ll";
   runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf)
+    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf, positions)
   });
+
+  debug("wrote asm files");
 
   runCompilerPhase("native/link", () -> {
     getLinkArgs(llFile, conf, exports).each(args -> {

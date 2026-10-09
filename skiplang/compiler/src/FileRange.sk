@@ -13,10 +13,10 @@ module FileRange;
 
 base class .Pos{
   file: FileCache.InputSource,
-  range: TextRange,
+  range: SourcePositions.Range,
 } uses Hashable, Orderable, Show {
   static fun create(file: FileCache.InputSource, range: TextRange): FileRange {
-    FileRange{file, range}
+    FileRange{file, range => SourcePositions.Range::absolute(range)}
   }
 
   static fun fromStartEnd(start: FilePosition, end: FilePosition): FileRange {
@@ -27,25 +27,12 @@ base class .Pos{
     );
   }
 
-  fun start(): FilePosition {
-    FilePosition.create(this.file, this.range.start);
+  fun startPosition(positions: SourcePositions.Table): Position {
+    positions.resolve(this).start
   }
 
-  fun end(): FilePosition {
-    FilePosition.create(this.file, this.range.end);
-  }
-
-  fun startPosition(): Position {
-    this.range.start;
-  }
-
-  fun endPosition(): Position {
-    this.range.end;
-  }
-
-  fun contains(position: FilePosition): Bool {
-    // TODO: invariant(this.file == position.file);
-    this.range.contains(position.position);
+  fun endPosition(positions: SourcePositions.Table): Position {
+    positions.resolve(this).end
   }
 
   protected fun defaultToString(): String {
