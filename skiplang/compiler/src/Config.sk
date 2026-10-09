@@ -82,6 +82,9 @@ class Config{
   canonize_paths: Bool,
   cwd: WorkingDirectory,
   batch_mode: Bool = false,
+  // Escape hatch: allow reaching module-`private` elements from other modules
+  // (e.g. white-box tests). Off by default so enforcement stays on.
+  bypass_module_private: Bool = false,
 } {
   static fun make(results: Cli.ParseResults): this {
     optConfig = Optimize.Config::make(
@@ -184,6 +187,7 @@ class Config{
     autogc = results.getBool("autogc");
     sampleRate = results.getString("sample-rate").toInt();
     useSpecializedNames = results.getBool("use-specialized-names");
+    bypass_module_private = results.getBool("allow-module-private-access");
     check = results.getBool("check");
     no_link = !results.getBool("link");
 
@@ -268,6 +272,7 @@ class Config{
       autogc,
       sampleRate,
       useSpecializedNames,
+      bypass_module_private,
       check,
       no_link,
       stackAlign,
