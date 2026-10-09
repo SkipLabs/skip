@@ -1,65 +1,56 @@
 module TOML;
 
+// Validates that `tok` is a well-formed TOML float, then parses it with the
+// correctly-rounded `String.toFloat` (Ryu s2d on WASM, libc strtod on native).
+// Reconstructing the value here by hand (repeated `* 0.1`) was not correctly
+// rounded, e.g. "3.14" parsed to 3.1400000000000006 instead of the nearest
+// double, which broke round-tripping once Float.toString became exact.
 private fun parseFloat(tok: .String): ?.Float {
   iter = tok.getIter();
 
-  sign = iter.current().fromSome() match {
-  | '-' ->
-    _ = iter.next();
-    -1.0
-  | '+' ->
-    _ = iter.next();
-    1.0
-  | _ -> 1.0
+  // Optional leading sign.
+  iter.current() match {
+  | Some('-')
+  | Some('+') ->
+    _ = iter.next()
+  | _ -> void
   };
 
-  result = eatInteger(iter) match {
+  // Integer part: required, no leading zeros (a lone "0" is allowed).
+  eatInteger(iter) match {
   | Some((0, 0)) -> return None()
-  | Some((0, 1)) -> 0.0
-  | Some((x, 0)) -> x.toFloat()
+  | Some((0, 1)) -> void
+  | Some((_, 0)) -> void
   | _ -> return None()
   };
 
-  e = 0;
-  iter.current().fromSome() match {
-  | '.' ->
+  // Optional fractional part; a '.' must be followed by at least one digit.
+  iter.current() match {
+  | Some('.') ->
     _ = iter.next();
     eatInteger(iter) match {
     | Some((0, 0)) -> return None()
-    | Some((decimalPart, leadingZeros)) ->
-      for (_ in Range(0, leadingZeros)) {
-        !result = 10.0 * result;
-        !e = e - 1
-      };
-      i = decimalPart;
-      while (i != 0) {
-        !result = 10.0 * result;
-        !e = e - 1;
-        !i = i / 10
-      };
-      !result = result + decimalPart.toFloat()
-    | _ -> return None()
+    | Some(_) -> void
+    | None() -> return None()
     }
   | _ -> void
   };
 
+  // Optional exponent.
   iter.current() match {
   | Some('e')
   | Some('E') ->
     _ = iter.next();
-    expSign = iter.current().fromSome() match {
-    | '-' ->
-      _ = iter.next();
-      -1
-    | '+' ->
-      _ = iter.next();
-      1
-    | _ -> 1
+    iter.current() match {
+    | Some('-')
+    | Some('+') ->
+      _ = iter.next()
+    | _ -> void
     };
     eatInteger(iter) match {
     | Some((0, 0)) -> return None()
-    | Some((exp, _)) -> !e = e + expSign * exp
-    | _ -> return None()
+    | Some(_) -> void
+    | None() -> return None()
     }
   | _ -> void
   };
@@ -68,17 +59,16 @@ private fun parseFloat(tok: .String): ?.Float {
     return None()
   };
 
-  while (e > 0) {
-    !result = 10.0 * result;
-    !e = e - 1
-  };
-
-  while (e < 0) {
-    !result = 0.1 * result;
-    !e = e + 1
-  };
-
-  Some(sign * result)
+  // Strip TOML digit-group underscores and a leading '+', which
+  // `String.toFloat` (and Ryu s2d) does not accept, then parse.
+  digits = tok.replace("_", "");
+  Some(
+    if (digits.startsWith("+")) {
+      digits.stripPrefix("+").toFloat()
+    } else {
+      digits.toFloat()
+    },
+  )
 }
 
 module end;

@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "ryu/ryu_parse.h"
 
 #ifdef SKIP64
 #include <stdlib.h>
@@ -279,6 +280,16 @@ double SKIP_String__toFloat_raw(char* str) {
   memcpy(cstr, str, size);
   cstr[size] = 0;
 
+#ifdef SKIP32
+  // WASM has no libc strtod, and the atof below reconstructs the value with
+  // repeated `* 0.1`, which is not correctly rounded (breaks round-trip). Use
+  // Ryu's s2d, which is correctly rounded, for the inputs it supports (<=17
+  // significant digits, standard formats); fall back to atof for the rest.
+  double parsed;
+  if (s2d_n(cstr, (int)size, &parsed) == SUCCESS) {
+    return parsed;
+  }
+#endif
   return atof(cstr);
 }
 
