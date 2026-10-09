@@ -7,16 +7,15 @@ const config: Config = {
   tagline: "A generic framework for reactive programming",
   favicon: "img/favicon.svg",
 
-  // Set the production url of your site here
-  url: "https://skiplabs.io/",
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: "/",
+  // Production url of the site, and the pathname under which it is served.
+  // The GitHub Pages workflow (.github/workflows/docs.yml) overrides these
+  // with the values Pages reports, e.g. https://skiplabs.github.io + /skip/
+  // until the skiplabs.io custom domain is configured.
+  url: process.env.DOCS_URL ?? "https://skiplabs.io/",
+  baseUrl: process.env.DOCS_BASE_URL ?? "/",
 
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: "skiplabs", // Usually your GitHub org/user name.
-  projectName: "skip", // Usually your repo name.
+  organizationName: "skiplabs",
+  projectName: "skip",
 
   onBrokenLinks: "throw",
   markdown: {
