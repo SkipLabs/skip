@@ -217,10 +217,9 @@ class SpecializerDirFile(
   value: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ) extends SKStore.File
 
-// Sink of the backend mapper: for each unit, the compile errors it produced
-// (empty/absent on success). The mapper *emits its outcome* here rather than
-// reporting errors from inside the reactive computation; `compile()` reads it
-// back after `update()` and decides what to do.
+// Frontend errors for the current unit (empty/absent on success). The
+// backend checks this once before entering specialization and throws on
+// failure, so unsuccessful updates never reach persistence.
 const backendSinkDirName: SKStore.DirName = SKStore.DirName::create(
   "/backendSink/",
 );
@@ -232,6 +231,25 @@ const backendSinkDir: SKStore.EHandle<
   SkipError.ErrorsFile::type,
   backendSinkDirName,
 );
+
+// Render errors while the failed invocation still has its current source
+// contents. The top-level handler exits before SKStore can persist the update;
+// batch mode catches the exception and discards this unit's forked context.
+fun throwIfFrontendErrors(context: mutable SKStore.Context): void {
+  backendSinkDir.maybeGet(context, SKStore.UnitID::singleton) match {
+  | Some(ef) if (!ef.value.isEmpty()) ->
+    get_file = file -> {
+      FileCache.fileDir.unsafeGetArray(context, file)[0].value
+    };
+    throw SkipError.CompileFailureException{
+      message => SkipError.errorsToString(
+        ef.value.map(x -> x.errors).flatten().collect(Vector),
+        get_file,
+      ),
+    }
+  | _ -> void
+  }
+}
 
 class OldFile(files: Array<SKStore.File>) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
@@ -408,11 +426,7 @@ fun getOrInitializeBackend(
     (context, writer, key, values) ~> {
       conf = values.first.value;
 
-      if (
-        !backendSinkDir.getArray(context, SKStore.UnitID::singleton).isEmpty()
-      ) {
-        return void
-      };
+      throwIfFrontendErrors(context);
 
       if (conf.check) {
         return void;
@@ -547,13 +561,6 @@ fun getOrInitializeBackend(
                 "/specializer/reduced1/" + phaseNumberCopy + "/",
               ),
               (context, writer, key, values) ~> {
-                if (
-                  !backendSinkDir
-                    .getArray(context, SKStore.UnitID::singleton)
-                    .isEmpty()
-                ) {
-                  return void
-                };
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
                   for (value in values) {
@@ -689,8 +696,16 @@ fun getOrInitializeBackend(
 
         !phaseNumber = phaseNumber + 1;
       };
+      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+      if (config.verbose) {
+        print_error(`Incremental specialization: ${phaseNumber} rounds`)
+      };
       writer.set(SKStore.IID(0), SpecializerDirFile(specializerAllDir));
     },
+    // The pipeline collects each round. An enclosing mapper region would
+    // copy the complete pipeline state again after its final round.
+    None(),
+    false,
   );
 
   backendEmitDir = backendDir.map(
@@ -837,26 +852,9 @@ fun compile(
 
   runCompilerPhase("frontend/update", () -> context.update());
 
-  // The backend mapper records any compile errors as this unit's outcome in
-  // `/backendSink/` (absent on success). Report them here, out of the reactive
-  // computation. In batch mode a failure is recoverable (surface it as an
-  // exception so the batch can move on); otherwise it exits the process.
-  backendSinkDir.maybeGet(context, SKStore.UnitID::singleton) match {
-  | Some(ef) if (!ef.value.isEmpty()) ->
-    get_file = file -> {
-      FileCache.fileDir.unsafeGetArray(context, file)[0].value
-    };
-    if (config.batch_mode) {
-      msg = SkipError.errorsToString(
-        ef.value.map(x -> x.errors).flatten().collect(Vector),
-        get_file,
-      );
-      throw SkipError.CompileFailureException{message => msg}
-    } else {
-      SkipError.printErrorsAndExit(ef.value.toArray(), get_file)
-    }
-  | _ -> void
-  }
+  // Also check invocations that bypass or reuse the backend entry point,
+  // including --check. Failures abort before the transaction is persisted.
+  throwIfFrontendErrors(context)
 }
 
 // Type the stdlib (dependencies) once into `context`, with no config written

@@ -415,4 +415,77 @@ fun testMapSharedOutputRemoval(): void {
   T.expectEq(output(), Array[]);
 }
 
+@test
+fun testMapWithOwnRegions(): void {
+  for (collect in Array[true, false]) {
+    sourceName = SKStore.DirName::create("/region-source/");
+    biasName = SKStore.DirName::create("/region-bias/");
+    outputName = SKStore.DirName::create("/region-output/");
+    context = SKStore.run(context ~> {
+      source = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        sourceName,
+        Array[(SKStore.IID(0), SKStore.IntFile(1))],
+      );
+      bias = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        biasName,
+        Array[(SKStore.IID(0), SKStore.IntFile(10))],
+      );
+      _ = source.map(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        context,
+        outputName,
+        (context, writer, key, values) ~> {
+          value = values.first.value;
+          result = SKStore.withRegion(context, (_, context) ~> {
+            offset = bias.getArray(context, SKStore.IID(0))[0].value;
+            // Exercise retained context state as well as a returned value.
+            context.setGlobal("region-result", SKStore.IntFile(value + offset));
+            SKStore.IntFile(value + offset)
+          });
+          writer.set(key, result)
+        },
+        None(),
+        collect,
+      );
+    });
+    expect = (context: mutable SKStore.Context, value: Int) ~> {
+      T.expectEq(
+        getData(context, outputName, SKStore.IID(0))
+          .map(SKStore.IntFile::type)
+          .map(f -> f.value),
+        Array[value],
+      );
+      T.expectEq(
+        context.getGlobal("region-result").map(SKStore.IntFile::type).map(f ->
+          f.value
+        ),
+        Some(value),
+      );
+    };
+    expect(context, 11);
+    write(context, sourceName, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+    context.update();
+    expect(context, 12);
+    write(context, biasName, SKStore.IID(0), Array[SKStore.IntFile(20)]);
+    context.update();
+    expect(context, 22);
+    write(context, sourceName, SKStore.IID(0), Array[]);
+    context.update();
+    T.expectEq(
+      getData(context, outputName, SKStore.IID(0))
+        .map(SKStore.IntFile::type)
+        .map(f -> f.value),
+      Array[],
+    );
+    write(context, sourceName, SKStore.IID(0), Array[SKStore.IntFile(3)]);
+    context.update();
+    expect(context, 23);
+  }
+}
+
 module end;

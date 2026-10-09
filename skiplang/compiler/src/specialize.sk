@@ -1658,7 +1658,10 @@ mutable class Specializer{
   }
 
   mutable fun specializePendingFun(stackElt: FStackElement): void {
-    this.withRegion(this.context, (context, specializer) ~> {
+    specialize = (
+      context: mutable SKStore.Context,
+      specializer: mutable Specializer,
+    ) ~> {
       try {
         specializer.!fstackOrigin = Some(stackElt);
         result = static::specializePendingFunCPS(
@@ -1679,7 +1682,14 @@ mutable class Specializer{
         specializer.!fstackOrigin = None();
         throw x
       }
-    })
+    };
+    if (this.pauseOnSClassCreation) {
+      // Incremental discovery runs within the pipeline's per-round region.
+      // Avoid a nested region and cloning the specializer for each request.
+      specialize(this.context, this)
+    } else {
+      this.withRegion(this.context, specialize)
+    }
   }
 
   // Specializes pending functions. Returns true if anything changed.

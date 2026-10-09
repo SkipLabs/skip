@@ -126,9 +126,9 @@ fun printErrorsAndExit<T>(
 
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
-// A recoverable compilation failure: in batch mode a failing unit throws
-// this instead of exiting the process, so the batch can report it and move
-// on to the next unit.
+// A rendered compilation failure. The command-line handler reports it and
+// exits before synchronization commits the failed update. In batch mode the
+// unit handler records it and continues with the remaining isolated units.
 class CompileFailureException{message: String} extends Exception {
   fun getMessage(): String {
     this.message

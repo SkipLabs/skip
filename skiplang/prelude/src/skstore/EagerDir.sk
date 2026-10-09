@@ -60,6 +60,12 @@ mutable class Writer{
 
 base class Mapper<K: frozen, F: frozen> uses Unsafe.Downcastable, Equality {
   fun map(mutable Context, mutable Writer, K, mutable Iterator<F>): void;
+
+  // Mappers that collect their own temporary work may opt out of the
+  // enclosing row region, which otherwise copies all retained context state.
+  overridable fun collectsRows(): Bool {
+    true
+  }
 }
 
 /*****************************************************************************/
@@ -95,7 +101,12 @@ class Parent(
 
 class LambdaMapper<K: frozen, F: frozen>(
   lambda: MapFun<K, F>,
+  collect: Bool = true,
 ) extends Mapper<K, F> {
+  fun collectsRows(): Bool {
+    this.collect
+  }
+
   fun map(
     context: mutable Context,
     writer: mutable Writer,
@@ -107,7 +118,8 @@ class LambdaMapper<K: frozen, F: frozen>(
 
   fun ==(other: Mapper<K, F>): Bool {
     Unsafe.maybeCast(other, LambdaMapper<K, F>) match {
-    | Some(o) -> native_eq(this.lambda, o.lambda) == 0
+    | Some(o) ->
+      this.collect == o.collect && native_eq(this.lambda, o.lambda) == 0
     | _ -> false
     }
   }
@@ -1081,7 +1093,7 @@ base class EagerDir protected {
   }
 
   protected static fun subMapData(
-    obstack: Obstack,
+    obstack: ?Obstack,
     context: mutable Context,
     parent: EagerDir,
     childName: DirName,
@@ -1123,7 +1135,7 @@ base class EagerDir protected {
           current,
         );
         !size = size + 1;
-        if (shouldGC(obstack) != 0) {
+        if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
           return (acc, oldVec, Some(fixedKey), current.value);
         }
       };
@@ -1146,7 +1158,7 @@ base class EagerDir protected {
         f,
       );
       !size = size + 1;
-      if (shouldGC(obstack) != 0) {
+      if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
         return (acc, oldVec, Some(key), current.value);
       }
     };
@@ -1164,7 +1176,7 @@ base class EagerDir protected {
         current,
       );
       !size = size + 1;
-      if (shouldGC(obstack) != 0) {
+      if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
         return (acc, oldVec, Some(fixedKey), current.value);
       }
     };
@@ -1200,6 +1212,24 @@ base class EagerDir protected {
       min(parent.fixedData.data.size() - 1, pos)
     };
 
+    if (!f.collectsRows()) {
+      (localAcc, localOldVec, _, _) = static::subMapData(
+        None(),
+        context,
+        parent,
+        childName,
+        timeStack,
+        f,
+        current,
+        currentEnd,
+        last,
+        end,
+      );
+      acc.extend(localAcc);
+      oldVec.extend(localOldVec);
+      return void
+    };
+
     loop {
       lcurrent = current;
       llast = last;
@@ -1208,7 +1238,7 @@ base class EagerDir protected {
         context,
         (obstack, context) ~> {
           static::subMapData(
-            obstack,
+            Some(obstack),
             context,
             parent,
             childName,
@@ -1716,6 +1746,7 @@ base class EagerDir protected {
         ctx.leave(arrow);
         child
       },
+      parentMaps.all(p -> p.mapper.collectsRows()),
     );
 
     context.setDir(childRef);
@@ -2380,10 +2411,13 @@ class TEagerDir extends EagerDir, TDir {
     childName: DirName,
     reducerOpt: ?IReducer<File> = None(),
     unsafeSkipInit: Bool = false,
+    collect: Bool = true,
   ): void {
     static::applyManyFor(
       context,
-      parents.map(arr ~> arr.map(t -> Parent(LambdaMapper(t.i0), t.i1, t.i2))),
+      parents.map(arr ~>
+        arr.map(t -> Parent(LambdaMapper(t.i0, collect), t.i1, t.i2))
+      ),
       childName,
       reducerOpt,
       unsafeSkipInit,

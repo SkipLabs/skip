@@ -196,7 +196,9 @@ private fun incrementalFrontendErrors(): void {
     "}\n" +
     "fun unused(): Int { 42 }\n" +
     "fun main(): void { (mutable ErrorGateExample{}).run() }\n";
-  args = compile_cmd(Array[source], output).concat(Array["--emit=llvm-ir"]);
+  args = compile_cmd(Array[source], output).concat(
+    Array["--emit=llvm-ir", "--verbose"],
+  );
   writeSource = (contents, timestamp) -> {
     FileSystem.writeTextFile(source, contents);
     // FileCache uses second-resolution mtimes to discover edits.
@@ -238,8 +240,9 @@ private fun incrementalFrontendErrors(): void {
     removedBeforeErrors = System.subprocess(Array["rm", output]).fromSuccess();
     T.expectTrue(removedBeforeErrors.success(), removedBeforeErrors.stderr);
 
-    // A method-body-only error leaves backendPhase1 cached. Also check that
-    // multiple failing definitions still produce all of their diagnostics.
+    // Method-body-only errors must abort before specialization, even when
+    // the backend's projected declarations are unchanged. Multiple failing
+    // definitions must still produce all of their diagnostics.
     invalid = valid.replace("debug(\"before\")", "this.foo(9)");
     for ((contents, timestamp, diagnostic) in Array[
       (invalid, "200001010000.02", "Try annotating 'foo' method as 'readonly'"),
@@ -257,6 +260,10 @@ private fun incrementalFrontendErrors(): void {
         args.concat(Array["--data", data]),
       ).fromSuccess();
       T.expectEq(failed.exitcode(), 2, failed.stderr);
+      T.expectFalse(
+        failed.stderr.contains("Incremental specialization:"),
+        "Frontend errors reached specialization: " + failed.stderr,
+      );
       T.expectTrue(
         failed.stderr.contains("Cannot call this method on a readonly object"),
         failed.stderr,

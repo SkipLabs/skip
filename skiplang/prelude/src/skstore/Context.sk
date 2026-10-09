@@ -2263,7 +2263,20 @@ fun withRegionFold<K, T>(
   it: mutable Iterator<K>,
   value: T,
   fn: (?mutable Context, K, T) ~> T,
+  collect: Bool = true,
 ): T {
+  // A mapper with its own regions can retain a large graph. Avoid putting
+  // that graph in another region just to copy it when this fold finishes.
+  if (!collect) {
+    result = value;
+    loop {
+      it.next() match {
+      | Some(key) -> !result = fn(contextOpt, key, result)
+      | None() -> return result
+      }
+    }
+  };
+
   optSaved: ?Obstack = None();
   valueInRegion = value;
   try {

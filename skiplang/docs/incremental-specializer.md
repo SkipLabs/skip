@@ -64,8 +64,9 @@ Use the current environment's `skargo` and compiler together. Resolve resulting
 source/API errors before native builds or performance conclusions. The rebase
 needed manual changes in these areas:
 
-- Preserve upstream's `/backendSink/` error results and reporting outside reactive
-  callbacks, including `--batch`; gate roots, discovery, and emission on errors.
+- The original port preserved upstream's `/backendSink/` error results and
+  per-row callback guards. The fail-fast follow-up below checks errors at the
+  backend entry point and throws; command-line and batch handlers report them.
 - Adapt scheduling to typed `TArrowKey`, `TimeStack`, and `Context.setDir` APIs.
   `Context.invalidateReader` factors the existing dirty-reader scheduling logic
   so deleted output can force only the final backend callback.
@@ -342,6 +343,10 @@ Temporary allocations are collected after an entire specialization round has
 been evaluated inside `withRegion`. Reading the next round's work forces its
 evaluation before leaving the region. The live context and dependency graph
 survive. This does not erase retained SKStore state or copy/discard dependencies.
+Incremental pending-function discovery uses this round region rather than adding
+another region around each function. Sequential discovery and the later native
+function generation retain their finer-grained regions.
+
 
 EagerDir fast paths reuse a single mapper's grouped output arrays, use
 `MInfoSingle` where appropriate, and avoid temporary arrays of pairs, key arrays,
@@ -356,6 +361,89 @@ themselves accounted for about 0.021 GiB of shallow size. These are **older
 variant measurements**, but explain why bookkeeping was a stronger target than
 shrinking the class object alone. Shallow closure size also excludes everything
 reachable through a closure.
+
+### Avoiding the enclosing pipeline region: 2026-10-07
+
+`EHandle.map` now accepts a trailing `collect` option, defaulting to `true`.
+The specialization pipeline mapper uses `false`: it already collects each round,
+so SKStore must not wrap the entire pipeline in another row region. The option
+applies to initialization and updates. Mapper equality includes the policy, so a
+recipe with a changed policy is not accidentally reused. Ordinary maps retain
+their existing collection behavior. This does not allocate objects on a parent
+obstack while another region is active, avoiding cross-region reference hazards.
+
+For incremental discovery (`pauseOnSClassCreation`), `specializePendingFun`
+also avoids its nested per-function region and specializer clone. Other discovery
+and native-generation calls continue to use `Specializer.withRegion`.
+
+The same frozen 108-file compiler self-build workload as the memory profile,
+with `-O2 --init --verbose --stop-after-specialization`, gave:
+
+| Variant | Rounds | Peak RSS through round completion |
+| --- | ---: | ---: |
+| Previous baseline | 182 | 25.1 GiB |
+| Pipeline mapper without enclosing region | 182 | 25.4 GiB |
+| Also without incremental per-function region | 182 | 25.3 GiB |
+
+These single runs do not show a material reduction in retained specialization
+memory. They target the copy after the round loop. In the previous baseline,
+three stack samples caught `SKIP_copy_with_pages` called by
+`withRegionFold` during `EagerDir.update`. With both changes, a breakpoint on
+region copies involving more than 2,000 pages did not trigger; the run reached
+the 50 GiB RSS guard in `SKIP_intern_shared` during persistent synchronization.
+The earlier region-copy peak is removed, but a complete self-build still has an
+unresolved persistence peak. No native IR generation, optimization, assembly or
+linking of the workload was performed.
+
+All 45 SKStore tests and four incremental compiler regressions passed. The new
+`testMapWithOwnRegions` exercises initialization, updates, reads in an inner
+region, retained context globals, dependency invalidation, removal and re-addition
+with collection both enabled and disabled.
+
+Local measurement commands, JSON and logs are in `/tmp/skip-region-copy` and
+`/tmp/skip-monomorphic-seed/region-{outer,outer-inner}.{json,log}`. The retained-heap
+profile and the original region-copy backtraces remain in
+`/tmp/skip-specialization-profile`.
+
+### Fail fast before specialization: 2026-10-07
+
+The error check is now at the `backendPhase1` entry point. If the frontend error
+sink contains errors, `throwIfFrontendErrors` renders them against the current
+source contents and throws `CompileFailureException`. The command-line handler
+reports the exception and exits before heap interning or transaction commit.
+Batch mode catches it for the failed unit, discards that unit's forked context,
+and continues with the other units. A final invocation-level check covers cached
+or bypassed backend paths, including `--check`.
+
+Specialization rows no longer read the error sink. A failed invocation is aborted,
+so rows do not need to record error dependencies or retract intermediate results.
+This removes the repeated directory tags, read paths, reader identities, dependency
+set nodes and read arrays associated with the common error guard.
+
+With the same frozen 108-file workload and specialization-only flags:
+
+| Variant | Rounds | Peak RSS through round completion | Full diagnostic result |
+| --- | ---: | ---: | --- |
+| Region changes, per-row error guards | 182 | 25.3 GiB | Stopped at 50 GiB in persistence |
+| Region changes, fail-fast error check | 182 | 13.8 GiB | Completed specialization and persistence; 37.7 GiB peak |
+
+The full peak is `RUSAGE_CHILDREN.ru_maxrss`; 200 ms RSS sampling saw a lower
+34.9 GiB maximum and can miss short allocation-growth spikes. The fail-fast run
+reached the round marker at 146.1 s and exited successfully at 172.7 s. These are
+single-run timings, with some concurrent regression activity; they are not a
+controlled speedup claim. No native IR generation, optimization, assembly or
+linking of the workload ran. Earlier measurements of the error-guarded variant
+remain historical comparison data, not the current compiler's failure behavior.
+
+All four incremental compiler regressions passed, including an assertion that
+frontend errors do not reach the specialization completion marker. Additional
+cold/warm error, repair, `--check`, and mixed valid/error/valid batch checks passed.
+On a warm database, a failed compile and a failed `--check` left the committed
+context-root pointer unchanged; repair subsequently committed a new root.
+
+Commands and logs are in `/tmp/skip-failfast`; the benchmark command, input hash,
+RSS and exit status are in `/tmp/skip-failfast/failfast.json`. The failed earlier
+benchmark database files were removed after retaining their measurement logs.
 
 ## One traced invalidation cascade
 

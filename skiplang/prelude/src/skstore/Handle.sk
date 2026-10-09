@@ -480,6 +480,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     >,
     dirName: DirName,
     reducerOpt: ?IReducer<File> = None(),
+    collect: Bool = true,
   ): EHandle<K2, V3> {
     dynParents = mutable Map[];
     parentSet = mutable Set[];
@@ -512,7 +513,14 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     fixedParents = FixedSingle::createFromIterator(
       dynParents.items().map(kv -> (kv.i0, kv.i1.toArray())),
     );
-    TEagerDir::applyMany(context, fixedParents, dirName, reducerOpt);
+    TEagerDir::applyMany(
+      context,
+      fixedParents,
+      dirName,
+      reducerOpt,
+      false,
+      collect,
+    );
     EHandle(typeOutputKey, typeOutput, dirName)
   }
 
@@ -562,13 +570,17 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     dirName: DirName,
     f: TMapFun<K, V, K2, V2>,
     rangeOpt: ?Array<KeyRange<K>> = None(),
+    // Set false only when the mapper provides its own temporary regions.
+    collect: Bool = true,
   ): EHandle<K2, V2> {
-    static::multiMap(
+    static::genMultiMapReduce(
       typeKey,
       type,
       context,
       Array[(this, (f, rangeOpt))],
       dirName,
+      None(),
+      collect,
     )
   }
 
