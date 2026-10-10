@@ -14,13 +14,34 @@ libdir   ?= $(exec_prefix)/lib
 .PHONY: default
 default: stage$(STAGE)
 
-stage%:
+# Each stage target names a *directory*, so as a file target with no
+# prerequisites make considers it up to date the moment the directory exists:
+# once you had built a stage, `make stageN` printed "'stageN' is up to date" and
+# recursed into nothing, leaving however stale a skc was already sitting there.
+# They are aggregates, so make them phony and always recurse; the rules they
+# recurse into now key off real inputs, so an up-to-date tree still does nothing.
+#
+# The stages have to be listed explicitly rather than matched with `stage%`:
+# make skips implicit-rule search for phony targets, so a phony target built by
+# a pattern rule gets "Nothing to be done" instead. Naming them also turns a
+# typo like `make stage7` into an error rather than a successful no-op.
+.PHONY: stage0 stage1 stage2 stage3 stageD
+stage0 stage1 stage2 stage3 stageD:
 	mkdir -p $@
 	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
 
 build/%.ll: bootstrap/%.ll.gz | check-bootstrap
 	mkdir -p $(@D)
 	gunzip -c $< > $@
+
+# The real inputs of the stage0 artifacts. The recursive makes that produce the
+# runtime archives and the stdlib cannot report whether they changed anything,
+# so their targets are .PHONY and their mtimes bump on every invocation; a
+# stage0 rule that took them as ordinary prerequisites would relink on every
+# invocation too. Depend on the sources instead, and see stage0/bin/skc for how
+# the archives themselves are kept up to date without forcing that relink.
+RUNTIME_SRC := $(wildcard ../prelude/runtime/*.c ../prelude/runtime/*.cpp ../prelude/runtime/*.h)
+PRELUDE_SRC := $(shell find ../prelude/src -name '*.sk')
 
 # The compiler is bootstrapped from the pre-compiled IR shipped in the
 # `bootstrap` submodule. If that submodule is not at the commit recorded in this
@@ -40,18 +61,42 @@ check-bootstrap:
 	  exit 1; \
 	fi
 
+# One recursive make produces both archives, so only one of them carries the
+# recipe and the other depends on it. Written as a single `a b:` rule, make --
+# which treats that as two rules sharing a recipe, not one recipe with two
+# outputs -- would run the recursive make twice, and under -j run both copies
+# concurrently against the same ../prelude build dirs, whose libbacktrace recipe
+# rm -rf's state inside the shared submodule checkout.
 .PHONY: build/libskip_runtime64.a build/libbacktrace.a
-build/libskip_runtime64.a build/libbacktrace.a:
+build/libskip_runtime64.a:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
+build/libbacktrace.a: build/libskip_runtime64.a
 
-.PHONY: stage0/lib/libstd.sklib
-stage0/lib/libstd.sklib:
+# Real prerequisites rather than .PHONY. This recipe puts stage0/bin on PATH and
+# compiles the stdlib with whatever `skc` it finds there, so stage0/bin/skc is a
+# genuine input; without it an already-present but outdated stage0/bin/skc was
+# used as-is and the bootstrap IR it should have been rebuilt from was never
+# even unpacked. A stage0 left over from an older checkout then silently
+# compiled the current prelude and reported errors for language features it
+# predates -- a stage0 older than `@allow_tracked_call` rejects it with 47
+# "Cannot call an untracked function from a tracked context", which reads
+# exactly like the stdlib being broken. It also means the check-bootstrap guard,
+# which hangs off unpacking that IR, now actually runs on this path.
+#
+# Being a real file target also stops stage0/bin/{skargo,skfmt}, which link
+# against it, from relinking on every invocation.
+stage0/lib/libstd.sklib: stage0/bin/skc $(PRELUDE_SRC)
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
-stage0/bin/skc: build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
+# The archives are order-only prerequisites: they are always brought up to date
+# before the link, but being .PHONY they are never a reason to relink. The
+# relink decision comes from the bootstrap IR and the runtime sources, which are
+# what actually determine this binary. As ordinary prerequisites they forced a
+# ~2.5min -O3 link of a 72MB IR module on every single invocation.
+stage0/bin/skc: build/skc_out64.ll $(RUNTIME_SRC) | build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
+	clang++ -no-pie $(CXXFLAGS) -o $@ build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a -lpthread -g3
 
 stage0/bin/skargo: build/skargo_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
@@ -61,23 +106,28 @@ stage0/bin/skfmt: build/skfmt_out64.ll stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage1/bin/skc stage1/bin/skfmt: stage0
+# skc and skfmt come out of one `skargo build --bins`, so skfmt hangs off skc
+# rather than sharing the rule -- see build/libskip_runtime64.a above for why.
+stage1/bin/skc: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target
+stage1/bin/skfmt: stage1/bin/skc
 stage1/lib/libstd.sklib: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
 stage1/bin/skargo: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
-stage2/bin/skc stage2/bin/skfmt: stage1
+stage2/bin/skc: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target
+stage2/bin/skfmt: stage2/bin/skc
 stage2/lib/libstd.sklib: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
 stage2/bin/skargo: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
-stage3/bin/skc stage3/bin/skfmt: stage2
+stage3/bin/skc: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
+stage3/bin/skfmt: stage3/bin/skc
 stage3/lib/libstd.sklib: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2
@@ -89,11 +139,13 @@ stage3/bin/skargo: stage2
 # compiler; skargo and skfmt are built using the skargo found in PATH and the
 # stageD compiler
 
-stageD/bin/skc:
+STAGED_SRC := $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
+
+stageD/bin/skc: $(STAGED_SRC) $(RUNTIME_SRC)
 	mkdir -p $(@D)
 	OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude default
-	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
-	mkdir -p stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/ && mv stage$(STAGE)/bin/skc.ll stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
+	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(STAGED_SRC)
+	mkdir -p stageD/target/host/$(SKARGO_PROFILE)/deps/ && mv stageD/bin/skc.ll stageD/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
 
 stageD/lib/libstd.sklib: stageD/bin/skc
 	mkdir -p $(@D)

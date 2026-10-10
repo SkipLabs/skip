@@ -38,8 +38,9 @@ make promote
 
 # 2. Verify the promoted bootstrap on its own. `make clean` removes stage*/build
 #    but leaves the freshly promoted bootstrap/*.ll.gz, so this rebuild starts
-#    from the NEW IR. A full clean is required: the stage rules key off stage
-#    directory mtimes, so a partial clean would reuse stale stages.
+#    from the NEW IR. Clean rather than incremental so the verification is a
+#    true from-scratch bootstrap, and so the skc-*.ll glob above stays
+#    unambiguous -- not because the stages would otherwise go stale.
 make clean
 make stage3
 
