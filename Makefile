@@ -203,8 +203,11 @@ test-%:
 	cd $* && skargo test --profile $(SKARGO_PROFILE)
 
 .PHONY: test-native
+# The skargo test step above runs the .sk tests first; the shell pipeline below
+# is silenced (@) so its long command line does not bury those results.
 test-native: build/skdb
-	cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) SKDB_BIN=$(realpath build/skdb) ./test_sql.sh \
+	cd sql && skargo test --profile $(SKARGO_PROFILE)
+	@cd sql/ && SKARGO_PROFILE=$(SKARGO_PROFILE) SKDB_BIN=$(realpath build/skdb) ./test_sql.sh \
 	|tee /tmp/native-test.out ; \
 	! grep -v '\*\|^[[:blank:]]*$$\|OK\|PASS' /tmp/native-test.out
 
