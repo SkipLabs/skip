@@ -1253,9 +1253,16 @@ base class EagerDir protected {
     context.!reads = SortedSet[];
 
     writer = mutable Writer{};
-    mapper.map(context, writer, key, valueIter);
-
-    kvArray = writer.getWrites();
+    /* Context.asyncCall recorded the call before throwing. Swallow it so the caller
+       carries on and collects the remaining calls. This row gets no output: an empty entry
+       is what a pending value looks like. Reads made before the call stay registered below. */
+    kvArray = try {
+      mapper.map(context, writer, key, valueIter);
+      writer.getWrites()
+    } catch {
+    | AsyncCallPending() -> Array[]
+    | exn -> throw exn
+    };
     newDirs = context.newDirs;
     reads = context.getReads();
     context.!newDirs = newDirsCopy;
@@ -1637,21 +1644,29 @@ base class EagerDir protected {
 
         for (p in parentMaps) {
           writer = mutable Writer{};
-          p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
-          mapped = writer.getWrites();
-          for (kv in mapped) {
-            (k, rvalues) = kv;
+          try {
+            p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
+            mapped = writer.getWrites();
+            for (kv in mapped) {
+              (k, rvalues) = kv;
 
-            keys.push(k);
-            if (oldKeys.contains(k)) {
-              !oldKeys = oldKeys.remove(k);
-            };
+              keys.push(k);
+              if (oldKeys.contains(k)) {
+                !oldKeys = oldKeys.remove(k);
+              };
 
-            if (!mvalues.containsKey(k)) {
-              !mvalues = mvalues.set(k, mutable Vector[]);
+              if (!mvalues.containsKey(k)) {
+                !mvalues = mvalues.set(k, mutable Vector[]);
+              };
+              mvalues[k].extend(rvalues);
             };
-            mvalues[k].extend(rvalues);
-          };
+          } catch {
+          /* Context.asyncCall recorded the call before throwing. Swallow it so the cascade
+             carries on and collects the remaining calls instead of aborting on the first.
+             This key gets no output: an empty entry is what a pending value looks like. */
+          | AsyncCallPending() -> void
+          | exn -> throw exn
+          }
         };
 
         newDirs = ctx.newDirs;

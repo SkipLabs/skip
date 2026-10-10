@@ -122,6 +122,39 @@ void SkipRuntime_deleteMapper(uint32_t mapperId) {
   CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteMapper", args);
 }
 
+/* AsyncFunction callbacks. */
+
+CJObject SkipRuntime_AsyncFunction__getInfo(uint32_t fnId) {
+  Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {
+      Napi::Number::New(env, fnId),
+  };
+  return CallJSFunction(env, externFunctions,
+                        "SkipRuntime_AsyncFunction__getInfo", args);
+}
+
+void SkipRuntime_deleteAsyncFunction(uint32_t fnId) {
+  Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::Number::New(env, fnId)};
+  CallJSVoidFunction(env, externFunctions, "SkipRuntime_deleteAsyncFunction",
+                     args);
+}
+
+/* AsyncCache callbacks. */
+
+CJSON SkipRuntime_AsyncCache__get(char* callId) {
+  Napi::Env env = kExternFunctions.Env();
+  Napi::HandleScope scope(env);
+  Napi::Object externFunctions = kExternFunctions.Value();
+  std::vector<napi_value> args = {Napi::String::New(env, callId)};
+  return CallJSNullableFunction(env, externFunctions,
+                                "SkipRuntime_AsyncCache__get", args);
+}
+
 /* LazyCompute callbacks. */
 
 CJSON SkipRuntime_LazyCompute__compute(uint32_t lazyComputeId, char* self,

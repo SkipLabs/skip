@@ -15,6 +15,7 @@ char* SkipRuntime_Context__createLazyCollection(SKLazyCompute lazyCompute);
 CJArray SkipRuntime_Context__jsonExtract(CJObject json, char* pattern);
 char* SkipRuntime_Context__useExternalResource(char* service, char* identifier,
                                                CJObject json);
+CJObject SkipRuntime_Context__asyncCall(uint32_t fn, CJSON input);
 
 SKMapper SkipRuntime_createMapper(int32_t ref);
 SKLazyCompute SkipRuntime_createLazyCompute(int32_t ref);
@@ -146,6 +147,27 @@ Napi::Value UseExternalResourceOfContext(const Napi::CallbackInfo& info) {
         ToSKString(info[0]), ToSKString(info[1]),
         info[2].As<Napi::External<void>>().Data());
     result = Napi::String::New(env, skcollection);
+  });
+  return result;
+}
+
+Napi::Value AsyncCallOfContext(const Napi::CallbackInfo& info) {
+  Napi::Env env = info.Env();
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
+  }
+  if (!info[0].IsNumber()) {
+    throw Napi::TypeError::New(env, "The first parameter must be a number.");
+  }
+  if (!info[1].IsExternal()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a pointer.");
+  }
+  Napi::Value result;
+  NatTryCatch(env, [&result, &info, env](Napi::Env) {
+    CJSON skresult = SkipRuntime_Context__asyncCall(
+        info[0].As<Napi::Number>().Uint32Value(),
+        info[1].As<Napi::External<void>>().Data());
+    result = Napi::External<void>::New(env, skresult);
   });
   return result;
 }
@@ -791,6 +813,8 @@ Napi::Value GetToJSBinding(const Napi::CallbackInfo& info) {
               JSONExtractOfContext);
   AddFunction(env, binding, "SkipRuntime_Context__useExternalResource",
               UseExternalResourceOfContext);
+  AddFunction(env, binding, "SkipRuntime_Context__asyncCall",
+              AsyncCallOfContext);
   //
   AddFunction(env, binding, "SkipRuntime_createMapper", CreateMapper);
   AddFunction(env, binding, "SkipRuntime_createLazyCompute", CreateLazyCompute);

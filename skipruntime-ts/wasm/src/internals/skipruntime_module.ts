@@ -21,6 +21,7 @@ import type {
   HandlerInfo,
   ServiceDefinition,
   ChangeManager,
+  AsyncFunction,
 } from "@skipruntime/core";
 import {
   ServiceInstance,
@@ -230,6 +231,11 @@ export interface FromWasm {
     identifier: ptr<Internal.String>,
     params: ptr<Internal.CJSON>,
   ): ptr<Internal.String>;
+
+  SkipRuntime_Context__asyncCall(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+    input: ptr<Internal.CJSON>,
+  ): ptr<Internal.CJObject>;
 }
 
 interface ToWasm {
@@ -409,6 +415,22 @@ interface ToWasm {
   SkipRuntime_deleteReducer(
     reducer: Handle<HandlerInfo<Reducer<Json, Json>>>,
   ): void;
+
+  // AsyncFunction
+
+  SkipRuntime_AsyncFunction__getInfo(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+  ): ptr<Internal.CJObject>;
+
+  SkipRuntime_deleteAsyncFunction(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+  ): void;
+
+  // AsyncCache
+
+  SkipRuntime_AsyncCache__get(
+    callId: ptr<Internal.String>,
+  ): Nullable<ptr<Internal.CJSON>>;
 }
 
 export class WasmFromBinding implements FromBinding {
@@ -754,6 +776,13 @@ export class WasmFromBinding implements FromBinding {
       ),
     );
   }
+
+  SkipRuntime_Context__asyncCall(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+    input: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.CJObject> {
+    return this.fromWasm.SkipRuntime_Context__asyncCall(fn, toPtr(input));
+  }
 }
 
 class LinksImpl implements Links {
@@ -834,6 +863,27 @@ class LinksImpl implements Links {
 
   deleteMapper(mapper: Handle<HandlerInfo<JSONMapper>>) {
     this.tobinding.SkipRuntime_deleteMapper(mapper);
+  }
+
+  // AsyncFunction
+
+  getInfoOfAsyncFunction(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+  ): ptr<Internal.CJObject> {
+    return toPtr(this.tobinding.SkipRuntime_AsyncFunction__getInfo(fn));
+  }
+
+  deleteAsyncFunction(fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>) {
+    this.tobinding.SkipRuntime_deleteAsyncFunction(fn);
+  }
+
+  // AsyncCache
+
+  getOfAsyncCache(callId: ptr<Internal.String>): Nullable<ptr<Internal.CJSON>> {
+    const result = this.tobinding.SkipRuntime_AsyncCache__get(
+      this.utils.importString(callId),
+    );
+    return result === null ? null : toPtr(result);
   }
 
   // LazyCompute
@@ -1133,6 +1183,17 @@ class Manager implements ToWasmManager {
     toWasm.SkipRuntime_Mapper__getInfo = links.getInfoOfMapper.bind(links);
     toWasm.SkipRuntime_Mapper__isEquals = links.isEqualsOfMapper.bind(links);
     toWasm.SkipRuntime_deleteMapper = links.deleteMapper.bind(links);
+
+    // AsyncFunction
+
+    toWasm.SkipRuntime_AsyncFunction__getInfo =
+      links.getInfoOfAsyncFunction.bind(links);
+    toWasm.SkipRuntime_deleteAsyncFunction =
+      links.deleteAsyncFunction.bind(links);
+
+    // AsyncCache
+
+    toWasm.SkipRuntime_AsyncCache__get = links.getOfAsyncCache.bind(links);
 
     // LazyCompute
 

@@ -53,3 +53,12 @@ export class SkipNonUniqueValueError extends SkipError {}
  * @hideconstructor
  */
 export class SkipResourceInstanceInUseError extends SkipError {}
+
+/**
+ * Internal signal thrown when an async call has not resolved yet.
+ *
+ * It unwinds the user's mapper so the runtime can collect the pending call and replay.
+ * The runtime catches it before it reaches Skip; user code is not meant to catch it.
+ * @hideconstructor
+ */
+export class SkipAsyncCallPendingError extends SkipError {}
