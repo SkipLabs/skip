@@ -18,7 +18,7 @@
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
-#define FTABLE_SIZE 64
+#define FTABLE_SIZE 96
 
 /*****************************************************************************/
 /* Persistent constants. */
@@ -638,19 +638,22 @@ static inline size_t __builtin_stdc_bit_width(size_t size) {
 }
 #endif
 
+// Exact word-sized classes through 256 bytes; larger blocks remain geometric.
+// The format version changes with the free-list layout and class numbering.
+#define SMALL_ALLOC_LIMIT 256
+#define SMALL_ALLOC_SLOTS (SMALL_ALLOC_LIMIT / sizeof(void*))
+
 slot_t sk_slot_of_size(size_t size) {
-  // Must return a value between 0 and FTABLE_SIZE - 1 included
-  if (__builtin_expect(size < sizeof(void*), 0)) {
-    // sk_size_of_slot requires slot to be at least log2(sizeof(void*))
-    size = sizeof(void*);
+  if (size <= SMALL_ALLOC_LIMIT) {
+    if (size < sizeof(void*)) size = sizeof(void*);
+    return (size + sizeof(void*) - 1) / sizeof(void*) - 1;
   }
-  return __builtin_stdc_bit_width(size - 1);
+  return SMALL_ALLOC_SLOTS + __builtin_stdc_bit_width(size - 1) - 9;
 }
 
 size_t sk_size_of_slot(slot_t slot) {
-  // Must return a multiple of sizeof(void*) and at least sizeof(void*)
-  // Hence slot is expected to be at least log2(sizeof(void*))
-  return 1 << slot;
+  if (slot < SMALL_ALLOC_SLOTS) return (slot + 1) * sizeof(void*);
+  return (size_t)1 << (slot - SMALL_ALLOC_SLOTS + 9);
 }
 
 void sk_add_ftable(void* ptr, slot_t slot) {

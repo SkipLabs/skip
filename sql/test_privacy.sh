@@ -341,4 +341,9 @@ done
 pass "GROUP PERMISSION UPDATE3"
 
 kill "$tailerID"
+# Both follow pipelines have upstream tail processes. Stopping the writer alone
+# leaves an idle tail alive and makes the final wait hang.
+for tailPID in $(jobs -p); do
+    kill "$tailPID" 2>/dev/null || true
+done
 wait

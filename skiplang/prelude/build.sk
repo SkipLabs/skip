@@ -4,6 +4,8 @@ fun main(): void {
   out_dir = Environ.var("OUT_DIR");
   pic = (Environ.var("RELOCATION_MODEL") == "pic");
 
+  // Persistent files contain native layouts and allocator free-list classes.
+  // A rebuilt runtime must reject files produced by a different build.
   magic_c = Path.join(out_dir, "magic.c");
   FileSystem.writeTextFile(
     magic_c,

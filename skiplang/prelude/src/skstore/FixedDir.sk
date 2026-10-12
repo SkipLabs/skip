@@ -172,6 +172,90 @@ class FixedDir<+K: Orderable, +T: frozen> extends
   }
 }
 
+// Uniform identity-forwarding collections retain only keys and singleton files.
+class SingletonFixedDir protected {
+  sourceDir: DirName,
+  tag: TickRange,
+} extends IFixedDir<Key, Array<File>, (Key, File)> {
+  static fun create(
+    vec: mutable Vector<FixedRow<Key, Array<File>>>,
+  ): FixedData<Key, Array<File>> {
+    if (vec.size() == 0) return SharedSingletonFixedDir::create(vec);
+    first = vec[0];
+    for (row in vec) {
+      if (
+        row.value.size() != 1 ||
+        row.source.dirName != first.source.dirName ||
+        row.source.baseName != row.key ||
+        row.tag.current != first.tag.current
+      ) {
+        return SharedSingletonFixedDir::create(vec)
+      }
+    };
+    if (!vec.isSorted()) vec.sort();
+    static{
+      sourceDir => first.source.dirName,
+      tag => TickRange::create(first.tag.current),
+      data => vec.map(row -> (row.key, row.value[0])).toArray(),
+    }
+  }
+
+  fun get(i: Int): FixedRow<Key, Array<File>> {
+    (key, file) = this.data.unsafe_get(i);
+    FixedRow(key, Array[file], Path::create(this.sourceDir, key), this.tag)
+  }
+}
+
+// Mixed ticks and nonidentity forwarding still share the directory and avoid
+// retaining a singleton Array and a Path for every row.
+value class SharedSingletonRow(
+  key: Key,
+  file: File,
+  sourceKey: Key,
+  tag: TickRange,
+)
+
+class SharedSingletonFixedDir protected {
+  sourceDir: DirName,
+} extends IFixedDir<Key, Array<File>, SharedSingletonRow> {
+  static fun create(
+    vec: mutable Vector<FixedRow<Key, Array<File>>>,
+  ): FixedData<Key, Array<File>> {
+    if (vec.size() == 0) return FixedDir<Key, Array<File>>::create(vec);
+    dir = vec[0].source.dirName;
+    for (row in vec) {
+      if (row.value.size() != 1 || row.source.dirName != dir) {
+        return FixedDir<Key, Array<File>>::create(vec)
+      }
+    };
+    if (!vec.isSorted()) vec.sort();
+    IFixedDir::computeTags(vec);
+    static{
+      sourceDir => dir,
+      data => vec
+        .map(row ->
+          SharedSingletonRow(
+            row.key,
+            row.value[0],
+            row.source.baseName,
+            row.tag,
+          )
+        )
+        .toArray(),
+    }
+  }
+
+  fun get(i: Int): FixedRow<Key, Array<File>> {
+    row = this.data.unsafe_get(i);
+    FixedRow(
+      row.key,
+      Array[row.file],
+      Path::create(this.sourceDir, row.sourceKey),
+      row.tag,
+    )
+  }
+}
+
 value class CompactRow(
   values: Array<?SKDB.CValue>,
   repeat: Int,
@@ -197,7 +281,7 @@ class CompactFixedDir protected {
     vec: mutable Vector<FixedRow<Key, Array<File>>> = mutable Vector[],
   ): FixedData<Key, Array<File>> {
     static::getMetadata(vec) match {
-    | None() -> FixedDir<Key, Array<File>>::create(vec)
+    | None() -> SingletonFixedDir::create(vec)
     | Some(metadata) -> static::createWithMetadata(vec, metadata)
     }
   }
@@ -515,7 +599,7 @@ base class FixedSourceMap {
     static::getMetadata(data) match {
     | Some(metadata) ->
       CompactFSMImpl::createWithMetadata(data, metadata, allowDuplicates)
-    | None() -> FSMImpl::create(data, allowDuplicates)
+    | None() -> IdentityFSMImpl::create(data, allowDuplicates)
     }
   }
 
@@ -608,6 +692,49 @@ base class FixedSourceMap {
     )
   }
 }
+// Identity forwarding has no explicit reads or created directories to retain.
+private class IdentityFSMImpl(
+  dir: DirName,
+  keys: Array<Key>,
+) extends FixedSourceMap {
+  static fun create(
+    data: mutable Vector<(Path, MInfo)>,
+    allowDuplicates: Bool = false,
+  ): FixedSourceMap {
+    if (data.size() == 0) return FSMImpl::create(data, allowDuplicates);
+    dir = data[0].i0.dirName;
+    for ((path, info) in data) {
+      if (path.dirName != dir) return FSMImpl::create(data, allowDuplicates);
+      info match {
+      | MInfoSingle(key) if (key == path.baseName) -> void
+      | _ -> return FSMImpl::create(data, allowDuplicates)
+      }
+    };
+    data.sortBy(x ~> x.i0);
+    if (!allowDuplicates) assertUnique(data, x ~> x.i0);
+    static(dir, data.map(x -> x.i0.baseName).toArray())
+  }
+
+  fun maybeGet(path: Path): ?MInfo {
+    if (path.dirName != this.dir) return None();
+    i = binSearch(i ~> this.keys[i], path.baseName, 0, this.size() - 1);
+    if (i >= this.size() || this.keys[i] != path.baseName) return None();
+    Some(MInfoSingle(this.keys[i]))
+  }
+
+  fun get(i: Int): (Path, MInfo) {
+    key = this.keys[i];
+    (Path::create(this.dir, key), MInfoSingle(key))
+  }
+
+  fun size(): Int {
+    this.keys.size()
+  }
+  fun items(): mutable Iterator<(Path, MInfo)> {
+    this.keys.keys().map(i -> this.get(i))
+  }
+}
+
 // Direct implementation of a FixedSourceMap as a (sorted) array of Path/MInfo pairs
 private class FSMImpl(
   protected data: FixedSingle<Path, MInfo>,

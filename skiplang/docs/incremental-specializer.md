@@ -673,3 +673,16 @@ These temporary paths are supporting evidence, not prerequisites for understandi
 or using the implementation. The original field-anchor test binary was
 `/tmp/test/relative_positions/fields/bin/skc`; that experiment did not replace the
 normal `stage1/bin/skc`.
+
+## Compact SKStore follow-up: 2026-10-12
+
+On the frozen 108-file workload, compact fixed rows/dependency maps, smaller
+copy/intern restoration records, and finer native allocation classes reduce
+incremental initialization peak RSS from 37.639 GiB after config hoisting to
+26.152 GiB: **11.487 GiB saved (30.52%)**. Both runs completed 182 rounds;
+elapsed times were 184.635 and 184.251 seconds. OldFile wrappers are unchanged.
+These peaks include final persistence; the periodic RSS sample through the
+specialization summary falls from 13.690 to 12.389 GiB. The result covers one
+completed run of each version and does not attribute savings to individual
+features. See [the implementation plan and results](skstore-compact-collections-plan.md)
+and its recorded invocation for validation details and measurement limits.

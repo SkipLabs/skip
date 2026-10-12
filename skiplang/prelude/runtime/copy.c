@@ -73,10 +73,13 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
 
   sk_stack_t st_holder;
   sk_stack_t* st = &st_holder;
+  sk_stack_t restore_holder;
+  sk_stack_t* restore = &restore_holder;
   sk_stack3_t st3_holder;
   sk_stack3_t* st3 = &st3_holder;
 
   sk_stack_init(st, STACK_INIT_CAPACITY);
+  sk_stack_init(restore, STACK_INIT_CAPACITY);
   sk_stack3_init(st3, STACK_INIT_CAPACITY);
 
   void* result = obj;
@@ -127,7 +130,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     // distinguish it from vtable pointers
     if (((uintptr_t)vtable_ptr & 1) == 0) {
       copied_ptr = SKIP_copy_obj(st, toCopy, large_page);
-      sk_stack3_push(st3, addr_vtable_ptr, vtable_ptr, NULL);
+      sk_stack_push(restore, (void**)addr_vtable_ptr, vtable_ptr);
       *addr_vtable_ptr = (void*)((uintptr_t)copied_ptr | 1);
     } else {
       copied_ptr = (void*)((uintptr_t)vtable_ptr & ~1);
@@ -136,17 +139,23 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     *delayed.slot = copied_ptr;
   }
 
+  while (restore->head > 0) {
+    sk_value_t cell = sk_stack_pop(restore);
+    *cell.value = cell.slot;
+  }
+
   while (st3->head > 0) {
     sk_value3_t cell = sk_stack3_pop(st3);
     void** toClean = cell.value1;
     *toClean = cell.value2;
-    if (cell.value3 != NULL) {
+    {
       sk_string_t* str = get_sk_string(cell.value1);
       str->size = (uint32_t)(uintptr_t)cell.value3;
     }
   }
 
   sk_stack_free(st);
+  sk_stack_free(restore);
   sk_stack3_free(st3);
 
   return result;
