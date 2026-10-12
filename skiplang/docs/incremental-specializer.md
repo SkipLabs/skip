@@ -686,3 +686,15 @@ specialization summary falls from 13.690 to 12.389 GiB. The result covers one
 completed run of each version and does not attribute savings to individual
 features. See [the implementation plan and results](skstore-compact-collections-plan.md)
 and its recorded invocation for validation details and measurement limits.
+
+### Finer persistent size classes
+
+Replacing power-of-two rounding above 256 bytes with eight classes per doubling
+reduced the same workload's recorded peak from 26.152 to 26.005 GiB: 150.4 MiB
+(0.562%). Final database allocated blocks fell by only 5.87 MiB, so the peak
+difference may include run variation. Both runs completed 182 rounds. All
+compiler/prelude tests and the full
+native SKDB suite passed. This is a small additional improvement; the original
+small-object allocation compaction was already in the baseline. See
+[the allocator experiment](experiments/skstore-size-classes/README.md) for the
+recorded results and measurement limits.
