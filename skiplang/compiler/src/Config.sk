@@ -40,6 +40,10 @@ private fun default_lib_name(output: ?String): String {
   }
 }
 
+// Only target layout affects discovery. Keep mapper captures independent of
+// emission options and the rest of the compiler configuration.
+value class SpecializationConfig(ptrBitSize: Int)
+
 class Config{
   release: Bool,
   verbose: Bool,
@@ -70,6 +74,8 @@ class Config{
   check: Bool,
   no_link: Bool,
   stopAfterSpecialization: Bool,
+  // Persistent invocations retain the incremental specialization graph.
+  incrementalSpecialization: Bool = false,
   stackAlign: Int,
   stackAlignStr: String,
   ptrByteSize: Int,
@@ -188,6 +194,9 @@ class Config{
     check = results.getBool("check");
     no_link = !results.getBool("link");
     stopAfterSpecialization = results.getBool("stop-after-specialization");
+    incrementalSpecialization =
+      results.maybeGetString("init").isSome() ||
+      results.maybeGetString("data").isSome();
 
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
@@ -273,6 +282,7 @@ class Config{
       check,
       no_link,
       stopAfterSpecialization,
+      incrementalSpecialization,
       stackAlign,
       stackAlignStr,
       ptrByteSize,
@@ -290,6 +300,10 @@ class Config{
 
   fun isWasm(): Bool {
     this.target.startsWith("wasm32");
+  }
+
+  fun specializationConfig(): SpecializationConfig {
+    SpecializationConfig(this.ptrBitSize)
   }
 
   // Derive a per-unit config for batch compilation: same shared settings

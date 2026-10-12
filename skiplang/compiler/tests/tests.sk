@@ -595,11 +595,99 @@ private fun incrementalConstructorPositions(): void {
   );
 }
 
+// Ordinary invocations discover sequentially; persistence opts into the
+// incremental graph, including source and config-only updates to a database.
+private fun specializationModeSelection(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  args = compile_cmd(Array[source], output).concat(Array["--verbose"]);
+  try {
+    FileSystem.writeTextFile(
+      source,
+      "class ModeThing() { fun value(): Int { 41 } }\n" +
+        "untracked fun main(): void { print_raw(ModeThing().value().toString()); }\n",
+    );
+    for (persistent in Array[false, true]) {
+      compiled = System.subprocess(
+        args.concat(if (persistent) Array["--init", data] else Array[]),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      T.expectEq(
+        compiled.stderr.contains("Sequential specialization complete"),
+        !persistent,
+      );
+      T.expectEq(
+        compiled.stderr.contains("Incremental specialization:"),
+        persistent,
+      );
+      result = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(result.success(), result.stderr);
+      T.expectEq(result.stdout, "41");
+    };
+    FileSystem.writeTextFile(
+      source,
+      "class ExtraThing() { fun value(): Int { 42 } }\n" +
+        "untracked fun configOnlyExtra(): Int { ExtraThing().value() }\n" +
+        "untracked fun main(): void { print_raw(ExtraThing().value().toString()); }\n",
+    );
+    touched = System.subprocess(
+      Array["touch", "-t", "200001010000.02", source],
+    ).fromSuccess();
+    T.expectTrue(touched.success(), touched.stderr);
+    updated = System.subprocess(
+      args.concat(Array["--data", data]),
+    ).fromSuccess();
+    T.expectTrue(updated.success(), updated.stderr);
+    T.expectFalse(
+      updated.stderr.contains("Sequential specialization complete"),
+      updated.stderr,
+    );
+    result = System.subprocess(Array[output]).fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    T.expectEq(result.stdout, "42");
+    // Changing exports reruns the driver while preserving the work mappers'
+    // target-layout captures. The source stays unchanged during these updates.
+    for (exported in Array[true, false]) {
+      compiled = System.subprocess(
+        args
+          .concat(Array["--data", data, "--emit=llvm-ir"])
+          .concat(
+            if (exported) {
+              Array["--export-function-as", "configOnlyExtra=config_only_extra"]
+            } else {
+              Array[]
+            },
+          ),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      T.expectEq(
+        FileSystem.readTextFile(output).contains("@config_only_extra("),
+        exported,
+      );
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
   tests.set(
     "incremental",
     mutable Vector[
+      T.Test{
+        name => "mode_selection",
+        func => () ~> specializationModeSelection(),
+      },
       T.Test{
         name => "source_positions",
         func => () ~> incrementalSourcePositions(),

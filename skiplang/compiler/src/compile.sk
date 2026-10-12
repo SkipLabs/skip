@@ -502,6 +502,7 @@ fun getOrInitializeBackend(
       };
       prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
       conf = prevPhase.conf;
+      if (!conf.incrementalSpecialization) return void;
       specializer = O.createSpecializer(
         context,
         conf,
@@ -534,9 +535,13 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/specializer/"),
     (context, writer, _, _) ~> {
+      // Keep the config dependency on the driver; work mappers capture the layout.
+      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+      if (!config.incrementalSpecialization) return void;
       if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
         return void
       };
+      specializationConfig = config.specializationConfig();
       specializerAllDir = specializerInitMerged;
       phaseNumber = 0;
 
@@ -580,11 +585,10 @@ fun getOrInitializeBackend(
                 | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
 
-                config = backendDir.getArray(context, SKStore.IID(0))[0].value;
                 specializer = O.Specializer::make(
                   specializerAllDirCopy,
                   context,
-                  config,
+                  specializationConfig,
                   converter,
                 );
                 invariant(specializer.funStack is List.Nil());
@@ -696,7 +700,6 @@ fun getOrInitializeBackend(
 
         !phaseNumber = phaseNumber + 1;
       };
-      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       if (config.verbose) {
         print_error(`Incremental specialization: ${phaseNumber} rounds`)
       };
@@ -720,18 +723,40 @@ fun getOrInitializeBackend(
       prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
       partialConfig = prevPhase.conf;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
-      specializerDataDir = specializerDir.getArray(context, SKStore.IID(0))[
-        0,
-      ].value;
-      specializer = O.Specializer::make(
-        specializerDataDir,
-        context,
-        partialConfig,
-        converter,
-      );
-      specializer.specializePendingFuns();
+      specializer = if (config.incrementalSpecialization) {
+        specializerDataDir = specializerDir.getArray(context, SKStore.IID(0))[
+          0,
+        ].value;
+        sp = O.Specializer::make(
+          specializerDataDir,
+          context,
+          partialConfig.specializationConfig(),
+          converter,
+        );
+        sp.specializePendingFuns();
+        sp.toFixed(context);
+        sp
+      } else {
+        // Discovery is local to this invocation. Reclaim its temporary work,
+        // returning the completed state for native code generation.
+        state = SKStore.withRegion(context, (_, context) ~> {
+          sp = O.createSpecializer(
+            context,
+            partialConfig,
+            converter,
+            specializerEmptyDir,
+          ).mclone(context);
+          for (root in prevPhase.rootsIR.forceCompile) {
+            sp.requestFunction(root, Array[], Array[])
+          };
+          sp.specializePendingFuns();
+          sp.toFixed(context);
+          sp.chill()
+        });
+        if (config.verbose) print_error("Sequential specialization complete");
+        state.mclone(context)
+      };
 
-      specializer.toFixed(context);
       specializer.!canCreateNewSClasses = false;
       // Return from the callback so context.update() and database persistence
       // still finish normally in specialization-only experiments.

@@ -8,6 +8,51 @@ after specialization. They are not whole-compiler speedups.
 
 ## Baseline and validation boundaries
 
+### Sequential invocation comparison: 2026-10-09
+
+The subsequent [collection data shape report](specialization-data-shapes.md)
+profiles stored values, keys, nested arrays/maps, and sharing on this compiler.
+It includes candidate representation sizes and reusable diagnostic tools.
+
+Ordinary invocations now use sequential specialization. Either `--init` or
+`--data` selects the incremental specialization graph. The sequential path
+discovers the reachable functions inside `SKStore.withRegion`, retaining the
+completed specializer state for code generation while reclaiming temporary work.
+
+The modified compiler was rebuilt successfully. All five incremental compiler
+regressions passed, including a new mode-selection test covering ordinary
+compilation, database initialization, and an update introducing a different
+class. Four native smoke programs also compiled with sequential specialization:
+`DispatchParentSpecializedChild`, `GenericSpecialMethod`, `NestedClosureCapture`,
+and `SpecializeRecursive`.
+
+Measurements use the same rebuilt binary and frozen 108-file compiler-source
+workload, with `-O2 --stop-after-specialization --verbose`. Incremental runs use
+fresh databases. The input SHA-256 is
+`2cdbaa8bf4b4b69dd0ff8274cf274ac81ae66a3179cb7b83f0c72158c02e03d4`.
+Overall peak RSS comes from the child process's `ru_maxrss`; elapsed time includes
+frontend, specialization, and persistence, and excludes native optimization,
+LLVM emission, and linking. Runs are isolated from other builds and tests.
+
+| Mode | Run | Elapsed (s) | Overall peak RSS (GiB) |
+| --- | --- | ---: | ---: |
+| Sequential | 1 | 57.738 | 2.945 |
+| Sequential | 2 | 55.701 | 2.946 |
+| Incremental initialization | 1 | 170.545 | 37.736 |
+| Incremental initialization | 2 | 172.247 | 37.731 |
+
+Both modes exited successfully in both runs. Mean elapsed time fell from
+171.396 s to 56.720 s (3.02 times faster), and peak RSS fell by about 92.2%
+(12.81 times smaller). Incremental initialization executed 182 rounds each
+time. These ratios apply only to the boundary above, not full native compilation
+or warm incremental updates.
+
+Reproduction scripts, exact commands, and measurement JSON are under
+`/tmp/skip-sequential/`; inputs and process logs are under
+`/tmp/skip-monomorphic-seed/`. These are scratch artifacts, not checked-in build
+dependencies. The compiler changes and this comparison are based on `657757f1`
+with the sequential-mode working-tree changes.
+
 The last fully tested implementation before the upstream rebase was
 `440dd065e76e9e72f44cae7dc4282fcc7fc0ec19` on `incr_backend2` in the development
 repository. It passed `skargo check` and all 1,702 compiler tests, including the
@@ -27,6 +72,26 @@ The port adapts typed SKStore interfaces, batch error handling, environment
 macros, and source paths that include package identity. It needs fresh runtime
 validation in the LLVM 20 environment. Do not interpret an eventual type-check
 success as validation of incremental scheduling, persistence, or generated code.
+
+## Config dependency hoist 2026-10-09
+
+The specializer driver reads the backend config once. Per-work mappers capture
+`Config.SpecializationConfig(ptrBitSize)` and construct their specializers from
+that value, so those callbacks no longer register backend-config reads. The
+specializer and its saved state retain only this discovery configuration;
+native function generation still receives the full config separately.
+
+Capturing the full `Config.Config` initially passed the existing incremental
+tests, but an export-only update repeatedly replayed the 45-round pipeline and
+grew memory until the scratch process was terminated. Restricting the mapper
+capture to pointer layout fixed that update. Export and output settings update
+the driver without changing the per-work mapper's configuration capture.
+
+The release compiler rebuilt successfully, and all five incremental regressions
+passed. The mode-selection regression now also adds and removes an exported
+function without changing source bytes, checking the resulting LLVM symbols.
+An independent config-only update check passed as well. Logs are under
+`/tmp/skip-config-hoist/`. Memory savings from this change have not been measured.
 
 ## Rebase handoff: 2026-10-05
 
