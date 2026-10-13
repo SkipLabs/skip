@@ -217,6 +217,17 @@ class SpecializerDirFile(
   value: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ) extends SKStore.File
 
+class SpecializerProgress(
+  dir: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  round: Int,
+  reads: SortedSet<SKStore.Path>,
+  dirs: SortedSet<SKStore.DirName>,
+  complete: Bool,
+) extends SKStore.File
+
+const pipelinePhaseKey: String = "COMPILER_PIPELINE_PHASE";
+const specializationProgressKey: String = "COMPILER_SPECIALIZATION_PROGRESS";
+
 // Frontend errors for the current unit (empty/absent on success). The
 // backend checks this once before entering specialization and throws on
 // failure, so unsuccessful updates never reach persistence.
@@ -544,6 +555,22 @@ fun getOrInitializeBackend(
       specializationConfig = config.specializationConfig();
       specializerAllDir = specializerInitMerged;
       phaseNumber = 0;
+      phased = context.getGlobal(pipelinePhaseKey).isSome();
+      previousInfo = if (phased) context.currentEagerMapperInfo() else {
+        SKStore.MInfoEmpty()
+      };
+      if (phased) {
+        context.getGlobal(specializationProgressKey).each(file -> {
+          file match {
+          | progress @ SpecializerProgress _ if (!progress.complete) ->
+            !specializerAllDir = progress.dir;
+            !phaseNumber = progress.round;
+            context.!reads = progress.reads;
+            context.!newDirs = progress.dirs
+          | _ -> void
+          }
+        })
+      };
 
       while (!specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {
         phaseNumberCopy = phaseNumber;
@@ -699,8 +726,30 @@ fun getOrInitializeBackend(
         });
 
         !phaseNumber = phaseNumber + 1;
+        if (phased) break void;
       };
-      if (config.verbose) {
+      complete = specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty();
+      if (phased) {
+        context.setGlobal(
+          specializationProgressKey,
+          SpecializerProgress(
+            specializerAllDir,
+            phaseNumber,
+            context.reads,
+            context.newDirs,
+            complete,
+          ),
+        );
+        if (!complete) {
+          for (dir in previousInfo.getNewDirs()) {
+            context.!newDirs = context.newDirs.set(dir)
+          };
+          for (read in previousInfo.getReads()) {
+            context.!reads = context.reads.set(read)
+          }
+        }
+      };
+      if (config.verbose && complete) {
         print_error(`Incremental specialization: ${phaseNumber} rounds`)
       };
       writer.set(SKStore.IID(0), SpecializerDirFile(specializerAllDir));
@@ -820,6 +869,7 @@ fun compile(
   config: Config.Config,
   context: mutable SKStore.Context,
   fileNames: Array<String>,
+  deferUpdate: Bool = false,
 ): void {
   if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
     print_error("fatal error: no input files\n");
@@ -875,11 +925,66 @@ fun compile(
     context.invalidateReader(reader);
   };
 
+  if (deferUpdate) return void;
   runCompilerPhase("frontend/update", () -> context.update());
 
   // Also check invocations that bypass or reuse the backend entry point,
   // including --check. Failures abort before the transaction is persisted.
   throwIfFrontendErrors(context)
+}
+
+// Each callback leaves all continuation state in the context. runWithGc
+// interns that context and reclaims the callback's temporary heap before reentry.
+fun compilerPipeline(
+  config: Config.Config,
+): Array<mutable SKStore.Context ~> Bool> {
+  Array[
+    context ~> {
+      context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
+      compile(config, context, config.input_files, true);
+      true
+    },
+    context ~> {
+      roundLimit = context.getGlobal(specializationProgressKey) match {
+      | Some(progress @ SpecializerProgress _) -> progress.round - 1
+      | _ -> -1
+      };
+      boundary = context.updateUntilBoundary(
+        dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
+        dir ~> dir == SKStore.DirName::create("/specializer/"),
+        dir ~> {
+          name = dir.toString();
+          if (
+            name.startsWith("/specializer/reduced1/") ||
+            name.startsWith("/specializer/merge1/")
+          ) {
+            name.split("/")[3].toInt() <= roundLimit
+          } else {
+            true
+          }
+        },
+      );
+      throwIfFrontendErrors(context);
+      progressOpt = context.getGlobal(specializationProgressKey);
+      progressOpt match {
+      | Some(progress @ SpecializerProgress _) if (!progress.complete) ->
+        key: SKStore.Key = SKStore.IID(0);
+        reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
+          parentName => SKStore.DirName::create("/backend/"),
+          childName => SKStore.DirName::create("/specializer/"),
+          key,
+        };
+        context.invalidateReader(reader);
+        false
+      | _ -> boundary != Some(false)
+      }
+    },
+    context ~> {
+      context.update();
+      throwIfFrontendErrors(context);
+      true
+    },
+  ]
 }
 
 // Type the stdlib (dependencies) once into `context`, with no config written

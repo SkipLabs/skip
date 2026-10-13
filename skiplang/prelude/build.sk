@@ -6,6 +6,10 @@ fun main(): void {
 
   // Persistent files contain native layouts and allocator free-list classes.
   // A rebuilt runtime must reject files produced by a different build.
+  // These persisted scheduler layouts can change without any C source change.
+  // Regenerate the runtime format version when they change as well.
+  print_string("skargo:rerun-if-changed=src/skstore/Context.sk");
+  print_string("skargo:rerun-if-changed=src/skstore/EagerDir.sk");
   magic_c = Path.join(out_dir, "magic.c");
   FileSystem.writeTextFile(
     magic_c,

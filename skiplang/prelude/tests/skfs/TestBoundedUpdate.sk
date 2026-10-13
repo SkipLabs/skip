@@ -1,0 +1,95 @@
+module SKStoreTest;
+
+@test
+fun testBoundedUpdateAcrossSynchronization(): void {
+  sourceName = SKStore.DirName::create("/bounded/source/");
+  middleName = SKStore.DirName::create("/bounded/middle/");
+  outputName = SKStore.DirName::create("/bounded/output/");
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    try {
+      phase = context.getGlobal("BOUNDED_PHASE") match {
+      | None() -> 0
+      | Some(file) -> SKStore.IntFile::type(file).value
+      };
+      source = SKStore.EHandle(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        sourceName,
+      );
+      middle = SKStore.EHandle(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        middleName,
+      );
+      output = SKStore.EHandle(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        outputName,
+      );
+      if (phase == 0) {
+        input = context.mkdir(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          sourceName,
+          Array[(SKStore.IID(0), SKStore.IntFile(1))],
+        );
+        mid = input.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          middleName,
+          (_, writer, key, values) ~> writer.set(key, values.first),
+        );
+        _ = mid.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          outputName,
+          (_, writer, key, values) ~> writer.set(key, values.first),
+        );
+        context.update();
+        source.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+        tick = context.getTick();
+        invariant(context.updateUntil(dir ~> dir == middleName, _ ~> false));
+        invariant(middle.getArray(context, SKStore.IID(0))[0].value == 1);
+        invariant(context.getTick() == tick);
+        context.setGlobal("BOUNDED_TICK", SKStore.IntFile(tick.value));
+      } else if (phase == 1) {
+        invariant(
+          context.updateUntilBoundary(
+            _ ~> false,
+            _ ~> false,
+            dir ~> dir != middleName,
+          ) == Some(true),
+        );
+        invariant(middle.getArray(context, SKStore.IID(0))[0].value == 1);
+        invariant(context.updateUntil(_ ~> false, dir ~> dir == middleName));
+        invariant(middle.getArray(context, SKStore.IID(0))[0].value == 2);
+        invariant(output.getArray(context, SKStore.IID(0))[0].value == 1);
+        invariant(
+          context.getTick().value ==
+            SKStore.IntFile::type(context.getGlobal("BOUNDED_TICK").fromSome())
+              .value,
+        );
+      } else {
+        // New work arriving while paused must run before pending downstream work.
+        source.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(3)]);
+        context.update();
+        invariant(output.getArray(context, SKStore.IID(0))[0].value == 3);
+        void
+      };
+      if (phase >= 2) {
+        SKStore.CStop(None())
+      } else {
+        context.setGlobal("BOUNDED_PHASE", SKStore.IntFile(phase + 1));
+        SKStore.CContinue(None())
+      }
+    } catch {
+    | exn ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    }
+  })
+}
+
+module end;

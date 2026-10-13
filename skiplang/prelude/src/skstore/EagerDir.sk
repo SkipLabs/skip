@@ -2069,6 +2069,12 @@ base class EagerDir protected {
     this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
   }
 
+  // Checkpointed coordinators must retain the previous invocation's owned
+  // directories and reads until their replacement has completed.
+  fun mapperInfo(source: Path): MInfo {
+    this.getOld(source)
+  }
+
   protected fun getOld(key: Path): MInfo {
     if (this.old.containsKey(key)) {
       this.old[key]

@@ -139,27 +139,53 @@ fun main(): void {
   if (isInit) {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
-  SKStore.runWithGc(
-    SKStore.Context::create{},
-    _context ~> {
-      SKStore.CStop(
-        Some((context, _, _) ~> {
-          // Tracing is an invocation option, even when the saved context has
-          // debugging enabled and all compiler collections remain cached.
-          context.!debugMode = debugSKStore;
-          try {
-            batchManifest match {
-            | Some(manifest) -> compile_batch(config, context, manifest)
-            | None() -> compile(config, context, config.input_files)
+  if (config.incrementalSpecialization && batchManifest.isNone()) {
+    pipeline = compilerPipeline(config);
+    SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+      context.!debugMode = debugSKStore;
+      phase = context.getGlobal(pipelinePhaseKey) match {
+      | Some(x) -> SKStore.IntFile::type(x).value
+      | None() -> 0
+      };
+      try {
+        if (pipeline[phase](context)) !phase = phase + 1;
+        if (phase == pipeline.size()) {
+          context.removeGlobal(pipelinePhaseKey);
+          context.removeGlobal(specializationProgressKey);
+          SKStore.CStop(None())
+        } else {
+          context.setGlobal(pipelinePhaseKey, SKStore.IntFile(phase));
+          SKStore.CContinue(None())
+        }
+      } catch {
+      | exn ->
+        print_error(exn.getMessage());
+        skipExit(2)
+      }
+    })
+  } else {
+    SKStore.runWithGc(
+      SKStore.Context::create{},
+      _context ~> {
+        SKStore.CStop(
+          Some((context, _, _) ~> {
+            // Tracing is an invocation option, even when the saved context has
+            // debugging enabled and all compiler collections remain cached.
+            context.!debugMode = debugSKStore;
+            try {
+              batchManifest match {
+              | Some(manifest) -> compile_batch(config, context, manifest)
+              | None() -> compile(config, context, config.input_files)
+              }
+            } catch {
+            | exn ->
+              print_error(exn.getMessage());
+              skipExit(2)
             }
-          } catch {
-          | exn ->
-            print_error(exn.getMessage());
-            skipExit(2)
-          }
-        }),
-      )
-    },
-    Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
-  )
+          }),
+        )
+      },
+      Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
+    )
+  }
 }

@@ -510,6 +510,7 @@ mutable class Context private {
   /* Invariant: tick is only updated at the end of updateWithStatus */
   private mutable tick: Tick = Tick(1),
   private mutable lazyCapacity: Int = 10,
+  private mutable updatePaused: Bool = false,
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   private mutable deps: Deps = Deps::empty(),
   mutable debugMode: Bool = debugMode,
@@ -668,6 +669,7 @@ mutable class Context private {
       time => this.time,
       tick => this.tick,
       lazyCapacity => this.lazyCapacity,
+      updatePaused => this.updatePaused,
       toUpdate => this.toUpdate,
       deps => this.deps,
       debugMode => this.debugMode,
@@ -701,6 +703,7 @@ mutable class Context private {
     this.!time = ctx.time;
     this.!tick = ctx.tick;
     this.!lazyCapacity = ctx.lazyCapacity;
+    this.!updatePaused = ctx.updatePaused;
     this.!toUpdate = ctx.toUpdate;
     this.!deps = ctx.deps;
     this.!debugMode = ctx.debugMode;
@@ -741,6 +744,13 @@ mutable class Context private {
       invariant(arr.i0 == arrow);
       this.!arrowStack = rl
     }
+  }
+
+  readonly fun currentEagerMapperInfo(): MInfo {
+    arrow = this.currentArrow().fromSome();
+    parent = this.unsafeGetDir(arrow.parentName).typed();
+    source = Path::create(arrow.parentName, parent.keyOfArrowKey(arrow));
+    this.unsafeGetEagerDir(arrow.childName).mapperInfo(source)
   }
 
   readonly fun currentArrow(): ?ArrowKey {
@@ -949,7 +959,45 @@ mutable class Context private {
     }
   }
 
+  // Pause only between complete arrows. Pending invalidations and the current
+  // tick survive cloning/persistence; normal update() resumes the same pass.
+  mutable fun updateUntil(
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+  ): Bool {
+    this.updateUntilBoundary(before, after).isSome()
+  }
+
+  // None means fully drained; Some(true) stopped before an arrow and
+  // Some(false) stopped after one. A completed coordinator may still have
+  // queued descendants, so callers must distinguish those boundaries.
+  mutable fun updateUntilBoundary(
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+    eligible: DirName ~> Bool = _ ~> true,
+  ): ?Bool {
+    loop {
+      (changed, paused, stoppedBefore) = this.updateWithBoundary(
+        None(),
+        before,
+        after,
+        eligible,
+      );
+      if (paused) return Some(stoppedBefore);
+      if (!changed) return None();
+    }
+  }
+
   mutable fun updateWithStatus(from: ?Context = None()): Bool {
+    this.updateWithBoundary(from, _ ~> false, _ ~> false, _ ~> true).i0
+  }
+
+  private mutable fun updateWithBoundary(
+    from: ?Context,
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+    eligible: DirName ~> Bool,
+  ): (Bool, Bool, Bool) {
     invariant(
       this.currentArrow().isNone(),
       "updateWithStatus cannot be called during update.",
@@ -957,17 +1005,23 @@ mutable class Context private {
     if (this.debugMode) {
       print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
-    this.!fromContext = from;
+    if (!this.updatePaused) this.!fromContext = from;
     from.each(ctx ->
       if (ctx.tick > this.tick) {
         this.!tick = ctx.tick
       }
     );
-    this.updateLazyGets();
+    if (!this.updatePaused) this.updateLazyGets();
+    heldUpdates: SortedMap<(TimeStack, Time), Arrow> = SortedMap[];
 
     loop {
       this.toUpdate.removeMin() match {
       | None() ->
+        if (!heldUpdates.isEmpty()) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!updatePaused = true;
+          break (false, true, true)
+        };
         this.!dirty = SortedMap[];
         this.!dirtyReaders = SortedMap[];
         withPostponables = this.checkPostponables();
@@ -975,7 +1029,8 @@ mutable class Context private {
         withChanges = withPostponables || withPre;
         this.!tick = this.tick.next();
         this.!fromContext = None();
-        break withChanges
+        this.!updatePaused = false;
+        break (withChanges, false, false)
       | Some((queuedTime, arrow @ Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
         // Reusing a nested directory gives it a new TimeStack. Updates that
@@ -994,6 +1049,16 @@ mutable class Context private {
           this.addToUpdate(time, parentTime, arrow);
           continue
         | _ -> void
+        };
+        if (!eligible(childName)) {
+          !heldUpdates = heldUpdates.set(queuedTime, arrow);
+          continue
+        };
+        if (before(childName)) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!toUpdate = this.toUpdate.set(queuedTime, arrow);
+          this.!updatePaused = true;
+          break (false, true, true)
         };
         this.unsafeMaybeGetDir(childName) match {
         | None()
@@ -1015,8 +1080,21 @@ mutable class Context private {
             parentMaps,
             child,
           )
+        };
+        if (after(childName)) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!updatePaused = true;
+          break (false, true, false)
         }
       }
+    }
+  }
+
+  private mutable fun restoreDeferredUpdates(
+    heldUpdates: SortedMap<(TimeStack, Time), Arrow>,
+  ): void {
+    for (priority => arrow in heldUpdates) {
+      this.!toUpdate = this.toUpdate.set(priority, arrow)
     }
   }
 

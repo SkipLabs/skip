@@ -698,3 +698,19 @@ native SKDB suite passed. This is a small additional improvement; the original
 small-object allocation compaction was already in the baseline. See
 [the allocator experiment](experiments/skstore-size-classes/README.md) for the
 recorded results and measurement limits.
+
+## Per-round shared-heap checkpoints: 2026-10-13
+
+An explicit compiler pipeline, bounded update propagation and one completed
+specialization round per `runWithGc` iteration reduce the frozen compiler
+workload's peak RSS from 26.005 to **10.790 GiB**: **15.214 GiB saved (58.51%)**,
+a **2.41x reduction**. The run completed the same 182 rounds in 163.752 seconds
+versus 174.201 seconds for the prior recorded run. Timing is a single-run
+comparison with overlapping correctness tests. The workload still stops after
+specialization and persistence, before native optimization/code emission.
+
+The temporary heap is reclaimed after each synchronized step. Lookup structure
+and OldFile wrappers are unchanged. Incremental replacement retains old mapper
+ownership and reads until completion, and paused updates preserve dirty queues,
+tick boundaries and lazy-cache aging. See
+[the pipeline design and validation report](compiler-pipeline-checkpoints.md).
