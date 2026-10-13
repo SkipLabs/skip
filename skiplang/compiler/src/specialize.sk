@@ -1635,6 +1635,10 @@ mutable class Specializer{
     context: mutable SKStore.Context,
     f: (mutable SKStore.Context, mutable Specializer) ~> T,
   ): T {
+    // The compiler pipeline owns this phase's temporary heap and reclaims it
+    // after synchronization. Nested collection would copy survivors twice.
+    // Sequential and unphased callers still need the local collection boundary.
+    if (context.getGlobal(.pipelinePhaseKey).isSome()) return f(context, this);
     frozenSpecializer = this.chill();
     (newSpecializer, result) = SKStore.withRegion(context, (_, context) ~> {
       specializer = frozenSpecializer.mclone(context);
@@ -1684,7 +1688,7 @@ mutable class Specializer{
       }
     };
     if (this.pauseOnSClassCreation) {
-      // Incremental discovery runs within the pipeline's per-round region.
+      // Incremental discovery runs within the pipeline's phase heap.
       // Avoid a nested region and cloning the specializer for each request.
       specialize(this.context, this)
     } else {

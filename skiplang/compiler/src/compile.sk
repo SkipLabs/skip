@@ -581,9 +581,9 @@ fun getOrInitializeBackend(
         classPhase = specializerAllDirCopy
           .getArray(context, SKStore.IID(0))
           .any(value -> value is O.CStackElement _);
-        // Collect temporary allocations once the complete round is evaluated.
-        // withRegion preserves the context, including its dependencies.
-        !specializerAllDir = SKStore.withRegion(context, (_, context) ~> {
+        // The phased driver synchronizes and destroys its heap after this round.
+        // Only the legacy unphased path needs a separate collection region.
+        runRound = (context: mutable SKStore.Context) ~> {
           nextDir = specializerAllDirCopy
             .map(
               x ~> x,
@@ -723,7 +723,12 @@ fun getOrInitializeBackend(
             );
           _ = nextDir.getArray(context, SKStore.IID(0));
           nextDir
-        });
+        };
+        !specializerAllDir = if (phased) {
+          runRound(context)
+        } else {
+          SKStore.withRegion(context, (_, context) ~> runRound(context))
+        };
 
         !phaseNumber = phaseNumber + 1;
         if (phased) break void;
