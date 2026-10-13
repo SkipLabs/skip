@@ -14,11 +14,14 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "alloc_size_classes.h"
 #include "runtime.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
 #define FTABLE_SIZE 512
+_Static_assert(SK_ALLOC_SLOT_COUNT <= FTABLE_SIZE,
+               "persistent free table too small");
 
 /*****************************************************************************/
 /* Persistent constants. */
@@ -629,43 +632,6 @@ int sk_is_static(void* ptr) {
 /*****************************************************************************/
 /* Free table. */
 /*****************************************************************************/
-
-typedef size_t slot_t;
-
-#if !(defined(__has_builtin) && __has_builtin(__builtin_stdc_bit_width))
-static inline size_t __builtin_stdc_bit_width(size_t size) {
-  return size ? (size_t)(sizeof(size_t) * 8UL - __builtin_clzl(size)) : 0;
-}
-#endif
-
-// Exact word-sized classes through 256 bytes; eight classes per doubling above.
-// The format version changes with the free-list layout and class numbering.
-#define SMALL_ALLOC_LIMIT 256
-#define SMALL_ALLOC_SLOTS (SMALL_ALLOC_LIMIT / sizeof(void*))
-
-slot_t sk_slot_of_size(size_t size) {
-  if (size <= SMALL_ALLOC_LIMIT) {
-    if (size < sizeof(void*)) size = sizeof(void*);
-    return (size + sizeof(void*) - 1) / sizeof(void*) - 1;
-  }
-  size_t exponent = __builtin_stdc_bit_width(size - 1) - 1;
-  size_t base = (size_t)1 << exponent;
-  size_t step = base >> 3;
-  size_t part = (size - base - 1) / step + 1;
-  // The final class of the largest octave would round to SIZE_MAX + 1.
-  if (exponent == sizeof(size_t) * 8 - 1 && part == 8) {
-    fprintf(stderr, "Error: persistent allocation size overflow.\n");
-    exit(ERROR_OUT_OF_MEMORY);
-  }
-  return SMALL_ALLOC_SLOTS + (exponent - 8) * 8 + part - 1;
-}
-
-size_t sk_size_of_slot(slot_t slot) {
-  if (slot < SMALL_ALLOC_SLOTS) return (slot + 1) * sizeof(void*);
-  size_t index = slot - SMALL_ALLOC_SLOTS;
-  size_t base = (size_t)1 << (8 + index / 8);
-  return base + (index % 8 + 1) * (base >> 3);
-}
 
 void sk_add_ftable(void* ptr, slot_t slot) {
   *(void**)ptr = ginfo->ftable[slot];
