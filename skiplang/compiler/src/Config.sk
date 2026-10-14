@@ -76,6 +76,7 @@ class Config{
   stopAfterSpecialization: Bool,
   // Persistent invocations retain the incremental specialization graph.
   incrementalSpecialization: Bool = false,
+  specializerWorkers: Int = 0,
   stackAlign: Int,
   stackAlignStr: String,
   ptrByteSize: Int,
@@ -198,6 +199,22 @@ class Config{
       results.maybeGetString("init").isSome() ||
       results.maybeGetString("data").isSome();
 
+    workerSetting = results.getString("specializer-workers");
+    specializerWorkers = if (workerSetting == "auto") {
+      // Match skargo's CPU detection, respecting the process's CPU affinity.
+      System.subprocess(Array["nproc"]) match {
+      | Success(p) if (p.success()) ->
+        min(64, max(1, p.stdout.trim().toIntOption().default(1)))
+      | _ -> 1
+      }
+    } else {
+      workerSetting.toInt()
+    };
+    if (specializerWorkers < 0 || specializerWorkers > 64) {
+      print_error("--specializer-workers must be between 0 and 64");
+      skipExit(2)
+    };
+
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
       vals = f.split("=");
@@ -283,6 +300,7 @@ class Config{
       no_link,
       stopAfterSpecialization,
       incrementalSpecialization,
+      specializerWorkers,
       stackAlign,
       stackAlignStr,
       ptrByteSize,

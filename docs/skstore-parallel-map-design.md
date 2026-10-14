@@ -340,7 +340,66 @@ Validation:
 `runtime/tests/run_prelude_wasm.mjs` runs a compiled prelude Wasm test binary using
 the existing built JS bindings. Pass `testParallelMap` as the optional filter.
 
-This prototype does not add lazy/filtered reads, worker-side Context operations,
-mapReduce, or nested native parallelism. It has not been connected to the compiler
-specializer or benchmarked for speed or memory. Thread scheduling and performance
-tuning remain subsequent work after this correctness baseline.
+### Compiler specializer integration
+
+Persistent compilation (`--init`/`--data`) can specialize pending function rows
+through `parallelMap`. Class discovery and generic IR conversion remain on the
+main thread. `SpecializerContext` gives workers tracked immutable reads without
+capturing a mutable Context; unsupported conversion requests retry serially.
+Ordinary nonpersistent compilation retains its existing specialization path.
+
+`--specializer-workers` defaults to `auto`: the available CPU count reported by
+`nproc`, capped at 64, with a fallback of one. Zero selects the ordinary serial
+map; one uses the prepared path without native concurrency. Changing this option
+on an existing compiler database rebuilds the compiler cache to avoid retaining
+incompatible graph namespaces. The generic parallelMap automatic limit described
+above remains separate from the compiler's explicit resolved worker count.
+
+The map API now accepts optional selection, serial forwarding, main-thread
+preparation, and exception recovery callbacks. Nonselected rows use the ordinary
+streaming mapper; selected keys are filtered before the 256-row batching step.
+Preparation and recovery run in the original row's arrow/time scope, and their
+read dependencies and newly owned directories are replayed with worker writes.
+Preparation may create row-owned directories, but must not mutate existing input
+directories that workers read. Output contributions retain source-key order even
+when serial forwarding executes first. Prepared GIR and worker results live only
+for a batch, rather than in persistent intermediate collections.
+
+The initial integration created threads for unchanged state rows and persisted
+redundant preparation/results. Profiling recorded 234,516 thread creations; the
+corrected four-worker run records 1,528 (99.35% fewer). The initial prototype's
+four-worker run took 207.06 seconds and peaked at 16.16 GiB. These historical
+numbers use an earlier compiler/stdlib and are not the corrected serial control.
+The 16-worker performance run remains on hold.
+
+Validation of the corrected implementation: 91 native prelude tests, eight Wasm
+parallel-map tests, five existing incremental compiler tests, and 18 compiler
+integration records covering identical LLVM across 0/1/4 workers, source/layout
+edits, class replacement, failure recovery, and worker reconfiguration. The full
+1,742-test compiler suite passed with the earlier integration, before the
+transient batch rewrite. Regression tests cover sparse work, tracked preparation
+reads, owned-directory cleanup, recovery, and mixed serial/parallel output order.
+Evidence and benchmark scripts are under
+`skiplang/docs/experiments/compiler-parallel-specializer/`.
+
+Worker-side Context operations, mapReduce, and nested native parallelism remain
+unsupported. Worker threads are still created per batch; a persistent pool is a
+possible subsequent optimization.
+
+
+The corrected matched benchmark (one trial per variant, identical compiler,
+stdlib, 108-file input, and task-event tracing) completed 169 specialization
+rounds in both modes:
+
+| Workers | Wall time | Peak RSS | Allocated database |
+| --- | ---: | ---: | ---: |
+| 0 | 159.90 s | 11.11 GiB | 10.46 GiB |
+| 4 | 174.37 s | 11.21 GiB | 10.48 GiB |
+
+Four workers remain 9.05% slower, with 0.86% more peak RSS and about 26.3 MiB
+additional allocated database space. This is not a demonstrated performance
+improvement. Preparation, replay, copying and scheduling still add work while
+generic IR conversion and class discovery remain serial; this measurement does
+not isolate their remaining individual costs. More profiling is needed before
+increasing concurrency. Raw metrics, hashes and scope are in `fixed/summary.json`
+and the per-run JSON files under the evidence directory above.

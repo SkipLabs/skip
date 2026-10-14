@@ -44,6 +44,28 @@ type RawParallelMapFun = (
   Array<File>,
 ) ~> void;
 
+// Main-thread hooks run in the source row's ordinary arrow/read scope. Their
+// inputs and read logs live only until this batch has been installed.
+type ParallelPrepareFun = (mutable Context, Key, Array<File>) ~> Array<File>;
+type ParallelRecoverFun = (
+  mutable Context,
+  mutable Writer,
+  Key,
+  Array<File>,
+  .Exception,
+) ~> Bool;
+
+class ParallelPreparation(
+  inputs: Array<File>,
+  reads: SortedSet<Path>,
+  dirs: SortedSet<DirName>,
+)
+class PreparedParallelRow(
+  result: ParallelRowResult,
+  reads: SortedSet<Path>,
+  dirs: SortedSet<DirName>,
+)
+
 class ParallelRowResult(
   writes: SortedMap<Key, Array<File>>,
   reads: SortedSet<Path>,
@@ -56,13 +78,18 @@ class ParallelMapJob(
   parent: EagerDir,
   keys: Array<Key>,
   lambda: RawParallelMapFun,
+  inputs: ?Array<Array<File>> = None(),
 ) {
   fun evaluate(index: Int): ParallelOutcome {
     try {
       reader = ParallelReader::create(this.snapshot);
       writer = mutable Writer{};
       key = this.keys[index];
-      this.lambda(reader, writer, key, this.parent.getArrayRaw(key));
+      values = this.inputs match {
+      | Some(inputs) -> inputs[index]
+      | None() -> this.parent.getArrayRaw(key)
+      };
+      this.lambda(reader, writer, key, values);
       ParallelOutcome(
         Some(ParallelRowResult(writer.writes, reader.getRequests())),
         None(),
@@ -118,6 +145,10 @@ native fun parallelMapRun(
 class ParallelMapper(
   lambda: RawParallelMapFun,
   workers: Int,
+  select: Key ~> Bool = _ ~> true,
+  serial: ?MapFun<Key, File> = None(),
+  prepareRow: ?ParallelPrepareFun = None(),
+  recoverRow: ?ParallelRecoverFun = None(),
 ) extends Mapper<Key, File> {
   fun map(
     _context: mutable Context,
@@ -128,41 +159,143 @@ class ParallelMapper(
     invariant_violation("Parallel mapper must be prepared as a batch")
   }
 
+  fun hasWork(keys: Array<Key>): Bool {
+    keys.any(this.select)
+  }
+
+  fun serialMapper(): Mapper<Key, File> {
+    LambdaMapper(
+      this.serial.fromSome("Nonparallel keys require a serial mapper"),
+    )
+  }
+
   fun prepare(
     context: mutable Context,
     parent: EagerDir,
     keys: Array<Key>,
+    childName: DirName,
+    timeStack: TimeStack,
   ): Mapper<Key, File> {
-    job = ParallelMapJob(context.parallelSnapshot(), parent, keys, this.lambda);
-    outcomes = parallelMapRun(job, keys.size(), this.workers);
+    selected = keys.filter(this.select);
+    if (selected.isEmpty()) return this.serialMapper();
+    preparations = this.prepareRow.map(prepare ->
+      selected.map(key -> {
+        arrow = TArrowKey::create{parentName => parent.dirName, childName, key};
+        context.enter(arrow, timeStack);
+        savedReads = context.reads;
+        savedDirs = context.newDirs;
+        context.!reads = SortedSet[];
+        context.!newDirs = SortedSet[];
+        try {
+          inputs = prepare(context, key, parent.getArrayRaw(key));
+          result = ParallelPreparation(
+            inputs,
+            context.getReads(),
+            context.newDirs,
+          );
+          context.!reads = savedReads;
+          context.!newDirs = savedDirs;
+          context.leave(arrow);
+          result
+        } catch {
+        | ex ->
+          context.!reads = savedReads;
+          context.!newDirs = savedDirs;
+          context.leave(arrow);
+          throw ex
+        }
+      })
+    );
+    job = ParallelMapJob(
+      context.parallelSnapshot(),
+      parent,
+      selected,
+      this.lambda,
+      preparations.map(rows -> rows.map(row -> row.inputs)),
+    );
+    outcomes = parallelMapRun(job, selected.size(), this.workers);
     results = SortedMap[];
-    for (i in Range(0, keys.size())) {
+    for (i in Range(0, selected.size())) {
+      key = selected[i];
+      preparedReads = preparations
+        .map(rows -> rows[i].reads)
+        .default(SortedSet[]);
+      preparedDirs = preparations
+        .map(rows -> rows[i].dirs)
+        .default(SortedSet[]);
       outcome = outcomes[i];
-      outcome.exception.each(exn -> throw exn);
-      !results = results.set(keys[i], outcome.result.fromSome());
+      result = outcome.exception match {
+      | None() -> outcome.result.fromSome()
+      | Some(ex) ->
+        recover = this.recoverRow match {
+        | Some(recover) -> recover
+        | None() -> throw ex
+        };
+        arrow = TArrowKey::create{parentName => parent.dirName, childName, key};
+        context.enter(arrow, timeStack);
+        savedReads = context.reads;
+        savedDirs = context.newDirs;
+        context.!reads = preparedReads;
+        context.!newDirs = preparedDirs;
+        try {
+          writer = mutable Writer{};
+          if (!recover(context, writer, key, parent.getArrayRaw(key), ex)) {
+            throw ex
+          };
+          recovered = ParallelRowResult(writer.writes, SortedSet[]);
+          !preparedReads = context.getReads();
+          !preparedDirs = context.newDirs;
+          context.!reads = savedReads;
+          context.!newDirs = savedDirs;
+          context.leave(arrow);
+          recovered
+        } catch {
+        | failure ->
+          context.!reads = savedReads;
+          context.!newDirs = savedDirs;
+          context.leave(arrow);
+          throw failure
+        }
+      };
+      !results = results.set(
+        key,
+        PreparedParallelRow(result, preparedReads, preparedDirs),
+      );
     };
-    ParallelReplayMapper(results)
+    ParallelReplayMapper(results, this.serial)
   }
 
   fun ==(other: Mapper<Key, File>): Bool {
     Unsafe.maybeCast(other, ParallelMapper) match {
     | Some(o) ->
-      this.workers == o.workers && native_eq(this.lambda, o.lambda) == 0
+      this.workers == o.workers &&
+        native_eq(this.lambda, o.lambda) == 0 &&
+        native_eq(this.select, o.select) == 0 &&
+        native_eq(this.serial, o.serial) == 0 &&
+        native_eq(this.prepareRow, o.prepareRow) == 0 &&
+        native_eq(this.recoverRow, o.recoverRow) == 0
     | _ -> false
     }
   }
 }
 
 class ParallelReplayMapper(
-  results: SortedMap<Key, ParallelRowResult>,
+  results: SortedMap<Key, PreparedParallelRow>,
+  serial: ?MapFun<Key, File>,
 ) extends Mapper<Key, File> {
   fun map(
     context: mutable Context,
     writer: mutable Writer,
     key: Key,
-    _values: mutable Iterator<File>,
+    values: mutable Iterator<File>,
   ): void {
-    result = this.results[key];
+    prepared = this.results.maybeGet(key) match {
+    | None() -> return this.serial.fromSome()(context, writer, key, values)
+    | Some(row) -> row
+    };
+    context.!reads = context.reads.union(prepared.reads);
+    context.!newDirs = context.newDirs.union(prepared.dirs);
+    result = prepared.result;
     for (path in result.reads) {
       // Match Handle.getArray: track both directory replacement and row writes.
       dir = context.getEagerDir(path.dirName);

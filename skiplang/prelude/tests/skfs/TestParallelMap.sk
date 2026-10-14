@@ -330,4 +330,114 @@ fun testParallelMapEmptyAndSerialFallback(): void {
   invariant(output.get(context, SKStore.IID(0)).value == 1);
 }
 
+// Main preparation must retain normal filtered-read and directory ownership
+// semantics without retaining the prepared inputs in another eager collection.
+@test
+fun testParallelMapTransientPreparationAndSparseWork(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("prepared-source"),
+    Array::fillBy(800, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+  );
+  extra = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("prepared-extra"),
+    Array[(SKStore.IID(0), SKStore.IntFile(10))],
+  );
+  childName = key ~> parallelName("prepared-child-" + key.value);
+  result = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("prepared-output"),
+    (_, writer, key, values) ~> {
+      if (key.value % 64 == 0) throw ParallelTestFailure(key.value);
+      writer.set(key, values[0])
+    },
+    None(),
+    4,
+    key ~> key.value % 16 == 0,
+    Some((_, writer, key, values) ~> writer.setArray(key, values.toArray())),
+    Some((context, key, values) ~> {
+      offset = extra.getArrayFilter(context, SKStore.IID(0), value ~>
+        SKStore.IntFile(value.value % 100)
+      )[0].value;
+      _ = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        childName(key),
+        Array[(key, values[0])],
+      );
+      Array[SKStore.IntFile(values[0].value + offset)]
+    }),
+    Some((context, writer, key, values, ex) ~> {
+      ex match {
+      | ParallelTestFailure _ ->
+        writer.set(
+          key,
+          SKStore.IntFile(
+            values[0].value + extra.getArray(context, SKStore.IID(0))[0].value,
+          ),
+        );
+        true
+      | _ -> false
+      }
+    }),
+  );
+  for (offset in Array[10, 20]) {
+    extra.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(offset)]);
+    context.update();
+    for (i in Range(0, 800)) {
+      expected = i + (if (i % 16 == 0) offset else 0);
+      invariant(result.getArray(context, SKStore.IID(i))[0].value == expected);
+    }
+  };
+  invariant(context.unsafeMaybeGetEagerDir(childName(SKStore.IID(0))).isSome());
+  source.writeArray(context, SKStore.IID(0), Array[]);
+  context.update();
+  invariant(result.getArray(context, SKStore.IID(0)).isEmpty());
+  invariant(context.unsafeMaybeGetEagerDir(childName(SKStore.IID(0))).isNone());
+  source.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(0)]);
+  context.update();
+  invariant(result.getArray(context, SKStore.IID(0))[0].value == 20);
+}
+
+@test
+fun testParallelMapSelectedAndSerialRowsPreserveOutputOrder(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("mixed-order-source"),
+    Array::fillBy(600, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+  );
+  output = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("mixed-order-output"),
+    (_, writer, _, values) ~> writer.set(SKStore.IID(0), values[0]),
+    None(),
+    4,
+    key ~> key.value % 2 == 1,
+    Some((_, writer, _, values) ~> writer.set(SKStore.IID(0), values.first)),
+  );
+  invariant(
+    output.getArray(context, SKStore.IID(0)).map(v -> v.value) ==
+      Array::fillBy(600, i -> i),
+  );
+  source.writeArray(context, SKStore.IID(7), Array[]);
+  source.writeArray(context, SKStore.IID(8), Array[SKStore.IntFile(808)]);
+  context.update();
+  expected = Range(0, 600).filter(i -> i != 7)
+    .map(i -> if (i == 8) 808 else i)
+    .collect(Array);
+  invariant(
+    output.getArray(context, SKStore.IID(0)).map(v -> v.value) == expected,
+  );
+}
+
 module end;

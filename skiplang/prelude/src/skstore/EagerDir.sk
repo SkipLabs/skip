@@ -1194,13 +1194,31 @@ base class EagerDir protected {
     rangeOpt: ?KeyRange<Key>,
   ): void {
     if (f is ParallelMapper _) {
-      // Stream existing source keys; do not build another index of the parent.
+      parallel = Unsafe.cast(f, ParallelMapper);
+      // Keep nonworker rows on the ordinary streaming iterator. Looking up
+      // each unchanged state key again would turn this pass into O(n log n).
+      parallel.serial.each(serial -> {
+        forwarding = LambdaMapper((context, writer, key, values) ~> {
+          if (!parallel.select(key)) serial(context, writer, key, values)
+        });
+        static::mapData(
+          context,
+          oldVec,
+          parent,
+          childName,
+          timeStack,
+          forwarding,
+          acc,
+          rangeOpt,
+        )
+      });
+      // Select before batching, so a sparse work set still fills worker jobs.
+      // Do not build another collection or index of the parent.
       selected = parent
         .unsafeGetFileIterNoReducer(rangeOpt.map(range -> range.start))
         .map(row -> row.i0)
-        .takeWhile(key ~>
-          rangeOpt.map(range -> key <= range.end).default(true)
-        );
+        .takeWhile(key ~> rangeOpt.map(range -> key <= range.end).default(true))
+        .filter(parallel.select);
       loop {
         batch = mutable Vector<Key>[];
         for (_ in Range(0, 256)) {
@@ -1216,6 +1234,8 @@ base class EagerDir protected {
             context,
             parent,
             batchKeys,
+            childName,
+            timeStack,
           );
           rows = mutable Vector[];
           infos = mutable Vector[];
@@ -1501,6 +1521,10 @@ base class EagerDir protected {
     f: RawParallelMapFun,
     rangeOpt: ?Array<KeyRange<Key>> = None(),
     workers: Int = 0,
+    select: Key ~> Bool = _ ~> true,
+    serial: ?MapFun<Key, File> = None(),
+    prepareRow: ?ParallelPrepareFun = None(),
+    recoverRow: ?ParallelRecoverFun = None(),
   ): void {
     invariant(
       workers >= 0 && workers <= 64,
@@ -1510,7 +1534,7 @@ base class EagerDir protected {
       context,
       parentName,
       childName,
-      ParallelMapper(f, workers),
+      ParallelMapper(f, workers, select, serial, prepareRow, recoverRow),
       None(),
       rangeOpt,
     )
@@ -1844,11 +1868,42 @@ base class EagerDir protected {
         if (batch.isEmpty()) break void;
         batchKeys = batch.toArray();
         childCopy = childRef;
+        if (
+          !parentMaps.any(p ->
+            p.mapper match {
+            | parallel @ ParallelMapper _ -> parallel.hasWork(batchKeys)
+            | _ -> false
+            }
+          )
+        ) {
+          serialMaps = parentMaps.map(p ->
+            p.mapper match {
+            | parallel @ ParallelMapper _ ->
+              p with {mapper => parallel.serialMapper()}
+            | _ -> p
+            }
+          );
+          !childRef = runRows(
+            context,
+            batchKeys.iterator(),
+            serialMaps,
+            childCopy,
+          );
+          continue
+        };
         !childRef = withRegion(context, (_, context) ~> {
           preparedMaps = parentMaps.map(p -> {
             p.mapper match {
             | parallel @ ParallelMapper _ ->
-              p with {mapper => parallel.prepare(context, parent, batchKeys)}
+              p with {
+                mapper => parallel.prepare(
+                  context,
+                  parent,
+                  batchKeys,
+                  childName,
+                  timeStack,
+                ),
+              }
             | _ -> p
             }
           });

@@ -572,6 +572,16 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     f: ParallelMapFun<K, V, K2, V2>,
     rangeOpt: ?Array<KeyRange<K>> = None(),
     workers: Int = 0,
+    select: K ~> Bool = _ ~> true,
+    serial: ?TMapFun<K, V, K2, V2> = None(),
+    prepare: ?((mutable Context, K, Array<V>) ~> Array<V>) = None(),
+    recover: ?((
+      mutable Context,
+      mutable TWriter<K2, V2>,
+      K,
+      Array<V>,
+      .Exception,
+    ) ~> Bool) = None(),
   ): EHandle<K2, V2> {
     invariant(
       workers >= 0 && workers <= 64,
@@ -592,6 +602,45 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       raw,
       rangeOpt,
       workers,
+      key ~> select(inputKeyType(key)),
+      serial.map(f ->
+        (context, writer, key, values) ~> {
+          FileIterator::create(values) match {
+          | EmptyFileIterator _ -> void
+          | iter @ NonEmptyIterator _ ->
+            typedWriter = TWriter<K2, V2>::mcreate(writer.writes);
+            f(
+              context,
+              typedWriter,
+              inputKeyType(key),
+              iter.nonEmptyMap(inputType),
+            );
+            writer.!writes = typedWriter.writes
+          }
+        }
+      ),
+      prepare.map(f ->
+        (context, key, values) ~> {
+          if (values.isEmpty()) return Array[];
+          f(context, inputKeyType(key), values.map(inputType)).map(v ->
+            (v : File)
+          )
+        }
+      ),
+      recover.map(f ->
+        (context, writer, key, values, ex) ~> {
+          typedWriter = TWriter<K2, V2>::mcreate(writer.writes);
+          handled = f(
+            context,
+            typedWriter,
+            inputKeyType(key),
+            values.map(inputType),
+            ex,
+          );
+          writer.!writes = typedWriter.writes;
+          handled
+        }
+      ),
     );
     EHandle(typeKey, type, dirName)
   }

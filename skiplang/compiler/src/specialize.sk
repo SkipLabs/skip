@@ -399,14 +399,14 @@ mutable base class SPMap<K: Orderable, V>{} {
   readonly fun chill(): SPMap<K, V>;
   readonly fun mclone(): mutable SPMap<K, V>;
   readonly fun readonlyGet(k: K): V;
-  mutable fun get(context: mutable SKStore.Context, k: K): V;
+  mutable fun get(context: mutable SpecializerContext, k: K): V;
   mutable fun getFilter<R: SKStore.File>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     k: K,
     project: V ~> R,
   ): R;
-  mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V;
-  mutable fun contains(context: mutable SKStore.Context, k: K): Bool;
+  mutable fun maybeGet(context: mutable SpecializerContext, k: K): ?V;
+  mutable fun contains(context: mutable SpecializerContext, k: K): Bool;
   mutable fun set(k: K, v: V): void;
   mutable fun replace(other: readonly SPMap<K, V>): void;
   readonly fun toFixed(): readonly SPMapFixed<K, V>;
@@ -473,10 +473,10 @@ mutable class SPMapDiff<K: Orderable, V>{
     invariant_violation("Cannot call readonlyGet from SPMapDiff")
   }
 
-  mutable fun get(context: mutable SKStore.Context, k: K): V {
+  mutable fun get(context: mutable SpecializerContext, k: K): V {
     this.data.maybeGet(k) match {
     | None() ->
-      arr = this.handle.getArray(context, this.k2Key(k));
+      arr = context.getArray(this.handle, this.k2Key(k));
       if (arr.size() == 0) invariant_violation("Not found") else {
         this.file2V(arr[0])
       }
@@ -485,7 +485,7 @@ mutable class SPMapDiff<K: Orderable, V>{
   }
 
   mutable fun getFilter<R: SKStore.File>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     k: K,
     project: V ~> R,
   ): R {
@@ -493,7 +493,7 @@ mutable class SPMapDiff<K: Orderable, V>{
     | Some(value) -> project(value)
     | None() ->
       convert = this.file2V;
-      values = this.handle.getArrayFilter(context, this.k2Key(k), file ~>
+      values = context.getArrayFilter(this.handle, this.k2Key(k), file ~>
         project(convert(file))
       );
       invariant(!values.isEmpty(), "Not found");
@@ -501,10 +501,10 @@ mutable class SPMapDiff<K: Orderable, V>{
     }
   }
 
-  mutable fun maybeGet(context: mutable SKStore.Context, k: K): ?V {
+  mutable fun maybeGet(context: mutable SpecializerContext, k: K): ?V {
     this.data.maybeGet(k) match {
     | None() ->
-      arr = this.handle.getArray(context, this.k2Key(k));
+      arr = context.getArray(this.handle, this.k2Key(k));
       if (arr.size() == 0) None() else {
         Some(this.file2V(arr[0]))
       }
@@ -512,12 +512,12 @@ mutable class SPMapDiff<K: Orderable, V>{
     }
   }
 
-  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+  mutable fun contains(context: mutable SpecializerContext, k: K): Bool {
     this.data.maybeGet(k) match {
     | None() ->
       this.handlePresence match {
-      | None() -> this.handle.getArray(context, this.k2Key(k)).size() != 0
-      | Some(handle) -> handle.getArray(context, this.k2Key(k)).size() != 0
+      | None() -> context.getArray(this.handle, this.k2Key(k)).size() != 0
+      | Some(handle) -> context.getArray(handle, this.k2Key(k)).size() != 0
       }
 
     | Some(_) -> true
@@ -563,23 +563,23 @@ mutable class SPMapFixed<K: Orderable, V>{
     this.data[k]
   }
 
-  mutable fun get(_context: mutable SKStore.Context, k: K): V {
+  mutable fun get(_context: mutable SpecializerContext, k: K): V {
     this.data[k]
   }
 
   mutable fun getFilter<R: SKStore.File>(
-    _context: mutable SKStore.Context,
+    _context: mutable SpecializerContext,
     k: K,
     project: V ~> R,
   ): R {
     project(this.data[k])
   }
 
-  mutable fun maybeGet(_context: mutable SKStore.Context, k: K): ?V {
+  mutable fun maybeGet(_context: mutable SpecializerContext, k: K): ?V {
     this.data.maybeGet(k)
   }
 
-  mutable fun contains(context: mutable SKStore.Context, k: K): Bool {
+  mutable fun contains(context: mutable SpecializerContext, k: K): Bool {
     this.maybeGet(context, k) is Some _
   }
 
@@ -644,14 +644,14 @@ mutable class SPRelations<K: Orderable>{
   }
 
   mutable fun get(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     key: K,
   ): SortedSet<SClassID> {
     additions = this.data.maybeGet(key).default(kEmptySClassSet);
     this.handle match {
     | None() -> additions
     | Some(handle) ->
-      values = handle.getArray(context, this.k2Key(key));
+      values = context.getArray(handle, this.k2Key(key));
       if (values.isEmpty()) additions else {
         convFile2SortedSetSClassID(values[0]).union(additions)
       }
@@ -659,7 +659,7 @@ mutable class SPRelations<K: Orderable>{
   }
 
   mutable fun maybeGet(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     key: K,
   ): ?SortedSet<SClassID> {
     values = this.get(context, key);
@@ -667,7 +667,7 @@ mutable class SPRelations<K: Orderable>{
   }
 
   mutable fun containsValue(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     key: K,
     value: SClassID,
   ): Bool {
@@ -677,7 +677,7 @@ mutable class SPRelations<K: Orderable>{
     this.handle match {
     | None() -> false
     | Some(handle) ->
-      values = handle.getArrayFilter(context, this.k2Key(key), file ~>
+      values = context.getArrayFilter(handle, this.k2Key(key), file ~>
         SKStore.BoolFile(convFile2SortedSetSClassID(file).contains(value))
       );
       !values.isEmpty() && values[0].value
@@ -715,7 +715,7 @@ class FStackElement(
 class CStackElement(
   origin: FStackElement,
   hc: HalfClass,
-  k: (mutable SKStore.Context, mutable Specializer, SClassInfo) ~> void,
+  k: (mutable SpecializerContext, mutable Specializer, SClassInfo) ~> void,
   pos: Pos,
 ) extends SKStore.File
 
@@ -785,6 +785,12 @@ class SpecializerState{
   }
 
   fun mclone(context: mutable SKStore.Context): mutable Specializer {
+    this.mcloneWithContext(SpecializerContext::serial(context))
+  }
+
+  fun mcloneWithContext(
+    context: mutable SpecializerContext,
+  ): mutable Specializer {
     mutable Specializer{
       context => context,
       fstackOrigin => this.fstackOrigin,
@@ -923,7 +929,7 @@ fun convFile2GFunKey(x: SKStore.File): GFunKey {
 }
 
 mutable class Specializer{
-  context: mutable SKStore.Context,
+  context: mutable SpecializerContext,
 
   mutable fstackOrigin: ?FStackElement = None(),
 
@@ -969,6 +975,20 @@ mutable class Specializer{
   static fun make(
     handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
     context: mutable SKStore.Context,
+    config: Config.SpecializationConfig,
+    converter: Converter,
+  ): mutable Specializer {
+    static::makeWithContext(
+      handle,
+      SpecializerContext::serial(context),
+      config,
+      converter,
+    )
+  }
+
+  static fun makeWithContext(
+    handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
+    context: mutable SpecializerContext,
     config: Config.SpecializationConfig,
     converter: Converter,
   ): mutable Specializer {
@@ -1466,7 +1486,7 @@ mutable class Specializer{
   // the pending-function CPS walk must use the private CPS implementations
   // so the rest of the walk remains in k, including across class creation.
   mutable fun computeMethodTargs(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     call: GCallMethodBase,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
   ): Array<Tclass> {
@@ -1480,11 +1500,11 @@ mutable class Specializer{
   }
 
   private static fun computeMethodTargsCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     call: GCallMethodBase,
     tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
-    k: (mutable SKStore.Context, mutable this, Array<Tclass>) ~> T,
+    k: (mutable SpecializerContext, mutable this, Array<Tclass>) ~> T,
   ): T {
     pos = call.pos;
 
@@ -1521,14 +1541,14 @@ mutable class Specializer{
   }
 
   private static fun computeMethodTargsForObjTypeCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     call: GCallMethodBase,
     tparamEnvOrig: UnorderedMap<GTparam, Tclass>,
     pos: FileRange,
     objType: Tclass,
     k: (
-      mutable SKStore.Context,
+      mutable SpecializerContext,
       mutable this,
       (Array<GType>, UnorderedMap<GTparam, Tclass>),
     ) ~> T,
@@ -1553,7 +1573,7 @@ mutable class Specializer{
         } else {
           // Look up the source method so we can add its tparams
           // to the environment.
-          sourceGClass = sp.converter.getGClass(context, call.source, pos);
+          sourceGClass = context.getGClass(sp.converter, call.source, pos);
           sm = sourceGClass.methods.maybeGet(call.method) match {
           | Some(cm) -> cm
           | None() ->
@@ -1632,19 +1652,23 @@ mutable class Specializer{
   }
 
   mutable fun withRegion<T>(
-    context: mutable SKStore.Context,
-    f: (mutable SKStore.Context, mutable Specializer) ~> T,
+    context: mutable SpecializerContext,
+    f: (mutable SpecializerContext, mutable Specializer) ~> T,
   ): T {
     // The compiler pipeline owns this phase's temporary heap and reclaims it
     // after synchronization. Nested collection would copy survivors twice.
     // Sequential and unphased callers still need the local collection boundary.
-    if (context.getGlobal(.pipelinePhaseKey).isSome()) return f(context, this);
+    if (context.inPhase()) return f(context, this);
     frozenSpecializer = this.chill();
-    (newSpecializer, result) = SKStore.withRegion(context, (_, context) ~> {
-      specializer = frozenSpecializer.mclone(context);
-      result = f(context, specializer);
-      (specializer.chill(), result)
-    });
+    (newSpecializer, result) = SKStore.withRegion(
+      context.requireSerial(),
+      (_, serialContext) ~> {
+        localContext = SpecializerContext::serial(serialContext);
+        specializer = frozenSpecializer.mcloneWithContext(localContext);
+        result = f(localContext, specializer);
+        (specializer.chill(), result)
+      },
+    );
     this.replace(newSpecializer);
     result
   }
@@ -1663,7 +1687,7 @@ mutable class Specializer{
 
   mutable fun specializePendingFun(stackElt: FStackElement): void {
     specialize = (
-      context: mutable SKStore.Context,
+      context: mutable SpecializerContext,
       specializer: mutable Specializer,
     ) ~> {
       try {
@@ -1720,12 +1744,12 @@ mutable class Specializer{
   }
 
   private static fun specializePendingFunCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     fname: LazyGFun,
     methodTargs: Array<Tclass>,
     classTargs: Array<Tclass>,
-    k: (mutable SKStore.Context, mutable this, void) ~> T,
+    k: (mutable SpecializerContext, mutable this, void) ~> T,
   ): T {
     superposition = FunSuperpositionID(
       ClassSuperpositionID(classTargs),
@@ -1738,7 +1762,7 @@ mutable class Specializer{
     };
 
     targs = classTargs.concat(methodTargs);
-    f = sp.converter.getGFunction(context, fname);
+    f = context.getGFunction(sp.converter, fname);
     if (f.funInfo.tparams.size() != targs.size()) {
       sp.pos.die(
         `tparam count mismatch in requestFunction for ${f}; ` +
@@ -1801,11 +1825,11 @@ mutable class Specializer{
   }
 
   private static fun specializePendingInstrsCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     instrs: Array<(GNonConstantInstr, Bool, Bool)>,
-    k: (mutable SKStore.Context, mutable this, void) ~> T,
+    k: (mutable SpecializerContext, mutable this, void) ~> T,
   ): T {
     for (entry in instrs) {
       (instr, noteType, noteLiteralType) = entry;
@@ -1813,7 +1837,7 @@ mutable class Specializer{
       // Each continuation finishes only this instruction. A missing class
       // saves that work in classStack while the loop visits other instructions.
       afterType = (
-        context: mutable SKStore.Context,
+        context: mutable SpecializerContext,
         sp: mutable this,
         _type: Tclass,
       ) ~> {
@@ -1849,12 +1873,12 @@ mutable class Specializer{
   }
 
   private static fun specializePendingInstrCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     instr: GNonConstantInstr,
     noteLiteralType: Bool,
-    k: (mutable SKStore.Context, mutable this, void) ~> T,
+    k: (mutable SpecializerContext, mutable this, void) ~> T,
   ): T {
     instr match {
     | GCallFunctionBase{name, targs => innerTargs} ->
@@ -2114,7 +2138,7 @@ mutable class Specializer{
   // contravariance in generic types. Basically if it is ever legal to cast
   // 'sub' to 'super'
   private mutable fun inherit(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     super: SClassInfo,
     sub: SClassInfo,
   ): (SClassInfo, SClassInfo) {
@@ -2142,7 +2166,7 @@ mutable class Specializer{
   }
 
   mutable fun specializeType2(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     generic: LazyGClass,
     mutability: Mutability,
     targs: Array<Type>,
@@ -2170,7 +2194,7 @@ mutable class Specializer{
 
   // Converts a non-parametric type to a Tclass.
   mutable fun getTclass2(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     generic: LazyGClass,
     targs: Array<Tclass>,
     mutability: Mutability,
@@ -2192,13 +2216,13 @@ mutable class Specializer{
   }
 
   private static fun getTclass2CPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     generic: LazyGClass,
     targs: Array<Tclass>,
     mutability: Mutability,
     literalType: Bool,
-    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+    k: (mutable SpecializerContext, mutable this, Tclass) ~> T,
   ): T {
     // Correct the lie that the type is frozen even though its
     // tparams are not (meaning it is merely "chilled").
@@ -2228,7 +2252,7 @@ mutable class Specializer{
   }
 
   mutable fun getTclass3(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     gt: GType,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     pos: Pos = this.pos,
@@ -2250,12 +2274,12 @@ mutable class Specializer{
   }
 
   private static fun getTclass3GTargsCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     pos: Pos,
     gtargs: List<GType>,
-    k: (mutable SKStore.Context, mutable this, List<Tclass>) ~> T,
+    k: (mutable SpecializerContext, mutable this, List<Tclass>) ~> T,
   ): T {
     gtargs match {
     | List.Nil() -> k(context, sp, List.Nil())
@@ -2284,13 +2308,13 @@ mutable class Specializer{
   }
 
   private static fun getTclass3CPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     gt: GType,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     pos: Pos,
     literalType: Bool,
-    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+    k: (mutable SpecializerContext, mutable this, Tclass) ~> T,
   ): T {
     gt match {
     | tp @ GTparam _ -> k(context, sp, typeMapGet(tparamEnv, tp, pos))
@@ -2358,7 +2382,7 @@ mutable class Specializer{
   }
 
   mutable fun specializeType(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     t: GType,
     mapCache: mutable UnorderedMap<(GType, Bool), Type>,
     callers: Array<FunSuperpositionID>,
@@ -2395,7 +2419,7 @@ mutable class Specializer{
   // later stages of the compiler we make their return types always be
   // scalarized out to an instance of this if they have more than one argument.
   mutable fun getReturnTuple(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     types: Array<Tclass>,
   ): Tclass {
     invariant(types.size() > 1, "No need for 0- or 1-return tuples.");
@@ -2418,7 +2442,7 @@ mutable class Specializer{
   // can of what's happening without introducing a lot of complexity
   // related to nested value classes etc.
   mutable fun getReturnType(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     typ: Type,
     callers: Array<FunSuperpositionID>,
     pos: Pos,
@@ -2530,10 +2554,10 @@ mutable class Specializer{
   // Base<T>, Concrete<T> and Class<T> to the corresponding metaclass,
   // or return 'hc' if no such conversion is possible.
   private static fun maybeConvertMetaClassCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     hc: HalfClass,
-    k: (mutable SKStore.Context, mutable this, HalfClass) ~> T,
+    k: (mutable SpecializerContext, mutable this, HalfClass) ~> T,
   ): T {
     (gid, targ) = hc.generic match {
     | FrontEndLazyGClass("Base") ->
@@ -2604,10 +2628,10 @@ mutable class Specializer{
   }
 
   private static fun getOptionTagTypeCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     optionGClass: LazyGClass,
-    k: (mutable SKStore.Context, mutable this, Tclass) ~> T,
+    k: (mutable SpecializerContext, mutable this, Tclass) ~> T,
   ): T {
     lazyGClass = optionGClass match {
     | FrontEndLazyGClass("Option") -> FrontEndLazyGClass("FastOption.OptionTag")
@@ -2627,7 +2651,7 @@ mutable class Specializer{
   }
 
   mutable fun getSClass2(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     hc: HalfClass,
   ): SClassInfo {
     this.pos.invariant(
@@ -2648,10 +2672,10 @@ mutable class Specializer{
   }
 
   static fun getSClass2CPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     hc: HalfClass,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+    k: (mutable SpecializerContext, mutable this, SClassInfo) ~> T,
   ): T {
     // Canonicalize a Concrete<T>, etc. to the right metaclass.
     static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
@@ -2678,11 +2702,11 @@ mutable class Specializer{
   }
 
   private static fun gclassFieldsMapCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     fields: List<GField>,
-    k: (mutable SKStore.Context, mutable this, List<SField>) ~> T,
+    k: (mutable SpecializerContext, mutable this, List<SField>) ~> T,
   ): T {
     fields match {
     | List.Nil() -> k(context, sp, List.Nil())
@@ -2723,12 +2747,12 @@ mutable class Specializer{
   }
 
   private static fun gclassExtendsCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     gclassList: List<GTapply>,
     info: SClassInfo,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+    k: (mutable SpecializerContext, mutable this, SClassInfo) ~> T,
   ): T {
     gclassList match {
     | List.Nil() -> k(context, sp, info)
@@ -2755,12 +2779,12 @@ mutable class Specializer{
   }
 
   private static fun gclassExtendsInheritCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     tparamEnv: UnorderedMap<GTparam, Tclass>,
     gclassList: List<GTapply>,
     info: SClassInfo,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+    k: (mutable SpecializerContext, mutable this, SClassInfo) ~> T,
   ): T {
     gclassList match {
     | List.Nil() -> k(context, sp, info)
@@ -2785,16 +2809,16 @@ mutable class Specializer{
   }
 
   private static fun createSClassCPS<T>(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     sp: mutable this,
     hc: HalfClass,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
+    k: (mutable SpecializerContext, mutable this, SClassInfo) ~> T,
   ): T {
     targs = hc.targs;
     hsc = HalfSClass(hc.generic, targs);
     sp.getOptionStyle2(hc, sp.pos) match {
     | None() ->
-      gclass = sp.converter.getGClass(context, hc.generic, sp.pos);
+      gclass = context.getGClass(sp.converter, hc.generic, sp.pos);
 
       kind = gclass.kind match {
       | ck @ ClassKind _ -> ck
@@ -3002,12 +3026,12 @@ mutable class Specializer{
   // super- and subtypes.
 
   mutable fun createVariance(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     hc: HalfClass,
     sid: SClassID,
     info: SClassInfo,
   ): void {
-    gclass = this.converter.getGClass(context, hc.generic, this.pos);
+    gclass = context.getGClass(this.converter, hc.generic, this.pos);
     hasAnyVariance = gclass.variances.any(v ->
       v match {
       | I.Vnone _ -> false
@@ -3107,7 +3131,7 @@ mutable class Specializer{
   // add entry to info's method map, and optionally request
   // implementation function
   private mutable fun addMethod(
-    context: mutable SKStore.Context,
+    _context: mutable SpecializerContext,
     info: SClassInfo,
     m: MethodKey,
     requestImpl: Bool,
@@ -3129,7 +3153,7 @@ mutable class Specializer{
         hostInfo = this.trackedSClassGet(hostID);
         host = hostInfo.sclass;
         this.requestFunction(
-          getLazyGFun(context, hostInfo.lazyGClass),
+          getLazyGFun(hostInfo.lazyGClass),
           m.targs.id,
           host.superposition.id,
         )
@@ -3140,7 +3164,7 @@ mutable class Specializer{
   }
 
   private mutable fun noteCalledMethod(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     receiver: SClassInfo,
     m: MethodKey,
   ): SClassInfo {
@@ -3179,7 +3203,7 @@ mutable class Specializer{
   }
 
   mutable fun requestMethod(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     method: String,
     objType: Tclass,
     targs: Array<Tclass>,
@@ -3259,7 +3283,7 @@ mutable class Specializer{
   // partition every function. The real algorithm needs to examine the GInstrs
   // and other referenced functions to decide what needs to be partitioned.
   mutable fun partitionFunctions(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     runtimeFunctionsVec: Array<FrontEndLazyGFun>,
     env: GlobalEnv,
     config: Config.Config,
@@ -3272,7 +3296,7 @@ mutable class Specializer{
 
     // First dealing with all the symbols found at initialization time
     for (_ => f in this.funsNeeded.toFixed().data) {
-      gf = this.converter.getGFunction(context, f.i0);
+      gf = context.getGFunction(this.converter, f.i0);
       funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(f);
     };
     for (gf => insts in funToInstsMap) {
@@ -3457,7 +3481,7 @@ mutable class FunSpecializer{
   }
 
   static fun run(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     config: Config.Config,
     specializer: mutable Specializer,
     gfunction: GFunction,
@@ -3656,7 +3680,7 @@ mutable class FunSpecializer{
   // Given a set of outgoing Targs for a function call, returns the
   // SuperpositionMap for it.
   mutable fun getFunSMap(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     targs: Array<GType>,
   ): SuperpositionMap<FunSuperpositionID> {
     if (targs.isEmpty()) {
@@ -3704,7 +3728,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun specializeType(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     t: GType,
     literalType: Bool = false,
   ): Type {
@@ -3719,7 +3743,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun specializeType2(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     lazyGClass: LazyGClass,
     targs: Array<Type>,
     mutability: Mutability,
@@ -3742,7 +3766,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun getOptionStyle(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     gt: GType,
   ): ?OptionStyle {
     // If we are in a superposition of Option<Foo> and Option<Bar>,
@@ -3771,7 +3795,7 @@ mutable class FunSpecializer{
   //
   // TODO: Delete forceSomeUndef flag once T25379806 is fixed.
   mutable fun getValue(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     val: GInstr,
     forceSomeUndef: Bool = false,
   ): MaybeExists<InstrTree> {
@@ -3861,7 +3885,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGSuspend(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     a: GSuspend,
     pos: Pos,
   ): void {
@@ -3926,7 +3950,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunction(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     call: GCallFunctionBase,
     typ: Type,
     pos: Pos,
@@ -3977,7 +4001,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallFunctionWithSmap(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     callID: GInstrID,
     callArgs: Array<GInstr>,
     name: LazyGFun,
@@ -4082,7 +4106,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KValue or KClass.
   private mutable fun emitGCallFinalMethod(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     callID: GInstrID,
     objType: Type,
     method: String,
@@ -4157,7 +4181,7 @@ mutable class FunSpecializer{
 
   // Call a method on a KBase.
   private mutable fun emitGCallVirtualMethod(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     callID: GInstrID,
     method: String,
     targs: Array<Type>,
@@ -4247,7 +4271,7 @@ mutable class FunSpecializer{
   // Implement SentinelOption::isSome by comparing the appropriate
   // field against the chosen sentinel constant.
   private mutable fun emitGCallToIsSome(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     callID: GInstrID,
     args: Array<GInstr>,
     pos: Pos,
@@ -4299,7 +4323,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCallMethod(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     call: GCallMethodBase,
     typ: Type,
     pos: Pos,
@@ -4359,7 +4383,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGFreeze(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     frz: GFreeze,
     pos: Pos,
   ): void {
@@ -4406,7 +4430,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGCastOrReinterpret(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     c: GTypedStmt,
     resultInstrType: Concrete<SimpleUnaryStmt>,
     castValue: GInstr,
@@ -4453,7 +4477,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGEArray(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     ev: GEArray,
     typ: Type,
     pos: Pos,
@@ -4507,7 +4531,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGGetField(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     gf: GGetField,
     typ: Type,
     pos: Pos,
@@ -4564,7 +4588,7 @@ mutable class FunSpecializer{
   // Converts Some(x) or None() to the corresponding code to construct
   // the analogous FlagOption or SentinelOption.
   private mutable fun optionGObjectValue(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     o: GObject,
     style: OptionStyle,
   ): InstrTree {
@@ -4629,7 +4653,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGObject(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     o: GObject,
     typ: Type,
     pos: Pos,
@@ -4698,7 +4722,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGReturn(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     r: GReturn,
     pos: Pos,
   ): void {
@@ -4710,7 +4734,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGSetField(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     s: GSetField,
     pos: Pos,
   ): void {
@@ -4757,7 +4781,7 @@ mutable class FunSpecializer{
   //      bbb()
   //    }
   private mutable fun emitOptionGTypeSwitch(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     ts: GTypeSwitch,
     style: OptionStyle,
     pos: Pos,
@@ -4816,7 +4840,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGTypeSwitch(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     ts: GTypeSwitch,
     pos: Pos,
   ): void {
@@ -4848,7 +4872,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGWith(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     w: GWith,
     resultType: Type,
     pos: Pos,
@@ -4913,7 +4937,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun initializeGeneratorInfo(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     none: GInstr,
     pos: Pos,
   ): void {
@@ -4941,7 +4965,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGYield(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     r: GYield,
     pos: Pos,
   ): void {
@@ -4955,7 +4979,7 @@ mutable class FunSpecializer{
   }
 
   private mutable fun emitGYieldBreak(
-    context: mutable SKStore.Context,
+    context: mutable SpecializerContext,
     r: GYieldBreak,
     pos: Pos,
   ): void {
@@ -4987,7 +5011,7 @@ mutable class FunSpecializer{
     }
   }
 
-  private mutable fun go(context: mutable SKStore.Context): Function {
+  private mutable fun go(context: mutable SpecializerContext): Function {
     fpos = this.optinfo.f.pos;
 
     for (block in this.gfunction.blocks) {
