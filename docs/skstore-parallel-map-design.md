@@ -546,3 +546,32 @@ Raw commands, hashes, timings, scripts and validation logs are in
 retain this machine's scratch paths; restore the recorded workload and adjust
 compiler/stdlib paths to reproduce elsewhere. `measure.py` starts from the saved
 serial command; its profiled mode uses the supplied `thread_cpu.c` interposer.
+
+
+### Follow-up: 16 type-checker workers
+
+At the user's request, the same binary, stdlib and frozen 108-file input were
+measured with 16 type-checker workers. Parsing and specialization remained serial.
+Five fresh processes ran sequentially in order: 16, 4, 16, 0, 16 workers. No builds
+or tests ran concurrently. This follow-up supersedes the four-worker measurement
+limit above for type checking; specialization was not benchmarked at 16 workers.
+
+| Mode | Wall time | Peak RSS |
+| --- | ---: | ---: |
+| Serial, fresh control | 13.161 s | 1.556 GiB |
+| 4 workers, fresh control | 9.037 s | 2.928 GiB |
+| 16 workers, median of 3 | 7.346 s | 3.154 GiB |
+
+The 16-worker trials took 7.290, 7.346 and 7.354 seconds, all successful with zero
+serial retries and identical compiler/stdlib/input hashes to the earlier runs.
+The median is **44.2% faster than the fresh serial control (1.79x)** and
+**18.7% faster than the fresh four-worker control**, with 7.7% more peak memory
+than four workers. The controls are single trials; earlier three-trial medians
+were 13.374 s serial and 9.320 s with four workers. The 16-worker median is
+45.1% and 21.2% faster than those earlier medians, respectively.
+
+Median total process CPU time (user plus system) was about 14.50 seconds at 16
+workers versus 13.16 seconds for the fresh serial control. Additional parallelism
+improves elapsed time with some extra CPU work. These remain frontend-only
+measurements, not end-to-end compiler/code-generation times. Raw trial files and
+`sixteen-workers-summary.json` are beside the original evidence.
