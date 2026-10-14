@@ -691,6 +691,7 @@ void* sk_parallel_map_result_get(void*, int64_t);
 void sk_parallel_map_result_set(void*, int64_t, void*);
 void* SKIP_detach_Obstack(void);
 void* SKIP_transfer_Obstack(void*, void*);
+void SKIP_adopt_Obstack(void*);
 void SKIP_release_Obstack(void*);
 }
 
@@ -714,7 +715,8 @@ struct ParallelMapThreads {
 }
 
 extern "C" void* SKIP_skstore_parallel_map(void* job, int64_t count,
-                                         int64_t requested_workers) {
+                                         int64_t requested_workers,
+                                         bool retain_arenas) {
   if (in_parallel_map || count < 0 || count > 256 || requested_workers < 0 ||
       requested_workers > 64) {
     SKIP_throw_cruntime(ERROR_CONTEXT_CHECK);
@@ -769,7 +771,13 @@ extern "C" void* SKIP_skstore_parallel_map(void* job, int64_t count,
   }
   void* results = sk_parallel_map_results_create(count);
   for (auto& worker : state) {
-    void* transferred = SKIP_transfer_Obstack(worker.arena, worker.results);
+    void* transferred;
+    if (retain_arenas) {
+      SKIP_adopt_Obstack(worker.arena);
+      transferred = worker.results;
+    } else {
+      transferred = SKIP_transfer_Obstack(worker.arena, worker.results);
+    }
     for (int64_t i = worker.start; i < worker.end; i++) {
       sk_parallel_map_result_set(results, i,
         sk_parallel_map_result_get(transferred, i - worker.start));

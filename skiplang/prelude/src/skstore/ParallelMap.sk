@@ -140,6 +140,7 @@ native fun parallelMapRun(
   job: ParallelMapJob,
   count: Int,
   workers: Int,
+  retainArenas: Bool,
 ): Array<ParallelOutcome>;
 
 class ParallelMapper(
@@ -149,6 +150,7 @@ class ParallelMapper(
   serial: ?MapFun<Key, File> = None(),
   prepareRow: ?ParallelPrepareFun = None(),
   recoverRow: ?ParallelRecoverFun = None(),
+  retainWorkerArenas: Bool = false,
 ) extends Mapper<Key, File> {
   fun map(
     _context: mutable Context,
@@ -213,7 +215,12 @@ class ParallelMapper(
       this.lambda,
       preparations.map(rows -> rows.map(row -> row.inputs)),
     );
-    outcomes = parallelMapRun(job, selected.size(), this.workers);
+    outcomes = parallelMapRun(
+      job,
+      selected.size(),
+      this.workers,
+      this.retainWorkerArenas,
+    );
     results = SortedMap[];
     for (i in Range(0, selected.size())) {
       key = selected[i];
@@ -262,7 +269,7 @@ class ParallelMapper(
         PreparedParallelRow(result, preparedReads, preparedDirs),
       );
     };
-    ParallelReplayMapper(results, this.serial)
+    ParallelReplayMapper(results, this.serial, !this.retainWorkerArenas)
   }
 
   fun ==(other: Mapper<Key, File>): Bool {
@@ -273,7 +280,8 @@ class ParallelMapper(
         native_eq(this.select, o.select) == 0 &&
         native_eq(this.serial, o.serial) == 0 &&
         native_eq(this.prepareRow, o.prepareRow) == 0 &&
-        native_eq(this.recoverRow, o.recoverRow) == 0
+        native_eq(this.recoverRow, o.recoverRow) == 0 &&
+        this.retainWorkerArenas == o.retainWorkerArenas
     | _ -> false
     }
   }
@@ -282,7 +290,12 @@ class ParallelMapper(
 class ParallelReplayMapper(
   results: SortedMap<Key, PreparedParallelRow>,
   serial: ?MapFun<Key, File>,
+  collect: Bool = true,
 ) extends Mapper<Key, File> {
+  fun collectsRows(): Bool {
+    this.collect
+  }
+
   fun map(
     context: mutable Context,
     writer: mutable Writer,

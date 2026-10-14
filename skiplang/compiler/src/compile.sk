@@ -802,6 +802,7 @@ fun getOrInitializeBackend(
                 | _ -> false
                 }
               }),
+              config.specializerRetainWorkerArenas && phased,
             )
           };
           nextDir = reduced.map(
@@ -989,8 +990,12 @@ fun compile(
       previous = dir.getArrayRaw(SKStore.IID(0));
       if (
         !previous.isEmpty() &&
-        ConfigFile::type(previous[0]).value.specializerWorkers !=
-          config.specializerWorkers
+        (
+          ConfigFile::type(previous[0]).value.specializerWorkers !=
+            config.specializerWorkers ||
+          ConfigFile::type(previous[0]).value.specializerRetainWorkerArenas !=
+            config.specializerRetainWorkerArenas
+        )
       ) {
         debugMode = context.debugMode;
         context.replaceFromSaved(SKStore.Context::create{});

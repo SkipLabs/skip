@@ -1,0 +1,14 @@
+{
+  "trials_per_mode": 1,
+  "copy_wall_seconds": 169.54910845204722,
+  "retained_wall_seconds": 168.91680903499946,
+  "retained_time_change_percent": -0.3729299568841937,
+  "retained_peak_rss_change_percent": 1.0721252536178172,
+  "worker_threads_per_four_worker_run": 1528,
+  "conclusion": "Retained arenas show no demonstrated improvement over copying in one matched pair (0.37% difference), and remain 6.67% slower than serial. Combined with the one-worker control, this rules out immediate worker transfer as the main explanation for the prepared-path slowdown. Only about 1.1% of process CPU runs in workers; additional main-thread selection, preparation, dependency replay and state bookkeeping overwhelm that small parallel discovery workload. This experiment does not time each remaining operation separately. The later body-specialization loop is still serial and is excluded by the benchmark stop flag.",
+  "semantics": "Retain all worker pages in enclosing region without moving objects, defer batch collection, synchronize live state then free phase pages. Disabled by default; compiler opt-in only in phased persistent mode.",
+  "workload": "Frozen 108-file HEAD 479c52587 input; identical compiler/stdlib/input hashes, 169 rounds, fresh cache per run, identical perf task-event recording, no concurrent builds/tests.",
+  "serial_wall_seconds": 158.35388873901684,
+  "copy_slowdown_percent": 7.0697472617683665,
+  "retained_slowdown_percent": 6.6704520994690375
+}

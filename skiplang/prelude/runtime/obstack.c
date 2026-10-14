@@ -490,6 +490,20 @@ void* SKIP_transfer_Obstack(void* detached, void* root) {
   return SKIP_copy_with_pages(root, arena->count, arena->pages);
 }
 
+// After all readers have joined, move ownership of every worker page into the
+// caller's current region. Objects keep their addresses. The enclosing region
+// must outlive all published results; its ordinary collection/destruction owns
+// these pages from here on, including pages containing only worker scratch.
+void SKIP_adopt_Obstack(void* detached) {
+  sk_detached_arena_t* arena = detached;
+  for (size_t i = 0; i < arena->count; i++) {
+    if ((uint64_t)arena->pages[i].key != arena->pages[i].value) {
+      sk_obstack_attach_page(arena->pages[i].key, NULL);
+      arena->pages[i].value = (uint64_t)arena->pages[i].key;
+    }
+  }
+}
+
 void SKIP_release_Obstack(void* detached) {
   sk_detached_arena_t* arena = detached;
   if (arena == NULL) return;

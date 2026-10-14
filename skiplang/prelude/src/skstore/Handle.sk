@@ -582,6 +582,8 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
       Array<V>,
       .Exception,
     ) ~> Bool) = None(),
+    // Keep whole worker heaps in the enclosing region until it is collected.
+    retainWorkerArenas: Bool = false,
   ): EHandle<K2, V2> {
     invariant(
       workers >= 0 && workers <= 64,
@@ -641,6 +643,7 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
           handled
         }
       ),
+      retainWorkerArenas,
     );
     EHandle(typeKey, type, dirName)
   }

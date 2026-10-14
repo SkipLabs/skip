@@ -1229,7 +1229,7 @@ base class EagerDir protected {
         };
         if (batch.isEmpty()) break void;
         batchKeys = batch.toArray();
-        (rows, infos) = withRegion(context, (_, context) ~> {
+        evaluateBatch = (context: mutable Context) ~> {
           prepared = Unsafe.cast(f, ParallelMapper).prepare(
             context,
             parent,
@@ -1253,7 +1253,12 @@ base class EagerDir protected {
             );
           };
           (rows, infos)
-        });
+        };
+        (rows, infos) = if (parallel.retainWorkerArenas) {
+          evaluateBatch(context)
+        } else {
+          withRegion(context, (_, context) ~> evaluateBatch(context))
+        };
         acc.extend(rows);
         oldVec.extend(infos);
       };
@@ -1525,6 +1530,7 @@ base class EagerDir protected {
     serial: ?MapFun<Key, File> = None(),
     prepareRow: ?ParallelPrepareFun = None(),
     recoverRow: ?ParallelRecoverFun = None(),
+    retainWorkerArenas: Bool = false,
   ): void {
     invariant(
       workers >= 0 && workers <= 64,
@@ -1534,7 +1540,15 @@ base class EagerDir protected {
       context,
       parentName,
       childName,
-      ParallelMapper(f, workers, select, serial, prepareRow, recoverRow),
+      ParallelMapper(
+        f,
+        workers,
+        select,
+        serial,
+        prepareRow,
+        recoverRow,
+        retainWorkerArenas,
+      ),
       None(),
       rangeOpt,
     )
@@ -1891,7 +1905,7 @@ base class EagerDir protected {
           );
           continue
         };
-        !childRef = withRegion(context, (_, context) ~> {
+        evaluateBatch = (context: mutable Context) ~> {
           preparedMaps = parentMaps.map(p -> {
             p.mapper match {
             | parallel @ ParallelMapper _ ->
@@ -1908,7 +1922,18 @@ base class EagerDir protected {
             }
           });
           runRows(context, batchKeys.iterator(), preparedMaps, childCopy)
-        });
+        };
+        retain = parentMaps.any(p ->
+          p.mapper match {
+          | parallel @ ParallelMapper _ -> parallel.retainWorkerArenas
+          | _ -> false
+          }
+        );
+        !childRef = if (retain) {
+          evaluateBatch(context)
+        } else {
+          withRegion(context, (_, context) ~> evaluateBatch(context))
+        };
       };
     };
 

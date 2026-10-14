@@ -240,6 +240,15 @@ class ParallelPayload(
 
 @test
 fun testParallelMapLargeAndBorrowedOutputs(): void {
+  parallelMapLargeAndBorrowedOutputs(false)
+}
+
+@test
+fun testParallelMapRetainedLargeAndBorrowedOutputs(): void {
+  parallelMapLargeAndBorrowedOutputs(true)
+}
+
+fun parallelMapLargeAndBorrowedOutputs(retainWorkerArenas: Bool): void {
   context = SKStore.Context::mcreate{};
   source = context.mkdir(
     SKStore.IID::keyType,
@@ -260,6 +269,11 @@ fun testParallelMapLargeAndBorrowedOutputs(): void {
     },
     None(),
     4,
+    _ ~> true,
+    None(),
+    None(),
+    None(),
+    retainWorkerArenas,
   );
   for (i in Range(0, 4)) {
     value = output.get(context, SKStore.IID(i));
@@ -334,6 +348,15 @@ fun testParallelMapEmptyAndSerialFallback(): void {
 // semantics without retaining the prepared inputs in another eager collection.
 @test
 fun testParallelMapTransientPreparationAndSparseWork(): void {
+  parallelMapTransientPreparationAndSparseWork(false)
+}
+
+@test
+fun testParallelMapRetainedPreparationAndSparseWork(): void {
+  parallelMapTransientPreparationAndSparseWork(true)
+}
+
+fun parallelMapTransientPreparationAndSparseWork(retainWorkerArenas: Bool): void {
   context = SKStore.Context::mcreate{};
   source = context.mkdir(
     SKStore.IID::keyType,
@@ -386,6 +409,7 @@ fun testParallelMapTransientPreparationAndSparseWork(): void {
       | _ -> false
       }
     }),
+    retainWorkerArenas,
   );
   for (offset in Array[10, 20]) {
     extra.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(offset)]);
@@ -438,6 +462,74 @@ fun testParallelMapSelectedAndSerialRowsPreserveOutputOrder(): void {
   invariant(
     output.getArray(context, SKStore.IID(0)).map(v -> v.value) == expected,
   );
+}
+
+@test
+fun testParallelMapRetainedAcrossPhaseSynchronization(): void {
+  sourceName = parallelName("retained-phase-source");
+  outputName = parallelName("retained-phase-output");
+  source = SKStore.EHandle(SKStore.IID::keyType, SKStore.IntFile::type, sourceName);
+  output = SKStore.EHandle(SKStore.IID::keyType, ParallelPayload::type, outputName);
+  borrowed = Array::fillBy(200, i -> SKStore.IntFile(i));
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    try {
+      stage = context.getGlobal("PARALLEL_RETAINED_STAGE")
+        .map(file -> SKStore.IntFile::type(file).value)
+        .default(0);
+      if (stage == 0) {
+        _ = context.mkdir(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          sourceName,
+          Array::fillBy(16, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+        );
+        _ = source.parallelMap(
+          SKStore.IID::keyType,
+          ParallelPayload::type,
+          context,
+          outputName,
+          (_, writer, key, values) ~> {
+            value = SKStore.IntFile(values[0].value);
+            size = if (key.value % 4 == 0) 1100000 else 128;
+            data = Array::fillBy(size, _ -> value);
+            writer.set(key, ParallelPayload(data, borrowed))
+          },
+          None(),
+          4,
+          _ ~> true,
+          None(),
+          None(),
+          None(),
+          true,
+        );
+      } else {
+        for (i in Range(0, 16)) {
+          result = output.get(context, SKStore.IID(i));
+          invariant(result.data.last().value == i + (stage - 1) * 100);
+          invariant(result.borrowed[199].value == 199);
+        };
+        if (stage < 3) {
+          for (i in Range(0, 16)) {
+            source.writeArray(
+              context,
+              SKStore.IID(i),
+              Array[SKStore.IntFile(i + stage * 100)],
+            )
+          };
+          context.update();
+        };
+      };
+      if (stage == 3) SKStore.CStop(None()) else {
+        context.setGlobal("PARALLEL_RETAINED_STAGE", SKStore.IntFile(stage + 1));
+        SKStore.CContinue(None())
+      }
+    } catch {
+    | exn ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    }
+  });
+  invariant(borrowed[199].value == 199);
 }
 
 module end;

@@ -1,0 +1,16 @@
+{
+  "worker_threads": 1528,
+  "worker_cpu_seconds": 1.945711464,
+  "worker_sum_wall_seconds": 1.945737535,
+  "worker_cpu_percent_of_process": 1.1301615770120275,
+  "mean_thread_cpu_ms": 1.2733713769633508,
+  "profile_scope": "Corrected copying implementation f04d09054, 4 workers, same frozen workload; process CPU includes instrumentation. LD_PRELOAD pthread_create wrapper clocks only worker entry to return, excluding pthread startup/teardown outside the wrapper. All 1,528 worker completions recorded.",
+  "one_worker_control_seconds": 172.94816499500303,
+  "one_worker_control_scope": "Same compiler/stdlib/input hashes as fixed/ 0 and 4 controls, perf task-event tracing, no native threads or worker transfer. Batch prepare/replay and collection remain enabled.",
+  "scope_correction": "parallelMap runs incremental function/type/method discovery only. partitionFunctions/FunSpecializer::run remain serial and are excluded by --stop-after-specialization.",
+  "observations": [
+    "Worker execution accounts for about 1.1% of process CPU. Most of the observed slowdown remains with a single worker and no worker-to-main transfer.",
+    "Copying also happens at the per-batch withRegion boundary, including prepared IR/context changes. Deferring batch collection tests a different cost from the immediate worker-to-main transfer.",
+    "The profile shows key/string comparisons, directory hashing, allocation, sorting and copying/persistence as major costs. Frame-pointer call chains are incomplete; this sampling profile does not isolate exact per-phase wall times."
+  ]
+}

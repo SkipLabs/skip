@@ -403,3 +403,88 @@ generic IR conversion and class discovery remain serial; this measurement does
 not isolate their remaining individual costs. More profiling is needed before
 increasing concurrency. Raw metrics, hashes and scope are in `fixed/summary.json`
 and the per-run JSON files under the evidence directory above.
+
+
+### Follow-up profiling and retained worker arenas
+
+The compiler integration above parallelizes incremental **discovery** of required
+functions, types and methods. It does not parallelize the later
+`partitionFunctions` / `FunSpecializer::run` body-specialization loop.
+`--stop-after-specialization` returns before `createIR` reaches that loop, so the
+current benchmark measures discovery and its persistent bookkeeping, excluding
+body specialization. The earlier name "specialization-only" should be read with
+that scope in mind.
+
+A direct `pthread_create` wrapper measured all 1,528 worker completions in a
+corrected four-worker profile. Their combined CPU time was 1.9457 seconds in a
+170.86-second run (172.16 process CPU seconds): about 1.13% of total CPU. The
+average worker entry-to-return CPU time was 1.27 ms. These clocks exclude pthread
+startup/teardown outside the wrapper; sampling undercounts short-lived threads,
+so the direct clocks are the evidence for worker CPU time. No CPU quota
+throttling was recorded. Sampling finds substantial serial key/string
+comparison, directory hashing, allocation, sorting, copying and persistence work;
+frame-pointer call chains do not isolate exact per-phase times.
+
+A matching one-worker control took 172.95 seconds, versus 159.90 for ordinary
+serial mapping and 174.37 for four workers. One worker uses the same prepared
+read/replay path but starts no threads and performs no worker-to-main arena
+transfer. Most of the slowdown therefore persists without that transfer.
+There are two different copy boundaries: the main thread transfers worker
+results, then the per-batch `withRegion` collector copies live results and
+preparation/context changes into its parent. The second also exists with one
+worker. Additional full-state selection scans and main-thread read replay remain
+in all prepared variants. These controls identify broad overhead, not a precise
+allocation of every second to an individual operation.
+
+The optional `retainWorkerArenas` map argument experiments with removing both
+boundaries. After every worker has joined and native errors have been checked,
+`SKIP_adopt_Obstack` attaches all worker pages to the calling region without
+moving objects. It marks those pages as owned by the parent so detached-arena
+cleanup frees only its descriptors. Batch preparation/replay skip their nested
+collection boundary. The enclosing region subsequently owns both live objects
+and dead worker scratch, and its normal collection or destruction reclaims the
+pages, including on errors. Large pages were already adoptable in the original
+copying path; this option also retains small-object pages and unused scratch.
+
+The compiler exposes this as `--specializer-retain-worker-arenas`, disabled by
+default and enabled only for phased persistent discovery. In that path the
+owning region lasts through synchronization, which persists live results before
+destroying the phase heap. Generic callers retain pages until their own enclosing
+region is collected; the API does not assume every caller synchronizes a
+Context. Wasm remains serial. Changing the compiler's worker/arena configuration
+rebuilds its cache.
+
+The prototype passed 94 native prelude tests, 11 Wasm parallel-map tests, five
+incremental compiler regressions with four workers and retention enabled, and 18
+LLVM/output integration records across 0/1/4 workers. A dedicated test creates
+small and large worker allocations inside a phase, synchronizes, updates source
+rows in later phases, and rereads results after the owning heaps have been freed.
+Profiling evidence is in `compiler-parallel-specializer/analysis/` alongside the
+experiment scripts. Retention timing results are recorded separately from the
+original compiler/stdlib measurements.
+
+
+A fresh matched comparison with the retention-capable compiler/stdlib produced:
+
+| Mode | Wall time | Peak RSS |
+| --- | ---: | ---: |
+| Ordinary serial map (0 workers) | 158.35 s | 11.11 GiB |
+| 4 workers, copying | 169.55 s | 11.22 GiB |
+| 4 workers, retained arenas | 168.92 s | 11.34 GiB |
+
+All three use identical compiler, stdlib and input hashes, fresh caches, identical
+perf task-event recording and 169 rounds; builds/tests were stopped during each
+measurement. These are single trials. Retention's 0.37% timing difference is too
+small to claim an improvement, and its peak RSS is 1.07% higher than copying.
+It remains 6.67% slower than serial. The immediate worker transfer and per-batch
+collection therefore do not explain most of the prepared path's overhead here.
+The retained mode remains experimental and disabled by default. No 16-worker
+performance run was performed.
+
+The next useful targets are the added serial state-selection/dependency-replay
+work and the later body-specialization loop. Increasing concurrency in the
+current discovery workers has little potential: their combined work is only
+about two CPU seconds. A body-specialization experiment needs a benchmark that
+continues through `createIR` / `partitionFunctions`, rather than using the
+current stop flag. Raw retention metrics and validation are under
+`compiler-parallel-specializer/arena-retention/`.
