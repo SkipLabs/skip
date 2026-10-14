@@ -1302,6 +1302,19 @@ mutable class Context private {
     this.dirs.maybeGet(dirName);
   }
 
+  readonly fun parallelSnapshot(): ParallelSnapshot {
+    dirs = this.dirs;
+    ParallelSnapshot(dirName ~> {
+      dirs.maybeGet(dirName) match {
+      | Some(eager @ EagerDir _) -> eager
+      | _ ->
+        invariant_violation(
+          `Parallel read requires an eager directory: ${dirName}`,
+        )
+      }
+    })
+  }
+
   readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
     this.dirs.maybeGet(dirName);
   }

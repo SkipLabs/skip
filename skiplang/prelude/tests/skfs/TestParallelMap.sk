@@ -1,0 +1,333 @@
+module SKStoreTest;
+
+@cpp_extern("SKIP_parallel_map_worker_id")
+fun parallelWorkerId(): Int {
+  0
+}
+
+@cpp_extern("SKIP_parallel_map_native")
+fun parallelNative(): Bool {
+  false
+}
+
+fun parallelName(name: String): SKStore.DirName {
+  SKStore.DirName::create("/parallel/" + name + "/")
+}
+
+@test
+fun testParallelMapMatchesMapAndUsesThreads(): void {
+  context = SKStore.Context::mcreate{};
+  rows = Array::fillBy(600, i -> (SKStore.IID(i), SKStore.IntFile(i)));
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("source"),
+    rows,
+  );
+  serial = source.map(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("serial"),
+    (_, writer, key, values) ~>
+      writer.set(SKStore.IID(key.value % 5), values.first)
+    ,
+  );
+  parallel = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("output"),
+    (_, writer, key, values) ~>
+      writer.set(SKStore.IID(key.value % 5), values[0]),
+    None(),
+    4,
+  );
+  for (i in Range(0, 5)) {
+    invariant(
+      serial.getArray(context, SKStore.IID(i)) ==
+        parallel.getArray(context, SKStore.IID(i)),
+    );
+  };
+  tags = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("tags"),
+    (_, writer, key, _) ~> writer.set(key, SKStore.IntFile(parallelWorkerId())),
+    None(),
+    4,
+  );
+  ids = SortedSet[];
+  for (i in Range(0, 256)) {
+    !ids = ids.set(tags.get(context, SKStore.IID(i)).value);
+  };
+  invariant(ids.size() == (if (parallelNative()) 4 else 1));
+  context.update();
+  source.writeArray(context, SKStore.IID(17), Array[SKStore.IntFile(1000)]);
+  context.update();
+  invariant(
+    serial.getArray(context, SKStore.IID(2)) ==
+      parallel.getArray(context, SKStore.IID(2)),
+  );
+  source.writeArray(context, SKStore.IID(17), Array[]);
+  context.update();
+  invariant(
+    serial.getArray(context, SKStore.IID(2)) ==
+      parallel.getArray(context, SKStore.IID(2)),
+  );
+  invariant(context.currentArrow().isNone());
+}
+
+@test
+fun testParallelMapTracksConditionalAndMissingReads(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("readsource"),
+    Array::fillBy(20, i -> (SKStore.IID(i), SKStore.IntFile(0))),
+  );
+  extra = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("extra"),
+    Array[
+      (SKStore.IID(0), SKStore.IntFile(10)),
+      (SKStore.IID(1), SKStore.IntFile(20)),
+    ],
+  );
+  output = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("readoutput"),
+    (reader, writer, key, values) ~> {
+      selected = SKStore.IID(values[0].value);
+      files = reader.getArray(extra, selected);
+      // Repeat the read to check row-local deduplication.
+      invariant(files == reader.getArray(extra, selected));
+      if (!files.isEmpty()) writer.set(key, files[0]);
+    },
+    None(),
+    3,
+  );
+  context.update();
+  source.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(1)]);
+  source.writeArray(context, SKStore.IID(1), Array[SKStore.IntFile(99)]);
+  context.update();
+  invariant(output.get(context, SKStore.IID(0)).value == 20);
+  invariant(output.getArray(context, SKStore.IID(1)).isEmpty());
+  reads = context.maybeGetReads(source.dirName, output.dirName);
+  for (arrow => paths in reads) {
+    key = context
+      .unsafeGetEagerDir(source.dirName)
+      .typed()
+      .keyOfArrowKey(arrow);
+    if (key == SKStore.IID(0)) {
+      invariant(paths.contains(SKStore.Path::iid(extra.dirName, 1)));
+      invariant(!paths.contains(SKStore.Path::iid(extra.dirName, 0)));
+      invariant(paths.size() == 2);
+    };
+  };
+  extra.writeArray(context, SKStore.IID(99), Array[SKStore.IntFile(99)]);
+  extra.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(30)]);
+  context.update();
+  invariant(output.get(context, SKStore.IID(1)).value == 99);
+  invariant(output.get(context, SKStore.IID(2)).value == 30);
+  invariant(output.get(context, SKStore.IID(0)).value == 20);
+  source.writeArray(context, SKStore.IID(1), Array[]);
+  context.update();
+  invariant(output.getArray(context, SKStore.IID(1)).isEmpty());
+  invariant(context.currentArrow().isNone());
+}
+
+@test
+fun testParallelMapInitiallyEmptyOutputsKeepReads(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("emptysource"),
+    Array::fillBy(8, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+  );
+  extra = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("emptyextra"),
+    (Array[] : Array<(SKStore.IID, SKStore.IntFile)>),
+  );
+  output = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("emptyoutput"),
+    (reader, writer, key, _) ~> {
+      values = reader.getArray(extra, key);
+      if (!values.isEmpty()) writer.set(key, values[0]);
+    },
+    None(),
+    2,
+  );
+  context.update();
+  invariant(output.getArray(context, SKStore.IID(3)).isEmpty());
+  extra.writeArray(context, SKStore.IID(3), Array[SKStore.IntFile(42)]);
+  context.update();
+  invariant(output.get(context, SKStore.IID(3)).value == 42);
+  extra.writeArray(context, SKStore.IID(3), Array[]);
+  context.update();
+  invariant(output.getArray(context, SKStore.IID(3)).isEmpty());
+}
+
+class ParallelTestFailure(index: Int) extends .Exception
+
+@test
+fun testParallelMapExceptionsAndRecovery(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("exnsource"),
+    Array::fillBy(16, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+  );
+  caught = false;
+  try {
+    _ = source.parallelMap(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      parallelName("failed"),
+      (_, writer, key, values) ~> {
+        if (key.value == 2 || key.value == 10) {
+          throw ParallelTestFailure(key.value)
+        };
+        writer.set(key, values[0]);
+      },
+      None(),
+      4,
+    );
+  } catch {
+  | ParallelTestFailure(index) ->
+    invariant(index == 2);
+    !caught = true
+  | exn -> throw exn
+  };
+  invariant(caught);
+  invariant(context.currentArrow().isNone());
+  output = source.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("recovered"),
+    (_, writer, key, values) ~> writer.set(key, values[0]),
+    None(),
+    4,
+  );
+  invariant(output.get(context, SKStore.IID(10)).value == 10);
+}
+
+class ParallelPayload(
+  data: Array<SKStore.IntFile>,
+  borrowed: Array<SKStore.IntFile>,
+) extends SKStore.File {
+  static fun type(file: SKStore.File): this {
+    file match {
+    | value @ ParallelPayload _ -> value
+    | _ -> invariant_violation("Expected ParallelPayload")
+    }
+  }
+}
+
+@test
+fun testParallelMapLargeAndBorrowedOutputs(): void {
+  context = SKStore.Context::mcreate{};
+  source = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("largesource"),
+    Array::fillBy(4, i -> (SKStore.IID(i), SKStore.IntFile(i))),
+  );
+  borrowed = Array::fillBy(200, i -> SKStore.IntFile(i));
+  output = source.parallelMap(
+    SKStore.IID::keyType,
+    ParallelPayload::type,
+    context,
+    parallelName("largeoutput"),
+    (_, writer, key, _) ~> {
+      // Cross the runtime's 8 MiB page size on native; check adoption/cleanup.
+      data = Array::fillBy(1100000, _ -> borrowed[key.value]);
+      writer.set(key, ParallelPayload(data, borrowed));
+    },
+    None(),
+    4,
+  );
+  for (i in Range(0, 4)) {
+    value = output.get(context, SKStore.IID(i));
+    invariant(value.data.size() == 1100000);
+    invariant(value.data[1099999].value == i);
+    invariant(value.borrowed == borrowed);
+  };
+  invariant(borrowed[199].value == 199);
+  // Synchronization enumerates the whole page chain and persists adopted pages.
+  // This also catches cycles caused by out-of-order large-page adoption.
+  context.update();
+  captured = context.clone();
+  SKStore.runWithGc(SKStore.Context::create{}, context ~> {
+    try {
+      if (context.getGlobal("PARALLEL_LARGE_SYNC").isNone()) {
+        context.replaceFromSaved(captured);
+        context.setGlobal("PARALLEL_LARGE_SYNC", SKStore.IntFile(1));
+        SKStore.CContinue(None())
+      } else {
+        for (i in Range(0, 4)) {
+          value = output.get(context, SKStore.IID(i));
+          invariant(value.data[1099999].value == i);
+          invariant(value.borrowed[199].value == 199);
+        };
+        SKStore.CStop(None())
+      }
+    } catch {
+    | exn ->
+      print_error(exn.getMessage());
+      skipExit(1)
+    }
+  });
+}
+
+@test
+fun testParallelMapEmptyAndSerialFallback(): void {
+  context = SKStore.Context::mcreate{};
+  empty = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("nosource"),
+    (Array[] : Array<(SKStore.IID, SKStore.IntFile)>),
+  );
+  _ = empty.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("nooutput"),
+    (_, _, _, _) ~> throw ParallelTestFailure(0),
+    None(),
+    2,
+  );
+  one = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    parallelName("onesource"),
+    Array[(SKStore.IID(0), SKStore.IntFile(1))],
+  );
+  output = one.parallelMap(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    parallelName("oneoutput"),
+    (_, writer, key, values) ~> writer.set(key, values[0]),
+    None(),
+    1,
+  );
+  invariant(output.get(context, SKStore.IID(0)).value == 1);
+}
+
+module end;

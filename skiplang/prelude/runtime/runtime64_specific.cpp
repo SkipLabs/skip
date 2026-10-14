@@ -683,3 +683,101 @@ int main(int pargc, char** pargv) {
   skip_main();
 }
 #endif  // SKIP_LIBRARY
+
+extern "C" {
+void* sk_parallel_map_evaluate(void*, int64_t, int64_t);
+void* sk_parallel_map_results_create(int64_t);
+void* sk_parallel_map_result_get(void*, int64_t);
+void sk_parallel_map_result_set(void*, int64_t, void*);
+void* SKIP_detach_Obstack(void);
+void* SKIP_transfer_Obstack(void*, void*);
+void SKIP_release_Obstack(void*);
+}
+
+namespace {
+thread_local bool in_parallel_map = false;
+thread_local int64_t parallel_map_worker_id = 0;
+struct ParallelMapWorker {
+  void* arena = nullptr;
+  void* results = nullptr;
+  std::exception_ptr error;
+  int64_t start = 0;
+  int64_t end = 0;
+  ~ParallelMapWorker() { SKIP_release_Obstack(arena); }
+};
+struct ParallelMapThreads {
+  std::vector<std::thread> threads;
+  ~ParallelMapThreads() {
+    for (auto& thread : threads) if (thread.joinable()) thread.join();
+  }
+};
+}
+
+extern "C" void* SKIP_skstore_parallel_map(void* job, int64_t count,
+                                         int64_t requested_workers) {
+  if (in_parallel_map || count < 0 || count > 256 || requested_workers < 0 ||
+      requested_workers > 64) {
+    SKIP_throw_cruntime(ERROR_CONTEXT_CHECK);
+  }
+  int64_t workers = requested_workers;
+  if (workers == 0) {
+    workers = std::min<int64_t>(16, std::max<unsigned>(1, std::thread::hardware_concurrency()));
+  }
+#ifdef MEMORY_CHECK
+  // The diagnostic malloc registry is process-global and unsynchronized.
+  workers = 1;
+#endif
+  workers = std::min(workers, count);
+  if (workers <= 1) return sk_parallel_map_evaluate(job, 0, count);
+
+  // State outlives the threads; RAII joins before releasing their arenas.
+  std::vector<ParallelMapWorker> state(workers);
+  ParallelMapThreads pool;
+  pool.threads.reserve(workers);
+  for (int64_t i = 0; i < workers; i++) {
+    auto& worker = state[i];
+    worker.start = count * i / workers;
+    worker.end = count * (i + 1) / workers;
+    pool.threads.emplace_back([&worker, job, i]() {
+      in_parallel_map = true;
+      parallel_map_worker_id = i + 1;
+      SKIP_new_Obstack();
+      try {
+        worker.results = sk_parallel_map_evaluate(job, worker.start, worker.end);
+      } catch (...) {
+        worker.error = std::current_exception();
+      }
+      worker.arena = SKIP_detach_Obstack();
+      in_parallel_map = false;
+      parallel_map_worker_id = 0;
+    });
+  }
+  for (auto& thread : pool.threads) thread.join();
+  for (auto& worker : state) {
+    // Skip exceptions are normally captured into a frozen outcome by the bridge.
+    // This handles unexpected native failures before publishing any result.
+    if (worker.error) {
+      try {
+        std::rethrow_exception(worker.error);
+      } catch (const skip::SkipException& error) {
+        // Preserve a Skip exception even if allocation while constructing the
+        // normal outcome caused it to escape the Skip-side catch boundary.
+        throw skip::SkipException(SKIP_transfer_Obstack(worker.arena,
+                                                       error.m_skipException));
+      }
+    }
+  }
+  void* results = sk_parallel_map_results_create(count);
+  for (auto& worker : state) {
+    void* transferred = SKIP_transfer_Obstack(worker.arena, worker.results);
+    for (int64_t i = worker.start; i < worker.end; i++) {
+      sk_parallel_map_result_set(results, i,
+        sk_parallel_map_result_get(transferred, i - worker.start));
+    }
+  }
+  return results;
+}
+
+// Diagnostics used by the allocator/thread regression tests.
+extern "C" int64_t SKIP_parallel_map_worker_id() { return parallel_map_worker_id; }
+extern "C" bool SKIP_parallel_map_native() { return true; }
