@@ -7,23 +7,6 @@
 
 module Config;
 
-private fun workerCount(setting: String, option: String): Int {
-  if (setting == "auto") {
-    // Respect the process's available CPUs, as skargo does.
-    return System.subprocess(Array["nproc"]) match {
-    | Success(p) if (p.success()) ->
-      min(64, max(1, p.stdout.trim().toIntOption().default(1)))
-    | _ -> 1
-    }
-  };
-  setting.toIntOption() match {
-  | Some(count) if (count >= 0 && count <= 64) -> count
-  | _ ->
-    print_error(option + " must be auto or an integer between 0 and 64");
-    skipExit(2)
-  }
-}
-
 private fun hostTarget(): String {
   p = System.subprocess(Array["llvm-config", "--host-target"]) match {
   | Success(p) -> p
@@ -94,7 +77,6 @@ class Config{
   // Persistent invocations retain the incremental specialization graph.
   incrementalSpecialization: Bool = false,
   specializerWorkers: Int = 0,
-  parserWorkers: Int = 0,
   specializerRetainWorkerArenas: Bool = false,
   stackAlign: Int,
   stackAlignStr: String,
@@ -218,11 +200,21 @@ class Config{
       results.maybeGetString("init").isSome() ||
       results.maybeGetString("data").isSome();
 
-    specializerWorkers = workerCount(
-      results.getString("specializer-workers"),
-      "--specializer-workers",
-    );
-    parserWorkers = workerCount(results.getString("parser-workers"), "--parser-workers");
+    workerSetting = results.getString("specializer-workers");
+    specializerWorkers = if (workerSetting == "auto") {
+      // Match skargo's CPU detection, respecting the process's CPU affinity.
+      System.subprocess(Array["nproc"]) match {
+      | Success(p) if (p.success()) ->
+        min(64, max(1, p.stdout.trim().toIntOption().default(1)))
+      | _ -> 1
+      }
+    } else {
+      workerSetting.toInt()
+    };
+    if (specializerWorkers < 0 || specializerWorkers > 64) {
+      print_error("--specializer-workers must be between 0 and 64");
+      skipExit(2)
+    };
 
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
@@ -310,7 +302,6 @@ class Config{
       stopAfterSpecialization,
       incrementalSpecialization,
       specializerWorkers,
-      parserWorkers,
       specializerRetainWorkerArenas => results.getBool(
         "specializer-retain-worker-arenas",
       ),

@@ -12,9 +12,8 @@ module SkipMain;
 
 fun type_program(
   context: mutable SKStore.Context,
-  parserWorkers: Int = 0,
 ): SKStore.EHandle<SKStore.SID, SkipTyping.DefFile> {
-  parsed_program = if (parserWorkers == 0) FileCache.fileDir.map(
+  parsed_program = FileCache.fileDir.map(
     FileCache.InputSource::keyType,
     SkipParse.DefsWithAccessedEnvVarsFile::type,
     context,
@@ -25,25 +24,6 @@ fun type_program(
         writer.set(key, SkipParse.parseFile(key, source.value))
       })
     },
-  ) else FileCache.fileDir.parallelMap(
-    FileCache.InputSource::keyType,
-    SkipParse.DefsWithAccessedEnvVarsFile::type,
-    context,
-    SKStore.DirName::create("/astAndAccessedEnvVarsCache/"),
-    (_, writer, key, sources) ~> {
-      writer.set(key, SkipParse.parseFile(key, sources[0].value))
-    },
-    None(),
-    parserWorkers,
-    _ ~> true,
-    None(),
-    None(),
-    Some((context, _, _, _, ex) ~> {
-      // Render diagnostics on the main thread in source-key order, using the
-      // same error handling as ordinary parsing. Never print from a worker.
-      SkipError.catchErrors(0, context, () -> { throw ex });
-      false
-    }),
   );
 
   _ = parsed_program.map(
