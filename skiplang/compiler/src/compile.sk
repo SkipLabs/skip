@@ -486,6 +486,7 @@ fun specializeRow(
 
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
+  typecheckerWorkers: Int = 0,
 ): (
   SKStore.EHandle<SKStore.IID, ConfigFile>,
   SKStore.EHandle<SKStore.IID, TickFile>,
@@ -519,7 +520,7 @@ fun getOrInitializeBackend(
 
   tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
 
-  outerIst = O.makeOuterIst(context);
+  outerIst = O.makeOuterIst(context, typecheckerWorkers);
 
   defsProj = outerIst.getFunsProj(context);
   constsProj = outerIst.getConstsProj(context);
@@ -556,6 +557,12 @@ fun getOrInitializeBackend(
     SKStore.DirName::create("/backendPhase1/"),
     (context, writer, key, values) ~> {
       conf = values.first.value;
+
+      if (conf.verbose && conf.typecheckerWorkers != 0) {
+        retries = context.getGlobal(SkipTyping.serialRetriesKey)
+          .map(file -> SKStore.IntFile::type(file).value).default(0);
+        print_error(`Parallel type-checking: ${retries} serial retries`)
+      };
 
       throwIfFrontendErrors(context);
 
@@ -994,7 +1001,8 @@ fun compile(
           ConfigFile::type(previous[0]).value.specializerWorkers !=
             config.specializerWorkers ||
           ConfigFile::type(previous[0]).value.specializerRetainWorkerArenas !=
-            config.specializerRetainWorkerArenas
+            config.specializerRetainWorkerArenas ||
+          ConfigFile::type(previous[0]).value.typecheckerWorkers != config.typecheckerWorkers
         )
       ) {
         debugMode = context.debugMode;
@@ -1007,7 +1015,10 @@ fun compile(
         }
       }
     });
-  (backendDir, tickDir) = getOrInitializeBackend(context);
+  if (config.typecheckerWorkers != 0) {
+    context.setGlobal(SkipTyping.serialRetriesKey, SKStore.IntFile(0))
+  };
+  (backendDir, tickDir) = getOrInitializeBackend(context, config.typecheckerWorkers);
   backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)]);
   tickDir.writeArray(
     context,
@@ -1118,7 +1129,7 @@ fun compilerPipeline(
 // so the backend mapper never fires — leaving a clean "warm" base that carries
 // the typed stdlib and no unit-specific state.
 fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
-  _ = getOrInitializeBackend(context);
+  _ = getOrInitializeBackend(context, config.typecheckerWorkers);
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
     if (config.canonize_paths) {

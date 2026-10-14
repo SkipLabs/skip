@@ -1,9 +1,19 @@
 module SKStore;
 
-// A frozen registry of eager directories, without a mutable Context capability.
-class ParallelSnapshot(private resolve: DirName ~> EagerDir) {
+class ParallelContextUnavailable() extends .Exception
+
+class ParallelContextFilter(path: Path, project: File ~> File, value: Array<File>)
+class ParallelContextReads(reads: SortedSet<Path>, filters: List<ParallelContextFilter>)
+
+// Only immutable directory/global state is shared. A compatibility Context is
+// private to one worker row and refuses writes and uncached lazy computation.
+class ParallelSnapshot(private resolve: DirName ~> EagerDir, private template: Context) {
   fun get(dirName: DirName): EagerDir {
     this.resolve(dirName)
+  }
+
+  fun readContext(): mutable Context {
+    this.template.mclone()
   }
 }
 
@@ -11,6 +21,8 @@ class ParallelSnapshot(private resolve: DirName ~> EagerDir) {
 mutable class ParallelReader private {
   private snapshot: ParallelSnapshot,
   private mutable requests: SortedSet<Path> = SortedSet[],
+  private mutable contextRequests: SortedSet<Path> = SortedSet[],
+  private mutable filters: List<ParallelContextFilter> = List[],
 } {
   static fun create(snapshot: ParallelSnapshot): mutable this {
     mutable static{snapshot}
@@ -28,6 +40,19 @@ mutable class ParallelReader private {
   readonly fun getRequests(): SortedSet<Path> {
     this.requests
   }
+
+  readonly fun readContext(): mutable Context {
+    this.snapshot.readContext()
+  }
+
+  mutable fun recordContext(context: readonly Context): void {
+    log = context.parallelReadLog();
+    this.!contextRequests = this.contextRequests.union(log.reads);
+    this.!filters = log.filters.concat(this.filters);
+  }
+
+  readonly fun getContextRequests(): SortedSet<Path> { this.contextRequests }
+  readonly fun getFilters(): List<ParallelContextFilter> { this.filters }
 }
 
 type ParallelMapFun<K, V, K2, V2> = (
@@ -69,6 +94,8 @@ class PreparedParallelRow(
 class ParallelRowResult(
   writes: SortedMap<Key, Array<File>>,
   reads: SortedSet<Path>,
+  contextReads: SortedSet<Path> = SortedSet[],
+  filters: List<ParallelContextFilter> = List[],
 )
 
 class ParallelOutcome(result: ?ParallelRowResult, exception: ?.Exception)
@@ -91,7 +118,12 @@ class ParallelMapJob(
       };
       this.lambda(reader, writer, key, values);
       ParallelOutcome(
-        Some(ParallelRowResult(writer.writes, reader.getRequests())),
+        Some(ParallelRowResult(
+          writer.writes,
+          reader.getRequests(),
+          reader.getContextRequests(),
+          reader.getFilters(),
+        )),
         None(),
       )
     } catch {
@@ -309,6 +341,17 @@ class ParallelReplayMapper(
     context.!reads = context.reads.union(prepared.reads);
     context.!newDirs = context.newDirs.union(prepared.dirs);
     result = prepared.result;
+    context.!reads = context.reads.union(result.contextReads);
+    for (path in result.contextReads) {
+      // Preserve lazy-cache reference/retention bookkeeping on the main thread.
+      context.unsafeMaybeGetDir(path.dirName) match {
+      | Some(lazy @ LazyDir _) -> _ = lazy.typed().getArray(context, path.baseName)
+      | _ -> void
+      }
+    };
+    for (filter in result.filters.reversed()) {
+      context.addFilteredDep(filter.path, filter.project, filter.value)
+    };
     for (path in result.reads) {
       // Match Handle.getArray: track both directory replacement and row writes.
       dir = context.getEagerDir(path.dirName);

@@ -204,6 +204,12 @@ class TLazyDir{
   }
 
   fun unsafeGetArray(context: mutable Context, key: Key): Array<File> {
+    if (context.isParallelReadOnly()) {
+      return this.data.maybeGet(key) match {
+      | Some(LDefined(values, _)) -> values
+      | _ -> throw ParallelContextUnavailable()
+      }
+    };
     if (this.collect) {
       context.addLazyGet(this, key)
     };

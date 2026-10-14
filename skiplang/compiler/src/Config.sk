@@ -77,6 +77,7 @@ class Config{
   // Persistent invocations retain the incremental specialization graph.
   incrementalSpecialization: Bool = false,
   specializerWorkers: Int = 0,
+  typecheckerWorkers: Int = 0,
   specializerRetainWorkerArenas: Bool = false,
   stackAlign: Int,
   stackAlignStr: String,
@@ -216,6 +217,18 @@ class Config{
       skipExit(2)
     };
 
+    typecheckerSetting = results.getString("typechecker-workers");
+    typecheckerWorkers = if (typecheckerSetting == "auto") {
+      System.subprocess(Array["nproc"]) match {
+      | Success(p) if (p.success()) -> min(64, max(1, p.stdout.trim().toIntOption().default(1)))
+      | _ -> 1
+      }
+    } else typecheckerSetting.toInt();
+    if (typecheckerWorkers < 0 || typecheckerWorkers > 64) {
+      print_error("--typechecker-workers must be between 0 and 64");
+      skipExit(2)
+    };
+
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
       vals = f.split("=");
@@ -302,6 +315,7 @@ class Config{
       stopAfterSpecialization,
       incrementalSpecialization,
       specializerWorkers,
+      typecheckerWorkers,
       specializerRetainWorkerArenas => results.getBool(
         "specializer-retain-worker-arenas",
       ),

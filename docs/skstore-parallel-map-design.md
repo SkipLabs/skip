@@ -488,3 +488,61 @@ about two CPU seconds. A body-specialization experiment needs a benchmark that
 continues through `createIR` / `partitionFunctions`, rather than using the
 current stop flag. Raw retention metrics and validation are under
 `compiler-parallel-specializer/arena-retention/`.
+
+
+## Parallel definition type checking (2026-10-14)
+
+The file-parsing experiment was reverted in `f1a0397dd`; parsing uses its original
+serial map. Type checking now has `--typechecker-workers N`: 0 (the default) uses
+the ordinary serial map, 1 uses the prepared/replay path without native threads,
+and `auto` selects the available CPU count, capped at 64. Performance experiments
+used at most four concurrent workers; no 16-worker benchmark was run.
+
+`SkipTyping.program` runs each expanded definition through its existing class,
+function, constant or alias checker using `parallelMap`. This includes expression
+checking and constraint solving. A whole class remains one row; its methods are
+checked sequentially within that row. Naming and expansion remain serial.
+
+Each row gets a private mutable Context with frozen directory/global/persistent
+snapshots, no shared WriteChecker, and private dependency logs. Context mutation
+helpers and uncached lazy computations reject worker execution. Ordinary reads
+and projected reads return with the result; the main thread replays dependencies,
+allocates filter IDs and performs lazy-cache retention bookkeeping. Worker
+exceptions are retried on the main thread in source-key order, preserving normal
+diagnostics and supporting uncached lazy work. Changing the worker configuration
+rebuilds the cached mapper graph. This Context API is an internal compatibility
+path for existing checkers, which must use the supported Context operations.
+
+Three fresh-process trials per mode checked the same frozen 108-file compiler
+workload, with identical compiler, stdlib and input hashes. Parsing and
+specialization were serial; `--check` stops before specialization/code generation.
+Builds and tests were stopped during measurements. These are frontend times,
+not complete compiler build times.
+
+| Type-checker workers | Median wall time | Range | Median peak RSS |
+| --- | ---: | ---: | ---: |
+| 0 | 13.374 s | 13.204–13.617 s | 1.557 GiB |
+| 4 | 9.320 s | 9.303–9.383 s | 2.932 GiB |
+
+Four workers reduced wall time by **30.31% (1.435x speedup)**, with approximately
+88% higher peak memory. All parallel runs reported zero serial retries. A separate
+one-worker control took 13.441 s and 3.426 GiB (one trial). A separate four-worker
+CPU profile recorded 84 thread invocations across batches, totaling 8.873 CPU
+seconds; its wall time was 9.283 s. Thread count here is cumulative, not concurrent.
+The profile covers worker callbacks including obstack setup/detachment, excluding
+thread startup/teardown outside the wrapper. It was excluded from timing medians.
+
+Validation passed: 96 native prelude tests, 13 Wasm parallel-map tests, 898 valid
+program frontend checks, 839 invalid-program golden diagnostic checks and five
+existing incremental compiler tests. A separate 27-record integration run at
+0/1/4 workers checked identical LLVM and output through body/class edits, file
+removal/reinsertion, environment changes and source-position shifts, plus exact
+syntax/type diagnostics, recovery and worker-mode changes. The 898 valid-program
+checks exercise the frontend only, not the entire runtime test corpus. New
+prelude tests cover projected/missing reads, lazy-cache retention and write guards.
+
+Raw commands, hashes, timings, scripts and validation logs are in
+`skiplang/docs/experiments/compiler-parallel-typechecker/`. Measurement scripts
+retain this machine's scratch paths; restore the recorded workload and adjust
+compiler/stdlib paths to reproduce elsewhere. `measure.py` starts from the saved
+serial command; its profiled mode uses the supplied `thread_cpu.c` interposer.

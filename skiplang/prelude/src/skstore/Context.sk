@@ -503,6 +503,8 @@ mutable base class WriteChecker {
    because of a cache.
 */
 mutable class Context private {
+  private mutable parallelReadOnly: Bool = false,
+  private mutable parallelFilters: List<ParallelContextFilter> = List[],
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
@@ -548,6 +550,17 @@ mutable class Context private {
 
   static fun mcreate{}: mutable this {
     mutable static{}
+  }
+
+  readonly fun isParallelReadOnly(): Bool { this.parallelReadOnly }
+
+  readonly fun requireWritable(): void {
+    if (this.parallelReadOnly) throw ParallelContextUnavailable()
+  }
+
+  readonly fun parallelReadLog(): ParallelContextReads {
+    invariant(this.parallelReadOnly);
+    ParallelContextReads(this.reads, this.parallelFilters)
   }
 
   fun withGlobals(globals: SortedMap<String, File>): this {
@@ -606,6 +619,7 @@ mutable class Context private {
   }
 
   mutable fun postpone(postponable: Postponable): void {
+    this.requireWritable();
     postponable match {
     | u @ UPostponable _ -> this.!postponables = this.postponables.push(u)
     | f @ FPostponable _ -> this.!fpostponables = this.fpostponables.push(f)
@@ -663,6 +677,8 @@ mutable class Context private {
 
   readonly fun mclone(): mutable this {
     mutable static{
+      parallelReadOnly => this.parallelReadOnly,
+      parallelFilters => this.parallelFilters,
       toPurge => this.toPurge,
       dirs => this.dirs,
       reads => this.reads,
@@ -697,6 +713,9 @@ mutable class Context private {
   }
 
   mutable fun replaceFromSaved(ctx: readonly Context): void {
+    this.requireWritable();
+    this.!parallelReadOnly = ctx.parallelReadOnly;
+    this.!parallelFilters = ctx.parallelFilters;
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
     this.!reads = ctx.reads;
@@ -1184,6 +1203,7 @@ mutable class Context private {
   }
 
   mutable fun timeStamp(): Time {
+    this.requireWritable();
     this.!time = this.time.next();
     this.time
   }
@@ -1288,13 +1308,14 @@ mutable class Context private {
   }
 
   mutable fun setDir(dir: Dir): void {
+    this.requireWritable();
     dirName = dir.getDirName();
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
 
   mutable fun getDir(dirName: DirName): Dir {
     this.addRead(Path::dirTag(dirName));
-    this.dirs.get(dirName);
+    this.unsafeGetDir(dirName)
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -1304,6 +1325,13 @@ mutable class Context private {
 
   readonly fun parallelSnapshot(): ParallelSnapshot {
     dirs = this.dirs;
+    template = static{
+      dirs,
+      tick => this.tick,
+      globals => this.globals,
+      persistents => this.persistents,
+      parallelReadOnly => true,
+    };
     ParallelSnapshot(dirName ~> {
       dirs.maybeGet(dirName) match {
       | Some(eager @ EagerDir _) -> eager
@@ -1312,7 +1340,7 @@ mutable class Context private {
           `Parallel read requires an eager directory: ${dirName}`,
         )
       }
-    })
+    }, template)
   }
 
   readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -1320,6 +1348,12 @@ mutable class Context private {
   }
 
   readonly fun unsafeGetDir(dirName: DirName): Dir {
+    if (this.parallelReadOnly) {
+      return this.dirs.maybeGet(dirName) match {
+      | Some(dir) -> dir
+      | None() -> throw ParallelContextUnavailable()
+      }
+    };
     this.dirs.get(dirName);
   }
 
@@ -1451,16 +1485,25 @@ mutable class Context private {
     project: File ~> File,
     value: Array<File>,
   ): void {
+    if (this.parallelReadOnly) {
+      this.!parallelFilters = List.Cons(
+        ParallelContextFilter(path, project, value),
+        this.parallelFilters,
+      );
+      return void
+    };
     (deps, read) = this.deps.addFilter(path, project, value);
     this.!deps = deps;
     this.addRead(read);
   }
 
   mutable fun setGlobal(name: String, file: File): void {
+    this.requireWritable();
     this.!globals = this.globals.set(name, file);
   }
 
   mutable fun removeGlobal(name: String): void {
+    this.requireWritable();
     this.!globals = this.globals.remove(name);
   }
 
@@ -1476,10 +1519,12 @@ mutable class Context private {
   }
 
   mutable fun setPersistent(name: String, file: File): void {
+    this.requireWritable();
     this.!persistents = this.persistents.set(name, file);
   }
 
   mutable fun removePersistent(name: String): void {
+    this.requireWritable();
     this.!persistents = this.persistents.remove(name);
   }
 
@@ -2166,6 +2211,7 @@ fun withRegion<T>(
   context: mutable Context,
   f: (Obstack, mutable Context) ~> T,
 ): T {
+  context.requireWritable();
   optSaved: ?Obstack = None();
   try {
     !optSaved = Some(newObstack());
