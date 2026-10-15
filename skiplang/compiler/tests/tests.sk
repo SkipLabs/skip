@@ -404,6 +404,77 @@ private fun incrementalRelationships(): void {
   );
 }
 
+// Relation attachment has its own tracked rows. A body edit reuses them;
+// adding/removing a reachable sibling invalidates the unchanged base row.
+private fun incrementalLatchedRelations(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  types = dir + "/types.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program.ll";
+  data = dir + "/data";
+  baseline =
+    "fun latchUse(x: LatchPassBase): Int { x.value() + 0 }\n" +
+    "untracked fun main(): void { debug(latchUse(LatchPassFirst()) + LatchPassIndependent().value()); }\n";
+  args = compile_cmd(Array[types, source], output).concat(Array["--emit=llvm-ir"]);
+  writePrefix = "WRITTEN:  /specializer/latch-classes/OuterIstToIR.SClassIDKey(SClassID(\"";
+  baseWrite = writePrefix + "LatchPassBase\"))";
+  independentWrite = writePrefix + "LatchPassIndependent\"))";
+  try {
+    FileSystem.writeTextFile(
+      types,
+      "base class LatchPassBase { fun value(): Int { 7 } }\n" +
+        "class LatchPassFirst() extends LatchPassBase\n" +
+        "class LatchPassSecond() extends LatchPassBase\n" +
+        "class LatchPassIndependent() { fun value(): Int { 11 } }\n",
+    );
+    FileSystem.writeTextFile(source, baseline);
+    stopped = System.subprocess(
+      args.concat(Array["--init", data, "--stop-after-specialization"]),
+    ).fromSuccess();
+    T.expectTrue(stopped.success(), stopped.stderr);
+    T.expectFalse(System.subprocess(Array["test", "-f", output]).fromSuccess().success());
+    initial = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    for ((contents, timestamp, relationsChanged) in Array[
+      (baseline.replace("+ 0", "+ 1"), "200001010000.01", false),
+      (
+        baseline.replace(
+          "latchUse(LatchPassFirst())",
+          "latchUse(LatchPassFirst()) + latchUse(LatchPassSecond())",
+        ),
+        "200001010000.02",
+        true,
+      ),
+      (baseline, "200001010000.03", true),
+    ]) {
+      FileSystem.writeTextFile(source, contents);
+      touched = System.subprocess(Array["touch", "-t", timestamp, source]).fromSuccess();
+      T.expectTrue(touched.success(), touched.stderr);
+      updated = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(updated.stdout.contains(baseWrite), relationsChanged);
+      T.expectFalse(updated.stdout.contains(independentWrite));
+      T.expectTrue(updated.stdout.contains("REUSING: /specializer/latch-classes/"));
+      if (relationsChanged) {
+        T.expectTrue(updated.stdout.split("\n").any(line ->
+          line.startsWith("DIRTY READER: ") &&
+          line.contains("=> /specializer/latch-classes/ (dependency: ") &&
+          line.contains("OuterIstToIR.SubtypesKey(SClassID(\"LatchPassBase\"))")
+        ));
+      };
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
@@ -718,6 +789,7 @@ untracked fun main(): void {
         func => () ~> incrementalConstructorPositions(),
       },
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
+      T.Test{name => "latched_relations", func => () ~> incrementalLatchedRelations()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

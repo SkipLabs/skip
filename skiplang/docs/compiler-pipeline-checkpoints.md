@@ -110,3 +110,74 @@ Paused checkpoints are internal compiler state. A failed later phase preserves
 previous checkpoints, and a new invocation begins with input preparation again.
 The pipeline holds the existing global lock across its steps. Batch and ordinary
 sequential compilation continue to use their previous transaction path.
+
+
+## Incremental attachment of class relations (2026-10-15)
+
+The first `createIR` pass, attaching each specialized class's subtype and
+supertype sets, now uses the existing specialization map/diff/merge pattern.
+Completed incremental discovery registers `/specializer/latch-classes/` and
+`/specializer/latch-classes-merged/`. Each class row constructs a specializer over
+the preceding state, disables class creation, reads its own relation keys through
+`trackedSubtypesGet` and `trackedSupertypesGet`, updates the class and publishes
+`writeDiff`. Other state is forwarded through `OldFile`; the existing `mergeFun`
+selects the updated class contribution and unwraps forwarded state. The old
+class record is not merged with its replacement via `SClassInfo.merge`, which
+only merges method-provider information.
+
+Downstream `createIR` consumes the latched state and skips its old attachment
+loop. Scalarization, layout and function construction remain unchanged.
+Sequential/release builds retain the original local loop. Specialization-only
+builds skip the new pass; resuming without `--stop-after-specialization` builds
+it before proceeding to code generation.
+
+The traced workload had 25 input files, 12 independent class families and 1,227
+specialized classes including stdlib types. A body-only edit executed no class
+rows from the final discovery directory and reused both latch directories.
+A field edit wrote two changed class records. Adding a reachable subtype
+invalidated the unchanged base row through its subtype dependency; removal
+invalidated it again. The focused compiler regression checks these dependencies,
+unrelated-class reuse, and specialization-only stop/resume.
+
+Three fresh databases per compiler ran the same eight-step edit sequence,
+alternating compiler order between trials. There were no concurrent builds or
+tests during timing. Both binaries used identical source paths, inputs and stdlib.
+The baseline is `d1ba74736`. The final compiler was rebuilt and its measurements
+rerun after adding the specialization-only guard. All 48 compilations produced
+byte-identical LLVM between compilers and across repetitions of each scenario.
+These measurements include frontend, discovery, IR construction, optimization
+and LLVM emission at `-O0 --no-inline`, excluding native LLVM compilation/linking.
+
+| Scenario | Baseline median | Incremental attachment median | Wall change |
+| --- | ---: | ---: | ---: |
+| initial | 4.0673 s | 4.0664 s | -0.02% |
+| body | 0.2106 s | 0.2123 s | +0.80% |
+| fields | 0.2375 s | 0.2384 s | +0.39% |
+| relation-add | 0.5923 s | 0.5887 s | -0.61% |
+| relation-remove | 0.5889 s | 0.5920 s | +0.53% |
+| class-replace | 0.5872 s | 0.5840 s | -0.53% |
+| restore | 0.5861 s | 0.5893 s | +0.55% |
+| cached | 0.0320 s | 0.0319 s | -0.45% |
+
+These results show no measurable end-to-end speedup or regression: all median
+wall changes are within about 1%, and initial compile time is effectively unchanged.
+This first pass is small relative to the remaining pipeline. It now avoids
+repeating attachment work on unrelated updates, but further passes are still
+recomputed. Raw timing ranges and peak RSS are recorded in `timing-summary.json`.
+
+Validation passed: 898 valid-program frontend checks, 839 invalid-program golden
+diagnostic checks, five existing incremental compiler regressions and the new
+focused relation-attachment regression. The expanded release-mode regression
+also passed. Broad frontend/diagnostic tests and large dependency traces ran on
+the initial implementation before the final early-stop guard; the final binary
+was rebuilt and the focused and five existing incremental tests were rerun.
+The focused test is also compiled and run separately from the cached harness,
+so it exercises the new test body. Native compilation and execution are covered
+by the existing incremental tests; the timing comparison uses LLVM emission.
+
+Scripts, commands, binary/stdlib hashes, compact trace summaries and validation
+logs are under `experiments/incremental-class-relations/`. Scripts preserve this
+machine's scratch paths; adjust them to reproduce elsewhere. The large raw
+SKStore debug logs remain scratch artifacts, with relevant dependency/write
+lines retained in `trace-summary.json`. The trace timings are excluded from the
+performance comparison.

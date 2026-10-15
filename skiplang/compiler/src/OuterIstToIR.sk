@@ -5147,13 +5147,16 @@ fun createIR(
   roots: RootsIR,
   specializer: mutable Specializer,
 ): GlobalEnv {
-  // Latch the sub- and supertypes.
-  for (info in specializer.getSClasses()) {
-    !info.sclass = info.sclass with {
-      subtypes => specializer.subtypesGet(info.sclass.id),
-      supertypes => specializer.supertypesGet(info.sclass.id),
-    };
-    specializer.sclassSet(info.sclass.id, info);
+  // Incremental builds already attached these sets in a tracked map/merge
+  // phase. Sequential builds keep the original local pass.
+  if (!config.incrementalSpecialization) {
+    for (info in specializer.getSClasses()) {
+      !info.sclass = info.sclass with {
+        subtypes => specializer.subtypesGet(info.sclass.id),
+        supertypes => specializer.supertypesGet(info.sclass.id),
+      };
+      specializer.sclassSet(info.sclass.id, info);
+    }
   };
   reportMemoryStatistics("native/createIR after latch sub/super");
 

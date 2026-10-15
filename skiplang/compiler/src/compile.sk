@@ -364,6 +364,44 @@ fun mergeFun(
   }
 }
 
+// Attach the completed relation sets one class at a time. Each row reads only
+// its own relation keys and publishes a class diff; the ordinary round merger
+// forwards the remaining state without merging old and updated class records.
+fun latchSpecializerClasses(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  config: Config.SpecializationConfig,
+  converter: O.Converter,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/latch-classes/"),
+    (context, writer, key, values) ~> {
+      key match {
+      | O.SClassIDKey(id) ->
+        info = O.SClassInfoFile::type(values.first).value;
+        sp = O.Specializer::make(input, context, config, converter);
+        sp.!canCreateNewSClasses = false;
+        !info.sclass = info.sclass with {
+          subtypes => sp.trackedSubtypesGet(id),
+          supertypes => sp.trackedSupertypesGet(id),
+        };
+        sp.sclassSet(id, info);
+        sp.writeDiff(writer)
+      | _ -> writer.set(key, OldFile(values.toArray()))
+      }
+    },
+  ).map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/latch-classes-merged/"),
+    mergeFun,
+  )
+}
+
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
 ): (
@@ -757,7 +795,17 @@ fun getOrInitializeBackend(
       if (config.verbose && complete) {
         print_error(`Incremental specialization: ${phaseNumber} rounds`)
       };
-      writer.set(SKStore.IID(0), SpecializerDirFile(specializerAllDir));
+      completedDir = if (complete && !config.stopAfterSpecialization) {
+        latchSpecializerClasses(
+          context,
+          specializerAllDir,
+          config.specializationConfig(),
+          converter,
+        )
+      } else {
+        specializerAllDir
+      };
+      writer.set(SKStore.IID(0), SpecializerDirFile(completedDir));
     },
     // The pipeline collects each round. An enclosing mapper region would
     // copy the complete pipeline state again after its final round.
