@@ -22,18 +22,3 @@ all 83 native prelude tests passed; the standalone native and Node/Wasm checks
 passed; the complete Wasm prelude test binary passed `wasm-validate`.
 `skargo test --target wasm32-unknown-unknown` builds the suite but does not execute
 it, so Wasm execution above refers to the standalone allocator regression checks.
-
-## SKStore parallel-map checks in Wasm
-
-After building the prelude test binary for `wasm32-unknown-unknown` and the existing
-JS bindings, run:
-
-```sh
-node skiplang/prelude/runtime/tests/run_prelude_wasm.mjs \
-  /path/to/wasm32-unknown-unknown/release/test.wasm testParallelMap
-```
-
-This executes the six Skip regression tests through the serial Wasm map bridge.
-The same regressions in the native prelude suite additionally verify actual
-worker threads and cross-thread arena transfer. The large-output test persists
-and rereads outputs, covering page-chain ownership after adoption.

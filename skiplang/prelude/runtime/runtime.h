@@ -324,7 +324,6 @@ void*(memset)(void* b, int c, size_t len);
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
-void sk_obstack_unlink_page(sk_cell_t*, sk_cell_t*, size_t);
 void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages);
 uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);

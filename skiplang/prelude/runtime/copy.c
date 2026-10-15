@@ -9,7 +9,7 @@ extern size_t total_palloc_size;
 static char* shallow_copy(char* obj, size_t memsize, size_t leftsize,
                           sk_cell_t* large_page) {
   if (large_page != NULL) {
-    sk_obstack_attach_page(large_page->key, NULL);
+    sk_obstack_attach_page(large_page->key, large_page->next);
     return obj;
   }
 
@@ -100,7 +100,6 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
 
     if (sk_is_large_page(pages[obstack_idx].key)) {
       large_page = &pages[obstack_idx];
-      sk_obstack_unlink_page(large_page, pages, nbr_pages);
       pages[obstack_idx].value = (uint64_t)pages[obstack_idx].key;
     }
 

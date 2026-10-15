@@ -399,7 +399,7 @@ class InspectLazyGFun extends ConcreteLazyGFun {
           cls,
           emitter.converter.getGFunction(
             context,
-            def.function.fromSome()(clsID),
+            def.function.fromSome()(context, clsID),
           ),
           emitter.converter,
         )
@@ -1076,7 +1076,7 @@ class Converter private (
         GClassName(className),
         this.convertTypeParameters(cls.tparams),
       );
-      method.function.fromSome()(FrontEndLazyGClass(className))
+      method.function.fromSome()(context, FrontEndLazyGClass(className))
     }
   }
 
@@ -1156,7 +1156,7 @@ class Converter private (
       // Copy this into a local so we don't capture all of gclass.
       tparams = gclass.tparams;
 
-      Some(receiver ~> {
+      Some((_context, receiver) ~> {
         className = receiver.name();
 
         funInfo = GFunInfo{
@@ -1204,7 +1204,7 @@ class Converter private (
       // Copy this into a local so we don't capture all of gclass.
       tparams = gclass.tparams;
 
-      Some(receiver ~> {
+      Some((_context, receiver) ~> {
         className = receiver.name();
 
         returnType = GTapply(
@@ -1457,7 +1457,7 @@ class Converter private (
     methods = UnorderedMap[
       "call" => GMethodDef{
         function => generateBody.map(bodyFunc ~>
-          receiver ~> {
+          (_context, receiver) ~> {
             thisType: GType = GTapply(
               receiver,
               Mutability::fromFlag(callMethodType.isMutable),
@@ -2687,7 +2687,7 @@ class Converter private (
     (
       name,
       GMethodDef{
-        function => methodFunction.map(lazy ~> (_ ~> lazy)),
+        function => methodFunction.map(lazy ~> ((_, _) ~> lazy)),
         tparams => methodTparams,
         tparamInherit,
         pos,
@@ -2854,7 +2854,7 @@ class Converter private (
             methodDef
           } else {
             GMethodDef{
-              function => Some(receiver ~> {
+              function => Some((_context, receiver) ~> {
                 generatorType = GTapply(receiver, Mutable(), tparams);
 
                 // Produce a skeleton for the "next" method. The body will
@@ -2977,7 +2977,7 @@ class Converter private (
           if (name != "next") {
             methodDef
           } else {
-            function = receiver ~> {
+            function = (_context, receiver) ~> {
               // Produce a skeleton for the "next" method. The body will
               // be filled in for real much later, once the ramp up function
               // has been optimized and gets split in two.
@@ -4824,7 +4824,7 @@ mutable class OuterIstEmitter{
     method = gc.methods["next"];
     opt = this.converter.getGFunction(
       context,
-      method.function.fromSome("No next method found")(ta.generic),
+      method.function.fromSome("No next method found")(context, ta.generic),
     ).funInfo.funType.returnType;
 
     targs = opt match {
@@ -4998,9 +4998,9 @@ private const kEmptyMethods: UnorderedMap<
   SFunctionID,
 > = UnorderedMap[];
 
-fun makeOuterIst(context: mutable SKStore.Context, typecheckerWorkers: Int = 0): OuterIst.Program {
+fun makeOuterIst(context: mutable SKStore.Context): OuterIst.Program {
   // run the compiler front end from parsing to type checking
-  typedAst = SkipMain.type_program(context, typecheckerWorkers);
+  typedAst = SkipMain.type_program(context);
   // OuterIst skeleton is built here, but code is done lazily
   SkipMakeOuterIst.program(context, typedAst)
 }
@@ -5163,7 +5163,7 @@ fun createIR(
   );
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
-  specializer.withRegion(specializer.context, (_context, specializer) ~> {
+  specializer.withRegion(context, (_context, specializer) ~> {
     // Choose offsets for every field.
     FieldLayoutChooser::run(specializer, config);
     reportMemoryStatistics("native/createIR after FieldLayoutChooser");
@@ -5175,7 +5175,7 @@ fun createIR(
     sourcePositions => SourcePositions.Table::read(context),
   };
   !env = specializer.partitionFunctions(
-    specializer.context,
+    context,
     roots.runtimeFunctions,
     env,
     config,

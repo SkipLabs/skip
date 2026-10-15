@@ -157,9 +157,6 @@ fun printErrorsOrRecover<T>(
   context: mutable SKStore.Context,
   errors: Array<SkipErrorException>,
 ): T {
-  // A worker must never print or exit the process. Retry the definition on
-  // the main thread, where the ordinary diagnostic/error-mode rules apply.
-  if (context.isParallelReadOnly()) throw SKStore.ParallelContextUnavailable();
   get_file = file -> {
     FileCache.fileDir.unsafeGetArray(context, file)[0].value
   };

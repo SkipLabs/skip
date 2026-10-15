@@ -1193,78 +1193,6 @@ base class EagerDir protected {
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     rangeOpt: ?KeyRange<Key>,
   ): void {
-    if (f is ParallelMapper _) {
-      parallel = Unsafe.cast(f, ParallelMapper);
-      // Keep nonworker rows on the ordinary streaming iterator. Looking up
-      // each unchanged state key again would turn this pass into O(n log n).
-      parallel.serial.each(serial -> {
-        forwarding = LambdaMapper((context, writer, key, values) ~> {
-          if (!parallel.select(key)) serial(context, writer, key, values)
-        });
-        static::mapData(
-          context,
-          oldVec,
-          parent,
-          childName,
-          timeStack,
-          forwarding,
-          acc,
-          rangeOpt,
-        )
-      });
-      // Select before batching, so a sparse work set still fills worker jobs.
-      // Do not build another collection or index of the parent.
-      selected = parent
-        .unsafeGetFileIterNoReducer(rangeOpt.map(range -> range.start))
-        .map(row -> row.i0)
-        .takeWhile(key ~> rangeOpt.map(range -> key <= range.end).default(true))
-        .filter(parallel.select);
-      loop {
-        batch = mutable Vector<Key>[];
-        for (_ in Range(0, 256)) {
-          selected.next() match {
-          | None() -> break void
-          | Some(key) -> batch.push(key)
-          }
-        };
-        if (batch.isEmpty()) break void;
-        batchKeys = batch.toArray();
-        evaluateBatch = (context: mutable Context) ~> {
-          prepared = Unsafe.cast(f, ParallelMapper).prepare(
-            context,
-            parent,
-            batchKeys,
-            childName,
-            timeStack,
-          );
-          rows = mutable Vector[];
-          infos = mutable Vector[];
-          for (key in batchKeys) {
-            static::mapRow(
-              context,
-              rows,
-              infos,
-              parent.dirName,
-              childName,
-              timeStack,
-              key,
-              parent.getIterRaw(key),
-              prepared,
-            );
-          };
-          (rows, infos)
-        };
-        (rows, infos) = if (parallel.retainWorkerArenas) {
-          evaluateBatch(context)
-        } else {
-          withRegion(context, (_, context) ~> evaluateBatch(context))
-        };
-        acc.extend(rows);
-        oldVec.extend(infos);
-      };
-      return void;
-    };
-
     last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
     current = rangeOpt match {
     | None() -> 0
@@ -1355,8 +1283,8 @@ base class EagerDir protected {
     newDirsCopy = context.newDirs;
     readsCopy = context.reads;
 
-    context.!newDirs = SortedSet<DirName>[];
-    context.!reads = SortedSet<Path>[];
+    context.!newDirs = SortedSet[];
+    context.!reads = SortedSet[];
 
     writer = mutable Writer{};
     mapper.map(context, writer, key, valueIter);
@@ -1386,7 +1314,7 @@ base class EagerDir protected {
       for (k => v in writes) {
         acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
       };
-      if (!writes.isEmpty() || !newDirs.isEmpty() || !reads.isEmpty()) {
+      if (!writes.isEmpty() || !newDirs.isEmpty()) {
         oldVec.push(
           (
             source,
@@ -1516,41 +1444,6 @@ base class EagerDir protected {
       rangeOpt,
       onUpdate,
       unsafeSkipInit,
-    )
-  }
-
-  static fun parallelMap(
-    context: mutable Context,
-    parentName: DirName,
-    childName: DirName,
-    f: RawParallelMapFun,
-    rangeOpt: ?Array<KeyRange<Key>> = None(),
-    workers: Int = 0,
-    select: Key ~> Bool = _ ~> true,
-    serial: ?MapFun<Key, File> = None(),
-    prepareRow: ?ParallelPrepareFun = None(),
-    recoverRow: ?ParallelRecoverFun = None(),
-    retainWorkerArenas: Bool = false,
-  ): void {
-    invariant(
-      workers >= 0 && workers <= 64,
-      "Invalid parallelMap worker count",
-    );
-    static::applyFor(
-      context,
-      parentName,
-      childName,
-      ParallelMapper(
-        f,
-        workers,
-        select,
-        serial,
-        prepareRow,
-        recoverRow,
-        retainWorkerArenas,
-      ),
-      None(),
-      rangeOpt,
     )
   }
 
@@ -1725,7 +1618,7 @@ base class EagerDir protected {
     childName = childRef.dirName;
     timeStack = childRef.timeStack;
 
-    dirty = SortedSet<Key>[];
+    dirty = SortedSet[];
     contextDirtyReadersOpt match {
     | None() -> void
     | Some(contextDirtyReaders) ->
@@ -1767,175 +1660,94 @@ base class EagerDir protected {
       })
     };
 
-    runRows = (
-      context: mutable Context,
-      rowIter: mutable Iterator<Key>,
-      preparedMaps: Array<Parent>,
-      initialChild: EagerDir,
-    ) ~> {
-      withRegionFold(
-        Some(context),
-        rowIter,
-        initialChild,
-        (contextOpt, key, child) ~> {
-          ctx = contextOpt.fromSome();
-          arrow = TArrowKey::create{parentName, childName, key};
-          ctx.enter(arrow, timeStack);
-          path = Path::create(parentName, key);
-          oldInfo = child.getOld(path);
-          newDirsCopy = ctx.newDirs;
-          readsCopy = ctx.reads;
-          ctx.!newDirs = SortedSet<DirName>[];
-          ctx.!reads = SortedSet<Path>[];
+    it = dirty.iterator();
+    !childRef = withRegionFold(
+      Some(context),
+      it,
+      childRef,
+      (contextOpt, key, child) ~> {
+        ctx = contextOpt.fromSome();
+        arrow = TArrowKey::create{parentName, childName, key};
+        ctx.enter(arrow, timeStack);
+        path = Path::create(parentName, key);
+        oldInfo = child.getOld(path);
+        newDirsCopy = ctx.newDirs;
+        readsCopy = ctx.reads;
+        ctx.!newDirs = SortedSet[];
+        ctx.!reads = SortedSet[];
 
-          writes = if (preparedMaps.size() == 1) {
-            // A single map already groups its writes by output key. Reuse its
-            // arrays instead of collecting them into vectors and copying again.
-            writer = mutable Writer{};
-            preparedMaps[0].mapper.map(
-              ctx,
-              writer,
-              key,
-              parent.getIterRaw(key),
-            );
-            writer.writes
-          } else {
-            // Multiple maps from the same parent contribute in callback order.
-            mvalues = SortedMap<Key, mutable Vector<File>>[];
-            for (p in preparedMaps) {
-              writer = mutable Writer{};
-              p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
-              for (k => rvalues in writer.writes) {
-                if (!mvalues.containsKey(k)) {
-                  !mvalues = mvalues.set(k, mutable Vector[]);
-                };
-                mvalues[k].extend(rvalues);
-              };
-            };
-            mvalues.map((_, values) -> values.toArray())
-          };
-
-          newDirs = ctx.newDirs;
-          reads = ctx.getReads();
-          ctx.!newDirs = newDirsCopy;
-          ctx.!reads = readsCopy;
-
-          !child = child.updateNewDirs(ctx, path, newDirs);
-
-          ctx.updateNewDeps(arrow, reads);
-
-          ctx.removeDeps(
-            arrow,
-            oldInfo.getReads().iterator().filter(oldRead ~>
-              !reads.contains(oldRead)
-            ),
-          );
-
-          for (k => values in writes) {
-            !child = child.writeEntry(ctx, path, path, k, values);
-          };
-
-          // Let's remove the keys that no longer exist.
-          for (k in oldInfo.getKeys()) {
-            if (!writes.containsKey(k)) {
-              !child = child.writeEntry(ctx, path, path, k, Array[]);
-            };
-          };
-
-          // We need to remember what keys we produced for the next
-          // time around. Forwarding a single key needs no temporary key array.
-          minfo = if (
-            writes.size() == 1 &&
-            newDirs.isEmpty() &&
-            reads.isEmpty()
-          ) {
-            MInfoSingle(writes.minimum().fromSome().i0)
-          } else {
-            MInfo::create(
-              writes.keys().collect(Array),
-              newDirs.toArray(),
-              reads.toArray(),
-            )
-          };
-          // The source cannot be removed from old here
-          // => prevent getting fixed data minfo on multiple call during update
-          !child.old[path] = minfo;
-          ctx.leave(arrow);
-          child
-        },
-        preparedMaps.all(p -> p.mapper.collectsRows()),
-      );
-    };
-    if (!parentMaps.any(p -> p.mapper is ParallelMapper _)) {
-      // Ordinary maps retain their original single iterator and region policy.
-      !childRef = runRows(context, dirty.iterator(), parentMaps, childRef);
-    } else {
-      it = dirty.iterator();
-      loop {
-        batch = mutable Vector<Key>[];
-        for (_ in Range(0, 256)) {
-          it.next() match {
-          | None() -> break void
-          | Some(key) -> batch.push(key)
-          }
-        };
-        if (batch.isEmpty()) break void;
-        batchKeys = batch.toArray();
-        childCopy = childRef;
-        if (
-          !parentMaps.any(p ->
-            p.mapper match {
-            | parallel @ ParallelMapper _ -> parallel.hasWork(batchKeys)
-            | _ -> false
-            }
-          )
-        ) {
-          serialMaps = parentMaps.map(p ->
-            p.mapper match {
-            | parallel @ ParallelMapper _ ->
-              p with {mapper => parallel.serialMapper()}
-            | _ -> p
-            }
-          );
-          !childRef = runRows(
-            context,
-            batchKeys.iterator(),
-            serialMaps,
-            childCopy,
-          );
-          continue
-        };
-        evaluateBatch = (context: mutable Context) ~> {
-          preparedMaps = parentMaps.map(p -> {
-            p.mapper match {
-            | parallel @ ParallelMapper _ ->
-              p with {
-                mapper => parallel.prepare(
-                  context,
-                  parent,
-                  batchKeys,
-                  childName,
-                  timeStack,
-                ),
-              }
-            | _ -> p
-            }
-          });
-          runRows(context, batchKeys.iterator(), preparedMaps, childCopy)
-        };
-        retain = parentMaps.any(p ->
-          p.mapper match {
-          | parallel @ ParallelMapper _ -> parallel.retainWorkerArenas
-          | _ -> false
-          }
-        );
-        !childRef = if (retain) {
-          evaluateBatch(context)
+        writes = if (parentMaps.size() == 1) {
+          // A single map already groups its writes by output key. Reuse its
+          // arrays instead of collecting them into vectors and copying again.
+          writer = mutable Writer{};
+          parentMaps[0].mapper.map(ctx, writer, key, parent.getIterRaw(key));
+          writer.writes
         } else {
-          withRegion(context, (_, context) ~> evaluateBatch(context))
+          // Multiple maps from the same parent contribute in callback order.
+          mvalues = SortedMap<Key, mutable Vector<File>>[];
+          for (p in parentMaps) {
+            writer = mutable Writer{};
+            p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
+            for (k => rvalues in writer.writes) {
+              if (!mvalues.containsKey(k)) {
+                !mvalues = mvalues.set(k, mutable Vector[]);
+              };
+              mvalues[k].extend(rvalues);
+            };
+          };
+          mvalues.map((_, values) -> values.toArray())
         };
-      };
-    };
+
+        newDirs = ctx.newDirs;
+        reads = ctx.getReads();
+        ctx.!newDirs = newDirsCopy;
+        ctx.!reads = readsCopy;
+
+        !child = child.updateNewDirs(ctx, path, newDirs);
+
+        ctx.updateNewDeps(arrow, reads);
+
+        ctx.removeDeps(
+          arrow,
+          oldInfo.getReads().iterator().filter(oldRead ~>
+            !reads.contains(oldRead)
+          ),
+        );
+
+        for (k => values in writes) {
+          !child = child.writeEntry(ctx, path, path, k, values);
+        };
+
+        // Let's remove the keys that no longer exist.
+        for (k in oldInfo.getKeys()) {
+          if (!writes.containsKey(k)) {
+            !child = child.writeEntry(ctx, path, path, k, Array[]);
+          };
+        };
+
+        // We need to remember what keys we produced for the next
+        // time around. Forwarding a single key needs no temporary key array.
+        minfo = if (
+          writes.size() == 1 &&
+          newDirs.isEmpty() &&
+          reads.isEmpty()
+        ) {
+          MInfoSingle(writes.minimum().fromSome().i0)
+        } else {
+          MInfo::create(
+            writes.keys().collect(Array),
+            newDirs.toArray(),
+            reads.toArray(),
+          )
+        };
+        // The source cannot be removed from old here
+        // => prevent getting fixed data minfo on multiple call during update
+        !child.old[path] = minfo;
+        ctx.leave(arrow);
+        child
+      },
+      parentMaps.all(p -> p.mapper.collectsRows()),
+    );
 
     context.setDir(childRef);
 

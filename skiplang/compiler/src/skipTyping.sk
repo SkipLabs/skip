@@ -257,67 +257,44 @@ const dir: SKStore.EHandle<SKStore.SID, DefFile> = SKStore.EHandle(
   dirName,
 );
 
-const serialRetriesKey: String = "TYPECHECK_SERIAL_RETRIES";
-
-fun checkDefinition(
-  context: mutable SKStore.Context,
-  writer: mutable SKStore.TWriter<SKStore.SID, DefFile>,
-  definition: GlobalEnv.ExpandedDefFile,
-): void {
-  definition.value match {
-  | GlobalEnv.EClass(x) ->
-    writer.set(SKStore.SID(x.name.i1), DefFile(SkipTypedAst.DClass(class_def(context, x.name))))
-  | GlobalEnv.EConst(x) ->
-    writer.set(SKStore.SID(x.name.i1), DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))))
-  | GlobalEnv.EFun(x) ->
-    writer.set(SKStore.SID(x.name.i1), DefFile(SkipTypedAst.DFun(fun_def(context, x.name))))
-  | GlobalEnv.EType(ta) -> SkipNaming.check_type_alias(context, ta)
-  }
-}
-
 fun program(
   context: mutable SKStore.Context,
   defs: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
-  workers: Int = 0,
 ): SKStore.EHandle<SKStore.SID, DefFile> {
-  if (workers != 0) {
-    return defs.parallelMap(
-      SKStore.SID::keyType,
-      DefFile::type,
-      context,
-      dirName,
-      (reader, writer, _, values) ~> {
-        local = reader.readContext();
-        checkDefinition(local, writer, values[0]);
-        reader.recordContext(local)
-      },
-      None(),
-      workers,
-      _ ~> true,
-      None(),
-      None(),
-      Some((context, writer, _, values, _) ~> {
-        retries = context.getGlobal(serialRetriesKey)
-          .map(file -> SKStore.IntFile::type(file).value).default(0);
-        context.setGlobal(serialRetriesKey, SKStore.IntFile(retries + 1));
-        // Recompute failures in source-key order with ordinary dependency and
-        // diagnostic handling. Unsupported lazy work also takes this path.
-        SkipError.keepErrors(3, context, () -> {
-          checkDefinition(context, writer, values[0])
-        });
-        true
-      }),
-    )
-  };
   defs.map(
     SKStore.SID::keyType,
     DefFile::type,
     context,
     dirName,
     (context, writer, _key, values) ~> {
-      SkipError.keepErrors(3, context, () -> {
-        checkDefinition(context, writer, values.first)
-      })
+      // if(values.size() > 1) TODO multiple defs
+      values.first.value match {
+      | GlobalEnv.EClass(x) ->
+        SkipError.keepErrors(3, context, () -> {
+          writer.set(
+            SKStore.SID(x.name.i1),
+            DefFile(SkipTypedAst.DClass(class_def(context, x.name))),
+          )
+        })
+      | GlobalEnv.EConst(x) ->
+        SkipError.keepErrors(3, context, () -> {
+          writer.set(
+            SKStore.SID(x.name.i1),
+            DefFile(SkipTypedAst.DConst(global_const_def(context, x.name))),
+          )
+        })
+      | GlobalEnv.EFun(x) ->
+        SkipError.keepErrors(3, context, () -> {
+          writer.set(
+            SKStore.SID(x.name.i1),
+            DefFile(SkipTypedAst.DFun(fun_def(context, x.name))),
+          )
+        })
+      | GlobalEnv.EType(ta) ->
+        SkipError.keepErrors(3, context, () -> {
+          SkipNaming.check_type_alias(context, ta)
+        })
+      }
     },
   );
 }
