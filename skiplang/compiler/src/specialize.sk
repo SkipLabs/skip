@@ -1973,7 +1973,13 @@ mutable class Specializer{
     callers: Array<FunSuperpositionID>,
     pos: Pos,
   ): TypeTree {
-    example = this.exampleSClass(typ);
+    // This also runs over a directory-backed state during field scalarization.
+    // Track the representation test as well as the recursively expanded fields.
+    info = typ match {
+    | Tclass(id, _) -> this.trackedSClassGet(id)
+    | Tsuperposition(unique, _) -> this.trackedSClassGet(unique[0].sclassID)
+    };
+    example = info.sclass;
 
     if (example.maybeGetScalarType().isSome()) {
       NamedLeaf(typ)
@@ -1986,8 +1992,6 @@ mutable class Specializer{
 
       // Minor optimization: reuse this table each time through the loop.
       smap = mutable UnorderedMap[];
-
-      info = this.trackedSClassGet(example.id);
 
       NamedInner(
         info.unscalarizedFields.map(exampleField -> {
@@ -2039,7 +2043,10 @@ mutable class Specializer{
     // at some point (array type map only needs to know how many
     // pointers are in each slot, since they are all at the beginning).
     scalarTypes = vectorSlotTypes
-      .mapWithIndex((tupleIndex, t) -> (tupleIndex, this.getScalarType(t)))
+      .mapWithIndex((tupleIndex, t) -> (
+        tupleIndex,
+        this.trackedSClassGet(t.sclassID).sclass.getScalarType(),
+      ))
       .sortedBy(a ~> a.i1);
 
     // Hand out bit offsets to the tuple members in each Vector slot.
@@ -2065,41 +2072,44 @@ mutable class Specializer{
     ArraySlotInfo(vectorSlotTypes, bitOffsets.chill(), bitSize)
   }
 
+  // Flatten one class using only its original fields and tracked type reads.
+  mutable fun scalarizeFields(info: SClassInfo): void {
+    buf = mutable Vector[];
+    sclass = info.sclass;
+    pos = sclass.pos;
+    for (topLevelField in info.unscalarizedFields) {
+      oneScalarizedField = this.scalarize(
+        topLevelField.typ,
+        kSimpleCaller,
+        pos,
+      );
+      for (nsf in oneScalarizedField.flattened(topLevelField.name)) {
+        (name, typ) = nsf;
+        buf.push(
+          SField{
+            name,
+            typ => typ.asTclass(topLevelField.pos),
+            isAssignable => topLevelField.isAssignable,
+            pos => topLevelField.pos,
+            index => topLevelField.index,
+          },
+        )
+      }
+    };
+
+    arraySlot = if (sclass.isNative && sclass.gclassName.id == "Array") {
+      Some(this.computeArraySlotInfo(sclass))
+    } else {
+      None()
+    };
+
+    !info.sclass = sclass with {fields => buf.toArray(), arraySlot};
+    this.sclassSet(info.sclass.id, info);
+  }
+
   // Flatten each SClass's fields into scalars.
   mutable fun scalarizeAllFields(classes: mutable Iterator<SClassInfo>): void {
-    for (info in classes) {
-      buf = mutable Vector[];
-      sclass = info.sclass;
-      pos = sclass.pos;
-      for (topLevelField in info.unscalarizedFields) {
-        oneScalarizedField = this.scalarize(
-          topLevelField.typ,
-          kSimpleCaller,
-          pos,
-        );
-        for (nsf in oneScalarizedField.flattened(topLevelField.name)) {
-          (name, typ) = nsf;
-          buf.push(
-            SField{
-              name,
-              typ => typ.asTclass(topLevelField.pos),
-              isAssignable => topLevelField.isAssignable,
-              pos => topLevelField.pos,
-              index => topLevelField.index,
-            },
-          )
-        }
-      };
-
-      arraySlot = if (sclass.isNative && sclass.gclassName.id == "Array") {
-        Some(this.computeArraySlotInfo(sclass))
-      } else {
-        None()
-      };
-
-      !info.sclass = sclass with {fields => buf.toArray(), arraySlot};
-      this.sclassSet(info.sclass.id, info);
-    }
+    for (info in classes) this.scalarizeFields(info)
   }
 
   // Add the given SClass to its GClass's list of instances.

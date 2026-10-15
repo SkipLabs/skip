@@ -402,6 +402,40 @@ fun latchSpecializerClasses(
   )
 }
 
+// Each class owns its scalarized fields and array-slot representation. Nested
+// value-class reads come from the preceding, unscalarized phase, never from a
+// partially updated sibling row.
+fun scalarizeSpecializerClasses(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  config: Config.SpecializationConfig,
+  converter: O.Converter,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/scalarize-fields/"),
+    (context, writer, key, values) ~> {
+      key match {
+      | O.SClassIDKey _ ->
+        info = O.SClassInfoFile::type(values.first).value;
+        sp = O.Specializer::make(input, context, config, converter);
+        sp.!canCreateNewSClasses = false;
+        sp.scalarizeFields(info);
+        sp.writeDiff(writer)
+      | _ -> writer.set(key, OldFile(values.toArray()))
+      }
+    },
+  ).map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/scalarize-fields-merged/"),
+    mergeFun,
+  )
+}
+
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
 ): (
@@ -796,9 +830,15 @@ fun getOrInitializeBackend(
         print_error(`Incremental specialization: ${phaseNumber} rounds`)
       };
       completedDir = if (complete && !config.stopAfterSpecialization) {
-        latchSpecializerClasses(
+        latched = latchSpecializerClasses(
           context,
           specializerAllDir,
+          config.specializationConfig(),
+          converter,
+        );
+        scalarizeSpecializerClasses(
+          context,
+          latched,
           config.specializationConfig(),
           converter,
         )

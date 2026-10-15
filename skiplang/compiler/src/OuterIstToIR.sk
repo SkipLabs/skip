@@ -5161,9 +5161,11 @@ fun createIR(
   reportMemoryStatistics("native/createIR after latch sub/super");
 
   // Flatten value class fields into scalars.
-  specializer.scalarizeAllFields(
-    specializer.getSClasses().items().map(x -> x.i1),
-  );
+  if (!config.incrementalSpecialization) {
+    specializer.scalarizeAllFields(
+      specializer.getSClasses().items().map(x -> x.i1),
+    )
+  };
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
   specializer.withRegion(context, (_context, specializer) ~> {

@@ -475,6 +475,83 @@ private fun incrementalLatchedRelations(): void {
   T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
 }
 
+// A leaf's representation changes must invalidate unchanged containers and
+// array slots through tracked reads of the preceding phase's class records.
+private fun incrementalScalarizedFields(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  leaf = dir + "/leaf.sk";
+  containers = dir + "/containers.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  baselineLeaf = "value class ScalarPassLeaf(x: Int, flag: Bool = false)\n";
+  baselineMain =
+    "fun scalarPassDelta(): Int { 1 }\n" +
+    "untracked fun main(): void {\n" +
+    "  a = Array[ScalarPassNested(ScalarPassLeaf(7)), ScalarPassNested(ScalarPassLeaf(8))];\n" +
+    "  h = ScalarPassHolder(a[0]);\n" +
+    "  print_raw((h.value.value.x + a[1].value.x + ScalarPassIndependent().value + scalarPassDelta()).toString());\n" +
+    "}\n";
+  args = compile_cmd(Array[leaf, containers, source], output);
+  writePrefix = "WRITTEN:  /specializer/scalarize-fields/OuterIstToIR.SClassIDKey(SClassID(\"";
+  try {
+    FileSystem.writeTextFile(leaf, baselineLeaf);
+    FileSystem.writeTextFile(source, baselineMain);
+    FileSystem.writeTextFile(
+      containers,
+      "value class ScalarPassNested(value: ScalarPassLeaf)\n" +
+        "class ScalarPassHolder(value: ScalarPassNested)\n" +
+        "class ScalarPassIndependent(value: Int = 5)\n",
+    );
+    initial = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    initialRun = System.subprocess(Array[output]).fromSuccess();
+    T.expectTrue(initialRun.success(), initialRun.stderr);
+    T.expectEq(initialRun.stdout, "21");
+    for ((leafText, mainText, expected, shapeChanged, timestamp) in Array[
+      (baselineLeaf, baselineMain.replace("Int { 1 }", "Int { 2 }"), "22", false, "200001010000.01"),
+      (
+        baselineLeaf.replace("flag: Bool = false", "flag: Bool = false, text: String = \"hello\""),
+        baselineMain, "21", true, "200001010000.02",
+      ),
+      (baselineLeaf, baselineMain, "21", true, "200001010000.03"),
+      (baselineLeaf.replace("value class", "class"), baselineMain, "21", true, "200001010000.04"),
+      (baselineLeaf, baselineMain, "21", true, "200001010000.05"),
+    ]) {
+      FileSystem.writeTextFile(leaf, leafText);
+      FileSystem.writeTextFile(source, mainText);
+      touched = System.subprocess(Array["touch", "-t", timestamp, leaf, source]).fromSuccess();
+      T.expectTrue(touched.success(), touched.stderr);
+      updated = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      run = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(run.success(), run.stderr);
+      T.expectEq(run.stdout, expected);
+      T.expectEq(updated.stdout.contains(writePrefix + "ScalarPassHolder\"))"), shapeChanged);
+      T.expectFalse(updated.stdout.contains(writePrefix + "ScalarPassIndependent\"))"));
+      if (shapeChanged) {
+        T.expectTrue(updated.stdout.split("\n").any(line ->
+          line.startsWith("DIRTY READER: ") &&
+          line.contains("=> /specializer/scalarize-fields/ (dependency: ") &&
+          line.contains("OuterIstToIR.SClassIDKey(SClassID(\"ScalarPassLeaf\"))")
+        ));
+        T.expectTrue(updated.stdout.split("\n").any(line ->
+          line.startsWith(writePrefix + "Array<") && line.contains("ScalarPassNested")
+        ));
+      };
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
@@ -790,6 +867,7 @@ untracked fun main(): void {
       },
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
       T.Test{name => "latched_relations", func => () ~> incrementalLatchedRelations()},
+      T.Test{name => "scalarized_fields", func => () ~> incrementalScalarizedFields()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

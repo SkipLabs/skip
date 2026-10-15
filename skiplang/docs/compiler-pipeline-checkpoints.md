@@ -181,3 +181,75 @@ machine's scratch paths; adjust them to reproduce elsewhere. The large raw
 SKStore debug logs remain scratch artifacts, with relevant dependency/write
 lines retained in `trace-summary.json`. The trace timings are excluded from the
 performance comparison.
+
+
+## Incremental field scalarization (2026-10-15)
+
+Field scalarization now follows relation attachment as another map/diff/merge
+phase: `/specializer/scalarize-fields/`, then its `-merged` directory. Each class
+row reads the preceding phase's immutable state, calls `scalarizeFields`, and
+publishes its own updated class through `writeDiff`. Other state is forwarded
+through `OldFile` and the unchanged `mergeFun`. Class creation stays disabled.
+No row observes the partially scalarized result of another row.
+
+`scalarizeFields` is extracted from the existing whole-class loop. Representation
+tests during recursive scalarization now use `trackedSClassGet`; so do scalar
+type reads when packing array slots. This is required both to work with a
+directory-backed specializer and to invalidate unchanged containers when an
+embedded class changes between value/reference representations. The existing
+`unscalarizedFields` drive recursive flattening. Sequential/release builds keep
+the whole-class loop using this same helper; incremental `createIR` skips it.
+Specialization-only stop/resume retains the guard introduced for attachment.
+Layout and function construction remain unchanged.
+
+A new native regression uses nested value classes, an object containing them,
+and two-element arrays. It checks execution and dependency invalidation after
+body-only edits, pointer-field addition/removal and transitions between value
+and reference classes. Array-slot and containing-object rows change as needed;
+an independent class remains untouched. The earlier attachment/stop-resume
+regression also passes with both phases installed.
+
+Validation passed on the new compiler: 898 valid-program frontend checks, 839
+invalid-program diagnostics, five existing incremental regressions and both
+phase-specific regressions. Nine existing tuple/option/GC fixtures were also
+compiled and executed in both persistent incremental and sequential release
+modes, for 18 matching-output checks.
+
+A separate 37-file workload has twelve independent families, each containing a
+value-class leaf, a nested value class, a reference-class holder and an array of
+nested values. It produces 1,251 specialized classes including stdlib types.
+The trace records zero scalarization class rows for a body-only edit; field and
+representation edits invalidate the affected containers and array rows through
+reads of the unchanged preceding phase. Relevant trace lines are saved in
+`trace-summary.json`; counts of matched write lines are diagnostic excerpts,
+not complete counts (stdout/stderr debug streams can interleave).
+
+Three trials per compiler each used a fresh database followed by eight updates.
+Compiler order alternated, and builds/tests were stopped during timing. The
+baseline is `7b0489f31`, with incremental relation attachment but local field
+scalarization. Both use the same source paths and stdlib. All 54 compilations
+produced byte-identical LLVM for each scenario. As above, timings include the
+frontend through LLVM emission at `-O0 --no-inline`, excluding native compilation
+and linking. Debug tracing is measured separately and excluded from medians.
+
+| Scenario | Baseline median | Incremental scalarization median | Wall change |
+| --- | ---: | ---: | ---: |
+| initial | 4.0394 s | 4.0831 s | +1.08% |
+| body | 0.2158 s | 0.2174 s | +0.73% |
+| nested-pointer-field | 0.2411 s | 0.2394 s | -0.71% |
+| field-remove | 0.2394 s | 0.2387 s | -0.27% |
+| value-to-reference | 0.2210 s | 0.2192 s | -0.82% |
+| reference-to-value | 0.2196 s | 0.2191 s | -0.24% |
+| nested-scalar-field | 0.2409 s | 0.2383 s | -1.11% |
+| restore | 0.2391 s | 0.2398 s | +0.30% |
+| cached | 0.0301 s | 0.0305 s | +1.41% |
+
+There is no meaningful end-to-end speedup on this workload: the initial build
+is about 1% slower and updated builds stay close to baseline. The structural
+benefit is avoiding repeated field flattening for unchanged classes; layout and
+function construction still run afterward. Full timing ranges, CPU time and peak
+RSS are in `experiments/incremental-field-scalarization/timing-summary.json`.
+Scripts, exact commands, binary/stdlib/input hashes and validation logs are in
+the same directory. Scripts preserve the scratch paths used for this run and
+need path adjustments on another machine. Large raw debug logs remain in scratch;
+the committed summaries retain the relevant dependency and update lines.
