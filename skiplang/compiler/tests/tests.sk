@@ -552,6 +552,84 @@ private fun incrementalScalarizedFields(): void {
   T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
 }
 
+// Component membership changes must retract the old groups and repack the
+// merged/split groups. Empty/value-only groups must retain their dependencies.
+private fun incrementalFieldLayouts(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  left = dir + "/left.sk";
+  right = dir + "/right.sk";
+  bridge = dir + "/bridge.sk";
+  cpp = dir + "/cpp.sk";
+  zero = dir + "/zero.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  baseLeft = "base class LayoutPassLeft(left: Int = 7, flag: Bool = true) { fun leftValue(): Int { this.left } }\nclass LayoutPassL(extra: String = \"l\") extends LayoutPassLeft\n";
+  baseRight = "base class LayoutPassRight(right: Int = 11) { fun rightValue(): Int { this.right } }\nclass LayoutPassR(extra: Bool = false) extends LayoutPassRight\n";
+  baseBridge = "class LayoutPassBridge(extra: Int = 3) extends LayoutPassLeft\n";
+  baseCpp = "class LayoutPassCpp(flag: Bool = true, value: Int = 13, text: String = \"fixed\")\n";
+  baseZero = "value class LayoutPassZero()\n";
+  baseMain = "class LayoutPassIndependent(value: Int = 5)\nclass LayoutPassZeroHolder(value: LayoutPassZero)\nfun layoutLeft(x: LayoutPassLeft): Int { x.leftValue() }\nfun layoutRight(x: LayoutPassRight): Int { x.rightValue() }\nfun layoutZero(_x: LayoutPassZero): Int { 1 }\nfun layoutDelta(): Int { 1 }\nuntracked fun main(): void {\n  l = LayoutPassL(); r = LayoutPassR(); b = LayoutPassBridge(); c = LayoutPassCpp(); z = LayoutPassZeroHolder(LayoutPassZero());\n  print_raw((layoutLeft(l) + layoutLeft(b) + layoutRight(r) + b.extra + layoutDelta() + LayoutPassIndependent().value + c.value + (if(c.flag) 1 else 0) + c.text.length() + layoutZero(z.value)).toString());\n}\n";
+  mergedBridge = baseBridge.replace("extends LayoutPassLeft", "extends LayoutPassLeft, LayoutPassRight");
+  mergedMain = baseMain.replace("+ layoutDelta()", "+ layoutRight(b) + layoutDelta()");
+  args = compile_cmd(Array[left, right, bridge, cpp, zero, source], output);
+  writePrefix = "WRITTEN:  /specializer/layout-fields/OuterIstToIR.SClassIDKey(SClassID(\"";
+  try {
+    FileSystem.writeTextFile(left, baseLeft);
+    FileSystem.writeTextFile(right, baseRight);
+    FileSystem.writeTextFile(bridge, baseBridge);
+    FileSystem.writeTextFile(cpp, baseCpp);
+    FileSystem.writeTextFile(zero, baseZero);
+    FileSystem.writeTextFile(source, baseMain);
+    initial = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    result = System.subprocess(Array[output]).fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    T.expectEq(result.stdout, "54");
+    previousZero = baseZero;
+    for ((leftText, bridgeText, cppText, zeroText, mainText, expected, rightChanged, timestamp) in Array[
+      (baseLeft, baseBridge, baseCpp, baseZero, baseMain.replace("fun layoutDelta(): Int { 1 }", "fun layoutDelta(): Int { 2 }"), "55", false, "200001010000.01"),
+      (baseLeft.replace("flag: Bool = true", "flag: Bool = true, text: String = \"extra\""), baseBridge, baseCpp, baseZero, baseMain, "54", false, "200001010000.02"),
+      (baseLeft, baseBridge, baseCpp, baseZero, baseMain, "54", false, "200001010000.03"),
+      (baseLeft, mergedBridge, baseCpp, baseZero, mergedMain, "65", true, "200001010000.04"),
+      (baseLeft, baseBridge, baseCpp, baseZero, baseMain, "54", true, "200001010000.05"),
+      (baseLeft, baseBridge, "@cpp_export\n" + baseCpp, baseZero, baseMain, "54", false, "200001010000.06"),
+      (baseLeft, baseBridge, baseCpp, baseZero.replace("value class", "@cpp_export\nclass"), baseMain, "54", false, "200001010000.07"),
+      (baseLeft, baseBridge, baseCpp, baseZero, baseMain, "54", false, "200001010000.08"),
+    ]) {
+      FileSystem.writeTextFile(left, leftText);
+      FileSystem.writeTextFile(bridge, bridgeText);
+      FileSystem.writeTextFile(cpp, cppText);
+      FileSystem.writeTextFile(zero, zeroText);
+      FileSystem.writeTextFile(source, mainText);
+      touched = System.subprocess(Array["touch", "-t", timestamp, left, bridge, cpp, zero, source]).fromSuccess();
+      T.expectTrue(touched.success(), touched.stderr);
+      updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      run = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(run.success(), run.stderr);
+      T.expectEq(run.stdout, expected);
+      T.expectEq(updated.stdout.contains(writePrefix + "LayoutPassRight\"))"), rightChanged);
+      T.expectFalse(updated.stdout.contains(writePrefix + "LayoutPassIndependent\"))"));
+      if (zeroText != previousZero) {
+        T.expectTrue(updated.stdout.split("\n").any(line ->
+          line.startsWith("DIRTY READER: /specializer/layout-groups/") &&
+          line.contains("=> /specializer/layout-fields/ (dependency: ") &&
+          line.contains("SClassID(\"LayoutPassZero\")")
+        ));
+      };
+      !previousZero = zeroText;
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
@@ -868,6 +946,7 @@ untracked fun main(): void {
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
       T.Test{name => "latched_relations", func => () ~> incrementalLatchedRelations()},
       T.Test{name => "scalarized_fields", func => () ~> incrementalScalarizedFields()},
+      T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

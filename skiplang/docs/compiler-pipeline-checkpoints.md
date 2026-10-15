@@ -253,3 +253,96 @@ Scripts, exact commands, binary/stdlib/input hashes and validation logs are in
 the same directory. Scripts preserve the scratch paths used for this run and
 need path adjustments on another machine. Large raw debug logs remain in scratch;
 the committed summaries retain the relevant dependency and update lines.
+
+
+## Incremental field layout (2026-10-15)
+
+Field layout now follows scalarization as a grouped map/diff/merge phase.
+`/specializer/layout-shapes/` projects each class to its ID, scalarized field
+names and attached subtype set. A single grouping row builds disjoint components
+using path-compressed union/find, joining subtype pairs that share a field name.
+Canonical roots and member lists use sorted class IDs. This conservatively
+includes fixed-layout, value and array classes in components; the original
+chooser still decides which members require offsets.
+
+`/specializer/layout-groups/` publishes one stable membership record per group.
+The grouping scan reruns when the projected graph changes; equal membership
+records let unrelated packing rows remain cached. This is not a fully dynamic
+connected-component algorithm: graph-changing edits still pay the global scan.
+Field types, annotations and source positions are not part of the grouping
+projection. Packing rows track those full class records separately.
+
+`/specializer/layout-fields/` combines the original state forwarded as `OldFile`
+with one packing producer per group. Each producer creates a specializer over
+the scalarized input, disables class creation, runs the existing chooser on its
+sorted member list and publishes `writeDiff`. All class, primitive-type and
+relation reads in the chooser use tracked accessors. The existing `mergeFun`
+unwraps forwarded state and selects updated class records. Splitting or joining
+groups retracts old producers through normal SKStore contribution handling.
+
+The existing fixed-C++ preprocessing, field constraints, packing heuristic and
+class order within a group are preserved. The grouping graph keeps every
+shared-field subtype edge, so mutually constrained classes are solved together;
+components may be conservative. Sequential/release builds retain the whole-class
+chooser and use the same tracked-access implementation over fixed state. The
+layout builder captures only the specialization configuration (pointer width).
+Standalone layouts for compiler-generated constant objects remain local.
+
+Every packing producer publishes at least its root class record, including
+value-only or array-only groups with no offsets to assign. This retains the
+row's read dependencies when the chooser otherwise produces no diff. A new
+regression switches an empty value class to a forced reference representation
+using `@cpp_export`, then switches back, and checks the group-owned dependency
+invalidation. A plain empty `class` would be optimized back to a value class,
+so it would not test that transition.
+
+The new native regression checks inherited field accesses while two groups are
+joined through a multiple-inheritance bridge, then split again. It also covers
+pointer-field additions/removals, fixed-layout annotation changes, empty groups,
+and an unrelated class that must remain unchanged. Native outputs and dependency
+traces passed, as did both earlier phase regressions and specialization-only
+stop/resume. There were 898 valid-program frontend checks, 839 invalid-program
+diagnostic checks, five existing incremental regressions and 26 native fixture
+checks (13 fixtures in both persistent and release modes). The native fixtures
+include field inheritance, positional/named diamonds and the large method-
+dispatch test. No Wasm execution was part of this experiment.
+
+The 51-file timing workload has twelve independent pairs of field-bearing
+hierarchies, bridge classes, a C++ layout and an empty value/reference class.
+The initial trace recorded 1,212 packing groups. A body-only edit executed no
+packing-group rows and produced no class writes or group invalidations. Joining
+and splitting a bridge replaced the affected membership records and repacked
+the peer hierarchy without changing an independent family. The empty-group
+read dependency remained active in both directions of the representation change.
+`trace.py` separates stdout/stderr so diagnostic lines cannot interleave in the
+saved trace excerpts. Large raw traces remain scratch files.
+
+The baseline is `a3272d636`, with scalarization already incremental. Three trials
+per compiler each used a fresh database followed by nine updates, alternating
+compiler order. No builds/tests ran concurrently with timing. Identical inputs,
+paths and stdlib were used; all 60 compilations produced byte-identical LLVM per
+scenario. Times include frontend through LLVM emission at `-O0 --no-inline`,
+excluding native compilation/linking. Traces are excluded from these medians.
+
+| Scenario | Baseline median | Incremental layout median | Wall change |
+| --- | ---: | ---: | ---: |
+| initial | 4.1412 s | 4.1367 s | -0.11% |
+| body | 0.2277 s | 0.2263 s | -0.59% |
+| base-pointer-field | 0.2562 s | 0.2613 s | +2.02% |
+| field-remove | 0.2556 s | 0.2553 s | -0.11% |
+| groups-merge | 0.2577 s | 0.2646 s | +2.69% |
+| groups-split | 0.2599 s | 0.2620 s | +0.80% |
+| cpp-layout | 0.2323 s | 0.2367 s | +1.86% |
+| zero-value-to-reference | 0.2376 s | 0.2358 s | -0.75% |
+| zero-reference-to-value | 0.2246 s | 0.2313 s | +2.99% |
+| cached | 0.0302 s | 0.0323 s | +6.94% |
+
+There is no overall speedup on this workload. Initial and body-only times are
+nearly unchanged; affected-shape/group edits add a few milliseconds in several
+cases. The cached invocation is about two milliseconds slower. The benefit at
+this stage is correct per-group reuse, while planning and graph bookkeeping
+still have costs and function construction remains outside these cached phases.
+Full timing ranges, CPU time and peak RSS are recorded alongside commands,
+compiler/stdlib/input hashes, scripts and validation logs in
+`experiments/incremental-field-layout/`. Scripts retain the scratch paths used
+for the measurements and need path adjustments on another machine.

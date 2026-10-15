@@ -436,6 +436,67 @@ fun scalarizeSpecializerClasses(
   )
 }
 
+fun layoutSpecializerClasses(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  config: Config.SpecializationConfig,
+  converter: O.Converter,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  shapes = input.map(
+    x ~> x,
+    O.FieldLayoutShapeFile::type,
+    context,
+    SKStore.DirName::create("/specializer/layout-shapes/"),
+    (_context, writer, key, values) ~> {
+      key match {
+      | O.SClassIDKey _ ->
+        sc = O.SClassInfoFile::type(values.first).value.sclass;
+        writer.set(SKStore.UnitID::singleton, O.FieldLayoutShapeFile(
+          sc.id,
+          SortedSet::createFromItems(sc.fields.map(field -> field.name)),
+          sc.subtypes,
+        ))
+      | _ -> void
+      }
+    },
+  );
+  groups = shapes.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/layout-groups/"),
+    (_context, writer, _, values) ~> {
+      for (id => group in O.planFieldLayoutGroups(values.toArray())) {
+        writer.set(O.SClassIDKey(id), group)
+      }
+    },
+  );
+  SKStore.EHandle::multiMap(
+    x ~> x,
+    x ~> x,
+    context,
+    Array[
+      (input, ((_, writer, key, values) ~> {
+        writer.set(key, OldFile(values.toArray()))
+      }, None())),
+      (groups, ((context, writer, _, values) ~> {
+        group = O.FieldLayoutGroupFile::type(values.first);
+        sp = O.Specializer::make(input, context, config, converter);
+        sp.!canCreateNewSClasses = false;
+        O.layoutSpecializerGroup(sp, config, group.classes);
+        sp.writeDiff(writer)
+      }, None())),
+    ],
+    SKStore.DirName::create("/specializer/layout-fields/"),
+  ).map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/layout-fields-merged/"),
+    mergeFun,
+  )
+}
+
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
 ): (
@@ -836,9 +897,15 @@ fun getOrInitializeBackend(
           config.specializationConfig(),
           converter,
         );
-        scalarizeSpecializerClasses(
+        scalarized = scalarizeSpecializerClasses(
           context,
           latched,
+          config.specializationConfig(),
+          converter,
+        );
+        layoutSpecializerClasses(
+          context,
+          scalarized,
           config.specializationConfig(),
           converter,
         )

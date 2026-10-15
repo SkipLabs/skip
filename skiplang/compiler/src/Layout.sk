@@ -67,7 +67,7 @@ mutable private class LayoutBuilder(
   mutable prevType: ScalarType,
 ) {
   static fun mcreate(
-    config: Config.Config,
+    config: Config.SpecializationConfig,
     fields: mutable Vector<LayoutSlot> = mutable Vector[],
   ): mutable LayoutBuilder {
     mutable LayoutBuilder(fields, 0, ScalarType::gcPointer(config.ptrBitSize))
@@ -165,7 +165,7 @@ mutable private class LayoutBuilder(
 mutable private class FieldLayoutChooser(
   specializer: mutable Specializer,
 
-  config: Config.Config,
+  config: Config.SpecializationConfig,
 
   // True for every class which is part of a connected component of classes
   // that has been or is being graph-colored.
@@ -179,10 +179,23 @@ mutable private class FieldLayoutChooser(
     specializer: mutable Specializer,
     config: Config.Config,
   ): void {
+    static::runClasses(
+      specializer,
+      config.specializationConfig(),
+      specializer.getSClasses().keys().collect(Array),
+    )
+  }
+
+  static fun runClasses(
+    specializer: mutable Specializer,
+    config: Config.SpecializationConfig,
+    classes: Array<SClassID>,
+  ): void {
     flc = mutable FieldLayoutChooser(specializer, config, SortedSet[]);
 
     // Process all the fixed layout classes first
-    for (info in specializer.getSClasses()) {
+    for (id in classes) {
+      info = specializer.trackedSClassGet(id);
       sc = info.sclass;
       if (
         annotationsContainParam(sc.annotations, "@cpp_export", sc.pos).isSome()
@@ -197,7 +210,8 @@ mutable private class FieldLayoutChooser(
 
     emptyLayout = Some(Array[]);
 
-    for (info in specializer.getSClasses()) {
+    for (id in classes) {
+      info = specializer.trackedSClassGet(id);
       sc = info.sclass;
       if (!sc.isArray() && !sc.kind.isValueClass()) {
         if (sc.fields.isEmpty()) {
@@ -247,15 +261,15 @@ mutable private class FieldLayoutChooser(
       sid = typesWithField[i];
       !i = i + 1;
 
-      info = this.specializer.sclassGet(sid);
+      info = this.specializer.trackedSClassGet(sid);
 
       // Visit all supertypes and constrain those with this field to
       // use the same offset as this type.
-      for (superID in this.specializer.supertypesGet(sid)) {
+      for (superID in this.specializer.trackedSupertypesGet(sid)) {
         fkey = FieldKey(superID, name);
         if (!this.fieldsDone.contains(fkey)) {
           this.!fieldsDone = this.fieldsDone.set(fkey);
-          superInfo = this.specializer.sclassGet(superID);
+          superInfo = this.specializer.trackedSClassGet(superID);
           if (superInfo.sclass.maybeGetField(name).isSome()) {
             typesWithField.push(superID)
           }
@@ -263,8 +277,8 @@ mutable private class FieldLayoutChooser(
       };
 
       // Same as above, but for all subtypes.
-      for (subID in this.specializer.subtypesGet(sid)) {
-        subInfo = this.specializer.sclassGet(subID);
+      for (subID in this.specializer.trackedSubtypesGet(sid)) {
+        subInfo = this.specializer.trackedSClassGet(subID);
         fkey = FieldKey(subID, name);
         if (!this.fieldsDone.contains(fkey)) {
           this.!fieldsDone = this.fieldsDone.set(fkey);
@@ -287,7 +301,7 @@ mutable private class FieldLayoutChooser(
 
     // Get this field's primitive type. We don't have legal GlobalEnv
     // yet so we can't use Type::getScalarType().
-    fieldSClass = this.specializer.sclassGet(field.typ.sclassID).sclass;
+    fieldSClass = this.specializer.trackedSClassGet(field.typ.sclassID).sclass;
     fieldPrim = fieldSClass.getScalarType();
 
     FieldLayoutConstraint(field.name, fieldPrim, typesWithField.toArray())
@@ -304,7 +318,7 @@ mutable private class FieldLayoutChooser(
 
     while (!connectedClassesStack.isEmpty()) {
       sid = connectedClassesStack.pop();
-      sclass = this.specializer.sclassGet(sid).sclass;
+      sclass = this.specializer.trackedSClassGet(sid).sclass;
 
       for (field in sclass.fields) {
         fkey = FieldKey(sid, field.name);
@@ -406,7 +420,7 @@ mutable private class FieldLayoutChooser(
     for (sidAndLayoutIndex in classToLayout.items()) {
       (sid, layoutIndex) = sidAndLayoutIndex;
       layout = classLayouts[layoutIndex].fields;
-      info = this.specializer.sclassGet(sid);
+      info = this.specializer.trackedSClassGet(sid);
       sc = info.sclass;
 
       sc.pos.invariant(sc.fields.size() == layout.size(), "Layout mismatch");
@@ -415,6 +429,76 @@ mutable private class FieldLayoutChooser(
       this.specializer.sclassSet(info.sclass.id, info);
     }
   }
+}
+
+// The grouping pass depends only on field names and the completed subtype
+// graph. Packing still reads full class/type records through the specializer.
+class FieldLayoutShapeFile(
+  id: SClassID,
+  fields: SortedSet<String>,
+  subtypes: SortedSet<SClassID>,
+) extends SKStore.File
+
+class FieldLayoutGroupFile(classes: Array<SClassID>) extends SKStore.File
+
+private fun fieldLayoutRoot(
+  parents: mutable UnorderedMap<SClassID, SClassID>,
+  start: SClassID,
+): SClassID {
+  root = start;
+  while (parents[root] != root) !root = parents[root];
+  node = start;
+  while (parents[node] != node) {
+    next = parents[node];
+    parents.set(node, root);
+    !node = next
+  };
+  root
+}
+
+// Sharing any field joins the placement constraints for the two classes.
+// Keeping all such edges also conservatively groups fixed-layout classes;
+// the original chooser then preserves its fixed-layout preprocessing/order.
+fun planFieldLayoutGroups(
+  shapes: Array<FieldLayoutShapeFile>,
+): SortedMap<SClassID, FieldLayoutGroupFile> {
+  byID = mutable UnorderedMap<SClassID, FieldLayoutShapeFile>[];
+  parents = mutable UnorderedMap<SClassID, SClassID>[];
+  for (shape in shapes) {
+    byID.set(shape.id, shape);
+    parents.set(shape.id, shape.id)
+  };
+  for (shape in shapes) {
+    for (sub in shape.subtypes) {
+      if (sub != shape.id) {
+        other = byID[sub];
+        if (shape.fields.any(name -> other.fields.contains(name))) {
+          left = fieldLayoutRoot(parents, shape.id);
+          right = fieldLayoutRoot(parents, sub);
+          if (left < right) parents.set(right, left) else parents.set(left, right)
+        }
+      }
+    }
+  };
+  members = SortedMap<SClassID, SortedSet<SClassID>>[];
+  for (shape in shapes) {
+    root = fieldLayoutRoot(parents, shape.id);
+    !members[root] = members.maybeGet(root).default(SortedSet[]).set(shape.id)
+  };
+  members.map((_, ids) -> FieldLayoutGroupFile(ids.toArray()))
+}
+
+fun layoutSpecializerGroup(
+  specializer: mutable Specializer,
+  config: Config.SpecializationConfig,
+  classes: Array<SClassID>,
+): void {
+  // Publish at least the root, including groups of arrays/value classes that
+  // need no offsets. This keeps the group's tracked read dependencies alive
+  // so a later change to a reference class can create a layout.
+  root = classes[0];
+  specializer.sclassSet(root, specializer.trackedSClassGet(root));
+  FieldLayoutChooser::runClasses(specializer, config, classes)
 }
 
 // Lay out fields for one class with no super- or subclasses.
@@ -429,7 +513,7 @@ fun layoutOneStandaloneClass(
   existingLayout: Array<LayoutSlot> = Array[],
 ): Array<LayoutSlot> {
   builder = LayoutBuilder::mcreate(
-    config,
+    config.specializationConfig(),
     Vector::mcreateFromItems(existingLayout),
   );
 
@@ -451,7 +535,7 @@ private fun layoutCppExportClass(
     .map(field -> {
       // Get this field's primitive type. We don't have legal GlobalEnv
       // yet so we can't use Type::getScalarType().
-      fieldSClass = s.sclassGet(field.typ.sclassID).sclass;
+      fieldSClass = s.trackedSClassGet(field.typ.sclassID).sclass;
       scalarType = fieldSClass.getScalarType();
 
       // Naturally align the bit offsets
