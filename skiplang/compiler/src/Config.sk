@@ -194,9 +194,11 @@ class Config{
     check = results.getBool("check");
     no_link = !results.getBool("link");
     stopAfterSpecialization = results.getBool("stop-after-specialization");
-    incrementalSpecialization =
+    // Release builds use sequential specialization, including persisted builds.
+    incrementalSpecialization = !release && (
       results.maybeGetString("init").isSome() ||
-      results.maybeGetString("data").isSome();
+      results.maybeGetString("data").isSome()
+    );
 
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {

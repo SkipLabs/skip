@@ -595,8 +595,8 @@ private fun incrementalConstructorPositions(): void {
   );
 }
 
-// Ordinary invocations discover sequentially; persistence opts into the
-// incremental graph, including source and config-only updates to a database.
+// Ordinary and release invocations discover sequentially; non-release
+// persistence opts into the incremental graph, including config-only updates.
 private fun specializationModeSelection(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
   T.expectTrue(temp.success(), temp.stderr);
@@ -611,22 +611,43 @@ private fun specializationModeSelection(): void {
       "class ModeThing() { fun value(): Int { 41 } }\n" +
         "untracked fun main(): void { print_raw(ModeThing().value().toString()); }\n",
     );
-    for (persistent in Array[false, true]) {
+    for ((release, persistent) in Array[
+      (true, false), (true, true), (false, false), (false, true),
+    ]) {
+      selectedData = if (release) data + "-release" else data;
       compiled = System.subprocess(
-        args.concat(if (persistent) Array["--init", data] else Array[]),
+        args
+          .concat(if (release) Array["--release"] else Array[])
+          .concat(if (persistent) Array["--init", selectedData] else Array[]),
       ).fromSuccess();
       T.expectTrue(compiled.success(), compiled.stderr);
       T.expectEq(
         compiled.stderr.contains("Sequential specialization complete"),
-        !persistent,
+        release || !persistent,
       );
       T.expectEq(
         compiled.stderr.contains("Incremental specialization:"),
-        persistent,
+        persistent && !release,
       );
       result = System.subprocess(Array[output]).fromSuccess();
       T.expectTrue(result.success(), result.stderr);
       T.expectEq(result.stdout, "41");
+      if (release && persistent) {
+        resumed = System.subprocess(
+          args.concat(Array[
+            "--release", "--data", selectedData, "--emit=llvm-ir",
+          ]),
+        ).fromSuccess();
+        T.expectTrue(resumed.success(), resumed.stderr);
+        T.expectTrue(
+          resumed.stderr.contains("Sequential specialization complete"),
+          resumed.stderr,
+        );
+        T.expectFalse(
+          resumed.stderr.contains("Incremental specialization:"),
+          resumed.stderr,
+        );
+      };
     };
     FileSystem.writeTextFile(
       source,
