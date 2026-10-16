@@ -844,9 +844,13 @@ private fun makeWorkFile(
       }
     }
   };
-  // Positions remain available for every retained definition and instruction.
-  files = mutable UnorderedSet[];
-  addPos = (pos: Pos) -> addPositionFiles(pos, files);
+  // Only referenced anchors affect diagnostics for this work item. Unrelated
+  // declarations in the same file must not invalidate its optimization.
+  symbols = mutable Map<
+    FileCache.InputSource,
+    mutable UnorderedSet<SourcePositions.Symbol>,
+  >[];
+  addPos = (pos: Pos) -> addPositionSymbols(pos, symbols);
   for (function in functions.values()) {
     addPos(function.pos);
     function.params.each(param -> addPos(param.posOrDefault(function.pos)));
@@ -856,25 +860,49 @@ private fun makeWorkFile(
       block.instrs.each(instr -> addPos(instr.pos))
     }
   };
-  neededFiles = files.chill();
+  neededSymbols = symbols.map((_, names) -> names.chill()).chill();
   positions = shared.getArrayFilter(context, SKStore.IID(2), file ~> {
     table = PositionsFile::type(file).value;
     PositionsFile(
       SourcePositions.Table{
-        files => table.files.filter((file, _) -> neededFiles.contains(file)),
+        files => table.files
+          .filter((file, _) -> neededSymbols.containsKey(file))
+          .map((file, anchors) ->
+            anchors.filter((name, _) -> neededSymbols[file].contains(name))
+          ),
       },
     )
   })[0].value;
   WorkFile(f, functions.chill(), positions)
 }
 
-private fun addPositionFiles(
-  pos: Pos,
-  files: mutable UnorderedSet<FileCache.InputSource>,
+private fun addRangeSymbols(
+  file: FileCache.InputSource,
+  range: SourcePositions.Range,
+  symbols: mutable Map<
+    FileCache.InputSource,
+    mutable UnorderedSet<SourcePositions.Symbol>,
+  >,
 ): void {
-  _ = files.maybeInsert(pos.file);
+  for (name in Array[range.start.symbol, range.end.symbol]) {
+    if (!name.isEmpty()) {
+      _ = symbols.getOrAdd(file, () -> mutable UnorderedSet[]).insert(name)
+    }
+  }
+}
+
+private fun addPositionSymbols(
+  pos: Pos,
+  symbols: mutable Map<
+    FileCache.InputSource,
+    mutable UnorderedSet<SourcePositions.Symbol>,
+  >,
+): void {
+  addRangeSymbols(pos.file, pos.range, symbols);
   pos match {
-  | InlinedPos{inlinedAt} -> addPositionFiles(inlinedAt, files)
+  | InlinedPos{origFun, inlinedAt} ->
+    addRangeSymbols(origFun.pos.file, origFun.pos.range, symbols);
+    addPositionSymbols(inlinedAt, symbols)
   | _ -> void
   }
 }
@@ -1268,7 +1296,9 @@ fun compileAllIncrementally(
   input: SKStore.EHandle<SKStore.IID, InputFile>,
 ): ?GlobalEnv {
   phased = context.getGlobal(progressKey).isSome();
-  previousInfo = if (phased) context.currentEagerMapperInfo() else SKStore.MInfoEmpty();
+  previousInfo = if (phased) context.currentEagerMapperInfo() else {
+    SKStore.MInfoEmpty()
+  };
   round = 0;
   beforeRound = -1;
   afterConst = false;
@@ -1276,7 +1306,9 @@ fun compileAllIncrementally(
   | Some(progress @ Progress _) ->
     context.!reads = progress.reads;
     context.!newDirs = progress.dirs;
-    if (progress.complete) return Some(progress.dir.getArray(context, SKStore.IID(0))[0].env);
+    if (progress.complete) {
+      return Some(progress.dir.getArray(context, SKStore.IID(0))[0].env)
+    };
     !round = progress.round;
     !beforeRound = progress.beforeRound;
     !afterConst = progress.afterConst;
@@ -1299,7 +1331,9 @@ fun compileAllIncrementally(
     return Some(completed.getArray(context, SKStore.IID(0))[0].env)
   };
   if (unfinished(context, current)) {
-    scope = if (afterConst) "/optimizer/after-const" else "/optimizer/before-const";
+    scope = if (afterConst) "/optimizer/after-const" else {
+      "/optimizer/before-const"
+    };
     !current = runRound(context, current, scope, round);
     !round = round + 1
   };
@@ -1311,13 +1345,30 @@ fun compileAllIncrementally(
     !round = 0;
     !afterConst = true
   };
-  result = if (complete) Some(current.getArray(context, SKStore.IID(0))[0].env) else None();
-  context.setGlobal(progressKey, Progress(
-    current, round, beforeRound, afterConst, context.reads, context.newDirs, complete,
-  ));
+  result = if (complete) {
+    Some(current.getArray(context, SKStore.IID(0))[0].env)
+  } else {
+    None()
+  };
+  context.setGlobal(
+    progressKey,
+    Progress(
+      current,
+      round,
+      beforeRound,
+      afterConst,
+      context.reads,
+      context.newDirs,
+      complete,
+    ),
+  );
   if (!complete) {
-    for (dir in previousInfo.getNewDirs()) context.!newDirs = context.newDirs.set(dir);
-    for (read in previousInfo.getReads()) context.!reads = context.reads.set(read)
+    for (dir in previousInfo.getNewDirs()) {
+      context.!newDirs = context.newDirs.set(dir)
+    };
+    for (read in previousInfo.getReads()) {
+      context.!reads = context.reads.set(read)
+    }
   };
   result
 }

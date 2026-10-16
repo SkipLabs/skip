@@ -185,6 +185,12 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   ).toArray();
   T.expectTrue(!modules.isEmpty());
   oldContents = modules.map(contents);
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.00"].concat(modules))
+      .fromSuccess()
+      .success(),
+  );
+  oldTimes = modules.map(mtime);
 
   // A C comment changes the build fingerprint but not the deterministic
   // native bytes. Recomputed LLVM, if any, must remain byte-identical.
@@ -200,6 +206,7 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   _ = build(skargo, consumer);
   run_probe(consumer, "1");
   T.expectEq(modules.map(contents), oldContents);
+  T.expectEq(modules.map(mtime), oldTimes);
 
   // Native bytes must be repackaged even though the Skip source is unchanged.
   write_file(

@@ -1013,3 +1013,11 @@ configuration selects sequential specialization, including release builds.
   symbols/position changes can invalidate many rows. Next refinement will project
   only referenced symbols, including inlined origins, preserving diagnostics;
   avoid weakening runtime type identity merely to regain unsafe cache hits.
+- Exact-symbol source-position projection validated with a newly bootstrapped
+  optimized driver (/tmp/skip-position-optimizer-driver/skc, 260.367 s).
+  Focused optimizer test confirms unrelated declaration adds zero WorkKey input
+  writes. Write-if-changed LLVM emission preserves native-comment output mtime.
+  Focused skargo integration passed. Broader checks: 844 regressions, 26 native
+  fixtures, 28 native update comparisons passed (symbol-*.log in experiment dir).
+  Full compiler edit timings have NOT yet been repeated with this refinement.
+  Stage 5 native split-output experiment remains pending; draft not applied.

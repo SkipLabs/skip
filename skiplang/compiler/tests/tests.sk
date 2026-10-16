@@ -817,6 +817,16 @@ private fun incrementalOptimization(): void {
         .size();
       T.expectTrue(links <= 1, updated.stderr);
     };
+    // New unrelated symbols must not invalidate a whole file's optimizer inputs.
+    FileSystem.writeTextFile(right, "fun optRight(x: Int): Int { x + 8 }\nfun optUnused(): Int { 42 }\n");
+    T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.04", right]).fromSuccess().success());
+    unrelated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
+    T.expectTrue(unrelated.success(), unrelated.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "20");
+    unrelatedRows = unrelated.stdout.split("\n").filter(line ->
+      line.startsWith("WRITTEN:  /optimizer/") && line.contains("/inputs/") && line.contains("WorkKey")
+    ).collect(Array);
+    T.expectEq(unrelatedRows.size(), 0, unrelatedRows.join("\n"));
     for (release in Array[true, false]) {
       mode = if (release) Array["--release"] else Array[];
       switched = System.subprocess(

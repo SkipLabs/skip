@@ -1078,7 +1078,10 @@ fun writeOutputFiles(
 
   output match {
   | "-" -> print_raw(contents)
-  | _ -> FileSystem.writeTextFile(output, contents)
+  | _ ->
+    if (!FileSystem.exists(output) || FileSystem.readTextFile(output) != contents) {
+      FileSystem.writeTextFile(output, contents)
+    }
   }
 }
 
