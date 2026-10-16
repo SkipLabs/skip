@@ -119,6 +119,9 @@ mutable class BuildRunner(
   }
 
   private mutable fun unit_is_dirty(unit: Unit): Bool {
+    if (this.outputs_for(unit).any(output -> !FileSystem.exists(output.path))) {
+      return true
+    };
     fingerprint_file = this.fingerprint_file_for(unit);
     if (!FileSystem.exists(fingerprint_file)) {
       return true
@@ -275,8 +278,14 @@ mutable class BuildRunner(
   }
 
   private mutable fun link_or_copy(src: String, dst: String): void {
-    // TODO: Actually link when relevant.
-    _ = system(`cp ${src} ${dst}`)
+    // Replace atomically so rebuilding the running skargo executable works.
+    temporary = dst + ".tmp";
+    _ = this.run_cmd(
+      ProcessBuilder::create{cmd => "cp", args => Array[src, temporary]},
+    );
+    _ = this.run_cmd(
+      ProcessBuilder::create{cmd => "mv", args => Array[temporary, dst]},
+    )
   }
 
   private mutable fun run_build_script(unit: Unit): BuildScriptOutput {
@@ -432,14 +441,13 @@ mutable class BuildRunner(
     };
 
     if (!unit.target.is_build_script()) {
-      // TODO: Once we have namespaced packages, we can share the state.db
-      // across architectures.
-      state_db_path = Path.join(
-        this.layout_for(unit).build,
-        // FIXME: This is a dirty hack that splits out the state.db between pic
-        // and static, which is required until `skc` namespaces packages.
-        `${unit.build_opts.relocation_model}_state.db`,
-      );
+      // A compiler database belongs to one compilation unit. Sharing it across
+      // packages or targets replaces the cached source/config inputs each time
+      // the next unit builds. The artifact hash includes target, architecture,
+      // profile, relocation model and whether sources are merged.
+      state_dir = this.fingerprint_dir_for(unit);
+      this.create_dir(state_dir);
+      state_db_path = Path.join(state_dir, "state.db");
       skc.args(
         Array[
           if (FileSystem.exists(state_db_path)) {
@@ -496,7 +504,18 @@ mutable class BuildRunner(
     p = this.run_cmd(skc);
 
     if (separate_link) {
-      (cmd, args) = parse_link_args(p.stdout) match {
+      // A cached compiler backend has no new stdout side effect. Retain its
+      // link plan per unit so an unchanged LLVM module can still be linked.
+      link_plan_path = Path.join(this.fingerprint_dir_for(unit), "link-args");
+      link_output = if (
+        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+        FileSystem.exists(link_plan_path)
+      ) {
+        FileSystem.readTextFile(link_plan_path)
+      } else {
+        p.stdout
+      };
+      (cmd, args) = parse_link_args(link_output) match {
       | Success(v) -> v
       | Failure(msg) ->
         this.bctx.gctx.console.error(
@@ -504,6 +523,12 @@ mutable class BuildRunner(
         );
         skipExit(3)
       };
+      FileSystem.writeTextFile(
+        link_plan_path,
+        "---LINK_ARGS_BEGIN---\n" +
+          Array[cmd].concat(args).join("\n") +
+          "\n---LINK_ARGS_END---\n",
+      );
       link_cmd = ProcessBuilder::create{cmd, args};
       _ = this.run_cmd(link_cmd)
     }
@@ -691,7 +716,12 @@ mutable class BuildRunner(
     lines.push("module end;");
 
     content = lines.join("\n");
-    FileSystem.writeTextFile(dispatcher_path, content);
+    if (
+      !FileSystem.exists(dispatcher_path) ||
+      FileSystem.readTextFile(dispatcher_path) != content
+    ) {
+      FileSystem.writeTextFile(dispatcher_path, content)
+    };
     dispatcher_path
   }
 

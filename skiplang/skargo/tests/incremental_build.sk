@@ -1,0 +1,184 @@
+module alias T = SKTest;
+module SkargoIncrementalBuildTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, text: String): void {
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(path)])
+      .fromSuccess()
+      .success(),
+  );
+  FileSystem.writeTextFile(path, text)
+}
+
+@allow_tracked_call
+untracked fun build(skargo: String, dir: String): System.CompletedProcess {
+  result = System.popen{
+    args => Array[skargo, "build", "-v"],
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(dir),
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result
+}
+
+@allow_tracked_call
+untracked fun run_probe(dir: String, expected: String): void {
+  result = System.popen{
+    args => Array[dir + "/target/host/dev/probe"],
+    env => Map["SKARGO_BIN" => "probe"],
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  T.expectEq(result.stdout, expected)
+}
+
+@allow_tracked_call
+untracked fun mtime(path: String): Int {
+  FileSystem.getLastModificationTime(path)
+}
+
+// Cover per-unit database isolation, archive source dependencies, native
+// packaging inputs, and replay of a cached --no-link command.
+@test
+fun test_incremental_build_inputs_and_cached_link(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string(
+        "skipping: merged-mode only, run `skargo test` in the dev profile",
+      );
+      return void
+    };
+    Environ.current_exe()
+  };
+  root = Path.join(kManifestDir, "target/it-incremental-build");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  pure = root + "/pure";
+  source = pure + "/src/lib.sk";
+  write_file(
+    pure + "/Skargo.toml",
+    `[package]\nname = "incremental-probe"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n[[bin]]\nname = "probe"\nmain = "IncrementalProbe.main"\n`,
+  );
+  write_file(
+    source,
+    "module IncrementalProbe; fun value(): Int { 1 } untracked fun main(): void { print_raw(value().toString()) } module end;\n",
+  );
+  initial = build(skargo, pure);
+  run_probe(pure, "1");
+  databases = initial.stderr
+    .split("\n")
+    .filter(line ->
+      line.contains("--init ") &&
+        line.contains("/.fingerprints/incremental-probe-")
+    )
+    .map(line -> line.split("--init ")[1].split(" ")[0])
+    .collect(UnorderedSet);
+  T.expectEq(databases.size(), 2, initial.stderr);
+  for (database in databases) {
+    T.expectTrue(FileSystem.exists(database), database)
+  };
+  write_file(
+    source,
+    "module IncrementalProbe; fun value(): Int { 2 } untracked fun main(): void { print_raw(value().toString()) } module end;\n",
+  );
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.01", source])
+      .fromSuccess()
+      .success(),
+  );
+  updated = build(skargo, pure);
+  T.expectTrue(updated.stderr.contains("--data "), updated.stderr);
+  run_probe(pure, "2");
+
+  // A fingerprint cannot make a missing primary artifact fresh.
+  artifacts = FileSystem.readFilesRecursive(
+    pure + "/target/host/dev/deps",
+    path ->
+      Path.basename(path).startsWith("__merged-") && !path.endsWith(".ll")
+    ,
+  ).toArray();
+  T.expectTrue(!artifacts.isEmpty());
+  T.expectTrue(
+    System.subprocess(Array["rm", artifacts[0]]).fromSuccess().success(),
+  );
+  _ = build(skargo, pure);
+  T.expectTrue(FileSystem.exists(artifacts[0]));
+  run_probe(pure, "2");
+
+  // The consumer must obtain native code from its dependency's archive,
+  // rather than linking the dependency's build-script library directly.
+  nativeDir = root + "/native";
+  consumer = root + "/consumer";
+  csource = nativeDir + "/native.c";
+  write_file(
+    nativeDir + "/Skargo.toml",
+    `[package]\nname = "incremental-native"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+  );
+  write_file(
+    nativeDir + "/src/lib.sk",
+    "module IncrementalNative; @cpp_extern(\"incremental_native_value\") native fun value(): Int; module end;\n",
+  );
+  write_file(
+    nativeDir + "/build.sk",
+    "fun main(): void { out = Environ.var(\"OUT_DIR\"); objFile = Path.join(out, \"native.o\"); archive = Path.join(out, \"native.a\"); p = System.subprocess(Array[\"clang++\", \"-x\", \"c\", \"-c\", \"native.c\", \"-o\", objFile]).fromSuccess(); invariant(p.success(), p.stderr); a = System.subprocess(Array[\"llvm-ar\", \"rcs\", archive, objFile]).fromSuccess(); invariant(a.success(), a.stderr); print_string(\"skargo:skc-link-lib=\" + archive); print_string(\"skargo:rerun-if-changed=native.c\"); }\n",
+  );
+  write_file(
+    csource,
+    "long long incremental_native_value(void) { return 1; }\n",
+  );
+  write_file(
+    consumer + "/Skargo.toml",
+    `[package]\nname = "incremental-native-consumer"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\nincremental-native = { path = "../native" }\n[[bin]]\nname = "probe"\nmain = "IncrementalNativeConsumer.main"\n`,
+  );
+  write_file(
+    consumer + "/src/lib.sk",
+    "module IncrementalNativeConsumer; untracked fun main(): void { print_raw(IncrementalNative.value().toString()) } module end;\n",
+  );
+  _ = build(skargo, consumer);
+  run_probe(consumer, "1");
+  modules = FileSystem.readFilesRecursive(
+    consumer + "/target/host/dev/deps",
+    path -> Path.basename(path).startsWith("__merged-") && path.endsWith(".ll"),
+  ).toArray();
+  T.expectTrue(!modules.isEmpty());
+  touched = System.subprocess(
+    Array["touch", "-t", "200001010000.00"].concat(modules),
+  ).fromSuccess();
+  T.expectTrue(touched.success(), touched.stderr);
+  oldTimes = modules.map(mtime);
+
+  // A C comment changes the build fingerprint, but the deterministic native
+  // object and compiler inputs are identical: no new link-plan stdout exists.
+  write_file(
+    csource,
+    "long long incremental_native_value(void) { return 1; } /* comment */\n",
+  );
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.02", csource])
+      .fromSuccess()
+      .success(),
+  );
+  _ = build(skargo, consumer);
+  run_probe(consumer, "1");
+  T.expectEq(modules.map(mtime), oldTimes);
+
+  // Native bytes must be repackaged even though the Skip source is unchanged.
+  write_file(
+    csource,
+    "long long incremental_native_value(void) { return 5; }\n",
+  );
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.03", csource])
+      .fromSuccess()
+      .success(),
+  );
+  _ = build(skargo, consumer);
+  run_probe(consumer, "5");
+}
+module end;

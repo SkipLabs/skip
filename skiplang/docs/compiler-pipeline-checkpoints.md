@@ -896,3 +896,51 @@ configuration selects sequential specialization, including release builds.
 - Benchmark script now accepts BENCH_SKC/BENCH_SKARGO/BENCH_TARGET overrides;
   defaults use identity-pruned driver and original dev target. DO NOT run using
   old round-kind optimized driver against these unit DBs (host ABI differs).
+- Committed runtime identity fix + native equality regression as bbafd0d87.
+  It deliberately prevents GC metadata sharing across nominal classes, including
+  generic instantiations; names remain optional in --release.
+- Pruned optimizer driver passed 844 existing selected regressions, all 28 native
+  update comparisons, all 26 default-inline native fixtures, and six-step cache /
+  no-op / release-mode-transition checks. Logs identity-pruned-{regressions,
+  updates,native-inline,optimizer}.log. Full dev build and release self-bootstrap
+  still running (18885 / 24548). Source changes remain frozen for measurements.
+- Removed only completed bootstrap databases >500 MB from stage4-skargo and
+  release compiler scratch targets, retaining all immutable driver executables,
+  unit archives, fingerprints, link plans and logs. These unused caches consumed
+  >20 GB; dev measurement target's live DBs are untouched. Future rebuilds of
+  bootstrap units can --init their missing DBs.
+- Sequential --release self-bootstrap completed successfully; generated compiler
+  /tmp/skip-identity-release-bootstrap/skc passes fresh persistent --check
+  (identity-release-bootstrap-check.log). This end-to-end reproducer crashed
+  before the GC identity fix. Running six-step cached native/mode test with
+  this fully identity-tagged release host too (check_release_host.py, log
+  identity-release-host-cache.log). Original pruned driver remains unchanged
+  for active dev measurement DB ABI compatibility.
+- Fully identity-tagged --release host passes cached-update/native/no-op/mode
+  regression (identity-release-host-cache.log). Release correctness fix validated
+  end to end, not just by the small native_eq test.
+- Pruned optimizer full dev build still exhausted host memory after >7 min;
+  subprocess was signal-killed with empty stderr, cgroup memory.events reports
+  oom_kill=4. No completed full-dev cold timing yet. The retained optimizer
+  rounds all execute in one callback, keeping temporary work heaps alive until
+  optimizer completion. Do not claim pruning alone fixes full compiler scale.
+- Implemented phased optimizer orchestration mirroring specializer: fixed
+  compilerPipeline gains optimizer phase; explicit Optimize.Progress global data
+  controls one collection round per synchronization. Backend optimizer publishes
+  no final env until before/after-const rounds reach fixed points. Round workers
+  still capture only handles; command-line sequential paths are unchanged. Batch
+  callers without phased progress run the same graph synchronously as before.
+  Future round scheduling is bounded in the driver, just like specialization.
+- All compiler sources pass frontend --check after phased changes (direct source
+  check via identity-tagged release host, phased-source-check.log). Compiling
+  optimized release phased driver directly from all compiler/src .sk files with
+  std/cli/arparser archives, no persistent bootstrap DB: session 60888, build-phased-driver.py, logs build-phased-driver.log
+  and build-phased-driver-result.log. Target /tmp/skip-phased-optimizer-driver/skc.
+  Original unphased source copies saved as {compile,optimize}-pruned-unphased.sk.
+  Active dev target DBs still contain interrupted old-host state; delete them
+  before switching to phased driver. Preserve archives/fingerprints/artifacts.
+- Initial phased bootstrap frontend passed but IR conversion rejected two
+  reused pattern aliases named value in the new constant pipeline callback
+  (Internal error: Encountered multiple Binds of value). Renamed the aliases
+  previousProgress/pendingProgress; compiling again, session 50321. No algorithm
+  workaround or validation bypass. Earlier failed session was 60888 (13 s).

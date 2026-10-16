@@ -598,6 +598,12 @@ fun getOrInitializeBackend(
       };
 
       if (conf.emit == "sklib") {
+        // Native archive/preamble contents are filesystem inputs to packaging.
+        // Refresh those external bytes on invocation; Skip sources use their
+        // tracked package row in compile_sklib.
+        if (!conf.static_libraries.isEmpty() || !conf.preambles.isEmpty()) {
+          _ = tickDir.getArray(context, SKStore.IID(0))
+        };
         compile_sklib(context, conf);
         return void
       };
@@ -734,6 +740,19 @@ fun getOrInitializeBackend(
         // The phased driver synchronizes and destroys its heap after this round.
         // Only the legacy unphased path needs a separate collection region.
         runRound = (context: mutable SKStore.Context) ~> {
+          workKey: SKStore.Key = SKStore.IID(0);
+          classPhaseDir = specializerAllDirCopy.map(
+            SKStore.IID::keyType,
+            SKStore.BoolFile::type,
+            context,
+            SKStore.DirName::create("/specializer/phase-kind/" + phaseNumberCopy + "/"),
+            (_context, writer, _, values) ~> {
+              writer.set(SKStore.IID(0), SKStore.BoolFile(
+                values.values().any(value -> value is O.CStackElement _),
+              ))
+            },
+            Some(Array[SKStore.KeyRange::create(workKey, workKey)]),
+          );
           nextDir = specializerAllDirCopy
             .map(
               x ~> x,
@@ -743,11 +762,13 @@ fun getOrInitializeBackend(
                 "/specializer/reduced1/" + phaseNumberCopy + "/",
               ),
               (context, writer, key, values) ~> {
-                classPhase = specializerAllDirCopy
-                  .getArray(context, SKStore.IID(0))
-                  .any(value -> value is O.CStackElement _);
-                specializationConfig = specializationConfigDir
-                  .getArray(context, SKStore.IID(0))[0].value;
+                // Forward state without reading the work queue. Work rows
+                // depend on the once-per-round projection of its kind.
+                key match {
+                | SKStore.IID _ | O.FStackElement _ -> void
+                | _ -> return writer.set(key, OldFile(values.toArray()))
+                };
+                classPhase = classPhaseDir.getArray(context, SKStore.IID(0))[0].value;
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
                   for (value in values) {
@@ -767,6 +788,8 @@ fun getOrInitializeBackend(
                 | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
 
+                specializationConfig = specializationConfigDir
+                  .getArray(context, SKStore.IID(0))[0].value;
                 specializer = O.Specializer::make(
                   specializerAllDirCopy,
                   context,
@@ -1175,8 +1198,12 @@ fun compile(
     // when the output disappears, preserving cached specialization work.
     key: SKStore.Key = SKStore.IID(0);
     reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
-      parentName => SKStore.DirName::create("/backendLower/"),
-      childName => SKStore.DirName::create("/backendEmit/"),
+      parentName => if (config.emit == "sklib") backendDir.dirName else {
+        SKStore.DirName::create("/backendLower/")
+      },
+      childName => SKStore.DirName::create(
+        if (config.emit == "sklib") "/backendPhase1/" else "/backendEmit/",
+      ),
       key,
     };
     context.invalidateReader(reader);
@@ -1369,6 +1396,9 @@ fun compile_binary(
 
 fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
   runCompilerPhase("native/write_sklib", () -> {
+    // Archive emission reads native files below. Track the package input so
+    // source edits also rerun this mapper when its configuration is unchanged.
+    _ = FileCache.packageDir.getArray(context, FileCache.InputPackageName(conf.lib_name));
     accessed_env_vars = SortedSet::createFromItems(
       FileCache.packageEnvAccessDir.getArray(
         context,
