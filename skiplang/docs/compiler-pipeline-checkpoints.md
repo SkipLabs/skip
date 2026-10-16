@@ -346,3 +346,122 @@ Full timing ranges, CPU time and peak RSS are recorded alongside commands,
 compiler/stdlib/input hashes, scripts and validation logs in
 `experiments/incremental-field-layout/`. Scripts retain the scratch paths used
 for the measurements and need path adjustments on another machine.
+
+## Compiler incrementalization work plan and progress log 2026 10 16
+
+This section is the durable work record for the five-stage plan requested by
+Julien. Update the log after significant findings, changes, tests and commits,
+and before context compression. Complete the stages in order. No pushes are
+requested. Preserve sequential specialization and optimization whenever the
+configuration selects sequential specialization, including release builds.
+
+### Plan
+
+1. Refactor the compiler pipeline to fixed definitions in a const Array. Keep
+   compilation-specific configuration and state in explicit SKStore inputs and
+   mapper results. Remove the failed last-phase scheduling experiments from
+   this commit. Validate the refactor and commit it separately.
+2. Finish per-instantiation function IR generation after specialization and
+   layout. Express planning and generation through SKStore mappers, avoid
+   captured invocation snapshots and scheduling exceptions, verify incremental
+   invalidation and native correctness, measure performance, and commit.
+3. Incrementalize optimization using successive function collections until a
+   fixed point, following the specialization round architecture. Preserve the
+   existing sequential optimizer for sequential-specializer modes. Validate,
+   measure, and commit the completed change.
+4. Investigate and fix nonincremental skargo builds. Build the compiler through
+   skargo, edit its source (including a debug statement and other representative
+   changes), and measure update costs. Record correctness and timing evidence
+   and commit the fix.
+5. Investigate repeated skc output arguments and make skargo use multiple LLVM
+   outputs in development mode, initially using the available core count.
+   Repeat compiler-edit measurements. Commit only if measured development
+   builds improve; otherwise revert this experiment and record the result.
+
+### Starting state and recovery information
+
+- Repository: /home/julienv/skip, branch pr-1541. Last committed phase is
+  525490b59, incremental field layout. Earlier relation and scalarization phases
+  are committed. Parallel compiler experiments were reverted previously.
+- A formatting-only change in specialize.sk computeArraySlotInfo existed before
+  the current IR work; preserve it.
+- Per-instantiation IR experiments are uncommitted and not ready to keep. A
+  complete patch before beginning stage 1 is saved at
+  /tmp/skip-function-ir-experiment/pending-before-pipeline.patch.
+- The first function cache stored Function plus generated ReturnTuple classes.
+  ReturnTuple creation is explicitly allowed after canCreateNewSClasses=false;
+  omitting those classes broke tuple-return verification.
+- Numeric function IDs were formerly allocated through a GFunction-keyed hash
+  grouping, making allocation depend on bodies. The experiment used sorted
+  GFunKey order instead. Future work must preserve valid embedded call IDs.
+- The failed cache captured a fixed SpecializerState and full ID table. It was
+  registered from external pipeline orchestration, so the previous closure
+  could execute on newly discovered keys before being replaced. Do not retain
+  the custom function-ir eligibility exclusions or extra imperative preparation
+  phase as the solution. The user requires a mapper-based dependency model.
+- Creating the cache inside backend emission caused duplicate optimization and
+  LLVM output on body updates. Debugger and native link counts confirmed this.
+  Creating it outside reactive ownership introduced the stale-table problem.
+- Scratch evidence and scripts are in /tmp/skip-function-ir-experiment. Saved
+  baseline compiler /tmp/skip-function-ir-baseline/skc matches 525490b59 (SHA256
+  aca5a7c2f4d7890d3bc552c40989083eb5b254270d643a52f0d0c1ab368935a8).
+- Working build directory: /tmp/skip-release-sequential-build. Current binary
+  contains an intermediate, failing cache experiment; rebuild before trusting
+  it. No compiler source edits while its build is running.
+- Build: PATH=/tmp/skip-wasm-tools:/tmp/skip-specializer-bootstrap/bin:$PATH
+  SKIP_CAPACITY=64G skargo build --release --bin skc
+  --manifest-path skiplang/compiler/Skargo.toml
+  --target-dir /tmp/skip-release-sequential-build.
+- Shared stdlib: /tmp/skip-release-sequential-build/host/release/deps/
+  libstd-d1d97ecd7abc2467.sklib. Wrapper tools are in
+  /tmp/skip-release-mode-test/tools (skc invokes the current built compiler).
+- Existing cached test harness:
+  /tmp/skstore-compact-20261012/compiler-tests/host/release/test, compiler cwd,
+  SKTEST_FILTERS='visibility syntax runtime typechecking expand
+  typechecking/exhaustiveness incremental', -j2, wrapper PATH first. This runs
+  839 invalid-program tests and five existing incremental regressions.
+- Additional phase regression binaries: /tmp/skip-latch-experiment/latch-test,
+  /tmp/skip-scalarize-experiment/scalar-test,
+  /tmp/skip-layout-experiment/layout-test. New IR regression source is included
+  in the pending patch and /tmp/skip-function-ir-experiment/function-test.sk.
+- Existing Python validation recipes in that scratch directory: check_valid.py
+  (898 frontend checks), check_native.py (13 fixtures in two modes),
+  check_updates.py (four fixtures across updates and two compilers),
+  check_batch.py (two persistent batch units), run.py (51-file timings),
+  check_fresh.py (cached versus fresh LLVM), trace.py. Timing and fresh recipes
+  share a work directory and must run sequentially; trace.py uses trace-work.
+- SKStore eager reads record paths but do not refresh a captured immutable
+  value. applyMany compares mapper captures when re-registering. TimeStack
+  orders updates and records nested ownership. The specialization coordinator
+  deliberately retains previous directories and reads during incomplete
+  phased rounds. Account for these facts in the mapper design.
+
+### Progress log
+
+- 2026-10-16: Recorded the user's five-stage plan and archived the pending IR
+  experiment before isolating the const-pipeline refactor. No new phase has
+  been committed yet. Compiler build for the scheduling workaround was stopped
+  after the user's architectural questions; it must not be resumed as the
+  intended design.
+- Stage 1 implementation: compilerPipeline is now a global const Array. CLI
+  config is written to the existing backend input at the invocation boundary;
+  callbacks read that input. Specializer worker maps now read a projected
+  specialization-config collection and their predecessor's class-work marker,
+  rather than capturing invocation layout settings or the current class phase.
+  First bootstrap compilation exposed a const-closure lowering restriction on
+  duplicate pattern variable names; renamed the earlier progress binding.
+  Release bootstrap build is running; no validation result claimed yet.
+- Read-only stage 4 investigation: skargo stores static_state.db in the shared
+  profile build directory for every package and target. A library invocation
+  and following binary invocation overwrite each other's input universe. Test
+  per-unit database isolation using the existing artifact identity hash.
+- Read-only stage 5 investigation: this checkout accepts a single --output
+  string and AsmOutput.writeOutputFiles accepts one filename. Repeated outputs
+  are not currently implemented here; stage 5 will need compiler support as
+  well as skargo plumbing, and its benefit must be measured before keeping it.
+- Stage 1 validation: release bootstrap build passed (295.668 s), full existing
+  compiler regression selection passed 844/844, valid frontend corpus passed
+  898/898, native fixtures passed 26/26 across persistent and --release modes,
+  and field-layout incremental regression passed. Stage 1 binary preserved at
+  /tmp/skip-const-pipeline-baseline/skc. Const declaration formatting was cleaned
+  after the build; no semantic source changes after the tested build.

@@ -140,7 +140,6 @@ fun main(): void {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
   if (config.incrementalSpecialization && batchManifest.isNone()) {
-    pipeline = compilerPipeline(config);
     SKStore.runWithGc(SKStore.Context::create{}, context ~> {
       context.!debugMode = debugSKStore;
       phase = context.getGlobal(pipelinePhaseKey) match {
@@ -148,8 +147,12 @@ fun main(): void {
       | None() -> 0
       };
       try {
-        if (pipeline[phase](context)) !phase = phase + 1;
-        if (phase == pipeline.size()) {
+        if (phase == 0) {
+          (backendDir, _) = getOrInitializeBackend(context);
+          backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)])
+        };
+        if (compilerPipeline[phase](context)) !phase = phase + 1;
+        if (phase == compilerPipeline.size()) {
           context.removeGlobal(pipelinePhaseKey);
           context.removeGlobal(specializationProgressKey);
           SKStore.CStop(None())

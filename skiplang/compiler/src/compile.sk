@@ -206,6 +206,10 @@ fun ensureCompatibleLLVMVersion(): void {
 }
 
 class ConfigFile(value: Config.Config) extends SKStore.File
+
+class SpecializationConfigFile(
+  value: Config.SpecializationConfig,
+) extends SKStore.File
 class BackendPhase1File(
   conf: Config.Config,
   rootsIR: O.RootsIR,
@@ -370,7 +374,7 @@ fun mergeFun(
 fun latchSpecializerClasses(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  config: Config.SpecializationConfig,
+  configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
   converter: O.Converter,
 ): SKStore.EHandle<SKStore.Key, SKStore.File> {
   input.map(
@@ -382,6 +386,7 @@ fun latchSpecializerClasses(
       key match {
       | O.SClassIDKey(id) ->
         info = O.SClassInfoFile::type(values.first).value;
+        config = configDir.getArray(context, SKStore.IID(0))[0].value;
         sp = O.Specializer::make(input, context, config, converter);
         sp.!canCreateNewSClasses = false;
         !info.sclass = info.sclass with {
@@ -408,7 +413,7 @@ fun latchSpecializerClasses(
 fun scalarizeSpecializerClasses(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  config: Config.SpecializationConfig,
+  configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
   converter: O.Converter,
 ): SKStore.EHandle<SKStore.Key, SKStore.File> {
   input.map(
@@ -420,6 +425,7 @@ fun scalarizeSpecializerClasses(
       key match {
       | O.SClassIDKey _ ->
         info = O.SClassInfoFile::type(values.first).value;
+        config = configDir.getArray(context, SKStore.IID(0))[0].value;
         sp = O.Specializer::make(input, context, config, converter);
         sp.!canCreateNewSClasses = false;
         sp.scalarizeFields(info);
@@ -439,7 +445,7 @@ fun scalarizeSpecializerClasses(
 fun layoutSpecializerClasses(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  config: Config.SpecializationConfig,
+  configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
   converter: O.Converter,
 ): SKStore.EHandle<SKStore.Key, SKStore.File> {
   shapes = input.map(
@@ -481,6 +487,7 @@ fun layoutSpecializerClasses(
       }, None())),
       (groups, ((context, writer, _, values) ~> {
         group = O.FieldLayoutGroupFile::type(values.first);
+        config = configDir.getArray(context, SKStore.IID(0))[0].value;
         sp = O.Specializer::make(input, context, config, converter);
         sp.!canCreateNewSClasses = false;
         O.layoutSpecializerGroup(sp, config, group.classes);
@@ -531,6 +538,18 @@ fun getOrInitializeBackend(
   );
 
   tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
+
+  specializationConfigDir = backendDir.map(
+    SKStore.IID::keyType,
+    SpecializationConfigFile::type,
+    context,
+    SKStore.DirName::create("/specialization-config/"),
+    (_context, writer, key, values) ~> {
+      writer.set(key, SpecializationConfigFile(
+        values.first.value.specializationConfig(),
+      ))
+    },
+  );
 
   outerIst = O.makeOuterIst(context);
 
@@ -679,13 +698,12 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/specializer/"),
     (context, writer, _, _) ~> {
-      // Keep the config dependency on the driver; work mappers capture the layout.
+      // Invocation data stays in collections; work mappers capture stable handles.
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       if (!config.incrementalSpecialization) return void;
       if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
         return void
       };
-      specializationConfig = config.specializationConfig();
       specializerAllDir = specializerInitMerged;
       phaseNumber = 0;
       phased = context.getGlobal(pipelinePhaseKey).isSome();
@@ -711,9 +729,6 @@ fun getOrInitializeBackend(
         // Class creation inherits discovered methods, and method discovery
         // visits existing subclasses. Run them in separate rounds so each
         // sees the other's merged writes.
-        classPhase = specializerAllDirCopy
-          .getArray(context, SKStore.IID(0))
-          .any(value -> value is O.CStackElement _);
         // The phased driver synchronizes and destroys its heap after this round.
         // Only the legacy unphased path needs a separate collection region.
         runRound = (context: mutable SKStore.Context) ~> {
@@ -726,6 +741,11 @@ fun getOrInitializeBackend(
                 "/specializer/reduced1/" + phaseNumberCopy + "/",
               ),
               (context, writer, key, values) ~> {
+                classPhase = specializerAllDirCopy
+                  .getArray(context, SKStore.IID(0))
+                  .any(value -> value is O.CStackElement _);
+                specializationConfig = specializationConfigDir
+                  .getArray(context, SKStore.IID(0))[0].value;
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
                   for (value in values) {
@@ -894,19 +914,19 @@ fun getOrInitializeBackend(
         latched = latchSpecializerClasses(
           context,
           specializerAllDir,
-          config.specializationConfig(),
+          specializationConfigDir,
           converter,
         );
         scalarized = scalarizeSpecializerClasses(
           context,
           latched,
-          config.specializationConfig(),
+          specializationConfigDir,
           converter,
         );
         layoutSpecializerClasses(
           context,
           scalarized,
-          config.specializationConfig(),
+          specializationConfigDir,
           converter,
         )
       } else {
@@ -1095,57 +1115,57 @@ fun compile(
 
 // Each callback leaves all continuation state in the context. runWithGc
 // interns that context and reclaims the callback's temporary heap before reentry.
-fun compilerPipeline(
-  config: Config.Config,
-): Array<mutable SKStore.Context ~> Bool> {
-  Array[
-    context ~> {
-      context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
-      compile(config, context, config.input_files, true);
-      true
-    },
-    context ~> {
-      roundLimit = context.getGlobal(specializationProgressKey) match {
-      | Some(progress @ SpecializerProgress _) -> progress.round - 1
-      | _ -> -1
+// Definitions are fixed for the whole compiler. Invocation options are backend
+// input data; reactive work captures handles, never invocation snapshots.
+const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
+  context ~> {
+    context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
+    (backendDir, _) = getOrInitializeBackend(context);
+    config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+    compile(config, context, config.input_files, true);
+    true
+  },
+  context ~> {
+    roundLimit = context.getGlobal(specializationProgressKey) match {
+    | Some(previousRound @ SpecializerProgress _) -> previousRound.round - 1
+    | _ -> -1
+    };
+    boundary = context.updateUntilBoundary(
+      dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
+      dir ~> dir == SKStore.DirName::create("/specializer/"),
+      dir ~> {
+        name = dir.toString();
+        if (
+          name.startsWith("/specializer/reduced1/") ||
+          name.startsWith("/specializer/merge1/")
+        ) {
+          name.split("/")[3].toInt() <= roundLimit
+        } else {
+          true
+        }
+      },
+    );
+    throwIfFrontendErrors(context);
+    progressOpt = context.getGlobal(specializationProgressKey);
+    progressOpt match {
+    | Some(progress @ SpecializerProgress _) if (!progress.complete) ->
+      key: SKStore.Key = SKStore.IID(0);
+      reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
+        parentName => SKStore.DirName::create("/backend/"),
+        childName => SKStore.DirName::create("/specializer/"),
+        key,
       };
-      boundary = context.updateUntilBoundary(
-        dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
-        dir ~> dir == SKStore.DirName::create("/specializer/"),
-        dir ~> {
-          name = dir.toString();
-          if (
-            name.startsWith("/specializer/reduced1/") ||
-            name.startsWith("/specializer/merge1/")
-          ) {
-            name.split("/")[3].toInt() <= roundLimit
-          } else {
-            true
-          }
-        },
-      );
-      throwIfFrontendErrors(context);
-      progressOpt = context.getGlobal(specializationProgressKey);
-      progressOpt match {
-      | Some(progress @ SpecializerProgress _) if (!progress.complete) ->
-        key: SKStore.Key = SKStore.IID(0);
-        reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
-          parentName => SKStore.DirName::create("/backend/"),
-          childName => SKStore.DirName::create("/specializer/"),
-          key,
-        };
-        context.invalidateReader(reader);
-        false
-      | _ -> boundary != Some(false)
-      }
-    },
-    context ~> {
-      context.update();
-      throwIfFrontendErrors(context);
-      true
-    },
-  ]
-}
+      context.invalidateReader(reader);
+      false
+    | _ -> boundary != Some(false)
+    }
+  },
+  context ~> {
+    context.update();
+    throwIfFrontendErrors(context);
+    true
+  },
+];
 
 // Type the stdlib (dependencies) once into `context`, with no config written
 // so the backend mapper never fires — leaving a clean "warm" base that carries
