@@ -825,6 +825,10 @@ class OptionLayoutFile(
 ) extends SKStore.File
 class GFunKeyKey(value: GFunKey) extends SKStore.Key
 class GFunKeyFile(value: GFunKey) extends SKStore.File
+class SpecializedFunctionFile(
+  value: Function,
+  returnTuples: SortedMap<SClassID, SClassInfo>,
+) extends SKStore.File
 class ContinuationFile(
   origin: FStackElement,
   pending: Array<CStackElement>,
@@ -960,6 +964,10 @@ mutable class Specializer{
 
   // Once it's too late to make new SClasses we turn this off.
   mutable canCreateNewSClasses: Bool = true,
+  // Transient output of one IR-generation row. Synthetic return tuples are
+  // the deliberate exception to the class-creation guard. This accumulator
+  // is local to the fresh mapper specializer, not discovery state.
+  mutable generatedReturnTuples: ?SortedMap<SClassID, SClassInfo> = None(),
   mutable verifyChanged: Bool = false,
   mutable pauseOnSClassCreation: Bool = false,
 
@@ -1347,6 +1355,11 @@ mutable class Specializer{
 
   mutable fun sclassSet(key: SClassID, value: SClassInfo): void {
     this.sclasses.set(key, value);
+    if (!this.canCreateNewSClasses && value.gclass.isReturnTuple) {
+      this.!generatedReturnTuples = this.generatedReturnTuples.map(tuples ->
+        tuples.set(key, value)
+      )
+    }
   }
 
   mutable fun getSClasses(): SortedMap<SClassID, SClassInfo> {
@@ -2043,10 +2056,9 @@ mutable class Specializer{
     // at some point (array type map only needs to know how many
     // pointers are in each slot, since they are all at the beginning).
     scalarTypes = vectorSlotTypes
-      .mapWithIndex((tupleIndex, t) -> (
-        tupleIndex,
-        this.trackedSClassGet(t.sclassID).sclass.getScalarType(),
-      ))
+      .mapWithIndex((tupleIndex, t) ->
+        (tupleIndex, this.trackedSClassGet(t.sclassID).sclass.getScalarType())
+      )
       .sortedBy(a ~> a.i1);
 
     // Hand out bit offsets to the tuple members in each Vector slot.
@@ -3275,34 +3287,20 @@ mutable class Specializer{
     config: Config.Config,
     lconsts: Array<ConstLazyGFun>,
     disasm: readonly UnorderedSet<String>,
+    incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
   ): GlobalEnv {
-    // Map each GFunction to all its instantiations.
-    funToInstsMap = mutable UnorderedMap<GFunction, mutable Vector<GFunKey>>[];
-    funToInsts = mutable Vector[];
-
-    // First dealing with all the symbols found at initialization time
-    for (_ => f in this.funsNeeded.toFixed().data) {
-      gf = this.converter.getGFunction(context, f.i0);
-      funToInstsMap.getOrAdd(gf, () -> mutable Vector[]).push(f);
-    };
-    for (gf => insts in funToInstsMap) {
-      funToInsts.push((gf, insts.toArray()));
-    };
+    // GFunKey order depends on callable identity and type arguments, not the
+    // current body. The old GFunction-keyed hash grouping could renumber every
+    // function after a body edit. Every instantiation already gets its own IR.
+    instantiations = this.funsNeeded.toFixed().data.values().collect(Array);
 
     msfuns = FunctionIDToFunction::mcreate();
 
     // Partition functions into superpositions and give them SFunctionIDs.
     // We need to assign SFunctionIDs now so that when we specialize them
     // below, Call Instrs know the SFunctionIDs to use to refer to other funs.
-    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(
-      this.funsNeeded.toFixed().data.size(),
-    );
-    for (gfAndInsts in funToInsts) {
-      (_, insts) = gfAndInsts;
-      // For now, stupidly give every unique set of parameters its own
-      // Function, even though we could sometimes superimpose them.
-      for (key in insts) msids.add(key, msfuns.allocID())
-    };
+    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(instantiations.size());
+    for (key in instantiations) msids.add(key, msfuns.allocID());
     sids = msids.chill();
     reportMemoryStatistics("native/partitionFunctions after sids");
 
@@ -3316,31 +3314,29 @@ mutable class Specializer{
       }
     };
 
-    for (gfAndInsts in funToInsts) {
-      (gf, insts) = gfAndInsts;
-
-      // Stupidly give every unique set of parameters its own instantiation.
-      for (s in insts) {
-        sid = sids[s];
-
-        f = this.withRegion(context, (context, specializer) ~> {
-          f = FunSpecializer::run(
-            context,
-            config,
-            specializer,
-            gf,
-            Array[s.i1],
-            sid,
-            sids,
-          );
-          if (!gf.hasImplementation()) {
-            // Kill off junk "Unreachable" block.
-            !f = f with {blocks => Array[]}
-          };
-          f
-        });
-        msfuns.insert(f)
-      }
+    ptrByteSize = config.ptrByteSize;
+    for (s in instantiations) {
+      sid = sids[s];
+      f = incrementalFunctions match {
+      | Some(functions) ->
+        result = functions.getArray(context, GFunKeyKey(s))[0];
+        for (id => info in result.returnTuples) {
+          this.sclasses.maybeGet(context, id).each(previous -> {
+            invariant(
+              native_eq(previous, info) == 0,
+              "Conflicting synthetic return tuple",
+            )
+          });
+          this.sclassSet(id, info)
+        };
+        result.value
+      | None() ->
+        gf = this.converter.getGFunction(context, s.i0);
+        this.withRegion(context, (context, specializer) ~> {
+          specializeFunctionIR(context, ptrByteSize, specializer, gf, s, sid, sids)
+        })
+      };
+      msfuns.insert(f)
     };
     reportMemoryStatistics("native/partitionFunctions after sfuns");
 
@@ -3420,6 +3416,102 @@ mutable class Specializer{
   }
 }
 
+// Every changing value is an explicit row input. This mapper's definition
+// captures no compilation snapshot or ID table.
+class FunctionIRStateFile(
+  state: SpecializerState,
+  sids: UnorderedMap<GFunKey, SFunctionID>,
+  ptrByteSize: Int,
+) extends SKStore.File
+class FunctionIRWorkFile(
+  gf: GFunction,
+  instantiation: GFunKey,
+) extends SKStore.File
+
+fun planFunctionIR(
+  context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  config: Config.SpecializationConfig,
+  converter: Converter,
+): void {
+  // toFixed uses a raw scan; explicitly register the whole collection read.
+  _ = input.items(context);
+  snapshot = Specializer::make(input, context, config, converter);
+  snapshot.toFixed(context);
+  snapshot.!canCreateNewSClasses = false;
+  instantiations = snapshot.funsNeeded.toFixed().data.values().collect(Array);
+  msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(instantiations.size());
+  for (index => key in instantiations) msids.add(key, SFunctionID(index));
+  sids = msids.chill();
+  state = snapshot.chill() with {
+    funsNeeded => SPMapFixed::mcreate(SortedMap[]).chill(),
+    pos => FileRange.builtin,
+  };
+  // Compare shared state once. Unchanged state retains the stored row, so
+  // function rows need only compare their own generic body and identity.
+  writer.set(
+    SKStore.IID(0),
+    FunctionIRStateFile(state, sids, config.ptrBitSize / 8),
+  );
+  for (key in instantiations) {
+    writer.set(
+      GFunKeyKey(key),
+      FunctionIRWorkFile(converter.getGFunction(context, key.i0), key),
+    )
+  }
+}
+
+fun generateFunctionIR(
+  context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SpecializedFunctionFile>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+  plan: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): void {
+  work = values.first match {
+  | work @ FunctionIRWorkFile _ -> work
+  | _ -> return void
+  };
+  common = FunctionIRStateFile::type(plan.getArray(context, SKStore.IID(0))[0]);
+  sp = common.state.mclone(context);
+  sp.!generatedReturnTuples = Some(SortedMap[]);
+  f = specializeFunctionIR(
+    context,
+    common.ptrByteSize,
+    sp,
+    work.gf,
+    work.instantiation,
+    common.sids[work.instantiation],
+    common.sids,
+  );
+  writer.set(
+    key,
+    SpecializedFunctionFile(f, sp.generatedReturnTuples.fromSome()),
+  )
+}
+
+// Generate only the instantiation's body. Method tables, coroutine ordering,
+// export flags, and final assembly remain owned by partitionFunctions.
+fun specializeFunctionIR(
+  context: mutable SKStore.Context,
+  ptrByteSize: Int,
+  specializer: mutable Specializer,
+  gf: GFunction,
+  instantiation: GFunKey,
+  sid: SFunctionID,
+  sids: UnorderedMap<GFunKey, SFunctionID>,
+): Function {
+  f = FunSpecializer::run(
+    context, ptrByteSize, specializer, gf, Array[instantiation.i1], sid, sids,
+  );
+  if (!gf.hasImplementation()) {
+    // Kill off the synthetic unreachable block for declarations.
+    !f = f with {blocks => Array[]}
+  };
+  f
+}
+
 // Converts a GFunction to a Function. This involves:
 //
 // - Converting all GTypes to Types (i.e. specializing generics).
@@ -3429,7 +3521,7 @@ mutable class Specializer{
 //   three parameters, etc.
 mutable class FunSpecializer{
   gfunction: GFunction,
-  config: Config.Config,
+  ptrByteSize: Int,
   specializer: mutable Specializer,
   converter: Converter,
   values: mutable UnorderedMap<
@@ -3468,7 +3560,7 @@ mutable class FunSpecializer{
 
   static fun run(
     context: mutable SKStore.Context,
-    config: Config.Config,
+    ptrByteSize: Int,
     specializer: mutable Specializer,
     gfunction: GFunction,
     callers: Array<FunSuperpositionID>,
@@ -3591,7 +3683,7 @@ mutable class FunSpecializer{
 
     fs = mutable FunSpecializer{
       gfunction,
-      config,
+      ptrByteSize,
       specializer,
       converter => specializer.converter,
       optinfo,
@@ -4276,7 +4368,7 @@ mutable class FunSpecializer{
       !sentinelField = sentinelField.asInner(pos).getField(field, pos)
     };
     bits = this.emitReinterpret{
-      typ => tIntPtr(this.config.ptrByteSize),
+      typ => tIntPtr(this.ptrByteSize),
       pos,
       value => sentinelField.asLeaf(pos).value,
     };
@@ -4289,7 +4381,7 @@ mutable class FunSpecializer{
         InstrLeaf(
           this.emitIntCmpNe{
             rhs => this.constantTypedInt(
-              tIntPtr(this.config.ptrByteSize),
+              tIntPtr(this.ptrByteSize),
               style.pointer,
             ).id,
             pos,

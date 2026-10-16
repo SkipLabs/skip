@@ -465,3 +465,102 @@ configuration selects sequential specialization, including release builds.
   and field-layout incremental regression passed. Stage 1 binary preserved at
   /tmp/skip-const-pipeline-baseline/skc. Const declaration formatting was cleaned
   after the build; no semantic source changes after the tested build.
+- Stage 1 committed as fdaf284ac. The pre-existing specialize.sk formatting
+  change remains outside that commit.
+- Stage 2 now replaces the archived snapshot closure with FunctionIRWorkFile
+  rows (fixed class state, generic body, instantiation, ID table and pointer
+  width). A stable planner mapper depends on the completed specialization
+  handle and explicitly reads its collection; the stable body mapper consumes
+  the work rows. No external preparation callback or new eligibility exclusion
+  is present. ReturnTuple contributions and deterministic ID allocation from
+  the earlier experiment were retained. Bootstrap build is in progress at
+  /tmp/skip-function-ir-experiment/build-explicit-plan.log.
+- Stage 2 focused validation passed with the explicit plan: generic edit writes
+  exactly two function IR entries; independent edit writes one; no-op writes
+  zero. Changed invocations link exactly once. Added/removed callees have valid
+  IDs and correct native results. All 28 native update comparisons, two
+  persistent batch units and the field-layout regression passed. Wider native
+  and compiler regressions are still running; timings follow those checks.
+- Stage 2 wider validation passed 844/844 existing regressions and 26/26 native
+  fixtures. All ten cached LLVM outputs match fresh persistent compilation,
+  including field additions/removals, inheritance-group merges/splits, exported
+  layout and reference/value changes.
+- First explicit-plan timing (three alternating trials, 51 files): initial
+  5.3853 -> 5.4253 s; body 0.2320 -> 0.3240 s; no-op 0.0327 -> 0.0322 s.
+  Other changed builds were 10-93% slower. Profile shows 22.22% of body-update
+  samples in SKIP_native_eq_obj under TEagerDir.writeEntry: every work row was
+  deeply comparing freshly rebuilt but identical shared snapshots. Testing
+  interning the shared class state and ID table once in the planner. Original
+  explicit-plan results saved in /tmp/skip-function-ir-experiment/explicit-uninterned.
+- Scratch bootstrap database exhausted its 64 GB persistent capacity while
+  rebuilding the interned-plan variant. Removed only the rebuildable
+  /tmp/skip-release-sequential-build/host/release/build/static_state.db and
+  restarted; binaries and evidence were preserved. The failed build did not
+  produce a candidate binary. This also illustrates why per-unit state
+  isolation matters for skargo.
+- While that compiler build runs, prepared stage 4's independent skargo fix:
+  database now lives in the existing per-unit fingerprint directory (whose
+  artifact identity includes architecture, profile, relocation and merge mode).
+  The directory is explicitly created for --check too. This skargo-only change
+  is uncommitted and must be excluded from the stage 2/3 commits. A standalone
+  patched skargo is building in /tmp/skip-stage4-skargo-build using the saved
+  stage 1 compiler and --skcopt=--release. Its compiler wrapper needs -L pointing
+  at the existing stdlib deps directory for transitive library resolution.
+- Stage 3 implementation drafts are scratch only:
+  /tmp/skip-function-ir-experiment/{optimizer-rounds.sk,optimizer-projection.sk,
+  apply-optimizer.py}. Do not assume they are validated. The design preserves
+  native-function summaries, coroutine extra functions/classes, and sequential
+  cycle breaking. It separates IR/optimization/emission mappers; per-round work
+  records carry explicit function/environment/config inputs. These drafts have
+  NOT yet been applied to compiler source.
+- The intern experiment is rejected: runtime SKIP_intern calls sk_new_const,
+  which registers persistent constants; changing invocation data triggers
+  ERROR_CHANGING_CONST. Do not use intern for dynamic work records. Removed it
+  completely. The replacement normalizes shared state into one IID(0) planner
+  row; body work rows contain only generic body and instantiation. Body mappers
+  read the shared row through a stable handle. This compares shared snapshots
+  once and gives SKStore an explicit dependency when class/ID state changes.
+  New build: build-normalized-plan.log. The currently installed candidate is
+  still the rejected intern variant until that build completes.
+- skfmt reformatted unrelated parts of compile.sk/tests.sk during this build.
+  After it finishes, run /tmp/skip-function-ir-experiment/trim-stage2-formatting.py
+  to restore unrelated formatting while retaining the normalized mapper code.
+  It reconstructs stage-2 files against stage-1 HEAD and archived sources; this
+  is formatting-only relative to the current implementation. Do NOT run it
+  after applying stage 3 or after committing stage 2, because it assumes the
+  current HEAD is fdaf284ac and original stage-2 source structure.
+- Patched skargo built successfully (22.546 s) in stage-4 scratch target. Its
+  independent native build/edit regression is running (skargo-state.log).
+- Stage 4 experiment proved two additional bugs masked by the shared database.
+  With isolated per-unit state, editing the root source leaves its .sklib stale:
+  compile_sklib reads native files but has no tracked dependency on the package
+  input row. The following cached native backend then emits no --no-link stdout,
+  and skargo fails with 'Missing link args'. Baseline edit times were 2.97 and
+  2.68 s; isolated variant correctly exposed the failure on its first edit.
+  Evidence: /tmp/skip-skargo-state-experiment/{before-1,after-1}.log.
+- Added skargo per-unit link-plan persistence/replay when the compiler emits no
+  new plan (malformed nonempty plans still fail). Patched skargo rebuilt in
+  4.86 s, build-skargo-link-cache.log. Archive-source dependency fix is still
+  needed in compile_sklib. Plan: read FileCache.packageDir at
+  InputPackageName(conf.lib_name) so a changed source mtime/list re-emits the
+  archive. Keep that compiler change in the stage-4 commit, even if testing it
+  in the same bootstrap binary as stage 3 to avoid an extra long build.
+- Stage 3 scratch work was normalized too: SharedFile holds classes/config once
+  per round; WorkFile holds the function and sparse dependency map/positions.
+  Dense function arrays are reconstructed only inside rows that rerun, avoiding
+  quadratic sparse ID arrays during planning. Virtual-call dependencies come
+  from findDirectDependencies; GetConst, runtime entries, unfinished coroutine
+  next methods and optimizer dependencies are included explicitly. No use of
+  dynamic intern remains in the optimizer drafts.
+- Stage 2 normalized plan passed the focused cache/native/link regression,
+  all 844 existing regression selections, all 28 native update comparisons,
+  and cached-vs-fresh LLVM equality for all ten workloads. Earlier 26 native
+  fixtures and two persistent batch checks also passed the explicit-record
+  design. No rejected intern calls or scheduling exclusions remain.
+- Final stage-2 timing medians (three alternating trials, 51 files): initial
+  5.4712 -> 5.4944 s (+0.4%), body 0.2376 -> 0.2282 s (-4.0%), cached
+  0.0327 -> 0.0328 s (+0.4%). Ordinary layout edits cost +4-7%; exported/zero
+  representation edits cost +14-17%. Shared class/ID invalidation is deliberately
+  conservative. Results: normalized-timing-summary.log and timing-summary.json.
+  This is functional incrementalization with a modest body-edit benefit,
+  not a general end-to-end speedup for every class change.

@@ -219,6 +219,7 @@ class SpecializerFile(value: O.SpecializerState) extends SKStore.File
 
 class SpecializerDirFile(
   value: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  complete: Bool,
 ) extends SKStore.File
 
 class SpecializerProgress(
@@ -932,12 +933,41 @@ fun getOrInitializeBackend(
       } else {
         specializerAllDir
       };
-      writer.set(SKStore.IID(0), SpecializerDirFile(completedDir));
+      writer.set(SKStore.IID(0), SpecializerDirFile(completedDir, complete));
     },
     // The pipeline collects each round. An enclosing mapper region would
     // copy the complete pipeline state again after its final round.
     None(),
     false,
+  );
+
+  functionIRPlan = specializerDir.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-plan/"),
+    (context, writer, _, values) ~> {
+      completed = values.first;
+      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+      if (completed.complete && !config.stopAfterSpecialization) {
+        O.planFunctionIR(
+          context,
+          writer,
+          completed.value,
+          config.specializationConfig(),
+          converter,
+        )
+      }
+    },
+  );
+  functionIR = functionIRPlan.map(
+    x ~> x,
+    O.SpecializedFunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/function-ir/"),
+    (context, writer, key, values) ~>
+      O.generateFunctionIR(context, writer, key, values, functionIRPlan)
+    ,
   );
 
   backendEmitDir = backendDir.map(
@@ -992,7 +1022,13 @@ fun getOrInitializeBackend(
       if (config.stopAfterSpecialization) return void;
 
       roots = prevPhase.rootsIR;
-      env = O.createIR(context, config, roots, specializer);
+      env = O.createIR(
+        context,
+        config,
+        roots,
+        specializer,
+        if (config.incrementalSpecialization) Some(functionIR) else None(),
+      );
       !env = createOptimizedFunctions(context, env, config);
       defs = runCompilerPhase("native/create_asm_graph", () -> {
         AsmOutput.createAsmDefGraph(env, config)

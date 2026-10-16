@@ -5146,6 +5146,7 @@ fun createIR(
   config: Config.Config,
   roots: RootsIR,
   specializer: mutable Specializer,
+  incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
 ): GlobalEnv {
   // Incremental builds already attached these sets in a tracked map/merge
   // phase. Sequential builds keep the original local pass.
@@ -5188,6 +5189,7 @@ fun createIR(
     config,
     roots.consts,
     roots.disasm,
+    incrementalFunctions,
   );
 
   reportMemoryStatistics("native/createIR end");

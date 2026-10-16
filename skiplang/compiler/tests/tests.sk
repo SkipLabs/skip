@@ -630,6 +630,86 @@ private fun incrementalFieldLayouts(): void {
   T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
 }
 
+// Function bodies are cached before method tables, coroutine dependencies and
+// emission flags are attached. A generic body edit must rebuild its two
+// instantiations without regenerating unrelated bodies.
+private fun incrementalFunctionIR(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  generic = dir + "/generic.sk";
+  independent = dir + "/independent.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  pair = "fun irPair<T>(x: T): (T, Int) { (x, 1) }\n";
+  other = "fun irIndependent(): Int { 9 }\n";
+  main = "untracked fun main(): void { (i, a) = irPair(7); (s, b) = irPair(\"abc\"); print_raw((i + a + s.length() + b + irIndependent()).toString()) }\n";
+  args = compile_cmd(Array[generic, independent, source], output).concat(Array["--verbose"]);
+  try {
+    FileSystem.writeTextFile(generic, pair);
+    FileSystem.writeTextFile(independent, other);
+    FileSystem.writeTextFile(source, main);
+    initial = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectEq(initial.stderr.split("\n").filter(line ->
+      line.startsWith(">> clang++ ")
+    ).collect(Array).size(), 1, initial.stderr);
+    first = System.subprocess(Array[output]).fromSuccess();
+    T.expectTrue(first.success(), first.stderr);
+    T.expectEq(first.stdout, "21");
+    for ((pairText, otherText, mainText, expected, expectedWrites, timestamp) in Array[
+      (pair.replace("(x, 1)", "(x, 2)"), other, main, "23", 2, "200001010000.01"),
+      (pair.replace("(x, 1)", "(x, 2)"), other.replace("9", "8"), main, "22", 1, "200001010000.02"),
+      (pair.replace("(x, 1)", "(x, 2)"), other.replace("9", "8"), main, "22", 0, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(generic, pairText);
+      FileSystem.writeTextFile(independent, otherText);
+      FileSystem.writeTextFile(source, mainText);
+      touched = System.subprocess(Array["touch", "-t", timestamp, generic, independent, source]).fromSuccess();
+      T.expectTrue(touched.success(), touched.stderr);
+      updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      run = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(run.success(), run.stderr);
+      T.expectEq(run.stdout, expected);
+      writes = updated.stdout.split("\n").filter(line ->
+        line.startsWith("WRITTEN:  /specializer/function-ir/")
+      ).collect(Array);
+      T.expectEq(writes.size(), expectedWrites, writes.join("\n"));
+      links = updated.stderr.split("\n").filter(line ->
+        line.startsWith(">> clang++ ")
+      ).collect(Array).size();
+      // Updating the cache must not dirty the backend while it is running.
+      T.expectTrue(links <= 1, updated.stderr);
+      if (expectedWrites != 0) T.expectEq(links, 1, updated.stderr);
+    };
+    // Reachable-set changes can renumber functions; both adding and removing
+    // a callee must regenerate callers with valid IDs.
+    extraMain = main.replace("irIndependent()", "irIndependent() + irExtra()");
+    for ((pairText, otherText, mainText, expected, timestamp) in Array[
+      (pair + "fun irExtra(): Int { 4 }\n", other, extraMain, "25", "200001010000.04"),
+      (pair, other, main, "21", "200001010000.05"),
+    ]) {
+      FileSystem.writeTextFile(generic, pairText);
+      FileSystem.writeTextFile(independent, otherText);
+      FileSystem.writeTextFile(source, mainText);
+      touched = System.subprocess(Array["touch", "-t", timestamp, generic, independent, source]).fromSuccess();
+      T.expectTrue(touched.success(), touched.stderr);
+      updated = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      run = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(run.success(), run.stderr);
+      T.expectEq(run.stdout, expected);
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
@@ -947,6 +1027,7 @@ untracked fun main(): void {
       T.Test{name => "latched_relations", func => () ~> incrementalLatchedRelations()},
       T.Test{name => "scalarized_fields", func => () ~> incrementalScalarizedFields()},
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
+      T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),
