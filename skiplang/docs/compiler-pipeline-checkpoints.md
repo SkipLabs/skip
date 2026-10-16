@@ -710,3 +710,189 @@ configuration selects sequential specialization, including release builds.
   all function rows currently depend on the shared class snapshot. Keep this
   limitation explicit; no claim of across-the-board speedup. Detailed default
   results /tmp/skip-optimizer-inline-benchmark/{timing-results,summary}.json.
+- Stage 3 committed as a657e90b5. Immutable validated compiler saved at
+  /tmp/skip-optimizer-stage3/skc, wrapper skc-with-std adds existing stdlib -L.
+  The stage-4 compiler changes (archive source dependency and library missing
+  output replay) were excluded from that commit and restored afterward.
+- Added stage-4 native packaging replay: backendPhase1 reads tickDir only when
+  the archive consumes static_libraries or preambles, since those bytes are
+  external filesystem inputs not represented by the source package row.
+- Started a real default dev skargo compiler build in
+  /tmp/skip-compiler-development-build using patched skargo and stage-3 driver.
+  Default dev merges bins and all @exptest test sources, so this target is
+  substantially larger than the release bootstrap. Initial build ran >12 min
+  in specialization, reached ~29 GB resident/persistent storage, and was stopped
+  after live profiling found a stage-1 scaling regression (not optimizer work).
+  Evidence compiler-dev-initial.{log,perf}, compiler-dev-perf.log.
+- Regression: every specialization mapper, including every forwarded state key,
+  collected/scanned the full pending-work array to derive classPhase. On large
+  rounds this is quadratic and creates broad unnecessary dependencies. Fixed
+  in source: a point-range map over IID(0) publishes one BoolFile per round at
+  /specializer/phase-kind/N/. Only actual work keys read it; forwarding state
+  reads neither the queue nor config. Worker definitions still capture only
+  stable handles, never the computed Bool. No extra scheduling exclusions.
+- Building a fixed release driver using stage-3 compiler's sequential --release
+  mode and patched skargo, avoiding the old bootstrap's expensive shared cache:
+  session 54427, build-round-kind-projection.log. Typing passed after using
+  NonEmptyIterator.values().any. LLVM compilation is in progress. Source frozen
+  until it finishes. Current /tmp/skip-release-sequential-build/.../skc remains
+  stage-3 binary until link completes; stage-3 immutable copy is preserved.
+- Removed interrupted dev target's state.db files (only rebuildable scratch
+  caches), retaining artifacts/fingerprints/logs. New host compiler has changed
+  runtime constants, so old compiler databases must not be reused. After the
+  fixed driver passes focused checks, save it immutably and restart the dev
+  target with it. Other scripts create fresh DBs for every compiler variant.
+- New skargo regression source: skiplang/skargo/tests/incremental_build.sk.
+  It tests two distinct unit DBs, source-body archive refresh, and a C dependency
+  through a consumer package. C-comment-only rebuild must reuse the cached
+  --no-link plan without rewriting LLVM; changed C bytes must update the .sklib
+  even though Skip source is unchanged. Standalone harness compiled at
+  /tmp/skip-function-ir-experiment/skargo-incremental-test (not run yet). Run
+  with SKARGO_UNDER_TEST=/tmp/skip-stage4-skargo-build/host/release/skargo,
+  SKC pointing at the fixed driver, PATH including wasm tools, capacity64G.
+  The test has an override for standalone execution; ordinary dev skargo tests
+  use the merged executable. It leaves ignored fixture output under
+  skiplang/skargo/target/it-incremental-build. Manifest dependency alias was
+  corrected to incremental-native (skargo does not support package renames).
+
+- Sequential release self-bootstrap completed in 191.481 s but its compiler
+  failed parsing a leading stdlib doc comment. Saved that candidate separately
+  at /tmp/skip-round-kind-driver/skc; do not use it as a validated driver.
+  Small lexer probes built sequentially and incrementally both pass, so the
+  full-world self-host failure still needs isolation (possibly layout/inlining).
+- Rebuilding the phase-kind fix using the previously validated stage-3 driver's
+  incremental route, session 73173, build-round-kind-incremental-driver.log.
+  Current compiler sources remain frozen during this rebuild.
+- Found another skargo correctness bug: a valid fingerprint ignored missing
+  primary artifacts, and failed cp was ignored. Added primary-output existence
+  checking and checked argv-based copying; regression deletes a merged binary
+  before rebuilding. These changes still need compilation and execution.
+- Narrowed bad sequential bootstrap failure: ordinary --check succeeds, and
+  --check --release --init succeeds, while default --check --init fails on the
+  first stdlib doc comment. This isolates the failure to the phased persistent
+  pipeline path, not general parsing. Incremental bootstrap still running.
+- Patched missing-output detection and checked copying; rebuilding skargo with
+  stage-3 driver (session 8099). Old bootstrap skargo uses a shared incompatible
+  database; use the patched binary itself for these per-unit rebuilds.
+- Stopped stage-3 incremental bootstrap after >12 min, with cache >32 GB;
+  old queue-scanning driver cannot validate its own performance fix efficiently.
+  Removed that interrupted scratch state.db only. New route: original validated
+  525490b59 compiler compiles current source archive without persistence,
+  -O0 --no-inline, output /tmp/skip-round-kind-probe/skc-baseline-noinline,
+  session 11379. This also isolates O2/inlining from the phased-runtime failure.
+- Checked-copy fix exposed Text file busy in skargo self-build. Updated artifact
+  publication to checked cp to adjacent temporary path then checked mv, allowing
+  atomic replacement of a running executable. Rebuilding via deps executable,
+  session 72935, skargo-stage4-atomic-rebuild.log.
+- Prior newly attempted lexer-inline probe accidentally exported global compiler
+  main from the imported archive, so that probe is invalid. Replacement focused
+  phased-lexer probe exports its qualified module main, session 33443, to test
+  const callback arrays plus lexing across SKStore GC directly.
+- Baseline -O0 --no-inline bootstrap succeeded, and resulting compiler passed
+  fresh persistent --check and fresh persistent native compile (program prints
+  ok). Saved validated fixed driver at /tmp/skip-round-kind-fixed/skc with
+  skc-with-std wrapper. Also copied it to mutable release target short skc path
+  for existing validation scripts (bad optimized binary is still separately saved).
+- Fixed driver passed six-step optimizer work-row/no-op/mode-transition checks:
+  two work rows per leaf edit, zero for no-op, sequential release and reentry
+  correct. Log round-kind-optimizer-check.log. Qualified phased-lexer probe
+  built with O2 sequential specialization passes across GC, so whole-compiler
+  optimized-bootstrap failure still does not reproduce in the smaller program.
+- Restarted default dev compiler build with validated fixed driver, session
+  87322, compiler-dev-fixed-initial.log. Root archive includes all test sources.
+- First skargo integration execution used stage-3 driver and failed comment-only
+  LLVM mtime assertion; that driver does not contain stage-4 archive fixes, so
+  rerunning correctly with fixed driver (session 2111,
+  skargo-incremental-fixed-test-run.log). Keep both evidence logs.
+- Fixed-driver skargo regression still failed native-comment LLVM mtime check.
+  Root cause found: generate_dispatcher rewrote identical text every build,
+  changing source mtime embedded in .sklib metadata. Changed to write only when
+  contents differ; rebuilt successfully (dispatch rebuild log), rerunning full
+  integration with optimized fixed driver (session 34541,
+  skargo-incremental-dispatch-test-run.log).
+- All 28 native update comparisons pass with phase-kind fix (round-kind-updates).
+- Original baseline compiler built current source with O2/default inlining;
+  resulting driver passes fresh persistent --check. Saved immutable optimized
+  fixed driver /tmp/skip-round-kind-optimized/skc and skc-with-std wrapper.
+- Stopped diagnostic unoptimized-driver dev build after ~8 min in specialization
+  (perf confirms actual specialization, no longer old queue scan). Its rootlib
+  finished ~85 s. This is not a completed cold timing. Removed only its unit DBs
+  to switch host ABI, restarted dev build with optimized fixed driver, session
+  86121, compiler-dev-optimized-fixed-initial.log. Source still unchanged.
+- Important confounder for bad bootstrap: stage-3 build explicitly used --release
+  while successful baseline O2 build did not. Release also omits GC class names
+  (vtable.sk), beyond selecting sequential algorithms. Do NOT yet blame stable
+  function IDs or change them speculatively. Original baseline now compiling the
+  same archived compiler source with -O2 --release, session 58653, output
+  /tmp/skip-round-kind-probe/skc-baseline-release. If this also fails persistence,
+  failure predates this task and is likely release runtime metadata sharing.
+- Stage-4 skargo integration now passes completely with write-if-changed
+  dispatcher and optimized fixed driver: source edits, two independent unit
+  DBs, deleted artifact recovery, native-comment cached-link replay with
+  unchanged LLVM mtime, and changed native bytes through a consumer archive.
+  Log skargo-incremental-dispatch-test-run.log. Standalone test source compiled
+  successfully. Formatted new skargo code/test with installed skfmt.
+- Prepared /tmp/skip-function-ir-experiment/benchmark-compiler-edits.py. It runs
+  no-op, comment, message-body, debug-print, unused-helper and corresponding
+  revert builds; validates produced compiler after every edit; restores original
+  source and mtime in finally. Run only after current dev initial build completes.
+- Release code generation bug reproduced independently with original baseline:
+  /tmp/skip-round-kind-probe/skc-baseline-release crashes on fresh persistent
+  --check; identical no-release O2 baseline driver succeeds. Focused reproducer
+  release-type-identity.sk proves native_eq(A(1), B(1)) returns 0 for different
+  nominal classes with identical layouts. Runtime native_eq compares GC-type
+  pointers, while release gcTypes sharing erases class identity. Runtime intern
+  also special-cases ExternalPointer by GC-type pointer, so aliasing can skip
+  child copying. Fix in vtable.sk: fill reserved GC metadata word with a unique
+  class ordinal (sorted class IDs), retaining compact release metadata without
+  names while preventing cross-class GC-type merging. Added nativeTypeIdentity
+  regression to tests.sk; both normal and release compilation must print pass.
+- Full optimized-driver dev build reached optimizer and grew to ~50 GB RSS,
+  ~15+ GB persistent before stop (~8 min). Perf shows optimizer round/input
+  work. WorkFile discovery eagerly followed every callee transitively, including
+  unfinished and non-inlineable bodies. New safe cutoff: retain direct callees'
+  records/summaries, traverse their bodies only if inlining is enabled and the
+  callee is fully optimized and meets the inliner's legality/complexity/returns
+  checks. IPA uses summaries; intrinsic expansion uses runtime entries; coroutine
+  next-method records remain explicitly included. Needs broad validation.
+- Stopped session 86121 and removed interrupted scratch compiler unit DBs plus
+  release compiler unit DBs for host ABI switch. Building corrected driver with
+  original baseline compiler, normal O2 (no --release metadata), patched skargo:
+  session 39125, build-identity-pruned-driver.log, release target. Current source
+  frozen except new tests (not part of release target). Do not run benchmark
+  edits until new driver passes tests and dev initial build finishes.
+- Corrected driver bootstrap reached native clang compilation after ~3m40s;
+  session 39125 still running. This route uses original baseline persistent
+  compiler with ordinary O2; generated host metadata includes names, avoiding
+  old release bug while it compiles the new identity-preserving implementation.
+- Standalone new regression harness /tmp/skip-function-ir-experiment/identity-unit
+  compiled successfully (identity-unit-build.log). Run against new driver via
+  PATH wrapper; expected stdout Native type identity tests passed. Old release
+  small reproducer outputs 0 (confirmed false equality).
+- Source audit for optimizer cutoff: Inline waits for OptDone and only traverses
+  legal callees within complexity limit (or always_inline); GetConst also waits
+  for OptDone. IPA, peephole, intrinsic and verifier function reads use direct
+  callee metadata/summaries, not transitive unfinished bodies. Coroutine next
+  skeleton remains explicit. Broad tests and real compiler build still required.
+- Installed skfmt reformatted unrelated compile.sk sections. Saved original
+  stage-4 preformat compile source from dev archive to
+  /tmp/skip-function-ir-experiment/compile-before-format.sk (47165 bytes,
+  includes phase-kind fix plus archive fixes). After bootstrap finishes,
+  restore that file to avoid review noise; it is semantically identical.
+- Corrected driver bootstrap finished successfully in 335.908 s. Saved
+  immutable /tmp/skip-identity-pruned-driver/skc and skc-with-std wrapper; PATH
+  wrapper in its bin/skc. Current mutable release target short skc also updated.
+- Fresh persistent compiler --check passes. New native type identity regression
+  passes both normal and --release modes (identity-unit-run.log). Restored
+  compile.sk from preformat archive snapshot; all stage-4 semantics retained,
+  diff back to 44 lines. Updated vtable comment about release names.
+- Running 26 default-inline native fixtures (session 98747,
+  identity-pruned-native-inline.log), six-step optimizer cache/mode regression
+  (53852, identity-pruned-optimizer.log), full dev compiler build (18885,
+  compiler-dev-pruned-initial.log), and sequential release self-bootstrap
+  (24548, identity-release-bootstrap.log, output
+  /tmp/skip-identity-release-bootstrap/skc). Validate this final release binary's
+  fresh persistent --check once built, to confirm end-to-end crash correction.
+- Benchmark script now accepts BENCH_SKC/BENCH_SKARGO/BENCH_TARGET overrides;
+  defaults use identity-pruned driver and original dev target. DO NOT run using
+  old round-kind optimized driver against these unit DBs (host ABI differs).

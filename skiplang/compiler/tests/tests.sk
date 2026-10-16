@@ -713,6 +713,39 @@ private fun incrementalFunctionIR(): void {
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
+// native_eq must distinguish nominal classes even when release omits names.
+private fun nativeTypeIdentity(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  try {
+    FileSystem.writeTextFile(
+      source,
+      "base class Kind { children = | A(n: Int) | B(n: Int) }\n" +
+        "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 }\n" +
+        "untracked fun main(): void { print_raw(if (differs(A(1), B(1))) \"pass\" else \"fail\") }\n",
+    );
+    for (release in Array[false, true]) {
+      compiled = System.subprocess(
+        compile_cmd(Array[source], output).concat(
+          if (release) Array["--release"] else Array[],
+        ),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      run = System.subprocess(Array[output]).fromSuccess();
+      T.expectTrue(run.success(), run.stderr);
+      T.expectEq(run.stdout, "pass");
+    }
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Verify selective optimizer work inputs and native results.
 // A body edit should visit its caller and reuse the independent function.
 private fun incrementalOptimization(): void {
@@ -1123,6 +1156,7 @@ untracked fun main(): void {
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
       T.Test{name => "optimization", func => () ~> incrementalOptimization()},
+      T.Test{name => "native_type_identity", func => () ~> nativeTypeIdentity()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

@@ -237,7 +237,7 @@ private fun createVTableBuilders(
   // Intern table for SkipGcType structs.
   gcTypes = mutable UnorderedSet[];
 
-  for (sc in classesNeedingVTables) {
+  for (typeIdentity => sc in classesNeedingVTables.toArray().sorted()) {
     _ = builders.getOrAdd(sc, () -> {
       builder = mutable VTableBuilder(sc, env);
 
@@ -252,7 +252,7 @@ private fun createVTableBuilders(
 
       // Seed the VTable with its SkipGcType, which all vtables must have.
       // Note that it goes in the second possible pointer slot, not the first.
-      tentative = createGCType(sclass, env, config);
+      tentative = createGCType(sclass, env, config, typeIdentity + 1);
       gct = gcTypes.maybeGet(tentative) match {
       | Some(old) -> old
       | None() ->
@@ -472,6 +472,7 @@ private fun createGCType(
   sc: SClass,
   env: GlobalEnv,
   config: Config.Config,
+  typeIdentity: Int,
 ): ConstantStruct {
   (userByteSize, hasGCPointers, uninternedMetaSize, kind) = sc.arraySlot match {
   | None() ->
@@ -526,10 +527,8 @@ private fun createGCType(
     !refsHint = refsHint.or(1) // kSkipGcRefsHintMixedRefs
   };
 
-  // Inserting names into GC info prevents SkipGcTypes from being shared
-  // between different classes, which prevents their vtables from being
-  // shared, which can bloat the binary. So we only include detailed
-  // information in non-release mode.
+  // Keep diagnostic names out of compact release metadata. Nominal type
+  // identity is preserved independently in the reserved metadata word.
   provideName = !config.release;
 
   fields = mutable Vector[];
@@ -569,8 +568,12 @@ private fun createGCType(
     ConstantInt{id => InstrID::none, typ => tInt, value => userByteSize},
   );
 
-  // m_unused_padding
-  pushField(ConstantInt{id => InstrID::none, typ => tInt, value => 0});
+  // Runtime native equality and external-pointer handling identify classes by
+  // their GC type pointer. Preserve nominal identity even without debug names.
+  // Use the reserved ABI word; distinct classes must not share this struct.
+  pushField(
+    ConstantInt{id => InstrID::none, typ => tInt, value => typeIdentity},
+  );
 
   if (fieldBitOffset % 64 != 0) {
     sc.die("bad vtable entry alignment")
