@@ -13,33 +13,34 @@ fun createOptimizedFunctions(
   config: Config.Config,
 ): GlobalEnv {
   runCompilerPhase("native/compile", () -> {
-    !env = Optimize.compileAll(context, env, config);
+    Optimize.compileAll(context, env, config)
+  })
+}
 
-    // Find all the functions that are still reachable from the root set,
-    // post-inlining, dead code elimination, etc.
-    !env.sfuns = findAllReachableFuns(
-      keep -> {
-        // Seed the "reachable" recursion with functions we definitely
-        // need to emit.
-        keep(env.initializeAllConstsID);
-        for (f in env.sfuns) {
-          if (f.isDisasm || f.isRuntimeExport) {
-            keep(f.id)
-          }
-        };
-        env.runtimeFunctions.values().each(keep)
-      },
-      env,
-    );
+fun finishOptimizedFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
+  // Find all the functions that are still reachable from the root set,
+  // post-inlining, dead code elimination, etc.
+  !env.sfuns = findAllReachableFuns(
+    keep -> {
+      // Seed the "reachable" recursion with functions we definitely
+      // need to emit.
+      keep(env.initializeAllConstsID);
+      for (f in env.sfuns) {
+        if (f.isDisasm || f.isRuntimeExport) {
+          keep(f.id)
+        }
+      };
+      env.runtimeFunctions.values().each(keep)
+    },
+    env,
+  );
 
-    // Now that we have computed the fields for all of the various
-    // coroutine classes, we can finally analyze pointer escape info.
-    !env = Escape.computeWhetherPointersCanEscape(env);
+  // Now that we have computed the fields for all of the various
+  // coroutine classes, we can finally analyze pointer escape info.
+  !env = Escape.computeWhetherPointersCanEscape(env);
 
-    // optimize.sk steps (5) Lower + (6) Lay out vtables.
-    !env = Lower.lowerFunctions(env, config)
-  });
-
+  // optimize.sk steps (5) Lower + (6) Lay out vtables.
+  !env = Lower.lowerFunctions(env, config);
   env
 }
 
@@ -970,12 +971,12 @@ fun getOrInitializeBackend(
     ,
   );
 
-  backendEmitDir = backendDir.map(
+  backendIRDir = backendDir.map(
     SKStore.IID::keyType,
-    ConfigFile::type,
+    Optimize.InputFile::type,
     context,
     SKStore.DirName::create("/backendPhase2/"),
-    (context, _writer, _key, _values) ~> {
+    (context, writer, key, _values) ~> {
       if (backendPhase1.getArray(context, SKStore.IID(0)).isEmpty()) {
         return void
       };
@@ -1029,7 +1030,47 @@ fun getOrInitializeBackend(
         specializer,
         if (config.incrementalSpecialization) Some(functionIR) else None(),
       );
-      !env = createOptimizedFunctions(context, env, config);
+      writer.set(key, Optimize.InputFile(env, config))
+    },
+  );
+  backendOptimizeDir = backendIRDir.map(
+    SKStore.IID::keyType,
+    Optimize.InputFile::type,
+    context,
+    SKStore.DirName::create("/backendOptimize/"),
+    (context, writer, key, values) ~> {
+      input = values.first;
+      config = input.config;
+      env = if (config.incrementalSpecialization) {
+        Optimize.compileAllIncrementally(context, backendIRDir)
+      } else {
+        createOptimizedFunctions(context, input.env, config)
+      };
+      writer.set(key, Optimize.InputFile(env, Optimize.workConfig(config)))
+    },
+  );
+  // Keep final reachability, escape analysis and lowering downstream of the
+  // fixed-point coordinator. Equal intermediate results do not repeat them.
+  backendLowerDir = backendOptimizeDir.map(
+    SKStore.IID::keyType,
+    Optimize.InputFile::type,
+    context,
+    SKStore.DirName::create("/backendLower/"),
+    (_context, writer, key, values) ~> {
+      input = values.first;
+      writer.set(key, Optimize.InputFile(
+        finishOptimizedFunctions(input.env, input.config), input.config,
+      ))
+    },
+  );
+  backendEmitDir = backendLowerDir.map(
+    SKStore.IID::keyType,
+    ConfigFile::type,
+    context,
+    SKStore.DirName::create("/backendEmit/"),
+    (context, _writer, _key, values) ~> {
+      env = values.first.env;
+      config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       defs = runCompilerPhase("native/create_asm_graph", () -> {
         AsmOutput.createAsmDefGraph(env, config)
       });
@@ -1134,8 +1175,8 @@ fun compile(
     // when the output disappears, preserving cached specialization work.
     key: SKStore.Key = SKStore.IID(0);
     reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
-      parentName => backendDir.dirName,
-      childName => SKStore.DirName::create("/backendPhase2/"),
+      parentName => SKStore.DirName::create("/backendLower/"),
+      childName => SKStore.DirName::create("/backendEmit/"),
       key,
     };
     context.invalidateReader(reader);

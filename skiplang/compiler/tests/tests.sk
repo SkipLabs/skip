@@ -713,6 +713,100 @@ private fun incrementalFunctionIR(): void {
 // Moving declarations must update diagnostics and debug metadata without
 // replaying serialized class discovery. Exercise both file-wide shifts and
 // changes confined to an earlier method in the same class.
+// Verify selective optimizer work inputs and native results.
+// A body edit should visit its caller and reuse the independent function.
+private fun incrementalOptimization(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  left = dir + "/left.sk";
+  right = dir + "/right.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  args = compile_cmd(Array[left, right, source], output).concat(
+    Array["--verbose"],
+  );
+  try {
+    FileSystem.writeTextFile(left, "fun optLeft(x: Int): Int { x + 1 }\n");
+    FileSystem.writeTextFile(right, "fun optRight(x: Int): Int { x + 9 }\n");
+    FileSystem.writeTextFile(
+      source,
+      "untracked fun main(): void { print_raw((optLeft(7) + optRight(3)).toString()) }\n",
+    );
+    initial = System.subprocess(
+      args.concat(Array["--init", data]),
+    ).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "20");
+    for ((leftValue, rightValue, expected, changed, timestamp) in Array[
+      (2, 9, "21", true, "200001010000.01"),
+      (2, 8, "20", true, "200001010000.02"),
+      (2, 8, "20", false, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(
+        left,
+        `fun optLeft(x: Int): Int { x + ${leftValue} }\n`,
+      );
+      FileSystem.writeTextFile(
+        right,
+        `fun optRight(x: Int): Int { x + ${rightValue} }\n`,
+      );
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, left, right])
+          .fromSuccess()
+          .success(),
+      );
+      updated = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      rows = updated.stdout
+        .split("\n")
+        .filter(line ->
+          line.startsWith("WRITTEN:  /optimizer/before-const/0/inputs/") &&
+            line.contains("WorkKey")
+        )
+        .collect(Array);
+      if (changed) {
+        T.expectTrue(rows.size() == 2, rows.join("\n"))
+      } else {
+        T.expectEq(rows.size(), 0, rows.join("\n"))
+      };
+      links = updated.stderr
+        .split("\n")
+        .filter(line -> line.startsWith(">> clang++ "))
+        .collect(Array)
+        .size();
+      T.expectTrue(links <= 1, updated.stderr);
+    };
+    for (release in Array[true, false]) {
+      mode = if (release) Array["--release"] else Array[];
+      switched = System.subprocess(
+        args.concat(Array["--data", data]).concat(mode).concat(
+          if (release) Array["--debug-skstore"] else Array[],
+        ),
+      ).fromSuccess();
+      T.expectTrue(switched.success(), switched.stderr);
+      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "20");
+      if (release) {
+        T.expectTrue(!switched.stdout.contains("WRITTEN:  /optimizer/"))
+      };
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
 private fun incrementalSourcePositions(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
   T.expectTrue(temp.success(), temp.stderr);
@@ -1028,6 +1122,7 @@ untracked fun main(): void {
       T.Test{name => "scalarized_fields", func => () ~> incrementalScalarizedFields()},
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
+      T.Test{name => "optimization", func => () ~> incrementalOptimization()},
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

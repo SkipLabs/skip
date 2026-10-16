@@ -490,13 +490,12 @@ private fun findUnfinishedDependencyCycleMember(
 
 // Optimizes all functions with the given set of optimizations. Returns
 // the new Env.
-private fun optimizeAll(
-  context: mutable SKStore.Context,
-  env: GlobalEnv,
+private fun optimizationPasses(
   config: Config.Config,
-  opts: Int,
-): GlobalEnv {
-  passes = Array[
+): Array<
+  (String, Int, (Function, GlobalEnv, Config.Config) ~> (Function, PassResult)),
+> {
+  Array[
     ("ready", Config::kOptReady, checkReady),
     ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
     ("dce", config.optConfig.dce, EliminateDeadCode::run),
@@ -505,7 +504,16 @@ private fun optimizeAll(
     ("regpromote", config.optConfig.regpromote, RegisterPromote::run),
     ("ipa", config.optConfig.ipa, Interprocedural::run),
     ("inline", config.optConfig.inline, Inline::run),
-  ];
+  ]
+}
+
+private fun optimizeAll(
+  context: mutable SKStore.Context,
+  env: GlobalEnv,
+  config: Config.Config,
+  opts: Int,
+): GlobalEnv {
+  passes = optimizationPasses(config);
 
   // Extract the functions to optimize.
   allFuns = env.sfuns.clone();
@@ -753,6 +761,472 @@ fun compileAll(
   !env = optimizeAll(context, env, config, config.optConfig.all());
 
   env
+}
+
+// The optimizer may devirtualize or introduce runtime calls, so include every
+// runtime entry conservatively, plus the transitive direct-call, possible
+// virtual-call and constant dependencies of this function. Unrelated functions
+// are omitted. Debug dumps keep the full environment for diagnostics.
+private fun makeWorkFile(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  shared: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+): WorkFile {
+  if (config.debug || f.isDisasm) {
+    full = RoundFile::type(input.getArray(context, SKStore.IID(0))[0]).env;
+    return WorkFile(
+      f,
+      full.sfuns
+        .values()
+        .map(function -> (function.id, function))
+        .collect(UnorderedMap),
+      full.sourcePositions,
+    )
+  };
+  functions = mutable UnorderedMap<SFunctionID, Function>[];
+  stack = mutable Vector[];
+  keep = fid -> {
+    if (fid != SFunctionID::none && !functions.containsKey(fid)) {
+      input.getArray(context, WorkKey(fid)).maybeGet(0).each(file -> {
+        dependency = FunctionFile::type(file).value;
+        functions.set(fid, dependency);
+        stack.push(dependency)
+      })
+    }
+  };
+  keep(f.id);
+  env.runtimeFunctions.values().each(keep);
+  while (!stack.isEmpty()) {
+    current = stack.pop();
+    findDirectDependencies(current, keep, env);
+    getDeps(current).each(keep);
+    current.coroutineInfo match {
+    | Some(UnfinishedCoroutine _) ->
+      for (typ in current.funType.returnType) {
+        _ = typ.forEachTclass(tc -> {
+          keep(
+            env
+              .getSClass(tc.sclassID)
+              .getMethod("next", MethodSuperpositionID::empty, current.pos),
+          );
+          true
+        })
+      }
+    | _ -> void
+    };
+    for (block in current.blocks) {
+      for (instr in block.instrs) {
+        instr match {
+        | GetConst{name} -> keep(env.consts[name])
+        | _ -> void
+        }
+      }
+    }
+  };
+  // Positions remain available for every retained definition and instruction.
+  files = mutable UnorderedSet[];
+  addPos = (pos: Pos) -> addPositionFiles(pos, files);
+  for (function in functions.values()) {
+    addPos(function.pos);
+    function.params.each(param -> addPos(param.posOrDefault(function.pos)));
+    for (block in function.blocks) {
+      addPos(block.pos);
+      block.params.each(param -> addPos(param.posOrDefault(function.pos)));
+      block.instrs.each(instr -> addPos(instr.pos))
+    }
+  };
+  neededFiles = files.chill();
+  positions = shared.getArrayFilter(context, SKStore.IID(2), file ~> {
+    table = PositionsFile::type(file).value;
+    PositionsFile(
+      SourcePositions.Table{
+        files => table.files.filter((file, _) -> neededFiles.contains(file)),
+      },
+    )
+  })[0].value;
+  WorkFile(f, functions.chill(), positions)
+}
+
+private fun addPositionFiles(
+  pos: Pos,
+  files: mutable UnorderedSet<FileCache.InputSource>,
+): void {
+  _ = files.maybeInsert(pos.file);
+  pos match {
+  | InlinedPos{inlinedAt} -> addPositionFiles(inlinedAt, files)
+  | _ -> void
+  }
+}
+
+fun workConfig(config: Config.Config): Config.Config {
+  // None of the optimization passes read package archives, source inputs or
+  // output filenames. Target layout, pass switches and diagnostics are kept.
+  config with {
+    input_files => Array[],
+    direct_dependencies => Array[],
+    dependencies => Map[],
+    output => "",
+    lib_name => None(),
+  }
+}
+
+// Inputs and intermediate rounds are collection data. Mapper definitions only
+// capture stable handles and structural directory names.
+class InputFile(env: GlobalEnv, config: Config.Config) extends SKStore.File
+private class RoundFile(
+  env: GlobalEnv,
+  config: Config.Config,
+  unoptimized: Array<SFunctionID>,
+  round: Int,
+) extends SKStore.File
+private class PositionsFile(value: SourcePositions.Table) extends SKStore.File
+private class WorkKey(id: SFunctionID) extends SKStore.Key
+private class SharedFile(
+  env: GlobalEnv,
+  config: Config.Config,
+) extends SKStore.File
+private class WorkFile(
+  f: Function,
+  functions: UnorderedMap<SFunctionID, Function>,
+  positions: SourcePositions.Table,
+) extends SKStore.File
+private class ResultFile(value: OptimizeOneResult) extends SKStore.File
+
+private fun initializeRound(input: InputFile): RoundFile {
+  env = input.env;
+  config = workConfig(input.config);
+  allFuns = env.sfuns.clone();
+  unoptimized = mutable Vector[];
+  for (f in allFuns) {
+    if (f.hasImplementation()) {
+      if (!f.isFullyOptimized()) unoptimized.push(f.id)
+    } else {
+      pos = f.pos;
+      pos.invariant(f.isNative, "Compiling non-native function with no body.");
+      f.status match {
+      | OptDone _ -> void
+      | OptPartial _ ->
+        allFuns.insert(
+          f with {
+            status => OptDone{
+              inlineComplexity => Int::max,
+              returns => !annotationsContain(f.annotations, "@no_return", pos),
+              canThrow => !annotationsContain(f.annotations, "@no_throw", pos),
+              allocAmount => if (
+                annotationsContain(f.annotations, "@may_alloc", pos)
+              ) {
+                AllocUnbounded()
+              } else {
+                AllocNothing()
+              },
+            },
+          },
+        )
+      }
+    }
+  };
+  RoundFile(
+    env with {sfuns => allFuns.chill()},
+    config,
+    unoptimized.toArray(),
+    0,
+  )
+}
+
+private fun planRound(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  _key: SKStore.IID,
+  values: mutable SKStore.NonEmptyIterator<RoundFile>,
+): void {
+  state = values.first;
+  env = state.env;
+  config = state.config;
+  round = state.round + 1;
+  if (round > 100000) {
+    env
+      .getFunction(state.unoptimized[0], FileRange.builtin)
+      .die(`Optimizer failed to converge after ${round} rounds.`)
+  };
+  // Match the sequential scheduler: any progress-ready function permits
+  // another attempt on every unfinished function in this round.
+  ready = state.unoptimized.any(fid -> {
+    f = env.getFunction(fid, FileRange.builtin);
+    f.status match {
+    | OptPartial{unfinishedDependencies} ->
+      unfinishedDependencies.isEmpty() ||
+        unfinishedDependencies.any(dep ->
+          env.getFunction(dep, f.pos).isFullyOptimized()
+        )
+    | OptDone _ -> false
+    }
+  });
+  if (ready) {
+    writer.set(SKStore.IID(0), state with {round});
+    for (f in env.sfuns) writer.set(WorkKey(f.id), FunctionFile(f))
+  } else {
+    popularity = UnorderedMap::mcreate(state.unoptimized.size());
+    for (fid in state.unoptimized) {
+      for (d in getDeps(env.getFunction(fid, FileRange.builtin))) {
+        popularity.set(d, popularity.maybeGet(d).default(0) + 1)
+      }
+    };
+    processed = mutable UnorderedSet[];
+    allFuns = env.sfuns.clone();
+    for (fid in state.unoptimized) {
+      findUnfinishedDependencyCycleMember(
+        env.getFunction(fid, FileRange.builtin),
+        processed,
+        popularity,
+        env,
+        config,
+      ).each(pretendDone -> {
+        allFuns.insert(
+          pretendDone with {
+            status => OptPartial{donePasses => config.optConfig.all()},
+          },
+        )
+      })
+    };
+    writer.set(
+      SKStore.IID(0),
+      state with {env => env with {sfuns => allFuns.chill()}, round},
+    )
+  }
+}
+
+// Dependency discovery is itself incremental: each function reads only the
+// function rows it can inspect and a projection of shared class/config state.
+private fun prepareRow(
+  context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  shared: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): void {
+  values.first match {
+  | FunctionFile(f) ->
+    if (f.isFullyOptimized()) {
+      writer.set(key, ResultFile(OptimizeOneResult(f)))
+    } else {
+      common = SharedFile::type(shared.getArray(context, SKStore.IID(1))[0]);
+      writer.set(
+        key,
+        makeWorkFile(context, input, shared, f, common.env, common.config),
+      )
+    }
+  | state @ RoundFile _ -> writer.set(key, state)
+  | _ -> invariant_violation("Unexpected optimizer function input")
+  }
+}
+
+private fun optimizeRow(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): void {
+  values.first match {
+  | work @ WorkFile _ ->
+    common = SharedFile::type(input.getArray(_context, SKStore.IID(1))[0]);
+    functions = FunctionIDToFunction::mcreate();
+    for (function in work.functions.values()) functions.insert(function);
+    env = common.env with {
+      sfuns => functions.chill(),
+      sourcePositions => work.positions,
+    };
+    writer.set(
+      key,
+      ResultFile(
+        optimizeOne(
+          work.f,
+          env,
+          common.config,
+          optimizationPasses(common.config),
+          common.config.optConfig.all(),
+        ),
+      ),
+    )
+  | state @ RoundFile _ -> writer.set(key, state)
+  | result @ ResultFile _ -> writer.set(key, result)
+  | SharedFile _ -> void
+  | _ -> invariant_violation("Unexpected optimizer work record")
+  }
+}
+
+private fun mergeRound(
+  _context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.IID, RoundFile>,
+  key: SKStore.IID,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+): void {
+  files = values.toArray();
+  state = files
+    .filterMap(file ->
+      file match {
+      | state @ RoundFile _ -> Some(state)
+      | _ -> None()
+      }
+    )
+    .collect(Array)[0];
+  results = files
+    .filterMap(file ->
+      file match {
+      | ResultFile(value) -> Some(value)
+      | _ -> None()
+      }
+    )
+    .collect(Array);
+  if (results.isEmpty()) {
+    writer.set(key, state);
+    return void
+  };
+  env = state.env;
+  allFuns = env.sfuns.clone();
+  for (result in results) allFuns.insert(result.f);
+  // Coroutine replacements win over the ordinary row for the same function.
+  for (result in results) {
+    result.extraFun.each(f -> allFuns.insert(f));
+    result.extraClass.each(sc -> !env.sclasses = env.sclasses.set(sc.id, sc))
+  };
+  if (state.config.optConfig.verify) {
+    for (result in results) {
+      result.extraFun.each(f ->
+        Verify.verifyFunction(f, env, state.config, "new function")
+      )
+    }
+  };
+  remaining = results
+    .map(result -> result.f.id)
+    .filter(fid -> !allFuns[fid].isFullyOptimized())
+    .collect(Array);
+  writer.set(
+    key,
+    state with {
+      env => env with {sfuns => allFuns.chill()},
+      unoptimized => remaining,
+    },
+  )
+}
+
+private fun runRounds(
+  context: mutable SKStore.Context,
+  initial: SKStore.EHandle<SKStore.IID, RoundFile>,
+  scope: String,
+): SKStore.EHandle<SKStore.IID, RoundFile> {
+  previous = initial;
+  round = 0;
+  while (
+    previous.getArrayFilter(context, SKStore.IID(0), state ~>
+      SKStore.BoolFile(!state.unoptimized.isEmpty())
+    )[0].value
+  ) {
+    prefix = scope + "/" + round;
+    shared: SKStore.EHandle<SKStore.Key, SKStore.File> = previous.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create(prefix + "/shared/"),
+      (_context, writer, _, values) ~> {
+        state = values.first;
+        writer.set(
+          SKStore.IID(1),
+          SharedFile(
+            state.env with {
+              sfuns => FunctionIDToFunction::mcreate().chill(),
+              sourcePositions => SourcePositions.Table{},
+            },
+            state.config,
+          ),
+        );
+        writer.set(SKStore.IID(2), PositionsFile(state.env.sourcePositions))
+      },
+    );
+    planned = previous.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create(prefix + "/plan/"),
+      planRound,
+    );
+    prepared = planned.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create(prefix + "/inputs/"),
+      (context, writer, key, values) ~>
+        prepareRow(context, writer, key, values, planned, shared)
+      ,
+    );
+    results = prepared.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create(prefix + "/functions/"),
+      (context, writer, key, values) ~>
+        optimizeRow(context, writer, key, values, shared)
+      ,
+    );
+    gathered = results.map(
+      SKStore.IID::keyType,
+      x ~> x,
+      context,
+      SKStore.DirName::create(prefix + "/gather/"),
+      (_context, writer, _, values) ~>
+        writer.setArray(SKStore.IID(0), values.toArray())
+      ,
+    );
+    !previous = gathered.map(
+      SKStore.IID::keyType,
+      RoundFile::type,
+      context,
+      SKStore.DirName::create(prefix + "/merge/"),
+      mergeRound,
+    );
+    !round = round + 1
+  };
+  previous
+}
+
+fun compileAllIncrementally(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, InputFile>,
+): GlobalEnv {
+  initial = input.map(
+    SKStore.IID::keyType,
+    RoundFile::type,
+    context,
+    SKStore.DirName::create("/optimizer/initial/"),
+    (_context, writer, key, values) ~>
+      writer.set(key, initializeRound(values.first))
+    ,
+  );
+  first = runRounds(context, initial, "/optimizer/before-const");
+  lowered = first.map(
+    SKStore.IID::keyType,
+    RoundFile::type,
+    context,
+    SKStore.DirName::create("/optimizer/lower-const/"),
+    (_context, writer, key, values) ~> {
+      state = values.first;
+      writer.set(
+        key,
+        initializeRound(
+          InputFile(
+            LowerConst.lowerAllConsts(state.env, state.config),
+            state.config,
+          ),
+        ),
+      )
+    },
+  );
+  completed = runRounds(context, lowered, "/optimizer/after-const");
+  completed.getArray(context, SKStore.IID(0))[0].env
 }
 
 module end;

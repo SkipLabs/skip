@@ -564,3 +564,149 @@ configuration selects sequential specialization, including release builds.
   conservative. Results: normalized-timing-summary.log and timing-summary.json.
   This is functional incrementalization with a modest body-edit benefit,
   not a general end-to-end speedup for every class change.
+- Stage 2 committed as 98992cde7. Binary saved at
+  /tmp/skip-function-ir-stage2/skc. Unrelated formatting was restored before
+  that commit; the pre-existing specialize.sk formatting change was retained.
+- Stage 3 source is now applied. The old sequential optimizeAll remains intact
+  except sharing pass-table construction. Incremental builds use collection
+  work/result/merge rounds on both sides of LowerConst. IR, optimization and
+  emission have separate mappers. Missing final-output invalidation now targets
+  the final emitter, so cached IR can regenerate an output without reoptimizing.
+- Stage 4's package input dependency is temporarily included in this bootstrap
+  build (three-line comment and getArray read at compile_sklib). Exclude that
+  hunk from the stage-3 commit; retain it for the stage-4 commit. Skargo changes
+  likewise remain uncommitted stage-4 work. Stage-3 bootstrap passed parsing and
+  typing after fixing draft signature/type errors and is generating native code.
+- Focused optimizer validation script is
+  /tmp/skip-function-ir-experiment/check_optimizer.py. It checks native outputs,
+  actual MAP_ROW counts for independent body edits/no-op, one native link per
+  change, and incremental -> --release -> incremental transitions in one DB.
+- Current stage-3 bootstrap session is 29891; log build-optimizer-rounds.log.
+  Source typing passed; native generation is running. Current executable still
+  matches stage 2 until this build completes. Later type fixes in actual
+  optimize.sk (forEachTclass returns Bool, addPos argument annotated Pos, Map
+  filter already returns Map) are not all reflected in the scratch apply script.
+  Do not reapply that script over the working source.
+- Stage-3 static audit: runtimeFunctions contains native @cpp_runtime entries,
+  so conservatively including these in work dependencies does not recursively
+  pull in the whole program. findDirectDependencies covers virtual calls and
+  function constants; explicit GetConst and coroutine next-method dependencies
+  supplement it. WorkFile stores a sparse UnorderedMap, not dense IDMap.
+- First stage-3 candidate passed: 26 native fixtures, 28 native update
+  comparisons, 844 existing regressions, ten cached/fresh LLVM comparisons,
+  focused function IR test, and the newly compiled optimizer regression.
+  Optimizer regression: two first-round work records change per independent
+  body edit, zero on no-op, one link per body edit and zero on no-op; both
+  incremental -> release -> incremental transitions produce correct results.
+- MAP_ROW only traces initial mapper construction in this SKStore version,
+  not updates of reused rows. Tests now count changed work records instead.
+  GDB breakpoint at sk.Optimize_optimizeOne confirmed nine calls for a body
+  update across all rounds, compared to 849 initial first-round work records.
+  Evidence optimizer-gdb.log; initial 1.2 GB debug trace was summarized and
+  removed. Avoid --debug-skstore on cold rebuilds/mode reentry; it is enormous.
+- Nevertheless first optimizer timings are bad: initial 5.431 -> 5.845 s,
+  body 0.2221 -> 1.0050 s; class edits ~1.12-1.20 s versus ~0.27-0.33 s.
+  Profiling showed 44% of update samples under finishOptimizedFunctions, which
+  was rerunning on coordinator reentry. Fixes now in source: separate final
+  reachability/escape/lowering into /backendLower/; coordinator continuation
+  reads use getArrayFilter(BoolFile), so unchanged continuation flags do not
+  dirty it on every environment change. Also project package/archive/output
+  data out of optimizer RoundFile configuration and its output. Emitter reads
+  full current ConfigFile directly; only emission needs those package details.
+  Source audit confirmed these removed fields are unused by optimizer/lowering.
+- The projected build was stopped before LLVM compilation to include the config
+  projection, then restarted. Current session 82502, log
+  build-optimizer-projected.log. Compiler source is frozen until it finishes.
+  Current binary remains first stage-3 candidate. No stage-3 commit yet.
+- Stage 4 combined fixes passed the small native skargo probe: baseline body
+  updates ~3.04 s, isolated databases + tracked archive emission + link-plan
+  replay ~1.40 s, native results 1 -> 2 -> 3 correct; no-op ~0.037 s. This used
+  the first optimizer candidate (whose own scheduling overhead is being fixed).
+  Results /tmp/skip-skargo-state-fixed-experiment/results.json. Need compiler
+  self-build and source-edit measurements before stage-4 commit.
+- Added missing-library-output replay to compile() in pending source: library
+  outputs invalidate /backendPhase1/, native/LLVM outputs invalidate
+  /backendEmit/ through its new /backendLower/ parent. Keep the library-specific
+  branch plus compile_sklib dependency in stage 4; stage-3 commit retains the
+  unconditional /backendLower/ -> /backendEmit/ version of that branch.
+- Verified repeated --output fails in this checkout: repeated-output-probe.log.
+  LLVM's module splitter is installed at /usr/lib/llvm-20/bin/llvm-split (bare
+  command absent from PATH). Prototype split of a compiler module produced two
+  valid-looking bitcode parts /tmp/skip-llvm-split-probe/part0 and part1. No
+  parallel clang timing or production stage-5 changes yet. Consider using LLVM
+  splitting in skargo instead of reimplementing LLVM symbol/linkage partitioning.
+- The projected coordinator candidate built successfully (309.642 s), passed
+  the compiled optimizer regression, but still measured body 0.2184 -> 0.4974 s
+  (+128%). Initial +6.6%, no-op unchanged; class changes ~2.1-2.4x baseline.
+  Snapshot of its source and timings is /tmp/skip-optimizer-projected-snapshot.
+- Final stage-3 redesign now maps dependency preparation per function. Each
+  round publishes all FunctionFile rows; prepareRow reads only referenced
+  function keys from that round's collection (including virtual/constant/coroutine
+  dependencies). Fully optimized rows forward directly. Optimization operates on
+  sparse dependency WorkFiles, and merge retains coroutine replacement precedence.
+  Shared class/config and position data are projected once in a separate
+  /shared/ collection; per-function readers use stable rows there. This avoids
+  recomputing every transitive dependency table after a body edit, and avoids
+  repeatedly comparing a class snapshot embedded in each work record.
+- Current bootstrap session is 27978, log build-optimizer-normalized-functions.log.
+  Earlier per-function attempt was stopped before LLVM to normalize shared
+  state; its scratch normalization script initially failed before writing and
+  was corrected. Current source passed typing and is generating native code.
+  Compiler source must remain frozen until it finishes. Current executable is
+  still the projected coordinator candidate, not the per-function variant.
+- IMPORTANT test update pending after that build: first-round WorkFile records
+  now live at /optimizer/before-const/0/inputs/ rather than /plan/. Change the
+  WRITTEN-prefix assertions in tests.sk and check_optimizer.py accordingly,
+  then rebuild/run the standalone optimizer-unit test. /plan/ now holds raw
+  FunctionFile rows, so it changes one record for a leaf edit; /inputs/ changes
+  two (leaf + caller).
+- Stage-5 LLVM tool experiment: a two-module compiler links and successfully
+  compiles a native program. However sixteen-way LLVM splitting is slower
+  end-to-end: single clang -O0 4.4158 s; llvm-split 5.0216 s + parallel clang
+  0.4843 s + link 0.1708 s = 5.6767 s. No production LLVM-split changes kept.
+  Evidence /tmp/skip-llvm-split-probe/{result,many-result}.json.
+- Stage-5 native emission draft is scratch only:
+  /tmp/skip-function-ir-experiment/apply-native-outputs.py. NOT applied/validated.
+  It adds repeatable --output for --emit=llvm-ir and --codegen-units for native
+  builds, emits owned definitions by stable symbol hash with declarations for
+  foreign references, and keeps cross-file implementation symbols hidden.
+  It must be applied only after stage 4 is committed, measured with skargo,
+  and reverted if no actual compiler-edit speedup. Audit/update output-missing
+  replay for all part paths, optimizer config projection for the new fields,
+  and computed-goto/multi-file validation. The LLVM tool experiment itself
+  does not justify retaining this untested native draft.
+- Additional stage-4 packaging observation: libraries with static_libraries or
+  preambles read native bytes not reflected in the source package row. Make
+  their archive mapper also read the invocation tick (only for those external
+  packaging inputs) so per-unit caching does not hide a changed native archive
+  or preamble. Pure Skip libraries should retain the tracked package-input
+  dependency. This is pending, not in the current bootstrap source. Test via
+  rebuilding a small native archive with unchanged Skip source.
+- Per-function optimizer candidate built (317.279 s) and passed the updated
+  compiled regression. No-inline timings versus stage 2: initial 5.4481 ->
+  7.0363 s (+29%), body 0.2256 -> 0.2274 s (essentially equal), no-op ~0.033 s
+  unchanged. Class/layout edits ~1.86-1.91 s versus ~0.28-0.34 s; global shared
+  class dependencies still conservatively invalidate every optimization row.
+  Testing native fixtures and performance with default inlining now, because
+  the existing phase benchmark explicitly disables inlining whereas skargo does
+  not. Do not claim an optimizer speedup from the no-inline fixture.
+- Removed only the old bootstrap target's 38 GB static_state.db after the build
+  completed, to leave disk space for compiler self-build tests. Future compiler
+  bootstraps should use the validated new compiler with --release and patched
+  skargo's per-unit databases, rather than the old bootstrap's shared database.
+  Existing stdlib, binary, .sklib, logs and regression evidence remain intact.
+- Updated tests' first-round work-record prefix to /inputs/ and rebuilt the
+  standalone optimizer-unit successfully. check_optimizer.py has the same new
+  prefix. Current native binary is the per-function candidate, with no source
+  algorithm edits since its build. Stage 3 remains uncommitted pending final
+  tests and default-mode/compiler measurements.
+- Final per-function optimizer validation passed: 844 existing regressions,
+  28 native update comparisons, ten cached-versus-fresh LLVM checks, two
+  persistent batch units, the focused optimizer/mode regression, and 26 native
+  fixtures with default inlining. Sequential --release paths remain intact.
+- Default-inlining timing medians (three trials): initial 5.5349 -> 6.8705 s
+  (+24%), body 0.3023 -> 0.2141 s (-29.2%), cached 0.03325 -> 0.03328 s.
+  Layout/class changes remain materially slower (~1.6 s versus ~0.4 s), because
+  all function rows currently depend on the shared class snapshot. Keep this
+  limitation explicit; no claim of across-the-board speedup. Detailed default
+  results /tmp/skip-optimizer-inline-benchmark/{timing-results,summary}.json.
