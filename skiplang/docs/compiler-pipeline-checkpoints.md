@@ -1021,3 +1021,59 @@ configuration selects sequential specialization, including release builds.
   fixtures, 28 native update comparisons passed (symbol-*.log in experiment dir).
   Full compiler edit timings have NOT yet been repeated with this refinement.
   Stage 5 native split-output experiment remains pending; draft not applied.
+- User requested: remeasure, commit measurements, then run split LLVM experiment.
+  Refinement committed as 14a6f85dd. Running refreshed compiler edit benchmark
+  session29029: /tmp/skip-function-ir-experiment/compiler-position-benchmark-run.log,
+  results /tmp/skip-compiler-position-benchmark/results.json. Host immutable
+  /tmp/skip-position-optimizer-driver/skc-with-std. Deleted only old scratch
+  compiler target state.db files because they belonged to the phased host ABI;
+  target remains /tmp/skip-compiler-development-build. Cold build needed first.
+  Script now restores original source timestamp before final warm/no-op checks.
+- Prepared stage-5 patches OUTSIDE worktree in experiment dir:
+  apply-native-outputs.py, native-output-extras.py,
+  apply-skargo-native-outputs.py, llvm-jobs.sk. Applied to isolated source copy
+  /tmp/skip-native-output-source and checked compiler + skargo successfully.
+  No production stage-5 edits applied yet. Test script check-split-outputs.py
+  prepared for fresh /tmp/skip-native-output-driver/skc (not built yet).
+  Draft native emission hashes definitions into parts, emits foreign declarations,
+  makes implementation definitions hidden external, coalesces repeated preamble
+  wrappers via weak_odr. Skargo draft chooses cores for large (>8MB) dev LLVM,
+  drains stderr concurrently, falls back for unrecognized clang options. No object
+  cache implemented. Need real native validation and performance decision.
+
+### Paused at user request — 2026-10-16
+
+- User asked to stop and restart tomorrow. All benchmark/compiler/linker child
+  processes stopped. Interrupted the diagnostic-message build with SIGTERM;
+  benchmark script exited through its finally block and restored compile.sk
+  contents AND original timestamp. Verified no compiler source diff remains.
+- Completed measurements with 14a6f85dd host: cold659.452 s, no-op0.13412 s,
+  comment201.0835 s, comment revert20.8907 s. Produced compiler smoke checks
+  passed after all completed builds. Old comment197.1505/revert20.5752 s:
+  no demonstrated full-compiler improvement. Cold run included two independent
+  scratch source checks, so its comparison against old541.571 s is confounded.
+- Message edit was INTERRUPTED at41.24 s, exit3 caused by our termination, not a
+  compiler failure or valid timing. Tagged invalid/interrupted in results.json.
+  Message revert, debug, unused-helper, and final no-op were NOT measured.
+  Do not present these partial results as a completed benchmark suite.
+- Evidence: /tmp/skip-compiler-position-benchmark/results.json plus per-build and
+  compiler-check logs; /tmp/skip-function-ir-experiment/compiler-position-benchmark-run.log.
+- Restart: use immutable /tmp/skip-position-optimizer-driver/skc-with-std with
+  target /tmp/skip-compiler-development-build. Warm/recover once with restored
+  source before timing, because interruption left last package archive/cache
+  potentially reflecting the temporary message edit. Persistent per-unit DBs
+  belong ONLY to this driver. Never reuse with another compiler executable.
+  ~44GB free at last check; target caches occupy ~44GB.
+- Finish representative edit timings (especially previous219.5 s unused-helper)
+  using benchmark-compiler-edits.py, preferably a new results directory so this
+  interrupted run remains preserved. It restores source/timestamp in finally.
+  Do not edit compile.sk concurrently with it. Then commit recorded measurements.
+- Split LLVM experiment is NOT STARTED in production. Only outside-worktree
+  drafts/source checks prepared as above. Both scratch compiler/skargo source
+  checks passed. Next apply reviewed scripts, bootstrap NEW experimental driver
+  via build-phased-driver.py BOOTSTRAP_OUTPUT/BOOTSTRAP_LOG overrides, validate
+  check-split-outputs.py and native fixtures, then compare SAME driver with
+  codegen-units1 versus16 on compiler edits. Fresh DBs required for new driver.
+  Native split draft must still validate preamble linkage/native behavior; no
+  performance claim yet. Commit stage5 only if it improves performance; revert
+  experimental production edits otherwise. Keep all earlier committed work.
