@@ -1065,7 +1065,10 @@ fun getOrInitializeBackend(
       input = values.first;
       config = input.config;
       env = if (config.incrementalSpecialization) {
-        Optimize.compileAllIncrementally(context, backendIRDir)
+        Optimize.compileAllIncrementally(context, backendIRDir) match {
+        | Some(env) -> env
+        | None() -> return void
+        }
       } else {
         createOptimizedFunctions(context, input.env, config)
       };
@@ -1224,6 +1227,7 @@ fun compile(
 const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
   context ~> {
     context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
+    context.setGlobal(Optimize.progressKey, SKStore.IntFile(0));
     (backendDir, _) = getOrInitializeBackend(context);
     config = backendDir.getArray(context, SKStore.IID(0))[0].value;
     compile(config, context, config.input_files, true);
@@ -1257,6 +1261,46 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
       reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
         parentName => SKStore.DirName::create("/backend/"),
         childName => SKStore.DirName::create("/specializer/"),
+        key,
+      };
+      context.invalidateReader(reader);
+      false
+    | _ -> boundary != Some(false)
+    }
+  },
+  context ~> {
+    (beforeLimit, afterLimit, afterConst) = context.getGlobal(Optimize.progressKey) match {
+    | Some(previousProgress @ Optimize.Progress _) ->
+      (
+        if (previousProgress.afterConst) previousProgress.beforeRound else previousProgress.round - 1,
+        if (previousProgress.afterConst) previousProgress.round - 1 else -1,
+        previousProgress.afterConst,
+      )
+    | _ -> (-1, -1, false)
+    };
+    boundary = context.updateUntilBoundary(
+      dir ~> dir == SKStore.DirName::create("/backendLower/"),
+      dir ~> dir == SKStore.DirName::create("/backendOptimize/"),
+      dir ~> {
+        name = dir.toString();
+        if (name.startsWith("/optimizer/before-const/")) {
+          name.split("/")[3].toInt() <= beforeLimit
+        } else if (name.startsWith("/optimizer/after-const/")) {
+          name.split("/")[3].toInt() <= afterLimit
+        } else if (name == "/optimizer/lower-const/") {
+          afterConst
+        } else {
+          true
+        }
+      },
+    );
+    throwIfFrontendErrors(context);
+    context.getGlobal(Optimize.progressKey) match {
+    | Some(pendingProgress @ Optimize.Progress _) if (!pendingProgress.complete) ->
+      key: SKStore.Key = SKStore.IID(0);
+      reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
+        parentName => SKStore.DirName::create("/backendPhase2/"),
+        childName => SKStore.DirName::create("/backendOptimize/"),
         key,
       };
       context.invalidateReader(reader);

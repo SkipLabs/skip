@@ -801,6 +801,24 @@ private fun makeWorkFile(
   env.runtimeFunctions.values().each(keep);
   while (!stack.isEmpty()) {
     current = stack.pop();
+    if (current.id != f.id) {
+      // Interprocedural passes inspect callee summaries. Only inlining can
+      // expose its body's dependencies, and it waits for a completed callee.
+      canInline =
+        config.optConfig.inline != 0 &&
+        Inline.isLegalToInline(current) &&
+        (current.status match {
+        | OptDone{inlineComplexity, returns} ->
+          (inlineComplexity < Int::max && returns) ||
+            annotationsContain(
+              current.annotations,
+              "@always_inline",
+              current.pos,
+            )
+        | _ -> false
+        });
+      if (!canInline) continue
+    };
     findDirectDependencies(current, keep, env);
     getDeps(current).each(keep);
     current.coroutineInfo match {
@@ -1114,6 +1132,99 @@ private fun mergeRound(
   )
 }
 
+const progressKey: String = "COMPILER_OPTIMIZER_PROGRESS";
+
+// Resume from the completed round without re-registering its graph. Replaying
+// old registrations changes TimeStacks and can keep the coordinator dirty.
+class Progress(
+  dir: SKStore.EHandle<SKStore.IID, RoundFile>,
+  round: Int,
+  beforeRound: Int,
+  afterConst: Bool,
+  reads: SortedSet<SKStore.Path>,
+  dirs: SortedSet<SKStore.DirName>,
+  complete: Bool,
+) extends SKStore.File
+
+private fun runRound(
+  context: mutable SKStore.Context,
+  previous: SKStore.EHandle<SKStore.IID, RoundFile>,
+  scope: String,
+  round: Int,
+): SKStore.EHandle<SKStore.IID, RoundFile> {
+  prefix = scope + "/" + round;
+  shared: SKStore.EHandle<SKStore.Key, SKStore.File> = previous.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create(prefix + "/shared/"),
+    (_context, writer, _, values) ~> {
+      state = values.first;
+      writer.set(
+        SKStore.IID(1),
+        SharedFile(
+          state.env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          state.config,
+        ),
+      );
+      writer.set(SKStore.IID(2), PositionsFile(state.env.sourcePositions))
+    },
+  );
+  planned = previous.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create(prefix + "/plan/"),
+    planRound,
+  );
+  prepared = planned.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create(prefix + "/inputs/"),
+    (context, writer, key, values) ~>
+      prepareRow(context, writer, key, values, planned, shared)
+    ,
+  );
+  results = prepared.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create(prefix + "/functions/"),
+    (context, writer, key, values) ~>
+      optimizeRow(context, writer, key, values, shared)
+    ,
+  );
+  gathered = results.map(
+    SKStore.IID::keyType,
+    x ~> x,
+    context,
+    SKStore.DirName::create(prefix + "/gather/"),
+    (_context, writer, _, values) ~>
+      writer.setArray(SKStore.IID(0), values.toArray())
+    ,
+  );
+  gathered.map(
+    SKStore.IID::keyType,
+    RoundFile::type,
+    context,
+    SKStore.DirName::create(prefix + "/merge/"),
+    mergeRound,
+  );
+}
+
+private fun unfinished(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, RoundFile>,
+): Bool {
+  input.getArrayFilter(context, SKStore.IID(0), state ~>
+    SKStore.BoolFile(!state.unoptimized.isEmpty())
+  )[0].value
+}
+
 private fun runRounds(
   context: mutable SKStore.Context,
   initial: SKStore.EHandle<SKStore.IID, RoundFile>,
@@ -1121,93 +1232,18 @@ private fun runRounds(
 ): SKStore.EHandle<SKStore.IID, RoundFile> {
   previous = initial;
   round = 0;
-  while (
-    previous.getArrayFilter(context, SKStore.IID(0), state ~>
-      SKStore.BoolFile(!state.unoptimized.isEmpty())
-    )[0].value
-  ) {
-    prefix = scope + "/" + round;
-    shared: SKStore.EHandle<SKStore.Key, SKStore.File> = previous.map(
-      x ~> x,
-      x ~> x,
-      context,
-      SKStore.DirName::create(prefix + "/shared/"),
-      (_context, writer, _, values) ~> {
-        state = values.first;
-        writer.set(
-          SKStore.IID(1),
-          SharedFile(
-            state.env with {
-              sfuns => FunctionIDToFunction::mcreate().chill(),
-              sourcePositions => SourcePositions.Table{},
-            },
-            state.config,
-          ),
-        );
-        writer.set(SKStore.IID(2), PositionsFile(state.env.sourcePositions))
-      },
-    );
-    planned = previous.map(
-      x ~> x,
-      x ~> x,
-      context,
-      SKStore.DirName::create(prefix + "/plan/"),
-      planRound,
-    );
-    prepared = planned.map(
-      x ~> x,
-      x ~> x,
-      context,
-      SKStore.DirName::create(prefix + "/inputs/"),
-      (context, writer, key, values) ~>
-        prepareRow(context, writer, key, values, planned, shared)
-      ,
-    );
-    results = prepared.map(
-      x ~> x,
-      x ~> x,
-      context,
-      SKStore.DirName::create(prefix + "/functions/"),
-      (context, writer, key, values) ~>
-        optimizeRow(context, writer, key, values, shared)
-      ,
-    );
-    gathered = results.map(
-      SKStore.IID::keyType,
-      x ~> x,
-      context,
-      SKStore.DirName::create(prefix + "/gather/"),
-      (_context, writer, _, values) ~>
-        writer.setArray(SKStore.IID(0), values.toArray())
-      ,
-    );
-    !previous = gathered.map(
-      SKStore.IID::keyType,
-      RoundFile::type,
-      context,
-      SKStore.DirName::create(prefix + "/merge/"),
-      mergeRound,
-    );
+  while (unfinished(context, previous)) {
+    !previous = runRound(context, previous, scope, round);
     !round = round + 1
   };
   previous
 }
 
-fun compileAllIncrementally(
+private fun lowerConsts(
   context: mutable SKStore.Context,
-  input: SKStore.EHandle<SKStore.IID, InputFile>,
-): GlobalEnv {
-  initial = input.map(
-    SKStore.IID::keyType,
-    RoundFile::type,
-    context,
-    SKStore.DirName::create("/optimizer/initial/"),
-    (_context, writer, key, values) ~>
-      writer.set(key, initializeRound(values.first))
-    ,
-  );
-  first = runRounds(context, initial, "/optimizer/before-const");
-  lowered = first.map(
+  first: SKStore.EHandle<SKStore.IID, RoundFile>,
+): SKStore.EHandle<SKStore.IID, RoundFile> {
+  first.map(
     SKStore.IID::keyType,
     RoundFile::type,
     context,
@@ -1224,9 +1260,66 @@ fun compileAllIncrementally(
         ),
       )
     },
-  );
-  completed = runRounds(context, lowered, "/optimizer/after-const");
-  completed.getArray(context, SKStore.IID(0))[0].env
+  )
+}
+
+fun compileAllIncrementally(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, InputFile>,
+): ?GlobalEnv {
+  phased = context.getGlobal(progressKey).isSome();
+  previousInfo = if (phased) context.currentEagerMapperInfo() else SKStore.MInfoEmpty();
+  round = 0;
+  beforeRound = -1;
+  afterConst = false;
+  current = context.getGlobal(progressKey) match {
+  | Some(progress @ Progress _) ->
+    context.!reads = progress.reads;
+    context.!newDirs = progress.dirs;
+    if (progress.complete) return Some(progress.dir.getArray(context, SKStore.IID(0))[0].env);
+    !round = progress.round;
+    !beforeRound = progress.beforeRound;
+    !afterConst = progress.afterConst;
+    progress.dir
+  | _ ->
+    input.map(
+      SKStore.IID::keyType,
+      RoundFile::type,
+      context,
+      SKStore.DirName::create("/optimizer/initial/"),
+      (_context, writer, key, values) ~>
+        writer.set(key, initializeRound(values.first))
+      ,
+    )
+  };
+  if (!phased) {
+    first = runRounds(context, current, "/optimizer/before-const");
+    lowered = lowerConsts(context, first);
+    completed = runRounds(context, lowered, "/optimizer/after-const");
+    return Some(completed.getArray(context, SKStore.IID(0))[0].env)
+  };
+  if (unfinished(context, current)) {
+    scope = if (afterConst) "/optimizer/after-const" else "/optimizer/before-const";
+    !current = runRound(context, current, scope, round);
+    !round = round + 1
+  };
+  done = !unfinished(context, current);
+  complete = afterConst && done;
+  if (!afterConst && done) {
+    !beforeRound = round - 1;
+    !current = lowerConsts(context, current);
+    !round = 0;
+    !afterConst = true
+  };
+  result = if (complete) Some(current.getArray(context, SKStore.IID(0))[0].env) else None();
+  context.setGlobal(progressKey, Progress(
+    current, round, beforeRound, afterConst, context.reads, context.newDirs, complete,
+  ));
+  if (!complete) {
+    for (dir in previousInfo.getNewDirs()) context.!newDirs = context.newDirs.set(dir);
+    for (read in previousInfo.getReads()) context.!reads = context.reads.set(read)
+  };
+  result
 }
 
 module end;

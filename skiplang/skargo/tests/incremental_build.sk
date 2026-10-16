@@ -14,9 +14,13 @@ untracked fun write_file(path: String, text: String): void {
 }
 
 @allow_tracked_call
-untracked fun build(skargo: String, dir: String): System.CompletedProcess {
+untracked fun build(
+  skargo: String,
+  dir: String,
+  prolix: Bool = false,
+): System.CompletedProcess {
   result = System.popen{
-    args => Array[skargo, "build", "-v"],
+    args => Array[skargo, "build", if (prolix) "-vv" else "-v"],
     env => Map["SKARGO_BIN" => "skargo"],
     cwd => Some(dir),
   }.fromSuccess();
@@ -37,6 +41,11 @@ untracked fun run_probe(dir: String, expected: String): void {
 @allow_tracked_call
 untracked fun mtime(path: String): Int {
   FileSystem.getLastModificationTime(path)
+}
+
+@allow_tracked_call
+untracked fun contents(path: String): String {
+  FileSystem.readTextFile(path)
 }
 
 // Cover per-unit database isolation, archive source dependencies, native
@@ -111,6 +120,34 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   T.expectTrue(FileSystem.exists(artifacts[0]));
   run_probe(pure, "2");
 
+  // A manifest-only timestamp change dirties skargo's merged unit without
+  // changing compiler inputs. Prolix output exposes any new skc link plan.
+  pureModules = FileSystem.readFilesRecursive(
+    pure + "/target/host/dev/deps",
+    path -> Path.basename(path).startsWith("__merged-") && path.endsWith(".ll"),
+  ).toArray();
+  T.expectTrue(!pureModules.isEmpty());
+  T.expectTrue(
+    System.subprocess(
+      Array["touch", "-t", "200001010000.00"].concat(pureModules),
+    )
+      .fromSuccess()
+      .success(),
+  );
+  pureTimes = pureModules.map(mtime);
+  T.expectTrue(
+    System.subprocess(
+      Array["touch", "-t", "200001010000.09", pure + "/Skargo.toml"],
+    )
+      .fromSuccess()
+      .success(),
+  );
+  replay = build(skargo, pure, true);
+  T.expectTrue(replay.stderr.contains("--data "), replay.stderr);
+  T.expectTrue(!replay.stdout.contains("---LINK_ARGS_BEGIN---"), replay.stdout);
+  T.expectEq(pureModules.map(mtime), pureTimes);
+  run_probe(pure, "2");
+
   // The consumer must obtain native code from its dependency's archive,
   // rather than linking the dependency's build-script library directly.
   nativeDir = root + "/native";
@@ -147,14 +184,10 @@ fun test_incremental_build_inputs_and_cached_link(): void {
     path -> Path.basename(path).startsWith("__merged-") && path.endsWith(".ll"),
   ).toArray();
   T.expectTrue(!modules.isEmpty());
-  touched = System.subprocess(
-    Array["touch", "-t", "200001010000.00"].concat(modules),
-  ).fromSuccess();
-  T.expectTrue(touched.success(), touched.stderr);
-  oldTimes = modules.map(mtime);
+  oldContents = modules.map(contents);
 
-  // A C comment changes the build fingerprint, but the deterministic native
-  // object and compiler inputs are identical: no new link-plan stdout exists.
+  // A C comment changes the build fingerprint but not the deterministic
+  // native bytes. Recomputed LLVM, if any, must remain byte-identical.
   write_file(
     csource,
     "long long incremental_native_value(void) { return 1; } /* comment */\n",
@@ -166,7 +199,7 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   );
   _ = build(skargo, consumer);
   run_probe(consumer, "1");
-  T.expectEq(modules.map(mtime), oldTimes);
+  T.expectEq(modules.map(contents), oldContents);
 
   // Native bytes must be repackaged even though the Skip source is unchanged.
   write_file(

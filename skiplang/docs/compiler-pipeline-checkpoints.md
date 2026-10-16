@@ -944,3 +944,72 @@ configuration selects sequential specialization, including release builds.
   (Internal error: Encountered multiple Binds of value). Renamed the aliases
   previousProgress/pendingProgress; compiling again, session 50321. No algorithm
   workaround or validation bypass. Earlier failed session was 60888 (13 s).
+- Stage-4 compiler/skargo fixes committed atomically as 083cbed48; staged only
+  pre-phased compile.sk snapshot plus skargo source/test, leaving optimizer
+  phasing/pruning uncommitted for continued validation. Full compiler edit
+  timings are still outstanding; that stage is not yet complete.
+- First phased driver compiled (261.755 s) but tiny tests failed to terminate.
+  Diagnostic-only LLVM instrumentation (instrument-phased-ir.py) showed before
+  rounds advancing to 46, after round to 1, and flags=3 (complete), yet PIPE /
+  COORD kept firing. Re-registering all previous round maps on every callback
+  changes directory TimeStacks (EagerDir.reuseDir), continually dirtying the
+  coordinator. This was scheduling replay, not failure to converge.
+- Replaced replay with exact continuation, matching SpecializerProgress: save
+  current collection handle, next round, phase, reads and owned directories;
+  restore dependency metadata on reentry, register only the next round, and
+  preserve old mapper metadata while incomplete. A completed reentry returns
+  cached final env without registrations. Initial/release/batch paths unchanged.
+  Compiling revised driver now, session 15452. Previous wrong phased executable
+  /tmp/skip-phased-optimizer-driver/skc will be overwritten only on success;
+  treat it as INVALID until then. Current mutable release short skc also wrong
+  phased executable. Existing identity-pruned and identity-release immutable
+  hosts remain validated. Failed tiny-test logs preserved; debug logs 9/76 MB.
+- Continuation-based phased driver built successfully in 257.120 s (session
+  15452 completed). /tmp/skip-phased-optimizer-driver/skc now contains the revised
+  continuation implementation, wrapper/bin symlink already valid; mutable release
+  short skc copied from it. Testing focused optimizer cache/modes (session28860,
+  phased-resume-optimizer-check.log) and skargo integration (session8010,
+  skargo-phased-resume-test-run.log). Do not launch compiler-size build until
+  these terminate correctly. Old diagnostic skc-phased-trace remains invalid
+  replay implementation; use only as historical evidence.
+- Resumable phased driver now passes focused six-step optimizer cache/native/
+  no-op/release-mode checks and all 26 default-inline native fixtures. Logs
+  phased-resume-optimizer-check.log and phased-native-inline.log. Started full
+  compiler dev build with fresh compiler unit DBs, session98856,
+  compiler-dev-phased-initial.log, -vv and SKC_TIME_PHASES=1 for phase evidence.
+  It is actively progressing and reclaiming heaps, ~20 GB RSS after ~5 min,
+  versus the prior >50 GB signal-killed unphased runs. No completed timing yet.
+- Skargo integration with fully identity-tagged phased host fails only the
+  native-comment LLVM mtime assertion; native outputs otherwise correct up to
+  that point. Need separate cached-link replay from conservative backend
+  recomputation/identical LLVM rewrites. Control integration with fully tagged
+  but unphased release host running (session59176, skargo-identity-host-control).
+  Initial control attempt lacked -L wrapper, failed immediately; corrected
+  skc-with-std wrapper added. Consider write-if-changed LLVM emission plus an
+  explicit manifest-only rebuild test for no-new-link-plan fallback.
+- Benchmark script default host updated to phased driver, accepts explicit
+  overrides. Still wait for full build and any remaining source fixes before
+  running controlled compiler edits. No stage-5 production edits applied.
+- Full dev compiler build completed successfully with phased optimizer in
+  541.571 s, compiler-dev-phased-initial.log. Cache occupies 36 GB (plus 643 MB
+  root archive unit); synchronization bounded heap use and avoided previous OOM.
+  Produced compiler passed every subsequent edit's --check smoke test.
+- Initial compiler edit benchmark complete, all outputs correct including debug
+  marker only in debug variant. Seconds: no-op .12384; first comment197.1505,
+  comment revert20.5752; message52.7948/revert54.0512; debug191.7408/revert194.9351;
+  unused helper219.4809/revert202.0354; no-op .12411. Do not claim fast hot builds
+  for all edits. Evidence /tmp/skip-compiler-edit-benchmark/results.json and
+  per-edit compiler-check logs. Source contents and original mtime restored in
+  finally; unit fingerprint still reflects last synthetic mtime until next build.
+- Refined skargo integration now passes with fully tagged phased host. It tests
+  cached-link replay explicitly via manifest-only mtime change in prolix mode:
+  skc emits no new plan, previous plan links successfully, LLVM mtime unchanged.
+  Native C comment test instead asserts byte-identical LLVM; its backend may
+  conservatively recompute under nominal type identity. Real C-body change still
+  must update consumer output. Logs skargo-refined-test-{build,run}.log.
+- Profiling/source audit found optimizer resolved source positions are consumed
+  only for PrettyIR diagnostics (normal optimization keeps symbolic positions).
+  Current WorkFile position dependency projects whole files, so adding unrelated
+  symbols/position changes can invalidate many rows. Next refinement will project
+  only referenced symbols, including inlined origins, preserving diagnostics;
+  avoid weakening runtime type identity merely to regain unsafe cache hits.
