@@ -790,7 +790,7 @@ private fun makeWorkFile(
   keep = fid -> {
     if (fid != SFunctionID::none && !functions.containsKey(fid)) {
       input.getArray(context, WorkKey(fid)).maybeGet(0).each(file -> {
-        dependency = storedFunction(context, file);
+        dependency = storedFunction(file);
         functions.set(fid, dependency);
         stack.push(dependency)
       })
@@ -904,20 +904,8 @@ private class WorkFile(
   f: Function,
   functions: UnorderedMap<SFunctionID, Function>,
   positions: SourcePositions.Table,
-  original: ?FunctionRefFile = None(),
 ) extends SKStore.File
-private class ResultFile(
-  value: OptimizeOneResult,
-  original: ?FunctionRefFile = None(),
-) extends SKStore.File
-// A round carries scheduling state, not the function's body. The origin stays
-// unchanged until an optimization actually changes the function. Body readers
-// track that origin directly, so a literal edit need not rewrite later rounds.
-private class FunctionRefFile(
-  source: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  id: SFunctionID,
-  status: OptimizationStatus,
-) extends SKStore.File
+private class ResultFile(value: OptimizeOneResult) extends SKStore.File
 private class PendingFile(
   id: SFunctionID,
   dependencies: Array<SFunctionID>,
@@ -941,16 +929,11 @@ private class Round(
   pending: SKStore.EHandle<SKStore.IID, PendingFile>,
 ) extends SKStore.File
 
-private fun storedFunction(
-  context: mutable SKStore.Context,
-  file: SKStore.File,
-): Function {
+private fun storedFunction(file: SKStore.File): Function {
   file match {
   | FunctionFile(f)
   | GeneratedFile(f) ->
     f
-  | FunctionRefFile(source, id, _) ->
-    storedFunction(context, source.getArray(context, WorkKey(id))[0])
   | _ -> invariant_violation("Expected optimizer function")
   }
 }
@@ -963,29 +946,9 @@ private fun readEnv(
 ): GlobalEnv {
   common = SharedFile::type(files.getArray(context, SKStore.IID(1))[0]);
   functions = FunctionIDToFunction::mcreate();
-  resolve = (file: SKStore.File) -> {
-    current = file;
-    loop {
-      current match {
-      | FunctionRefFile(source, id, _) ->
-        bodies = source.getArray(context, WorkKey(id));
-        if (bodies.size() != 1) {
-          invariant_violation(
-            "Expected one optimizer body in " + source.dirName + "/" + id +
-              ", found " + bodies.size(),
-          )
-        };
-        !current = bodies[0]
-      | FunctionFile(f)
-      | GeneratedFile(f) ->
-        break f
-      | _ -> invariant_violation("Expected optimizer function")
-      }
-    }
-  };
   for ((key, values) in files.items(context)) {
     key match {
-    | WorkKey _ -> functions.insert(resolve(values.next().fromSome()))
+    | WorkKey _ -> functions.insert(storedFunction(values.next().fromSome()))
     | _ -> void
     }
   };
@@ -1003,8 +966,8 @@ private fun makeRound(
     SKStore.DirName::create(files.dirName.toString() + "pending/"),
     (_context, writer, _, values) ~> {
       values.first match {
-      | FunctionRefFile(_, id, OptPartial{unfinishedDependencies}) ->
-        writer.set(SKStore.IID(0), PendingFile(id, unfinishedDependencies))
+      | FunctionFile(f) if (!f.isFullyOptimized()) ->
+        writer.set(SKStore.IID(0), PendingFile(f.id, getDeps(f)))
       | _ -> void
       }
     },
@@ -1073,20 +1036,7 @@ private fun initializeRound(
       )
     },
   );
-  refs = files.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create(prefix + "refs/"),
-    (_context, writer, key, values) ~> {
-      values.first match {
-      | FunctionFile(f) ->
-        writer.set(key, FunctionRefFile(files, f.id, f.status))
-      | file -> writer.set(key, file)
-      }
-    },
-  );
-  makeRound(context, refs)
+  makeRound(context, files)
 }
 
 private fun scheduleRound(
@@ -1111,7 +1061,7 @@ private fun scheduleRound(
     popularity = UnorderedMap::mcreate(pending.size());
     for (p in pending) {
       functions.insert(
-        storedFunction(context, input.getArray(context, WorkKey(p.id))[0]),
+        storedFunction(input.getArray(context, WorkKey(p.id))[0]),
       );
       for (dep in p.dependencies) {
         popularity.set(dep, popularity.maybeGet(dep).default(0) + 1)
@@ -1142,8 +1092,8 @@ private fun planRow(
 ): void {
   file = values.first;
   file match {
-  | ref @ FunctionRefFile(_, _, OptPartial _) ->
-    fid = ref.id;
+  | FunctionFile(f) if (!f.isFullyOptimized()) ->
+    fid = f.id;
     action = schedule.getArrayFilter(context, SKStore.IID(0), s ~>
       SKStore.BoolFile(s.abandon.contains(fid))
     )[0];
@@ -1151,7 +1101,7 @@ private fun planRow(
       // The following round finishes this function, exactly as in the
       // sequential algorithm. No optimization executes in a cycle-break round.
       // The pass mask is read from the shared row, not captured in the mapper.
-      writer.set(key, AbandonFile(ref))
+      writer.set(key, AbandonFile(f))
     } else {
       writer.set(key, file)
     }
@@ -1159,7 +1109,7 @@ private fun planRow(
   }
 }
 
-private class AbandonFile(ref: FunctionRefFile) extends SKStore.File
+private class AbandonFile(f: Function) extends SKStore.File
 
 private fun prepareRow(
   context: mutable SKStore.Context,
@@ -1172,9 +1122,8 @@ private fun prepareRow(
   file = values.first;
   file match {
   | SharedFile _ -> writer.set(key, file)
-  | AbandonFile(ref) ->
+  | AbandonFile(f) ->
     common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
-    f = storedFunction(context, ref);
     writer.set(
       key,
       ResultFile(
@@ -1185,26 +1134,20 @@ private fun prepareRow(
         ),
       ),
     )
-  | ref @ FunctionRefFile _ ->
-    if (ref.status is OptDone _) {
-      writer.set(key, ref)
+  | FunctionFile(f) ->
+    if (f.isFullyOptimized()) {
+      writer.set(key, ResultFile(OptimizeOneResult(f)))
     } else {
       ready = schedule.getArrayFilter(context, SKStore.IID(0), s ~>
         SKStore.BoolFile(s.ready)
       )[0].value;
       if (!ready) {
-        writer.set(key, ref)
+        writer.set(key, ResultFile(OptimizeOneResult(f)))
       } else {
         common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
         writer.set(
           key,
-          makeWorkFile(
-            context,
-            input,
-            storedFunction(context, ref),
-            common.env,
-            common.config,
-          ) with {original => Some(ref)},
+          makeWorkFile(context, input, f, common.env, common.config),
         )
       }
     }
@@ -1229,22 +1172,21 @@ private fun optimizeRow(
       sfuns => functions.chill(),
       sourcePositions => work.positions,
     };
-    result = Verify.withSourcePositions(context, () ->
-      optimizeOne(
-        work.f,
-        env,
-        common.config with {deferVerifierDiagnostics => true},
-        optimizationPasses(common.config),
-        common.config.optConfig.all(),
-      )
-    );
-    // A pass may wait for callees without changing this function. Retain
-    // its origin in that case; creating a fresh origin each round would
-    // rebuild the same reference chain that body indirection avoids.
-    original = if (native_eq(result.f, work.f) == 0) work.original else None();
-    writer.set(key, ResultFile(result, original))
+    writer.set(
+      key,
+      ResultFile(
+        Verify.withSourcePositions(context, () ->
+          optimizeOne(
+            work.f,
+            env,
+            common.config with {deferVerifierDiagnostics => true},
+            optimizationPasses(common.config),
+            common.config.optConfig.all(),
+          )
+        ),
+      ),
+    )
   | ResultFile _
-  | FunctionRefFile _
   | SharedFile _ ->
     writer.set(key, file)
   | _ -> invariant_violation("Unexpected optimizer work record")
@@ -1258,23 +1200,15 @@ private fun publishRow(
   values: mutable SKStore.NonEmptyIterator<SKStore.File>,
 ): void {
   values.first match {
-  | ResultFile(result, original) ->
-    writer.set(
-      key,
-      original match {
-      | Some(ref) -> ref
-      | None() -> FunctionFile(result.f)
-      },
-    );
+  | ResultFile(result) ->
+    writer.set(key, FunctionFile(result.f));
     result.extraFun.each(f ->
       writer.set(WorkKey(f.id), ReplacementFile(result.f.id, f))
     );
     result.extraClass.each(sc ->
       writer.set(SKStore.IID(1), ClassUpdateFile(result.f.id, sc))
     )
-  | file @ SharedFile _
-  | file @ FunctionRefFile _ ->
-    writer.set(key, file)
+  | file @ SharedFile _ -> writer.set(key, file)
   | _ -> invariant_violation("Unexpected optimizer result")
   }
 }
@@ -1357,11 +1291,7 @@ private fun verifyRow(
         )
       )
     };
-    writer.set(key, FunctionRefFile(input, f.id, f.status))
-  | FunctionFile(f) ->
-    // The merged collection owns changed bodies. Publish their references
-    // here rather than retaining another full collection at every round.
-    writer.set(key, FunctionRefFile(input, f.id, f.status))
+    writer.set(key, FunctionFile(f))
   | _ -> writer.set(key, file)
   }
 }
@@ -1513,36 +1443,10 @@ private fun withCurrentPositions(
   context: mutable SKStore.Context,
   dir: Round,
 ): GlobalEnv {
-  files = dir.files;
-  // Assemble after the round's mappers have settled. Reading origins in the
-  // owner continuation would wake it before the reference rows have updated,
-  // so removing a function could pair an old reference with a deleted body.
-  output = files.map(
-    SKStore.IID::keyType,
-    OutputFile::type,
-    context,
-    SKStore.DirName::create("/optimizer/output/"),
-    (context, writer, _, _) ~> {
-      writer.set(
-        SKStore.IID(0),
-        OutputFile(readEnv(context, files)),
-      )
-    },
-    Some(
-      Array[
-        SKStore.KeyRange::create(
-          (SKStore.IID(1) : SKStore.Key),
-          (SKStore.IID(1) : SKStore.Key),
-        ),
-      ],
-    ),
-  );
-  output.getArray(context, SKStore.IID(0))[0].env with {
+  readEnv(context, dir.files) with {
     sourcePositions => SourcePositions.Table::read(context),
   }
 }
-
-private class OutputFile(env: GlobalEnv) extends SKStore.File
 
 fun compileAllIncrementally(
   context: mutable SKStore.Context,
