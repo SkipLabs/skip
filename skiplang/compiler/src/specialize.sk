@@ -3423,10 +3423,9 @@ class FunctionIRStateFile(
   sids: UnorderedMap<GFunKey, SFunctionID>,
   ptrByteSize: Int,
 ) extends SKStore.File
-class FunctionIRWorkFile(
-  gf: GFunction,
-  instantiation: GFunKey,
-) extends SKStore.File
+class FunctionIRWorkFile(instantiation: GFunKey) extends SKStore.File
+class GenericFunctionKey(callable: LazyGFun) extends SKStore.Key
+class GenericFunctionRequestFile(callable: LazyGFun) extends SKStore.File
 
 fun planFunctionIR(
   context: mutable SKStore.Context,
@@ -3449,16 +3448,38 @@ fun planFunctionIR(
     pos => FileRange.builtin,
   };
   // Compare shared state once. Unchanged state retains the stored row, so
-  // function rows need only compare their own generic body and identity.
+  // instantiation rows contain identities only; generic bodies are separate.
   writer.set(
     SKStore.IID(0),
     FunctionIRStateFile(state, sids, config.ptrBitSize / 8),
   );
+  requested = mutable UnorderedSet[];
   for (key in instantiations) {
-    writer.set(
-      GFunKeyKey(key),
-      FunctionIRWorkFile(converter.getGFunction(context, key.i0), key),
-    )
+    writer.set(GFunKeyKey(key), FunctionIRWorkFile(key));
+    // Body compilation belongs to a per-callable mapper. In particular,
+    // foo<Int> and foo<String> must share one generic body, and a body edit
+    // must not make this global identity scan recompile unrelated functions.
+    genericKey = GenericFunctionKey(key.i0);
+    if (requested.maybeInsert(key.i0)) {
+      writer.set(genericKey, GenericFunctionRequestFile(key.i0))
+    }
+  }
+}
+
+fun generateGenericFunctionIR(
+  context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, GFunctionFile>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+  converter: Converter,
+): void {
+  values.first match {
+  | GenericFunctionRequestFile(callable) ->
+    if (context.debugMode) print_string(`GENERIC_IR: ${key}`);
+    // Resolving the current definition and compiling it here records body,
+    // signature and class dependencies on this callable's row, not the plan.
+    writer.set(key, GFunctionFile(converter.getGFunction(context, callable)))
+  | _ -> void
   }
 }
 
@@ -3468,19 +3489,24 @@ fun generateFunctionIR(
   key: SKStore.Key,
   values: mutable SKStore.NonEmptyIterator<SKStore.File>,
   plan: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  genericFunctions: SKStore.EHandle<SKStore.Key, GFunctionFile>,
 ): void {
   work = values.first match {
   | work @ FunctionIRWorkFile _ -> work
   | _ -> return void
   };
   common = FunctionIRStateFile::type(plan.getArray(context, SKStore.IID(0))[0]);
+  gf = genericFunctions.getArray(
+    context,
+    GenericFunctionKey(work.instantiation.i0),
+  )[0].value;
   sp = common.state.mclone(context);
   sp.!generatedReturnTuples = Some(SortedMap[]);
   f = specializeFunctionIR(
     context,
     common.ptrByteSize,
     sp,
-    work.gf,
+    gf,
     work.instantiation,
     common.sids[work.instantiation],
     common.sids,

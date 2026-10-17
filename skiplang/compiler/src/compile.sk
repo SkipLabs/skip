@@ -984,13 +984,29 @@ fun getOrInitializeBackend(
       }
     },
   );
+  genericFunctionIR = functionIRPlan.map(
+    x ~> x,
+    O.GFunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/generic-function-ir/"),
+    (context, writer, key, values) ~>
+      O.generateGenericFunctionIR(context, writer, key, values, converter)
+    ,
+  );
   functionIR = functionIRPlan.map(
     x ~> x,
     O.SpecializedFunctionFile::type,
     context,
     SKStore.DirName::create("/specializer/function-ir/"),
     (context, writer, key, values) ~>
-      O.generateFunctionIR(context, writer, key, values, functionIRPlan)
+      O.generateFunctionIR(
+        context,
+        writer,
+        key,
+        values,
+        functionIRPlan,
+        genericFunctionIR,
+      )
     ,
   );
 

@@ -1604,3 +1604,130 @@ Implementation in progress; artifacts/scripts/logs in /tmp/skip-eager-optimizer.
   Implementation ready to commit: per-key eager optimizer rounds, no parallel
   compiler or split-LLVM changes. Remaining message cost primarily backend/native
   output; do not begin new optimization without user's next instruction.
+
+### 2026-10-17 — split function-IR preparation into three mapper stages
+
+Authorized: implement three logical stages and measure incremental updates.
+1. Global identity/shared-state mapper retains existing ID assignment, emits
+   instantiation rows and deduplicated callable requests, compiles no bodies.
+2. Generic-body mapper keyed by callable compiles through tracked current-def
+   reads; multiple instantiations share one row.
+3. Existing per-instantiation mapper reads the cached generic-body row and
+   shared state explicitly. Preserve sequential specialization/release behavior.
+Validate body reuse, generic multi-instantiation edits, add/remove callees,
+class/signature/coroutine changes, and existing incremental regression suite.
+Then build immutable optimized host, measure message/revert in fresh target
+(without concurrent jobs), compare against completed21.52/21.46s measurements.
+Artifacts /tmp/skip-generic-ir-mappers. Keep new-host databases separate from
+old-host databases; source+mtime restoration required in edit benchmarks.
+- Three-stage implementation in specialize.sk/compile.sk. Plan emits shared
+  state, identity-only instantiation rows, and deduplicated generic requests.
+  New generic-function-ir mapper compiles with current-definition tracked reads;
+  function-ir mapper reads that cached body. Sequential path unchanged.
+- Debug SKStore emits GENERIC_IR per actual generic-row compilation. Focused
+  test checks generic's two instantiations compile body ONCE, no unrelated body
+  execution, zero plan writes on body edits, and no recompilation on timestamp
+  touch. Caller main is ALSO legitimately invalidated: its declaration lookup
+  tracks the callee's full declaration. Test bounds work to changed callable +
+  main, not an inaccurate exactly-one-total assumption. Signature/default-arg
+  add/change/remove cases added after initial focused test passed; need rerun.
+- Fast immutable host built100.406s; focused initial updated tests PASSED,
+  fast28 native persistent-update comparisons PASSED. Optimized host building
+  session4609, driver-build-result.log. Source formatting/comments only changed
+  after host compilation began; no executable semantics changed. Updated full
+  tests have additional default-param cases, excluded from host build sources.
+- Updated focused test incl default-parameter signature add/change/remove now
+  PASSED with fast host. Fast26 native fixtures and10 coordinate-consumer cases
+  PASSED; all fixture caches cleaned by scripts. Optimized bootstrap still
+  running, external clang phase. Next run optimized validation, then attempt
+  same-source old eager-host control against existing matching eager target.
+  Benchmark script now uses3 message/revert pairs to distinguish small gains
+  from run variation. Will free ONLY old completed compiler state.db pair after
+  control, before fresh new-host target /tmp/skip-generic-ir-development-build.
+- Optimized immutable host built282.772s. All optimized validations PASSED:
+  focused exact updated IR test, mode6, native26, persistent native updates28,
+  existing844 regressions. Logs in /tmp/skip-generic-ir-mappers. No runtime fixes.
+- Same-source OLD eager-host control now running against its matching existing
+  target. /tmp/skip-generic-ir-mappers/control-benchmark-run.log; first warm-up
+  incorporates current implementation into subject compiler. No concurrent
+  tests/builds/profiles. Script owns compile.sk and restores original content+
+  mtime. Three message/revert pairs follow. Watch RAM; previous old global-round
+  algorithm warm-up OOM paging issue was a different older host, not this one.
+- Active control session66074, OLD /tmp/skip-eager-optimizer/skc-with-std,
+  target /tmp/skip-eager-optimizer-development-build. At~9min warm-up merged
+  compiler pid80807 ~31GiB RSS, CPU99.9%, no errors; disk39GiB free. Do not
+  edit compile.sk/commit while script owns source; it finally restores content
+  AND original mtime. Control progress log empty until first build completes.
+- After control: preserve results; delete ONLY completed old target's skc
+  state.db pair (inspect exact names first) to free~40GiB. Run new benchmark:
+  BENCH_SKC=/tmp/skip-generic-ir-mappers/skc-with-std
+  BENCH_TARGET=/tmp/skip-generic-ir-development-build
+  python3 /tmp/skip-generic-ir-mappers/benchmark-message.py
+    /tmp/skip-generic-ir-mappers/compiler-benchmark
+  redirect compiler-benchmark-run.log. Fresh target required new ABI.
+- Then diagnosis/run.py (new host/target) performs one profiled+debug message
+  edit and restored-mtime revert; analyze-reuse.py reports GENERIC_IR execution,
+  generic-body/plan/specialized writes. No benchmarks concurrent with other jobs.
+- Finally run self-built __merged executable with SKARGO_BIN=test,
+  SKTEST_FILTERS=incremental, PATH=new bin, --jobs2, cwd compiler; expect13 tests
+  including modified function_ir signature/default/cache checks. All earlier
+  optimized844/native/update/focused validations already passed. Then record
+  performance and commit. Current sources only specialize.sk,compile.sk,tests.sk
+  +this log modified. No unresolved implementation failures.
+- Existing old eager-cache warm-up STOPPED at~23min before completion: cache
+  grew from39GiB to~60GiB near64GiB configured capacity, no message samples yet.
+  Not a completed timing or proof of OOM. Short 1s/18-sample profile confirms
+  optimizer cache updates + runtime sync/purge; preserved control-warmup.perf.
+  Source+mtime restored by finally; terminated only merged skc, script exited.
+- Removed ONLY old target merged state.db after process exit. Rootlib current
+  source archive/cache kept. Restarted OLD control fresh merged cache session
+  89207, control-benchmark-fresh-run.log and control-benchmark-fresh/results.json.
+  This gives both hosts fresh caches for fair same-source3-pair comparison.
+  No other active heavy jobs. New-host fresh benchmark still pending, then
+  diagnosis+13 updated self-built incremental tests, results+commit.
+- Sequential orchestration active: session15374 runs finish-experiment.py,
+  /tmp/skip-generic-ir-mappers/finish-experiment.log. It pidfd-waits control PID
+  81144, validates10 successful records + exact source/mtime restoration, deletes
+  old completed skc DB pair, then runs NEW fresh benchmark, diagnostic profile+
+  trace, reuse analyzer, and self-built updated13-test incremental suite. Checks
+  each result and source restoration. Do NOT manually start duplicate jobs or
+  delete caches while it runs. If user requests stop, stop orchestration too.
+  Control fresh session89207, merged pid81218, at~5min healthy, no other CPU jobs.
+  All plan/source/validation details above remain current. No commit yet.
+- OLD same-source FRESH control completed successfully: initial585.344s,
+  no-op0.121/0.124s. Three message/revert pairs:
+  21.9119/22.3023,21.5314/22.8673,22.8474/21.9186s;
+  mean22.2298s median22.1105s. Generated compiler
+  smoke checks pass every step. Original timestamp restore20.772s. Source+mtime
+  verified exact by orchestration. Only completed old skc DB pair deleted.
+- NEW fresh benchmark now automatically running, same current source, target
+  /tmp/skip-generic-ir-development-build, compiler-benchmark-run.log. Orchestration
+  session15374 still active, no duplicate jobs. After benchmark it will run
+  diagnostic and updated self-built13 incremental tests automatically.
+- NEW same-source fresh benchmark completed successfully: initial615.580s
+  INCLUDING dependency setup (old fresh-main control585.344s reused dependencies,
+  so these initial totals are not a cold-build A/B comparison). No-op0.120/0.125s.
+  Three message/revert pairs20.9086/20.7392,19.9814/20.2978,21.8638/20.3745s.
+  Mean20.6942s, median20.5569s, vs old mean22.2298s/median22.1105s:
+  1.5356s saved, 6.91% less time across6 samples/host. One new
+  edit21.864s shows remaining variation; report approximate7%, not exact guarantee.
+  All produced compiler smoke checks passed; original timestamp restore19.364s.
+- Profile+trace complete: wall20.337s, merged skc13.725s (13.027user/.703system),
+  source archive.623s. LLVM graph3.143s, merge.052s, symbols.030s, emit3.064s.
+  EXACTLY3 generic mapper executions: compile,compile_batch,ensureCompatibleLLVMVersion.
+  Only ensureCompatibleLLVMVersion generic output changes; exactlyONE specialized
+  IR write; ZERO global plan writes. Callers compile because their current
+  declaration reads are broad, but cached output suppresses further work.
+- CPU samples: planFunctionIR27 samples~.273s vs earlier old134~1.354s.
+  getGFunctionFun no samples in new vs old115~1.162s (not proof of zero CPU;
+  actual3 executions known from explicit debug events). Old profile is historical,
+  whereas total A/B times above use IDENTICAL source and fresh caches per host.
+  phase-comparison.json and comparison.json preserve estimates and timing results.
+- Orchestration finished successfully, source content+mtime restored exactly.
+  Self-built UPDATED full incremental suite PASSED13/13 incl modified function_ir
+  generic reuse and signature/default updates. All844 existing regressions,
+  optimized26 native fixtures,28 native updates,6 mode cases and focused tests
+  also passed; fast10 coordinate-consumer cases passed. git diff --check passes.
+  Final new cache39GiB+658MiB. No active experiment jobs. Ready to commit three
+  mapper stages, debug execution event, tests and this log. Remaining global
+  identity scan intentionally retained; no parallelism/split LLVM changes.

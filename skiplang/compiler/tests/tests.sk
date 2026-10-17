@@ -677,6 +677,43 @@ private fun incrementalFunctionIR(): void {
         line.startsWith("WRITTEN:  /specializer/function-ir/")
       ).collect(Array);
       T.expectEq(writes.size(), expectedWrites, writes.join("\n"));
+      // Both irPair instantiations share one generic compilation. Check
+      // execution as well as writes: comparing unchanged outputs afterward
+      // used to hide recompilation of every generic body in the global plan.
+      genericCompilations = updated.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("GENERIC_IR:"))
+        .collect(Array);
+      changedCallable = if (expectedWrites == 2) "irPair" else "irIndependent";
+      T.expectEq(
+        genericCompilations
+          .filter(line -> line.contains(changedCallable))
+          .collect(Array)
+          .size(),
+        if (expectedWrites == 0) 0 else 1,
+        genericCompilations.join("\n"),
+      );
+      // A caller can also be invalidated by its tracked declaration read.
+      // It must not cause unrelated callables to compile, nor compile the
+      // shared generic once per instantiation.
+      T.expectTrue(
+        genericCompilations.all(line ->
+          expectedWrites != 0 &&
+            (line.contains(changedCallable) || line.contains("\"main\""))
+        ),
+        genericCompilations.join("\n"),
+      );
+      T.expectTrue(
+        genericCompilations.size() <= 2,
+        genericCompilations.join("\n"),
+      );
+      planWrites = updated.stdout
+        .split("\n")
+        .filter(line ->
+          line.startsWith("WRITTEN:  /specializer/function-ir-plan/")
+        )
+        .collect(Array);
+      T.expectEq(planWrites.size(), 0, planWrites.join("\n"));
       links = updated.stderr.split("\n").filter(line ->
         line.startsWith(">> clang++ ")
       ).collect(Array).size();
@@ -690,6 +727,17 @@ private fun incrementalFunctionIR(): void {
     for ((pairText, otherText, mainText, expected, timestamp) in Array[
       (pair + "fun irExtra(): Int { 4 }\n", other, extraMain, "25", "200001010000.04"),
       (pair, other, main, "21", "200001010000.05"),
+      (
+        pair.replace("(x: T)", "(x: T, bias: Int = 1)")
+          .replace("(x, 1)", "(x, bias)"),
+        other, main, "21", "200001010000.06",
+      ),
+      (
+        pair.replace("(x: T)", "(x: T, bias: Int = 2)")
+          .replace("(x, 1)", "(x, bias)"),
+        other, main, "23", "200001010000.07",
+      ),
+      (pair, other, main, "21", "200001010000.08"),
     ]) {
       FileSystem.writeTextFile(generic, pairText);
       FileSystem.writeTextFile(independent, otherText);
