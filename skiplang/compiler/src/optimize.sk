@@ -770,7 +770,6 @@ fun compileAll(
 private fun makeWorkFile(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  shared: SKStore.EHandle<SKStore.Key, SKStore.File>,
   f: Function,
   env: GlobalEnv,
   config: Config.Config,
@@ -783,7 +782,7 @@ private fun makeWorkFile(
         .values()
         .map(function -> (function.id, function))
         .collect(UnorderedMap),
-      full.sourcePositions,
+      SourcePositions.Table::read(context),
     )
   };
   functions = mutable UnorderedMap<SFunctionID, Function>[];
@@ -844,36 +843,10 @@ private fun makeWorkFile(
       }
     }
   };
-  // Only referenced anchors affect diagnostics for this work item. Unrelated
-  // declarations in the same file must not invalidate its optimization.
-  symbols = mutable Map<
-    FileCache.InputSource,
-    mutable UnorderedSet<SourcePositions.Symbol>,
-  >[];
-  addPos = (pos: Pos) -> addPositionSymbols(pos, symbols);
-  for (function in functions.values()) {
-    addPos(function.pos);
-    function.params.each(param -> addPos(param.posOrDefault(function.pos)));
-    for (block in function.blocks) {
-      addPos(block.pos);
-      block.params.each(param -> addPos(param.posOrDefault(function.pos)));
-      block.instrs.each(instr -> addPos(instr.pos))
-    }
-  };
-  neededSymbols = symbols.map((_, names) -> names.chill()).chill();
-  positions = shared.getArrayFilter(context, SKStore.IID(2), file ~> {
-    table = PositionsFile::type(file).value;
-    PositionsFile(
-      SourcePositions.Table{
-        files => table.files
-          .filter((file, _) -> neededSymbols.containsKey(file))
-          .map((file, anchors) ->
-            anchors.filter((name, _) -> neededSymbols[file].contains(name))
-          ),
-      },
-    )
-  })[0].value;
-  WorkFile(f, functions.chill(), positions)
+  // Optimization and successful verification consume symbolic positions only.
+  // Verifier failures resolve current coordinates in
+  // optimizeRow; debug/disassembly took the full-env path above.
+  WorkFile(f, functions.chill(), SourcePositions.Table{})
 }
 
 private fun addRangeSymbols(
@@ -928,7 +901,6 @@ private class RoundFile(
   unoptimized: Array<SFunctionID>,
   round: Int,
 ) extends SKStore.File
-private class PositionsFile(value: SourcePositions.Table) extends SKStore.File
 private class WorkKey(id: SFunctionID) extends SKStore.Key
 private class SharedFile(
   env: GlobalEnv,
@@ -975,7 +947,12 @@ private fun initializeRound(input: InputFile): RoundFile {
     }
   };
   RoundFile(
-    env with {sfuns => allFuns.chill()},
+    // Absolute coordinates are tracked by their consumers. Keeping them here
+    // would propagate an unrelated anchor change through every cached round.
+    env with {
+      sfuns => allFuns.chill(),
+      sourcePositions => SourcePositions.Table{},
+    },
     config,
     unoptimized.toArray(),
     0,
@@ -1062,7 +1039,7 @@ private fun prepareRow(
       common = SharedFile::type(shared.getArray(context, SKStore.IID(1))[0]);
       writer.set(
         key,
-        makeWorkFile(context, input, shared, f, common.env, common.config),
+        makeWorkFile(context, input, f, common.env, common.config),
       )
     }
   | state @ RoundFile _ -> writer.set(key, state)
@@ -1071,7 +1048,7 @@ private fun prepareRow(
 }
 
 private fun optimizeRow(
-  _context: mutable SKStore.Context,
+  context: mutable SKStore.Context,
   writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
   key: SKStore.Key,
   values: mutable SKStore.NonEmptyIterator<SKStore.File>,
@@ -1079,7 +1056,7 @@ private fun optimizeRow(
 ): void {
   values.first match {
   | work @ WorkFile _ ->
-    common = SharedFile::type(input.getArray(_context, SKStore.IID(1))[0]);
+    common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
     functions = FunctionIDToFunction::mcreate();
     for (function in work.functions.values()) functions.insert(function);
     env = common.env with {
@@ -1089,12 +1066,14 @@ private fun optimizeRow(
     writer.set(
       key,
       ResultFile(
-        optimizeOne(
-          work.f,
-          env,
-          common.config,
-          optimizationPasses(common.config),
-          common.config.optConfig.all(),
+        Verify.withSourcePositions(context, () ->
+          optimizeOne(
+            work.f,
+            env,
+            common.config with {deferVerifierDiagnostics => true},
+            optimizationPasses(common.config),
+            common.config.optConfig.all(),
+          )
         ),
       ),
     )
@@ -1106,7 +1085,7 @@ private fun optimizeRow(
 }
 
 private fun mergeRound(
-  _context: mutable SKStore.Context,
+  context: mutable SKStore.Context,
   writer: mutable SKStore.TWriter<SKStore.IID, RoundFile>,
   key: SKStore.IID,
   values: mutable SKStore.NonEmptyIterator<SKStore.File>,
@@ -1143,7 +1122,14 @@ private fun mergeRound(
   if (state.config.optConfig.verify) {
     for (result in results) {
       result.extraFun.each(f ->
-        Verify.verifyFunction(f, env, state.config, "new function")
+        Verify.withSourcePositions(context, () ->
+          Verify.verifyFunction(
+            f,
+            env,
+            state.config with {deferVerifierDiagnostics => true},
+            "new function",
+          )
+        )
       )
     }
   };
@@ -1197,8 +1183,7 @@ private fun runRound(
           },
           state.config,
         ),
-      );
-      writer.set(SKStore.IID(2), PositionsFile(state.env.sourcePositions))
+      )
     },
   );
   planned = previous.map(
@@ -1276,19 +1261,50 @@ private fun lowerConsts(
     RoundFile::type,
     context,
     SKStore.DirName::create("/optimizer/lower-const/"),
-    (_context, writer, key, values) ~> {
+    (context, writer, key, values) ~> {
       state = values.first;
+      // Initializer ordering consumes coordinates. Track only the
+      // initializer anchors here, then remove coordinates from the next round.
+      symbols = mutable Map<
+        FileCache.InputSource,
+        mutable UnorderedSet<SourcePositions.Symbol>,
+      >[];
+      for (f in state.env.sfuns) {
+        if (f.gfunction.id.endsWith(LowerConst.kComputeConstSuffix)) {
+          addPositionSymbols(f.pos, symbols)
+        }
+      };
+      positions = SourcePositions.Table::readSymbols(
+        context,
+        symbols.map((_, names) -> names.chill()).chill(),
+      );
       writer.set(
         key,
         initializeRound(
           InputFile(
-            LowerConst.lowerAllConsts(state.env, state.config),
+            Verify.withSourcePositions(context, () ->
+              LowerConst.lowerAllConsts(
+                state.env with {sourcePositions => positions},
+                state.config with {deferVerifierDiagnostics => true},
+              )
+            ),
             state.config,
           ),
         ),
       )
     },
   )
+}
+
+// Backend diagnostics and LLVM debug metadata must resolve symbolic positions
+// against the current sources even when every optimization round is reused.
+private fun withCurrentPositions(
+  context: mutable SKStore.Context,
+  dir: SKStore.EHandle<SKStore.IID, RoundFile>,
+): GlobalEnv {
+  dir.getArray(context, SKStore.IID(0))[0].env with {
+    sourcePositions => SourcePositions.Table::read(context),
+  }
 }
 
 fun compileAllIncrementally(
@@ -1307,7 +1323,7 @@ fun compileAllIncrementally(
     context.!reads = progress.reads;
     context.!newDirs = progress.dirs;
     if (progress.complete) {
-      return Some(progress.dir.getArray(context, SKStore.IID(0))[0].env)
+      return Some(withCurrentPositions(context, progress.dir))
     };
     !round = progress.round;
     !beforeRound = progress.beforeRound;
@@ -1328,7 +1344,7 @@ fun compileAllIncrementally(
     first = runRounds(context, current, "/optimizer/before-const");
     lowered = lowerConsts(context, first);
     completed = runRounds(context, lowered, "/optimizer/after-const");
-    return Some(completed.getArray(context, SKStore.IID(0))[0].env)
+    return Some(withCurrentPositions(context, completed))
   };
   if (unfinished(context, current)) {
     scope = if (afterConst) "/optimizer/after-const" else {
@@ -1346,7 +1362,7 @@ fun compileAllIncrementally(
     !afterConst = true
   };
   result = if (complete) {
-    Some(current.getArray(context, SKStore.IID(0))[0].env)
+    Some(withCurrentPositions(context, current))
   } else {
     None()
   };

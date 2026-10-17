@@ -1284,3 +1284,138 @@ host/deps), verify clean restored source/mTime, commit tested fix + notes.
   original before-fix logs untouched. Current compiler-dev DBs belong ONLY to
   immutable /tmp/skip-file-array-fix/skc and its runtime; old position host must
   not be used against them. No split LLVM changes made. Ready to commit fix.
+
+### 2026-10-17 — isolate optimizer coordinate dependencies (authorized)
+User approved the next bottleneck experiment: keyed source anchors, semantic
+round state, explicit coordinate dependencies for diagnostics/backend. Changes
+in progress in SourcePositions.sk and optimize.sk. Add keyed anchor collection;
+remove absolute positions from initial/continued RoundFile.env; attach current
+positions on optimizer return. Work diagnostics retain only individually read
+anchors (including verifier/lowering failure dumps). Constant initializer order
+is a real coordinate consumer: lower-const reads only initializer anchors before
+stripping coordinates from its output. Sequential implementation unchanged.
+Next: source check, build immutable experimental host with fixed std archives,
+regression/update/debug-coordinate tests, fresh ABI-specific compiler build DBs,
+clean helper/body/comment timings and causal trace. Existing compiler-dev DBs
+belong to /tmp/skip-file-array-fix/skc; never use new executable on those DBs.
+No split LLVM work. Do not commit until validated and measured.
+- Important audit refinement: verifier is ON by default and Rewrite also verifies
+  intermediate IR internally. Avoid per-work anchor reads (would retain a huge
+  coordinate dependency graph). Config.deferVerifierDiagnostics is set ONLY in
+  local calls wrapped by Verify.withSourcePositions: verifier throws an internal
+  structured failure, wrapper resolves tracked current sources and emits the same
+  function dump/InternalError. Sequential verification keeps immediate reporting.
+  No invocation closure is stored in a mapper or cached data. Normal optimizer
+  work now carries an empty position table; debug/disasm retain full current data.
+  New regression exercises successful verification without reads and failed
+  verification requiring current positions; helper/pure-movement tests require
+  zero optimizer writes, including round state. Final host building session57968.
+  Draft host kept /tmp/skip-anchor-optimizer/draft-skc (NOT for measurements).
+- Removed ONLY completed baseline target skc-*/state.db caches (~57GB), preserving
+  all baseline artifacts/logs; fresh experimental target will use a new path.
+- Final optimized experimental host built successfully in264.931s:
+  /tmp/skip-anchor-optimizer/skc (fixed std/cli/arparser archives unchanged).
+  Wrapper/bin in same directory. Six optimizer mode/cache cases passed (body
+  rows2, genuine no-op0rows/0links, release/back correct). Native/update/844
+  regression validation running serial script validate.py, session11695.
+- Current compiler + modified test harness source check passed (include one
+  @exptest fixture to avoid empty-macro unused parameter diagnostic). Standalone
+  deferred verifier regression passed: success adds no coordinate reads; failure
+  reads current source table, prints verifier-positions.sk(201, 5), then retains
+  Assert.InternalError. Initial malformed empty-block fixture hit existing dump
+  assumptions, changed test to well-formed body with argument-count mismatch.
+  Scratch assertion spacing corrected only; production behavior was correct.
+- Focused test runner now builds/runs exact repository optimization/positions/
+  constructor/verifier tests against new host, session14621. Existing behavior
+  regressions running; no compiler-size benchmarks started yet.
+- Focused runner's first initial source-position build was inadvertently launched
+  with --debug-skstore; full cold MAP_ROW value rendering dominated (gdb stack in
+  string joining / mapRow at~50s). Stopped that scratch child, cleanup completed.
+  Test now enables tracing only on warm updates where zero optimizer writes are
+  asserted. Rebuilding/rerunning focused runner session84209. No production
+  algorithm failure observed; ordinary native fixtures26 passed in58.187s,
+  updates28 passed23.279s. 844 regressions still running under validation script.
+- All844 existing regression selections passed (105.052s), 26 native and28 update
+  comparisons passed. Exact focused repo optimization/verifier/source-position/
+  constructor tests passed: helper add/remove zero optimizer writes, declaration
+  relocation zero optimizer writes with updated LLVM metadata, moving frontend
+  error locations correct. Trace now enabled only for pure relocation, avoiding
+  unnecessary verbose traces of genuine body/reorder updates.
+- Clean full compiler benchmarks started session from tool result, fresh target
+  /tmp/skip-anchor-compiler-development-build, immutable host
+  /tmp/skip-anchor-optimizer/skc-with-std, script benchmark-compiler-edits.py in
+  same dir (adds an unused-helper-front variant). Logs compiler-benchmark-run.log,
+  results compiler-benchmark/results.json. No other CPU-heavy work running.
+  Do NOT edit compile.sk during script; finally restores contents AND mtime.
+- Clean compiler cold build completed562.637s (fixed-array baseline676.169s),
+  no-op .1240s, comment20.6165/revert20.3337s. Cold merged DB~36GB versus~56GB
+  baseline. Benchmarks still running session30507: message/debug/helper/front
+  helper and restores pending. Source edits/restoration owned by script.
+- Primary clean timings: message47.8019/revert47.7823 (roughly unchanged);
+  debug-print insertion47.9682/revert50.2927 (old170.085/179.854);
+  unused helper26.6592/revert26.5040 (old101.300/107.778). All produced compiler
+  smoke checks passed. No-op .1240, comments20.6165/20.3337, cold562.637.
+- Extra front-of-file helper fixture initially placed a declaration before module
+  alias directives, which is syntactically invalid. Failed fast0.310s; not a
+  performance result or production regression. Script finally restored source
+  content AND mtime. Corrected fixture inserts after module alias O, before all
+  original functions. Continuation benchmark-remaining.py session13868 first
+  recovers baseline then times corrected add/remove + final restored no-op.
+  Results retain invalid fixture entry for transparency; main valid results
+  untouched. No concurrent tests/profiling. Need causal trace + final checks,
+  coordinate-consumer probe and incremental suite, review then commit.
+- Corrected before-functions helper add26.0674/revert27.1153s. Baseline recovery
+  after invalid fixture19.8103s; final original-mtime restoration20.2702s,
+  no-op-after .126425s. All produced compiler smoke checks passed. compile.sk
+  contents AND original mtime restored; no source diff. All clean timings done.
+- Causal helper trace/perf now running trace-helper.py session from tool result,
+  /tmp/skip-anchor-optimizer/diagnostic-run.log and diagnostic/* artifacts.
+  Uses ONLY new host and new /tmp/skip-anchor-compiler-development-build DBs.
+  No other CPU work during profile. After trace: check zero optimizer state/work
+  writes and executions; report profile; coordinate-consumer script and full
+  current compiled incremental suite; final diff review, log and commit.
+- Final causal trace complete: baseline20.277s/helper26.568s/restore29.489s
+  (instrumented, clean timings above primary). ZERO WRITTEN/MAP_ROW/DIRTY READER
+  events with optimizer source paths. All cached optimizer rounds reused; input
+  normalization/coordinator may still run upstream. No whole-position projection
+  closures remain. Remaining6804 dirty-reader events mostly frontend modulecache
+  validation (6578 events across the two compiler units), not optimizer work.
+- Perf sample report (zero lost) no longer shows position projection or round
+  planning as significant. Main compiler backend phase times graph3.061s,
+  merge .050s, symbols .030s, write3.028s. Assembly writing17.89% inclusive;
+  native_eq2.76% inclusive. updateDirtyReaders below .5% report threshold,
+  previously42.54%. Profiles in diagnostic/helper-add/perf-{self,inclusive}.txt.
+  Reports regenerated with DEBUGINFOD_URLS empty to avoid remote symbol wait.
+- All12 CURRENT incrementality tests passed using freshly self-built __merged
+  compiler/test runner, current-incremental-suite.log. Includes new deferred
+  verifier test and strengthened helper/coordinate assertions. Together with
+  earlier844 regressions,26 native fixtures and28 update comparisons, all checks
+  for this change pass. Prior unrelated SKStore stress failure not rerun/modified.
+- Additional10 coordinate-consumer cases passed, coordinate-consumers/results.json:
+  constant initializer first-failure order matches sequential release after
+  moving/reordering/restoring declarations (4 cases); --debug, --disasm-function,
+  --no-verify metadata tracks a moved main correctly (6 cases). Initial scratch
+  metadata assertion expected main rather than exported skip_main; corrected
+  fixture only. Constant order and production behavior were correct throughout.
+
+Completed experiment results (seconds, serial builds, identical edit workload):
+
+| Edit | Previous fixed-array host | Semantic-round host |
+| --- | ---: | ---: |
+| No-op | .123 / .125 | .124 / .126 |
+| Comment add/remove | 20.585 / 20.443 | 20.617 / 20.334 |
+| Message change/revert | 47.895 / 47.023 | 47.802 / 47.782 |
+| Debug print add/remove | 170.085 / 179.854 | 47.968 / 50.293 |
+| Unused helper add/remove | 101.300 / 107.778 | 26.659 / 26.504 |
+| Helper before original functions add/remove | not measured | 26.067 / 27.115 |
+| Cold build | 676.169 | 562.637 |
+
+Source contents/original mtime restored after both benchmark and trace scripts;
+no compile.sk diff. Experimental DBs belong ONLY to immutable
+/tmp/skip-anchor-optimizer/skc; baseline compiler-dev target DBs removed, baseline
+binaries/archives/results preserved. Final experimental compiler merged DB~39GB
+(cold~36GB), compared baseline~56GB cold. No active builds/tests/profilers remain.
+This checkpoint completes the authorized source-coordinate bottleneck change.
+Sequential optimizer preserved; normal verification still enabled. No split LLVM
+changes applied. Original split-output stage remains future work. Review/commit
+this change; no additional implementation needed in this experiment.

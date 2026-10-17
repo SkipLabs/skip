@@ -217,6 +217,19 @@ class SymbolsFile(
 
 class OrderFile(value: Map<Symbol, Int>) extends SKStore.File
 
+// Coordinate readers depend on individual anchors, not every declaration in a
+// file. Adding an unrelated symbol must not revalidate all optimizer readers.
+private class AnchorKey(
+  file: FileCache.InputSource,
+  symbol: Symbol,
+) extends SKStore.Key
+private class AnchorFile(value: Position) extends SKStore.File
+private const anchors: SKStore.EHandle<AnchorKey, AnchorFile> = SKStore.EHandle(
+  AnchorKey::keyType,
+  AnchorFile::type,
+  SKStore.DirName::create("/sourcePositionAnchors/"),
+);
+
 // Some language features deliberately enumerate definitions in source order.
 // Their dependency is on that order, not on the absolute marker coordinates.
 fun sourceOrder(
@@ -261,6 +274,17 @@ fun populate(
       writer.set(key, SymbolsFile(symbols, order))
     },
   );
+  _ = dir.map(
+    AnchorKey::keyType,
+    AnchorFile::type,
+    context,
+    anchors.dirName,
+    (_context, writer, file, values) ~> {
+      for ((symbol, position) in values.first.value.items()) {
+        writer.set(AnchorKey(file, symbol), AnchorFile(position))
+      }
+    },
+  );
 }
 
 class Table{files: Map<FileCache.InputSource, Map<Symbol, Position>> = Map[]} {
@@ -270,6 +294,21 @@ class Table{files: Map<FileCache.InputSource, Map<Symbol, Position>> = Map[]} {
         .items(context)
         .map(entry -> (entry.i0, entry.i1.next().fromSome().value))
         .collect(Map),
+    }
+  }
+
+  static fun readSymbols(
+    context: mutable SKStore.Context,
+    symbols: Map<FileCache.InputSource, UnorderedSet<Symbol>>,
+  ): Table {
+    Table{
+      files => symbols.map((file, names) ->
+        names
+          .map(name ->
+            (name, anchors.getArray(context, AnchorKey(file, name))[0].value)
+          )
+          .collect(Map)
+      ),
     }
   }
 

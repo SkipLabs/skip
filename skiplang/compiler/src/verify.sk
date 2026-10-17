@@ -729,10 +729,50 @@ mutable private class Verifier(
       " during phase '" +
       this.where +
       "'\n";
-    print_error("" + this.currentPos + ": Internal error: " + errorMsg);
+    failure = VerificationFailure(
+      this.optinfo.f,
+      this.env,
+      this.config,
+      this.currentPos,
+      errorMsg,
+    );
+    if (this.config.deferVerifierDiagnostics) throw failure;
+    failure.report(this.env.sourcePositions);
+  }
+}
+
+// A mapper may optimize semantic IR without absolute coordinates. Carry a
+// failed verification to its caller before resolving source locations; this
+// also covers verification inside Rewrite, not just the outer pass checks.
+private class VerificationFailure(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+  pos: Pos,
+  message: String,
+) extends Exception {
+  fun getMessage(): String {
+    this.message
+  }
+
+  fun report(positions: SourcePositions.Table): _ {
+    print_error("" + this.pos + ": Internal error: " + this.message);
     print_error("Function causing the error:\n");
-    this.optinfo.f.dump(this.env, this.config);
-    this.currentPos.die(errorMsg);
+    this.f.dump(this.env with {sourcePositions => positions}, this.config);
+    this.pos.die(this.message)
+  }
+}
+
+fun withSourcePositions<R>(
+  context: mutable SKStore.Context,
+  action: () -> R,
+): R {
+  try {
+    action()
+  } catch {
+  | failure @ VerificationFailure _ ->
+    failure.report(SourcePositions.Table::read(context))
+  | other -> throw other
   }
 }
 
