@@ -1077,3 +1077,115 @@ configuration selects sequential specialization, including release builds.
   Native split draft must still validate preamble linkage/native behavior; no
   performance claim yet. Commit stage5 only if it improves performance; revert
   experimental production edits otherwise. Keep all earlier committed work.
+
+### 2026-10-17 — diagnosis only (new user scope)
+
+User resumed asking WHY rebuilds are slow, explicitly no solutions yet. Split
+LLVM and production optimization changes remain on hold. Existing immutable
+position driver and its matching compiler-dev DBs are used; no new host ABI.
+
+Diagnostic run: /tmp/skip-rebuild-diagnosis/run.py (session56457), wrapper
+skc-trace.py records --debug-skstore stdout plus monotonic timestamps, phase
+stderr with SKC_TIME_PHASES=1, per-unit JSON counters, and a 99Hz DWARF perf
+profile for helper-add. Raw traces are authoritative; wrapper directory-count
+regex misses numeric IID state keys. trace-analysis.json reparses raw writes.
+Python wrapper forwards link plan stdout to skargo. Source restored with original
+mtime in finally. Do not edit compile.sk during this run.
+
+Major confirmed discovery: filtered-read revalidation compares arrays with
+DIFFERENT runtime generic types after bbafd0d87 nominal GC type identity fix.
+EagerDir.getArrayFilter<R> initially registers Array<R>, covariantly stored as
+Array<File>. Context.updateDirtyReaders replays erased File->File projection,
+creating Array<File>. native_eq compares runtime GC type pointers, so identical
+projected elements can still produce unequal enclosing arrays. This is a
+SKStore equality-boundary regression exposed by the identity correction, not a
+legitimate dependency on an unused helper. Do NOT weaken nominal identity: it
+fixed real class confusion. No fix implemented in this diagnostic task.
+
+Proof programs OUTSIDE repo:
+- array-probe.sk: native_eq(narrow[0],broad[0])=0, native_eq(narrow,broad)=1.
+- filter-probe.sk: only observed field projected; initial runs1, ignored-field
+  change runs2 (WRONG), observed change runs3. Same test compiled by immutable
+  /tmp/skip-optimizer-stage3/skc-with-std before GC identity correction gives
+  1,1,2 as expected. Current host diagnostic control filter-probe-wide.sk, with
+  erased return type File, also gives1,1,2. Control exists only in scratch code;
+  no production fix applied. Probes use fresh small processes, not compiler DB.
+- write-probe.sk currently checking analogous typed-array false write against
+  fixed/purged storage (hypothesis until its output inspected).
+
+Completed diagnosis observations so far:
+- Interrupted prior invocation recovered successfully50.608s (not benchmark),
+  restored baseline forced timestamp rebuild19.956s, skargo no-op0.123s.
+- Instrumented helper addition344.007s total; main skc334.309s, library skc3.509s.
+  NOT comparable directly to old219s timing: debug text, Python tracing and perf
+  overhead. Several tiny probe builds also ran during diagnostic tracing.
+- Helper-add trace: ZERO changed specialized function IR rows and ZERO optimizer
+  function WorkKey writes at every stage. All1,475,416 optimizer DIRTY READER
+  events target inputs from shared/FilteredReadKey(IID2) position projections;
+  none target actual optimizer functions stage. Source position state propagates
+  through385 before-const +3 after-const cached round collections. Each round's
+  state record changes, but function bodies/results do not.
+- Perf helper-add (32K samples, zero lost): inclusive52.96% makeWorkFile,
+  14.89% Context.updateDirtyReaders, 8.52% updateNewDeps, 5.27% Deps.addFilter,
+  planRound2.20%, native_eq1.57%, copy_with_pages3.59%. Inclusive percentages
+  overlap. Expensive repeated position filtering/symbol traversal/string hash
+  and compare dominate; native_eq mismatch itself is fast but triggers work.
+  Files helper-add/perf-{self,inclusive}.txt, compiler.perf.
+- Main skc LLVM phases: create graph3.301s, merge .059s, symbols .038s,
+  write LLVM4.072s. Whole build minus both skc invocations6.19s includes native
+  clang/link/copy/skargo. Restored baseline main skc13.758s, LLVMgraph2.933s,
+  write2.849s, total19.956s. Avoid promising exact post-fix or split speedups.
+- Frontend sees3284 module readers invalidated on root namespace change, but
+  changed naming/typing/outer rows for helper only, no specialized helper IR.
+  Thus real frontend global enumeration exists but is not dominant profile cost.
+
+Run still completing helper-remove, then comment-add/restore. Need final raw
+counts and compare timing/cause patterns, inspect write-probe output, ensure
+source restoration and no running subprocesses, finish user-facing report.
+Environment DIAG_DIR differs per label and perf injects several env vars for
+helper-add, so use timings only diagnostically. Major causal repro independent
+of those variables; control/source-position-only traces show no function IR
+changes. Future clean timing should hold environment stable and avoid tracers.
+
+Diagnosis completion:
+- All trace builds completed successfully; helper-remove356.899s with debugging,
+  comment-add21.499s, final restore22.218s. Source content and ORIGINAL timestamp
+  restored; no compiler/skargo/perf processes remain. Compiler code unchanged.
+- Raw helper-remove has identical totals to addition:1,475,416 position-reader
+  invalidations;385 before-const and3 after-const round states propagate; zero
+  changed function IR and zero optimizer WorkKey writes. Naming/typing/outerdefs
+  each change just the helper's row. Comment and restore have ZERO optimizer
+  round writes, position invalidations, function IR, naming, or typing changes.
+- Position parser probe (positions-probe.sk, linked existing compiler archive):
+  compile.sk base112 anchors; helper114 with ONLY two new helper start/end
+  anchors; every existing coordinate unchanged. Comment112, every coordinate
+  unchanged. Thus unused-helper projections should stay semantically equal.
+- Ordinary-write regression CONFIRMED: write-probe.sk uses an UNFILTERED reader,
+  purges storage, then writes identical row. Counts1->2 (wrong). Later genuine
+  ignored/observed row changes produce3,4 as expected for unfiltered reader.
+  Before-identity compiler gives1,1,2,3. Current host diagnostic control
+  write-probe-wide.sk writes erased Array<File> and also gives1,1,2,3.
+  Fixed getArraySourceKey flattens into Array<File>; incoming TWriter/typed
+  write may supply Array<ConcreteFile>. Whole-array native_eq is too strict
+  across that boundary. Same family of mismatch as filtered revalidation.
+- This explains the validation blind spot: optimizer test asserted zero changed
+  WorkKey OUTPUTS, which still passes while prepareRow/makeWorkFile rerun
+  millions of times and produce equal outputs. Native correctness tests also
+  cannot catch unnecessary recomputation. SKStore filtered-read tests do cover
+  ignored fields, but were not rerun with the final nominal-identity bootstrap.
+- Clang-only command from final restored build measured serially three times
+  after traces finished, with output redirected to scratch ELF:5.6859,5.6975,
+  5.7111s (median5.6975s). LLVM graph/write remains~6-7s inside skc, other
+  snapshot/tracking/frontend/archive work plus native stage explains observed
+  ~20s warm rebuild floor in unaffected source-position case. Splitting clang
+  alone cannot eliminate the other work; no speedup promised or tested.
+- Yesterday's first-comment201s result had no causal trace, so exact reason for
+  that historical first-run discrepancy remains unproven. Today's controlled
+  helper +/- cases isolate position-triggered invalidation; comment +/- do not
+  trigger it. Do not retrospectively claim every slow edit has identical cause.
+- No solutions, production diagnostics changes, or split-output changes applied.
+  Existing --debug-skstore, phase timing and perf were enough for this report.
+  Evidence/probes/logs in /tmp/skip-rebuild-diagnosis. Raw traces~1.2GB; compiler
+  DB remains tied to /tmp/skip-position-optimizer-driver/skc, never substitute
+  another driver against it. Broader typed-container equality audit remains for
+  any subsequent implementation task; no performance estimate is validated.
