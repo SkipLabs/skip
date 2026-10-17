@@ -1419,3 +1419,79 @@ This checkpoint completes the authorized source-coordinate bottleneck change.
 Sequential optimizer preserved; normal verification still enabled. No split LLVM
 changes applied. Original split-output stage remains future work. Review/commit
 this change; no additional implementation needed in this experiment.
+
+### 2026-10-17 — diagnose remaining ~48s message edit (report only)
+User asks where48s is spent / why changing a message costs so much. No fixes
+requested. Starting controlled experiment /tmp/skip-message-diagnosis/run.py,
+session2835. Same immutable host /tmp/skip-anchor-optimizer/skc, matching target
+/tmp/skip-anchor-compiler-development-build. Compiler wrapper records each unit
+wall/user/system time, phase timers, optional perf and SKStore events. clang++
+wrapper records native compile/link separately. Sequence baseline warm, message
+profile (no verbose store trace), revert, message store trace (no perf), final
+restore with original mtime. No concurrent heavy work. Do NOT edit compile.sk;
+script finally restores exact source+mtime. Pending: measure per-unit/phase time,
+profile both root sklib and merged compiler, attribute mapper executions/dirty
+reader causes and actual changed functions/rounds, inspect source dependencies,
+report diagnosis. No compiler/runtime modifications yet.
+- Experiment complete; original compile.sk content AND mtime restored. All five
+  builds succeeded: warm baseline19.868s, profiled message50.204s, revert49.333s,
+  traced message48.947s, original-mtime restore49.744s. Profiling has overhead;
+  original uninstrumented message47.802/revert47.782s remains clean reference.
+  Scripts/raw traces/profiles/timing-summary.json under /tmp/skip-message-diagnosis.
+- Process split, profiled message: source sklib .583s; main compiler43.643s
+  (40.554user/1.447system); external clang5.793s; remaining dispatch~.185s.
+  Traced message main42.354s; comparable compiler CPU42.351s, not a wait/sync
+  bottleneck. Native clang consistently5.75–5.81s across all cases.
+- Main phase timers: message LLVM graph3.164s, merge .057s, symbols .030s,
+  emit3.069s; baseline3.022/.052/.030/2.936s. LLVM/backend timers largely unchanged.
+  Before graph generation message36.732s vs baseline7.407s. Most extra elapsed
+  time is before LLVM, not larger native compile or archive packaging.
+- Main CPU profile~4K samples, zero lost: optimizer/IR pipeline callback(index2)
+  63.54% (~25.7 CPU seconds); specialization/frontend callback4.97% (~2.0s);
+  final backend callback21.56% (~8.7s), including finishOptimizedFunctions6.06%
+  (~2.45s) and LLVM graph/write~6.2s. Remaining~10% covers initialization/context
+  synchronization/GC and other frames. These are sampled inclusive estimates,
+  not independent per-pass wall timers. Reported subprocess totals are exact.
+- Within optimizer/IR callback, planRound17.82% of main samples (~7.2s), almost
+  all constructing its TWriter SortedMap (17.44%). mergeRound5.17% (~2.1s).
+  SKStore.writeEntry21.69%, getArraySourceKey11.95%, equalFileArrays9.53%,
+  native_eq7.09%: overlapping inclusive costs, do NOT add these percentages.
+  Dominant self costs sorted-map key lookup/insertion/iteration/balancing,
+  WorkKey comparison, allocation and equality. Actual optimization passes are
+  small in this profile; successful verification is .32% inclusive.
+- Trace establishes causality: exactly ONE per-instantiation function-IR write,
+  ensureCompatibleLLVMVersion; zero source-position/anchor writes (same-width
+  replacement version->release). Function IDs stable. Optimizer result rows
+  change for only SFunctionID75708. Two additional preparation keys75634/75638
+  depend on it; their optimizer result rows remain unchanged.
+- Nevertheless, round state rewrites all386 before-const rounds +3 after-const
+  rounds (389 total). Of before-const rounds358 are ready,28 cycle scheduling.
+  Plan writes modified function row358 times before/3 after; preparation has
+  additional153/154 caller-key writes. Round state propagates through plan,
+  inputs, functions, gather, merge. All stored functions remain in RoundFile.env
+  even after completion, so a real body difference survives in every subsequent
+  global round snapshot. This differs from the solved source-coordinate issue.
+- Root architecture: optimize.sk RoundFile.env holds full sfuns; planRound's
+  ready branch loops over ALL env.sfuns and inserts every FunctionFile into a
+  new writer map. SKStore correctly suppresses unchanged per-function outputs,
+  after building/looking up/comparing them. Gather groups all function results
+  under IID0; mergeRound converts the complete group to arrays, clones sfuns,
+  reinserts all results. One semantic change therefore causes whole-table
+  planning/comparison/gather/merge repeatedly even with good per-function reuse.
+  SKStore sees genuinely changed coarse inputs; no evidence of another stale
+  closure or equality correctness bug.
+- Final backend is also coarse: any optimized-env change reruns whole-program
+  reachability/vtables/lowering (~2.5 sampled CPU seconds), all LLVM generation
+  and text (~6.2s), then clang parses/codegens the entire105,578,621-byte .ll
+  (~5.8s). Cached source-library packaging is only .4–.6s. Split LLVM alone
+  cannot eliminate the dominant optimizer round overhead.
+- Diagnostic limitations: embedded host produces WRITTEN/DIRTY READER events,
+  but no MAP_ROW events in this run, despite having the logging string. Infer
+  round replay from changed state rows and CPU stacks, not absent MAP_ROW logs.
+  Likewise previous helper's strongest evidence is zero state/work writes plus
+  profile disappearance; do not overclaim an exact mapper-execution count from
+  absence of this event. No instrumentation or compiler/runtime fixes added.
+- Completed requested diagnosis. Main next target would be preserving per-key
+  function collections across rounds with small scheduling state, avoiding the
+  full snapshot rebuild and global gather when one row changes. Not implemented
+  or benchmarked here. No split LLVM changes. Working compiler source restored.
