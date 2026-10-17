@@ -1,0 +1,277 @@
+module alias T = SKTest;
+module SKStoreTest;
+
+private fun replacementParentCase(
+  ranged: Bool,
+  delayed: Bool,
+  paused: Bool,
+): void {
+  key = SKStore.IID(0);
+  controlName = SKStore.DirName::create("/replacement/control/");
+  leftName = SKStore.DirName::create("/replacement/left/");
+  rightName = SKStore.DirName::create("/replacement/right/");
+  childName = SKStore.DirName::create("/replacement/child/");
+  ownedName = SKStore.DirName::create("/replacement/owned/");
+  control = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    controlName,
+  );
+  left = SKStore.EHandle(SKStore.IID::keyType, SKStore.IntFile::type, leftName);
+  right = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    rightName,
+  );
+  child = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    childName,
+  );
+  context = SKStore.run(context ~> {
+    for ((name, value) in Array[
+      (controlName, 0),
+      (leftName, 10),
+      (rightName, 20),
+    ]) {
+      _ = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        name,
+        Array[(key, SKStore.IntFile(value))],
+      );
+    };
+    _ = control.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/replacement/driver/"),
+      (context, writer, key, values) ~> {
+        old = values.first.value == 0;
+        source = if (old) left else right;
+        _ = source.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          childName,
+          (context, writer, key, values) ~> {
+            if (old) {
+              _ = right.map(
+                SKStore.IID::keyType,
+                SKStore.IntFile::type,
+                context,
+                ownedName,
+                (_, writer, key, values) ~> writer.set(key, values.first),
+              );
+            };
+            writer.set(key, values.first);
+          },
+          if (ranged) Some(Array[SKStore.KeyRange::create(key, key)]) else {
+            None()
+          },
+        );
+        writer.set(key, values.first);
+      },
+    );
+  });
+  T.expectEq(child.get(context, key).value, 10);
+  if (!delayed) left.writeArray(context, key, Array[SKStore.IntFile(11)]);
+  control.writeArray(context, key, Array[SKStore.IntFile(1)]);
+  if (paused) {
+    T.expectTrue(
+      context.updateUntil(
+        _ ~> false,
+        name ~> name == SKStore.DirName::create("/replacement/driver/"),
+      ),
+    );
+  };
+  context.update();
+  T.expectEq(child.get(context, key).value, 20);
+  T.expectTrue(context.getDir(ownedName) is SKStore.DeletedDir _);
+  // This is a separate tick: fixing only an already queued arrow is not enough.
+  left.writeArray(context, key, Array[SKStore.IntFile(12)]);
+  context.update();
+  T.expectEq(child.get(context, key).value, 20);
+  right.writeArray(context, key, Array[SKStore.IntFile(21)]);
+  context.update();
+  T.expectEq(child.get(context, key).value, 21);
+}
+
+@test
+fun testEagerReplacementParents(): void {
+  for (ranged in Array[false, true]) {
+    for (delayed in Array[false, true]) {
+      for (paused in Array[false, true]) {
+        replacementParentCase(ranged, delayed, paused)
+      };
+    }
+  }
+}
+
+@test
+fun testEagerReplacementRetiresReads(): void {
+  key = SKStore.IID(0);
+  controlName = SKStore.DirName::create("/replacement/control/");
+  sourceName = SKStore.DirName::create("/replacement/source/");
+  dependencyName = SKStore.DirName::create("/replacement/dependency/");
+  childName = SKStore.DirName::create("/replacement/child/");
+  control = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    controlName,
+  );
+  dependency = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    dependencyName,
+  );
+  child = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    childName,
+  );
+  context = SKStore.run(context ~> {
+    for ((name, value) in Array[
+      (controlName, 0),
+      (sourceName, 10),
+      (dependencyName, 5),
+    ]) {
+      _ = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        name,
+        Array[(key, SKStore.IntFile(value))],
+      );
+    };
+    source = SKStore.EHandle(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      sourceName,
+    );
+    _ = control.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/replacement/driver/"),
+      (context, writer, key, values) ~> {
+        old = values.first.value == 0;
+        _ = source.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          childName,
+          (context, writer, key, values) ~> {
+            calls = context
+              .getGlobal("REPLACEMENT_CALLS")
+              .map(SKStore.IntFile::type)
+              .map(f -> f.value)
+              .default(0);
+            context.setGlobal("REPLACEMENT_CALLS", SKStore.IntFile(calls + 1));
+            extra = if (old) dependency.get(context, key).value else 0;
+            writer.set(key, SKStore.IntFile(values.first.value + extra));
+          },
+        );
+        writer.set(key, values.first);
+      },
+    );
+  });
+  T.expectEq(child.get(context, key).value, 15);
+  control.writeArray(context, key, Array[SKStore.IntFile(1)]);
+  context.update();
+  T.expectEq(child.get(context, key).value, 10);
+  calls = SKStore.IntFile::type(
+    context.getGlobal("REPLACEMENT_CALLS").fromSome(),
+  ).value;
+  dependency.writeArray(context, key, Array[SKStore.IntFile(6)]);
+  context.update();
+  T.expectEq(
+    SKStore.IntFile::type(context.getGlobal("REPLACEMENT_CALLS").fromSome())
+      .value,
+    calls,
+  );
+  T.expectEq(child.get(context, key).value, 10);
+}
+
+@test
+fun testEagerReplacementChangesRanges(): void {
+  zero = SKStore.IID(0);
+  one = SKStore.IID(1);
+  controlName = SKStore.DirName::create("/replacement/control/");
+  sourceName = SKStore.DirName::create("/replacement/source/");
+  childName = SKStore.DirName::create("/replacement/child/");
+  control = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    controlName,
+  );
+  source = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    sourceName,
+  );
+  child = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    childName,
+  );
+  context = SKStore.run(context ~> {
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      controlName,
+      Array[(zero, SKStore.IntFile(0))],
+    );
+    _ = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      sourceName,
+      Array[(zero, SKStore.IntFile(10)), (one, SKStore.IntFile(20))],
+    );
+    _ = control.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/replacement/driver/"),
+      (context, writer, key, values) ~> {
+        selected = SKStore.IID(values.first.value);
+        _ = source.map(
+          SKStore.IID::keyType,
+          SKStore.IntFile::type,
+          context,
+          childName,
+          (context, writer, key, values) ~> {
+            calls = context
+              .getGlobal("REPLACEMENT_CALLS")
+              .map(SKStore.IntFile::type)
+              .map(f -> f.value)
+              .default(0);
+            context.setGlobal("REPLACEMENT_CALLS", SKStore.IntFile(calls + 1));
+            writer.set(key, values.first);
+          },
+          Some(Array[SKStore.KeyRange::create(selected, selected)]),
+        );
+        writer.set(key, values.first);
+      },
+    );
+  });
+  T.expectEq(child.get(context, zero).value, 10);
+  control.writeArray(context, zero, Array[SKStore.IntFile(1)]);
+  context.update();
+  T.expectTrue(child.getArray(context, zero).isEmpty());
+  T.expectEq(child.get(context, one).value, 20);
+  calls = SKStore.IntFile::type(
+    context.getGlobal("REPLACEMENT_CALLS").fromSome(),
+  ).value;
+  source.writeArray(context, zero, Array[SKStore.IntFile(11)]);
+  context.update();
+  T.expectEq(
+    SKStore.IntFile::type(context.getGlobal("REPLACEMENT_CALLS").fromSome())
+      .value,
+    calls,
+  );
+  T.expectTrue(child.getArray(context, zero).isEmpty());
+  source.writeArray(context, one, Array[SKStore.IntFile(21)]);
+  context.update();
+  T.expectEq(child.get(context, one).value, 21);
+}
+module end;

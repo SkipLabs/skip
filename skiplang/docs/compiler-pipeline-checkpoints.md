@@ -1815,3 +1815,280 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   /tmp/skip-skargo-no-inline contains new skargo, benchmarks, profiles, analyses
   and test logs. Old inline skc cache pair removed ONLY after baseline profile
   completed to free space; logs/binaries/profiles retained. New cache retained.
+
+### Development IPA experiment (in progress)
+
+- Disable IPA alongside inlining for dev/debug; release flags unchanged. Shared
+  profile flags also update freshness fingerprint. Extend integration assertions.
+- Compare three compiler message/revert pairs against retained no-inline-only
+  six-sample baseline (mean20.1399s). Reuse existing target/cache; exclude policy
+  migration build from timings. Same immutable host/compiler source. Then profile
+  optimizer rounds and test source/native/release/incremental correctness.
+- Artifacts /tmp/skip-skargo-no-ipa; retained target
+  /tmp/skip-skargo-no-inline-development-build. Restore source text and mtime.
+- Initial migrated-cache build206.482s and no-op.124s passed, but first
+  message edit failed in host SKStore Context.updateWithBoundary: Could not find
+  parent. Debug trace repeats failure; no valid timing from this run.
+- Preserved migrated main DB as state-before-no-ipa-migration.db in retained
+  target main .fingerprints directory. Fresh main DB initialized on next edit
+  (280.310s, exclude); subsequent warm edits pass so far. Fresh .sklib cache
+  retains existing policy-migrated DB (smaller cache passed).
+- Updated dev/release/source/native integration PASSED. Small no-IPA optimizer
+  edit/no-op/release-switch test PASSED. Trace in failing migrated run shows
+ 2before+1after rounds versus242+2 baseline; do not treat failed run as timing.
+- Fresh-main-DB warm results:19.5249,19.7846,19.1465,19.7991,19.0415s;
+  five-sample mean19.4593/median19.5249 (baseline six mean20.1399;~3.38%
+  lower). Exclude first message280.310s which initialized missing main DB.
+  Original-timestamp restore18.7001s, final no-op.1241s. Smoke checks pass.
+- Successful matched perf+trace edit19.9028s, compiler12.3137s/user11.6662s.
+  Rounds2before+1after; three plan/functions/publish/merge/verified row writes
+  each, five prepared input writes. Old no-inline rounds242+2,244 row writes
+  each and377 prepared writes. Sampled optimizer/update CPU1.263->.222s.
+  Counts include controller/bookkeeping and are sampled CPU, not wall timers.
+  Native graph3.564s, merge.079s, symbols.038s, LLVM text2.909s.
+- PAC callchain recovery used best original or stripped chain, original perf
+  retained; leaf IP/timestamp/sample period exports verified identical. See
+  recover-perf.py, diagnosis-no-ipa/analysis.json, comparison.json in artifact
+  root. Regression suite running with produced compiler AND subprocess
+  --no-ipa wrapper (including existing --no-inline test arguments).
+- Do not claim migration safety: retained old large DB fails on first update
+  after policy migration. No SKStore/compiler fix made in this experiment.
+- COMPLETE: produced no-inline/no-IPA development compiler passed all13
+  incremental tests with --no-ipa forced on subprocess compiler invocations
+  (340.213s). Updated skargo integration passed dev/release flags, source/native
+  updates, database isolation, cached link. No active jobs. Source content and
+  original mtime restored by benchmark/profile scripts. git diff --check clean.
+- Leave experiment UNCOMMITTED: dev/debug flags changed as requested, but
+  migration of existing large main DB remains an exposed SKStore failure.
+  Fresh-cache incremental timings/correctness pass; do not silently represent
+  them as proof that old cached projects upgrade safely.
+
+### Diagnose no-IPA cached graph failure and audit unsafe SKStore usage
+
+- User requests cause, plus review all unsafe primitives introduced by compiler
+  incrementalization. Preserve existing no-IPA skargo changes and failing DB.
+- Plan: enrich missing-parent diagnostics; build isolated std/host; replay
+  preserved failing DB; minimize into SKStore regression. Audit unsafe calls
+  and direct Context state manipulation against git history. Fix demonstrated
+  cause with tracked APIs where appropriate; test regression + existing cache
+  and compiler suites. Record exact mechanism and audit findings.
+- Artifacts /tmp/skip-no-ipa-cache-cause. Existing failing DB retained at
+  /tmp/skip-skargo-no-inline-development-build/.fingerprints/
+  skc-07f192307ac1209b/state-before-no-ipa-migration.db.
+
+#### Cause established (diagnosis, no behavioral fix applied)
+
+- Minimal /tmp/skip-no-ipa-cache-cause/repro.sk uses only public tracked
+  mkdir/map/writeArray/update APIs. A control mapper creates /child/ from
+  /left/, then changes it to /right/. Updating left in the same update fails
+  with queued /left/=>/child/, actual parents[/right/]. DELAY=1 switches first,
+  drains update successfully, then writes left in next tick: same failure.
+  repro-normal-api.log and repro-delayed-old-parent.log preserve evidence.
+  Therefore this is not intrinsically caused by untracked compiler reads,
+  compiler continuation state, persistent storage, or the size of the cache.
+- EagerDir.TEagerDir.applyManyFor rejects reuse when parents differ, but its
+  recreation path replaces the named child via context.setDir and adds the new
+  parent-child links WITHOUT detaching the old parent's child links. It also
+  does not retire old mapper dependency registrations there. writeEntry later
+  schedules childDirs/slices by name; updateWithBoundary assumes queued arrows
+  still belong to current child.parents and throws when they no longer do.
+  Existing queued arrows are another path to the same invalid relationship.
+- Original preserved compiler DB replayed under ORIGINAL immutable host + gdb.
+  missing-parent.gdb breakpoint at original invariant captures actual pointers:
+    queued parent /optimizer/before-const/241/verified/
+    child /optimizer/lower-const/
+    actual parent /optimizer/before-const/1/verified/ (one parent)
+  Stack: updateWithBoundary -> updateUntilBoundary -> compilerPipeline Closure2.
+  replay-gdb.log preserves this evidence. No cache reset/bypass required.
+  First new-policy build replaced lower-const parent after round count shrank;
+  a later update attempts to traverse the surviving old relationship.
+- An isolated diagnostic std/host built successfully (host271.942s) but cannot
+  open original DB: persistent constant identity changed. Did NOT bypass runtime
+  safety or enable unsafe constant mode. Used original host read-only gdb
+  inspection instead; process quits at invariant before transaction commit.
+  replay-gdb.py restores source contents+mtime in finally. New diagnostic std
+  produces explicit queued parent, child and actual parents in invariant text.
+- Correct fix direction: SKStore must retire replaced collection's prior graph
+  relationships (including old reads and range links), and reject obsolete
+  queued arrows. Simply suppressing this invariant would hide surviving stale
+  links; resetting compiler DBs or special-casing no-IPA does not fix cause.
+
+#### Unsafe SKStore audit (current code versus pre-incrementalization base)
+
+- Reviewed compiler/src and all six modified prelude/src/skstore files against
+  21d42fab, then against pre-parallel-revert05bff4629, with git blame for
+  inherited calls. Reverted parallelization/body-reference experiments are not
+  present. Current optimizer has NO unsafeGet/unsafeGetArray snapshot reads;
+  all function/common-state reads use handles.getArray/getArrayFilter/items.
+- New projected EHandle.getArrayFilter internally uses unsafeGetEagerDir but
+  EagerDir.getArrayFilter explicitly records filtered row dependency AND the
+  directory tag. No dependency bypass found at this boundary. Added compact
+  FixedDir unsafe_get calls are bounded array accesses behind normal storage
+  get(i) interface, not untracked SKStore value reads. LazyDir unsafe presence
+  check is debug-only callback-replacement logging.
+- Context.currentEagerMapperInfo uses raw directory access to inspect mapper
+  ownership/read bookkeeping, not compute an output from untracked inputs.
+  Context.invalidateReader and update queue reprioritization use raw lookup
+  assuming relationship validity; missing current-parent membership validation
+  matters here. Queue ordering logic alone cannot repair recreated graph links.
+- Compiler directly restores context.reads/newDirs in BOTH specialization and
+  optimization coordinators. Progress is saved before previous invocation's
+  state is unioned for temporary retention; on completion saved current-only
+  state permits old directories/reads to retire. This is manual lifecycle work,
+  fragile and deserving a SKStore-owned continuation API. No evidence it causes
+  this crash: minimal reproduction has none of it.
+- Compiler backend emission TimeStack/setDir manipulation was ALREADY present
+  at21d42fab; earlier work adapted it to withTimeStack. It forces emission last,
+  is an ordering escape hatch, and should eventually use a supported sink or
+  phase boundary API. Not involved in reproduced /child/ parent switch.
+- New error-sink FileCache.fileDir.unsafeGetArray reads only while constructing
+  a fatal diagnostic. Failed update exits/discards fork before persistence;
+  no successful cached output depends on it. Existing skipError error callback
+  already uses the same pattern.
+- Specializer.toFixed raw unsafeGetFileIter predates this work. New function-IR
+  plan explicitly calls input.items(context) before it to track the whole scan.
+  The API itself does not enforce tracking, and backend assembly also calls it;
+  this remains a separate dependency-audit concern, not proof of this crash.
+  Prefer tracked iteration INSIDE toFixed so every caller is covered, rather
+  than relying on caller knowledge. No blanket claim all legacy reads are safe.
+- Other inherited raw calls: backend/env directory existence during input
+  setup; package prior-file read during input delta calculation; archive env
+  value reads. They were not newly introduced; archive env reads still deserve
+  separate value-only-env-change coverage (outside this demonstrated failure).
+- No behavior fix or broad unsafe-call rewrite performed: user asked to establish
+  cause/review. Worktree retains no-IPA skargo experiment, diagnostic enhancement
+  and this log. git diff --check passed; no active jobs.
+
+### Fix eager mapper replacement; measure complete phase costs
+
+- User authorizes fix, then complete initialization/simple-edit phase table.
+- Implementation starts by retiring old eager directory through removeDir before
+  reconstructing mapper, unlinking ranged as well as whole-parent edges, and
+  rejecting obsolete queued edges before reordering or update boundaries.
+- Tests will cover concurrent/delayed parent switches, old read dependencies,
+  ranges, owned nested directories, paused updates, and existing SKStore suite.
+- Build isolated fixed std/host under /tmp/skip-eager-replacement-fix. Reproduce
+  IPA->no-IPA flag transition with same host/database. Profile compiler initial
+  and message edit without overlapping heavy work; exclusive phase accounting
+  must distinguish wall time, CPU, nested lazy work and build/native overhead.
+- First fixed std tests: both normal and delayed minimal repro pass. Added
+  TestEagerReplacement tests public APIs only, covering ranged/whole edges,
+  simultaneous/delayed old-parent writes, pause/resume, old owned directory
+  deletion, same-parent mapper replacement and removed read dependency.
+- Full SKStore51 tests:50 pass, existing testChangesAfter fails with exact
+  historical extra keys36,248 at iteration3 (documented earlier in this log).
+  New regression tests pass. Building control suite to show regressions fail
+  with original std. Fixed host build in progress.
+- Control suite with original std confirms BOTH new regression tests fail
+  (missing-parent and obsolete read re-execution). Fixed suite passes both,
+  including new pause/resume combinations. Full51:50 pass + known unchanged
+  testChangesAfter iteration3 failure (same keys36,248 as old baseline).
+- Removed ONLY preserved completed failing migration DB after original-host gdb
+  evidence and independent reproductions were captured, freeing~30GiB to allow
+  fresh fixed-host compiler initialization measurements. Original no-IPA target
+  current state.db/binaries, traces, gdb log and all repro sources retained.
+- Fixed optimized host built265.381s, embeds fixed std; no ABI field changes.
+  check_optimizer.py passed initial IPA -> no-IPA + body edits, no-op, sequential
+  release -> incremental no-IPA transitions. Three new tests now include
+  same-parent changed key ranges and no re-execution on excluded keys. All pass.
+- Profiling artifacts: instrument.py creates TEMPORARY LLVM/C exclusive scoped
+  timers; no compiler source instrumentation in repo. profile-functions.json
+  lists exact boundaries. Separate context-sync/sk_commit wrappers; skc-measure
+  and clang++ wrappers record complete command wall/user/system times.
+- First broad profile smoke caught exception-unwind stack imbalance; NOT used
+  for measurements. Revised instrumentation saves depth in all42 LLVM landingpad
+  functions and restores it immediately after landingpad; reduced to coarse pass
+  boundaries to keep timer overhead low. Current profile build session83420.
+  Earlier broad profiler build90464 was intentionally stopped, so its assertion
+  log is not a correctness/compiler failure. It shares profile-link.log, latest
+  successful completion overwrites it.
+- Pending after balanced smoke: /tmp/skip-eager-replacement-fix/measure.py fresh
+  /tmp/skip-eager-replacement-development-build initialization, no-op, message
+  profile, restore, uninstrumented-control message, exact timestamp restore.
+  Script captures source+mtime in finally. No concurrent heavy jobs during timing.
+  Then13 produced-compiler incremental regressions forced --no-ipa, updated skargo
+  integration, final full SKStore suite; known ChangesAfter failure retained.
+- Revised profiler successful, balanced smoke3.4002s (fixed host uninstrumented
+  smoke3.4576s in separate single runs). All measured compiler subprocesses
+  depth=0/bad=0; analyze-phases.py checks exact unrounded category sums and
+  rejects overlapping compiler/external-clang spans. Old interleaved log with
+  intentional stopped attempt preserved separately; clean profile-link.log.
+- Fresh target INITIALIZATION336.6963s; no-op.1241s. Message profile19.2825s;
+  restore profile19.4543s. All produced-development-compiler smoke checks pass.
+- Attempt to use different uninstrumented host on profiling DB rejected safely
+  by persistent constant identity check before update; not a graph bug. Used
+  SAME profiled binary with SKC_PROFILE_EXCLUSIVE unset for timer control:
+  message18.5360s, restore19.7754s, final no-op.1250s. Do not attribute the
+  difference precisely to timers: one pair, ordinary run variation also visible.
+- measure.py first run and finish-measure.py finally restore original source
+  content AND mtime. Compiler source git diff clean. No concurrent heavy jobs
+  during measured builds. Measurement wrappers intercept host compiler and
+  external clang++, record per-unit elapsed/user/system and native timers.
+- Complete exclusive elapsed table in phase-table.json/.md. Initialization
+  includes fresh target dependencies/build scripts, not just main skc unit.
+  Table adds all compiler invocations, nonnested external clang commands and
+  measured residual skargo/native-dependency/process time to end-to-end wall.
+  Scope boundaries named in profile-functions.json; lazy nested phases are
+  charged once, and exception unwinds restore profiler scope depth.
+  SKStore bin includes eager map/update/write coordination and remaining mapper
+  work outside named pass scopes; do not equate it only with synchronization.
+  Sync bin includes persistent interning; sk_commit root publication is <1ms
+  with normal runtime async persistence. Timings include profiler overhead.
+- Final validation running /tmp/skip-eager-replacement-fix/after-measure.py
+  session13152: produced development test harness, OPTIMIZED fixed-host child
+  compiler with --no-ipa forced, all13 incremental tests; skargo integration;
+  formatted final full52 SKStore suite (known ChangesAfter failure expected).
+
+| Phase (exclusive elapsed seconds) | Initialization | Message edit |
+|---|---:|---:|
+| Startup, input loading and driver | 1.681 | 0.530 |
+| Parsing | 1.309 | 0.007 |
+| Naming and expansion | 5.105 | 0.019 |
+| Inheritance | 0.109 | 0.000 |
+| Type checking and variance | 57.862 | 0.140 |
+| Outer IR construction and lowering | 12.305 | 0.000 |
+| Specialization | 3.979 | 0.002 |
+| Class relations | 0.244 | 0.000 |
+| Field scalarization | 0.301 | 0.000 |
+| Field layout | 0.589 | 0.000 |
+| Function IR planning | 0.234 | 0.264 |
+| Generic function IR | 0.432 | 0.000 |
+| Per-instantiation function IR | 2.307 | 0.000 |
+| IR environment assembly | 0.369 | 0.276 |
+| Optimizer rounds | 8.192 | 0.091 |
+| Constant lowering | 0.017 | 0.017 |
+| Reachability and escape analysis | 0.292 | 0.288 |
+| Native IR lowering | 2.374 | 2.351 |
+| LLVM graph construction | 3.751 | 3.721 |
+| LLVM graph merging | 0.076 | 0.076 |
+| LLVM symbol assignment | 0.040 | 0.038 |
+| LLVM text emission | 3.064 | 3.015 |
+| SKStore coordination | 192.520 | 1.178 |
+| Context synchronization and collection | 28.072 | 0.716 |
+| Persistent database commit | 0.000 | 0.000 |
+| Native commands | 0.461 | 0.000 |
+| External clang compilation and linking | 6.832 | 6.371 |
+| Skargo, native dependency setup and process overhead | 4.183 | 0.180 |
+| **Total skargo build** | **336.696** | **19.283** |
+
+#### Final validation and state
+
+- COMPLETE: all13 compiler incremental tests passed86.706s (produced development
+  harness, optimized fixed host subprocess compiler, --no-ipa forced). Updated
+  skargo dev/release/source/native/cache-link integration passed78.756s.
+- Final formatted SKStore test build passed12.554s; full52 tests:51 pass, only
+  previously verified testChangesAfter fails (same iteration3 extra keys36,248).
+  All3 new replacement regression tests pass, including whole/ranged parent
+  switches, queued/delayed writes, pause/resume, owned-directory cleanup,
+  obsolete reads, and changed ranges on same parent.
+- Queued and delayed minimal reproductions pass. Control original std fails
+  parent-switch invariant and obsolete-read call count, demonstrating regressions
+  are meaningful. Same fixed host/cache IPA->no-IPA and release transitions pass.
+- Full end-to-end profiled table above uses all compiler subprocesses for a fresh
+  target; warm edit is the compiler diagnostic string version->release. Rounded
+  rows may differ slightly; unrounded sums are exact. Both C profiler scope depth
+  and exception unwind validation pass in every timed process.
+- Final source contents and original mtime restored. Compiler source unchanged.
+  No active work jobs. Changes remain uncommitted: std eager replacement/scheduler
+  fix + diagnostic,3 regression tests, existing skargo no-IPA policy/tests, log.
+  No broad compiler unsafe-read refactor or persistence-compatibility bypass added.

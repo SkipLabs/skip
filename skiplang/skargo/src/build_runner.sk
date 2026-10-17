@@ -776,9 +776,10 @@ private fun hash_of(
 private fun skc_profile_options(profile: String): Array<String> {
   profile match {
   | "release" -> Array["-O2"]
-  // Development builds favor incremental compilation over inlining, just as
+  // Development builds favor incremental compilation over interprocedural
+  // optimization (inlining and IPA), just as
   // their native code generation favors compile time over optimization.
-  | "debug" | "dev" -> Array["-O0", "--no-inline"]
+  | "debug" | "dev" -> Array["-O0", "--no-inline", "--no-ipa"]
   | _ -> invariant_violation("unreachable")
   }
 }

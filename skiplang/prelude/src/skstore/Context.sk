@@ -1033,6 +1033,22 @@ mutable class Context private {
         break (withChanges, false, false)
       | Some((queuedTime, arrow @ Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
+        // The child may have been deleted or recreated after this edge was
+        // queued (including while an update was paused). Validate membership
+        // before reprioritizing: its name alone does not identify the old map.
+        valid = this.unsafeMaybeGetDir(childName) match {
+        | Some(child @ EagerDir _) ->
+          child.parents.maybeGet(parentName).isSome() &&
+            this.unsafeMaybeGetEagerDir(parentName).isSome()
+        | Some(LazyDir _) -> parentName == childName
+        | _ -> false
+        };
+        if (!valid) {
+          if (this.debugMode) {
+            print_debug(`OBSOLETE UPDATE: ${parentName} => ${childName}`)
+          };
+          continue
+        };
         // Reusing a nested directory gives it a new TimeStack. Updates that
         // were queued before reuse must follow the directory's current order.
         currentTimeOpt = this.unsafeMaybeGetDir(childName).map(child -> {
@@ -1069,7 +1085,10 @@ mutable class Context private {
           dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
-          | None() -> invariant_violation("Could not find parent")
+          | None() ->
+            invariant_violation(
+              `Could not find parent: queued ${parentName} => ${childName}; current parents: ${child.parents.items().map(kv -> kv.i0).collect(Array)}`,
+            )
           | Some(f) -> f
           };
           parent = this.unsafeGetEagerDir(parentName);

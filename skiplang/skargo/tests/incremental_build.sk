@@ -80,6 +80,7 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   );
   initial = build(skargo, pure);
   T.expectTrue(initial.stderr.contains("--no-inline"), initial.stderr);
+  T.expectTrue(initial.stderr.contains("--no-ipa"), initial.stderr);
   run_probe(pure, "1");
   release = System.popen{
     args => Array[skargo, "build", "--release", "-v"],
@@ -93,6 +94,7 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   T.expectEq(releaseCommands.size(), 1, release.stderr);
   T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
   T.expectTrue(!releaseCommands[0].contains("--no-inline"), release.stderr);
+  T.expectTrue(!releaseCommands[0].contains("--no-ipa"), release.stderr);
   releaseProbe = System.popen{
     args => Array[pure + "/target/host/release/probe"],
     env => Map["SKARGO_BIN" => "probe"],

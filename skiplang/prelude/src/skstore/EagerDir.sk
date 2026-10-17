@@ -2087,7 +2087,17 @@ base class EagerDir protected {
   }
 
   fun removeChildDir(dirName: DirName): this {
-    this with {childDirs => this.childDirs.remove(dirName)}
+    // A replacement may use a different parent or different key ranges.
+    // Remove ranged edges too, so an old range cannot schedule the new mapper.
+    slices = RangeMapList[];
+    for ((range, childNames) in this.slices) {
+      for (child in childNames) {
+        if (child != dirName) {
+          !slices = slices.add(range.i0, range.i1, child)
+        }
+      }
+    };
+    this with {childDirs => this.childDirs.remove(dirName), slices}
   }
 
   protected fun updateNewDirs(
@@ -2466,6 +2476,13 @@ class TEagerDir extends EagerDir, TDir {
       | _ -> void
       }
     });
+
+    // Replacing the named mapper must retire its former parents, reads and
+    // owned subdirectories before the new mapper registers any of them.
+    // Otherwise an old parent can later schedule an edge to the replacement.
+    if (context.unsafeMaybeGetEagerDir(childName).isSome()) {
+      context.removeDir(childName)
+    };
 
     globalName = "PRE_COMPUTED_" + childName;
 
