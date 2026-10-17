@@ -1,6 +1,72 @@
 module alias T = SKTest;
 module SKStoreTest;
 
+class ArrayEqualityFirst(value: Int) extends SKStore.File
+class ArrayEqualitySecond(value: Int) extends SKStore.File
+
+fun widenArrayEqualityFile(file: SKStore.File): SKStore.File { file }
+
+@test
+fun testFileArrayEquality(): void {
+  narrow = Array[ArrayEqualityFirst(1), ArrayEqualityFirst(2)];
+  wide = narrow.map(widenArrayEqualityFile);
+  T.expectTrue(SKStore.equalFileArrays(narrow, wide));
+  T.expectTrue(SKStore.equalFileArrays(wide, narrow));
+  T.expectTrue(
+    SKStore.equalFileArrays(Array<ArrayEqualityFirst>[], Array<SKStore.File>[]),
+  );
+  T.expectEq(false, SKStore.equalFileArrays(narrow, Array[ArrayEqualityFirst(1)]));
+  T.expectEq(
+    false,
+    SKStore.equalFileArrays(narrow, Array[ArrayEqualityFirst(2), ArrayEqualityFirst(1)]),
+  );
+  T.expectEq(
+    false,
+    SKStore.equalFileArrays(Array[ArrayEqualityFirst(1)], Array[ArrayEqualityFirst(2)]),
+  );
+  T.expectEq(
+    false,
+    SKStore.equalFileArrays(Array[ArrayEqualityFirst(1)], Array[ArrayEqualitySecond(1)]),
+  );
+}
+
+@test
+fun testIdenticalWritesAfterPurge(): void {
+  sourceName = SKStore.DirName::create("/identical-source/");
+  context = SKStore.run(context ~> {
+    source = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      sourceName,
+      Array[(SKStore.IID(0), SKStore.IntFile(1))],
+    );
+    _ = source.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/identical-output/"),
+      (context, writer, key, values) ~> {
+        recordReadFilter(context, 0);
+        writer.set(key, values.first)
+      },
+    );
+  });
+  T.expectEq(1, readFilterCount(context, 0));
+  for (_ in Range(0, 2)) {
+    context.purge();
+    write(context, sourceName, SKStore.IID(0), Array[SKStore.IntFile(1)]);
+    context.update();
+    T.expectEq(
+      1,
+      readFilterCount(context, 0),
+      "Identical typed writes stay cached after purge",
+    )
+  };
+  write(context, sourceName, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+  context.update();
+  T.expectEq(2, readFilterCount(context, 0), "Changed file still invalidates")
+}
+
 @test
 fun testReusedDirectoryUpdateOrder(): void {
   sourceName = SKStore.DirName::create("/reuse-order-source/");

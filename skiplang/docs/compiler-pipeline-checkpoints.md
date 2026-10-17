@@ -1189,3 +1189,98 @@ Diagnosis completion:
   DB remains tied to /tmp/skip-position-optimizer-driver/skc, never substitute
   another driver against it. Broader typed-container equality audit remains for
   any subsequent implementation task; no performance estimate is validated.
+
+### 2026-10-17 — implement file-array equality fix (authorized)
+
+User: "ok let's try it!" plus explicit requirement to comment why comparison is
+by element. Implemented SKStore.equalFileArrays in File.sk, with covariance /
+fixed-storage / erased-projection explanation. Size/order/files compared without
+copying; native_eq remains per FILE, preserving nominal identity. Used for
+Deps.addFilter value sharing, Context.updateDirtyReaders projections, and
+EagerDir.writeEntry suppression. Audited remaining SKStore native_eq call sites:
+all compare mapper/reducer callback identities, not file-array envelopes.
+
+Tests added to TestReadFilter.sk: array widening both directions, empty arrays,
+size/order/value differences, sibling file nominal types, repeated identical
+writes after purge, and true changed write. Existing filtered-read suite tests
+execution counts, sharing, imports, captured predicates and reducers.
+
+Fresh fixed std archive /tmp/skip-file-array-fix/deps/libstd.sklib built from all
+109 current std sources with old validated position host. Reuses immutable old
+native runtime object archive and exact old preamble/link flags (no ABI fields
+changed). Rebuilt cli/arparser/sktest archives against this std hash. sktest also
+requires extra/src/host.sk. Standalone focused10 tests passed. Full skfs suite
+49 tests:48 pass, testChangesAfter fails at iteration3 with two extra keys36,248.
+CONTROL using UNFIXED old development std and same position host reproduces
+EXACT same failure; baseline artifact changes-before plus logs in fix dir. Treat
+as pre-existing, not fixed or silently removed. No unrelated changes applied.
+
+New optimized compiler bootstrap complete262.817s, immutable path
+/tmp/skip-file-array-fix/skc, wrapper skc-with-std adds fixed deps; bin/skc symlink.
+Build script build-driver.py uses fixed std+cli+arparser explicitly, existing
+identity-release host, --release -O2. Host now embeds fixed SKStore, unlike merely
+changing sources in checkout. Driver log/result in fix dir.
+
+Cross-process native persistence fixture persistent-probe.sk compiled against
+fixed std and exercised --init then five --data launches, same executable:
+init count1, identical write1, ignored-field1, observed-field2, remove3, reinsert4.
+Uses context persistents (globals are invocation-local); first trial mistakenly
+used globals and recreated dirs on reopen, yielding Duplicate element. Corrected
+fixture to persistents, all six cases passed. DB deleted after completion.
+
+Removed ONLY two completed old compiler-dev target state.db files (previous
+position host ABI) to free~59GB. Artifacts, archived inputs, logs retained. New
+host requires fresh per-unit DBs. ~87GB free after cleanup, no old DB reuse.
+
+Currently running new-host optimizer mode/cache6 checks, native fixtures26,
+updates28 sequentially in session61439. Logs /tmp/skip-file-array-fix/{optimizer-mode,
+native-inline,native-updates}.log. Mode checks already pass (body rows2, true
+no-op0 rows/0 links, release transitions correct). Script copies isolated roots
+under fix dir; check_updates root corrected to /tmp/skip-file-array-fix/updates.
+Next: wait native checks, format only added test lines, then compiler-dev cold
+build + clean edit benchmarks using fixed host (all other CPU work stopped).
+Use existing benchmark-compiler-edits.py BENCH_SKC fixed wrapper, fresh results
+dir. No split LLVM changes authorized in this immediate fix task; remain pending.
+Need record timings, optional causal helper trace (new wrapper must target fixed
+host/deps), verify clean restored source/mTime, commit tested fix + notes.
+- All26 native fixtures and28 native update comparisons passed with fixed host.
+  All844 selected compiler regressions passed, compiler-regressions.log.
+  Full compiler edit benchmark now running session29908 with immutable fixed
+  wrapper BENCH_SKC=/tmp/skip-file-array-fix/skc-with-std; output dir
+  /tmp/skip-file-array-fix/compiler-benchmark, progress compiler-benchmark-run.log.
+  Cold caches recreated first; no concurrent compilation during timing. Only
+  test-source formatting changed after its successful test builds (no semantics).
+  No production compiler-phase or diagnostic instrumentation changes added.
+- Clean fixed-host compiler measurements completed (session29908): cold676.169s,
+  no-op .12276/.12510s; comment20.5855/revert20.4431; message47.8951/revert47.0228;
+  debug170.0851/revert179.8539; unused helper101.3005/revert107.7784;
+  restore-original-timestamp21.0615. All return0 and produced compiler smoke
+  checks passed at each step; debug marker only in debug variant. Source content
+  AND original mtime restored; original benchmark logs preserved separately.
+  Helper improves54% addition/47% removal versus old219.48/202.04s, still not20s.
+- Now separate causal helper trace running /tmp/skip-file-array-fix/trace-helper.py
+  (session from tool output), progress diagnostic-run.log; diagnostics under
+  fix dir /diagnostic. Wrapper skc-trace.py uses FIXED host and FIXED deps. Only
+  baseline forced mtime, helper-add (with perf), final restore; finally restores
+  source+mtime. No algorithm changes beyond elementwise file-array comparisons.
+  Need check optimizer position invalidations vs old1,475,416, collect perf
+  explanation remaining~100s, wait restore and final check, then commit fix.
+- Causal fixed-host helper trace complete: baseline20.641s, helper101.864s,
+  restore102.894s (instrumented; clean timings above are primary). Main helper
+  trace has ZERO optimizer position-reader invalidations (previous1,475,416),
+  ZERO optimizer DIRTY READER targets, ZERO function IR or WorkKey output writes.
+  All388 existing round states still propagate position data (385 before-const,
+  3 after-const), six stage state rows each. trace-analysis.json records counts.
+- Post-fix perf~8K samples, zero lost: inclusive Context.updateDirtyReaders42.54%
+  validates stored projections even though no readers become dirty. Stored
+  position projection closure40.81% (overlaps42.54), planRound8.33%,
+  native_eq7.15%, addFilter .03%, prepareRow absent from significant profile.
+  Rebuilding function work inputs was eliminated for the helper; validating
+  whole-table projections across388 cached rounds is the main remaining cost.
+  Further position dependency/round architecture changes NOT implemented here.
+- Source content+original mtime restored by both benchmark/trace finally blocks.
+  Final produced compiler --check smoke test passed; no build processes remain.
+  Tests and proof sources outside repo retained in /tmp/skip-file-array-fix;
+  original before-fix logs untouched. Current compiler-dev DBs belong ONLY to
+  immutable /tmp/skip-file-array-fix/skc and its runtime; old position host must
+  not be used against them. No split LLVM changes made. Ready to commit fix.

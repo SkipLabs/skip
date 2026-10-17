@@ -225,4 +225,18 @@ base class File {
   }
 }
 
+fun equalFileArrays(first: Array<File>, second: Array<File>): Bool {
+  // Covariance preserves the array's concrete runtime type: Array<IntFile>
+  // can reach this boundary as Array<File>. Reads from fixed storage and
+  // projection revalidation construct Array<File> instead. Whole-array
+  // native_eq rejects those different array types even when their files are
+  // identical. Compare the ordered files while preserving each file's nominal
+  // type identity; do not copy or erase the stored values to compare them.
+  if (first.size() != second.size()) return false;
+  for (i in Range(0, first.size())) {
+    if (native_eq(first[i], second[i]) != 0) return false
+  };
+  true
+}
+
 module end;

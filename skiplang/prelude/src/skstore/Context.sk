@@ -228,7 +228,7 @@ value class Deps private (
       // Share only readers that observed the same projected array.
       if (
         native_eq(filter.project, project) == 0 &&
-        native_eq(filter.value, value) == 0
+        equalFileArrays(filter.value, value)
       ) {
         return (this, filter.path(path))
       };
@@ -867,7 +867,7 @@ mutable class Context private {
             values = newValues.map(values -> values.map(filter.project));
             changed = values match {
             | None() -> true
-            | Some(v) -> native_eq(v, filter.value) != 0
+            | Some(v) -> !equalFileArrays(v, filter.value)
             };
             if (changed) {
               this.updateDirtyReaders(filter.path(path));
