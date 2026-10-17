@@ -2236,3 +2236,106 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   runtime changes or unsafe primitives added.
 - User requested committing this completed work. LLVM graph incrementalization
   remains a design discussion; no implementation changes for that phase yet.
+
+### LLVM graph construction incrementalization (completed)
+
+- Starting point: clean e4078cd6d. User authorized implementation. Baseline from
+  native-lowering experiment: warm message edit graph construction3.795s,
+  full skargo build17.094s. Native lowering already cached.
+- Plan: immutable per-function graph fragments with symbolic keys, shared keyed
+  definitions, tracked signature/body/block-label/vtable-offset reads, global
+  graph assembly followed by existing merge/symbol/text phases. Preserve the
+  specialization mode selection and legacy sequential graph builder. No manual
+  SKStore dependency lists or unsafe primitives. Class metadata conservative.
+- Need special treatment for ConstantCodeLabel (callee blocks, not just its
+  signature), native extern aliases, static image cycles/dedup, debug/disassembly
+  positions, and type-symbol unique IDs. Keep all function IDs numeric in the
+  final graph for debug metadata compatibility. Artifacts /tmp/skip-llvm-graph.
+- Implementation type-checks. New AsmGraph.sk contains the eager mapper graph;
+  AsmOutput.sk adds transient tracked readers and fragment-local definition IDs;
+  compile.sk assembles cached definitions only in incremental mode. Sequential
+  code remains available. Static image keys compare generated payloads (hash is
+  only a comparison prefilter), including symbolic references and cycle tokens.
+- Added execution-count assertions to native_lowering and llvm_graph regression
+  covering strings shared across functions, literal edits, no-op and missing
+  output replay. Optimized and profiling hosts building; baseline target is
+  /tmp/skip-native-lowering/target with its original skc-profiled binary.
+- Validation so far: original14 incremental tests pass, including new actual
+  LLVM execution-count assertions in native_lowering; graph strings and output
+  replay pass. New code-label fixture corrected (base positional fields). Debug
+  IR dumps pass; disassembly position edit/restore passes (line2 ->4 ->2).
+- Removed obsolete assistant benchmark state.db only from
+  /tmp/skip-skargo-no-inline-development-build/.fingerprints/skc-07f192307ac1209b/
+  to leave room for new whole-compiler cache. Logs, binaries, inputs retained;
+  current native-lowering baseline target and host preserved.
+- All15 incremental regressions now pass (original14 plus llvm_graph; the latter
+  rerun after fixing its fixture). Actual LLVM generation counts for an integer
+  or string literal edit are1, no-op0; shared regeneration0. String sharing,
+  constant removal/reintroduction, deleted-output replay, multi-way type switch
+  edits/restores, class/vtable changes and sequential/development mode switches
+  execute correctly. Computed gotos are disabled (kCanUseComputedGoto=false), so
+  source-level dispatch tests cover the active integer-switch path; dormant
+  ConstantCodeLabel support uses separate tracked terminator/block summaries.
+- Matched whole-compiler benchmark running via measure.py. Same source and
+  message edit/restore pairs, original baseline profiling binary/DB, fresh new
+  profiling binary/DB, and timers-off controls with those same binaries. Do not
+  edit compiler source while this runs; it restores original compile.sk bytes
+  and mtime in a finally block. Raw artifacts in /tmp/skip-llvm-graph.
+
+- Completed matched benchmark: mean of four same-length compiler diagnostic
+  message edits/restores, same source in both hosts. Baseline18.130630s ->
+  cached13.760148s (24.11% lower wall time). Graph4.067457s ->0.091810s
+  (97.74% lower). Exactly1 LLVM function generation on every warm update;
+  native lowering also1 and vtable layout0. New cache initialization386.281s;
+  noop0.122s. Timers disabled controls17.966925s ->13.561650s (24.52% lower).
+- LLVM merging also falls0.087s ->0.030s: keyed shared physical struct/image
+  definitions avoid duplicate nodes before whole-graph isomorphism sharing.
+  Text writing remains global3.178s, clang compilation/linking6.707s.
+- All exclusive profiling stacks balanced (depth0,bad0). Full phase sums
+  validated against whole skargo wall time. Initialization includes dependency
+  libraries/build scripts and compiler itself; no matched fresh baseline init
+  collected, so do not compare that column to earlier differently-sized source.
+
+| Phase (exclusive wall seconds) | New initialization | Old warm update | New warm update |
+|---|---:|---:|---:|
+| Startup, input loading and driver | 1.712 | 0.562 | 0.526 |
+| Parsing | 1.316 | 0.007 | 0.007 |
+| Naming and expansion | 5.152 | 0.019 | 0.018 |
+| Inheritance | 0.110 | 0.000 | 0.000 |
+| Type checking and variance | 58.234 | 0.145 | 0.140 |
+| Outer IR construction and lowering | 12.465 | <0.001 | <0.001 |
+| Specialization | 4.323 | 0.003 | 0.002 |
+| Class relations | 0.270 | <0.001 | <0.001 |
+| Field scalarization | 0.323 | <0.001 | <0.001 |
+| Field layout | 0.595 | <0.001 | <0.001 |
+| Function IR planning | 0.268 | 0.313 | 0.287 |
+| Generic function IR | 0.433 | <0.001 | <0.001 |
+| Per-instantiation function IR | 2.501 | <0.001 | <0.001 |
+| IR environment assembly | 0.397 | 0.310 | 0.298 |
+| Optimizer rounds | 9.227 | 0.103 | 0.081 |
+| Constant lowering | 0.021 | 0.023 | 0.020 |
+| Reachability and escape analysis | 0.360 | 0.381 | 0.358 |
+| Native IR lowering | 3.367 | 0.035 | 0.037 |
+| LLVM graph construction | 3.984 | 4.067 | 0.092 |
+| LLVM graph merging | 0.029 | 0.087 | 0.030 |
+| LLVM symbol assignment | 0.029 | 0.041 | 0.031 |
+| LLVM text emission | 3.220 | 3.190 | 3.178 |
+| SKStore coordination | 235.132 | 1.250 | 1.213 |
+| Context synchronization and collection | 31.205 | 0.682 | 0.556 |
+| Persistent database commit | <0.001 | <0.001 | <0.001 |
+| Native commands | 0.463 | 0.000 | 0.000 |
+| External clang compilation and linking | 6.937 | 6.728 | 6.707 |
+| Other skargo and process overhead | 4.209 | 0.184 | 0.178 |
+| **Total skargo build** | **386.281** | **18.131** | **13.760** |
+
+- Benchmark restored compile.sk bytes and original mtime. Artifacts:
+  /tmp/skip-llvm-graph/{measurements.json,phase-results.json,summary.json,
+  phase-table.md,measure.log}; raw compiler/clang events in per-run directories.
+  Current host /tmp/skip-llvm-graph/skc, exact profiling host skc-profiled,
+  target /tmp/skip-llvm-graph/target. Never swap binaries against these DBs.
+- Final verification: self-built development compiler compiled and ran a fresh
+  persisted native probe successfully. git diff --check clean. Only
+  AsmGraph.sk, AsmOutput.sk, compile.sk, tests/tests.sk and this log changed.
+  No SKStore API/runtime changes or unsafe primitives. Class metadata remains
+  conservative; assembly, sharing, symbols and text output remain global.
+  User requested committing the completed implementation, tests and measurements.

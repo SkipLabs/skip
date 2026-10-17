@@ -1,0 +1,560 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module AsmOutput;
+
+// These are names for output definitions, not manually maintained SKStore
+// dependencies. Emission reads its inputs through handles; SKStore records the
+// reads. Symbolic references keep cached text independent of allocation order.
+private base class GraphKey extends SKStore.Key uses Hashable
+private class GraphFunctionKey(id: SFunctionID) extends GraphKey
+private class GraphExternalKey(symbol: String) extends GraphKey
+private class GraphLocalImageKey(origin: Int, index: Int) extends GraphKey
+private class GraphSelfKey() extends GraphKey
+private class GraphImageKey(
+  identityHash: Int,
+  text: String,
+  refs: Array<(Int, GraphKey)>,
+  numDefinitionRefs: Int,
+  declarationText: String,
+  typeRef: ?GraphKey,
+) extends GraphKey {
+  fun hash(): Int {
+    this.identityHash
+  }
+}
+private class GraphStructKey(fields: Array<(String, Int)>) extends GraphKey
+private class GraphMegaKey() extends GraphKey
+private class GraphGlobalsKey() extends GraphKey
+private class GraphInitializerKey() extends GraphKey
+private class GraphClassOffsetKey(id: SClassID) extends SKStore.Key
+private class GraphRequestOffsetKey(
+  id: VTable.VTableRequestID,
+) extends SKStore.Key
+
+private fun asGraphKey(key: SKStore.Key): GraphKey {
+  key match {
+  | value @ GraphKey _ -> value
+  | _ -> invariant_violation("Expected LLVM graph key")
+  }
+}
+
+// A persisted definition contains no mutable builder or invocation environment.
+// Text already contains the punctuation around references; refs say where final
+// symbols are inserted. Debug positions remain symbolic until file writing.
+private class GraphDefinition(
+  text: String,
+  refs: Array<(Int, GraphKey)>,
+  numDefinitionRefs: Int,
+  debug: Array<(Int, Pos, Bool)>,
+  declarationText: String,
+  symbol: String,
+  sharedSymbol: ?String,
+  symbolPrefix: String,
+  forceExternal: Bool,
+  canShare: Bool,
+  typeString: ?String,
+  typeRef: ?GraphKey,
+  linkageOffset: Int,
+  internalLinkage: String,
+)
+private base class GraphFile extends SKStore.File
+private class GraphNodeFile(
+  origin: Int,
+  value: GraphDefinition,
+) extends GraphFile
+private class GraphAliasFile(target: GraphKey) extends GraphFile
+
+private fun asGraphFile(file: SKStore.File): GraphFile {
+  file match {
+  | value @ GraphFile _ -> value
+  | _ -> invariant_violation("Expected LLVM graph file")
+  }
+}
+private class GraphFragmentFile(
+  entries: Array<(GraphKey, GraphFile)>,
+) extends SKStore.File
+private class GraphCommonFile(
+  env: GlobalEnv,
+  config: Config.Config,
+) extends SKStore.File
+private class GraphMegaFile(
+  fields: Array<StaticImageField>,
+) extends SKStore.File
+private class GraphLabelsFile(value: Function) extends SKStore.File
+
+// Only temporary builders own this object. The mapper supplies the current
+// context; handles identify constant collections, never captured snapshots.
+private mutable class GraphReads{
+  context: mutable SKStore.Context,
+  functions: SKStore.EHandle<GraphFunctionKey, FunctionFile>,
+  labels: SKStore.EHandle<GraphFunctionKey, GraphLabelsFile>,
+  offsets: SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
+}
+
+private fun graphPlaceholder(id: AsmDefID, symbol: String): AsmDef {
+  AsmDef{
+    id,
+    symbol,
+    text => "",
+    refs => Array[],
+    numDefinitionRefs => 0,
+    debug => Array[],
+    declarationText => "",
+    canShare => false,
+    typeString => Some("ptr"),
+    typeRef => None(),
+  }
+}
+
+private fun fragmentBuilder(
+  env: GlobalEnv,
+  config: Config.Config,
+  reads: mutable GraphReads,
+  primary: GraphKey,
+  origin: Int,
+): mutable AsmOutput {
+  defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
+  function = defs.allocID();
+  mega = defs.allocID();
+  globals = defs.allocID();
+  keys = mutable UnorderedMap[
+    function => primary,
+    mega => (GraphMegaKey() : GraphKey),
+    globals => (GraphGlobalsKey() : GraphKey),
+  ];
+  // Functions only need the address and pointer type of these shared globals.
+  // Their real definitions are emitted once by the shared-definition mapper.
+  defs.set(mega, graphPlaceholder(mega, ".allVTables"));
+  defs.set(globals, graphPlaceholder(globals, "skip.globals"));
+  mutable AsmOutput{
+    env,
+    config,
+    defs,
+    fragment => true,
+    graphReads => Some(reads),
+    graphKeys => keys,
+    graphOrigin => origin,
+    megaVTableImage => mega,
+    globalsImage => globals,
+  }
+}
+
+private fun symbolicKey(common: mutable AsmOutput, id: AsmDefID): GraphKey {
+  if (id.id < 0) GraphFunctionKey(SFunctionID(-1 - id.id)) else {
+    common.graphKeys[id]
+  }
+}
+
+// Image keys use the generated LLVM payload, not a lossy hash of constants.
+// Normal references are canonicalized recursively; self references are markers.
+// A cycle retains an origin-local token, so it cannot conflate unrelated images.
+// The existing whole-graph sharing pass can still merge such cyclic definitions.
+private fun canonicalImageKey(
+  common: mutable AsmOutput,
+  id: AsmDefID,
+  visiting: mutable UnorderedSet<AsmDefID>,
+): GraphKey {
+  key = symbolicKey(common, id);
+  if (!(key is GraphLocalImageKey _)) return key;
+  if (!visiting.maybeInsert(id)) return key;
+  def = common.defs[id];
+  refs = def.refs.map(ref ->
+    (
+      ref.i0,
+      if (ref.i1 == id) (GraphSelfKey() : GraphKey) else {
+        canonicalImageKey(common, ref.i1, visiting)
+      },
+    )
+  );
+  typ = def.typeRef.map(ref -> canonicalImageKey(common, ref, visiting));
+  contentHash = (
+    def.text,
+    refs,
+    def.numDefinitionRefs,
+    def.declarationText,
+    typ,
+  ).hash();
+  result = GraphImageKey(
+    contentHash,
+    def.text,
+    refs,
+    def.numDefinitionRefs,
+    def.declarationText,
+    typ,
+  );
+  common.graphKeys.set(id, result);
+  _ = visiting.remove(id);
+  result
+}
+
+private fun snapshotFragment(
+  common: mutable AsmOutput,
+  origin: Int,
+  shared: Bool,
+  nativeAlias: ?SFunctionID,
+): GraphFragmentFile {
+  entries: mutable Vector<(GraphKey, GraphFile)> = mutable Vector[];
+  visiting = mutable UnorderedSet[];
+  for (index in Range(0, common.defs.size())) {
+    id = AsmDefID(index);
+    common.defs.maybeGet(id).each(_ -> {
+      _ = canonicalImageKey(common, id, visiting)
+    })
+  };
+  for (index in Range(0, common.defs.size())) {
+    // Local slots 1 and 2 are address-only placeholders in function fragments.
+    if (!shared && (index == 1 || index == 2)) continue;
+    common.defs.maybeGet(AsmDefID(index)).each(def -> {
+      key = symbolicKey(common, AsmDefID(index));
+      if (def.id.id != index) {
+        entries.push((key, GraphAliasFile(symbolicKey(common, def.id))))
+      } else {
+        entries.push(
+          (
+            key,
+            GraphNodeFile(
+              origin,
+              GraphDefinition(
+                def.text,
+                def.refs.map(ref -> (ref.i0, symbolicKey(common, ref.i1))),
+                def.numDefinitionRefs,
+                def.debug,
+                def.declarationText,
+                def.symbol,
+                def.sharedSymbol,
+                def.symbolPrefix,
+                def.forceExternal,
+                def.canShare,
+                def.typeString,
+                def.typeRef.map(id -> symbolicKey(common, id)),
+                def.linkageOffset,
+                def.internalLinkage,
+              ),
+            ),
+          ),
+        )
+      }
+    })
+  };
+  nativeAlias.each(fid ->
+    entries.push(
+      (GraphFunctionKey(fid), GraphAliasFile(common.graphKeys[AsmDefID(0)])),
+    )
+  );
+  GraphFragmentFile(entries.toArray())
+}
+
+// Only the coordinator materializes the mutable whole-program graph required
+// by existing sharing/symbol/file passes. All function text is already cached.
+class GraphCache(nodes: SKStore.EHandle<GraphKey, GraphFile>) {
+  fun assemble(
+    context: mutable SKStore.Context,
+    env: GlobalEnv,
+  ): mutable AsmDefIDToAsmDef {
+    entries = mutable Map[];
+    for ((key, files) in this.nodes.items(context)) {
+      // Directory iteration may include removed keys with no remaining values.
+      for (file in files) entries.set(key, file)
+    };
+    defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
+    for (_ in Range(0, env.sfuns.size())) _ = defs.allocID();
+    mega = defs.allocID();
+    globals = defs.allocID();
+    ids = mutable UnorderedMap<GraphKey, AsmDefID>[];
+    for ((key, file) in entries.items()) {
+      file match {
+      | node @ GraphNodeFile _ ->
+        id = key match {
+        | GraphFunctionKey(fid) -> AsmDefID(fid.id)
+        | GraphExternalKey _ -> AsmDefID(node.origin)
+        | GraphMegaKey() -> mega
+        | GraphGlobalsKey() -> globals
+        | _ -> defs.allocID()
+        };
+        ids.set(key, id)
+      | GraphAliasFile _ -> void
+      }
+    };
+    pending = entries.filter((_, file) -> file is GraphAliasFile _).chill();
+    while (!pending.isEmpty()) {
+      next = mutable Map[];
+      for ((key, file) in pending.items()) {
+        alias = GraphAliasFile::type(file);
+        ids.maybeGet(alias.target) match {
+        | Some(id) -> ids.set(key, id)
+        | None() -> next.set(key, file)
+        }
+      };
+      invariant(next.size() < pending.size(), "Unresolved LLVM graph alias");
+      !pending = next.chill()
+    };
+    for ((key, file) in entries.items()) {
+      file match {
+      | GraphNodeFile(_, node) ->
+        id = ids[key];
+        defs.set(
+          id,
+          AsmDef{
+            id,
+            text => node.text,
+            refs => node.refs.map(ref -> (ref.i0, ids[ref.i1])),
+            numDefinitionRefs => node.numDefinitionRefs,
+            debug => node.debug,
+            declarationText => node.declarationText,
+            symbol => node.symbol,
+            sharedSymbol => node.sharedSymbol,
+            symbolPrefix => node.symbolPrefix,
+            forceExternal => node.forceExternal,
+            canShare => node.canShare,
+            typeString => node.typeString,
+            typeRef => node.typeRef.map(ref -> ids[ref]),
+            linkageOffset => node.linkageOffset,
+            internalLinkage => node.internalLinkage,
+          },
+        )
+      | GraphAliasFile _ -> void
+      }
+    };
+    // Keep original function slots until removeRedundantDefs canonicalizes them,
+    // as the sequential builder does for native functions sharing a C++ symbol.
+    for ((key, file) in entries.items()) {
+      (key, file) match {
+      | (GraphFunctionKey(fid), GraphAliasFile _) ->
+        defs.set(AsmDefID(fid.id), defs[ids[key]])
+      | _ -> void
+      }
+    };
+    removeRedundantDefs(defs);
+    defs
+  }
+}
+
+fun createGraphCache(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+): GraphCache {
+  files = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-graph/inputs/"),
+    (_context, writer, _, values) ~> {
+      entry = values.first;
+      if (!entry.config.incrementalSpecialization) return void;
+      writer.set(
+        SKStore.IID(0),
+        GraphCommonFile(
+          entry.env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            vtables => None(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          entry.config,
+        ),
+      );
+      writer.set(
+        SKStore.IID(1),
+        GraphMegaFile(entry.env.vtables.fromSome().megaVTable),
+      );
+      for (f in entry.env.sfuns) {
+        writer.set(GraphFunctionKey(f.id), FunctionFile(f))
+      }
+    },
+  );
+  functions = files.map(
+    GraphFunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/signatures/"),
+    (_context, writer, _, values) ~>
+      values.first match {
+      | FunctionFile(f) ->
+        writer.set(
+          GraphFunctionKey(f.id),
+          FunctionFile(
+            f with {blocks => Array[], constants => kEmptyConstants},
+          ),
+        )
+      | _ -> void
+      }
+    ,
+  );
+  labels = files.map(
+    GraphFunctionKey::keyType,
+    GraphLabelsFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/labels/"),
+    (_context, writer, _, values) ~>
+      values.first match {
+      | FunctionFile(f) ->
+        writer.set(
+          GraphFunctionKey(f.id),
+          GraphLabelsFile(
+            f with {
+              constants => kEmptyConstants,
+              blocks => f.blocks.map(b ->
+                b with {instrs => Array[b.terminator()]}
+              ),
+            },
+          ),
+        )
+      | _ -> void
+      }
+    ,
+  );
+  offsets = input.map(
+    x ~> x,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/offsets/"),
+    (_context, writer, _, values) ~> {
+      entry = values.first;
+      if (!entry.config.incrementalSpecialization) return void;
+      info = entry.env.vtables.fromSome();
+      for (i => offset in info.vtableBitOffsets) {
+        writer.set(
+          GraphRequestOffsetKey(VTable.VTableRequestID(i)),
+          SKStore.IntFile(offset),
+        )
+      };
+      for ((sc, offset) in info.classByteOffsets.items()) {
+        writer.set(GraphClassOffsetKey(sc), SKStore.IntFile(offset))
+      }
+    },
+  );
+  fragments = files.map(
+    GraphFunctionKey::keyType,
+    GraphFragmentFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/functions/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        if (context.debugMode) print_string(`LLVM_FUNCTION: ${f.name}`);
+        common = GraphCommonFile::type(
+          files.getArray(context, SKStore.IID(0))[0],
+        );
+        env = common.env with {
+          sourcePositions => if (f.isDisasm || common.config.disasmAll) {
+            SourcePositions.Table::read(context)
+          } else {
+            common.env.sourcePositions
+          },
+        };
+        reads = mutable GraphReads{context, functions, labels, offsets};
+        // A native function can have several specialized IDs but one C symbol.
+        // Choose the same earliest specialization as the sequential builder.
+        external = if (f.hasImplementation()) None() else {
+          Some(
+            cppExternalName(
+              f,
+              common.config.exportedAsFunctions,
+              common.config.isWasm(),
+            ) match {
+            | Some(name) -> name
+            | None() ->
+              "SKIP_" +
+                mangle(f.gfunction.id.replace("::.ConcreteMetaImpl::", "::"))
+            },
+          )
+        };
+        primary = external match {
+        | Some(symbol) -> (GraphExternalKey(symbol) : GraphKey)
+        | None() -> GraphFunctionKey(f.id)
+        };
+        builder = fragmentBuilder(env, common.config, reads, primary, f.id.id);
+        llvmWriteFunction(f, builder);
+        writer.set(
+          GraphFunctionKey(f.id),
+          snapshotFragment(builder, f.id.id, false, external.map(_ -> f.id)),
+        )
+      | _ -> void
+      }
+    },
+  );
+  shared = files.map(
+    SKStore.IID::keyType,
+    GraphFragmentFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/shared/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | common @ GraphCommonFile _ ->
+        if (context.debugMode) print_string("LLVM_SHARED");
+        reads = mutable GraphReads{context, functions, labels, offsets};
+        builder = fragmentBuilder(
+          common.env,
+          common.config,
+          reads,
+          GraphInitializerKey(),
+          -1,
+        );
+        builder.writeGlobals();
+        mega = GraphMegaFile::type(files.getArray(context, SKStore.IID(1))[0]);
+        _ = createStaticImage{
+          getField => mega.fields.maybeGet,
+          common => builder,
+          symbolNameHint => ".allVTables",
+          minByteAlignment => 2 * VTable.kFrozenMask,
+          id => Some(builder.megaVTableImage),
+        };
+        builder.writeStaticData();
+        writer.set(SKStore.IID(0), snapshotFragment(builder, -1, true, None()))
+      | _ -> void
+      }
+    },
+  );
+  functionNodes = fragments.map(
+    asGraphKey,
+    asGraphFile,
+    context,
+    SKStore.DirName::create("/llvm-graph/function-nodes/"),
+    (_context, writer, _, values) ~> {
+      for (entry in values.first.entries) writer.set(entry.i0, entry.i1)
+    },
+  );
+  sharedNodes = shared.map(
+    asGraphKey,
+    asGraphFile,
+    context,
+    SKStore.DirName::create("/llvm-graph/shared-nodes/"),
+    (_context, writer, _, values) ~> {
+      for (entry in values.first.entries) writer.set(entry.i0, entry.i1)
+    },
+  );
+  // Reduction preserves one shared constant/type definition, with the first
+  // origin's name hint, rather than copying it into the final graph per caller.
+  forward = (_context, writer, key, values) ~>
+    writer.setArray(key, values.toArray());
+  contributions = SKStore.EHandle::multiMap(
+    asGraphKey,
+    asGraphFile,
+    context,
+    Array[(functionNodes, (forward, None())), (sharedNodes, (forward, None()))],
+    SKStore.DirName::create("/llvm-graph/contributions/"),
+  );
+  nodes = contributions.map(
+    asGraphKey,
+    asGraphFile,
+    context,
+    SKStore.DirName::create("/llvm-graph/nodes/"),
+    (_context, writer, key, values) ~> {
+      entries = values.toArray();
+      chosen = entries.sortedBy(file ~>
+        file match {
+        | GraphNodeFile(origin, _) -> origin
+        | GraphAliasFile _ -> -2
+        }
+      )[0];
+      writer.set(key, chosen)
+    },
+  );
+  GraphCache(nodes)
+}
+
+module end;

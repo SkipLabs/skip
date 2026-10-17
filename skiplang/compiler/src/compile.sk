@@ -1104,6 +1104,7 @@ fun getOrInitializeBackend(
     },
   );
   backendLowerDir = Lower.incrementalLower(context, backendReachableDir);
+  graphCache = AsmOutput.createGraphCache(context, backendLowerDir);
   backendEmitDir = backendLowerDir.map(
     SKStore.IID::keyType,
     ConfigFile::type,
@@ -1113,7 +1114,11 @@ fun getOrInitializeBackend(
       env = values.first.env;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       defs = runCompilerPhase("native/create_asm_graph", () -> {
-        AsmOutput.createAsmDefGraph(env, config)
+        if (config.incrementalSpecialization) {
+          graphCache.assemble(context, env)
+        } else {
+          AsmOutput.createAsmDefGraph(env, config)
+        }
       });
 
       runCompilerPhase("native/merge_asm_graph", () -> {

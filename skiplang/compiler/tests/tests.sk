@@ -957,12 +957,45 @@ private fun incrementalNativeLowering(): void {
       T.expectTrue(System.subprocess(Array["touch", "-t", timestamp, left]).fromSuccess().success());
       updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
       T.expectTrue(updated.success(), updated.stderr);
-      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, expected);
-      executions = updated.stdout.split("\n").filter(line -> line.startsWith("NATIVE_LOWER:")).collect(Array);
-      T.expectEq(executions.size(), if (changed) 1 else 0, executions.join("\n"));
-      T.expectTrue(executions.all(line -> line.contains("nativeLeft")), executions.join("\n"));
-      T.expectFalse(updated.stdout.contains("WRITTEN:  /native-lower/vtables/"), updated.stdout);
-      T.expectFalse(updated.stdout.contains("WRITTEN:  /native-lower/merged/"), updated.stdout);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      executions = updated.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("NATIVE_LOWER:"))
+        .collect(Array);
+      T.expectEq(
+        executions.size(),
+        if (changed) 1 else 0,
+        executions.join("\n"),
+      );
+      T.expectTrue(
+        executions.all(line -> line.contains("nativeLeft")),
+        executions.join("\n"),
+      );
+      T.expectFalse(
+        updated.stdout.contains("WRITTEN:  /native-lower/vtables/"),
+        updated.stdout,
+      );
+      T.expectFalse(
+        updated.stdout.contains("WRITTEN:  /native-lower/merged/"),
+        updated.stdout,
+      );
+      graphExecutions = updated.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("LLVM_FUNCTION:"))
+        .collect(Array);
+      T.expectEq(
+        graphExecutions.size(),
+        if (changed) 1 else 0,
+        graphExecutions.join("\n"),
+      );
+      T.expectTrue(
+        graphExecutions.all(line -> line.contains("nativeLeft")),
+        graphExecutions.join("\n"),
+      );
+      T.expectFalse(updated.stdout.contains("LLVM_SHARED"), updated.stdout);
     };
     // Exercise request insertion/removal, dispatch and class layout changes.
     // Compare the cached result to a fresh sequential compilation at each step.
@@ -995,7 +1028,128 @@ private fun incrementalNativeLowering(): void {
       )).fromSuccess();
       T.expectTrue(switched.success(), switched.stderr);
       T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "16");
-      T.expectEq(switched.stderr.contains("Sequential specialization complete"), release);
+      T.expectEq(
+        switched.stderr.contains("Sequential specialization complete"),
+        release,
+      );
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+// Shared strings exercise cross-fragment constant identities, including removal
+// and reintroduction. Count executions so equal output cannot hide recomputation.
+private fun incrementalLLVMGraph(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  left = dir + "/left.sk";
+  right = dir + "/right.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  args = compile_cmd(Array[left, right, source], output).concat(
+    Array["--no-ipa"],
+  );
+  try {
+    FileSystem.writeTextFile(left, "fun graphLeft(): String { \"one\" }\n");
+    FileSystem.writeTextFile(right, "fun graphRight(): String { \"one\" }\n");
+    FileSystem.writeTextFile(
+      source,
+      "untracked fun main(): void { print_raw(graphLeft()); print_raw(graphRight()) }\n",
+    );
+    initial = System.subprocess(
+      args.concat(Array["--init", data]),
+    ).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "oneone");
+    for ((literal, expected, changed, timestamp) in Array[
+      ("two", "twoone", true, "200001010000.01"),
+      ("two", "twoone", false, "200001010000.02"),
+      ("one", "oneone", true, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(
+        left,
+        `fun graphLeft(): String { "${literal}" }\n`,
+      );
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, left])
+          .fromSuccess()
+          .success(),
+      );
+      updated = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      executions = updated.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("LLVM_FUNCTION:"))
+        .collect(Array);
+      T.expectEq(
+        executions.size(),
+        if (changed) 1 else 0,
+        executions.join("\n"),
+      );
+      T.expectTrue(
+        executions.all(line -> line.contains("graphLeft")),
+        executions.join("\n"),
+      );
+      T.expectFalse(updated.stdout.contains("LLVM_SHARED"), updated.stdout);
+    };
+    // Missing output replay assembles cached fragments without regenerating them.
+    T.expectTrue(
+      System.subprocess(Array["rm", output]).fromSuccess().success(),
+    );
+    replay = System.subprocess(
+      args.concat(Array["--data", data, "--debug-skstore"]),
+    ).fromSuccess();
+    T.expectTrue(replay.success(), replay.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "oneone");
+    T.expectFalse(replay.stdout.contains("LLVM_FUNCTION:"), replay.stdout);
+    T.expectFalse(replay.stdout.contains("LLVM_SHARED"), replay.stdout);
+    // A multi-way type switch exercises shared vtable data and target blocks.
+    // Computed gotos are disabled, so the active backend uses switch indices.
+    dispatch =
+      "base class GraphBase() {}\n" +
+      "class GraphA() extends GraphBase {}\n" +
+      "class GraphB() extends GraphBase {}\n" +
+      "class GraphC() extends GraphBase {}\n" +
+      "fun graphPick(n: Int): GraphBase { if (n == 0) GraphA() else if (n == 1) GraphB() else GraphC() }\n" +
+      "untracked fun graphShow(x: GraphBase): void { x match { | GraphA _ -> print_raw(\"A\"); print_raw(\"A\") | GraphB _ -> print_raw(\"B\") | GraphC _ -> print_raw(\"C\"); print_raw(\"C\"); print_raw(\"C\") } }\n" +
+      "untracked fun main(): void { graphShow(graphPick(0)); graphShow(graphPick(1)); graphShow(graphPick(2)) }\n";
+    for ((text, expected, timestamp) in Array[
+      (dispatch, "AABCCC", "200001010000.04"),
+      (
+        dispatch.replace("print_raw(\"A\");", "print_raw(\"D\");"),
+        "DABCCC",
+        "200001010000.05",
+      ),
+      (dispatch, "AABCCC", "200001010000.06"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      updated = System.subprocess(
+        args.concat(Array["--data", data]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
     };
   } catch {
   | exn ->
@@ -1533,7 +1687,11 @@ untracked fun main(): void {
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
       T.Test{name => "optimization", func => () ~> incrementalOptimization()},
-      T.Test{name => "native_lowering", func => () ~> incrementalNativeLowering()},
+      T.Test{
+        name => "native_lowering",
+        func => () ~> incrementalNativeLowering(),
+      },
+      T.Test{name => "llvm_graph", func => () ~> incrementalLLVMGraph()},
       T.Test{
         name => "optimization_cycles",
         func => () ~> incrementalOptimizationCycles(),

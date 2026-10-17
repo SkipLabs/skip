@@ -232,9 +232,9 @@ extension class .Function uses AsmFormattable {
       // Debug for a Function is special, creating the diSubprogram entry.
       asm.writeDebug(this.pos, true)
     | 'n' ->
-      // AsmDefID uses the same numbers for all existing SFunctionID
+      // Cached fragments resolve function IDs during final graph assembly.
       asm.print('@');
-      asm.writeRef(this.getAsmDefID())
+      asm.writeRef(asm.common.functionRef(this.id))
     | 't' -> asm.print("ptr")
     | 'N' -> asm.print("%t %n" % this % this)
     | _ -> asm.die(`Bad format for Function: "${spec}"`)
@@ -1442,11 +1442,18 @@ private fun createStaticImageAsmDef{
 
     structType = common.uniqueStructType(types);
 
+    imageID = id match {
+    | Some(x) -> x
+    | None() -> common.defs.allocID()
+    };
+    if (common.fragment && id.isNone()) {
+      common.graphKeys.set(
+        imageID,
+        GraphLocalImageKey(common.graphOrigin, imageID.id),
+      )
+    };
     asm = mutable StructAsmDefBuilder{
-      id => id match {
-      | Some(x) -> x
-      | None() -> common.defs.allocID()
-      },
+      id => imageID,
       canShare => true,
       symbol => symbolNameHint,
       typeString => None(),
@@ -1831,6 +1838,13 @@ mutable class .AsmOutput{
   mutable env: GlobalEnv,
   config: Config.Config,
 
+  // Fragment builders use local IDs for owned definitions and negative IDs for
+  // references to functions. Only immutable symbolic definitions enter SKStore.
+  fragment: Bool = false,
+  graphOrigin: Int = -1,
+  graphKeys: mutable UnorderedMap<AsmDefID, GraphKey> = mutable UnorderedMap[],
+  graphReads: ?mutable GraphReads = None(),
+
   // Skip String -> LLVM expression.
   strings: mutable UnorderedMap<UTF8String, AsmDefID> = mutable UnorderedMap[],
 
@@ -1889,6 +1903,46 @@ mutable class .AsmOutput{
     };
   }
 
+  readonly fun functionRef(fid: SFunctionID): AsmDefID {
+    if (this.fragment) AsmDefID(-1 - fid.id) else AsmDefID(fid.id)
+  }
+
+  readonly fun definitionID(fid: SFunctionID): AsmDefID {
+    if (this.fragment) AsmDefID(0) else AsmDefID(fid.id)
+  }
+
+  mutable fun getFunction(fid: SFunctionID, pos: Pos): Function {
+    this.graphReads match {
+    | Some(reads) ->
+      reads.functions.get(reads.context, GraphFunctionKey(fid)).value
+    | None() -> this.env.getFunction(fid, pos)
+    }
+  }
+
+  mutable fun getCodeFunction(fid: SFunctionID): Function {
+    this.graphReads match {
+    | Some(reads) ->
+      reads.labels.get(reads.context, GraphFunctionKey(fid)).value
+    | None() -> this.env.getFunction(fid, FileRange.builtin)
+    }
+  }
+
+  mutable fun classByteOffset(sc: SClassID): Int {
+    this.graphReads match {
+    | Some(reads) ->
+      reads.offsets.get(reads.context, GraphClassOffsetKey(sc)).value
+    | None() -> this.env.vtables.fromSome().classByteOffsets[sc]
+    }
+  }
+
+  mutable fun vtableBitOffset(request: VTable.VTableRequestID): Int {
+    this.graphReads match {
+    | Some(reads) ->
+      reads.offsets.get(reads.context, GraphRequestOffsetKey(request)).value
+    | None() -> this.env.vtables.fromSome().vtableBitOffsets[request.id]
+    }
+  }
+
   mutable fun resetForNewFunction(pos: Pos): void {
     this.!pos = pos
   }
@@ -1914,8 +1968,17 @@ mutable class .AsmOutput{
         numDigits,
       );
 
+      structID = this.defs.allocID();
+      if (this.fragment) {
+        this.graphKeys.set(
+          structID,
+          GraphStructKey(
+            fields.map(field -> (field.typ.toString(), field.count)),
+          ),
+        )
+      };
       asm = mutable StructAsmDefBuilder{
-        id => this.defs.allocID(),
+        id => structID,
         canShare => true,
         symbol => sstr.toString(),
         symbolPrefix => "%",
@@ -2033,8 +2096,7 @@ mutable class .AsmOutput{
     vtable = ConstantMegaVTableMember{
       id => InstrID::none,
       typ => tNonGCPointer,
-      value => (this.env.vtables.fromSome().classByteOffsets[sc.id] +
-        VTable.kFrozenMask),
+      value => (this.classByteOffset(sc.id) + VTable.kFrozenMask),
     };
 
     header = if (this.config.vtableByteSize == 8) {
@@ -2100,8 +2162,7 @@ mutable class .AsmOutput{
     vtable = ConstantMegaVTableMember{
       id => InstrID::none,
       typ => tNonGCPointer,
-      value => (this.env.vtables.fromSome().classByteOffsets[sc.id] +
-        VTable.kFrozenMask),
+      value => (this.classByteOffset(sc.id) + VTable.kFrozenMask),
     };
 
     header = if (this.config.vtableByteSize == 8) {
@@ -2234,8 +2295,10 @@ mutable class .AsmOutput{
   }
 
   private mutable fun writeInitializer(): void {
+    initializerID = this.defs.allocID();
+    if (this.fragment) this.graphKeys.set(initializerID, GraphInitializerKey());
     asm = mutable StructAsmDefBuilder{
-      id => this.defs.allocID(),
+      id => initializerID,
       canShare => false,
       forceExternal => true,
       symbol => "SKIP_initializeSkip",
@@ -2250,7 +2313,7 @@ mutable class .AsmOutput{
     asm.print("void %n() {\n" % asm);
     asm.print(
       "  call void %n()\n" %
-        this.env.getFunction(this.env.initializeAllConstsID, FileRange.builtin),
+        this.getFunction(this.env.initializeAllConstsID, FileRange.builtin),
     );
     asm.print("  ret void\n");
     asm.print("}\n\n");
@@ -2292,13 +2355,14 @@ private fun llvmWriteCall(
   if (call.typ != tVoid) {
     asm.print("%n = " % call)
   };
+  typedSymbol = code match {
+  | ConstantFun{value} ->
+    asm.common.getFunction(value, asm.pos()).gfunction.id ==
+      "SKStore.const_typed_symbol"
+  | _ -> false
+  };
   code match {
-  | ConstantFun{
-    value,
-  } if ({
-    subf = asm.env().getFunction(value, asm.pos());
-    subf.gfunction.id == "SKStore.const_typed_symbol"
-  }) ->
+  | ConstantFun _ if (typedSymbol) ->
     typeId = SKStore.genSym(0);
     asm.print("add i64 0, %s ;" % typeId)
   | _ ->
@@ -2415,7 +2479,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
       asm.print(text)
     }
   | ConstantFun{value} ->
-    subf = asm.env().getFunction(value, asm.pos());
+    subf = asm.common.getFunction(value, asm.pos());
     asm.print("%n" % subf)
   | ConstantGlobalSingleton _ -> asm.writeRef(asm.common.globalsImage)
   | ConstantInt{value} -> asm.print(value)
@@ -2434,7 +2498,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | ConstantVoid _ -> asm.die("Cannot name void input value.")
   | ConstantVTable{value, frozen_} ->
     byteOffset = (
-      asm.env().vtables.fromSome().classByteOffsets[value] +
+      asm.common.classByteOffset(value) +
       (if (frozen_) VTable.kFrozenMask else 0)
     );
     llvmWriteVTableRef(byteOffset, asm)
@@ -2551,7 +2615,7 @@ private fun llvmWriteTypeAndName(
 ): void {
   instr match {
   | ConstantCodeLabel{function, tag, case} ->
-    f = asm.env().getFunction(function, FileRange.builtin);
+    f = asm.common.getCodeFunction(function);
 
     if (
       !f.blocks.any(b -> {
@@ -2585,7 +2649,7 @@ private fun llvmWriteTypeAndName(
       asm.print("ptr null")
     }
   | ConstantFun{value} ->
-    subf = asm.env().getFunction(value, asm.pos());
+    subf = asm.common.getFunction(value, asm.pos());
     asm.print("%N" % subf)
   | ConstantVoid _ -> asm.print("void")
   | _ -> asm.print("%t %n" % instr % instr)
@@ -3281,14 +3345,13 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | LoadVTableEntry{id, typ, pos, vtable, offset} ->
     // Now that we know the bit offset where this value ended up, create
     // a Load and let it handle the code generation mechanics.
-    vtableInfo = asm.env().vtables.fromSome();
     load = Load{
       id,
       typ,
       pos,
       addrByteAlignment => 8,
       addr => vtable,
-      bitOffset => vtableInfo.vtableBitOffsets[offset.id],
+      bitOffset => asm.common.vtableBitOffset(offset),
       canCSE => true,
       invariant => true,
     };
@@ -3815,7 +3878,7 @@ fun llvmWriteFunctionDefinition(
   optinfo = OptimizerInfo::make(f);
 
   asm = mutable FunAsmDefBuilder{
-    id => f.getAsmDefID(),
+    id => common.definitionID(f.id),
     canShare => !forceExternal,
     forceExternal,
     symbol => symbol,
@@ -3912,7 +3975,7 @@ fun llvmWriteFunctionDefinition(
   if (disasm) {
     asm.print(";;; @disasm_symbol: \"");
     // Use writeRef directly so we get the symbol without a leading "@".
-    asm.writeRef(f.getAsmDefID());
+    asm.writeRef(common.functionRef(f.id));
     asm.print("\"\n");
   };
 
@@ -3926,7 +3989,7 @@ fun llvmWriteFunctionDeclaration(
   symbol: String,
   common: mutable AsmOutput,
 ): void {
-  asmDefID = f.getAsmDefID();
+  asmDefID = common.definitionID(f.id);
 
   common.externs.maybeGet(symbol) match {
   | Some(old) -> common.defs.set(asmDefID, common.defs[old])
