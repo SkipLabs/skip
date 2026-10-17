@@ -924,6 +924,87 @@ private fun incrementalOptimization(): void {
   );
 }
 
+// Verify actual lowering executions, not just equal output rows. A stale global
+// environment capture or a body-bearing callee dependency would still produce
+// correct output while needlessly lowering unrelated functions.
+private fun incrementalNativeLowering(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  left = dir + "/left.sk";
+  right = dir + "/right.sk";
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  args = compile_cmd(Array[left, right, source], output).concat(
+    Array["--no-ipa"],
+  );
+  try {
+    FileSystem.writeTextFile(left, "fun nativeLeft(): Int { 7 }\n");
+    FileSystem.writeTextFile(right, "fun nativeRight(): Int { 9 }\n");
+    FileSystem.writeTextFile(source,
+      "untracked fun main(): void { print_raw((nativeLeft() + nativeRight()).toString()) }\n",
+    );
+    initial = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "16");
+    for ((text, expected, changed, timestamp) in Array[
+      ("fun nativeLeft(): Int { 8 }\n", "17", true, "200001010000.01"),
+      ("fun nativeLeft(): Int { 8 }\n", "17", false, "200001010000.02"),
+      ("fun nativeLeft(): Int { 7 }\n", "16", true, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(left, text);
+      T.expectTrue(System.subprocess(Array["touch", "-t", timestamp, left]).fromSuccess().success());
+      updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, expected);
+      executions = updated.stdout.split("\n").filter(line -> line.startsWith("NATIVE_LOWER:")).collect(Array);
+      T.expectEq(executions.size(), if (changed) 1 else 0, executions.join("\n"));
+      T.expectTrue(executions.all(line -> line.contains("nativeLeft")), executions.join("\n"));
+      T.expectFalse(updated.stdout.contains("WRITTEN:  /native-lower/vtables/"), updated.stdout);
+      T.expectFalse(updated.stdout.contains("WRITTEN:  /native-lower/merged/"), updated.stdout);
+    };
+    // Exercise request insertion/removal, dispatch and class layout changes.
+    // Compare the cached result to a fresh sequential compilation at each step.
+    dispatch =
+      "base class NativeBase { overridable fun value(): Int { 3 } }\n" +
+      "class NativeA(x: Int) extends NativeBase { fun value(): Int { this.x } }\n" +
+      "class NativeB() extends NativeBase { fun value(): Int { 5 } }\n" +
+      "fun nativePick(b: Bool): NativeBase { if (b) NativeA(8) else NativeB() }\n" +
+      "untracked fun main(): void { print_raw((nativePick(true).value() + nativePick(false).value()).toString()) }\n";
+    for ((text, expected, timestamp) in Array[
+      (dispatch, "13", "200001010000.04"),
+      (dispatch.replace("NativeB", "NativeC"), "13", "200001010000.05"),
+      (dispatch.replace("x: Int)", "x: Int, y: Int = 2)").replace("this.x }", "this.x + this.y }"), "15", "200001010000.06"),
+      ("untracked fun main(): void { print_raw((nativeLeft() + nativeRight()).toString()) }\n", "16", "200001010000.07"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(System.subprocess(Array["touch", "-t", timestamp, source]).fromSuccess().success());
+      updated = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, expected);
+      sequentialOutput = dir + "/sequential";
+      sequential = System.subprocess(compile_cmd(Array[left, right, source], sequentialOutput).concat(Array["--no-ipa"])).fromSuccess();
+      T.expectTrue(sequential.success(), sequential.stderr);
+      T.expectEq(System.subprocess(Array[sequentialOutput]).fromSuccess().stdout, expected);
+    };
+    // Persisted mode switches must retire and recreate the incremental graph.
+    for (release in Array[true, false]) {
+      switched = System.subprocess(args.concat(Array["--data", data, "--verbose"]).concat(
+        if (release) Array["--release"] else Array[],
+      )).fromSuccess();
+      T.expectTrue(switched.success(), switched.stderr);
+      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "16");
+      T.expectEq(switched.stderr.contains("Sequential specialization complete"), release);
+    };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
 // Preserve cycle-breaking behavior while bodies and dependency edges change.
 private fun incrementalOptimizationCycles(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
@@ -1452,6 +1533,7 @@ untracked fun main(): void {
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
       T.Test{name => "optimization", func => () ~> incrementalOptimization()},
+      T.Test{name => "native_lowering", func => () ~> incrementalNativeLowering()},
       T.Test{
         name => "optimization_cycles",
         func => () ~> incrementalOptimizationCycles(),

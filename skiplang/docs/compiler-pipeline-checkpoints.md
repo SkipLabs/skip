@@ -2092,3 +2092,147 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   No active work jobs. Changes remain uncommitted: std eager replacement/scheduler
   fix + diagnostic,3 regression tests, existing skargo no-IPA policy/tests, log.
   No broad compiler unsafe-read refactor or persistence-compatibility bypass added.
+
+### Native IR lowering incrementalization (in progress)
+
+- Starting point: clean commit 91617615b. User authorized implementation and
+  measurement after feasibility discussion. Prior warm diagnostic-string edit:
+  native lowering 2.351s; full skargo build 19.283s (profiled exclusive wall).
+- Plan: preserve sequential lowering; separate per-function lowering with local
+  vtable requests from global request merging/layout and ID resolution. Use
+  eager mappers with tracked reads, body-free callee summaries, conservative
+  shared class metadata, and no captured changing environment snapshots.
+- Validate literal edits, dispatch/layout changes, additions/removals, no-op,
+  persistence and sequential-mode transitions. Measure cold and warm compiler
+  self-builds with the same host binary per database. Keep experiments in
+  /tmp/skip-native-lowering. Do not bypass persistent constant checks.
+- Implementation: native lowering expansion, separate body-free function
+  summaries, tracked direct/virtual/runtime callee dependencies, cached local
+  lowering results, requirements-only reduction, global layout, per-function
+  local-to-global request ID resolution, environment assembly. Sequential
+  lowering refactored to share the per-function algorithm. No unsafe SKStore
+  calls added. Existing pipeline boundary moved to reachability stage.
+- Added debug-mode NATIVE_LOWER execution marker and a regression covering
+  literal edits, no-op, cached vtable requirements/layout, persistence and
+  sequential/development mode transitions. Existing relation/layout tests will
+  exercise global requirement invalidation. Optimized host build in progress.
+- Optimized host built successfully in 297.8s. Smoke test confirms only
+  nativeLeft executes lowering on each literal edit (~0.29s whole small compile),
+  no vtable layout writes, and no lowering on no-op (~0.038s). Release transition
+  uses sequential lowering. Full incremental suite and separate LLVM-level
+  profiling host build running; tests/benchmarks not yet complete.
+- First full suite:12/14 pass. mode_selection revealed that eager directory
+  iteration includes tombstoned keys with empty value iterators. New layout/
+  assembly loops incorrectly called next().fromSome(); gdb public-API rename
+  repro confirmed FunctionFile::fromSome in the new mapper. Fixed by iterating
+  surviving values, retaining normal tracked collection reads. native_lowering
+  failed in the wrapper (duplicate --no-ipa), not compiler; wrapper corrected.
+  Rebuilding optimized host. First binaries preserved as *-v1. Smoke mode
+  transition did complete; its ~46s was verbose SKStore output (~1.2GB), not an
+  infinite update. Full warm performance measurement has not started.
+- New native_lowering test, with corrected wrapper, reproduces the tombstone
+  failure on v1 (meaningful regression control). Fixed loops consume all values
+  rather than assuming nonempty keys. Also retained tracked source coordinates
+  for explicit --debug IR dumps; normal successful lowering remains independent
+  of coordinates. Final optimized host rebuild restarted before LLVM linking.
+- Final optimized host built in313.8s; profiling host also linked. Corrected full
+  incremental suite running. An accidental attempt to reopen the v1 repro DB
+  with the rebuilt host segfaulted (cross-binary persistent constants are not a
+  supported test); excluded. Repeating the repro using a new DB initialized by
+  the final host. Benchmarks keep one unchanged host binary per DB.
+- Final full compiler incremental suite PASSED all14 tests, including the new
+  native-lowering literal/no-op/dispatch/layout/add-remove/sequential parity and
+  mode-transition regression. Fresh-final-host rename/removal repro also passes
+  and returns42. Starting isolated matched-source skargo measurements now:
+  original profiled host on its existing cache, then final profiled host on a
+  fresh cache, two edit/restore pairs plus timers-disabled controls for each.
+  No other build/test jobs run during timing. Script restores source+mtime.
+- Discarded first timing sequence: timestamp increments were nanoseconds instead
+  of whole seconds, so skargo skipped the edit legs (~.14s). Records/logs kept in
+  rejected-nanosecond-mtimes. Interrupted before meaningful new-cache work;
+  script finally restored source+mtime, all subprocesses exited. Removed only
+  our partial scratch target and restarted with1s increments + assertion every
+  edit invokes a compiler. Do not use rejected timings as performance results.
+
+#### Final native lowering results
+
+- COMPLETE: all14 incremental compiler tests pass (86.65s), including actual
+  native-lowering execution counts, unchanged vtable requirements/layout on
+  literals, no-op, dispatch target additions/removals, field layout changes,
+  fresh sequential parity, persistence and release/development transitions.
+- Self-built development compiler successfully compiles/runs a native program
+  through a fresh persisted pipeline. Explicit --debug persisted compilation
+  and IR source-coordinate dumps pass (6.18s; log compressed in scratch dir).
+- Matched-source benchmark complete. Both hosts optimized; same current compiler
+  sources/flags, skargo dev -O0 --no-inline --no-ipa. Original unchanged profiling
+  host uses original cache; final profiling host uses its own fresh target/DB.
+  No competing jobs during timings. Each measured edit invokes compiler; each
+  new warm edit has exactly1 lowerFunction call and0 populateVTables calls.
+- Four profiled edit/restore runs each: old20.617/21.067/20.648/21.444s,
+  new16.945/17.408/16.944/17.081s. Mean20.944 ->17.094s,18.38% reduction.
+  Native lowering (including native mapper callbacks/assembly, excluding store
+  engine coordination)2.588828 ->.035406s. Actual one-function pass average
+  .000083s; remaining native time is projection/assembly. No vtable layout work.
+- Same unchanged hosts with exclusive timers disabled, one edit/restore pair:
+  old20.313/21.238s (mean20.775), new16.792/17.172s (mean16.982). Consistent gain;
+  do not infer exact profiling overhead from this single pair. No-op.12-.14s.
+- Saved time outside native lowering is mainly context synchronization/collection
+  (1.362 ->.518s) and SKStore coordination (1.366 ->1.114s). Reusing persisted
+  lowered bodies avoids rebuilding/reinterning whole-program intermediate IR;
+  exact allocation attribution would require a separate allocation profile.
+- New fresh target initialization369.597s, including dependencies/build scripts/
+  compiler library/merged unit. Old initialization was NOT remeasured with these
+  same expanded sources; do not compare directly with historical336.696s.
+- Exclusive wall table below sums unrounded values exactly. Warm columns average
+  four runs each. Native row combines local passes, vtable layout and native
+  mapper callbacks. New initialization splits3.0989s native into1.0376s local
+  passes,1.5396s vtable layout,.5217s callbacks/assembly. Initial70,100 local calls
+  aggregate all compiler invocations (including declarations), not unique bodies
+  in the final compiler. SKStore coordination also includes remaining mapper
+  work outside named scopes; it is not a pure engine/synchronization metric.
+  Profiling scopes finish depth=0,bad=0 in every measured compiler subprocess.
+
+| Phase (exclusive wall seconds) | New initialization | Old warm update | New warm update |
+|---|---:|---:|---:|
+| Startup, input loading and driver | 1.788 | 0.567 | 0.526 |
+| Parsing | 1.374 | 0.007 | 0.007 |
+| Naming and expansion | 5.374 | 0.019 | 0.019 |
+| Inheritance | 0.116 | 0.000 | 0.000 |
+| Type checking and variance | 61.856 | 0.147 | 0.139 |
+| Outer IR construction and lowering | 13.529 | <0.001 | <0.001 |
+| Specialization | 4.226 | 0.003 | 0.003 |
+| Class relations | 0.257 | <0.001 | <0.001 |
+| Field scalarization | 0.312 | <0.001 | <0.001 |
+| Field layout | 0.548 | <0.001 | <0.001 |
+| Function IR planning | 0.248 | 0.297 | 0.275 |
+| Generic function IR | 0.426 | <0.001 | <0.001 |
+| Per-instantiation function IR | 2.402 | <0.001 | <0.001 |
+| IR environment assembly | 0.390 | 0.310 | 0.289 |
+| Optimizer rounds | 9.053 | 0.081 | 0.080 |
+| Constant lowering | 0.018 | 0.022 | 0.019 |
+| Reachability and escape analysis | 0.320 | 0.349 | 0.317 |
+| Native IR lowering | 3.099 | 2.589 | 0.035 |
+| LLVM graph construction | 3.922 | 3.795 | 3.795 |
+| LLVM graph merging | 0.088 | 0.086 | 0.083 |
+| LLVM symbol assignment | 0.040 | 0.041 | 0.039 |
+| LLVM text emission | 3.134 | 3.140 | 3.106 |
+| SKStore coordination | 214.672 | 1.366 | 1.114 |
+| Context synchronization and collection | 30.497 | 1.362 | 0.518 |
+| Persistent database commit | <0.001 | <0.001 | <0.001 |
+| Native commands | 0.487 | 0.000 | 0.000 |
+| External clang compilation and linking | 6.917 | 6.573 | 6.551 |
+| Other skargo and process overhead | 4.505 | 0.189 | 0.177 |
+| **Total skargo build** | **369.597** | **20.944** | **17.094** |
+
+- Current limitations: class metadata remains a conservative shared dependency;
+  callee summaries are individually tracked and body-free. Vtable layout is
+  global and also reads reachable function summaries (for lambda membership).
+  Requirement changes can renumber IDs and replay small resolution mappers;
+  unchanged body lowering remains cached unless its tracked inputs change.
+- Source contents and original compile.sk mtime restored. git diff --check clean.
+  Scratch scripts, raw timing JSON, phase-results.json, summary.json and logs:
+  /tmp/skip-native-lowering. Rejected nanosecond-mtime runs remain segregated.
+  Only compile.sk,lower.sk,tests/tests.sk and this log changed. No SKStore API/
+  runtime changes or unsafe primitives added.
+- User requested committing this completed work. LLVM graph incrementalization
+  remains a design discussion; no implementation changes for that phase yet.

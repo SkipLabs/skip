@@ -17,7 +17,7 @@ fun createOptimizedFunctions(
   })
 }
 
-fun finishOptimizedFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
+fun finishOptimizedFunctions(env: GlobalEnv, _config: Config.Config): GlobalEnv {
   // Find all the functions that are still reachable from the root set,
   // post-inlining, dead code elimination, etc.
   !env.sfuns = findAllReachableFuns(
@@ -39,8 +39,6 @@ fun finishOptimizedFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
   // coroutine classes, we can finally analyze pointer escape info.
   !env = Escape.computeWhetherPointersCanEscape(env);
 
-  // optimize.sk steps (5) Lower + (6) Lay out vtables.
-  !env = Lower.lowerFunctions(env, config);
   env
 }
 
@@ -1093,11 +1091,11 @@ fun getOrInitializeBackend(
   );
   // Keep final reachability, escape analysis and lowering downstream of the
   // fixed-point coordinator. Equal intermediate results do not repeat them.
-  backendLowerDir = backendOptimizeDir.map(
+  backendReachableDir = backendOptimizeDir.map(
     SKStore.IID::keyType,
     Optimize.InputFile::type,
     context,
-    SKStore.DirName::create("/backendLower/"),
+    SKStore.DirName::create("/backendReachable/"),
     (_context, writer, key, values) ~> {
       input = values.first;
       writer.set(key, Optimize.InputFile(
@@ -1105,6 +1103,7 @@ fun getOrInitializeBackend(
       ))
     },
   );
+  backendLowerDir = Lower.incrementalLower(context, backendReachableDir);
   backendEmitDir = backendLowerDir.map(
     SKStore.IID::keyType,
     ConfigFile::type,
@@ -1295,7 +1294,7 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     | _ -> (-1, -1, false)
     };
     boundary = context.updateUntilBoundary(
-      dir ~> dir == SKStore.DirName::create("/backendLower/"),
+      dir ~> dir == SKStore.DirName::create("/backendReachable/"),
       dir ~> dir == SKStore.DirName::create("/backendOptimize/"),
       dir ~> {
         name = dir.toString();

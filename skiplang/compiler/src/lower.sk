@@ -1216,17 +1216,24 @@ private fun requestVTablesForConstants(
   }
 }
 
-fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
-  classesNeedingVTables = mutable UnorderedSet[];
-  vtableRequests = mutable UnorderedSet[];
-  constantsSeen = mutable UnorderedSet[];
-  stack = mutable Vector[];
-  newFuns = env.sfuns.clone();
+// Local request IDs deliberately belong to one function. They are resolved only
+// after all functions' requirements have been merged; a cached body must never
+// depend on the insertion order of another function's mutable request set.
+private class FunctionResult(
+  f: Function,
+  requests: Array<VTable.VTableRequest>,
+  classes: Array<SClassID>,
+) extends SKStore.File
 
-  rng = Random::mcreate(
-    env.sfuns.reduce((h, f) -> Hashable.combine(h, f.name.hash()), 0),
-  );
-
+private fun lowerFunction(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+  vtableRequests: mutable UnorderedSet<VTable.VTableRequest>,
+  classesNeedingVTables: mutable UnorderedSet<SClassID>,
+  rng: mutable Random,
+): Function {
+  if (!f.hasImplementation()) return f;
   runPass = (name: String, f: Function, pass: Function -> Function) -> {
     f2 = pass(f);
     if (config.debug) {
@@ -1235,51 +1242,307 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
     };
     f2
   };
-
-  for (f in env.sfuns) {
-    if (f.hasImplementation()) {
-      if (config.debug) {
-        print_error(`\nAbout to run lower passes for ${f}.\n`);
-        f.dump(env, config);
-      };
-      f2 = runPass("Lower", f, f -> {
-        Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0
-      });
-
-      // Run a few more passes right now.
-      f3 = runPass("LowerLocalGC", f2, f2 -> {
-        LowerLocalGC::run(f2, env, config, rng).i0
-      });
-      f4 = runPass("Alloc", f3, f3 -> {
-        Alloc::run(f3, env, config).i0
-      });
-
-      // Scavenge the final result for any constants needing vtables.
-      stack.extend(f4.constants);
-      requestVTablesForConstants(
-        stack,
-        classesNeedingVTables,
-        constantsSeen,
-        env,
-      );
-
-      // Insert trampoline blocks to make LLVM phi nodes happy
-      // (this must be the last transformation we do).
-      f5 = runPass("trampoline", f4, f4 -> {
-        AsmOutput.maybeInsertTrampolineBlocks(f4)
-      });
-      newFuns.set(f5.id, f5)
-    }
+  if (config.debug) {
+    print_error(`\nAbout to run lower passes for ${f}.\n`);
+    f.dump(env, config);
   };
-
-  vtableInfo = VTable.populateVTables(
-    vtableRequests,
+  f2 = runPass("Lower", f, f -> {
+    Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0
+  });
+  f3 = runPass("LowerLocalGC", f2, f2 -> {
+    LowerLocalGC::run(f2, env, config, rng).i0
+  });
+  f4 = runPass("Alloc", f3, f3 -> {
+    Alloc::run(f3, env, config).i0
+  });
+  requestVTablesForConstants(
+    Vector::mcreateFromIterator(f4.constants.values()),
     classesNeedingVTables,
+    mutable UnorderedSet[],
     env,
-    config,
   );
+  // This must be the last transformation before resolving vtable request IDs.
+  runPass("trampoline", f4, f4 -> {
+    AsmOutput.maybeInsertTrampolineBlocks(f4)
+  })
+}
 
+fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
+  classesNeedingVTables = mutable UnorderedSet[];
+  vtableRequests = mutable UnorderedSet[];
+  newFuns = env.sfuns.clone();
+  rng = Random::mcreate(
+    env.sfuns.reduce((h, f) -> Hashable.combine(h, f.name.hash()), 0),
+  );
+  runCompilerPhase("native/lower_functions", () -> {
+    for (f in env.sfuns) {
+      newFuns.set(
+        f.id,
+        lowerFunction(
+          f,
+          env,
+          config,
+          vtableRequests,
+          classesNeedingVTables,
+          rng,
+        ),
+      )
+    }
+  });
+  vtableInfo = runCompilerPhase("native/layout_vtables", () -> {
+    VTable.populateVTables(vtableRequests, classesNeedingVTables, env, config)
+  });
   env with {sfuns => newFuns.chill(), vtables => Some(vtableInfo)}
+}
+
+private class FunctionKey(id: SFunctionID) extends SKStore.Key
+private class SharedFile(
+  env: GlobalEnv,
+  config: Config.Config,
+) extends SKStore.File
+private class RequirementsFile(
+  id: SFunctionID,
+  requests: Array<VTable.VTableRequest>,
+  classes: Array<SClassID>,
+) extends SKStore.File
+private class RequestIDsFile(
+  ids: Array<VTable.VTableRequestID>,
+) extends SKStore.File
+private class LayoutFile(info: VTable.VTableInfo) extends SKStore.File
+private class LayoutInputFile(
+  requests: UnorderedSet<VTable.VTableRequest>,
+  classes: UnorderedSet<SClassID>,
+) extends SKStore.File
+
+// Callee bodies and constants are irrelevant to lowering. Keep their signatures
+// and optimization summaries separately so a literal edit cannot invalidate all
+// callers. Class metadata is shared conservatively in this first implementation.
+private fun functionSummary(f: Function): Function {
+  f with {blocks => Array[], constants => kEmptyConstants}
+}
+
+fun incrementalLower(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+): SKStore.EHandle<SKStore.IID, Optimize.InputFile> {
+  files = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/native-lower/inputs/"),
+    (_context, writer, _, values) ~> {
+      entry = values.first;
+      if (!entry.config.incrementalSpecialization) return void;
+      writer.set(
+        SKStore.IID(0),
+        SharedFile(
+          entry.env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          entry.config,
+        ),
+      );
+      for (f in entry.env.sfuns) writer.set(FunctionKey(f.id), FunctionFile(f))
+    },
+  );
+  summaries = files.map(
+    FunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/summaries/"),
+    (_context, writer, _key, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        writer.set(FunctionKey(f.id), FunctionFile(functionSummary(f)))
+      | _ -> void
+      }
+    },
+  );
+  lowered = files.map(
+    FunctionKey::keyType,
+    FunctionResult::type,
+    context,
+    SKStore.DirName::create("/native-lower/functions/"),
+    (context, writer, _key, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        if (context.debugMode && f.hasImplementation()) {
+          print_string(`NATIVE_LOWER: ${f.name}`)
+        };
+        common = SharedFile::type(files.getArray(context, SKStore.IID(0))[0]);
+        functions = FunctionIDToFunction::mcreate();
+        keep = fid -> {
+          if (fid != SFunctionID::none && !functions.contains(fid)) {
+            summaries
+              .getArray(context, FunctionKey(fid))
+              .maybeGet(0)
+              .each(file -> {
+                functions.insert(file.value)
+              })
+          }
+        };
+        keep(f.id);
+        common.env.runtimeFunctions.values().each(keep);
+        findDirectDependencies(f, keep, common.env);
+        env = common.env with {
+          sfuns => functions.chill(),
+          // Successful normal lowering needs symbolic positions only. Explicit
+          // IR dumps also print source coordinates, so track those in debug mode.
+          sourcePositions => if (common.config.debug) {
+            SourcePositions.Table::read(context)
+          } else {
+            common.env.sourcePositions
+          },
+        };
+        requests = mutable UnorderedSet[];
+        classes = mutable UnorderedSet[];
+        result = Verify.withSourcePositions(context, () -> {
+          lowerFunction(
+            f,
+            env,
+            common.config with {deferVerifierDiagnostics => true},
+            requests,
+            classes,
+            Random::mcreate(f.name.hash()),
+          )
+        });
+        writer.set(
+          FunctionKey(f.id),
+          FunctionResult(
+            result,
+            requests.toArray().sortedBy(r ~> r.id.id),
+            classes.toArray().sorted(),
+          ),
+        )
+      | _ -> void
+      }
+    },
+  );
+  requirements = lowered.map(
+    SKStore.IID::keyType,
+    RequirementsFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/requirements/"),
+    (_context, writer, _, values) ~> {
+      result = values.first;
+      writer.set(
+        SKStore.IID(0),
+        RequirementsFile(result.f.id, result.requests, result.classes),
+      )
+    },
+  );
+  merged = requirements.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/native-lower/merged/"),
+    (_context, writer, _, values) ~> {
+      requests = mutable UnorderedSet[];
+      classes = mutable UnorderedSet[];
+      for (entry in values.toArray().sortedBy(e ~> e.id)) {
+        ids = mutable Vector[];
+        for (request in entry.requests) {
+          canonical = request with {
+            id => VTable.VTableRequestID(requests.size()),
+          };
+          if (!requests.maybeInsert(canonical)) {
+            !canonical = requests[canonical]
+          };
+          ids.push(canonical.id)
+        };
+        for (sc in entry.classes) classes.insert(sc);
+        writer.set(FunctionKey(entry.id), RequestIDsFile(ids.toArray()))
+      };
+      writer.set(
+        SKStore.IID(0),
+        LayoutInputFile(requests.chill(), classes.chill()),
+      )
+    },
+  );
+  layout = merged.map(
+    SKStore.IID::keyType,
+    LayoutFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/vtables/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | requests @ LayoutInputFile _ ->
+        common = SharedFile::type(files.getArray(context, SKStore.IID(0))[0]);
+        functions = FunctionIDToFunction::mcreate();
+        // Directory iteration can include tombstoned keys with no values.
+        for ((_, entries) in summaries.items(context)) {
+          for (stored in entries) functions.insert(stored.value)
+        };
+        env = common.env with {sfuns => functions.chill()};
+        info = runCompilerPhase("native/layout_vtables", () -> {
+          VTable.populateVTables(
+            requests.requests.clone(),
+            requests.classes.clone(),
+            env,
+            common.config,
+          )
+        });
+        writer.set(SKStore.IID(0), LayoutFile(info))
+      | _ -> void
+      }
+    },
+  );
+  resolved = lowered.map(
+    FunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/resolved/"),
+    (context, writer, key, values) ~> {
+      f = values.first.f;
+      ids = RequestIDsFile::type(merged.getArray(context, key)[0]).ids;
+      // Compare the small ID table first: most functions have no requests or
+      // retain the same IDs, so do not scan/rebuild all their instructions.
+      identity = true;
+      for (i => id in ids) {
+        if (i != id.id) !identity = false
+      };
+      result = if (identity) f else {
+        f with {
+          blocks => f.blocks.map(b ->
+            b with {
+              instrs => b.instrs.map(instr ->
+                instr match {
+                | load @ LoadVTableEntry{offset} ->
+                  load with {offset => ids[offset.id]}
+                | _ -> instr
+                }
+              ),
+            }
+          ),
+        }
+      };
+      writer.set(key, FunctionFile(result))
+    },
+  );
+  input.map(
+    SKStore.IID::keyType,
+    Optimize.InputFile::type,
+    context,
+    SKStore.DirName::create("/backendLower/"),
+    (context, writer, key, values) ~> {
+      entry = values.first;
+      env = if (entry.config.incrementalSpecialization) {
+        functions = FunctionIDToFunction::mcreate();
+        // Removed functions leave keys with empty value iterators.
+        for ((_, entries) in resolved.items(context)) {
+          for (stored in entries) functions.insert(stored.value)
+        };
+        entry.env with {
+          sfuns => functions.chill(),
+          vtables => Some(layout.getArray(context, SKStore.IID(0))[0].info),
+        }
+      } else {
+        lowerFunctions(entry.env, entry.config)
+      };
+      writer.set(key, Optimize.InputFile(env, entry.config))
+    },
+  )
 }
 
 module end;
