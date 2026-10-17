@@ -1731,3 +1731,164 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   Final new cache39GiB+658MiB. No active experiment jobs. Ready to commit three
   mapper stages, debug execution event, tests and this log. Remaining global
   identity scan intentionally retained; no parallelism/split LLVM changes.
+
+### 2026-10-17 — stable optimizer body references (authorized)
+
+User requests reference-based bodies like specializer, avoiding changed literals
+propagating through unchanged optimizer rounds. Plan:
+- Round rows hold origin handle+function ID+optimization status, not full bodies.
+- Initial/actually changed bodies stay in producing mapper collections; round
+  maps forward unchanged references. Actual no-op optimization retains input
+  origin rather than creating a new reference at every round.
+- Read bodies explicitly through tracked references for real optimization,
+  cycle choices, verification and final assembly. Preserve sequential algorithm.
+- Full-env consumers register whole producing collections before raw body
+  lookups (same pattern as specializer.toFixed); avoid per-function dependency
+  table overhead for consumers which genuinely need the whole program.
+- Test literal edit round/reference write suppression, body correctness, cycles,
+  generated coroutine replacements, signature/class/source-position changes.
+- Build optimized host; compare same-source fresh-cache control/new message
+  edits (avoid refreshing old whole compiler cache; prior warm-up was huge).
+Artifacts /tmp/skip-optimizer-body-refs. Start HEAD400271cf7, no other edits.
+- Prototype fast host built101.547s. Literal reference/schedule-write assertions,
+  mode6 and native update28 checks passed. Full focused optimizer/cycle/functionIR
+  runner exposed assertion removing reachable irExtra (function IDs renumber).
+- Preserved exact failure source, before.db318MiB and argv in failure-v1/. GDB
+  breaks at invariant_violation addresses (rbreak misses generated SKIP names);
+  stack: readEnv -> withCurrentPositions -> compileAllIncrementally's
+  progress.complete reentry branch. Input/round graph can settle again after
+  completion; previous body references may then address removed producing rows.
+- Prototyping continuation input scoping: Progress.source InputFile; only resume
+  if native_eq(source,current input)==0, otherwise initialize from current input.
+  No body cache update bookkeeping; mapper data/dependencies still drive work.
+  New fast host building session83440. Don't reuse v1 DBs with changed Progress
+  layout! Old binaries saved skc-fast-v1/skc-v1. Focused tests must restart fresh.
+  Need verify fix, optimized rebuild, validations, then fresh-old/fresh-new A/B.
+
+- Continuation input-scoping experiment did not fix callee removal and was
+  removed. No Progress layout change remains.
+- User challenged unsafe body reads. Inspection confirms tracked getArray
+  records both dirTag and the individual key, whereas items records filesTag
+  alone. Removed unsafe reads and bulk dependency workaround from readEnv;
+  rebuilding fast host to test this dependency correction. Root cause of the
+  missing body is not yet established; do not claim this fixes it until tested.
+- Tracked reads alone still fail helper removal (shape-repro step5). Debug trace
+  shows verified round1 deletes body1050, waking the owner backendOptimize
+  before its final refs mapper processes that deletion. Owner-before-child
+  ordering makes direct origin dependencies unsafe in the owner continuation.
+- Moving final GlobalEnv assembly to /optimizer/output/, a mapper created
+  after rounds. It owns tracked body reads; the continuation reads only its
+  output. Thus body updates schedule assembly after reference-row updates.
+  Rebuilding fast host; must validate before accepting this diagnosis/fix.
+- Separate tracked final-output mapper fixes fresh six-step shape reproducer:
+  baseline21 -> generic-body23 -> independent22 -> touch22 -> helper-add25 ->
+  helper-remove21. All generated native outputs checked. No fallback on missing
+  references, no snapshots, no manual body-cache bookkeeping. Broad fast
+  incremental validations running next, then optimized host and timing.
+- Full focused optimizer/cycles/functionIR suite now PASSES with final assembly
+  mapper and source-position read retained in owner. Keeping positions out of
+  output mapper avoids output writes for unused anchors (existing strict test).
+- Fast mode6, native26 and native persistent updates28 passed. Coordinate10
+  validation still running. Optimized host build session61070, PID90490 wrapper
+  /90505 compiler; orchestration session85785 waits wrapper then runs optimized
+  validations/focused/coordinates, fresh old/new benchmark3pairs, diagnosis and
+  self-built incremental13 suite. Log finish-experiment.log. No concurrent heavy
+  work during benchmark stages; do not manually start duplicate benchmarks.
+  It deletes ONLY experimental old skc cache before fresh control, then old pair
+  before fresh new target; preserves outputs/logs. Checks original source+mtime
+  restoration after every source-edit experiment. No commit yet.
+- Fast coordinate consumers10 passed. Optimized host built283.327s (validation
+  jobs overlapped part of build, not a benchmark). Optimized mode6/native26/
+  persistent native updates28 and all844 existing regressions PASSED.
+  Optimized focused runner now running; orchestrator then coordinates and
+  same-source fresh-cache control/new timings. No source implementation edits
+  during measurements. New per-round body lookup uses only tracked getArray.
+- Optimized focused suite PASSED; optimized coordinate10 PASSED. Orchestrator
+  now in OLD fresh control benchmark (control-benchmark-run.log), old target
+  /tmp/skip-generic-ir-development-build, host /tmp/skip-generic-ir-mappers/skc.
+  Deleted only old merged cache before this fresh control. All six samples
+  will compile identical current source (including new reference implementation);
+  only compiler host algorithm differs. New target fresh cache follows.
+- Same-source OLD fresh control completed; initial563.859s, no-op.121/.129s.
+  Six edit/revert samples 19.7324, 23.4136, 19.6666, 20.3717, 19.8059, 20.3957 seconds;
+  mean20.5643, median20.0888. Smoke checks all pass.
+  Original source and timestamp restored. Removed only old skc cache pair to
+  free space. NEW fresh target now running; compiler-benchmark-run.log.
+- First correct prototype completed ALL validations incl self-built13/13.
+  BUT performance regresses: mean21.7322 median21.6972 vs control20.5643/20.0888
+  (six each); new setup723.785 includes dependency setup, not cold A/B.
+  Trace only7 verified writes vs old390, inputs329 vs701; zero ref/schedule
+  writes. Cache43GiB vs old~39GiB; extra refs map adds one collection per round.
+- Do not commit this regression as a speedup. Saved extra-round-mapper.patch
+  and skc[-fast]-extra-round-mapper binaries. Fusing reference publication into
+  existing verifyRow (body source=merged collection); separate refs mapper only
+  for initial inputs, not every round. Tests now assert zero verified writes
+  as well as initial refs writes for literal edits. Tracked reads/final assembly
+  mapper remain. New fast build session18043, optimized build starting too.
+  Old orchestration COMPLETE; do not rerun it against existing new cache.
+  Need validate fused version and fresh matching-cache performance.
+- Fused fast host built105.239s; rebuilt focused runner14.698s with stronger
+  verified/reference-write assertion. Full optimizer/cycles/functionIR PASSED.
+- Preserved v1 control-benchmark-extra-round-mapper/, compiler-benchmark-extra-
+  round-mapper/, diagnosis-extra-round-mapper/ and saved binaries; deleted ONLY
+  completed v1 target skc cache pair (~43GiB main) to free space.
+- Fused optimized build session85847 wrapper98198; finish-fused-experiment.py
+  session93378 waits that PID then validates and runs fresh OLD/NEW benchmarks
+  on identical current source. Logs finish-fused-experiment.log. NEW target
+  /tmp/skip-optimizer-body-refs-fused-development-build (fresh ABI). Existing
+  old control cache absent; script handles missing cache before creating it.
+  Then profile+trace and all13 updated self-built incremental tests. No active
+  old orchestration; do not duplicate or benchmark while builds/tests run.
+- Fused optimized host built280.047s; mode6/native26/updates28/all844 regressions
+  PASSED. Stronger focused optimizer/cycles/functionIR PASSED, coordinate10
+  PASSED. Fresh final-source OLD control now running (finish-fused-experiment
+  session93378), followed by fresh NEW fused target. No further compiler edits
+  planned during measurements. Current tests assert zero refs AND verified row
+  writes for literal changes, plus prior schedule/work/output correctness.
+- Final-source fused comparison OLD control completed. Initial596.541s; no-op
+  .125/.129s. Six samples 20.4761, 20.3866, 21.5084, 20.3260, 20.4177, 20.6128 seconds;
+  mean20.6213, median20.4469. All smoke checks passed,
+  contents+mtime restored. Old skc cache pair removed after completion. NEW
+  fused target now creating fresh cache; log compiler-benchmark-run.log.
+
+#### Final result — optimizer body references
+
+- Implementation complete: initial input mapper stores bodies; initial refs and
+  each round's existing verification mapper publish origin handle+ID+status.
+  No separate per-round reference collection. No-op passes retain their origin.
+  All body access uses tracked getArray; no unsafe body reads remain. The old
+  proposed whole-collection/raw-read shortcut above was abandoned.
+- Final assembly lives in /optimizer/output/ so origin invalidation cannot run
+  owner assembly ahead of reference updates. Source positions remain outside
+  that mapper. Sequential optimizer and sequential-selection criteria unchanged.
+- ALL checks passed:844 regressions,13 updated self-built incremental tests,
+  optimized focused optimizer/cycles/functionIR runner,6 mode transitions,26
+  native fixtures,28 persistent native updates,10 coordinate-consumer cases.
+  Includes helper additions/removals, generic/signature/default changes, cycles,
+  generated coroutine replacements, constants, class layouts and debug metadata.
+- Final-source same-input comparison (fresh cache per immutable host, three
+  message/revert pairs): OLD mean20.6213 median20.4469 seconds; NEW samples
+  21.1550,20.8852,22.1515,21.2675,21.3337,21.6076 seconds, mean21.4001
+  median21.3006. About3.78% SLOWER overall; this is NOT a measured speedup.
+  All produced compiler smoke checks passed. New no-op.149/.127 seconds
+  (exact values in compiler-benchmark/results.json). New setup727.623s includes
+  dependency setup; old596.541s reused dependencies, not a cold-build A/B.
+- Final trace confirms ZERO verified/reference/schedule row writes for message
+  edit,329 optimizer input writes,18 result writes,7 publish/merge writes,one
+  final-output write. Exactlyone specialized IR output and zero global IR-plan
+  writes. Generic mapper executes3 bodies; only ensureCompatibleLLVMVersion
+  changes. Thus the intended propagation suppression works despite net slowdown.
+- Final profiled build21.456s, main compiler14.828s/13.782user CPU. Remaining
+  dependency bookkeeping and cache/GC overhead offset saved writes. Perf sample
+  categories overlap and are NOT additive phase wall times. Historical profile
+  is not identical-source CPU A/B; controlled six-sample wall results above are.
+- All source contents AND original mtime restored by completed orchestration.
+  No active experiment jobs. Artifact root /tmp/skip-optimizer-body-refs;
+  comparison.json, diagnosis/optimizer-analysis.json, diagnosis/stacks.txt,
+  finish-fused-experiment.log. Final matching cache target
+  /tmp/skip-optimizer-body-refs-fused-development-build (~43GiB main); host skc
+  and wrapper skc-with-std in artifact root. Never reuse its DB with a rebuilt
+  host. Earlier extra-round-mapper artifacts retained separately; caches removed.
+- Commit retains the requested reference architecture and its reuse regression
+  assertion, with the lack of overall performance benefit explicitly recorded.
+  No further optimizer tuning, parallelism or split-LLVM changes in this work.

@@ -868,6 +868,16 @@ private fun incrementalOptimization(): void {
         )
         .collect(Array);
       T.expectEq(scheduleWrites.size(), 0, scheduleWrites.join("\n"));
+      // A literal changes a body, not its origin or scheduling state. Later
+      // rounds must keep their references instead of forwarding changed bodies.
+      referenceWrites = updated.stdout
+        .split("\n")
+        .filter(line ->
+          line.startsWith("WRITTEN:  /optimizer/") &&
+            (line.contains("/refs/") || line.contains("/verified/"))
+        )
+        .collect(Array);
+      T.expectEq(referenceWrites.size(), 0, referenceWrites.join("\n"));
       links = updated.stderr
         .split("\n")
         .filter(line -> line.startsWith(">> clang++ "))
