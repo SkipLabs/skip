@@ -145,6 +145,9 @@ mutable class BuildRunner(
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
       this.fingerprints![unit] = (
+        // Default compiler flags can change without a source or profile edit.
+        // Rebuild artifacts produced with the previous profile policy too.
+        skc_profile_options(unit.profile),
         srcs
           .map(f ->
             (
@@ -472,12 +475,7 @@ mutable class BuildRunner(
       void
     };
 
-    // TODO: Proper Profile class.
-    unit.profile match {
-    | "release" -> skc.arg("-O2")
-    | "debug" | "dev" -> skc.arg("-O0")
-    | _ -> invariant_violation("unreachable")
-    };
+    skc.args(skc_profile_options(unit.profile));
 
     separate_link = if (check) {
       skc.arg("--check");
@@ -772,6 +770,17 @@ private fun hash_of(
   };
 
   out[unit]
+}
+
+// TODO: Proper Profile class.
+private fun skc_profile_options(profile: String): Array<String> {
+  profile match {
+  | "release" -> Array["-O2"]
+  // Development builds favor incremental compilation over inlining, just as
+  // their native code generation favors compile time over optimization.
+  | "debug" | "dev" -> Array["-O0", "--no-inline"]
+  | _ -> invariant_violation("unreachable")
+  }
 }
 
 // NOTE: `merged` is part of the artifact's identity, not just of its

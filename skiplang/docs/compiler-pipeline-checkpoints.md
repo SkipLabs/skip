@@ -1731,3 +1731,87 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   Final new cache39GiB+658MiB. No active experiment jobs. Ready to commit three
   mapper stages, debug execution event, tests and this log. Remaining global
   identity scan intentionally retained; no parallelism/split LLVM changes.
+
+### 2026-10-17 — disable inlining for skargo development builds
+
+- User reverted optimizer-body-reference experiment (d79cc0aaf; tree matches
+  400271cf7 compiler) and requests --no-inline for skargo build without release,
+  then measure optimizer work after message edits.
+- Plan: share profile compiler flags between command and freshness fingerprint;
+  dev/debug -O0 --no-inline, release retains -O2. Fingerprint makes existing
+  inline-built artifacts rebuild under new default policy. No compiler changes.
+- Extend skargo integration test to check dev flag and release command/native
+  output. Build standalone tool and runner; verify old-to-new cached-build
+  migration, incremental native/source updates and no-op behavior.
+- Use SAME immutable host /tmp/skip-generic-ir-mappers/skc for both benchmarks;
+  source/compiler ABI unchanged. Fresh old/new targets, 3 message/revert pairs,
+  matched perf+SKStore traces to measure optimizer CPU, rounds and writes.
+  Source text+mtime restored. No heavy concurrent jobs during timings.
+- Artifacts /tmp/skip-skargo-no-inline. Removed only completed/reverted
+  fused-reference experiment's skc cache pair to free42GiB; binaries/logs kept.
+- New standalone skargo built8.167s using matching old skargo dependency
+  archives. Updated integration test PASSED (dev no-inline, release -O2 with
+  inlining, source/native changes, cached link replay).
+- Policy migration fixture PASSED: old initial26.463s/noop.040s; new tool on
+  same sources/target8.463s uses existing --data DBs and --no-inline (no new DBs);
+  subsequent default and explicit --profile=dev no-ops both~.040s.
+- Orchestrator finish-experiment.py session82907 now running old inline
+  baseline fresh target /tmp/skip-skargo-inline-development-build, then matched
+  perf+trace, then new no-inline fresh target
+  /tmp/skip-skargo-no-inline-development-build, perf+trace, then self-built13
+  incremental tests using THAT produced compiler as subprocess skc (wrapper
+  overrides SKARGO_BIN=skc). Log finish-experiment.log. Source+mtime checked
+  after every benchmark/profile. No duplicate/heavy concurrent benchmark jobs.
+- Inline baseline complete: fresh initial622.960s; no-op.118/.126s. Six
+  message/revert samples 20.1762, 19.9561, 20.0088, 20.4175, 20.2621, 20.1587s;
+  mean20.1632, median20.1674. Smoke checks pass.
+  Matched baseline profile20.237s, restored source+mtime after profile.
+- No-inline fresh target now running. Deleted ONLY completed baseline skc
+  cache pair after diagnosis-inline finished to ensure disk space for new cache;
+  retained old outputs, logs and profile. Orchestrator session82907 continues.
+
+#### Final result — skargo development inlining policy
+
+- dev/debug commands now pass -O0 --no-inline; release retains -O2 and
+  existing inlining behavior. Profile compiler options are shared with the
+  freshness fingerprint, so pre-change dev artifacts rebuild automatically.
+  Artifact identity and per-unit database paths unchanged. No compiler edits.
+- Updated native/source/cache-link integration test PASSED, including dev flag
+  assertions and release command/output. Old->new unchanged-source migration
+  uses existing --data DBs and no --init; subsequent default and explicit-dev
+  invocations are no-ops. Produced no-inline development compiler itself passed
+  all13 incremental tests (wrapper explicitly sets SKARGO_BIN=skc).
+- Both benchmark targets fresh; SAME immutable compiler host and SAME compiler
+  source, only skargo profile policy differs. Three message/revert pairs each.
+  Inline mean20.1632s/median20.1674s.
+  No-inline samples 19.7521, 20.7328, 19.4741, 20.2657, 19.4389, 21.1756s;
+  mean20.1399s/median20.0089s. Overall mean
+  changes by only-0.12%; no meaningful total incremental
+  improvement established. Edit/revert variation remains visible.
+- Optimizer/update CPU estimate from99Hz user-CPU samples: inline
+  1.768s -> no-inline1.263s (~28.6% less). Includes optimizer round
+  controller and SKStore mapper updates; excludes context synchronization
+  outside callback stacks. This is sampled CPU, NOT phase wall time.
+  Rounds387+3 ->242+2; changed prepared rows701 ->377;
+  plan/functions/publish/merge/verified writes390 each ->244 each.
+  Dependency-registration sampled CPU.333 ->.222; controller.374 ->.172.
+  These categories are subsets/overlap; do NOT sum as wall-time phase table.
+- Whole profiled builds20.237 ->19.769s; compiler13.667 ->12.820s. Native
+  graph creation3.100 ->3.486s; LLVM text emission3.058 ->2.864s. These are
+  individual profiled edits, not six-sample means; broad build work remains.
+- Initial build single-run totals622.960 ->457.656s (~26.5% faster), both
+  include fresh dependency setup. No-ops~.12s for both. Every produced-compiler
+  smoke check passed, original source contents AND mtime restored exactly.
+- Baseline original DWARF call-chain unwinding dropped most frames on ARM64.
+  Analysis recovered PAC-shaped high address bits in offline perf copies.
+  Kept original call chains unless offline copy recovered more resolved host
+  frames; original leaf instruction addresses, timestamps and sample periods
+  verified byte-identical in perf-script exports for both recordings. Original
+  .perf files retained untouched. Recovered stacks and comparison.json record
+  method; do not use zero counts from initial incomplete analysis.
+- Orchestrator COMPLETE (finish-experiment.log), no active jobs. Final host
+  /tmp/skip-generic-ir-mappers/skc-with-std, target
+  /tmp/skip-skargo-no-inline-development-build. Artifact root
+  /tmp/skip-skargo-no-inline contains new skargo, benchmarks, profiles, analyses
+  and test logs. Old inline skc cache pair removed ONLY after baseline profile
+  completed to free space; logs/binaries/profiles retained. New cache retained.

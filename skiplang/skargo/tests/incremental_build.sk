@@ -79,7 +79,26 @@ fun test_incremental_build_inputs_and_cached_link(): void {
     "module IncrementalProbe; fun value(): Int { 1 } untracked fun main(): void { print_raw(value().toString()) } module end;\n",
   );
   initial = build(skargo, pure);
+  T.expectTrue(initial.stderr.contains("--no-inline"), initial.stderr);
   run_probe(pure, "1");
+  release = System.popen{
+    args => Array[skargo, "build", "--release", "-v"],
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(pure),
+  }.fromSuccess();
+  T.expectTrue(release.success(), release.stderr);
+  releaseCommands = release.stderr.split("\n").filter(line ->
+    line.contains("--export-function-as IncrementalProbe.main=skip_main")
+  ).collect(Array);
+  T.expectEq(releaseCommands.size(), 1, release.stderr);
+  T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
+  T.expectTrue(!releaseCommands[0].contains("--no-inline"), release.stderr);
+  releaseProbe = System.popen{
+    args => Array[pure + "/target/host/release/probe"],
+    env => Map["SKARGO_BIN" => "probe"],
+  }.fromSuccess();
+  T.expectTrue(releaseProbe.success(), releaseProbe.stderr);
+  T.expectEq(releaseProbe.stdout, "1");
   databases = initial.stderr
     .split("\n")
     .filter(line ->
