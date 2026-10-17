@@ -810,6 +810,16 @@ private fun incrementalOptimization(): void {
       } else {
         T.expectEq(rows.size(), 0, rows.join("\n"))
       };
+      // A literal edit changes a function body, not the optimizer schedule.
+      // Replaying a whole-program snapshot used to make every round do work.
+      scheduleWrites = updated.stdout
+        .split("\n")
+        .filter(line ->
+          line.startsWith("WRITTEN:  /optimizer/") &&
+            line.contains("/schedule/")
+        )
+        .collect(Array);
+      T.expectEq(scheduleWrites.size(), 0, scheduleWrites.join("\n"));
       links = updated.stderr
         .split("\n")
         .filter(line -> line.startsWith(">> clang++ "))
@@ -856,6 +866,72 @@ private fun incrementalOptimization(): void {
         T.expectTrue(!switched.stdout.contains("WRITTEN:  /optimizer/"))
       };
     };
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+// Preserve cycle-breaking behavior while bodies and dependency edges change.
+private fun incrementalOptimizationCycles(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  baseline =
+    "fun optCycleLeft(n: Int): Int { if (n == 0) 11 else optCycleRight(n - 1) }\n" +
+    "fun optCycleRight(n: Int): Int { if (n == 0) 2 else optCycleLeft(n - 1) }\n" +
+    "untracked fun main(): void { print_raw((optCycleLeft(4) + optCycleLeft(5)).toString()) }\n";
+  args = compile_cmd(Array[source], output);
+  try {
+    for ((contents, expected, timestamp, initial) in Array[
+      (baseline, "13", "200001010000.01", true),
+      (
+        baseline.replace(") 11 else", ") 12 else"),
+        "14",
+        "200001010000.02",
+        false,
+      ),
+      (
+        baseline.replace(
+          "else optCycleLeft(n - 1)",
+          "else optCycleRight(n - 1)",
+        ),
+        "4",
+        "200001010000.03",
+        false,
+      ),
+      (baseline, "13", "200001010000.04", false),
+    ]) {
+      FileSystem.writeTextFile(source, contents);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      compiled = System.subprocess(
+        args.concat(Array[if (initial) "--init" else "--data", data]),
+      ).fromSuccess();
+      T.expectTrue(compiled.success(), compiled.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      sequential = System.subprocess(
+        args.concat(Array["--release"]),
+      ).fromSuccess();
+      T.expectTrue(sequential.success(), sequential.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+    }
   } catch {
   | exn ->
     _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
@@ -1328,7 +1404,14 @@ untracked fun main(): void {
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
       T.Test{name => "optimization", func => () ~> incrementalOptimization()},
-      T.Test{name => "native_type_identity", func => () ~> nativeTypeIdentity()},
+      T.Test{
+        name => "optimization_cycles",
+        func => () ~> incrementalOptimizationCycles(),
+      },
+      T.Test{
+        name => "native_type_identity",
+        func => () ~> nativeTypeIdentity(),
+      },
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),

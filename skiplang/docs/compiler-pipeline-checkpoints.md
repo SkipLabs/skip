@@ -1495,3 +1495,112 @@ report diagnosis. No compiler/runtime modifications yet.
   function collections across rounds with small scheduling state, avoiding the
   full snapshot rebuild and global gather when one row changes. Not implemented
   or benchmarked here. No split LLVM changes. Working compiler source restored.
+
+### 2026-10-17 — eager per-function optimizer rounds (authorized)
+User approved replacing global optimizer snapshots with eager collections, matching
+specializer architecture. Plan: (1) preserve sequential optimizer untouched;
+(2) initialize functions once as WorkKey->FunctionFile plus shared env/config;
+(3) derive unfinished dependency summaries separately, schedule from those,
+reading function bodies only for cycle choices; (4) map/optimize per function and
+merge coroutine replacements/classes by key, retaining tracked diagnostics;
+(5) materialize GlobalEnv only at constant lowering, final backend, debug dumps;
+(6) source-check, bootstrap immutable /tmp/skip-eager-optimizer/skc with fixed
+stdlib deps, validate correctness/cache/cycles/coroutines/positions/release;
+(7) fresh ABI-specific compiler DB, repeat compiler edit benchmarks and trace,
+commit only tested implementation/results. Existing ABI caches may not be opened
+by new executable. No compiler parallelization or split LLVM in this task.
+Implementation in progress; artifacts/scripts/logs in /tmp/skip-eager-optimizer.
+- Replaced RoundFile/global gather with keyed FunctionFile+SharedFile collections.
+  Each collection has a separate PendingFile projection (ID+unfinished deps),
+  and schedule ready/abandon decisions. Per-key plan/preparation reads tracked
+  schedule projections; cycle body reads only unfinished functions, preserving
+  old popularity/cost/ID choices. Per-key publication/merge makes coroutine
+  replacements win and updates shared class map; generated functions verified
+  against merged dependencies before next round. Final env materialized only
+  at const boundary/final/debug. Progress retains collection+pending handles
+  without re-registering old round maps across GC callbacks.
+- Source check passed. Fast bootstrap -O0 host built99.566s at
+  /tmp/skip-eager-optimizer/skc-fast (no persistent compiler-size DB yet).
+  Basic mode/cache test first4 cases pass; native fixtures and focused tests
+  (literal edits must not rewrite schedule; recursive cycle/edge changes vs
+  release) running. bin/skc currently points to skc-fast-with-std; will switch
+  to optimized immutable host only after fresh fixture DBs are removed.
+- Fast host passed all6 mode/cache cases. Focused exact repo tests passed:
+  independent function reuse, literal-body edits with ZERO schedule writes,
+  helper add/remove with ZERO optimizer writes, mutually recursive calls,
+  literal changes, mutual-cycle->self-cycle edge change, restore; all native
+  outputs match sequential --release controls. Optimized -O2 immutable host
+  now building session from tool output at /tmp/skip-eager-optimizer/skc.
+  Fast26 native fixtures still running (includes coroutine generation).
+- Fast host all26 native fixtures passed, including coroutine-generated next
+  methods/classes and release controls. Fast28 cross-process update comparisons
+  running now; optimized host bootstrap still running. No runtime failures found.
+  New optimizer cycle test currently uses compile_cmd (--no-inline), preserving
+  tested scheduler graph behavior; default-inline coroutine fixtures also pass.
+- All28 fast-host native update comparisons passed, including changed coroutine
+  bodies and class layouts across persistent invocations. Optimized bootstrap
+  now in external clang -O2 stage. Fast coordinate-consumer checks (constant
+  ordering, debug/disasm and --no-verify moving locations) running separately.
+- For a fair compiler benchmark, plan to warm the OLD immutable host's existing
+  compiler target against the NEW compiler source, then measure message/debug/
+  helper edits serially. Preserve those control results before deleting ONLY
+  the old target's completed skc state.db caches to free disk for new executable's
+  fresh target. New target /tmp/skip-eager-optimizer-development-build. Do not
+  overlap any benchmark with tests, bootstrap compilation or profiling.
+- Optimized immutable host built275.444s, /tmp/skip-eager-optimizer/skc.
+  Fast coordinate-consumer10 cases passed, full modified source/test harness
+  check passed. Fast fixture DBs deleted by successful scripts. bin/skc switched
+  to optimized skc-with-std. Optimized validation suite now running: mode/cache6,
+  native26, updates28, existing844 selected regressions, validation-result.log.
+- Benchmark narrowed to the exact message-change/revert workload that motivated
+  this change (benchmark-message.py), with initial/no-op/restored timestamp and
+  produced-compiler smoke checks. Run old and new hosts on IDENTICAL updated
+  compiler source; no concurrent heavy work. Other edit correctness covered by
+  focused/native/update/coordinate tests. Additional timings only if needed.
+- Optimized host validation complete: mode6, native26, updates28, all844 existing
+  selected regressions passed (103.696s regression step). Focused updated literal
+  schedule/cycle tests also pass against optimized host. Fast coordinate10 and
+  modified harness source check passed. No runtime fixes needed after prototype.
+- OLD-host control benchmarking now running (session from tool result),
+  BENCH_SKC=/tmp/skip-anchor-optimizer/skc-with-std, matching existing old target
+  /tmp/skip-anchor-compiler-development-build, new compiler source held fixed.
+  /tmp/skip-eager-optimizer/control-benchmark/results.json and progress
+  control-benchmark-run.log. Initial warm-up incorporates implementation changes;
+  then message/revert measured. Do not edit compile.sk while script owns it;
+  finally restores exact source+mtime. No other CPU work running.
+- OLD-host same-source control warm-up stopped after1009.634s: machine
+  exhausted physical RAM and swap (62GiB RAM,2GiB swap); no message timings
+  collected, do not treat interrupted result as completed build. Logs preserved
+  control-benchmark/. Source+mtime restored by finally. Earlier completed old
+  message48–50s baseline remains available but different compiler source.
+- Removed only old target skc state.db pair after process exited (40GiB+713MiB)
+  to free disk. NEW-host fresh target benchmark started, session96460,
+  /tmp/skip-eager-optimizer/compiler-benchmark-run.log; do not edit compile.sk.
+- NEW optimized host fresh compiler build completed642.327s; produced compiler
+  smoke checks pass at every benchmark step. No-op0.1199/0.1213s, message21.523s,
+  revert21.462s, original-timestamp restore20.607s. Source+mtime restored.
+  Earlier completed old-host message48–50s => about55% less wall time, but
+  same-source old-host warm-up was interrupted, so comparison is historical.
+  Cold historical old562.6s vs new642.3s (about14% higher; source differs).
+  New main cache39GiB, rootlib657MiB, roughly comparable to old40GiB/713MiB.
+- Instrumented confirmation diagnosis/run.py completed: profile21.966s,
+  revert21.716s, trace22.185s. Trace: ZERO schedule writes; exactly ONE function
+  key77303 changes results per round (387 before,3 after); two caller keys
+ 77233/77229 refresh inputs156/155 rounds but emit unchanged outputs. No global
+  round snapshot writes. No MAP_ROW events with embedded std, don't infer
+  execution counts from absence. Profile zero lost samples: optimizer pipeline
+  callback2 12.13% of14.323 userCPU seconds (~1.74s), historical63.54% (~25.7s).
+  Final backend callback3 60.37% (~8.65s), roughly unchanged historical~8.7s.
+  Native graph3.260s, emit3.180s; LLVM remains monolithic. Profile symbols and
+  trace analysis in /tmp/skip-eager-optimizer/diagnosis/.
+- Self-built dev compiler now running full modified incremental test group,
+  session18748, SKARGO_BIN=test SKTEST_FILTERS=incremental, --jobs2; subprocess
+  skc points to optimized immutable host. No source modifications or benchmarks
+  active. Expected13 tests including new optimization_cycles.
+- Self-built modified incremental suite PASSED13/13, including cycle updates,
+  mode selection, source/verifier/constructor positions, relationships, layouts,
+  function IR, nominal type identity and frontend errors. Log preserved above.
+  git diff --check passes. No active heavy jobs; compile.sk restored unchanged.
+  Implementation ready to commit: per-key eager optimizer rounds, no parallel
+  compiler or split-LLVM changes. Remaining message cost primarily backend/native
+  output; do not begin new optimization without user's next instruction.
