@@ -306,7 +306,17 @@ class GraphCache(nodes: SKStore.EHandle<GraphKey, GraphFile>) {
             numDefinitionRefs => node.numDefinitionRefs,
             debug => node.debug,
             declarationText => node.declarationText,
-            symbol => node.symbol,
+            // Auxiliary IDs can move when another constant is inserted. Give
+            // shareable data a content-derived name before global disambiguation.
+            symbol => if (
+              !node.forceExternal &&
+              !(key is GraphFunctionKey _) &&
+              !(key is GraphExternalKey _) &&
+              !(key is GraphMegaKey _) &&
+              !(key is GraphGlobalsKey _)
+            ) node.symbol + ".c" + key.hash().and(Int::max) else {
+              node.symbol
+            },
             sharedSymbol => node.sharedSymbol,
             symbolPrefix => node.symbolPrefix,
             forceExternal => node.forceExternal,

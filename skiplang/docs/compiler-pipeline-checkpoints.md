@@ -2339,3 +2339,198 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   No SKStore API/runtime changes or unsafe primitives. Class metadata remains
   conservative; assembly, sharing, symbols and text output remain global.
   User requested committing the completed implementation, tests and measurements.
+
+### Incremental LLVM file emission (completed)
+
+- Start clean aab1293ef. Keep packed mega-vtable. Implement normal eager mapper
+  emission with declaration-only dependencies and per-module source anchors;
+  shared data/runtime output separate. No manual dependency bookkeeping or new
+  unsafe primitives. Preserve sequential/release/Wasm paths.
+- Physical files initially use stable bounded function groups to avoid spawning
+  ~70k clang processes/objects on a compiler clean build. Measure both emission
+  reuse and object reuse. Existing skargo --no-link protocol can link cached
+  objects if skc returns an object-only link plan.
+- Key correctness issues: stable names/ownership, body-free declaration inputs,
+  preamble function definitions emitted once, vtable declaration without its
+  gigantic generated type, local debug metadata and tracked source anchors,
+  stale/deleted outputs, compile flags and failed/partial object writes.
+- Baseline /tmp/skip-llvm-graph/skc-profiled + target; do not swap binaries against
+  those databases. Scratch /tmp/skip-llvm-emission. Baseline message updates
+  13.760s (graph.092, LLVM text3.178, clang6.707).
+- Current implementation: new AsmEmit.sk; backendGraph map publishes immutable
+  NativeGraphFile array after existing sharing; emission projection normalizes
+  references to symbols, separates body and declaration rows, groups64 function
+  +16 constant modules and one support module. Render maps read only own bodies,
+  declaration/type closure and SourcePositions.Table.readSymbols anchors.
+  Existing merge retained; private functions use stable FID suffixes, auxiliary
+  graph names use full-key hashes before disambiguation. Metadata disables
+  canonicalizing local IDs, retaining original function IDs for debug scopes.
+- Native compile materializes cached strings under output.llvm/m{kind}_{index},
+  compares contents before writing (no lossy hash equality), compiles only changed
+  or missing objects with success flags including clang version and full args.
+  Recovery manifest published before compilation; stamp removed before LLVM
+  replacement and object temp moved on success. Existing skargo object link plan
+  sufficient, no skargo changes yet. User preambles with unsupported definitions
+  take monolithic fallback. Release, nonpersistent, explicit llvm-ir and Wasm
+  remain monolithic. Existing compiler emit reader parent now /backendGraph/.
+- Initial smoke caught duplicate source-anchor insertion; changed to maybeInsert.
+  A scratch-only LLVM-patched O0 host /tmp/skip-llvm-emission/skc-debug-patched
+  was used to rapidly validate that one fix. It compiled/ran emission-ok and
+  passed llvm_emission test (literal edit <=3 module/clang compiles, noop and
+  unused helper0, support bytes identical, deleted ll/o/flags recovery1 compile
+  without rerender). Never benchmark or reuse its DB with another host.
+- Final source also adds hidden visibility for private cross-module definitions,
+  prepublished recovery plan, clang-version flags and opaque-preamble fallback.
+  All type-checks pass. Source locally formatted. Optimized final host rebuilding
+  from source (build.py); prior obsolete builds deliberately stopped after fix.
+  Original baseline host/target refresh running separately (baseline-preparation),
+  excluded from warm timings. Scratch build/tests/profile/measure scripts ready.
+- Removed only obsolete native-lowering benchmark main state.db from
+  /tmp/skip-native-lowering/target/.fingerprints/skc-07f192307ac1209b/ for space;
+  its logs/binaries retained. Current baseline /tmp/skip-llvm-graph/target intact.
+- Pending: final optimized host + profiling host build, run all16 incremental
+  tests, failed-clang recovery/flags/custom-preamble/cdylib probes, then matched
+  whole-compiler timing (baseline old graph host, fresh final new host DB). No
+  benchmark while other builds/tests run. New generated compiler native probe.
+- Final review also moved preamble filesystem reads to invocation input refresh
+  (/llvm-emit/preamble/ normal StringFile handle). Header mapper reads that row;
+  preamble-only edits now invalidate emission without function changes. Final
+  materializer records the same read for unsupported-preamble fallback. Private
+  cross-module functions/data use hidden visibility, public exports unchanged.
+- Two intermediate optimized builds were intentionally stopped for correctness
+  fixes before benchmarks. A stopped compiler driver left an orphan clang;
+  it was explicitly terminated to prevent competing writes to skc. Final build
+  must be generated from current source; regenerate instrument.py's LLVM input
+  after its new skc.ll exists. Scratch patched host remains diagnostic only.
+- Corrected final source type-checks; final optimized host build active. Baseline
+  preparation finished337.154s (excluded from warm results). tests binary rebuilt
+  with all16 incremental cases. Probes.py additionally tests failed clang retry,
+  compile flags, custom-preamble fallback and preamble-only edits, PIC cdylib
+  exports/hidden private symbols. No further source changes planned until tests.
+- Final optimized and profiling hosts built successfully from source. Debug IR
+  dump probe passes. Final-source O0 host probes pass failed-clang/retry, flag
+  invalidation, preamble-only edits and opaque global-preamble fallback.
+- Direct cdylib fixture cannot link existing non-PIC std runtime archive (same
+  pre-existing fixture constraint); new -fPIC module objects successfully linked
+  alone as .so, nm/readelf show hidden private symbols/no TEXTREL, and native
+  driver linked non-PIC runtime into executable and called export returning37.
+- Full16 suite:14 passed, two old assertions counted every clang invocation as a
+  link. Updated only link-count predicates to exclude '-c'; separate emission
+  test still counts actual object compiles. Rebuilding tests, rerun those two.
+- All16 incremental tests now pass: original14 successes plus corrected
+  function_ir/optimization reruns (optimization filter also reran cycles).
+  No compiler algorithm changes required for the link-count assertions.
+  Debug IR output passes. Native no-op/unused-helper emission0 and literal edits
+  <=3 module/object compiles, support unchanged, individual artifact replay pass.
+- Probes: failed clang leaves old executable and retries successfully; LLVM flags
+  force object recompilation; preamble-only filesystem edits update module text;
+  unsupported opaque global definitions in isolated std metadata fall back to
+  monolithic emission. Original malformed custom fixture placed a global before
+  target directives (invalid for legacy too), corrected fixture uses valid order.
+- PIC module .so successfully linked without non-PIC runtime, nm/readelf verified
+  hidden private symbols/no TEXTREL. Native runtime driver supplies skip_main,
+  links runtime archive into executable, calls shared export returning37.
+- Matched measure.py now running (no competing builds/tests): baseline profiling
+  host /tmp/skip-llvm-graph/skc-profiled + existing target; new exact final
+  /tmp/skip-llvm-emission/skc-profiled + fresh target. Source edit/restore4 runs
+  per host, plus counters-off controls. Script restores compile.sk bytes+mtime.
+  Do not edit compiler source while it runs. Remaining: analyze timings, native
+  probe with produced development compiler, final diff review/documentation.
+- Final review follow-up after timing: declarationPreamble should recognize
+  leading whitespace before 'define' (trimLeft before prefix/stripPrefix). Current
+  standard preamble is column0 and all tested paths pass. Add the tiny parser
+  compatibility fix after benchmark source restoration; validate with the produced
+  development compiler and an isolated std metadata preamble containing an indented
+  function definition. This avoids silent duplicate helper definitions in custom
+  preambles. Do not change source during matched timing.
+
+- Matched whole-compiler results (mean4 diagnostic edits/restores, same source):
+  old14.969723s -> new5.574840s, 62.76% lower wall time. New individual runs
+  5.151534,5.301390,6.529308,5.317130s. The6.529s repeat includes extra file
+  materialization/cache-check time; retained in mean. Counters disabled controls
+  old14.900439s ->new5.123318s (65.62% lower). Noop.126-.130s.
+- LLVM emission (includes normalizing/projecting records and rendering changed
+  modules)3.317247s ->.261300s. New filesystem/object checks.488304s mean
+  (.154s typical, one longer repeat). Object clang/file operations.217877s;
+  final clang link.222s vs old compile+link6.826s. Each warm edit compiles exactly
+  3 objects (one function bucket,two constant buckets); support/mega object reused.
+  Exactly1 native IR lowering,1 LLVM function generation,0 vtable layouts.
+- New full initialization407.310s includes all dependency packages/build scripts
+  and compiler. No matched fresh baseline init collected; do not compare it to
+  earlier smaller source snapshots. All exclusive profiling depth0,bad0 and
+  phase sums verified against total skargo wall time. Data and scripts under
+  /tmp/skip-llvm-emission; main graph baseline /tmp/skip-llvm-graph preserved.
+
+| Phase (exclusive wall seconds) | New initialization | Old warm update | New warm update |
+|---|---:|---:|---:|
+| Startup, input loading and driver | 1.720 | 0.561 | 0.527 |
+| Parsing | 1.319 | 0.008 | 0.007 |
+| Naming and expansion | 5.151 | 0.021 | 0.020 |
+| Inheritance | 0.110 | 0.000 | 0.000 |
+| Type checking and variance | 58.845 | 0.168 | 0.159 |
+| Outer IR construction and lowering | 13.028 | <0.001 | <0.001 |
+| Specialization | 4.418 | 0.003 | 0.002 |
+| Class relations | 0.274 | <0.001 | <0.001 |
+| Field scalarization | 0.333 | <0.001 | <0.001 |
+| Field layout | 0.594 | <0.001 | <0.001 |
+| Function IR planning | 0.268 | 0.404 | 0.291 |
+| Generic function IR | 0.437 | <0.001 | <0.001 |
+| Per-instantiation function IR | 2.668 | <0.001 | <0.001 |
+| IR environment assembly | 0.416 | 0.327 | 0.314 |
+| Optimizer rounds | 9.761 | 0.175 | 0.087 |
+| Constant lowering | 0.022 | 0.033 | 0.022 |
+| Reachability and escape analysis | 0.386 | 0.437 | 0.381 |
+| Native IR lowering | 3.456 | 0.058 | 0.039 |
+| LLVM graph construction | 4.068 | 0.211 | 0.121 |
+| LLVM graph merging | 0.040 | 0.033 | 0.041 |
+| LLVM symbol assignment | 0.044 | 0.031 | 0.045 |
+| LLVM text emission | 4.399 | 3.317 | 0.261 |
+| LLVM materialization and object cache checks | 0.067 | 0.000 | 0.488 |
+| SKStore coordination | 246.651 | 1.384 | 1.481 |
+| Context synchronization and collection | 35.193 | 0.790 | 0.668 |
+| Persistent database commit | <0.001 | <0.001 | <0.001 |
+| Native commands | 9.043 | 0.000 | 0.218 |
+| External clang compilation and linking | 0.499 | 6.826 | 0.222 |
+| Other skargo and process overhead | 4.097 | 0.183 | 0.179 |
+| **Total skargo build** | **407.310** | **14.970** | **5.575** |
+
+- Self-built development compiler compiled/ran persisted native-ok probe. After
+  matched timing restored compile.sk bytes+mtime, fixed whitespace-before-define
+  compatibility in declarationPreamble and rebuilt compiler incrementally using
+  the exact same profiling host/database:10.305693s. This is a separate helper
+  code edit, not included in message-edit averages. Targeted indented-preamble
+  validation uses the resulting development compiler, never reuses host DBs.
+- Repository preamble-only regression initially failed because readTextFile's
+  tracked wrapper was common-subexpression eliminated across external writes:
+  generated tests.ll SkcTests_incrementalLLVMEmission__Closure0__call contains
+  only ONE SKIP_open_file call, reusing originalSupport after subprocess updates.
+  Both System_popen calls remain, so command execution is not elided. Standalone
+  optimized-host transition initial(no preamble)->FIRST->SECOND updates all73
+  module files correctly. Fix test assertions to read via cat subprocess for
+  actual current bytes; comment explains why. This is an existing tracked IO
+  wrapper purity issue, no SKStore failure. Not changing stdlib/compiler purity
+  rules in this emission task. Rebuilding/rerunning the targeted test only.
+
+- Final targeted llvm_emission regression passes with fresh cat reads, including
+  support byte identity, no-op/unused helpers, missing ll/object/stamp replay and
+  preamble-only changes without any LLVM function regeneration. All16 regressions
+  have passing results; only targeted modified cases rerun after their changes.
+- Whitespace-before-define fix verified by newly bootstrapped development compiler
+  with isolated std preamble containing an indented helper: native output runs,
+  nm shows helper defined once. Exactly1 native and1 LLVM function generation in
+  that separate10.305693s source-helper update (other changed debug anchors also
+  rerendered appropriate modules). No host/database swapping.
+- Final scope: AsmEmit.sk new; AsmGraph.sk stable auxiliary names; AsmOutput.sk
+  stable function names/debug metadata IDs; compile.sk graph/emission pipeline,
+  object-cache/link integration; tests/tests.sk and this log. No skargo changes
+  required, no SKStore/runtime API changes or new unsafe primitives. Keep64 stable
+  function buckets +16 constant buckets +one support/mega unit. Explicit llvm-ir,
+  release, nonpersistent, Wasm and unsupported opaque preambles keep monolithic
+  emission. Class metadata remains conservative. No parallel compiler work added.
+- Native compilation/link wall after change is about.440s combined (.218 inside
+  compiler including file commands +.222 final link), versus6.826s previously.
+  LLVM emission.261s plus materialization checks.488s mean. All phase sums in
+  table above are exclusive and include the longer profiled materialization run.
+- Final git diff --check clean; benchmark source bytes/mtime restored before the
+  intentional parser compatibility edit. Only current intended changes retained.
+  Work completed and validated; user requested committing these changes.

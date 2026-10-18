@@ -48,6 +48,7 @@ fun getLinkArgs(
   llFile: String,
   config: Config.Config,
   exports: Array<String> = Array[],
+  nativeInputs: ?Array<String> = None(),
 ): ?Array<String> {
   linker_args = config.link_args.concat(
     config.dependencies.values().collect(Array).flatMap(x -> x.i1.links),
@@ -156,8 +157,8 @@ fun getLinkArgs(
         `--target=${config.target}`,
         "-o",
         config.output,
-        llFile,
-      ].concat(flags)
+      ].concat(nativeInputs.default(Array[llFile]))
+        .concat(flags)
         .concat(linker_args)
         .concat(static_libs),
     )
@@ -538,6 +539,7 @@ fun getOrInitializeBackend(
   );
 
   tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
+  _ = context.mkdir(SKStore.IID::keyType, SKStore.StringFile::type, AsmOutput.emissionPreambleDirName);
 
   specializationConfigDir = backendDir.map(
     SKStore.IID::keyType,
@@ -1105,12 +1107,12 @@ fun getOrInitializeBackend(
   );
   backendLowerDir = Lower.incrementalLower(context, backendReachableDir);
   graphCache = AsmOutput.createGraphCache(context, backendLowerDir);
-  backendEmitDir = backendLowerDir.map(
+  backendGraphDir = backendLowerDir.map(
     SKStore.IID::keyType,
-    ConfigFile::type,
+    AsmOutput.NativeGraphFile::type,
     context,
-    SKStore.DirName::create("/backendEmit/"),
-    (context, _writer, _key, values) ~> {
+    SKStore.DirName::create("/backendGraph/"),
+    (context, writer, key, values) ~> {
       env = values.first.env;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       defs = runCompilerPhase("native/create_asm_graph", () -> {
@@ -1126,11 +1128,36 @@ fun getOrInitializeBackend(
       });
 
       runCompilerPhase("native/create_asm_symbols", () -> {
-        AsmOutput.assignFinalSymbols(defs)
+        AsmOutput.assignFinalSymbols(
+          defs,
+          AsmOutput.incrementalEmission(config),
+        )
       });
 
+      writer.set(
+        key,
+        AsmOutput.NativeGraphFile(defs.values().collect(Array), config),
+      )
+    },
+  );
+  emission = AsmOutput.createEmissionCache(context, backendGraphDir);
+  backendEmitDir = backendGraphDir.map(
+    SKStore.IID::keyType,
+    ConfigFile::type,
+    context,
+    SKStore.DirName::create("/backendEmit/"),
+    (context, _writer, _key, values) ~> {
+      input = values.first;
+      config = input.config;
+      defs = mutable AsmOutput.AsmDefIDToAsmDef{pos => FileRange.builtin};
+      for (def in input.defs) defs.set(def.id, def);
+      positions = if (AsmOutput.incrementalEmission(config)) {
+        SourcePositions.Table{}
+      } else {
+        SourcePositions.Table::read(context)
+      };
       config.emit match {
-      | "llvm-ir" -> compile_llvm_ir(defs, config, env.sourcePositions)
+      | "llvm-ir" -> compile_llvm_ir(defs, config, positions)
       | "link" | "cdylib" ->
         // TODO: Remove exports stuff once --emit=cdylib is supported.
         wasm_exports = outerIst
@@ -1148,7 +1175,28 @@ fun getOrInitializeBackend(
               ).isSome()
           )
           .map(exportName);
-        compile_binary(defs, config, wasm_exports, env.sourcePositions)
+        if (AsmOutput.incrementalEmission(config)) {
+          _ = AsmOutput.emissionPreambleDir.getArray(context, SKStore.IID(0));
+          modules = emission.contents(context);
+          if (modules.isEmpty()) {
+            // Unsupported opaque user preambles retain the previous native path.
+            compile_binary(
+              defs,
+              config,
+              wasm_exports,
+              SourcePositions.Table::read(context),
+            );
+            dir = config.output + ".llvm";
+            if (!FileSystem.exists(dir)) {
+              runShell(Array["mkdir", "-p", dir], config.verbose)
+            };
+            FileSystem.writeTextFile(dir + "/outputs", config.output + ".ll")
+          } else {
+            compile_incremental_binary(modules, config, wasm_exports)
+          }
+        } else {
+          compile_binary(defs, config, wasm_exports, positions)
+        }
       | "sklib" ->
         invariant_violation("--emit=sklib should have been handled earlier")
       | _ ->
@@ -1188,6 +1236,7 @@ fun compile(
 
   (backendDir, tickDir) = getOrInitializeBackend(context);
   backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)]);
+  AsmOutput.refreshEmissionPreamble(context, config);
   tickDir.writeArray(
     context,
     SKStore.IID(0),
@@ -1215,14 +1264,14 @@ fun compile(
   if (
     !config.stopAfterSpecialization &&
     config.output != "-" &&
-    !FileSystem.exists(config.output)
+    (!FileSystem.exists(config.output) || emissionOutputsMissing(config))
   ) {
     // Output files are external side effects. Replay the final backend map
     // when the output disappears, preserving cached specialization work.
     key: SKStore.Key = SKStore.IID(0);
     reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
       parentName => if (config.emit == "sklib") backendDir.dirName else {
-        SKStore.DirName::create("/backendLower/")
+        SKStore.DirName::create("/backendGraph/")
       },
       childName => SKStore.DirName::create(
         if (config.emit == "sklib") "/backendPhase1/" else "/backendEmit/",
@@ -1455,6 +1504,87 @@ fun compile_binary(
         runShell(args, conf.verbose)
       }
     })
+  })
+}
+
+// These files are external side effects. Missing artifacts replay only final
+// materialization; cached module text remains in the eager emission collection.
+fun emissionOutputsMissing(config: Config.Config): Bool {
+  if (!AsmOutput.incrementalEmission(config)) return false;
+  manifest = config.output + ".llvm/outputs";
+  !FileSystem.exists(manifest) ||
+    FileSystem.readTextFile(manifest).split("\n").any(path ->
+      !path.isEmpty() && !FileSystem.exists(path)
+    )
+}
+
+fun compile_incremental_binary(
+  modules: Array<(String, String)>,
+  config: Config.Config,
+  exports: Array<String>,
+): void {
+  dir = config.output + ".llvm";
+  if (!FileSystem.exists(dir)) {
+    runShell(Array["mkdir", "-p", dir], config.verbose)
+  };
+  objects = mutable Vector[];
+  outputs = modules.flatMap(part -> {
+    base = dir + "/" + part.i0;
+    Array[base + ".ll", base + ".o", base + ".flags"]
+  });
+  // Publish the complete recovery plan before compiling. A failed first build
+  // of a newly introduced module must also be detectable on the next invocation.
+  FileSystem.writeTextFile(dir + "/outputs", outputs.join("\n"));
+  tool = System.subprocess(Array["clang++", "--version"]).fromSuccess();
+  invariant(tool.success(), tool.stderr);
+  for ((name, contents) in modules) {
+    ll = dir + "/" + name + ".ll";
+    object = dir + "/" + name + ".o";
+    stamp = dir + "/" + name + ".flags";
+    temp = object + ".tmp";
+    args = Array[
+      "clang++",
+      `-O${config.optLevel}`,
+      `--target=${config.target}`,
+      "-c",
+      ll,
+      "-o",
+      temp,
+    ].concat(if (config.emit == "cdylib") Array["-fPIC"] else Array[])
+      .concat(config.link_args)
+      .concat(
+        config.dependencies.values().collect(Array).flatMap(dep ->
+          dep.i1.links
+        ),
+      );
+    flags = tool.stdout + "\n" + args.join("\n");
+    changed = !FileSystem.exists(ll) || FileSystem.readTextFile(ll) != contents;
+    if (
+      changed ||
+      !FileSystem.exists(object) ||
+      !FileSystem.exists(stamp) ||
+      FileSystem.readTextFile(stamp) != flags
+    ) {
+      // Invalidate success before replacing the input: a failed clang must not
+      // make a subsequent retry mistake the old object for a successful build.
+      if (FileSystem.exists(stamp)) {
+        runShell(Array["rm", stamp], config.verbose)
+      };
+      if (changed) FileSystem.writeTextFile(ll, contents);
+      runShell(args, config.verbose);
+      runShell(Array["mv", temp, object], config.verbose);
+      FileSystem.writeTextFile(stamp, flags)
+    };
+    objects.push(object);
+  };
+  getLinkArgs("", config, exports, Some(objects.toArray())).each(args -> {
+    if (config.no_link) {
+      print_string("---LINK_ARGS_BEGIN---");
+      args.each(print_string);
+      print_string("---LINK_ARGS_END---")
+    } else {
+      runShell(args, config.verbose)
+    }
   })
 }
 

@@ -653,7 +653,7 @@ private fun incrementalFunctionIR(): void {
     initial = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
     T.expectTrue(initial.success(), initial.stderr);
     T.expectEq(initial.stderr.split("\n").filter(line ->
-      line.startsWith(">> clang++ ")
+      line.startsWith(">> clang++ ") && !line.contains(" -c ")
     ).collect(Array).size(), 1, initial.stderr);
     first = System.subprocess(Array[output]).fromSuccess();
     T.expectTrue(first.success(), first.stderr);
@@ -715,7 +715,7 @@ private fun incrementalFunctionIR(): void {
         .collect(Array);
       T.expectEq(planWrites.size(), 0, planWrites.join("\n"));
       links = updated.stderr.split("\n").filter(line ->
-        line.startsWith(">> clang++ ")
+        line.startsWith(">> clang++ ") && !line.contains(" -c ")
       ).collect(Array).size();
       // Updating the cache must not dirty the backend while it is running.
       T.expectTrue(links <= 1, updated.stderr);
@@ -870,7 +870,7 @@ private fun incrementalOptimization(): void {
       T.expectEq(scheduleWrites.size(), 0, scheduleWrites.join("\n"));
       links = updated.stderr
         .split("\n")
-        .filter(line -> line.startsWith(">> clang++ "))
+        .filter(line -> line.startsWith(">> clang++ ") && !line.contains(" -c "))
         .collect(Array)
         .size();
       T.expectTrue(links <= 1, updated.stderr);
@@ -1157,6 +1157,145 @@ private fun incrementalLLVMGraph(): void {
     throw exn
   };
   T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+}
+
+// Count real emission/clang work, and verify other modules remain byte-identical.
+private fun incrementalLLVMEmission(): void {
+  dir = System.subprocess(Array["mktemp", "-d"]).fromSuccess().stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  args = compile_cmd(Array[source], output).concat(
+    Array["--no-ipa", "--verbose"],
+  );
+  baseline =
+    "untracked fun emitLeft(n: Int): void { print_raw(\"left\" + n.toString()) }\n" +
+    "untracked fun emitRight(n: Int): void { print_raw(\"right\" + n.toString()) }\n" +
+    "untracked fun main(): void { emitLeft(1); emitRight(2) }\n";
+  try {
+    FileSystem.writeTextFile(source, baseline);
+    initial = System.subprocess(
+      args.concat(Array["--init", data]),
+    ).fromSuccess();
+    T.expectTrue(initial.success(), initial.stderr);
+    T.expectEq(
+      System.subprocess(Array[output]).fromSuccess().stdout,
+      "left1right2",
+    );
+    support = output + ".llvm/m2_0.ll";
+    // readTextFile's tracked wrapper can be CSE'd across child-process writes.
+    // Use fresh external reads to verify the bytes actually present on disk.
+    originalSupport = System.subprocess(
+      Array["cat", support],
+    ).fromSuccess().stdout;
+    for ((text, expected, changed, stamp) in Array[
+      (
+        baseline.replace("left", "LEFT"),
+        "LEFT1right2",
+        true,
+        "200001010000.01",
+      ),
+      (
+        baseline.replace("left", "LEFT"),
+        "LEFT1right2",
+        false,
+        "200001010000.02",
+      ),
+      (baseline, "left1right2", true, "200001010000.03"),
+      (
+        baseline + "fun emitUnused(): Int { 42 }\n",
+        "left1right2",
+        false,
+        "200001010000.04",
+      ),
+      (baseline, "left1right2", false, "200001010000.05"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      _ = System.subprocess(Array["touch", "-t", stamp, source]).fromSuccess();
+      updated = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(updated.success(), updated.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      modules = updated.stdout
+        .split("\n")
+        .filter(l -> l.startsWith("LLVM_MODULE:"))
+        .collect(Array);
+      compiles = updated.stderr
+        .split("\n")
+        .filter(l -> l.startsWith(">> clang++ ") && l.contains(" -c "))
+        .collect(Array);
+      T.expectTrue(
+        modules.size() <= (if (changed) 3 else 0),
+        modules.join("\n"),
+      );
+      T.expectTrue(
+        compiles.size() <= (if (changed) 3 else 0),
+        compiles.join("\n"),
+      );
+      if (changed) T.expectTrue(!compiles.isEmpty(), updated.stderr);
+      T.expectEq(
+        System.subprocess(Array["cat", support]).fromSuccess().stdout,
+        originalSupport,
+      );
+    };
+    // Losing one LLVM/object artifact recreates it without rerendering modules.
+    for (suffix in Array[".ll", ".o", ".flags"]) {
+      missing = output + ".llvm/m2_0" + suffix;
+      _ = System.subprocess(Array["rm", missing]).fromSuccess();
+      replay = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(replay.success(), replay.stderr);
+      T.expectTrue(FileSystem.exists(missing));
+      T.expectFalse(replay.stdout.contains("LLVM_MODULE:"), replay.stdout);
+      compiles = replay.stderr
+        .split("\n")
+        .filter(l -> l.startsWith(">> clang++ ") && l.contains(" -c "))
+        .collect(Array);
+      T.expectEq(compiles.size(), 1, replay.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        "left1right2",
+      );
+    };
+    // Only the external preamble changes; the Skip sources and configuration
+    // stay identical on the second invocation. Its bytes are tracked inputs.
+    preamble = dir + "/header.ll";
+    FileSystem.writeTextFile(preamble, "; EMISSION_HEADER_FIRST\n");
+    withPreamble = Array["env", "SKC_PREAMBLE=" + preamble].concat(args).concat(
+      Array["--data", data, "--debug-skstore"],
+    );
+    firstHeader = System.subprocess(withPreamble).fromSuccess();
+    T.expectTrue(firstHeader.success(), firstHeader.stderr);
+    FileSystem.writeTextFile(preamble, "; EMISSION_HEADER_SECOND\n");
+    nextHeader = System.subprocess(withPreamble).fromSuccess();
+    T.expectTrue(nextHeader.success(), nextHeader.stderr);
+    actualSupport = System.subprocess(
+      Array["cat", support],
+    ).fromSuccess().stdout;
+    T.expectTrue(
+      actualSupport.startsWith("; EMISSION_HEADER_SECOND"),
+      actualSupport.take(200),
+    );
+    T.expectTrue(nextHeader.stdout.contains("LLVM_MODULE:"), nextHeader.stdout);
+    T.expectFalse(
+      nextHeader.stdout.contains("LLVM_FUNCTION:"),
+      nextHeader.stdout,
+    );
+    T.expectEq(
+      System.subprocess(Array[output]).fromSuccess().stdout,
+      "left1right2",
+    );
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
 }
 
 // Preserve cycle-breaking behavior while bodies and dependency edges change.
@@ -1692,6 +1831,7 @@ untracked fun main(): void {
         func => () ~> incrementalNativeLowering(),
       },
       T.Test{name => "llvm_graph", func => () ~> incrementalLLVMGraph()},
+      T.Test{name => "llvm_emission", func => () ~> incrementalLLVMEmission()},
       T.Test{
         name => "optimization_cycles",
         func => () ~> incrementalOptimizationCycles(),

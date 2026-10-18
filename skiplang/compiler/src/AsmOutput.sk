@@ -917,7 +917,10 @@ fun mergeIdenticalAsmDefs(
   removeRedundantDefs(defs)
 }
 
-fun assignFinalSymbols(defs: mutable AsmOutput.AsmDefIDToAsmDef): void {
+fun assignFinalSymbols(
+  defs: mutable AsmOutput.AsmDefIDToAsmDef,
+  stableFunctions: Bool = false,
+): void {
   symbolsTaken = (mutable UnorderedMap[] : mutable UnorderedMap<String, Int>);
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
@@ -949,6 +952,10 @@ fun assignFinalSymbols(defs: mutable AsmOutput.AsmDefIDToAsmDef): void {
             true,
           );
           sstr.toString()
+        };
+
+        if (stableFunctions && def.isFunction() && !def.forceExternal) {
+          !sym = sym + ".f" + def.id.id
         };
 
         symbolsTaken.maybeGet(sym) match {
@@ -1681,6 +1688,7 @@ mutable class Metadata{
 
   defs: readonly AsmDefIDToAsmDef,
   positions: SourcePositions.Table,
+  mutable canonicalizeFunctions: Bool = true,
 } {
   static fun create(
     defs: readonly AsmDefIDToAsmDef,
@@ -1744,9 +1752,11 @@ mutable class Metadata{
 
     // Canonicalize the SFunctionID to handle sharing.
     origID = AsmDefID(funPos.id.id);
-    id = this.defs.maybeGet(origID) match {
-    | Some(x) -> x.id
-    | None() -> origID
+    id = if (!this.canonicalizeFunctions) origID else {
+      this.defs.maybeGet(origID) match {
+      | Some(x) -> x.id
+      | None() -> origID
+      }
     };
 
     key = (file, id);
