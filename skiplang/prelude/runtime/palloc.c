@@ -17,7 +17,7 @@
 #include "alloc_size_classes.h"
 #include "runtime.h"
 
-#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
+#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 64L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
 #define FTABLE_SIZE 512
 _Static_assert(SK_ALLOC_SLOT_COUNT <= FTABLE_SIZE,

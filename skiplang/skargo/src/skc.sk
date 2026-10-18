@@ -2,7 +2,17 @@ module Skargo;
 
 class Skc(cmd: String, extra_options: Array<String>) {
   fun process(): mutable ProcessBuilder {
-    ProcessBuilder::create{cmd => this.cmd, args => this.extra_options}
+    process = ProcessBuilder::create{
+      cmd => this.cmd,
+      args => this.extra_options,
+    };
+    // Older bootstrap compilers default to 16 GiB, which is too small when
+    // compiling the compiler itself. Match the runtime's 64 GiB sparse mapping
+    // default without allocating it up front. Keep explicit user limits intact.
+    if (Environ.varOpt("SKIP_CAPACITY").default("") == "") {
+      process.env("SKIP_CAPACITY", "64G")
+    };
+    process
   }
 }
 

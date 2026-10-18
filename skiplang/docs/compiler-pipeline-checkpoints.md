@@ -2534,3 +2534,39 @@ old-host databases; source+mtime restoration required in edit benchmarks.
 - Final git diff --check clean; benchmark source bytes/mtime restored before the
   intentional parser compatibility edit. Only current intended changes retained.
   Work completed and validated; user requested committing these changes.
+
+### Ordinary compiler build persistent-capacity failure (fix committed; full build validation pending)
+
+- User's plain `skargo build` in compiler failed with runtime exit24 after
+  about337s. Its merged compiler state.db had the default16GiB capacity;
+  allocator head was exactly capacity minus32 bytes and live allocations were
+  17,179,591,784 bytes. This is the fixed persistent arena limit, not RAM OOM.
+  Previous benchmarks explicitly used SKIP_CAPACITY=64G, masking this default.
+- Skargo Skc.process now supplies SKIP_CAPACITY=64G only when the inherited
+  variable is absent/empty. Explicit environment values and --capacity arguments
+  retain precedence. The runtime default is also raised below, per user request.
+- Built release skargo successfully in51.988s. System /usr/local/bin installation
+  requires sudo authentication, so installed the fixed executable in existing
+  ~/.local/bin (already precedes /usr/local/bin). Original saved under
+  /tmp/skip-capacity-fix/skargo-before.
+- Removed only the exhausted generated merged compiler state.db, retaining
+  dependency databases/artifacts. Capacity settings do not resize existing DBs.
+  Rebuilding compiler using fixed skargo with SKIP_CAPACITY removed from parent
+  environment. Raw logs and measurements: /tmp/skip-capacity-fix/.
+- Added tests/skc_capacity.sk: invokes a child through the actual Skc process
+  builder and checks its effective capacity environment. Compiled against std
+  and sktest, and passed with parent capacity unset, empty, and explicit32G.
+  Formatted changed Skip sources; git diff --check clean.
+- Follow-up user request: also raise runtime DEFAULT_CAPACITY itself to64GiB.
+  Changed prelude/runtime/palloc.c; retained skargo's compatibility fallback for
+  installed bootstrap compilers with the previous16GiB runtime default.
+  Compiled a C probe against current palloc.c with dead-section elimination:
+  unset/empty environment =>64GiB, explicit32G =>32GiB, --capacity1G overrides
+  environment32G. All four cases pass.
+- User requested committing the capacity fix while full compiler validation is
+  still running. Release skargo build, three child-environment regressions, and
+  four C capacity/default/override probes passed. Full compiler process6829
+  remains active; do not report its successful completion yet. The existing
+  compiler-build.json with returncode -15 belongs to the deliberately stopped
+  first attempt using old system skargo; the current attempt overwrites it on
+  completion. Follow up with a warm build against the changed prelude runtime.
