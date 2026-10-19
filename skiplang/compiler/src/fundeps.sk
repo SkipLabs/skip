@@ -11,6 +11,7 @@ fun findDirectDependencies(
   f: Function,
   visit: SFunctionID -> void,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   for (c in f.constants) {
     c match {
@@ -37,7 +38,7 @@ fun findDirectDependencies(
             _ = optinfo.allMethodImplementations(call, env, (_, code, _, _) -> {
               _ = visit(code);
               true
-            })
+            }, classReader)
           }
         | _ -> void
         }

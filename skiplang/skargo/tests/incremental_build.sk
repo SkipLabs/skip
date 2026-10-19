@@ -93,6 +93,7 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   ).collect(Array);
   T.expectEq(releaseCommands.size(), 1, release.stderr);
   T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
+  T.expectTrue(releaseCommands[0].contains("--release"), release.stderr);
   T.expectTrue(!releaseCommands[0].contains("--no-inline"), release.stderr);
   T.expectTrue(!releaseCommands[0].contains("--no-ipa"), release.stderr);
   releaseProbe = System.popen{
@@ -145,7 +146,10 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   // changing compiler inputs. Prolix output exposes any new skc link plan.
   pureModules = FileSystem.readFilesRecursive(
     pure + "/target/host/dev/deps",
-    path -> Path.basename(path).startsWith("__merged-") && path.endsWith(".ll"),
+    path ->
+      path.endsWith(".ll") &&
+        (Path.basename(path).startsWith("__merged-") || path.contains(".llvm/"))
+    ,
   ).toArray();
   T.expectTrue(!pureModules.isEmpty());
   T.expectTrue(
@@ -166,6 +170,48 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   replay = build(skargo, pure, true);
   T.expectTrue(replay.stderr.contains("--data "), replay.stderr);
   T.expectTrue(!replay.stdout.contains("---LINK_ARGS_BEGIN---"), replay.stdout);
+  T.expectTrue(!replay.stderr.contains("Running: `clang"), replay.stderr);
+  T.expectEq(pureModules.map(mtime), pureTimes);
+  run_probe(pure, "2");
+
+  // Model an interrupted external link after skc committed its clean cache.
+  // The older executable still exists, but the saved plan must run again.
+  linkStatuses = FileSystem.readFilesRecursive(
+    pure + "/target/.fingerprints",
+    path ->
+      Path.basename(path) == "link-status" &&
+        path.contains("incremental-probe-") &&
+        FileSystem.readTextFile(
+          Path.join(Path.dirname(path), "link-args"),
+        ).contains("/host/dev/")
+    ,
+  ).toArray();
+  T.expectEq(linkStatuses.size(), 1);
+  FileSystem.writeTextFile(linkStatuses[0], "pending");
+  T.expectTrue(
+    System.subprocess(
+      Array["touch", "-t", "200001010000.10", pure + "/Skargo.toml"],
+    )
+      .fromSuccess()
+      .success(),
+  );
+  recovered = build(skargo, pure, true);
+  T.expectTrue(
+    !recovered.stdout.contains("---LINK_ARGS_BEGIN---"),
+    recovered.stdout,
+  );
+  T.expectTrue(recovered.stderr.contains("Running: `clang"), recovered.stderr);
+  T.expectEq(FileSystem.readTextFile(linkStatuses[0]), "complete");
+  run_probe(pure, "2");
+
+  // An unused declaration changes frontend inputs but leaves native output
+  // current. It must not trigger LLVM materialization or external linking.
+  FileSystem.writeTextFile(source, FileSystem.readTextFile(source) +
+    "\nfun unusedIncrementalHelper(): Int { 17 }\n");
+  T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.11", source]).fromSuccess().success());
+  unused = build(skargo, pure, true);
+  T.expectTrue(!unused.stdout.contains("---LINK_ARGS_BEGIN---"), unused.stdout);
+  T.expectTrue(!unused.stderr.contains("Running: `clang"), unused.stderr);
   T.expectEq(pureModules.map(mtime), pureTimes);
   run_probe(pure, "2");
 
@@ -202,7 +248,10 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   run_probe(consumer, "1");
   modules = FileSystem.readFilesRecursive(
     consumer + "/target/host/dev/deps",
-    path -> Path.basename(path).startsWith("__merged-") && path.endsWith(".ll"),
+    path ->
+      path.endsWith(".ll") &&
+        (Path.basename(path).startsWith("__merged-") || path.contains(".llvm/"))
+    ,
   ).toArray();
   T.expectTrue(!modules.isEmpty());
   oldContents = modules.map(contents);

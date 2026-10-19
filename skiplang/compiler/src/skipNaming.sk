@@ -1044,6 +1044,24 @@ fun check_type_alias(
   _ = type(context, acc, env1, ta.body)
 }
 
+class ConstTypeFile(value: A.Type_) extends SKStore.File
+const constTypes: SKStore.EHandle<SKStore.SID, ConstTypeFile> = SKStore.EHandle(
+  SKStore.SID::keyType,
+  ConstTypeFile::type,
+  SKStore.DirName::create("/namingConstTypes/"),
+);
+
+fun maybeGetConstType(context: mutable SKStore.Context, name: String): ?N.Type_ {
+  constTypes.getArray(context, SKStore.SID(name)).maybeGet(0).map(file ->
+    type(
+      context,
+      mutable ClassAcc{},
+      make_env() with {in_consts_type_annot => true},
+      file.value,
+    )
+  )
+}
+
 fun maybeGetConst(
   context: mutable SKStore.Context,
   constName: String,
@@ -1229,6 +1247,69 @@ const classesDir: SKStore.EHandle<SKStore.SID, ClassFile> = SKStore.EHandle(
 );
 class ClassFile(value: N.Class_def) extends SKStore.File
 
+private const copydownDirName: SKStore.DirName = SKStore.DirName::create("/namingCopydownPolicy/");
+private const copydownDir: SKStore.EHandle<SKStore.SID, SKStore.BoolFile> = SKStore.EHandle(
+  SKStore.SID::keyType, SKStore.BoolFile::type, copydownDirName,
+);
+
+// Copydown policy does not depend on the source class's descendants. Publish
+// its exact decision separately so adding a child does not retype all users.
+fun copydownSourceAllowsOmission(context: mutable SKStore.Context, name: A.Name): Bool {
+  entries = copydownDir.getArray(context, SKStore.SID(name.i1));
+  if (entries.isEmpty()) {
+    SkipError.fatalError(context, name.i0, `Unbound class: '${name.i1}'`)
+  };
+  entries[0].value
+}
+
+
+// Type construction needs these properties, not the descendant lists or
+// method bodies. Keeping a distinct record makes that dependency explicit.
+class ClassTypeInfo{
+  kind: A.Class_kind,
+  name: N.Name,
+  tparams: Array<N.Type_parameter>,
+  extends_: N.ParentMap,
+  use: N.ParentMap,
+  tparam_mismatched: SMap<SSet>,
+  depth: Int,
+  tparam_parents: Array<SSet>,
+}
+private class ClassTypeInfoFile(value: ClassTypeInfo) extends SKStore.File
+private const classTypesDirName: SKStore.DirName = SKStore.DirName::create("/namingClassTypes/");
+private const classTypesDir: SKStore.EHandle<SKStore.SID, ClassTypeInfoFile> = SKStore.EHandle(
+  SKStore.SID::keyType, ClassTypeInfoFile::type, classTypesDirName,
+);
+
+fun getClassTypeInfo(context: mutable SKStore.Context, name: A.Name): ClassTypeInfo {
+  entries = classTypesDir.getArray(context, SKStore.SID(name.i1));
+  if (entries.isEmpty()) {
+    SkipError.fatalError(context, name.i0, `Unbound class: '${name.i1}'`)
+  };
+  entries[0].value
+}
+
+// Member lookup needs signatures and visibility, not descendant lists.
+class ClassMembersInfo{
+  name: N.Name,
+  kind: A.Class_kind,
+  fields: UMap<N.Field_type>,
+  types: UMap<N.Type_def>,
+  tparams: Array<N.Type_parameter>,
+}
+private class ClassMembersInfoFile(value: ClassMembersInfo) extends SKStore.File
+private const classMembersDirName: SKStore.DirName = SKStore.DirName::create("/namingClassMembers/");
+private const classMembersDir: SKStore.EHandle<SKStore.SID, ClassMembersInfoFile> = SKStore.EHandle(
+  SKStore.SID::keyType, ClassMembersInfoFile::type, classMembersDirName,
+);
+fun getClassMembers(context: mutable SKStore.Context, name: A.Name): ClassMembersInfo {
+  entries = classMembersDir.getArray(context, SKStore.SID(name.i1));
+  if (entries.isEmpty()) {
+    SkipError.fatalError(context, name.i0, `Unbound class: '${name.i1}'`)
+  };
+  entries[0].value
+}
+
 fun populateClasses(
   context: mutable SKStore.Context,
   defDir: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
@@ -1258,7 +1339,50 @@ fun populateClasses(
         }
       })
     },
-  )
+  );
+  _ = classesDir.map(
+    SKStore.SID::keyType,
+    ClassTypeInfoFile::type,
+    context,
+    classTypesDirName,
+    (_context, writer, key, values) ~> {
+      cd = values.first.value;
+      writer.set(key, ClassTypeInfoFile(ClassTypeInfo{
+        kind => cd.kind, name => cd.name, tparams => cd.tparams,
+        extends_ => cd.extends_, use => cd.use,
+        tparam_mismatched => cd.tparam_mismatched,
+        depth => cd.depth, tparam_parents => cd.tparam_parents,
+      }))
+    },
+  );
+  _ = classesDir.map(
+    SKStore.SID::keyType,
+    SKStore.BoolFile::type,
+    context,
+    copydownDirName,
+    (_context, writer, key, values) ~> {
+      source = values.first.value;
+      writer.set(key, SKStore.BoolFile(
+        !(source.kind is A.KTrait()) &&
+          !source.fields.any((_, f) -> f.deferred_.isSome()) &&
+          !source.types.any((_, tyd) -> tyd.body is N.TydAbstract _) &&
+          !source.is_self_parameterized
+      ))
+    },
+  );
+  _ = classesDir.map(
+    SKStore.SID::keyType,
+    ClassMembersInfoFile::type,
+    context,
+    classMembersDirName,
+    (_context, writer, key, values) ~> {
+      cd = values.first.value;
+      writer.set(key, ClassMembersInfoFile(ClassMembersInfo{
+        name => cd.name, kind => cd.kind, fields => cd.fields,
+        types => cd.types, tparams => cd.tparams,
+      }))
+    },
+  );
 }
 
 fun maybeGetClass(
@@ -2139,6 +2263,23 @@ fun populateFuns(
   context: mutable SKStore.Context,
   defDir: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
 ): void {
+  // Constant references need the declared type, not the initializer's named
+  // expression. Comparing this projection also prevents body-only declaration
+  // changes from invalidating every reader of the constant's type. The
+  // declaration's own typing mapper still validates its complete initializer.
+  _ = defDir.map(
+    SKStore.SID::keyType,
+    ConstTypeFile::type,
+    context,
+    constTypes.dirName,
+    (_context, writer, _, values) ~> {
+      values.getUnique() match {
+      | Some(GlobalEnv.ExpandedDefFile(GlobalEnv.EConst(cst))) ->
+        writer.set(SKStore.SID(cst.name.i1), ConstTypeFile(cst.type))
+      | _ -> void
+      }
+    },
+  );
   // Gathering all functions with their annotations so that they are available
   // for `#forEachFunction` macro expansion.
   _ = defDir.map(

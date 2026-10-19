@@ -1,0 +1,43 @@
+/** Bound the publication work between whole-program and per-function passes. */
+module FunctionBatches;
+
+class FunctionsFile(value: Array<Function>) extends SKStore.File
+
+fun create(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+  name: String,
+): SKStore.EHandle<SKStore.IID, SKStore.File> {
+  input.map(
+    SKStore.IID::keyType,
+    x ~> x,
+    context,
+    SKStore.DirName::create(name),
+    (_context, writer, _, values) ~> {
+      entry = values.first;
+      if (!entry.config.incrementalSpecialization) return void;
+      writer.set(
+        SKStore.IID(0),
+        Optimize.InputFile(
+          entry.env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          entry.config,
+        ),
+      );
+      groups = mutable Map<Int, mutable Vector<Function>>[];
+      for (f in entry.env.sfuns) {
+        groups.getOrAdd(f.id.id.and(255), () -> mutable Vector[]).push(f)
+      };
+      // Compare arrays within stable buckets so equal functions avoid repeated
+      // keyed publication. They remain ordinary function values; SKStore tracks
+      // the bucket and subsequent per-function reads normally.
+      for ((group, functions) in groups.items()) {
+        writer.set(SKStore.IID(group + 1), FunctionsFile(functions.toArray()))
+      }
+    },
+  )
+}
+
+module end;

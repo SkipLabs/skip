@@ -2570,3 +2570,1781 @@ old-host databases; source+mtime restoration required in edit benchmarks.
   compiler-build.json with returncode -15 belongs to the deliberately stopped
   first attempt using old system skargo; the current attempt overwrites it on
   completion. Follow up with a warm build against the changed prelude runtime.
+
+### Comprehensive incremental profiling and optimization (active)
+
+User requests profiling every material phase, explaining incremental work,
+forming hypotheses, implementing and measuring them, with a5–6hour work window.
+
+Plan:
+1. Close capacity validation: the plain compiler rebuild completed successfully
+   in343.945s using fixed skargo and no parent capacity override. Runtime default
+   changed during that run; follow up after profiling setup with a warm build.
+2. Establish a repeatable baseline with diagnostic-message edits/restores, unused
+   helper add/remove, and no-op controls. Reuse each exact profiling binary only
+   with its own database. Restore all source bytes and mtimes after experiments.
+3. Use exclusive phase timers plus CPU sampling/call stacks and operation counts
+   to explain all material phases, especially SKStore coordination/sync, whole
+   program scans/assembly, frontend, LLVM materialization, and native tool work.
+4. Record ranked hypotheses before changes. Implement bounded changes using
+   normal SKStore dependencies; avoid unsafe shortcuts. Measure one hypothesis
+   at a time, retain improvements and revert regressions.
+5. Validate correctness with relevant incremental regressions, native probes,
+   helper addition/removal, and sequential/release paths. Repeat matched phase
+   measurements and uninstrumented controls. Record a complete table with sums.
+
+Artifacts: /tmp/skip-incremental-profile/. Existing prior baseline artifacts under
+/tmp/skip-llvm-emission/ are retained. Reclaim only the obsolete pre-emission
+/tmp/skip-llvm-graph/target merged compiler state.db (~24GiB); all its timing logs,
+LLVM, binaries and dependency artifacts remain. This permits fresh variant DBs.
+No subagents: current instructions prohibit delegation without explicit request.
+- Capacity follow-up complete: compiler build finished343.945s; rebuilding with
+  the changed runtime default then succeeded in8.238s. No capacity environment
+  override supplied by the parent in either validation invocation.
+- Baseline refresh78.321s after native runtime archive changed (not an edit
+  sample). No-op.148s. Message restore/edit/restore:5.455/5.389/5.525s, mean5.456s.
+  CPU sampling run7.392s is excluded from wall comparison due profiler overhead.
+  Counter-disabled edit/restore5.245/6.113s. Detailed per-phase baseline saved in
+  phase-results.json; all exclusive rows sum exactly to elapsed build time.
+- Initial CPU sampling works, but DWARF call-chain unwinding drops many deep
+  stacks on this AArch64 setup. Building a more detailed profiling host with
+  operation counters and optional in-memory phase-transition trace to correlate
+  CPU sample timestamps with exact active phases. Instrumentation remains in
+  scratch LLVM/C; no compiler algorithm changed yet.
+
+Hypothesis H1 — backend config contains frontend source payloads:
+- Config.dependencies stores Sklib.Metadata including each complete source text,
+  source mtime, package hash, environment, and transitive dependency hashes.
+  compile() writes all of this to /backend/ on each invocation. A same-length
+  message edit changes dependency archive metadata even though backend options,
+  specialization identities, classes and function signatures are unchanged.
+- functionIRPlan reads full /backend/ configuration, so this broad dependency
+  forces its snapshot/identity scan; downstream config records also carry source
+  payloads through whole-program rows and comparisons/copies.
+- Experiment: normalize metadata only at the backend row boundary. FileCache
+  continues receiving original full config; preserve link paths/flags, preambles,
+  target/object-code fields. Preserve package hashes for sklib emission, which
+  writes dependency hashes; bin/cdylib/LLVM backend never consumes those hashes.
+  Use ordinary collection writes/equality, no unsafe dependency shortcuts.
+- H1 correctness refinement before measuring: native archives retain their hash
+  too, so standalone skc still relinks after native-only archive changes. Pure
+  source dependency hashes are redundant after FileCache has tracked the source
+  payload. Confirmed compiler/cli libraries are source-only; std has native code.
+- Detailed profiler first link failed because --wrap removed the archive's only
+  prior references to equality/copy functions. Move profiling object before the
+  runtime archive so its __real references pull the proper archive members.
+  Retrying; this is scratch instrumentation only, no product change.
+
+Hypothesis H2 — whole-program IR assembly registers per-function dependencies:
+- partitionFunctions consumes every specialized function, but calls getArray
+  separately for ~70,000 instantiations on each update. SKStore builds, compares,
+  and persists a dependency entry for every read, despite the consumer already
+  depending on the entire collection.
+- Experiment: read the eager collection with normal tracked items(context),
+  index current nonempty rows locally, and assemble in the existing stable
+  instantiation order. This records the whole-collection dependency directly,
+  preserves additions/removals, and introduces no unsafe reads. Compare against
+  H1 before retention; use a local hash table only for this invocation.
+- Detailed baseline and H1 profiling hosts now link successfully. To fit repeated
+  fresh databases, reclaim old /tmp/skip-llvm-emission/target merged state.db
+  (~20GiB) after its baseline samples have been saved. Keep all its old phase
+  logs, generated LLVM, binaries, source inputs and dependency caches. New
+  detailed baseline uses its own fresh detailed-target database.
+- H1 optimized host built successfully366.864s. All16 existing incremental
+  compiler regressions pass118.172s, including mode switches, function IDs,
+  class/type identity, lowering, graph generation and LLVM emission.
+
+Hypothesis H3 — reachability/escape analysis repeats independent analyses:
+- Baseline reachability+escape costs.387s per message update. fundeps.sk scans
+  every reachable body, constructs OptimizerInfo for functions containing calls,
+  and rediscovers identical direct edges. escape.sk reads class structure only,
+  yet runs downstream of the whole changing GlobalEnv.
+- Experiment: normal eager function rows cache outgoing edges; a separate class
+  projection caches escape flags. Compute reachable IDs from roots+edge rows,
+  and assemble current bodies afterward. A literal edit should run one edge
+  analysis, preserve the reachable-ID row, and skip class escape analysis.
+  Structural class changes conservatively invalidate all edge rows. Sequential
+  builds retain finishOptimizedFunctions unchanged.
+- H2 implementation uses tracked items(context) and a local immutable index;
+  sequential path allocates no index. Initial edit needed a missing separator
+  fixed before build. H3 source check passes; optimized LLVM generation140.395s.
+- Avoid duplicate native host links for future experiments: generate release
+  optimized LLVM once, then link the profiling host from it. Counter-disabled
+  controls use that same exact binary, so its constant table and DB match.
+  H2's redundant plain native link was stopped after its LLVM was saved; the
+  independently linked profiling host is the binary used for H2 measurements.
+- Additional disk reclamation: obsolete abandoned parallel-specializer scratch
+  caches /tmp/skip-specializer-parallel/profile-4.db (~15GiB) and
+  workers-16-trial-1.db (~3GiB), plus old region-copy bootstrap build cache
+  /tmp/skip-region-copy/outer-build/host/release/build/static_state.db (~11GiB).
+  These experiments were reverted long before this task. Preserve logs/binaries
+  and the user's current compiler target/cache. No source or output is removed.
+- H1a refinement from code inspection: main's phased entry writes full Config
+  to /backend/ before compilerPipeline[0] reads it. Normalizing in compile() after
+  this write leaves a dirty backend row even if normalized contents are equal.
+  Initial H1 host is therefore a partial experiment, not the complete hypothesis.
+- H1b fixes the boundary: main puts raw invocation config in a temporary global;
+  constant pipeline stage0 consumes it, calls compile(raw), then removes it before
+  synchronization. Only normalized backend options are ever written to /backend/.
+  Source loading still receives raw metadata; no new unsafe operation is added.
+- Detailed baseline profile: archive metadata decoding.484s (27 archive reads);
+  plan snapshot.280s; partition assembly.421s, including89,029 method-table
+  visits; escape.341s; reachability.255s. Framework: dependency updates.313s,
+  old contribution lookups.274s (680,250 calls), equality.170s, region copy.178s.
+  Intern/persist.835s plus free-root.138s across194 synchronization calls.
+  These operation timings are inclusive and overlap; do not sum as phase rows.
+- A setup run mislabeled detailed-noop took122.989s because regression test code
+  changed during setup, adding reachable compiler functions. Exclude it from
+  no-op/update comparisons. Freeze a separate benchmark source fixture before
+  further implementation changes to prevent this measurement contamination.
+- H3 optimized profiling host linked; new regression assertions verify exactly
+  one edge analysis and zero live-set/escape passes for a literal edit. All16
+  incremental regressions pass with H1a+H2+H3, including class dispatch/layout
+  changes, coroutine/optimizer cycles, mode switching and sequential comparisons.
+- Frozen benchmark fixture: /tmp/skip-incremental-profile/fixture/skiplang,
+  current compiler source+tests and dependency sources copied separately from
+  implementation work. Generated compiler outputs removed from that copy. Build
+  script uses fixed current commit string. measure.py now edits only fixture
+  compile.sk, preserving original bytes+mtime. Future compiler implementation
+  edits cannot change the benchmark program or add reachable test functions.
+
+Hypothesis H4 — discovery coordinator restarts for irrelevant declaration bodies:
+- RootsIR carries funDefs (every full top-level function declaration), but no
+  consumer reads that field. Body-only edits therefore change the roots record
+  and invalidate specialization initialization/coordinator even when root names
+  and type discovery do not change. This explains the194 sync calls per update.
+- Remove the unused field. Also let the phase1 driver drain cached discovery
+  rounds before a coordinator explicitly requests a checkpoint: its initial
+  round limit must be Int::max, not -1. Once progress exists, retain the existing
+  per-round boundary. Otherwise a dirty existing round could be deferred into
+  a later pipeline phase before it can discover/request a new round.
+- Validate especially new callees/classes, retractions, mode changes, and the
+  optimizer/coroutine cycle cases; no skipping semantic discovery or unsafe reads.
+- Reclaim H1a's merged scratch DB after its regression validation/setup runs:
+  normalization-after-raw-write is an incomplete hypothesis and will not be
+  retained as the final result. Keep its hosts, code, logs and measurements.
+- All subsequent phase comparisons use the frozen fixture. The fixture's source
+  tree was overlaid from the baseline archive for exact source text; its tests
+  use current copied bytes. Absolute test path/package cwd changes require one
+  excluded cache refresh per old target before repeated warm samples.
+
+Hypothesis H5 — dependency metadata is decoded repeatedly within one invocation:
+- Startup profile attributes.484s to27 read_metadata calls across the library
+  and merged-compiler commands. Resolver::create already parses every candidate
+  archive; explicit name=path dependencies are then parsed again by resolve().
+- Cache parsed metadata by canonical path inside that invocation's immutable
+  Resolver. Reuse it for explicit dependencies and duplicate search paths.
+  Recreate the Resolver on each invocation so archive edits remain visible;
+  no persistent metadata cache or manual invalidation is introduced.
+- Benchmark setup correction: relocating the old persisted targets to the frozen
+  fixture failed with an existing fromSome invariant in both the unmodified
+  baseline host and H2 host. This is a project-relocation/cache setup failure,
+  not a measured optimization result. Do not reuse those relocated databases.
+  Recreate only their merged DBs and initialize directly against the fixed
+  fixture. All failed/setup durations remain in measurements.json, excluded
+  from warm comparisons. Future source edits stay entirely inside the fixture.
+
+Hypothesis H6 — global projections pay keyed publication overhead for all functions:
+- Detailed message profile shows680,250 old-contribution lookups (.274s) and
+  682,150 equality calls (.170s). Several adapters take one GlobalEnv row and
+  publish every function again: optimizer inputs, reachability inputs, native
+  lowering inputs, LLVM graph inputs. This is publication/comparison work, not
+  rerunning each function's actual compiler pass.
+- Experiment: insert normal eager rows containing stable groups of256-way
+  function-ID buckets. The global adapter scans functions once, publishes at
+  most257 rows; only changed buckets expand to individual function rows. Keep
+  class/config metadata separate. No Ref, unsafe access, manual dependency lists,
+  or changes to sequential algorithms. Measure before retaining.
+- H4 functional validation:15/16 pass, with the sole failure an obsolete debug
+  assertion requiring REUSING latch pass on body-only edits. Targeted reproduction
+  confirms literal edit: zero base/independent writes and no coordinator reuse;
+  new subtype/removal: base writes, independent untouched, reuse and dirty-reader
+  events retained. Updated assertion to require reuse only for relation changes.
+- H6 implemented normal eager FunctionBatches between optimizer/reachability/
+  lowering/graph global envs and keyed functions. Graph vtable-offset projection
+  now consumes the metadata-only bucket, avoiding a full offset publication on
+  body edits. New profiler row Function collection projection separates this
+  adapter work from compiler semantics. H6 source check passed before formatting.
+- First controlled frozen-source matrix (no bulk builds running): baseline
+  6.002552s; H1a+H2 5.354233s; H1a+H2+H3 5.103748s. Each mean uses three
+  exclusive-timed edits/restores without perf sampling; sampling and controls
+  retained separately. Assembly .3654 ->.2511s; framework coordination1.6387
+  ->1.3530s with H2. Reachability/escape .4946 ->.1468s with H3; residual includes
+  its whole-env input projection and final assembly, not repeated escape analysis.
+  Raw runs: steady-baseline-*, steady-h2-*, steady-h3-* in measurements.json.
+- Reclaim H2/H3 merged scratch DBs after these samples to make room for H1b/H4
+  and later variants. Keep baseline DB, all logs/LLVM/hosts and dependency caches.
+
+Hypothesis H7 — final IR assembly rebuilds an already cached discovery snapshot:
+- Operation profile found two full Specializer.toFixed scans on each message
+  update: one in planFunctionIR and another before createIR. The plan already
+  publishes completed immutable class state and the function-ID table, consumed
+  by every per-instantiation mapper. Final assembly can read that same row.
+- Cache instantiation order alongside IDs in the plan, resolve class method IDs
+  there once, and clone its immutable state for assembly. Keep generated return
+  tuple merging in the existing assembly loop. Sequential specialization remains
+  unchanged. This avoids another full collection scan, ID-table reconstruction,
+  and repeated method-table resolution; all reads use ordinary handles.
+- Corrected H4 targeted regression now passes (latched_relations,1 test,
+  10.227s). Earlier attempted suite filter selected0 tests; that empty run is
+  not counted as validation. Correct positional test filter is used afterward.
+- H6 release LLVM generation146.405s and detailed profiling host link succeed;
+  test harness rebuilt22.420s with corrected latch expectations and edge counters.
+  Running the full16-test incremental suite against H6 before measurements.
+- H7 source check succeeds. Reuses the already tracked FunctionIRStateFile in
+  backend IR assembly; plan now stores stable instantiation order and pre-resolves
+  method IDs. It skips an unused pre-assembly class-map copy only in incremental
+  mode. Return tuples are still merged from current per-instantiation results;
+  their synthesized classes have no methods. Sequential path unchanged.
+- H6 full incremental suite passes16/16 in124.286s. H7 release LLVM generation
+  succeeds138.483s. Neither result is a performance claim until warm measurements.
+
+Hypothesis H8 — full source-position tables invalidate semantic backend records:
+- createIR always reads SourcePositions.Table::read and optimizer final assembly
+  does likewise. Adding an unused helper adds a marker, dirtying these whole-env
+  consumers even when no function IR or root changes.
+- Ordinary incremental emission already reads exactly its used anchors per LLVM
+  module. Constant ordering reads its own const anchors; verifier failures load
+  locations lazily. Keep full tables for sequential compilation, debug IR dumps,
+  and disassembly; omit them from normal incremental semantic env assembly.
+  Validate source positions, constructor shifts, verifier failures and debug dumps.
+- H1b/H4 controlled matrix complete; raw runs steady-h1b-* and steady-h4-*.
+  H4 counter-disabled message edits3.923/4.103s, versus H3 5.417/5.142s.
+  One timed H4 edit had an IO outlier5.506s; retain it in statistics, do not
+  cherry-pick. More repeats/final shell-launch controls will follow.
+- Reclaim H1b merged scratch DB after its matrix; retain all artifacts/results.
+
+Hypothesis H10 — reachable helper additions renumber the entire program:
+- Controlled same-line injection of a new called free helper (existing Int/String
+  types, no line shifts for other functions) costs82.467s add /64.095s remove on
+  baseline. Per-instantiation IR callbacks93,243/93,241; native lowering and LLVM
+  generation73,335/73,334 each. Coordination30.289/17.934s; optimizer~10s; native
+  commands~8.49s. This is separate from the6s message-update problem.
+- Current plan assigns sorted keys dense IDs from0 and publishes the full ID map
+  in the shared row read by every instantiation. New function => shifted existing
+  IDs plus global invalidation even where IDs did not move.
+- Experiment: immutable per-key IDs allocated once in a normal lazy registry;
+  normal active work rows carry their own ID. Function lowering reads callee IDs
+  through those tracked work rows. Project class state into a separate eager row
+  so a map-membership change does not invalidate every body. Reserve raw ID0 for
+  the synthetic const initializer (raw function IDs start1) so its ID stays stable
+  when functions are added/removed. Sequential release retains old dense scheme.
+- Dense registry allocation uses a private per-context monotonic counter, only
+  inside the no-dependency lazy factory; it allocates identities, not cached
+  semantic results. No unsafe primitives or manual dependency invalidation.
+  Registry retains removed identities for stable resurrection. Compiler context
+  mutation remains serial, as throughout this branch.
+- Helper probe setup corrections retained as failed records: uppercase function
+  name is invalid Skip syntax; changed to lowercase. Retry must use a distinct
+  whole-second mtime, since FileCache keys raw file refreshes by mtime. Analyzer
+  excludes failed records (exit-time profiler stacks need not be balanced on exit).
+- H10 allocator refinement: SKStore normally collects lazy keys when their final
+  reader disappears. Keep a small persistent allocation ledger in a context
+  global so recreating an evicted lazy row returns the same ID. Its finalized
+  keys are only (callable name, type arguments), avoiding retained function bodies.
+  This ledger records immutable identities; semantic membership/callee reads
+  remain in ordinary eager work rows. Shared class-state mapper compares once
+  before publishing, avoiding per-reader whole-state filtered comparisons.
+- H10 code review caught an allocator lifetime issue before using its host:
+  runWithGc resets globals from initCtx on every process invocation. Allocation
+  ledger must use getPersistent/setPersistent, not getGlobal/setGlobal. Changed
+  to the normal persistent-state API and rebuilding H10b; H10's first host is
+  not a valid performance/correctness candidate. Release synchronizer leaves
+  the existing persistent ledger intact because sequential compilation never
+  allocates from it. No existing database opened with another host.
+
+- H10b regression run:12/16 passed; four failures when classes/functions were
+  removed or modes switched. GDB breakpoint on generated invariant helpers
+  identifies Optimize.readEnv: values.next().fromSome() on an empty WorkKey
+  entry. Stable IDs retain holes; a collection can contain a retired key with
+  an empty value iterator. Changed assembly to iterate its actual values.
+  This fixes an existing dense-ID assumption, without unsafe reads or hiding
+  missing required function references. H10c rebuild pending validation.
+- H5 isolated archive experiment: 2MB comment-only source metadata, scanned on
+  -L and explicitly imported with -l. Baseline decoded twice (114.563ms), H5
+  once (57.144ms). Both successfully emitted an archive with --no-std. Setup
+  initially used JSON field 'links' rather than serialized 'link'; corrected.
+  Artifacts: metadata-probe/{baseline,h5}.log under profiling scratch root.
+- H9 hypothesis: skargo invokes the external linker even when skc emits no new
+  link plan and its output exists. Skip this redundant command; still replay
+  the saved plan if output is absent. Native archive hashes/options remain
+  tracked compiler inputs. Updated integration LLVM-file discovery for split
+  module directories, and assert cached replay launches no external linker.
+  Build/test pending. First build attempts used incompatible old host with an
+  existing DB, then a host without a std search path; isolated target and
+  fixed-dependency wrapper avoid both setup problems. Parser caught missing
+  'void' after return; corrected before rerunning build.
+
+- H5 freshness probe changed the imported archive hash from one to two between
+  invocations; emitted output dependency metadata contains the new hash two.
+  Confirms resolver reuse is invocation-local, not stale persistent metadata.
+- H9 review found a failure-recovery edge: skc commits before external linking,
+  so an old executable could survive a failed link. Added per-unit pending /
+  complete link status; skip only after a successful link. A failed command
+  retains pending so the next invocation replays its saved plan.
+- Unused-helper probes, instrumented and while native host compilation was
+  running (diagnostic counts, not uncontended final timing): baseline add13.562s,
+  remove14.295s; H4 add12.417s/remove10.954s. H4 does not solve source marker
+  invalidation; H8 specifically targets this remaining problem.
+
+- H11 hypothesis: /moduleCache/ stores all names in each module. Successful
+  constructor/variable/constant/privacy resolution reads the entire list;
+  adding an unrelated helper dirties broad name-expansion consumers, including
+  naming lazy bodies and their typing rows. Unused-helper baseline naming
+  ~2.4s, typing~4.4s. Add normal eager /moduleMembers/ projection keyed by module
+  and kind:name, with privacy as a Boolean value. Individual lookups read one
+  tracked row; only error suggestions read the full list. Preserve existing
+  lookup priority and current is_module behavior (module_names_find always
+  returns Some even for missing modules). No unsafe primitives added.
+
+- H10c (empty retired-key fix) passes17/18 regressions, including mode switches,
+  class replacements, and new module-shadowing behavior. New stable-ID test
+  catches a remaining native invalidation: function IR callbacks2 as intended,
+  native lowering817 instead of2. Retained tiny probe confirms no escape pass
+  rerun and only2 raw IR bodies rebuilt. Root cause: LowerConst allocates const
+  accessor functions BEFORE the global initializer; reserving raw ID0 did not
+  stabilize initializer ID when an accessor consumed that slot first. H12 gives
+  generated const accessors and the global initializer identities from the same
+  persistent registry. Sequential lowerAllConsts retains its default local
+  allocator. Registry now naturally starts0; no special reserved-ID scheme.
+- H9 integration recovery assertion initially found two link-status files,
+  because the fixture builds release and dev outputs. Restrict the tested status
+  to the saved command targeting /host/dev/. This is a fixture-selection error,
+  not a linker skip correctness failure.
+- Reclaimed only H4 merged benchmark database (~21GiB) after all H4 measurements;
+  logs, host, LLVM, library databases and phase results retained.
+
+- H11 source check and optimized LLVM generation succeeded (140.518s). Native
+  host built; all66 Expand/Visibility runtime cases pass using subprocess mode.
+  Running corresponding invalid expand/visibility diagnostics next.
+- H12 optimized LLVM generation succeeds (144.745s); native host and18-test
+  incremental regression run queued. This combines H11 member queries with
+  stable synthetic IDs. Source-check setup corrected an incorrect qualification
+  OuterIstToIR.FunSuperpositionID; that type lives in the root namespace.
+- Finalized H9 integration passes: cached link skip, pending-link recovery,
+  missing output recreation, dev flags, release flags and native archive edits.
+  Scratch skargo build uses explicit root environment because bootstrap host
+  does not restore dependency package env when the merged tests are compiled.
+
+- H12 passes all18 incremental regressions, including stable raw/native IDs,
+  helper removal/reintroduction, module shadowing, debug/source positions,
+  class/layout changes, sequential/release switching, native lowering, LLVM
+  graph/emission and optimizer cycles. Logs h12/incremental-tests.log.
+- All62 invalid expand/visibility diagnostic cases pass on H11; combined with
+  66 runtime cases verifies lookup priority, privacy and error suggestions.
+- Intermediate H10c message edits/restores:3.165/3.656/3.144/3.350s profiled;
+  counters-disabled controls3.055/3.188s; no-op0.136/0.140s. Fresh initialization
+  516.270s under concurrent host builds/tests (not an uncontended cold claim).
+  Unused helper8.335/8.816s; reachable helper42.133/46.342s, confirming that raw
+  stable IDs alone leave major native invalidation. H12 addresses both remaining
+  frontend name-list and synthetic identity causes.
+- Refined profiler v2: release inlining places user mapper callbacks inside
+  SKStore.genMultiMapReduce adapter functions. Native-symbol-only classification
+  hid FunctionBatches and parts of Reachability inside coordination. Resolve
+  callback ownership from LLVM DISubprogram/DILocation inlining chains and time
+  adapters under that phase. This is an attribution correction, not a compiler
+  optimization. Rebuild both baseline/final profiling hosts for matched final
+  tables; each host gets a new DB. Earlier v1 timings remain valid wall totals.
+- Formatted only changed source regions; no unrelated whole-file formatter churn.
+  Running final source check after whitespace/comment cleanup.
+
+- H12 targeted native counter probe: initial1034raw/816native; add2/2,
+  remove1/1, reintroduce2/2; escape analysis0 on each update. IDs restored on
+  reintroduction. New generated-constant regression also passes: constant add /
+  remove / readd and release-to-incremental mode switches preserve output.
+  Full19-test run queued on refined profiling host.
+- Integration on H12 initially reached the native consumer then found no LLVM
+  modules: a SECOND old single-file .ll finder remained in the integration
+  fixture. Updated that finder for split .llvm/ paths too; rerunning. Pure
+  cached/recovered links and source updates had already passed on H12.
+- Final source check after formatting/comment cleanup passes (14.801s).
+- Normal repository `skargo build --bin skc` running with installed compiler,
+  default capacity (no injected SKIP_CAPACITY), and user compiler target.
+  Timing wrapper uses Python because /usr/bin/time is unavailable here.
+- Matched profiler-v2 matrix queued sequentially: baseline fresh init, repeated
+  message edits/controls, unused and used helper pairs, then final fresh init
+  and identical matrix. Wait for bulk build/tests first. Retire old v1 merged
+  DBs only after their complete case matrices; preserve logs/LLVM/hosts.
+
+- H12 full compiler helper measurements: unused add2.474/remove1.988s;
+  reachable add7.315/remove9.243s. Native/LLVM lowering callbacks2 on add,1 on
+  remove (raw callbacks include wrappers, so profiler count4/2 vs debug2/1).
+  Reachable plan0.707/0.618s, optimizer~0.074s, but vtable layout1.812/1.764s.
+- H13 hypothesis: native vtable layout reads the entire summaries collection to
+  build env.sfuns. populateVTables only asks sfuns.contains for lambda call
+  methods. Adding any unrelated function invalidates that collection read and
+  reruns the expensive graph coloring. Add a normal eager lambda-function
+  projection driven by shared class metadata and tracked per-lambda summary
+  reads. Layout consumes this projection; no whole-functions dependency and no
+  changes to sequential vtable algorithm. Add VTABLE_LAYOUT debug marker and
+  assert helper edits do not rerun layout. Measure before retaining.
+
+- H14 hypothesis: /backendEmit/ unconditionally reads outerIst.getFuns to build
+  wasm_exports, even for native linking where exports are unused. An unused
+  declaration therefore reruns native file/object checks (~0.16s) and emits a
+  fresh link plan (~0.25s external link). Gate that declaration scan on
+  config.isWasm(); native exports/roots remain tracked by specialization.
+  This also allows H9 to skip the otherwise unnecessary link on helper edits.
+  Keep wasm behavior and sequential native behavior otherwise identical.
+
+- H14 review caught partial formatter splice corruption: a moved/reindented
+  repeated expression lost the @wasm_export literal and duplicated @export.
+  Corrected immediately; H14 snapshot may contain that mistake, so it is not
+  the final candidate. Added token-equivalence validation to the selective
+  formatting helper; it now skips any token-changing partial splice. Auditing
+  other changed regions and rebuilding final H14b. No affected compiler shipped.
+- Normal repository compiler build succeeded with default64G in520.291s using
+  installed older compiler, before H13/H14 edits. This measures building the
+  implementation with the old host; it is not the candidate's warm-update time.
+
+- Product source word-diff audit completed across Config/main/compile/OuterIst,
+  specializer, const lowering, optimizer, library resolver, module expansion,
+  native lowering and graph adapters. No other accidental token changes found.
+  Formatter helper now validates token equivalence before writing any splice.
+- Final candidate is H14b (H13 lambda-only vtable dependency plus H14 native
+  export gating). Invalid H14 LLVM build stopped after review correction.
+  Final matched v2 matrix now targets H14b, not H12; H12 remains ablation data.
+  Added end-to-end skargo assertion that an unused helper triggers no new LLVM
+  link plan, no external linker, and preserves LLVM file mtimes.
+
+- Final H14b validation:19/19 incremental regressions pass, including no
+  VTABLE_LAYOUT on helper add/remove/reintroduction. Two skargo integration /
+  capacity tests pass with H14b; unused helper produces no link plan/linker and
+  preserves .ll mtimes. Both legacy @wasm_export and current @export exist in
+  baseline/final real wasm outputs (wasm-objdump inspection).
+- WASM watcher first hit a setup race: linker output existed before executable
+  permissions were ready. Retained wasm-startup-race.log and reran after native
+  link completed; final WASM compile/exports test succeeds. Do not treat the
+  startup-race record as a compiler regression.
+- Normal repository final build succeeds in368.565s with installed older host
+  and no capacity override. The package archive's compile.sk/lower.sk/specialize.sk
+  bytes exactly match current sources. Its --version still embeds c8e2c42a9 from
+  the previously cached git build-script output; version text is not used as
+  proof of which source was compiled. No installation or global compiler swap.
+- Matched profiler-v2 baseline fresh initialization began18:36UTC after all bulk
+  build/regression/integration/WASM jobs completed. Candidate is H14b. All timing
+  scripts use the same frozen compiler source and separate host-specific DBs.
+- Final formatting check skips the only remaining token-changing partial splice
+  in skargo test formatting; product source unchanged, export literals verified.
+
+- Runtime audit for interpreting the final table: context synchronization is
+  SKIP_resolve_context + SKIP_intern_shared + root reclamation, not worker-thread
+  waiting. Compiler runWithGc uses its default sync=false. sk_commit therefore
+  swaps the mmap root without MS_SYNC; explicit commit time can round to zero
+  while interning/reference-count collection remain material. Do not describe
+  the residual synchronization row as disk fsync or parallel synchronization.
+- Host environment for reproducibility: aarch64 Linux,16 available CPUs,62GiB
+  RAM,64G sparse persistent mappings. Native profiling compilers built with
+  --release -O2; measured target compiler builds are dev, --no-inline --no-ipa.
+
+- Preliminary H12 helper removal had Native commands2.079s, but actual logged
+  clang work was0.101s+0.037s (plus0.011s --version). Preserve this outlier;
+  do not attribute it to LLVM optimization or silently remove it from results.
+  runShell also includes process launch/wait and rm/mv/native-cache file work.
+- Investigated a possible initializer-module migration explanation and rejected
+  it before changes: both add/remove only compile m0_62.ll and m1_11.ll, not
+  the support module; SKIP_initializeSkip has no function debug records, so isFunction()
+  is false and the existing support-module grouping applies correctly. No
+  speculative grouping change retained.
+
+- H15 hypothesis from final frontend trace: remaining unused-helper typing
+  revisits main/getOrInitializeBackend/Specializer/etc through declaration rows
+  for constants in compile.sk. Only the new helper's typed output changes.
+  Code audit finds variable typing calls maybeGetConst and then getConst.type;
+  both fully name the initializer, including the large compilerPipeline array.
+  Add a normal eager constant declared-type projection and one lookup for Var
+  typing. The constant declaration itself still receives full naming/typing;
+  pattern matching consumers that need its value still use the existing API.
+  Measure and validate constant/type/error cases before retaining this change.
+
+- Final H14b matched table now available in scratch final/report-fragment.md:
+  init457.896->472.968s (+3.3%); six-message-sample mean5.877->3.629s, with
+  candidate samples3.230/4.864/3.025/4.428/3.041/3.188. Counters-disabled
+  controls5.355/5.641->2.932/3.107s. Keep native-command outliers in mean.
+  Reachable helper62.932/64.778->5.262/5.339s; unused11.594/12.607->2.101/1.770s;
+  debug print6.898/5.803->2.980/3.254s. New skargo unused1.670/1.509s, no-op0.121s.
+- Six process-traced message updates on the unchanged H14b product:
+  3.057/3.265/3.119/3.177/3.054/3.206s; process creation sub-millisecond.
+  Earlier command spikes did not reproduce; exact cause remains unresolved.
+  Tracing uses temporary LD_PRELOAD hooks for spawn/poll/wait, no product edits.
+- H15 source check passes12.568s; optimized LLVM generation142.363s. Added
+  regression steps for constant body-only changes, declared-type changes,
+  invalid initializer with unchanged declared type, and failure recovery.
+  Full19 incremental tests plus220 Runtime and529 invalid typechecking cases
+  queued on H15. New native host/normal repo rebuild are running.
+- Before retaining H15, measure against H14b using same frozen source. Preserve
+  H14b DB for interleaved comparison. Retire completed baseline-v2 merged DB
+  only after baseline data is exported, if space is needed for H15 fresh DB.
+
+- H15 validation passes: all19 incremental tests with expanded const body/type /
+  invalid-initializer recovery steps;665 selected Runtime/typechecking cases
+  (actual suite-filter count, not the749 files originally counted recursively),
+  both skargo integration/capacity tests, and both real WASM exports.
+- H15 normal repository rebuild with the installed older bootstrap host succeeds
+  in458.694s. H15 fresh benchmark initialization began after broad tests ended;
+  baseline merged DB retired after exporting its complete timing records.
+- Queue an optimized, uninstrumented self-host build using H15 against current
+  compiler source after timing/interleaved comparisons finish. Output target:
+  compiler/target/incremental-profile-release/host/release/skc. Then validate19
+  incremental regressions with that normal binary and run an uninstrumented
+  frozen-compiler benchmark using shell exec (no Python compiler/clang wrappers).
+  This checks actual optimized tool behavior separately from profiler controls.
+
+- H15 retained after measurement. Unused-helper typing~0.638->0.190s, since
+  declared-type readers no longer name initializer bodies twice. Same-period
+  second paired message comparison H14b3.180s vs H15 3.177s: no meaningful
+  literal-edit improvement attributable to H15 alone. First paired H14b edit
+  was a7.768s reentry outlier, retained in raw records rather than used as an
+  H15 speedup claim. Its exact extra-cost cause was not established.
+- New primary H15 six-message mean3.052s (2.977/3.099/3.016/3.117/2.984/3.119)
+  versus baseline5.877s. Initialization456.842 vs baseline457.896s, effectively
+  flat for one sample. Reachable helper4.824/4.813s; unused1.617/1.321s;
+  debug print2.971/3.125s. New skargo unused1.070/1.697s (variable collection
+  overhead), no-op0.122s. Counters-disabled H15 controls2.925/3.032s.
+- Durable machine-readable results exported to
+  docs/compiler-incremental-profile-20261018.json with both H14b/H15 records,
+  source/LLVM hashes, all six samples and phase/counter data. Full exclusive
+  table sums exactly to totals at displayed precision (overhead row includes
+  rounding remainder). Final prose/table still to append after normal binary
+  validation/benchmark. Profiler artifacts remain under scratch root.
+- Retired H14b merged DB after interleaved comparison; source, binary and all
+  measurements retained. H15 optimized uninstrumented self-host build is now
+  running against current compiler source; no profiler hooks in its output.
+
+- H16 discovered during optimized self-host validation: skargo release profile
+  forwarded only -O2, not skc's --release. Actual command has --init, so skc
+  selects incremental specialization/optimization despite this being a release
+  build. After >9min the native compiler still runs optimizer rounds; 2s CPU
+  sampling shows large FunctionIDToFunction vector copies in optimizeRow /
+  SKStore rounds, not native clang. This is the wrong algorithm for release.
+- Fix skc_profile_options("release") to [--release, -O2]; extend integration
+  assertion. Dev options remain unchanged. Stop that incorrectly configured
+  self-host attempt, retain logs/perf, rebuild skargo, rerun self-host from the
+  same host-specific unit DB with correct mode. Failed attempt is validation
+  setup/build-tool behavior, not a candidate warm dev measurement.
+
+- H16 rebuilt skargo and integration passes2/2, now asserting --release in
+  actual release compiler command. Retried self-host command confirmed:
+  --data <same-host-db> --export-function-as main=skip_main --release -O2 ...
+  Correctly switches to sequential specialization/optimization. Dev benchmark
+  options are unchanged, so H15 timing table remains applicable.
+- First incorrectly configured self-host attempt stopped after655.868s; retained
+  self-host-incremental-release-aborted*.log/json and self-host-perf.data. Normal
+  binary test/measurement watchers that saw that failure were restarted; their
+  setup failure logs retained separately. They did not run compiler test cases.
+
+- Correct-mode self-host retry emitted99MB LLVM, then exited abnormally with no
+  compiler diagnostic while the filesystem was full. Its reused aborted
+  incremental optimizer DB had reached31.92GiB. Do not infer a semantic compiler
+  error or precise signal from skargo's exitstatus -1. OOM-event counter is4
+  without a pre-run baseline, so it also cannot identify this failure's cause.
+- Freed52.08GiB: exported H15 profiling DB20.16GiB and aborted self-host root
+  cache31.92GiB. All source/LLVM/logs/metrics preserved. Retry self-host with
+  fresh root DB and --release, retaining valid library artifacts/DBs from the
+  same exact host. Normal test/benchmark watchers reset after that setup failure.
+
+### Overnight follow-up: broader edit matrix and remaining overhead (2026-10-18)
+
+Authorization: continue experiments until tomorrow morning. Record hypotheses
+before implementation; measure invalidation and wall time, retain raw failures
+and regressions. Do not introduce unsafe SKStore dependencies or attribute
+unexplained timing variance to a specific cause.
+
+Validation checkpoint: the optimized uninstrumented self-host now succeeds
+(390.483s), and that resulting compiler passes all19 incremental regressions
+(121.867s). Its fresh frozen-compiler initialization and warm measurements are
+running serially. This is a separate normal-binary check, not a replacement for
+the matched instrumented baseline/candidate comparison.
+
+Experiment N1 (measurement only, before further architecture changes): extend
+normal-binary workload from message/helper edits to comments, source-position
+shifts, local variable renames, control-flow changes, helper signature changes,
+and declared-constant changes. Repeat add/restore pairs to distinguish work
+that follows changed semantics from unnecessary broad invalidation. Reuse the
+same binary and target; always restore exact source bytes and timestamps.
+Semantic no-ops should avoid native output changes; function-local changes
+should not regenerate unrelated functions. Capture command logs and wall time
+for each case. Slow cases will receive a separate profiled reproduction using
+a fresh compatible database, never the normal binary's database.
+
+Potential N2: startup still spends ~0.33s decoding archive metadata. Before
+implementing a persistent cache, establish where loading happens relative to
+SKStore import and which filesystem dependencies can invalidate it correctly.
+Do not use an mtime-only cache that can silently preserve stale archive bytes.
+Potential N3: remaining ~0.93s context/dependency overhead. Attribute operations
+and checkpoint counts per edit before removing synchronization boundaries;
+those boundaries also bound transient memory and preserve fixpoint ordering.
+
+Experiment H17 planned (snapshot-only until measured): warm invocations currently
+synchronize/reclaim after every completed pipeline callback, even when no
+fixpoint continuation is required. Let adjacent completed phases share a heap,
+while keeping checkpoints for incomplete discovery/optimization rounds and
+preserving every initialization checkpoint. Prediction: lower synchronization
+and publication overhead on message edits, with unchanged mapper dependencies
+and generated output. Risk: larger transient heap on substantial warm edits.
+Measure message/helper/control-flow edits and resident memory, run incremental
+correctness regressions; reject if memory growth outweighs warm savings.
+Implementation starts in /tmp/skip-incremental-profile/h17/src, leaving the
+reviewable working tree unchanged until results justify retaining it. Build and
+benchmark only after the serial N1 matrix finishes to avoid CPU interference.
+
+- Ordinary optimized binary completes frozen compiler initialization420.841s;
+  six message edits2.723/2.786/2.727/2.837/2.746/2.835s, no-op0.113/0.115s;
+  unused helper1.297/0.986s, reachable helper4.418/4.492s. These use the new
+  skargo and no profiling hooks, so do not splice into the matched phase table.
+- N1 identifies a new slow case immediately: inserting a comment newline or a
+  blank line costs~13s in both directions; local rename~2.5s, equivalent local
+  control flow~2.6-3.0s. Newline edits shift source locations for following
+  functions. LLVM output includes line-table metadata even without --debug,
+  so some output changes are required for correct backtraces. Do not label all
+  this work spurious invalidation. Queue debug traces and LLVM-content hash
+  comparisons to count frontend/body/module regeneration and native changes.
+- Parameterized-helper case adds a reachable helper taking an Int; it does not
+  change an existing helper's signature (scratch label helper-signature).
+  Control-flow experiment changes exactly one occurrence, inside the selected
+  function. Full repeated matrix and diagnostics finish before H17 compilation.
+
+Experiment H18 planned (independent H15 snapshot, not combined with H17):
+LLVM function grouping currently uses functionID &63, dispersing functions
+from a source file over all64 modules. A source line insertion changes their
+DWARF line tables and potentially recompiles all64 modules even when bodies
+remain cached. Hypothesis: group by (source-file hash &15)*4 + (functionID &3).
+This keeps64 total groups and spreads a large file across4 groups while
+concentrating source-coordinate changes. No changes to debug semantics,
+function identities, dependency tracking or emitted function bodies.
+Measure line/comment edits, literal edits, helpers, total initialization,
+output module counts and clang time. Risks: less balanced groups, extra work
+for a local edit if it lands in a larger group, collisions between files.
+Retain only if representative incremental workloads improve without severe
+initialization regressions. Snapshot /tmp/skip-incremental-profile/h18/src;
+run after H17 measurements, with its own compatible persistent database.
+
+- N1 debug/hash confirmation: comment insert/restore changes exactly64 LLVM
+  files; ~13s in each direction. The successful skargo command suppresses
+  compiler stdout, so the first diagnostic runs have hashes but no mapper
+  trace. Adjusted temporary wrapper to preserve compiler stdout/stderr before
+  replaying them to skargo. A separate overnight-trace-position pair captures
+  mapper counts while H17 is compiling; its contended wall times must NOT be
+  used as performance comparison samples.
+
+#### H1–H16 checkpoint report (before overnight experiments)
+
+The main causes were broad dependencies on archive source metadata and function
+membership, unstable dense function IDs, repeated whole-program collection
+publication, and synchronization after cached discovery rounds. The retained
+changes narrow these inputs through normal tracked mapper projections, keep
+identities stable, and avoid redoing unchanged graph/escape work. No new unsafe
+SKStore primitives were introduced. Release skargo builds now pass --release,
+so both specialization and optimization use their sequential release paths.
+
+All19 incremental regressions,665 runtime/typechecking cases,128 module and
+visibility cases,2 skargo integration/capacity tests and both WASM export forms
+pass. The resulting optimized ordinary self-host also passes19 regressions.
+The following table is the matched, instrumented H15 comparison; ordinary
+uninstrumented measurements are separate, as noted above.
+
+| Phase (seconds) | Baseline init | Candidate init | Baseline message update | Candidate message update |
+|---|---:|---:|---:|---:|
+| Startup, input loading and driver | 1.807 | 1.613 | 0.550 | 0.389 |
+| Parsing | 1.324 | 1.323 | 0.008 | 0.008 |
+| Naming and expansion | 5.498 | 5.630 | 0.022 | 0.023 |
+| Inheritance | 0.120 | 0.119 | 0.000 | 0.000 |
+| Type checking and variance | 64.657 | 64.252 | 0.181 | 0.181 |
+| Outer IR construction and lowering | 13.797 | 13.040 | 0.000 | 0.000 |
+| Specialization | 4.891 | 4.872 | 0.003 | 0.002 |
+| Class relations | 0.311 | 0.311 | 0.000 | 0.000 |
+| Field scalarization | 0.365 | 0.368 | 0.000 | 0.000 |
+| Field layout | 0.740 | 0.687 | 0.000 | 0.000 |
+| Function IR planning | 0.276 | 0.755 | 0.309 | 0.000 |
+| Generic function IR | 0.451 | 0.472 | 0.000 | 0.000 |
+| Per-instantiation function IR | 2.723 | 2.901 | 0.000 | 0.000 |
+| IR environment assembly | 0.436 | 0.231 | 0.344 | 0.142 |
+| Optimizer rounds | 10.071 | 10.093 | 0.091 | 0.045 |
+| Constant lowering | 0.036 | 0.043 | 0.031 | 0.043 |
+| Reachability and escape analysis | 0.469 | 1.676 | 0.467 | 0.002 |
+| Native IR lowering | 3.798 | 3.782 | 0.038 | 0.017 |
+| LLVM graph construction | 1.748 | 1.651 | 0.143 | 0.109 |
+| LLVM graph merging | 0.042 | 0.043 | 0.043 | 0.044 |
+| LLVM symbol assignment | 0.046 | 0.045 | 0.046 | 0.048 |
+| LLVM text emission | 4.665 | 4.778 | 0.267 | 0.267 |
+| SKStore coordination | 282.908 | 283.821 | 1.566 | 0.575 |
+| Context synchronization and collection | 35.545 | 33.472 | 0.949 | 0.351 |
+| Persistent database commit | 0.000 | 0.000 | 0.000 | 0.000 |
+| Native commands | 9.463 | 9.273 | 0.217 | 0.211 |
+| Vtable layout | 1.751 | 1.804 | 0.000 | 0.000 |
+| Per-function native lowering | 1.222 | 1.161 | 0.000 | 0.000 |
+| Per-function LLVM generation | 3.917 | 3.926 | 0.000 | 0.000 |
+| Shared LLVM generation | 0.000 | 0.000 | 0.000 | 0.000 |
+| LLVM materialization and object cache checks | 0.089 | 0.081 | 0.154 | 0.157 |
+| Function collection projection | 0.000 | 0.007 | 0.000 | 0.007 |
+| External clang compilation and linking | 0.549 | 0.521 | 0.248 | 0.238 |
+| Other skargo and process overhead | 4.181 | 4.091 | 0.200 | 0.193 |
+| **Total** | **457.896** | **456.842** | **5.877** | **3.052** |
+
+Times are exclusive and include the complete skargo command. Message columns average three edit/restore pairs. The final overhead row is the remainder, including displayed rounding, so rows sum exactly to each total. Initialization is one fresh run per host, not a statistical average.
+
+Message samples baseline: [5.471050877938978, 5.853369961027056, 5.599163544015028, 5.845919877057895, 6.756349919945933, 5.738991460995749]; candidate: [2.976863376912661, 3.098879585042596, 3.0163755010580644, 3.116729791974649, 2.9842471259180456, 3.1189882518956438].
+
+| Change | Baseline add/edit | Candidate add/edit | Baseline remove/restore | Candidate remove/restore |
+|---|---:|---:|---:|---:|
+| Unused helper | 11.594s | 1.617s | 12.607s | 1.321s |
+| Reachable helper | 62.932s | 4.824s | 64.778s | 4.813s |
+| Debug print | 6.898s | 2.971s | 5.803s | 3.125s |
+
+| Counters disabled | Baseline | Candidate |
+|---|---:|---:|
+| control-edit | 5.355s | 2.925s |
+| control-restore | 5.641s | 3.032s |
+| final-noop | 0.145s | 0.141s |
+
+Remaining warm costs are principally publication/dependency bookkeeping,
+context interning and reclamation, archive JSON decoding, final IR/graph
+assembly and LLVM module emission. Initialization remains dominated by store
+construction and full typechecking; none of these warm gains establishes a
+meaningful cold-build improvement. All changes remain uncommitted at this
+checkpoint. Further experiments are recorded below/above chronologically.
+
+- Completed N1 six samples per case (three edit/restore pairs): comment newline
+  mean13.111s [12.815,13.851], whole-file blank line12.949s [12.809,13.087],
+  local rename2.566s [2.494,2.652], equivalent control flow2.734s [2.601,2.988],
+  reachable parameterized helper4.862s [4.727,5.451], integer constant value
+  100->101 mean5.129s [4.911,5.313]. All36 commands succeed and source restored.
+- Captured trace for whole-file line shift contains64 LLVM_MODULE events and
+  zero FUNCTION_IR/NATIVE_FUNCTION/LLVM_FUNCTION events. Dirty-reader edges
+  explicitly point from /sourcepositionanchors/ to /llvm-emit/modules/.
+  Thus this slowdown is final line-table regeneration plus native compilation,
+  not broad specialization/optimization invalidation. Output hashes confirm
+  exactly64 LLVM files change for both comment and whole-file newline cases.
+- H17 LLVM generation succeeds133.856s; native profiling-host compilation is
+  running. H17/H18 source changes remain isolated snapshots pending tests and
+  results. Repository JSON now includes ordinary-binary runs, marking separate
+  contended tracing samples as diagnostics rather than timing comparisons.
+
+Experiment N4 planned: after isolated H17/H18 timings, use the unchanged normal
+H15 compiler to add/remove an unused class, then a reachable single-field class
+constructed in the selected function. Class membership/layout changes are a
+materially different workload from helper functions and may expose remaining
+whole-class-snapshot dependencies or vtable changes. Preserve stdout mapper
+traces and classify required layout changes separately from unnecessary body
+regeneration. Execute serially after H18; exact source restored in finally.
+
+Experiment H19 planned (independent H15 snapshot): the final global LLVM graph
+adapter still publishes every body and declaration on any graph edit. Prior
+sampling attributes ~190k old-contribution lookups to remaining store work.
+Hypothesis: introduce256 stable symbol-hash batches, plus separate header and
+membership batches, before publishing individual emission input rows. Normal
+SKStore array equality should retain unchanged batches so only one or a few
+batches revisit their individual rows. Build all normalized entries as before;
+do not change graph dependencies, symbol resolution or output grouping.
+Comment explains why element-by-element array comparison is intentional.
+Prediction: reduce old-contribution lookups/publication overhead; possible
+tradeoff is additional array construction/comparison, so reject if wall time
+or memory regresses. Source snapshot h19/src; run after the class matrix and
+compare matched phases/counters, native outputs and incremental regressions.
+
+Experiment H20 planned (standalone microbenchmark, no product change): archive
+metadata currently converts Bytes via iterator->Vector->Array before UTF-8
+conversion. Array::createFromItems can allocate the known-size array directly.
+Compare both paths in the same optimized binary, alternating execution order,
+20 real std archive decodes per process, six samples per mode. Check identical
+metadata hash/source count; measure wall time first. This removes collection
+copying without persistent caching, archive-format changes or unsafe APIs.
+Only consider a compiler experiment if the isolated improvement is material;
+full compiler measurements are still required before retaining it. Queued
+behind H19 to preserve serial timing conditions.
+
+- H17 passes19 incremental tests114.645s. Cold initialization460.749s versus
+  matched H15 456.842s (single samples; no established cold regression).
+- H17 message samples4.024/2.978/2.901/3.596/2.914/3.018s, mean3.239s versus
+  H15 3.052s. First edit contains1.714s store coordination and a source archive
+  compiler invocation1.678s (usual~0.54), and restore1 has0.615s outer-process
+  overhead. Preserve both outliers; precise cause not established. Controls
+  with counters disabled2.826/2.946s. Helpers unused1.323/1.033s, reachable
+  4.465/4.499s. New skargo used throughout H17, unlike primary H15 table.
+- Representative H15 edit1 vs H17 edit1: intern calls12->6, inclusive intern
+  time0.261->0.227s, free-root38->20 with time0.040->0.041s. Row publication,
+  equality and dependency counts essentially unchanged. H17's source archive
+  child peaks~1.50GiB; warm merged compiler~3.2-3.3GiB. No old-host peak RSS
+  measurement yet, so do not claim a relative memory improvement/regression.
+- Decision: H17 remains experimental, not retained. Raw averages do not show
+  a clear overall win, and interning savings are smaller than the initial
+  hypothesis. If revisited, use a runtime experimental switch in one exact
+  binary for alternating on/off measurements against the same compatible DB;
+  do not compare two binary formats using the same DB. H18 starts next.
+
+- H19/H20 source checks run during H18 compiler construction (no timed warm
+  benchmark active). H20 passes. H19 initially rejects a pure (~>) local helper
+  capturing its mutable batch map; corrected to a regular (->) closure and
+  rerun source check. This is isolated experiment code, not a runtime failure.
+- Added resource.getrusage max_rss_kib to the temporary compiler measurement
+  wrapper so subsequent warm/compiler samples retain peak child RSS alongside
+  user/system time. Original matched records did not capture peak memory.
+
+- Constant debug trace aborted: older compiler verbose formatting expands
+  GFunKeyKey's lazy callable captured AST/classes. Output reached1.1GiB and
+  compiler RSS~48GiB; cgroup oom_kill increased4->5 while trace/compiler and
+  clang were active. Compiler stderr ends 'Killed'. Terminated the collecting
+  skargo parent, restored source bytes+mtime. This is a debug-output failure,
+  not a valid timed incremental result. Kept stdout losslessly compressed43MiB
+  with original byte size and SHA256; excluded failed record from phase means.
+- Fix in working tree: GFunKey.toString uses gname().id; GFunKeyKey and
+  GenericFunctionKey explicitly format compact stable names/type arguments,
+  avoiding inspect() recursion. No key equality, ordering or dependencies
+  change. Added focused regression with a100k-character captured payload;
+  all three debug strings must contain the function name and stay<256 chars.
+- Pending H19 source snapshot includes this debug-only fix. H18 already built
+  from earlier snapshot; its timing uses no debug mode. Class-matrix baseline
+  now uses plain wrapper on old binary, with an untimed recovery build first;
+  do not re-enable verbose traces on that old compiler for large-key workloads.
+
+Potential class-edit hypothesis to test ONLY after N4 measurements: function IR
+currently reads FunctionIRSharedFile containing a complete fixed SpecializerState.
+SPMapFixed.readonlyGet does not register per-class dependencies. A reachable
+class addition may therefore invalidate all instantiations even if their own
+classes are unchanged. Existing SPMapDiff already implements tracked per-key
+reads, so a possible repair is to publish prepared class/method state as normal
+keyed rows under a stable handle, construct the body specializer from that
+handle, and route sclassGet through tracked get(context,key). This requires
+making the currently readonly accessor/callers mutable, rather than introducing
+an unsafe context mutation. Preserve the fixed prepared state for final assembly
+and the sequential path. Measure dependency-count/initialization-memory costs:
+more precise dependencies may add reads at initialization. No implementation
+or performance claim yet; first establish whether N4 actually exposes this.
+- Also compact LazyGFunKey/LazyGClassKey display (their default inspect would
+  expand the same captured structures). Existing compare/equality methods are
+  unchanged. Focused regression now covers four function debug formats.
+  Initial test source check caught named-field inheritance and String.length
+  syntax issues; corrected both. Final compile/run of this new test remains
+  pending; do not count it in the19 tests already run by the older harness.
+
+- H18 passes19 incremental regressions. Cold460.285s vs H15 456.842s,
+  one sample each; treat as effectively flat, not a cold-speedup claim.
+- H18 six message samples3.718/2.966/2.879/2.993/2.882/3.014s, mean3.075s
+  vs H15 3.052s. Most samples~2.9-3.0s; first reentry outlier retained.
+- Line-shift improvement is large despite comparing instrumented candidate to
+  faster uninstrumented baseline: comment newline six samples mean2.644s
+  [2.380,3.881] vs normal baseline13.111s; whole-file blank line2.412s
+  [2.364,2.574] vs12.949s. Includes the comment restore1 outlier3.881s.
+  Representative candidate line update~0.54s native commands,0.23s LLVM text,
+ 0.32-0.34s store coordination,0.09s synchronization; no whole-body rebuild.
+- Retain H18 source grouping in working-tree AsmEmit.sk. Keep H17 isolated.
+  Need final combined-host validation/ordinary measurements before final report.
+  Class matrix now runs on unchanged normal H15 compiler; H19 still independent
+  of H18 so its publication effects remain separately attributable.
+
+- H18 counters-disabled message controls2.789/2.905s; no-op0.111/0.119s;
+  unused helper1.355/1.056s; reachable helper4.641/4.681s. No evidence of a
+  material regression in ordinary edits. Final emitted modules contain
+  compile.sk debug metadata in5 function modules (four source groups plus
+  a synthetic/other-origin group), versus all64 previously. This is metadata
+  presence, not a fresh changed-content count. Keep that distinction explicit.
+- Exported full H18 phase data to repository JSON, then retired only its20.16GiB
+  experimental root DB to leave space for class edits/H19. LLVM/binary/logs stay.
+- N4 first unused-class add12.759s, but repeated add/remove0.977/0.999s;
+  first-time cause not established, so no claim of a systematic12s cost.
+  Initial produced-compiler probe used invalid '{}' body; corrected '{ void }'
+  and restarted under class2 labels, preserving setup failure logs. Each valid
+  variant now runs the produced dev compiler's --check as well as --version;
+  this extra validation is outside measured build time and can take tens of
+  seconds because the produced compiler itself is an unoptimized dev binary.
+
+- N4 all six corrected class variants and produced-compiler checks pass. Used
+  class add50.509s; field add38.603s; field remove41.514s; class remove39.264s.
+  Content watcher observes only8 changed LLVM files for field removal and9
+  for class removal; support mega-table module is not among them. Large
+  upstream recomputation is a better candidate than wholesale native output.
+- H21 isolated prototype planned/prepared: class IR shared snapshot is an
+  explicit whole-map dependency in generateFunctionIR. Publish prepared class
+  state as keyed rows, retain only config/converter/ptr-size in its header,
+  and build body-specializers from existing SPMapDiff tracked handles. Change
+  readonly accessors to mutable where they now record ordinary reads, rather
+  than bypassing tracking. Sequential/final assembly retains prepared fixed
+  state. H21 omits H18 grouping and H19 publication batching to isolate this.
+  Source-check during H19 construction only; do not retain/run performance
+  experiment before H19's class phase profile confirms the invalidation scope.
+
+- H21 source prototype now passes13.873s. A direct change to the fixed
+  ClassLookupEnv interface made ordinary immutable GlobalEnv consumers invalid;
+  rejected that broad interface change. Instead add a separate mutable
+  TrackedClassLookupEnv used only by Specializer/FunSpecializer and the existing
+  tracked type-switch helper. Fixed lookup APIs and types.sk remain unchanged.
+  RewriteBase scalar lookup now honestly permits tracked reads; compute it
+  before a pure pattern guard. No unsafe tracking bypass or new reference.
+- Compact-debug regression source check passes14.884s after named-field and
+  String.length fixes. New20-test harness build/run remains queued after the
+  timed experiments; older harness still runs19 tests for H19/H21 initially.
+- H21 full host construction gated on H19 class-profile review plus completion
+  of H20 microbenchmark/new debug-regression validation. No H21 binary or
+  performance claim yet. H19 publication host is running its correctness suite.
+
+- H19 initial suite18/19: function_ir test still expected quoted '"main"' in
+  the legacy GenericFunctionKey dump. Actual output now correctly prints
+  GenericFunctionKey(main), so update assertion to accept compact/legacy exact
+  main forms without weakening the changed-callable compilation-count check.
+  Rebuild harness with the new compact-key payload regression (20 tests), rerun
+  before benchmarks. Preserve first failure logs under legacy-format-failure-*.
+  No semantic compiler failure established; no candidate timings run yet.
+
+- Updated20-test harness builds20.175s; H19 now passes all20 tests101.385s,
+  including compact_function_debug_keys and corrected generic compilation
+  assertion. H19 fresh compiler-cache initialization started after tests.
+- Machine-readable report retains per-experiment source hashes and unified
+  patches from the H15 baseline, including rejected/isolated approaches.
+  Exporter preserves these fields when adding further ordinary run data.
+- Retired completed normal-final experimental root DB after all class variants
+  and produced-compiler probes finished and data export succeeded. Original
+  compiler/target dev cache is untouched. This leaves space for H19/H21 class
+  recomputation; exact-host database sharing remains prohibited.
+
+Experiment H22 planned: H19 class profiles rerun73334 LLVM function fragments
+(~3.9s) plus graph/publication work although only8-9 output chunks change.
+GraphCommonFile carries the full GlobalEnv.sclasses map, so every fragment has
+that whole-map dependency. Reuse existing mutable GraphReads context to read
+individual class rows. Redirect LLVM type/constant writers through these normal
+reads; scalar representation reads use getArrayFilter so an unrelated subtype
+list change does not invalidate pointer/integer signatures. Keep a separate
+full environment only for explicit disassembly, not normal function fragments.
+The shared mega-table builder can also read needed classes through GraphReads;
+its giant constant and offset algorithm stay unchanged. Sequential builders
+have no GraphReads and continue using their complete immutable GlobalEnv.
+Prepare an independent H15+debug-fix source snapshot (exclude H18/H19/H21),
+then source-check/build/test after H21 measurements finish, preserving serial
+benchmarks. Risks: missed direct class lookups, disassembly and static constants;
+audit every asm.env()/this.env type query, run existing graph/emission/position
+regressions, compare native output and class-edit phase counts. Retain only with
+correctness plus measured reductions; no unsafe reads or extra reference layer.
+
+- Retained H19 publication batching in working tree after20 passing regressions
+  and six message samples mean2.745s [2.680,2.838], versus H15 3.052s.
+  Representative old-contribution lookups190437->8926 (0.079->0.009s), store
+  coordination0.580->0.452s, LLVM text/publication0.265->0.196s, intern time
+ 0.261->0.218s without changing synchronization boundaries. Equality calls
+ 213937->32426 but inclusive equality time0.061->0.086s: deep batch equality
+  costs more, yet overall work/wall time improves. Cold463.368s, one sample.
+- H20 micro: iterator mean0.623852s vs direct0.599410s per20 std decodes,
+  identical serialized metadata hashes, alternating order six samples/mode.
+  About3.9% metadata gain translates to roughly hundredths of a second in
+  whole builds. Deferred from product while class changes cost40+ seconds.
+- H21 passes20 regressions. Cold471.835s vs H15 456.842s (~15s/3.3% extra,
+  single samples); record dependency precision/startup tradeoff, not free gain.
+  Ordinary message mean3.009s [2.917,3.242] vs H15 3.052s. Classes add36.520s,
+  field add36.587s, field remove36.342s, class remove37.218s. H19 equivalent
+  profiled cases41.096/42.427/40.716/41.575s (independent publication variant).
+- H21 class add reruns2 instantiation IR rows0.001s vs H19 93241 rows3.079s;
+  store coordination8.517s vs9.660s. Optimizer9.647s and LLVM73334 fragments
+ 3.788s remain broad, confirming separate downstream shared-env dependencies.
+  Retain H21 class state projection/mutable tracked lookup in working tree;
+  sequential/final assembly fixed paths preserved. Final combined validation
+  with retained H18/H19 remains pending. H22 source check passes13.538s and
+  its isolated host construction is running.
+
+- H22 attempt1 source-check/build succeeds but3/20 tests pass;17 fail 'Key not
+  found' before backend completion. Missed static-image helpers alias
+  common.env locally and call scalar type queries through that alias. Redirect
+  those size/alignment lookups to the same tracked builder; do not restore an
+  untracked snapshot. Preserve attempt1 source/binary/LLVM/logs separately.
+  Add a native print42 initialization/execution smoke test before exposing the
+  built-host ready flag, then rerun20 regressions. No H22 timings or retention.
+
+Experiment H23 planned: native lowering reruns73334 functions (~4.7s including
+per-function work) on class edits because its function mapper reads SharedFile's
+complete class map. Keep the complete shared row for global vtable/layout work,
+but use a normal getArrayFilter projection with classes removed for function
+mappers. Publish classes as individual rows and pass a transient mutable class
+reader through Lower/LocalGC/Alloc and verification. Scalar reads filter to the
+representation; field/subtype queries read needed class records. Debug dumping
+retains the complete environment. Fixed/sequential calls use reader=None.
+Do not infer class dependencies from a hand-maintained static type list or
+hide context mutation behind readonly APIs. Preserve full failure diagnostics
+by storing only an immutable class handle in deferred verification failures,
+then materializing class metadata through normal reads on the error path.
+Use the same dynamic-reader approach for later optimizer work only after this
+stage validates. H23 source is isolated, based on corrected H22 (graph reader)
+without H18/H19/H21; no product retention or performance claim yet.
+
+- H22 attempt2 passes source check12.876s, native print42 smoke (fresh DB),
+  and20 regressions. Attempt1 sequential print42 also passes, confirming its
+  missed lookups affected directory-backed emission, not the legacy path.
+- H22 cold initialization overlapped a13.799s H23 source check near its start;
+  mark that cold sample contended and exclude from startup comparisons. Warm
+  measurements are serialized. No repeat cold build solely to claim a gain.
+- H22 classes add35.074s, field add33.795s, field remove33.526s, class remove
+ 33.841s. LLVM function fragments73334->1,3.859->0.001s on class add; graph
+  construction1.304->0.137s, store coordination9.660->8.889s. Its independent
+  baseline still regenerates93241 IR rows and runs optimizer9.694s. Retain
+  graph per-class/scalar dependencies in working tree. H18/H19/H21 remain.
+- H23 source check passes13.799s. Native lowering class reader + verifier
+  forwarding implemented only in isolated snapshot. Extend deferred-verifier
+  test to both fixed and tracked readers; complete class metadata is read only
+  on failure using an immutable handle. Full host now building; no timings yet.
+
+- H23 attempt1 source-check/build succeeds, but new print42 smoke fails
+  'Key not found' before20 tests. GDB first generic throw is routine frontend
+  constraint control flow, so filter throw breakpoints to native frames.
+  Stack identifies Lower.lowerCallMethod -> OptimizerInfo.allMethodImplementations
+  -> empty fixed class map: lowerCallMethod did not forward the optional reader.
+  Forward it, retain attempt1 source/binary/LLVM/logs and GDB traces, rebuild.
+  Retire only failed smoke/GDB experimental DBs; each rebuilt host uses fresh
+  smoke storage. No H23 timing/retention; H22 already retained independently.
+
+Experiment H24 planned: optimizer class edits rerun every function (~9.7s),
+independently of IR/LLVM fixes. Publish normal class rows in each round and
+carry them through the same mapper/reducer pipeline as functions. Default-dev
+function mappers read a filtered SharedFile without the whole class map, then
+use the H23 reader through pass callbacks, verification and function summaries.
+Pass callback arrays take the reader explicitly (no captured mutable context).
+Keep existing full-environment behavior for inline/IPA/debug and coroutines
+initially; preserve sequential release behavior. Class updates from coroutine
+results still update the full shared metadata and keyed class projection via
+ordinary mapper contributions. Measure per-function optimizer counts, class
+updates, literals/helpers, initialization, and option switches; reject if
+correctness or meaningful timings regress. Isolated source based on H23.
+
+22:24 UTC checkpoint: H24 source check succeeds13.998s (before final reader
+forwarding audit). H23 attempt2 still fails fresh native print42 smoke.
+Filtered GDB trace identifies a second omitted forwarding site: multiline
+Control.findTypeSwitchSuccessor in Lower.tryLowerTypeSwitchToLoad. The other
+single-line call already forwarded the reader. Fix both H23/H24 snapshots;
+H24 Control's own optimizer call also forwards its Rewrite reader. Preserve
+attempt2 sources/binary/LLVM/logs. Audit native class access sites and rebuild
+H23 attempt3; no performance claim for this unvalidated prototype. H24 build
+and measurement scripts queued behind H23 measurement completion, so compiler
+builds/source checks cannot contaminate the timed H23 matrix. Every binary
+continues to use fresh persistent storage.
+
+22:30 UTC audit: H24 final source check13.850s succeeds. Also redirect
+peepholeCast's global isSubType call through ClassInputs with its reader;
+peepholeWith's obsolete getSClass(generic,targs,pos) is inside a TODO block
+comment and is not executable. Coroutine dependency planning retains the
+fixed environment by the explicit coroutine gate. Native compilation of H23
+attempt3 is ongoing; queued H24 waits for H23's complete measured matrix.
+
+22:32 UTC H23 attempt3: source check13.295s, LLVM generation135.874s,
+profiled native host linked; fresh tracked-native print42 smoke passes.
+Extended20-test harness builds20.671s against this exact isolated source,
+including fixed/tracked verifier error-position coverage. Regression suite
+now running; cold compiler/cache and class matrix remain pending. H24
+source passes final check13.850s; full host queued behind H23 measurements.
+
+Next workload matrix planned (no optimization hypothesis yet): add/remove an
+unused source file; add a reachable helper in a separate file; change and
+restore its body; change its parameter list and both caller/callee; remove
+that reachable file and restore caller. These exercise package input-set,
+per-member identity and function-type edges separately from line-coordinate,
+message and class-shape cases. Script structural-matrix.py records exact
+source content/hashes and restores original bytes/mtimes in finally. Do not
+run concurrently with the current compiler timing matrices. Profile observed
+outliers before choosing any subsequent implementation.
+
+22:44 UTC H23 retained after20 regressions, fresh native smoke and complete
+compiler/class matrix. Class add27.128s, field add26.765s, field remove27.080s,
+class remove27.168s (H19 baseline41.096/42.427/40.716/41.575; H22 graph-only
+35.074/33.795/33.526/33.841). Native function count73334->1, native IR lowering
+3.580->0.074s, store coordination8.889->7.073s relative H22. Optimizer still
+9.818s and93241 IR bodies3.016s in this isolated host. Message mean2.941s;
+unused helper1.328/1.032, reachable4.636/4.729. Cold481.673s vs H15456.842s,
+one each; extra startup work explicitly retained as a tradeoff, not a gain.
+Combined native source merges H21's tracked specializer interface and existing
+constantZero comment/format. Adds tracked-reader verifier diagnostic coverage.
+ClassInputs.Reader lifetime documented: one mapper invocation, no context in
+output rows. All source changes remain uncommitted.
+
+Structural matrix H23 succeeds: body/signature edits around2.9-3.3s; reachable
+file removal6.492s is the largest new case and needs phase/count diagnosis.
+H24 queued build now unblocked after all H23 timing work; no overlapping host
+builds during these samples. Preserve H23 cache until structural data exported.
+
+Combined retained source (H18/H19/H21/H22/H23) passes source check13.399s.
+H24 isolated source check13.411s succeeds; its build wrapper initially asserted
+obsolete 'h23' output prefix despite successful h24 check. Correct harness
+prefix and restart build. This was harness-only, no compiler error or timing.
+
+H23 structural results: unused file add/remove0.877/0.794s; reachable add4.714s;
+body edit/restore2.868/3.323s; signature edit/restore3.133/2.984s; removal6.492s.
+The removal's largest excess over addition is outside compiler process1.595s
+vs0.169-ish in typical runs, plus sync0.920 vs0.640s. Store1.217 vs1.205s,
+planning0.597 vs0.591s; do not infer wholesale recomputation from that outlier.
+Repeat before implementing any fix. Ordinary metadata/file-list work is a
+possible explanation for outside-process time, not established yet.
+
+Experiment H25 planned before implementation: H23 reachable value-class edits
+still run vtable layout1.711s although earlier output hashes showed no change
+to the shared megatable for field/class removal. Layout reads full SharedFile
+including every class; lambda-membership projection is already separate.
+Replace that class-map read with a normal getArrayFilter projection and pass
+ClassInputs.Reader through vtable construction, GC descriptors, scalar sizes
+and verification. Keep megatable packing/ordering/type identities unchanged;
+fixed/sequential/debug paths retain a full environment and None reader. This
+should skip layout for unrelated value-class edits, while changes to a class
+actually used by a vtable still invalidate it through ordinary tracked reads.
+Require source check, native smoke, class/layout/dispatch regression output,
+class-phase count/time, and full compiler timings before retention. Isolated
+H25 source derives from H24; full build queued after H24 measurements.
+
+22:50 UTC: H24 LLVM generation136.079s, native clang compile ongoing. Extend
+native-lowering regression to keep nativeRight reachable across class/field
+edits, assert unchanged native/LLVM function execution traces and correct
+runtime output (22/24/16), plus existing fresh sequential comparison. H24/H25
+harnesses include this extension; it remains pending until those suites run.
+H25 source check succeeds14.016s. First source-generation attempt produced a
+malformed indexed-receiver expression, fixed before host compilation; failed
+check log kept. Vtable reader propagates through builders, scalar layout,
+GC descriptor fields and consistency checks. No vtable algorithm change.
+H25 build/measure queues wait for H24 class+structural matrix completion.
+
+Experiment H26 planned: measured H23 reachability/escape phase1.075s on class
+add, of which the existing inclusive escape-analysis operation is0.277s once.
+Code confirms every per-function edge mapper reads ClassesFile containing the
+whole map. Thus most of the remainder is edge work plus framework overhead,
+independent of pointer-escape computation. Publish normal ClassInputs rows
+beside ClassesFile; edge mappers call the existing reader-aware dependency
+finder with a transient Reader and empty fixed map. Direct calls require no
+class reads; virtual calls record their real class/subtype dependencies.
+Keep global pointer-escape algorithm unchanged. Expect unchanged edge rows to
+avoid execution on unrelated class edits; preserve output and dynamic dispatch
+under subclass changes. Add REACHABILITY_EDGES to the independent-function
+reuse assertion. Isolated source from H25; build gated behind its full matrix.
+
+22:54 UTC H24 smoke passes. Test harness initially wrote its binary to H23
+because a copied absolute Path literal escaped the earlier replacement; runner
+then failed FileNotFoundError before executing compiler tests. Fix explicit
+per-experiment harness paths and runner working paths for H24/H25/H26, preserve
+failed harness logs, restart H24 suite. Actual H24 harness builds20.564s and
+20-test suite (including expanded class reuse assertion) is now running. No
+H24 performance records exist yet, so no failed timing included. H26 source
+check passes13.848s. No further source checks during later cold/warm timings.
+
+Final validation plan after isolated retention decisions: merge surviving
+patches without reverting H18/H19/H21/H22/H23; source check combined compiler;
+build exact combined profiled host and ordinary optimized host independently;
+use a fresh DB for each binary. Run expanded20 incremental regressions, broad
+runtime/typechecking/module suites and existing skargo/WASM checks as applicable.
+Measure the combined message/helper/class/source-file matrix and all exclusive
+phase totals, then repeat ordinary (uninstrumented) timings. Serialize CPU-heavy
+builds/tests against performance runs. Export raw results/provenance before
+retiring only completed experimental root caches for disk space. Preserve user
+cache and installed compiler. Report initialization cost alongside warm gains;
+do not claim isolated improvements simply add together. No commit yet.
+
+Metadata diagnostic planned: read_metadata opens an archive, parses lib.skmeta,
+then explicitly closes it. Probe read-only .sklib open-to-close intervals per
+PID/executable/path to locate repeated decoding work; intervals include any
+other work while a descriptor is held, not pure CPU time. strace is absent;
+use an isolated LD_PRELOAD open/close probe, smoke-tested with a small archive.
+No compiler/product source change. H24 structural wrapper will run two traced
+message edit/restore diagnostics after normal timing samples and before H25
+build; label them diagnostic and exclude from performance comparisons. Probe
+restores source bytes/mtime and preload environment in finally. Inspect archive
+paths/counts before proposing any resolver change.
+
+Extend the queued structural matrix with unused/used SKStore.Key subclass
+addition/removal and a field addition/restoration. The reachable variant adds
+a helper returning the base Key type and invokes toString on it from the
+compiler version-check function. This exercises actual virtual dispatch and
+GC/vtable metadata, unlike the earlier ephemeral Box.field read which can be
+eliminated. New subclass edges and megatable changes may legitimately affect
+more functions; measure/count and distinguish those from unrelated reads.
+All workload bytes/hashes are recorded and restored. H23 earlier structural
+records remain the original eight variants; H24+ have these six extra cases.
+
+23:06 UTC H24 first class-add sample15.153s vs H2327.128s; optimizer9.818->
+0.310s, store7.073->4.788s. Isolated host still regenerates93241 IR bodies
+3.057s because it excludes retained H21. Cold514.111s vs H23481.673s:
+optimizer10.309->26.634s, store290.573->303.309s, sync35.233->37.403s. This
+is a real startup tradeoff, not hidden. Finish full matrix before retention.
+
+Debug-mode enhancement: queued H25/H26 optimizer work mapper prints compact
+OPTIMIZE_FUNCTION name immediately before actual function optimization when
+context.debugMode. Same pattern as NATIVE_LOWER/LLVM_FUNCTION, no ordinary
+output or data dependency changes. Extend class-reuse regression to forbid
+this marker for the independent nativeRight function. H26 also forbids its
+reachability-edge marker. Build-time checks will validate the updated sources;
+no heavy checks overlap current H24 timing matrix.
+
+Experiment H27 planned: H24 cold optimizer26.634s vs H2310.309s; optimizer-
+attributed read registrations3,177,088->47,627,294 (inclusive registration
+0.248->2.867s), alongside additional lookup/filter overhead. Reader currently
+repeats normal reads for the same scalar/class many times in one function.
+Add ephemeral per-Reader full-class and scalar maps, keyed by SClassID.
+Construct a fresh Reader for every mapper invocation (already the design);
+record normal tracked reads on first access, return the same immutable value
+on repeats. Keep scalar/full caches separate so filtered dependencies remain
+exactly the same; cached None must be distinct from a missing entry. No
+context/reader/cache is stored in output rows or reused across ticks/rounds.
+Add an experiment-only environment switch to disable memoization for same-
+binary comparisons, and test both modes. Primary targets are cold cost and
+legitimate larger class updates; do not assume ordinary message edits improve.
+Isolated H27 source from H26; queued build only after its measured matrix.
+
+Experiment H28 planned before implementation: vtable createVTableBuilders
+assigns each GC descriptor a reserved identity word from its index in the
+sorted class list. Adding a class shifts that word in every later descriptor,
+even when those classes are unchanged. The word prevents distinct nominal
+classes with identical shapes/debug names from sharing one descriptor; runtime
+native equality uses descriptor pointers, not this numeric word's ordinal.
+H24 reachable Key subtype add52.418s visits426 native functions but25043 LLVM
+fragments (5.214s) and graph8.371s, LLVM text4.627s, native commands8.814s.
+Hypothesis: ordinal descriptor churn contributes to changed physical offsets
+and widespread constant/LLVM invalidation.
+
+Keep the same mega table and packing algorithm. For incremental/dev mode,
+choose nonzero positive identities from stable full SClassID-name hashes;
+resolve collisions explicitly against a used-ID set with linear probing.
+Do not rely on hash uniqueness for correctness. Sorting remains as before;
+only colliding hash clusters may renumber after insertion, rather than every
+later class. Preserve ordinal identities in the same sequential modes as the
+specializer via config.incrementalSpecialization. No persistent allocator,
+unsafe read or additional reference wrapper. Measure offset dirty-edge counts,
+LLVM executions and add/remove times; reject or revise if they do not improve.
+Test identical-layout distinct generic instantiations with collapsed debug
+names, in dev and release, to guard nominal identity. Source from H27; first
+check/build queued after H27 measurements, no heavy work during H25 cold run.
+
+H28 regression refinement: runtime string hash is the polynomial31 hash with
+a fixed tag. Aa/BB collide, as do equal-prefix/suffix strings embedding them.
+Use Box<Aa>/Box<BB>, with identical Int fields and collapsed Box<...> debug
+names, through a common base type and native_eq. Both dev and release must
+print pass. This exercises the collision guard semantically, rather than
+assuming a wide hash is unique. Added sources remain isolated and unchecked
+until the gated H28 build; no source checking during H25 cold measurement.
+
+Frontend diagnostic enhancement (actual source and queued H26/H27/H28):
+TYPECHECK_CLASS/FUNCTION/CONST markers in SkipTyping's definition mapper, gated
+by context.debugMode. Needed because H24 unused Key subclass4.687/4.716s is
+3.329/3.334s type checking with negligible backend work; the aggregate12048
+phase-call count is not a definition count. H26+ bounded offset diagnostic
+will record definition names, so do not claim thousands of definitions are
+retyped from that aggregate. Preserve ordinary outputs and mapper dependency
+behavior. Latest new diagnostic lines await gated source checks/regressions.
+
+H25 cold529.150s (H24514.111s). Vtable layout1.746-ish warm baseline / ~1.8s
+cold baseline ->24.647s cold, with40,917,228 vtable-attributed read-registration
+calls (2.894s inclusive), plus40,858,178 equalities (1.763s). This unvalidated
+tracked-layout prototype must not be retained alone; H27 local memoization is
+needed to test the repeated-read cause. Plain class add14.044s, field add13.494s
+so far; full structural/virtual-layout matrix still running. H25 passes20 tests
+103.528s. Do not equate instrumented costs to ordinary-host times.
+
+H27 matched ABBA protocol refined: on/off with counters enabled, then off/on
+with counters disabled; each mode adds/restores the same reachable subclass's
+field. Report profiled and counters-disabled results separately. This checks
+that the apparent gain is not just avoided profiler hook work on repeated
+reads. Same exact binary/cache, fresh Reader per callback, source/env restored.
+
+H25 plain field-remove outlier16.893s vs add13.494s: framework-attributed
+exclusive time8.517 vs4.855s, but operation counts/equalities/dependency
+updates are identical and operation CPU-like intervals nearly equal. Split
+process records: merged compiler12.278s (user11.598/system0.679), library
+archive compiler4.174s (user0.519/system0.051). Faster library sample0.563s
+(user0.512/system0.051). Coarse native/write_sklib is3.853s in the outlier.
+Thus ~3.6s is off-CPU delay in archive construction/writing, not extra
+invalidation. Exact blocking syscall/OS cause unestablished. Keep the sample.
+Important accounting limit: v2 'SKStore coordination' also owns unclassified
+callbacks, including this archive-writing path; do not describe every second
+in that bucket as dependency-bookkeeping CPU. Coarse ##TIME## provides useful
+cross-checks for such outliers; it is inclusive and not additive to phase rows.
+
+23:32 UTC restart checkpoint:
+- Actual retained through H24 optimizer keyed class reads, plus earlier
+  H18/H19/H21/H22/H23. Latest actual source has OPTIMIZE_FUNCTION and
+  TYPECHECK_* diagnostics; combined source passed13.846s before TYPECHECK
+  marker-only addition. All changes uncommitted; no installs/user cache edits.
+- H25 tracked vtable layout isolated, NOT retained: cold529.150s, subtype
+  add74.905s vs H2452.418s, so repeated-read regression needs H27. Normal
+  plain-class updates ~13.5-14s (one16.893s archive-write off-CPU outlier kept).
+- Automatic chain: H25 measure->structural14 variants->bounded offset debug
+  add/remove->H26 build/check/smoke->20 tests->fresh init+matrix->structural+
+  offset debug->H27 build/test both memo modes->fresh init+matrix->structural+
+  same-binary memo ABBA profile/control->H28 build/tests/matrix/structural+
+  offset debug. Watch logs under /tmp/skip-incremental-profile/hNN.
+- H26 adds per-class reachability reads and debug class/request offsets/typing
+  definition markers. H27 ephemeral Reader memo (Environ.varOpt switch) first
+  source check13.926s; H28 stable nominal GC descriptor hash IDs with explicit
+  collision handling, release ordinals preserved, Box<Aa>/Box<BB> regression.
+  Latest source hash/patches/statuses exported to repo JSON. Never retain
+  unvalidated queued prototypes just because they inherit each other.
+- Heavy tasks are gated serially. Check failures rather than waiting forever
+  on a missing completion flag. Test harness absolute paths were normalized;
+  scripts for H27/H28 use their own dirs. Source fixture always restored in
+  finally, SHA23601ce7d3b04e4353397e53908c30b74e0534abe272dacb8abbf8c99b096c5a.
+- Next analyze H25 offset stats for cause of25043 LLVM executions, then H26
+  TYPECHECK_* names to diagnose unused-subclass3.3s frontend cost. H24 metadata
+  open-close probe already exported (old own archive decoded unnecessarily
+  during library build, duplicate bootstrap std search path also costs time).
+- Final combined ordinary/profiling hosts, full regressions/suites and honest
+  startup-vs-warm phase tables remain required. See final validation plan above.
+
+23:34 UTC queue refinement: skip standalone H26 host/DB measurement. H25 has
+already demonstrated the unmemoized vtable regression (529s cold,74.905s
+subtype add/48.968s field add). Next build is H27, containing H26 reachability
+precision + local reader memo. Its same-binary on/off controls isolate memo;
+phase timings and edge-execution traces isolate reachability, while both-mode
+20 regressions test semantics. H26 source/patch retained as experiment base,
+not product retention or a fabricated standalone measurement. Stopped only
+idle H26 run/measure/structural and old idle H27 run/measure watchers. H27 now
+waits H25 structural diagnostics and retires completed H25 cache before fresh
+init; H28 still waits H27 matrix/ABBA. No completion flags forged, no user cache
+removed, no compiler measurements overlapped. This avoids repeating a known
+expensive unmemoized cold run just to reach the controlled memo experiment.
+
+H25 offset diagnostic confirms: 28585 changed GraphClassOffsetKey rows,8
+GraphRequestOffsetKey rows;45758 offset-triggered reader notifications. Frequent
+class dependencies include Array<String>,Array<Inspect>,Range,InspectCall,
+Array<Tuple2<String, Inspect>>,InspectObject. Actual executions:93254 function
+IR,2245 optimizer,93682 reachability edges,426 native,25043 LLVM functions,
+73 LLVM modules. Only5 oversized debug lines truncated in the bounded capture;
+these are diagnostic runs, excluded from performance comparisons. MAP_ROW is
+absent in the fixed support archive although repository source has it, so use
+new compiler-level TYPECHECK_* markers for exact frontend definitions.
+
+Experiment H29 feasibility/plan: keep class vtable references symbolic through
+LLVM graph construction using one LLVM alias per class, all aliases defined in
+the same support module as the mega table. Normal fragments track vtable
+membership, not physical offsets; only alias-definition rows read offsets.
+Object/string headers currently convert class identity into a numeric
+ConstantMegaVTableMember too early; retain existing ConstantVTable(class,frozen)
+in incremental fragments, with sequential behavior preserved. Alias definitions
+are real graph nodes, declarations used across modules; group them with the
+mega table because LLVM requires aliasee definitions in the same module.
+Reference https://llvm.org/docs/LangRef.html#aliases (checked): aliases introduce
+no data and may name a constant expression into a defined global. Do not add
+unnamed_addr since address identity matters. Runtime layout stays unchanged.
+
+Before compiler changes, native two-module LLVM toy passes: owner defines
+hidden alias into byte1 of mega; consumer external declaration reads42, native
+exit42. Wasm32 owner also compiles to object. Raw toy/results under
+/tmp/skip-incremental-profile/vtable-alias-toy. Full wasm linking/compiler tests
+remain needed. Hypothesis targets28585 physical class-offset invalidations;
+request slots (8 changed here) retain existing tracked numeric handling. H29
+implementation remains isolated/pending, after H28 identity experiment.
+
+23:48 UTC H27 build/smoke succeeds; both expanded20 suites pass (memo on
+101.654s, off103.716s). Fresh H27 compiler cache now initializing, serialized.
+H29 alias prototype source check passes13.880s during H27 tests, before cold
+measurement. Adds GraphVTableKey + per-offset alias nodes; skips fragment
+placeholders; object/array headers retain ConstantVTable in fragments;
+sequential headers unchanged. Alias names use bounded hashes and existing
+assembly-symbol disambiguation, graph identity retains full class ID. Force
+alias definition roots into support module with .allVTables; no unnamed_addr.
+Native alias toy also accepts external hidden alias + zero-length-byte-array
+consumer declaration. Wasm owner/consumer link succeeds with wasm-ld-20 and
+wasm-validate. Initial bare wasm-ld invocation was missing PATH, not a target
+failure. Full compiler smoke/regressions/performance and wasm exports pending.
+
+H29 graph regression strengthened (isolated harness): graphRight returns a
+static Array<String>, whose object header must contain a vtable pointer.
+Keep it reachable during existing GraphA/B/C dispatch class updates, compare
+correct output and require no LLVM_FUNCTION execution for graphRight. Existing
+literal edit/replay checks continue. This covers cached allocation-bearing
+fragments and per-module declarations; earlier independent Int-return case
+had no object header. Runtime execution of this extended test is pending H29.
+
+00:05 UTC H25+H26+H27 retained as a validated bundle in working tree after
+both20-test suites and same-binary controls: counter-disabled field add/restore
+cache OFF41.132/40.323s, ON23.070/21.747s. This is real lookup/allocation work,
+not just profiling overhead. Profiled field results also saved; no mixing
+counter-disabled phase rows into exclusive phase comparison. Fresh H27 init
+484.299s vs H25529.150s; optimizer26.823->11.243s, layout24.647->0.387s.
+Layout read registrations40,917,228->73,960; optimizer47,627,294->7,592,536.
+Class add11.701s, field add11.672s, remove11.674s, class removal12.714s (outlier
+kept); reachable Key subtype add48.972s, field add23.751s so far. Isolated
+host still excludes retained H21 and redoes93241 function IR rows on classes.
+
+Bundle actual changes: tracked vtable reader, per-class reachability edges,
+ephemeral Reader memo (separate scalar/full caches, no cross-invocation reuse),
+class/request-offset debug markers and independent reachability reuse assertion.
+Kept normal tracked first reads; no unsafe primitives or body references added.
+ClassInputs reader lifetime/comment explicitly excludes output storage. Actual
+source check deferred until a build/test window to avoid live ABBA timings.
+H28/H29 identity/alias prototypes remain isolated, not retained.
+
+Experiment H30 planned: exact dependency trace shows308 typing readers of
+/namingclasses/SKStore.Key (312 typed readers total;326 definition executions),
+causing unused-subclass3.3s typechecking. Audit common helpers: currentlySolvable,
+rtyKTraits,is_leaf_type,ktraits,hasConditionalTraitPoint,instantiate_tapply,
+fix_mismatched_variance,has_concrete_type_for_matching use only class kind,
+name,type parameters,parent/trait maps,variance mismatch map. None returns
+N.Class_def or reads descendants. Introduce a distinct six-field ClassTypeInfo
+record and a normal mapper from naming classes, before typing. Helpers use a
+constant named header collection via ordinary tracked reads. No repeated
+getArrayFilter per query (cold typing has36m read registrations per merged
+invocation), no custom equality ignoring fields, no empty-child fake class.
+Full class APIs, constructor/full-class-return helpers and descendant-sensitive
+matching remain unchanged. This makes accidental child access impossible on
+the smaller return type. Measure unused/used subtype timing and exact remaining
+recheck names; broad445 invalid typing and220 runtime tests required before
+retention. Isolated source from H29; source check during H28 build window,
+full host/test/measurement gated after H29. Reject/extend based on measurements.
+
+### H28 first validation correction (2026-10-19)
+
+The first 20-test run passed 19 tests, including the new colliding nominal-type identity case, but failed `relationships`: a broad test-fixture rename changed `RelationBox` declarations without changing the insertion patterns used to add `RelationOther`. Restored the unrelated fixture name in H28/H29/H30. This was a test setup failure before performance measurement; preserve attempt1 logs and rerun the full suite. No compiler change is inferred from this failure.
+
+### 00:21 UTC checkpoint: H27 complete, H28 measuring
+
+Combined retained compiler source check passed (13.952s). H28 fixture correction rerun passes all20 incremental tests (102.402s); cold initialization now running. H29/H30 remain isolated and gated. H30 will additionally capture the identical unused-subclass typing dependency trace after its timing matrix, to test whether header projection actually removes the observed308 readers of the descendant-bearing SKStore.Key record.
+
+H27 final representative exclusive phase accounting (seconds; isolated host excludes retained H18/H19/H21):
+
+| Workload | Total | Store/unclassified callbacks | Function IR | LLVM graph | Typing | Sync/collection | Native commands |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| h27-edit-1 | 2.940 | 0.581 | 0.000 | 0.096 | 0.179 | 0.273 | 0.209 |
+| h27-used-class-add | 11.701 | 4.169 | 3.052 | 0.140 | 0.191 | 1.066 | 0.165 |
+| h27-structural-used-subclass-add | 48.972 | 9.290 | 3.023 | 8.430 | 3.340 | 2.504 | 8.805 |
+| h27-structural-used-subclass-field-add | 23.751 | 5.080 | 3.064 | 8.141 | 0.433 | 1.870 | 0.753 |
+
+The store bucket includes unclassified callbacks, including archive serialization; it must not be described as pure SKStore bookkeeping CPU. H25 field-remove16.893s outlier included about3.6s off-CPU archive-write delay versus the adjacent samples, with identical invalidation counts. Counter-disabled controls remain separate from phase tables. H28/H29 target descriptor identity and physical offset churn independently; H30 targets full-class naming dependencies. Final combined-host measurement is still required before presenting cumulative gains.
+
+Storage checkpoint: after H28 structural diagnostics, retire only `*/state.db` replay caches from completed isolated H15/H17/H18/H19/H21/H22/H23/H24/H25/H27 targets. Preserve source snapshots, binaries, support archives, generated outputs, hashes and raw timing/debug logs. This provides room for separate final normal/profiled compiler databases; no user/default build cache is touched. Exact removed paths/sizes recorded in `/tmp/skip-incremental-profile/retired-completed-support-caches.json`.
+
+H28 preliminary: cold489.520s versusH27484.299s (one sample each, no startup gain); plain class add11.951, field add11.714, field remove11.642s, essentially unchanged. Message4.194s outlier has other skargo/process overhead1.229s versus usual~0.17s; librarycompiler0.559s and merged2.154s, so do not attribute it to store invalidation. Remaining ordinary message samples2.936/3.048/3.140/2.988/3.094s. Reachable subtype matrix and offset trace pending. H29/H30 now include full initial/update Wasm validation with both export forms before their fresh timing runs; incremental text emission remains native-only, graph fallback must still work for Wasm.
+
+### H28 rejected; H29 isolated against retained H27
+
+Reachable subclass add48.559s vsH2748.972s, same25043 LLVM function executions; field add24.172s vs23.751s, same3 LLVM function executions and~8.2s graph construction. Descriptor rank identities are not the material cause of the physical-offset invalidation cascade here. Do not retain H28. Both queued H29/H30 source snapshots restored vtable.sk exactly from H27 before any host build; H29 now differs from H27 only by aliases (plus stronger tests), not by the rejected identity scheme. Preserve H28 source/binary/measurements, complete its offset diagnostic, and record this rejection rather than claiming a gain. New nominal collision regression still useful and passed on predecessor H27 release probe.
+
+H28 completed offset trace:28593 changed offset rows, exactly same as H25 trace; class-address dependency fanout unchanged (Array<String>1396, Array<Inspect>1278, Range1251). Same25043 LLVM function executions. H27 reachability precision remains visible:292 edge callbacks in H28 trace versus93682 in H25. H29 updated baseline source check passes13.352s; LLVM host generation started after H28 diagnostics/restoration.
+
+Final validation plan (before combined timing): retain only successful hypotheses; copy actual compiler src/tests into a frozen combined-final snapshot, source check and build profiled/ordinary optimized executables from identical LLVM generation. Run all incremental regressions, Runtime/typechecking and Expand/Visibility suites, Wasm initial/update exports, and produced-compiler initial/update probe. Measure frozen original workload for comparisons, then a separate current-source fixture to report realistic compiler self-update cost. Fresh DBs per exact executable; serialize measurements. Preserve counter-disabled controls separately. Prepared `/tmp/skip-incremental-profile/prepare-combined.py` only; it has not been invoked while H29/H30 are undecided.
+
+Audit checkpoint: `git diff -U0 -- skiplang/compiler/src` contains no newly added unsafe SKStore primitive. The lone added textual `unsafe` call is the existing module naming helper `module_names_find_unsafe`, not a store bypass. ClassInputs memo caches remain fresh per invocation; distinct scalar/full maps preserve first-read dependency projections. Do not interpret aggregate profiled helper call counts as numbers of definitions invalidated; use TYPECHECK_*, FUNCTION_IR, OPTIMIZE_FUNCTION, NATIVE_LOWER, LLVM_FUNCTION debug markers for definition execution counts.
+
+H29 attempt1 build succeeds but smoke fails before regressions: alias text emitted `hidden hidden alias`. `AsmEmit` normalizes definition linkage to hidden, so literal hidden in GraphDefinition prefix duplicates it. Archived attempt1 source/LLVM/binary/logs; removed literal visibility in H29/H30 prefixes so ordinary linkage insertion owns it. This is a real prototype emission bug, unlike the earlier H28 fixture failure. Rebuild/check/smoke required; no performance sample accepted, no actual source retention.
+
+H29 preflight: saved attempt1 smoke modules corrected solely by replacing `hidden hidden alias` with `hidden alias`; all73 opt-verifier checks pass, all compile, link with unchanged runtime archive and run42. This is diagnostic evidence for the visibility fix, not acceptance of a patched compiler or a performance sample. Full new host rebuild still required. Results under h29/attempt1/corrected-emission-preflight.
+
+### H31 plan: temporary LLVM graph-reader memoization
+
+Measured before implementation: H27 reachable subclass field edit spends8.141s in LLVM graph construction while only3 functions regenerate LLVM. Inclusive operations in that phase show14,598,699 read registrations (0.895s measured hook interval),14,246,950 equality calls(0.673s); a message edit has only3 registrations. Audit identifies shared mega-table static-image rendering repeatedly calling AsmDefBuilder.getScalarType -> Common.maybeGetScalarType -> GraphReads.classes.getArrayFilter. The shared fragment is correctly dirty when the table changes, but querying the same scalar class millions of times within that one callback is unnecessary. This is separate from global graph assembly and physical-offset fanout; revise the initial suspicion accordingly.
+
+Experiment isolated against H27, excluding rejectedH28 and pendingH29/H30: add fresh full-class/scalar caches to transient GraphReads, with a diagnostic environment toggle SKC_DISABLE_GRAPH_READER_MEMO. First access still uses ordinary keyed read or scalar projection filter; separate caches preserve dependency precision; cache None distinctly from absence. Never store reader/cache/context in output rows, never reuse across callbacks. Change no function/body representations, no unsafe primitive. Compare full20 incremental tests with memo on/off, then cold/message/helper/class/subclass matrices and same-binary ABBA counter-disabled field edits. Expect shared-fragment graph time and registrations to drop, not definition invalidations. Gate full build/timing after H30 structural diagnostics; source-check during the current build window. Retain only if correct and measured beneficial.
+
+H31 actual prototype source check passes14.031s. Initial cloned check script accidentally still referenced H27/src (14.049s), caught by path audit and excluded; corrected check references H31/src. Audited all H31 run/check/measure/structural/test-build paths before starting only gated watchers. No H31 cache or timing exists yet. H31 full build after H30 structural diagnostics; both memo-mode regressions precede cold timing.
+
+H29 attempt2 succeeds: source check13.469s, LLVM generation137.815s, native host compile/smoke passes. All20 incremental regressions pass99.075s including allocation-bearing graphRight reuse after dispatch class changes and generic nominal identity. Full Wasm initial/update both validate and preserve legacy/current named exports. Fresh compiler-cache timing now active; no retention decision until matrix/offset measurements. H31 remains independently gated after H30.
+
+H29 preliminary timing: fresh490.091s vsH27484.299s. Produced compiler validation passes --version0.011s,--check20.408s,tiny compile26.515s/run42, incremental update0.639s/run43 (separate validation, not benchmark samples). Six message samples3.236/3.629/3.280/3.398/3.269/3.407s mean3.370, slower thanH272.988. Costs increase across store/sync/emission/native work, so this regression must be retained in decision/report, not hidden by a favorable structural case. Plain class fieldadd13.079s (possible outlier),remove11.836s; subclass/offset results pending. No actual source retention yet.
+
+### H29 retained with measured tradeoff, pending final combined validation
+
+20 incremental regressions, Wasm init/update+exports, produced compiler version/check/compile/update all pass. Reachable Key subclass insertion48.972->33.204s, LLVM functions25043->17 (5.046->0.005s), native commands8.805->2.591s, text4.593->2.201s. Removal35.215s. Field add25.230/remove23.810s vsH2723.751/~23: no gain. Six message mean2.988->3.370s: real tradeoff (~0.38s), preserved in reporting; no startup speedup (484.299->490.091 oneeach). Keep symbolic class references as dependency correction benefiting structural changes; final combined normal-host measurements must assess common-message cost with retained H19 publication buckets (absent in isolated host).
+
+Actual source: copied H29 AsmGraph/AsmOutput (diff audited against actual H27 base); added only alias support-module grouping condition to actual AsmEmit, preserving H18 source grouping and H19 buckets. Merged only nativeTypeIdentity and incrementalLLVMGraph test functions, retaining actual verifier formatting and reachability reuse coverage. H28 identity prototype remains rejected. H31 later merge must add GraphReads methods/caches without overwriting these alias changes.
+
+Alias-use inventory after restored baseline:28945 emitted definitions,22662 referenced names,6283 unreferenced. Pruning is a possible refinement, not yet justified as next experiment; avoid adding dependency machinery solely on this inventory. Exact full module counts saved in h29/alias-use-counts.json. H30 build now active; actual combined source check in its build window next.
+
+Combined retained source check after H29 passes13.934s; git diff --check clean. H30 source check13.405s and LLVM generation141.574s pass; native compile underway. H31 source check14.031s complete, full build gated after H30 structural + typing diagnostics. Last actual retention H29; no H30/H31 retention yet. No current-task commits/installations/user cache modifications.
+
+### Compact restart checkpoint, 2026-10-19 01:12 UTC
+
+Actual retained source: H1-H16 + H18/H19 + compact debug keys + H21/H22/H23/H24 + H25/H26/H27 bundle + H29 symbolic vtable aliases. H17 checkpoint-coalescing and H28 descriptor-hash identity rejected. Latest actual combined source check afterH29 passes13.934s; actual combined native build/tests/timing still pending. No commits in this task, no installations, no user cache modifications. Current actual tests retain formatted verifier and reachable nativeRight reuse assertions; H29 generic nominal identity/allocation-bearing LLVM reuse merged by function only.
+
+H29 complete:20 tests99.075s, Wasm initial/update exports, produced-compiler version/check/compile/update pass; cold490.091; message mean3.370 vsH272.988 (regression retained); reachable subtype33.204 vs48.972, LLVM functions17 vs25043; field25.230/23.810, no improvement. Alias inventory28945/22662 referenced,6283 unused; pruning deferred. Raw tables h27/h28/h29/phase-table.md all sum exactly (rounding aside). H29 attempt1 duplicated hidden visibility archived; attempt2 correct. H28 all35 benchmark records and rejection summary saved, source restored.
+
+Active pipeline: H30 type-header projection native build (LLVM141.574s, source13.405s pass), then20 incremental +665 Runtime/typechecking +128 Expand/Visibility, Wasm probe, fresh init + produced-compiler probe + message/helper/class matrix +14 structural edits + unused-subclass typing dependency trace. H31 graph-reader memo isolated fromH27, source14.031s pass; waits H30 structural-complete. H31 both20-test memo modes, cold/matrix +samebinary ABBA controls afterward. H31 original cloned check accidentally usedH27 source, caught/corrected; only14.031s valid. Audited H31 run/check/measure/structural/test paths; no H31 benchmark exists yet.
+
+H31 hypothesis: shared mega static-image rendering repeats scalar reads14,598,699 times on field edit, graph8.141s; message only3 reads. Add per-callback GraphReads full/scalar caches, not global graph reconstruction redesign. Read first normally, separate caches, None cached distinctly, no unsafe API, no persisted context/cache. Later merge GraphReads methods into actual H29 files without reverting aliases.
+
+Remaining required work: assess H30/H31 results/diagnostics and retain only useful/correct changes; final combined source snapshot +optimized ordinary/profiled executables (same uninstrumented LLVM), complete meaningful test suites, fresh caches per binary, frozen workload comparison and current-source compiler build/update benchmarks. Prepare script /tmp/skip-incremental-profile/prepare-combined.py exists but has NOT been invoked; audit generated paths before running. Preserve old H18 source grouping/H19 buckets when merging AsmEmit. Do not merely sum isolated gains. Update durable JSON/table/checkpoint and report initial-build tradeoffs/regressions honestly. Final current-source fixture should be copied after retention; don't mutate user source for benchmark.
+
+Storage: only completed experimental replay state.db files retired; exact paths/logical sparse sizes in retired-completed-support-caches.json. Binaries, support archives, raw logs and source snapshots retained; H29 root DB still active until H30 tests precede fresh init. Use df actual allocation, not huge sparse logical sizes. Saved actual retained-through-H27 patch/untracked source copies as extra checkpoint; current actual H29 source is newer. No subagents permitted. Keep commentary at most60s apart; no overlapping build/test workload with performance samples.
+
+Alias compatibility check planned in H30 build/test window (not a timing sample): incremental -O2 with inlining/IPA disabled still exercises optimized native LLVM assumptions for aliases declared as external global i8 in consumer modules. Compile/run generic nominal-equality + static Array<Payload>, edit payload and incrementally update, compare fresh --release -O2 output. Check addresses/pointer tagging under optimization as well as existing O0 suites; fresh independent DB, raw commands/results saved.
+
+Optimized alias validation passes: initial 5.957s, update 0.172s, sequential 4.160s. Incremental-O2 outputs pass42 thenpass43; fresh sequential-release-O2 agrees pass43. Covers same-layout generic nominal equality and static object-array pointer tagging under optimized consumer modules. Separate validation only, not benchmark data. H30 smoke/test harness build passes21.185s;20 incremental tests now active before broad suites.
+
+H30 build/smoke succeeds,20 incremental regressions pass98.324s. Broad665 Runtime/typechecking now running8 jobs, then128 Expand/Visibility4 jobs. No H30 performance sample or retention yet; avoid any other timing experiment while broad suites run.
+
+H29 native command follow-up: merged support module m2_0 compile is only0.240s, final link0.296s; remaining native2.591s distributed across affected function modules (~0.10-0.12s each). Do not claim2s is mega-table support compilation or prioritize alias pruning on that assumption. Unused6283 aliases may reduce graph overhead, but native support upper bound is small; pruning deferred in favor of measured14.6m graph-reader repeats. Raw per-command records under h29-structural-used-subclass-add.
+
+H30 broad Runtime/typechecking suite passes all665 cases274.605s, no failures;128 Expand/Visibility suite now active. Exact final count in runtime-tests.log. Typing header experiment still not retained; correctness evidence precedes fresh/warm timing and dependency diagnosis.
+
+H30 all correctness gates pass:20 incremental98.324s,665 Runtime/typechecking274.605s,128 Expand/Visibility77.725s, Wasm initial/update+legacy/current exports. Fresh initialization active; no parallel workload. H30 measure script retains an old log label saying H28 cache retired, but actual hardcoded deletion path is h29-target/.fingerprints/skc-07f192307ac1209b/state.db, the completed predecessor; no other cache touched. H31 log label corrected before its watcher starts.
+
+H30 preliminary negative result: unused subclass add4.740s/typechecking3.330s, reachable subtype33.286s vsH2933.204s; field24.715s, no material gain. Do not retain on timing alone. Finish dependency trace, then bounded GDB caller sampling of SkipNaming.getClass for SKStore.Key during the same unused-subclass update. Purpose: distinguish remaining constructor/pattern/type helper reads from actual descendant-sensitive match-set reads. No production compiler change needed. GDB diagnostic is excluded from timing comparisons, runs after H30 structural-complete while H31 builds from independent source, restores fixture bytes/mtime finally; cap stacks and execution time, do not run into H31 benchmark stage. Native print_stack_trace is not implemented, so do not use it.
+
+### H30 rejected; measured cause and H32 plan
+
+H30 complete matrix/trace: all312 typing readers and308 /namingclasses/SKStore.Key dependency notifications are identical to H27;209 class,97 function,21 constant executions. No performance gain. Do NOT retain generic ClassTypeInfo projection/8 helper changes. Preserve tests/source/results as rejected experiment.
+
+Bounded GDB direct function-entry trace (existing H30 host, no instrumentation/source change) catches repeated SkipNaming.getClass -> SkipTyping.method_is_copydown -> class_def method filtering. It reads full source class only for kind, any deferred field, any abstract type constant, and is_self_parameterized. New child list should not change this boolean decision. Initial64 matching calls all this path,3 unique recursion-depth stacks. Exclude copydown in a second bounded trace to inspect remaining paths. Both add/remove diagnostic builds restore fixture and are excluded from timings (first5.006/5.070s, not performance measurements). Native print_stack_trace unavailable; GDB works. Raw stacks under h30-class-reader-gdb-diagnostic-add/gdb.stdout.
+
+H32 hypothesis: isolate against retained H29 (exclude rejected H30 headers): normal eager mapper of naming classes publishes one Bool per class, the exact can-omit-copydown source predicate. method_is_copydown preserves method-specific guards and reads that Bool ordinarily; missing class still raises same diagnostic at source position. No ignored fields in equality, no custom cache lifetime, no unsafe API. Expected to stop copying-down policy checks from depending on descendant lists, removing class rechecks first; remaining function dependencies will be measured, not guessed. Source check during H31 build; full build/test/matrix gated after H31 ABBA. Add incremental regression changing a relevant class property so decision changes are tracked. Compare unused/used subclass typing/execution counts and wall time. Keep broad Runtime/typechecking/Visibility suites before retention.
+
+H32 source check14.030s and test harness build21.892s pass after fixing a test-local rebinding error (`updated` ->`rebuilt`). New21st regression copydown_policy: add unrelated Key child and require existing sibling class not retype; then change base explicit-this return policy, verify inherited child-only method behavior and fresh sequential agreement, restore. Parent H29 runs exactly1 filtered test and FAILS expected unnecessary sibling TYPECHECK_CLASS (initial mistaken suite filter selected0, corrected to suite incremental +positional copydown_policy). Direct parent self-type program runs7, so syntax/semantics case valid. H32 unoptimized full compiler preflight build in progress; unlike the small harness it reaches the entire compiler, so generation is still substantial, but avoids optimized native-host compile. This probe is correctness/invalidation only, never compare its wall time to optimized host.
+
+Timing harness now acquires a filesystem lock before starting each timed command, with wait excluded from elapsed interval; fast preflight holds same lock (existing first process covered by a lock-holder until exit). This ensures no accidental overlap if preflight outlasts H31 tests. H31 first20 regressions pass103.074s; memo-disabled suite running. No H31 performance result yet. H30 second GDB trace excluding copydown captures no non-inlined getClass(Key) call; cannot conclude absence of inlined reads. Audit still finds make_extend__ reading full parent class only for tparams, so overlapping dependencies may require the earlier header projection plus this getter as an enabling bundle if narrow preflight still fails.
+
+H32 narrow preflight builds155.481s, runs exactly1 regression and FAILS expected sibling-retyping assertion10.106s. This confirms overlapping dependencies: copydown policy alone is insufficient. Preserve narrow source/fast binary/results under h32/narrow-attempt. Parent also fails same test; direct self-type program output7 confirms positive-case syntax. H31 both20 suites pass103.074/105.423s; fresh H31 initialization running with no competing work. Timing lock excludes any queued diagnostic/build from measured intervals.
+
+H32 revised enabling bundle (still compared against H29): combine previously validated H30 type-header projection with the copydown Bool plus make_extend__ parent tparams access changed to that header. The source audit shows make_extend__ only consumes tparams from its full parent read; it must not depend on parent's children. Full APIs for descendant matching, constructor/member access unchanged. H30 alone and narrow copydown alone are negative controls; together remove overlapping coarse reads. Source staged now, no optimized host built yet. Fast unoptimized GDB trace is queued after H31 cold run using the immutable narrow binary (not regenerated until trace completes), to locate any further inlined full-class calls before accepting this bundle. More preflight and all21+665+128 tests required. Do not claim H30-alone success.
+
+H32 bounded O0-host trace succeeds after restoring execute permission on copied narrow binary (copyfile omitted mode; initial launch failed before any compiler ran, corrected). Raw class-read-trace/fast/trace.stdout captures16 stack variants: make_extend__, Types.promote/promote_tpromoted/join_tpromoted, TypedAstExpand.check_tapply/check_tpromoted, and ExprDot.tapply. This proves multiple coarse reads masked both earlier isolated projections. Audit: all13 getClass sites in skipTypes use no descendants, three Class_def-typed helper parameters only consume type params/parents/name/kind/depth; all6 typed-AST expansion sites use kind/depth/parents. Extend ClassTypeInfo with depth and tparam_parents; use it for those reads/helpers. ExprDot field lookup consumes only name/fields/tparams (build_fdt_subst one caller); add distinct ClassFieldsInfo mapped normally and use it there/expr_dot. Descendant-sensitive getClass and full constructors/class definitions remain unchanged. No synthetic Class_def with erased fields; source checker must reject access to unavailable children on smaller records. Check/build fast extended source and run the known-failing21st regression before optimized host. H31 cold completes474.001s vsH27484.299; graph8.283->1.198s; warm and samebinary controls pending.
+
+H32 extended typed preflight catches a transitive member helper: specialize_tparam -> specialize_trait also consumes class kind (not descendants). Added kind to distinct ClassFieldsInfo and changed those two helper parameter types; one call chain only. No fake full class or cast. Controller now checks source-check printed status, since check.py prints nonzero compiler status but itself exits0; test-harness compilation had correctly blocked before any fast build. Earlier assembly assertion overlapped expr_dot span with its nested ExprDot class, corrected only the actual tapply method. Preflight-success remains absent; optimized H32 remains blocked.
+
+H32 extended fast preflight still fails sibling retyping9.591s; saved exact source/binary/results extended-attempt1. Follow-up audit identifies check_implement reading full parent record for fields+tparams, then check_missing_fields needs parent types and check_fields/specialize_this_type use kind/name only. Extend smaller member view with types, rename ClassMembersInfo/getClassMembers, and change only parent parameters in those helpers (child remains full). Also use header for clear kind/tparams/protected-parent queries make_inst/make_inst_from_class/check_protected. Full descendant matching API unchanged. Recheck source types and rebuild fast; no optimized H32 host or retention until regression passes.
+
+### H31 retained after matched controls
+
+Both20 regression suites on/off pass103.074/105.423s. Fresh474.001s vsH27484.299 (oneeach); graph8.283->1.198s. Reachable subtype field edit23.751->17.259s (first matrix), matched profileON16.460s vsOFF24.692s. Graph8.141->0.789s; read registrations14,598,699->351,645. Samebinary/cache counter-disabled OFF24.089/21.745s vsON18.662/15.442s, mean22.917->17.052 (~25.6% lower). Keep outliers; profile hooks exaggerate part of repeated-read cost, controls confirm actual gain. Added filesystem serialization pauses between some commands for H32 preflight, no overlap within measured intervals; delays excluded. H31 final removal40.249s and baseline source restored; all matrix/ABBA records complete.
+
+Actual merge: transplanted only GraphReads fields/methods from isolated H31 into actual H29 AsmGraph before alias helpers, preserving alias definitions/comments; replaced only full/scalar lookup expressions in actual AsmOutput. H18/H19/H21/H29 retained; H30 standalone remains rejected. No new unsafe APIs or output-stored mutable reader. Final combined native validation still required. Completed predecessor experimental DB cleanup now safe; artifacts remain.
+
+H32 extended2 (parent-interface member view with types + narrow helper signatures + clear header-only queries) source check13.209s/harness20.681s pass, fast compiler building. No preflight-success yet and no optimized host/timing accepted.
+
+### H32 preflight succeeds; optimized experiment active
+
+Extended2 source check13.209s/harness20.681s; final fast compiler preflight passes exactly1 regression24.614s. Adding unrelated Key child skips TYPECHECK_CLASS CopydownStableKey; explicit-this source-policy change produces7 and agrees with fresh sequential release; restoring produces1 and agrees fresh. Thus observed overlapping full-class reads removed for the regression, not just cheaper lookup. Narrow Bool-only and header+partial-fields attempts preserved as failing controls. Preflight-success written by controller only after printed source status0, successful harness/fast build and exactly1 positive regression. H32 optimized run now started from this finalized source (no further changes during build); after smoke run21 incremental +665 Runtime/typechecking +128 Expand/Visibility +Wasm +produced-compiler probes before timings/retention.
+
+Actual retained H29+H31 source check passes13.872s. No H32 retention until full validation and performance trace. Completed H31 predecessor caches retired36,969,512,960 allocated bytes (logical sparse sizes much larger), no user paths. Raw source/binaries/records remain. Final combined prepare script still not invoked; after H32 result it must use actualsrc/tests with aliases,graph memo,H18/H19/H21 plus any accepted typing bundle. Root DB per exact executable mandatory.
+
+H32 optimized LLVM generation142.885s and native smoke pass; all21 incremental regressions now running before665+128/Wasm/produced-compiler gates. Source frozen during build; isolated H32 baseline H29 deliberately excludes graph-reader memo so typing result is measured independently. Actual retained H29+H31 not changed by rejected H30 or ongoing H32 source.
+
+H31 counters-disabled process evidence: OFF merged wall/CPU21.415/21.414s and20.650/20.650s, peak RSS16.717/16.627GiB; ON15.576/15.576s and14.355/14.355s, peak RSS8.772/8.701GiB. Thus CPU lookup/allocation cost and~48% warm peak RSS reduction are real; total ON add18.662 includes extra time outside merged compiler. Report root CPU separately from end-to-end wall, do not discard outlier. Source max_rss_kib divided by2^20 to GiB.
+
+H32 optimized correctness suites pass:21 incremental114.396s,665 Runtime/typechecking278.113s,128 Expand/Visibility78.588s. No retention until timed matrix and exact typing dependency trace show material improvement; Wasm/produced-compiler probes also required. Source remains frozen and actual retained code remains H29+H31 backend bundle.
+
+Final diagnostics prepared (not changing frozen H32): add TYPECHECK_METHOD to method_def_ debug mode, since class-level marker alone hides which methods execute; bounded collector recognizes it. Script add-method-marker.py should run on actual SkipTyping after any H32 copy, before final snapshot. This is debug-only output, no new semantic dependency. Final profiler instrument-v3 adds inclusive operation15 class input publication around ClassInputs.writeClasses (LLVM symbol verified), expands op arrays/loops15->16; phase labels unchanged and new hooks only a few publication calls, not per row. Helps separate class row publication from generic coordination. Ordinary final executable still built from original uninstrumented LLVM. Prepared combined script now chooses v3; not invoked yet.
+
+Final current-source workload matrix planned: comment/newline edits, local rename, equivalent branch, typed reachable helper, const initializer100->101, debug print, and two Converter class changes. Method helper is inserted on the existing last-method closing line, adding no newline and leaving old positions unchanged; it is private/unreferenced, so native code should not change. Method message edit changes only equal-length `Unexpected RawStorage fields.` ->`...values.` in Converter, same line count; valid compiler behavior/probes unaffected. Purpose: distinguish source-line emission from member/body dependency cascades on actual updated compiler source, not only the old frozen baseline. Profile/normal hosts use separate caches; mutations restore bytes/mtimes finally; hash/line-count provenance saved by varied-workloads.py. Run after final build/tests; if slowdown found capture bounded method/type markers before considering another solution. Do not add speculative class-scope rewrite before measuring.
+
+H32 retained:21+665+128, Wasm init/update exports and produced compiler probes pass. Fresh489.964s vsH29490.091 unchanged; message3.321 vs3.370s essentially unchanged; unused subclass4.693->2.757s, typing3.304->1.484; used subclass33.204->31.544s, typing3.320->1.495. Field25.227s unchanged. Diagnostic20classes+31functions+6constants=57 executions vs327; remaining full-class reads still require investigation, not claim eliminated. Copied only5 frontend files and new regression function/registration; actual backend aliases/memo/H18/H19/H21 preserved. Add method marker before combined source snapshot. Final native validation pending.
+
+Final combined validation/measurement plan refined: matched current-source fixture (actual retained source +debug method marker) compiled by earlier ordinary H15, combined profiled, combined ordinary, each fresh DB. This provides before/after on identical updated program and actual production wall time, rather than comparing different source revisions. Frozen-program hypothesis results retained separately; do not sum isolated gains or conflate source revisions. Run21 regressions with both final executables,665+128 broader suites,2 skargo tests,Wasminit/update,produced compiler version/check/compile/update. Full matrix includes9 varied edit forms with method cases +helpers/classes/separatefiles/subclasses. Fixture copy preserves existing symlinks; initial copy followed dangling libbacktrace.la links and failed before any build, partialcopy preserved outside fixture and clean symlink-preserving copy made. Current fixture src hashes equal final frozen source snapshot; helper probe directories now unique per target. Controller combined-final/validate-and-measure.py queued behind combined build. Benchmark suite restores bytes/mtimes, verifies source hashes after each full suite, retires only completed replay state files between exact binaries. No user cache/install touched.
+
+Final combined build succeeds: source12.789s, LLVM140.245s, profiled and ordinary executables from identical original LLVM; ordinary native compile288.130s. Profile16-operation dimensions verified. Combined21 incremental regressions pass109.261s;665 Runtime/typechecking active, then128 visibility+2skargo+Wasm+ordinary21 before matched current-source comparison. Actual source/tests hashes still exactly match frozen snapshot; diff check clean.
+
+Final combined validation ALL PASS:21 incremental profile109.261s, ordinary109.088s;665 Runtime/typechecking277.572s;128 visibility78.453s;2skargo capacity/cachedlink;Wasm init/update exports. Ordinary binary nm has no phase_enter; profiled does. Current-source before/after measurements now active; old H15 ordinary fresh initialization first. No source changes planned until these finish. All mutation cases restore bytes/mtimes and suite verifies hashes.
+
+Final matched current-source matrix active03:32 UTC: ordinary earlier-H15 initial462.071s; message mean2.975s; plain reachable class44.854s/field45.121s, reachable Key subtype64.909s/field48.197s, comment13.534s. These are baseline observations, not final revised timings. All final correctness gates have passed; final actual source/tests remain frozen, uncommitted. Profiled and ordinary-after suites follow serially with fresh DB each. Current baseline DB will be retired only after complete suite/export;24GiB free currently, next DB starts after retirement.
+
+03:45 UTC final combined profiled current-source run: fresh539.150s, message6 mean3.164s. Plain reachable class insertion7.701s, field insertion7.602s, compared with ordinary earlier-H15 baseline44.854/45.121s (profiling differs, ordinary-after confirmation pending). Source-file method and Key-subtype diagnostics still pending. ClassInputs.writeClasses inclusive startup publication0.119s total (optimizer2calls.059,reachability.030,native.031); it is not the large startup bucket. Keep full initialization regression visible until normal-after control.
+
+### Final method diagnostics and a next hypothesis (not implemented)
+
+Bounded current-after-profile method-message diagnostic: changing same-length Converter error text checks21 classes/284 unique methods plus19 functions, but actual backend markers show1 FUNCTION_IR,1 NATIVE_LOWER,1 LLVM_FUNCTION,3 LLVM_MODULE. Converter contributes51 methods, OuterIstEmitter50; many LazyGFun-family classes and SKStore.File are also checked. Non-debug profile message3.893s: typing.547s, store.651s, while ordinary confirmation is pending. Unused same-line private Converter method addition checks22 classes/371 methods,138 FUNCTION_IR; profile6.287s, typing.944s/store3.143/planning.611. Thus frontend granularity remains coarse even when generated bodies are mostly reused.
+
+Static cause to test next: SkipParse.parseFile passes isLazy=true (skipParse.sk:291); SkipParser.parseLazyBlock captures LexingPosition.saveState in each body builder, and LexingPosition.saveState retains source:String and its iterator over the entire file (prelude/src/stdlib/parsing/LexingPosition.sk). A same-length edit anywhere in that source changes the closure's captured input even when this body's text is unchanged. Converter wraps that builder, then expansion/inheritance wrap body closures again. Source position markers alone do not remove this dependency. This strongly explains file-wide body-input changes; it is a code-derived hypothesis, not a measured H33 result.
+
+Potential controlled experiment: parseLazyBlock already calls parseBlock once and discards its result before retaining a reparse closure. Compare retaining that already-parsed block, or capturing only a bounded body slice with correct source coordinates. Test diagnostic position preservation, environment reads/macros, comments/trivia, nested bodies and unchanged sibling reuse. Eager retention also changes SourcePositions.Builder traversal and stored AST size; a slice solution needs a safe LexingPosition origin API. Do not casually reconstruct private lexer state or introduce unchecked dependency reads. Current final source remains frozen; no H33 code retained or speedup claimed. Exact method lists and dependency samples in combined-final/final-diagnostics.json, to be exported after final ordinary comparison.
+
+### H33 bounded body-capture diagnostic planned before execution
+
+Run only after all final timing matrices complete, serialized by timing.lock, so compilation cannot contaminate timings. Build a tiny diagnostic entry point with final snapshot compiler sources (no production changes), parsing two same-length source strings differing only in one function literal. Compare expanded AST definition values for the changed function, an unchanged function, and an unchanged class. Then build an isolated source copy changing only parseLazyBlock to retain its already-parsed BlockTree; repeat equality comparisons. Hypothesis: lazy saved lexer state makes all three definitions unequal, whereas eager control keeps unchanged function/class equal. This tests representation-level invalidation, not wall-time speedup or full compiler correctness. Do not retain eager control without broader position/environment/memory testing. Sources, commands/logs/results under /tmp/skip-incremental-profile/body-capture-diagnostic. No production compiler edit, installation, cache migration or performance claim authorized by this diagnostic result alone.
+
+03:59 UTC ordinary-after confirmations: fresh486.136s vs462.071s (~5.2% slower, one each); message6 mean2.967s vs2.975s essentially flat. Plain reachable class44.854->8.717s, field45.121->7.325; reachable Key subtype64.909->21.505s, field48.197->12.247. Individual structural rows one sample; do not hide profile/normal variation or source fixture change. Final varied edits still running. H33 small representation control queued only after measurement-complete, production source remains unchanged.
+
+<!-- FINAL_CURRENT_SOURCE_RESULT_20261019 -->
+
+### Final current-source comparison, 2026-10-19 UTC
+
+The earlier ordinary H15 compiler and final ordinary compiler build the same updated compiler source. Fresh databases per exact executable; no profiling hooks in either ordinary executable. Message row averages six samples; other rows are individual edit samples, with restores and raw records preserved. Do not compare these current-source numbers directly with earlier frozen-program tables.
+
+Fresh build (one sample each): 462.071s before, 486.136s after.
+
+| Change | Earlier ordinary (s) | Final ordinary (s) |
+|---|---:|---:|
+| Message edit (six samples) | 2.975 | 2.967 |
+| Unused helper addition | 1.336 | 1.363 |
+| Reachable helper addition | 4.763 | 5.244 |
+| Unused class addition | 1.060 | 1.070 |
+| Reachable class addition | 44.854 | 8.717 |
+| Reachable field addition | 45.121 | 7.325 |
+| Unused Key subclass addition | 4.608 | 2.731 |
+| Reachable Key subclass addition | 64.909 | 21.505 |
+| Reachable Key field addition | 48.197 | 12.247 |
+| Source comment | 13.534 | 2.458 |
+| Leading newline | 13.636 | 2.493 |
+| Constant initializer | 5.364 | 5.766 |
+| Debug print | 3.034 | 2.984 |
+| Unused Converter method | 11.131 | 6.016 |
+| Converter method message | 4.309 | 3.714 |
+
+Final validation:21 incremental regressions on both final executables;665 runtime/typechecking;128 expansion/visibility;2 skargo integration/capacity tests;Wasm initialization/update and both export forms;produced compiler checks/initial compilation/incremental update. All pass. Source and tests match frozen snapshot. Work remains uncommitted; no executable installed or user cache modified.
+
+Complete final phase accounting follows. These are profiled numbers; ordinary wall times above are primary. Shared LLVM constant rendering is included in graph construction. Store coordination includes unclassified callbacks, including archive writing. Inclusive operation counters overlap phase time. Phase entry counts include helper calls; use explicit debug markers for actual definitions checked/generated.
+
+| Phase | Fresh initialization (s) | Message update (s) |
+|---|---:|---:|
+| Startup, input loading and driver | 1.713 | 0.396 |
+| Parsing | 1.317 | 0.008 |
+| Naming and expansion | 4.732 | 0.019 |
+| Inheritance | 0.120 | 0.000 |
+| Type checking and variance | 64.050 | 0.181 |
+| Outer IR construction and lowering | 13.245 | 0.000 |
+| Specialization | 5.278 | 0.002 |
+| Class relations | 0.333 | 0.000 |
+| Field scalarization | 0.389 | 0.000 |
+| Field layout | 0.745 | 0.000 |
+| Function IR planning | 0.741 | 0.000 |
+| Generic function IR | 0.467 | 0.000 |
+| Per-instantiation function IR | 9.536 | 0.001 |
+| IR environment assembly | 0.247 | 0.153 |
+| Optimizer rounds | 13.978 | 0.103 |
+| Constant lowering | 0.046 | 0.047 |
+| Reachability and escape analysis | 2.799 | 0.002 |
+| Native IR lowering | 5.975 | 0.015 |
+| LLVM graph construction | 1.477 | 0.134 |
+| LLVM graph merging | 0.057 | 0.060 |
+| LLVM symbol assignment | 0.063 | 0.068 |
+| LLVM text emission | 4.884 | 0.229 |
+| SKStore coordination | 345.777 | 0.506 |
+| Context synchronization and collection | 40.536 | 0.391 |
+| Persistent database commit | 0.000 | 0.000 |
+| Native commands | 9.200 | 0.195 |
+| Vtable layout | 0.437 | 0.000 |
+| Per-function native lowering | 1.617 | 0.000 |
+| Per-function LLVM generation | 4.629 | 0.000 |
+| Shared LLVM generation | 0.000 | 0.000 |
+| LLVM materialization and object cache checks | 0.074 | 0.167 |
+| Function collection projection | 0.009 | 0.007 |
+| External clang compilation and linking | 0.590 | 0.302 |
+| Other skargo and process overhead | 4.090 | 0.176 |
+| **Total** | **539.150** | **3.164** |
+
+
+Retained H29 alias tradeoff was visible in isolated frozen-source tests: slower routine messages but sharply fewer LLVM function regenerations for subclass insertion. H31 controls confirm real CPU and memory reductions. H30-only and narrow H32 controls were rejected; final typing views were retained only after the sibling-reuse and policy-transition regression and broad suites passed. Detailed hypotheses/results and hashes remain above and in the JSON artifact.
+
+### H33 cause confirmed; isolated optimized experiment planned
+
+Tiny native representation control succeeds: same-length literal edit makes changed function=false, untouched function=false, untouched class=false with lazy bodies; eager control gives false,true,true. Native comparison is the same native_eq primitive used by SKStore file comparison, not language Equality. Initial diagnostic compile missed module end; corrected and failed log retained, then both variants build/run successfully17.56/17.64s (diagnostic build durations, not compiler speedup). This isolates whole-source closure capture as a real cause of unrelated body inequality.
+
+Proceed with H33 isolated compiler source fork, one production-method change: parseLazyBlock retains this.parseBlock() instead of discarding its result and capturing a whole-file lexer state to reparse later. Existing method already eagerly parses once for validation; this changes retention and avoids the second parse. Add22nd body_capture regression comparing these three definition rows. Do not merge into actual until22 incremental+665 runtime/typechecking+128 expansion/visibility+Wasm+produced compiler pass and matched current-fixture updates show benefit. Preserve final combined parent benchmark/table; fixture source bytes remain identical across parent/H33 hosts. Profiled build first, fresh DB and same full matrix; if positive, ordinary binary from identical uninstrumented LLVM and fresh ordinary matrix before retention. Consider initialization, peak memory, source coordinates, environment-dependent bodies and release behavior, not only message edits. Hypothesis: fewer file-wide frontend invalidations, reduced method retyping, faster body/method/comment updates; structural layout improvements from parent must remain. No new unchecked SKStore reads or stored references. No production source edits yet.
+
+H33 pre-measurement caveat04:07 UTC: ConvertTree.Converter itself captures SourcePositions.Index for the whole file. An equal-length body literal preserves that index (tiny control demonstrated unchanged eager definitions), but adding a declaration or moving lines can change it and still affect sibling body closures. Therefore do not predict removal of all helper/source-position invalidation from lexer-state isolation alone. Compare method literal vs same-line private method insertion explicitly; retain only measured gains and log remaining Index capture separately. H33 source check13.180s and LLVM generation141.530s pass; native compilation underway.
+
+04:12 UTC H33 optimized profiled host builds and smoke passes; new22-case incremental suite active, including body_capture. Final actual source/tests remain parent snapshot. Controller h33/validate-and-measure.py will run broad tests, fresh profile matrix, then build ordinary host/test22 and fresh ordinary matrix, all serialized for timing. Build source/tests path substitutions audited; regression inserted once at actual module main, not fixture string literals. Result-count guards use real `successes: 22 (total: 22)` output. Source check13.180s/LLVM141.530s; h33/run.py session86308 complete, validation session50881 active.
+
+04:17 UTC H33 all22 incremental regressions pass108.466s; broad665 suite active. Source position/end-range assertions included and pass. Prototype not merged. Parent complete ordinary/profiled comparison exported under final_current_source in durable JSON, plus method diagnostics; parent phase table sums exactly539.150s fresh/3.164s mean message (ordinary462.071->486.136 startup,2.975->2.967 message). H33 final report generator prepared h33/report.py; must inspect results and decide retention, then export with explicit status. If retained, update obsolete parseLazyBlock header comment as a comment-only correction and keep pre-build source hashes/provenance distinct rather than claiming bytes match when comments differ. No current-task commits or installs.
+
+H33 attempt1 raw BlockTree:22 incremental pass108.466s;665 broad cases produce663success/2fail in271.752s. Failures overridable3/overridable5 are exact diagnostic underline differences: old body wrapper starts at opening brace, raw block's full range adds underlining on following line. No runtime mismatch observed. Preserve all sources/binaries/LLVM/logs under h33/attempt-1-raw-block. No timing or retention accepted.
+
+H33 revised plan before rebuild: preserve ParseTree.LazyTree wrapper and its existing range, but build its closure as () ~> tree after parsing the block once. Closure captures only the validated block, not LexingPosition/state/whole source. SourcePositions.Builder keeps its existing LazyTree skip; ConvertTree sees identical wrapper shape and source coordinates. Non-lazy parser returns the same raw block as before. This is smaller and more behavior-preserving than removing the wrapper; no new ParseTree type/API, no ignored metadata. Repeat all22+665+128/Wasm/produced compiler gates before fresh matched performance. Updated header comment now describes retention honestly. Actual production source still unchanged parent.
+
+04:22 UTC H33 revised wrapper candidate source check passes; LLVM generation141.648s. Uninstrumented O0 preflight host built from the same LLVM during optimized native compilation; exact single-test overridable3 and overridable5 each pass, confirming original diagnostic underline ranges restored. Preflight logs h33/range-preflight-*.log, success marker range-preflight-complete. These are correctness controls, not timed performance data. Full optimized native compilation ongoing (session85350); validation/measurement controller session77676 waiting build-complete. Earlier failed raw-block variant preserved attempt-1-raw-block. No H33 timing yet or actual retention.
+
+04:29 UTC H33 revised optimized host +test harness build succeed; all22 incremental regressions pass108.168s (zero failures). Broad665 cases active, then128 visibility/skargo/Wasm before fresh performance. Current controller77676; source/build candidate frozen, actual production still combined parent. No H33 performance results or retention yet.
+
+04:34 UTC H33 wrapper revision all665 Runtime/typechecking cases pass272.019s, including overridable3/5; no golden-file updates. All22 incremental pass108.168.128 expansion/visibility currently active; no performance acceptance yet.
+
+04:35 UTC H33 wrapper revision all128 expansion/visibility pass77.408s. Integration harness initially referenced skc-normal, which is intentionally built after profile measurements; test failed exit127 missing executable (capacity case passed), no compiler semantic failure. Saved missing-normal-host logs, fixed harness to profiled executable. Resume-after-broad.py asserts completed22/665/128 success counts, reruns only2integration+Wasm then resumes fresh profiling and ordinary pipeline. Original controller77676 exited on harness failure; no benchmark run had started, so no cache/timing records to repeat.
+
+04:38 UTC H33 revised wrapper candidate ALL profiled correctness gates pass:22 incremental108.168s,665 Runtime/typechecking272.019s,128 expansion/visibility77.408s,2skargo tests,Wasminit/update+legacy/current exports. Fresh h33-current-profile initial now active on exactly frozen current-fixture program (parent source, same bytes as current-before/current-after suites); no competing builds/tests. Completed parent ordinary replay DB retired by resume controller, raw exports remain. New controller session18333 h33/resume-after-broad.py continues profile matrix→ordinary native build→22ordinary tests→fresh ordinary matrix. Parent actualsource unchanged, no H33 retention/performance claim until data.
+
+Phase attribution clarification04:45 UTC: profiler Parsing boundary is SkipParse.parseFile. The parent lazy-body builder reparses during later callbacks, charged to that owning phase (often typing); parser helper CPU is not independently tagged. H33 eliminates the second parse while preserving wrapper. Full exclusive table still adds exactly to wall time; do not interpret Parsing row as all parser-internal CPU in the old parent. Final report generator includes this caveat.
+
+04:49 UTC H33 first matched profiled results: startup538.983s vsparent539.150 essentially flat, peak RSS29,679,548 vs29,508,268KiB (single each). Six message samples2.846/2.968/2.862/3.000/2.870/3.028, mean2.929 vsparent3.164. Mean typing0.1807->0.0104s, naming0.0193->0.0074, parsing0.0076->0.0078, storecoord0.5062->0.5053. Thus measured benefit is reduced frontend invalidation, not lower SKStore bookkeeping or first-parse cost. Ordinary confirmation pending. Structural Key subtype23.869 vs22.838 profile includes1.28s off-CPU (wall23.869 vsuser21.137+sys1.451); keep raw result and await ordinary control, do not call this 1s CPU regression.
+
+04:52 UTC H33 complete profile matrix+method diagnostics; ordinary native build active. Method-message debugchecks21classes/284methods/19functions ->2classes/53methods/1function, dirty-reader markers627->54, writes154->80; typing.544->.295s. Backend still1IR/1native/1LLVM/3modules asparent. Debug wall3.953->3.876s, showing other phase/noise can mask typing reduction; normal confirmation pending. Unused method addition remains22classes/371methods/20functions, so global source-position index and member input dependencies remain; do not claim lexer fix solves declaration edits. No H33 merge yet.
+
+H33 measured tradeoff04:53 UTC: large Converter method literal checks284->53 methods, typing.547->.291s, but non-debug wall3.893->3.877 nearly flat. Native equality inclusive0.20324->0.46909s (35894->35672 calls), while read registration1,508,374->827,966 and.1004->.0611s, dependency updates771->195. Increased structural AST comparison cost offsets saved typing. This is measured, not merely synchronization speculation. Routine small-file message still3.164->2.929 profile mean. Await ordinary result before retention; do not call H33 general class-edit speedup. More granular body/signature rows or safely bounded body-text captures would be future alternatives; no new unsafe or hash-only equality introduced.
+
+04:58 UTC H33 ordinary optimized executable builds, nm confirms no phase hooks (profiled does contain them); hashes saved h33/binary-checks.json. All22 ordinary incremental cases pass109.327s, so both executables validated. Fresh h33-current-normal initial now running, serialized/no competing build. Profile matrix complete/DBretired; ordinary matrix is final timing gate. Current parentactualsource still unchanged; H33 source+tests ready to merge only after final normal results/decision. Native binarysha normal37bf1b97406008b6c64ec257110d73c4fb8ec8372495068f06382c8c210eb2aa.
+
+05:12 UTC H33 RETAINED after full ordinary matrix: routine message six mean2.967->2.757s (~7.1% gain); Converter literal3.714->3.654s essentially flat; startup486.136->500.640s (+3.0%, one each). Retain narrow dependency correction for common edits, with explicit cold/large-AST comparison tradeoffs. Key field12.247->12.226 unchanged; declaration-helper scope not solved. Method restore5.466s outlier kept (CPU3.442+sys.985 vswall5.466), not discarded. Copied only tested SkipParser.sk+tests.sk after verifying actual parent snapshot unchanged; all source files and tests now exactly match built H33 snapshot. No comments changed after build, new header already accurate. Final self-check/report export pending. No commit/install/user default cache change.
+
+<!-- H33_FINAL_RESULT_20261019 -->
+
+### H33 final matched workload comparison
+
+RETAINED: narrower body captures improve six-sample ordinary message updates by about 7%; preserve LazyTree diagnostics. Fresh ordinary build increased about 3% versus combined parent (one sample each); Converter message updates are approximately flat because AST equality costs more.
+
+All three ordinary hosts compile the same frozen updated-compiler program. H33 compiler implementation differs from the parent snapshot in parseLazyBlock; the workload intentionally remains the parent source snapshot to preserve a matched comparison. Fresh DB per exact executable, no profiling hooks in ordinary binaries. Message mean uses six samples; other update rows are single edit samples with restores preserved; fresh builds are one sample per executable.
+
+| Change | Earlier H15 ordinary (s) | Combined parent ordinary (s) | H33 ordinary (s) |
+|---|---:|---:|---:|
+| Message edit (mean of six) | 2.975 | 2.967 | 2.757 |
+| Source comment | 13.534 | 2.458 | 2.452 |
+| Leading newline | 13.636 | 2.493 | 2.487 |
+| Unused helper | 1.336 | 1.363 | 1.355 |
+| Reachable helper | 4.763 | 5.244 | 5.206 |
+| Reachable class | 44.854 | 8.717 | 7.263 |
+| Reachable class field | 45.121 | 7.325 | 7.552 |
+| Unused Key subclass | 4.608 | 2.731 | 2.772 |
+| Reachable Key subclass | 64.909 | 21.505 | 21.490 |
+| Reachable Key field | 48.197 | 12.247 | 12.226 |
+| Constant initializer | 5.364 | 5.766 | 5.814 |
+| Debug print | 3.034 | 2.984 | 2.774 |
+| Unused Converter method | 11.131 | 6.016 | 5.866 |
+| Converter method message | 4.309 | 3.714 | 3.654 |
+| Fresh build | 462.071 | 486.136 | 500.640 |
+
+Validation:22 incremental regressions on both profile/ordinary executables,665 Runtime/typechecking,128 expansion/visibility,2 skargo tests,Wasm init/update and exports,produced compiler checks/compile/update pass. No executable installed; source changes remain uncommitted.
+
+Exclusive profiled phase table follows; ordinary wall times above are primary. Rows are rounded to milliseconds; totals use unrounded values and are checked against complete wall time. Store coordination includes unclassified callbacks/archive work; inclusive operation timings overlap phases. Parsing denotes SkipParse.parseFile intervals; in the parent, deferred body reparsing is charged to its calling phase (usually typing), so this table is phase ownership rather than a parser-only CPU total.
+
+| Phase | Fresh initialization (s) | Message update (s) |
+|---|---:|---:|
+| Startup, input loading and driver | 1.793 | 0.395 |
+| Parsing | 1.321 | 0.008 |
+| Naming and expansion | 2.895 | 0.007 |
+| Inheritance | 0.118 | 0.000 |
+| Type checking and variance | 64.243 | 0.010 |
+| Outer IR construction and lowering | 13.202 | 0.000 |
+| Specialization | 5.206 | 0.002 |
+| Class relations | 0.333 | 0.000 |
+| Field scalarization | 0.392 | 0.000 |
+| Field layout | 0.754 | 0.000 |
+| Function IR planning | 0.760 | 0.000 |
+| Generic function IR | 0.465 | 0.000 |
+| Per-instantiation function IR | 9.408 | 0.001 |
+| IR environment assembly | 0.263 | 0.151 |
+| Optimizer rounds | 14.073 | 0.082 |
+| Constant lowering | 0.048 | 0.045 |
+| Reachability and escape analysis | 2.795 | 0.002 |
+| Native IR lowering | 5.890 | 0.017 |
+| LLVM graph construction | 1.489 | 0.140 |
+| LLVM graph merging | 0.056 | 0.058 |
+| LLVM symbol assignment | 0.064 | 0.063 |
+| LLVM text emission | 4.908 | 0.227 |
+| SKStore coordination | 346.186 | 0.505 |
+| Context synchronization and collection | 41.608 | 0.370 |
+| Persistent database commit | 0.000 | 0.000 |
+| Native commands | 9.242 | 0.197 |
+| Vtable layout | 0.436 | 0.000 |
+| Per-function native lowering | 1.593 | 0.000 |
+| Per-function LLVM generation | 4.692 | 0.000 |
+| Shared LLVM generation | 0.000 | 0.000 |
+| LLVM materialization and object cache checks | 0.072 | 0.163 |
+| Function collection projection | 0.008 | 0.007 |
+| External clang compilation and linking | 0.572 | 0.300 |
+| Other skargo and process overhead | 4.098 | 0.176 |
+| **Total** | **538.983** | **2.929** |
+
+
+### Final handoff checkpoint, 2026-10-19 05:13 UTC
+
+Actual retained compiler source/tests exactly match optimized H33 wrapper-preserving snapshot. Final ordinary executable checks actual repository compiler sources successfully13.514s.22 incremental regressions pass on both executables;665 Runtime/typechecking,128 expansion/visibility,2skargo,Wasminit/update+both exports,produced compiler probes pass. Git diff whitespace check rerun after trimming report-only trailing blank line. No source edits after built snapshot. No new current-task commits, installation or changes to default user build caches. Test and benchmark scratch caches are separate.
+
+Latest ordinary matched table and complete exclusive phase table are immediately above. Baseline is earlier H15 on the identical frozen updated compiler program; combined parent and H33 are additional hosts on that same program. Six message samples; other updates and cold starts individual samples. Source fixture bytes fully restored and all source hashes checked, including after structural/method variants. Retained H33 narrow benefit: routine2.967->2.757s (~7.1%), method invalidation284->53 checks; unused method insertion still371checks; larger AST equality.203->.469s offsets typing in large class literal. Fresh ordinary486.136->500.640s (+3%, single each), earlierH15462.071s. Both startup tradeoff and slow restore outlier retained in data.
+
+Remaining causes to investigate next: whole SourcePositions.Index captured by body converters when declaration membership/positions change; class-level method typing still coarse; structural equality of retained ASTs; normal SKStore contribution lookups/persistence and synchronization. These are future targets, not additional implemented changes. No hash-only equality, unchecked body references or per-thread work introduced by H33. Source parser retains existing LazyTree range and captures already-validated block, preserving original diagnostics; failed raw-block variant remains a negative control.
+
+Durable machine-readable results: compiler-incremental-profile-20261018.json (historical primary, overnight_experiments, parent final_current_source, and latest H33 data/patches/validation/source hashes). Scratch binaries: /tmp/skip-incremental-profile/h33/skc-normal (uninstrumented), skc-profiled; all raw timings and controls in /tmp/skip-incremental-profile. Final sources remain uncommitted for review. No experiment still running.
+
+Follow-up user question: detail unused-method SKStore coordination3.111s. Existing operation counters are inclusive and phase-at-entry, not complete exclusive decomposition. Plan a CPU sample on the same unchanged H33 ordinary executable/cache and identical same-line private-method insertion in scratch fixture; restore bytes/mtime and compiler state afterward, no production changes. Use perf cpu-clock:u499Hz/DWARF8192; sampling records excluded from performance table. Inspect flat CPU and call chains to identify compiler callbacks hidden inside generic SKStore mapper timing, rather than attributing whole bucket to maintenance.
+
+Follow-up unused-method coordination result:3.110705s exclusive bucket =0.300079s library invocation+2.810627s merged compilation. Inclusive operations entered while bucket active: read registration2,871,744calls.318115s; dependency add/update1584calls.306624s; old contribution lookup528,982calls.264810s; regioncopy806calls.201067s; equality566,897calls.109420s; dependency removal1516calls.069340s; dirty propagation1307calls.008421s. These overlap and do not fully explain3.111; do not invent a residual additive category or call whole bucket pure bookkeeping. EagerDir.mapRow invokes mapper.map inside its timer; unclassified compiler helpers remain charged here. Archive invocation accounts only.300s, so archiving cannot explain most of this bucket.
+
+Ordinary follow-up CPU sample5.931s, restore5.752s (sampling diagnostic only, not new benchmark averages). Flat complete CPU report:memcmp10.48%,String_cmp7.07%,hash4.39%,Obstack_alloc4.31%,get_sk_string3.84%,SortedMap.containsKeyImpl3.57%,sk_get_obstack_idx3.26%,malloc2.76%,SKStore.findAllBy.next2.14%. These percentages cover entire sampled build, not the3.111s bucket. Example partial stacks show ModuleMap member reads -> Context.addRead -> SortedSet/Path/String comparisons, and Context.updateNewDeps -> Deps.set -> SortedMap/String comparisons. Full DWARF expansion too slow; stopped report/script processes after obtaining complete flat data and bounded stack examples, no claim of full stack attribution. Source/cache restored; production unchanged. More exclusive SKStore subphase instrumentation is required for a complete attribution of the remaining bucket. Raw perf.data/flat report/summary under /tmp/skip-incremental-profile/unused-method-coordination*; structured summary in durable JSON.
+
+User follow-up: where do2,871,744 read registrations come from? Static keyed lookup registers collection dirTag through Context.getDir and row path through TEagerDir.getIter; duplicate calls still check sorted set membership. Plan hardware instruction breakpoint sample on unmodified ordinary Context.getDir entry0x408354, every1000 calls, capturing AArch64 LR (direct caller) without DWARF unwind. Kernel permits event (zero-hit true smoke succeeds). Same scratch unused-method edit/restore and exact normal host/cache; no rebuild or shared cache across binaries. Sampling is diagnostic only, no wall-time benchmark claim. Captures callers of out-of-line getDir, not all inlined addRead paths, so report sampling coverage honestly.
+
+### Follow-up: origins of 2,871,744 read registrations
+
+Hardware breakpoint samples every 1000 helper entries identify approximately 1.1 million class-header lookups and 948 thousand class-relation lookups across the entire unused-method update. These whole-build samples must not be presented as a precise partition of the phase-22 count (2,871,744); whole-build registrations total 5,676,919. Typical keyed lookups register both directory and key paths. Context.addRead deduplicates retained edges, not repeated requests.
+
+928/948 sampled SPRelations callers originate in createVariance (specialize.sk:3032): each instantiation scans others of the same generic class, checking subtype and supertype compatibility across type parameters. Repeated relationship-set reads are not memoized by SPRelations.data, which holds additions. Header lookups arise mainly in recursive type promotion/intersection expansion (skipTypes.sk); sampled origins include make_promoted_elt, promote_inter_elt, promote and join_tpromoted.
+
+Diagnostic artifacts: /tmp/skip-incremental-profile/read-callers and read-origins (callers.json, events.txt, sample.py); samples cover out-of-line entry points and may omit inlined sites. Both experiments restored fixture bytes/mtime and ran restore updates in finally. No production compiler code changed. Exported full caller samples under followup_read_registration_origins in durable JSON.
+
+### Generic SKStore checkpoint pipeline driver
+
+User requested moving the reusable phase driver into SKStore. Plan: retain the compiler's constant phase array and exact boundaries, move checkpoint advancement/persistence and CContinue/CStop policy into SKStore.runPipeline, and keep only invocation setup and compiler progress cleanup in compile.sk. Main delegates to runCompilerPipeline. Generic steps return true to advance or false to repeat after synchronization; beforeStep and onComplete hooks keep application configuration outside SKStore. Caller-owned progress keys allow distinct pipelines; the driver removes the key on completion. Errors use a caller-supplied handler and then abort rather than persisting a partially completed step. Empty pipelines complete without invoking beforeStep. No implicit update drain is added.
+
+Implementation: prelude/src/skstore/Context.sk adds runPipeline on top of runWithGc; compiler/src/compile.sk adds runCompilerPipeline; main.sk removes its hand-written checkpoint loop. Existing compiler callbacks, round eligibility, and sequential/batch paths preserved. New TestPipeline.sk covers repeat/resume across synchronization and restart after completion, empty pipelines, and per-arrow synchronization with descendants left pending until the next checkpoint.
+
+Validation so far: rebuilt std/cli/arparser/sktest into isolated /tmp/skip-generic-pipeline/deps, compiler source type-check passes, all 3 new tests pass. Full SKStore suite:54 pass,1 fail; testChangesAfter has exactly the previously documented extra keys36/248 at iteration3 (baseline reproduced before this task). Full compiler build and incremental regressions pending. No installations, commits or user cache changes.
+
+Generic pipeline validation COMPLETE: compiler native build128.721s (development O0/no-inline/no-IPA build for correctness), all22 incremental regressions pass307.543s, all3 direct pipeline tests pass, compiler type-check passes. Full SKStore remains54/55 with known testChangesAfter baseline failure only. Source comments and newly added test formatted without reformatting unrelated existing code; compiler diff versus H33 snapshot contains only driver extraction and its updated comment. Results exported under followup_generic_pipeline_driver; raw logs/scripts/executable in /tmp/skip-generic-pipeline. No performance comparison claimed. No commit/install/user cache changes.

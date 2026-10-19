@@ -20,6 +20,7 @@ mutable class .EliminateDeadCode{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
 
@@ -38,6 +39,7 @@ mutable class .EliminateDeadCode{
       optinfo,
       env,
       config,
+      classReader,
       isLive => Array::mfill(optinfo.idToInstr.size(), false),
       origBlockParams,
       pos => f.pos,

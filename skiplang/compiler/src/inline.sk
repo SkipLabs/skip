@@ -651,7 +651,9 @@ fun isLegalToInline(f: Function): Bool {
 // take into account speed, not just space.
 //
 // TODO: Return a Float?
-fun estimateSize(instr: Stmt, env: GlobalEnv): Int {
+fun estimateSize(instr: Stmt, env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Int {
   instr match {
   | Alloca _ -> 1
   | AsyncReturn _ -> 0
@@ -690,7 +692,7 @@ fun estimateSize(instr: Stmt, env: GlobalEnv): Int {
 
     // Creating a value class is considered "zero cost" since it
     // does not allocate any memory.
-    if (typ.exampleSClass(env).kind.isValueClass()) {
+    if (ClassInputs.exampleSClass(typ, env, classReader).kind.isValueClass()) {
       0
     } else {
       defaultCost
@@ -740,8 +742,10 @@ private fun containsLoop(f: Function): Bool {
   }
 }
 
-private fun takesLambdaParameter(f: Function, env: GlobalEnv): Bool {
-  f.params.any(p -> !p.typ.forEachTclass(tc -> !tc.sclass(env).isLambda))
+private fun takesLambdaParameter(f: Function, env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Bool {
+  f.params.any(p -> !p.typ.forEachTclass(tc -> !ClassInputs.getSClass(env, tc.sclassID, classReader).isLambda))
 }
 
 // Roughly estimate how many machine instructions this function would
@@ -755,7 +759,9 @@ private fun takesLambdaParameter(f: Function, env: GlobalEnv): Bool {
 // folding, it is important that for a zero-argument function this can
 // only return zero cost if it really is completely free (notably, no
 // memory allocation).
-fun computeInlineComplexity(f: Function, env: GlobalEnv): Int {
+fun computeInlineComplexity(f: Function, env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Int {
   if (!isLegalToInline(f)) {
     Int::max
   } else {
@@ -769,13 +775,13 @@ fun computeInlineComplexity(f: Function, env: GlobalEnv): Int {
 
     _ = f.blocks.all(b -> {
       b.instrs.all(instr -> {
-        !cost = cost + estimateSize(instr, env);
+        !cost = cost + estimateSize(instr, env, classReader);
         cost <= limit
       })
     });
 
     if (cost <= limit) {
-      if (!takesLambdaParameter(f, env) && containsLoop(f)) {
+      if (!takesLambdaParameter(f, env, classReader) && containsLoop(f)) {
         // Heuristically we don't like to inline functions with loops,
         // unless they take a lambda parameter.
         Int::max

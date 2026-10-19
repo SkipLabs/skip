@@ -46,6 +46,11 @@ fun refreshEmissionPreamble(
   )
 }
 
+private class EmitBatchKey(index: Int) extends SKStore.Key
+private class EmitBatchFile(
+  entries: Array<(SKStore.Key, SKStore.File)>,
+) extends SKStore.File
+
 private class EmitBodyKey(symbol: String) extends SKStore.Key
 private class EmitDeclKey(symbol: String) extends SKStore.Key
 private class EmitHeaderKey() extends SKStore.Key
@@ -243,11 +248,11 @@ fun createEmissionCache(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
 ): EmissionCache {
-  files = input.map(
+  batches = input.map(
     x ~> x,
     x ~> x,
     context,
-    SKStore.DirName::create("/llvm-emit/inputs/"),
+    SKStore.DirName::create("/llvm-emit/batches/"),
     (_context, writer, _, values) ~> {
       entry = values.first;
       if (!incrementalEmission(entry.config)) return void;
@@ -258,7 +263,12 @@ fun createEmissionCache(
       | Some(text) -> text
       | None() -> return void
       };
-      writer.set(
+      grouped = mutable Map<Int, mutable Vector<(SKStore.Key, SKStore.File)>>[];
+      emit = (bucket: Int, key: SKStore.Key, file: SKStore.File) -> {
+        grouped.getOrAdd(bucket, () -> mutable Vector[]).push((key, file))
+      };
+      emit(
+        256,
         EmitHeaderKey(),
         EmitHeaderFile(entry.config.cwd, "skip-module", full, declarations),
       );
@@ -274,13 +284,22 @@ fun createEmissionCache(
             declarationText => "",
             typeRef => None(),
           };
-          writer.set(
+          emit(
+            def.symbol.hash().and(255),
             EmitBodyKey(def.symbol),
             EmitBodyFile(normal, refs.map(ref -> defs[ref.i1].symbol)),
           );
           group = if (def.isFunction()) {
-            EmitModuleKey(0, def.id.id.and(63))
+            // A source-line shift changes debug line tables for many functions
+            // in the same file. Keep those functions in four stable subgroups,
+            // so one file does not force recompiling all 64 function modules.
+            // IDs still spread large source files over four modules.
+            EmitModuleKey(
+              0,
+              def.debug[0].i1.file.hash().and(15) * 4 + def.id.id.and(3),
+            )
           } else if (
+            def.symbol.startsWith(".classVTable.") ||
             def.symbol == ".allVTables" ||
             def.symbol == "skip.globals" ||
             def.symbol == "SKIP_initializeSkip"
@@ -317,10 +336,27 @@ fun createEmissionCache(
               .collect(Array),
           )
         };
-        writer.set(EmitDeclKey(def.symbol), decl)
+        emit(def.symbol.hash().and(255), EmitDeclKey(def.symbol), decl)
       };
       for ((key, names) in groups.items()) {
-        writer.set(key, EmitRootsFile(names.toArray().sorted()))
+        emit(257, key, EmitRootsFile(names.toArray().sorted()))
+      };
+      // SKStore compares these arrays element by element. Stable buckets let
+      // it retain equal batches without revisiting every body/declaration row
+      // on a one-function edit; only changed buckets publish their keyed rows.
+      for ((bucket, entries) in grouped.items()) {
+        writer.set(EmitBatchKey(bucket), EmitBatchFile(entries.toArray()))
+      }
+    },
+  );
+  files = batches.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/inputs/"),
+    (_context, writer, _, values) ~> {
+      for ((key, file) in EmitBatchFile::type(values.first).entries) {
+        writer.set(key, file)
       }
     },
   );

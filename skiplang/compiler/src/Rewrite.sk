@@ -26,7 +26,7 @@ mutable base class .RewriteBase{
   mutable positionRewriter: ?Pos ~> Pos = None(),
   mutable pos: Pos,
 } {
-  readonly fun getScalarType(t: Type): ScalarType;
+  mutable fun getScalarType(t: Type): ScalarType;
 
   mutable fun iid(): InstrID {
     this.optinfo.iid()
@@ -101,10 +101,13 @@ mutable base class .RewriteBase{
   }
 
   mutable fun constantZero(typ: Type): Constant {
+    // Pattern guards are pure; record any tracked class read before matching.
+    isInteger = typ != tBool && typ != tChar &&
+      this.getScalarType(typ).kind == IntegerScalarKind();
     typ match {
     | t if (t == tBool) -> this.constantBool(false)
     | t if (t == tChar) -> this.constantChar('\x00')
-    | t if (this.getScalarType(t).kind == IntegerScalarKind()) ->
+    | t if (isInteger) ->
       this.constantTypedInt(t, 0)
     | t if (t == tFloat) -> this.constantFloat(0.0)
     | _ -> this.getConstant(ConstantPointer{id => this.iid(), typ, value => 0})
@@ -1392,6 +1395,7 @@ mutable base class .RewriteBase{
 // Base class for general-purpose Function rewriting passes.
 mutable base class .Rewrite{
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
   config: Config.Config,
   unfinishedDependencies: mutable UnorderedSet<
     SFunctionID,
@@ -1468,8 +1472,8 @@ mutable base class .Rewrite{
     for (b in inputBlocks) this.optimizeBlock(this.getBlock(b))
   }
 
-  readonly fun getScalarType(t: Type): ScalarType {
-    t.exampleSClass(this.env).getScalarType()
+  mutable fun getScalarType(t: Type): ScalarType {
+    ClassInputs.getScalarType(t, this.env, this.classReader)
   }
 
   // The passDescription is either the name of a pass being performed or None()
@@ -1547,7 +1551,7 @@ mutable base class .Rewrite{
 
       // Verify that the newly generated function is still valid.
       if (this.config.optConfig.verify && verifyAtEnd) {
-        Verify.verifyFunction(f2, this.env, this.config, passDescription);
+        Verify.verifyFunction(f2, this.env, this.config, passDescription, this.classReader);
       };
 
       (f2, PassChanged())

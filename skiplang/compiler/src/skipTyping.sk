@@ -270,6 +270,7 @@ fun program(
       // if(values.size() > 1) TODO multiple defs
       values.first.value match {
       | GlobalEnv.EClass(x) ->
+        if (context.debugMode) print_string(`TYPECHECK_CLASS: ${x.name.i1}`);
         SkipError.keepErrors(3, context, () -> {
           writer.set(
             SKStore.SID(x.name.i1),
@@ -277,6 +278,7 @@ fun program(
           )
         })
       | GlobalEnv.EConst(x) ->
+        if (context.debugMode) print_string(`TYPECHECK_CONST: ${x.name.i1}`);
         SkipError.keepErrors(3, context, () -> {
           writer.set(
             SKStore.SID(x.name.i1),
@@ -284,6 +286,7 @@ fun program(
           )
         })
       | GlobalEnv.EFun(x) ->
+        if (context.debugMode) print_string(`TYPECHECK_FUNCTION: ${x.name.i1}`);
         SkipError.keepErrors(3, context, () -> {
           writer.set(
             SKStore.SID(x.name.i1),
@@ -465,25 +468,7 @@ fun method_is_copydown(
     met.deferred_.isNone() &&
     // ...and not macro
     met.macro_.isNone() &&
-    {
-      source = SkipNaming.getClass(context, met.source);
-      // ...and source is a class, not a trait
-      !(source.kind is Ast.KTrait()) &&
-        // ...with no deferred fields of any kind
-        // this is conservative: most methods that interact with deferred things
-        // will themselves be deferred. But this ensure we're safe w.r.t. legacy
-        !source.fields.any((_, f) -> f.deferred_.isSome()) &&
-        // ...and no abstract type constants
-        // since overridable type constants change the typing environment
-        // of a subclass, we copy methods down from classes that define them.
-        // (not all such methods are currently required to be deferred)
-        !source.types.any((_, tyd) -> tyd.body is N.TydAbstract _) &&
-        // ...and no `this` type references
-        // our current approach to modeling the `this` type relies on copying
-        // down methods, so we copy methods down in any class whose code mentions
-        // the `this` type explicitly.
-        !source.is_self_parameterized
-    }
+    SkipNaming.copydownSourceAllowsOmission(context, met.source)
 }
 
 fun class_def(
@@ -780,7 +765,7 @@ fun make_extend__(
   conditions: Array<Array<N.Whenclause>>,
 ): UMap<TAst.Parent> {
   fr = parName.i0;
-  tparams = SkipNaming.getClass(context, parName).tparams;
+  tparams = SkipNaming.getClassTypeInfo(context, parName).tparams;
   !acc = TUtils.bind_tparam_constraints(context, env, acc, tparams);
   sk_this = env.this_class.fromSome().i1;
   ty = (fr, N.Tapply(N.Mchilled(), parName, tyl));
@@ -1198,6 +1183,7 @@ fun method_def_(
   algebraic = met.algebraic;
   deferred_ = met.deferred_;
   this_name = env.this_class.fromSome();
+  if (context.debugMode) print_string(`TYPECHECK_METHOD: ${this_name.i1}::${name.i1}`);
   (_, this_str) = this_name;
   !env = env with {
     kind => Some(kind),
@@ -2553,10 +2539,10 @@ fun expr_(
         (!acc, ty) = check_local_mutable(env, acc, pos1, level, origTy);
         e1 = (pos1, TAst.Fun(n, targs));
         (acc, (ty, e1))
-      } else if (SkipNaming.maybeGetConst(context, n.i1).isSome()) {
-        ty = SkipNaming.getConst(context, n).type;
-        (acc, (ty, (pos1, TAst.Const(n))))
       } else {
+        SkipNaming.maybeGetConstType(context, n.i1) match {
+        | Some(ty) -> (acc, (ty, (pos1, TAst.Const(n))))
+        | None() ->
         /* TODO: reinsert this
         didYouMeanTypos = SkipDidYouMean.didYouMeanTypos(
         sk_smap_key_list(env.locals)
@@ -2567,6 +2553,7 @@ fun expr_(
         */
 
         SkipError.error(n.i0, "Unbound variable: " + n.i1)
+        }
       }
     }
   | N.If(e1, e2, e3) ->
@@ -4849,7 +4836,7 @@ mutable class ExprDot(
     name: N.Name,
     obj_targs: Array<N.Type_>,
   ): DotResult {
-    cd = SkipNaming.getClass(context, name);
+    cd = SkipNaming.getClassMembers(context, name);
     if (!cd.fields.containsKey(this.field_name)) return DotNone();
 
     (_, field_str) = this.field_name;
@@ -5052,7 +5039,7 @@ fun build_fdt_subst(
   next_id: () -> Int,
   acc: TUtils.Acc,
   pos: FileRange,
-  cd: N.Class_def,
+  cd: SkipNaming.ClassMembersInfo,
   fdt: N.Field_type,
   obj_targs: Array<N.Type_>,
 ): (TUtils.Acc, SMap<N.Type_>, SMap<N.Type_>, Array<N.Type_>) {
@@ -5179,7 +5166,7 @@ fun check_protected(
   env.this_class match {
   | Some(this_name) ->
     if ({
-      this_class = SkipNaming.getClass(context, this_name);
+      this_class = SkipNaming.getClassTypeInfo(context, this_name);
       this_name1 = this_class.name;
       class_str == this_name1.i1 ||
         this_class.extends_.any((n, _, _) -> class_str == n.i1)
@@ -5263,7 +5250,7 @@ fun check_field_kind(
 }
 
 fun specialize_tparam(
-  cd: N.Class_def,
+  cd: SkipNaming.ClassMembersInfo,
   tparam: ?(FileRange, N.Type__),
   ty: N.Type_,
 ): N.Type_ {
@@ -5274,7 +5261,7 @@ fun specialize_tparam(
 }
 
 fun specialize_trait(
-  cd: N.Class_def,
+  cd: SkipNaming.ClassMembersInfo,
   sk_this: (FileRange, N.Type__),
   ty: N.Type_,
 ): N.Type_ {
@@ -5285,7 +5272,7 @@ fun specialize_trait(
 }
 
 fun specialize_this_type(
-  parent: N.Class_def,
+  parent: SkipNaming.ClassMembersInfo,
   child: N.Class_def,
   new_this_ty: (FileRange, N.Type__),
   ty: N.Type_,
@@ -5480,7 +5467,7 @@ fun add_binding_info(
 fun check_missing_fields(
   _env: TUtils.Env,
   child_class: N.Class_def,
-  parent_class: N.Class_def,
+  parent_class: SkipNaming.ClassMembersInfo,
 ): void {
   child_types = child_class.types.reduce(sadd, SSet[]);
   parent_types = parent_class.types.reduce(sadd, SSet[]);
@@ -5528,7 +5515,7 @@ fun check_implement(
 
   child_name = child_class.name;
   (pos, _) = child_name;
-  parent_class = SkipNaming.getClass(context, parent_name);
+  parent_class = SkipNaming.getClassMembers(context, parent_name);
   check_missing_fields(env, child_class, parent_class);
   parent_tparam_idents = parent_class.tparams.map(N.tparam_ident);
   parent_subst = N.make_subst(pos, parent_tparam_idents, childs_parent_targs);
@@ -5602,7 +5589,7 @@ fun check_fields(
   child_class: N.Class_def,
   child_fields: UMap<N.Field_type>,
   parent_subst: SMap<N.Type_>,
-  parent_class: N.Class_def,
+  parent_class: SkipNaming.ClassMembersInfo,
   parent_fields: UMap<N.Field_type>,
 ): TUtils.Acc {
   child_fields.reduce(
@@ -5906,7 +5893,7 @@ fun make_inst(
   child_class: N.Class_def,
 ): ?(N.Name, Array<N.Type_>) {
   inst_name = child_field.source;
-  source_cd = SkipNaming.getClass(context, inst_name);
+  source_cd = SkipNaming.getClassTypeInfo(context, inst_name);
   source_cd.kind match {
   | Ast.KTrait() -> None()
   | Ast.KBase()
@@ -5925,7 +5912,7 @@ fun make_inst_from_class(
   context: mutable SKStore.Context,
   inst_name: N.Name,
 ): (N.Name, Array<N.Type_>) {
-  cd = SkipNaming.getClass(context, inst_name);
+  cd = SkipNaming.getClassTypeInfo(context, inst_name);
   targs = cd.tparams.map(tparam -> {
     (_, i, x, tyl) = tparam;
     if (!tyl.isEmpty()) invariant_violation("TODO make_inst_from_class");

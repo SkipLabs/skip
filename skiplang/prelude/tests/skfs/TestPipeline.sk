@@ -1,0 +1,139 @@
+module SKStoreTest;
+
+const repeatedPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
+  context ~> {
+    count = context.getGlobal("PIPELINE_REPEAT_COUNT") match {
+    | None() -> 0
+    | Some(file) -> SKStore.IntFile::type(file).value
+    };
+    // The first invocation has no checkpoint. Repeated invocations must resume
+    // this same step after the driver has synchronized the context.
+    invariant(
+      context.getGlobal("PIPELINE_REPEAT_STEP").isSome() == (count > 0),
+    );
+    context.setGlobal("PIPELINE_REPEAT_COUNT", SKStore.IntFile(count + 1));
+    count == 2
+  },
+  context ~> {
+    invariant(
+      SKStore.IntFile::type(
+        context.getGlobal("PIPELINE_REPEAT_COUNT").fromSome(),
+      ).value == 3,
+    );
+    invariant(
+      SKStore.IntFile::type(
+        context.getGlobal("PIPELINE_REPEAT_STEP").fromSome(),
+      ).value == 1,
+    );
+    true
+  },
+];
+
+@test
+fun testPipelineRepeatAndRestart(): void {
+  // Completion removes the checkpoint, so the same pipeline can run again.
+  for (_ in Range(0, 2)) {
+    SKStore.runPipeline(
+      SKStore.Context::create{},
+      "PIPELINE_REPEAT_STEP",
+      repeatedPipeline,
+      (_, _) ~> void,
+      context ~> {
+        invariant(context.getGlobal("PIPELINE_REPEAT_STEP").isNone());
+        context.removeGlobal("PIPELINE_REPEAT_COUNT")
+      },
+      exn ~> {
+        print_error(exn.getMessage());
+        skipExit(1)
+      },
+    )
+  }
+}
+
+@test
+fun testPipelineEmpty(): void {
+  SKStore.runPipeline(
+    SKStore.Context::create{},
+    "PIPELINE_EMPTY_STEP",
+    Array[],
+    (_, _) ~> invariant_violation("Empty pipeline must not invoke beforeStep"),
+    context ~> invariant(context.getGlobal("PIPELINE_EMPTY_STEP").isNone()),
+    exn ~> {
+      print_error(exn.getMessage());
+      skipExit(1)
+    },
+  )
+}
+
+const directoryPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
+  context ~> {
+    source = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      SKStore.DirName::create("/pipeline/source/"),
+      Array[(SKStore.IID(0), SKStore.IntFile(1))],
+    );
+    middle = source.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/pipeline/middle/"),
+      (_, writer, key, values) ~> writer.set(key, values.first),
+    );
+    _ = middle.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/pipeline/output/"),
+      (_, writer, key, values) ~> writer.set(key, values.first),
+    );
+    context.update();
+    source.writeArray(context, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+    true
+  },
+  context ~> {
+    count = context.getGlobal("PIPELINE_DIRECTORY_COUNT") match {
+    | None() -> 0
+    | Some(file) -> SKStore.IntFile::type(file).value
+    };
+    middle = SKStore.EHandle(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      SKStore.DirName::create("/pipeline/middle/"),
+    );
+    output = SKStore.EHandle(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      SKStore.DirName::create("/pipeline/output/"),
+    );
+    if (count == 1) {
+      // The previous arrow was synchronized without running its descendant.
+      invariant(middle.getArray(context, SKStore.IID(0))[0].value == 2);
+      invariant(output.getArray(context, SKStore.IID(0))[0].value == 1)
+    };
+    done = context.updateUntilBoundary(_ ~> false, _ ~> true).isNone();
+    context.setGlobal("PIPELINE_DIRECTORY_COUNT", SKStore.IntFile(count + 1));
+    if (done) {
+      invariant(count == 2);
+      invariant(output.getArray(context, SKStore.IID(0))[0].value == 2)
+    };
+    done
+  },
+];
+
+@test
+fun testPipelineDirectoryBoundaries(): void {
+  SKStore.runPipeline(
+    SKStore.Context::create{},
+    "PIPELINE_DIRECTORY_STEP",
+    directoryPipeline,
+    (_, _) ~> void,
+    context ~> context.removeGlobal("PIPELINE_DIRECTORY_COUNT"),
+    exn ~> {
+      print_error(exn.getMessage());
+      skipExit(1)
+    },
+  )
+}
+
+module end;

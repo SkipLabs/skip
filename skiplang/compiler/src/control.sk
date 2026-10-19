@@ -124,6 +124,7 @@ fun findTypeSwitchSuccessor(
   sc: SClass,
   cases: Array<GClassName>,
   env: readonly ClassLookupEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Int {
   invariant(
     sc.kind.isFinal(),
@@ -135,7 +136,7 @@ fun findTypeSwitchSuccessor(
     cases.any(gclass -> {
       !case = case + 1;
       sc.supertypes.any(super -> {
-        gclass == env.getSClass(super).gclassName
+        gclass == ClassInputs.getSClass(env, super, classReader).gclassName
       })
     })
   ) {
@@ -150,7 +151,7 @@ fun findTypeSwitchSuccessor(
 fun trackedFindTypeSwitchSuccessor(
   sc: SClass,
   cases: Array<GClassName>,
-  env: mutable ClassLookupEnv,
+  env: mutable TrackedClassLookupEnv,
 ): Int {
   invariant(
     sc.kind.isFinal(),
@@ -186,12 +187,14 @@ mutable class .Control{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
     d = mutable static{
       optinfo,
       env,
       config,
+      classReader,
       blocksEmitted => Array::mfill(optinfo.idToBlock.size(), false),
       pos => f.pos,
     };
@@ -614,9 +617,9 @@ mutable class .Control{
     numLive = 0;
 
     valueType = this.getInstr(peep.value).typ;
-    _ = valueType.forEachConcreteSubtype(this.env, sc -> {
+    _ = ClassInputs.forEachConcreteSubtype(valueType, this.env, sc -> {
       if (genericsSeen.maybeInsert(sc.gclassName)) {
-        succIndex = findTypeSwitchSuccessor(sc, peep.cases, this.env);
+        succIndex = findTypeSwitchSuccessor(sc, peep.cases, this.env, this.classReader);
 
         if (!live[succIndex]) {
           live.set(succIndex, true);
@@ -626,7 +629,7 @@ mutable class .Control{
 
       // Keep going until everything is live (if ever).
       numLive < live.size()
-    });
+    }, this.classReader);
 
     if (numLive == live.size()) {
       // Every case is live, nothing to be done.

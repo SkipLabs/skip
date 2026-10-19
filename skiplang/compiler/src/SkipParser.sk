@@ -2628,23 +2628,20 @@ mutable class SkipParser{
     };
   }
 
-  // Same as block, but done lazily when the option is turned on
+  // Retain the validated block while preserving the body wrapper's range.
   // block:
   //    {  expression-sequence  }
   mutable fun parseLazyBlock(): ParseTree {
+    start = this.mark();
+    range = this.createRange(start);
+    tree = this.parseBlock();
     if (this.lazy) {
-      start = this.mark();
-      state = this.position.position.saveState();
-      range = this.createRange(start);
-      builder = () ~> {
-        lexingPosition = Lexer.LexingPosition::createAt(state);
-        parser = static::createFromPosition(lexingPosition);
-        parser.parseBlock()
-      };
-      _ = this.parseBlock();
-      ParseTree.LazyTree{range, builder};
+      // Saved lexer state contains the whole source file, so capturing it
+      // makes unrelated bodies unequal after one edit. This closure captures
+      // only the already-validated block and preserves existing body positions.
+      ParseTree.LazyTree{range, builder => () ~> tree}
     } else {
-      this.parseBlock()
+      tree
     }
   }
 

@@ -160,6 +160,7 @@ private fun identifyGetConsts(
   f: Function,
   sfuns: mutable FunctionIDToFunction,
   initConstFuns: mutable UnorderedMap<ConstID, SFunctionID>,
+  stableIDs: UnorderedMap<String, SFunctionID>,
 ): Bool {
   found = false;
 
@@ -168,7 +169,12 @@ private fun identifyGetConsts(
       instr match {
       | GetConst{name} ->
         !found = true;
-        _ = initConstFuns.getOrAdd(name, sfuns.allocID)
+        _ = initConstFuns.getOrAdd(name, () ->
+          stableIDs.maybeGet(name.id + kInitializeConstSuffix) match {
+          | Some(id) -> id
+          | None() -> sfuns.allocID()
+          }
+        )
       | _ -> void
       }
     }
@@ -327,12 +333,31 @@ private fun createInitializeConstFun(
 }
 
 // Lower all GetConst instrs to read global variables.
-fun lowerAllConsts(env: GlobalEnv, config: Config.Config): GlobalEnv {
+fun generatedFunctionNames(env: GlobalEnv): Array<String> {
+  names = mutable UnorderedSet[".initializeAllConsts"];
+  for (f in env.sfuns) {
+    for (b in f.blocks) {
+      for (instr in b.instrs) {
+        instr match {
+        | GetConst{name} -> names.insert(name.id + kInitializeConstSuffix)
+        | _ -> void
+        }
+      }
+    }
+  };
+  names.toArray().sorted()
+}
+
+fun lowerAllConsts(
+  env: GlobalEnv,
+  config: Config.Config,
+  stableIDs: UnorderedMap<String, SFunctionID> = UnorderedMap[],
+): GlobalEnv {
   initConstFuns = mutable UnorderedMap[];
 
   newFuns = env.sfuns.clone();
   for (f in env.sfuns) {
-    if (identifyGetConsts(f, newFuns, initConstFuns)) {
+    if (identifyGetConsts(f, newFuns, initConstFuns, stableIDs)) {
       (f2, passResult) = LowerConstPass::run(f, env, config, initConstFuns);
       passResult match {
       | PassUnchanged _ -> f2.pos.die("GetConst not removed")
@@ -364,7 +389,10 @@ fun lowerAllConsts(env: GlobalEnv, config: Config.Config): GlobalEnv {
   initAnnotations = SSet[].add("@no_inline").add("@debug");
 
   initAllName = ".initializeAllConsts";
-  fid = newFuns.allocID();
+  fid = stableIDs.maybeGet(initAllName) match {
+  | Some(id) -> id
+  | None() -> newFuns.allocID()
+  };
   initAllPos = FileRange.builtin;
   initAllFunInfo = FunInfo{
     name => initAllName,

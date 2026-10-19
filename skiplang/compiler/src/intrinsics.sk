@@ -17,11 +17,13 @@ mutable class .IntrinsicsInliner{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
       config,
+      classReader,
       pos => f.pos,
     };
     d.go("intrinsics", true)
@@ -281,7 +283,7 @@ mutable class .IntrinsicsInliner{
     | "Unsafe.array_set" | "Array::unsafe_set" ->
       vec = this.getInstr(call.args[0]);
       index = call.args[1];
-      sc = vec.typ.exampleSClass(this.env);
+      sc = ClassInputs.exampleSClass(vec.typ, this.env, this.classReader);
       slotInfo = sc.getArraySlotInfo(pos);
       isScalar = slotInfo.types.size() == 1;
 

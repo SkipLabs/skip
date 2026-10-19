@@ -231,6 +231,7 @@ class SpecializerProgress(
 ) extends SKStore.File
 
 const pipelinePhaseKey: String = "COMPILER_PIPELINE_PHASE";
+const invocationConfigKey: String = "COMPILER_INVOCATION_CONFIG";
 const specializationProgressKey: String = "COMPILER_SPECIALIZATION_PROGRESS";
 
 // Frontend errors for the current unit (empty/absent on success). The
@@ -563,6 +564,7 @@ fun getOrInitializeBackend(
     SKStore.DirName::create("/converter/"),
     outerIst,
   );
+  functionIdentities = O.createFunctionIdentities(context);
 
   _ = tickDir.map(
     SKStore.UnitID::keyType,
@@ -980,6 +982,7 @@ fun getOrInitializeBackend(
           completed.value,
           config.specializationConfig(),
           converter,
+          functionIdentities,
         )
       }
     },
@@ -992,6 +995,19 @@ fun getOrInitializeBackend(
     (context, writer, key, values) ~>
       O.generateGenericFunctionIR(context, writer, key, values, converter)
     ,
+  );
+  functionIRShared = functionIRPlan.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-shared/"),
+    (_context, writer, _, values) ~> {
+      values.first match {
+      | plan @ O.FunctionIRStateFile _ ->
+        O.publishFunctionIRClassState(writer, plan)
+      | _ -> void
+      }
+    },
   );
   functionIR = functionIRPlan.map(
     x ~> x,
@@ -1006,6 +1022,7 @@ fun getOrInitializeBackend(
         values,
         functionIRPlan,
         genericFunctionIR,
+        functionIRShared,
       )
     ,
   );
@@ -1022,20 +1039,21 @@ fun getOrInitializeBackend(
       prevPhase = backendPhase1.getArray(context, SKStore.IID(0))[0];
       partialConfig = prevPhase.conf;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
-      specializer = if (config.incrementalSpecialization) {
-        specializerDataDir = specializerDir.getArray(context, SKStore.IID(0))[
-          0,
-        ].value;
-        sp = O.Specializer::make(
-          specializerDataDir,
-          context,
-          partialConfig.specializationConfig(),
-          converter,
-        );
-        sp.specializePendingFuns();
-        sp.toFixed(context);
-        sp
+      if (config.incrementalSpecialization && config.stopAfterSpecialization) {
+        return void
+      };
+      prepared = if (config.incrementalSpecialization) {
+        Some(
+          O.FunctionIRStateFile::type(
+            functionIRPlan.getArray(context, SKStore.IID(0))[0],
+          ),
+        )
       } else {
+        None()
+      };
+      specializer = prepared match {
+      | Some(plan) -> plan.state.mclone(context)
+      | None() ->
         // Discovery is local to this invocation. Reclaim its temporary work,
         // returning the completed state for native code generation.
         state = SKStore.withRegion(context, (_, context) ~> {
@@ -1068,6 +1086,7 @@ fun getOrInitializeBackend(
         roots,
         specializer,
         if (config.incrementalSpecialization) Some(functionIR) else None(),
+        prepared,
       );
       writer.set(key, Optimize.InputFile(env, config))
     },
@@ -1093,16 +1112,25 @@ fun getOrInitializeBackend(
   );
   // Keep final reachability, escape analysis and lowering downstream of the
   // fixed-point coordinator. Equal intermediate results do not repeat them.
+  reachability = Reachability.createCache(context, backendOptimizeDir);
   backendReachableDir = backendOptimizeDir.map(
     SKStore.IID::keyType,
     Optimize.InputFile::type,
     context,
     SKStore.DirName::create("/backendReachable/"),
-    (_context, writer, key, values) ~> {
+    (context, writer, key, values) ~> {
       input = values.first;
-      writer.set(key, Optimize.InputFile(
-        finishOptimizedFunctions(input.env, input.config), input.config,
-      ))
+      writer.set(
+        key,
+        Optimize.InputFile(
+          if (input.config.incrementalSpecialization) {
+            reachability.finish(context, input.env)
+          } else {
+            finishOptimizedFunctions(input.env, input.config)
+          },
+          input.config,
+        ),
+      )
     },
   );
   backendLowerDir = Lower.incrementalLower(context, backendReachableDir);
@@ -1159,22 +1187,27 @@ fun getOrInitializeBackend(
       config.emit match {
       | "llvm-ir" -> compile_llvm_ir(defs, config, positions)
       | "link" | "cdylib" ->
-        // TODO: Remove exports stuff once --emit=cdylib is supported.
-        wasm_exports = outerIst
-          .getFuns(context, defsProj)
-          .filter(f ->
-            annotationsContainParam(
-              f.annotations,
-              "@wasm_export",
-              f.getPos(),
-            ).isSome() ||
+        // Native linking does not use the wasm export list. Reading all
+        // declarations here would dirty emission for an unused helper edit.
+        wasm_exports = if (config.isWasm()) {
+          outerIst
+            .getFuns(context, defsProj)
+            .filter(f ->
               annotationsContainParam(
                 f.annotations,
-                "@export",
+                "@wasm_export",
                 f.getPos(),
-              ).isSome()
-          )
-          .map(exportName);
+              ).isSome() ||
+                annotationsContainParam(
+                  f.annotations,
+                  "@export",
+                  f.getPos(),
+                ).isSome()
+            )
+            .map(exportName)
+        } else {
+          Array[]
+        };
         if (AsmOutput.incrementalEmission(config)) {
           _ = AsmOutput.emissionPreambleDir.getArray(context, SKStore.IID(0));
           modules = emission.contents(context);
@@ -1235,7 +1268,11 @@ fun compile(
   };
 
   (backendDir, tickDir) = getOrInitializeBackend(context);
-  backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)]);
+  backendDir.writeArray(
+    context,
+    SKStore.IID(0),
+    Array[ConfigFile(config.backendConfig())],
+  );
   AsmOutput.refreshEmissionPreamble(context, config);
   tickDir.writeArray(
     context,
@@ -1289,23 +1326,28 @@ fun compile(
   throwIfFrontendErrors(context)
 }
 
-// Each callback leaves all continuation state in the context. runWithGc
-// interns that context and reclaims the callback's temporary heap before reentry.
+// Each callback leaves all continuation state in the context. runPipeline
+// synchronizes it and reclaims the callback's temporary heap before reentry.
 // Definitions are fixed for the whole compiler. Invocation options are backend
 // input data; reactive work captures handles, never invocation snapshots.
 const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
   context ~> {
     context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
     context.setGlobal(Optimize.progressKey, SKStore.IntFile(0));
-    (backendDir, _) = getOrInitializeBackend(context);
-    config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+    config = ConfigFile::type(
+      context.getGlobal(invocationConfigKey).fromSome(),
+    ).value;
     compile(config, context, config.input_files, true);
+    context.removeGlobal(invocationConfigKey);
     true
   },
   context ~> {
     roundLimit = context.getGlobal(specializationProgressKey) match {
     | Some(previousRound @ SpecializerProgress _) -> previousRound.round - 1
-    | _ -> -1
+    // Existing cached rounds must propagate their changes before deciding
+    // whether discovery needs a new checkpoint. Deferring them here would
+    // postpone new requests until after the specialization driver has finished.
+    | _ -> Int::max
     };
     boundary = context.updateUntilBoundary(
       dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
@@ -1383,6 +1425,32 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     true
   },
 ];
+
+// Compiler policy only; SKStore owns checkpoint advancement, synchronization,
+// and temporary-memory reclamation between steps.
+fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
+  SKStore.runPipeline(
+    SKStore.Context::create{},
+    pipelinePhaseKey,
+    compilerPipeline,
+    (context, phase) ~> {
+      context.!debugMode = debugSKStore;
+      if (phase == 0) {
+        // Keep full archive source inputs out of the reactive backend row.
+        // Writing them there and normalizing afterward still leaves it dirty.
+        context.setGlobal(invocationConfigKey, ConfigFile(config))
+      }
+    },
+    context ~> {
+      context.removeGlobal(specializationProgressKey);
+      context.removeGlobal(Optimize.progressKey)
+    },
+    exn ~> {
+      print_error(exn.getMessage());
+      skipExit(2)
+    },
+  )
+}
 
 // Type the stdlib (dependencies) once into `context`, with no config written
 // so the backend mapper never fires — leaving a clean "warm" base that carries

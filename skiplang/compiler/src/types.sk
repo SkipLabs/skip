@@ -684,38 +684,5 @@ const concreteMetaImplSuffix: String = "::.ConcreteMetaImpl";
 
 // Return true iff t1 is a subtype of t2. Every type is a subtype of itself.
 fun isSubType(t1: Type, t2: Type, env: GlobalEnv, pos: Pos): Bool {
-  if (t1 == t2) {
-    true
-  } else {
-    (t1, t2) match {
-    | (ts1 @ Tsuperposition _, ts2 @ Tsuperposition _) ->
-      // It's a subtype if it's a subtype in every superposition.
-      // The two Tsuperpositions must have the same keys (it makes
-      // no sense to compare Tsuperpositions from different functions).
-
-      pos.invariant(
-        ts1.smap.smap.size() == ts2.smap.smap.size(),
-        "Tsuperposition size mismatch.",
-      );
-
-      ts1.smap.smap.all((sup1, tc1) -> {
-        tc2 = ts2.typeInSuperposition(sup1);
-        isSubType(tc1, tc2, env, pos)
-      })
-    | (ts1 @ Tsuperposition _, ts2) ->
-      ts1.unique.all(tt1 -> isSubType(tt1, ts2, env, pos))
-    | (ts1, ts2 @ Tsuperposition _) ->
-      ts2.unique.all(tt2 -> isSubType(ts1, tt2, env, pos))
-    | (tc1 @ Tclass _, tc2 @ Tclass _) ->
-      // Lambdas are the one oddball case where a frozen class
-      // can be a subtype of a mutable one. It's safe because of
-      // the restricted way in which they can be used.
-      sc1 = tc1.sclass(env);
-      sc1.supertypes.contains(tc2.sclassID) &&
-        (tc1.mutability.isSubTypeOf(tc2.mutability) ||
-          (sc1.isLambda &&
-            tc2.mutability != DeepFrozen() &&
-            tc2.sclass(env).isLambda))
-    }
-  }
+  ClassInputs.isSubType(t1, t2, env, pos, None())
 }

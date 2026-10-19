@@ -53,6 +53,7 @@ mutable class .LowerLocalGC{
     env: GlobalEnv,
     config: Config.Config,
     rng: mutable Random,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     pos = f.pos;
     hasNoGC = annotationsContain(f.annotations, "@no_gc", pos);
@@ -67,6 +68,7 @@ mutable class .LowerLocalGC{
         optinfo,
         env,
         config,
+        classReader,
         pos,
         gcNote => optinfo.iid(),
         hasGC,
@@ -127,7 +129,7 @@ mutable class .LowerLocalGC{
     static::isGCInstr(instr, this.hasGC || this.config.autogc)
   }
 
-  protected readonly fun isSaved(instr: Instr): Bool {
+  protected mutable fun isSaved(instr: Instr): Bool {
     // the only things we need to feed to GC.
     instr match {
     | Constant _ ->
@@ -140,7 +142,7 @@ mutable class .LowerLocalGC{
       false
     | p ->
       // Only pointers are relocatable.
-      p.typ.exampleSClass(this.env).maybeGetScalarType() match {
+      ClassInputs.maybeGetScalarType(p.typ, this.env, this.classReader) match {
       | Some(t) -> t.isGCPointer()
       | _ -> false
       }
@@ -214,7 +216,7 @@ mutable class .LowerLocalGC{
       // escaped. So we need to tell the GC about them, so it can trawl
       // through them looking for pointers allocated inside this.gcNote.
       escapeRoutes = this.optinfo.f.params.filter(fp ->
-        fp.typ.allowsPointerEscape(this.env)
+        ClassInputs.allowsPointerEscape(fp.typ, this.env, this.classReader)
       ).map(fp -> fp.id);
 
       live = liveAndRelocatable.concat(escapeRoutes);
@@ -420,6 +422,7 @@ private fun instrAllocAmount(
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
   unfinishedDependencies: mutable UnorderedSet<SFunctionID>,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): (?AllocAmount, Bool) {
   (
     Some(
@@ -465,7 +468,7 @@ private fun instrAllocAmount(
               !certain = false;
               false
             }
-          }) ||
+          }, classReader) ||
           certain
         ) {
           // Early return to override the normal assumption that
@@ -581,6 +584,7 @@ fun .funAllocAmount(
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
   unfinishedDependencies: ?mutable UnorderedSet<SFunctionID>,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): ?AllocAmount {
   // Does each block allocate AllocBounded()?
   blockAllocs = Array::mfill(optinfo.idToBlock.size(), false);
@@ -597,7 +601,7 @@ fun .funAllocAmount(
 
   for (b in optinfo.f.blocks) {
     for (instr in b.instrs) {
-      (amount, recurses) = instrAllocAmount(instr, optinfo, env, tentativeDeps);
+      (amount, recurses) = instrAllocAmount(instr, optinfo, env, tentativeDeps, classReader);
       !anyRecurses = anyRecurses || recurses;
 
       amount match {

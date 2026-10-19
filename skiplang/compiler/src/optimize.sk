@@ -123,6 +123,7 @@ private value class OptimizeOneResult(
 private fun finishOptimizingFunction(
   f: Function,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): OptimizeOneResult {
   returns = f.blocks.any(b -> b.instrs[b.instrs.size() - 1] is Return _);
 
@@ -137,11 +138,11 @@ private fun finishOptimizingFunction(
 
   // If we don't know how much memory it allocates, pessimistically assume
   // an unbounded amount.
-  allocAmount = funAllocAmount(optinfo, env, None()).default(AllocUnbounded());
+  allocAmount = funAllocAmount(optinfo, env, None(), classReader).default(AllocUnbounded());
 
   result = f with {
     status => OptDone{
-      inlineComplexity => Inline.computeInlineComplexity(f, env),
+      inlineComplexity => Inline.computeInlineComplexity(f, env, classReader),
       returns,
       canThrow,
       allocAmount,
@@ -161,10 +162,11 @@ private fun optimizeOne(
     (
       String,
       Int,
-      (Function, GlobalEnv, Config.Config) ~> (Function, PassResult),
+      (Function, GlobalEnv, Config.Config, ?mutable ClassInputs.Reader) ~> (Function, PassResult),
     ),
   >,
   opts: Int,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): OptimizeOneResult {
   // Grab a bit mask of which optimizations are already applied.
   donePasses = f.status match {
@@ -215,7 +217,7 @@ private fun optimizeOne(
           while ({
             !subIterations = subIterations + 1;
 
-            (!f, passResult) = func(f, env, config);
+            (!f, passResult) = func(f, env, config, classReader);
 
             passResult match {
             | PassChanged() ->
@@ -239,7 +241,7 @@ private fun optimizeOne(
               };
 
               if (config.optConfig.verify) {
-                Verify.verifyFunction(f, env, config, "optimize:" + passName)
+                Verify.verifyFunction(f, env, config, "optimize:" + passName, classReader)
               };
 
               !changed = true;
@@ -340,7 +342,7 @@ private fun optimizeOne(
     | Some _ -> f.die(`Unexpected CoroutineInfo for ${f}`)
     | None() ->
       // We completely finished optimizing this!
-      finishOptimizingFunction(f, env)
+      finishOptimizingFunction(f, env, classReader)
     }
   } else {
     u = Array::mcreateFromItems(unfinishedDependencies);
@@ -493,17 +495,17 @@ private fun findUnfinishedDependencyCycleMember(
 private fun optimizationPasses(
   config: Config.Config,
 ): Array<
-  (String, Int, (Function, GlobalEnv, Config.Config) ~> (Function, PassResult)),
+  (String, Int, (Function, GlobalEnv, Config.Config, ?mutable ClassInputs.Reader) ~> (Function, PassResult)),
 > {
   Array[
-    ("ready", Config::kOptReady, checkReady),
+    ("ready", Config::kOptReady, (f, env, config, _reader) ~> checkReady(f, env, config)),
     ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
     ("dce", config.optConfig.dce, EliminateDeadCode::run),
     ("peephole", config.optConfig.peephole, Peephole::run),
     ("control", config.optConfig.control, Control::run),
     ("regpromote", config.optConfig.regpromote, RegisterPromote::run),
-    ("ipa", config.optConfig.ipa, Interprocedural::run),
-    ("inline", config.optConfig.inline, Inline::run),
+    ("ipa", config.optConfig.ipa, (f, env, config, _reader) ~> Interprocedural::run(f, env, config)),
+    ("inline", config.optConfig.inline, (f, env, config, _reader) ~> Inline::run(f, env, config)),
   ]
 }
 
@@ -773,6 +775,7 @@ private fun makeWorkFile(
   f: Function,
   env: GlobalEnv,
   config: Config.Config,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): WorkFile {
   if (config.debug || f.isDisasm) {
     full = readEnv(context, input);
@@ -818,7 +821,7 @@ private fun makeWorkFile(
         });
       if (!canInline) continue
     };
-    findDirectDependencies(current, keep, env);
+    findDirectDependencies(current, keep, env, classReader);
     getDeps(current).each(keep);
     current.coroutineInfo match {
     | Some(UnfinishedCoroutine _) ->
@@ -948,7 +951,10 @@ private fun readEnv(
   functions = FunctionIDToFunction::mcreate();
   for ((key, values) in files.items(context)) {
     key match {
-    | WorkKey _ -> functions.insert(storedFunction(values.next().fromSome()))
+    | WorkKey _ ->
+      // A removed function can leave an empty keyed entry in the collection.
+      // Stable IDs preserve that hole instead of renumbering surviving rows.
+      values.each(file -> functions.insert(storedFunction(file)))
     | _ -> void
     }
   };
@@ -980,15 +986,19 @@ private fun initializeRound(
   input: SKStore.EHandle<SKStore.IID, InputFile>,
   prefix: String,
 ): Round {
-  files = input.map(
+  batches = FunctionBatches.create(context, input, prefix + "batches/");
+  files = batches.map(
     x ~> x,
     x ~> x,
     context,
     SKStore.DirName::create(prefix),
     (_context, writer, _, values) ~> {
       entry = values.first;
-      config = workConfig(entry.config);
-      for (f in entry.env.sfuns) {
+      functions = entry match {
+      | FunctionBatches.FunctionsFile(functions) -> functions
+      | _ -> Array[]
+      };
+      for (f in functions) {
         if (!f.hasImplementation()) {
           pos = f.pos;
           pos.invariant(
@@ -1024,16 +1034,21 @@ private fun initializeRound(
         };
         writer.set(WorkKey(f.id), FunctionFile(f))
       };
-      writer.set(
-        SKStore.IID(1),
-        SharedFile(
-          entry.env with {
-            sfuns => FunctionIDToFunction::mcreate().chill(),
-            sourcePositions => SourcePositions.Table{},
-          },
-          config,
-        ),
-      )
+      entry match {
+      | InputFile(env, config) ->
+        ClassInputs.writeClasses(writer, env.sclasses);
+        writer.set(
+          SKStore.IID(1),
+          SharedFile(
+            env with {
+              sfuns => FunctionIDToFunction::mcreate().chill(),
+              sourcePositions => SourcePositions.Table{},
+            },
+            workConfig(config),
+          ),
+        )
+      | _ -> void
+      }
     },
   );
   makeRound(context, files)
@@ -1111,6 +1126,22 @@ private fun planRow(
 
 private class AbandonFile(f: Function) extends SKStore.File
 
+private fun preciseClassReads(config: Config.Config, f: Function): Bool {
+  !config.debug && config.optConfig.inline == 0 && config.optConfig.ipa == 0 && f.coroutineInfo.isNone()
+}
+private fun workCommon(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  f: Function,
+): SharedFile {
+  coroutine = f.coroutineInfo.isSome();
+  files.getArrayFilter(context, SKStore.IID(1), file ~> {
+    common = SharedFile::type(file);
+    if (!common.config.debug && common.config.optConfig.inline == 0 && common.config.optConfig.ipa == 0 && !coroutine) {
+      SharedFile(common.env with {sclasses => SortedMap[]}, common.config)
+    } else { common }
+  })[0]
+}
 private fun prepareRow(
   context: mutable SKStore.Context,
   writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
@@ -1121,7 +1152,8 @@ private fun prepareRow(
 ): void {
   file = values.first;
   file match {
-  | SharedFile _ -> writer.set(key, file)
+  | SharedFile _
+  | ClassInputs.File _ -> writer.set(key, file)
   | AbandonFile(f) ->
     common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
     writer.set(
@@ -1144,10 +1176,11 @@ private fun prepareRow(
       if (!ready) {
         writer.set(key, ResultFile(OptimizeOneResult(f)))
       } else {
-        common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
+        common = workCommon(context, input, f);
+        classReader = if (preciseClassReads(common.config, f)) Some(mutable ClassInputs.Reader(context, input)) else None();
         writer.set(
           key,
-          makeWorkFile(context, input, f, common.env, common.config),
+          makeWorkFile(context, input, f, common.env, common.config, classReader),
         )
       }
     }
@@ -1165,7 +1198,11 @@ private fun optimizeRow(
   file = values.first;
   file match {
   | work @ WorkFile _ ->
-    common = SharedFile::type(input.getArray(context, SKStore.IID(1))[0]);
+    if (context.debugMode && work.f.hasImplementation()) {
+      print_string(`OPTIMIZE_FUNCTION: ${work.f.name}`)
+    };
+    common = workCommon(context, input, work.f);
+    classReader = if (preciseClassReads(common.config, work.f)) Some(mutable ClassInputs.Reader(context, input)) else None();
     functions = FunctionIDToFunction::mcreate();
     for (function in work.functions.values()) functions.insert(function);
     env = common.env with {
@@ -1182,12 +1219,14 @@ private fun optimizeRow(
             common.config with {deferVerifierDiagnostics => true},
             optimizationPasses(common.config),
             common.config.optConfig.all(),
+            classReader,
           )
         ),
       ),
     )
   | ResultFile _
-  | SharedFile _ ->
+  | SharedFile _
+  | ClassInputs.File _ ->
     writer.set(key, file)
   | _ -> invariant_violation("Unexpected optimizer work record")
   }
@@ -1205,10 +1244,12 @@ private fun publishRow(
     result.extraFun.each(f ->
       writer.set(WorkKey(f.id), ReplacementFile(result.f.id, f))
     );
-    result.extraClass.each(sc ->
-      writer.set(SKStore.IID(1), ClassUpdateFile(result.f.id, sc))
-    )
+    result.extraClass.each(sc -> {
+      writer.set(SKStore.IID(1), ClassUpdateFile(result.f.id, sc));
+      writer.set(ClassInputs.Key(sc.id), ClassUpdateFile(result.f.id, sc))
+    })
   | file @ SharedFile _ -> writer.set(key, file)
+  | file @ ClassInputs.File _ -> writer.set(key, file)
   | _ -> invariant_violation("Unexpected optimizer result")
   }
 }
@@ -1236,6 +1277,16 @@ private fun mergeRow(
       // Coroutine replacements win over the ordinary row, as before.
       replacement = replacements.maxBy(r ~> r.origin).fromSome();
       writer.set(key, GeneratedFile(replacement.f))
+    }
+  | ClassInputs.Key _ ->
+    updates = files.filterMap(file -> file match {
+      | update @ ClassUpdateFile _ -> Some(update)
+      | _ -> None()
+    }).collect(Array).sortedBy(update ~> update.origin);
+    if (updates.isEmpty()) {
+      writer.set(key, files[0])
+    } else {
+      writer.set(key, ClassInputs.File(updates[updates.size() - 1].sc))
     }
   | SKStore.IID(1) ->
     common = files
@@ -1419,10 +1470,32 @@ private fun lowerConsts(context: mutable SKStore.Context, first: Round): Round {
         context,
         symbols.map((_, names) -> names.chill()).chill(),
       );
+      // Synthetic const functions share the identity registry with raw IR.
+      // Otherwise a helper edit shifts the initializer ID, invalidating every
+      // native reader of that shared identity.
+      identities = SKStore.LHandle(
+        OuterIstToIR.GFunKeyKey::keyType,
+        SKStore.IntFile::type,
+        SKStore.DirName::create("/specializer/function-identities/"),
+      );
+      generatedIDs = UnorderedMap::mcreate();
+      for (name in LowerConst.generatedFunctionNames(env)) {
+        key = OuterIstToIR.GFunKey(
+          OuterIstToIR.FrontEndLazyGFun{frontEndName => name},
+          FunSuperpositionID::empty,
+        );
+        generatedIDs.set(
+          name,
+          SFunctionID(
+            identities.getArray(context, OuterIstToIR.GFunKeyKey(key))[0].value,
+          ),
+        )
+      };
       lowered = Verify.withSourcePositions(context, () ->
         LowerConst.lowerAllConsts(
           env with {sourcePositions => positions},
           common.config with {deferVerifierDiagnostics => true},
+          generatedIDs.chill(),
         )
       );
       writer.set(SKStore.IID(0), InputFile(lowered, common.config))
@@ -1443,8 +1516,14 @@ private fun withCurrentPositions(
   context: mutable SKStore.Context,
   dir: Round,
 ): GlobalEnv {
-  readEnv(context, dir.files) with {
-    sourcePositions => SourcePositions.Table::read(context),
+  env = readEnv(context, dir.files);
+  config = SharedFile::type(
+    dir.files.getArray(context, SKStore.IID(1))[0],
+  ).config;
+  if (config.needsIRSourcePositions()) {
+    env with {sourcePositions => SourcePositions.Table::read(context)}
+  } else {
+    env
   }
 }
 

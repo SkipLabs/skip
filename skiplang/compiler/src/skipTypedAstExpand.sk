@@ -68,7 +68,7 @@ fun type__(
     if (tparams.isEmpty()) {
       N.Tapply(mode, n, tyl1)
     } else {
-      cd = SkipNaming.getClass(context, n);
+      cd = SkipNaming.getClassTypeInfo(context, n);
       elt = N.InterElt{
         depth => cd.depth,
         kind => cd.kind,
@@ -159,7 +159,7 @@ fun type__inter(
       if (parents.contains(cname.i1)) {
         None()
       } else {
-        cd = SkipNaming.getClass(context, cname);
+        cd = SkipNaming.getClassTypeInfo(context, cname);
         add_all(cd.extends_);
         add_all(cd.use);
         !elt.targs = tyl.map(ty -> type(context, env, subst, ty));
@@ -198,7 +198,7 @@ fun check_tapply(
   is_valid =
     check_is_this(env, n) ||
     env.is_constraint ||
-    SkipNaming.getClass(context, n).kind != A.KTrait();
+    SkipNaming.getClassTypeInfo(context, n).kind != A.KTrait();
   if (!is_valid) {
     print_error_ln(pos.toString());
     BufferedPrinter.pp(SkipNamedAstPp.type__, ty);
@@ -220,7 +220,7 @@ fun check_tpromoted(
     check_is_this(env, n) ||
     env.is_constraint ||
     !tparams.isEmpty() ||
-    SkipNaming.getClass(context, n).kind != A.KTrait();
+    SkipNaming.getClassTypeInfo(context, n).kind != A.KTrait();
   if (!is_valid) {
     print_error_ln(pos.toString());
     BufferedPrinter.pp(SkipNamedAstPp.type__, ty);
@@ -557,7 +557,7 @@ fun find_source_ty(
     find_source_ty(context, env, from_with, source, inner_ty)
   | (pos, N.Tset(_, mode, _, elts)) ->
     elt = elts.find(elt -> elt.name.i1 == source.i1).fromSome();
-    elt_cd = SkipNaming.getClass(context, elt.name);
+    elt_cd = SkipNaming.getClassTypeInfo(context, elt.name);
     elt_cd.kind match {
     | A.KTrait() -> None()
     | _ -> Some((pos, N.Tapply(mode, elt.name, elt.targs)))
@@ -567,7 +567,7 @@ fun find_source_ty(
     N.Tpromoted(_, mode, _, tparam_set, n, tyl),
   ) if (!tparam_set.isEmpty()) ->
     invariant(n.i1 == source.i1, "ICE invalid cast");
-    SkipNaming.getClass(context, n).kind match {
+    SkipNaming.getClassTypeInfo(context, n).kind match {
     | A.KTrait() -> None()
     | _ -> Some((fr, N.Tapply(mode, n, tyl)))
     }

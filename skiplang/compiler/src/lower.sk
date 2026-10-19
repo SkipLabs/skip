@@ -84,11 +84,13 @@ mutable class .Lower{
     classesNeedingVTables: mutable UnorderedSet<SClassID>,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
       config,
+      classReader,
       vtableRequests,
       classesNeedingVTables,
       pos => f.pos,
@@ -115,7 +117,7 @@ mutable class .Lower{
 
       doneSetFlagBlock = BlockID::none;
 
-      if (value.typ.mightBeInConstMemory(this.env)) {
+      if (ClassInputs.mightBeInConstMemory(value.typ, this.env, this.classReader)) {
         // If the value we are no-op freezing is readonly, it might actually
         // be already frozen and stored in read-only memory, in which case
         // setting the kFrozenMask flag again would SEGV. So we check to
@@ -185,7 +187,7 @@ mutable class .Lower{
 
   private mutable fun lowerGetField(gf: GetField): void {
     obj = this.getInstr(gf.obj);
-    classType = obj.typ.exampleSClass(this.env);
+    classType = ClassInputs.exampleSClass(obj.typ, this.env, this.classReader);
     bitOffset = classType.getLayoutSlot(gf.field, gf.pos).bitOffset;
 
     // Create a raw memory load.
@@ -206,7 +208,7 @@ mutable class .Lower{
   private mutable fun lowerSetField(sf: SetField): void {
     pos = sf.pos;
     obj = this.getInstr(sf.obj);
-    classType = obj.typ.exampleSClass(this.env);
+    classType = ClassInputs.exampleSClass(obj.typ, this.env, this.classReader);
     bitOffset = classType.getLayoutSlot(sf.field, pos).bitOffset;
 
     // Create a raw memory store.
@@ -231,7 +233,7 @@ mutable class .Lower{
     pos = make.pos;
     env = this.env;
 
-    sc = make.typ.exampleSClass(env);
+    sc = ClassInputs.exampleSClass(make.typ, env, this.classReader);
     slotInfo = sc.getArraySlotInfo(pos);
 
     // We are definitely allocating a multiple of this many entries.
@@ -777,7 +779,7 @@ mutable class .Lower{
         for (i in needToLoad) {
           requests.clear();
 
-          _ = this.getInstr(switch.value).typ.forEachConcreteSubtype(
+          _ = ClassInputs.forEachConcreteSubtype(this.getInstr(switch.value).typ,
             this.env,
             sc -> {
               if (!sc.kind.isKClass()) {
@@ -794,6 +796,7 @@ mutable class .Lower{
                 sc,
                 switch.cases,
                 this.env,
+                this.classReader,
               );
 
               // Figure out what constant to store in the vtable.
@@ -806,8 +809,7 @@ mutable class .Lower{
               requests.push((sc.id, constant));
 
               true
-            },
-          );
+            }, this.classReader);
 
           requestID = this.makeVTableRequest(
             requests,
@@ -858,7 +860,7 @@ mutable class .Lower{
     tag = ("typeswitch." + optinfo.f.id.id + "." + switch.id.id);
 
     switchValueType = this.getInstr(switch.value).typ;
-    _ = switchValueType.forEachConcreteSubtype(this.env, sc -> {
+    _ = ClassInputs.forEachConcreteSubtype(switchValueType, this.env, sc -> {
       if (!sc.kind.isKClass()) {
         pos.die(
           "Attempting runtime TypeSwitch on value class " +
@@ -869,7 +871,7 @@ mutable class .Lower{
       };
 
       // Figure out which successor handles this.
-      tsSucc = Control.findTypeSwitchSuccessor(sc, switch.cases, this.env);
+      tsSucc = Control.findTypeSwitchSuccessor(sc, switch.cases, this.env, this.classReader);
 
       succIndex = successorsMap[tsSucc];
 
@@ -896,7 +898,7 @@ mutable class .Lower{
       requests.push((sc.id, val));
 
       true
-    });
+    }, this.classReader);
 
     if (requests.isEmpty()) {
       _ = this.emitInstr(
@@ -1009,7 +1011,7 @@ mutable class .Lower{
       );
 
       true
-    });
+    }, this.classReader);
 
     if (requests.isEmpty()) {
       // This is a call on a base class that has no concrete subclasses.
@@ -1042,7 +1044,7 @@ mutable class .Lower{
         pos => call.pos,
       };
 
-      if (call.typ.maybeGetScalarType(this.env).isSome()) {
+      if (ClassInputs.maybeGetScalarType(call.typ, this.env, this.classReader).isSome()) {
         optinfo.idToInstr.set(call.id, this.constantZero(call.typ))
       };
       this.unreachableCalls.add(call.id)
@@ -1111,7 +1113,7 @@ mutable class .Lower{
       this.lowerSetField(x);
       true
     | make @ Object _ ->
-      t = make.typ.exampleSClass(this.env);
+      t = ClassInputs.exampleSClass(make.typ, this.env, this.classReader);
       if (t.kind.isValueClass()) {
         false
       } else {
@@ -1138,7 +1140,7 @@ mutable class .Lower{
       this.lowerArraySize(x);
       true
     | w @ With _ ->
-      sc = w.typ.exampleSClass(this.env);
+      sc = ClassInputs.exampleSClass(w.typ, this.env, this.classReader);
       layout = sc.getLayout();
 
       // The bit size is determined by the end of the last field.
@@ -1191,12 +1193,13 @@ private fun requestVTablesForConstants(
   classesNeedingVTables: mutable UnorderedSet<SClassID>,
   seen: mutable UnorderedSet<Constant>,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   while (!stack.isEmpty()) {
     stack.pop() match {
     | c @ ConstantImage{typ, values} ->
       if (seen.maybeInsert(c)) {
-        sc = typ.exampleSClass(env);
+        sc = ClassInputs.exampleSClass(typ, env, classReader);
         sc.kind match {
         | KClass() -> classesNeedingVTables.insert(sc.id)
         | KValue() -> void
@@ -1232,6 +1235,7 @@ private fun lowerFunction(
   vtableRequests: mutable UnorderedSet<VTable.VTableRequest>,
   classesNeedingVTables: mutable UnorderedSet<SClassID>,
   rng: mutable Random,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Function {
   if (!f.hasImplementation()) return f;
   runPass = (name: String, f: Function, pass: Function -> Function) -> {
@@ -1247,19 +1251,20 @@ private fun lowerFunction(
     f.dump(env, config);
   };
   f2 = runPass("Lower", f, f -> {
-    Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0
+    Lower::run(f, vtableRequests, classesNeedingVTables, env, config, classReader).i0
   });
   f3 = runPass("LowerLocalGC", f2, f2 -> {
-    LowerLocalGC::run(f2, env, config, rng).i0
+    LowerLocalGC::run(f2, env, config, rng, classReader).i0
   });
   f4 = runPass("Alloc", f3, f3 -> {
-    Alloc::run(f3, env, config).i0
+    Alloc::run(f3, env, config, classReader).i0
   });
   requestVTablesForConstants(
     Vector::mcreateFromIterator(f4.constants.values()),
     classesNeedingVTables,
     mutable UnorderedSet[],
     env,
+    classReader,
   );
   // This must be the last transformation before resolving vtable request IDs.
   runPass("trampoline", f4, f4 -> {
@@ -1309,6 +1314,9 @@ private class RequestIDsFile(
   ids: Array<VTable.VTableRequestID>,
 ) extends SKStore.File
 private class LayoutFile(info: VTable.VTableInfo) extends SKStore.File
+private class LambdaFunctionsFile(
+  functions: Array<Function>,
+) extends SKStore.File
 private class LayoutInputFile(
   requests: UnorderedSet<VTable.VTableRequest>,
   classes: UnorderedSet<SClassID>,
@@ -1325,25 +1333,30 @@ fun incrementalLower(
   context: mutable SKStore.Context,
   input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
 ): SKStore.EHandle<SKStore.IID, Optimize.InputFile> {
-  files = input.map(
+  batches = FunctionBatches.create(context, input, "/native-lower/batches/");
+  files = batches.map(
     x ~> x,
     x ~> x,
     context,
     SKStore.DirName::create("/native-lower/inputs/"),
     (_context, writer, _, values) ~> {
-      entry = values.first;
-      if (!entry.config.incrementalSpecialization) return void;
-      writer.set(
-        SKStore.IID(0),
-        SharedFile(
-          entry.env with {
-            sfuns => FunctionIDToFunction::mcreate().chill(),
-            sourcePositions => SourcePositions.Table{},
-          },
-          entry.config,
-        ),
-      );
-      for (f in entry.env.sfuns) writer.set(FunctionKey(f.id), FunctionFile(f))
+      values.first match {
+      | Optimize.InputFile(env, config) ->
+        ClassInputs.writeClasses(writer, env.sclasses);
+        writer.set(
+          SKStore.IID(0),
+          SharedFile(
+            env with {
+              sfuns => FunctionIDToFunction::mcreate().chill(),
+              sourcePositions => SourcePositions.Table{},
+            },
+            config,
+          ),
+        )
+      | FunctionBatches.FunctionsFile(functions) ->
+        for (f in functions) writer.set(FunctionKey(f.id), FunctionFile(f))
+      | _ -> void
+      }
     },
   );
   summaries = files.map(
@@ -1370,7 +1383,15 @@ fun incrementalLower(
         if (context.debugMode && f.hasImplementation()) {
           print_string(`NATIVE_LOWER: ${f.name}`)
         };
-        common = SharedFile::type(files.getArray(context, SKStore.IID(0))[0]);
+        common = files.getArrayFilter(context, SKStore.IID(0), file ~> {
+          value = SharedFile::type(file);
+          if (value.config.debug) value else {
+            SharedFile(value.env with {sclasses => SortedMap[]}, value.config)
+          }
+        })[0];
+        classReader = if (common.config.debug) None() else {
+          Some(mutable ClassInputs.Reader(context, files))
+        };
         functions = FunctionIDToFunction::mcreate();
         keep = fid -> {
           if (fid != SFunctionID::none && !functions.contains(fid)) {
@@ -1384,7 +1405,7 @@ fun incrementalLower(
         };
         keep(f.id);
         common.env.runtimeFunctions.values().each(keep);
-        findDirectDependencies(f, keep, common.env);
+        findDirectDependencies(f, keep, common.env, classReader);
         env = common.env with {
           sfuns => functions.chill(),
           // Successful normal lowering needs symbolic positions only. Explicit
@@ -1405,6 +1426,7 @@ fun incrementalLower(
             requests,
             classes,
             Random::mcreate(f.name.hash()),
+            classReader,
           )
         });
         writer.set(
@@ -1460,6 +1482,34 @@ fun incrementalLower(
       )
     },
   );
+  lambdaFunctions = files.map(
+    SKStore.IID::keyType,
+    LambdaFunctionsFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/lambda-functions/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | common @ SharedFile _ ->
+        functions = mutable Map[];
+        for ((_id, sc) in common.env.sclasses.items()) {
+          if (sc.isLambda) {
+            sc.methods
+              .maybeGet(MethodKey("call", MethodSuperpositionID::empty))
+              .each(id ->
+                summaries.getArray(context, FunctionKey(id)).each(file ->
+                  functions.set(id, file.value)
+                )
+              )
+          }
+        };
+        writer.set(
+          SKStore.IID(0),
+          LambdaFunctionsFile(functions.values().collect(Array)),
+        )
+      | _ -> void
+      }
+    },
+  );
   layout = merged.map(
     SKStore.IID::keyType,
     LayoutFile::type,
@@ -1468,19 +1518,33 @@ fun incrementalLower(
     (context, writer, _, values) ~> {
       values.first match {
       | requests @ LayoutInputFile _ ->
-        common = SharedFile::type(files.getArray(context, SKStore.IID(0))[0]);
-        functions = FunctionIDToFunction::mcreate();
-        // Directory iteration can include tombstoned keys with no values.
-        for ((_, entries) in summaries.items(context)) {
-          for (stored in entries) functions.insert(stored.value)
+        // Layout reads only the classes it actually uses. Keep the complete
+        // environment for debug dumps; normal reads remain tracked per key.
+        common = files.getArrayFilter(context, SKStore.IID(0), file ~> {
+          value = SharedFile::type(file);
+          if (value.config.debug) value else {
+            SharedFile(value.env with {sclasses => SortedMap[]}, value.config)
+          }
+        })[0];
+        classReader = if (common.config.debug) None() else {
+          Some(mutable ClassInputs.Reader(context, files))
         };
+        functions = FunctionIDToFunction::mcreate();
+        // Vtable construction only tests compiled-function membership for
+        // lambda call methods. Reading every summary here would rerun layout
+        // whenever an unrelated helper was added or removed.
+        lambdaFunctions
+          .getArray(context, SKStore.IID(0))[0]
+          .functions.each(functions.insert);
         env = common.env with {sfuns => functions.chill()};
+        if (context.debugMode) print_string("VTABLE_LAYOUT");
         info = runCompilerPhase("native/layout_vtables", () -> {
           VTable.populateVTables(
             requests.requests.clone(),
             requests.classes.clone(),
             env,
             common.config,
+            classReader,
           )
         });
         writer.set(SKStore.IID(0), LayoutFile(info))

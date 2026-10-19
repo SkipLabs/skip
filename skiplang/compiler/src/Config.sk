@@ -311,6 +311,40 @@ class Config{
     SpecializationConfig(this.ptrBitSize)
   }
 
+  fun needsIRSourcePositions(): Bool {
+    this.debug ||
+      this.disasmAll ||
+      this.disasmAnnotated ||
+      !this.disasmFunctions.isEmpty() ||
+      !this.disasmFiles.isEmpty()
+  }
+
+  // FileCache consumes source text, mtimes and package environments separately.
+  // Keeping them in the backend's option row would invalidate every backend
+  // reader when an archive's source changes, even if its codegen options do not.
+  // Archive emission needs dependency hashes for its own metadata. Native
+  // archives also retain their hash so a native-only edit still relinks.
+  fun backendConfig(): this {
+    this with {
+      dependencies => this.dependencies.map((_, dep) ->
+        (
+          dep.i0,
+          dep.i1 with {
+            sources => Array[],
+            env => Array[],
+            pkg_dir => "",
+            dependencies => Array[],
+            hash => if (this.emit == "sklib" || dep.i1.has_object_code) {
+              dep.i1.hash
+            } else {
+              ""
+            },
+          },
+        )
+      ),
+    }
+  }
+
   // Derive a per-unit config for batch compilation: same shared settings
   // (dependencies, target, opt level, …) but different inputs, output, and
   // exported entry point.

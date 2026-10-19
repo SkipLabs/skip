@@ -140,33 +140,7 @@ fun main(): void {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
   if (config.incrementalSpecialization && batchManifest.isNone()) {
-    SKStore.runWithGc(SKStore.Context::create{}, context ~> {
-      context.!debugMode = debugSKStore;
-      phase = context.getGlobal(pipelinePhaseKey) match {
-      | Some(x) -> SKStore.IntFile::type(x).value
-      | None() -> 0
-      };
-      try {
-        if (phase == 0) {
-          (backendDir, _) = getOrInitializeBackend(context);
-          backendDir.writeArray(context, SKStore.IID(0), Array[ConfigFile(config)])
-        };
-        if (compilerPipeline[phase](context)) !phase = phase + 1;
-        if (phase == compilerPipeline.size()) {
-          context.removeGlobal(pipelinePhaseKey);
-          context.removeGlobal(specializationProgressKey);
-          context.removeGlobal(Optimize.progressKey);
-          SKStore.CStop(None())
-        } else {
-          context.setGlobal(pipelinePhaseKey, SKStore.IntFile(phase));
-          SKStore.CContinue(None())
-        }
-      } catch {
-      | exn ->
-        print_error(exn.getMessage());
-        skipExit(2)
-      }
-    })
+    runCompilerPipeline(config, debugSKStore)
   } else {
     SKStore.runWithGc(
       SKStore.Context::create{},

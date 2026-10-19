@@ -458,13 +458,22 @@ private fun incrementalLatchedRelations(): void {
       T.expectTrue(updated.success(), updated.stderr);
       T.expectEq(updated.stdout.contains(baseWrite), relationsChanged);
       T.expectFalse(updated.stdout.contains(independentWrite));
-      T.expectTrue(updated.stdout.contains("REUSING: /specializer/latch-classes/"));
+      // A body-only edit now leaves discovery and its class passes untouched.
+      // Relation changes still revisit the pass and reuse its unchanged rows.
+      T.expectEq(
+        updated.stdout.contains("REUSING: /specializer/latch-classes/"),
+        relationsChanged,
+      );
       if (relationsChanged) {
-        T.expectTrue(updated.stdout.split("\n").any(line ->
-          line.startsWith("DIRTY READER: ") &&
-          line.contains("=> /specializer/latch-classes/ (dependency: ") &&
-          line.contains("OuterIstToIR.SubtypesKey(SClassID(\"LatchPassBase\"))")
-        ));
+        T.expectTrue(
+          updated.stdout.split("\n").any(line ->
+            line.startsWith("DIRTY READER: ") &&
+              line.contains("=> /specializer/latch-classes/ (dependency: ") &&
+              line.contains(
+                "OuterIstToIR.SubtypesKey(SClassID(\"LatchPassBase\"))",
+              )
+          ),
+        );
       };
     };
   } catch {
@@ -627,7 +636,218 @@ private fun incrementalFieldLayouts(): void {
     _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
     throw exn
   };
-  T.expectTrue(System.subprocess(Array["rm", "-r", dir]).fromSuccess().success());
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+// Const accessors and the global initializer share the stable-ID allocator.
+// Exercise new generated functions and switching back to local release IDs.
+private fun incrementalConstFunctionIDs(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  base =
+    "const stableText: String = \"base\";\n" +
+    "untracked fun main(): void { print_raw(stableText) }\n";
+  added =
+    "const extraText: String = \"prefix\";\n" +
+    base.replace("print_raw(stableText)", "print_raw(extraText + stableText)");
+  changedType = added.replace("stableText: String = \"base\"", "stableText: Int = 7")
+    .replace("extraText + stableText", "extraText + stableText.toString()");
+  args = compile_cmd(Array[source], output).concat(Array["--no-ipa"]);
+  try {
+    for ((text, expected, initialize, timestamp) in Array[
+      (base, "base", true, "200001010000.01"),
+      (added, "prefixbase", false, "200001010000.02"),
+      (base, "base", false, "200001010000.03"),
+      (added, "prefixbase", false, "200001010000.04"),
+      (added.replace("\"base\"", "\"next\""), "prefixnext", false, "200001010000.05"),
+      (added, "prefixbase", false, "200001010000.06"),
+      (changedType, "prefix7", false, "200001010000.07"),
+      (added, "prefixbase", false, "200001010000.08"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      result = System.subprocess(
+        args.concat(Array[if (initialize) "--init" else "--data", data]),
+      ).fromSuccess();
+      T.expectTrue(result.success(), result.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+    };
+    // An unchanged declared type must not hide an invalid initializer.
+    FileSystem.writeTextFile(source, added.replace("stableText: String = \"base\"", "stableText: String = 17"));
+    T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.09", source]).fromSuccess().success());
+    invalid = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+    T.expectFalse(invalid.success(), invalid.stderr);
+    FileSystem.writeTextFile(source, added);
+    T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.10", source]).fromSuccess().success());
+    recovered = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+    T.expectTrue(recovered.success(), recovered.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "prefixbase");
+    for (release in Array[true, false]) {
+      switched = System.subprocess(
+        args
+          .concat(Array["--data", data])
+          .concat(if (release) Array["--release"] else Array[]),
+      ).fromSuccess();
+      T.expectTrue(switched.success(), switched.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        "prefixbase",
+      );
+    }
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+// Missing member reads must be dependencies too: a new module-local function
+// shadows a previously selected global function, and removal restores it.
+private fun incrementalModuleMembers(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  base =
+    "fun lookupValue(): Int { 1 }\nmodule LookupProbe;\n" +
+    "fun caller(): Int { lookupValue() }\nmodule end;\n" +
+    "untracked fun main(): void { print_raw(LookupProbe.caller().toString()) }\n";
+  shadow = base.replace(
+    "module LookupProbe;",
+    "module LookupProbe; fun lookupValue(): Int { 2 }",
+  );
+  args = compile_cmd(Array[source], output).concat(Array["--no-ipa"]);
+  try {
+    for ((text, expected, initialize, timestamp) in Array[
+      (base, "1", true, "200001010000.01"),
+      (shadow, "2", false, "200001010000.02"),
+      (base, "1", false, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      result = System.subprocess(
+        args.concat(Array[if (initialize) "--init" else "--data", data]),
+      ).fromSuccess();
+      T.expectTrue(result.success(), result.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+    }
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
+}
+
+private fun incrementalStableFunctionIDs(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/main.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  base =
+    "fun stableLeft(): Int { 7 }\n" +
+    "fun stableRight(): Int { 9 }\n" +
+    "untracked fun main(): void { print_raw((stableLeft() + stableRight()).toString()) }\n";
+  added =
+    base.replace(
+      "stableLeft() + stableRight()",
+      "stableLeft() + stableRight() + aStableAdded()",
+    ) + "fun aStableAdded(): Int { 3 }\n";
+  args = compile_cmd(Array[source], output).concat(Array["--no-ipa"]);
+  try {
+    FileSystem.writeTextFile(source, base);
+    first = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(first.success(), first.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "16");
+    firstID: ?String = None();
+    for ((text, expected, count, timestamp) in Array[
+      (added, "19", 2, "200001010000.01"),
+      (base, "16", 1, "200001010000.02"),
+      (added, "19", 2, "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(
+        System.subprocess(Array["touch", "-t", timestamp, source])
+          .fromSuccess()
+          .success(),
+      );
+      update = System.subprocess(
+        args.concat(Array["--data", data, "--debug-skstore"]),
+      ).fromSuccess();
+      T.expectTrue(update.success(), update.stderr);
+      T.expectEq(
+        System.subprocess(Array[output]).fromSuccess().stdout,
+        expected,
+      );
+      generated = update.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("FUNCTION_IR:"))
+        .collect(Array);
+      T.expectEq(generated.size(), count, generated.join("\n"));
+      T.expectTrue(
+        generated.all(line ->
+          line.contains("main") || line.contains("aStableAdded")
+        ),
+        generated.join("\n"),
+      );
+      generated
+        .filter(line -> line.contains("aStableAdded"))
+        .each(line -> {
+          id = line.split(" id=").collect(Array)[1];
+          firstID match {
+          | None() -> !firstID = Some(id)
+          | Some(previous) -> T.expectEq(id, previous)
+          }
+        });
+      T.expectEq(
+        update.stdout
+          .split("\n")
+          .filter(line -> line.startsWith("NATIVE_LOWER:"))
+          .collect(Array)
+          .size(),
+        count,
+        update.stdout,
+      );
+      T.expectFalse(update.stdout.contains("POINTER_ESCAPE"), update.stdout);
+      T.expectFalse(update.stdout.contains("VTABLE_LAYOUT"), update.stdout);
+    }
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  );
 }
 
 // Function bodies are cached before method tables, coroutine dependencies and
@@ -699,7 +919,9 @@ private fun incrementalFunctionIR(): void {
       T.expectTrue(
         genericCompilations.all(line ->
           expectedWrites != 0 &&
-            (line.contains(changedCallable) || line.contains("\"main\""))
+            (line.contains(changedCallable) ||
+              line.contains("GenericFunctionKey(main)") ||
+              line.contains("\"main\""))
         ),
         genericCompilations.join("\n"),
       );
@@ -775,16 +997,27 @@ private fun nativeTypeIdentity(): void {
         "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 }\n" +
         "untracked fun main(): void { print_raw(if (differs(A(1), B(1))) \"pass\" else \"fail\") }\n",
     );
-    for (release in Array[false, true]) {
-      compiled = System.subprocess(
-        compile_cmd(Array[source], output).concat(
-          if (release) Array["--release"] else Array[],
-        ),
-      ).fromSuccess();
-      T.expectTrue(compiled.success(), compiled.stderr);
-      run = System.subprocess(Array[output]).fromSuccess();
-      T.expectTrue(run.success(), run.stderr);
-      T.expectEq(run.stdout, "pass");
+    // Aa and BB collide under the runtime's polynomial string hash, including
+    // when embedded in IdentityCollisionBox<...>. Collapsed names/layouts must stay nominal.
+    generic =
+      "class Aa() {}\nclass BB() {}\n" +
+      "base class Kind() {}\n" +
+      "class IdentityCollisionBox<T>(value: ?T) extends Kind\n" +
+      "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 }\n" +
+      "untracked fun main(): void { print_raw(if (differs(IdentityCollisionBox<Aa>(None()), IdentityCollisionBox<BB>(None()))) \"pass\" else \"fail\") }\n";
+    for (genericCase in Array[false, true]) {
+      if (genericCase) FileSystem.writeTextFile(source, generic);
+      for (release in Array[false, true]) {
+        compiled = System.subprocess(
+          compile_cmd(Array[source], output).concat(
+            if (release) Array["--release"] else Array[],
+          ),
+        ).fromSuccess();
+        T.expectTrue(compiled.success(), compiled.stderr);
+        run = System.subprocess(Array[output]).fromSuccess();
+        T.expectTrue(run.success(), run.stderr);
+        T.expectEq(run.stdout, "pass");
+      };
     }
   } catch {
   | exn ->
@@ -996,6 +1229,24 @@ private fun incrementalNativeLowering(): void {
         graphExecutions.join("\n"),
       );
       T.expectFalse(updated.stdout.contains("LLVM_SHARED"), updated.stdout);
+      edgeAnalyses = updated.stdout
+        .split("\n")
+        .filter(line -> line.startsWith("REACHABILITY_EDGES:"))
+        .collect(Array);
+      T.expectEq(
+        edgeAnalyses.size(),
+        if (changed) 1 else 0,
+        edgeAnalyses.join("\n"),
+      );
+      T.expectTrue(
+        edgeAnalyses.all(line -> line.contains("nativeLeft")),
+        edgeAnalyses.join("\n"),
+      );
+      T.expectFalse(updated.stdout.contains("POINTER_ESCAPE"), updated.stdout);
+      T.expectFalse(
+        updated.stdout.contains("REACHABILITY_LIVE"),
+        updated.stdout,
+      );
     };
     // Exercise request insertion/removal, dispatch and class layout changes.
     // Compare the cached result to a fresh sequential compilation at each step.
@@ -1004,18 +1255,26 @@ private fun incrementalNativeLowering(): void {
       "class NativeA(x: Int) extends NativeBase { fun value(): Int { this.x } }\n" +
       "class NativeB() extends NativeBase { fun value(): Int { 5 } }\n" +
       "fun nativePick(b: Bool): NativeBase { if (b) NativeA(8) else NativeB() }\n" +
-      "untracked fun main(): void { print_raw((nativePick(true).value() + nativePick(false).value()).toString()) }\n";
+      "untracked fun main(): void { print_raw((nativePick(true).value() + nativePick(false).value() + nativeRight()).toString()) }\n";
     for ((text, expected, timestamp) in Array[
-      (dispatch, "13", "200001010000.04"),
-      (dispatch.replace("NativeB", "NativeC"), "13", "200001010000.05"),
-      (dispatch.replace("x: Int)", "x: Int, y: Int = 2)").replace("this.x }", "this.x + this.y }"), "15", "200001010000.06"),
+      (dispatch, "22", "200001010000.04"),
+      (dispatch.replace("NativeB", "NativeC"), "22", "200001010000.05"),
+      (dispatch.replace("x: Int)", "x: Int, y: Int = 2)").replace("this.x }", "this.x + this.y }"), "24", "200001010000.06"),
       ("untracked fun main(): void { print_raw((nativeLeft() + nativeRight()).toString()) }\n", "16", "200001010000.07"),
     ]) {
       FileSystem.writeTextFile(source, text);
       T.expectTrue(System.subprocess(Array["touch", "-t", timestamp, source]).fromSuccess().success());
-      updated = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+      updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
       T.expectTrue(updated.success(), updated.stderr);
       T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, expected);
+      // nativeRight remains reachable throughout the class edits. Its body
+      // and scalar signature stay equal, so class-map changes must not rerun it.
+      unaffected = updated.stdout.split("\n").filter(line ->
+        (line.startsWith("OPTIMIZE_FUNCTION:") || line.startsWith("NATIVE_LOWER:") ||
+          line.startsWith("LLVM_FUNCTION:") || line.startsWith("REACHABILITY_EDGES:")) &&
+          line.contains("nativeRight")
+      ).collect(Array);
+      T.expectEq(unaffected.size(), 0, unaffected.join("\n"));
       sequentialOutput = dir + "/sequential";
       sequential = System.subprocess(compile_cmd(Array[left, right, source], sequentialOutput).concat(Array["--no-ipa"])).fromSuccess();
       T.expectTrue(sequential.success(), sequential.stderr);
@@ -1059,10 +1318,10 @@ private fun incrementalLLVMGraph(): void {
   );
   try {
     FileSystem.writeTextFile(left, "fun graphLeft(): String { \"one\" }\n");
-    FileSystem.writeTextFile(right, "fun graphRight(): String { \"one\" }\n");
+    FileSystem.writeTextFile(right, "fun graphRight(): Array<String> { Array[\"one\"] }\n");
     FileSystem.writeTextFile(
       source,
-      "untracked fun main(): void { print_raw(graphLeft()); print_raw(graphRight()) }\n",
+      "untracked fun main(): void { print_raw(graphLeft()); print_raw(graphRight()[0]) }\n",
     );
     initial = System.subprocess(
       args.concat(Array["--init", data]),
@@ -1126,15 +1385,15 @@ private fun incrementalLLVMGraph(): void {
       "class GraphC() extends GraphBase {}\n" +
       "fun graphPick(n: Int): GraphBase { if (n == 0) GraphA() else if (n == 1) GraphB() else GraphC() }\n" +
       "untracked fun graphShow(x: GraphBase): void { x match { | GraphA _ -> print_raw(\"A\"); print_raw(\"A\") | GraphB _ -> print_raw(\"B\") | GraphC _ -> print_raw(\"C\"); print_raw(\"C\"); print_raw(\"C\") } }\n" +
-      "untracked fun main(): void { graphShow(graphPick(0)); graphShow(graphPick(1)); graphShow(graphPick(2)) }\n";
+      "untracked fun main(): void { graphShow(graphPick(0)); graphShow(graphPick(1)); graphShow(graphPick(2)); print_raw(graphRight()[0]) }\n";
     for ((text, expected, timestamp) in Array[
-      (dispatch, "AABCCC", "200001010000.04"),
+      (dispatch, "AABCCCone", "200001010000.04"),
       (
         dispatch.replace("print_raw(\"A\");", "print_raw(\"D\");"),
-        "DABCCC",
+        "DABCCCone",
         "200001010000.05",
       ),
-      (dispatch, "AABCCC", "200001010000.06"),
+      (dispatch, "AABCCCone", "200001010000.06"),
     ]) {
       FileSystem.writeTextFile(source, text);
       T.expectTrue(
@@ -1143,9 +1402,14 @@ private fun incrementalLLVMGraph(): void {
           .success(),
       );
       updated = System.subprocess(
-        args.concat(Array["--data", data]),
+        args.concat(Array["--data", data, "--debug-skstore"]),
       ).fromSuccess();
       T.expectTrue(updated.success(), updated.stderr);
+      // This independent static array retains its class-based vtable reference
+      // while new dispatch classes change the shared physical table layout.
+      T.expectFalse(updated.stdout.split("\n").any(line ->
+        line.startsWith("LLVM_FUNCTION:") && line.contains("graphRight")
+      ), updated.stdout);
       T.expectEq(
         System.subprocess(Array[output]).fromSuccess().stdout,
         expected,
@@ -1445,54 +1709,66 @@ private fun deferredVerifierPositions(): void {
   functions = FunctionIDToFunction::mcreate();
   functions.insert(f);
   env = GlobalEnv{sclasses => SortedMap[], sfuns => functions.chill()};
-  _ = SKStore.run(context ~> {
-    _ = context.mkdir(
-      FileCache.InputSource::keyType,
-      SourcePositions.SymbolsFile::type,
-      SourcePositions.dir.dirName,
-      Array[
-        (
-          file,
-          SourcePositions.SymbolsFile(
-            Map[symbol => Position.create(200, 4)],
-            Map[symbol => 0],
+  for (useTracked in Array[false, true]) {
+    _ = SKStore.run(context ~> {
+      classRows: Array<(SKStore.Key, SKStore.File)> = Array[
+        (SKStore.IID(0), SKStore.BoolFile(false)),
+      ];
+      classFiles = context.mkdir(
+        x ~> x,
+        x ~> x,
+        SKStore.DirName::create("/test-verifier-classes/"),
+        classRows,
+      );
+      reader = if (useTracked) Some(mutable ClassInputs.Reader(context, classFiles)) else None();
+      _ = context.mkdir(
+        FileCache.InputSource::keyType,
+        SourcePositions.SymbolsFile::type,
+        SourcePositions.dir.dirName,
+        Array[
+          (
+            file,
+            SourcePositions.SymbolsFile(
+              Map[symbol => Position.create(200, 4)],
+              Map[symbol => 0],
+            ),
           ),
-        ),
-      ],
-    );
-    reads = context.reads;
-    Verify.withSourcePositions(context, () ->
-      Verify.verifyFunction(f, env, config, "test")
-    );
-    T.expectEq(
-      context.reads,
-      reads,
-      "Successful verification must not read coordinates",
-    );
-    bad = f with {funType => f.funType with {params => Array[tInt]}};
-    failed = false;
-    try {
+        ],
+      );
+      reads = context.reads;
       Verify.withSourcePositions(context, () ->
-        Verify.verifyFunction(bad, env, config, "test")
-      )
-    } catch {
-    | error @ Assert.InternalError _ ->
-      !failed = true;
+        Verify.verifyFunction(f, env, config, "test", reader)
+      );
+      T.expectEq(
+        context.reads,
+        reads,
+        "Successful verification must not read coordinates",
+      );
+      bad = f with {funType => f.funType with {params => Array[tInt]}};
+      failed = false;
+      try {
+        Verify.withSourcePositions(context, () ->
+          Verify.verifyFunction(bad, env, config, "test", reader)
+        )
+      } catch {
+      | error @ Assert.InternalError _ ->
+        !failed = true;
+        T.expectTrue(
+          error.getMessage().contains("Argument count mismatch"),
+          error.getMessage(),
+        )
+      | other -> throw other
+      };
       T.expectTrue(
-        error.getMessage().contains("Argument count mismatch"),
-        error.getMessage(),
-      )
-    | other -> throw other
-    };
-    T.expectTrue(
-      failed,
-      "Expected verifier failure with a resolved function dump",
-    );
-    T.expectTrue(
-      context.reads.size() > reads.size(),
-      "Failure must read current coordinates",
-    );
-  });
+        failed,
+        "Expected verifier failure with a resolved function dump",
+      );
+      T.expectTrue(
+        context.reads.size() > reads.size(),
+        "Failure must read current coordinates",
+      );
+    });
+  };
 }
 
 private fun incrementalSourcePositions(): void {
@@ -1799,11 +2075,111 @@ private fun specializationModeSelection(): void {
   );
 }
 
+private class DebugTraceCallable{payload: String} extends OuterIstToIR.LazyGFun {
+  fun gname(): GFunctionName { GFunctionName("debugTraceFunction") }
+
+  fun compile(
+    _context: mutable SKStore.Context,
+    _converter: OuterIstToIR.Converter,
+  ): OuterIstToIR.GFunction {
+    invariant_violation("Debug key formatting must not compile the callable")
+  }
+}
+
+private fun compactFunctionDebugKeys(): void {
+  callable = DebugTraceCallable{payload => String::tabulate(100000, _ -> 'x')};
+  key = OuterIstToIR.GFunKey(callable, FunSuperpositionID::empty);
+  for (text in Array[
+    key.toString(),
+    OuterIstToIR.GFunKeyKey(key).toString(),
+    OuterIstToIR.GenericFunctionKey(callable).toString(),
+    OuterIstToIR.LazyGFunKey(callable).toString(),
+  ]) {
+    T.expectTrue(text.contains("debugTraceFunction"), text);
+    T.expectTrue(text.length() < 256, "Debug keys expanded the callable payload");
+  }
+}
+
+private fun incrementalCopydownPolicy(): void {
+  dir = System.subprocess(Array["mktemp", "-d"]).fromSuccess().stdout.trim();
+  source = Path.join(dir, "input.sk");
+  output = Path.join(dir, "program");
+  data = Path.join(dir, "data");
+  args = compile_cmd(Array[source], output);
+  initial =
+    "base class CopydownBase { fun value(): Int { 1 } }\n" +
+    "class CopydownChild() extends CopydownBase { fun marker(): Int { 7 } }\n" +
+    "class CopydownStableKey(value: Int) extends SKStore.Key\n" +
+    "untracked fun main(): void { print_raw(CopydownChild().value().toString()); }\n";
+  try {
+    FileSystem.writeTextFile(source, initial);
+    built = System.subprocess(args.concat(Array["--init", data])).fromSuccess();
+    T.expectTrue(built.success(), built.stderr);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "1");
+    FileSystem.writeTextFile(source, initial +
+      "class CopydownOtherKey(value: Int) extends SKStore.Key\n");
+    T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.01", source]).fromSuccess().success());
+    updated = System.subprocess(args.concat(Array["--data", data, "--debug-skstore"])).fromSuccess();
+    T.expectTrue(updated.success(), updated.stderr);
+    T.expectFalse(updated.stdout.split("\n").any(line ->
+      line.startsWith("TYPECHECK_CLASS:") && line.contains("CopydownStableKey")
+    ), updated.stdout);
+    T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "1");
+    // A source-class property used by the policy must still update its users.
+    // Explicit `this` return types require typing copied methods in the child.
+    selfTyped = initial.replace("fun value(): Int { 1 }",
+      "fun value(): Int { 2 } fun same(): this { this }")
+      .replace("CopydownChild().value()", "CopydownChild().same().marker()");
+    for ((text, expected, timestamp) in Array[
+      (selfTyped, "7", "200001010000.02"),
+      (initial, "1", "200001010000.03"),
+    ]) {
+      FileSystem.writeTextFile(source, text);
+      T.expectTrue(System.subprocess(Array["touch", "-t", timestamp, source]).fromSuccess().success());
+      rebuilt = System.subprocess(args.concat(Array["--data", data])).fromSuccess();
+      T.expectTrue(rebuilt.success(), rebuilt.stderr);
+      T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, expected);
+      fresh = System.subprocess(compile_cmd(Array[source], output + "-fresh")
+        .concat(Array["--release"])).fromSuccess();
+      T.expectTrue(fresh.success(), fresh.stderr);
+      T.expectEq(System.subprocess(Array[output + "-fresh"]).fromSuccess().stdout, expected);
+    }
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-rf", dir]);
+    throw exn
+  };
+  _ = System.subprocess(Array["rm", "-rf", dir]);
+}
+
+private fun incrementalBodyCapture(): void {
+  file = FileCache.InputSource(None(), "body-capture-probe.sk");
+  source = "fun changed(): Int { 1 }\nfun untouched(): Int { 2 }\nclass Stable { fun value(): Int { 3 } }\n";
+  edited = source.replace("{ 1 }", "{ 9 }");
+  before = SkipParse.parseFile(file, source).defs.collect(Array);
+  after = SkipParse.parseFile(file, edited).defs.collect(Array);
+  invariant(before.size() == after.size());
+  for (i => left in before) {
+    name = left match {
+    | SkipAst.DFun(def) -> def.name.i1
+    | SkipAst.DClass(def) -> def.name.i1
+    | _ -> "other"
+    };
+    T.expectEq(native_eq(left, after[i]) == 0, name != "changed")
+  }
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
   tests.set(
     "incremental",
     mutable Vector[
+      T.Test{name => "body_capture", func => () ~> incrementalBodyCapture()},
+      T.Test{name => "copydown_policy", func => () ~> incrementalCopydownPolicy()},
+      T.Test{
+        name => "compact_function_debug_keys",
+        func => () ~> compactFunctionDebugKeys(),
+      },
       T.Test{
         name => "mode_selection",
         func => () ~> specializationModeSelection(),
@@ -1821,10 +2197,28 @@ untracked fun main(): void {
         func => () ~> incrementalConstructorPositions(),
       },
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
-      T.Test{name => "latched_relations", func => () ~> incrementalLatchedRelations()},
-      T.Test{name => "scalarized_fields", func => () ~> incrementalScalarizedFields()},
+      T.Test{
+        name => "latched_relations",
+        func => () ~> incrementalLatchedRelations(),
+      },
+      T.Test{
+        name => "scalarized_fields",
+        func => () ~> incrementalScalarizedFields(),
+      },
       T.Test{name => "field_layouts", func => () ~> incrementalFieldLayouts()},
       T.Test{name => "function_ir", func => () ~> incrementalFunctionIR()},
+      T.Test{
+        name => "stable_function_ids",
+        func => () ~> incrementalStableFunctionIDs(),
+      },
+      T.Test{
+        name => "const_function_ids",
+        func => () ~> incrementalConstFunctionIDs(),
+      },
+      T.Test{
+        name => "module_members",
+        func => () ~> incrementalModuleMembers(),
+      },
       T.Test{name => "optimization", func => () ~> incrementalOptimization()},
       T.Test{
         name => "native_lowering",

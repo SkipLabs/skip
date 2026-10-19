@@ -118,6 +118,7 @@ mutable class .RegisterPromote{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     optinfo = OptimizerInfo::make(f);
 
@@ -132,6 +133,7 @@ mutable class .RegisterPromote{
       optinfo,
       env,
       config,
+      classReader,
       pos => f.pos,
       currentFlowBlock => dummyBlock,
       objFlags,
@@ -299,7 +301,7 @@ mutable class .RegisterPromote{
 
           args.each(noteEscape);
 
-          someSClass = instr.typ.exampleSClass(this.env);
+          someSClass = ClassInputs.exampleSClass(instr.typ, this.env, this.classReader);
           objFlags.set(
             instr.idValue(),
             mutable FlowFlags{

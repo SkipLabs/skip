@@ -502,6 +502,21 @@ mutable class BuildRunner(
     p = this.run_cmd(skc);
 
     if (separate_link) {
+      link_status_path = Path.join(
+        this.fingerprint_dir_for(unit),
+        "link-status",
+      );
+      // A clean backend emits no link plan. Its inputs include native archive
+      // hashes and linker options, so an existing output is already current.
+      // Still replay the saved plan when the primary output was removed.
+      if (
+        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+        this.outputs_for(unit).all(output -> FileSystem.exists(output.path)) &&
+        FileSystem.exists(link_status_path) &&
+        FileSystem.readTextFile(link_status_path) == "complete"
+      ) {
+        return void
+      };
       // A cached compiler backend has no new stdout side effect. Retain its
       // link plan per unit so an unchanged LLVM module can still be linked.
       link_plan_path = Path.join(this.fingerprint_dir_for(unit), "link-args");
@@ -528,7 +543,11 @@ mutable class BuildRunner(
           "\n---LINK_ARGS_END---\n",
       );
       link_cmd = ProcessBuilder::create{cmd, args};
-      _ = this.run_cmd(link_cmd)
+      // skc commits its cache before the external linker runs. A failed link
+      // must be retried even when an older executable still exists.
+      FileSystem.writeTextFile(link_status_path, "pending");
+      _ = this.run_cmd(link_cmd);
+      FileSystem.writeTextFile(link_status_path, "complete")
     }
   }
 
@@ -775,7 +794,9 @@ private fun hash_of(
 // TODO: Proper Profile class.
 private fun skc_profile_options(profile: String): Array<String> {
   profile match {
-  | "release" -> Array["-O2"]
+  // -O2 selects optimizations; --release also selects the sequential compiler
+  // algorithms when skargo supplies a persistent database.
+  | "release" -> Array["--release", "-O2"]
   // Development builds favor incremental compilation over interprocedural
   // optimization (inlining and IPA), just as
   // their native code generation favors compile time over optimization.

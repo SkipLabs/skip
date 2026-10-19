@@ -515,6 +515,18 @@ mutable private base class AsmDefBuilder{
     this.common.env
   }
 
+  mutable fun exampleSClass(typ: Type): SClass {
+    this.common.exampleSClass(typ)
+  }
+
+  mutable fun maybeGetScalarType(typ: Type): ?ScalarType {
+    this.common.maybeGetScalarType(typ)
+  }
+
+  mutable fun getScalarType(typ: Type): ScalarType {
+    this.common.getScalarType(typ)
+  }
+
   readonly fun die(msg: String): _ {
     this.pos().die(msg)
   }
@@ -1235,7 +1247,7 @@ private fun computeAlignment(n: Int, maxAlign: Int): Int {
 //   grouped into bytes or larger integers as needed, etc.
 private fun createStaticImageFields(
   getField: Int ~> ?StaticImageField,
-  env: GlobalEnv,
+  common: mutable AsmOutput,
 ): Array<Constant> {
   fields = mutable Vector<Constant>[];
 
@@ -1246,7 +1258,7 @@ private fun createStaticImageFields(
   bitOffset = 0;
 
   // Utility function to extract the bit size of a given Constant.
-  valueBitSize = instr -> instr.typ.getScalarType(env).bitSize;
+  valueBitSize = instr -> common.getScalarType(instr.typ).bitSize;
 
   while ({
     getField(i) match {
@@ -1388,14 +1400,13 @@ private fun createStaticImageAsmDef{
   minByteAlignment: Int,
   id: ?AsmDefID,
 }: AsmDefID {
-  env = common.env;
 
   // The overall alignment must be good enough for all fields.
   fieldBitAlignment = minByteAlignment * 8;
   bitSize = 0;
 
   for (field in fields) {
-    st = field.typ.getScalarType(env);
+    st = common.getScalarType(field.typ);
     !fieldBitAlignment = max(fieldBitAlignment, st.bitAlignment);
     !bitSize = bitSize + st.bitSize
   };
@@ -1426,13 +1437,13 @@ private fun createStaticImageAsmDef{
 
     j = 0;
     while (j < fields.size()) {
-      st = fields[j].typ.getScalarType(env);
+      st = common.getScalarType(fields[j].typ);
 
       // Count how many fields in a row have the same LLVM type name.
       k = j;
       while ({
         !k = k + 1;
-        k < fields.size() && st == fields[k].typ.getScalarType(env)
+        k < fields.size() && st == common.getScalarType(fields[k].typ)
       }) void;
 
       // Make an array for a run of 3 or more to keep the type concise.
@@ -1540,7 +1551,7 @@ private fun createStaticImage{
   minByteAlignment: Int = 1,
   id: ?AsmDefID = None(),
 }: AsmDefID {
-  fields = createStaticImageFields(getField, common.env);
+  fields = createStaticImageFields(getField, common);
   createStaticImageAsmDef{id, fields, common, symbolNameHint, minByteAlignment}
 }
 
@@ -1566,7 +1577,7 @@ fun llvmWriteTypeCallAttribute(
   spaceBefore: Bool,
   spaceAfter: Bool,
 ): void {
-  t.maybeGetScalarType(asm.env()) match {
+  asm.maybeGetScalarType(t) match {
   | Some(p) if (p.kind == IntegerScalarKind() && p.bitSize < 32) ->
     if (spaceBefore) asm.print(' ');
 
@@ -1580,16 +1591,18 @@ fun llvmWriteTypeCallAttribute(
 }
 
 fun llvmWriteTypeName(asm: mutable AsmDefBuilder, t: Type): void {
-  example = t.exampleSClass(asm.env());
-  example.maybeGetScalarType() match {
+  asm.maybeGetScalarType(t) match {
   | Some(p) -> asm.print(p.llvmTypeName)
   | None() ->
     if (t == tVoid) {
       asm.print("void")
-    } else if (example.isReturnTuple()) {
-      llvmWriteReturnTypeName(asm, example.fields.map(f -> f.typ))
     } else {
-      asm.pos().die(`Do not know what LLVM type to use for ${t}`)
+      example = asm.exampleSClass(t);
+      if (example.isReturnTuple()) {
+        llvmWriteReturnTypeName(asm, example.fields.map(f -> f.typ))
+      } else {
+        asm.pos().die(`Do not know what LLVM type to use for ${t}`)
+      }
     }
   }
 }
@@ -1854,6 +1867,7 @@ mutable class .AsmOutput{
   graphOrigin: Int = -1,
   graphKeys: mutable UnorderedMap<AsmDefID, GraphKey> = mutable UnorderedMap[],
   graphReads: ?mutable GraphReads = None(),
+  classVTables: mutable UnorderedMap<SClassID, AsmDefID> = mutable UnorderedMap[],
 
   // Skip String -> LLVM expression.
   strings: mutable UnorderedMap<UTF8String, AsmDefID> = mutable UnorderedMap[],
@@ -1934,6 +1948,73 @@ mutable class .AsmOutput{
     | Some(reads) ->
       reads.labels.get(reads.context, GraphFunctionKey(fid)).value
     | None() -> this.env.getFunction(fid, FileRange.builtin)
+    }
+  }
+
+  mutable fun exampleSClass(typ: Type): SClass {
+    this.graphReads match {
+    | Some(reads) ->
+      id = typ match {
+      | Tclass(id, _) -> id
+      | Tsuperposition(unique, _) -> unique[0].sclassID
+      };
+      reads.getSClass(id)
+    | None() -> typ.exampleSClass(this.env)
+    }
+  }
+
+  mutable fun maybeGetScalarType(typ: Type): ?ScalarType {
+    this.graphReads match {
+    | Some(reads) ->
+      id = typ match {
+      | Tclass(id, _) -> id
+      | Tsuperposition(unique, _) -> unique[0].sclassID
+      };
+      // Representation-only users must not depend on subtype lists/layouts.
+      reads.maybeGetScalarType(id)
+    | None() -> typ.maybeGetScalarType(this.env)
+    }
+  }
+
+  mutable fun getScalarType(typ: Type): ScalarType {
+    this.maybeGetScalarType(typ) match {
+    | Some(value) -> value
+    | None() -> this.exampleSClass(typ).getScalarType()
+    }
+  }
+
+  mutable fun writeClassVTableRef(
+    asm: mutable AsmDefBuilder,
+    sc: SClassID,
+    frozen_: Bool,
+  ): void {
+    this.graphReads match {
+    | Some(reads) ->
+      id = this.classVTables.getOrAdd(sc, () -> {
+        // The physical offset belongs only to the alias definition. A normal
+        // filtered read records membership, so moving the table keeps callers.
+        present = reads.offsets.getArrayFilter(reads.context, GraphClassOffsetKey(sc),
+          _ ~> SKStore.BoolFile(true));
+        invariant(!present.isEmpty(), "Missing class vtable: " + sc);
+        id = this.defs.allocID();
+        this.defs.set(id, graphPlaceholder(id, classVTableSymbol(sc)));
+        this.graphKeys.set(id, GraphVTableKey(sc));
+        id
+      });
+      id.writeGetPointer(asm, if (frozen_) VTable.kFrozenMask else 0)
+    | None() ->
+      llvmWriteVTableRef(this.classByteOffset(sc) +
+        (if (frozen_) VTable.kFrozenMask else 0), asm)
+    }
+  }
+
+  private mutable fun objectVTable(sc: SClassID): Constant {
+    if (this.fragment) {
+      ConstantVTable{id => InstrID::none, typ => tNonGCPointer,
+        value => sc, frozen_ => true}
+    } else {
+      ConstantMegaVTableMember{id => InstrID::none, typ => tNonGCPointer,
+        value => this.classByteOffset(sc) + VTable.kFrozenMask}
     }
   }
 
@@ -2101,13 +2182,9 @@ mutable class .AsmOutput{
     asm: mutable AsmDefBuilder,
     obj: ConstantObject,
   ): void {
-    sc = obj.typ.exampleSClass(this.env);
+    sc = this.exampleSClass(obj.typ);
 
-    vtable = ConstantMegaVTableMember{
-      id => InstrID::none,
-      typ => tNonGCPointer,
-      value => (this.classByteOffset(sc.id) + VTable.kFrozenMask),
-    };
+    vtable = this.objectVTable(sc.id);
 
     header = if (this.config.vtableByteSize == 8) {
       Array[StaticImageField(vtable, 0)]
@@ -2163,17 +2240,13 @@ mutable class .AsmOutput{
     asm: mutable AsmDefBuilder,
     cfv: ConstantArray,
   ): void {
-    sc = cfv.typ.exampleSClass(this.env);
+    sc = this.exampleSClass(cfv.typ);
     logicalOrderedValues = cfv.values;
     size = cfv.size;
 
     sizeConst = ConstantInt{id => InstrID::none, typ => tInt32, value => size};
 
-    vtable = ConstantMegaVTableMember{
-      id => InstrID::none,
-      typ => tNonGCPointer,
-      value => (this.classByteOffset(sc.id) + VTable.kFrozenMask),
-    };
+    vtable = this.objectVTable(sc.id);
 
     header = if (this.config.vtableByteSize == 8) {
       Array[
@@ -2263,7 +2336,7 @@ mutable class .AsmOutput{
     | Some(t) -> t
     | None() ->
       // Get the machine-generated class holding all the "const" globals.
-      globalsClass = tConstSingleton.sclass(this.env);
+      globalsClass = this.exampleSClass(tConstSingleton);
 
       // The bit size is determined by the end of the last field.
       layout = globalsClass.layout.fromSome();
@@ -2507,11 +2580,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | struct @ ConstantStruct _ -> asm.common.llvmWriteConstantStruct(asm, struct)
   | ConstantVoid _ -> asm.die("Cannot name void input value.")
   | ConstantVTable{value, frozen_} ->
-    byteOffset = (
-      asm.common.classByteOffset(value) +
-      (if (frozen_) VTable.kFrozenMask else 0)
-    );
-    llvmWriteVTableRef(byteOffset, asm)
+    asm.common.writeClassVTableRef(asm, value, frozen_)
 
   // TODO: More of these should just die, as they don't make sense.
 
@@ -2816,7 +2885,7 @@ private fun llvmGetAddr(
 // Emit LLVM code for a Load Instr.
 private fun llvmWriteLoad(load: Load, asm: mutable FunAsmDefBuilder): void {
   // Get the raw type of what we are loading.
-  t = load.typ.getScalarType(asm.env());
+  t = asm.getScalarType(load.typ);
 
   (addr, loadTypeName, isBitfield, bitOffset, memByteAlignment) = llvmGetAddr(
     load,
@@ -2889,7 +2958,7 @@ private fun llvmWriteStore(
 
   // Get the raw type of what we are storing.
   storeValue = optinfo.getInstr(store.value);
-  t = storeValue.typ.getScalarType(asm.env());
+  t = asm.getScalarType(storeValue.typ);
 
   (addr, memTypeName, isBitfield, bitOffset, memByteAlignment) = llvmGetAddr(
     store,
@@ -3056,7 +3125,7 @@ private fun llvmComputeArrayAddress(
 
   vec = optinfo.getInstr(vecID);
   vecType = vec.typ;
-  slotInfo = vecType.exampleSClass(asm.env()).getArraySlotInfo(pos);
+  slotInfo = asm.exampleSClass(vecType).getArraySlotInfo(pos);
 
   index = optinfo.getInstr(indexID);
 
@@ -3297,7 +3366,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | c @ CallBase _ -> c.pos.die(c.opname() + " should have been lowered away")
   | Cast{value} ->
     asm.print("  %n = bitcast %N" % instr % value);
-    prim = instr.typ.getScalarType(asm.env());
+    prim = asm.getScalarType(instr.typ);
     asm.print(" to %s, %D\n" % prim.llvmTypeName % instr)
   | FloatBits{value} ->
     asm.print("  %n = bitcast double %n to i64, %D\n" % instr % value % instr)
@@ -3391,8 +3460,8 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     )
   | Reinterpret{value} ->
     src = optinfo.getInstr(value);
-    srcPrim = src.typ.getScalarType(asm.env());
-    dstPrim = instr.typ.getScalarType(asm.env());
+    srcPrim = asm.getScalarType(src.typ);
+    dstPrim = asm.getScalarType(instr.typ);
 
     opcode = if (srcPrim.isLlvmPointer() == dstPrim.isLlvmPointer()) {
       "bitcast"

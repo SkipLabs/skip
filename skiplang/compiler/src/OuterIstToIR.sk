@@ -927,6 +927,10 @@ fun makeGFunTypeWithFlags{
 }
 
 class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
+  fun toString(): String {
+    "LazyGFunKey(" + this.value.gname().id + ")"
+  }
+
   fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGFunKey(value) -> this.value.toString().compare(value.toString())
@@ -936,6 +940,10 @@ class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
 }
 
 class LazyGClassKey(value: LazyGClass) extends SKStore.Key {
+  fun toString(): String {
+    "LazyGClassKey(" + this.value.name().id + ")"
+  }
+
   fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGClassKey(value) -> this.value.name().id.compare(value.name().id)
@@ -5024,7 +5032,6 @@ const constsArrayDir: SKStore.EHandle<
 
 class RootsIR{
   consts: Array<ConstLazyGFun>,
-  funDefs: Array<OuterIst.FunDef>,
   forceCompile: Array<LazyGFun>,
   runtimeFunctions: Array<FrontEndLazyGFun>,
   disasm: UnorderedSet<String>,
@@ -5117,7 +5124,6 @@ fun prepareCreateIR(
   reportMemoryStatistics("native/createIR after force compile constant inits");
   RootsIR{
     consts,
-    funDefs,
     forceCompile => forceCompile.toArray(),
     runtimeFunctions => runtimeFunctions.toArray(),
     disasm => disasm.chill(),
@@ -5147,6 +5153,7 @@ fun createIR(
   roots: RootsIR,
   specializer: mutable Specializer,
   incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
+  prepared: ?FunctionIRStateFile,
 ): GlobalEnv {
   // Incremental builds already attached these sets in a tracked map/merge
   // phase. Sequential builds keep the original local pass.
@@ -5178,9 +5185,21 @@ fun createIR(
   };
 
   // Split up functions based on which ones can share machine code.
-  sclasses = specializer.createNewSClassesMap();
+  // Incremental assembly fills classes after merging synthetic return tuples.
+  // It does not need another complete class map before partitionFunctions.
+  sclasses = if (prepared.isSome()) SortedMap[] else {
+    specializer.createNewSClassesMap()
+  };
   env = GlobalEnv::make(sclasses) with {
-    sourcePositions => SourcePositions.Table::read(context),
+    // Successful incremental semantics use symbolic positions. LLVM modules
+    // track their own anchors; adding an unused declaration must not invalidate
+    // this whole-program row merely by extending the source marker table.
+    sourcePositions => if (
+      !config.incrementalSpecialization ||
+      config.needsIRSourcePositions()
+    ) SourcePositions.Table::read(context) else {
+      SourcePositions.Table{}
+    },
   };
   !env = specializer.partitionFunctions(
     context,
@@ -5190,6 +5209,7 @@ fun createIR(
     roots.consts,
     roots.disasm,
     incrementalFunctions,
+    prepared,
   );
 
   reportMemoryStatistics("native/createIR end");

@@ -45,10 +45,11 @@ mutable class .Alloc{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     anythingEscapes = (
       f.funType.params.any(t -> t.isMutable()) ||
-      f.funType.returnType.any(t -> t.getScalarType(env).isGCPointer())
+      f.funType.returnType.any(t -> ClassInputs.getScalarType(t, env, classReader).isGCPointer())
     );
 
     // TODO: Something could escape via an exception which we aren't smart
@@ -56,7 +57,7 @@ mutable class .Alloc{
     !anythingEscapes = true;
 
     optinfo = OptimizerInfo::make(f);
-    d = mutable static{optinfo, env, config, pos => f.pos, anythingEscapes};
+    d = mutable static{optinfo, env, config, classReader, pos => f.pos, anythingEscapes};
     d.go("alloc", true)
   }
 

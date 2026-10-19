@@ -33,11 +33,13 @@ mutable class .Peephole{
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
       config,
+      classReader,
       pos => f.pos,
     };
     d.go("peephole", true)
@@ -236,7 +238,7 @@ mutable class .Peephole{
 
       // Use global value numbering (CSE) to look for a dominating duplicate.
       if (
-        canCSE(keepStmt, optinfo, this.env) &&
+        canCSE(keepStmt, optinfo, this.env, this.classReader) &&
         !this.gvn.maybeSet(keepStmt, keepStmt)
       ) {
         // We have an old one that's equal, so use it instead.
@@ -384,6 +386,7 @@ private fun canCSECall(
   call: CallBase,
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Bool {
   call.typ.isDeepFrozen() &&
     allDeepFrozen(call.args, optinfo) &&
@@ -396,8 +399,7 @@ private fun canCSECall(
       // silently delete that implementation's second execution. The
       // iteration stops at the first implementation that cannot CSE.
       optinfo.allMethodImplementations(mcall, env, (_, methodCodeID, _, _) ->
-        funCanCSE(methodCodeID, env, call.pos)
-      )
+        funCanCSE(methodCodeID, env, call.pos), classReader)
     })
 }
 
@@ -520,6 +522,7 @@ private fun canCSE(
   instr: Stmt,
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Bool {
   instr match {
   | Terminator _ -> false
@@ -580,12 +583,12 @@ private fun canCSE(
 
   | Load{canCSE} -> canCSE
 
-  | call @ CallBase _ -> canCSECall(call, optinfo, env)
+  | call @ CallBase _ -> canCSECall(call, optinfo, env, classReader)
   | GetField{obj, field} ->
     objType = optinfo.getInstr(obj).typ;
     objType.isDeepFrozen() ||
       {
-        sc = objType.exampleSClass(env);
+        sc = ClassInputs.exampleSClass(objType, env, classReader);
         !sc.getField(field, instr.pos).isAssignable
       }
   | Intern{value} -> optinfo.getInstr(value).typ.isDeepFrozen()
@@ -811,7 +814,7 @@ private fun peepholeBytePointerAdd(
 
 private fun peepholeCast(peep: Cast, s: mutable Peephole): Instr {
   input = s.getInstr(peep.value);
-  if (isSubType(input.typ, peep.typ, s.env, peep.pos)) {
+  if (ClassInputs.isSubType(input.typ, peep.typ, s.env, peep.pos, s.classReader)) {
     // Cast is not adding any information (i.e. remove upcast).
     input
   } else {
@@ -921,10 +924,11 @@ private fun onlyOneNonFrozen(
   optinfo: mutable OptimizerInfo,
   env: GlobalEnv,
   pos: Pos,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Bool {
   optinfo.f.superpositions.all(sposn -> {
     t = typ.typeInSuperposition(sposn);
-    sc = t.sclass(env);
+    sc = ClassInputs.getSClass(env, t.sclassID, classReader);
     if (!sc.isReturnTuple()) {
       pos.die("Expected a return tuple type, not " + t)
     };
@@ -944,7 +948,7 @@ private fun tryCallNopFreeze(peep: Freeze, s: mutable Peephole): Instr {
     s.getInstr(obj) match {
     | CallBase{args, typ} ->
       allDeepFrozen(args, s.optinfo) &&
-        onlyOneNonFrozen(typ, index, s.optinfo, s.env, peep.pos)
+        onlyOneNonFrozen(typ, index, s.optinfo, s.env, peep.pos, s.classReader)
     | _ -> false
     }
   | _ -> false
@@ -980,7 +984,7 @@ private fun peepholeGetField(peep: GetField, s: mutable Peephole): Instr {
   | ConstantObject{typ, values} ->
     // Reading a field from a compile-time constant Object yields a
     // campile-time constant.
-    sc = typ.exampleSClass(s.env);
+    sc = ClassInputs.exampleSClass(typ, s.env, s.classReader);
     c = values[sc.getFieldIndex(peep.field, peep.pos)];
     s.getConstant(c with {id => s.iid()})
   | _ -> peep
@@ -1018,8 +1022,7 @@ private fun peepholeCallMethod(
         !sid = SFunctionID::none;
         false
       }
-    },
-  );
+    }, s.classReader);
 
   if (sid == SFunctionID::none) {
     peep
@@ -1142,7 +1145,7 @@ private fun peepholeZeroExtend(peep: ZeroExtend, s: mutable Peephole): Instr {
   | obj ->
     obj.constantInteger() match {
     | Some(value) ->
-      inSize = obj.typ.getScalarType(s.env).bitSize;
+      inSize = ClassInputs.getScalarType(obj.typ, s.env, s.classReader).bitSize;
       shift = 64 - inSize;
       s.constantTypedInt(peep.typ, value.shl(shift).ushr(shift))
     | None() -> peep
@@ -1748,7 +1751,7 @@ private fun peepholeArrayAlloc(peep: ArrayAlloc, s: mutable Peephole): Instr {
     if (
       n == 0 ||
       {
-        sc = peep.typ.exampleSClass(s.env);
+        sc = ClassInputs.exampleSClass(peep.typ, s.env, s.classReader);
         sc.getArraySlotInfo(pos).types.isEmpty()
       }
     ) {
@@ -1770,7 +1773,7 @@ private fun allConstantArgs(
   args: Array<InstrID>,
   s: mutable Peephole,
 ): ?Array<Constant> {
-  sc = peep.typ.exampleSClass(s.env);
+  sc = ClassInputs.exampleSClass(peep.typ, s.env, s.classReader);
   if (
     sc.kind.isKClass() &&
     (args.isEmpty() ||

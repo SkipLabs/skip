@@ -253,9 +253,11 @@ mutable class .SklibBuilder(
 class Resolver(
   sklibs: Map<String, Map<String, (String, Metadata)>>,
   target: String,
+  metadataByPath: Map<String, Metadata>,
 ) {
   static fun create(paths: Array<String>, target: String): Resolver {
     sklibs = mutable Map[];
+    metadataByPath = mutable Map[];
     for (p in paths) {
       if (!FileSystem.exists(p)) {
         // TODO: Log it.
@@ -267,14 +269,15 @@ class Resolver(
           continue
         };
 
-        path = Path.join(p, f);
-        metadata = read_metadata(path) match {
-        | Success(metadata) -> metadata
-        | Failure(err) ->
-          print_error(`Failed to read metadata for ${path}: ${err}`);
-          // TODO: Does 3 make sense here?
-          skipExit(3)
-        };
+        path = FileSystem.realpath(Path.join(p, f));
+        metadata = metadataByPath.getOrAdd(path, () ->
+          read_metadata(path) match {
+          | Success(metadata) -> metadata
+          | Failure(err) ->
+            print_error(`Failed to read metadata for ${path}: ${err}`);
+            skipExit(3)
+          }
+        );
         if (metadata.target != target) continue;
         _ = sklibs
           .getOrAdd(metadata.name, () -> mutable Map[])
@@ -282,7 +285,7 @@ class Resolver(
       }
     };
 
-    Resolver(sklibs.map((_, v) -> v.chill()), target)
+    Resolver(sklibs.map((_, v) -> v.chill()), target, metadataByPath.chill())
   }
 
   fun resolve(dependencies: Array<String>): Map<String, (String, Metadata)> {
@@ -294,11 +297,18 @@ class Resolver(
       (!dep, path, metadata) = if (dep.contains("=")) {
         (name, path) = dep.splitFirst("=");
         !path = FileSystem.realpath(path);
-        metadata = read_metadata(path) match {
-        | Success(metadata) -> metadata
-        | Failure(err) ->
-          print_error(`Failed to read metadata for ${path}: ${err}`);
-          skipExit(3)
+        // Candidate scanning already parsed explicit dependencies on the search
+        // path. Reuse that invocation's snapshot rather than decoding all their
+        // source text again. A new invocation constructs a new Resolver.
+        metadata = this.metadataByPath.maybeGet(path) match {
+        | Some(metadata) -> metadata
+        | None() ->
+          read_metadata(path) match {
+          | Success(metadata) -> metadata
+          | Failure(err) ->
+            print_error(`Failed to read metadata for ${path}: ${err}`);
+            skipExit(3)
+          }
         };
         if (metadata.target != this.target) {
           print_error(`Failed to resolve ${name} (target mismatch)`);

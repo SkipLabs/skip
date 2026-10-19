@@ -21,7 +21,7 @@ class GFunKey(
   i1: FunSuperpositionID,
 ) uses Orderable, Hashable, Show {
   fun toString(): String {
-    "(" + this.i0 + ", " + this.i1 + ")"
+    "(" + this.i0.gname().id + ", " + this.i1.toString() + ")"
   }
 }
 
@@ -823,7 +823,13 @@ class OptionLayoutFile(
   isNative: Bool,
   fields: Array<SField>,
 ) extends SKStore.File
-class GFunKeyKey(value: GFunKey) extends SKStore.Key
+class GFunKeyKey(value: GFunKey) extends SKStore.Key {
+  fun toString(): String {
+    // Inspecting a lazy callable recursively expands its captured compiler
+    // structures. Debug keys need only the stable function name and type args.
+    "GFunKeyKey" + this.value.toString()
+  }
+}
 class GFunKeyFile(value: GFunKey) extends SKStore.File
 class SpecializedFunctionFile(
   value: Function,
@@ -973,7 +979,7 @@ mutable class Specializer{
 
   // Updated as we go to point to something related to what we are specializing.
   mutable pos: Pos,
-} extends ClassLookupEnv {
+} extends TrackedClassLookupEnv {
   static fun make(
     handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
     context: mutable SKStore.Context,
@@ -1282,11 +1288,11 @@ mutable class Specializer{
     };
   }
 
-  readonly fun supertypesGet(key: SClassID): SortedSet<SClassID> {
+  mutable fun supertypesGet(key: SClassID): SortedSet<SClassID> {
     if (this.canCreateNewSClasses) {
       invariant_violation("supertypesGet should not be called in this phase");
     };
-    this.supertypes.readonlyGet(key)
+    this.supertypes.get(this.context, key)
   }
 
   mutable fun trackedSupertypesGet(key: SClassID): SortedSet<SClassID> {
@@ -1297,11 +1303,11 @@ mutable class Specializer{
     this.supertypes.add(key, value)
   }
 
-  readonly fun subtypesGet(key: SClassID): SortedSet<SClassID> {
+  mutable fun subtypesGet(key: SClassID): SortedSet<SClassID> {
     if (this.canCreateNewSClasses) {
       invariant_violation("subtypesGet should not be called in this phase");
     };
-    this.subtypes.readonlyGet(key)
+    this.subtypes.get(this.context, key)
   }
 
   mutable fun trackedSubtypesGet(key: SClassID): SortedSet<SClassID> {
@@ -1340,11 +1346,11 @@ mutable class Specializer{
     this.sclassMap.set(key, value);
   }
 
-  readonly fun sclassGet(key: SClassID): SClassInfo {
+  mutable fun sclassGet(key: SClassID): SClassInfo {
     if (this.canCreateNewSClasses) {
       invariant_violation("sclassGet should not be called in this phase");
     };
-    result = this.sclasses.readonlyGet(key);
+    result = this.sclasses.get(this.context, key);
     result
   }
 
@@ -1431,7 +1437,7 @@ mutable class Specializer{
     this.!pos = other.pos;
   }
 
-  readonly fun getSClass(sid: SClassID): SClass {
+  mutable fun getSClass(sid: SClassID): SClass {
     this.sclassGet(sid).sclass
   }
 
@@ -1440,7 +1446,7 @@ mutable class Specializer{
   }
 
   // If t is Awaitable<T>, returns Some(T), else None().
-  readonly fun awaitableType(t: Tclass): ?Tclass {
+  mutable fun awaitableType(t: Tclass): ?Tclass {
     // Get the SClassInfo for the "Awaitable" type (maybe a base class).
     info = this.sclassGet(t.sclassID);
     baseInfo = if (info.sclass.gclassName == GClassName("Awaitable")) {
@@ -1961,22 +1967,22 @@ mutable class Specializer{
     }
   }
 
-  readonly fun exampleSClass(t: Type): SClass {
+  mutable fun exampleSClass(t: Type): SClass {
     this.exampleSClassInfo(t).sclass
   }
 
-  readonly fun exampleSClassInfo(t: Type): readonly SClassInfo {
+  mutable fun exampleSClassInfo(t: Type): readonly SClassInfo {
     t match {
     | Tclass(sclassID, _) -> this.sclassGet(sclassID)
     | Tsuperposition(unique, _) -> this.sclassGet(unique[0].sclassID)
     }
   }
 
-  readonly fun getScalarType(t: Type): ScalarType {
+  mutable fun getScalarType(t: Type): ScalarType {
     this.exampleSClass(t).getScalarType()
   }
 
-  readonly fun maybeGetScalarType(t: Type): ?ScalarType {
+  mutable fun maybeGetScalarType(t: Type): ?ScalarType {
     this.exampleSClass(t).maybeGetScalarType()
   }
 
@@ -3239,7 +3245,7 @@ mutable class Specializer{
   // the dependencies.
   //
   // See comments at the top of coroutine.sk for more info.
-  private readonly fun insertCoroutineCompilationOrderDependencies(
+  private mutable fun insertCoroutineCompilationOrderDependencies(
     msfuns: mutable FunctionIDToFunction,
   ): void {
     for (f in msfuns) {
@@ -3287,21 +3293,34 @@ mutable class Specializer{
     config: Config.Config,
     lconsts: Array<ConstLazyGFun>,
     disasm: readonly UnorderedSet<String>,
-    incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
+    incrementalFunctions: ?SKStore.EHandle<
+      SKStore.Key,
+      SpecializedFunctionFile,
+    >,
+    prepared: ?FunctionIRStateFile,
   ): GlobalEnv {
     // GFunKey order depends on callable identity and type arguments, not the
     // current body. The old GFunction-keyed hash grouping could renumber every
     // function after a body edit. Every instantiation already gets its own IR.
-    instantiations = this.funsNeeded.toFixed().data.values().collect(Array);
+    instantiations = prepared match {
+    | Some(plan) -> plan.instantiations
+    | None() -> this.funsNeeded.toFixed().data.values().collect(Array)
+    };
 
     msfuns = FunctionIDToFunction::mcreate();
 
     // Partition functions into superpositions and give them SFunctionIDs.
     // We need to assign SFunctionIDs now so that when we specialize them
     // below, Call Instrs know the SFunctionIDs to use to refer to other funs.
-    msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(instantiations.size());
-    for (key in instantiations) msids.add(key, msfuns.allocID());
-    sids = msids.chill();
+    sids = prepared match {
+    | Some(plan) -> plan.sids
+    | None() ->
+      msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(
+        instantiations.size(),
+      );
+      for (key in instantiations) msids.add(key, msfuns.allocID());
+      msids.chill()
+    };
     reportMemoryStatistics("native/partitionFunctions after sids");
 
     // Create a table of all runtime functions so we can look them up
@@ -3315,11 +3334,29 @@ mutable class Specializer{
     };
 
     ptrByteSize = config.ptrByteSize;
+    sequentialIDs = FunctionIDs{fixed => sids};
+    // This coordinator consumes every function. A tracked collection read
+    // expresses that dependency once, instead of registering and persisting one
+    // read per instantiation on every assembly. Keep stable instantiation order
+    // below; the local index is only a lookup table, not an incremental cache.
+    currentFunctions = incrementalFunctions.map(functions -> {
+      byInstantiation = UnorderedMap<GFunKey, SpecializedFunctionFile>::mcreate(
+        instantiations.size(),
+      );
+      for ((key, values) in functions.items(context)) {
+        key match {
+        | GFunKeyKey(instantiation) ->
+          values.next().each(value -> byInstantiation.set(instantiation, value))
+        | _ -> void
+        }
+      };
+      byInstantiation.chill()
+    });
     for (s in instantiations) {
       sid = sids[s];
-      f = incrementalFunctions match {
+      f = currentFunctions match {
       | Some(functions) ->
-        result = functions.getArray(context, GFunKeyKey(s))[0];
+        result = functions[s];
         for (id => info in result.returnTuples) {
           this.sclasses.maybeGet(context, id).each(previous -> {
             invariant(
@@ -3333,7 +3370,15 @@ mutable class Specializer{
       | None() ->
         gf = this.converter.getGFunction(context, s.i0);
         this.withRegion(context, (context, specializer) ~> {
-          specializeFunctionIR(context, ptrByteSize, specializer, gf, s, sid, sids)
+          specializeFunctionIR(
+            context,
+            ptrByteSize,
+            specializer,
+            gf,
+            s,
+            sid,
+            sequentialIDs,
+          )
         })
       };
       msfuns.insert(f)
@@ -3341,10 +3386,12 @@ mutable class Specializer{
     reportMemoryStatistics("native/partitionFunctions after sfuns");
 
     // Populate each SClass.methods with the SFunctionIDs for its code.
-    for (info in this.getSClasses()) {
-      this.withRegion(context, (_, specializer) ~> {
-        specializer.populateSFunctionIDs(info, sids);
-      })
+    if (prepared.isNone()) {
+      for (info in this.getSClasses()) {
+        this.withRegion(context, (_, specializer) ~> {
+          specializer.populateSFunctionIDs(info, sids);
+        })
+      }
     };
 
     // Figure out which Function handles each const.
@@ -3421,11 +3468,80 @@ mutable class Specializer{
 class FunctionIRStateFile(
   state: SpecializerState,
   sids: UnorderedMap<GFunKey, SFunctionID>,
+  instantiations: Array<GFunKey>,
   ptrByteSize: Int,
 ) extends SKStore.File
-class FunctionIRWorkFile(instantiation: GFunKey) extends SKStore.File
-class GenericFunctionKey(callable: LazyGFun) extends SKStore.Key
+class FunctionIRSharedFile(
+  config: Config.SpecializationConfig,
+  converter: Converter,
+  ptrByteSize: Int,
+) extends SKStore.File
+class FunctionIRWorkFile(
+  instantiation: GFunKey,
+  sid: SFunctionID,
+) extends SKStore.File
+class GenericFunctionKey(callable: LazyGFun) extends SKStore.Key {
+  fun toString(): String {
+    "GenericFunctionKey(" + this.callable.gname().id + ")"
+  }
+}
 class GenericFunctionRequestFile(callable: LazyGFun) extends SKStore.File
+private class FunctionIdentityState(
+  next: Int,
+  ids: SortedMap<(GFunctionName, FunSuperpositionID), SFunctionID>,
+) extends SKStore.File
+
+// The lazy factory allocates each identity once. It has no semantic inputs to
+// invalidate; active membership and callee dependencies live in ordinary eager
+// work rows. Retain retired identities so removing/reintroducing a function does
+// not change its ID. Context mutation is serial in the compiler pipeline.
+fun createFunctionIdentities(
+  context: mutable SKStore.Context,
+): SKStore.LHandle<GFunKeyKey, SKStore.IntFile> {
+  SKStore.LHandle::create(
+    GFunKeyKey::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/specializer/function-identities/"),
+    (context, _handle, key) ~> {
+      state = context.getPersistent("COMPILER_FUNCTION_IDENTITIES") match {
+      | Some(file) -> FunctionIdentityState::type(file)
+      // Raw instantiations and synthetic const functions share this allocator.
+      | None() -> FunctionIdentityState(0, SortedMap[])
+      };
+      identity = (key.value.i0.gname(), key.value.i1);
+      id = state.ids.maybeGet(identity) match {
+      | Some(id) -> id
+      | None() ->
+        id = SFunctionID(state.next);
+        // Lazy rows can be collected after their last reader disappears. The
+        // allocator retains identities so recreating such a row returns the
+        // same immutable ID; this is allocation state, not a semantic cache.
+        context.setPersistent(
+          "COMPILER_FUNCTION_IDENTITIES",
+          FunctionIdentityState(state.next + 1, state.ids.set(identity, id)),
+        );
+        id
+      };
+      Array[SKStore.IntFile(id.id)]
+    },
+  )
+}
+
+class FunctionIDs{
+  fixed: UnorderedMap<GFunKey, SFunctionID> = UnorderedMap[],
+  active: ?SKStore.EHandle<SKStore.Key, SKStore.File> = None(),
+} {
+  fun maybeGet(context: mutable SKStore.Context, key: GFunKey): ?SFunctionID {
+    this.active match {
+    | None() -> this.fixed.maybeGet(key)
+    | Some(active) ->
+      active.getArray(context, GFunKeyKey(key)).maybeGet(0).map(file ->
+        FunctionIRWorkFile::type(file).sid
+      )
+    }
+  }
+}
 
 fun planFunctionIR(
   context: mutable SKStore.Context,
@@ -3433,6 +3549,7 @@ fun planFunctionIR(
   input: SKStore.EHandle<SKStore.Key, SKStore.File>,
   config: Config.SpecializationConfig,
   converter: Converter,
+  identities: SKStore.LHandle<GFunKeyKey, SKStore.IntFile>,
 ): void {
   // toFixed uses a raw scan; explicitly register the whole collection read.
   _ = input.items(context);
@@ -3441,8 +3558,19 @@ fun planFunctionIR(
   snapshot.!canCreateNewSClasses = false;
   instantiations = snapshot.funsNeeded.toFixed().data.values().collect(Array);
   msids = UnorderedMap<GFunKey, SFunctionID>::mcreate(instantiations.size());
-  for (index => key in instantiations) msids.add(key, SFunctionID(index));
+  for (key in instantiations) {
+    msids.add(
+      key,
+      SFunctionID(identities.getArray(context, GFunKeyKey(key))[0].value),
+    )
+  };
   sids = msids.chill();
+  // Method identities depend on discovery and the ID table, not on function
+  // bodies. Resolve them once in this cached plan. Synthetic return tuples have
+  // no methods and are still collected from function results during assembly.
+  for (info in snapshot.getSClasses()) {
+    snapshot.populateSFunctionIDs(info, sids)
+  };
   state = snapshot.chill() with {
     funsNeeded => SPMapFixed::mcreate(SortedMap[]).chill(),
     pos => FileRange.builtin,
@@ -3451,11 +3579,11 @@ fun planFunctionIR(
   // instantiation rows contain identities only; generic bodies are separate.
   writer.set(
     SKStore.IID(0),
-    FunctionIRStateFile(state, sids, config.ptrBitSize / 8),
+    FunctionIRStateFile(state, sids, instantiations, config.ptrBitSize / 8),
   );
   requested = mutable UnorderedSet[];
   for (key in instantiations) {
-    writer.set(GFunKeyKey(key), FunctionIRWorkFile(key));
+    writer.set(GFunKeyKey(key), FunctionIRWorkFile(key, sids[key]));
     // Body compilation belongs to a per-callable mapper. In particular,
     // foo<Int> and foo<String> must share one generic body, and a body edit
     // must not make this global identity scan recompile unrelated functions.
@@ -3483,6 +3611,34 @@ fun generateGenericFunctionIR(
   }
 }
 
+// Class state remains keyed through body generation. Adding an unrelated
+// class must not replace a shared fixed snapshot read by every instantiation.
+fun publishFunctionIRClassState(
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  plan: FunctionIRStateFile,
+): void {
+  state = plan.state;
+  writer.set(
+    SKStore.IID(0),
+    FunctionIRSharedFile(state.config, state.converter, plan.ptrByteSize),
+  );
+  for ((key, value) in state.gclassMap.getDiff().items()) {
+    writer.set(convGClassName2Key(key), convSortedSetSClassID2File(value))
+  };
+  for ((key, value) in state.subtypes.getDiff().items()) {
+    writer.set(convSClassID2SubtypesKey(key), convSortedSetSClassID2File(value))
+  };
+  for ((key, value) in state.supertypes.getDiff().items()) {
+    writer.set(convSClassID2SupertypesKey(key), convSortedSetSClassID2File(value))
+  };
+  for ((key, value) in state.sclassMap.toFixed().data.items()) {
+    writer.set(convHalfSClass2Key(key), convSClassID2File(value))
+  };
+  for ((key, value) in state.sclasses.toFixed().data.items()) {
+    writer.set(convSClassID2Key(key), convSClassInfo2File(value))
+  }
+}
+
 fun generateFunctionIR(
   context: mutable SKStore.Context,
   writer: mutable SKStore.TWriter<SKStore.Key, SpecializedFunctionFile>,
@@ -3490,17 +3646,24 @@ fun generateFunctionIR(
   values: mutable SKStore.NonEmptyIterator<SKStore.File>,
   plan: SKStore.EHandle<SKStore.Key, SKStore.File>,
   genericFunctions: SKStore.EHandle<SKStore.Key, GFunctionFile>,
+  shared: SKStore.EHandle<SKStore.Key, SKStore.File>,
 ): void {
   work = values.first match {
   | work @ FunctionIRWorkFile _ -> work
   | _ -> return void
   };
-  common = FunctionIRStateFile::type(plan.getArray(context, SKStore.IID(0))[0]);
+  if (context.debugMode) {
+    print_string(`FUNCTION_IR: ${work.instantiation} id=${work.sid.id}`)
+  };
+  common = FunctionIRSharedFile::type(
+    shared.getArray(context, SKStore.IID(0))[0],
+  );
   gf = genericFunctions.getArray(
     context,
     GenericFunctionKey(work.instantiation.i0),
   )[0].value;
-  sp = common.state.mclone(context);
+  sp = Specializer::make(shared, context, common.config, common.converter);
+  sp.!canCreateNewSClasses = false;
   sp.!generatedReturnTuples = Some(SortedMap[]);
   f = specializeFunctionIR(
     context,
@@ -3508,8 +3671,8 @@ fun generateFunctionIR(
     sp,
     gf,
     work.instantiation,
-    common.sids[work.instantiation],
-    common.sids,
+    work.sid,
+    FunctionIDs{active => Some(plan)},
   );
   writer.set(
     key,
@@ -3526,10 +3689,16 @@ fun specializeFunctionIR(
   gf: GFunction,
   instantiation: GFunKey,
   sid: SFunctionID,
-  sids: UnorderedMap<GFunKey, SFunctionID>,
+  sids: FunctionIDs,
 ): Function {
   f = FunSpecializer::run(
-    context, ptrByteSize, specializer, gf, Array[instantiation.i1], sid, sids,
+    context,
+    ptrByteSize,
+    specializer,
+    gf,
+    Array[instantiation.i1],
+    sid,
+    sids,
   );
   if (!gf.hasImplementation()) {
     // Kill off the synthetic unreachable block for declarations.
@@ -3559,13 +3728,13 @@ mutable class FunSpecializer{
   typemaps: Array<UnorderedMap<GTparam, Tclass>>,
   mutable whyCurrentInstrUnreachable: ?String = None(),
   //  returnType: NamedInner<SuperpositionField>,
-  specializedFunctionMap: UnorderedMap<GFunKey, SFunctionID>,
+  specializedFunctionMap: FunctionIDs,
   invokeExtracts: mutable UnorderedMap<
     GBlockID,
     mutable Vector<TupleExtract>,
   > = mutable UnorderedMap[],
   mutable coroutineInfo: ?UnfinishedCoroutine = None(),
-} extends RewriteBase, ClassLookupEnv {
+} extends RewriteBase, TrackedClassLookupEnv {
   mutable fun makePos(pos: FileRange, fpos: FileRange): Pos {
     if (pos.file == fpos.file) {
       pos
@@ -3591,7 +3760,7 @@ mutable class FunSpecializer{
     gfunction: GFunction,
     callers: Array<FunSuperpositionID>,
     fid: SFunctionID,
-    specializedFunctionMap: UnorderedMap<GFunKey, SFunctionID>,
+    specializedFunctionMap: FunctionIDs,
   ): Function {
     gfi = gfunction.funInfo;
 
@@ -3765,7 +3934,7 @@ mutable class FunSpecializer{
     }
   }
 
-  readonly fun getSClass(sid: SClassID): SClass {
+  mutable fun getSClass(sid: SClassID): SClass {
     this.specializer.sclassGet(sid).sclass
   }
 
@@ -3773,11 +3942,11 @@ mutable class FunSpecializer{
     this.specializer.scalarize(typ, this.callers, this.pos)
   }
 
-  readonly fun getScalarType(t: Type): ScalarType {
+  mutable fun getScalarType(t: Type): ScalarType {
     this.specializer.getScalarType(t)
   }
 
-  readonly fun maybeGetScalarType(t: Type): ?ScalarType {
+  mutable fun maybeGetScalarType(t: Type): ?ScalarType {
     this.specializer.maybeGetScalarType(t)
   }
 
@@ -4075,6 +4244,7 @@ mutable class FunSpecializer{
   }
 
   mutable fun computeSFunctionID(
+    context: mutable SKStore.Context,
     name: LazyGFun,
     smap: SuperpositionMap<FunSuperpositionID>,
     pos: Pos,
@@ -4083,7 +4253,7 @@ mutable class FunSpecializer{
     for (c in this.callers) {
       fsposn = smap[c];
       fkey = GFunKey(name, fsposn);
-      this.specializedFunctionMap.maybeGet(fkey) match {
+      this.specializedFunctionMap.maybeGet(context, fkey) match {
       | Some(sid2) ->
         if (sid == SFunctionID::none) {
           !sid = sid2
@@ -4136,7 +4306,7 @@ mutable class FunSpecializer{
       | _ -> void
       };
 
-      sid = this.computeSFunctionID(name, smap, pos);
+      sid = this.computeSFunctionID(context, name, smap, pos);
 
       id = this.iid();
 

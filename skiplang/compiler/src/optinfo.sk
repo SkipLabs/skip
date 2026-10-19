@@ -222,6 +222,7 @@ mutable class .OptimizerInfo{
     call: CallMethodBase,
     env: GlobalEnv,
     func: (SClass, SFunctionID, FunSuperpositionID, FunSuperpositionID) -> Bool,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): Bool {
     pos = call.pos;
     objType = this.getInstr(call.obj()).typ;
@@ -229,11 +230,11 @@ mutable class .OptimizerInfo{
     this.f.superpositions.all(sposn -> {
       methodSuperposition = call.smap[sposn];
 
-      objType.typeInSuperposition(sposn).forEachConcreteSubtype(env, sc -> {
+      ClassInputs.forEachConcreteSubtype(objType.typeInSuperposition(sposn), env, sc -> {
         code = sc.getMethod(call.method, methodSuperposition, pos);
         callee = FunSuperpositionID(sc.superposition, methodSuperposition);
         func(sc, code, sposn, callee)
-      })
+      }, classReader)
     })
   }
 
@@ -244,8 +245,9 @@ mutable class .OptimizerInfo{
     call: CallMethodBase,
     env: GlobalEnv,
     func: (SClass, SFunctionID, FunSuperpositionID, FunSuperpositionID) -> Bool,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): Bool {
-    !this.allMethodImplementations(call, env, (a, b, c, d) -> !func(a, b, c, d))
+    !this.allMethodImplementations(call, env, (a, b, c, d) -> !func(a, b, c, d), classReader)
   }
 }
 

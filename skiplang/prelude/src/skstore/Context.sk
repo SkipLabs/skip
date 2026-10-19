@@ -2168,6 +2168,57 @@ fun runWithGc(
   )
 }
 
+// Run a fixed pipeline, synchronizing the context and reclaiming temporary
+// memory after every step. A step returns true to advance, or false to repeat
+// after synchronization. Continuation data must live in the context; callbacks
+// must not retain mutable invocation snapshots across checkpoints.
+//
+// progressKey belongs to the caller and must be distinct from other pipelines
+// sharing this context. Completion removes it, allowing a later invocation to
+// start again. This driver does not implicitly drain pending reactive updates:
+// steps choose their own updateUntilBoundary()/update() policy. For a checkpoint
+// after every dependency arrow, use one step returning:
+// context.updateUntilBoundary(_ ~> false, _ ~> true).isNone()
+fun runPipeline(
+  initCtx: Context,
+  progressKey: String,
+  steps: Array<mutable Context ~> Bool>,
+  beforeStep: (mutable Context, Int) ~> void = (_, _) ~> void,
+  onComplete: mutable Context ~> void = _ ~> void,
+  onError: .Exception ~> void = exn ~> {
+    throw exn
+  },
+): void {
+  runWithGc(initCtx, context ~> {
+    try {
+      step = context.getGlobal(progressKey) match {
+      | Some(value) -> IntFile::type(value).value
+      | None() -> 0
+      };
+      invariant(
+        step >= 0 && step <= steps.size(),
+        "Invalid pipeline checkpoint",
+      );
+      if (step < steps.size()) {
+        beforeStep(context, step);
+        if (steps[step](context)) !step = step + 1;
+      };
+      if (step == steps.size()) {
+        context.removeGlobal(progressKey);
+        onComplete(context);
+        CStop(None())
+      } else {
+        context.setGlobal(progressKey, IntFile(step));
+        CContinue(None())
+      }
+    } catch {
+    | exn ->
+      onError(exn);
+      throw exn
+    }
+  })
+}
+
 fun withRegion<T>(
   context: mutable Context,
   f: (Obstack, mutable Context) ~> T,

@@ -1,0 +1,167 @@
+// Normal keyed class inputs for transient compiler pass readers.
+module ClassInputs;
+class Key(id: SClassID) extends SKStore.Key
+class File(value: SClass) extends SKStore.File
+private class ScalarFile(value: ?ScalarType) extends SKStore.File
+
+fun writeClasses(
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  classes: SortedMap<SClassID, SClass>,
+): void {
+  for ((id, value) in classes.items()) writer.set(Key(id), File(value))
+}
+
+fun readAll(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): SortedMap<SClassID, SClass> {
+  result = SortedMap[];
+  for ((key, values) in files.items(context)) {
+    key match {
+    | Key(id) -> for (file in values) !result[id] = File::type(file).value
+    | _ -> void
+    }
+  };
+  result
+}
+
+private fun exampleID(typ: Type): SClassID {
+  typ match {
+  | Tclass(id, _) -> id
+  | Tsuperposition(unique, _) -> unique[0].sclassID
+  }
+}
+
+// The reader/context/caches are transient and never stored in output rows.
+// A reader lives for one mapper invocation. Memoization avoids repeating
+// tracked reads within that invocation; a fresh reader on the next invocation
+// guarantees that neither class values nor cached None results become stale.
+mutable class Reader(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  memoize: Bool = Environ.varOpt("SKC_DISABLE_CLASS_READER_MEMO").isNone(),
+  classCache: mutable UnorderedMap<SClassID, SClass> = mutable UnorderedMap[],
+  scalarCache: mutable UnorderedMap<SClassID, ?ScalarType> = mutable UnorderedMap[],
+) {
+  mutable fun getSClass(id: SClassID): SClass {
+    if (this.memoize) {
+      this.classCache.maybeGet(id) match {
+      | Some(value) -> return value
+      | None() -> void
+      }
+    };
+    value = File::type(this.files.getArray(this.context, Key(id))[0]).value;
+    if (this.memoize) this.classCache.set(id, value);
+    value
+  }
+  mutable fun maybeGetScalarType(typ: Type): ?ScalarType {
+    id = exampleID(typ);
+    if (this.memoize) {
+      this.scalarCache.maybeGet(id) match {
+      | Some(value) -> return value
+      | None() -> void
+      }
+    };
+    value = ScalarFile::type(this.files.getArrayFilter(this.context, Key(id), file ~>
+      ScalarFile(File::type(file).value.maybeGetScalarType())
+    )[0]).value;
+    if (this.memoize) this.scalarCache.set(id, value);
+    value
+  }
+  mutable fun getScalarType(typ: Type): ScalarType {
+    this.maybeGetScalarType(typ) match {
+    | Some(value) -> value
+    | None() -> this.getSClass(exampleID(typ)).getScalarType()
+    }
+  }
+}
+
+fun getSClass(env: readonly ClassLookupEnv, id: SClassID, reader: ?mutable Reader): SClass {
+  reader match {
+  | Some(value) -> value.getSClass(id)
+  | None() -> env.getSClass(id)
+  }
+}
+fun exampleSClass(typ: Type, env: readonly ClassLookupEnv, reader: ?mutable Reader): SClass {
+  getSClass(env, exampleID(typ), reader)
+}
+fun getScalarType(typ: Type, env: GlobalEnv, reader: ?mutable Reader): ScalarType {
+  reader match {
+  | Some(value) -> value.getScalarType(typ)
+  | None() -> typ.getScalarType(env)
+  }
+}
+fun maybeGetScalarType(typ: Type, env: GlobalEnv, reader: ?mutable Reader): ?ScalarType {
+  reader match {
+  | Some(value) -> value.maybeGetScalarType(typ)
+  | None() -> typ.maybeGetScalarType(env)
+  }
+}
+fun forEachConcreteSubtype(typ: Type, env: GlobalEnv, func: SClass -> Bool, reader: ?mutable Reader): Bool {
+  seen = mutable UnorderedSet[];
+  typ.forEachTclass(tc -> {
+    getSClass(env, tc.sclassID, reader).subtypes.all(id -> {
+      if (!seen.maybeInsert(id)) true else {
+        sub = getSClass(env, id, reader);
+        !sub.kind.isFinal() || func(sub)
+      }
+    })
+  })
+}
+fun allowsPointerEscape(typ: Type, env: GlobalEnv, reader: ?mutable Reader): Bool {
+  typ match {
+  | tc @ Tclass _ -> tc.mutability match {
+    | DeepFrozen() -> false
+    | Readonly() -> getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfReadonly
+    | Mutable() -> getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfMutable
+    }
+  | Tsuperposition(unique, _) -> unique.any(tc -> allowsPointerEscape(tc, env, reader))
+  }
+}
+fun mightBeInConstMemory(typ: Type, env: GlobalEnv, reader: ?mutable Reader): Bool {
+  typ match {
+  | tc @ Tclass _ -> tc.mutability != Mutable() || {
+      sc = getSClass(env, tc.sclassID, reader);
+      sc.isArray() || !sc.fields.any(f -> f.isAssignable)
+    }
+  | Tsuperposition(unique, _) -> unique.any(tc -> mightBeInConstMemory(tc, env, reader))
+  }
+}
+fun isSubType(t1: Type, t2: Type, env: GlobalEnv, pos: Pos, reader: ?mutable Reader): Bool {
+  if (t1 == t2) {
+    true
+  } else {
+    (t1, t2) match {
+    | (ts1 @ Tsuperposition _, ts2 @ Tsuperposition _) ->
+      // It's a subtype if it's a subtype in every superposition.
+      // The two Tsuperpositions must have the same keys (it makes
+      // no sense to compare Tsuperpositions from different functions).
+
+      pos.invariant(
+        ts1.smap.smap.size() == ts2.smap.smap.size(),
+        "Tsuperposition size mismatch.",
+      );
+
+      ts1.smap.smap.all((sup1, tc1) -> {
+        tc2 = ts2.typeInSuperposition(sup1);
+        isSubType(tc1, tc2, env, pos, reader)
+      })
+    | (ts1 @ Tsuperposition _, ts2) ->
+      ts1.unique.all(tt1 -> isSubType(tt1, ts2, env, pos, reader))
+    | (ts1, ts2 @ Tsuperposition _) ->
+      ts2.unique.all(tt2 -> isSubType(ts1, tt2, env, pos, reader))
+    | (tc1 @ Tclass _, tc2 @ Tclass _) ->
+      // Lambdas are the one oddball case where a frozen class
+      // can be a subtype of a mutable one. It's safe because of
+      // the restricted way in which they can be used.
+      sc1 = getSClass(env, tc1.sclassID, reader);
+      sc1.supertypes.contains(tc2.sclassID) &&
+        (tc1.mutability.isSubTypeOf(tc2.mutability) ||
+          (sc1.isLambda &&
+            tc2.mutability != DeepFrozen() &&
+            getSClass(env, tc2.sclassID, reader).isLambda))
+    }
+  }
+}
+
+module end;

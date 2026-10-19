@@ -31,6 +31,7 @@ mutable private class Verifier(
   where: String,
   mutable currentInstr: InstrWithPos,
   mutable currentPos: Pos,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ) {
   mutable fun verify(): void {
     optinfo = this.optinfo;
@@ -160,7 +161,7 @@ mutable private class Verifier(
         succ.args.eachWithIndex((i, argID) -> {
           arg = this.getInstr(argID);
           expected = target.params[i].typ;
-          if (fixedT31800000 && !isSubType(arg.typ, expected, env, term.pos)) {
+          if (fixedT31800000 && !ClassInputs.isSubType(arg.typ, expected, env, term.pos, this.classReader)) {
             this.die(
               `Block ${blockID} is passing argument ${i} of incompatible type` +
                 ` ${arg.typ} to block ${target.id}, which expected ${expected}`,
@@ -313,13 +314,13 @@ mutable private class Verifier(
   private mutable fun verifyCast(c: Cast): void {
     objType = this.getInstr(c.value).typ;
 
-    s1 = objType.maybeGetScalarType(this.env) match {
+    s1 = ClassInputs.maybeGetScalarType(objType, this.env, this.classReader) match {
     | Some(tt) -> tt
     | None() ->
       this.die(`Attempt to cast from non-scalar type ${objType} to ${c.typ}`)
     };
 
-    s2 = c.typ.maybeGetScalarType(this.env) match {
+    s2 = ClassInputs.maybeGetScalarType(c.typ, this.env, this.classReader) match {
     | Some(tt) -> tt
     | None() ->
       this.die(`Attempt to cast from ${objType} to non-scalar type ${c.typ}`)
@@ -336,8 +337,8 @@ mutable private class Verifier(
   private mutable fun verifyReinterpret(r: Reinterpret): void {
     objType = this.getInstr(r.value).typ;
 
-    s1 = objType.getScalarType(this.env);
-    s2 = r.typ.getScalarType(this.env);
+    s1 = ClassInputs.getScalarType(objType, this.env, this.classReader);
+    s2 = ClassInputs.getScalarType(r.typ, this.env, this.classReader);
     if (s1.bitSize != s2.bitSize) {
       this.die(
         `Attempt to reinterpret from ${objType} to ${r.typ}, but they have ` +
@@ -352,7 +353,7 @@ mutable private class Verifier(
     objType = this.getInstr(gf.obj).typ;
     for (s in optinfo.f.superpositions) {
       objtc = objType.typeInSuperposition(s);
-      objsc = objtc.sclass(this.env);
+      objsc = ClassInputs.getSClass(this.env, objtc.sclassID, this.classReader);
 
       objsc.maybeGetField(gf.field) match {
       | Some(field) ->
@@ -364,7 +365,7 @@ mutable private class Verifier(
 
         if (
           fixedT31800000 &&
-          !isSubType(fieldType, claimedType, this.env, gf.pos)
+          !ClassInputs.isSubType(fieldType, claimedType, this.env, gf.pos, this.classReader)
         ) {
           this.die(
             `${gf} read field '${gf.field}' from an object of type ${objtc}, ` +
@@ -390,7 +391,7 @@ mutable private class Verifier(
 
     for (s in optinfo.f.superpositions) {
       objtc = objType.typeInSuperposition(s);
-      objsc = objtc.sclass(this.env);
+      objsc = ClassInputs.getSClass(this.env, objtc.sclassID, this.classReader);
 
       if (objsc.fields.size() != obj.args.size()) {
         this.die(
@@ -411,7 +412,7 @@ mutable private class Verifier(
   private mutable fun verifyTupleExtract(extr: TupleExtract): void {
     obj = this.getInstr(extr.obj);
 
-    objSClass = obj.typ.exampleSClass(this.env);
+    objSClass = ClassInputs.exampleSClass(obj.typ, this.env, this.classReader);
     if (!objSClass.gclassName.id.startsWith("<builtin>.ReturnTuple")) {
       this.die("TupleExtract applied to unexpected type " + obj.typ)
     };
@@ -435,8 +436,8 @@ mutable private class Verifier(
   }
 
   private mutable fun verifyExtend(e: ExtendBase): void {
-    in_ = this.getInstr(e.value).typ.getScalarType(this.env);
-    out = e.typ.getScalarType(this.env);
+    in_ = ClassInputs.getScalarType(this.getInstr(e.value).typ, this.env, this.classReader);
+    out = ClassInputs.getScalarType(e.typ, this.env, this.classReader);
 
     this.invariant(IntegerScalarKind() == in_.kind, "Expected integer");
     this.invariant(IntegerScalarKind() == out.kind, "Expected integer");
@@ -467,9 +468,9 @@ mutable private class Verifier(
         )
       };
 
-      objtc.sclass(this.env).maybeGetField(s.field) match {
+      ClassInputs.getSClass(this.env, objtc.sclassID, this.classReader).maybeGetField(s.field) match {
       | None() ->
-        choices = objtc.sclass(this.env).fields.map(f -> f.name).sorted();
+        choices = ClassInputs.getSClass(this.env, objtc.sclassID, this.classReader).fields.map(f -> f.name).sorted();
         this.die(
           "Attempt to set nonexistent field '" +
             s.field +
@@ -486,7 +487,7 @@ mutable private class Verifier(
           )
         };
 
-        if (!isSubType(valtc, field.typ, this.env, s.pos)) {
+        if (!ClassInputs.isSubType(valtc, field.typ, this.env, s.pos, this.classReader)) {
           this.die(
             "Attempt to store incompatible value of type " +
               valtc +
@@ -503,8 +504,8 @@ mutable private class Verifier(
   }
 
   private mutable fun verifyTruncate(e: Truncate): void {
-    in_ = this.getInstr(e.value).typ.getScalarType(this.env);
-    out = e.typ.getScalarType(this.env);
+    in_ = ClassInputs.getScalarType(this.getInstr(e.value).typ, this.env, this.classReader);
+    out = ClassInputs.getScalarType(e.typ, this.env, this.classReader);
 
     this.invariant(IntegerScalarKind() == in_.kind, "Expected integer");
     this.invariant(IntegerScalarKind() == out.kind, "Expected integer");
@@ -515,7 +516,7 @@ mutable private class Verifier(
   }
 
   private mutable fun verifyIsArrayType(t: Type): void {
-    sc = t.exampleSClass(this.env);
+    sc = ClassInputs.exampleSClass(t, this.env, this.classReader);
     if (!sc.isArray()) {
       this.die("Got unexpected non-array type " + t)
     }
@@ -586,19 +587,18 @@ mutable private class Verifier(
     | Freeze{value} ->
       // allow any Mutability, since Freeze(x) -> x, if x is frozen
       o = this.getInstr(value);
-      if (!o.typ.getScalarType(this.env).isGCPointer()) {
+      if (!ClassInputs.getScalarType(o.typ, this.env, this.classReader).isGCPointer()) {
         this.die("Attempting to freeze value of non-pointer type " + o.typ)
       };
       // Only verify subtype, not an exact match. The argument to
       // freeze() might be an upcast, which we optimize away, leaving
       // the types not matching exactly ignoring frozenness.
       if (
-        !isSubType(
+        !ClassInputs.isSubType(
           o.typ.mapMutability(_ -> DeepFrozen()),
           instr.typ,
           this.env,
-          pos,
-        )
+          pos, this.classReader)
       ) {
         this.die(
           `freeze(${o.typ}) yielded value of ` +
@@ -612,12 +612,11 @@ mutable private class Verifier(
 
       o = this.getInstr(value);
       if (
-        !isSubType(
+        !ClassInputs.isSubType(
           o.typ.mapMutability(_ -> DeepFrozen()),
           instr.typ,
           this.env,
-          pos,
-        )
+          pos, this.classReader)
       ) {
         this.die(
           `intern(${o.typ}) yielded value of ` +
@@ -625,7 +624,7 @@ mutable private class Verifier(
         )
       };
 
-      if (!o.typ.getScalarType(this.env).isGCPointer()) {
+      if (!ClassInputs.getScalarType(o.typ, this.env, this.classReader).isGCPointer()) {
         this.die("Attempting to intern value of non-pointer type " + o.typ)
       }
     | IntSwitch _ -> this.verifySimple(instr, tInt, tVoid)
@@ -735,8 +734,9 @@ mutable private class Verifier(
       this.config,
       this.currentPos,
       errorMsg,
+      this.classReader.map(reader -> reader.files),
     );
-    if (this.config.deferVerifierDiagnostics) throw failure;
+    if (this.config.deferVerifierDiagnostics || this.classReader.isSome()) throw failure;
     failure.report(this.env.sourcePositions);
   }
 }
@@ -750,15 +750,16 @@ private class VerificationFailure(
   config: Config.Config,
   pos: Pos,
   message: String,
+  classFiles: ?SKStore.EHandle<SKStore.Key, SKStore.File> = None(),
 ) extends Exception {
   fun getMessage(): String {
     this.message
   }
 
-  fun report(positions: SourcePositions.Table): _ {
+  fun report(positions: SourcePositions.Table, diagnosticEnv: ?GlobalEnv = None()): _ {
     print_error("" + this.pos + ": Internal error: " + this.message);
     print_error("Function causing the error:\n");
-    this.f.dump(this.env with {sourcePositions => positions}, this.config);
+    this.f.dump(diagnosticEnv.default(this.env) with {sourcePositions => positions}, this.config);
     this.pos.die(this.message)
   }
 }
@@ -771,7 +772,10 @@ fun withSourcePositions<R>(
     action()
   } catch {
   | failure @ VerificationFailure _ ->
-    failure.report(SourcePositions.Table::read(context))
+    diagnosticEnv = failure.classFiles.map(files ->
+      failure.env with {sclasses => ClassInputs.readAll(context, files)}
+    );
+    failure.report(SourcePositions.Table::read(context), diagnosticEnv)
   | other -> throw other
   }
 }
@@ -781,6 +785,7 @@ fun verifyFunction(
   env: GlobalEnv,
   config: Config.Config,
   where: String,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   if (f.hasImplementation()) {
     // Sentinel instr we use to attribute errors.
@@ -795,6 +800,7 @@ fun verifyFunction(
       where,
       dummyInstr,
       pos,
+      classReader,
     );
 
     v.verify()
