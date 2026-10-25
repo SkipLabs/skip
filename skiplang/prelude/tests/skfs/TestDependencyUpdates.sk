@@ -1,0 +1,100 @@
+module alias T = SKTest;
+module SKStoreTest;
+
+class DependencyAlias(id: Int, payload: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    this.id.compare(DependencyAlias::keyType(other).id)
+  }
+  fun toString(): String {
+    this.id.toString()
+  }
+}
+
+@test
+fun testDependencyInverseIndexSharedChild(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/exact/source/"),
+    SKStore.IID(0),
+  );
+  first = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  second = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(1),
+  };
+  deps = SKStore.Deps::empty()
+    .set(path, first)
+    .set(path, second)
+    .remove(path, first);
+  T.expectEq(deps.maybeGetReads(parent, child).size(), 1);
+  T.expectTrue(deps.maybeGetReads(parent, child).get(second).contains(path));
+  T.expectTrue(deps.removeDir(child).maybeGet(path).isNone());
+}
+
+@test
+fun testExactDependencyReplacementAndSnapshots(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  source = SKStore.DirName::create("/exact/source/");
+  reader = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  oldReads = Array[0, 2, 4, 6].map(i ->
+    SKStore.Path::create(source, SKStore.IID(i))
+  );
+  newReads = SortedSet::createFromItems(
+    Array[1, 2, 5, 6].map(i -> SKStore.Path::create(source, SKStore.IID(i))),
+  );
+  for (mode in Array[0, 1]) {
+    ctx = SKStore.Context::mcreate{dependencyMode => mode};
+    ctx.updateNewDeps(reader, SortedSet::createFromItems(oldReads));
+    snapshot = ctx.clone();
+    ctx.replaceDeps(reader, oldReads, newReads);
+    T.expectEq(
+      ctx.maybeGetReads(parent, child).get(reader).toArray(),
+      newReads.toArray(),
+    );
+    T.expectEq(
+      snapshot.maybeGetReads(parent, child).get(reader).toArray(),
+      oldReads,
+    );
+    // A second unchanged update must preserve every edge before full removal.
+    ctx.replaceDeps(reader, newReads.toArray(), newReads);
+    T.expectEq(
+      ctx.maybeGetReads(parent, child).get(reader).toArray(),
+      newReads.toArray(),
+    );
+    ctx.replaceDeps(reader, newReads.toArray(), SortedSet[]);
+    T.expectTrue(ctx.maybeGetReads(parent, child).isEmpty());
+  }
+}
+
+@test
+fun testDependencyReplacementUsesLogicalKeyIdentity(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  source = SKStore.DirName::create("/exact/source/");
+  reader = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  before = SKStore.Path::create(source, DependencyAlias(7, 10));
+  after = SKStore.Path::create(source, DependencyAlias(7, 20));
+  ctx = SKStore.Context::mcreate{dependencyMode => 1};
+  ctx.updateNewDeps(reader, SortedSet[before]);
+  ctx.replaceDeps(reader, Array[before], SortedSet[after]);
+  T.expectEq(ctx.maybeGetReads(parent, child).get(reader).size(), 1);
+  T.expectTrue(ctx.maybeGetReads(parent, child).get(reader).contains(after));
+  ctx.replaceDeps(reader, Array[after], SortedSet[]);
+  T.expectTrue(ctx.maybeGetReads(parent, child).isEmpty());
+}
+module end;

@@ -261,11 +261,13 @@ fun program(
   context: mutable SKStore.Context,
   defs: SKStore.EHandle<SKStore.SID, GlobalEnv.ExpandedDefFile>,
 ): SKStore.EHandle<SKStore.SID, DefFile> {
-  defs.map(
+  ParallelPhases.map(
+    defs,
     SKStore.SID::keyType,
     DefFile::type,
     context,
     dirName,
+    "typecheck",
     (context, writer, _key, values) ~> {
       // if(values.size() > 1) TODO multiple defs
       values.first.value match {

@@ -563,6 +563,91 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     )
   }
 
+  // Native batches run on isolated thread heaps; Wasm evaluates serially.
+  fun parallelMap<K2: Key, V2: File>(
+    typeKey: Key ~> K2,
+    type: File ~> V2,
+    context: mutable Context,
+    dirName: DirName,
+    f: ParallelMapFun<K, V, K2, V2>,
+    rangeOpt: ?Array<KeyRange<K>> = None(),
+    workers: Int = 0,
+    select: K ~> Bool = _ ~> true,
+    serial: ?TMapFun<K, V, K2, V2> = None(),
+    prepare: ?((mutable Context, K, Array<V>) ~> Array<V>) = None(),
+    recover: ?((
+      mutable Context,
+      mutable TWriter<K2, V2>,
+      K,
+      Array<V>,
+      .Exception,
+    ) ~> Bool) = None(),
+    // Keep whole worker heaps in the enclosing region until it is collected.
+    retainWorkerArenas: Bool = false,
+  ): EHandle<K2, V2> {
+    invariant(
+      workers >= 0 && workers <= 64,
+      "Invalid parallelMap worker count",
+    );
+    inputKeyType = this.keyType;
+    inputType = this.type;
+    raw = (reader, writer, key, values) ~> {
+      if (values.isEmpty()) return void;
+      typedWriter = TWriter<K2, V2>::mcreate(writer.writes);
+      f(reader, typedWriter, inputKeyType(key), values.map(inputType));
+      writer.!writes = typedWriter.writes;
+    };
+    TEagerDir::parallelMap(
+      context,
+      this.dirName,
+      dirName,
+      raw,
+      rangeOpt,
+      workers,
+      key ~> select(inputKeyType(key)),
+      serial.map(f ->
+        (context, writer, key, values) ~> {
+          FileIterator::create(values) match {
+          | EmptyFileIterator _ -> void
+          | iter @ NonEmptyIterator _ ->
+            typedWriter = TWriter<K2, V2>::mcreate(writer.writes);
+            f(
+              context,
+              typedWriter,
+              inputKeyType(key),
+              iter.nonEmptyMap(inputType),
+            );
+            writer.!writes = typedWriter.writes
+          }
+        }
+      ),
+      prepare.map(f ->
+        (context, key, values) ~> {
+          if (values.isEmpty()) return Array[];
+          f(context, inputKeyType(key), values.map(inputType)).map(v ->
+            (v : File)
+          )
+        }
+      ),
+      recover.map(f ->
+        (context, writer, key, values, ex) ~> {
+          typedWriter = TWriter<K2, V2>::mcreate(writer.writes);
+          handled = f(
+            context,
+            typedWriter,
+            inputKeyType(key),
+            values.map(inputType),
+            ex,
+          );
+          writer.!writes = typedWriter.writes;
+          handled
+        }
+      ),
+      retainWorkerArenas,
+    );
+    EHandle(typeKey, type, dirName)
+  }
+
   fun map<K2: Key, V2: File>(
     typeKey: Key ~> K2,
     type: File ~> V2,

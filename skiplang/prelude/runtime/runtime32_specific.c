@@ -315,3 +315,14 @@ void SKIP_js_execvp(char* args_obj);
 void SKIP_posix_execvp(char* args_obj) {
   SKIP_js_execvp(args_obj);
 }
+
+// Serial counterpart of the native threaded SKStore batch evaluator.
+void* sk_parallel_map_evaluate(void*, int64_t, int64_t);
+void* SKIP_skstore_parallel_map(void* job, int64_t count, int64_t workers,
+                              _Bool retain_arenas) {
+  (void)workers;
+  (void)retain_arenas;
+  return sk_parallel_map_evaluate(job, 0, count);
+}
+int64_t SKIP_parallel_map_worker_id(void) { return 0; }
+_Bool SKIP_parallel_map_native(void) { return 0; }

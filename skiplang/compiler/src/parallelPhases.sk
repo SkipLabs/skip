@@ -1,0 +1,48 @@
+module ParallelPhases;
+
+// Experimental controls are fixed when constructing the persistent pipeline.
+// Use a fresh cache when changing these settings: mapper recipes are immutable.
+fun map<K: SKStore.Key, V: SKStore.File, K2: SKStore.Key, V2: SKStore.File>(
+  input: SKStore.EHandle<K, V>,
+  typeKey: SKStore.Key ~> K2,
+  type: SKStore.File ~> V2,
+  context: mutable SKStore.Context,
+  name: SKStore.DirName,
+  stage: String,
+  f: SKStore.TMapFun<K, V, K2, V2>,
+): SKStore.EHandle<K2, V2> {
+  enabled = Environ.varOpt("SKC_PARALLEL_PHASES")
+    .map(value -> value.split(",").contains(stage)).default(false);
+  if (!enabled) return input.map(typeKey, type, context, name, f);
+  workers = Environ.varOpt("SKC_PARALLEL_WORKERS")
+    .map(value -> value.toInt()).default(0);
+  input.parallelMap(
+    typeKey,
+    type,
+    context,
+    name,
+    (reader, writer, key, values) ~> {
+      local = reader.readContext();
+      // Keep verbose invalidation traces in source order on the main thread.
+      // Native parallel timing has its own independent profiling switch.
+      if (local.debugMode) throw SKStore.ParallelContextUnavailable();
+      iter = mutable SKStore.NonEmptyIterator(values[0], values.drop(1).iterator());
+      f(local, writer, key, iter);
+      reader.recordContext(local)
+    },
+    None(),
+    workers,
+    _ ~> true,
+    None(),
+    None(),
+    Some((context, writer, key, values, _exception) ~> {
+      // Uncached lazy reads and Context writes require ordinary main-thread
+      // evaluation. Replay in source order preserves diagnostics and IDs.
+      iter = mutable SKStore.NonEmptyIterator(values[0], values.drop(1).iterator());
+      f(context, writer, key, iter);
+      true
+    }),
+  )
+}
+
+module end;

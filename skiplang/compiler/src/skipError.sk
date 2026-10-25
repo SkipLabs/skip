@@ -177,6 +177,10 @@ fun keepErrors(
   context: mutable SKStore.Context,
   f: () -> void,
 ): void {
+  // A read-only worker must propagate failures to its job boundary. The main
+  // thread retries the ordinary checker to collect diagnostics in source order;
+  // workers cannot update diagnostic globals or print lazy-cache fallback errors.
+  if (context.isParallelReadOnly()) return f();
   try {
     f()
   } catch {

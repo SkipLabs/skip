@@ -270,6 +270,7 @@ fun throwIfFrontendErrors(context: mutable SKStore.Context): void {
 
 class OldFile(files: Array<SKStore.File>) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
+class ClassPhaseFile() extends SKStore.File
 
 const maxNbrFunsPerPhase: Int = 100;
 
@@ -354,6 +355,7 @@ fun mergeFun(
     } else {
       writer.setArray(key, continuations.toArray())
     }
+  | O.ClassWorkKey _ -> writer.setArray(key, files.toArray())
   | SKStore.IID(0) -> writer.setArray(key, files.toArray())
   | _ ->
     merged: ?SKStore.File = None();
@@ -503,6 +505,76 @@ fun layoutSpecializerClasses(
     context,
     SKStore.DirName::create("/specializer/layout-fields-merged/"),
     mergeFun,
+  )
+}
+
+fun createFunctionIRMaps(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
+  converter: O.Converter,
+  identities: SKStore.LHandle<O.GFunKeyKey, SKStore.IntFile>,
+  common: SKStore.EHandle<SKStore.IID, O.FunctionIRSharedFile>,
+): void {
+  shared = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-shared/"),
+    (context, writer, key, values) ~> {
+      // Forwarded relations and ignored discovery keys do not read config.
+      // Register it only on the class rows whose method tables need resolving.
+      config = if (key is O.SClassIDKey _) {
+        Some(configDir.getArray(context, SKStore.IID(0))[0].value)
+      } else {
+        None()
+      };
+      O.publishFunctionIRClassState(
+        context, writer, key, values, input, config, converter, identities,
+      )
+    },
+  );
+  plan = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-plan/"),
+    (context, writer, key, values) ~>
+      O.planFunctionIR(context, writer, key, values, identities)
+    ,
+  );
+  // The active identity aggregate is separate from the body rows. It stays
+  // cached when only a function body or an unused method changes.
+  _ = common.map(
+    SKStore.IID::keyType,
+    O.FunctionIRIdentityAggregateFile::type,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-identities/"),
+    (context, writer, key, _values) ~>
+      writer.set(key, O.collectFunctionIRIdentities(context, plan))
+    ,
+  );
+  generic = ParallelPhases.map(
+    plan,
+    x ~> x,
+    O.GFunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/generic-function-ir/"),
+    "generic-ir",
+    (context, writer, key, values) ~>
+      O.generateGenericFunctionIR(context, writer, key, values, converter)
+    ,
+  );
+  _ = ParallelPhases.map(
+    plan,
+    x ~> x,
+    O.SpecializedFunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/function-ir/"),
+    "function-ir",
+    (context, writer, key, values) ~>
+      O.generateFunctionIR(context, writer, key, values, plan, generic, shared, common)
+    ,
   )
 }
 
@@ -738,7 +810,8 @@ fun getOrInitializeBackend(
         specializerAllDirCopy = specializerAllDir;
         // Class creation inherits discovered methods, and method discovery
         // visits existing subclasses. Run them in separate rounds so each
-        // sees the other's merged writes.
+        // sees the other's merged writes. A class round may schedule another
+        // class round when a continuation discovers a missing class.
         // The phased driver synchronizes and destroys its heap after this round.
         // Only the legacy unphased path needs a separate collection region.
         runRound = (context: mutable SKStore.Context) ~> {
@@ -750,7 +823,7 @@ fun getOrInitializeBackend(
             SKStore.DirName::create("/specializer/phase-kind/" + phaseNumberCopy + "/"),
             (_context, writer, _, values) ~> {
               writer.set(SKStore.IID(0), SKStore.BoolFile(
-                values.values().any(value -> value is O.CStackElement _),
+                values.values().any(value -> value is ClassPhaseFile _),
               ))
             },
             Some(Array[SKStore.KeyRange::create(workKey, workKey)]),
@@ -767,14 +840,14 @@ fun getOrInitializeBackend(
                 // Forward state without reading the work queue. Work rows
                 // depend on the once-per-round projection of its kind.
                 key match {
-                | SKStore.IID _ | O.FStackElement _ -> void
+                | SKStore.IID _ | O.FStackElement _ | O.ClassWorkKey _ -> void
                 | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
                 classPhase = classPhaseDir.getArray(context, SKStore.IID(0))[0].value;
                 key match {
-                | SKStore.IID _ if (!classPhase) ->
+                | SKStore.IID _ ->
                   for (value in values) {
-                    invariant(value is SKStore.IntFile _);
+                    invariant(value is SKStore.IntFile _ || value is ClassPhaseFile _);
                   };
                   return void
                 | O.FStackElement _ if (classPhase) ->
@@ -784,7 +857,11 @@ fun getOrInitializeBackend(
                   writer.setArray(key, values.toArray());
                   writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
                   return void
-                | SKStore.IID _
+                | O.ClassWorkKey _ if (!classPhase) ->
+                  writer.setArray(key, values.toArray());
+                  writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
+                  return void
+                | O.ClassWorkKey _
                 | O.FStackElement _ ->
                   void
                 | _ -> return writer.set(key, OldFile(values.toArray()))
@@ -802,21 +879,45 @@ fun getOrInitializeBackend(
                 invariant(specializer.classStack is List.Nil());
 
                 key match {
-                | SKStore.IID _ ->
+                | origin @ O.ClassWorkKey _ ->
+                  specializer.!classWorkOrigin = Some(origin);
+                  specializer.!pauseOnSClassCreation = true;
                   for (value in values) {
                     value match {
-                    | SKStore.IntFile _ -> void
                     | classElt @ O.CStackElement _ ->
                       specializer.!pos = classElt.pos;
-                      _sclassInfo = O.Specializer::getSClass2CPS(
-                        context,
-                        specializer,
-                        classElt.hc,
-                        classElt.k,
-                      )
-                    | _ -> invariant_violation("Unexpected IID key")
+                      try {
+                        _ = O.Specializer::startSClass2CPS(
+                          context,
+                          specializer,
+                          classElt.hc,
+                          classElt.k,
+                        )
+                      } catch {
+                      | O.SClassCreatedExn() -> void
+                      | x -> throw x
+                      }
+                    | c @ O.ClassContinuationFile _ ->
+                      for (pending in c.pending) {
+                        invariant(pending.origin == origin);
+                        specializer.!pos = pending.pos;
+                        try {
+                          _ = O.Specializer::getSClass2CPS(
+                            context,
+                            specializer,
+                            pending.hc,
+                            pending.k,
+                          )
+                        } catch {
+                        | O.SClassCreatedExn() -> void
+                        | x -> throw x
+                        }
+                      }
+                    | _ -> invariant_violation("Unexpected class work file")
                     }
                   };
+                  specializer.!pauseOnSClassCreation = false;
+                  specializer.!classWorkOrigin = None();
                   if (specializer.funStack is List.Cons _) {
                     for (f in specializer.funStack) {
                       writer.setArray(f, Array[f]);
@@ -826,6 +927,21 @@ fun getOrInitializeBackend(
                       );
                     };
                     specializer.!funStack = List.Nil();
+                  };
+                  if (specializer.classStack is List.Cons _) {
+                    pending = specializer.classStack.reversed().toArray();
+                    for (classElt in pending) {
+                      writer.setArray(
+                        O.ClassWorkKey(classElt.hc.generic.name()),
+                        Array[classElt with {k => (_, _, _) ~> void}],
+                      )
+                    };
+                    writer.setArray(
+                      origin,
+                      Array[O.ClassContinuationFile(pending)],
+                    );
+                    writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
+                    specializer.!classStack = List.Nil();
                   };
                   specializer.writeDiff(writer)
 
@@ -872,16 +988,17 @@ fun getOrInitializeBackend(
                   specializer.!pauseOnSClassCreation = false;
                   if (specializer.classStack is List.Cons _) {
                     pending = specializer.classStack.reversed().toArray();
-                    writer.setArray(
-                      SKStore.IID(0),
-                      pending.map(classElt ->
-                        classElt with {k => (_, _, _) ~> void}
-                      ),
-                    );
+                    for (classElt in pending) {
+                      writer.setArray(
+                        O.ClassWorkKey(classElt.hc.generic.name()),
+                        Array[classElt with {k => (_, _, _) ~> void}],
+                      )
+                    };
                     writer.setArray(
                       origin,
                       Array[O.ContinuationFile(origin, pending)],
                     );
+                    writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
                     specializer.!classStack = List.Nil();
                   } else if (needsIID) {
                     writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
@@ -967,64 +1084,51 @@ fun getOrInitializeBackend(
     false,
   );
 
-  functionIRPlan = specializerDir.map(
+  // These handles refer to keyed maps installed once discovery has completed.
+  // Their recipes capture stable handles, never a compilation snapshot.
+  functionIRShared: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
+    x ~> x,
+    x ~> x,
+    SKStore.DirName::create("/specializer/function-ir-shared/"),
+  );
+  functionIRIdentities: SKStore.EHandle<
+    SKStore.IID,
+    O.FunctionIRIdentityAggregateFile,
+  > = SKStore.EHandle(
+    SKStore.IID::keyType,
+    O.FunctionIRIdentityAggregateFile::type,
+    SKStore.DirName::create("/specializer/function-ir-identities/"),
+  );
+  functionIR: SKStore.EHandle<SKStore.Key, O.SpecializedFunctionFile> = SKStore.EHandle(
+    x ~> x,
+    O.SpecializedFunctionFile::type,
+    SKStore.DirName::create("/specializer/function-ir/"),
+  );
+  functionIRCommon = specializationConfigDir.map(
+    SKStore.IID::keyType,
+    O.FunctionIRSharedFile::type,
+    context,
+    SKStore.DirName::create("/specializer/function-ir-common/"),
+    (_context, writer, key, values) ~> {
+      config = values.first.value;
+      writer.set(key, O.FunctionIRSharedFile(config, converter, config.ptrBitSize / 8))
+    },
+  );
+  _ = specializerDir.map(
     x ~> x,
     x ~> x,
     context,
-    SKStore.DirName::create("/specializer/function-ir-plan/"),
-    (context, writer, _, values) ~> {
+    SKStore.DirName::create("/specializer/function-ir-driver/"),
+    (context, _writer, _, values) ~> {
       completed = values.first;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       if (completed.complete && !config.stopAfterSpecialization) {
-        O.planFunctionIR(
-          context,
-          writer,
-          completed.value,
-          config.specializationConfig(),
-          converter,
-          functionIdentities,
+        createFunctionIRMaps(
+          context, completed.value, specializationConfigDir, converter,
+          functionIdentities, functionIRCommon,
         )
       }
     },
-  );
-  genericFunctionIR = functionIRPlan.map(
-    x ~> x,
-    O.GFunctionFile::type,
-    context,
-    SKStore.DirName::create("/specializer/generic-function-ir/"),
-    (context, writer, key, values) ~>
-      O.generateGenericFunctionIR(context, writer, key, values, converter)
-    ,
-  );
-  functionIRShared = functionIRPlan.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/function-ir-shared/"),
-    (_context, writer, _, values) ~> {
-      values.first match {
-      | plan @ O.FunctionIRStateFile _ ->
-        O.publishFunctionIRClassState(writer, plan)
-      | _ -> void
-      }
-    },
-  );
-  functionIR = functionIRPlan.map(
-    x ~> x,
-    O.SpecializedFunctionFile::type,
-    context,
-    SKStore.DirName::create("/specializer/function-ir/"),
-    (context, writer, key, values) ~>
-      O.generateFunctionIR(
-        context,
-        writer,
-        key,
-        values,
-        functionIRPlan,
-        genericFunctionIR,
-        functionIRShared,
-      )
-    ,
   );
 
   backendIRDir = backendDir.map(
@@ -1044,8 +1148,11 @@ fun getOrInitializeBackend(
       };
       prepared = if (config.incrementalSpecialization) {
         Some(
-          O.FunctionIRStateFile::type(
-            functionIRPlan.getArray(context, SKStore.IID(0))[0],
+          O.collectFunctionIRPlan(
+            context,
+            functionIRShared,
+            functionIRCommon.getArray(context, SKStore.IID(0))[0],
+            functionIRIdentities.getArray(context, SKStore.IID(0))[0],
           ),
         )
       } else {

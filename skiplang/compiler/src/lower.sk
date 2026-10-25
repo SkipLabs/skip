@@ -1372,23 +1372,28 @@ fun incrementalLower(
       }
     },
   );
-  lowered = files.map(
+  lowered = ParallelPhases.map(
+    files,
     FunctionKey::keyType,
     FunctionResult::type,
     context,
     SKStore.DirName::create("/native-lower/functions/"),
+    "native-lower",
     (context, writer, _key, values) ~> {
       values.first match {
       | FunctionFile(f) ->
-        if (context.debugMode && f.hasImplementation()) {
-          print_string(`NATIVE_LOWER: ${f.name}`)
-        };
         common = files.getArrayFilter(context, SKStore.IID(0), file ~> {
           value = SharedFile::type(file);
           if (value.config.debug) value else {
             SharedFile(value.env with {sclasses => SortedMap[]}, value.config)
           }
         })[0];
+        if (context.isParallelReadOnly() && !common.config.incrementalSpecialization) {
+          throw SKStore.ParallelContextUnavailable()
+        };
+        if (context.debugMode && f.hasImplementation()) {
+          print_string(`NATIVE_LOWER: ${f.name}`)
+        };
         classReader = if (common.config.debug) None() else {
           Some(mutable ClassInputs.Reader(context, files))
         };

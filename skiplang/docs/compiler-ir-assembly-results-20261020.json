@@ -1,0 +1,2127 @@
+{
+  "cold_limitation": "Baseline cold 862.298s and recheck 891.553s; final 883.229s. One cold run per candidate does not establish a cold gain or regression. Historical keyed experiment cold +8.2% remains unresolved.",
+  "date": "2026-10-20",
+  "decision": {
+    "reason": "Repeatable whole-build gains for both edit cases against early and late baseline controls; class aggregate publication absorbed most structural savings.",
+    "rejected": [
+      "fused export/disasm pass",
+      "streaming alone as final choice",
+      "both identity and class aggregates"
+    ],
+    "retained": "identity aggregate cached separately plus direct streamed body insertion"
+  },
+  "fixture": {
+    "edits": {
+      "message": "change strTraces.join(\"\\n\") to strTraces.join(\" | \") in fixture compiler/src/skipError.sk and restore",
+      "unused_method": "add/remove fun unusedAssemblyProbe(): Int { 1 } in fixture compiler/src/skipError.sk Error class"
+    },
+    "file_count": 524,
+    "manifest": "/tmp/skip-ir-assembly/fixture/source-manifest.json",
+    "manifest_sha256": "bf25b6ebfe5447a775a2c5e2e86632b653c80aedc7237a19dd17d80db4a2a595",
+    "root": "/tmp/skip-ir-assembly/fixture",
+    "timestamp_and_restoration": "whole-second distinct mtimes per edit; original bytes and mtime restored in finally, manifest hashes rechecked"
+  },
+  "historical_reference": "compiler-ir-planning-results-20261019.json remains unchanged; its fixture/host differ, so direct timing comparisons are invalid",
+  "hosts": {
+    "baseline": {
+      "path": "/tmp/skip-ir-assembly/host-direct/skc",
+      "sha256": "b60d0e37f02686807fa33b06a203cda4c649e00baf2e7372dcc6ed472d2a2d98"
+    },
+    "both_aggregates": {
+      "path": "/tmp/skip-ir-assembly/host-aggregate-o2/skc",
+      "sha256": "34eb27c4ba3d23b8cb506841cd02cc2a8e8bf1fe54ac5d7ca0d77ce6c63a9521"
+    },
+    "fusion_rejected": {
+      "path": "/tmp/skip-ir-assembly/host-after/skc",
+      "sha256": "6595d1c973466856030e6c0eab9328884c2d77914855682aa3de2f790aff6252"
+    },
+    "identity_only": {
+      "path": "/tmp/skip-ir-assembly/host-identity-o2/skc",
+      "sha256": "6ac99e7c5e7e7462f19434d81c99dc4b271bb3ad3291d552b67ef04bfa17ab49"
+    },
+    "streaming": {
+      "path": "/tmp/skip-ir-assembly/host-stream-o2/skc",
+      "sha256": "f4177f9e070f79d2a74bb3e3ce559fc7349fff11521416c3090f27b428f092d9"
+    }
+  },
+  "internal_timing": "##ASSEMBLY## marks cover source callbacks, not SKStore publication/synchronization. Baseline means ~326-344ms method and ~328-334ms message; final ~232-237ms both. Active identity and body index marks fall near zero; class collection remains ~81-85ms, body merge ~89-91ms.",
+  "mode": "serial exact dependency mode1 (default); SKC_PARALLEL_PHASES empty, workers1; dev compiler inputs -O0 --no-inline --no-ipa; optimized benchmark hosts -O2 --no-inline --no-ipa",
+  "no_commit_or_install": true,
+  "purpose": "IR environment assembly optimization after keyed function-IR planning/publication",
+  "raw_runs": {
+    "after": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/after-cold.log",
+        "returncode": 0,
+        "seconds": 929.2831468790537,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 16.452076,
+        "user": 911.636402
+      },
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/after-noop.log",
+        "returncode": 0,
+        "seconds": 0.06858087494038045,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.03656399999999849,
+        "user": 0.0321840000000293
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59004417",
+          "##ASSEMBLY## collect-classes 80282250",
+          "##ASSEMBLY## index-bodies 47797958",
+          "##ASSEMBLY## merge-bodies 129368542",
+          "##ASSEMBLY## runtime-consts-methods 138000",
+          "##ASSEMBLY## coroutine-dependencies 2440666",
+          "##ASSEMBLY## export-flags 42",
+          "##ASSEMBLY## environment-and-class-map 6468792"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/after-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.288466210011393,
+        "source_mtime_ns": 1792508782925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2591879999999982,
+        "user": 3.0305610000000343
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59752792",
+          "##ASSEMBLY## collect-classes 80530458",
+          "##ASSEMBLY## index-bodies 48420250",
+          "##ASSEMBLY## merge-bodies 129878292",
+          "##ASSEMBLY## runtime-consts-methods 146792",
+          "##ASSEMBLY## coroutine-dependencies 2267125",
+          "##ASSEMBLY## export-flags 125",
+          "##ASSEMBLY## environment-and-class-map 6331792"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/after-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.274099418078549,
+        "source_mtime_ns": 1792508784925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.24955000000000283,
+        "user": 3.0258099999999786
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59103958",
+          "##ASSEMBLY## collect-classes 80083208",
+          "##ASSEMBLY## index-bodies 48031458",
+          "##ASSEMBLY## merge-bodies 137067750",
+          "##ASSEMBLY## runtime-consts-methods 136333",
+          "##ASSEMBLY## coroutine-dependencies 2451250",
+          "##ASSEMBLY## export-flags 0",
+          "##ASSEMBLY## environment-and-class-map 6490875"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/after-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.3022933759493753,
+        "source_mtime_ns": 1792508786925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2726659999999974,
+        "user": 3.0307769999999437
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59060001",
+          "##ASSEMBLY## collect-classes 81101959",
+          "##ASSEMBLY## index-bodies 48351542",
+          "##ASSEMBLY## merge-bodies 129312084",
+          "##ASSEMBLY## runtime-consts-methods 135667",
+          "##ASSEMBLY## coroutine-dependencies 2307750",
+          "##ASSEMBLY## export-flags 42",
+          "##ASSEMBLY## environment-and-class-map 6334958"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/after-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.2765196680556983,
+        "source_mtime_ns": 1792508788925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.2330210000000008,
+        "user": 3.0447320000000673
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 69543334",
+          "##ASSEMBLY## collect-classes 82262500",
+          "##ASSEMBLY## index-bodies 49654792",
+          "##ASSEMBLY## merge-bodies 130672500",
+          "##ASSEMBLY## runtime-consts-methods 144458",
+          "##ASSEMBLY## coroutine-dependencies 2323042",
+          "##ASSEMBLY## export-flags 42",
+          "##ASSEMBLY## environment-and-class-map 6418000"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/after-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.5539947929792106,
+        "source_mtime_ns": 1792508790925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.3585570000000011,
+        "user": 3.196346999999946
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 61417750",
+          "##ASSEMBLY## collect-classes 82217708",
+          "##ASSEMBLY## index-bodies 49814958",
+          "##ASSEMBLY## merge-bodies 137449667",
+          "##ASSEMBLY## runtime-consts-methods 147000",
+          "##ASSEMBLY## coroutine-dependencies 2762417",
+          "##ASSEMBLY## export-flags 41",
+          "##ASSEMBLY## environment-and-class-map 6747208"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/after-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.7371915018884465,
+        "source_mtime_ns": 1792508792925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3835349999999984,
+        "user": 3.3545560000000023
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 53832167",
+          "##ASSEMBLY## collect-classes 78887042",
+          "##ASSEMBLY## index-bodies 49497083",
+          "##ASSEMBLY## merge-bodies 133160750",
+          "##ASSEMBLY## runtime-consts-methods 202791",
+          "##ASSEMBLY## coroutine-dependencies 2668208",
+          "##ASSEMBLY## export-flags 41",
+          "##ASSEMBLY## environment-and-class-map 6826000"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/after-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 4.0184070019749925,
+        "source_mtime_ns": 1792508794925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.4624580000000016,
+        "user": 3.556724000000031
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 62705792",
+          "##ASSEMBLY## collect-classes 85257750",
+          "##ASSEMBLY## index-bodies 50442458",
+          "##ASSEMBLY## merge-bodies 130088708",
+          "##ASSEMBLY## runtime-consts-methods 143583",
+          "##ASSEMBLY## coroutine-dependencies 2417875",
+          "##ASSEMBLY## export-flags 83",
+          "##ASSEMBLY## environment-and-class-map 7478291"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/after-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.8533184190746397,
+        "source_mtime_ns": 1792508796925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.42002199999999945,
+        "user": 3.4341160000000173
+      }
+    ],
+    "aggregate": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/aggregate-cold.log",
+        "returncode": 0,
+        "seconds": 902.7015804100083,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 15.715865,
+        "user": 885.357969
+      },
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/aggregate-noop.log",
+        "returncode": 0,
+        "seconds": 0.0715889580314979,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.03058499999999853,
+        "user": 0.041216999999960535
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 80641750",
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 10375",
+          "##ASSEMBLY## merge-bodies 88732792",
+          "##ASSEMBLY## runtime-consts-methods 139417",
+          "##ASSEMBLY## coroutine-dependencies 3274459",
+          "##ASSEMBLY## export-flags 55547750",
+          "##ASSEMBLY## environment-and-class-map 2498250"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.2390814590035006,
+        "source_mtime_ns": 1792513325925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.25414200000000164,
+        "user": 2.9852070000000595
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 82308917",
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 41",
+          "##ASSEMBLY## index-bodies 12292",
+          "##ASSEMBLY## merge-bodies 89249959",
+          "##ASSEMBLY## runtime-consts-methods 140667",
+          "##ASSEMBLY## coroutine-dependencies 3247042",
+          "##ASSEMBLY## export-flags 53424750",
+          "##ASSEMBLY## environment-and-class-map 2286666"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.237866543000564,
+        "source_mtime_ns": 1792513327925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.25265899999999775,
+        "user": 2.98642899999993
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 80861083",
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 11625",
+          "##ASSEMBLY## merge-bodies 89557958",
+          "##ASSEMBLY## runtime-consts-methods 135209",
+          "##ASSEMBLY## coroutine-dependencies 3258000",
+          "##ASSEMBLY## export-flags 56588792",
+          "##ASSEMBLY## environment-and-class-map 2643041"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.2406045850366354,
+        "source_mtime_ns": 1792513329925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2599400000000003,
+        "user": 2.9814569999999776
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 81226250",
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 125",
+          "##ASSEMBLY## index-bodies 13250",
+          "##ASSEMBLY## merge-bodies 97129958",
+          "##ASSEMBLY## runtime-consts-methods 149166",
+          "##ASSEMBLY## coroutine-dependencies 3560167",
+          "##ASSEMBLY## export-flags 55917583",
+          "##ASSEMBLY## environment-and-class-map 2295792"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.2453417100477964,
+        "source_mtime_ns": 1792513331925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.26187300000000135,
+        "user": 2.984858000000031
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 9666",
+          "##ASSEMBLY## merge-bodies 94942375",
+          "##ASSEMBLY## runtime-consts-methods 138166",
+          "##ASSEMBLY## coroutine-dependencies 3262000",
+          "##ASSEMBLY## export-flags 53739333",
+          "##ASSEMBLY## environment-and-class-map 3357458"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.306087502045557,
+        "source_mtime_ns": 1792513333925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.36230899999999977,
+        "user": 2.9446179999999913
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 9125",
+          "##ASSEMBLY## merge-bodies 94012625",
+          "##ASSEMBLY## runtime-consts-methods 165042",
+          "##ASSEMBLY## coroutine-dependencies 3424167",
+          "##ASSEMBLY## export-flags 56232833",
+          "##ASSEMBLY## environment-and-class-map 3473334"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.5175650840392336,
+        "source_mtime_ns": 1792513335925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.350128999999999,
+        "user": 3.1684119999999893
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 9625",
+          "##ASSEMBLY## merge-bodies 87722000",
+          "##ASSEMBLY## runtime-consts-methods 131958",
+          "##ASSEMBLY## coroutine-dependencies 3294708",
+          "##ASSEMBLY## export-flags 53209750",
+          "##ASSEMBLY## environment-and-class-map 3374042"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.737455334980041,
+        "source_mtime_ns": 1792513337925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.4107590000000023,
+        "user": 3.3261489999999867
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 41",
+          "##ASSEMBLY## index-bodies 8666",
+          "##ASSEMBLY## merge-bodies 95545042",
+          "##ASSEMBLY## runtime-consts-methods 127250",
+          "##ASSEMBLY## coroutine-dependencies 3220542",
+          "##ASSEMBLY## export-flags 54368041",
+          "##ASSEMBLY## environment-and-class-map 3559875"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.5956075430149212,
+        "source_mtime_ns": 1792513339925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3653179999999985,
+        "user": 3.230976000000055
+      }
+    ],
+    "aggregate-control": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-noop.log",
+        "returncode": 0,
+        "seconds": 1.318735959008336,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.12102399999999999,
+        "user": 1.1981600000000001
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.207725417916663,
+        "source_mtime_ns": 1792514360925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.282003,
+        "user": 2.926213
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.2450815009651706,
+        "source_mtime_ns": 1792514362925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.26295700000000005,
+        "user": 2.9820789999999997
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.194908960023895,
+        "source_mtime_ns": 1792514364925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.279755,
+        "user": 2.9162279999999994
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.2378921679919586,
+        "source_mtime_ns": 1792514366925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.26841499999999996,
+        "user": 2.9697200000000006
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.3458722099894658,
+        "source_mtime_ns": 1792514368925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.39411300000000016,
+        "user": 2.9523910000000004
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.5850826270179823,
+        "source_mtime_ns": 1792514370925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3801539999999999,
+        "user": 3.205457000000001
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.326265626004897,
+        "source_mtime_ns": 1792514372925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.3600749999999999,
+        "user": 2.9665909999999975
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-control-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.636659377021715,
+        "source_mtime_ns": 1792514374925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.37990100000000027,
+        "user": 3.2574170000000002
+      }
+    ],
+    "aggregate-repeat": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-noop.log",
+        "returncode": 0,
+        "seconds": 1.3135643339483067,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.127271,
+        "user": 1.186748
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 80761625",
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 11375",
+          "##ASSEMBLY## merge-bodies 93646417",
+          "##ASSEMBLY## runtime-consts-methods 165959",
+          "##ASSEMBLY## coroutine-dependencies 3176875",
+          "##ASSEMBLY## export-flags 57186750",
+          "##ASSEMBLY## environment-and-class-map 4288750"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.2777613350190222,
+        "source_mtime_ns": 1792514268925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.27129800000000004,
+        "user": 3.0076920000000005
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 81640542",
+          "##ASSEMBLY## collect-identities 0",
+          "##ASSEMBLY## collect-classes 41",
+          "##ASSEMBLY## index-bodies 11791",
+          "##ASSEMBLY## merge-bodies 90403584",
+          "##ASSEMBLY## runtime-consts-methods 135750",
+          "##ASSEMBLY## coroutine-dependencies 3264541",
+          "##ASSEMBLY## export-flags 54538792",
+          "##ASSEMBLY## environment-and-class-map 3568291"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.2236018769908696,
+        "source_mtime_ns": 1792514270925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.273618,
+        "user": 2.951212
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 81413500",
+          "##ASSEMBLY## collect-identities 0",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 10333",
+          "##ASSEMBLY## merge-bodies 89346541",
+          "##ASSEMBLY## runtime-consts-methods 134583",
+          "##ASSEMBLY## coroutine-dependencies 3164000",
+          "##ASSEMBLY## export-flags 53949667",
+          "##ASSEMBLY## environment-and-class-map 4049750"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.2172479178989306,
+        "source_mtime_ns": 1792514272925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.268197,
+        "user": 2.950246
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## aggregate-classes 82058334",
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 0",
+          "##ASSEMBLY## index-bodies 11875",
+          "##ASSEMBLY## merge-bodies 91732584",
+          "##ASSEMBLY## runtime-consts-methods 134334",
+          "##ASSEMBLY## coroutine-dependencies 3148292",
+          "##ASSEMBLY## export-flags 55322166",
+          "##ASSEMBLY## environment-and-class-map 2335416"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.231529501033947,
+        "source_mtime_ns": 1792514274925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.2944669999999999,
+        "user": 2.9383099999999995
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 9916",
+          "##ASSEMBLY## merge-bodies 95325500",
+          "##ASSEMBLY## runtime-consts-methods 141208",
+          "##ASSEMBLY## coroutine-dependencies 3308375",
+          "##ASSEMBLY## export-flags 53809500",
+          "##ASSEMBLY## environment-and-class-map 3345958"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.345641044084914,
+        "source_mtime_ns": 1792514276925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.358263,
+        "user": 2.988104
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 7750",
+          "##ASSEMBLY## merge-bodies 107993167",
+          "##ASSEMBLY## runtime-consts-methods 172792",
+          "##ASSEMBLY## coroutine-dependencies 3852833",
+          "##ASSEMBLY## export-flags 52980167",
+          "##ASSEMBLY## environment-and-class-map 3437750"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.635934001998976,
+        "source_mtime_ns": 1792514278925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.42490499999999987,
+        "user": 3.2118889999999993
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 0",
+          "##ASSEMBLY## index-bodies 8625",
+          "##ASSEMBLY## merge-bodies 99051000",
+          "##ASSEMBLY## runtime-consts-methods 128667",
+          "##ASSEMBLY## coroutine-dependencies 3206416",
+          "##ASSEMBLY## export-flags 53719750",
+          "##ASSEMBLY## environment-and-class-map 3433708"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.396962334983982,
+        "source_mtime_ns": 1792514280925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.3901450000000004,
+        "user": 3.0077130000000025
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 42",
+          "##ASSEMBLY## index-bodies 10000",
+          "##ASSEMBLY## merge-bodies 95380667",
+          "##ASSEMBLY## runtime-consts-methods 140000",
+          "##ASSEMBLY## coroutine-dependencies 3280625",
+          "##ASSEMBLY## export-flags 54456333",
+          "##ASSEMBLY## environment-and-class-map 3498291"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/aggregate-repeat-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.6114633770193905,
+        "source_mtime_ns": 1792514282925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3903949999999998,
+        "user": 3.2219189999999998
+      }
+    ],
+    "baseline-late": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/baseline-late-noop.log",
+        "returncode": 0,
+        "seconds": 0.07873066700994968,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.037903,
+        "user": 0.040978
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 55236583",
+          "##ASSEMBLY## collect-classes 80268791",
+          "##ASSEMBLY## index-bodies 46775959",
+          "##ASSEMBLY## merge-bodies 75049709",
+          "##ASSEMBLY## runtime-consts-methods 131833",
+          "##ASSEMBLY## coroutine-dependencies 3125542",
+          "##ASSEMBLY## export-flags 53648875",
+          "##ASSEMBLY## environment-and-class-map 6313250"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/baseline-late-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.252343585016206,
+        "source_mtime_ns": 1792515359925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.25289199999999995,
+        "user": 3.00061
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 57150000",
+          "##ASSEMBLY## collect-classes 79665333",
+          "##ASSEMBLY## index-bodies 46347001",
+          "##ASSEMBLY## merge-bodies 84968125",
+          "##ASSEMBLY## runtime-consts-methods 130541",
+          "##ASSEMBLY## coroutine-dependencies 3356709",
+          "##ASSEMBLY## export-flags 56308042",
+          "##ASSEMBLY## environment-and-class-map 6276500"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/baseline-late-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.248151876963675,
+        "source_mtime_ns": 1792515361925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.251615,
+        "user": 2.997808
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 57699250",
+          "##ASSEMBLY## collect-classes 79465542",
+          "##ASSEMBLY## index-bodies 48074541",
+          "##ASSEMBLY## merge-bodies 77014292",
+          "##ASSEMBLY## runtime-consts-methods 133583",
+          "##ASSEMBLY## coroutine-dependencies 3087958",
+          "##ASSEMBLY## export-flags 52803209",
+          "##ASSEMBLY## environment-and-class-map 6143542"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/baseline-late-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.2545363770332187,
+        "source_mtime_ns": 1792515363925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.25455400000000006,
+        "user": 3.001086000000001
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 55145667",
+          "##ASSEMBLY## collect-classes 82775125",
+          "##ASSEMBLY## index-bodies 46105333",
+          "##ASSEMBLY## merge-bodies 75387833",
+          "##ASSEMBLY## runtime-consts-methods 127792",
+          "##ASSEMBLY## coroutine-dependencies 3167333",
+          "##ASSEMBLY## export-flags 54624083",
+          "##ASSEMBLY## environment-and-class-map 6143667"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/baseline-late-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.240369043080136,
+        "source_mtime_ns": 1792515365925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.23316899999999996,
+        "user": 3.008502
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59611958",
+          "##ASSEMBLY## collect-classes 80172334",
+          "##ASSEMBLY## index-bodies 47506083",
+          "##ASSEMBLY## merge-bodies 80599208",
+          "##ASSEMBLY## runtime-consts-methods 133584",
+          "##ASSEMBLY## coroutine-dependencies 3508542",
+          "##ASSEMBLY## export-flags 61427541",
+          "##ASSEMBLY## environment-and-class-map 6181917"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/baseline-late-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.4642539599444717,
+        "source_mtime_ns": 1792515367925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.36231199999999997,
+        "user": 3.102314999999999
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58510458",
+          "##ASSEMBLY## collect-classes 80273834",
+          "##ASSEMBLY## index-bodies 55437333",
+          "##ASSEMBLY## merge-bodies 80142625",
+          "##ASSEMBLY## runtime-consts-methods 128334",
+          "##ASSEMBLY## coroutine-dependencies 3197750",
+          "##ASSEMBLY## export-flags 54600000",
+          "##ASSEMBLY## environment-and-class-map 6277708"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/baseline-late-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.658507668063976,
+        "source_mtime_ns": 1792515369925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3911,
+        "user": 3.2671210000000013
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59326208",
+          "##ASSEMBLY## collect-classes 80768375",
+          "##ASSEMBLY## index-bodies 47764125",
+          "##ASSEMBLY## merge-bodies 77587167",
+          "##ASSEMBLY## runtime-consts-methods 153500",
+          "##ASSEMBLY## coroutine-dependencies 3097167",
+          "##ASSEMBLY## export-flags 53740458",
+          "##ASSEMBLY## environment-and-class-map 6682708"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/baseline-late-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.850719667971134,
+        "source_mtime_ns": 1792515371925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.40713200000000005,
+        "user": 3.4444269999999975
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58984000",
+          "##ASSEMBLY## collect-classes 80366916",
+          "##ASSEMBLY## index-bodies 48084542",
+          "##ASSEMBLY## merge-bodies 76647333",
+          "##ASSEMBLY## runtime-consts-methods 140959",
+          "##ASSEMBLY## coroutine-dependencies 3292500",
+          "##ASSEMBLY## export-flags 53701208",
+          "##ASSEMBLY## environment-and-class-map 6344250"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/baseline-late-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.7159156689886004,
+        "source_mtime_ns": 1792515373925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3982999999999999,
+        "user": 3.318374000000002
+      }
+    ],
+    "baseline-recheck": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/baseline-recheck-cold.log",
+        "returncode": 0,
+        "seconds": 891.5527224480174,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 15.451493,
+        "user": 875.303149
+      }
+    ],
+    "before": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/before-cold.log",
+        "returncode": 0,
+        "seconds": 862.2984228100395,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 14.907709,
+        "user": 846.067012
+      },
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/before-noop.log",
+        "returncode": 0,
+        "seconds": 0.06894579203799367,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.03482599999999891,
+        "user": 0.03437600000006569
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/before-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.2904055430553854,
+        "source_mtime_ns": 1792506992925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2641480000000005,
+        "user": 3.027253999999971
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/before-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.2668635429581627,
+        "source_mtime_ns": 1792506994925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.24811399999999928,
+        "user": 3.0191639999999325
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/before-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.2722443769453093,
+        "source_mtime_ns": 1792506996925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2539920000000002,
+        "user": 3.0195360000000164
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/before-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.2842830839799717,
+        "source_mtime_ns": 1792506998925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.23829200000000128,
+        "user": 3.047251000000074
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/before-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.4687332100002095,
+        "source_mtime_ns": 1792507000925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.3638200000000005,
+        "user": 3.1056559999999536
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/before-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.702973210019991,
+        "source_mtime_ns": 1792507002925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3890819999999984,
+        "user": 3.3146920000000364
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/before-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 4.074482252006419,
+        "source_mtime_ns": 1792507004925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.4389630000000011,
+        "user": 3.6363269999999375
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/before-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.9202883769758046,
+        "source_mtime_ns": 1792507006925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.40501000000000076,
+        "user": 3.5160000000000764
+      }
+    ],
+    "before-marks": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/before-marks-noop.log",
+        "returncode": 0,
+        "seconds": 1.4051671259803697,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.12267099999999999,
+        "user": 1.283188
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58279459",
+          "##ASSEMBLY## collect-classes 89643292",
+          "##ASSEMBLY## index-bodies 55444625",
+          "##ASSEMBLY## merge-bodies 88921583",
+          "##ASSEMBLY## runtime-consts-methods 184916",
+          "##ASSEMBLY## coroutine-dependencies 3636791",
+          "##ASSEMBLY## export-flags 55305209",
+          "##ASSEMBLY## environment-and-class-map 6615292"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/before-marks-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.3990280420985073,
+        "source_mtime_ns": 1792507915925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.251906,
+        "user": 3.1487730000000003
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 68547375",
+          "##ASSEMBLY## collect-classes 85475792",
+          "##ASSEMBLY## index-bodies 56364042",
+          "##ASSEMBLY## merge-bodies 88149667",
+          "##ASSEMBLY## runtime-consts-methods 138334",
+          "##ASSEMBLY## coroutine-dependencies 3389125",
+          "##ASSEMBLY## export-flags 55391583",
+          "##ASSEMBLY## environment-and-class-map 6179459"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/before-marks-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.309549667988904,
+        "source_mtime_ns": 1792507917925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.24537599999999998,
+        "user": 3.0646239999999993
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 56959834",
+          "##ASSEMBLY## collect-classes 79597292",
+          "##ASSEMBLY## index-bodies 47954750",
+          "##ASSEMBLY## merge-bodies 76600917",
+          "##ASSEMBLY## runtime-consts-methods 141333",
+          "##ASSEMBLY## coroutine-dependencies 3693625",
+          "##ASSEMBLY## export-flags 54263833",
+          "##ASSEMBLY## environment-and-class-map 6351000"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/before-marks-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.2349785020342097,
+        "source_mtime_ns": 1792507919925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.252962,
+        "user": 2.983358000000001
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 55663208",
+          "##ASSEMBLY## collect-classes 84194333",
+          "##ASSEMBLY## index-bodies 48671000",
+          "##ASSEMBLY## merge-bodies 77774250",
+          "##ASSEMBLY## runtime-consts-methods 139958",
+          "##ASSEMBLY## coroutine-dependencies 3237750",
+          "##ASSEMBLY## export-flags 53871208",
+          "##ASSEMBLY## environment-and-class-map 6028083"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/before-marks-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.242944877012633,
+        "source_mtime_ns": 1792507921925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.23163999999999996,
+        "user": 3.012568999999999
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58936375",
+          "##ASSEMBLY## collect-classes 80052250",
+          "##ASSEMBLY## index-bodies 46940875",
+          "##ASSEMBLY## merge-bodies 76109375",
+          "##ASSEMBLY## runtime-consts-methods 121208",
+          "##ASSEMBLY## coroutine-dependencies 3128834",
+          "##ASSEMBLY## export-flags 54028291",
+          "##ASSEMBLY## environment-and-class-map 6155416"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/before-marks-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.497964250971563,
+        "source_mtime_ns": 1792507923925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.384644,
+        "user": 3.1140549999999987
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59778167",
+          "##ASSEMBLY## collect-classes 79897917",
+          "##ASSEMBLY## index-bodies 50276583",
+          "##ASSEMBLY## merge-bodies 78375333",
+          "##ASSEMBLY## runtime-consts-methods 137084",
+          "##ASSEMBLY## coroutine-dependencies 3252209",
+          "##ASSEMBLY## export-flags 53691250",
+          "##ASSEMBLY## environment-and-class-map 6224000"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/before-marks-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.756228835089132,
+        "source_mtime_ns": 1792507925925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.4189719999999999,
+        "user": 3.338039000000002
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59742041",
+          "##ASSEMBLY## collect-classes 79597584",
+          "##ASSEMBLY## index-bodies 47696250",
+          "##ASSEMBLY## merge-bodies 76943292",
+          "##ASSEMBLY## runtime-consts-methods 131750",
+          "##ASSEMBLY## coroutine-dependencies 3305500",
+          "##ASSEMBLY## export-flags 53943291",
+          "##ASSEMBLY## environment-and-class-map 6330834"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/before-marks-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.4925685429479927,
+        "source_mtime_ns": 1792507927925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.35468900000000003,
+        "user": 3.1387849999999986
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 59079584",
+          "##ASSEMBLY## collect-classes 79772792",
+          "##ASSEMBLY## index-bodies 47416208",
+          "##ASSEMBLY## merge-bodies 76799125",
+          "##ASSEMBLY## runtime-consts-methods 152209",
+          "##ASSEMBLY## coroutine-dependencies 3414542",
+          "##ASSEMBLY## export-flags 55637209",
+          "##ASSEMBLY## environment-and-class-map 5991084"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/before-marks-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.7338039180031046,
+        "source_mtime_ns": 1792507929925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.400363,
+        "user": 3.334106000000002
+      }
+    ],
+    "identity": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/identity-cold.log",
+        "returncode": 0,
+        "seconds": 883.2292142349761,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 15.033212,
+        "user": 867.730473
+      },
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/identity-noop.log",
+        "returncode": 0,
+        "seconds": 0.06793333298992366,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.027702999999998923,
+        "user": 0.04036200000007284
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 84368792",
+          "##ASSEMBLY## index-bodies 14500",
+          "##ASSEMBLY## merge-bodies 88369417",
+          "##ASSEMBLY## runtime-consts-methods 102750",
+          "##ASSEMBLY## coroutine-dependencies 3252334",
+          "##ASSEMBLY## export-flags 53157166",
+          "##ASSEMBLY## environment-and-class-map 5773500"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/identity-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.1979025850305334,
+        "source_mtime_ns": 1792516541925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.24161400000000022,
+        "user": 2.9574799999999186
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 86371333",
+          "##ASSEMBLY## index-bodies 9584",
+          "##ASSEMBLY## merge-bodies 94344625",
+          "##ASSEMBLY## runtime-consts-methods 105959",
+          "##ASSEMBLY## coroutine-dependencies 3691375",
+          "##ASSEMBLY## export-flags 55188125",
+          "##ASSEMBLY## environment-and-class-map 5748458"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/identity-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.1918117509922013,
+        "source_mtime_ns": 1792516543925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.24627399999999966,
+        "user": 2.9463590000000295
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 83254833",
+          "##ASSEMBLY## index-bodies 13584",
+          "##ASSEMBLY## merge-bodies 88624626",
+          "##ASSEMBLY## runtime-consts-methods 91541",
+          "##ASSEMBLY## coroutine-dependencies 3178459",
+          "##ASSEMBLY## export-flags 53845375",
+          "##ASSEMBLY## environment-and-class-map 5995417"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/identity-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.133183376980014,
+        "source_mtime_ns": 1792516545925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2482129999999998,
+        "user": 2.886190000000056
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 82902458",
+          "##ASSEMBLY## index-bodies 11708",
+          "##ASSEMBLY## merge-bodies 87617125",
+          "##ASSEMBLY## runtime-consts-methods 101167",
+          "##ASSEMBLY## coroutine-dependencies 3390333",
+          "##ASSEMBLY## export-flags 53346958",
+          "##ASSEMBLY## environment-and-class-map 5858083"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/identity-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.152320335037075,
+        "source_mtime_ns": 1792516547925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.23182699999999912,
+        "user": 2.9217129999999543
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 83836042",
+          "##ASSEMBLY## index-bodies 11709",
+          "##ASSEMBLY## merge-bodies 91215584",
+          "##ASSEMBLY## runtime-consts-methods 100666",
+          "##ASSEMBLY## coroutine-dependencies 3222250",
+          "##ASSEMBLY## export-flags 54440291",
+          "##ASSEMBLY## environment-and-class-map 5905375"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/identity-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.337250668089837,
+        "source_mtime_ns": 1792516549925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.33506000000000213,
+        "user": 3.0030040000000326
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 89842708",
+          "##ASSEMBLY## index-bodies 10000",
+          "##ASSEMBLY## merge-bodies 90683125",
+          "##ASSEMBLY## runtime-consts-methods 97042",
+          "##ASSEMBLY## coroutine-dependencies 3335750",
+          "##ASSEMBLY## export-flags 53743833",
+          "##ASSEMBLY## environment-and-class-map 6445584"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/identity-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.532348459935747,
+        "source_mtime_ns": 1792516551925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.39169499999999857,
+        "user": 3.1413860000000113
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 77648750",
+          "##ASSEMBLY## index-bodies 11667",
+          "##ASSEMBLY## merge-bodies 88181001",
+          "##ASSEMBLY## runtime-consts-methods 95667",
+          "##ASSEMBLY## coroutine-dependencies 3360500",
+          "##ASSEMBLY## export-flags 52782542",
+          "##ASSEMBLY## environment-and-class-map 6097042"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/identity-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.738239376922138,
+        "source_mtime_ns": 1792516553925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.4136620000000022,
+        "user": 3.3244159999999283
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 84170000",
+          "##ASSEMBLY## index-bodies 11334",
+          "##ASSEMBLY## merge-bodies 94748375",
+          "##ASSEMBLY## runtime-consts-methods 103458",
+          "##ASSEMBLY## coroutine-dependencies 3177666",
+          "##ASSEMBLY## export-flags 52444458",
+          "##ASSEMBLY## environment-and-class-map 6178875"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/identity-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.609020543983206,
+        "source_mtime_ns": 1792516555925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3694539999999975,
+        "user": 3.2397900000000845
+      }
+    ],
+    "identity-control": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/identity-control-noop.log",
+        "returncode": 0,
+        "seconds": 1.3128207500558347,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.130065,
+        "user": 1.183294
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/identity-control-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.1249080849811435,
+        "source_mtime_ns": 1792517532925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.239925,
+        "user": 2.8860770000000002
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/identity-control-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.1255505009321496,
+        "source_mtime_ns": 1792517534925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.26106499999999994,
+        "user": 2.8654389999999994
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/identity-control-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.112253543920815,
+        "source_mtime_ns": 1792517536925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.26250300000000004,
+        "user": 2.8508450000000005
+      },
+      {
+        "assembly_marks": [],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/identity-control-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.139382335008122,
+        "source_mtime_ns": 1792517538925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.26172000000000006,
+        "user": 2.8778489999999994
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/identity-control-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.404830208979547,
+        "source_mtime_ns": 1792517540925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.371332,
+        "user": 3.0341260000000005
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/identity-control-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.5979796269675717,
+        "source_mtime_ns": 1792517542925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3901549999999998,
+        "user": 3.2083049999999993
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/identity-control-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.3715364190284163,
+        "source_mtime_ns": 1792517544925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.3756660000000003,
+        "user": 2.9965730000000015
+      },
+      {
+        "assembly_marks": [],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/identity-control-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.632591709960252,
+        "source_mtime_ns": 1792517546925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.4154169999999997,
+        "user": 3.2177439999999997
+      }
+    ],
+    "identity-repeat": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-noop.log",
+        "returncode": 0,
+        "seconds": 1.3034006680827588,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.107817,
+        "user": 1.196031
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 83",
+          "##ASSEMBLY## collect-classes 79836959",
+          "##ASSEMBLY## index-bodies 11500",
+          "##ASSEMBLY## merge-bodies 87986125",
+          "##ASSEMBLY## runtime-consts-methods 97083",
+          "##ASSEMBLY## coroutine-dependencies 3102667",
+          "##ASSEMBLY## export-flags 52527542",
+          "##ASSEMBLY## environment-and-class-map 6015917"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.114283876027912,
+        "source_mtime_ns": 1792517462925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.24019799999999997,
+        "user": 2.874006
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 80202833",
+          "##ASSEMBLY## index-bodies 11291",
+          "##ASSEMBLY## merge-bodies 88816209",
+          "##ASSEMBLY## runtime-consts-methods 98667",
+          "##ASSEMBLY## coroutine-dependencies 3125667",
+          "##ASSEMBLY## export-flags 52715209",
+          "##ASSEMBLY## environment-and-class-map 5840375"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.1161265439586714,
+        "source_mtime_ns": 1792517464925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.23626199999999997,
+        "user": 2.8809759999999995
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 80236667",
+          "##ASSEMBLY## index-bodies 10083",
+          "##ASSEMBLY## merge-bodies 87654042",
+          "##ASSEMBLY## runtime-consts-methods 101916",
+          "##ASSEMBLY## coroutine-dependencies 3151084",
+          "##ASSEMBLY## export-flags 52435584",
+          "##ASSEMBLY## environment-and-class-map 6107083"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.117286251974292,
+        "source_mtime_ns": 1792517466925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.26679600000000003,
+        "user": 2.851686000000001
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 82547542",
+          "##ASSEMBLY## index-bodies 15125",
+          "##ASSEMBLY## merge-bodies 93340833",
+          "##ASSEMBLY## runtime-consts-methods 91583",
+          "##ASSEMBLY## coroutine-dependencies 3332375",
+          "##ASSEMBLY## export-flags 52591709",
+          "##ASSEMBLY## environment-and-class-map 5855000"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.1230702929897234,
+        "source_mtime_ns": 1792517468925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.2530730000000001,
+        "user": 2.8712400000000002
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 42",
+          "##ASSEMBLY## collect-classes 83505167",
+          "##ASSEMBLY## index-bodies 10500",
+          "##ASSEMBLY## merge-bodies 88673250",
+          "##ASSEMBLY## runtime-consts-methods 101625",
+          "##ASSEMBLY## coroutine-dependencies 3208792",
+          "##ASSEMBLY## export-flags 52061500",
+          "##ASSEMBLY## environment-and-class-map 6020667"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.3824926679953933,
+        "source_mtime_ns": 1792517470925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.39677699999999994,
+        "user": 2.986549
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 84",
+          "##ASSEMBLY## collect-classes 83649333",
+          "##ASSEMBLY## index-bodies 12500",
+          "##ASSEMBLY## merge-bodies 88953125",
+          "##ASSEMBLY## runtime-consts-methods 102458",
+          "##ASSEMBLY## coroutine-dependencies 3260583",
+          "##ASSEMBLY## export-flags 51864167",
+          "##ASSEMBLY## environment-and-class-map 5827833"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.5941295009106398,
+        "source_mtime_ns": 1792517472925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3661289999999999,
+        "user": 3.2289150000000006
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 84235792",
+          "##ASSEMBLY## index-bodies 9917",
+          "##ASSEMBLY## merge-bodies 90690667",
+          "##ASSEMBLY## runtime-consts-methods 102792",
+          "##ASSEMBLY## coroutine-dependencies 3246417",
+          "##ASSEMBLY## export-flags 53219500",
+          "##ASSEMBLY## environment-and-class-map 6138041"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.367876792908646,
+        "source_mtime_ns": 1792517474925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.34595,
+        "user": 3.0218789999999984
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 41",
+          "##ASSEMBLY## collect-classes 87984834",
+          "##ASSEMBLY## index-bodies 9875",
+          "##ASSEMBLY## merge-bodies 89044166",
+          "##ASSEMBLY## runtime-consts-methods 108208",
+          "##ASSEMBLY## coroutine-dependencies 3155959",
+          "##ASSEMBLY## export-flags 52977791",
+          "##ASSEMBLY## environment-and-class-map 6122167"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/identity-repeat-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.6237922930158675,
+        "source_mtime_ns": 1792517476925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.39631300000000014,
+        "user": 3.2283359999999988
+      }
+    ],
+    "stream": [
+      {
+        "assembly_marks": [],
+        "label": "cold",
+        "log": "/tmp/skip-ir-assembly/stream-cold.log",
+        "returncode": 0,
+        "seconds": 912.9845243699383,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 15.619805,
+        "user": 896.556953
+      },
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/stream-noop.log",
+        "returncode": 0,
+        "seconds": 0.06991387507878244,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.0332290000000004,
+        "user": 0.03702099999998154
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58370042",
+          "##ASSEMBLY## collect-classes 87575791",
+          "##ASSEMBLY## index-bodies 2083",
+          "##ASSEMBLY## merge-bodies 85026875",
+          "##ASSEMBLY## runtime-consts-methods 133083",
+          "##ASSEMBLY## coroutine-dependencies 3317667",
+          "##ASSEMBLY## export-flags 53857250",
+          "##ASSEMBLY## environment-and-class-map 6502167"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/stream-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.259219042956829,
+        "source_mtime_ns": 1792510998925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.2574109999999994,
+        "user": 3.0030160000000024
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58055917",
+          "##ASSEMBLY## collect-classes 87631292",
+          "##ASSEMBLY## index-bodies 2250",
+          "##ASSEMBLY## merge-bodies 88112125",
+          "##ASSEMBLY## runtime-consts-methods 137125",
+          "##ASSEMBLY## coroutine-dependencies 3240708",
+          "##ASSEMBLY## export-flags 55122375",
+          "##ASSEMBLY## environment-and-class-map 6582708"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/stream-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.222011959995143,
+        "source_mtime_ns": 1792511000925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.250472000000002,
+        "user": 2.9718560000000025
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58334208",
+          "##ASSEMBLY## collect-classes 89968083",
+          "##ASSEMBLY## index-bodies 2250",
+          "##ASSEMBLY## merge-bodies 87086083",
+          "##ASSEMBLY## runtime-consts-methods 135666",
+          "##ASSEMBLY## coroutine-dependencies 3218750",
+          "##ASSEMBLY## export-flags 67087459",
+          "##ASSEMBLY## environment-and-class-map 6493583"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/stream-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.254247292992659,
+        "source_mtime_ns": 1792511002925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.25985199999999864,
+        "user": 2.9956220000000258
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 63749042",
+          "##ASSEMBLY## collect-classes 88975666",
+          "##ASSEMBLY## index-bodies 2250",
+          "##ASSEMBLY## merge-bodies 85310375",
+          "##ASSEMBLY## runtime-consts-methods 161750",
+          "##ASSEMBLY## coroutine-dependencies 3256583",
+          "##ASSEMBLY## export-flags 53830458",
+          "##ASSEMBLY## environment-and-class-map 6801875"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/stream-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.238152084988542,
+        "source_mtime_ns": 1792511004925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.24654800000000066,
+        "user": 2.9930029999999306
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 61405666",
+          "##ASSEMBLY## collect-classes 89817375",
+          "##ASSEMBLY## index-bodies 1958",
+          "##ASSEMBLY## merge-bodies 90082542",
+          "##ASSEMBLY## runtime-consts-methods 138333",
+          "##ASSEMBLY## coroutine-dependencies 3246000",
+          "##ASSEMBLY## export-flags 53369250",
+          "##ASSEMBLY## environment-and-class-map 6546541"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/stream-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.512327000964433,
+        "source_mtime_ns": 1792511006925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.381139000000001,
+        "user": 3.131081999999992
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 60593875",
+          "##ASSEMBLY## collect-classes 89660458",
+          "##ASSEMBLY## index-bodies 2458",
+          "##ASSEMBLY## merge-bodies 87465917",
+          "##ASSEMBLY## runtime-consts-methods 136666",
+          "##ASSEMBLY## coroutine-dependencies 3366416",
+          "##ASSEMBLY## export-flags 54050250",
+          "##ASSEMBLY## environment-and-class-map 6719792"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/stream-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 4.186355211073533,
+        "source_mtime_ns": 1792511008925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.3777489999999979,
+        "user": 3.293459000000098
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 53084958",
+          "##ASSEMBLY## collect-classes 87856458",
+          "##ASSEMBLY## index-bodies 1833",
+          "##ASSEMBLY## merge-bodies 86505458",
+          "##ASSEMBLY## runtime-consts-methods 130250",
+          "##ASSEMBLY## coroutine-dependencies 3194916",
+          "##ASSEMBLY## export-flags 54174792",
+          "##ASSEMBLY## environment-and-class-map 6737500"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/stream-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.855882794014178,
+        "source_mtime_ns": 1792511010925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.4391020000000019,
+        "user": 3.417671999999925
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 62128416",
+          "##ASSEMBLY## collect-classes 90137125",
+          "##ASSEMBLY## index-bodies 2125",
+          "##ASSEMBLY## merge-bodies 91673042",
+          "##ASSEMBLY## runtime-consts-methods 137292",
+          "##ASSEMBLY## coroutine-dependencies 3251625",
+          "##ASSEMBLY## export-flags 55743500",
+          "##ASSEMBLY## environment-and-class-map 6718417"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/stream-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.752415125956759,
+        "source_mtime_ns": 1792511012925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.39756599999999764,
+        "user": 3.35474099999999
+      }
+    ],
+    "stream-repeat": [
+      {
+        "assembly_marks": [],
+        "label": "noop",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-noop.log",
+        "returncode": 0,
+        "seconds": 1.3019137089140713,
+        "source_mtime_ns": 1792505412925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.129457,
+        "user": 1.173018
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 56430334",
+          "##ASSEMBLY## collect-classes 92221333",
+          "##ASSEMBLY## index-bodies 2333",
+          "##ASSEMBLY## merge-bodies 88141208",
+          "##ASSEMBLY## runtime-consts-methods 169250",
+          "##ASSEMBLY## coroutine-dependencies 3583208",
+          "##ASSEMBLY## export-flags 56531166",
+          "##ASSEMBLY## environment-and-class-map 6604042"
+        ],
+        "label": "unused-method-add-0",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-unused-method-add-0.log",
+        "returncode": 0,
+        "seconds": 3.2238736680010334,
+        "source_mtime_ns": 1792511978925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.251245,
+        "user": 2.973998
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 67015000",
+          "##ASSEMBLY## collect-classes 90734458",
+          "##ASSEMBLY## index-bodies 2375",
+          "##ASSEMBLY## merge-bodies 88368875",
+          "##ASSEMBLY## runtime-consts-methods 142791",
+          "##ASSEMBLY## coroutine-dependencies 3335167",
+          "##ASSEMBLY## export-flags 53287875",
+          "##ASSEMBLY## environment-and-class-map 6477833"
+        ],
+        "label": "unused-method-remove-0",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-unused-method-remove-0.log",
+        "returncode": 0,
+        "seconds": 3.2568223769776523,
+        "source_mtime_ns": 1792511980925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.279393,
+        "user": 2.978797
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 66216334",
+          "##ASSEMBLY## collect-classes 97309167",
+          "##ASSEMBLY## index-bodies 2292",
+          "##ASSEMBLY## merge-bodies 95853709",
+          "##ASSEMBLY## runtime-consts-methods 155542",
+          "##ASSEMBLY## coroutine-dependencies 3450625",
+          "##ASSEMBLY## export-flags 55092417",
+          "##ASSEMBLY## environment-and-class-map 6394792"
+        ],
+        "label": "unused-method-add-1",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-unused-method-add-1.log",
+        "returncode": 0,
+        "seconds": 3.318291084957309,
+        "source_mtime_ns": 1792511982925921008,
+        "source_sha256": "2bf7642f074850a3e0265329fd73b390b3e2179b917e498d0481672cdb77ed62",
+        "system": 0.265247,
+        "user": 3.0543690000000003
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 56911292",
+          "##ASSEMBLY## collect-classes 87089792",
+          "##ASSEMBLY## index-bodies 2209",
+          "##ASSEMBLY## merge-bodies 84335750",
+          "##ASSEMBLY## runtime-consts-methods 156875",
+          "##ASSEMBLY## coroutine-dependencies 3468125",
+          "##ASSEMBLY## export-flags 53472750",
+          "##ASSEMBLY## environment-and-class-map 6450417"
+        ],
+        "label": "unused-method-remove-1",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-unused-method-remove-1.log",
+        "returncode": 0,
+        "seconds": 3.251504460000433,
+        "source_mtime_ns": 1792511984925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.28922900000000007,
+        "user": 2.963360999999999
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 63153083",
+          "##ASSEMBLY## collect-classes 90680208",
+          "##ASSEMBLY## index-bodies 2208",
+          "##ASSEMBLY## merge-bodies 86145708",
+          "##ASSEMBLY## runtime-consts-methods 135167",
+          "##ASSEMBLY## coroutine-dependencies 3102250",
+          "##ASSEMBLY## export-flags 52477958",
+          "##ASSEMBLY## environment-and-class-map 6365375"
+        ],
+        "label": "message-edit-0",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-message-edit-0.log",
+        "returncode": 0,
+        "seconds": 3.551895168959163,
+        "source_mtime_ns": 1792511986925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.41871499999999995,
+        "user": 3.134100000000002
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58567792",
+          "##ASSEMBLY## collect-classes 89469958",
+          "##ASSEMBLY## index-bodies 1959",
+          "##ASSEMBLY## merge-bodies 84984334",
+          "##ASSEMBLY## runtime-consts-methods 122417",
+          "##ASSEMBLY## coroutine-dependencies 3176542",
+          "##ASSEMBLY## export-flags 53749417",
+          "##ASSEMBLY## environment-and-class-map 6461958"
+        ],
+        "label": "message-restore-0",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-message-restore-0.log",
+        "returncode": 0,
+        "seconds": 3.6925528770079836,
+        "source_mtime_ns": 1792511988925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.39622599999999997,
+        "user": 3.297148
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 72675917",
+          "##ASSEMBLY## collect-classes 92138333",
+          "##ASSEMBLY## index-bodies 2250",
+          "##ASSEMBLY## merge-bodies 90035708",
+          "##ASSEMBLY## runtime-consts-methods 124833",
+          "##ASSEMBLY## coroutine-dependencies 3102250",
+          "##ASSEMBLY## export-flags 54148750",
+          "##ASSEMBLY## environment-and-class-map 6745875"
+        ],
+        "label": "message-edit-1",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-message-edit-1.log",
+        "returncode": 0,
+        "seconds": 3.4948972520651296,
+        "source_mtime_ns": 1792511990925921008,
+        "source_sha256": "f0c3c8798a910b6d3d6071b20614892c80f4dbaf877ada1b5bcd8e14264dbc22",
+        "system": 0.34550899999999984,
+        "user": 3.150002999999998
+      },
+      {
+        "assembly_marks": [
+          "##ASSEMBLY## collect-identities 58915625",
+          "##ASSEMBLY## collect-classes 90553709",
+          "##ASSEMBLY## index-bodies 2167",
+          "##ASSEMBLY## merge-bodies 86124042",
+          "##ASSEMBLY## runtime-consts-methods 129292",
+          "##ASSEMBLY## coroutine-dependencies 3144791",
+          "##ASSEMBLY## export-flags 53635000",
+          "##ASSEMBLY## environment-and-class-map 6602875"
+        ],
+        "label": "message-restore-1",
+        "log": "/tmp/skip-ir-assembly/stream-repeat-message-restore-1.log",
+        "returncode": 0,
+        "seconds": 3.7041772099910304,
+        "source_mtime_ns": 1792511992925921008,
+        "source_sha256": "f75dd3bcc1ed62fb2d6746aee2acb0cdc5e313d28c33cc94dd7b4d543c1f858c",
+        "system": 0.39576500000000037,
+        "user": 3.3093059999999994
+      }
+    ]
+  },
+  "scratch_artifacts": "/tmp/skip-ir-assembly",
+  "source_sha256": {
+    "skiplang/compiler/src/compile.sk": "56560f9eff5ea523bd24d8d506569b1139103e64b278e9792c015384af86c69d",
+    "skiplang/compiler/src/specialize.sk": "8b70171bcfd9479d3e70dca3514210bba15c9c8e6e2317756df6f03c591313e9",
+    "skiplang/compiler/tests/tests.sk": "c2609a234789d1c44c75df1721d8e1c07c93d9ca5a8f43dc261ced3ad87c6521",
+    "skiplang/prelude/src/skstore/Context.sk": "9c9853d689183303d071f74e31961fc884076cd9a7807fbee0b3b1c31acb0390"
+  },
+  "summary": {
+    "cold_s": {
+      "baseline_first": 862.2984228100395,
+      "baseline_recheck": 891.5527224480174,
+      "both_aggregates": 902.7015804100083,
+      "fusion_rejected": 929.2831468790537,
+      "identity_only": 883.2292142349761,
+      "streaming": 912.9845243699383
+    },
+    "message": {
+      "baseline": {
+        "cpu_mean_s": 3.64684175,
+        "n": 8,
+        "wall_mean_s": 3.646245313997497,
+        "wall_samples_s": [
+          3.497964250971563,
+          3.756228835089132,
+          3.4925685429479927,
+          3.7338039180031046,
+          3.4642539599444717,
+          3.658507668063976,
+          3.850719667971134,
+          3.7159156689886004
+        ]
+      },
+      "final": {
+        "cpu_mean_s": 3.523664375000007,
+        "n": 8,
+        "wall_mean_s": 3.5231437879701843,
+        "wall_samples_s": [
+          3.337250668089837,
+          3.532348459935747,
+          3.738239376922138,
+          3.609020543983206,
+          3.3824926679953933,
+          3.5941295009106398,
+          3.367876792908646,
+          3.6237922930158675
+        ]
+      },
+      "saved_percent": 3.376117496942418,
+      "saved_s": 0.1231015260273125
+    },
+    "unused_method": {
+      "baseline": {
+        "cpu_mean_s": 3.2739305,
+        "n": 8,
+        "wall_mean_s": 3.272737746403436,
+        "wall_samples_s": [
+          3.3990280420985073,
+          3.309549667988904,
+          3.2349785020342097,
+          3.242944877012633,
+          3.252343585016206,
+          3.248151876963675,
+          3.2545363770332187,
+          3.240369043080136
+        ]
+      },
+      "final": {
+        "cpu_mean_s": 3.1442383749999947,
+        "n": 8,
+        "wall_mean_s": 3.143248126623803,
+        "wall_samples_s": [
+          3.1979025850305334,
+          3.1918117509922013,
+          3.133183376980014,
+          3.152320335037075,
+          3.114283876027912,
+          3.1161265439586714,
+          3.117286251974292,
+          3.1230702929897234
+        ]
+      },
+      "saved_percent": 3.9566146087304284,
+      "saved_s": 0.12948961977963336
+    }
+  },
+  "validation": {
+    "aggregate": {
+      "incremental_tests": {
+        "failed": 0,
+        "log": "/tmp/skip-ir-assembly/test-aggregate-o0/results.log",
+        "passed": 23
+      },
+      "produced_native_probe": {
+        "after": "7",
+        "before": "12",
+        "compiler": "/tmp/skip-ir-assembly/aggregate-target/host/dev/skc",
+        "expected": [
+          "12",
+          "7"
+        ],
+        "source_restored": true
+      }
+    },
+    "identity": {
+      "incremental_tests": {
+        "failed": 0,
+        "log": "/tmp/skip-ir-assembly/test-identity-o0/results.log",
+        "passed": 23
+      },
+      "produced_native_probe": {
+        "after": "7",
+        "before": "12",
+        "compiler": "/tmp/skip-ir-assembly/identity-target/host/dev/skc",
+        "expected": [
+          "12",
+          "7"
+        ],
+        "source_restored": true
+      }
+    },
+    "stream": {
+      "incremental_tests": {
+        "failed": 0,
+        "log": "/tmp/skip-ir-assembly/test-stream-o0/results.log",
+        "passed": 23
+      },
+      "produced_native_probe": {
+        "after": "7",
+        "before": "12",
+        "compiler": "/tmp/skip-ir-assembly/stream-target/host/dev/skc",
+        "expected": [
+          "12",
+          "7"
+        ],
+        "source_restored": true
+      }
+    }
+  }
+}

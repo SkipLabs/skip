@@ -300,6 +300,46 @@ private fun incrementalFrontendErrors(): void {
   T.expectTrue(removed.success(), removed.stderr);
 }
 
+// A field chain and an unfinished parent cross generic-name work rows.
+private fun incrementalClassContinuations(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  output = dir + "/program";
+  data = dir + "/data";
+  FileSystem.writeTextFile(
+    source,
+    "class ChainC(value: Int = 3)\n" +
+      "class ChainB(child: ChainC = ChainC())\n" +
+      "class ChainA(child: ChainB = ChainB())\n" +
+      "class ParentLeaf(value: Int = 3)\n" +
+      "base class ParentWithLeaf(child: ParentLeaf = ParentLeaf()) {\n" +
+      "  fun value(): Int { this.child.value }\n" +
+      "}\n" +
+      "class ChildOfParent() extends ParentWithLeaf\n" +
+      "untracked fun main(): void {\n" +
+      "  print_raw((ChainA().child.child.value + ChildOfParent().value()).toString());\n" +
+      "}\n",
+  );
+  try {
+    compiled = System.subprocess(
+      compile_cmd(Array[source], output).concat(Array["--init", data]),
+    ).fromSuccess();
+    T.expectTrue(compiled.success(), compiled.stderr);
+    result = System.subprocess(Array[output]).fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    T.expectEq(result.stdout, "6")
+  } catch {
+  | exn ->
+    _ = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+    throw exn
+  };
+  T.expectTrue(
+    System.subprocess(Array["rm", "-r", dir]).fromSuccess().success(),
+  )
+}
+
 // Exercise persisted relationships through generic variance, removals, and
 // changes to inheritance, method bodies, methods, and layouts.
 private fun incrementalRelationships(): void {
@@ -2100,6 +2140,43 @@ private fun compactFunctionDebugKeys(): void {
   }
 }
 
+private fun functionIRPlanningPayload(): void {
+  context = SKStore.Context::mcreate{};
+  input = context.mkdir(
+    SKStore.IID::keyType,
+    (x: SKStore.File) ~> x,
+    SKStore.DirName::create("/function-ir-planning-payload-input/"),
+  );
+  oldCallable = DebugTraceCallable{payload => "retained key"};
+  currentCallable = DebugTraceCallable{payload => "current value"};
+  oldKey = OuterIstToIR.GFunKeyKey(
+    OuterIstToIR.GFunKey(oldCallable, FunSuperpositionID::empty),
+  );
+  current = OuterIstToIR.GFunKey(currentCallable, FunSuperpositionID::empty);
+  input.writeArray(context, SKStore.IID(0), Array[OuterIstToIR.GFunKeyFile(current)]);
+  identities = OuterIstToIR.createFunctionIdentities(context);
+  plan = input.map(
+    (x: SKStore.Key) ~> x,
+    (x: SKStore.File) ~> x,
+    context,
+    SKStore.DirName::create("/function-ir-planning-payload-output/"),
+    (context, writer, _, values) ~>
+      OuterIstToIR.planFunctionIR(context, writer, oldKey, values, identities)
+    ,
+  );
+  context.update();
+  work = OuterIstToIR.FunctionIRWorkFile::type(plan.getArray(context, oldKey)[0]);
+  generic = OuterIstToIR.GenericFunctionRequestFile::type(
+    plan.getArray(context, OuterIstToIR.GenericFunctionKey(currentCallable))[0],
+  );
+  for (callable in Array[work.instantiation.i0, generic.callable]) {
+    callable match {
+    | DebugTraceCallable{payload} -> T.expectEq(payload, "current value")
+    | _ -> T.fail("Planning changed the callable kind")
+    }
+  }
+}
+
 private fun incrementalCopydownPolicy(): void {
   dir = System.subprocess(Array["mktemp", "-d"]).fromSuccess().stdout.trim();
   source = Path.join(dir, "input.sk");
@@ -2175,6 +2252,7 @@ untracked fun main(): void {
     "incremental",
     mutable Vector[
       T.Test{name => "body_capture", func => () ~> incrementalBodyCapture()},
+      T.Test{name => "function_ir_planning_payload", func => () ~> functionIRPlanningPayload()},
       T.Test{name => "copydown_policy", func => () ~> incrementalCopydownPolicy()},
       T.Test{
         name => "compact_function_debug_keys",
@@ -2197,6 +2275,10 @@ untracked fun main(): void {
         func => () ~> incrementalConstructorPositions(),
       },
       T.Test{name => "relationships", func => () ~> incrementalRelationships()},
+      T.Test{
+        name => "class_continuations",
+        func => () ~> incrementalClassContinuations(),
+      },
       T.Test{
         name => "latched_relations",
         func => () ~> incrementalLatchedRelations(),
