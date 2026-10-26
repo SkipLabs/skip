@@ -290,11 +290,7 @@ private fun render_pos(
   if (source.path.startsWith(cwd)) {
     !path = path.stripPrefix(cwd + "/");
   };
-  file = source.pkg_opt match {
-  | Some(pkg) if (pkg != FileCache.kAnonymousPackageName) ->
-    `File "${path}" (package ${pkg})`
-  | _ -> `File "${path}"`
-  };
+  file = `File "${path}"`;
 
   position = if (!range.isNone()) {
     `, ${renderTextRange(range)}:`
