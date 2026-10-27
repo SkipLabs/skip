@@ -165,6 +165,12 @@ def main():
                     raise RuntimeError(f"missing compiled binary: {artifact}")
             artifact_hashes = {artifact.name: digest(artifact)
                                for artifact in artifacts}
+            if state["completed"]:
+                previous = state["completed"][-1]["binary_sha256"]
+                unchanged = [name for name, sha in artifact_hashes.items()
+                             if sha == previous[name]]
+                if unchanged:
+                    raise RuntimeError("outputs did not update: " + ", ".join(unchanged))
             version = run([str(artifacts[0]), "--version"], compiler,
                           capture_output=True, env=environment).stdout.strip()
             if revision[:9] not in version:
