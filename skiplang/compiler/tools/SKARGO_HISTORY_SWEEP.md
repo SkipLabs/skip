@@ -81,3 +81,11 @@ reached at least 22 GB of compiler RSS. This jump changes about 1,870 lines
 across 26 compiler files and updates SKStore. The build passed all output,
 version, and smoke checks; its unchanged rebuild took 0.81 seconds. Log:
 `/tmp/skip-skargo-100-current/logs/043-0f6cfe218d-build.log`.
+
+The first attempt at `657757f1f2` was interrupted after 3,240 seconds with
+the old compiler spending CPU in `SKStore.Deps.remove` while deleting child
+directories. `74a6659ad` skips redundant inverse-index scans during that
+operation, with a shared-path regression test and the existing dependency
+tests passing. This performance fix is being built for a retry; no speedup is
+claimed until that retry finishes. The interruption is recorded in
+`progress.json` under `interrupted_attempts`.
