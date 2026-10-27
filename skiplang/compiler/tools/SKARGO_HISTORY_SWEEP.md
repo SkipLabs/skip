@@ -95,3 +95,23 @@ loads a separate copy of the heap successfully, so the interruption did not
 corrupt its file format. The optimization's effect on this transition remains
 unverified. The interruption is recorded in `progress.json` under
 `interrupted_attempts`.
+
+## Fresh verification with the optimized compiler
+
+The optimized compiler cannot read the earlier target's persistent heap, so a
+new 100-revision run uses `/tmp/skip100-optimized-target` and saves progress in
+`/tmp/skip-skargo-100-optimized/progress.json`. Its compiler wrapper points to
+the same optimized compiler binary for every revision. The run uses the pinned
+revision list and the same artifact, version, smoke, and no-op checks described
+above. Resume it with:
+
+```sh
+python3 -u tools/sweep_skargo_history.py \
+  --repo ~/skip2 \
+  --work /tmp/skip-skargo-100-optimized \
+  --anchor pr-1541 --count 100 --all-unique-trees \
+  --revisions-file tools/skargo_history_revisions.txt \
+  --target-dir /tmp/skip100-optimized-target \
+  --skargo /tmp/skip100-skargo-bin/skargo \
+  --skc /tmp/skip100-skargo-bin/skc-opt-wrapper
+```
