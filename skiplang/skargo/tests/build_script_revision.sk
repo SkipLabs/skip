@@ -1,0 +1,104 @@
+module alias T = SKTest;
+module SkargoBuildScriptRevisionTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun command(args: Array<String>): String {
+  result = System.subprocess(args).fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result.stdout.trim()
+}
+
+@allow_tracked_call
+untracked fun write_file(path: String, contents: String): void {
+  _ = command(Array["mkdir", "-p", Path.dirname(path)]);
+  FileSystem.writeTextFile(path, contents)
+}
+
+@allow_tracked_call
+untracked fun build(skargo: String, root: String): String {
+  result = System.popen{
+    args => Array[skargo, "build", "-v"],
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(root),
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result.stderr
+}
+
+@allow_tracked_call
+untracked fun run_probe(root: String): String {
+  result = System.popen{
+    args => Array[root + "/target/host/dev/probe"],
+    env => Map["SKARGO_BIN" => "probe"],
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result.stdout
+}
+
+@test
+fun test_build_script_tracks_git_revision_and_package_sources(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string("skipping: merged-mode only, run `skargo test` in dev");
+      return void
+    };
+    Environ.current_exe()
+  };
+  root = Path.join(kManifestDir, "target/it-build-script-revision");
+  _ = command(Array["rm", "-rf", root]);
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  source = root + "/src/lib.sk";
+  write_file(root + "/.gitignore", "target/\n");
+  write_file(root + "/Skargo.toml",
+    `[package]\nname = "revision-probe"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n[[bin]]\nname = "probe"\nmain = "RevisionProbe.main"\n`,
+  );
+  write_file(root + "/build.sk",
+    "fun main(): void { p = System.subprocess(Array[\"git\", \"rev-parse\", \"--short\", \"HEAD\"]).fromSuccess(); print_string(\"skargo:skc-env=REV=\" + p.stdout.trim()) }\n",
+  );
+  write_file(source,
+    "module RevisionProbe; fun value(): Int { 1 } untracked fun main(): void { revision = #env (\"REV\"); print_raw(revision + \":\" + value().toString()) } module end;\n",
+  );
+  _ = command(Array["git", "-C", root, "init", "-q"]);
+  _ = command(Array["git", "-C", root, "add", "-A"]);
+  _ = command(Array["git", "-C", root,
+    "-c", "user.name=Skargo Test", "-c", "user.email=skargo@example.invalid",
+    "commit", "-qm", "initial"]);
+  first = command(Array["git", "-C", root, "rev-parse", "--short", "HEAD"]);
+  _ = build(skargo, root);
+  T.expectEq(run_probe(root), first + ":1");
+  unchanged = build(skargo, root);
+  T.expectTrue(
+    !unchanged.contains("Running: revision-probe v0.1.0 [build-script-revision-probe]"),
+    unchanged,
+  );
+
+  // No package source changes, but the build script reads Git HEAD.
+  write_file(root + "/README.md", "second commit\n");
+  _ = command(Array["git", "-C", root, "add", "-A"]);
+  _ = command(Array["git", "-C", root,
+    "-c", "user.name=Skargo Test", "-c", "user.email=skargo@example.invalid",
+    "commit", "-qm", "documentation"]);
+  second = command(Array["git", "-C", root, "rev-parse", "--short", "HEAD"]);
+  T.expectTrue(first != second);
+  _ = build(skargo, root);
+  T.expectEq(run_probe(root), second + ":1");
+
+  // With no rerun-if-changed directives, a dirty package source also reruns
+  // the build script even though Git HEAD did not move.
+  write_file(source,
+    "module RevisionProbe; fun value(): Int { 2 } untracked fun main(): void { revision = #env (\"REV\"); print_raw(revision + \":\" + value().toString()) } module end;\n",
+  );
+  _ = command(Array["touch", "-t", "203001010000.01", source]);
+  last_build = build(skargo, root);
+  T.expectTrue(
+    last_build.contains("Running: revision-probe v0.1.0 [build-script-revision-probe]"),
+    last_build,
+  );
+  T.expectEq(run_probe(root), second + ":2")
+}
+
+module end;

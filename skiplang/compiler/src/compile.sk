@@ -584,6 +584,25 @@ fun getOrInitializeBackend(
 ) {
   backendDirName = SKStore.DirName::create("/backend/");
   tickDirName = SKStore.DirName::create("/tick/");
+  if (!context.newDirs.contains(FileCache.fileDirName)) {
+    _ = context.mkdir(
+      FileCache.InputSource::keyType,
+      SKStore.StringFile::type,
+      FileCache.fileDirName,
+      Array[],
+      true,
+    )
+  };
+  if (!context.newDirs.contains(FileCache.packageDirName)) {
+    _ = context.mkdir(
+      FileCache.InputPackageName::keyType,
+      FileCache.InputPackageFiles::type,
+      FileCache.packageDirName,
+      Array[],
+      true,
+    )
+  };
+  FileCache.scaffoldPackageEnvDirs(context);
   context.unsafeMaybeGetEagerDir(backendDirName) match {
   | Some _ ->
     return (
@@ -593,16 +612,6 @@ fun getOrInitializeBackend(
   | None() -> void
   };
 
-  _ = context.mkdir(
-    FileCache.InputSource::keyType,
-    SKStore.StringFile::type,
-    FileCache.fileDirName,
-  );
-  _ = context.mkdir(
-    FileCache.InputPackageName::keyType,
-    FileCache.InputPackageFiles::type,
-    FileCache.packageDirName,
-  );
   backendDir = context.mkdir(
     SKStore.IID::keyType,
     ConfigFile::type,
@@ -1498,6 +1507,7 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
     (context, phase) ~> {
       context.!debugMode = debugSKStore;
       if (phase == 0) {
+        context.!newDirs = SortedSet[];
         // Keep full archive source inputs out of the reactive backend row.
         // Writing them there and normalizing afterward still leaves it dirty.
         context.setGlobal(invocationConfigKey, ConfigFile(config))
@@ -1732,7 +1742,7 @@ fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
     env_dir = FileCache.packageEnvDir(conf.lib_name);
     env_vars = SortedMap::createFromIterator(
       accessed_env_vars
-        .map(v -> (v, env_dir.unsafeGet(context, SKStore.SID(v)).value))
+        .map(v -> (v, env_dir.get(context, SKStore.SID(v)).value))
         .iterator(),
     );
 

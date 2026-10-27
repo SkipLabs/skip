@@ -236,17 +236,37 @@ fun packageEnvDir(
   )
 }
 
+fun registerPackageEnvDir(
+  context: mutable SKStore.Context,
+  pkg_opt: ?String,
+): void {
+  envDirName = packageEnvDirName(pkg_opt);
+  if (!context.newDirs.contains(envDirName)) {
+    _ = context.mkdir(
+      SKStore.SID::keyType,
+      SKStore.StringFile::type,
+      envDirName,
+      Array[],
+      true,
+    )
+  }
+}
+
+// Startup maps may expand #env before writeFiles updates the package inputs.
+fun scaffoldPackageEnvDirs(context: mutable SKStore.Context): void {
+  registerPackageEnvDir(context, None());
+  for ((pkg, _) in packageDir.items(context)) {
+    registerPackageEnvDir(context, pkg.name)
+  }
+}
+
 fun updatePackageEnv(
   context: mutable SKStore.Context,
   pkg_opt: ?String,
   env: Array<(String, String)>,
 ): void {
-  envDirName = packageEnvDirName(pkg_opt);
-  envDir = context.unsafeMaybeGetEagerDir(envDirName) match {
-  | Some _ -> packageEnvDir(pkg_opt)
-  | None _ ->
-    context.mkdir(SKStore.SID::keyType, SKStore.StringFile::type, envDirName)
-  };
+  registerPackageEnvDir(context, pkg_opt);
+  envDir = packageEnvDir(pkg_opt);
   previousEnvKeys = SortedSet::createFromIterator(
     envDir.items(context).map(kv -> SKStore.SID::keyType(kv.i0).value),
   );
@@ -261,7 +281,7 @@ fun updatePackageEnv(
   };
   for (key in previousEnvKeys.difference(seenEnvKeys)) {
     envDir.writeArray(context, SKStore.SID(key), Array[])
-  };
+  }
 }
 
 module end;

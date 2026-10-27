@@ -136,6 +136,9 @@ mutable class BuildRunner(
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
       srcs = unit.target.srcs;
+      run_build_script =
+        unit.target.is_build_script() &&
+        unit.mode is CompileModeRunBuildScript _;
       merged_lib =
         unit.target.kind is LibTarget(LibraryTypeSklib _) &&
         should_merge_unit(unit, this.bctx.ws.package);
@@ -165,30 +168,45 @@ mutable class BuildRunner(
         } else {
           None()
         },
-        if (
-          unit.target.is_build_script() &&
-          unit.mode is CompileModeRunBuildScript _
-        ) {
+        if (run_build_script) {
           dep_file = this.fingerprint_dep_file_for(unit);
-          if (FileSystem.exists(dep_file)) {
-            // FIXME: If dep_file is empty, default to checking mtime of all
-            // files in the corresponding package.
+          declared = if (FileSystem.exists(dep_file)) {
             FileSystem.readTextFile(dep_file)
               .split("\n")
-              .map(f ->
-                (
-                  f,
-                  FileSystem.getLastModificationTime(
-                    Path.join(unit.pkg.root(), f),
-                  ),
-                )
-              )
+              .filter(f -> !f.isEmpty())
               .collect(Array)
           } else {
             Array[]
-          }
+          };
+          watched = if (declared.isEmpty()) {
+            // With no explicit dependencies, a build script may read any
+            // source in its package.
+            unit.pkg.manifest.targets.flatMap(t -> t.srcs)
+          } else {
+            declared
+          };
+          watched.map(f ->
+            (
+              f,
+              FileSystem.getLastModificationTime(
+                Path.join(unit.pkg.root(), f),
+              ),
+            )
+          ).collect(Array)
         } else {
           Array[]
+        },
+        if (run_build_script && unit.pkg == this.bctx.ws.package) {
+          // Root build scripts commonly embed the repository revision.
+          // HEAD can change even when no package source file does.
+          System.subprocess(
+            Array["git", "-C", unit.pkg.root(), "rev-parse", "HEAD"],
+          ) match {
+          | Success(p) -> Some(p.stdout.trim())
+          | Failure(_) -> None()
+          }
+        } else {
+          None()
         },
       ).hash()
     };
