@@ -65,6 +65,8 @@ def main():
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--anchor", required=True)
     parser.add_argument("--count", type=int, default=100)
+    parser.add_argument("--exclude", action="append", default=[], metavar="REV",
+                        help="omit a historical revision with a known source error")
     parser.add_argument("--all-unique-trees", action="store_true",
                         help="select distinct compiler trees across all refs")
     parser.add_argument("--skargo", type=Path, required=True)
@@ -83,6 +85,7 @@ def main():
     logs.mkdir(exist_ok=True)
     state_path = work / "progress.json"
     anchor = git(repo, "rev-parse", options.anchor)
+    excluded = {git(repo, "rev-parse", revision) for revision in options.exclude}
     if not options.skargo.is_file() or not options.skc.is_file():
         parser.error("skargo and skc must be existing files")
 
@@ -106,6 +109,8 @@ def main():
             seen = set()
             revisions = []
             for revision in candidates:
+                if revision in excluded:
+                    continue
                 tree = git(repo, "rev-parse", f"{revision}:skiplang/compiler")
                 if tree not in seen:
                     seen.add(tree)
@@ -115,8 +120,10 @@ def main():
             revisions.reverse()
         else:
             revisions = git(repo, "rev-list", "--first-parent",
-                            f"--max-count={options.count}", anchor, "--",
+                            f"--max-count={options.count + len(excluded)}", anchor, "--",
                             "skiplang/compiler/src").splitlines()[::-1]
+            revisions = [revision for revision in revisions if revision not in excluded]
+            revisions = revisions[-options.count:]
         if len(revisions) != options.count:
             parser.error(f"found only {len(revisions)} compiler-source commits")
         state = {

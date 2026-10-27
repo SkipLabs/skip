@@ -1,14 +1,16 @@
 # Incremental Skargo compiler history sweep
 
-The active run checks 100 distinct `skiplang/compiler` directory trees from
-the available refs in `~/skip2`, ordered from oldest to newest. Its first
-revision is `7449893695` (2026-07-22). The revision list and completed results
-are frozen in `/tmp/skip-skargo-100-current/progress.json`.
+The active run checks 100 distinct `skiplang/compiler` directory trees,
+ordered from oldest to newest. Its first revision is `7449893695`
+(2026-07-22). Most revisions came from refs in `~/skip2`; two later
+replacements came from `~/skip` and were fetched into `~/skip2` as
+`sweep-current`. The exact revision list and completed results are frozen in
+`/tmp/skip-skargo-100-current/progress.json`.
 
-The current run has verified 15 revisions and stopped at revision 16,
-`8660a1f129`. A fresh target fails on the same revision: its
-`Specializer` constructor initializes `tick`, but that revision removed the
-field. This is a source error in the historical snapshot, so the 100-revision
+The run verified 15 revisions, then stopped at `8660a1f129`. A fresh target
+failed on the same source error. The next revision, `00dc44e0a`, has the same
+error. Both were removed from the frozen list, and `4786d1df8` and
+`e003bd45c` were appended as later replacements. The 100-revision
 verification is still in progress.
 
 Run the sweep with `tools/sweep_skargo_history.py`. It checks out each revision
@@ -19,13 +21,14 @@ output hashes. Each build and smoke check has its own log in
 `/tmp/skip-skargo-100-current/logs`. The checkout is restored to `pr-1541`
 after all 100 pass; a failure leaves it at the failing revision.
 
-Current invocation:
+Current resume invocation (the saved progress file supplies the exact list):
 
 ```sh
 python3 -u tools/sweep_skargo_history.py \
   --repo ~/skip2 \
   --work /tmp/skip-skargo-100-current \
   --anchor pr-1541 --count 100 --all-unique-trees \
+  --exclude 8660a1f129 --exclude 00dc44e0a \
   --target-dir /tmp/skip100-current-target \
   --skargo /tmp/skip100-skargo-bin/skargo \
   --skc /tmp/skip100-skargo-bin/skc-clean-wrapper
