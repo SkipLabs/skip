@@ -728,18 +728,14 @@ class FStackElement(
 ) extends SKStore.Key, SKStore.File
 
 class CStackElement(
-  origin: SKStore.Key,
+  origin: FStackElement,
   hc: HalfClass,
   k: (mutable SKStore.Context, mutable Specializer, SClassInfo) ~> void,
   pos: Pos,
 ) extends SKStore.File
 
-class ClassWorkKey(value: GClassName) extends SKStore.Key
-class ClassContinuationFile(pending: Array<CStackElement>) extends SKStore.File
-
 class SpecializerState{
   fstackOrigin: ?FStackElement,
-  classWorkOrigin: ?ClassWorkKey,
   gclassMap: SPRelations<GClassName>,
   subtypes: SPRelations<SClassID>,
   supertypes: SPRelations<SClassID>,
@@ -807,7 +803,6 @@ class SpecializerState{
     mutable Specializer{
       context => context,
       fstackOrigin => this.fstackOrigin,
-      classWorkOrigin => this.classWorkOrigin,
       gclassMap => this.gclassMap.mclone(),
       subtypes => this.subtypes.mclone(),
       supertypes => this.supertypes.mclone(),
@@ -956,7 +951,6 @@ mutable class Specializer{
   context: mutable SKStore.Context,
 
   mutable fstackOrigin: ?FStackElement = None(),
-  mutable classWorkOrigin: ?ClassWorkKey = None(),
 
   // For each FrontEndLazyGClass, what are all its SClass instances?
   mutable gclassMap: mutable SPRelations<GClassName>,
@@ -1423,7 +1417,6 @@ mutable class Specializer{
   readonly fun chill(): SpecializerState {
     SpecializerState{
       fstackOrigin => this.fstackOrigin,
-      classWorkOrigin => this.classWorkOrigin,
       gclassMap => this.gclassMap.chill(),
       subtypes => this.subtypes.chill(),
       supertypes => this.supertypes.chill(),
@@ -1444,7 +1437,6 @@ mutable class Specializer{
 
   mutable fun replace(other: SpecializerState): void {
     this.!fstackOrigin = other.fstackOrigin;
-    this.!classWorkOrigin = other.classWorkOrigin;
     this.gclassMap.replace(other.gclassMap);
     this.subtypes.replace(other.subtypes);
     this.supertypes.replace(other.supertypes);
@@ -2688,32 +2680,14 @@ mutable class Specializer{
     static::getSClass2CPS(context, this, hc, (_, _, x) ~> x)
   }
 
-  readonly fun getClassRequestOrigin(): SKStore.Key {
-    this.classWorkOrigin match {
-    | Some(x) -> x
+  readonly fun getFStackOrigin(): FStackElement {
+    this.fstackOrigin match {
     | None() ->
-      this.fstackOrigin match {
-      | Some(x) -> x
-      | None() -> invariant_violation("Missing class request origin")
-      }
+      invariant_violation(
+        "Trying to access the fstack origin when it is not defined",
+      )
+    | Some(x) -> x
     }
-  }
-
-  // Start a queued class in its generic-name row. Nested class lookups use
-  // getSClass2CPS and suspend when they cross into another generic-name row.
-  static fun startSClass2CPS<T>(
-    context: mutable SKStore.Context,
-    sp: mutable this,
-    hc: HalfClass,
-    k: (mutable SKStore.Context, mutable this, SClassInfo) ~> T,
-  ): T {
-    static::maybeConvertMetaClassCPS(context, sp, hc, (context, sp, hc) ~> {
-      hsc = HalfSClass(hc.generic, hc.targs);
-      sp.sclassMapMaybeGet(hsc) match {
-      | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
-      | None() -> static::createSClassCPS(context, sp, hc, k)
-      }
-    })
   }
 
   static fun getSClass2CPS<T>(
@@ -2728,16 +2702,10 @@ mutable class Specializer{
       hsc = HalfSClass(hc.generic, hc.targs);
       sp.sclassMapMaybeGet(hsc) match {
       | Some(sc) -> k(context, sp, sp.trackedSClassGet(sc))
-      | None() if (
-        sp.pauseOnSClassCreation &&
-          (sp.classWorkOrigin match {
-          | Some(origin) -> origin.value != hc.generic.name()
-          | None() -> true
-          })
-      ) ->
+      | None() if (sp.pauseOnSClassCreation) ->
         sp.!classStack = List.Cons(
           CStackElement(
-            sp.getClassRequestOrigin(),
+            sp.getFStackOrigin(),
             hc,
             (ctx, sp, sc) ~> {
               _ = k(ctx, sp, sc);

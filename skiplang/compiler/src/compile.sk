@@ -270,7 +270,6 @@ fun throwIfFrontendErrors(context: mutable SKStore.Context): void {
 
 class OldFile(files: Array<SKStore.File>) extends SKStore.File
 class TickFile(tick: SKStore.Tick) extends SKStore.File
-class ClassPhaseFile() extends SKStore.File
 
 const maxNbrFunsPerPhase: Int = 100;
 
@@ -355,7 +354,6 @@ fun mergeFun(
     } else {
       writer.setArray(key, continuations.toArray())
     }
-  | O.ClassWorkKey _ -> writer.setArray(key, files.toArray())
   | SKStore.IID(0) -> writer.setArray(key, files.toArray())
   | _ ->
     merged: ?SKStore.File = None();
@@ -810,8 +808,9 @@ fun getOrInitializeBackend(
         specializerAllDirCopy = specializerAllDir;
         // Class creation inherits discovered methods, and method discovery
         // visits existing subclasses. Run them in separate rounds so each
-        // sees the other's merged writes. A class round may schedule another
-        // class round when a continuation discovers a missing class.
+        // sees the other's merged writes. Keep class work in one serialized
+        // row: per-class rows can expose an unfinished extends_ map to
+        // variance propagation, then inherited method lookup fails.
         // The phased driver synchronizes and destroys its heap after this round.
         // Only the legacy unphased path needs a separate collection region.
         runRound = (context: mutable SKStore.Context) ~> {
@@ -823,7 +822,7 @@ fun getOrInitializeBackend(
             SKStore.DirName::create("/specializer/phase-kind/" + phaseNumberCopy + "/"),
             (_context, writer, _, values) ~> {
               writer.set(SKStore.IID(0), SKStore.BoolFile(
-                values.values().any(value -> value is ClassPhaseFile _),
+                values.values().any(value -> value is O.CStackElement _),
               ))
             },
             Some(Array[SKStore.KeyRange::create(workKey, workKey)]),
@@ -840,14 +839,14 @@ fun getOrInitializeBackend(
                 // Forward state without reading the work queue. Work rows
                 // depend on the once-per-round projection of its kind.
                 key match {
-                | SKStore.IID _ | O.FStackElement _ | O.ClassWorkKey _ -> void
+                | SKStore.IID _ | O.FStackElement _ -> void
                 | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
                 classPhase = classPhaseDir.getArray(context, SKStore.IID(0))[0].value;
                 key match {
-                | SKStore.IID _ ->
+                | SKStore.IID _ if (!classPhase) ->
                   for (value in values) {
-                    invariant(value is SKStore.IntFile _ || value is ClassPhaseFile _);
+                    invariant(value is SKStore.IntFile _);
                   };
                   return void
                 | O.FStackElement _ if (classPhase) ->
@@ -857,11 +856,7 @@ fun getOrInitializeBackend(
                   writer.setArray(key, values.toArray());
                   writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
                   return void
-                | O.ClassWorkKey _ if (!classPhase) ->
-                  writer.setArray(key, values.toArray());
-                  writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
-                  return void
-                | O.ClassWorkKey _
+                | SKStore.IID _
                 | O.FStackElement _ ->
                   void
                 | _ -> return writer.set(key, OldFile(values.toArray()))
@@ -879,45 +874,21 @@ fun getOrInitializeBackend(
                 invariant(specializer.classStack is List.Nil());
 
                 key match {
-                | origin @ O.ClassWorkKey _ ->
-                  specializer.!classWorkOrigin = Some(origin);
-                  specializer.!pauseOnSClassCreation = true;
+                | SKStore.IID _ ->
                   for (value in values) {
                     value match {
+                    | SKStore.IntFile _ -> void
                     | classElt @ O.CStackElement _ ->
                       specializer.!pos = classElt.pos;
-                      try {
-                        _ = O.Specializer::startSClass2CPS(
-                          context,
-                          specializer,
-                          classElt.hc,
-                          classElt.k,
-                        )
-                      } catch {
-                      | O.SClassCreatedExn() -> void
-                      | x -> throw x
-                      }
-                    | c @ O.ClassContinuationFile _ ->
-                      for (pending in c.pending) {
-                        invariant(pending.origin == origin);
-                        specializer.!pos = pending.pos;
-                        try {
-                          _ = O.Specializer::getSClass2CPS(
-                            context,
-                            specializer,
-                            pending.hc,
-                            pending.k,
-                          )
-                        } catch {
-                        | O.SClassCreatedExn() -> void
-                        | x -> throw x
-                        }
-                      }
-                    | _ -> invariant_violation("Unexpected class work file")
+                      _sclassInfo = O.Specializer::getSClass2CPS(
+                        context,
+                        specializer,
+                        classElt.hc,
+                        classElt.k,
+                      )
+                    | _ -> invariant_violation("Unexpected IID key")
                     }
                   };
-                  specializer.!pauseOnSClassCreation = false;
-                  specializer.!classWorkOrigin = None();
                   if (specializer.funStack is List.Cons _) {
                     for (f in specializer.funStack) {
                       writer.setArray(f, Array[f]);
@@ -927,21 +898,6 @@ fun getOrInitializeBackend(
                       );
                     };
                     specializer.!funStack = List.Nil();
-                  };
-                  if (specializer.classStack is List.Cons _) {
-                    pending = specializer.classStack.reversed().toArray();
-                    for (classElt in pending) {
-                      writer.setArray(
-                        O.ClassWorkKey(classElt.hc.generic.name()),
-                        Array[classElt with {k => (_, _, _) ~> void}],
-                      )
-                    };
-                    writer.setArray(
-                      origin,
-                      Array[O.ClassContinuationFile(pending)],
-                    );
-                    writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
-                    specializer.!classStack = List.Nil();
                   };
                   specializer.writeDiff(writer)
 
@@ -988,17 +944,16 @@ fun getOrInitializeBackend(
                   specializer.!pauseOnSClassCreation = false;
                   if (specializer.classStack is List.Cons _) {
                     pending = specializer.classStack.reversed().toArray();
-                    for (classElt in pending) {
-                      writer.setArray(
-                        O.ClassWorkKey(classElt.hc.generic.name()),
-                        Array[classElt with {k => (_, _, _) ~> void}],
-                      )
-                    };
+                    writer.setArray(
+                      SKStore.IID(0),
+                      pending.map(classElt ->
+                        classElt with {k => (_, _, _) ~> void}
+                      ),
+                    );
                     writer.setArray(
                       origin,
                       Array[O.ContinuationFile(origin, pending)],
                     );
-                    writer.setArray(SKStore.IID(0), Array[ClassPhaseFile()]);
                     specializer.!classStack = List.Nil();
                   } else if (needsIID) {
                     writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
