@@ -39,6 +39,15 @@ def digest(path):
     return sha.hexdigest()
 
 
+def read_revisions(path, repo):
+    revisions = [git(repo, "rev-parse", line.strip())
+                 for line in path.read_text().splitlines()
+                 if line.strip() and not line.lstrip().startswith("#")]
+    if len(revisions) != len(set(revisions)):
+        raise ValueError(f"duplicate revisions in {path}")
+    return revisions
+
+
 def logged(command, cwd, environment, log):
     started = time.monotonic()
     with log.open("w") as output:
@@ -65,6 +74,8 @@ def main():
     parser.add_argument("--work", type=Path, required=True)
     parser.add_argument("--anchor", required=True)
     parser.add_argument("--count", type=int, default=100)
+    parser.add_argument("--revisions-file", type=Path,
+                        help="use an explicit ordered list of commit IDs")
     parser.add_argument("--exclude", action="append", default=[], metavar="REV",
                         help="omit a historical revision with a known source error")
     parser.add_argument("--all-unique-trees", action="store_true",
@@ -91,6 +102,9 @@ def main():
 
     if state_path.exists():
         state = json.loads(state_path.read_text())
+        if (options.revisions_file and
+                read_revisions(options.revisions_file, repo) != state["revisions"]):
+            parser.error("revision file differs from saved progress")
         if (state["anchor"] != anchor or
                 len(state["revisions"]) != options.count or
                 state.get("all_unique_trees", False) != options.all_unique_trees or
@@ -102,7 +116,9 @@ def main():
         if git(repo, "status", "--porcelain", "--untracked-files=no",
                "--ignore-submodules=all"):
             parser.error("checkout has tracked changes")
-        if options.all_unique_trees:
+        if options.revisions_file:
+            revisions = read_revisions(options.revisions_file, repo)
+        elif options.all_unique_trees:
             candidates = git(repo, "log", "--all", "--format=%H",
                              "--since=2026-07-22", "--",
                              "skiplang/compiler").splitlines()
