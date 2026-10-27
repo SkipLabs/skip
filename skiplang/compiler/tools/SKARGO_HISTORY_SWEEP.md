@@ -73,3 +73,11 @@ python3 -u tools/sweep_skargo_history.py \
   reproduces the name collision. The next 13 selected source snapshots retain
   those declarations, so all 14 were replaced in the ordered revision list.
   Log: `/tmp/skip-skargo-100-current/logs/029-4348605172-build.log`.
+
+## Performance observation
+
+The transition to `0f6cfe218d` rebuilt the compiler in 1,751.7 seconds and
+reached at least 22 GB of compiler RSS. This jump changes about 1,870 lines
+across 26 compiler files and updates SKStore. The build passed all output,
+version, and smoke checks; its unchanged rebuild took 0.81 seconds. Log:
+`/tmp/skip-skargo-100-current/logs/043-0f6cfe218d-build.log`.
