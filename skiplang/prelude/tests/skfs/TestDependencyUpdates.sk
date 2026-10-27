@@ -38,6 +38,41 @@ fun testDependencyInverseIndexSharedChild(): void {
 }
 
 @test
+fun testRemoveDirPreservesOtherChildOnSharedPath(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  removedChild = SKStore.DirName::create("/exact/removed/");
+  survivingChild = SKStore.DirName::create("/exact/surviving/");
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/exact/source/"),
+    SKStore.IID(0),
+  );
+  first = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => removedChild,
+    key => SKStore.IID(0),
+  };
+  second = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => removedChild,
+    key => SKStore.IID(1),
+  };
+  survivor = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => survivingChild,
+    key => SKStore.IID(2),
+  };
+  deps = SKStore.Deps::empty()
+    .set(path, first)
+    .set(path, second)
+    .set(path, survivor)
+    .removeDir(removedChild);
+  T.expectTrue(deps.maybeGetReads(parent, removedChild).isEmpty());
+  T.expectTrue(deps.maybeGetReads(parent, survivingChild)
+    .get(survivor).contains(path));
+  T.expectTrue(deps.removeDir(survivingChild).maybeGet(path).isNone());
+}
+
+@test
 fun testExactDependencyReplacementAndSnapshots(): void {
   parent = SKStore.DirName::create("/exact/parent/");
   child = SKStore.DirName::create("/exact/child/");

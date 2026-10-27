@@ -343,7 +343,11 @@ value class Deps private (
     this
   }
 
-  fun remove(path: Path, arrowKey: ArrowKey): this {
+  private fun removeInternal(
+    path: Path,
+    arrowKey: ArrowKey,
+    skipInverseRemoval: Bool,
+  ): this {
     set = this.data.maybeGet(path) match {
     | None() -> SortedSet[]
     | Some(x) -> x
@@ -362,10 +366,17 @@ value class Deps private (
     };
     // Other rows from the same child may still read this path. Keep its
     // inverse-directory entry until the last such reader is removed.
-    if (!set.any(reader -> reader.childName == arrowKey.childName)) {
+    if (
+      !skipInverseRemoval &&
+      !set.any(reader -> reader.childName == arrowKey.childName)
+    ) {
       !this = this.iremove(arrowKey.childName, path)
     };
     this
+  }
+
+  fun remove(path: Path, arrowKey: ArrowKey): this {
+    this.removeInternal(path, arrowKey, false)
   }
 
   fun removeDir(dirName: DirName): this {
@@ -373,7 +384,13 @@ value class Deps private (
     for (path in affected) {
       for (reader in this.maybeGet(path).default(SortedSet[])) {
         if (reader.parentName == dirName || reader.childName == dirName) {
-          !this = this.remove(path, reader)
+          // The inverse index for this child is removed below. Avoid
+          // searching every remaining reader on paths with large fanout.
+          !this = this.removeInternal(
+            path,
+            reader,
+            reader.childName == dirName,
+          )
         }
       }
     };
