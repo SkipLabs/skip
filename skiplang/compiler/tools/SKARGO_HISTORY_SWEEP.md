@@ -86,6 +86,12 @@ The first attempt at `657757f1f2` was interrupted after 3,240 seconds with
 the old compiler spending CPU in `SKStore.Deps.remove` while deleting child
 directories. `74a6659ad` skips redundant inverse-index scans during that
 operation, with a shared-path regression test and the existing dependency
-tests passing. This performance fix is being built for a retry; no speedup is
-claimed until that retry finishes. The interruption is recorded in
-`progress.json` under `interrupted_attempts`.
+tests passing. The optimized compiler builds and passes a fresh smoke check,
+but cannot resume this target's persistent compiler heap: its new build has a
+different generated runtime version. Changing that version in a local binary
+gets past the file-format check, then fails with `Cannot have a changing
+constant in persistent mode` during startup. The original compiler still
+loads a separate copy of the heap successfully, so the interruption did not
+corrupt its file format. The optimization's effect on this transition remains
+unverified. The interruption is recorded in `progress.json` under
+`interrupted_attempts`.
