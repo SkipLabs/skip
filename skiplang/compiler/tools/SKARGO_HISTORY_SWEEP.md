@@ -16,13 +16,15 @@ children. Fresh targets reproduce both source errors. The excluded commits
 were replaced with distinct compiler commits from another branch and two
 later commits. The 100-revision verification is still in progress.
 
-At 2026-10-28 16:15 UTC, the optimized discovery run had verified its first 40
+At 2026-10-28, the optimized discovery run had verified its first 45
 commits with no failures in that run. An independent audit of
 `/tmp/skip-skargo-100-optimized/progress.json`
 and the saved no-op logs confirmed that every entry names the selected commit,
 all four artifact hashes change across each adjacent pair, the compiled
-version names that commit, and none of the 40 no-op builds reports
-`Compiling:`. The runner has since continued from revision 41. This milestone
+version names that commit, and none of the 45 no-op builds reports
+`Compiling:`. Revision 44 (`0f6cfe218d`) took 3430 seconds to build and
+passed all checks; revision 45 (`4f76be393c`) took 283 seconds and also passed.
+The runner has since continued from revision 46. This milestone
 does not include the final clean run with the fixed persistent-mutex runtime.
 
 Run the sweep with `tools/sweep_skargo_history.py`. It checks out each revision
