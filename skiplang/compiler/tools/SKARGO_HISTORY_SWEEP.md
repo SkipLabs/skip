@@ -143,3 +143,10 @@ field and verifies recovery and concurrent locking. The test timed out against
 the earlier runtime and passes with this change. The active sweep still uses
 the previously built compiler, so its revision 20 recovery above remains a
 manual intervention in that run.
+
+A separate compiler build using the fixed runtime was started in
+`/tmp/skc-fixed-builder` while revision 23 was compiling. Its compiler-library
+phase reached about 35 GB RSS while the history build used another 10 GB, so
+the secondary build was stopped to preserve memory for the active sweep. Build
+the fixed compiler after the discovery sweep stops, then use a new target for
+the final clean 100-revision run.
