@@ -194,8 +194,11 @@ def main():
             smoke_seconds = logged([str(artifacts[0]), "--no-std", "--check",
                                     str(smoke_source)], compiler, environment,
                                    logs / f"{prefix}-smoke.log")
+            noop_log = logs / f"{prefix}-noop.log"
             noop_seconds = logged([skargo, "build", "--target-dir", str(target_dir)], compiler,
-                                  environment, logs / f"{prefix}-noop.log")
+                                  environment, noop_log)
+            if any("Compiling:" in line for line in noop_log.read_text().splitlines()):
+                raise RuntimeError(f"unchanged build compiled a package: {noop_log}")
             for artifact in artifacts:
                 if digest(artifact) != artifact_hashes[artifact.name]:
                     raise RuntimeError(f"unchanged rebuild changed {artifact}")

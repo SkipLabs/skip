@@ -21,7 +21,9 @@ in `~/skip2`, runs `skargo build` against one persistent target, checks that
 the resulting `skc --version` names the checked-out commit, compiles a small
 program with that `skc`, checks that all four output hashes changed from the
 previous revision, then rebuilds without changes and checks that those hashes
-stay fixed. Each build and smoke check has its own log in
+stay fixed. The no-op rebuild must also report no `Compiling:` packages. An
+audit of the first 20 optimized-run no-op logs found no compilation lines.
+Each build and smoke check has its own log in
 `/tmp/skip-skargo-100-current/logs`. The checkout is restored to `pr-1541`
 after all 100 pass; a failure leaves it at the failing revision.
 
