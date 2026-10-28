@@ -131,6 +131,15 @@ the first 4096 bytes of `state.db` were saved at
 file offset 24 was reinitialized with `PTHREAD_PROCESS_SHARED` and
 `PTHREAD_MUTEX_ROBUST`, using the temporary helper
 `/tmp/recover_skargo_cache_mutex.c`. The retry then proceeded past the lock.
-This is recovery for an interrupted persistent build, not yet a code fix; the
-revision is counted only if all sweep checks pass. The cause of the stale lock
-across sessions remains to be determined.
+The revision was counted only after all sweep checks passed. The cause of the
+stale lock across sessions remains to be determined.
+
+The runtime now coordinates mapping users with a file lock. The first process
+reopening a mapping resets its persisted mutex while holding the exclusive
+lock, then holds a shared lock for its lifetime; other live users share the
+lock and retain the same mutex. The standalone
+`prelude/runtime/tests/persistent_mutex_recovery.c` test poisons the owner
+field and verifies recovery and concurrent locking. The test timed out against
+the earlier runtime and passes with this change. The active sweep still uses
+the previously built compiler, so its revision 20 recovery above remains a
+manual intervention in that run.

@@ -22,3 +22,19 @@ all 83 native prelude tests passed; the standalone native and Node/Wasm checks
 passed; the complete Wasm prelude test binary passed `wasm-validate`.
 `skargo test --target wasm32-unknown-unknown` builds the suite but does not execute
 it, so Wasm execution above refers to the standalone allocator regression checks.
+
+# Persistent mutex recovery
+
+On Linux, the first process reopening a persistent mapping resets its shared
+mutex under an exclusive file lock. Later concurrent processes hold shared file
+locks and use the same mutex. This test poisons the persisted owner field,
+checks that reopening recovers, and checks that a second live process waits for
+the first to release the mutex.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/persistent_mutex_recovery.c \
+  -o /tmp/test-persistent-mutex-recovery
+/tmp/test-persistent-mutex-recovery
+```
