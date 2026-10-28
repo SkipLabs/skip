@@ -115,3 +115,18 @@ python3 -u tools/sweep_skargo_history.py \
   --skargo /tmp/skip100-skargo-bin/skargo \
   --skc /tmp/skip100-skargo-bin/skc-opt-wrapper
 ```
+
+At revision 20 (`c0266dcad8`), resuming the optimized run after the previous
+session ended left the compiler waiting indefinitely in `sk_global_lock`. GDB
+showed `pthread_mutex_lock` on the process-shared mutex in the persistent
+`state.db`; its owner field held PID 3279, which was absent from this workspace.
+The compiler had one thread and used no CPU for over three minutes. After
+stopping the hung sweep and confirming no compiler process was using the target,
+the first 4096 bytes of `state.db` were saved at
+`/tmp/skip100-optimized-state-header-before-mutex-recovery.bin`. The mutex at
+file offset 24 was reinitialized with `PTHREAD_PROCESS_SHARED` and
+`PTHREAD_MUTEX_ROBUST`, using the temporary helper
+`/tmp/recover_skargo_cache_mutex.c`. The retry then proceeded past the lock.
+This is recovery for an interrupted persistent build, not yet a code fix; the
+revision is counted only if all sweep checks pass. The cause of the stale lock
+across sessions remains to be determined.
