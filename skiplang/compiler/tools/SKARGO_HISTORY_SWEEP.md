@@ -23,6 +23,8 @@ program with that `skc`, checks that all four output hashes changed from the
 previous revision, then rebuilds without changes and checks that those hashes
 stay fixed. The no-op rebuild must also report no `Compiling:` packages. An
 audit of the first 20 optimized-run no-op logs found no compilation lines.
+The detached process was started before this assertion was added; audit its
+remaining no-op logs before declaring the full sweep complete.
 Each build and smoke check has its own log in
 `/tmp/skip-skargo-100-current/logs`. The checkout is restored to `pr-1541`
 after all 100 pass; a failure leaves it at the failing revision.
