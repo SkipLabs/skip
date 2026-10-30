@@ -1,0 +1,94 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+@test
+fun testAsyncCallChained(): void {
+  inputsDirName = SK.DirName::create("/chained_inputs/");
+  mappedDirName = SK.DirName::create("/chained_mapped/");
+  mapped2DirName = SK.DirName::create("/chained_mapped2/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Two-level async chain:
+  //    /inputs/ --(async x2)--> /mapped/ --(async +1)--> /mapped2/
+  //    Both dirs empty -> no async fires yet -> commits.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsDirName,
+      Array[],
+    );
+    mapped = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedDirName,
+      (context, writer, k, _it) ~> {
+        context.asyncCall(DoubleAsyncFn(), k) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    );
+    _ = mapped.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mapped2DirName,
+      (context, writer, k, it) ~> {
+        // Key the second call on the first level's result: it only exists once
+        // /mapped/ is filled, i.e. once the first async has resolved.
+        v = it.next() match {
+        | Some(file) -> SK.IntFile::type(file).value
+        | None() -> return void
+        };
+        context.asyncCall(PlusOneAsyncFn(), SK.IID(v)) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    )
+  });
+
+  // Replay loop. round 1: Double(2) suspends. round 2: Double resolves, /mapped/ fills, which
+  // fires PlusOne(4) -> suspends (new call, absent at round 1). round 3: both cached -> converges.
+  cache: TestAsyncCache = emptyCache;
+  done = false;
+  rounds = 0;
+  while (!done) {
+    !rounds = rounds + 1;
+    T.expectTrue(rounds < 10, `loop did not converge, rounds=${rounds}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+      inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+      context.update()
+    }) match {
+    | Success _ -> !done = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  // /mapped2/[2] must be (2*2)+1 = 5, in exactly three rounds.
+  r = SK.withContext(context ~> {
+    mapped2 = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mapped2DirName);
+    mapped2.unsafeGet(context, SK.IID(2)).value
+  });
+  T.expectEq(r, 5, "chained async value");
+  T.expectEq(rounds, 3, "rounds")
+}
+
+module end;

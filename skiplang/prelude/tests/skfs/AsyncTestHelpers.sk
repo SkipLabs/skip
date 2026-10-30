@@ -1,0 +1,81 @@
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// Shared across async tests. The harness runs every @test in one process with no reset,
+// so these are declared once here and each test file adds only its own pieces.
+
+// In-memory cache. Frozen (capturable by the ~> write lambda); grows by rebuilding.
+class TestAsyncCache(
+  results: SortedMap<SK.CallId, SK.AsyncResult<SK.File>> = SortedMap[],
+) extends SK.AsyncCache {
+  fun get(callId: SK.CallId): ?SK.AsyncResult<SK.File> {
+    this.results.maybeGet(callId)
+  }
+  fun with(callId: SK.CallId, res: SK.AsyncResult<SK.File>): TestAsyncCache {
+    TestAsyncCache(this.results.set(callId, res))
+  }
+}
+
+// Test-side write: same path as runWithResult but seeds the global context first, so a
+// cold test can drive the real entry point. Hands the exception back on failure.
+fun asyncTestWrite(
+  cache: SK.AsyncCache,
+  f: mutable SK.Context ~> void,
+): Result<void, .Exception> {
+  if (!SK.gHasContext()) {
+    SK.gContextInit(SK.Context::create{});
+  };
+  SK.runWithResult(context ~> {
+    context.!asyncCache = Some(cache);
+    f(context)
+  })
+}
+
+/* Runs a pending call by name, the way the TS runtime does: the pending list carries an
+   identity, and the caller reaches its own recipe from it. skstore knows nothing about
+   how a call runs. */
+fun computeByName(
+  name: String,
+  input: SK.Key,
+  cb: (SK.AsyncResult<SK.File>) -> void,
+): void {
+  if (name == DoubleAsyncFn().getName()) {
+    DoubleAsyncFn().compute(input, cb)
+  } else if (name == PlusOneAsyncFn().getName()) {
+    PlusOneAsyncFn().compute(input, cb)
+  } else if (name == FailAsyncFn().getName()) {
+    FailAsyncFn().compute(input, cb)
+  } else {
+    invariant_violation(`Unknown async function '${name}'.`)
+  }
+}
+
+// mock async calls
+
+// x2 on the value it receives, reused by several tests.
+class DoubleAsyncFn() extends SK.AsyncFunction<SK.Key, SK.File> {
+  fun compute(input: SK.Key, cb: (SK.AsyncResult<SK.File>) -> void): void {
+    v = SK.IID::keyType(input).value;
+    result: SK.File = SK.IntFile(v * 2);
+    cb(SK.AOk(result))
+  }
+}
+
+// +1 on the value it receives, reused by several tests.
+class PlusOneAsyncFn() extends SK.AsyncFunction<SK.Key, SK.File> {
+  fun compute(input: SK.Key, cb: (SK.AsyncResult<SK.File>) -> void): void {
+    v = SK.IID::keyType(input).value;
+    result: SK.File = SK.IntFile(v + 1);
+    cb(SK.AOk(result))
+  }
+}
+
+// Async function that always fails, for testing the AError path.
+class FailAsyncFn() extends SK.AsyncFunction<SK.Key, SK.File> {
+  fun compute(_input: SK.Key, cb: (SK.AsyncResult<SK.File>) -> void): void {
+    cb(SK.AError("boom"))
+  }
+}
+
+module end;

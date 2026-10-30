@@ -1,0 +1,85 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// If an async call fails, the whole write fails. The replay loop detects the AError as it
+// resolves the call and aborts the write. The check lives in the loop because the caller
+// runs the calls -- the TS runtime does the same in runPendingCalls.
+@test
+fun testAsyncCallFailure(): void {
+  inputsDirName = SK.DirName::create("/fail_inputs/");
+  mappedDirName = SK.DirName::create("/fail_mapped/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Build the graph: mapper calls FailAsyncFn, which always yields AError.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsDirName,
+      Array[],
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedDirName,
+      (context, writer, k, _it) ~> {
+        context.asyncCall(FailAsyncFn(), k) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    )
+  });
+
+  // Replay loop with the hard-failure policy: a failing compute aborts the whole write.
+  cache: TestAsyncCache = emptyCache;
+  writeFailed = false;
+  done = false;
+  rounds = 0;
+  while (!done && !writeFailed) {
+    !rounds = rounds + 1;
+    T.expectTrue(rounds < 10, `loop did not converge, rounds=${rounds}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+      inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+      context.update()
+    }) match {
+    | Success _ -> !done = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              res match {
+              | SK.AError(_) ->
+                // Hard failure: don't cache, abort the write entirely.
+                !writeFailed = true
+              | SK.AOk(_) -> !cache = cache.with(callId, res)
+              }
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  // The write must have failed (never committed), and nothing landed in the mapped dir.
+  T.expectTrue(writeFailed, "a failing async call must abort the write");
+  T.expectFalse(done, "the write must not converge to success on failure");
+  isEmpty = SK.withContext(context ~> {
+    mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedDirName);
+    mapped.unsafeMaybeGet(context, SK.IID(2)) is None _
+  });
+  T.expectTrue(
+    isEmpty,
+    "nothing must be committed to the mapped dir on failure",
+  )
+}
+
+module end;

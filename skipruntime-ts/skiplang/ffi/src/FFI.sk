@@ -151,6 +151,7 @@ fun updateOfCollectionWriter(
   ) match {
   | Success(handles) ->
     SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(SKStore.AsyncCallsCollected(calls)) -> encodePendingCalls(calls)
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }
@@ -621,6 +622,7 @@ fun createResourceOfRuntime(
   }) match {
   | Success(handles) ->
     SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  | Failure(SKStore.AsyncCallsCollected(calls)) -> encodePendingCalls(calls)
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   }
 }
@@ -709,6 +711,9 @@ fun updateOfRuntime(input: String, values: SKJSON.CJArray): SKJSON.CJSON {
   }) match {
   | Success(handles) ->
     SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  /* Specific failure case for async: getErrorHdl would turn the collected pending
+     async calls into an opaque error handle and lose them otherwise. */
+  | Failure(SKStore.AsyncCallsCollected(calls)) -> encodePendingCalls(calls)
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   }
 }
@@ -811,6 +816,161 @@ fun useExternalResource(
   useExternalCollection(service, identifier, params).getId()
 }
 
+/************ AsyncFunction ****************/
+
+@cpp_extern("SkipRuntime_AsyncFunction__getInfo")
+@debug
+native fun getInfoOfAsyncFunction(fn: UInt32): SKJSON.CJObject;
+
+@cpp_extern("SkipRuntime_deleteAsyncFunction")
+@debug
+native fun deleteAsyncFunction(fn: UInt32): void;
+
+class ExternAsyncFunction(
+  eptr: SKStore.ExternalPointer,
+) extends SKStore.AsyncFunction<SKStore.Key, SKStore.File> {
+  /* Explicit because the derived == compares fields, and ExternalPointer is not
+     Equality. Two extern functions are the same when their identities agree, the same
+     rule CallId uses. */
+  fun ==(other: SKStore.AsyncFunction<SKStore.Key, SKStore.File>): Bool {
+    other match {
+    | ExternAsyncFunction _ -> this.getName() == other.getName()
+    }
+  }
+
+  /* Overridden because the default derives identity from the fields, and our only field
+     is a handle, an allocation slot, reassigned on every call. The TS side builds a
+     stable identity from the class name and its constructor parameters instead. */
+  fun getName(): String {
+    `xx_${XXHash64.xxHash64String(
+      getInfoOfAsyncFunction(this.eptr.value).prettyPrint(),
+    )}`
+  }
+}
+
+/* Outcome of a call, as a tagged object rather than a nullable: "pending" is a control
+   state, not an absent value and a cached value may legitimately be null. */
+fun asyncCallResult(status: String, value: ?SKJSON.CJSON): SKJSON.CJSON {
+  fields: mutable Vector<(String, SKJSON.CJSON)> = mutable Vector[];
+  fields.push(("status", SKJSON.CJString(status)));
+  value.each(v -> fields.push(("value", v)));
+  SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x))
+}
+
+/* Entry point behind Context.asyncCall, called from TS. Returns an "ok" outcome with the
+   cached value, or a "pending" one: the TS wrapper turns the latter into an error of its
+   own rather than let a Skip exception cross the boundary and lose its type. */
+@export("SkipRuntime_Context__asyncCall")
+fun asyncCallOfContext(fn: UInt32, input: SKJSON.CJSON): SKJSON.CJSON {
+  getContext() match {
+  | Some(context) ->
+    /* Installed here rather than at context creation: initCtx() lives in the core
+       package, which cannot name a class from ffi, the dependency runs the other way.
+       This is the first point on the ffi side that holds a context, and the only place
+       the cache is ever read. */
+    if (context.asyncCache is None()) {
+      context.!asyncCache = Some(ExternAsyncCache())
+    };
+    f = ExternAsyncFunction(
+      SKStore.ExternalPointer::create(fn, deleteAsyncFunction),
+    );
+    try {
+      context.asyncCall(f, JSONID(input)) match {
+      | SKStore.AOk(file) ->
+        asyncCallResult("ok", Some(JSONFile::type(file).json))
+      | SKStore.AError(message) -> throw SKStore.Error(message)
+      }
+    } catch {
+    /* Swallowed on purpose: the call is already recorded in AsyncData. Returning a
+       "pending" outcome keeps the exception on the Skip side; letting it cross would
+       flatten its type. */
+    | SKStore.AsyncCallPending() -> asyncCallResult("pending", None())
+    | ex -> throw ex
+    }
+  | _ -> invariant_violation("Store context must be specified.")
+  }
+}
+
+/* Third shape of the update result, next to the success array and the error number:
+   an object carrying the calls that suspended this write. TS runs them, fills its cache,
+   and replays. The CallId travels along so TS never recomputes Skip's key. */
+fun encodePendingCalls(
+  calls: SortedMap<SKStore.ArrowKey, Array<SKStore.AsyncCall>>,
+): SKJSON.CJSON {
+  entries = mutable Vector[];
+  for (_arrow => arrowCalls in calls) {
+    for (call in arrowCalls) {
+      call match {
+      | SKStore.PendingCall(callId, f, input) ->
+        fields: mutable Vector<(String, SKJSON.CJSON)> = mutable Vector[];
+        fields.push(
+          ("callId", SKJSON.CJString(`${callId.function}:${callId.input}`)),
+        );
+        /* The handle, not the name: TS indexes its own map by it, and cannot recompute
+           the name (that hash lives on the Skip side). */
+        fields.push(
+          (
+            "function",
+            SKJSON.CJFloat(
+              f match {
+              | ExternAsyncFunction(eptr) -> eptr.value.toInt().toFloat()
+              },
+            ),
+          ),
+        );
+        fields.push(("input", JSONID::keyType(input).json));
+        entries.push(
+          SKJSON.CJObject(SKJSON.CJFields::create(fields.toArray(), x -> x)),
+        )
+      }
+    }
+  };
+  outer: mutable Vector<(String, SKJSON.CJSON)> = mutable Vector[];
+  outer.push(("pendingCalls", SKJSON.CJArray(entries.toArray())));
+  SKJSON.CJObject(SKJSON.CJFields::create(outer.toArray(), x -> x))
+}
+
+/************  AsyncCache ****************/
+
+/* No handle: unlike mappers or resources, the cache is not something the user hands us,
+   and there is exactly one per runtime, the TS side reaches its own Map directly.
+   Same reason getContext() takes no argument. */
+@cpp_extern("SkipRuntime_AsyncCache__get")
+@debug
+native fun getOfAsyncCache(callId: String): ?SKJSON.CJSON;
+
+/* Skip-side view of the TS result cache. skstore never writes to it,
+   the TS replay loop fills its Map between two write attempts. */
+class ExternAsyncCache() extends SKStore.AsyncCache {
+  fun get(callId: SKStore.CallId): ?SKStore.AsyncResult<SKStore.File> {
+    getOfAsyncCache(`${callId.function}:${callId.input}`).map(decodeAsyncResult)
+  }
+}
+
+/* A resolved call is encoded as {"ok": <json>} or {"error": "<message>"}. A miss is the
+   null returned by getOfAsyncCache, so {"ok": null} is a genuine result, not a miss. */
+fun decodeAsyncResult(json: SKJSON.CJSON): SKStore.AsyncResult<SKStore.File> {
+  json match {
+  | SKJSON.CJObject(fields) ->
+    res: ?SKStore.AsyncResult<SKStore.File> = None();
+    for (name => field in fields) {
+      !res = name match {
+      | "ok" ->
+        file: SKStore.File = JSONFile(field);
+        Some(SKStore.AOk(file))
+      | "error" -> Some(SKStore.AError(SKJSON.asString(field)))
+      | _ ->
+        invariant_violation(`Unexpected field '${name}' in async cache result.`)
+      }
+    };
+    res match {
+    | Some(r) -> r
+    | None() -> invariant_violation("Empty async cache result.")
+    }
+  | _ -> invariant_violation("Async cache result must be an object.")
+  }
+}
+
 /************ initService ****************/
 
 @export("SkipRuntime_initService")
@@ -818,6 +978,9 @@ fun initSkipRuntimeService(service: Service): SKJSON.CJSON {
   initService(service) match {
   | Success(handles) ->
     SKJSON.CJArray(handles.map(h -> SKJSON.CJFloat(h.value)))
+  /* Non-empty initialData runs the mappers right here, so a mapper's async call suspends
+     the init. The TS side drives initService through runAsync, which replays it. */
+  | Failure(SKStore.AsyncCallsCollected(calls)) -> encodePendingCalls(calls)
   | Failure(err) -> SKJSON.CJFloat(getErrorHdl(err))
   };
 }

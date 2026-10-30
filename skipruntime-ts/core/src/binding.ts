@@ -9,6 +9,7 @@ import {
   type NamedEagerCollections,
   type Reducer,
   type Resource,
+  type AsyncFunction,
 } from "./api.js";
 import type { HandlerInfo, ServiceDefinition } from "./index.js";
 
@@ -217,6 +218,11 @@ export interface FromBinding {
     from: Pointer<Internal.CJObject>,
     pattern: string,
   ): Pointer<Internal.CJArray>;
+
+  SkipRuntime_Context__asyncCall(
+    fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
+    input: Pointer<Internal.CJSON>,
+  ): Pointer<Internal.CJObject>;
 
   SkipRuntime_Context__useExternalResource(
     service: string,
