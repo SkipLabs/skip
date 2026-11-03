@@ -297,6 +297,9 @@ class GFunction{
   params: Array<GFunParam>,
   blocks: Array<GBlock>,
   coroutineInfo: ?GUnfinishedNext = None(),
+  // Source-bearing closure recipes stay in the enclosing conversion result.
+  // The corresponding class and work keys contain only a tracked identity.
+  closureBodies: UnorderedMap<GClassName, NormalLazyGFun> = UnorderedMap[],
 } uses Show, Hashable, Orderable {
   fun toString(): String {
     "<GFunction " + this.funInfo.gfunction.id + ">"

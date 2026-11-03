@@ -1,0 +1,26 @@
+module Native_FrozenWriteChecker;
+
+mutable class AllowAll{} extends SKStore.WriteChecker {
+  mutable fun checkWrite(
+    _context: readonly SKStore.Context,
+    _dirName: SKStore.DirName,
+    _key: SKStore.Key,
+    _files: Array<SKStore.File>,
+  ): void {
+    void
+  }
+
+  readonly fun mclone(): mutable SKStore.WriteChecker {
+    mutable AllowAll{}
+  }
+}
+
+@exptest
+fun main(): void {
+  context = SKStore.Context::mcreate{};
+  context.!writeChecker = Some(mutable AllowAll{});
+  copy = context.clone();
+  print_string(copy.writeChecker.isSome().toString())
+}
+
+module end;

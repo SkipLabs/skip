@@ -40,6 +40,15 @@ private fun default_lib_name(output: ?String): String {
   }
 }
 
+// Keep discovery captures independent of emission options. Experimental
+// discovery algorithms are explicit inputs and have fresh-cache policy guards.
+value class SpecializationConfig(
+  ptrBitSize: Int,
+  indexedClassVariance: Bool = false,
+  streamClassConflicts: Bool = false,
+  classGroupHints: Bool = false,
+)
+
 class Config{
   release: Bool,
   verbose: Bool,
@@ -69,6 +78,32 @@ class Config{
   useSpecializedNames: Bool,
   check: Bool,
   no_link: Bool,
+  stopAfterSpecialization: Bool,
+  // Persistent invocations retain the incremental specialization graph.
+  incrementalSpecialization: Bool = false,
+  collectionEmission: Bool = false,
+  stableFunctionSymbols: Bool = false,
+  stableFunctionDeclarations: Bool = false,
+  stableVTableSlots: Bool = false,
+  vtableReceiverHints: Bool = false,
+  splitSupportModule: Bool = false,
+  balancedFunctionModules: Bool = false,
+  collectionFunctions: Bool = false,
+  collectionClasses: Bool = false,
+  collectionClassHeaders: Bool = false,
+  nativeEmissionConcat: Bool = false,
+  emissionTextSpans: Bool = false,
+  trackedClosureBodies: Bool = false,
+  compactSpecializer: Bool = false,
+  partitionClasses: Bool = false,
+  streamClassConflicts: Bool = false,
+  classGroupHints: Bool = false,
+  optimizerCalleeSummaries: Bool = false,
+  sharedCalleeViews: Bool = false,
+  preciseArraySlots: Bool = false,
+  // Set only for local semantic computations wrapped by Verify.withSourcePositions.
+  // Successful checks do not consume coordinates; failures resolve them there.
+  deferVerifierDiagnostics: Bool = false,
   stackAlign: Int,
   stackAlignStr: String,
   ptrByteSize: Int,
@@ -83,7 +118,10 @@ class Config{
   cwd: WorkingDirectory,
   batch_mode: Bool = false,
 } {
-  static fun make(results: Cli.ParseResults): this {
+  static fun make(
+    results: Cli.ParseResults,
+    archiveCache: ?mutable Sklib.MetadataCache = None(),
+  ): this {
     optConfig = Optimize.Config::make(
       results.getBool("dce"),
       results.getBool("peephole"),
@@ -147,7 +185,11 @@ class Config{
     direct_dependencies = dep_roots.map(v ->
       if (v.contains("=")) v.splitFirst("=").i0 else v
     );
-    dependency_resolver = Sklib.Resolver::create(sklib_search_paths, target);
+    dependency_resolver = Sklib.Resolver::create(
+      sklib_search_paths,
+      target,
+      archiveCache,
+    );
     dependencies = dependency_resolver.resolve(dep_roots);
 
     // Automatically add stdlib as a dependency, unless explicitly removed or
@@ -186,6 +228,13 @@ class Config{
     useSpecializedNames = results.getBool("use-specialized-names");
     check = results.getBool("check");
     no_link = !results.getBool("link");
+    stopAfterSpecialization = results.getBool("stop-after-specialization");
+    // Release builds use sequential specialization, including persisted builds.
+    incrementalSpecialization =
+      !release &&
+      results.getBool("incremental-backend") &&
+      (results.maybeGetString("init").isSome() ||
+        results.maybeGetString("data").isSome());
 
     exportAs = mutable UnorderedMap[];
     for (f in exportedAsFunctions) {
@@ -270,6 +319,40 @@ class Config{
       useSpecializedNames,
       check,
       no_link,
+      stopAfterSpecialization,
+      incrementalSpecialization,
+      collectionEmission => results.getBool("collection-emission"),
+      stableFunctionSymbols => results.getBool("stable-function-symbols"),
+      stableFunctionDeclarations => results.getBool(
+        "stable-function-declarations",
+      ),
+      stableVTableSlots => results.getBool("stable-vtable-slots"),
+      vtableReceiverHints => Environ.varOpt(
+        "SKC_VTABLE_RECEIVER_HINTS",
+      ).isSome(),
+      splitSupportModule => results.getBool("split-support-module"),
+      balancedFunctionModules => results.getBool("balanced-function-modules"),
+      collectionFunctions => results.getBool("collection-functions"),
+      collectionClasses => results.getBool("collection-classes"),
+      collectionClassHeaders => Environ.varOpt(
+        "SKC_COLLECTION_CLASS_HEADERS",
+      ).isSome(),
+      nativeEmissionConcat => Environ.varOpt(
+        "SKC_NATIVE_EMISSION_CONCAT",
+      ).isSome(),
+      emissionTextSpans => Environ.varOpt("SKC_EMISSION_TEXT_SPANS").isSome(),
+      trackedClosureBodies => results.getBool("tracked-closure-bodies"),
+      compactSpecializer => results.getBool("compact-specializer"),
+      partitionClasses => results.getBool("partition-classes"),
+      streamClassConflicts => Environ.varOpt(
+        "SKC_CLASS_CONFLICT_STREAM",
+      ).isSome(),
+      classGroupHints => Environ.varOpt("SKC_CLASS_GROUP_HINTS").isSome(),
+      optimizerCalleeSummaries => Environ.varOpt(
+        "SKC_OPTIMIZER_CALLEE_SUMMARIES",
+      ).isSome(),
+      sharedCalleeViews => Environ.varOpt("SKC_SHARED_CALLEE_VIEWS").isSome(),
+      preciseArraySlots => Environ.varOpt("SKC_PRECISE_ARRAY_SLOTS").isSome(),
       stackAlign,
       stackAlignStr,
       ptrByteSize,
@@ -287,6 +370,54 @@ class Config{
 
   fun isWasm(): Bool {
     this.target.startsWith("wasm32");
+  }
+
+  fun specializationConfig(): SpecializationConfig {
+    SpecializationConfig(
+      this.ptrBitSize,
+      this.incrementalSpecialization &&
+        Environ.varOpt("SKC_INDEX_VARIANCE").isSome(),
+      this.incrementalSpecialization &&
+        this.partitionClasses &&
+        this.streamClassConflicts,
+      this.incrementalSpecialization &&
+        this.partitionClasses &&
+        this.classGroupHints,
+    )
+  }
+
+  fun needsIRSourcePositions(): Bool {
+    this.debug ||
+      this.disasmAll ||
+      this.disasmAnnotated ||
+      !this.disasmFunctions.isEmpty() ||
+      !this.disasmFiles.isEmpty()
+  }
+
+  // FileCache consumes source text, mtimes and package environments separately.
+  // Keeping them in the backend's option row would invalidate every backend
+  // reader when an archive's source changes, even if its codegen options do not.
+  // Archive emission needs dependency hashes for its own metadata. Native
+  // archives also retain their hash so a native-only edit still relinks.
+  fun backendConfig(): this {
+    this with {
+      dependencies => this.dependencies.map((_, dep) ->
+        (
+          dep.i0,
+          dep.i1 with {
+            sources => Array[],
+            env => Array[],
+            pkg_dir => "",
+            dependencies => Array[],
+            hash => if (this.emit == "sklib" || dep.i1.has_object_code) {
+              dep.i1.hash
+            } else {
+              ""
+            },
+          },
+        )
+      ),
+    }
   }
 
   // Derive a per-unit config for batch compilation: same shared settings

@@ -1,0 +1,482 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/** Incremental native LLVM modules. Dependencies are ordinary SKStore reads. */
+module AsmOutput;
+
+class NativeGraphFile(
+  defs: Array<AsmDef>,
+  config: Config.Config,
+) extends SKStore.File
+// Filesystem bytes are refreshed at invocation entry, then read as ordinary
+// reactive inputs. A preamble-only edit must not depend on a function changing.
+const emissionPreambleDirName: SKStore.DirName = SKStore.DirName::create(
+  "/llvm-emit/preamble/",
+);
+const emissionPreambleDir: SKStore.EHandle<
+  SKStore.IID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.IID::keyType,
+  SKStore.StringFile::type,
+  emissionPreambleDirName,
+);
+
+fun refreshEmissionPreamble(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+): void {
+  if (!incrementalEmission(config)) {
+    emissionPreambleDir.writeArray(context, SKStore.IID(0), Array[]);
+    return void
+  };
+  emissionPreambleDir.writeArray(
+    context,
+    SKStore.IID(0),
+    Array[SKStore.StringFile(nativePreamble(config))],
+  )
+}
+
+// LLVM module headers must precede definitions. A user preamble can contain a
+// global definition before the standard library's target headers. Keep leading
+// comments (and ordinary preambles' bytes) in place while hoisting those headers.
+private fun nativePreamble(config: Config.Config): String {
+  preamble = mutable TextOutputStream.StringTextOutputStream{};
+  for (p in config.preambles) preamble.write(FileSystem.readTextFile(p));
+  for (dep in config.dependencies.values()) {
+    for (p in dep.i1.preambles) preamble.write(p)
+  };
+  prefix = mutable Vector[];
+  headers = mutable Vector[];
+  body = mutable Vector[];
+  inPrefix = true;
+  for (line in preamble.toString().split("\n")) {
+    trimmed = line.trimLeft();
+    if (inPrefix && (trimmed.isEmpty() || trimmed.startsWith(";"))) {
+      prefix.push(line)
+    } else {
+      !inPrefix = false;
+      if (
+        trimmed.startsWith("target datalayout =") ||
+        trimmed.startsWith("target triple =") ||
+        trimmed.startsWith("source_filename =")
+      ) {
+        headers.push(line)
+      } else {
+        body.push(line)
+      }
+    }
+  };
+  prefix.toArray().concat(headers.toArray()).concat(body.toArray()).join("\n")
+}
+
+private class EmitBatchKey(index: Int) extends SKStore.Key
+private class EmitBatchFile(
+  entries: Array<(SKStore.Key, SKStore.File)>,
+) extends SKStore.File
+
+private class EmitBodyKey(symbol: String) extends SKStore.Key
+private class EmitDeclKey(symbol: String) extends SKStore.Key
+private class EmitHeaderKey() extends SKStore.Key
+private class EmitModuleKey(
+  kind: Int,
+  index: Int,
+) extends SKStore.Key uses Hashable
+private class EmitBodyFile(
+  def: AsmDef,
+  refs: Array<String>,
+) extends SKStore.File
+private class EmitDeclFile(
+  text: String,
+  refs: Array<(Int, String)>,
+) extends SKStore.File
+private class EmitRootsFile(symbols: Array<String>) extends SKStore.File
+private class EmitHeaderFile(
+  cwd: Config.WorkingDirectory,
+  unit: String,
+  full: String,
+  declarations: String,
+  stableFunctionSymbols: Bool = false,
+  splitSupportModule: Bool = false,
+  balancedFunctionModules: Bool = false,
+  nativeEmissionConcat: Bool = false,
+  emissionTextSpans: Bool = false,
+) extends SKStore.File
+
+fun incrementalEmission(config: Config.Config): Bool {
+  config.incrementalSpecialization &&
+    !config.check &&
+    !config.isWasm() &&
+    (config.emit == "link" || config.emit == "cdylib")
+}
+
+fun collectionEmission(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+): Bool {
+  if (!config.collectionEmission || !incrementalEmission(config)) return false;
+  preamble = emissionPreambleDir.getArray(context, SKStore.IID(0));
+  // Switching output modes can retract the native preamble before cached
+  // optimizer rounds receive the new config. Track that absence too.
+  !preamble.isEmpty() && declarationPreamble(preamble[0].value).isSome()
+}
+
+// The preamble is small, but includes runtime definitions. Only the support
+// module owns those bodies; other modules need declarations with the same ABI.
+private fun declarationPreamble(text: String): ?String {
+  out = mutable TextOutputStream.StringTextOutputStream{};
+  body = false;
+  for (line in text.split("\n")) {
+    if (body) {
+      if (line.trim() == "}") !body = false
+    } else if (line.trimLeft().startsWith("define ")) {
+      if (!line.trimRight().endsWith("{")) return None();
+      head = line
+        .trimLeft()
+        .stripPrefix("define ")
+        .replace("linkonce_odr ", "")
+        .replace("internal ", "");
+      seenName = false;
+      depth = 0;
+      signature = mutable TextOutputStream.StringTextOutputStream{};
+      for (c in head.getIter()) {
+        signature.writeChar(c);
+        if (c == '@') !seenName = true;
+        if (seenName && c == '(') !depth = depth + 1;
+        if (seenName && c == ')') {
+          !depth = depth - 1;
+          if (depth == 0) break void
+        }
+      };
+      out.write("declare " + signature.toString() + "\n");
+      !body = true
+    } else {
+      // Opaque user preambles with definitions need the monolithic fallback.
+      if (line.trimLeft().startsWith("@") && !line.contains(" = external ")) {
+        return None()
+      };
+      out.write(line + "\n")
+    }
+  };
+  if (body) None() else Some(out.toString())
+}
+
+private fun writeEmissionRefs(
+  out: mutable TextOutputStream.StringTextOutputStream,
+  text: String,
+  refs: Array<(Int, String)>,
+): void {
+  if (out.fragmentWrites) {
+    cursor = mutable TextOutputStream.StringSpanCursor{text};
+    for ((offset, symbol) in refs) {
+      _ = cursor.writeUntil(out, offset);
+      out.write(symbol)
+    };
+    _ = cursor.writeUntil(out, Int::max);
+    return void
+  };
+  index = 0;
+  offset = 0;
+  for (c in text.getIter()) {
+    while (index < refs.size() && refs[index].i0 == offset) {
+      out.write(refs[index].i1);
+      !index = index + 1
+    };
+    out.writeChar(c);
+    !offset = offset + 1
+  };
+  while (index < refs.size()) {
+    invariant(refs[index].i0 == offset, "Invalid LLVM declaration reference");
+    out.write(refs[index].i1);
+    !index = index + 1
+  }
+}
+
+private fun emitModule(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  key: EmitModuleKey,
+  roots: EmitRootsFile,
+): String {
+  header = EmitHeaderFile::type(files.getArray(context, EmitHeaderKey())[0]);
+  rootSet = UnorderedSet::createFromItems(roots.symbols);
+  bodies = roots.symbols.map(symbol ->
+    EmitBodyFile::type(files.getArray(context, EmitBodyKey(symbol))[0])
+  );
+  declarations = mutable Map<String, EmitDeclFile>[];
+  pending = mutable Vector<String>[];
+  for (body in bodies) for (symbol in body.refs) pending.push(symbol);
+  while (!pending.isEmpty()) {
+    symbol = pending.pop();
+    if (!rootSet.contains(symbol) && !declarations.containsKey(symbol)) {
+      decl = EmitDeclFile::type(
+        files.getArray(context, EmitDeclKey(symbol))[0],
+      );
+      declarations.set(symbol, decl);
+      for ((_, ref) in decl.refs) if (ref != symbol) pending.push(ref)
+    }
+  };
+  defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
+  ids = mutable UnorderedMap<String, AsmDefID>[];
+  for (symbol in roots.symbols) ids.set(symbol, defs.allocID());
+  for (symbol in declarations.keys()) ids.set(symbol, defs.allocID());
+  for ((symbol, id) in ids.items()) defs.set(id, graphPlaceholder(id, symbol));
+  symbols = mutable Map<
+    FileCache.InputSource,
+    mutable UnorderedSet<SourcePositions.Symbol>,
+  >[];
+  keepPos = (pos: Pos) -> {
+    set = symbols.getOrAdd(pos.file, () -> mutable UnorderedSet[]);
+    if (!pos.range.start.symbol.isEmpty()) {
+      _ = set.maybeInsert(pos.range.start.symbol)
+    };
+    if (!pos.range.end.symbol.isEmpty()) {
+      _ = set.maybeInsert(pos.range.end.symbol)
+    }
+  };
+  for (body in bodies) {
+    for ((_, pos, _) in body.def.debug) {
+      keepPos(pos);
+      pos match {
+      | InlinedPos{origFun, inlinedAt} ->
+        keepPos(origFun.pos);
+        keepPos(inlinedAt)
+      | _ -> void
+      }
+    }
+  };
+  positions = SourcePositions.Table::readSymbols(
+    context,
+    symbols.map((_, names) -> names.chill()).chill(),
+  );
+  metadata = Metadata::create(
+    defs,
+    header.cwd,
+    `${header.unit}-${key.kind}-${key.index}`,
+    positions,
+  );
+  metadata.!canonicalizeFunctions = false;
+  out = mutable TextOutputStream.StringTextOutputStream{
+    fragmentWrites => header.emissionTextSpans,
+  };
+  out.write(if (key.kind == 2) header.full else header.declarations);
+  for (decl in declarations) writeEmissionRefs(out, decl.text, decl.refs);
+  for (body in bodies) {
+    // Keep original function IDs for debug scopes, while references use the
+    // small local symbol table. Metadata must not canonicalize these local IDs.
+    def = body.def with {
+      refs => body.def.refs.map(ref -> (ref.i0, ids[body.refs[ref.i1.id]])),
+      internalLinkage => if (body.def.forceExternal) "" else "hidden ",
+    };
+    def.write(out, metadata, true)
+  };
+  out.write(
+    "!llvm.module.flags = !{" +
+      metadata.moduleFlags.map(i -> "!" + i.toString()).join(", ") +
+      "}\n",
+  );
+  out.write("!llvm.dbg.cu = !{" + metadata.diCompileUnit.toString() + "}\n");
+  metadata.metadata.eachWithIndex((i, value) ->
+    out.write(`!${i} = ${value}\n`)
+  );
+  if (header.nativeEmissionConcat || header.emissionTextSpans) {
+    out.toStringNative()
+  } else {
+    out.toString()
+  }
+}
+
+class EmissionCache(
+  modules: SKStore.EHandle<EmitModuleKey, SKStore.StringFile>,
+  objects: SKStore.EHandle<EmitModuleKey, EmitObjectFile>,
+) {
+  fun objectFiles(context: mutable SKStore.Context): Array<String> {
+    out = mutable Vector[];
+    for ((_, values) in this.objects.items(context)) {
+      for (file in values) out.push(file.path)
+    };
+    out.toArray()
+  }
+
+  fun contents(context: mutable SKStore.Context): Array<(String, String)> {
+    out = mutable Vector[];
+    for ((key, values) in this.modules.items(context)) {
+      for (file in values) {
+        out.push((`m${key.kind}_${key.index}`, file.value))
+      }
+    };
+    out.toArray()
+  }
+}
+
+fun createEmissionCache(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
+  graph: GraphCache,
+): EmissionCache {
+  batches = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/batches/"),
+    (_context, writer, _, values) ~> {
+      entry = values.first;
+      if (!incrementalEmission(entry.config)) return void;
+      if (collectionEmission(_context, entry.config)) return void;
+      defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
+      for (def in entry.defs) defs.set(def.id, def);
+      full = emissionPreambleDir.getArray(_context, SKStore.IID(0))[0].value;
+      declarations = declarationPreamble(full) match {
+      | Some(text) -> text
+      | None() -> return void
+      };
+      grouped = mutable Map<Int, mutable Vector<(SKStore.Key, SKStore.File)>>[];
+      emit = (bucket: Int, key: SKStore.Key, file: SKStore.File) -> {
+        grouped.getOrAdd(bucket, () -> mutable Vector[]).push((key, file))
+      };
+      emit(
+        256,
+        EmitHeaderKey(),
+        EmitHeaderFile(
+          entry.config.cwd,
+          "skip-module",
+          full,
+          declarations,
+          entry.config.stableFunctionSymbols,
+          entry.config.splitSupportModule,
+          entry.config.balancedFunctionModules,
+          entry.config.nativeEmissionConcat,
+          entry.config.emissionTextSpans,
+        ),
+      );
+      groups = mutable Map<EmitModuleKey, mutable Vector<String>>[];
+      // Always keep the support module, even when no vtable entries are needed.
+      _ = groups.getOrAdd(EmitModuleKey(2, 0), () -> mutable Vector[]);
+      for (def in defs) {
+        if (def.hasDefinition()) {
+          refs = def.refs.take(def.numDefinitionRefs).collect(Array);
+          normal = def with {
+            id => if (def.isFunction()) def.id else AsmDefID(0),
+            refs => refs.mapWithIndex((i, ref) -> (ref.i0, AsmDefID(i))),
+            declarationText => "",
+            typeRef => None(),
+          };
+          emit(
+            def.symbol.hash().and(255),
+            EmitBodyKey(def.symbol),
+            EmitBodyFile(normal, refs.map(ref -> defs[ref.i1].symbol)),
+          );
+          group = if (def.isFunction()) {
+            // A source-line shift changes debug line tables for many functions
+            // in the same file. Keep those functions in four stable subgroups,
+            // so one file does not force recompiling all 64 function modules.
+            // IDs still spread large source files over four modules.
+            EmitModuleKey(
+              0,
+              def.debug[0].i1.file.hash().and(15) * 4 + def.id.id.and(3),
+            )
+          } else if (
+            def.symbol.startsWith(".classVTable.") ||
+            def.symbol == ".allVTables"
+          ) {
+            // LLVM aliases must stay with their defined aliasee. Keep the
+            // mega table and its class aliases together, but allow globals
+            // and initialization to change without rebuilding that image.
+            EmitModuleKey(if (entry.config.splitSupportModule) 3 else 2, 0)
+          } else if (
+            def.symbol == "skip.globals" ||
+            def.symbol == "SKIP_initializeSkip"
+          ) EmitModuleKey(2, 0) else {
+            EmitModuleKey(1, def.symbol.hash().and(15))
+          };
+          groups.getOrAdd(group, () -> mutable Vector[]).push(def.symbol)
+        };
+        decl = if (def.hasDefinition() && !def.isFunction()) {
+          // Native modules use byte-addressed opaque pointers. An unsized byte
+          // declaration avoids importing a shared image's entire struct layout.
+          EmitDeclFile(
+            "@" +
+              def.symbol +
+              " = external " +
+              (if (def.canShare) "constant" else "global") +
+              " [0 x i8]\n",
+            Array[],
+          )
+        } else if (def.hasDefinition()) {
+          EmitDeclFile(
+            def.declarationText,
+            def.refs
+              .drop(def.numDefinitionRefs)
+              .map(ref -> (ref.i0, defs[ref.i1].symbol))
+              .collect(Array),
+          )
+        } else {
+          EmitDeclFile(
+            def.text,
+            def.refs
+              .take(def.numDefinitionRefs)
+              .map(ref -> (ref.i0, defs[ref.i1].symbol))
+              .collect(Array),
+          )
+        };
+        emit(def.symbol.hash().and(255), EmitDeclKey(def.symbol), decl)
+      };
+      for ((key, names) in groups.items()) {
+        emit(257, key, EmitRootsFile(names.toArray().sorted()))
+      };
+      // SKStore compares these arrays element by element. Stable buckets let
+      // it retain equal batches without revisiting every body/declaration row
+      // on a one-function edit; only changed buckets publish their keyed rows.
+      for ((bucket, entries) in grouped.items()) {
+        writer.set(EmitBatchKey(bucket), EmitBatchFile(entries.toArray()))
+      }
+    },
+  );
+  legacyFiles = batches.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/legacy-inputs/"),
+    (_context, writer, _, values) ~> {
+      for ((key, file) in EmitBatchFile::type(values.first).entries) {
+        writer.set(key, file)
+      }
+    },
+  );
+  keyedFiles = createCollectionEmission(context, graph, input);
+  forward = (_context, writer, key, values) ~>
+    writer.setArray(key, values.toArray());
+  files = SKStore.EHandle::multiMap(
+    x ~> x,
+    x ~> x,
+    context,
+    Array[(legacyFiles, (forward, None())), (keyedFiles, (forward, None()))],
+    SKStore.DirName::create("/llvm-emit/inputs/"),
+  );
+  modules = files.map(
+    EmitModuleKey::keyType,
+    SKStore.StringFile::type,
+    context,
+    SKStore.DirName::create("/llvm-emit/modules/"),
+    (context, writer, key, values) ~> {
+      values.first match {
+      | roots @ EmitRootsFile _ ->
+        if (context.debugMode) print_string(`LLVM_MODULE: ${key}`);
+        writer.set(
+          EmitModuleKey::keyType(key),
+          SKStore.StringFile(
+            emitModule(context, files, EmitModuleKey::keyType(key), roots),
+          ),
+        )
+      | _ -> void
+      }
+    },
+  );
+  EmissionCache(modules, createArtifactCache(context, input, modules))
+}
+
+module end;

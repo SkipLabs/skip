@@ -1,0 +1,549 @@
+/** Keyed alias resolution, definition sharing, symbols and module membership. */
+module AsmOutput;
+
+private class ShareHashKey(value: Int) extends SKStore.Key
+private class ShareUniqueKey(value: GraphKey) extends SKStore.Key
+private class ShareMemberFile(key: GraphKey) extends SKStore.File
+private class SharedDefinitionFile(
+  target: GraphKey,
+  symbol: String,
+) extends SKStore.File
+private class SymbolStemKey(value: String) extends SKStore.Key
+private class SymbolMemberFile(
+  key: GraphKey,
+  canShare: Bool,
+) extends SKStore.File
+private class EmitMemberFile(symbol: String) extends SKStore.File
+
+private fun localSharingHash(key: GraphKey, node: GraphDefinition): Int {
+  if (!node.canShare) return key.hash();
+  node.refs.foldl(
+    (acc, ref) -> Hashable.combine(acc, ref.i0.hash()),
+    node.text.hash(),
+  )
+}
+
+private fun resolveGraphAlias(
+  context: mutable SKStore.Context,
+  identities: SKStore.EHandle<GraphKey, GraphAliasFile>,
+  key: GraphKey,
+): GraphKey {
+  seen = mutable UnorderedSet<GraphKey>[];
+  loop {
+    invariant(seen.maybeInsert(key), "Cyclic LLVM graph alias");
+    values = identities.getArray(context, key);
+    invariant(!values.isEmpty(), "Missing LLVM graph alias target");
+    next = values[0].target;
+    if (next == key) return key;
+    !key = next
+  }
+}
+
+// This is the same coinductive equivalence used by mergeIdenticalAsmDefs.
+// Hashes only select candidates. In particular, a hash collision never merges
+// different definitions, and recursive reference graphs terminate on pairs.
+private mutable class SharingNodeReader{
+  context: mutable SKStore.Context,
+  nodes: SKStore.EHandle<GraphKey, GraphNodeFile>,
+  memoize: Bool = Environ.varOpt("SKC_DISABLE_SHARING_READER_MEMO").isNone(),
+  cache: mutable UnorderedMap<
+    GraphKey,
+    GraphDefinition,
+  > = mutable UnorderedMap[],
+} {
+  mutable fun get(key: GraphKey): GraphDefinition {
+    if (this.memoize) {
+      this.cache.maybeGet(key) match {
+      | Some(value) -> return value
+      | None() -> void
+      }
+    };
+    value = this.nodes.getArray(this.context, key)[0].value;
+    if (this.memoize) this.cache.set(key, value);
+    value
+  }
+}
+
+private fun graphNodesIsomorphic(
+  reader: mutable SharingNodeReader,
+  left: GraphKey,
+  right: GraphKey,
+): Bool {
+  pending = mutable Vector[(left, right)];
+  seen = mutable UnorderedSet<(GraphKey, GraphKey)>[];
+  while (!pending.isEmpty()) {
+    (a, b) = pending.pop();
+    if (a == b) continue;
+    pair = if (a < b) (a, b) else (b, a);
+    if (!seen.maybeInsert(pair)) continue;
+    x = reader.get(a);
+    y = reader.get(b);
+    if (
+      !x.canShare ||
+      !y.canShare ||
+      x.text != y.text ||
+      x.refs.size() != y.refs.size()
+    ) {
+      return false
+    };
+    for (i in Range(0, x.refs.size())) {
+      if (x.refs[i].i0 != y.refs[i].i0) return false;
+      pending.push((x.refs[i].i1, y.refs[i].i1))
+    }
+  };
+  true
+}
+
+private fun graphSymbolHint(key: GraphKey, node: GraphDefinition): String {
+  if (
+    !node.forceExternal &&
+    !(key is GraphFunctionKey _) &&
+    !(key is GraphExternalKey _) &&
+    !(key is GraphMegaKey _) &&
+    !(key is GraphGlobalsKey _)
+  ) {
+    node.symbol + ".c" + key.hash().and(Int::max)
+  } else {
+    node.symbol
+  }
+}
+
+private fun graphSymbolStem(
+  key: GraphKey,
+  node: GraphNodeFile,
+  hint: String,
+): String {
+  out = mutable TextOutputStream.StringTextOutputStream{};
+  first = true;
+  for (c in hint.getIter()) {
+    ok = if (first) isLegalAsmIDHead(c) else isLegalAsmIDTail(c);
+    out.writeChar(if (ok) c else '_');
+    !first = false
+  };
+  if (!node.value.debug.isEmpty() && !node.value.forceExternal) {
+    id = key match {
+    | GraphFunctionKey(fid) -> fid.id
+    | _ -> node.origin
+    };
+    out.write(".f" + id)
+  };
+  out.toString()
+}
+
+private fun graphEmissionSymbol(
+  context: mutable SKStore.Context,
+  identities: SKStore.EHandle<GraphKey, GraphAliasFile>,
+  shared: SKStore.EHandle<GraphKey, SharedDefinitionFile>,
+  symbols: SKStore.EHandle<GraphKey, SKStore.StringFile>,
+  key: GraphKey,
+): String {
+  target = shared.getArray(
+    context,
+    resolveGraphAlias(context, identities, key),
+  )[0].target;
+  symbols.getArray(context, target)[0].value
+}
+
+private fun createCollectionEmission(
+  context: mutable SKStore.Context,
+  graph: GraphCache,
+  input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  header = input.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/keyed-header/"),
+    (context, writer, _, values) ~> {
+      config = values.first.config;
+      if (!collectionEmission(context, config)) return void;
+      full = emissionPreambleDir.getArray(context, SKStore.IID(0))[0].value;
+      writer.set(
+        EmitHeaderKey(),
+        EmitHeaderFile(
+          config.cwd,
+          "skip-module",
+          full,
+          declarationPreamble(full).fromSome(),
+          config.stableFunctionSymbols,
+          config.splitSupportModule,
+          config.balancedFunctionModules,
+          config.nativeEmissionConcat,
+          config.emissionTextSpans,
+        ),
+      );
+      // Keep a support module even when the graph has no native definitions.
+      writer.set(EmitModuleKey(2, 0), EmitRootsFile(Array[]))
+    },
+  );
+  identities = graph.nodes.map(
+    asGraphKey,
+    GraphAliasFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/identities/"),
+    (context, writer, key, values) ~> {
+      if (
+        header
+          .getArrayFilter(context, EmitHeaderKey(), _ ~> SKStore.IntFile(1))
+          .isEmpty()
+      ) return void;
+      writer.set(
+        key,
+        values.first match {
+        | alias @ GraphAliasFile _ -> alias
+        | GraphNodeFile _ -> GraphAliasFile(key)
+        },
+      )
+    },
+  );
+  nodes = graph.nodes.map(
+    asGraphKey,
+    GraphNodeFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/resolved-nodes/"),
+    (context, writer, key, values) ~> {
+      policy = header.getArrayFilter(context, EmitHeaderKey(), file ~>
+        SKStore.BoolFile(EmitHeaderFile::type(file).stableFunctionSymbols)
+      );
+      if (policy.isEmpty()) return void;
+      values.first match {
+      | GraphNodeFile(origin, node) ->
+        writer.set(
+          key,
+          GraphNodeFile(
+            origin,
+            node with {
+              // Distinct native function names keep body edits from changing
+              // the canonical target used by unrelated vtable references.
+              // Constants/types still use exact sharing, and sequential
+              // emission keeps its existing sharing policy.
+              canShare => node.canShare &&
+                (!policy[0].value || !(key is GraphFunctionKey _)),
+              refs => node.refs.map(ref ->
+                (ref.i0, resolveGraphAlias(context, identities, ref.i1))
+              ),
+              typeRef => node.typeRef.map(ref ->
+                resolveGraphAlias(context, identities, ref)
+              ),
+            },
+          ),
+        )
+      | GraphAliasFile _ -> void
+      }
+    },
+  );
+  localHashes = nodes.map(
+    asGraphKey,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/local-sharing-hashes/"),
+    (_, writer, key, values) ~>
+      writer.set(
+        key,
+        SKStore.IntFile(localSharingHash(key, values.first.value)),
+      )
+    ,
+  );
+  neighborHashes = nodes.map(
+    asGraphKey,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/neighbor-sharing-hashes/"),
+    (context, writer, key, values) ~> {
+      node = values.first.value;
+      value = if (!node.canShare) key.hash() else {
+        node.refs.foldl(
+          (acc, ref) ->
+            Hashable.combine(
+              acc,
+              localHashes.getArray(context, ref.i1)[0].value,
+            ),
+          localSharingHash(key, node),
+        )
+      };
+      writer.set(key, SKStore.IntFile(value))
+    },
+  );
+  candidates = nodes.map(
+    x ~> x,
+    ShareMemberFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/sharing-candidates/"),
+    (context, writer, key, values) ~> {
+      node = values.first.value;
+      group: SKStore.Key = if (node.canShare) {
+        // Two neighbor refinements separate identical instruction text that
+        // refers to different constants/types. Exact coinductive comparison
+        // remains mandatory: these hashes are only a necessary condition.
+        ShareHashKey(
+          node.refs.foldl(
+            (acc, ref) ->
+              Hashable.combine(
+                acc,
+                neighborHashes.getArray(context, ref.i1)[0].value,
+              ),
+            localSharingHash(key, node),
+          ),
+        )
+      } else {
+        ShareUniqueKey(key)
+      };
+      writer.set(group, ShareMemberFile(key))
+    },
+  );
+  shared = candidates.map(
+    asGraphKey,
+    SharedDefinitionFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/shared-definitions/"),
+    (context, writer, _, values) ~> {
+      profile = Environ.varOpt("SKC_GRAPH_STATS").isSome();
+      start = if (profile) Time.time_ns() else 0;
+      comparisons = 0;
+      // Repeated pair comparisons can revisit the same graph node thousands
+      // of times. Its first lookup records the dependency; this local reader
+      // never survives the callback or masks a read in a later update.
+      reader = mutable SharingNodeReader{context, nodes};
+      members = values.toArray().map(value -> value.key).sorted();
+      if (profile && members.size() >= 256) {
+        print_error(`##SHARE_BEGIN## ${members.size()}\n`)
+      };
+      groups = mutable Vector<(GraphKey, mutable Vector<GraphKey>)>[];
+      for (key in members) {
+        found = false;
+        for ((canonical, group) in groups) {
+          !comparisons = comparisons + 1;
+          if (graphNodesIsomorphic(reader, canonical, key)) {
+            group.push(key);
+            !found = true;
+            break void
+          }
+        };
+        if (!found) groups.push((key, mutable Vector[key]))
+      };
+      for ((canonical, group) in groups) {
+        node = reader.get(canonical);
+        symbol = graphSymbolHint(canonical, node);
+        if (group.size() > 1) {
+          preferred = node.sharedSymbol;
+          for (key in group) {
+            if (preferred.isNone()) {
+              !preferred = reader.get(key).sharedSymbol
+            }
+          };
+          !symbol = preferred.default(symbol)
+        };
+        for (key in group) {
+          writer.set(key, SharedDefinitionFile(canonical, symbol))
+        }
+      };
+      if (profile) {
+        print_error(
+          `##SHARE## ${members.size()} ${groups.size()} ${comparisons} ${Time.time_ns() -
+            start}\n`,
+        )
+      }
+    },
+  );
+  stems = shared.map(
+    SymbolStemKey::keyType,
+    SymbolMemberFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/symbol-stems/"),
+    (context, writer, key, values) ~> {
+      chosen = values.first;
+      if (chosen.target != key) return void;
+      node = nodes.getArray(context, key)[0];
+      writer.set(
+        SymbolStemKey(graphSymbolStem(key, node, chosen.symbol)),
+        SymbolMemberFile(key, node.value.canShare),
+      )
+    },
+  );
+  symbols = stems.map(
+    asGraphKey,
+    SKStore.StringFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/final-symbols/"),
+    (context, writer, stem, values) ~> {
+      members = values.toArray().sortedBy(value ~> (value.canShare, value.key));
+      suffix = 0;
+      for (member in members) {
+        symbol = stem.value;
+        if (suffix > 0) {
+          loop {
+            !symbol = stem.value + "." + suffix;
+            !suffix = suffix + 1;
+            // Reserve all unmodified names, including absent-key dependencies.
+            // Different stems cannot manufacture the same numeric suffix name.
+            if (stems.getArray(context, SymbolStemKey(symbol)).isEmpty()) {
+              break void
+            }
+          }
+        } else {
+          !suffix = 1
+        };
+        writer.set(member.key, SKStore.StringFile(symbol))
+      }
+    },
+  );
+  // Sharing candidates can move between hash buckets without changing their
+  // final symbol. Publish that symbol under its stable graph key before
+  // definition consumers read it. In particular, the mega vtable must not
+  // resolve every reference again merely because one bucket was replaced.
+  emissionSymbols = identities.map(
+    asGraphKey,
+    SKStore.StringFile::type,
+    context,
+    SKStore.DirName::create("/llvm-graph/emission-symbols/"),
+    (context, writer, key, _) ~>
+      writer.set(
+        key,
+        SKStore.StringFile(
+          graphEmissionSymbol(context, identities, shared, symbols, key),
+        ),
+      )
+    ,
+  );
+  definitions = nodes.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/keyed-definitions/"),
+    (context, writer, key, values) ~> {
+      chosen = shared.getArray(context, key)[0];
+      if (chosen.target != key) return void;
+      entry = values.first;
+      node = entry.value;
+      symbol = symbols.getArray(context, key)[0].value;
+      resolve = ref -> emissionSymbols.getArray(context, ref)[0].value;
+      hasDefinition = node.linkageOffset >= 0;
+      isFunction = !node.debug.isEmpty();
+      id = key match {
+      | GraphFunctionKey(fid) -> AsmDefID(fid.id)
+      | _ -> AsmDefID(if (isFunction) entry.origin else 0)
+      };
+      if (hasDefinition) {
+        refs = node.refs.take(node.numDefinitionRefs).collect(Array);
+        writer.set(
+          EmitBodyKey(symbol),
+          EmitBodyFile(
+            AsmDef{
+              id,
+              text => node.text,
+              refs => refs.mapWithIndex((i, ref) -> (ref.i0, AsmDefID(i))),
+              numDefinitionRefs => node.numDefinitionRefs,
+              debug => node.debug,
+              declarationText => "",
+              symbol,
+              sharedSymbol => node.sharedSymbol,
+              symbolPrefix => node.symbolPrefix,
+              forceExternal => node.forceExternal,
+              canShare => node.canShare,
+              typeString => node.typeString,
+              typeRef => None(),
+              linkageOffset => node.linkageOffset,
+              internalLinkage => node.internalLinkage,
+            },
+            refs.map(ref -> resolve(ref.i1)),
+          ),
+        );
+        moduleKey = if (isFunction) {
+          balanced = SKStore.BoolFile::type(
+            header.getArrayFilter(context, EmitHeaderKey(), file ~>
+              SKStore.BoolFile(
+                EmitHeaderFile::type(file).balancedFunctionModules,
+              )
+            )[0],
+          ).value;
+          EmitModuleKey(
+            0,
+            if (balanced) id.id.and(255) else {
+              node.debug[0].i1.file.hash().and(15) * 4 + id.id.and(3)
+            },
+          )
+        } else if (
+          symbol.startsWith(".classVTable.") ||
+          symbol == ".allVTables"
+        ) {
+          split = SKStore.BoolFile::type(
+            header.getArrayFilter(context, EmitHeaderKey(), file ~>
+              SKStore.BoolFile(EmitHeaderFile::type(file).splitSupportModule)
+            )[0],
+          ).value;
+          EmitModuleKey(if (split) 3 else 2, 0)
+        } else if (
+          symbol == "skip.globals" ||
+          symbol == "SKIP_initializeSkip"
+        ) {
+          EmitModuleKey(2, 0)
+        } else {
+          EmitModuleKey(1, symbol.hash().and(15))
+        };
+        writer.set(moduleKey, EmitMemberFile(symbol))
+      };
+      decl = if (hasDefinition && !isFunction) {
+        EmitDeclFile(
+          "@" +
+            symbol +
+            " = external " +
+            (if (node.canShare) "constant" else "global") +
+            " [0 x i8]\n",
+          Array[],
+        )
+      } else if (hasDefinition) {
+        EmitDeclFile(
+          node.declarationText,
+          node.refs
+            .drop(node.numDefinitionRefs)
+            .map(ref -> (ref.i0, resolve(ref.i1)))
+            .collect(Array),
+        )
+      } else {
+        EmitDeclFile(
+          node.text,
+          node.refs
+            .take(node.numDefinitionRefs)
+            .map(ref -> (ref.i0, resolve(ref.i1)))
+            .collect(Array),
+        )
+      };
+      writer.set(EmitDeclKey(symbol), decl)
+    },
+  );
+  forward = (_context, writer, key, values) ~>
+    writer.setArray(key, values.toArray());
+  contributions = SKStore.EHandle::multiMap(
+    x ~> x,
+    x ~> x,
+    context,
+    Array[(header, (forward, None())), (definitions, (forward, None()))],
+    SKStore.DirName::create("/llvm-emit/keyed-contributions/"),
+  );
+  contributions.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/llvm-emit/keyed-inputs/"),
+    (_context, writer, key, values) ~> {
+      key match {
+      | EmitModuleKey _ ->
+        members = mutable Vector[];
+        for (value in values) {
+          value match {
+          | EmitMemberFile(symbol) -> members.push(symbol)
+          | EmitRootsFile _ -> void
+          | _ -> invariant_violation("Invalid LLVM module membership")
+          }
+        };
+        writer.set(key, EmitRootsFile(members.toArray().sorted()))
+      | _ ->
+        entries = values.toArray();
+        invariant(entries.size() == 1, "Duplicate LLVM emission symbol");
+        writer.set(key, entries[0])
+      }
+    },
+  )
+}
+
+module end;

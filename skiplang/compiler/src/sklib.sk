@@ -4,6 +4,18 @@
 
 module Sklib;
 
+// The two paths produce identical UTF-8 bytes. The experimental path allocates
+// the final array once, avoiding an iterator and a growable intermediate vector.
+// Keep the control available for matched archive-loading measurements.
+private fun metadataText(bytes: readonly Bytes): String {
+  data = if (Environ.varOpt("SKC_ARCHIVE_DIRECT_BYTES").isSome()) {
+    Array::fillBy(bytes.size(), i -> bytes[i])
+  } else {
+    bytes.values().collect(Array)
+  };
+  String::fromUtf8(data)
+}
+
 class Metadata{
   name: String,
   target: String,
@@ -61,15 +73,30 @@ class Metadata{
     ]
   }
 
-  fun serialize(): readonly Bytes {
-    this.toJSON().toString().bytes()
+  fun serialize(
+    sourceCache: ?mutable SourceEncodingCache = None(),
+  ): readonly Bytes {
+    json = this.toJSON();
+    sourceCache.each(cache -> {
+      !json = json.set(
+        "sources",
+        JSON.Array(
+          Vector::createFromItems(
+            this.sources.map(source -> cache.encode(source)),
+          ),
+        ),
+      )
+    });
+    json.toString().bytes()
   }
 
   static fun read(bytes: readonly Bytes): Metadata {
+    static::readText(metadataText(bytes))
+  }
+
+  static fun readText(text: String): Metadata {
     // TODO: Proper reporting of parsing error.
-    json = JSON.decode(
-      String::fromUtf8(bytes.values().collect(Array)),
-    ).expectObject();
+    json = JSON.decode(text).expectObject();
     Metadata{
       name => json["name"].expectString(),
       target => json["target"].expectString(),
@@ -119,15 +146,237 @@ class Metadata{
   }
 }
 
-const kMetadataFile: String = "lib.skmeta";
+private class CachedMetadata(text: String, value: Metadata)
+private class MetadataCacheFile(
+  entries: Map<String, CachedMetadata>,
+) extends SKStore.File
+private const metadataCacheKey: String = "COMPILER_ARCHIVE_METADATA_CACHE";
 
-fun read_metadata(path: String): Result<Metadata, ARParser.Error> {
+// The raw metadata member is read on every invocation. Exact content equality,
+// rather than file timestamps or the archive's claimed hash, permits reusing its
+// decoded sources. A replacement with preserved timestamps is still observed.
+mutable class MetadataCache(
+  previous: Map<String, CachedMetadata>,
+  used: mutable Map<String, CachedMetadata> = mutable Map[],
+) {
+  mutable fun decode(path: String, bytes: readonly Bytes): Metadata {
+    text = metadataText(bytes);
+    entry = this.previous.maybeGet(path) match {
+    | Some(prior) if (prior.text == text) ->
+      if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
+        print_error(`ARCHIVE_METADATA_HIT: ${path}\n`)
+      };
+      prior
+    | _ ->
+      if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
+        print_error(`ARCHIVE_METADATA_MISS: ${path}\n`)
+      };
+      CachedMetadata(text, Metadata::readText(text))
+    };
+    this.used.set(path, entry);
+    entry.value
+  }
+}
+
+// Only archives consulted by this invocation survive. The cache has no branch
+// history, and an unsuccessful resolver does not commit a partially read set.
+fun withMetadataCache<T>(
+  context: mutable SKStore.Context,
+  read: mutable MetadataCache ~> T,
+): T {
+  previous = context.getPersistent(metadataCacheKey) match {
+  | Some(file) -> MetadataCacheFile::type(file).entries
+  | None() -> Map[]
+  };
+  cache = mutable MetadataCache(previous);
+  result = read(cache);
+  context.setPersistent(
+    metadataCacheKey,
+    MetadataCacheFile(cache.used.chill()),
+  );
+  result
+}
+
+private fun decodeMetadata(
+  path: String,
+  bytes: readonly Bytes,
+  cache: ?mutable MetadataCache,
+): Metadata {
+  cache match {
+  | Some(reader) -> reader.decode(path, bytes)
+  | None() -> Metadata::read(bytes)
+  }
+}
+
+private class EncodedSource(source: (String, Int, String), text: String)
+private class SourceEncodingCacheFile(
+  entries: Map<String, EncodedSource>,
+) extends SKStore.File
+private const sourceEncodingCacheKey: String = "COMPILER_ARCHIVE_SOURCE_ENCODING";
+
+// The fragment is produced by the ordinary JSON writer, including escaping.
+// It is used only by the compact archive serializer, never by JSON consumers.
+private class EncodedSourceJSON(text: String) extends JSON.Value {
+  fun writeToStream(
+    write: String -> void,
+    _space: Int = -1,
+    _depth: Int = 0,
+  ): void {
+    write(this.text)
+  }
+}
+
+mutable class SourceEncodingCache(
+  previous: Map<String, EncodedSource>,
+  used: mutable Map<String, EncodedSource> = mutable Map[],
+) {
+  mutable fun encode(source: (String, Int, String)): JSON.Value {
+    entry = this.previous.maybeGet(source.i0) match {
+    | Some(prior) if (prior.source == source) ->
+      if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
+        print_error(`ARCHIVE_ENCODING_HIT: ${source.i0}\n`)
+      };
+      prior
+    | _ ->
+      if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
+        print_error(`ARCHIVE_ENCODING_MISS: ${source.i0}\n`)
+      };
+      (path, mtime, contents) = source;
+      EncodedSource(
+        source,
+        JSON.Object[
+          "path" => JSON.String(path),
+          "mtime" => JSON.IntNumber(mtime),
+          "contents" => JSON.String(contents),
+        ].toString(),
+      )
+    };
+    this.used.set(source.i0, entry);
+    EncodedSourceJSON(entry.text)
+  }
+}
+
+fun withSourceEncodingCache<T>(
+  context: mutable SKStore.Context,
+  write: mutable SourceEncodingCache -> T,
+): T {
+  previous = context.getPersistent(sourceEncodingCacheKey) match {
+  | Some(file) -> SourceEncodingCacheFile::type(file).entries
+  | None() -> Map[]
+  };
+  cache = mutable SourceEncodingCache(previous);
+  result = write(cache);
+  context.setPersistent(
+    sourceEncodingCacheKey,
+    SourceEncodingCacheFile(cache.used.chill()),
+  );
+  result
+}
+
+const kMetadataFile: String = "lib.skmeta";
+const kIndexFile: String = "lib.skindex";
+
+// Search-path discovery needs identity, not every package's embedded sources.
+// Old readers ignore this optional member; new readers still accept archives
+// without it. A selected archive's full metadata must agree with its index.
+class ArchiveIndex(name: String, target: String, hash: String) uses Equality {
+  static fun fromMetadata(metadata: Metadata): this {
+    static(metadata.name, metadata.target, metadata.hash)
+  }
+
+  fun serialize(): readonly Bytes {
+    JSON.Object[
+      "version" => JSON.IntNumber(1),
+      "name" => JSON.String(this.name),
+      "target" => JSON.String(this.target),
+      "hash" => JSON.String(this.hash),
+    ]
+      .toString()
+      .bytes()
+  }
+
+  static fun read(bytes: readonly Bytes): ?this {
+    json = JSON.decode(metadataText(bytes)).expectObject();
+    if (json["version"].expectInt() != 1) return None();
+    Some(
+      static(
+        json["name"].expectString(),
+        json["target"].expectString(),
+        json["hash"].expectString(),
+      ),
+    )
+  }
+}
+
+class ArchiveCandidate(path: String, index: ArchiveIndex, metadata: ?Metadata) {
+  static fun read(
+    path: String,
+    cache: ?mutable MetadataCache = None(),
+  ): Result<this, ARParser.Error> {
+    file = IO.File::open(path, IO.OpenOptions{read => true});
+    ar = ARParser.Archive::read(file) match {
+    | Success(ar) -> ar
+    | Failure(err) ->
+      file.close();
+      return Failure(err)
+    };
+    indexBytes = ar[kIndexFile] match {
+    | Success(bytes) -> bytes
+    | Failure(err) ->
+      file.close();
+      return Failure(err)
+    };
+    indexOpt = indexBytes.flatMap(ArchiveIndex::read);
+    indexOpt match {
+    | Some(index) ->
+      file.close();
+      Success(static(path, index, None()))
+    | None() ->
+      bytes = ar[kMetadataFile] match {
+      | Success(Some(bytes)) -> bytes
+      | Success(None()) -> "".bytes()
+      | Failure(err) ->
+        file.close();
+        return Failure(err)
+      };
+      metadata = decodeMetadata(path, bytes, cache);
+      file.close();
+      Success(
+        static(path, ArchiveIndex::fromMetadata(metadata), Some(metadata)),
+      )
+    }
+  }
+
+  fun load(cache: ?mutable MetadataCache = None()): Metadata {
+    metadata = this.metadata match {
+    | Some(metadata) -> metadata
+    | None() ->
+      read_metadata(this.path, cache) match {
+      | Success(metadata) -> metadata
+      | Failure(err) ->
+        print_error(`Failed to read metadata for ${this.path}: ${err}`);
+        skipExit(3)
+      }
+    };
+    if (ArchiveIndex::fromMetadata(metadata) != this.index) {
+      print_error(`Archive index disagrees with metadata for ${this.path}`);
+      skipExit(3)
+    };
+    metadata
+  }
+}
+
+fun read_metadata(
+  path: String,
+  cache: ?mutable MetadataCache = None(),
+): Result<Metadata, ARParser.Error> {
   file = IO.File::open(path, IO.OpenOptions{read => true});
   ar = ARParser.Archive::read(file) match {
   | Success(ar) -> ar
   | Failure(err) -> return Failure(err)
   };
-  res = Metadata::read(
+  res = decodeMetadata(
+    path,
     (ar[kMetadataFile] match {
     | Success(bytes) -> bytes
     | Failure(err) -> return Failure(err)
@@ -136,6 +385,7 @@ fun read_metadata(path: String): Result<Metadata, ARParser.Error> {
     | None() -> "".bytes()
     // FIXME: Properly fail.
     }),
+    cache,
   );
   file.close();
   Success(res)
@@ -213,27 +463,33 @@ mutable class .SklibBuilder(
 
   mutable fun write(
     file: mutable IO.File,
+    sourceCache: ?mutable SourceEncodingCache = None(),
     // variant: ARParser.Variant = ARParser.VariantGNU(),
   ): Result<void, ARParser.Error> {
-    file_names = Array[kMetadataFile].concat(
+    file_names = Array[kIndexFile, kMetadataFile].concat(
       this.files.map(fn -> fn.i0).collect(Array),
     );
     ar = ARParser.Builder::createGNU(file, file_names);
+    metadata = Metadata{
+      name => this.name,
+      target => this.target,
+      hash => this.hash().toString(),
+      pkg_dir => this.pkg_dir,
+      sources => this.sources.collect(Array),
+      env => this.env.collect(Array),
+      dependencies => this.dependencies.collect(Array),
+      links => this.links.collect(Array),
+      preambles => this.preambles.collect(Array),
+      has_object_code => file_names.any(fn -> fn.endsWith(".o")),
+    };
     ar.append_id(
-      kMetadataFile,
-      Metadata{
-        name => this.name,
-        target => this.target,
-        hash => this.hash().toString(),
-        pkg_dir => this.pkg_dir,
-        sources => this.sources.collect(Array),
-        env => this.env.collect(Array),
-        dependencies => this.dependencies.collect(Array),
-        links => this.links.collect(Array),
-        preambles => this.preambles.collect(Array),
-        has_object_code => file_names.any(fn -> fn.endsWith(".o")),
-      }.serialize(),
+      kIndexFile,
+      ArchiveIndex::fromMetadata(metadata).serialize(),
     ) match {
+    | Success _ -> void
+    | Failure(err) -> return Failure(err)
+    };
+    ar.append_id(kMetadataFile, metadata.serialize(sourceCache)) match {
     | Success _ -> void
     | Failure(err) -> return Failure(err)
     };
@@ -250,12 +506,20 @@ mutable class .SklibBuilder(
   }
 }
 
-class Resolver(
-  sklibs: Map<String, Map<String, (String, Metadata)>>,
+mutable class Resolver(
+  sklibs: Map<String, Map<String, ArchiveCandidate>>,
   target: String,
+  candidatesByPath: Map<String, ArchiveCandidate>,
+  cache: ?mutable MetadataCache = None(),
+  loaded: mutable Map<String, Metadata> = mutable Map[],
 ) {
-  static fun create(paths: Array<String>, target: String): Resolver {
+  static fun create(
+    paths: Array<String>,
+    target: String,
+    cache: ?mutable MetadataCache = None(),
+  ): mutable Resolver {
     sklibs = mutable Map[];
+    candidatesByPath = mutable Map[];
     for (p in paths) {
       if (!FileSystem.exists(p)) {
         // TODO: Log it.
@@ -267,25 +531,37 @@ class Resolver(
           continue
         };
 
-        path = Path.join(p, f);
-        metadata = read_metadata(path) match {
-        | Success(metadata) -> metadata
-        | Failure(err) ->
-          print_error(`Failed to read metadata for ${path}: ${err}`);
-          // TODO: Does 3 make sense here?
-          skipExit(3)
-        };
-        if (metadata.target != target) continue;
+        path = FileSystem.realpath(Path.join(p, f));
+        candidate = candidatesByPath.getOrAdd(path, () ->
+          ArchiveCandidate::read(path, cache) match {
+          | Success(candidate) -> candidate
+          | Failure(err) ->
+            print_error(`Failed to read metadata for ${path}: ${err}`);
+            skipExit(3)
+          }
+        );
+        if (candidate.index.target != target) continue;
         _ = sklibs
-          .getOrAdd(metadata.name, () -> mutable Map[])
-          .maybeSet(metadata.hash, (path, metadata));
+          .getOrAdd(candidate.index.name, () -> mutable Map[])
+          .maybeSet(candidate.index.hash, candidate);
       }
     };
 
-    Resolver(sklibs.map((_, v) -> v.chill()), target)
+    mutable Resolver(
+      sklibs.map((_, v) -> v.chill()),
+      target,
+      candidatesByPath.chill(),
+      cache,
+    )
   }
 
-  fun resolve(dependencies: Array<String>): Map<String, (String, Metadata)> {
+  private mutable fun load(candidate: ArchiveCandidate): Metadata {
+    this.loaded.getOrAdd(candidate.path, () -> candidate.load(this.cache))
+  }
+
+  mutable fun resolve(
+    dependencies: Array<String>,
+  ): Map<String, (String, Metadata)> {
     resolved = mutable Map[];
     previous = mutable Vector[];
 
@@ -294,11 +570,19 @@ class Resolver(
       (!dep, path, metadata) = if (dep.contains("=")) {
         (name, path) = dep.splitFirst("=");
         !path = FileSystem.realpath(path);
-        metadata = read_metadata(path) match {
-        | Success(metadata) -> metadata
-        | Failure(err) ->
-          print_error(`Failed to read metadata for ${path}: ${err}`);
-          skipExit(3)
+        // Reuse the scanned candidate and this invocation's decoded metadata.
+        // A new invocation constructs a new Resolver and observes fresh files.
+        metadata = this.candidatesByPath.maybeGet(path) match {
+        | Some(candidate) -> this.load(candidate)
+        | None() ->
+          this.loaded.getOrAdd(path, () ->
+            read_metadata(path, this.cache) match {
+            | Success(metadata) -> metadata
+            | Failure(err) ->
+              print_error(`Failed to read metadata for ${path}: ${err}`);
+              skipExit(3)
+            }
+          )
         };
         if (metadata.target != this.target) {
           print_error(`Failed to resolve ${name} (target mismatch)`);
@@ -351,9 +635,9 @@ class Resolver(
     resolved.map((_, v) -> (v.i0, v.i1)).chill()
   }
 
-  fun resolve_single(
+  mutable fun resolve_single(
     dependency: String,
-    pred: (Metadata) -> Bool = _ -> true,
+    pred: (ArchiveIndex) -> Bool = _ -> true,
   ): (String, Metadata) {
     candidates = this.sklibs.maybeGet(dependency) match {
     | Some(candidates) -> candidates
@@ -362,8 +646,8 @@ class Resolver(
       skipExit(3)
     };
 
-    for ((path, metadata) in candidates.values()) {
-      if (pred(metadata)) return (path, metadata)
+    for (candidate in candidates.values()) {
+      if (pred(candidate.index)) return (candidate.path, this.load(candidate))
     };
 
     print_error(`Failed to resolve dependency ${dependency}`);

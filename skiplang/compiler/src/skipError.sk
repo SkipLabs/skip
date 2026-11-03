@@ -13,8 +13,9 @@ fun fail<T>(): T {
 
 type Trace = (FileRange, String);
 
+// Resolve fix locations against the file of the primary diagnostic trace.
 class Fix{
-  oldRange: TextRange,
+  oldRange: SourcePositions.Range,
   newText: String,
   // If included, this will be used to verify that the edit still applies cleanly.
   // TODO: oldText: ?String,
@@ -52,11 +53,35 @@ fun errorsToString(
   errors: Vector<Error>,
   get_file: (FileCache.InputSource) -> String,
 ): String {
+  symbols = mutable Map<
+    FileCache.InputSource,
+    Map<SourcePositions.Symbol, Position>,
+  >[];
   strErrors = mutable Vector[];
   for (error in errors) {
     strTraces = mutable Vector[];
     for (trace in error.traces) {
-      strTraces.push(traceToString(trace, get_file));
+      file = trace.i0.file;
+      contents = get_file(file);
+      positions = if (
+        trace.i0.range.start.symbol.isEmpty() &&
+        trace.i0.range.end.symbol.isEmpty()
+      ) {
+        Map<SourcePositions.Symbol, Position>[]
+      } else {
+        symbols.getOrAdd(file, () ->
+          SourcePositions.Index::create(
+            SkipParser.parseSource(contents, true).i0.tree,
+          ).symbols
+        )
+      };
+      range = trace.i0.range.resolve(positions);
+      strTraces.push(
+        render_pos(file, range) +
+          trace.i1 +
+          "\n" +
+          get_context_of_pos(range, contents),
+      );
     };
     strErrors.push(strTraces.join("\n"));
   };
@@ -101,9 +126,9 @@ fun printErrorsAndExit<T>(
 
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
-// A recoverable compilation failure: in batch mode a failing unit throws
-// this instead of exiting the process, so the batch can report it and move
-// on to the next unit.
+// A rendered compilation failure. The command-line handler reports it and
+// exits before synchronization commits the failed update. In batch mode the
+// unit handler records it and continues with the remaining isolated units.
 class CompileFailureException{message: String} extends Exception {
   fun getMessage(): String {
     this.message
@@ -152,6 +177,10 @@ fun keepErrors(
   context: mutable SKStore.Context,
   f: () -> void,
 ): void {
+  // A read-only worker must propagate failures to its job boundary. The main
+  // thread retries the ordinary checker to collect diagnostics in source order;
+  // workers cannot update diagnostic globals or print lazy-cache fallback errors.
+  if (context.isParallelReadOnly()) return f();
   try {
     f()
   } catch {
@@ -251,37 +280,25 @@ fun renderTextRange(range: TextRange): String {
   )}`;
 }
 
-private fun render_pos(pos: FileRange): String {
+private fun render_pos(
+  source: FileCache.InputSource,
+  range: TextRange,
+): String {
   // TODO: Better heuristic to use relative path when relevant.
   cwd = getcwd();
-  path = pos.file.path;
-  if (pos.file.path.startsWith(cwd)) {
+  path = source.path;
+  if (source.path.startsWith(cwd)) {
     !path = path.stripPrefix(cwd + "/");
   };
-  file = pos.file.pkg_opt match {
-  | Some(pkg) if (pkg != FileCache.kAnonymousPackageName) ->
-    `File "${path}" (package ${pkg})`
-  | _ -> `File "${path}"`
-  };
+  file = `File "${path}"`;
 
-  position = if (!pos.range.isNone()) {
-    `, ${renderTextRange(pos.range)}:`
+  position = if (!range.isNone()) {
+    `, ${renderTextRange(range)}:`
   } else {
     "";
   };
 
   file + position + "\n";
-}
-
-private fun traceToString(
-  trace: Trace,
-  get_file: (FileCache.InputSource) -> String,
-): String {
-  contents = get_file(trace.i0.file);
-  render_pos(trace.i0) +
-    trace.i1 +
-    "\n" +
-    get_context_of_pos(trace.i0.range, contents);
 }
 
 private fun get_context_of_pos(range: TextRange, contents: String): String {

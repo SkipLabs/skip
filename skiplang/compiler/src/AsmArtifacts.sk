@@ -1,0 +1,236 @@
+/** Materialize changed LLVM modules and retain a compact link manifest. */
+module AsmOutput;
+
+private const artifactRefreshName: SKStore.DirName = SKStore.DirName::create(
+  "/llvm-emit/artifact-refresh/",
+);
+private const artifactVersionName: SKStore.DirName = SKStore.DirName::create(
+  "/llvm-emit/tool-version/",
+);
+private const artifactRefresh: SKStore.EHandle<
+  SKStore.Key,
+  SKStore.IntFile,
+> = SKStore.EHandle(x ~> x, SKStore.IntFile::type, artifactRefreshName);
+private const artifactVersion: SKStore.EHandle<
+  SKStore.IID,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  SKStore.IID::keyType,
+  SKStore.StringFile::type,
+  artifactVersionName,
+);
+private const artifactPathsName: SKStore.DirName = SKStore.DirName::create(
+  "/llvm-emit/artifact-paths/",
+);
+private const artifactPaths: SKStore.EHandle<
+  EmitModuleKey,
+  SKStore.StringFile,
+> = SKStore.EHandle(
+  EmitModuleKey::keyType,
+  SKStore.StringFile::type,
+  artifactPathsName,
+);
+
+private class EmitBuildPlanFile(
+  config: Config.Config,
+  version: String,
+) extends SKStore.File
+private class EmitObjectFile(path: String, revision: Int) extends SKStore.File
+private class EmitArtifactWorkFile(
+  text: String,
+  config: Config.Config,
+  version: String,
+  revision: Int,
+) extends SKStore.File
+
+private const artifactWorkersPolicyKey: String = "COMPILER_ARTIFACT_WORKERS";
+
+// Mapper recipes persist in the context. Check before any native side effect,
+// including when an already initialized cache is opened under another policy.
+fun checkArtifactPolicy(context: mutable SKStore.Context): void {
+  workers = Environ.varOpt("SKC_NATIVE_ARTIFACT_WORKERS")
+    .map(value -> value.toInt())
+    .default(1);
+  invariant(
+    workers >= 1 && workers <= 64,
+    "Native artifact workers must be 1..64",
+  );
+  context.getPersistent(artifactWorkersPolicyKey) match {
+  | Some(SKStore.IntFile(previous)) if (previous != workers) ->
+    throw SkipError.CompileFailureException{
+      message => "Changing SKC_NATIVE_ARTIFACT_WORKERS requires a fresh --init cache.",
+    }
+  | Some(SKStore.IntFile _) -> void
+  | None() ->
+    context.setPersistent(artifactWorkersPolicyKey, SKStore.IntFile(workers))
+  | _ -> invariant_violation("Unexpected native artifact worker policy")
+  }
+}
+
+fun initializeArtifactInputs(context: mutable SKStore.Context): void {
+  checkArtifactPolicy(context);
+  _ = context.mkdir(x ~> x, SKStore.IntFile::type, artifactRefreshName);
+  _ = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.StringFile::type,
+    artifactVersionName,
+  )
+}
+
+// File existence is an external input. Refresh it before the update, never from
+// an eager callback. A missing file dirties just its module's materializer, not
+// its LLVM renderer. New modules already execute because their text is new.
+fun refreshArtifactInputs(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+): void {
+  if (!config.collectionEmission || !incrementalEmission(config)) return void;
+  tool = System.subprocess(Array["clang++", "--version"]).fromSuccess();
+  invariant(tool.success(), tool.stderr);
+  artifactVersion.writeArray(
+    context,
+    SKStore.IID(0),
+    Array[SKStore.StringFile(tool.stdout)],
+  );
+  dir = config.output + ".llvm";
+  tick = SKStore.IntFile(context.getTick().value);
+  if (!FileSystem.exists(dir + "/outputs")) {
+    artifactRefresh.writeArray(context, SKStore.IID(0), Array[tick])
+  };
+  for ((key, values) in artifactPaths.items(context)) {
+    for (value in values) {
+      base = dir + "/" + value.value;
+      if (
+        Array[".ll", ".o", ".flags"].any(suffix ->
+          !FileSystem.exists(base + suffix)
+        )
+      ) {
+        artifactRefresh.writeArray(context, key, Array[tick])
+      }
+    }
+  }
+}
+
+private fun createArtifactCache(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
+  modules: SKStore.EHandle<EmitModuleKey, SKStore.StringFile>,
+): SKStore.EHandle<EmitModuleKey, EmitObjectFile> {
+  paths = modules.map(
+    EmitModuleKey::keyType,
+    SKStore.StringFile::type,
+    context,
+    artifactPathsName,
+    (_context, writer, key, _values) ~>
+      writer.set(key, SKStore.StringFile(`m${key.kind}_${key.index}`))
+    ,
+  );
+  plan = input.map(
+    SKStore.IID::keyType,
+    EmitBuildPlanFile::type,
+    context,
+    SKStore.DirName::create("/llvm-emit/build-plan/"),
+    (context, writer, key, values) ~> {
+      config = values.first.config;
+      if (!collectionEmission(context, config)) return void;
+      _ = artifactRefresh.getArray(context, SKStore.IID(0));
+      version = artifactVersion.getArray(context, SKStore.IID(0))[0].value;
+      dir = config.output + ".llvm";
+      if (!FileSystem.exists(dir)) {
+        runShell(Array["mkdir", "-p", dir], config.verbose)
+      };
+      outputs = mutable Vector[];
+      for ((_, names) in paths.items(context)) {
+        for (name in names) {
+          for (suffix in Array[".ll", ".o", ".flags"]) {
+            outputs.push(dir + "/" + name.value + suffix)
+          }
+        }
+      };
+      // Publish recovery information before any object compilation can fail.
+      FileSystem.writeTextFile(dir + "/outputs", outputs.toArray().join("\n"));
+      writer.set(key, EmitBuildPlanFile(config, version))
+    },
+  );
+  workers = SKStore.IntFile::type(
+    context.getPersistent(artifactWorkersPolicyKey).fromSome(),
+  ).value;
+  if (workers > 1) {
+    // Widen the input type so preparation can replace text rows with complete
+    // jobs. The handle still names exactly the same tracked module collection.
+    preparedModules: SKStore.EHandle<
+      EmitModuleKey,
+      SKStore.File,
+    > = SKStore.EHandle(
+      EmitModuleKey::keyType,
+      (file: SKStore.File) ~> file,
+      modules.dirName,
+    );
+    return preparedModules.parallelMap(
+      EmitModuleKey::keyType,
+      EmitObjectFile::type,
+      context,
+      SKStore.DirName::create("/llvm-emit/artifacts/"),
+      (_reader, writer, key, values) ~> {
+        if (values.isEmpty()) return void;
+        job = EmitArtifactWorkFile::type(values[0]);
+        object = compile_incremental_module(
+          `m${key.kind}_${key.index}`,
+          job.text,
+          job.config,
+          job.version,
+          true,
+        );
+        writer.set(key, EmitObjectFile(object, job.revision))
+      },
+      None(),
+      workers,
+      _ ~> true,
+      None(),
+      Some((context, key, values) ~> {
+        plans = plan.getArray(context, SKStore.IID(0));
+        if (plans.isEmpty()) return Array[];
+        _ = artifactRefresh.getArray(context, SKStore.IID(0));
+        _ = artifactRefresh.getArray(context, key);
+        build = plans[0];
+        if (context.debugMode) print_string(`LLVM_ARTIFACT: ${key}`);
+        // All tracked reads and revisions belong to the main thread. Workers
+        // never read/mutate the context or retry after an external side effect.
+        Array[
+          EmitArtifactWorkFile(
+            SKStore.StringFile::type(values[0]).value,
+            build.config,
+            build.version,
+            context.timeStamp().value,
+          ),
+        ]
+      }),
+    )
+  };
+  modules.map(
+    EmitModuleKey::keyType,
+    EmitObjectFile::type,
+    context,
+    SKStore.DirName::create("/llvm-emit/artifacts/"),
+    (context, writer, key, values) ~> {
+      plans = plan.getArray(context, SKStore.IID(0));
+      if (plans.isEmpty()) return void;
+      _ = artifactRefresh.getArray(context, SKStore.IID(0));
+      _ = artifactRefresh.getArray(context, key);
+      build = plans[0];
+      if (context.debugMode) print_string(`LLVM_ARTIFACT: ${key}`);
+      object = compile_incremental_module(
+        `m${key.kind}_${key.index}`,
+        values.first.value,
+        build.config,
+        build.version,
+      );
+      // A module can materialize twice in one update tick while upstream
+      // collections settle. Every materialization needs a distinct revision:
+      // the final linker must observe the latest bytes at this stable path.
+      writer.set(key, EmitObjectFile(object, context.timeStamp().value))
+    },
+  )
+}
+
+module end;

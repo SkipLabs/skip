@@ -188,7 +188,9 @@ private fun isMutableType(tt: I.Type): Bool {
 }
 
 private fun getLineStr(pos: FileRange): String {
-  (pos.start().line() + 1).toString()
+  // Block labels only need a stable, readable suffix; resolving an absolute
+  // line here would make conversion depend on unrelated source movement.
+  (pos.range.start.line + 1).toString()
 }
 
 mutable private class JumpBlockInfo{
@@ -322,7 +324,20 @@ base class ConcreteLazyGFun{
     context: mutable SKStore.Context,
     converter: Converter,
   ): GFunction {
-    emitter = OuterIstEmitter::make(context, converter, this);
+    this.compileWithIdentity(context, converter, this)
+  }
+
+  fun compileWithIdentity(
+    context: mutable SKStore.Context,
+    converter: Converter,
+    bodyIdentity: LazyGFun,
+  ): GFunction {
+    emitter = OuterIstEmitter::make(
+      context,
+      converter,
+      this,
+      Some(bodyIdentity),
+    );
 
     emitter.emitPreamble();
 
@@ -340,6 +355,7 @@ base class ConcreteLazyGFun{
       funInfo => emitter.funInfo,
       params => emitter.params,
       blocks => blocks.toArray(),
+      closureBodies => emitter.closureBodies.chill(),
     }
   }
 
@@ -788,15 +804,32 @@ class AsyncCoroutineLazyGFun{
   }
 }
 
-// functions and methods backed by an OuterIst def
-class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
+// A source-free recipe for retrieving a definition through tracked reads.
+base class CallableDefRef extends SKStore.Key {
+  macro static fun callableKeyType(key: SKStore.Key): CallableDefRef {
+    key match {
+    | ref @ CallableDefRef _ -> ref
+    | _ -> invariant_violation("Expected CallableDefRef")
+    }
+  }
+  children =
+  | FunctionDefRef(name: String)
+  | MethodDefRef(className: String, name: String, isStatic: Bool)
+  | FactoryDefRef(className: String, returnsMutable: Bool, isAbstract: Bool)
+}
+
+// Functions and methods backed by an OuterIst definition, resolved on demand.
+class DefLazyGFun{defRef: CallableDefRef} extends BodyProvidingLazyGFun {
   static fun make{
     funInfo: GFunInfo,
-    def: I.CallableDef,
+    defRef: CallableDefRef,
     params: Array<ParameterInfo>,
     useOptionalMask: Bool,
   }: LazyGFun {
-    d = DefLazyGFun{funInfo, def, params, useOptionalMask};
+    // Default expressions are refreshed by getParams after lowering. Do not
+    // retain their source trees in the lazy function reference either.
+    !params = params.map(p -> p with {value => None()});
+    d = DefLazyGFun{funInfo, defRef, params, useOptionalMask};
     if (funInfo.isAsync) {
       AsyncCoroutineLazyGFun{
         funInfo,
@@ -812,18 +845,12 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
   private fun getLoweredDef(
     context: mutable SKStore.Context,
     converter: Converter,
-    def: I.CallableDef,
   ): I.CallableDef {
-    result = if (def.isLowered()) {
-      def
-    } else {
-      converter.lower.get(context, I.CallableDefFile(def)).value
-    };
-    result
+    converter.lower.get(context, this.defRef).value
   }
 
   fun getBody(context: mutable SKStore.Context, converter: Converter): I.Stmt {
-    this.getLoweredDef(context, converter, this.def).getBody().asOuter()
+    this.getLoweredDef(context, converter).getBody().asOuter()
   }
 
   // get our lowered def, and patch our params array with the fresh info.
@@ -833,7 +860,7 @@ class DefLazyGFun{def: I.CallableDef} extends BodyProvidingLazyGFun {
     context: mutable SKStore.Context,
     converter: Converter,
   ): Array<ParameterInfo> {
-    def = this.getLoweredDef(context, converter, this.def);
+    def = this.getLoweredDef(context, converter);
     defParams = def.getParams();
     this.params.map(p -> {
       if (p.index < 0) {
@@ -913,7 +940,69 @@ fun makeGFunTypeWithFlags{
   GFunType{isMutable, isTracked, params => paramsWithFlags, returnType}
 }
 
+private fun closureCallInfo(
+  className: GClassName,
+  callMethodType: GFunType,
+  tparams: Array<GTparam>,
+  yields: Bool,
+  pos: FileRange,
+  receiver: LazyGClass,
+): GFunInfo {
+  thisType: GType = GTapply(
+    receiver,
+    Mutability::fromFlag(callMethodType.isMutable),
+    tparams,
+  );
+  callFunType = callMethodType with {
+    params => Array[thisType].concat(callMethodType.params),
+  };
+  GFunInfo{
+    gfunction => GFunctionName(className.id + "::call"),
+    pos,
+    tparams,
+    annotations => SSet["@always_inline"],
+    funType => callFunType,
+    className => Some(className),
+    isGenerator => yields,
+  }
+}
+
+// This reference contains no lambda body or parameter source tree. Resolving
+// the enclosing conversion performs tracked reads and supplies the current
+// recipe, including its signature, captures and source positions.
+class ClosureLazyGFun{
+  parent: LazyGFun,
+  className: GClassName,
+} extends LazyGFun {
+  fun gname(): GFunctionName {
+    GFunctionName(this.className.id + "::call")
+  }
+
+  fun compile(
+    context: mutable SKStore.Context,
+    converter: Converter,
+  ): GFunction {
+    enclosing = converter.getGFunction(context, this.parent);
+    body = enclosing.closureBodies[this.className];
+    body.compileWithIdentity(context, converter, this)
+  }
+}
+
+private fun hasTrackedBodyIdentity(lazy: LazyGFun): Bool {
+  lazy match {
+  | DefLazyGFun _
+  | AsyncCoroutineLazyGFun{bodyProvider => DefLazyGFun _}
+  | ClosureLazyGFun _ ->
+    true
+  | _ -> false
+  }
+}
+
 class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
+  fun toString(): String {
+    "LazyGFunKey(" + this.value.gname().id + ")"
+  }
+
   fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGFunKey(value) -> this.value.toString().compare(value.toString())
@@ -923,6 +1012,10 @@ class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
 }
 
 class LazyGClassKey(value: LazyGClass) extends SKStore.Key {
+  fun toString(): String {
+    "LazyGClassKey(" + this.value.name().id + ")"
+  }
+
   fun compare(other: SKStore.Key): Order {
     other match {
     | LazyGClassKey(value) -> this.value.name().id.compare(value.name().id)
@@ -931,13 +1024,32 @@ class LazyGClassKey(value: LazyGClass) extends SKStore.Key {
   }
 }
 class GClassFile(value: GClass) extends SKStore.File
+private class GClassKindFile(value: GClassKind) extends SKStore.File
 
 // Manages the overall conversion from OuterIst to IR.
 class Converter private (
   program: I.Program,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
-  lower: SKStore.LHandle<I.CallableDefFile, I.CallableDefFile>,
+  lower: SKStore.LHandle<CallableDefRef, I.CallableDefFile>,
+  private functions: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
+  trackedClosureBodies: Bool,
 ) {
+  fun forSequential(): this {
+    this with {trackedClosureBodies => false}
+  }
+
+  fun getClassForConversion(
+    context: mutable SKStore.Context,
+    className: String,
+  ): I.ClassDef {
+    // Conversion does not use the front end's list of concrete descendants.
+    // Filter the eager declaration read so hierarchy-only changes do not
+    // invalidate the lazy converter and all of its specialization readers.
+    this.program.getClassFilter(context, className, cls ~>
+      I.ClassDefFile(cls with {concrete_children => SSet[]})
+    ).value
+  }
+
   fun getConsts(
     context: mutable SKStore.Context,
     constsProj: SKStore.EHandle<SKStore.UnitID, I.ConstDefFile>,
@@ -950,6 +1062,7 @@ class Converter private (
     context: mutable SKStore.Context,
     name: SKStore.DirName,
     program: I.Program,
+    trackedClosureBodies: Bool,
   ): this {
     classDirName = name.sub("classes");
     classes = SKStore.LHandle(
@@ -959,11 +1072,30 @@ class Converter private (
     );
     lowerDirName: SKStore.DirName = SKStore.DirName::create("/lowerDefs/");
     lower = SKStore.LHandle(
-      I.CallableDefFile::keyType,
+      CallableDefRef::callableKeyType,
       I.CallableDefFile::type,
       lowerDirName,
     );
-    converter = static(program, classes, lower);
+    functionDirName = name.sub("closure-functions");
+    functions = SKStore.LHandle(
+      LazyGFunKey::keyType,
+      GFunctionFile::type,
+      functionDirName,
+    );
+    converter = static(
+      program,
+      classes,
+      lower,
+      functions,
+      trackedClosureBodies,
+    );
+    _ = SKStore.LHandle::create(
+      LazyGFunKey::keyType,
+      GFunctionFile::type,
+      context,
+      functionDirName,
+      (context, _self, key) ~> converter.getGFunctionFun(context, key),
+    );
     _ = SKStore.LHandle::create(
       LazyGClassKey::keyType,
       GClassFile::type,
@@ -973,15 +1105,17 @@ class Converter private (
       false,
     );
     _ = SKStore.LHandle::create(
-      I.CallableDefFile::keyType,
+      CallableDefRef::callableKeyType,
       I.CallableDefFile::type,
       context,
       lowerDirName,
       (context, _self, key) ~> {
-        def = key match {
-        | I.CallableDefFile(x) -> x
+        def = converter.resolveCallableDef(context, key);
+        lowered = if (def.isLowered()) {
+          def
+        } else {
+          def.lower(context, program)
         };
-        lowered = def.lower(context, program);
         if (shouldDebugSymbol(def.getName())) {
           debug(def.getName() + " unlowered");
           debug(def);
@@ -995,18 +1129,88 @@ class Converter private (
     converter
   }
 
+  fun resolveCallableDef(
+    context: mutable SKStore.Context,
+    ref: CallableDefRef,
+  ): I.CallableDef {
+    ref match {
+    | FunctionDefRef(name) -> this.program.getFun(context, name)
+    | MethodDefRef(className, name, isStatic) ->
+      this.program.maybeGetMethod(context, className, name, isStatic) match {
+      | Some(method) -> return method
+      | None() -> void
+      };
+      // Class-constant getters are generated from class metadata rather than
+      // declared source methods.
+      cd = this.getClassForConversion(context, className);
+      methods = if (isStatic) {
+        this.getFrontEndStaticMethods(cd)
+      } else {
+        Array<I.MethodDef>[]
+      };
+      methods.find(md -> md.name.id == name) match {
+      | Some(md) -> md
+      | None() ->
+        cd.name.pos.die(`Method definition not found: ${className}::${name}`)
+      }
+    | FactoryDefRef(className, returnsMutable, isAbstract) ->
+      cd = this.getClassForConversion(context, className);
+      this.createFactory(context, returnsMutable, isAbstract, cd, cd.name.pos)
+    }
+  }
+
+  fun refreshCallable(
+    context: mutable SKStore.Context,
+    ref: CallableDefRef,
+    previous: GFunInfo,
+  ): LazyGFun {
+    ref match {
+    | FunctionDefRef(name) ->
+      this.convertFunDef(context, this.program.getFun(context, name))
+    | MethodDefRef(className, _, _)
+    | FactoryDefRef(className, _, _) ->
+      cls = this.getClassForConversion(context, className);
+      def = this.resolveCallableDef(context, ref) match {
+      | method @ I.MethodDef _ -> method
+      | _ -> invariant_violation("Expected method definition")
+      };
+      (_, method) = this.convertMethodDef(
+        context,
+        def,
+        ref,
+        GClassName(previous.gfunction.id.splitLast("::").i0),
+        GClassName(className),
+        this.convertTypeParameters(cls.tparams),
+      );
+      method.function.fromSome()(context, FrontEndLazyGClass(className))
+    }
+  }
+
   fun getGFunction(
     context: mutable SKStore.Context,
     lazy: LazyGFun,
   ): GFunction {
-    this.getGFunctionFun(context, LazyGFunKey(lazy))[0].value
+    key = LazyGFunKey(lazy);
+    if (this.trackedClosureBodies && hasTrackedBodyIdentity(lazy)) {
+      this.functions.get(context, key).value
+    } else {
+      this.getGFunctionFun(context, key)[0].value
+    }
   }
 
   private fun getGFunctionFun(
     context: mutable SKStore.Context,
     key: LazyGFunKey,
   ): Array<GFunctionFile> {
-    file = GFunctionFile(key.value.compile(context, this));
+    // Work keys retain a callable's stable identity across updates. Resolve
+    // its current signature as well as its body before binding parameters.
+    lazy = key.value match {
+    | DefLazyGFun{defRef, funInfo}
+    | AsyncCoroutineLazyGFun{bodyProvider => DefLazyGFun{defRef, funInfo}} ->
+      this.refreshCallable(context, defRef, funInfo)
+    | other -> other
+    };
+    file = GFunctionFile(lazy.compile(context, this));
     Array[file]
   }
 
@@ -1031,7 +1235,7 @@ class Converter private (
         gid match {
         | LiteralLazyGClass(cls) -> cls
         | name @ FrontEndLazyGClass _ ->
-          classDef = this.program.getClass(context, name.id);
+          classDef = this.getClassForConversion(context, name.id);
           this.convertClassDef(context, classDef, name, classDef.name.pos)
         | meta @ BaseMetaLazyGClass _ -> this.createBaseMeta(context, meta)
         | meta @ BaseMetaImplLazyGClass _ ->
@@ -1224,7 +1428,9 @@ class Converter private (
     ref match {
     | LiteralLazyGClass(cls) -> cls.kind
     | FrontEndLazyGClass(nameStr) ->
-      this.convertClassKind(this.program.getClass(context, nameStr))
+      this.program.getClassFilter(context, nameStr, cls ~>
+        GClassKindFile(Converter::convertClassKind(cls))
+      ).value
     | BaseMetaLazyGClass _
     | ClassMetaLazyGClass _
     | ConcreteMetaLazyGClass _
@@ -1363,25 +1569,14 @@ class Converter private (
       "call" => GMethodDef{
         function => generateBody.map(bodyFunc ~>
           (_context, receiver) ~> {
-            thisType: GType = GTapply(
-              receiver,
-              Mutability::fromFlag(callMethodType.isMutable),
+            funInfo = closureCallInfo(
+              className,
+              callMethodType,
               tparams,
-            );
-
-            callFunType = callMethodType with {
-              params => Array[thisType].concat(callMethodType.params),
-            };
-
-            funInfo = GFunInfo{
-              gfunction => GFunctionName(className.id + "::call"),
+              yields,
               pos,
-              tparams,
-              annotations => SSet["@always_inline"],
-              funType => callFunType,
-              className => Some(className),
-              isGenerator => yields,
-            };
+              receiver,
+            );
 
             bodyFunc(funInfo)
           }
@@ -1610,7 +1805,7 @@ class Converter private (
     };
 
     // Get the front end methods.
-    cd = this.program.getClass(context, gc.name.id);
+    cd = this.getClassForConversion(context, gc.name.id);
     fem = this.getFrontEndStaticMethods(cd);
 
     methods = UnorderedMap::mcreate(fem.size());
@@ -1619,6 +1814,7 @@ class Converter private (
       (mname, mf) = this.convertMethodDef(
         context,
         md,
+        MethodDefRef(cd.name.id, md.name.id, true),
         phys,
         orig.name,
         gc.tparams,
@@ -1920,7 +2116,7 @@ class Converter private (
 
     if (gc.isFrontEndClass && gc.fieldsFinal) {
       // Create abstract declarations for the factories.
-      fegc = this.program.getClass(context, gc.name.id);
+      fegc = this.getClassForConversion(context, gc.name.id);
       for (factoryIndex in Range(0, 2)) {
         factoryIsMutable = (factoryIndex == 0);
         factory = this.createFactory(
@@ -1933,6 +2129,7 @@ class Converter private (
         (mname, mf) = this.convertMethodDef(
           context,
           factory,
+          FactoryDefRef(fegc.name.id, factoryIsMutable, true),
           name.name(),
           gc.name,
           gc.tparams,
@@ -1991,7 +2188,7 @@ class Converter private (
 
           if (gc.isFrontEndClass && gc.fieldsFinal) {
             // Create factories.
-            fegc = this.program.getClass(context, gc.name.id);
+            fegc = this.getClassForConversion(context, gc.name.id);
             for (factoryIndex in Range(0, 2)) {
               factoryIsMutable = (factoryIndex == 0);
               factory = this.createFactory(
@@ -2004,6 +2201,7 @@ class Converter private (
               (mname, mf) = this.convertMethodDef(
                 context,
                 factory,
+                FactoryDefRef(fegc.name.id, factoryIsMutable, false),
                 name.name(),
                 gc.name,
                 gc.tparams,
@@ -2103,7 +2301,9 @@ class Converter private (
       // This back end does not care about traits, so throw them away.
       isTrait = tapply match {
       | GTapply(FrontEndLazyGClass(id), _, _) ->
-        this.program.getClass(context, id).kind is I.KTrait _
+        this.program.getClassFilter(context, id, cls ~>
+          SKStore.BoolFile(cls.kind is I.KTrait _)
+        ).value
       | GTapply _
       | GTparam _ ->
         false
@@ -2192,7 +2392,7 @@ class Converter private (
     })
   }
 
-  private fun convertClassKind(cd: I.ClassDef): GClassKind {
+  private static fun convertClassKind(cd: I.ClassDef): GClassKind {
     (cd.kind, cd.value) match {
     | (I.KClass(), Some _) -> KValue()
     | (I.KClass(), None()) -> KClass()
@@ -2208,7 +2408,7 @@ class Converter private (
     classID: FrontEndLazyGClass,
     pos: FileRange,
   ): GClass {
-    kind = this.convertClassKind(in_);
+    kind = static::convertClassKind(in_);
 
     classname = classID.id;
     name = GClassName(classname);
@@ -2278,7 +2478,14 @@ class Converter private (
 
     methods = UnorderedMap::mcreate(nonStaticMethods.size());
     for (v in nonStaticMethods) {
-      (mname, mf) = this.convertMethodDef(context, v, name, name, tparams);
+      (mname, mf) = this.convertMethodDef(
+        context,
+        v,
+        MethodDefRef(classname, v.name.id, false),
+        name,
+        name,
+        tparams,
+      );
       methods.add(mname, mf)
     };
 
@@ -2439,7 +2646,12 @@ class Converter private (
     } else {
       in_.body match {
       | Some _ ->
-        DefLazyGFun::make{funInfo, def => in_, params, useOptionalMask}
+        DefLazyGFun::make{
+          funInfo,
+          defRef => FunctionDefRef(name),
+          params,
+          useOptionalMask,
+        }
       | None() -> NativeLazyGFun{funInfo, params}
       }
     };
@@ -2450,6 +2662,7 @@ class Converter private (
   private fun convertMethodDef(
     context: mutable SKStore.Context,
     in_: I.MethodDef,
+    defRef: CallableDefRef,
     physicalClassName: GClassName,
     // Usually the same as physicalClassName, but for static methods
     // moved to metaclasses it's the original class, not the metaclass
@@ -2553,7 +2766,7 @@ class Converter private (
       // If a function (or method) is native then ignore any body it might have.
       Some(NativeLazyGFun{funInfo, params})
     } else if (in_.body is Some _) {
-      Some(DefLazyGFun::make{funInfo, def => in_, params, useOptionalMask})
+      Some(DefLazyGFun::make{funInfo, defRef, params, useOptionalMask})
     } else {
       // Do nothing with regular abstract methods.
       None()
@@ -2931,7 +3144,13 @@ mutable class OuterIstEmitter{
   converter: Converter,
   mutable funInfo: GFunInfo,
   lazy: ConcreteLazyGFun,
+  bodyIdentity: LazyGFun,
+  closureBodies: mutable UnorderedMap<
+    GClassName,
+    NormalLazyGFun,
+  > = mutable UnorderedMap[],
   mutable nextBlockID: Int = 0,
+  // Reset for every enclosing function, keeping closure names reproducible.
   mutable nextClosureID: Int = 0,
   mutable nextInstrID: Int = 0,
   mutable nextTryID: Int = 0,
@@ -2944,7 +3163,10 @@ mutable class OuterIstEmitter{
   // Maps local name to the GInstr providing its value and a flag indicating
   // whether that is the value (false) or a LocalVariable holding its value
   // indirectly (true).
-  locals: mutable UnorderedMap<String, (GInstr, Bool)> = mutable UnorderedMap[],
+  locals: mutable UnorderedMap<
+    String,
+    (GInstr, Bool, FileRange),
+  > = mutable UnorderedMap[],
   // Maps labels to JumpBlock entry block ids.
   labels: mutable UnorderedMap<String, GBlockID> = mutable UnorderedMap[],
   blocks: mutable Vector<mutable GBlock> = mutable Vector[],
@@ -2956,6 +3178,7 @@ mutable class OuterIstEmitter{
     context: mutable SKStore.Context,
     converter: Converter,
     lazy: ConcreteLazyGFun,
+    bodyIdentity: ?LazyGFun = None(),
   ): mutable OuterIstEmitter {
     funInfo = lazy.funInfo;
     if (funInfo.isGenerator) {
@@ -2970,7 +3193,13 @@ mutable class OuterIstEmitter{
       )
     };
 
-    mutable OuterIstEmitter{converter, funInfo, lazy, pos => lazy.funInfo.pos}
+    mutable OuterIstEmitter{
+      converter,
+      funInfo,
+      lazy,
+      bodyIdentity => bodyIdentity.default(lazy),
+      pos => lazy.funInfo.pos,
+    }
   }
 
   readonly fun constantBool(value: Bool): GConstantBool {
@@ -3023,11 +3252,11 @@ mutable class OuterIstEmitter{
   }
 
   // Returns the raw value of a local variable, which may be the value itself
-  // or may be a ref wrapping it.
+  // or may be a ref wrapping it, and the variable's binding position.
   private mutable fun getRawLocal(
     name: String,
     pos: FileRange,
-  ): (GInstr, Bool) {
+  ): (GInstr, Bool, FileRange) {
     this.locals.maybeGet(name) match {
     | Some(binding) -> binding
     | None() ->
@@ -3043,7 +3272,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun getLocal(name: String, pos: FileRange): GInstr {
-    (value, byRef) = this.getRawLocal(name, pos);
+    (value, byRef, _) = this.getRawLocal(name, pos);
     if (!byRef) {
       value
     } else {
@@ -3061,7 +3290,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun setLocal(var: String, value: GInstr, pos: FileRange): void {
-    (ref, byRef) = this.getRawLocal(var, pos);
+    (ref, byRef, _) = this.getRawLocal(var, pos);
 
     if (byRef) {
       // Capture-by-reference, so set the field of the ref.
@@ -3137,8 +3366,8 @@ mutable class OuterIstEmitter{
       );
 
       closureCaptureKind match {
-      | CCByValue() -> this.locals.set(localName, (load, false))
-      | CCByRef() -> this.locals.set(localName, (load, true))
+      | CCByValue() -> this.locals.set(localName, (load, false, f.pos))
+      | CCByRef() -> this.locals.set(localName, (load, true, f.pos))
       | CCNotCaptured() -> f.pos.die("Expected captured field " + localName)
       }
     };
@@ -3727,7 +3956,7 @@ mutable class OuterIstEmitter{
     // We create one field per captured variable.
     fieldsAndValues = captured.map(posAndName -> {
       (capturePos, name) = (posAndName.pos, posAndName.id);
-      (rawValue, byRef) = this.getRawLocal(name, capturePos);
+      (rawValue, byRef, bindingPos) = this.getRawLocal(name, capturePos);
 
       (fieldPrefix, fieldValue) = if (!byRef) {
         ("captured:", rawValue)
@@ -3739,7 +3968,12 @@ mutable class OuterIstEmitter{
         GField{
           name => fieldPrefix + name,
           typ => fieldValue.getType(),
-          pos => capturePos,
+          // A generated field represents the binding. Using a body use here
+          // makes moving that use invalidate the closure's class metadata.
+          // Keep the use's own position on instructions in the current body.
+          pos => if (this.converter.trackedClosureBodies) bindingPos else {
+            capturePos
+          },
           isAssignable => false,
           index => -1,
         },
@@ -3749,7 +3983,7 @@ mutable class OuterIstEmitter{
 
     fields = fieldsAndValues.map(fv -> fv.i0);
 
-    generateBody = funInfo ~> {
+    generateBody: GFunInfo ~> NormalLazyGFun = funInfo ~> {
       paramInfos = Array::fillBy(funInfo.funType.params.size(), i -> {
         // Prepend a "this" parameter with a non-conflicting name.
         if (i == 0) {
@@ -3788,6 +4022,17 @@ mutable class OuterIstEmitter{
         this.getNextClosureID(),
     );
 
+    parent = this.bodyIdentity;
+    trackedBody =
+      this.converter.trackedClosureBodies &&
+      hasTrackedBodyIdentity(parent);
+    inlineBody: GFunInfo ~> LazyGFun = funInfo ~> generateBody(funInfo);
+    classBody: GFunInfo ~> LazyGFun = if (trackedBody) {
+      _ ~> ClosureLazyGFun{parent, className => closureClassName}
+    } else {
+      inlineBody
+    };
+
     closureGClass = this.converter.createClosureClass(
       context,
       closureClassName,
@@ -3799,9 +4044,24 @@ mutable class OuterIstEmitter{
       Array[closureBaseType],
       yields,
       pos,
-      Some(generateBody),
+      Some(classBody),
       fields,
     );
+
+    if (trackedBody) {
+      // Publish the body with the enclosing conversion, not in class metadata.
+      // The fresh receiver ensures changed captures/signatures are reflected
+      // even when the retained work key was created in an earlier revision.
+      info = closureCallInfo(
+        closureClassName,
+        callMethodType,
+        this.funInfo.tparams,
+        yields,
+        pos,
+        LiteralLazyGClass(closureGClass),
+      );
+      this.closureBodies.set(closureClassName, generateBody(info))
+    };
 
     closureType = GTapply(
       LiteralLazyGClass(closureGClass),
@@ -3868,7 +4128,7 @@ mutable class OuterIstEmitter{
     } else {
       // See which fields are optional.
       fields = getFields(
-        this.converter.program.getClass(context, name.id),
+        this.converter.getClassForConversion(context, name.id),
         pos,
       );
       optional = mutable Vector[];
@@ -3997,7 +4257,7 @@ mutable class OuterIstEmitter{
           pos,
         )
       } else {
-        cd = this.converter.program.getClass(context, name.id);
+        cd = this.converter.getClassForConversion(context, name.id);
         args = this.emitParams(
           context,
           params,
@@ -4662,7 +4922,7 @@ mutable class OuterIstEmitter{
         (ref, true)
       };
 
-      this.locals.set(name, bind)
+      this.locals.set(name, (bind.i0, bind.i1, pos))
     }
   }
 
@@ -4908,16 +5168,22 @@ const constsArrayDir: SKStore.EHandle<
   constsArrayDirName,
 );
 
-fun createIR(
+class RootsIR{
+  consts: Array<ConstLazyGFun>,
+  forceCompile: Array<LazyGFun>,
+  runtimeFunctions: Array<FrontEndLazyGFun>,
+  disasm: UnorderedSet<String>,
+}
+
+fun prepareCreateIR(
   context: mutable SKStore.Context,
-  config: Config.Config,
   shouldDisasm: (I.FunDef ~> Bool),
   shouldRuntimeExport: (I.FunDef ~> Bool),
   outerIst: I.Program,
   converter: Converter,
   constsProj: SKStore.EHandle<SKStore.UnitID, I.ConstDefFile>,
   funDefsProj: SKStore.EHandle<SKStore.UnitID, I.FunDefFile>,
-): GlobalEnv {
+): RootsIR {
   consts = converter.getConsts(context, constsProj);
   funDefs = outerIst.getFuns(context, funDefsProj);
 
@@ -4994,48 +5260,96 @@ fun createIR(
   reportMemoryStatistics("native/createIR after specialize");
 
   reportMemoryStatistics("native/createIR after force compile constant inits");
+  RootsIR{
+    consts,
+    forceCompile => forceCompile.toArray(),
+    runtimeFunctions => runtimeFunctions.toArray(),
+    disasm => disasm.chill(),
+  }
+}
 
+fun createSpecializer(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+  converter: Converter,
+  handle: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): SpecializerState {
   // Find every relevant type and function in the program.
-  specializer = Specializer::make(context, config, converter);
+  specializer = Specializer::make(
+    handle,
+    context,
+    config.specializationConfig(),
+    converter,
+  );
+  specializer.builtins();
+  specializer.chill()
+}
 
-  for (gid in forceCompile) {
-    _ = specializer.requestFunction(context, gid, Array[])
-  };
-
-  specializer.findAllFunctionsAndSClasses(context);
-
-  reportMemoryStatistics("native/createIR after findAllFunctionsAndSClasses");
-
-  // Latch the sub- and supertypes.
-  for (info in specializer.untrackedSClasses()) {
-    !info.sclass = info.sclass with {
-      subtypes => info.subtypes,
-      supertypes => info.supertypes,
-    };
-    specializer.untrackedSClassSet(info.sclass.id, info);
+fun createIR(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+  roots: RootsIR,
+  specializer: mutable Specializer,
+  incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
+  prepared: ?FunctionIRStateFile,
+  returnTuples: ?SKStore.EHandle<SClassIDKey, SClassInfoFile> = None(),
+): GlobalEnv {
+  // Incremental builds already attached these sets in a tracked map/merge
+  // phase. Sequential builds keep the original local pass.
+  if (!config.incrementalSpecialization) {
+    for (info in specializer.getSClasses()) {
+      !info.sclass = info.sclass with {
+        subtypes => specializer.subtypesGet(info.sclass.id),
+        supertypes => specializer.supertypesGet(info.sclass.id),
+      };
+      specializer.sclassSet(info.sclass.id, info);
+    }
   };
   reportMemoryStatistics("native/createIR after latch sub/super");
 
   // Flatten value class fields into scalars.
-  specializer.scalarizeAllFields(specializer.sclasses.items().map(x -> x.i1));
+  if (!config.incrementalSpecialization) {
+    specializer.scalarizeAllFields(
+      specializer.getSClasses().items().map(x -> x.i1),
+    )
+  };
   reportMemoryStatistics("native/createIR after scalarizeAllFields");
 
-  specializer.withRegion(context, (_context, specializer) ~> {
-    // Choose offsets for every field.
-    FieldLayoutChooser::run(specializer, config);
-    reportMemoryStatistics("native/createIR after FieldLayoutChooser");
-  });
+  if (!config.incrementalSpecialization) {
+    specializer.withRegion(context, (_context, specializer) ~> {
+      // Choose offsets for every field.
+      FieldLayoutChooser::run(specializer, config);
+      reportMemoryStatistics("native/createIR after FieldLayoutChooser");
+    })
+  };
 
   // Split up functions based on which ones can share machine code.
-  sclasses = specializer.createNewSClassesMap();
-  env = GlobalEnv::make(sclasses);
+  // Incremental assembly fills classes after merging synthetic return tuples.
+  // It does not need another complete class map before partitionFunctions.
+  sclasses = if (prepared.isSome()) SortedMap[] else {
+    specializer.createNewSClassesMap()
+  };
+  env = GlobalEnv::make(sclasses) with {
+    // Successful incremental semantics use symbolic positions. LLVM modules
+    // track their own anchors; adding an unused declaration must not invalidate
+    // this whole-program row merely by extending the source marker table.
+    sourcePositions => if (
+      !config.incrementalSpecialization ||
+      config.needsIRSourcePositions()
+    ) SourcePositions.Table::read(context) else {
+      SourcePositions.Table{}
+    },
+  };
   !env = specializer.partitionFunctions(
     context,
-    runtimeFunctions,
+    roots.runtimeFunctions,
     env,
     config,
-    consts,
-    disasm,
+    roots.consts,
+    roots.disasm,
+    incrementalFunctions,
+    prepared,
+    returnTuples,
   );
 
   reportMemoryStatistics("native/createIR end");

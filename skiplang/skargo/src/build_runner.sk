@@ -142,6 +142,8 @@ mutable class BuildRunner(
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
       this.fingerprints![unit] = (
+        // Profile defaults are compiler inputs, even when sources are unchanged.
+        skc_profile_options(unit.profile),
         srcs
           .map(f ->
             (
@@ -464,12 +466,7 @@ mutable class BuildRunner(
       void
     };
 
-    // TODO: Proper Profile class.
-    unit.profile match {
-    | "release" -> skc.arg("-O2")
-    | "debug" | "dev" -> skc.arg("-O0")
-    | _ -> invariant_violation("unreachable")
-    };
+    skc.args(skc_profile_options(unit.profile));
 
     separate_link = if (check) {
       skc.arg("--check");
@@ -717,6 +714,20 @@ mutable class BuildRunner(
     hash = this.hashes[unit].toStringHex();
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
+  }
+}
+
+// TODO: Proper Profile class.
+private fun skc_profile_options(profile: String): Array<String> {
+  profile match {
+  // -O2 selects optimizations; --release also selects the sequential compiler
+  // algorithms when skargo supplies a persistent database.
+  | "release" -> Array["--release", "-O2"]
+  // Development builds favor incremental compilation over interprocedural
+  // optimization (inlining and IPA), just as
+  // their native code generation favors compile time over optimization.
+  | "debug" | "dev" -> Array["-O0", "--no-inline", "--no-ipa"]
+  | _ -> invariant_violation("unreachable")
   }
 }
 
