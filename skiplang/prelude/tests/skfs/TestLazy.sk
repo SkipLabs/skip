@@ -82,4 +82,277 @@ fun testLazy(): void {
   )
 }
 
+@test
+fun testLazyInvalidationAcrossRegionsAndRetiredReaders(): void {
+  inputName = SKStore.DirName::create("/region-lazy/input/");
+  countName = SKStore.DirName::create("/region-lazy/count/");
+  lazyName = SKStore.DirName::create("/region-lazy/cache/");
+  outputName = SKStore.DirName::create("/region-lazy/output/");
+  inputs = 512;
+  groups = 128;
+  sum = inputs * (inputs - 1) / 2;
+  context = SKStore.run(context ~> {
+    input = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      Range(0, inputs).map(i -> (SKStore.IID(i), SKStore.IntFile(i))).collect(
+        Array,
+      ),
+    );
+    count = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      countName,
+      Array[(SKStore.IID(0), SKStore.IntFile(groups))],
+    );
+    cached = SKStore.LHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      lazyName,
+      (context, _, key) ~> {
+        value = key.value;
+        for (i in Range(0, inputs)) {
+          !value = value + input.getArray(context, SKStore.IID(i))[0].value
+        };
+        Array[SKStore.IntFile(value)]
+      },
+    );
+    _ = count.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (context, writer, _, values) ~> {
+        for (i in Range(0, values.first.value)) {
+          key = SKStore.IID(i);
+          writer.setArray(key, cached.getArray(context, key))
+        }
+      },
+    )
+  });
+  context.update();
+  snapshot = context.clone().mclone();
+  T.expectEq(context.maybeGetReads(lazyName, lazyName).size(), groups);
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(1000)]);
+  context.update();
+  for (i in Range(0, groups)) {
+    T.expectEq(
+      getData(context, outputName, SKStore.IID(i)).map(toInt),
+      Array[sum + 1000 + i],
+    );
+    T.expectEq(
+      getData(snapshot, outputName, SKStore.IID(i)).map(toInt),
+      Array[sum + i],
+    )
+  };
+  // Dropped consumers retire half the lazy values. A later invalidation must
+  // remove their retained read edges as well as those of surviving values.
+  write(context, countName, SKStore.IID(0), Array[SKStore.IntFile(groups / 2)]);
+  context.update();
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(2000)]);
+  context.update();
+  T.expectEq(context.maybeGetReads(lazyName, lazyName).size(), groups / 2);
+  for (i in Range(0, groups)) {
+    expected = if (i < groups / 2) Array[sum + 2000 + i] else Array[];
+    T.expectEq(
+      getData(context, outputName, SKStore.IID(i)).map(toInt),
+      expected,
+    );
+    T.expectEq(
+      getData(snapshot, outputName, SKStore.IID(i)).map(toInt),
+      Array[sum + i],
+    )
+  }
+}
+
+private fun lazyExecutionCount(
+  context: readonly SKStore.Context,
+  key: Int,
+): Int {
+  context.getGlobal("lazy-executions-" + key) match {
+  | Some(SKStore.IntFile(count)) -> count
+  | _ -> 0
+  }
+}
+
+// A later invalidation of the same lazy directory must not replay keys whose
+// earlier invalidations have already been processed in this update tick.
+// The dependent variant also creates a new lazy invalidation while draining
+// the old batch; that newly queued work must survive consuming the old batch.
+private fun checkLazyInvalidationBatches(dependent: Bool): void {
+  inputName = SKStore.DirName::create("/lazy-batches/input/");
+  lazyName = SKStore.DirName::create("/lazy-batches/cache/");
+  outputName = SKStore.DirName::create("/lazy-batches/output/");
+  context = SKStore.run(context ~> {
+    input = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      Array[
+        (SKStore.IID(0), SKStore.IntFile(10)),
+        (SKStore.IID(1), SKStore.IntFile(20)),
+      ],
+    );
+    cached = SKStore.LHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      lazyName,
+      (context, self, key) ~> {
+        context.setGlobal(
+          "lazy-executions-" + key.value,
+          SKStore.IntFile(lazyExecutionCount(context, key.value) + 1),
+        );
+        value = input.getArray(context, key)[0].value;
+        if (dependent && key.value == 1) {
+          !value = value + self.getArray(context, SKStore.IID(0))[0].value
+        };
+        Array[SKStore.IntFile(value)]
+      },
+    );
+    requests = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      SKStore.DirName::create("/lazy-batches/requests/"),
+      Array[
+        (SKStore.IID(0), SKStore.IntFile(0)),
+        (SKStore.IID(1), SKStore.IntFile(0)),
+      ],
+    );
+    _ = requests.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (context, writer, key, _) ~>
+        writer.setArray(key, cached.getArray(context, key))
+      ,
+    )
+  });
+  context.update();
+  write(context, inputName, SKStore.IID(0), Array[SKStore.IntFile(11)]);
+  T.expectEq(
+    context.updateUntilBoundary(_ ~> false, dir ~> dir == lazyName),
+    Some(false),
+  );
+  T.expectEq(
+    context.updateUntilBoundary(_ ~> false, dir ~> dir == outputName),
+    Some(false),
+  );
+  T.expectEq(lazyExecutionCount(context, 0), 2);
+  write(context, inputName, SKStore.IID(1), Array[SKStore.IntFile(21)]);
+  context.update();
+  T.expectEq(
+    getData(context, outputName, SKStore.IID(0)).map(toInt),
+    Array[11],
+  );
+  T.expectEq(
+    getData(context, outputName, SKStore.IID(1)).map(toInt),
+    Array[if (dependent) 32 else 21],
+  );
+  T.expectEq(lazyExecutionCount(context, 0), 2);
+  T.expectEq(lazyExecutionCount(context, 1), if (dependent) 3 else 2);
+}
+
+@test
+fun testLazyInvalidationsAreConsumedOnce(): void {
+  checkLazyInvalidationBatches(false)
+}
+
+@test
+fun testLazyInvalidationsQueuedDuringDrainArePreserved(): void {
+  checkLazyInvalidationBatches(true)
+}
+
+// Run with both retention policies. Exercise sparse reads, expiry of a large
+// initial batch, reads entering as an old reference expires, duplicate reads,
+// restoration, and a frozen snapshot whose values must survive all of these.
+@test
+fun testLazyRetentionWindowAndRestoration(): void {
+  inputName = SKStore.DirName::create("/retention-window/input/");
+  lazyName = SKStore.DirName::create("/retention-window/cache/");
+  count = 128;
+  context = SKStore.run(context ~> {
+    input = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      Range(0, count).map(i -> (SKStore.IID(i), SKStore.IntFile(i))).collect(
+        Array,
+      ),
+    );
+    _ = SKStore.LHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      lazyName,
+      (context, _, key) ~> {
+        context.setGlobal(
+          "lazy-executions-" + key.value,
+          SKStore.IntFile(lazyExecutionCount(context, key.value) + 1),
+        );
+        input.getArray(context, key)
+      },
+    )
+  });
+  read = (context: mutable SKStore.Context, key: Int) ->
+    context
+      .unsafeGetLazyDir(lazyName)
+      .typed()
+      .getArray(context, SKStore.IID(key))
+      .map(toInt);
+  context.update();
+  for (i in Range(0, count)) T.expectEq(read(context, i), Array[i]);
+  _ = context.updateWithStatus();
+  snapshot = context.clone().mclone();
+  lastRead = Array::mfill(count, 0);
+  for (step in Range(1, 26)) {
+    for (i in Range(0, count)) {
+      if (i == 0 || (i < 6 && step % 4 == 0) || step == 11 || step == 21) {
+        T.expectEq(read(context, i), Array[i]);
+        T.expectEq(read(context, i), Array[i]);
+        lastRead.set(i, step)
+      }
+    };
+    _ = context.updateWithStatus();
+    dir = context.unsafeGetLazyDir(lazyName).typed();
+    for (i in Range(0, count)) {
+      expected = if (lastRead[i] > step - 10) Array[i] else Array[];
+      T.expectEq(dir.getArrayRaw(SKStore.IID(i)).map(toInt), expected);
+      T.expectEq(
+        snapshot
+          .unsafeGetLazyDir(lazyName)
+          .typed()
+          .getArrayRaw(SKStore.IID(i))
+          .map(toInt),
+        Array[i],
+      )
+    }
+  };
+  // Repeated reads within one batch must not leak reference counts.
+  T.expectEq(lazyExecutionCount(context, 0), 1);
+  for (_ in Range(0, 11)) _ = context.updateWithStatus();
+  for (i in Range(0, count)) {
+    T.expectEq(
+      context
+        .unsafeGetLazyDir(lazyName)
+        .typed()
+        .getArrayRaw(SKStore.IID(i))
+        .map(toInt),
+      Array[],
+    )
+  };
+  write(
+    context,
+    inputName,
+    SKStore.IID(count - 1),
+    Array[SKStore.IntFile(2000)],
+  );
+  context.update();
+  T.expectEq(read(context, count - 1), Array[2000]);
+  T.expectEq(read(snapshot, count - 1), Array[count - 1]);
+}
+
 module end;

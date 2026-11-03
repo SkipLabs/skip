@@ -35,25 +35,14 @@ extern "C" {
 #include <thread>
 #include <vector>
 
+#include "runtime64_support.h"
+
 extern "C" {
 #include "xoroshiro128plus.h"
 }
 
 #ifndef RELEASE
 #include <backtrace.h>
-
-typedef struct {
-  char* head;
-  char* page;
-  char* end;
-} sk_saved_obstack_t;
-
-extern "C" {
-void* sk_get_exception_type(void* skExn);
-void* sk_get_exception_message(void* skExn);
-sk_saved_obstack_t* SKIP_new_Obstack();
-void SKIP_destroy_Obstack(sk_saved_obstack_t* saved);
-}
 
 namespace {
 
@@ -92,23 +81,6 @@ static void error_callback(void* /* data */, const char* msg, int errnum) {
 #endif  // RELEASE
 
 namespace skip {
-struct SkipException : std::exception {
-  explicit SkipException(void* exc) : m_skipException(exc) {}
-
-  virtual const char* what() const noexcept override {
-    char* str = (char*)sk_get_exception_message(m_skipException);
-    sk_string_check_c_safe(str);
-    return str;
-  }
-
-  const char* name() const noexcept {
-    char* str = (char*)sk_get_exception_type(m_skipException);
-    sk_string_check_c_safe(str);
-    return str;
-  }
-
-  void* m_skipException;
-};
 
 #ifndef RELEASE
 

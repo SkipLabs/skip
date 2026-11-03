@@ -1,0 +1,100 @@
+module SKStoreTest;
+
+@test
+fun testCompactFixedCollections(): void {
+  dir = SKStore.DirName::create("/compact/");
+  rows = mutable Vector[];
+  deps = mutable Vector[];
+  for (i in Range(0, 100)) {
+    key: SKStore.Key = SKStore.IID(99 - i);
+    path = SKStore.Path::create(dir, key);
+    rows.push(
+      SKStore.FixedRow(
+        key,
+        Array[(SKStore.IntFile(i) : SKStore.File)],
+        path,
+        SKStore.TickRange::create(SKStore.Tick(7)),
+      ),
+    );
+    deps.push((path, (SKStore.MInfoSingle(key) : SKStore.MInfo)));
+  };
+  compact = SKStore.CompactFixedDir::create(rows);
+  sourceMap = SKStore.FixedSourceMap::create(deps);
+  invariant(compact is SKStore.SingletonFixedDir _);
+  invariant(compact.size() == 100);
+  invariant(sourceMap.size() == 100);
+  for (i in Range(0, 100)) {
+    key: SKStore.Key = SKStore.IID(i);
+    path = SKStore.Path::create(dir, key);
+    invariant(compact.getArraySourceKey(path, key).size() == 1);
+    invariant(compact.getArray(key).size() == 1);
+    invariant(sourceMap.maybeGet(path).isSome());
+    invariant(sourceMap.get(i).i0 == path);
+    invariant(
+      compact.getIterAfter(SKStore.Tick(7), key).collect(Array).size() == 1,
+    );
+    invariant(
+      compact.getIterAfter(SKStore.Tick(8), key).collect(Array).size() == 0,
+    );
+  };
+  invariant(compact.getChangesAfter(SKStore.Tick(7)).size() == 100);
+  invariant(compact.getChangesAfter(SKStore.Tick(8)).isEmpty());
+  invariant(sourceMap.maybeGet(SKStore.Path::iid(dir, 100)).isNone());
+  other = SKStore.DirName::create("/other/");
+  invariant(sourceMap.maybeGet(SKStore.Path::iid(other, 0)).isNone());
+  // A mixed tick must retain per-row change information.
+  rows.push(
+    SKStore.FixedRow(
+      (SKStore.IID(100) : SKStore.Key),
+      Array[(SKStore.IntFile(100) : SKStore.File)],
+      SKStore.Path::iid(dir, 100),
+      SKStore.TickRange::create(SKStore.Tick(9)),
+    ),
+  );
+  mixed = SKStore.CompactFixedDir::create(rows);
+  invariant(mixed is SKStore.SharedSingletonFixedDir _);
+  invariant(mixed.getChangesAfter(SKStore.Tick(8)).size() == 1);
+  // Nonidentity sources must remain distinct from output keys.
+  redirected = mutable Vector[
+    SKStore.FixedRow(
+      (SKStore.IID(0) : SKStore.Key),
+      Array[(SKStore.IntFile(42) : SKStore.File)],
+      SKStore.Path::iid(dir, 10),
+      SKStore.TickRange::create(SKStore.Tick(3)),
+    ),
+  ];
+  indirect = SKStore.CompactFixedDir::create(redirected);
+  invariant(
+    indirect
+      .getArraySourceKey(SKStore.Path::iid(dir, 10), SKStore.IID(0))
+      .size() == 1,
+  );
+  invariant(
+    indirect
+      .getArraySourceKey(SKStore.Path::iid(dir, 0), SKStore.IID(0))
+      .size() == 0,
+  );
+  redirected.push(
+    SKStore.FixedRow(
+      (SKStore.IID(1) : SKStore.Key),
+      Array[(SKStore.IntFile(1) : SKStore.File), SKStore.IntFile(2)],
+      SKStore.Path::iid(other, 1),
+      SKStore.TickRange::create(SKStore.Tick(4)),
+    ),
+  );
+  fallback = SKStore.CompactFixedDir::create(redirected);
+  invariant(fallback.getArray(SKStore.IID(1))[0].size() == 2);
+  explicitDeps = mutable Vector[
+    (
+      SKStore.Path::iid(dir, 0),
+      (SKStore.MInfoSingle(SKStore.IID(10)) : SKStore.MInfo),
+    ),
+  ];
+  explicitMap = SKStore.FixedSourceMap::create(explicitDeps);
+  explicitMap.get(0).i1 match {
+  | SKStore.MInfoSingle(key) -> invariant(key == SKStore.IID(10))
+  | _ -> invariant_violation("Expected singleton dependency")
+  };
+}
+
+module end;

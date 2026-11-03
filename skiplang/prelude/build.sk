@@ -70,7 +70,11 @@ fun main(): void {
     native_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     cfg.files(native_srcs).define("SKIP64").compile("skip_runtime");
 
-    native_cpp_srcs = Array["runtime/runtime64_specific.cpp"];
+    native_cpp_srcs = Array[
+      "runtime/runtime64_specific.cpp",
+      "runtime/parallel_map.cpp",
+    ];
+    print_string("skargo:rerun-if-changed=runtime/runtime64_support.h");
     native_cpp_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     Cc.Build()
       .cpp(true)

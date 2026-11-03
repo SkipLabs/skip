@@ -171,27 +171,420 @@ fun run(f: (mutable Context) -> void): mutable Context {
 }
 
 /*****************************************************************************/
+// Synthetic read paths reuse ordinary reader registration and cleanup. The
+// source key remains separate so projections never change stored collection keys.
+class FilteredReadKey(source: Key, projectionHash: Int, id: Int) extends Key
+
+class ReadFilter(
+  id: Int,
+  projectionHash: Int,
+  project: File ~> File,
+  value: Array<File>,
+) {
+  fun path(source: Path): Path {
+    Path::create(
+      source.dirName,
+      FilteredReadKey(source.baseName, this.projectionHash, this.id),
+    )
+  }
+}
+
+// Internal comparison control; each saved context keeps its selected strategy.
+// The normal mode updates only dependency edges whose logical paths changed.
+fun defaultDependencyMode(): Int {
+  Environ.varOpt("SKSTORE_DEPENDENCY_MODE")
+    .map(value -> value.toInt())
+    .default(1)
+}
+
 /* Dependencies tracking. */
 /*****************************************************************************/
 
-value class Deps private (
-  private data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
-  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+// Small reader sets can avoid allocating a tree node per reader. Large fanout
+// still needs logarithmic updates, so arrays hold at most eight readers.
+// Both representations preserve ArrowKey order and immutable snapshots.
+private class ReaderBlockSet(
+  blocks: SortedMap<ArrowKey, Array<ArrowKey>>,
+  count: Int,
 ) {
-  static fun empty(): this {
-    Deps()
+  static fun fromSorted(values: Array<ArrowKey>): this {
+    invariant(!values.isEmpty());
+    static(SortedMap::singleton(values[0], values), values.size())
+  }
+
+  fun values(): mutable Iterator<ArrowKey> {
+    for (block in this.blocks.values()) for (value in block) yield value
+  }
+
+  private static fun lowerBound(values: Array<ArrowKey>, key: ArrowKey): Int {
+    lo = 0;
+    hi = values.size();
+    while (lo < hi) {
+      mid = (lo + hi) / 2;
+      if (values[mid].compare(key) == LT()) !lo = mid + 1 else !hi = mid
+    };
+    lo
+  }
+
+  // Each tree key is the first reader in its block. A key below the minimum
+  // belongs in the first block; other keys use the greatest preceding block.
+  private fun blockFor(key: ArrowKey): ?(ArrowKey, Array<ArrowKey>) {
+    tree = this.blocks;
+    previous: ?(ArrowKey, Array<ArrowKey>) = None();
+    loop {
+      tree match {
+      | SortedMap.Nil() ->
+        return previous match {
+        | Some _ -> previous
+        | None() -> this.blocks.minimum()
+        }
+      | node @ SortedMap.Node _ ->
+        if (key.compare(node.key) == LT()) !tree = node.left else {
+          !previous = Some((node.key, node.value));
+          !tree = node.right
+        }
+      }
+    }
+  }
+
+  private fun neighbor(
+    key: ArrowKey,
+    before: Bool,
+  ): ?(ArrowKey, Array<ArrowKey>) {
+    tree = this.blocks;
+    found: ?(ArrowKey, Array<ArrowKey>) = None();
+    loop {
+      tree match {
+      | SortedMap.Nil() -> return found
+      | node @ SortedMap.Node _ ->
+        order = node.key.compare(key);
+        if (if (before) order == LT() else order == GT()) {
+          !found = Some((node.key, node.value));
+          !tree = if (before) node.right else node.left
+        } else {
+          !tree = if (before) node.left else node.right
+        }
+      }
+    }
+  }
+
+  fun set(key: ArrowKey): this {
+    (first, values) = this.blockFor(key).fromSome();
+    index = static::lowerBound(values, key);
+    if (index < values.size() && values[index].compare(key) == EQ()) {
+      return this
+    };
+    updated = Array::fillBy(values.size() + 1, i ->
+      if (i < index) values[i] else if (i == index) key else values[i - 1]
+    );
+    blocks = this.blocks;
+    if (first.compare(updated[0]) != EQ()) !blocks = blocks.remove(first);
+    if (updated.size() <= 64) {
+      !blocks[updated[0]] = updated
+    } else {
+      left = updated.take(32);
+      right = updated.drop(32);
+      !blocks[left[0]] = left;
+      !blocks[right[0]] = right
+    };
+    static(blocks, this.count + 1)
+  }
+
+  fun remove(key: ArrowKey): this {
+    selected = this.blockFor(key);
+    if (selected.isNone()) return this;
+    (first, values) = selected.fromSome();
+    index = static::lowerBound(values, key);
+    if (index == values.size() || values[index].compare(key) != EQ()) {
+      return this
+    };
+    updated = Array::fillBy(values.size() - 1, i ->
+      if (i < index) values[i] else values[i + 1]
+    );
+    blocks = this.blocks;
+    if (updated.isEmpty() || first.compare(updated[0]) != EQ()) {
+      !blocks = blocks.remove(first)
+    };
+    if (!updated.isEmpty()) !blocks[updated[0]] = updated;
+    result = static(blocks, this.count - 1);
+    if (!updated.isEmpty() && updated.size() < 16 && result.count > 8) {
+      // Rebalance just two neighboring blocks. Repeated deletion must not
+      // leave one tree node per surviving reader in otherwise empty blocks.
+      neighbor = result.neighbor(updated[0], true) match {
+      | Some(entry) -> Some(entry)
+      | None() -> result.neighbor(updated[0], false)
+      };
+      neighbor.each(entry -> {
+        (otherFirst, other) = entry;
+        combined = if (otherFirst.compare(updated[0]) == LT()) {
+          other.concat(updated)
+        } else {
+          updated.concat(other)
+        };
+        !blocks = blocks.remove(updated[0]).remove(otherFirst);
+        if (combined.size() <= 64) {
+          !blocks[combined[0]] = combined
+        } else {
+          middle = combined.size() / 2;
+          left = combined.take(middle);
+          right = combined.drop(middle);
+          !blocks[left[0]] = left;
+          !blocks[right[0]] = right
+        }
+      });
+      !result = static(blocks, result.count)
+    };
+    result
+  }
+
+  fun hasSibling(arrow: ArrowKey): Bool {
+    comparePrefix = (other: ArrowKey) -> {
+      order = arrow.parentName.compare(other.parentName);
+      if (order == EQ()) arrow.childName.compare(other.childName) else order
+    };
+    tree = this.blocks;
+    previous: Array<ArrowKey> = Array[];
+    loop {
+      tree match {
+      | SortedMap.Nil() ->
+        return previous.any(reader -> comparePrefix(reader) == EQ())
+      | node @ SortedMap.Node _ ->
+        comparePrefix(node.key) match {
+        | EQ() -> return true
+        | LT() -> !tree = node.left
+        | GT() ->
+          !previous = node.value;
+          !tree = node.right
+        }
+      }
+    }
+  }
+}
+
+private base class DependencyReaders {
+  children =
+  | ReaderArray(items: Array<ArrowKey>)
+  | ReaderTree(tree: SortedMap<ArrowKey, void>)
+  | ReaderBlocks(blocks: ReaderBlockSet)
+
+  static fun empty(compact: Bool, blocks: Bool): DependencyReaders {
+    if (compact || blocks) ReaderArray(Array[]) else ReaderTree(SortedMap[])
+  }
+
+  fun size(): Int
+  | ReaderArray(values) -> values.size()
+  | ReaderTree(tree) -> tree.size()
+  | ReaderBlocks(blocks) -> blocks.count
+
+  fun isEmpty(): Bool {
+    this.size() == 0
+  }
+
+  fun values(): mutable Iterator<ArrowKey>
+  | ReaderArray(values) -> values.values()
+  | ReaderTree(tree) -> tree.keys()
+  | ReaderBlocks(blocks) -> blocks.values()
+
+  fun toSet(): SortedSet<ArrowKey>
+  | ReaderArray(values) -> SortedSet::createFromItems(values)
+  | ReaderTree(tree) -> SortedSet(tree)
+  | ReaderBlocks(blocks) -> SortedSet::createFromIterator(blocks.values())
+
+  fun set(key: ArrowKey, blockReaders: Bool): DependencyReaders
+  | ReaderTree(tree) -> ReaderTree(tree.set(key, void))
+  | ReaderBlocks(blocks) -> ReaderBlocks(blocks.set(key))
+  | ReaderArray(values) ->
+    index = 0;
+    while (index < values.size() && values[index].compare(key) == LT()) {
+      !index = index + 1
+    };
+    // As in SortedMap.set, preserve the existing representative when keys
+    // compare equal, even if their other fields differ.
+    if (index < values.size() && values[index].compare(key) == EQ()) {
+      this
+    } else if (values.size() < 8) {
+      ReaderArray(
+        Array::fillBy(values.size() + 1, i -> {
+          if (i < index) values[i] else if (i == index) key else values[i - 1]
+        }),
+      )
+    } else if (blockReaders) {
+      ReaderBlocks(ReaderBlockSet::fromSorted(values).set(key))
+    } else {
+      tree = SortedMap::createFromIterator(
+        values.values().map(value -> (value, void)),
+      );
+      ReaderTree(tree.set(key, void))
+    }
+
+  fun remove(key: ArrowKey, compact: Bool): DependencyReaders
+  | ReaderBlocks(blocks) ->
+    updated = blocks.remove(key);
+    if (updated.count <= 8) ReaderArray(updated.values().collect(Array)) else {
+      ReaderBlocks(updated)
+    }
+  | ReaderArray(values) ->
+    ReaderArray(values.filter(value -> value.compare(key) != EQ()))
+  | ReaderTree(tree) ->
+    updated = tree.remove(key);
+    if (compact && updated.size() <= 8) {
+      ReaderArray(updated.keys().collect(Array))
+    } else {
+      ReaderTree(updated)
+    }
+
+  fun hasChild(child: DirName): Bool {
+    this.values().any(reader -> reader.childName == child)
+  }
+
+  fun hasSibling(arrow: ArrowKey): Bool
+  | ReaderBlocks(blocks) -> blocks.hasSibling(arrow)
+  | ReaderArray(values) ->
+    values.any(reader ->
+      arrow.parentName.compare(reader.parentName) == EQ() &&
+        arrow.childName.compare(reader.childName) == EQ()
+    )
+  | ReaderTree(tree) ->
+    loop {
+      tree match {
+      | SortedMap.Nil() -> return false
+      | node @ SortedMap.Node _ ->
+        order = arrow.parentName.compare(node.key.parentName);
+        if (order == EQ()) {
+          !order = arrow.childName.compare(node.key.childName)
+        };
+        order match {
+        | EQ() -> return true
+        | LT() -> !tree = node.left
+        | GT() -> !tree = node.right
+        }
+      }
+    }
+}
+
+value class Deps private (
+  private data: SortedMap<Path, DependencyReaders> = SortedMap[],
+  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+  filters: SortedMap<Path, SortedMap<Int, Array<ReadFilter>>> = SortedMap[],
+  nextFilterID: Int = 0,
+  compactReaders: Bool = false,
+  canonicalReadPaths: Bool = false,
+  blockReaders: Bool = false,
+) {
+  static fun empty(
+    compactReaders: Bool = false,
+    canonicalReadPaths: Bool = false,
+    blockReaders: Bool = false,
+  ): this {
+    Deps() with {compactReaders, canonicalReadPaths, blockReaders}
+  }
+
+  // Observational counts of physically retained dependency records. This
+  // deliberately bypasses tracked reads and is only used by diagnostics.
+  fun retentionCounts(): SortedMap<DirName, (Int, Int, Int)> {
+    result = SortedMap<DirName, (Int, Int, Int)>[];
+    for ((path, readers) in this.data.items()) {
+      (paths, edges, filters) = result
+        .maybeGet(path.dirName)
+        .default((0, 0, 0));
+      !result[path.dirName] = (paths + 1, edges + readers.size(), filters)
+    };
+    for ((path, buckets) in this.filters.items()) {
+      (paths, edges, filters) = result
+        .maybeGet(path.dirName)
+        .default((0, 0, 0));
+      for (bucket in buckets.values()) !filters = filters + bucket.size();
+      !result[path.dirName] = (paths, edges, filters)
+    };
+    result
   }
 
   fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
-    this.data.maybeGet(path)
+    this.data.maybeGet(path).map(readers -> readers.toSet())
+  }
+
+  // Reuse the reverse index's live representative, including its directory
+  // and key. This adds no interning table or lifetime beyond existing readers.
+  // Logical ordering defines dependency identity, even for structurally unequal
+  // keys. Absent paths remain ordinary reads and register normally afterward.
+  fun canonicalPath(path: Path): Path {
+    if (!this.canonicalReadPaths) return path;
+    this.data.maybeGetItem(path).map(entry -> entry.i0).default(path)
+  }
+
+  // Hot invalidation paths iterate without reconstructing a public SortedSet.
+  fun readers(path: Path): mutable Iterator<ArrowKey> {
+    this.data.maybeGet(path) match {
+    | Some(readers) -> readers.values()
+    | None() -> Array<ArrowKey>[].values()
+    }
+  }
+
+  fun setFilters(path: Path, filters: SortedMap<Int, Array<ReadFilter>>): this {
+    !this.filters[path] = filters;
+    this
+  }
+
+  fun addFilter(
+    path: Path,
+    project: File ~> File,
+    value: Array<File>,
+  ): (this, Path) {
+    // Captures can distinguish thousands of predicates on a single key.
+    // Index by structural hash, then check equality inside the collision bucket.
+    projectionHash = hash(project);
+    groups = this.filters.maybeGet(path).default(
+      SortedMap<Int, Array<ReadFilter>>[],
+    );
+    filters = groups.maybeGet(projectionHash).default(Array<ReadFilter>[]);
+    for (filter in filters) {
+      // A replaced directory may be read again before its old readers run.
+      // Share only readers that observed the same projected array.
+      if (
+        native_eq(filter.project, project) == 0 &&
+        equalFileArrays(filter.value, value)
+      ) {
+        return (this, filter.path(path))
+      };
+    };
+    // Context forks may register projections independently and later import
+    // each other's readers. Allocate identities from the shared counter.
+    id = genSym(this.nextFilterID + 1);
+    filter = ReadFilter(id, projectionHash, project, value);
+    !this.nextFilterID = id;
+    !this.filters[path] = groups.set(
+      projectionHash,
+      filters.concat(Array[filter]),
+    );
+    (this, filter.path(path))
+  }
+
+  fun importFilter(from: this, read: Path): this {
+    read.baseName match {
+    | FilteredReadKey(source, projectionHash, id) ->
+      path = Path::create(read.dirName, source);
+      bucket = from.filters.get(path).get(projectionHash);
+      filter = bucket.find(filter -> filter.id == id).fromSome();
+      groups = this.filters.maybeGet(path).default(SortedMap[]);
+      current = groups.maybeGet(projectionHash).default(Array[]);
+      if (!current.any(filter -> filter.id == id)) {
+        !this.filters[path] = groups.set(
+          projectionHash,
+          current.concat(Array[filter]),
+        );
+      };
+      !this.nextFilterID = max(this.nextFilterID, id)
+    | _ -> void
+    };
+    this
   }
 
   fun set(path: Path, arrowKey: ArrowKey): this {
     set = this.data.maybeGet(path) match {
-    | None() -> SortedSet[]
+    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
     | Some(x) -> x
     };
-    !set = set.set(arrowKey);
+    !set = set.set(arrowKey, this.blockReaders);
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
     this
@@ -205,6 +598,7 @@ value class Deps private (
     this.idata.maybeGet(child).each(paths ->
       paths.each(path ->
         this.data.get(path)
+          .values()
           .filter(ak -> ak.parentName == parent && ak.childName == child)
           .each(ak ->
             reads.maybeGet(ak) match {
@@ -241,33 +635,67 @@ value class Deps private (
     this
   }
 
-  fun remove(path: Path, arrowKey: ArrowKey): this {
-    set = this.data.maybeGet(path) match {
-    | None() -> SortedSet[]
-    | Some(x) -> x
-    };
-    !set = set.remove(arrowKey);
-    if (set.isEmpty()) {
-      !this.data = this.data.remove(path)
-    } else {
-      !this.data[path] = set
-    };
-    !this = this.iremove(arrowKey.childName, path);
+  private fun removeFilter(path: Path, projectionHash: Int, id: Int): this {
+    this.filters.maybeGet(path).each(groups -> {
+      groups.maybeGet(projectionHash).each(bucket -> {
+        remaining = bucket.filter(filter -> filter.id != id);
+        groups2 = if (remaining.isEmpty()) groups.remove(projectionHash) else {
+          groups.set(projectionHash, remaining)
+        };
+        !this.filters = if (groups2.isEmpty()) this.filters.remove(path) else {
+          this.filters.set(path, groups2)
+        };
+      });
+    });
     this
   }
 
-  fun removeDir(dirName: DirName): this {
-    paths = this.idata.maybeGet(dirName) match {
-    | None() -> return this
+  private fun removeInternal(
+    path: Path,
+    arrowKey: ArrowKey,
+    skipInverseRemoval: Bool,
+  ): this {
+    set = this.data.maybeGet(path) match {
+    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
     | Some(x) -> x
     };
-    for (path in paths) {
-      this.data.maybeGet(path) match {
-      | None() -> continue
-      | Some(vset) ->
-        !this.data[path] = vset.filter(x ->
-          !(x.parentName == dirName || x.childName == dirName)
-        )
+    !set = set.remove(arrowKey, this.compactReaders);
+    if (set.isEmpty()) {
+      !this.data = this.data.remove(path);
+      path.baseName match {
+      | FilteredReadKey(source, projectionHash, id) ->
+        sourcePath = Path::create(path.dirName, source);
+        !this = this.removeFilter(sourcePath, projectionHash, id)
+      | _ -> void
+      }
+    } else {
+      !this.data[path] = set
+    };
+    // Other rows from the same child may still read this path. Keep its
+    // inverse-directory entry until the last such reader is removed.
+    if (
+      !skipInverseRemoval &&
+      !set.hasSibling(arrowKey) &&
+      !set.hasChild(arrowKey.childName)
+    ) {
+      !this = this.iremove(arrowKey.childName, path)
+    };
+    this
+  }
+
+  fun remove(path: Path, arrowKey: ArrowKey): this {
+    this.removeInternal(path, arrowKey, false)
+  }
+
+  fun removeDir(dirName: DirName): this {
+    affected = this.idata.maybeGet(dirName).default(SortedSet[]);
+    for (path in affected) {
+      for (reader in this.readers(path)) {
+        if (reader.parentName == dirName || reader.childName == dirName) {
+          // The inverse index for this child is removed below. Avoid
+          // searching every remaining reader on paths with large fanout.
+          !this = this.removeInternal(path, reader, reader.childName == dirName)
+        }
       }
     };
     !this.idata = this.idata.remove(dirName);
@@ -389,13 +817,17 @@ mutable base class WriteChecker {
    because of a cache.
 */
 mutable class Context private {
+  private mutable parallelReadOnly: Bool = false,
+  private mutable parallelFilters: List<ParallelContextFilter> = List[],
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
+  dependencyMode: Int = 1,
   private mutable time: Time = Time(0),
   /* Invariant: tick is only updated at the end of updateWithStatus */
   private mutable tick: Tick = Tick(1),
   private mutable lazyCapacity: Int = 10,
+  private mutable updatePaused: Bool = false,
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   private mutable deps: Deps = Deps::empty(),
   mutable debugMode: Bool = debugMode,
@@ -427,12 +859,61 @@ mutable class Context private {
   mutable sourceOverride: ?Path = None(),
   mutable fromContext: ?Context = None(),
 } {
-  static fun create{canReuse: CanReuse = CRIfMatch()}: this {
-    static{canReuse}
+  static fun create{
+    canReuse: CanReuse = CRIfMatch(),
+    dependencyMode: Int = defaultDependencyMode(),
+    compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
+    canonicalReadPaths: Bool = Environ.varOpt(
+      "SKSTORE_CANONICAL_READ_PATHS",
+    ).isSome(),
+    blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
+  }: this {
+    static{
+      canReuse,
+      dependencyMode,
+      deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+    }
   }
 
-  static fun mcreate{}: mutable this {
-    mutable static{}
+  static fun mcreate{
+    dependencyMode: Int = defaultDependencyMode(),
+    compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
+    canonicalReadPaths: Bool = Environ.varOpt(
+      "SKSTORE_CANONICAL_READ_PATHS",
+    ).isSome(),
+    blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
+  }: mutable this {
+    mutable static{
+      dependencyMode,
+      deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+    }
+  }
+
+  readonly fun isParallelReadOnly(): Bool {
+    this.parallelReadOnly
+  }
+
+  // This policy belongs to the persisted context. Changing the environment
+  // does not rewrite the reader sets of an already initialized database.
+  readonly fun usesCompactDependencyReaders(): Bool {
+    this.deps.compactReaders
+  }
+
+  readonly fun usesCanonicalReadPaths(): Bool {
+    this.deps.canonicalReadPaths
+  }
+
+  readonly fun usesBlockDependencyReaders(): Bool {
+    this.deps.blockReaders
+  }
+
+  readonly fun requireWritable(): void {
+    if (this.parallelReadOnly) throw ParallelContextUnavailable()
+  }
+
+  readonly fun parallelReadLog(): ParallelContextReads {
+    invariant(this.parallelReadOnly);
+    ParallelContextReads(this.reads, this.parallelFilters)
   }
 
   fun withGlobals(globals: SortedMap<String, File>): this {
@@ -491,6 +972,7 @@ mutable class Context private {
   }
 
   mutable fun postpone(postponable: Postponable): void {
+    this.requireWritable();
     postponable match {
     | u @ UPostponable _ -> this.!postponables = this.postponables.push(u)
     | f @ FPostponable _ -> this.!fpostponables = this.fpostponables.push(f)
@@ -548,12 +1030,16 @@ mutable class Context private {
 
   readonly fun mclone(): mutable this {
     mutable static{
+      parallelReadOnly => this.parallelReadOnly,
+      parallelFilters => this.parallelFilters,
       toPurge => this.toPurge,
       dirs => this.dirs,
       reads => this.reads,
+      dependencyMode => this.dependencyMode,
       time => this.time,
       tick => this.tick,
       lazyCapacity => this.lazyCapacity,
+      updatePaused => this.updatePaused,
       toUpdate => this.toUpdate,
       deps => this.deps,
       debugMode => this.debugMode,
@@ -581,12 +1067,17 @@ mutable class Context private {
   }
 
   mutable fun replaceFromSaved(ctx: readonly Context): void {
+    this.requireWritable();
+    this.!parallelReadOnly = ctx.parallelReadOnly;
+    this.!parallelFilters = ctx.parallelFilters;
+    invariant(this.dependencyMode == ctx.dependencyMode);
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
     this.!reads = ctx.reads;
     this.!time = ctx.time;
     this.!tick = ctx.tick;
     this.!lazyCapacity = ctx.lazyCapacity;
+    this.!updatePaused = ctx.updatePaused;
     this.!toUpdate = ctx.toUpdate;
     this.!deps = ctx.deps;
     this.!debugMode = ctx.debugMode;
@@ -629,6 +1120,13 @@ mutable class Context private {
     }
   }
 
+  readonly fun currentEagerMapperInfo(): MInfo {
+    arrow = this.currentArrow().fromSome();
+    parent = this.unsafeGetDir(arrow.parentName).typed();
+    source = Path::create(arrow.parentName, parent.keyOfArrowKey(arrow));
+    this.unsafeGetEagerDir(arrow.childName).mapperInfo(source)
+  }
+
   readonly fun currentArrow(): ?ArrowKey {
     this.arrowStack.maybeHead().map(x -> x.i0)
   }
@@ -637,16 +1135,63 @@ mutable class Context private {
     this.arrowStack.maybeHead().map(x -> x.i1)
   }
 
-  private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
-    this.deps.maybeGet(path) match {
-    | None() -> SortedSet[]
-    | Some(deps) -> deps
-    }
+  private readonly fun getDeps(path: Path): mutable Iterator<ArrowKey> {
+    this.deps.readers(path)
   }
 
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
     for (path in reads) {
       this.!deps = this.deps.set(path, reader);
+    };
+  }
+
+  // MInfo read arrays are sorted by logical Path order. Compare them once
+  // against the new set: reinserting unchanged edges rewrites persistent
+  // reverse-index trees and their directory indexes without changing a read.
+  mutable fun replaceDeps(
+    reader: ArrowKey,
+    oldReads: Array<Path>,
+    newReads: SortedSet<Path>,
+  ): void {
+    if (this.dependencyMode.and(1) == 0) {
+      this.updateNewDeps(reader, newReads);
+      this.removeDeps(
+        reader,
+        oldReads.iterator().filter(path ~> !newReads.contains(path)),
+      );
+      return void
+    };
+    oldIndex = 0;
+    for (path in newReads) {
+      while (
+        oldIndex < oldReads.size() &&
+        oldReads[oldIndex].compare(path) == LT()
+      ) {
+        this.!deps = this.deps.remove(oldReads[oldIndex], reader);
+        !oldIndex = oldIndex + 1
+      };
+      if (
+        oldIndex < oldReads.size() &&
+        oldReads[oldIndex].compare(path) == EQ()
+      ) {
+        !oldIndex = oldIndex + 1
+      } else {
+        this.!deps = this.deps.set(path, reader)
+      }
+    };
+    while (oldIndex < oldReads.size()) {
+      this.!deps = this.deps.remove(oldReads[oldIndex], reader);
+      !oldIndex = oldIndex + 1
+    }
+  }
+
+  mutable fun importDeps(
+    from: Context,
+    reader: ArrowKey,
+    reads: SortedSet<Path>,
+  ): void {
+    for (path in reads) {
+      this.!deps = this.deps.importFilter(from.deps, path).set(path, reader);
     };
   }
 
@@ -686,35 +1231,66 @@ mutable class Context private {
    * - dirty are files that are made dirty because of a Map.
    */
   /*****************************************************************************/
-  mutable fun updateDirtyReaders(path: Path): void {
+  readonly fun hasReadFilters(path: Path): Bool {
+    this.deps.filters.containsKey(path)
+  }
+
+  mutable fun invalidateReader(reader: ArrowKey): void {
+    child = this.unsafeMaybeGetDir(reader.childName) match {
+    | None() -> return void
+    | Some(x) -> x
+    };
+    parent = this.unsafeMaybeGetDir(reader.parentName) match {
+    | None() -> return void
+    | Some(x) -> x
+    };
+    this.!dirtyReaders[reader.parentName] = {
+      map = this.dirtyReaders.maybeGet(reader.parentName).default(SortedMap[]);
+      map.set(
+        reader.childName,
+        parent.addReaderKeyToKeySetOpt(reader, map.maybeGet(reader.childName)),
+      )
+    };
+    time = if (reader.parentName == reader.childName) {
+      -child.getTimeStack()
+    } else {
+      child.getTimeStack()
+    };
+    arrow = Arrow(reader.parentName, reader.childName);
+    this.addToUpdate(time, parent.getTime(), arrow);
+  }
+
+  mutable fun updateDirtyReaders(
+    path: Path,
+    newValues: ?Array<File> = None(),
+  ): void {
     for (reader in this.getDeps(path)) {
-      child = this.unsafeMaybeGetDir(reader.childName) match {
-      | None() -> continue
-      | Some(x) -> x
+      if (this.debugMode) {
+        print_string(`DIRTY READER: ${reader} (dependency: ${path})`);
       };
-      parent = this.unsafeMaybeGetDir(reader.parentName) match {
-      | None() -> continue
-      | Some(x) -> x
-      };
-      this.!dirtyReaders[reader.parentName] = {
-        map = this.dirtyReaders.maybeGet(reader.parentName).default(
-          SortedMap[],
+      this.invalidateReader(reader);
+    };
+
+    if (!this.deps.filters.isEmpty()) {
+      this.deps.filters.maybeGet(path).each(filters -> {
+        updated = filters.map((_, bucket) ->
+          bucket.map(filter -> {
+            values = newValues.map(values -> values.map(filter.project));
+            changed = values match {
+            | None() -> true
+            | Some(v) -> !equalFileArrays(v, filter.value)
+            };
+            if (changed) {
+              this.updateDirtyReaders(filter.path(path));
+            };
+            values match {
+            | None() -> filter
+            | Some(v) -> filter with {value => v}
+            }
+          })
         );
-        map.set(
-          reader.childName,
-          parent.addReaderKeyToKeySetOpt(
-            reader,
-            map.maybeGet(reader.childName),
-          ),
-        )
-      };
-      time = if (reader.parentName == reader.childName) {
-        -child.getTimeStack()
-      } else {
-        child.getTimeStack()
-      };
-      arrow = Arrow(reader.parentName, reader.childName);
-      this.addToUpdate(time, parent.getTime(), arrow);
+        this.!deps = this.deps.setFilters(path, updated);
+      });
     };
   }
 
@@ -794,7 +1370,46 @@ mutable class Context private {
     }
   }
 
+  // Pause only between complete arrows. Pending invalidations and the current
+  // tick survive cloning/persistence; normal update() resumes the same pass.
+  mutable fun updateUntil(
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+  ): Bool {
+    this.updateUntilBoundary(before, after).isSome()
+  }
+
+  // None means fully drained; Some(true) stopped before an arrow and
+  // Some(false) stopped after one. A completed coordinator may still have
+  // queued descendants, so callers must distinguish those boundaries.
+  mutable fun updateUntilBoundary(
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+    eligible: DirName ~> Bool = _ ~> true,
+  ): ?Bool {
+    loop {
+      (changed, paused, stoppedBefore) = this.updateWithBoundary(
+        None(),
+        before,
+        after,
+        eligible,
+      );
+      if (paused) return Some(stoppedBefore);
+      if (!changed) return None();
+    }
+  }
+
   mutable fun updateWithStatus(from: ?Context = None()): Bool {
+    this.updateWithBoundary(from, _ ~> false, _ ~> false, _ ~> true).i0
+  }
+
+  private mutable fun updateWithBoundary(
+    from: ?Context,
+    before: DirName ~> Bool,
+    after: DirName ~> Bool,
+    eligible: DirName ~> Bool,
+  ): (Bool, Bool, Bool) {
+    profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
     invariant(
       this.currentArrow().isNone(),
       "updateWithStatus cannot be called during update.",
@@ -802,17 +1417,31 @@ mutable class Context private {
     if (this.debugMode) {
       print_debug(`------------ UPDATE (TICK: ${this.tick}) ------------`);
     };
-    this.!fromContext = from;
+    if (!this.updatePaused) this.!fromContext = from;
     from.each(ctx ->
       if (ctx.tick > this.tick) {
         this.!tick = ctx.tick
       }
     );
-    this.updateLazyGets();
+    if (!this.updatePaused) {
+      retentionStart = if (profile) Time.time_ns() else 0;
+      this.updateLazyGets();
+      if (profile) {
+        print_error(
+          `##SPAN## ${retentionStart} ${Time.time_ns()} store lazy_retention\n`,
+        )
+      }
+    };
+    heldUpdates: SortedMap<(TimeStack, Time), Arrow> = SortedMap[];
 
     loop {
       this.toUpdate.removeMin() match {
       | None() ->
+        if (!heldUpdates.isEmpty()) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!updatePaused = true;
+          break (false, true, true)
+        };
         this.!dirty = SortedMap[];
         this.!dirtyReaders = SortedMap[];
         withPostponables = this.checkPostponables();
@@ -820,19 +1449,77 @@ mutable class Context private {
         withChanges = withPostponables || withPre;
         this.!tick = this.tick.next();
         this.!fromContext = None();
-        break withChanges
-      | Some((_time, Arrow(parentName, childName), toUpdate)) ->
+        this.!updatePaused = false;
+        break (withChanges, false, false)
+      | Some((queuedTime, arrow @ Arrow(parentName, childName), toUpdate)) ->
         this.!toUpdate = toUpdate;
+        // The child may have been deleted or recreated after this edge was
+        // queued (including while an update was paused). Validate membership
+        // before reprioritizing: its name alone does not identify the old map.
+        valid = this.unsafeMaybeGetDir(childName) match {
+        | Some(child @ EagerDir _) ->
+          child.parents.maybeGet(parentName).isSome() &&
+            this.unsafeMaybeGetEagerDir(parentName).isSome()
+        | Some(LazyDir _) -> parentName == childName
+        | _ -> false
+        };
+        if (!valid) {
+          if (this.debugMode) {
+            print_debug(`OBSOLETE UPDATE: ${parentName} => ${childName}`)
+          };
+          continue
+        };
+        // Reusing a nested directory gives it a new TimeStack. Updates that
+        // were queued before reuse must follow the directory's current order.
+        currentTimeOpt = this.unsafeMaybeGetDir(childName).map(child -> {
+          parent = this.unsafeGetDir(parentName);
+          time = if (parentName == childName) {
+            -child.getTimeStack()
+          } else {
+            child.getTimeStack()
+          };
+          (time, parent.getTime())
+        });
+        currentTimeOpt match {
+        | Some((time, parentTime)) if (queuedTime != (time, parentTime)) ->
+          this.addToUpdate(time, parentTime, arrow);
+          continue
+        | _ -> void
+        };
+        if (!eligible(childName)) {
+          !heldUpdates = heldUpdates.set(queuedTime, arrow);
+          continue
+        };
+        if (before(childName)) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!toUpdate = this.toUpdate.set(queuedTime, arrow);
+          this.!updatePaused = true;
+          break (false, true, true)
+        };
+        arrowStart = if (profile) Time.time_ns() else 0;
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->
           void
         | Some(dir @ LazyDir _) ->
           invariant(parentName == childName);
-          dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
+          // This lazy directory may be invalidated several times before the
+          // tick drains. Consume its pending batch before notifying readers:
+          // retaining it would invalidate already recomputed keys again when
+          // an unrelated later key becomes dirty. New invalidations (including
+          // dependencies between keys in this directory) enter a fresh batch.
+          pendingReaders = this.dirtyReaders.maybeGet(dir.dirName);
+          this.!dirtyReaders = this.dirtyReaders.remove(dir.dirName);
+          dir.update(this, pendingReaders)
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
-          | None() -> invariant_violation("Could not find parent")
+          | None() ->
+            invariant_violation(
+              `Could not find parent: queued ${parentName} => ${childName}; current parents: ${child.parents
+                .items()
+                .map(kv -> kv.i0)
+                .collect(Array)}`,
+            )
           | Some(f) -> f
           };
           parent = this.unsafeGetEagerDir(parentName);
@@ -843,8 +1530,26 @@ mutable class Context private {
             parentMaps,
             child,
           )
+        };
+        if (profile) {
+          print_error(
+            `##SPAN## ${arrowStart} ${Time.time_ns()} arrow ${childName}\n`,
+          )
+        };
+        if (after(childName)) {
+          this.restoreDeferredUpdates(heldUpdates);
+          this.!updatePaused = true;
+          break (false, true, false)
         }
       }
+    }
+  }
+
+  private mutable fun restoreDeferredUpdates(
+    heldUpdates: SortedMap<(TimeStack, Time), Arrow>,
+  ): void {
+    for (priority => arrow in heldUpdates) {
+      this.!toUpdate = this.toUpdate.set(priority, arrow)
     }
   }
 
@@ -934,6 +1639,7 @@ mutable class Context private {
   }
 
   mutable fun timeStamp(): Time {
+    this.requireWritable();
     this.!time = this.time.next();
     this.time
   }
@@ -1038,13 +1744,14 @@ mutable class Context private {
   }
 
   mutable fun setDir(dir: Dir): void {
+    this.requireWritable();
     dirName = dir.getDirName();
     this.!dirs = this.dirs.set(this.tick, dirName, dir);
   }
 
   mutable fun getDir(dirName: DirName): Dir {
     this.addRead(Path::dirTag(dirName));
-    this.dirs.get(dirName);
+    this.unsafeGetDir(dirName)
   }
 
   mutable fun maybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -1052,11 +1759,47 @@ mutable class Context private {
     this.dirs.maybeGet(dirName);
   }
 
+  readonly fun parallelSnapshot(): ParallelSnapshot {
+    dirs = this.dirs;
+    template = static{
+      dirs,
+      tick => this.tick,
+      globals => this.globals,
+      persistents => this.persistents,
+      parallelReadOnly => true,
+      debugMode => this.debugMode,
+      dependencyMode => this.dependencyMode,
+      deps => Deps::empty(
+        this.deps.compactReaders,
+        this.deps.canonicalReadPaths,
+        this.deps.blockReaders,
+      ),
+    };
+    ParallelSnapshot(
+      dirName ~> {
+        dirs.maybeGet(dirName) match {
+        | Some(eager @ EagerDir _) -> eager
+        | _ ->
+          invariant_violation(
+            `Parallel read requires an eager directory: ${dirName}`,
+          )
+        }
+      },
+      template,
+    )
+  }
+
   readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
     this.dirs.maybeGet(dirName);
   }
 
   readonly fun unsafeGetDir(dirName: DirName): Dir {
+    if (this.parallelReadOnly) {
+      return this.dirs.maybeGet(dirName) match {
+      | Some(dir) -> dir
+      | None() -> throw ParallelContextUnavailable()
+      }
+    };
     this.dirs.get(dirName);
   }
 
@@ -1178,14 +1921,35 @@ mutable class Context private {
   }
 
   mutable fun addRead(path: Path): void {
-    this.!reads = this.reads.set(path);
+    if (!this.reads.contains(path)) {
+      this.!reads = this.reads.set(this.deps.canonicalPath(path));
+    };
+  }
+
+  mutable fun addFilteredDep(
+    path: Path,
+    project: File ~> File,
+    value: Array<File>,
+  ): void {
+    if (this.parallelReadOnly) {
+      this.!parallelFilters = List.Cons(
+        ParallelContextFilter(path, project, value),
+        this.parallelFilters,
+      );
+      return void
+    };
+    (deps, read) = this.deps.addFilter(path, project, value);
+    this.!deps = deps;
+    this.addRead(read);
   }
 
   mutable fun setGlobal(name: String, file: File): void {
+    this.requireWritable();
     this.!globals = this.globals.set(name, file);
   }
 
   mutable fun removeGlobal(name: String): void {
+    this.requireWritable();
     this.!globals = this.globals.remove(name);
   }
 
@@ -1201,10 +1965,12 @@ mutable class Context private {
   }
 
   mutable fun setPersistent(name: String, file: File): void {
+    this.requireWritable();
     this.!persistents = this.persistents.set(name, file);
   }
 
   mutable fun removePersistent(name: String): void {
+    this.requireWritable();
     this.!persistents = this.persistents.remove(name);
   }
 
@@ -1221,6 +1987,13 @@ mutable class Context private {
 
   readonly fun listDirs(): mutable Iterator<Dir> {
     this.dirs.values()
+  }
+
+  readonly fun dependencyRetentionCounts(): SortedMap<
+    DirName,
+    (Int, Int, Int),
+  > {
+    this.deps.retentionCounts()
   }
 
   readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
@@ -1731,7 +2504,9 @@ fun runWithGcIntern(
   synchronizer: ?Synchronizer = None(),
   isync: Bool = false,
   fork: ?String = None(),
+  onError: .Exception ~> void = exn ~> print_error(exn.getMessage()),
 ): Contexts {
+  profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
   sync = UInt32::truncate(if (isync) 1 else 0);
   if (!gHasContext(fork)) {
     gContextInit(initCtx, fork);
@@ -1746,22 +2521,30 @@ fun runWithGcIntern(
   loop {
     context = contexts.get(fork);
     startTick = context.getTick();
+    stepStart = if (profile) Time.time_ns() else 0;
     pos = newObstack();
     (newContext, newContextOp) = (try {
-      Some(f(context.withGlobals(globals)))
+      Success(f(context.withGlobals(globals)))
     } catch {
-    | exn ->
-      print_error(exn.getMessage());
-      None()
+    | exn -> Failure(exn)
     }) match {
-    | Some(x) -> x
-    | None() ->
+    | Success(result) -> result
+    | Failure(exn) ->
+      // The handler may exit the process. Release the borrowed persistent
+      // snapshot first, or it remains live in the database across restarts.
+      cexn = destroyObstackWithValue(pos, exn);
+      replaceExn(cexn);
       if (synchronizer is None _) {
         gGlobalUnlock();
       };
-      destroyObstack(pos);
+      gUnsafeFree(contexts);
+      onError(cexn);
       return contexts
     };
+    if (profile) {
+      print_error(`##SPAN## ${stepStart} ${Time.time_ns()} store step\n`)
+    };
+    syncStart = if (profile) Time.time_ns() else 0;
     newContextOp match {
     | CContinue(underLockF) ->
       synchronizer match {
@@ -1812,6 +2595,9 @@ fun runWithGcIntern(
         !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
+        if (profile) {
+          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
+        };
         return contexts
       | Some _ ->
         new = gContextSync(
@@ -1828,8 +2614,14 @@ fun runWithGcIntern(
         !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
+        if (profile) {
+          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
+        };
         return contexts
       }
+    };
+    if (profile) {
+      print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
     };
     !globals = contexts.get(fork).globals;
   }
@@ -1873,6 +2665,7 @@ fun runWithGc(
   synchronizer: ?Synchronizer = None(),
   sync: Bool = false,
   fork: ?String = None(),
+  onError: .Exception ~> void = exn ~> print_error(exn.getMessage()),
 ): void {
   _ = runWithGcIntern(
     initCtx,
@@ -1884,6 +2677,62 @@ fun runWithGc(
     synchronizer,
     sync,
     fork,
+    onError,
+  )
+}
+
+// Run a fixed pipeline, synchronizing the context and reclaiming temporary
+// memory after every step. A step returns true to advance, or false to repeat
+// after synchronization. Continuation data must live in the context; callbacks
+// must not retain mutable invocation snapshots across checkpoints.
+//
+// progressKey belongs to the caller and must be distinct from other pipelines
+// sharing this context. Completion removes it, allowing a later invocation to
+// start again. This driver does not implicitly drain pending reactive updates:
+// steps choose their own updateUntilBoundary()/update() policy. For a checkpoint
+// after every dependency arrow, use one step returning:
+// context.updateUntilBoundary(_ ~> false, _ ~> true).isNone()
+// onError runs after the failed step's temporary region and borrowed persistent
+// snapshot have been released. It may terminate the process or rethrow safely;
+// failed step writes are discarded and the last committed checkpoint remains.
+fun runPipeline(
+  initCtx: Context,
+  progressKey: String,
+  steps: Array<mutable Context ~> Bool>,
+  beforeStep: (mutable Context, Int) ~> void = (_, _) ~> void,
+  onComplete: mutable Context ~> void = _ ~> void,
+  onError: .Exception ~> void = exn ~> {
+    throw exn
+  },
+): void {
+  runWithGc(
+    initCtx,
+    context ~> {
+      step = context.getGlobal(progressKey) match {
+      | Some(value) -> IntFile::type(value).value
+      | None() -> 0
+      };
+      invariant(
+        step >= 0 && step <= steps.size(),
+        "Invalid pipeline checkpoint",
+      );
+      if (step < steps.size()) {
+        beforeStep(context, step);
+        if (steps[step](context)) !step = step + 1;
+      };
+      if (step == steps.size()) {
+        context.removeGlobal(progressKey);
+        onComplete(context);
+        CStop(None())
+      } else {
+        context.setGlobal(progressKey, IntFile(step));
+        CContinue(None())
+      }
+    },
+    None(),
+    false,
+    None(),
+    onError,
   )
 }
 
@@ -1891,6 +2740,7 @@ fun withRegion<T>(
   context: mutable Context,
   f: (Obstack, mutable Context) ~> T,
 ): T {
+  context.requireWritable();
   optSaved: ?Obstack = None();
   try {
     !optSaved = Some(newObstack());
@@ -2079,7 +2929,20 @@ fun withRegionFold<K, T>(
   it: mutable Iterator<K>,
   value: T,
   fn: (?mutable Context, K, T) ~> T,
+  collect: Bool = true,
 ): T {
+  // A mapper with its own regions can retain a large graph. Avoid putting
+  // that graph in another region just to copy it when this fold finishes.
+  if (!collect) {
+    result = value;
+    loop {
+      it.next() match {
+      | Some(key) -> !result = fn(contextOpt, key, result)
+      | None() -> return result
+      }
+    }
+  };
+
   optSaved: ?Obstack = None();
   valueInRegion = value;
   try {
@@ -2221,17 +3084,28 @@ fun runWithResult<T>(
     gContextsGetNoLock()
   | Some _ -> gUnsafeContextsGet()
   };
-  try {
+  prepared = try {
     current = contexts.get(fork);
     context = current.mclone();
     res = f(context);
-    startTick = current.getTick();
+    Success((current.getTick(), context.clone(), res))
+  } catch {
+  | exn -> Failure(exn)
+  };
+  (startTick, newContext, res) = prepared match {
+  | Success(value) -> value
+  | Failure(exn) ->
+    if (synchronizer.isNone()) gGlobalUnlock();
+    gUnsafeFree(contexts);
+    return Failure(exn)
+  };
+  try {
     new = synchronizer match {
     | None() ->
       new = gContextSyncNoLock(
         startTick,
         contexts,
-        context.clone(),
+        newContext,
         synchronizer,
         sync,
         None(),
@@ -2243,7 +3117,7 @@ fun runWithResult<T>(
       gContextSync(
         startTick,
         contexts,
-        context.clone(),
+        newContext,
         synchronizer,
         sync,
         None(),
