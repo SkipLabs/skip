@@ -63,7 +63,8 @@ jobs:
 
   compiler:
     docker:
-      - image: skiplabs/skiplang:latest
+      # Includes Python and Node for the backend and Wasm regression checks.
+      - image: skiplabs/skip:latest
     resource_class: xlarge.gen2
     environment:
       SKIP_CAPACITY: 12G
@@ -78,14 +79,40 @@ jobs:
           command: |
             mkdir -p ~/test-results
             root="$PWD"
-            cd skiplang/compiler && make STAGE=1
+            cd skiplang/compiler
+            python3 tools/incremental_profile.py run \
+              --root "$PWD" --label ci-compiler-build \
+              --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
+              -- make STAGE=1 || { tail -n 100 runs/ci-compiler-build/command.log; exit 1; }
             # The dev profile merges skc, skfmt and every test into one binary;
             # incremental specialization of that combined graph exceeds this
             # job's memory budget. Release builds the same tests separately.
-            PATH=$(realpath ./stage1/bin):$PATH \
-              GIT_COMMIT_HASH=$(git rev-parse --short HEAD) SKTEST_PROFILE=release \
+            python3 tools/incremental_profile.py run \
+              --root "$PWD" --label ci-compiler-tests \
+              --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
+              -- env PATH="$(realpath ./stage1/bin):$PATH" \
+              GIT_COMMIT_HASH="$(git rev-parse --short HEAD)" SKTEST_PROFILE=release \
               SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
-              "$root/bin/run-sktest.sh"
+              "$root/bin/run-sktest.sh" || { tail -n 100 runs/ci-compiler-tests/command.log; exit 1; }
+      - run:
+          name: Run backend and runtime regressions
+          command: |
+            bash skiplang/prelude/runtime/tests/run.sh
+            cd skiplang/compiler
+            python3 tools/incremental_profile.py run \
+              --root /tmp/skc-backend-checks --label regressions \
+              --disk-gib 12 --reserve-gib 8 --rss-gib 14 --timeout 3600 \
+              -- python3 tools/run_backend_tests.py \
+              --compiler stage1/bin/skc \
+              --sysroot stage1/target/host/release/deps \
+              --legacy-compiler stage0/bin/skc \
+              --scratch /tmp/skc-backend-checks/tmp
+      - store_artifacts:
+          path: skiplang/compiler/runs
+          destination: compiler-resources
+      - store_artifacts:
+          path: /tmp/skc-backend-checks/runs
+          destination: backend-regressions
       - store_test_results:
           path: ~/test-results
 
