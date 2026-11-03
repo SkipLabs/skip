@@ -37,7 +37,7 @@ callee-view revision passes fourteen focused diagnostic checks, then 30 focused
 and 28 broad checks on its optimized host. That host is
 `host-shared-callee-views`, SHA-256
 `d7d366e69fb464d998e3e30bf3ed791869135dfc629349e9470e15da7b336536`.
-Independent full-workload timing and memory controls remain queued.
+The subsequent matched four-policy timing and memory screen is complete; see below.
 
 The isolated `SKC_PRECISE_CLASS_PREDICATES` prototype has been rejected and removed
 from active source. Its diagnostic host builds and passes ten semantic checks,
@@ -55,9 +55,18 @@ addressing, preserving the existing missing-layout error path. The candidate
 passes paired reuse, real stride changes, policy switches and removal/restore.
 Eight focused checks passed initially; two skipped graph checks passed on
 follow-up after supplying their wrapper variable. Both results are preserved.
-The next optimized host is building for 38 focused and 28 broad checks, then
-one four-policy control/shared/array/combined matrix. That matrix replaces the
-unrun shared-only screen. No full-workload benefit is established yet.
+The optimized host passes all 38 focused and 28 broad checks. The four-policy
+control/shared/array/combined matrix is complete and replaces the unrun
+shared-only screen. It shows no substantial end-to-end improvement: control
+branch transitions take 67.007/70.182 s, versus 70.890/68.844 s with both changes.
+The generic edit changes from 2.844 to 2.706 s; ordinary edits remain roughly
+0.6–1.2 s. Retained reachable state rises from 11.432307 to 11.549366 GB. All
+outputs validate and all four replay caches have been retired. Small edits have
+two samples; each branch direction has one. See
+`optimizer-array-locality-matched-screen.{md,json}` for all policies and phases.
+Both refinements remain default-off; the paired locality proof does not establish
+a useful whole-workload speedup. The frozen host SHA-256 is
+`2cd178ea7d3844031489d0dc9f231d1e07185e404fb628263a230e1b8ec4dd19`.
 
 Generated databases, native binaries, LLVM/object trees and per-run raw logs are
 not part of the Git checkpoint. The experiment directory's top-level summaries,
@@ -71,7 +80,7 @@ Lossless, verified compression of 73 completed/exported profiling logs reclaimed
 2,570,956,800 bytes. JSON summaries and small logs remain; use
 `retired-raw-log-compression-20261103.json` to restore any old plaintext filename.
 
-Next gates: finish the shared-view controls, validate precise array-layout reads,
-run the development-path language/retention gates and broader branch corpus,
+Next gates: investigate the remaining upstream invalidation and serial class
+construction costs; run the development-path language/retention gates and broader branch corpus,
 measure observation overhead, and revisit the remaining invalidation costs.
 Neither branch latency nor the proposed memory-halving goal is complete.

@@ -1,0 +1,51 @@
+{
+  "policy": "control",
+  "host_identity": {
+    "binary_sha256": "2cd178ea7d3844031489d0dc9f231d1e07185e404fb628263a230e1b8ec4dd19",
+    "generated_llvm_sha256": "319599dabfb1a3540fb34e4b37a9c00fc64abbe29c88eb4549979e7365703308",
+    "optimization": "Skip O2 release, native Clang O2",
+    "source_identity": "host-array-slots-diag1-source-identity.json",
+    "runtime_identity": "capture-pipes-runtime-identity.json"
+  },
+  "labels": [
+    "optimizer-array-locality-control-cold",
+    "optimizer-array-locality-control-noop",
+    "optimizer-array-locality-control-literal-1",
+    "optimizer-array-locality-control-after-literal-1",
+    "optimizer-array-locality-control-literal-2",
+    "optimizer-array-locality-control-after-literal-2",
+    "optimizer-array-locality-control-control-flow-1",
+    "optimizer-array-locality-control-after-control-flow-1",
+    "optimizer-array-locality-control-control-flow-2",
+    "optimizer-array-locality-control-after-control-flow-2",
+    "optimizer-array-locality-control-method-body-1",
+    "optimizer-array-locality-control-after-method-body-1",
+    "optimizer-array-locality-control-method-body-2",
+    "optimizer-array-locality-control-after-method-body-2",
+    "optimizer-array-locality-control-generic-1",
+    "optimizer-array-locality-control-after-generic-1",
+    "optimizer-array-locality-control-generic-2",
+    "optimizer-array-locality-control-after-generic-2",
+    "optimizer-array-locality-control-unused-1",
+    "optimizer-array-locality-control-after-unused-1",
+    "optimizer-array-locality-control-unused-2",
+    "optimizer-array-locality-control-after-unused-2",
+    "optimizer-array-locality-control-history-historical-1",
+    "optimizer-array-locality-control-history-baseline-1"
+  ],
+  "final_validation_label": "optimizer-array-locality-control-history-baseline-1",
+  "target": "/tmp/skip-incremental-next/replay-optimizer-array-locality-control",
+  "samples_per_small_edit": 2,
+  "completed_screen": true,
+  "rejection": null,
+  "screen_limits": {
+    "cold_seconds": 480,
+    "literal_seconds": 5
+  },
+  "goals": {
+    "typical_seconds": 1,
+    "heavy_seconds": 10,
+    "branch_seconds": 30
+  },
+  "comparison": "Same frozen optimized host; separate fresh caches. Class headers are enabled throughout. Control uses full callees and complete array-class reads; shared uses shared filtered callee views; array narrows LLVM element-layout reads; combined enables both. Policies vary only these controls. The rejected class-predicate prototype is absent from this frozen host. Other controls identical, including four Clang workers, LLD, indexed variance, compact/block readers and delta retention. Partitioning disabled. Limits stop severe regressions; they are not the user latency targets. All recorded outputs validate."
+}

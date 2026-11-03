@@ -613,11 +613,19 @@ leaving sequential emission unchanged. Its diagnostic host builds and passes
 paired reuse, real stride changes, policy switches, removal/restore and the
 other focused checks. Eight checks passed initially; two graph checks were
 skipped because their wrapper variable was omitted, then both passed in an
-explicit follow-up. The original incomplete result is preserved. An optimized
-host is building for 38 focused and 28 broad checks, followed by matched
-control/shared/array/combined timing and memory measurements. This replaces the
-unrun shared-only screen and avoids repeating its full control. No full-workload
-benefit is established yet.
+explicit follow-up. The original incomplete result is preserved. The optimized
+host passes all 38 focused and 28 broad checks. The completed
+[matched four-policy screen](experiments/incremental-backend-20261101/optimizer-array-locality-matched-screen.md)
+shows no substantial end-to-end gain from these two refinements. Control versus
+both enabled measures 0.804/0.821 s for the literal edit, 1.094/1.169 s for control
+flow, 1.191/1.128 s for the method edit, and 2.844/2.706 s for the generic edit.
+Historical/return transitions are 67.007/70.182 s in the control and
+70.890/68.844 s with both enabled. Retained reachable state rises from
+11.432307 to 11.549366 GB, adding 117,058,888 bytes. The independent shared and
+array policies also fail to demonstrate a consistent branch improvement. These
+are two samples per small edit and one per branch direction; do not treat small
+differences as reliable wins. Every output validates. All four full caches were
+exported and retired. Both experimental controls remain disabled by default.
 
 Lossless compression of 73 completed/exported large profiling logs reclaimed
 2,570,956,800 bytes. Each compressed log was decoded and hash-checked before
