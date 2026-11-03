@@ -111,6 +111,9 @@ private class GraphFunctionReferenceFile(
 private class GraphClassInfoKey(id: SClassID) extends SKStore.Key
 private class GraphClassInfoFile(value: SClass) extends SKStore.File
 private class GraphScalarInfoFile(value: ?ScalarType) extends SKStore.File
+private class GraphArraySlotInfoFile(
+  value: ?ArraySlotInfo,
+) extends SKStore.File
 private class GraphDebugEnvFile(value: GlobalEnv) extends SKStore.File
 
 // Only temporary builders own this object. The mapper supplies the current
@@ -121,7 +124,12 @@ private mutable class GraphReads{
   labels: SKStore.EHandle<GraphFunctionKey, GraphLabelsFile>,
   offsets: SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
   classes: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  preciseArraySlots: Bool = false,
   memoize: Bool = Environ.varOpt("SKC_DISABLE_GRAPH_READER_MEMO").isNone(),
+  arraySlotCache: mutable UnorderedMap<
+    SClassID,
+    ?ArraySlotInfo,
+  > = mutable UnorderedMap[],
   classCache: mutable UnorderedMap<SClassID, SClass> = mutable UnorderedMap[],
   scalarCache: mutable UnorderedMap<
     SClassID,
@@ -145,6 +153,31 @@ private mutable class GraphReads{
     if (this.memoize) this.classCache.set(id, value);
     value
   }
+  mutable fun getArraySlotInfo(id: SClassID, pos: Pos): ArraySlotInfo {
+    if (!this.preciseArraySlots) {
+      return this.getSClass(id).getArraySlotInfo(pos)
+    };
+    value = this.arraySlotCache.maybeGet(id) match {
+    | Some(value) if (this.memoize) -> value
+    | _ ->
+      // Element layout is independent of the array class's subtype/method sets.
+      // Read the optional value too, so removal cannot retain an old layout.
+      current = this.classes.getArrayFilter(
+        this.context,
+        GraphClassInfoKey(id),
+        file ~>
+          GraphArraySlotInfoFile(GraphClassInfoFile::type(file).value.arraySlot)
+        ,
+      )[0].value;
+      if (this.memoize) this.arraySlotCache.set(id, current);
+      current
+    };
+    value match {
+    | Some(slot) -> slot
+    | None() -> this.getSClass(id).getArraySlotInfo(pos)
+    }
+  }
+
   mutable fun maybeGetScalarType(id: SClassID): ?ScalarType {
     if (this.memoize) {
       this.scalarCache.maybeGet(id) match {
@@ -649,6 +682,7 @@ fun createGraphCache(
           labels,
           offsets,
           classes => files,
+          preciseArraySlots => common.config.preciseArraySlots,
         };
         // A native function can have several specialized IDs but one C symbol.
         // Choose the same earliest specialization as the sequential builder.
@@ -695,6 +729,7 @@ fun createGraphCache(
           labels,
           offsets,
           classes => files,
+          preciseArraySlots => common.config.preciseArraySlots,
         };
         builder = fragmentBuilder(
           common.env,

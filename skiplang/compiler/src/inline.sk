@@ -694,7 +694,7 @@ fun estimateSize(
 
     // Creating a value class is considered "zero cost" since it
     // does not allocate any memory.
-    if (ClassInputs.isValueClass(typ, env, classReader)) {
+    if (ClassInputs.exampleSClass(typ, env, classReader).kind.isValueClass()) {
       0
     } else {
       defaultCost
@@ -751,7 +751,7 @@ private fun takesLambdaParameter(
 ): Bool {
   f.params.any(p ->
     !p.typ.forEachTclass(tc ->
-      !ClassInputs.isLambda(env, tc.sclassID, classReader)
+      !ClassInputs.getSClass(env, tc.sclassID, classReader).isLambda
     )
   )
 }

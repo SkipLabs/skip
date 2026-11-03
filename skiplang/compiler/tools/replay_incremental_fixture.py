@@ -167,7 +167,7 @@ def main():
                             'SKC_CLASS_CONFLICT_STREAM', 'SKC_CLASS_GROUP_HINTS',
                             'SKC_OPTIMIZER_CALLEE_SUMMARIES',
                             'SKC_SHARED_CALLEE_VIEWS',
-                            'SKC_PRECISE_CLASS_PREDICATES',
+                            'SKC_PRECISE_CLASS_PREDICATES', 'SKC_PRECISE_ARRAY_SLOTS',
                             'SKC_VTABLE_RECEIVER_HINTS', 'SKC_VTABLE_HINT_STATS',
                             'SKC_NATIVE_ARTIFACT_WORKERS',
                             'SKC_INDEX_VARIANCE', 'SKC_VARIANCE_STATS',

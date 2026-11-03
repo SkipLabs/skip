@@ -4,7 +4,10 @@ This is a work-in-progress backup of the incremental backend plan, implementatio
 regressions, experiment recipes and compact results. It is not a completed
 integration or a claim that the latency targets have been met.
 
-The latest completed optimized host is `host-optimizer-locality`, SHA-256
+The initial recovery commit `354c627` was pushed to
+`codex/incremental-backend-progress-20261103` and its remote SHA verified.
+
+The latest completed measurement host is `host-optimizer-locality`, SHA-256
 `f8408c0e41e1d736cb6320ada5d0ae553446836a18dfcdd2ff9f553c742f4551`.
 Its frozen source patch and identities are included. It passes 28 focused and
 28 broad incremental regressions. Earlier integrated hosts pass all 1,765
@@ -30,14 +33,31 @@ Streaming conflicts and prior accepted-group hints do not offset transaction
 maintenance/publication costs. See `group-scheduler-matched-screen.{md,json}`.
 
 The original callee projection also fails its memory/performance gate. The shared
-callee-view revision passes fourteen focused diagnostic checks; optimized
-validation and independent full-workload controls are still running/queued.
+callee-view revision passes fourteen focused diagnostic checks, then 30 focused
+and 28 broad checks on its optimized host. That host is
+`host-shared-callee-views`, SHA-256
+`d7d366e69fb464d998e3e30bf3ed791869135dfc629349e9470e15da7b336536`.
+Independent full-workload timing and memory controls remain queued.
 
-The newest `SKC_PRECISE_CLASS_PREDICATES` implementation is **not yet compiled or
-validated in this checkpoint**. Its control probe reproduces an identity function
-being optimized again after an unrelated reference-class layout addition. The
-candidate adds projected class-flag reads for inline-cost estimation, behind a
-default-off configuration field. Its regression tests have been written.
+The isolated `SKC_PRECISE_CLASS_PREDICATES` prototype has been rejected and removed
+from active source. Its diagnostic host builds and passes ten semantic checks,
+but does not achieve the proposed reuse assertion in either layout-change paired
+probe. The identity fixture changes incoming IR and invalidates a local-variable
+class read; an unused-method probe was already cached in the control. The source
+patch, original tests and failed experiments remain archived, including in the
+initial recovery commit. See `class-predicate-rejection.json`.
+
+The new default-off `SKC_PRECISE_ARRAY_SLOTS` prototype passes diagnostic
+validation. A control reproduces LLVM regeneration for an unchanged array reader
+when a related covariant array type is instantiated; native lowering stays cached.
+The candidate tracks only optional element-layout information for LLVM array
+addressing, preserving the existing missing-layout error path. The candidate
+passes paired reuse, real stride changes, policy switches and removal/restore.
+Eight focused checks passed initially; two skipped graph checks passed on
+follow-up after supplying their wrapper variable. Both results are preserved.
+The next optimized host is building for 38 focused and 28 broad checks, then
+one four-policy control/shared/array/combined matrix. That matrix replaces the
+unrun shared-only screen. No full-workload benefit is established yet.
 
 Generated databases, native binaries, LLVM/object trees and per-run raw logs are
 not part of the Git checkpoint. The experiment directory's top-level summaries,
@@ -47,7 +67,11 @@ bundles remain local under this directory and the bounded scratch root
 export. Some reproduction scripts refer to scratch toolchain artifacts, so use
 their recorded commands/identities when reconstructing an environment.
 
-Next gates: finish the shared-view controls, validate precise class predicates,
+Lossless, verified compression of 73 completed/exported profiling logs reclaimed
+2,570,956,800 bytes. JSON summaries and small logs remain; use
+`retired-raw-log-compression-20261103.json` to restore any old plaintext filename.
+
+Next gates: finish the shared-view controls, validate precise array-layout reads,
 run the development-path language/retention gates and broader branch corpus,
 measure observation overhead, and revisit the remaining invalidation costs.
 Neither branch latency nor the proposed memory-halving goal is complete.

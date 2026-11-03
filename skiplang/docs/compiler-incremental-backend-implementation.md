@@ -592,13 +592,38 @@ the cache is retired; this partition policy stays disabled. The separate
 saves 1.3–2.7 seconds per branch direction and 87 MB, but makes ordinary edits
 roughly 0.07–0.11 seconds slower. Neither result meets the branch target.
 
-The newest precise-class-predicate control reproduces an identity function
-being optimized again after a reference-class layout addition. A default-off
-`SKC_PRECISE_CLASS_PREDICATES` candidate and executable regressions are written,
-but not yet compiled or validated. It narrows inline-cost estimation's reads
-of `isLambda` and value-class kind, retaining real layout/scalar dependencies.
-This work is distinct from the already frozen shared-callee-view optimized
-host now being built.
+The isolated class-predicate prototype was [rejected and removed](experiments/incremental-backend-20261101/class-predicate-rejection.json).
+Its diagnostic host builds and passes ten semantic checks, but fails its proposed
+locality assertion: narrowing inline-cost estimation to `isLambda` and value-class
+kind does not prevent either tested layout edit from reoptimizing the function.
+The identity fixture also changes its incoming IR and invalidates a
+`Runtime.LocalVariable` read. An unused-method probe was already cached in the
+control, so it provides no positive evidence. The patch, tests, frozen host and
+failed probes remain archived; no speedup or correctness regression is claimed.
+The separate shared-callee-view optimized host passes 30 focused and 28 broad
+incremental checks. Its matched timing and memory controls remain queued.
+
+A second [functional control](experiments/incremental-backend-20261101/array-slot-control-result.json)
+introduces a related covariant array specialization. The unchanged `slotRead`
+function is optimized and emitted to LLVM again, while native lowering stays
+cached. LLVM array addressing reads the full class just to obtain element
+layout. The default-off `SKC_PRECISE_ARRAY_SLOTS` prototype projects the optional
+`ArraySlotInfo`, preserving the existing error path for a missing layout and
+leaving sequential emission unchanged. Its diagnostic host builds and passes
+paired reuse, real stride changes, policy switches, removal/restore and the
+other focused checks. Eight checks passed initially; two graph checks were
+skipped because their wrapper variable was omitted, then both passed in an
+explicit follow-up. The original incomplete result is preserved. An optimized
+host is building for 38 focused and 28 broad checks, followed by matched
+control/shared/array/combined timing and memory measurements. This replaces the
+unrun shared-only screen and avoids repeating its full control. No full-workload
+benefit is established yet.
+
+Lossless compression of 73 completed/exported large profiling logs reclaimed
+2,570,956,800 bytes. Each compressed log was decoded and hash-checked before
+removing its plaintext copy; JSON summaries and small logs remain in place.
+See the [compression manifest](experiments/incremental-backend-20261101/retired-raw-log-compression-20261103.json)
+when reconstructing an older analysis that expects plaintext filenames.
 
 | Workstream | Implemented or observed | Still required |
 | --- | --- | --- |

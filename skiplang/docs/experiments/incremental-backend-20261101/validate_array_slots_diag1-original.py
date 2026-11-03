@@ -1,0 +1,25 @@
+import json, os, shutil, subprocess
+from pathlib import Path
+root=Path('/tmp/skip-incremental-next')
+tools=Path('/home/julienv/skip/skiplang/compiler/tools')
+evidence=tools.parents[1]/'docs/experiments/incremental-backend-20261101'
+result={}
+labels=[]
+def run(label, command, env=None, cwd=None):
+    labels.append(label)
+    result[label]=subprocess.call(['python3',str(tools/'incremental_profile.py'),'run','--root',str(root),'--label',label,'--timeout','1800','--',*command],env=env,cwd=cwd)
+    assert result[label]==0,(label,result[label])
+try:
+    run('build-array-slots-diag1',['python3',str(root/'build_array_slots_diag1.py')])
+    env=dict(os.environ,TMPDIR=str(root/'tmp'),SKC_FUNCTION_TEST_COMPILER=str(root/'bin/skc-array-slots-diag1'),SKSTORE_COMPACT_READERS='1',SKSTORE_CANONICAL_READ_PATHS='1',SKSTORE_BLOCK_READERS='1',SKSTORE_DELTA_LAZY_RETENTION='1',SKC_INDEX_VARIANCE='1',SKC_LAMBDA_SOURCE_ANCHORS='1',SKC_PRECISE_ARRAY_SLOTS='1')
+    run('array-slots-diag1-focused',['python3','-m','unittest','-v','test_array_slot_reads.ArraySlotReadTests','test_collection_graph.CollectionGraphTests.test_native_aliases_survive_edit_and_retraction','test_collection_graph.CollectionGraphTests.test_stable_declarations_preserve_return_and_exception_changes','test_optimizer_policy.OptimizerPolicyTests.test_optimization_changes_with_constants_and_coroutines','test_optimizer_policy.OptimizerPolicyTests.test_optimization_changes_without_source_edits'],env=env,cwd=tools)
+    log=(root/'runs/array-slots-diag1-focused/command.log').read_text()
+    assert 'Ran 10 tests' in log and 'skipped' not in log,log[-3000:]
+    result['complete']=True
+finally:
+    for label in labels:
+        if (root/'runs'/label/'run.json').exists():
+            result.setdefault('exports',{})[label]=subprocess.call(['python3',str(root/'export_bounded_functional.py'),label])
+    (root/'array-slots-preliminary-result.json').write_text(json.dumps(result,indent=2)+'\n')
+    for name in ['validate_array_slots_diag1.py','build_array_slots_diag1.py','array-slots-preliminary-result.json']:
+        shutil.copy2(root/name,evidence/name)

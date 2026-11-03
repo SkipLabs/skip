@@ -1976,6 +1976,18 @@ mutable class .AsmOutput{
     }
   }
 
+  mutable fun getArraySlotInfo(typ: Type, pos: Pos): ArraySlotInfo {
+    this.graphReads match {
+    | Some(reads) ->
+      id = typ match {
+      | Tclass(id, _) -> id
+      | Tsuperposition(unique, _) -> unique[0].sclassID
+      };
+      reads.getArraySlotInfo(id, pos)
+    | None() -> typ.exampleSClass(this.env).getArraySlotInfo(pos)
+    }
+  }
+
   mutable fun maybeGetScalarType(typ: Type): ?ScalarType {
     this.graphReads match {
     | Some(reads) ->
@@ -3153,7 +3165,7 @@ private fun llvmComputeArrayAddress(
 
   vec = optinfo.getInstr(vecID);
   vecType = vec.typ;
-  slotInfo = asm.exampleSClass(vecType).getArraySlotInfo(pos);
+  slotInfo = asm.common.getArraySlotInfo(vecType, pos);
 
   index = optinfo.getInstr(indexID);
 

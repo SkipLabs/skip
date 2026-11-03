@@ -3,15 +3,6 @@ module ClassInputs;
 class Key(id: SClassID) extends SKStore.Key
 class File(value: SClass) extends SKStore.File
 private class ScalarFile(value: ?ScalarType) extends SKStore.File
-private class PredicatesFile(
-  isLambda: Bool,
-  isValueClass: Bool,
-) extends SKStore.File
-
-private fun classPredicates(file: SKStore.File): PredicatesFile {
-  sc = File::type(file).value;
-  PredicatesFile(sc.isLambda, sc.kind.isValueClass())
-}
 
 fun writeClasses(
   writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
@@ -116,46 +107,13 @@ private fun exampleID(typ: Type): SClassID {
 mutable class Reader(
   context: mutable SKStore.Context,
   files: SKStore.EHandle<SKStore.Key, SKStore.File>,
-  precisePredicates: Bool = false,
   memoize: Bool = Environ.varOpt("SKC_DISABLE_CLASS_READER_MEMO").isNone(),
   classCache: mutable UnorderedMap<SClassID, SClass> = mutable UnorderedMap[],
   scalarCache: mutable UnorderedMap<
     SClassID,
     ?ScalarType,
   > = mutable UnorderedMap[],
-  predicateCache: mutable UnorderedMap<
-    SClassID,
-    PredicatesFile,
-  > = mutable UnorderedMap[],
 ) {
-  private mutable fun predicates(id: SClassID): PredicatesFile {
-    if (!this.precisePredicates) {
-      sc = this.getSClass(id);
-      return PredicatesFile(sc.isLambda, sc.kind.isValueClass())
-    };
-    if (this.memoize) {
-      this.predicateCache.maybeGet(id) match {
-      | Some(value) -> return value
-      | None() -> void
-      }
-    };
-    // Cost estimation needs these flags, not fields, methods or subtype sets.
-    // Keep this dependency distinct from full-class and scalar reads.
-    value = this.files.getArrayFilter(this.context, Key(id), classPredicates)[
-      0,
-    ];
-    if (this.memoize) this.predicateCache.set(id, value);
-    value
-  }
-
-  mutable fun isLambda(id: SClassID): Bool {
-    this.predicates(id).isLambda
-  }
-
-  mutable fun isValueClass(typ: Type): Bool {
-    this.predicates(exampleID(typ)).isValueClass
-  }
-
   mutable fun getSClass(id: SClassID): SClass {
     if (this.memoize) {
       this.classCache.maybeGet(id) match {
@@ -207,26 +165,6 @@ fun exampleSClass(
   reader: ?mutable Reader,
 ): SClass {
   getSClass(env, exampleID(typ), reader)
-}
-fun isLambda(
-  env: readonly ClassLookupEnv,
-  id: SClassID,
-  reader: ?mutable Reader,
-): Bool {
-  reader match {
-  | Some(value) -> value.isLambda(id)
-  | None() -> env.getSClass(id).isLambda
-  }
-}
-fun isValueClass(
-  typ: Type,
-  env: readonly ClassLookupEnv,
-  reader: ?mutable Reader,
-): Bool {
-  reader match {
-  | Some(value) -> value.isValueClass(typ)
-  | None() -> exampleSClass(typ, env, None()).kind.isValueClass()
-  }
 }
 fun getScalarType(
   typ: Type,
