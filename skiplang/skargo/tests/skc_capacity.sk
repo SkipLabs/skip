@@ -1,0 +1,20 @@
+module SkargoCapacityTests;
+
+// Check the effective child environment, including inheritance of an explicit
+// user limit. Run with SKIP_CAPACITY unset, empty, and set to exercise each case.
+@test
+fun test_compiler_persistent_capacity(): void {
+  expected = Environ.varOpt("SKIP_CAPACITY") match {
+  | Some(value) -> if (value == "") "64G" else value
+  | None() -> "64G"
+  };
+  process = Skargo.Skc(
+    "sh",
+    Array["-c", "printf '%s' \"$SKIP_CAPACITY\""],
+  ).process();
+  result = process.run();
+  SKTest.expectTrue(result.success(), result.stderr);
+  SKTest.expectEq(result.stdout, expected)
+}
+
+module end;

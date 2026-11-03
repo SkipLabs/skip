@@ -115,6 +115,11 @@ jobs:
           destination: backend-regressions
       - store_test_results:
           path: ~/test-results
+      - persist_to_workspace:
+          root: .
+          paths:
+            - skiplang/compiler/stage1/bin
+            - skiplang/compiler/stage1/lib
 
   skdb:
     docker:
@@ -168,9 +173,17 @@ jobs:
     parameters:
       dir:
         type: string
+      candidate_compiler:
+        type: boolean
+        default: false
     steps:
       - custom-checkout:
           submodules: true
+      - when:
+          condition: << parameters.candidate_compiler >>
+          steps:
+            - attach_workspace:
+                at: .
       - run:
           name: Run << parameters.dir >> tests
           # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
@@ -178,6 +191,12 @@ jobs:
           command: |
             mkdir -p ~/test-results
             root="$PWD"
+            if << parameters.candidate_compiler >>; then
+              export PATH="$root/skiplang/compiler/stage1/bin:$PATH"
+              # Compile the merged test driver sequentially; its fixtures still
+              # exercise development builds through the candidate compiler.
+              export SKTEST_SKCOPT=--release
+            fi
             cd << parameters.dir >>
             SKTEST_JOBS=2 SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
               "$root/bin/run-sktest.sh"

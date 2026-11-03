@@ -52,6 +52,12 @@ while [ "${#queue[@]}" -gt 0 ]; do
   done
 done
 
+# Skargo's incremental integration tests exercise the compiler from this checkout.
+# Schedule its producer even when only the driver changed.
+if ${SK_CHANGED[skiplang/skargo]:-false}; then
+  SK_CHANGED[skiplang/compiler]=true
+fi
+
 check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
@@ -128,6 +134,15 @@ for dir in "${!SK_CHANGED[@]}"; do
       skiplang/compiler)
         echo "      - compiler"
         NAMES+=(compiler)
+        ;;
+      skiplang/skargo)
+        echo "      - skip-package-tests:"
+        echo "          dir: $dir"
+        echo "          name: skargo"
+        echo "          candidate_compiler: true"
+        echo "          requires:"
+        echo "            - compiler"
+        NAMES+=(skargo)
         ;;
       *)
         name=$(basename "$dir")
