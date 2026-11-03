@@ -115,6 +115,20 @@ void sk_obstack_attach_page(sk_obstack_t* lpage, sk_obstack_t* next) {
   page->previous = lpage;
 }
 
+// Keep predecessor descriptors current as source pages are removed. A saved
+// predecessor may otherwise already belong to the destination heap, so
+// unlinking through that stale pointer can create a cycle in the destination's
+// page chain.
+void sk_obstack_unlink_page(sk_cell_t* entry, sk_cell_t* pages, size_t count) {
+  sk_obstack_t* source = entry->key;
+  sk_obstack_t* previous = source->previous;
+  if (entry->next != NULL) {
+    ((sk_obstack_t*)entry->next)->previous = previous;
+  }
+  size_t index = sk_get_obstack_idx((char*)previous, pages, count);
+  if (index < count) pages[index].next = entry->next;
+}
+
 char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(sk_obstack_t);
   // SKIP32

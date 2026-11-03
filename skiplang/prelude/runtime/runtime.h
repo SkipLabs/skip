@@ -4,7 +4,6 @@
  * additional dependency makes it more challenging.
  */
 /*****************************************************************************/
-#define SK_FTABLE_SIZE 64
 
 #ifndef SKIP_RUNTIME
 #define SKIP_RUNTIME 1
@@ -80,9 +79,6 @@ void sk_print_ctx_table();
 /* Types used for the Obstack pages. */
 /*****************************************************************************/
 
-#ifdef SKIP32
-typedef struct sk_size_info sk_size_info_t;
-#endif
 typedef struct sk_obstack sk_obstack_t;
 
 /*****************************************************************************/
@@ -328,6 +324,7 @@ void*(memset)(void* b, int c, size_t len);
 
 char* SKIP_Obstack_alloc(size_t size);
 uint32_t SKIP_String_byteSize(char* str);
+void sk_obstack_unlink_page(sk_cell_t*, sk_cell_t*, size_t);
 void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages);
 uint32_t SKIP_getArraySize(char*);
 char* SKIP_get_free_slot(uint32_t);
@@ -359,10 +356,7 @@ Context SKIP_get_fork_context(Contexts, Fork);
 sk_contexts_with_actions_t SKIP_check_fork_context(Contexts, Fork, Context);
 uint32_t SKIP_has_fork_context(Contexts, Fork);
 
-#ifdef SKIP32
-void sk_add_ftable(void*, sk_size_info_t);
-void* sk_get_ftable(sk_size_info_t);
-#else
+#ifdef SKIP64
 void sk_add_ftable(void* ptr, size_t size);
 void* sk_get_ftable(size_t size);
 #endif
@@ -379,7 +373,6 @@ size_t sk_page_size(sk_obstack_t* page);
 void* sk_palloc(size_t size);
 void sk_persist_consts();
 void sk_pfree_size(void*, size_t);
-size_t sk_pow2_size(size_t);
 void sk_print_int(SkipInt);
 void sk_staging();
 char* sk_string_create(const char* buffer, uint32_t size);

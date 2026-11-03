@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
@@ -11,6 +15,34 @@
 #include <unistd.h>
 
 #include "runtime.h"
+
+// Capture pipes must not leak into unrelated concurrent subprocesses. Linux
+// creates these descriptors atomically; the portable path synchronizes its
+// pipe/fcntl window with this runtime's spawn calls. The override lets native
+// tests exercise the portable implementation on Linux too.
+#if defined(__linux__) && !defined(SKIP_POSIX_PIPE_FALLBACK)
+#define SKIP_ATOMIC_CAPTURE_PIPE 1
+#else
+#define SKIP_ATOMIC_CAPTURE_PIPE 0
+#include <pthread.h>
+static pthread_mutex_t capture_pipe_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void capture_pipe_lock(void) {
+  int error = pthread_mutex_lock(&capture_pipe_mutex);
+  if (error) {
+    fprintf(stderr, "capture pipe lock: %s\n", strerror(error));
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void capture_pipe_unlock(void) {
+  int error = pthread_mutex_unlock(&capture_pipe_mutex);
+  if (error) {
+    fprintf(stderr, "capture pipe unlock: %s\n", strerror(error));
+    exit(EXIT_FAILURE);
+  }
+}
+#endif
 
 int64_t SKIP_posix_open(char* path, int64_t oflag, int64_t mode) {
   sk_string_check_c_safe(path);
@@ -96,6 +128,33 @@ char* SKIP_posix_pipe() {
     perror("pipe");
     exit(EXIT_FAILURE);
   }
+  return sk_create_posix_pipe((int64_t)fds[0], (int64_t)fds[1]);
+}
+
+// Popen uses this private entry point. Preserve the public Posix.pipe behavior
+// for callers that deliberately pass inheritable descriptors to subprocesses.
+char* SKIP_posix_pipe_cloexec() {
+  int fds[] = {-1, -1};
+#if SKIP_ATOMIC_CAPTURE_PIPE
+  if (pipe2(fds, O_CLOEXEC) == -1) {
+    perror("pipe2");
+    exit(EXIT_FAILURE);
+  }
+#else
+  capture_pipe_lock();
+  if (pipe(fds) == -1) {
+    perror("pipe");
+    exit(EXIT_FAILURE);
+  }
+  for (int i = 0; i < 2; ++i) {
+    int flags = fcntl(fds[i], F_GETFD);
+    if (flags == -1 || fcntl(fds[i], F_SETFD, flags | FD_CLOEXEC) == -1) {
+      perror("capture pipe close-on-exec");
+      exit(EXIT_FAILURE);
+    }
+  }
+  capture_pipe_unlock();
+#endif
   return sk_create_posix_pipe((int64_t)fds[0], (int64_t)fds[1]);
 }
 
@@ -257,9 +316,15 @@ int64_t SKIP_posix_spawnp(char* skargv, char* skenvp, char* file_actionsp) {
 
   pid_t pid = -1;
 
+#if !SKIP_ATOMIC_CAPTURE_PIPE
+  capture_pipe_lock();
+#endif
   int rv =
       posix_spawnp(&pid, argv[0], (posix_spawn_file_actions_t*)file_actionsp,
                    NULL, argv, envp);
+#if !SKIP_ATOMIC_CAPTURE_PIPE
+  capture_pipe_unlock();
+#endif
   free(argv);
   free(envp);
 

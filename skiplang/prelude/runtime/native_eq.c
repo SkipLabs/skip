@@ -65,7 +65,7 @@ SkipInt SKIP_native_eq_obj(sk_stack_t* st, char* obj1, char* obj2) {
         void* ptr2 = *((void**)ohead2);
 
         if (ptr1 != ptr2) {
-          if (ty1->m_refMask[mask_slot] & (1 << i)) {
+          if ((ty1->m_refMask[mask_slot] >> i) & 1) {
             sk_stack_push(st, ptr1, ptr2);
           } else {
             return 1;

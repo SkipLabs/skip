@@ -43,6 +43,9 @@ magic.c:
 libskip_runtime32.bc: $(BCFILES32)
 	llvm-link $(BCFILES32) -o $@
 
+memory.bc: alloc_size_classes.h
+palloc.o: alloc_size_classes.h
+
 %.bc: %.c
 	clang $(CC32FLAGS) -o $@ -c $<
 
