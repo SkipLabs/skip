@@ -1,0 +1,83 @@
+module alias O = OuterIstToIR;
+module ClassConflictTests;
+
+class EquivalentFootprintKey(id: Int, payload: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    this.id.compare(EquivalentFootprintKey::keyType(other).id)
+  }
+}
+
+fun normalized(
+  groups: SortedMap<String, SortedSet<String>>,
+): Array<(String, Array<String>)> {
+  groups.items().map(entry -> (entry.i0, entry.i1.toArray())).collect(Array)
+}
+
+fun check(attempts: SortedMap<String, O.ClassGroupAttempt>): void {
+  expected = normalized(O.joinClassGroups(attempts));
+  actual = normalized(O.joinClassGroups(attempts, true));
+  invariant(actual == expected, "Streaming conflicts changed the partition")
+}
+
+untracked fun main(): void {
+  check(SortedMap[]);
+  state = 9137;
+  for (sample in Range(0, 256)) {
+    attempts = SortedMap<String, O.ClassGroupAttempt>[];
+    for (group in Range(0, sample % 19)) {
+      reads = SortedSet<SKStore.Key>[];
+      writes = SortedSet<SKStore.Key>[];
+      exclusive = SortedSet<SKStore.Key>[];
+      for (key in Range(0, sample % 37)) {
+        !state = (state * 25173 + 13849) % 65536;
+        bits = state.shr(8).and(7);
+        name: SKStore.Key = if (sample % 2 == 0) SKStore.IID(key) else {
+          EquivalentFootprintKey(key, group)
+        };
+        if (bits.and(1) != 0) !reads = reads.set(name);
+        if (bits.and(2) != 0) {
+          !writes = writes.set(name);
+          if (bits.and(4) != 0) !exclusive = exclusive.set(name)
+        }
+      };
+      root = "family" + group;
+      families = SortedSet[root];
+      if (group % 3 == 0) !families = families.set(root + ".joined");
+      !attempts[root] = O.ClassGroupAttempt(
+        families,
+        O.ClassAttemptFootprint(reads, writes, exclusive, 0),
+        SortedMap[],
+      )
+    };
+    check(attempts)
+  };
+  for (mask in Range(0, 256)) {
+    families = SortedSet<String>[];
+    for (index in Range(0, 8)) {
+      if (mask.and(1.shl(index)) != 0) !families = families.set("family" + index)
+    };
+    old = SortedMap<String, SortedSet<String>>[];
+    for (bucket in Range(0, 5)) {
+      members = SortedSet<String>[];
+      for (index in Range(0, 12)) {
+        if ((index + bucket + mask) % 3 != 0) {
+          !members = members.set("family" + index)
+        }
+      };
+      !old["old" + bucket] = members
+    };
+    seeded = O.seedClassGroupPartition(families, old);
+    seen = SortedSet<String>[];
+    count = 0;
+    for ((root, members) in seeded.items()) {
+      invariant(root == members.min().fromSome(), "Unstable hint root");
+      !seen = seen.union(members);
+      !count = count + members.size()
+    };
+    invariant(seen.toArray() == families.toArray(), "Hints changed the live family set");
+    invariant(count == seen.size(), "Hints duplicated a family")
+  };
+  print_raw("256 footprint comparisons and 256 hint partitions passed\n")
+}
+
+module end;

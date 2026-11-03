@@ -1,0 +1,66 @@
+{
+  "default_enabled": false,
+  "status": "Focused and broad native validation passed; isolated performance gate pending.",
+  "runs": [
+    {
+      "label": "build-stable-declarations-diag1",
+      "returncode": 1,
+      "seconds": 13.319556298,
+      "sampled_peak_summed_rss": 2096517120
+    },
+    {
+      "label": "build-stable-declarations-diag1-corrected",
+      "returncode": 0,
+      "seconds": 186.895061793,
+      "sampled_peak_summed_rss": 15837908992
+    },
+    {
+      "label": "stable-declarations-focused",
+      "returncode": 1,
+      "seconds": 20.401799176,
+      "sampled_peak_summed_rss": 1237749760
+    },
+    {
+      "label": "stable-declarations-focused-corrected",
+      "returncode": 1,
+      "seconds": 23.891838219,
+      "sampled_peak_summed_rss": 1386332160
+    },
+    {
+      "label": "stable-declarations-throw-return",
+      "returncode": 0,
+      "seconds": 14.498671257,
+      "sampled_peak_summed_rss": 1374486528
+    },
+    {
+      "label": "stable-declarations-diag1-regressions",
+      "returncode": 0,
+      "seconds": 542.807525208,
+      "sampled_peak_summed_rss": 8563433472
+    },
+    {
+      "label": "build-stable-declarations-optimized",
+      "returncode": 0,
+      "seconds": 645.33726363,
+      "sampled_peak_summed_rss": 18041327616
+    },
+    {
+      "label": "stable-declarations-optimized-graph-tests",
+      "returncode": 0,
+      "seconds": 73.065159617,
+      "sampled_peak_summed_rss": 1257185280
+    }
+  ],
+  "host": {
+    "binary_sha256": "071a7dabf61f9c854ddd76477661c37efb8e753961cb3528691472f48e23320f",
+    "generated_llvm_sha256": "a49ab1924102a26a95fd10a6e18e99ad4d79b6d8437c1860dbf799e5eb42472e",
+    "optimization": "Skip O2 release, native Clang O2",
+    "source_identity": "host-stable-declarations-diag1-source-identity.json",
+    "runtime_identity": "runtime-reference-mask-native-identity.json"
+  },
+  "findings": [
+    "The first build failed on using StringIterator.collectString after generic Iterator.take. Corrected by streaming characters directly.",
+    "The first fixture did not require a virtual-table declaration; corrected to exercise dispatch through two classes. The separate return/throw fixture uses separate function modules.",
+    "Corrected virtual dispatch locality and exception/return tests pass. All 28 broad incremental regressions and all 8 optimized graph tests pass. These are functional runs, not latency evidence."
+  ]
+}

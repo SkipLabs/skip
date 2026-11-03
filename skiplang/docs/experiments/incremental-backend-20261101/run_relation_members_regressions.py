@@ -1,0 +1,21 @@
+import os
+from pathlib import Path
+import subprocess
+
+root = Path('/tmp/skip-incremental-next')
+mode = root/'test-modes/relation-members-all'
+mode.mkdir(exist_ok=True)
+text = (root/'test-modes/error-cleanup-all/skc').read_text().replace(
+    'skc-error-cleanup-diag1', 'skc-relation-members-diag2').replace(
+    'for option in ', 'for option in --split-support-module ')
+(mode/'skc').write_text(text)
+(mode/'skc').chmod(0o755)
+env = dict(os.environ, TMPDIR=str(root/'tmp'), PATH=str(mode)+os.pathsep+os.environ['PATH'],
+           SKC_HIERARCHICAL_DISCOVERY='1', SKC_BATCH_CACHED_SPECIALIZATION='1',
+           SKC_CHECKPOINT_BACKEND_PHASES='1', SKC_SPECIALIZER_ISOLATION_AUDIT='1',
+           SKC_ARCHIVE_METADATA_CACHE='1', SKC_ARCHIVE_ENCODING_CACHE='1')
+raise SystemExit(subprocess.call(['python3',
+    '/home/julienv/skip/skiplang/compiler/tools/incremental_profile.py', 'run',
+    '--root', str(root), '--label', 'relation-members-diag2-regressions', '--timeout', '1200', '--',
+    str(root/'test-harness/retention-tests'), 'incremental', '--jobs', '1'],
+    cwd='/home/julienv/skip/skiplang/compiler', env=env))

@@ -1,0 +1,48 @@
+{
+  "original_llvm_sha256": "bbfd883a63dc95ca20ef58f8af3d6a67183248383a0a4a811bb71969091fb9dc",
+  "control_llvm_identical": true,
+  "variants": {
+    "control": {
+      "llvm_sha256": "bbfd883a63dc95ca20ef58f8af3d6a67183248383a0a4a811bb71969091fb9dc",
+      "binary_sha256": "a9c3695758b3de77bd5e9f34f4db741fa537097d1b8cd7374672e19b4be7a5fd",
+      "command": [
+        "/tmp/skip-incremental-next/bin/skc-groups",
+        "-L",
+        "/tmp/skip-incremental-next/host-support-compact-readers",
+        "-l",
+        "std=/tmp/skip-incremental-next/host-support-compact-readers/libstd.sklib",
+        "-l",
+        "skc=/tmp/skip-incremental-next/host-compact-readers-diag1/libskc.sklib",
+        "--export-function-as",
+        "main=skip_main",
+        "-O2",
+        "--release",
+        "--link-args=-O0",
+        "-o",
+        "/tmp/skip-incremental-next/compact-readers-gc-names/control/skc"
+      ]
+    },
+    "named": {
+      "llvm_sha256": "4e60df805d384c24577db7e00b3f8e714aa3840611dcb53cd707bdff57d7c879",
+      "binary_sha256": "5b56b810fd6071eb0d32bf3bdc0f6834589d7e2667b8262446cbcb870528b434",
+      "command": [
+        "/tmp/skip-incremental-next/bin/skc-groups",
+        "-L",
+        "/tmp/skip-incremental-next/host-support-compact-readers",
+        "-l",
+        "std=/tmp/skip-incremental-next/host-support-compact-readers/libstd.sklib",
+        "-l",
+        "skc=/tmp/skip-incremental-next/host-compact-readers-diag1/libskc.sklib",
+        "--export-function-as",
+        "main=skip_main",
+        "-O2",
+        "--link-args=-O0",
+        "-o",
+        "/tmp/skip-incremental-next/compact-readers-gc-names/named/skc",
+        "--use-specialized-names"
+      ]
+    }
+  },
+  "diagnostic_only": true,
+  "source_reason": "In the frozen compiler, Config.release affects GC names and LLVM unreachable explanations; useSpecializedNames affects GC names. No persistent/incremental build is used."
+}

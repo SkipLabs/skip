@@ -793,6 +793,27 @@ base class EagerDir protected {
     this with {timeStack}
   }
 
+  // Count physical buffers separately from compacted rows: newer entries can
+  // shadow older ones, so these must not be described as logical row counts.
+  fun retentionCounts(): SortedMap<String, Int> {
+    values = 0;
+    tombs = 0;
+    for (sources in this.data.data.values()) {
+      for (_ in sources.items()) !values = values + 1
+    };
+    for (sources in this.data.tombs.values()) {
+      for (_ in sources.items()) !tombs = tombs + 1
+    };
+    SortedMap[
+      "eager_buffered_values" => values,
+      "eager_buffered_tombs" => tombs,
+      "eager_fixed_values" => this.fixedData.data.size(),
+      "eager_fixed_tombs" => this.fixedData.tombs.size(),
+      "eager_buffered_mappers" => this.old.size(),
+      "eager_fixed_mappers" => this.fixedOld.size(),
+    ]
+  }
+
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -1712,12 +1733,15 @@ base class EagerDir protected {
     reused = 0;
     for ((key, values) in writes.items()) {
       oldValues = this.getArraySourceKey(source, key);
-      !result = result.set(key, if (equalFileArrays(values, oldValues)) {
-        !reused = reused + 1;
-        oldValues
-      } else {
-        values
-      });
+      !result = result.set(
+        key,
+        if (equalFileArrays(values, oldValues)) {
+          !reused = reused + 1;
+          oldValues
+        } else {
+          values
+        },
+      );
     };
     (result, reused)
   }

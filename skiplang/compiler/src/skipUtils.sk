@@ -113,8 +113,10 @@ fun runCompilerPhase<T>(phaseName: String, phase: () -> T): T {
     // Monotonic (steady_clock), nanosecond-resolution elapsed time.
     start = Time.time_ns();
     result = phase();
-    elapsed = Time.time_ns() - start;
+    end = Time.time_ns();
+    elapsed = end - start;
     print_error(`##TIME## ${phaseName} ${elapsed}\n`);
+    print_error(`##SPAN## ${start} ${end} phase ${phaseName}\n`);
     result
   }
 }

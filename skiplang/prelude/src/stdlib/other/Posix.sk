@@ -41,6 +41,10 @@ fun lseek(fd: Int, offset: Int, whence: SeekWhence): Int {
 untracked native fun pipe(): Pipe;
 
 @allow_tracked_call
+@cpp_extern("SKIP_posix_pipe_cloexec")
+untracked native private fun capturePipe(): Pipe;
+
+@allow_tracked_call
 @cpp_extern("SKIP_posix_dup")
 untracked native fun dup(fd: Int): Int;
 
@@ -328,9 +332,9 @@ mutable class Popen(
     stderr: Bool = false,
   }: Result<mutable Popen, IO.Error> {
     file_actions = SpawnFileActions::init();
-    stdin_pipe = if (stdin) Some(pipe()) else None();
-    stdout_pipe = if (stdout) Some(pipe()) else None();
-    stderr_pipe = if (stderr) Some(pipe()) else None();
+    stdin_pipe = if (stdin) Some(capturePipe()) else None();
+    stdout_pipe = if (stdout) Some(capturePipe()) else None();
+    stderr_pipe = if (stderr) Some(capturePipe()) else None();
     stdin_pipe.each(pipe -> {
       file_actions.dup2(pipe.output, IO.stdin().fileno);
       file_actions.close(pipe.input);

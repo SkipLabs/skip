@@ -17,7 +17,10 @@ fun createOptimizedFunctions(
   })
 }
 
-fun finishOptimizedFunctions(env: GlobalEnv, _config: Config.Config): GlobalEnv {
+fun finishOptimizedFunctions(
+  env: GlobalEnv,
+  _config: Config.Config,
+): GlobalEnv {
   // Find all the functions that are still reachable from the root set,
   // post-inlining, dead code elimination, etc.
   !env.sfuns = findAllReachableFuns(
@@ -165,7 +168,11 @@ fun getLinkArgs(
   }
 }
 
-fun runShell(args: Array<String>, verbose: Bool = false): void {
+fun runShell(
+  args: Array<String>,
+  verbose: Bool = false,
+  throwOnFailure: Bool = false,
+): void {
   if (verbose) {
     print_error(">> " + args.join(" "))
   };
@@ -183,6 +190,13 @@ fun runShell(args: Array<String>, verbose: Bool = false): void {
     },
   ).fromSuccess();
   if (!p.success()) {
+    if (throwOnFailure) {
+      // Parallel artifact workers must finish/join their children before the
+      // main thread reports failure. Exiting here would abandon sibling jobs.
+      throw SkipError.CompileFailureException{
+        message => "Native command failed: " + args.join(" ") + "\n" + p.stderr,
+      }
+    };
     if (!verbose) {
       print_error_raw(p.stderr)
     };
@@ -224,6 +238,7 @@ class SpecializerDirFile(
 
 class SpecializerProgress(
   dir: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  view: O.SpecializerView,
   round: Int,
   reads: SortedSet<SKStore.Path>,
   dirs: SortedSet<SKStore.DirName>,
@@ -233,6 +248,23 @@ class SpecializerProgress(
 const pipelinePhaseKey: String = "COMPILER_PIPELINE_PHASE";
 const invocationConfigKey: String = "COMPILER_INVOCATION_CONFIG";
 const specializationProgressKey: String = "COMPILER_SPECIALIZATION_PROGRESS";
+const discoveryStoragePolicyKey: String = "COMPILER_DISCOVERY_STORAGE_POLICY";
+const discoveryHierarchyPolicyKey: String = "COMPILER_DISCOVERY_HIERARCHY_POLICY";
+const classPartitionPolicyKey: String = "COMPILER_CLASS_PARTITION_POLICY";
+const varianceIndexPolicyKey: String = "COMPILER_VARIANCE_INDEX_POLICY";
+const closureBodyPolicyKey: String = "COMPILER_CLOSURE_BODY_POLICY";
+const lambdaAnchorPolicyKey: String = "COMPILER_LAMBDA_ANCHOR_POLICY";
+const specializationWorkKey: String = "COMPILER_SPECIALIZATION_WORK";
+
+// Scheduling observation only; never an input to a semantic compiler result.
+// Keep the mapper definition independent of the invocation's batching option.
+fun markSpecializationWork(context: mutable SKStore.Context): void {
+  context.getGlobal(specializationWorkKey) match {
+  | Some(SKStore.BoolFile(false)) ->
+    context.setGlobal(specializationWorkKey, SKStore.BoolFile(true))
+  | _ -> void
+  }
+}
 
 // Frontend errors for the current unit (empty/absent on success). The
 // backend checks this once before entering specialization and throws on
@@ -285,6 +317,12 @@ fun mergeSpecializerFiles(
     O.SortedSetSClassIDFile(y),
   ) ->
     O.SortedSetSClassIDFile(x.union(y))
+  | (
+    O.GClassArgumentKey _,
+    O.SortedSetSClassIDFile(x),
+    O.SortedSetSClassIDFile(y),
+  ) ->
+    O.SortedSetSClassIDFile(x.union(y))
   | (O.SupertypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y))
   | (O.SubtypesKey _, O.SortedSetSClassIDFile(x), O.SortedSetSClassIDFile(y)) ->
     O.SortedSetSClassIDFile(x.union(y))
@@ -323,6 +361,7 @@ fun mergeFun(
   };
   key match {
   | O.GClassNameKey _
+  | O.GClassArgumentKey _
   | O.SubtypesKey _
   | O.SupertypesKey _ ->
     // Each writer contributes only its newly discovered relationships. Keep
@@ -370,6 +409,38 @@ fun mergeFun(
   }
 }
 
+// Discovery overlays store replacement values. Relationship writes are
+// additions, so fold the preceding set into just the keys changed this round.
+// Retractions rerun this reducer and its tracked base read, rather than keeping
+// a union containing contributions from an obsolete producer.
+fun mergeDiscoveryDelta(
+  context: mutable SKStore.Context,
+  writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+  key: SKStore.Key,
+  values: mutable SKStore.NonEmptyIterator<SKStore.File>,
+  previous: O.SpecializerView,
+): void {
+  key match {
+  | O.GClassNameKey _
+  | O.GClassArgumentKey _
+  | O.SubtypesKey _
+  | O.SupertypesKey _ ->
+    ids = SortedSet<SClassID>[];
+    for (file in previous.getArray(context, key)) {
+      !ids = O.SortedSetSClassIDFile::type(file).value;
+    };
+    for (file in values) {
+      file match {
+      | O.SortedSetSClassIDFile(additions) -> !ids = ids.union(additions)
+      | O.SClassIDFile(id) -> !ids = ids.set(id)
+      | _ -> invariant_violation("Unexpected discovery relation contribution")
+      }
+    };
+    writer.set(key, O.SortedSetSClassIDFile(ids))
+  | _ -> mergeFun(context, writer, key, values)
+  }
+}
+
 // Attach the completed relation sets one class at a time. Each row reads only
 // its own relation keys and publishes a class diff; the ordinary round merger
 // forwards the remaining state without merging old and updated class records.
@@ -379,34 +450,36 @@ fun latchSpecializerClasses(
   configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
   converter: O.Converter,
 ): SKStore.EHandle<SKStore.Key, SKStore.File> {
-  input.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/latch-classes/"),
-    (context, writer, key, values) ~> {
-      key match {
-      | O.SClassIDKey(id) ->
-        info = O.SClassInfoFile::type(values.first).value;
-        config = configDir.getArray(context, SKStore.IID(0))[0].value;
-        sp = O.Specializer::make(input, context, config, converter);
-        sp.!canCreateNewSClasses = false;
-        !info.sclass = info.sclass with {
-          subtypes => sp.trackedSubtypesGet(id),
-          supertypes => sp.trackedSupertypesGet(id),
-        };
-        sp.sclassSet(id, info);
-        sp.writeDiff(writer)
-      | _ -> writer.set(key, OldFile(values.toArray()))
-      }
-    },
-  ).map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/latch-classes-merged/"),
-    mergeFun,
-  )
+  input
+    .map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/latch-classes/"),
+      (context, writer, key, values) ~> {
+        key match {
+        | O.SClassIDKey(id) ->
+          info = O.SClassInfoFile::type(values.first).value;
+          config = configDir.getArray(context, SKStore.IID(0))[0].value;
+          sp = O.Specializer::make(input, context, config, converter);
+          sp.!canCreateNewSClasses = false;
+          !info.sclass = info.sclass with {
+            subtypes => sp.trackedSubtypesGet(id),
+            supertypes => sp.trackedSupertypesGet(id),
+          };
+          sp.sclassSet(id, info);
+          sp.writeDiff(writer)
+        | _ -> writer.set(key, OldFile(values.toArray()))
+        }
+      },
+    )
+    .map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/latch-classes-merged/"),
+      mergeFun,
+    )
 }
 
 // Each class owns its scalarized fields and array-slot representation. Nested
@@ -418,30 +491,32 @@ fun scalarizeSpecializerClasses(
   configDir: SKStore.EHandle<SKStore.IID, SpecializationConfigFile>,
   converter: O.Converter,
 ): SKStore.EHandle<SKStore.Key, SKStore.File> {
-  input.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/scalarize-fields/"),
-    (context, writer, key, values) ~> {
-      key match {
-      | O.SClassIDKey _ ->
-        info = O.SClassInfoFile::type(values.first).value;
-        config = configDir.getArray(context, SKStore.IID(0))[0].value;
-        sp = O.Specializer::make(input, context, config, converter);
-        sp.!canCreateNewSClasses = false;
-        sp.scalarizeFields(info);
-        sp.writeDiff(writer)
-      | _ -> writer.set(key, OldFile(values.toArray()))
-      }
-    },
-  ).map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/scalarize-fields-merged/"),
-    mergeFun,
-  )
+  input
+    .map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/scalarize-fields/"),
+      (context, writer, key, values) ~> {
+        key match {
+        | O.SClassIDKey _ ->
+          info = O.SClassInfoFile::type(values.first).value;
+          config = configDir.getArray(context, SKStore.IID(0))[0].value;
+          sp = O.Specializer::make(input, context, config, converter);
+          sp.!canCreateNewSClasses = false;
+          sp.scalarizeFields(info);
+          sp.writeDiff(writer)
+        | _ -> writer.set(key, OldFile(values.toArray()))
+        }
+      },
+    )
+    .map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/scalarize-fields-merged/"),
+      mergeFun,
+    )
 }
 
 fun layoutSpecializerClasses(
@@ -459,11 +534,14 @@ fun layoutSpecializerClasses(
       key match {
       | O.SClassIDKey _ ->
         sc = O.SClassInfoFile::type(values.first).value.sclass;
-        writer.set(SKStore.UnitID::singleton, O.FieldLayoutShapeFile(
-          sc.id,
-          SortedSet::createFromItems(sc.fields.map(field -> field.name)),
-          sc.subtypes,
-        ))
+        writer.set(
+          SKStore.UnitID::singleton,
+          O.FieldLayoutShapeFile(
+            sc.id,
+            SortedSet::createFromItems(sc.fields.map(field -> field.name)),
+            sc.subtypes,
+          ),
+        )
       | _ -> void
       }
     },
@@ -484,17 +562,29 @@ fun layoutSpecializerClasses(
     x ~> x,
     context,
     Array[
-      (input, ((_, writer, key, values) ~> {
-        writer.set(key, OldFile(values.toArray()))
-      }, None())),
-      (groups, ((context, writer, _, values) ~> {
-        group = O.FieldLayoutGroupFile::type(values.first);
-        config = configDir.getArray(context, SKStore.IID(0))[0].value;
-        sp = O.Specializer::make(input, context, config, converter);
-        sp.!canCreateNewSClasses = false;
-        O.layoutSpecializerGroup(sp, config, group.classes);
-        sp.writeDiff(writer)
-      }, None())),
+      (
+        input,
+        (
+          (_, writer, key, values) ~> {
+            writer.set(key, OldFile(values.toArray()))
+          },
+          None(),
+        ),
+      ),
+      (
+        groups,
+        (
+          (context, writer, _, values) ~> {
+            group = O.FieldLayoutGroupFile::type(values.first);
+            config = configDir.getArray(context, SKStore.IID(0))[0].value;
+            sp = O.Specializer::make(input, context, config, converter);
+            sp.!canCreateNewSClasses = false;
+            O.layoutSpecializerGroup(sp, config, group.classes);
+            sp.writeDiff(writer)
+          },
+          None(),
+        ),
+      ),
     ],
     SKStore.DirName::create("/specializer/layout-fields/"),
   ).map(
@@ -513,75 +603,135 @@ fun createFunctionIRMaps(
   converter: O.Converter,
   identities: SKStore.LHandle<O.GFunKeyKey, SKStore.IntFile>,
   common: SKStore.EHandle<SKStore.IID, O.FunctionIRSharedFile>,
+  backendConfig: SKStore.EHandle<SKStore.IID, ConfigFile>,
 ): void {
-  shared = input.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/function-ir-shared/"),
-    (context, writer, key, values) ~> {
-      // Forwarded relations and ignored discovery keys do not read config.
-      // Register it only on the class rows whose method tables need resolving.
-      config = if (key is O.SClassIDKey _) {
-        Some(configDir.getArray(context, SKStore.IID(0))[0].value)
-      } else {
-        None()
-      };
-      O.publishFunctionIRClassState(
-        context, writer, key, values, input, config, converter, identities,
-      )
-    },
+  shared = runCompilerPhase("function-ir/class-publication", () ->
+    input.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/function-ir-shared/"),
+      (context, writer, key, values) ~> {
+        // Forwarded relations and ignored discovery keys do not read config.
+        // Register it only on the class rows whose method tables need resolving.
+        config = if (key is O.SClassIDKey _) {
+          Some(configDir.getArray(context, SKStore.IID(0))[0].value)
+        } else {
+          None()
+        };
+        O.publishFunctionIRClassState(
+          context,
+          writer,
+          key,
+          values,
+          input,
+          config,
+          converter,
+          identities,
+        )
+      },
+    )
   );
-  plan = input.map(
-    x ~> x,
-    x ~> x,
-    context,
-    SKStore.DirName::create("/specializer/function-ir-plan/"),
-    (context, writer, key, values) ~>
-      O.planFunctionIR(context, writer, key, values, identities)
-    ,
+  plan = runCompilerPhase("function-ir/planning", () ->
+    input.map(
+      x ~> x,
+      x ~> x,
+      context,
+      SKStore.DirName::create("/specializer/function-ir-plan/"),
+      (context, writer, key, values) ~>
+        O.planFunctionIR(context, writer, key, values, identities)
+      ,
+    )
   );
   // The active identity aggregate is separate from the body rows. It stays
   // cached when only a function body or an unused method changes.
-  _ = common.map(
-    SKStore.IID::keyType,
-    O.FunctionIRIdentityAggregateFile::type,
-    context,
-    SKStore.DirName::create("/specializer/function-ir-identities/"),
-    (context, writer, key, _values) ~>
-      writer.set(key, O.collectFunctionIRIdentities(context, plan))
-    ,
+  _ = runCompilerPhase("function-ir/identities", () ->
+    common.map(
+      SKStore.IID::keyType,
+      O.FunctionIRIdentityAggregateFile::type,
+      context,
+      SKStore.DirName::create("/specializer/function-ir-identities/"),
+      (context, writer, key, _values) ~> {
+        config = backendConfig.getArray(context, SKStore.IID(0))[0].value;
+        if (!BackendProgram::classHeadersEnabled(context, config)) {
+          writer.set(key, O.collectFunctionIRIdentities(context, plan))
+        }
+      },
+    )
   );
-  generic = ParallelPhases.map(
-    plan,
-    x ~> x,
-    O.GFunctionFile::type,
-    context,
-    SKStore.DirName::create("/specializer/generic-function-ir/"),
-    "generic-ir",
-    (context, writer, key, values) ~>
-      O.generateGenericFunctionIR(context, writer, key, values, converter)
-    ,
+  generic = runCompilerPhase("function-ir/generic", () ->
+    ParallelPhases.map(
+      plan,
+      x ~> x,
+      O.GFunctionFile::type,
+      context,
+      SKStore.DirName::create("/specializer/generic-function-ir/"),
+      "generic-ir",
+      (context, writer, key, values) ~>
+        O.generateGenericFunctionIR(context, writer, key, values, converter)
+      ,
+    )
   );
-  _ = ParallelPhases.map(
-    plan,
-    x ~> x,
-    O.SpecializedFunctionFile::type,
-    context,
-    SKStore.DirName::create("/specializer/function-ir/"),
-    "function-ir",
-    (context, writer, key, values) ~>
-      O.generateFunctionIR(context, writer, key, values, plan, generic, shared, common)
-    ,
+  _ = runCompilerPhase("function-ir/instantiate", () ->
+    ParallelPhases.map(
+      plan,
+      x ~> x,
+      O.SpecializedFunctionFile::type,
+      context,
+      SKStore.DirName::create("/specializer/function-ir/"),
+      "function-ir",
+      (context, writer, key, values) ~>
+        O.generateFunctionIR(
+          context,
+          writer,
+          key,
+          values,
+          plan,
+          generic,
+          shared,
+          common,
+        )
+      ,
+    )
   )
 }
 
 fun getOrInitializeBackend(
   context: mutable SKStore.Context,
+  trackedClosureBodies: Bool,
 ): (
   SKStore.EHandle<SKStore.IID, ConfigFile>,
   SKStore.EHandle<SKStore.IID, TickFile>,
 ) {
+  lambdaAnchors = Environ.varOpt("SKC_LAMBDA_SOURCE_ANCHORS").isSome();
+  context.getPersistent(lambdaAnchorPolicyKey) match {
+  | Some(SKStore.BoolFile(previous)) if (previous != lambdaAnchors) ->
+    print_error(
+      "Changing SKC_LAMBDA_SOURCE_ANCHORS requires a fresh --init cache.\n",
+    );
+    skipExit(2)
+  | Some(SKStore.BoolFile _) -> void
+  | None() ->
+    context.setPersistent(
+      lambdaAnchorPolicyKey,
+      SKStore.BoolFile(lambdaAnchors),
+    )
+  | _ -> invariant_violation("Unexpected lambda anchor policy")
+  };
+  context.getPersistent(closureBodyPolicyKey) match {
+  | Some(SKStore.BoolFile(previous)) if (previous != trackedClosureBodies) ->
+    print_error(
+      "Changing --tracked-closure-bodies requires a fresh --init cache.\n",
+    );
+    skipExit(2)
+  | Some(SKStore.BoolFile _) -> void
+  | None() ->
+    context.setPersistent(
+      closureBodyPolicyKey,
+      SKStore.BoolFile(trackedClosureBodies),
+    )
+  | _ -> invariant_violation("Unexpected closure body policy")
+  };
   backendDirName = SKStore.DirName::create("/backend/");
   tickDirName = SKStore.DirName::create("/tick/");
   if (!context.newDirs.contains(FileCache.fileDirName)) {
@@ -619,7 +769,12 @@ fun getOrInitializeBackend(
   );
 
   tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
-  _ = context.mkdir(SKStore.IID::keyType, SKStore.StringFile::type, AsmOutput.emissionPreambleDirName);
+  _ = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.StringFile::type,
+    AsmOutput.emissionPreambleDirName,
+  );
+  AsmOutput.initializeArtifactInputs(context);
 
   specializationConfigDir = backendDir.map(
     SKStore.IID::keyType,
@@ -627,9 +782,10 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/specialization-config/"),
     (_context, writer, key, values) ~> {
-      writer.set(key, SpecializationConfigFile(
-        values.first.value.specializationConfig(),
-      ))
+      writer.set(
+        key,
+        SpecializationConfigFile(values.first.value.specializationConfig()),
+      )
     },
   );
 
@@ -642,6 +798,7 @@ fun getOrInitializeBackend(
     context,
     SKStore.DirName::create("/converter/"),
     outerIst,
+    trackedClosureBodies,
   );
   functionIdentities = O.createFunctionIdentities(context);
 
@@ -730,7 +887,9 @@ fun getOrInitializeBackend(
         shouldDisasm,
         shouldRuntimeExport,
         outerIst,
-        converter,
+        if (conf.incrementalSpecialization) converter else {
+          converter.forSequential()
+        },
         constsProj,
         defsProj,
       );
@@ -781,6 +940,13 @@ fun getOrInitializeBackend(
     mergeFun,
   );
 
+  classGroupAttempts = O.createClassGroupAttempts(
+    context,
+    context ~>
+      specializationConfigDir.getArray(context, SKStore.IID(0))[0].value,
+    converter,
+  );
+
   specializerDir = backendDir.map(
     SKStore.IID::keyType,
     SpecializerDirFile::type,
@@ -794,8 +960,19 @@ fun getOrInitializeBackend(
         return void
       };
       specializerAllDir = specializerInitMerged;
+      specializerView = O.SpecializerView(specializerInitMerged);
+      compact = config.compactSpecializer;
+      hierarchical =
+        compact &&
+        Environ.varOpt("SKC_HIERARCHICAL_DISCOVERY").isSome();
+      partitionClasses = config.partitionClasses;
       phaseNumber = 0;
       phased = context.getGlobal(pipelinePhaseKey).isSome();
+      batchCached =
+        phased &&
+        Environ.varOpt("SKC_BATCH_CACHED_SPECIALIZATION").isSome();
+      roundsThisStep = 0;
+      context.removeGlobal(specializationWorkKey);
       previousInfo = if (phased) context.currentEagerMapperInfo() else {
         SKStore.MInfoEmpty()
       };
@@ -804,6 +981,7 @@ fun getOrInitializeBackend(
           file match {
           | progress @ SpecializerProgress _ if (!progress.complete) ->
             !specializerAllDir = progress.dir;
+            !specializerView = progress.view;
             !phaseNumber = progress.round;
             context.!reads = progress.reads;
             context.!newDirs = progress.dirs
@@ -812,9 +990,17 @@ fun getOrInitializeBackend(
         })
       };
 
-      while (!specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {
+      loop {
+        if (batchCached) {
+          context.setGlobal(specializationWorkKey, SKStore.BoolFile(false))
+        };
+        if (specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty()) {
+          context.removeGlobal(specializationWorkKey);
+          break void
+        };
         phaseNumberCopy = phaseNumber;
         specializerAllDirCopy = specializerAllDir;
+        specializerViewCopy = specializerView;
         // Class creation inherits discovered methods, and method discovery
         // visits existing subclasses. Run them in separate rounds so each
         // sees the other's merged writes. Keep class work in one serialized
@@ -828,14 +1014,31 @@ fun getOrInitializeBackend(
             SKStore.IID::keyType,
             SKStore.BoolFile::type,
             context,
-            SKStore.DirName::create("/specializer/phase-kind/" + phaseNumberCopy + "/"),
+            SKStore.DirName::create(
+              "/specializer/phase-kind/" + phaseNumberCopy + "/",
+            ),
             (_context, writer, _, values) ~> {
-              writer.set(SKStore.IID(0), SKStore.BoolFile(
-                values.values().any(value -> value is O.CStackElement _),
-              ))
+              writer.set(
+                SKStore.IID(0),
+                SKStore.BoolFile(
+                  values.values().any(value -> value is O.CStackElement _),
+                ),
+              )
             },
             Some(Array[SKStore.KeyRange::create(workKey, workKey)]),
           );
+          classRequests = if (partitionClasses) {
+            Some(
+              O.createClassRequests(
+                context,
+                specializerAllDirCopy,
+                specializerViewCopy,
+                phaseNumberCopy,
+              ),
+            )
+          } else {
+            None()
+          };
           nextDir = specializerAllDirCopy
             .map(
               x ~> x,
@@ -848,10 +1051,16 @@ fun getOrInitializeBackend(
                 // Forward state without reading the work queue. Work rows
                 // depend on the once-per-round projection of its kind.
                 key match {
-                | SKStore.IID _ | O.FStackElement _ -> void
-                | _ -> return writer.set(key, OldFile(values.toArray()))
+                | SKStore.IID _
+                | O.FStackElement _ ->
+                  void
+                | _ ->
+                  if (!compact) writer.set(key, OldFile(values.toArray()));
+                  return void
                 };
-                classPhase = classPhaseDir.getArray(context, SKStore.IID(0))[0].value;
+                classPhase = classPhaseDir.getArray(context, SKStore.IID(0))[
+                  0,
+                ].value;
                 key match {
                 | SKStore.IID _ if (!classPhase) ->
                   for (value in values) {
@@ -871,10 +1080,26 @@ fun getOrInitializeBackend(
                 | _ -> return writer.set(key, OldFile(values.toArray()))
                 };
 
-                specializationConfig = specializationConfigDir
-                  .getArray(context, SKStore.IID(0))[0].value;
-                specializer = O.Specializer::make(
-                  specializerAllDirCopy,
+                markSpecializationWork(context);
+                specializationConfig = specializationConfigDir.getArray(
+                  context,
+                  SKStore.IID(0),
+                )[0].value;
+                if (partitionClasses && key is SKStore.IID _) {
+                  O.publishClassGroups(
+                    context,
+                    writer,
+                    classRequests.fromSome(),
+                    classGroupAttempts,
+                    phaseNumberCopy,
+                    specializerViewCopy,
+                    specializationConfig,
+                    converter,
+                  );
+                  return void
+                };
+                specializer = O.Specializer::makeView(
+                  specializerViewCopy,
                   context,
                   specializationConfig,
                   converter,
@@ -882,95 +1107,153 @@ fun getOrInitializeBackend(
                 invariant(specializer.funStack is List.Nil());
                 invariant(specializer.classStack is List.Nil());
 
-                key match {
-                | SKStore.IID _ ->
-                  for (value in values) {
-                    value match {
-                    | SKStore.IntFile _ -> void
-                    | classElt @ O.CStackElement _ ->
-                      specializer.!pos = classElt.pos;
-                      _sclassInfo = O.Specializer::getSClass2CPS(
-                        context,
-                        specializer,
-                        classElt.hc,
-                        classElt.k,
-                      )
-                    | _ -> invariant_violation("Unexpected IID key")
-                    }
-                  };
-                  if (specializer.funStack is List.Cons _) {
-                    for (f in specializer.funStack) {
-                      writer.setArray(f, Array[f]);
-                      writer.setArray(
-                        SKStore.IID(0),
-                        Array[SKStore.IntFile(1)],
-                      );
-                    };
-                    specializer.!funStack = List.Nil();
-                  };
-                  specializer.writeDiff(writer)
-
-                | origin @ O.FStackElement _ ->
-                  needsIID = false;
-                  for (value in values) {
-                    specializer.!pauseOnSClassCreation = true;
-                    value match {
-                    | f @ O.FStackElement _ ->
-                      specializer.specializePendingFun(f)
-
-                    | c @ O.ContinuationFile _ ->
-                      for (pending in c.pending) {
-                        invariant(pending.origin == origin);
-                        specializer.!pos = pending.pos;
-                        try {
-                          specializer.!fstackOrigin = Some(origin);
-                          _ = O.Specializer::getSClass2CPS(
+                runCompilerPhase(
+                  if (key is SKStore.IID _) "specialization/classes" else {
+                    "specialization/functions"
+                  },
+                  () ->
+                    key match {
+                    | SKStore.IID _ ->
+                      isolation = Environ.varOpt(
+                        "SKC_SPECIALIZER_ISOLATION_AUDIT",
+                      ).isSome();
+                      verifyVariance =
+                        specializationConfig.indexedClassVariance &&
+                        Environ.varOpt("SKC_VERIFY_VARIANCE_INDEX").isSome();
+                      isolatedRequests = mutable Vector<O.CStackElement>[];
+                      if (Environ.varOpt("SKC_SPECIALIZER_AUDIT").isSome()) {
+                        specializer.!classAudit = Some(
+                          mutable O.ClassWorkAudit{},
+                        )
+                      };
+                      for (value in values) {
+                        value match {
+                        | SKStore.IntFile _ -> void
+                        | classElt @ O.CStackElement _ ->
+                          if (isolation || verifyVariance) {
+                            isolatedRequests.push(classElt)
+                          };
+                          if (specializer.classAudit.isSome()) {
+                            specializer.classAudit
+                              .fromSome()
+                              .begin(classElt.hc.generic.name().id)
+                          };
+                          specializer.!pos = classElt.pos;
+                          _sclassInfo = O.Specializer::getSClass2CPS(
                             context,
                             specializer,
-                            pending.hc,
-                            pending.k,
-                          );
-                          specializer.!fstackOrigin = None();
-                        } catch {
-                        | O.SClassCreatedExn() ->
-                          specializer.!fstackOrigin = None();
-                          void
-                        | x ->
-                          specializer.!fstackOrigin = None();
-                          throw x
+                            classElt.hc,
+                            classElt.k,
+                          )
+                        | _ -> invariant_violation("Unexpected IID key")
                         }
-                      }
-                    | _ -> invariant_violation("Unexpected type (compile.sh)")
-                    };
-                  };
-                  if (specializer.funStack is List.Cons _) {
-                    for (f in specializer.funStack) {
-                      writer.setArray(f, Array[f]);
-                    };
-                    !needsIID = true;
-                    specializer.!funStack = List.Nil();
-                  };
-                  specializer.!pauseOnSClassCreation = false;
-                  if (specializer.classStack is List.Cons _) {
-                    pending = specializer.classStack.reversed().toArray();
-                    writer.setArray(
-                      SKStore.IID(0),
-                      pending.map(classElt ->
-                        classElt with {k => (_, _, _) ~> void}
-                      ),
-                    );
-                    writer.setArray(
-                      origin,
-                      Array[O.ContinuationFile(origin, pending)],
-                    );
-                    specializer.!classStack = List.Nil();
-                  } else if (needsIID) {
-                    writer.setArray(SKStore.IID(0), Array[SKStore.IntFile(1)]);
-                  };
-                  specializer.writeDiff(writer)
+                      };
+                      specializer.classAudit.each(audit ->
+                        audit.report(phaseNumberCopy)
+                      );
+                      specializer.reportVarianceWork();
+                      if (verifyVariance) {
+                        O.auditVarianceIndex(
+                          context,
+                          specializerViewCopy,
+                          specializationConfig,
+                          converter,
+                          isolatedRequests.toArray(),
+                          phaseNumberCopy,
+                          specializer,
+                        )
+                      };
+                      if (isolation) {
+                        O.auditIsolatedClassGroups(
+                          context,
+                          specializerViewCopy,
+                          specializationConfig,
+                          converter,
+                          isolatedRequests.toArray(),
+                          phaseNumberCopy,
+                          specializer,
+                        )
+                      };
+                      if (specializer.funStack is List.Cons _) {
+                        for (f in specializer.funStack) {
+                          writer.setArray(f, Array[f]);
+                          writer.setArray(
+                            SKStore.IID(0),
+                            Array[SKStore.IntFile(1)],
+                          );
+                        };
+                        specializer.!funStack = List.Nil();
+                      };
+                      specializer.writeDiff(writer)
 
-                | _ -> invariant_violation("Unexpected specializer work key")
-                }
+                    | origin @ O.FStackElement _ ->
+                      needsIID = false;
+                      for (value in values) {
+                        specializer.!pauseOnSClassCreation = true;
+                        value match {
+                        | f @ O.FStackElement _ ->
+                          specializer.specializePendingFun(f)
+
+                        | c @ O.ContinuationFile _ ->
+                          for (pending in c.pending) {
+                            invariant(pending.origin == origin);
+                            specializer.!pos = pending.pos;
+                            try {
+                              specializer.!fstackOrigin = Some(origin);
+                              _ = O.Specializer::getSClass2CPS(
+                                context,
+                                specializer,
+                                pending.hc,
+                                pending.k,
+                              );
+                              specializer.!fstackOrigin = None();
+                            } catch {
+                            | O.SClassCreatedExn() ->
+                              specializer.!fstackOrigin = None();
+                              void
+                            | x ->
+                              specializer.!fstackOrigin = None();
+                              throw x
+                            }
+                          }
+                        | _ ->
+                          invariant_violation("Unexpected type (compile.sh)")
+                        };
+                      };
+                      if (specializer.funStack is List.Cons _) {
+                        for (f in specializer.funStack) {
+                          writer.setArray(f, Array[f]);
+                        };
+                        !needsIID = true;
+                        specializer.!funStack = List.Nil();
+                      };
+                      specializer.!pauseOnSClassCreation = false;
+                      if (specializer.classStack is List.Cons _) {
+                        pending = specializer.classStack.reversed().toArray();
+                        writer.setArray(
+                          SKStore.IID(0),
+                          pending.map(classElt ->
+                            classElt with {k => (_, _, _) ~> void}
+                          ),
+                        );
+                        writer.setArray(
+                          origin,
+                          Array[O.ContinuationFile(origin, pending)],
+                        );
+                        specializer.!classStack = List.Nil();
+                      } else if (needsIID) {
+                        writer.setArray(
+                          SKStore.IID(0),
+                          Array[SKStore.IntFile(1)],
+                        );
+                      };
+                      specializer.writeDiff(writer)
+
+                    | _ ->
+                      invariant_violation("Unexpected specializer work key")
+                    }
+                  ,
+                )
               },
             )
             .map(
@@ -980,19 +1263,54 @@ fun getOrInitializeBackend(
               SKStore.DirName::create(
                 "/specializer/merge1/" + phaseNumberCopy + "/",
               ),
-              mergeFun,
+              (context, writer, key, values) ~> {
+                if (compact) {
+                  mergeDiscoveryDelta(
+                    context,
+                    writer,
+                    key,
+                    values,
+                    specializerViewCopy,
+                  )
+                } else {
+                  mergeFun(context, writer, key, values)
+                }
+              },
             );
           _ = nextDir.getArray(context, SKStore.IID(0));
-          nextDir
+          nextView = if (compact) {
+            specializerViewCopy.append(
+              context,
+              nextDir,
+              phaseNumberCopy,
+              hierarchical,
+            )
+          } else {
+            O.SpecializerView(nextDir)
+          };
+          (nextDir, nextView)
         };
-        !specializerAllDir = if (phased) {
-          runRound(context)
-        } else {
-          SKStore.withRegion(context, (_, context) ~> runRound(context))
-        };
+        roundResult = runCompilerPhase("specialization/round", () ->
+          if (phased) {
+            runRound(context)
+          } else {
+            SKStore.withRegion(context, (_, context) ~> runRound(context))
+          }
+        );
+        !specializerAllDir = roundResult.i0;
+        !specializerView = roundResult.i1;
 
         !phaseNumber = phaseNumber + 1;
-        if (phased) break void;
+        !roundsThisStep = roundsThisStep + 1;
+        didWork = context.getGlobal(specializationWorkKey) match {
+        | Some(SKStore.BoolFile(work)) -> work
+        | _ -> true
+        };
+        context.removeGlobal(specializationWorkKey);
+        // Existing completed rounds need no heap checkpoint individually.
+        // Yield after the first executed class/function transaction, or after
+        // eight cached rounds to bound forwarding and coordination temporaries.
+        if (phased && (didWork || roundsThisStep >= 8)) break void;
       };
       complete = specializerAllDir.getArray(context, SKStore.IID(0)).isEmpty();
       if (phased) {
@@ -1000,6 +1318,7 @@ fun getOrInitializeBackend(
           specializationProgressKey,
           SpecializerProgress(
             specializerAllDir,
+            specializerView,
             phaseNumber,
             context.reads,
             context.newDirs,
@@ -1018,24 +1337,43 @@ fun getOrInitializeBackend(
       if (config.verbose && complete) {
         print_error(`Incremental specialization: ${phaseNumber} rounds`)
       };
+      if (complete) {
+        O.pruneClassGroupHints(
+          context,
+          phaseNumber,
+          partitionClasses && config.classGroupHints,
+        )
+      };
+      if (complete && compact) {
+        !specializerAllDir = runCompilerPhase(
+          "specialization/checkpoint",
+          () -> specializerView.materialize(context, "discovery-complete"),
+        )
+      };
       completedDir = if (complete && !config.stopAfterSpecialization) {
-        latched = latchSpecializerClasses(
-          context,
-          specializerAllDir,
-          specializationConfigDir,
-          converter,
+        latched = runCompilerPhase("specialization/latch", () ->
+          latchSpecializerClasses(
+            context,
+            specializerAllDir,
+            specializationConfigDir,
+            converter,
+          )
         );
-        scalarized = scalarizeSpecializerClasses(
-          context,
-          latched,
-          specializationConfigDir,
-          converter,
+        scalarized = runCompilerPhase("specialization/scalarize", () ->
+          scalarizeSpecializerClasses(
+            context,
+            latched,
+            specializationConfigDir,
+            converter,
+          )
         );
-        layoutSpecializerClasses(
-          context,
-          scalarized,
-          specializationConfigDir,
-          converter,
+        runCompilerPhase("specialization/layout", () ->
+          layoutSpecializerClasses(
+            context,
+            scalarized,
+            specializationConfigDir,
+            converter,
+          )
         )
       } else {
         specializerAllDir
@@ -1050,7 +1388,10 @@ fun getOrInitializeBackend(
 
   // These handles refer to keyed maps installed once discovery has completed.
   // Their recipes capture stable handles, never a compilation snapshot.
-  functionIRShared: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
+  functionIRShared: SKStore.EHandle<
+    SKStore.Key,
+    SKStore.File,
+  > = SKStore.EHandle(
     x ~> x,
     x ~> x,
     SKStore.DirName::create("/specializer/function-ir-shared/"),
@@ -1063,7 +1404,10 @@ fun getOrInitializeBackend(
     O.FunctionIRIdentityAggregateFile::type,
     SKStore.DirName::create("/specializer/function-ir-identities/"),
   );
-  functionIR: SKStore.EHandle<SKStore.Key, O.SpecializedFunctionFile> = SKStore.EHandle(
+  functionIR: SKStore.EHandle<
+    SKStore.Key,
+    O.SpecializedFunctionFile,
+  > = SKStore.EHandle(
     x ~> x,
     O.SpecializedFunctionFile::type,
     SKStore.DirName::create("/specializer/function-ir/"),
@@ -1075,7 +1419,10 @@ fun getOrInitializeBackend(
     SKStore.DirName::create("/specializer/function-ir-common/"),
     (_context, writer, key, values) ~> {
       config = values.first.value;
-      writer.set(key, O.FunctionIRSharedFile(config, converter, config.ptrBitSize / 8))
+      writer.set(
+        key,
+        O.FunctionIRSharedFile(config, converter, config.ptrBitSize / 8),
+      )
     },
   );
   _ = specializerDir.map(
@@ -1088,13 +1435,27 @@ fun getOrInitializeBackend(
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       if (completed.complete && !config.stopAfterSpecialization) {
         createFunctionIRMaps(
-          context, completed.value, specializationConfigDir, converter,
-          functionIdentities, functionIRCommon,
+          context,
+          completed.value,
+          specializationConfigDir,
+          converter,
+          functionIdentities,
+          functionIRCommon,
+          backendDir,
+        );
+        _ = O.createFunctionIRProgram(
+          context,
+          functionIR,
+          functionIRShared,
+          functionIdentities,
+          backendDir,
+          backendPhase1,
         )
       }
     },
   );
 
+  functionIRProgram = O.FunctionIRProgram::handles();
   backendIRDir = backendDir.map(
     SKStore.IID::keyType,
     Optimize.InputFile::type,
@@ -1108,6 +1469,17 @@ fun getOrInitializeBackend(
       partialConfig = prevPhase.conf;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
       if (config.incrementalSpecialization && config.stopAfterSpecialization) {
+        return void
+      };
+      if (context.debugMode) print_string("IR_ASSEMBLY");
+      if (BackendProgram::classHeadersEnabled(context, config)) {
+        writer.set(
+          key,
+          Optimize.InputFile(
+            O.createKeyedIRHeader(context, config, prevPhase.rootsIR),
+            config,
+          ),
+        );
         return void
       };
       prepared = if (config.incrementalSpecialization) {
@@ -1127,20 +1499,22 @@ fun getOrInitializeBackend(
       | None() ->
         // Discovery is local to this invocation. Reclaim its temporary work,
         // returning the completed state for native code generation.
-        state = SKStore.withRegion(context, (_, context) ~> {
-          sp = O.createSpecializer(
-            context,
-            partialConfig,
-            converter,
-            specializerEmptyDir,
-          ).mclone(context);
-          for (root in prevPhase.rootsIR.forceCompile) {
-            sp.requestFunction(root, Array[], Array[])
-          };
-          sp.specializePendingFuns();
-          sp.toFixed(context);
-          sp.chill()
-        });
+        state = runCompilerPhase("specialization/sequential", () ->
+          SKStore.withRegion(context, (_, context) ~> {
+            sp = O.createSpecializer(
+              context,
+              partialConfig,
+              converter.forSequential(),
+              specializerEmptyDir,
+            ).mclone(context);
+            for (root in prevPhase.rootsIR.forceCompile) {
+              sp.requestFunction(root, Array[], Array[])
+            };
+            sp.specializePendingFuns();
+            sp.toFixed(context);
+            sp.chill()
+          })
+        );
         if (config.verbose) print_error("Sequential specialization complete");
         state.mclone(context)
       };
@@ -1158,33 +1532,49 @@ fun getOrInitializeBackend(
         specializer,
         if (config.incrementalSpecialization) Some(functionIR) else None(),
         prepared,
+        if (BackendProgram::enabled(context, config)) {
+          Some(functionIRProgram.returnTuples)
+        } else {
+          None()
+        },
       );
       writer.set(key, Optimize.InputFile(env, config))
     },
   );
   backendOptimizeDir = backendIRDir.map(
     SKStore.IID::keyType,
-    Optimize.InputFile::type,
+    Optimize.OutputFile::type,
     context,
     SKStore.DirName::create("/backendOptimize/"),
     (context, writer, key, values) ~> {
       input = values.first;
       config = input.config;
-      env = if (config.incrementalSpecialization) {
-        Optimize.compileAllIncrementally(context, backendIRDir) match {
-        | Some(env) -> env
+      output = if (config.incrementalSpecialization) {
+        Optimize.compileAllIncrementally(
+          context,
+          BackendProgram(
+            backendIRDir,
+            functionIRProgram.functions,
+            Some(functionIRProgram.classes),
+          ),
+        ) match {
+        | Some(output) -> output
         | None() -> return void
         }
       } else {
-        createOptimizedFunctions(context, input.env, config)
+        Optimize.OutputFile(
+          createOptimizedFunctions(context, input.env, config),
+          Optimize.workConfig(config),
+        )
       };
-      writer.set(key, Optimize.InputFile(env, Optimize.workConfig(config)))
+      writer.set(key, output)
     },
   );
   // Keep final reachability, escape analysis and lowering downstream of the
   // fixed-point coordinator. Equal intermediate results do not repeat them.
-  reachability = Reachability.createCache(context, backendOptimizeDir);
-  backendReachableDir = backendOptimizeDir.map(
+  optimizedProgram = Optimize.createProgram(context, backendOptimizeDir);
+  reachability = Reachability.createCache(context, optimizedProgram);
+  backendReachableDir = optimizedProgram.header.map(
     SKStore.IID::keyType,
     Optimize.InputFile::type,
     context,
@@ -1195,7 +1585,7 @@ fun getOrInitializeBackend(
         key,
         Optimize.InputFile(
           if (input.config.incrementalSpecialization) {
-            reachability.finish(context, input.env)
+            reachability.finish(context, input.env, input.config)
           } else {
             finishOptimizedFunctions(input.env, input.config)
           },
@@ -1204,8 +1594,12 @@ fun getOrInitializeBackend(
       )
     },
   );
-  backendLowerDir = Lower.incrementalLower(context, backendReachableDir);
-  graphCache = AsmOutput.createGraphCache(context, backendLowerDir);
+  loweredProgram = Lower.incrementalLower(
+    context,
+    BackendProgram(backendReachableDir, reachability.functions),
+  );
+  backendLowerDir = loweredProgram.header;
+  graphCache = AsmOutput.createGraphCache(context, loweredProgram);
   backendGraphDir = backendLowerDir.map(
     SKStore.IID::keyType,
     AsmOutput.NativeGraphFile::type,
@@ -1214,6 +1608,10 @@ fun getOrInitializeBackend(
     (context, writer, key, values) ~> {
       env = values.first.env;
       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
+      if (AsmOutput.collectionEmission(context, config)) {
+        writer.set(key, AsmOutput.NativeGraphFile(Array[], config));
+        return void
+      };
       defs = runCompilerPhase("native/create_asm_graph", () -> {
         if (config.incrementalSpecialization) {
           graphCache.assemble(context, env)
@@ -1239,7 +1637,11 @@ fun getOrInitializeBackend(
       )
     },
   );
-  emission = AsmOutput.createEmissionCache(context, backendGraphDir);
+  emission = AsmOutput.createEmissionCache(
+    context,
+    backendGraphDir,
+    graphCache,
+  );
   backendEmitDir = backendGraphDir.map(
     SKStore.IID::keyType,
     ConfigFile::type,
@@ -1281,22 +1683,30 @@ fun getOrInitializeBackend(
         };
         if (AsmOutput.incrementalEmission(config)) {
           _ = AsmOutput.emissionPreambleDir.getArray(context, SKStore.IID(0));
-          modules = emission.contents(context);
-          if (modules.isEmpty()) {
-            // Unsupported opaque user preambles retain the previous native path.
-            compile_binary(
-              defs,
+          if (AsmOutput.collectionEmission(context, config)) {
+            link_incremental_objects(
+              emission.objectFiles(context),
               config,
               wasm_exports,
-              SourcePositions.Table::read(context),
-            );
-            dir = config.output + ".llvm";
-            if (!FileSystem.exists(dir)) {
-              runShell(Array["mkdir", "-p", dir], config.verbose)
-            };
-            FileSystem.writeTextFile(dir + "/outputs", config.output + ".ll")
+            )
           } else {
-            compile_incremental_binary(modules, config, wasm_exports)
+            modules = emission.contents(context);
+            if (modules.isEmpty()) {
+              // Unsupported opaque user preambles retain the previous native path.
+              compile_binary(
+                defs,
+                config,
+                wasm_exports,
+                SourcePositions.Table::read(context),
+              );
+              dir = config.output + ".llvm";
+              if (!FileSystem.exists(dir)) {
+                runShell(Array["mkdir", "-p", dir], config.verbose)
+              };
+              FileSystem.writeTextFile(dir + "/outputs", config.output + ".ll")
+            } else {
+              compile_incremental_binary(modules, config, wasm_exports)
+            }
           }
         } else {
           compile_binary(defs, config, wasm_exports, positions)
@@ -1326,6 +1736,73 @@ fun compile(
   fileNames: Array<String>,
   deferUpdate: Bool = false,
 ): void {
+  AsmOutput.checkArtifactPolicy(context);
+  if (config.incrementalSpecialization) {
+    indexedVariance = Environ.varOpt("SKC_INDEX_VARIANCE").isSome();
+    context.getPersistent(varianceIndexPolicyKey) match {
+    | Some(SKStore.BoolFile(previous)) if (previous != indexedVariance) ->
+      print_error(
+        "Changing SKC_INDEX_VARIANCE requires a fresh --init cache.\n",
+      );
+      skipExit(2)
+    | Some(SKStore.BoolFile _) -> void
+    | None() ->
+      context.setPersistent(
+        varianceIndexPolicyKey,
+        SKStore.BoolFile(indexedVariance),
+      )
+    | _ -> invariant_violation("Unexpected variance index policy")
+    };
+    hierarchical =
+      config.compactSpecializer &&
+      Environ.varOpt("SKC_HIERARCHICAL_DISCOVERY").isSome();
+    context.getPersistent(discoveryHierarchyPolicyKey) match {
+    | Some(SKStore.BoolFile(previous)) if (previous != hierarchical) ->
+      print_error(
+        "Changing SKC_HIERARCHICAL_DISCOVERY requires a fresh --init cache.\n",
+      );
+      skipExit(2)
+    | Some(SKStore.BoolFile _) -> void
+    | None() ->
+      context.setPersistent(
+        discoveryHierarchyPolicyKey,
+        SKStore.BoolFile(hierarchical),
+      )
+    | _ -> invariant_violation("Unexpected discovery hierarchy policy")
+    };
+    context.getPersistent(classPartitionPolicyKey) match {
+    | Some(
+      SKStore.BoolFile(partitioned),
+    ) if (partitioned != config.partitionClasses) ->
+      print_error(
+        "Changing --partition-classes requires a fresh --init cache.\n",
+      );
+      skipExit(2)
+    | Some(SKStore.BoolFile _) -> void
+    | None() ->
+      context.setPersistent(
+        classPartitionPolicyKey,
+        SKStore.BoolFile(config.partitionClasses),
+      )
+    | _ -> invariant_violation("Unexpected class partition policy")
+    };
+    context.getPersistent(discoveryStoragePolicyKey) match {
+    | Some(
+      SKStore.BoolFile(compact),
+    ) if (compact != config.compactSpecializer) ->
+      print_error(
+        "Changing --compact-specializer requires a fresh --init cache.\n",
+      );
+      skipExit(2)
+    | Some(SKStore.BoolFile _) -> void
+    | None() ->
+      context.setPersistent(
+        discoveryStoragePolicyKey,
+        SKStore.BoolFile(config.compactSpecializer),
+      )
+    | _ -> invariant_violation("Unexpected discovery storage policy")
+    }
+  };
   if (fileNames.isEmpty() && config.dependencies.isEmpty()) {
     print_error("fatal error: no input files\n");
     skipExit(4); // Exit code used by g++ for no input files
@@ -1338,13 +1815,17 @@ fun compile(
     SkipError.setBatchMode(context)
   };
 
-  (backendDir, tickDir) = getOrInitializeBackend(context);
+  (backendDir, tickDir) = getOrInitializeBackend(
+    context,
+    config.trackedClosureBodies,
+  );
   backendDir.writeArray(
     context,
     SKStore.IID(0),
     Array[ConfigFile(config.backendConfig())],
   );
   AsmOutput.refreshEmissionPreamble(context, config);
+  AsmOutput.refreshArtifactInputs(context, config);
   tickDir.writeArray(
     context,
     SKStore.IID(0),
@@ -1397,12 +1878,42 @@ fun compile(
   throwIfFrontendErrors(context)
 }
 
+fun compilerAfterOptimizer(dir: SKStore.DirName): Bool {
+  name = dir.toString();
+  name.startsWith("/optimizer/output-") ||
+    name.startsWith("/reachability/") ||
+    name.startsWith("/native-lower/") ||
+    name.startsWith("/llvm-graph/") ||
+    name.startsWith("/llvm-emit/") ||
+    dir == SKStore.DirName::create("/backendReachable/") ||
+    dir == SKStore.DirName::create("/backendLower/") ||
+    dir == SKStore.DirName::create("/backendGraph/") ||
+    dir == SKStore.DirName::create("/backendEmit/")
+}
+
+// These are allocation boundaries, not semantic phase barriers. Stop only
+// after an entire arrow, retain its pending work, and resume the same ordered
+// queue. This bounds the newly retained graph copied at one synchronization.
+const backendMemoryBoundaries: SortedSet<String> = SortedSet[
+  "/reachability/live/",
+  "/native-lower/functions/",
+  "/llvm-graph/functions/",
+  "/llvm-graph/shared/",
+  "/llvm-graph/nodes/",
+  "/llvm-graph/resolved-nodes/",
+  "/llvm-graph/sharing-candidates/",
+  "/llvm-graph/shared-definitions/",
+  "/llvm-emit/keyed-definitions/",
+  "/llvm-emit/modules/",
+];
+
 // Each callback leaves all continuation state in the context. runPipeline
 // synchronizes it and reclaims the callback's temporary heap before reentry.
 // Definitions are fixed for the whole compiler. Invocation options are backend
 // input data; reactive work captures handles, never invocation snapshots.
 const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
   context ~> {
+    context.removeGlobal(specializationWorkKey);
     context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
     context.setGlobal(Optimize.progressKey, SKStore.IntFile(0));
     config = ConfigFile::type(
@@ -1413,6 +1924,10 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     true
   },
   context ~> {
+    partitioned = context.getPersistent(classPartitionPolicyKey) match {
+    | Some(SKStore.BoolFile(enabled)) -> enabled
+    | _ -> false
+    };
     roundLimit = context.getGlobal(specializationProgressKey) match {
     | Some(previousRound @ SpecializerProgress _) -> previousRound.round - 1
     // Existing cached rounds must propagate their changes before deciding
@@ -1422,10 +1937,20 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     };
     boundary = context.updateUntilBoundary(
       dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
-      dir ~> dir == SKStore.DirName::create("/specializer/"),
       dir ~> {
         name = dir.toString();
-        if (
+        dir == SKStore.DirName::create("/specializer/") ||
+          (partitioned &&
+            (name.startsWith("/specializer/reduced1/") ||
+              name == "/specializer/class-attempts/"))
+      },
+      dir ~> {
+        name = dir.toString();
+        // Keyed bodies can update without changing the coordinator's header.
+        // Keep downstream work behind the phase barrier in that case too.
+        if (compilerAfterOptimizer(dir) || name.startsWith("/optimizer/")) {
+          false
+        } else if (
           name.startsWith("/specializer/reduced1/") ||
           name.startsWith("/specializer/merge1/")
         ) {
@@ -1451,21 +1976,30 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     }
   },
   context ~> {
-    (beforeLimit, afterLimit, afterConst) = context.getGlobal(Optimize.progressKey) match {
+    (beforeLimit, afterLimit, afterConst) = context.getGlobal(
+      Optimize.progressKey,
+    ) match {
     | Some(previousProgress @ Optimize.Progress _) ->
       (
-        if (previousProgress.afterConst) previousProgress.beforeRound else previousProgress.round - 1,
+        if (previousProgress.afterConst) previousProgress.beforeRound else {
+          previousProgress.round - 1
+        },
         if (previousProgress.afterConst) previousProgress.round - 1 else -1,
         previousProgress.afterConst,
       )
-    | _ -> (-1, -1, false)
+    // Body rows can invalidate existing rounds without changing the input
+    // header. Let those rounds reach the coordinator while its continuation
+    // phase is active; the final drain cannot resume an incomplete optimizer.
+    | _ -> (Int::max, Int::max, true)
     };
     boundary = context.updateUntilBoundary(
       dir ~> dir == SKStore.DirName::create("/backendReachable/"),
       dir ~> dir == SKStore.DirName::create("/backendOptimize/"),
       dir ~> {
         name = dir.toString();
-        if (name.startsWith("/optimizer/before-const/")) {
+        if (compilerAfterOptimizer(dir)) {
+          false
+        } else if (name.startsWith("/optimizer/before-const/")) {
           name.split("/")[3].toInt() <= beforeLimit
         } else if (name.startsWith("/optimizer/after-const/")) {
           name.split("/")[3].toInt() <= afterLimit
@@ -1478,7 +2012,9 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     );
     throwIfFrontendErrors(context);
     context.getGlobal(Optimize.progressKey) match {
-    | Some(pendingProgress @ Optimize.Progress _) if (!pendingProgress.complete) ->
+    | Some(
+      pendingProgress @ Optimize.Progress _,
+    ) if (!pendingProgress.complete) ->
       key: SKStore.Key = SKStore.IID(0);
       reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
         parentName => SKStore.DirName::create("/backendPhase2/"),
@@ -1491,9 +2027,17 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     }
   },
   context ~> {
-    context.update();
+    complete = if (Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome()) {
+      context.updateUntilBoundary(
+        _ ~> false,
+        dir ~> backendMemoryBoundaries.contains(dir.toString()),
+      ) != Some(false)
+    } else {
+      context.update();
+      true
+    };
     throwIfFrontendErrors(context);
-    true
+    complete
   },
 ];
 
@@ -1505,6 +2049,7 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
     pipelinePhaseKey,
     compilerPipeline,
     (context, phase) ~> {
+      profileCompilerMemory(context, "before-" + phase);
       context.!debugMode = debugSKStore;
       if (phase == 0) {
         context.!newDirs = SortedSet[];
@@ -1514,6 +2059,7 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
       }
     },
     context ~> {
+      context.removeGlobal(specializationWorkKey);
       context.removeGlobal(specializationProgressKey);
       context.removeGlobal(Optimize.progressKey)
     },
@@ -1521,14 +2067,17 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
       print_error(exn.getMessage());
       skipExit(2)
     },
-  )
+  );
+  if (Environ.varOpt("SKC_MEMORY_STATS").isSome()) {
+    SKStore.withContext(context -> profileCompilerMemory(context, "complete"))
+  }
 }
 
 // Type the stdlib (dependencies) once into `context`, with no config written
 // so the backend mapper never fires — leaving a clean "warm" base that carries
 // the typed stdlib and no unit-specific state.
 fun warm_stdlib(config: Config.Config, context: mutable SKStore.Context): void {
-  _ = getOrInitializeBackend(context);
+  _ = getOrInitializeBackend(context, config.trackedClosureBodies);
   make_input_source_path = (pkg_base_dir, src_path) ~> {
     res = Path.join(pkg_base_dir, src_path);
     if (config.canonize_paths) {
@@ -1667,7 +2216,6 @@ fun compile_incremental_binary(
   if (!FileSystem.exists(dir)) {
     runShell(Array["mkdir", "-p", dir], config.verbose)
   };
-  objects = mutable Vector[];
   outputs = modules.flatMap(part -> {
     base = dir + "/" + part.i0;
     Array[base + ".ll", base + ".o", base + ".flags"]
@@ -1677,47 +2225,64 @@ fun compile_incremental_binary(
   FileSystem.writeTextFile(dir + "/outputs", outputs.join("\n"));
   tool = System.subprocess(Array["clang++", "--version"]).fromSuccess();
   invariant(tool.success(), tool.stderr);
-  for ((name, contents) in modules) {
-    ll = dir + "/" + name + ".ll";
-    object = dir + "/" + name + ".o";
-    stamp = dir + "/" + name + ".flags";
-    temp = object + ".tmp";
-    args = Array[
-      "clang++",
-      `-O${config.optLevel}`,
-      `--target=${config.target}`,
-      "-c",
-      ll,
-      "-o",
-      temp,
-    ].concat(if (config.emit == "cdylib") Array["-fPIC"] else Array[])
-      .concat(config.link_args)
-      .concat(
-        config.dependencies.values().collect(Array).flatMap(dep ->
-          dep.i1.links
-        ),
-      );
-    flags = tool.stdout + "\n" + args.join("\n");
-    changed = !FileSystem.exists(ll) || FileSystem.readTextFile(ll) != contents;
-    if (
-      changed ||
-      !FileSystem.exists(object) ||
-      !FileSystem.exists(stamp) ||
-      FileSystem.readTextFile(stamp) != flags
-    ) {
-      // Invalidate success before replacing the input: a failed clang must not
-      // make a subsequent retry mistake the old object for a successful build.
-      if (FileSystem.exists(stamp)) {
-        runShell(Array["rm", stamp], config.verbose)
-      };
-      if (changed) FileSystem.writeTextFile(ll, contents);
-      runShell(args, config.verbose);
-      runShell(Array["mv", temp, object], config.verbose);
-      FileSystem.writeTextFile(stamp, flags)
+  objects = modules.map(part ->
+    compile_incremental_module(part.i0, part.i1, config, tool.stdout)
+  );
+  link_incremental_objects(objects, config, exports)
+}
+
+fun compile_incremental_module(
+  name: String,
+  contents: String,
+  config: Config.Config,
+  toolVersion: String,
+  throwOnFailure: Bool = false,
+): String {
+  dir = config.output + ".llvm";
+  ll = dir + "/" + name + ".ll";
+  object = dir + "/" + name + ".o";
+  stamp = dir + "/" + name + ".flags";
+  temp = object + ".tmp";
+  args = Array[
+    "clang++",
+    `-O${config.optLevel}`,
+    `--target=${config.target}`,
+    "-c",
+    ll,
+    "-o",
+    temp,
+  ].concat(if (config.emit == "cdylib") Array["-fPIC"] else Array[])
+    .concat(config.link_args)
+    .concat(
+      config.dependencies.values().collect(Array).flatMap(dep -> dep.i1.links),
+    );
+  flags = toolVersion + "\n" + args.join("\n");
+  changed = !FileSystem.exists(ll) || FileSystem.readTextFile(ll) != contents;
+  if (
+    changed ||
+    !FileSystem.exists(object) ||
+    !FileSystem.exists(stamp) ||
+    FileSystem.readTextFile(stamp) != flags
+  ) {
+    // Invalidate success before replacing the input. A failed clang must never
+    // make a retry mistake the old object for a successful compilation.
+    if (FileSystem.exists(stamp)) {
+      runShell(Array["rm", stamp], config.verbose, throwOnFailure)
     };
-    objects.push(object);
+    if (changed) FileSystem.writeTextFile(ll, contents);
+    runShell(args, config.verbose, throwOnFailure);
+    runShell(Array["mv", temp, object], config.verbose, throwOnFailure);
+    FileSystem.writeTextFile(stamp, flags)
   };
-  getLinkArgs("", config, exports, Some(objects.toArray())).each(args -> {
+  object
+}
+
+fun link_incremental_objects(
+  objects: Array<String>,
+  config: Config.Config,
+  exports: Array<String>,
+): void {
+  getLinkArgs("", config, exports, Some(objects)).each(args -> {
     if (config.no_link) {
       print_string("---LINK_ARGS_BEGIN---");
       args.each(print_string);
@@ -1732,7 +2297,10 @@ fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
   runCompilerPhase("native/write_sklib", () -> {
     // Archive emission reads native files below. Track the package input so
     // source edits also rerun this mapper when its configuration is unchanged.
-    _ = FileCache.packageDir.getArray(context, FileCache.InputPackageName(conf.lib_name));
+    _ = FileCache.packageDir.getArray(
+      context,
+      FileCache.InputPackageName(conf.lib_name),
+    );
     accessed_env_vars = SortedSet::createFromItems(
       FileCache.packageEnvAccessDir.getArray(
         context,
@@ -1766,7 +2334,14 @@ fun compile_sklib(context: mutable SKStore.Context, conf: Config.Config): void {
       conf.output,
       IO.OpenOptions{write => true, create => true, truncate => true},
     );
-    sklib.write(ar_file) match {
+    written = if (Environ.varOpt("SKC_ARCHIVE_ENCODING_CACHE").isSome()) {
+      Sklib.withSourceEncodingCache(context, cache ->
+        sklib.write(ar_file, Some(cache))
+      )
+    } else {
+      sklib.write(ar_file)
+    };
+    written match {
     | Success _ -> void
     | Failure(err) ->
       print_error(`Could not write ${conf.output}: ${err}`);

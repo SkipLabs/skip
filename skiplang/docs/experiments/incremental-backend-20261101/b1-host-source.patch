@@ -1,0 +1,1129 @@
+--- a/skiplang/compiler/src/AsmArtifacts.sk
++++ b/skiplang/compiler/src/AsmArtifacts.sk
+@@ -0,0 +1,149 @@
++/** Materialize changed LLVM modules and retain a compact link manifest. */
++module AsmOutput;
++
++private const artifactRefreshName: SKStore.DirName = SKStore.DirName::create(
++  "/llvm-emit/artifact-refresh/",
++);
++private const artifactVersionName: SKStore.DirName = SKStore.DirName::create(
++  "/llvm-emit/tool-version/",
++);
++private const artifactRefresh: SKStore.EHandle<
++  SKStore.Key,
++  SKStore.IntFile,
++> = SKStore.EHandle(x ~> x, SKStore.IntFile::type, artifactRefreshName);
++private const artifactVersion: SKStore.EHandle<
++  SKStore.IID,
++  SKStore.StringFile,
++> = SKStore.EHandle(
++  SKStore.IID::keyType,
++  SKStore.StringFile::type,
++  artifactVersionName,
++);
++private const artifactPathsName: SKStore.DirName = SKStore.DirName::create(
++  "/llvm-emit/artifact-paths/",
++);
++private const artifactPaths: SKStore.EHandle<
++  EmitModuleKey,
++  SKStore.StringFile,
++> = SKStore.EHandle(
++  EmitModuleKey::keyType,
++  SKStore.StringFile::type,
++  artifactPathsName,
++);
++
++private class EmitBuildPlanFile(
++  config: Config.Config,
++  version: String,
++) extends SKStore.File
++private class EmitObjectFile(path: String, revision: Int) extends SKStore.File
++
++fun initializeArtifactInputs(context: mutable SKStore.Context): void {
++  _ = context.mkdir(x ~> x, SKStore.IntFile::type, artifactRefreshName);
++  _ = context.mkdir(
++    SKStore.IID::keyType,
++    SKStore.StringFile::type,
++    artifactVersionName,
++  )
++}
++
++// File existence is an external input. Refresh it before the update, never from
++// an eager callback. A missing file dirties just its module's materializer, not
++// its LLVM renderer. New modules already execute because their text is new.
++fun refreshArtifactInputs(
++  context: mutable SKStore.Context,
++  config: Config.Config,
++): void {
++  if (!config.collectionEmission || !incrementalEmission(config)) return void;
++  tool = System.subprocess(Array["clang++", "--version"]).fromSuccess();
++  invariant(tool.success(), tool.stderr);
++  artifactVersion.writeArray(
++    context,
++    SKStore.IID(0),
++    Array[SKStore.StringFile(tool.stdout)],
++  );
++  dir = config.output + ".llvm";
++  tick = SKStore.IntFile(context.getTick().value);
++  if (!FileSystem.exists(dir + "/outputs")) {
++    artifactRefresh.writeArray(context, SKStore.IID(0), Array[tick])
++  };
++  for ((key, values) in artifactPaths.items(context)) {
++    for (value in values) {
++      base = dir + "/" + value.value;
++      if (
++        Array[".ll", ".o", ".flags"].any(suffix ->
++          !FileSystem.exists(base + suffix)
++        )
++      ) {
++        artifactRefresh.writeArray(context, key, Array[tick])
++      }
++    }
++  }
++}
++
++private fun createArtifactCache(
++  context: mutable SKStore.Context,
++  input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
++  modules: SKStore.EHandle<EmitModuleKey, SKStore.StringFile>,
++): SKStore.EHandle<EmitModuleKey, EmitObjectFile> {
++  paths = modules.map(
++    EmitModuleKey::keyType,
++    SKStore.StringFile::type,
++    context,
++    artifactPathsName,
++    (_context, writer, key, _values) ~>
++      writer.set(key, SKStore.StringFile(`m${key.kind}_${key.index}`))
++    ,
++  );
++  plan = input.map(
++    SKStore.IID::keyType,
++    EmitBuildPlanFile::type,
++    context,
++    SKStore.DirName::create("/llvm-emit/build-plan/"),
++    (context, writer, key, values) ~> {
++      config = values.first.config;
++      if (!collectionEmission(context, config)) return void;
++      _ = artifactRefresh.getArray(context, SKStore.IID(0));
++      version = artifactVersion.getArray(context, SKStore.IID(0))[0].value;
++      dir = config.output + ".llvm";
++      if (!FileSystem.exists(dir)) {
++        runShell(Array["mkdir", "-p", dir], config.verbose)
++      };
++      outputs = mutable Vector[];
++      for ((_, names) in paths.items(context)) {
++        for (name in names) {
++          for (suffix in Array[".ll", ".o", ".flags"]) {
++            outputs.push(dir + "/" + name.value + suffix)
++          }
++        }
++      };
++      // Publish recovery information before any object compilation can fail.
++      FileSystem.writeTextFile(dir + "/outputs", outputs.toArray().join("\n"));
++      writer.set(key, EmitBuildPlanFile(config, version))
++    },
++  );
++  modules.map(
++    EmitModuleKey::keyType,
++    EmitObjectFile::type,
++    context,
++    SKStore.DirName::create("/llvm-emit/artifacts/"),
++    (context, writer, key, values) ~> {
++      plans = plan.getArray(context, SKStore.IID(0));
++      if (plans.isEmpty()) return void;
++      _ = artifactRefresh.getArray(context, SKStore.IID(0));
++      _ = artifactRefresh.getArray(context, key);
++      build = plans[0];
++      if (context.debugMode) print_string(`LLVM_ARTIFACT: ${key}`);
++      object = compile_incremental_module(
++        `m${key.kind}_${key.index}`,
++        values.first.value,
++        build.config,
++        build.version,
++      );
++      // Paths stay the same when object bytes change. The update tick makes
++      // linking observe the replacement without copying module text here.
++      writer.set(key, EmitObjectFile(object, context.getTick().value))
++    },
++  )
++}
++
++module end;
+--- a/skiplang/compiler/src/AsmCollections.sk
++++ b/skiplang/compiler/src/AsmCollections.sk
+@@ -0,0 +1,427 @@
++/** Keyed alias resolution, definition sharing, symbols and module membership. */
++module AsmOutput;
++
++private class ShareHashKey(value: Int) extends SKStore.Key
++private class ShareUniqueKey(value: GraphKey) extends SKStore.Key
++private class ShareMemberFile(key: GraphKey) extends SKStore.File
++private class SharedDefinitionFile(
++  target: GraphKey,
++  symbol: String,
++) extends SKStore.File
++private class SymbolStemKey(value: String) extends SKStore.Key
++private class SymbolMemberFile(
++  key: GraphKey,
++  canShare: Bool,
++) extends SKStore.File
++private class EmitMemberFile(symbol: String) extends SKStore.File
++
++private fun resolveGraphAlias(
++  context: mutable SKStore.Context,
++  identities: SKStore.EHandle<GraphKey, GraphAliasFile>,
++  key: GraphKey,
++): GraphKey {
++  seen = mutable UnorderedSet<GraphKey>[];
++  loop {
++    invariant(seen.maybeInsert(key), "Cyclic LLVM graph alias");
++    values = identities.getArray(context, key);
++    invariant(!values.isEmpty(), "Missing LLVM graph alias target");
++    next = values[0].target;
++    if (next == key) return key;
++    !key = next
++  }
++}
++
++// This is the same coinductive equivalence used by mergeIdenticalAsmDefs.
++// Hashes only select candidates. In particular, a hash collision never merges
++// different definitions, and recursive reference graphs terminate on pairs.
++private fun graphNodesIsomorphic(
++  context: mutable SKStore.Context,
++  nodes: SKStore.EHandle<GraphKey, GraphNodeFile>,
++  left: GraphKey,
++  right: GraphKey,
++): Bool {
++  pending = mutable Vector[(left, right)];
++  seen = mutable UnorderedSet<(GraphKey, GraphKey)>[];
++  while (!pending.isEmpty()) {
++    (a, b) = pending.pop();
++    if (a == b) continue;
++    pair = if (a < b) (a, b) else (b, a);
++    if (!seen.maybeInsert(pair)) continue;
++    x = nodes.getArray(context, a)[0].value;
++    y = nodes.getArray(context, b)[0].value;
++    if (
++      !x.canShare ||
++      !y.canShare ||
++      x.text != y.text ||
++      x.refs.size() != y.refs.size()
++    ) {
++      return false
++    };
++    for (i in Range(0, x.refs.size())) {
++      if (x.refs[i].i0 != y.refs[i].i0) return false;
++      pending.push((x.refs[i].i1, y.refs[i].i1))
++    }
++  };
++  true
++}
++
++private fun graphSymbolHint(key: GraphKey, node: GraphDefinition): String {
++  if (
++    !node.forceExternal &&
++    !(key is GraphFunctionKey _) &&
++    !(key is GraphExternalKey _) &&
++    !(key is GraphMegaKey _) &&
++    !(key is GraphGlobalsKey _)
++  ) {
++    node.symbol + ".c" + key.hash().and(Int::max)
++  } else {
++    node.symbol
++  }
++}
++
++private fun graphSymbolStem(
++  key: GraphKey,
++  node: GraphNodeFile,
++  hint: String,
++): String {
++  out = mutable TextOutputStream.StringTextOutputStream{};
++  first = true;
++  for (c in hint.getIter()) {
++    ok = if (first) isLegalAsmIDHead(c) else isLegalAsmIDTail(c);
++    out.writeChar(if (ok) c else '_');
++    !first = false
++  };
++  if (!node.value.debug.isEmpty() && !node.value.forceExternal) {
++    id = key match {
++    | GraphFunctionKey(fid) -> fid.id
++    | _ -> node.origin
++    };
++    out.write(".f" + id)
++  };
++  out.toString()
++}
++
++private fun graphEmissionSymbol(
++  context: mutable SKStore.Context,
++  identities: SKStore.EHandle<GraphKey, GraphAliasFile>,
++  shared: SKStore.EHandle<GraphKey, SharedDefinitionFile>,
++  symbols: SKStore.EHandle<GraphKey, SKStore.StringFile>,
++  key: GraphKey,
++): String {
++  target = shared.getArray(
++    context,
++    resolveGraphAlias(context, identities, key),
++  )[0].target;
++  symbols.getArray(context, target)[0].value
++}
++
++private fun createCollectionEmission(
++  context: mutable SKStore.Context,
++  graph: GraphCache,
++  input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
++): SKStore.EHandle<SKStore.Key, SKStore.File> {
++  header = input.map(
++    x ~> x,
++    x ~> x,
++    context,
++    SKStore.DirName::create("/llvm-emit/keyed-header/"),
++    (context, writer, _, values) ~> {
++      config = values.first.config;
++      if (!collectionEmission(context, config)) return void;
++      full = emissionPreambleDir.getArray(context, SKStore.IID(0))[0].value;
++      writer.set(
++        EmitHeaderKey(),
++        EmitHeaderFile(
++          config.cwd,
++          "skip-module",
++          full,
++          declarationPreamble(full).fromSome(),
++        ),
++      );
++      // Keep a support module even when the graph has no native definitions.
++      writer.set(EmitModuleKey(2, 0), EmitRootsFile(Array[]))
++    },
++  );
++  identities = graph.nodes.map(
++    asGraphKey,
++    GraphAliasFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/identities/"),
++    (context, writer, key, values) ~> {
++      if (
++        header
++          .getArrayFilter(context, EmitHeaderKey(), _ ~> SKStore.IntFile(1))
++          .isEmpty()
++      ) return void;
++      writer.set(
++        key,
++        values.first match {
++        | alias @ GraphAliasFile _ -> alias
++        | GraphNodeFile _ -> GraphAliasFile(key)
++        },
++      )
++    },
++  );
++  nodes = graph.nodes.map(
++    asGraphKey,
++    GraphNodeFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/resolved-nodes/"),
++    (context, writer, key, values) ~> {
++      if (
++        header
++          .getArrayFilter(context, EmitHeaderKey(), _ ~> SKStore.IntFile(1))
++          .isEmpty()
++      ) return void;
++      values.first match {
++      | GraphNodeFile(origin, node) ->
++        writer.set(
++          key,
++          GraphNodeFile(
++            origin,
++            node with {
++              refs => node.refs.map(ref ->
++                (ref.i0, resolveGraphAlias(context, identities, ref.i1))
++              ),
++              typeRef => node.typeRef.map(ref ->
++                resolveGraphAlias(context, identities, ref)
++              ),
++            },
++          ),
++        )
++      | GraphAliasFile _ -> void
++      }
++    },
++  );
++  candidates = nodes.map(
++    x ~> x,
++    ShareMemberFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/sharing-candidates/"),
++    (_context, writer, key, values) ~> {
++      node = values.first.value;
++      group: SKStore.Key = if (node.canShare) {
++        ShareHashKey(
++          node.refs.foldl(
++            (acc, ref) -> Hashable.combine(acc, ref.i0.hash()),
++            node.text.hash(),
++          ),
++        )
++      } else {
++        ShareUniqueKey(key)
++      };
++      writer.set(group, ShareMemberFile(key))
++    },
++  );
++  shared = candidates.map(
++    asGraphKey,
++    SharedDefinitionFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/shared-definitions/"),
++    (context, writer, _, values) ~> {
++      profile = Environ.varOpt("SKC_GRAPH_STATS").isSome();
++      start = if (profile) Time.time_ns() else 0;
++      comparisons = 0;
++      members = values.toArray().map(value -> value.key).sorted();
++      groups = mutable Vector<(GraphKey, mutable Vector<GraphKey>)>[];
++      for (key in members) {
++        found = false;
++        for ((canonical, group) in groups) {
++          !comparisons = comparisons + 1;
++          if (graphNodesIsomorphic(context, nodes, canonical, key)) {
++            group.push(key);
++            !found = true;
++            break void
++          }
++        };
++        if (!found) groups.push((key, mutable Vector[key]))
++      };
++      for ((canonical, group) in groups) {
++        node = nodes.getArray(context, canonical)[0].value;
++        symbol = graphSymbolHint(canonical, node);
++        if (group.size() > 1) {
++          preferred = node.sharedSymbol;
++          for (key in group) {
++            if (preferred.isNone()) {
++              !preferred = nodes.getArray(context, key)[0].value.sharedSymbol
++            }
++          };
++          !symbol = preferred.default(symbol)
++        };
++        for (key in group) {
++          writer.set(key, SharedDefinitionFile(canonical, symbol))
++        }
++      };
++      if (profile) {
++        print_error(`##SHARE## ${members.size()} ${groups.size()} ${comparisons} ${Time.time_ns() - start}\n`)
++      }
++    },
++  );
++  stems = shared.map(
++    SymbolStemKey::keyType,
++    SymbolMemberFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/symbol-stems/"),
++    (context, writer, key, values) ~> {
++      chosen = values.first;
++      if (chosen.target != key) return void;
++      node = nodes.getArray(context, key)[0];
++      writer.set(
++        SymbolStemKey(graphSymbolStem(key, node, chosen.symbol)),
++        SymbolMemberFile(key, node.value.canShare),
++      )
++    },
++  );
++  symbols = stems.map(
++    asGraphKey,
++    SKStore.StringFile::type,
++    context,
++    SKStore.DirName::create("/llvm-graph/final-symbols/"),
++    (context, writer, stem, values) ~> {
++      members = values.toArray().sortedBy(value ~> (value.canShare, value.key));
++      suffix = 0;
++      for (member in members) {
++        symbol = stem.value;
++        if (suffix > 0) {
++          loop {
++            !symbol = stem.value + "." + suffix;
++            !suffix = suffix + 1;
++            // Reserve all unmodified names, including absent-key dependencies.
++            // Different stems cannot manufacture the same numeric suffix name.
++            if (stems.getArray(context, SymbolStemKey(symbol)).isEmpty()) {
++              break void
++            }
++          }
++        } else {
++          !suffix = 1
++        };
++        writer.set(member.key, SKStore.StringFile(symbol))
++      }
++    },
++  );
++  definitions = nodes.map(
++    x ~> x,
++    x ~> x,
++    context,
++    SKStore.DirName::create("/llvm-emit/keyed-definitions/"),
++    (context, writer, key, values) ~> {
++      chosen = shared.getArray(context, key)[0];
++      if (chosen.target != key) return void;
++      entry = values.first;
++      node = entry.value;
++      symbol = symbols.getArray(context, key)[0].value;
++      resolve = ref ->
++        graphEmissionSymbol(context, identities, shared, symbols, ref);
++      hasDefinition = node.linkageOffset >= 0;
++      isFunction = !node.debug.isEmpty();
++      id = key match {
++      | GraphFunctionKey(fid) -> AsmDefID(fid.id)
++      | _ -> AsmDefID(if (isFunction) entry.origin else 0)
++      };
++      if (hasDefinition) {
++        refs = node.refs.take(node.numDefinitionRefs).collect(Array);
++        writer.set(
++          EmitBodyKey(symbol),
++          EmitBodyFile(
++            AsmDef{
++              id,
++              text => node.text,
++              refs => refs.mapWithIndex((i, ref) -> (ref.i0, AsmDefID(i))),
++              numDefinitionRefs => node.numDefinitionRefs,
++              debug => node.debug,
++              declarationText => "",
++              symbol,
++              sharedSymbol => node.sharedSymbol,
++              symbolPrefix => node.symbolPrefix,
++              forceExternal => node.forceExternal,
++              canShare => node.canShare,
++              typeString => node.typeString,
++              typeRef => None(),
++              linkageOffset => node.linkageOffset,
++              internalLinkage => node.internalLinkage,
++            },
++            refs.map(ref -> resolve(ref.i1)),
++          ),
++        );
++        moduleKey = if (isFunction) {
++          EmitModuleKey(
++            0,
++            node.debug[0].i1.file.hash().and(15) * 4 + id.id.and(3),
++          )
++        } else if (
++          symbol.startsWith(".classVTable.") ||
++          symbol == ".allVTables" ||
++          symbol == "skip.globals" ||
++          symbol == "SKIP_initializeSkip"
++        ) {
++          EmitModuleKey(2, 0)
++        } else {
++          EmitModuleKey(1, symbol.hash().and(15))
++        };
++        writer.set(moduleKey, EmitMemberFile(symbol))
++      };
++      decl = if (hasDefinition && !isFunction) {
++        EmitDeclFile(
++          "@" +
++            symbol +
++            " = external " +
++            (if (node.canShare) "constant" else "global") +
++            " [0 x i8]\n",
++          Array[],
++        )
++      } else if (hasDefinition) {
++        EmitDeclFile(
++          node.declarationText,
++          node.refs
++            .drop(node.numDefinitionRefs)
++            .map(ref -> (ref.i0, resolve(ref.i1)))
++            .collect(Array),
++        )
++      } else {
++        EmitDeclFile(
++          node.text,
++          node.refs
++            .take(node.numDefinitionRefs)
++            .map(ref -> (ref.i0, resolve(ref.i1)))
++            .collect(Array),
++        )
++      };
++      writer.set(EmitDeclKey(symbol), decl)
++    },
++  );
++  forward = (_context, writer, key, values) ~>
++    writer.setArray(key, values.toArray());
++  contributions = SKStore.EHandle::multiMap(
++    x ~> x,
++    x ~> x,
++    context,
++    Array[(header, (forward, None())), (definitions, (forward, None()))],
++    SKStore.DirName::create("/llvm-emit/keyed-contributions/"),
++  );
++  contributions.map(
++    x ~> x,
++    x ~> x,
++    context,
++    SKStore.DirName::create("/llvm-emit/keyed-inputs/"),
++    (_context, writer, key, values) ~> {
++      key match {
++      | EmitModuleKey _ ->
++        members = mutable Vector[];
++        for (value in values) {
++          value match {
++          | EmitMemberFile(symbol) -> members.push(symbol)
++          | EmitRootsFile _ -> void
++          | _ -> invariant_violation("Invalid LLVM module membership")
++          }
++        };
++        writer.set(key, EmitRootsFile(members.toArray().sorted()))
++      | _ ->
++        entries = values.toArray();
++        invariant(entries.size() == 1, "Duplicate LLVM emission symbol");
++        writer.set(key, entries[0])
++      }
++    },
++  )
++}
++
++module end;
+--- a/skiplang/compiler/src/AsmEmit.sk
++++ b/skiplang/compiler/src/AsmEmit.sk
+@@ -34,16 +34,40 @@
+     emissionPreambleDir.writeArray(context, SKStore.IID(0), Array[]);
+     return void
+   };
++  emissionPreambleDir.writeArray(
++    context,
++    SKStore.IID(0),
++    Array[SKStore.StringFile(nativePreamble(config))],
++  )
++}
++
++// LLVM module headers must precede definitions. A user preamble can contain a
++// global definition before the standard library's target headers. Keep leading
++// comments (and ordinary preambles' bytes) in place while hoisting those headers.
++private fun nativePreamble(config: Config.Config): String {
+   preamble = mutable TextOutputStream.StringTextOutputStream{};
+   for (p in config.preambles) preamble.write(FileSystem.readTextFile(p));
+   for (dep in config.dependencies.values()) {
+     for (p in dep.i1.preambles) preamble.write(p)
+   };
+-  emissionPreambleDir.writeArray(
+-    context,
+-    SKStore.IID(0),
+-    Array[SKStore.StringFile(preamble.toString())],
+-  )
++  prefix = mutable Vector[];
++  headers = mutable Vector[];
++  body = mutable Vector[];
++  inPrefix = true;
++  for (line in preamble.toString().split("\n")) {
++    trimmed = line.trimLeft();
++    if (inPrefix && (trimmed.isEmpty() || trimmed.startsWith(";"))) {
++      prefix.push(line)
++    } else {
++      !inPrefix = false;
++      if (trimmed.startsWith("target datalayout =") ||
++          trimmed.startsWith("target triple =") ||
++          trimmed.startsWith("source_filename =")) {
++        headers.push(line)
++      } else body.push(line)
++    }
++  };
++  prefix.toArray().concat(headers.toArray()).concat(body.toArray()).join("\n")
+ }
+ 
+ private class EmitBatchKey(index: Int) extends SKStore.Key
+@@ -78,6 +102,11 @@
+   config.incrementalSpecialization && !config.check &&
+     !config.isWasm() &&
+     (config.emit == "link" || config.emit == "cdylib")
++}
++
++fun collectionEmission(context: mutable SKStore.Context, config: Config.Config): Bool {
++  config.collectionEmission && incrementalEmission(config) &&
++    declarationPreamble(emissionPreambleDir.getArray(context, SKStore.IID(0))[0].value).isSome()
+ }
+ 
+ // The preamble is small, but includes runtime definitions. Only the support
+@@ -232,7 +261,16 @@
+ 
+ class EmissionCache(
+   modules: SKStore.EHandle<EmitModuleKey, SKStore.StringFile>,
++  objects: SKStore.EHandle<EmitModuleKey, EmitObjectFile>,
+ ) {
++  fun objectFiles(context: mutable SKStore.Context): Array<String> {
++    out = mutable Vector[];
++    for ((_, values) in this.objects.items(context)) {
++      for (file in values) out.push(file.path)
++    };
++    out.toArray()
++  }
++
+   fun contents(context: mutable SKStore.Context): Array<(String, String)> {
+     out = mutable Vector[];
+     for ((key, values) in this.modules.items(context)) {
+@@ -247,6 +285,7 @@
+ fun createEmissionCache(
+   context: mutable SKStore.Context,
+   input: SKStore.EHandle<SKStore.IID, NativeGraphFile>,
++  graph: GraphCache,
+ ): EmissionCache {
+   batches = input.map(
+     x ~> x,
+@@ -256,6 +295,7 @@
+     (_context, writer, _, values) ~> {
+       entry = values.first;
+       if (!incrementalEmission(entry.config)) return void;
++      if (collectionEmission(_context, entry.config)) return void;
+       defs = mutable AsmDefIDToAsmDef{pos => FileRange.builtin};
+       for (def in entry.defs) defs.set(def.id, def);
+       full = emissionPreambleDir.getArray(_context, SKStore.IID(0))[0].value;
+@@ -349,16 +389,25 @@
+       }
+     },
+   );
+-  files = batches.map(
+-    x ~> x,
+-    x ~> x,
+-    context,
+-    SKStore.DirName::create("/llvm-emit/inputs/"),
++  legacyFiles = batches.map(
++    x ~> x,
++    x ~> x,
++    context,
++    SKStore.DirName::create("/llvm-emit/legacy-inputs/"),
+     (_context, writer, _, values) ~> {
+       for ((key, file) in EmitBatchFile::type(values.first).entries) {
+         writer.set(key, file)
+       }
+     },
++  );
++  keyedFiles = createCollectionEmission(context, graph, input);
++  forward = (_context, writer, key, values) ~> writer.setArray(key, values.toArray());
++  files = SKStore.EHandle::multiMap(
++    x ~> x,
++    x ~> x,
++    context,
++    Array[(legacyFiles, (forward, None())), (keyedFiles, (forward, None()))],
++    SKStore.DirName::create("/llvm-emit/inputs/"),
+   );
+   modules = files.map(
+     EmitModuleKey::keyType,
+@@ -379,7 +428,7 @@
+       }
+     },
+   );
+-  EmissionCache(modules)
++  EmissionCache(modules, createArtifactCache(context, input, modules))
+ }
+ 
+ module end;
+--- a/skiplang/compiler/src/AsmOutput.sk
++++ b/skiplang/compiler/src/AsmOutput.sk
+@@ -1027,12 +1027,7 @@
+ 
+   sstr = mutable TextOutputStream.StringTextOutputStream{};
+ 
+-  config.preambles.each(p -> sstr.write(FileSystem.readTextFile(p)));
+-  for (dep in config.dependencies.values()) {
+-    for (p in dep.i1.preambles) {
+-      sstr.write(p)
+-    }
+-  };
++  sstr.write(nativePreamble(config));
+ 
+   // arbitrarily pick some unique input file as the CU for this output file.
+   metadata = AsmOutput.Metadata::create(
+--- a/skiplang/compiler/src/BackendMemory.sk
++++ b/skiplang/compiler/src/BackendMemory.sk
+@@ -0,0 +1,30 @@
++// Opt-in diagnostics. These counters are observational and do not become
++// dependencies of compiler callbacks. Persistent bytes are size-class-rounded
++// live allocations across the runtime's contexts, not RSS or file length.
++@allow_tracked_call
++@cpp_extern("SKIP_print_persistent_size")
++untracked native fun printCompilerPersistentBytes(): void;
++
++fun profileCompilerMemory(context: readonly SKStore.Context, label: String): void {
++  if (Environ.varOpt("SKC_MEMORY_STATS").isNone()) return void;
++  tick = context.getTick().value;
++  print_raw(`##PERSISTENT## ${tick} ${label} `);
++  printCompilerPersistentBytes();
++  // size() normally records a dependency. Use a disposable context so this
++  // diagnostic never broadens the reads of the active compiler operation.
++  diagnostic = context.clone().mclone();
++  counts = mutable Map<String, Int>[];
++  for (dir in context.listDirs()) {
++    dir match {
++    | eager @ SKStore.EagerDir _ ->
++      name = dir.getDirName().toString();
++      parts = name.split("/");
++      owner = if (parts.size() > 1) parts[1] else name;
++      counts.set(owner, counts.maybeGet(owner).default(0) + eager.size(diagnostic))
++    | _ -> void
++    }
++  };
++  for ((owner, count) in counts.items()) {
++    print_error(`##ROWS## ${tick} ${label} ${owner} ${count}\n`)
++  }
++}
+--- a/skiplang/compiler/src/Config.sk
++++ b/skiplang/compiler/src/Config.sk
+@@ -76,6 +76,7 @@
+   stopAfterSpecialization: Bool,
+   // Persistent invocations retain the incremental specialization graph.
+   incrementalSpecialization: Bool = false,
++  collectionEmission: Bool = false,
+   // Set only for local semantic computations wrapped by Verify.withSourcePositions.
+   // Successful checks do not consume coordinates; failures resolve them there.
+   deferVerifierDiagnostics: Bool = false,
+@@ -198,7 +199,7 @@
+     no_link = !results.getBool("link");
+     stopAfterSpecialization = results.getBool("stop-after-specialization");
+     // Release builds use sequential specialization, including persisted builds.
+-    incrementalSpecialization = !release && (
++    incrementalSpecialization = !release && results.getBool("incremental-backend") && (
+       results.maybeGetString("init").isSome() ||
+       results.maybeGetString("data").isSome()
+     );
+@@ -288,6 +289,7 @@
+       no_link,
+       stopAfterSpecialization,
+       incrementalSpecialization,
++      collectionEmission => results.getBool("collection-emission"),
+       stackAlign,
+       stackAlignStr,
+       ptrByteSize,
+--- a/skiplang/compiler/src/compile.sk
++++ b/skiplang/compiler/src/compile.sk
+@@ -620,6 +620,7 @@
+ 
+   tickDir = context.mkdir(SKStore.IID::keyType, TickFile::type, tickDirName);
+   _ = context.mkdir(SKStore.IID::keyType, SKStore.StringFile::type, AsmOutput.emissionPreambleDirName);
++  AsmOutput.initializeArtifactInputs(context);
+ 
+   specializationConfigDir = backendDir.map(
+     SKStore.IID::keyType,
+@@ -882,7 +883,9 @@
+                 invariant(specializer.funStack is List.Nil());
+                 invariant(specializer.classStack is List.Nil());
+ 
+-                key match {
++                runCompilerPhase(
++                  if (key is SKStore.IID _) "specialization/classes" else "specialization/functions",
++                  () -> key match {
+                 | SKStore.IID _ ->
+                   for (value in values) {
+                     value match {
+@@ -970,7 +973,7 @@
+                   specializer.writeDiff(writer)
+ 
+                 | _ -> invariant_violation("Unexpected specializer work key")
+-                }
++                })
+               },
+             )
+             .map(
+@@ -1214,6 +1217,10 @@
+     (context, writer, key, values) ~> {
+       env = values.first.env;
+       config = backendDir.getArray(context, SKStore.IID(0))[0].value;
++      if (AsmOutput.collectionEmission(context, config)) {
++        writer.set(key, AsmOutput.NativeGraphFile(Array[], config));
++        return void
++      };
+       defs = runCompilerPhase("native/create_asm_graph", () -> {
+         if (config.incrementalSpecialization) {
+           graphCache.assemble(context, env)
+@@ -1239,7 +1246,7 @@
+       )
+     },
+   );
+-  emission = AsmOutput.createEmissionCache(context, backendGraphDir);
++  emission = AsmOutput.createEmissionCache(context, backendGraphDir, graphCache);
+   backendEmitDir = backendGraphDir.map(
+     SKStore.IID::keyType,
+     ConfigFile::type,
+@@ -1281,22 +1288,26 @@
+         };
+         if (AsmOutput.incrementalEmission(config)) {
+           _ = AsmOutput.emissionPreambleDir.getArray(context, SKStore.IID(0));
+-          modules = emission.contents(context);
+-          if (modules.isEmpty()) {
+-            // Unsupported opaque user preambles retain the previous native path.
+-            compile_binary(
+-              defs,
+-              config,
+-              wasm_exports,
+-              SourcePositions.Table::read(context),
+-            );
+-            dir = config.output + ".llvm";
+-            if (!FileSystem.exists(dir)) {
+-              runShell(Array["mkdir", "-p", dir], config.verbose)
+-            };
+-            FileSystem.writeTextFile(dir + "/outputs", config.output + ".ll")
++          if (AsmOutput.collectionEmission(context, config)) {
++            link_incremental_objects(emission.objectFiles(context), config, wasm_exports)
+           } else {
+-            compile_incremental_binary(modules, config, wasm_exports)
++            modules = emission.contents(context);
++            if (modules.isEmpty()) {
++              // Unsupported opaque user preambles retain the previous native path.
++              compile_binary(
++                defs,
++                config,
++                wasm_exports,
++                SourcePositions.Table::read(context),
++              );
++              dir = config.output + ".llvm";
++              if (!FileSystem.exists(dir)) {
++                runShell(Array["mkdir", "-p", dir], config.verbose)
++              };
++              FileSystem.writeTextFile(dir + "/outputs", config.output + ".ll")
++            } else {
++              compile_incremental_binary(modules, config, wasm_exports)
++            }
+           }
+         } else {
+           compile_binary(defs, config, wasm_exports, positions)
+@@ -1345,6 +1356,7 @@
+     Array[ConfigFile(config.backendConfig())],
+   );
+   AsmOutput.refreshEmissionPreamble(context, config);
++  AsmOutput.refreshArtifactInputs(context, config);
+   tickDir.writeArray(
+     context,
+     SKStore.IID(0),
+@@ -1505,6 +1517,7 @@
+     pipelinePhaseKey,
+     compilerPipeline,
+     (context, phase) ~> {
++      profileCompilerMemory(context, "before-" + phase);
+       context.!debugMode = debugSKStore;
+       if (phase == 0) {
+         context.!newDirs = SortedSet[];
+@@ -1521,7 +1534,10 @@
+       print_error(exn.getMessage());
+       skipExit(2)
+     },
+-  )
++  );
++  if (Environ.varOpt("SKC_MEMORY_STATS").isSome()) {
++    SKStore.withContext(context -> profileCompilerMemory(context, "complete"))
++  }
+ }
+ 
+ // Type the stdlib (dependencies) once into `context`, with no config written
+@@ -1667,7 +1683,6 @@
+   if (!FileSystem.exists(dir)) {
+     runShell(Array["mkdir", "-p", dir], config.verbose)
+   };
+-  objects = mutable Vector[];
+   outputs = modules.flatMap(part -> {
+     base = dir + "/" + part.i0;
+     Array[base + ".ll", base + ".o", base + ".flags"]
+@@ -1677,47 +1692,48 @@
+   FileSystem.writeTextFile(dir + "/outputs", outputs.join("\n"));
+   tool = System.subprocess(Array["clang++", "--version"]).fromSuccess();
+   invariant(tool.success(), tool.stderr);
+-  for ((name, contents) in modules) {
+-    ll = dir + "/" + name + ".ll";
+-    object = dir + "/" + name + ".o";
+-    stamp = dir + "/" + name + ".flags";
+-    temp = object + ".tmp";
+-    args = Array[
+-      "clang++",
+-      `-O${config.optLevel}`,
+-      `--target=${config.target}`,
+-      "-c",
+-      ll,
+-      "-o",
+-      temp,
+-    ].concat(if (config.emit == "cdylib") Array["-fPIC"] else Array[])
+-      .concat(config.link_args)
+-      .concat(
+-        config.dependencies.values().collect(Array).flatMap(dep ->
+-          dep.i1.links
+-        ),
+-      );
+-    flags = tool.stdout + "\n" + args.join("\n");
+-    changed = !FileSystem.exists(ll) || FileSystem.readTextFile(ll) != contents;
+-    if (
+-      changed ||
+-      !FileSystem.exists(object) ||
+-      !FileSystem.exists(stamp) ||
+-      FileSystem.readTextFile(stamp) != flags
+-    ) {
+-      // Invalidate success before replacing the input: a failed clang must not
+-      // make a subsequent retry mistake the old object for a successful build.
+-      if (FileSystem.exists(stamp)) {
+-        runShell(Array["rm", stamp], config.verbose)
+-      };
+-      if (changed) FileSystem.writeTextFile(ll, contents);
+-      runShell(args, config.verbose);
+-      runShell(Array["mv", temp, object], config.verbose);
+-      FileSystem.writeTextFile(stamp, flags)
+-    };
+-    objects.push(object);
++  objects = modules.map(part -> compile_incremental_module(part.i0, part.i1, config, tool.stdout));
++  link_incremental_objects(objects, config, exports)
++}
++
++fun compile_incremental_module(
++  name: String,
++  contents: String,
++  config: Config.Config,
++  toolVersion: String,
++): String {
++  dir = config.output + ".llvm";
++  ll = dir + "/" + name + ".ll";
++  object = dir + "/" + name + ".o";
++  stamp = dir + "/" + name + ".flags";
++  temp = object + ".tmp";
++  args = Array[
++    "clang++", `-O${config.optLevel}`, `--target=${config.target}`,
++    "-c", ll, "-o", temp,
++  ].concat(if (config.emit == "cdylib") Array["-fPIC"] else Array[])
++    .concat(config.link_args)
++    .concat(config.dependencies.values().collect(Array).flatMap(dep -> dep.i1.links));
++  flags = toolVersion + "\n" + args.join("\n");
++  changed = !FileSystem.exists(ll) || FileSystem.readTextFile(ll) != contents;
++  if (changed || !FileSystem.exists(object) || !FileSystem.exists(stamp) ||
++      FileSystem.readTextFile(stamp) != flags) {
++    // Invalidate success before replacing the input. A failed clang must never
++    // make a retry mistake the old object for a successful compilation.
++    if (FileSystem.exists(stamp)) runShell(Array["rm", stamp], config.verbose);
++    if (changed) FileSystem.writeTextFile(ll, contents);
++    runShell(args, config.verbose);
++    runShell(Array["mv", temp, object], config.verbose);
++    FileSystem.writeTextFile(stamp, flags)
+   };
+-  getLinkArgs("", config, exports, Some(objects.toArray())).each(args -> {
++  object
++}
++
++fun link_incremental_objects(
++  objects: Array<String>,
++  config: Config.Config,
++  exports: Array<String>,
++): void {
++  getLinkArgs("", config, exports, Some(objects)).each(args -> {
+     if (config.no_link) {
+       print_string("---LINK_ARGS_BEGIN---");
+       args.each(print_string);
+--- a/skiplang/compiler/src/main.sk
++++ b/skiplang/compiler/src/main.sk
+@@ -62,6 +62,12 @@
+     .arg(Cli.Arg::bool("profile"))
+     .arg(Cli.Arg::bool("canonize-paths").negatable())
+     .arg(Cli.Arg::bool("check").about("Run the front end only."))
++    .arg(Cli.Arg::bool("collection-emission").about(
++      "Use keyed LLVM sharing and emission in incremental native builds.",
++    ))
++    .arg(Cli.Arg::bool("incremental-backend").default(true).negatable().about(
++      "Use the incremental backend with persistent storage; disabling it keeps frontend caching and output/debug flags.",
++    ))
+     .arg(
+       Cli.Arg::bool("link")
+         .negatable()
+@@ -130,7 +136,7 @@
+     skipExit(0);
+   };
+ 
+-  config = Config.Config::make(results);
++  config = runCompilerPhase("frontend/config_and_archives", () -> Config.Config::make(results));
+   debugSKStore = results.getBool("debug-skstore");
+ 
+   batchManifest = results.maybeGetString("batch");
+--- a/skiplang/compiler/src/skipUtils.sk
++++ b/skiplang/compiler/src/skipUtils.sk
+@@ -113,8 +113,10 @@
+     // Monotonic (steady_clock), nanosecond-resolution elapsed time.
+     start = Time.time_ns();
+     result = phase();
+-    elapsed = Time.time_ns() - start;
++    end = Time.time_ns();
++    elapsed = end - start;
+     print_error(`##TIME## ${phaseName} ${elapsed}\n`);
++    print_error(`##SPAN## ${start} ${end} phase ${phaseName}\n`);
+     result
+   }
+ }
+diff --git a/skiplang/prelude/src/skstore/Context.sk b/skiplang/prelude/src/skstore/Context.sk
+index 3c2b1f11d..8908a5688 100644
+--- a/skiplang/prelude/src/skstore/Context.sk
++++ b/skiplang/prelude/src/skstore/Context.sk
+@@ -1075,6 +1075,7 @@ mutable class Context private {
+     after: DirName ~> Bool,
+     eligible: DirName ~> Bool,
+   ): (Bool, Bool, Bool) {
++    profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
+     invariant(
+       this.currentArrow().isNone(),
+       "updateWithStatus cannot be called during update.",
+@@ -1153,6 +1154,7 @@ mutable class Context private {
+           this.!updatePaused = true;
+           break (false, true, true)
+         };
++        arrowStart = if (profile) Time.time_ns() else 0;
+         this.unsafeMaybeGetDir(childName) match {
+         | None()
+         | Some(DeletedDir _) ->
+@@ -1177,6 +1179,9 @@ mutable class Context private {
+             child,
+           )
+         };
++        if (profile) {
++          print_error(`##SPAN## ${arrowStart} ${Time.time_ns()} arrow ${childName}\n`)
++        };
+         if (after(childName)) {
+           this.restoreDeferredUpdates(heldUpdates);
+           this.!updatePaused = true;
+@@ -2131,6 +2136,7 @@ fun runWithGcIntern(
+   isync: Bool = false,
+   fork: ?String = None(),
+ ): Contexts {
++  profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
+   sync = UInt32::truncate(if (isync) 1 else 0);
+   if (!gHasContext(fork)) {
+     gContextInit(initCtx, fork);
+@@ -2145,6 +2151,7 @@ fun runWithGcIntern(
+   loop {
+     context = contexts.get(fork);
+     startTick = context.getTick();
++    stepStart = if (profile) Time.time_ns() else 0;
+     pos = newObstack();
+     (newContext, newContextOp) = (try {
+       Some(f(context.withGlobals(globals)))
+@@ -2161,6 +2168,10 @@ fun runWithGcIntern(
+       destroyObstack(pos);
+       return contexts
+     };
++    if (profile) {
++      print_error(`##SPAN## ${stepStart} ${Time.time_ns()} store step\n`)
++    };
++    syncStart = if (profile) Time.time_ns() else 0;
+     newContextOp match {
+     | CContinue(underLockF) ->
+       synchronizer match {
+@@ -2211,6 +2222,9 @@ fun runWithGcIntern(
+         !contexts = new.contexts;
+         gUnsafeFree(contexts);
+         destroyObstack(pos);
++        if (profile) {
++          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
++        };
+         return contexts
+       | Some _ ->
+         new = gContextSync(
+@@ -2227,9 +2241,15 @@ fun runWithGcIntern(
+         !contexts = new.contexts;
+         gUnsafeFree(contexts);
+         destroyObstack(pos);
++        if (profile) {
++          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
++        };
+         return contexts
+       }
+     };
++    if (profile) {
++      print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
++    };
+     !globals = contexts.get(fork).globals;
+   }
+ }

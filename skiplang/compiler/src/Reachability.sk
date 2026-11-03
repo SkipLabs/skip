@@ -1,9 +1,10 @@
 /** Incremental post-optimization reachability and class escape analysis. */
 module Reachability;
 
-private class FunctionKey(id: SFunctionID) extends SKStore.Key
+private type FunctionKey = BackendFunctionKey;
 private class ClassesFile(
   classes: SortedMap<SClassID, SClass>,
+  source: ?SKStore.EHandle<ClassInputs.Key, ClassInputs.File> = None(),
 ) extends SKStore.File
 private class RootsFile(ids: Array<SFunctionID>) extends SKStore.File
 private class EdgesFile(ids: Array<SFunctionID>) extends SKStore.File
@@ -12,11 +13,18 @@ private class LiveFile(ids: Array<SFunctionID>) extends SKStore.File
 class Cache(
   live: SKStore.EHandle<SKStore.IID, LiveFile>,
   escapes: SKStore.EHandle<SKStore.IID, ClassesFile>,
+  functions: SKStore.EHandle<BackendFunctionKey, FunctionFile>,
 ) {
-  fun finish(context: mutable SKStore.Context, env: GlobalEnv): GlobalEnv {
+  fun finish(
+    context: mutable SKStore.Context,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): GlobalEnv {
     functions = FunctionIDToFunction::mcreate();
-    for (id in this.live.getArray(context, SKStore.IID(1))[0].ids) {
-      functions.insert(env.getFunction(id, FileRange.builtin))
+    if (!BackendProgram::enabled(context, config)) {
+      for (id in this.live.getArray(context, SKStore.IID(1))[0].ids) {
+        functions.insert(env.getFunction(id, FileRange.builtin))
+      }
     };
     env with {
       sfuns => functions.chill(),
@@ -27,29 +35,38 @@ class Cache(
 
 fun createCache(
   context: mutable SKStore.Context,
-  input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+  program: BackendProgram,
 ): Cache {
-  batches = FunctionBatches.create(context, input, "/reachability/batches/");
-  files = batches.map(
-    x ~> x,
-    x ~> x,
+  files = program.publishInputs(
     context,
-    SKStore.DirName::create("/reachability/inputs/"),
-    (_context, writer, _, values) ~> {
+    "/reachability/inputs/",
+    (context, writer, env, config) ~> {
+      writer.set(
+        SKStore.IID(0),
+        ClassesFile(
+          env.sclasses,
+          if (BackendProgram::classHeadersEnabled(context, config)) {
+            program.classes
+          } else {
+            None()
+          },
+        ),
+      );
+      roots = mutable UnorderedSet[env.initializeAllConstsID];
+      env.runtimeFunctions.values().each(roots.insert);
+      writer.set(SKStore.IID(1), RootsFile(roots.toArray().sorted()))
+    },
+  );
+  rootInputs = files.map(
+    SKStore.IID::keyType,
+    RootsFile::type,
+    context,
+    SKStore.DirName::create("/reachability/roots/"),
+    (_, writer, _, values) ~> {
       values.first match {
-      | Optimize.InputFile(env, _) ->
-        ClassInputs.writeClasses(writer, env.sclasses);
-        writer.set(SKStore.IID(0), ClassesFile(env.sclasses));
-        roots = mutable UnorderedSet[env.initializeAllConstsID];
-        env.runtimeFunctions.values().each(roots.insert);
-        writer.set(SKStore.IID(1), RootsFile(roots.toArray().sorted()))
-      | FunctionBatches.FunctionsFile(functions) ->
-        roots = mutable Vector[];
-        for (f in functions) {
-          writer.set(FunctionKey(f.id), FunctionFile(f));
-          if (f.isDisasm || f.isRuntimeExport) roots.push(f.id)
-        };
-        writer.set(SKStore.IID(1), RootsFile(roots.toArray()))
+      | roots @ RootsFile _ -> writer.set(SKStore.IID(1), roots)
+      | FunctionFile(f) if (f.isDisasm || f.isRuntimeExport) ->
+        writer.set(SKStore.IID(1), RootsFile(Array[f.id]))
       | _ -> void
       }
     },
@@ -90,46 +107,79 @@ fun createCache(
       values.first match {
       | classes @ ClassesFile _ ->
         if (context.debugMode) print_string("POINTER_ESCAPE");
+        current = classes.classes;
+        classes.source.each(source -> {
+          // Escape analysis remains a global class pass. Its collection read
+          // sees only final class rows, never unrelated function body updates.
+          for ((key, entries) in source.items(context)) {
+            for (entry in entries) !current[key.id] = entry.value
+          }
+        });
         writer.set(
           SKStore.IID(0),
           ClassesFile(
-            Escape.computeWhetherPointersCanEscape(
-              GlobalEnv::make(classes.classes),
-            ).sclasses,
+            Escape.computeWhetherPointersCanEscape(GlobalEnv::make(current))
+              .sclasses,
           ),
         )
       | _ -> void
       }
     },
   );
-  live = files.map(
+  live = rootInputs.map(
     SKStore.IID::keyType,
     LiveFile::type,
     context,
     SKStore.DirName::create("/reachability/live/"),
     (context, writer, _, values) ~> {
+      if (context.debugMode) print_string("REACHABILITY_LIVE");
+      roots = values.toArray().flatMap(file -> RootsFile::type(file).ids);
+      // Traversal consumes the complete graph. A normal collection read
+      // tracks that once rather than recording one dependency per function.
+      graph = mutable UnorderedMap[];
+      for ((key, entries) in edges.items(context)) {
+        entries.next().each(entry -> graph.set(key.id, entry.ids))
+      };
+      pending = Vector::mcreateFromItems(roots);
+      visited = mutable UnorderedSet[];
+      while (!pending.isEmpty()) {
+        id = pending.pop();
+        if (visited.maybeInsert(id)) pending.extend(graph[id])
+      };
+      writer.set(SKStore.IID(1), LiveFile(visited.toArray().sorted()))
+    },
+  );
+  liveKeys = live.map(
+    BackendFunctionKey::keyType,
+    SKStore.BoolFile::type,
+    context,
+    SKStore.DirName::create("/reachability/live-keys/"),
+    (context, writer, _, values) ~> {
+      enabled = program.header.getArrayFilter(context, SKStore.IID(0), entry ~>
+        SKStore.BoolFile(entry.config.collectionFunctions)
+      );
+      if (enabled.isEmpty() || !enabled[0].value) return void;
+      for (id in values.first.ids) {
+        writer.set(BackendFunctionKey(id), SKStore.BoolFile(true))
+      }
+    },
+  );
+  functions = files.map(
+    BackendFunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/reachability/functions/"),
+    (context, writer, _, values) ~> {
       values.first match {
-      | RootsFile _ ->
-        if (context.debugMode) print_string("REACHABILITY_LIVE");
-        roots = values.toArray().flatMap(file -> RootsFile::type(file).ids);
-        // Traversal consumes the complete graph. A normal collection read
-        // tracks that once rather than recording one dependency per function.
-        graph = mutable UnorderedMap[];
-        for ((key, entries) in edges.items(context)) {
-          entries.next().each(entry -> graph.set(key.id, entry.ids))
-        };
-        pending = Vector::mcreateFromItems(roots);
-        visited = mutable UnorderedSet[];
-        while (!pending.isEmpty()) {
-          id = pending.pop();
-          if (visited.maybeInsert(id)) pending.extend(graph[id])
-        };
-        writer.set(SKStore.IID(1), LiveFile(visited.toArray().sorted()))
+      | file @ FunctionFile(f) ->
+        if (!liveKeys.getArray(context, BackendFunctionKey(f.id)).isEmpty()) {
+          writer.set(BackendFunctionKey(f.id), file)
+        }
       | _ -> void
       }
     },
   );
-  Cache(live, escapes)
+  Cache(live, escapes, functions)
 }
 
 module end;

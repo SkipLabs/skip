@@ -3,6 +3,15 @@ module ClassInputs;
 class Key(id: SClassID) extends SKStore.Key
 class File(value: SClass) extends SKStore.File
 private class ScalarFile(value: ?ScalarType) extends SKStore.File
+private class PredicatesFile(
+  isLambda: Bool,
+  isValueClass: Bool,
+) extends SKStore.File
+
+private fun classPredicates(file: SKStore.File): PredicatesFile {
+  sc = File::type(file).value;
+  PredicatesFile(sc.isLambda, sc.kind.isValueClass())
+}
 
 fun writeClasses(
   writer: mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
@@ -25,6 +34,74 @@ fun readAll(
   result
 }
 
+// Some transformations, especially coroutine lowering, still need a complete
+// class environment. Share that view per source collection. Its input contains
+// only classes, so an unrelated function body cannot invalidate the fallback.
+private class SharedViewFile(
+  classes: SortedMap<SClassID, SClass>,
+) extends SKStore.File
+
+private fun sharedViewName(
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): SKStore.DirName {
+  SKStore.DirName::create(files.dirName.toString() + "class-view/")
+}
+
+// The optimizer coordinator owns these collections. Never register them from
+// an individual function callback: many callbacks can use the same source.
+fun createSharedView(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): void {
+  classes = files.map(
+    SKStore.IID::keyType,
+    File::type,
+    context,
+    SKStore.DirName::create(files.dirName.toString() + "class-view-inputs/"),
+    (_, writer, key, values) ~> {
+      key match {
+      | Key _ ->
+        writer.setArray(SKStore.IID(0), values.toArray().map(File::type))
+      | _ -> void
+      }
+    },
+  );
+  _ = SKStore.LHandle::create(
+    SKStore.IID::keyType,
+    SharedViewFile::type,
+    context,
+    sharedViewName(files),
+    (context, _, key) ~> {
+      invariant(key == SKStore.IID(0), "Unexpected shared class view key");
+      _ = context.getDir(classes.dirName);
+      if (context.debugMode) {
+        print_string(`OPTIMIZER_CLASS_VIEW: ${files.dirName}`)
+      };
+      result = SortedMap<SClassID, SClass>[];
+      for (file in classes.getArray(context, SKStore.IID(0))) {
+        !result[file.value.id] = file.value
+      };
+      Array[SharedViewFile(result)]
+    },
+  )
+}
+
+fun readSharedView(
+  context: mutable SKStore.Context,
+  files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+): SortedMap<SClassID, SClass> {
+  view = SKStore.LHandle(
+    SKStore.IID::keyType,
+    SharedViewFile::type,
+    sharedViewName(files),
+  );
+  invariant(
+    context.maybeGetDir(view.dirName).isSome(),
+    "Missing optimizer class view: " + view.dirName,
+  );
+  view.getArray(context, SKStore.IID(0))[0].classes
+}
+
 private fun exampleID(typ: Type): SClassID {
   typ match {
   | Tclass(id, _) -> id
@@ -39,10 +116,46 @@ private fun exampleID(typ: Type): SClassID {
 mutable class Reader(
   context: mutable SKStore.Context,
   files: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  precisePredicates: Bool = false,
   memoize: Bool = Environ.varOpt("SKC_DISABLE_CLASS_READER_MEMO").isNone(),
   classCache: mutable UnorderedMap<SClassID, SClass> = mutable UnorderedMap[],
-  scalarCache: mutable UnorderedMap<SClassID, ?ScalarType> = mutable UnorderedMap[],
+  scalarCache: mutable UnorderedMap<
+    SClassID,
+    ?ScalarType,
+  > = mutable UnorderedMap[],
+  predicateCache: mutable UnorderedMap<
+    SClassID,
+    PredicatesFile,
+  > = mutable UnorderedMap[],
 ) {
+  private mutable fun predicates(id: SClassID): PredicatesFile {
+    if (!this.precisePredicates) {
+      sc = this.getSClass(id);
+      return PredicatesFile(sc.isLambda, sc.kind.isValueClass())
+    };
+    if (this.memoize) {
+      this.predicateCache.maybeGet(id) match {
+      | Some(value) -> return value
+      | None() -> void
+      }
+    };
+    // Cost estimation needs these flags, not fields, methods or subtype sets.
+    // Keep this dependency distinct from full-class and scalar reads.
+    value = this.files.getArrayFilter(this.context, Key(id), classPredicates)[
+      0,
+    ];
+    if (this.memoize) this.predicateCache.set(id, value);
+    value
+  }
+
+  mutable fun isLambda(id: SClassID): Bool {
+    this.predicates(id).isLambda
+  }
+
+  mutable fun isValueClass(typ: Type): Bool {
+    this.predicates(exampleID(typ)).isValueClass
+  }
+
   mutable fun getSClass(id: SClassID): SClass {
     if (this.memoize) {
       this.classCache.maybeGet(id) match {
@@ -62,9 +175,11 @@ mutable class Reader(
       | None() -> void
       }
     };
-    value = ScalarFile::type(this.files.getArrayFilter(this.context, Key(id), file ~>
-      ScalarFile(File::type(file).value.maybeGetScalarType())
-    )[0]).value;
+    value = ScalarFile::type(
+      this.files.getArrayFilter(this.context, Key(id), file ~>
+        ScalarFile(File::type(file).value.maybeGetScalarType())
+      )[0],
+    ).value;
     if (this.memoize) this.scalarCache.set(id, value);
     value
   }
@@ -76,28 +191,69 @@ mutable class Reader(
   }
 }
 
-fun getSClass(env: readonly ClassLookupEnv, id: SClassID, reader: ?mutable Reader): SClass {
+fun getSClass(
+  env: readonly ClassLookupEnv,
+  id: SClassID,
+  reader: ?mutable Reader,
+): SClass {
   reader match {
   | Some(value) -> value.getSClass(id)
   | None() -> env.getSClass(id)
   }
 }
-fun exampleSClass(typ: Type, env: readonly ClassLookupEnv, reader: ?mutable Reader): SClass {
+fun exampleSClass(
+  typ: Type,
+  env: readonly ClassLookupEnv,
+  reader: ?mutable Reader,
+): SClass {
   getSClass(env, exampleID(typ), reader)
 }
-fun getScalarType(typ: Type, env: GlobalEnv, reader: ?mutable Reader): ScalarType {
+fun isLambda(
+  env: readonly ClassLookupEnv,
+  id: SClassID,
+  reader: ?mutable Reader,
+): Bool {
+  reader match {
+  | Some(value) -> value.isLambda(id)
+  | None() -> env.getSClass(id).isLambda
+  }
+}
+fun isValueClass(
+  typ: Type,
+  env: readonly ClassLookupEnv,
+  reader: ?mutable Reader,
+): Bool {
+  reader match {
+  | Some(value) -> value.isValueClass(typ)
+  | None() -> exampleSClass(typ, env, None()).kind.isValueClass()
+  }
+}
+fun getScalarType(
+  typ: Type,
+  env: GlobalEnv,
+  reader: ?mutable Reader,
+): ScalarType {
   reader match {
   | Some(value) -> value.getScalarType(typ)
   | None() -> typ.getScalarType(env)
   }
 }
-fun maybeGetScalarType(typ: Type, env: GlobalEnv, reader: ?mutable Reader): ?ScalarType {
+fun maybeGetScalarType(
+  typ: Type,
+  env: GlobalEnv,
+  reader: ?mutable Reader,
+): ?ScalarType {
   reader match {
   | Some(value) -> value.maybeGetScalarType(typ)
   | None() -> typ.maybeGetScalarType(env)
   }
 }
-fun forEachConcreteSubtype(typ: Type, env: GlobalEnv, func: SClass -> Bool, reader: ?mutable Reader): Bool {
+fun forEachConcreteSubtype(
+  typ: Type,
+  env: GlobalEnv,
+  func: SClass -> Bool,
+  reader: ?mutable Reader,
+): Bool {
   seen = mutable UnorderedSet[];
   typ.forEachTclass(tc -> {
     getSClass(env, tc.sclassID, reader).subtypes.all(id -> {
@@ -108,26 +264,47 @@ fun forEachConcreteSubtype(typ: Type, env: GlobalEnv, func: SClass -> Bool, read
     })
   })
 }
-fun allowsPointerEscape(typ: Type, env: GlobalEnv, reader: ?mutable Reader): Bool {
+fun allowsPointerEscape(
+  typ: Type,
+  env: GlobalEnv,
+  reader: ?mutable Reader,
+): Bool {
   typ match {
-  | tc @ Tclass _ -> tc.mutability match {
+  | tc @ Tclass _ ->
+    tc.mutability match {
     | DeepFrozen() -> false
-    | Readonly() -> getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfReadonly
-    | Mutable() -> getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfMutable
+    | Readonly() ->
+      getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfReadonly
+    | Mutable() ->
+      getSClass(env, tc.sclassID, reader).allowsPointerEscapeIfMutable
     }
-  | Tsuperposition(unique, _) -> unique.any(tc -> allowsPointerEscape(tc, env, reader))
+  | Tsuperposition(unique, _) ->
+    unique.any(tc -> allowsPointerEscape(tc, env, reader))
   }
 }
-fun mightBeInConstMemory(typ: Type, env: GlobalEnv, reader: ?mutable Reader): Bool {
+fun mightBeInConstMemory(
+  typ: Type,
+  env: GlobalEnv,
+  reader: ?mutable Reader,
+): Bool {
   typ match {
-  | tc @ Tclass _ -> tc.mutability != Mutable() || {
-      sc = getSClass(env, tc.sclassID, reader);
-      sc.isArray() || !sc.fields.any(f -> f.isAssignable)
-    }
-  | Tsuperposition(unique, _) -> unique.any(tc -> mightBeInConstMemory(tc, env, reader))
+  | tc @ Tclass _ ->
+    tc.mutability != Mutable() ||
+      {
+        sc = getSClass(env, tc.sclassID, reader);
+        sc.isArray() || !sc.fields.any(f -> f.isAssignable)
+      }
+  | Tsuperposition(unique, _) ->
+    unique.any(tc -> mightBeInConstMemory(tc, env, reader))
   }
 }
-fun isSubType(t1: Type, t2: Type, env: GlobalEnv, pos: Pos, reader: ?mutable Reader): Bool {
+fun isSubType(
+  t1: Type,
+  t2: Type,
+  env: GlobalEnv,
+  pos: Pos,
+  reader: ?mutable Reader,
+): Bool {
   if (t1 == t2) {
     true
   } else {

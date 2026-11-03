@@ -56,6 +56,11 @@ base class LazyDir protected {protected collect: Bool} extends Dir {
 class TLazyDir{
   protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
   protected compute: LazyCompute<Key, File>,
+  // Fixed with the directory, including snapshots. This changes only cache
+  // maintenance, never the retention window or dependency invalidation.
+  private deltaRetention: Bool = Environ.varOpt(
+    "SKSTORE_DELTA_LAZY_RETENTION",
+  ).isSome(),
 } extends LazyDir, TDir {
   fun updateLazyGets(
     refCountsOpt: ?KeyMap<Int>,
@@ -63,35 +68,88 @@ class TLazyDir{
     deadKeysOpt: ?KeySet,
   ): (?KeyMap<Int>, ?this) {
     refCounts = this.castOrEmptyKeyMap(refCountsOpt);
+    previousRefCounts = refCounts;
     newKeys = this.castOrEmptyKeySet(newKeysOpt);
     deadKeys = this.castOrEmptyKeySet(deadKeysOpt);
 
     toRemove = mutable Vector[];
-    !refCounts = refCounts.mergeWith2(
-      newKeys.getInner(),
-      deadKeys.getInner(),
-      (key, refCountOpt, newOpt, deadOpt) -> {
-        (refCountOpt, newOpt, deadOpt) match {
-        | (_, None(), None())
-        | (_, Some(void), Some(void)) ->
-          refCountOpt
-        | (None(), None(), Some(void)) ->
-          // Not found, but since the aim is to remove them, we can do nothing.
-          refCountOpt
-        | (Some(1), None(), Some(void)) ->
-          toRemove.push(key);
-          None()
-        | _ ->
-          Some(
-            refCountOpt.default(0) +
-              newOpt.maybe(0, (_: void) -> 1) -
-              deadOpt.maybe(0, (_: void) -> 1),
-          )
+    if (
+      this.deltaRetention &&
+      newKeys.inner.size() + deadKeys.inner.size() < refCounts.inner.size() / 8
+    ) {
+      // A tiny update must not rebuild a large retained count map. A key read
+      // in both the entering and expiring batch has no net count change.
+      for (key in newKeys.values()) {
+        if (!deadKeys.inner.contains(key)) {
+          !refCounts[key] = refCounts.inner.maybeGet(key).default(0) + 1
         }
-      },
-    );
+      };
+      for (key in deadKeys.values()) {
+        if (newKeys.inner.contains(key)) continue;
+        refCounts.inner.maybeGet(key) match {
+        | None() -> void
+        | Some(1) ->
+          toRemove.push(key);
+          !refCounts = refCounts.remove(key)
+        | Some(count) -> !refCounts[key] = count - 1
+        }
+      }
+    } else {
+      !refCounts = refCounts.mergeWith2(
+        newKeys.getInner(),
+        deadKeys.getInner(),
+        (key, refCountOpt, newOpt, deadOpt) -> {
+          (refCountOpt, newOpt, deadOpt) match {
+          | (_, None(), None())
+          | (_, Some(void), Some(void)) ->
+            refCountOpt
+          | (None(), None(), Some(void)) ->
+            // Not found, but since the aim is to remove them, we can do nothing.
+            refCountOpt
+          | (Some(1), None(), Some(void)) ->
+            toRemove.push(key);
+            None()
+          | _ ->
+            Some(
+              refCountOpt.default(0) +
+                newOpt.maybe(0, (_: void) -> 1) -
+                deadOpt.maybe(0, (_: void) -> 1),
+            )
+          }
+        },
+      )
+    };
     dirOpt = if (toRemove.isEmpty()) None() else {
-      Some(this.removeKeys(toRemove))
+      Some(
+        if (this.deltaRetention && toRemove.size() > this.data.size() / 8) {
+          // Expiring a cold-build batch can retire almost every row. Merge
+          // ordered maps once instead of copying a search path for each row.
+          // Use the OLD counts: only a final reference leaving without a new
+          // read expires, exactly as in the count update above.
+          this with {
+            data => this.data.mergeWith2(
+              previousRefCounts.inner,
+              deadKeys.getInner().inner,
+              (key, value, count, dead) -> {
+                if (
+                  count == Some(1) &&
+                  dead.isSome() &&
+                  !newKeys.inner.contains(key)
+                ) {
+                  value match {
+                  | Some(LDefined(_, reads)) -> Some(LRemoved(reads))
+                  | _ -> value
+                  }
+                } else {
+                  value
+                }
+              },
+            ),
+          }
+        } else {
+          this.removeKeys(toRemove)
+        },
+      )
     };
     !refCountsOpt = if (refCounts.isEmpty()) None() else Some(refCounts);
     (refCountsOpt, dirOpt)
@@ -118,6 +176,33 @@ class TLazyDir{
     keys
   }
 
+  fun retentionCounts(): SortedMap<String, Int> {
+    defined = 0;
+    removed = 0;
+    absent = 0;
+    cyclic = 0;
+    reads = 0;
+    for (value in this.data.values()) {
+      value match {
+      | LDefined(_, paths) ->
+        !defined = defined + 1;
+        !reads = reads + paths.size()
+      | LRemoved(paths) ->
+        !removed = removed + 1;
+        !reads = reads + paths.size()
+      | LAbsent() -> !absent = absent + 1
+      | LCycle() -> !cyclic = cyclic + 1
+      }
+    };
+    SortedMap[
+      "lazy_defined" => defined,
+      "lazy_removed" => removed,
+      "lazy_absent" => absent,
+      "lazy_cyclic" => cyclic,
+      "lazy_read_paths" => reads,
+    ]
+  }
+
   fun getArrayRaw(key: Key): Array<File> {
     this.data.maybeGet(key) match {
     | Some(LDefined(arr, _)) -> arr
@@ -133,26 +218,36 @@ class TLazyDir{
     | None() -> void
     | Some(dirtyReaders) ->
       for (dirtyReaderDirName => dirtyReaderKeys in dirtyReaders) {
-        for (key in this.castKeySet(dirtyReaderKeys)) {
-          oldValue = this.data.maybeGet(key);
-          if (context.debugMode && oldValue.isSome()) {
-            path = Path::create(dirtyReaderDirName, key);
-            print_string(`INVALIDATED LAZY: ${path} (dependency changed)`);
-          };
-          !this.data = this.data.remove(key);
-          context.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
-          oldValue match {
-          | Some(LDefined(_, reads))
-          | Some(LRemoved(reads)) ->
-            arrow = TArrowKey::create{
-              parentName => this.dirName,
-              childName => this.dirName,
-              key,
+        // Dependency removal rebuilds reverse-index trees. Collect between
+        // complete keys so invalidating many cached values does not retain
+        // every obsolete tree version until the entire arrow finishes.
+        !this = withRegionFold(
+          Some(context),
+          this.castKeySet(dirtyReaderKeys).values(),
+          this,
+          (contextOpt, key, dir) ~> {
+            ctx = contextOpt.fromSome();
+            oldValue = dir.data.maybeGet(key);
+            if (ctx.debugMode && oldValue.isSome()) {
+              path = Path::create(dirtyReaderDirName, key);
+              print_string(`INVALIDATED LAZY: ${path} (dependency changed)`)
             };
-            context.removeDeps(arrow, reads.iterator())
-          | _ -> void
-          }
-        };
+            !dir.data = dir.data.remove(key);
+            ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
+            oldValue match {
+            | Some(LDefined(_, reads))
+            | Some(LRemoved(reads)) ->
+              arrow = TArrowKey::create{
+                parentName => dir.dirName,
+                childName => dir.dirName,
+                key,
+              };
+              ctx.removeDeps(arrow, reads.iterator())
+            | _ -> void
+            };
+            dir
+          },
+        )
       }
     };
 

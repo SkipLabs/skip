@@ -151,6 +151,9 @@ mutable class BuildRunner(
         // Default compiler flags can change without a source or profile edit.
         // Rebuild artifacts produced with the previous profile policy too.
         skc_profile_options(unit.profile),
+        // Explicit options must invalidate artifacts even when every source
+        // timestamp is unchanged. They are applied to every compiler command.
+        this.bctx.build_config.skc_extra_options,
         srcs
           .map(f ->
             (
@@ -185,14 +188,16 @@ mutable class BuildRunner(
           } else {
             declared
           };
-          watched.map(f ->
-            (
-              f,
-              FileSystem.getLastModificationTime(
-                Path.join(unit.pkg.root(), f),
-              ),
+          watched
+            .map(f ->
+              (
+                f,
+                FileSystem.getLastModificationTime(
+                  Path.join(unit.pkg.root(), f),
+                ),
+              )
             )
-          ).collect(Array)
+            .collect(Array)
         } else {
           Array[]
         },

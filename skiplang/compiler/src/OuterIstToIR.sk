@@ -324,7 +324,20 @@ base class ConcreteLazyGFun{
     context: mutable SKStore.Context,
     converter: Converter,
   ): GFunction {
-    emitter = OuterIstEmitter::make(context, converter, this);
+    this.compileWithIdentity(context, converter, this)
+  }
+
+  fun compileWithIdentity(
+    context: mutable SKStore.Context,
+    converter: Converter,
+    bodyIdentity: LazyGFun,
+  ): GFunction {
+    emitter = OuterIstEmitter::make(
+      context,
+      converter,
+      this,
+      Some(bodyIdentity),
+    );
 
     emitter.emitPreamble();
 
@@ -342,6 +355,7 @@ base class ConcreteLazyGFun{
       funInfo => emitter.funInfo,
       params => emitter.params,
       blocks => blocks.toArray(),
+      closureBodies => emitter.closureBodies.chill(),
     }
   }
 
@@ -926,6 +940,64 @@ fun makeGFunTypeWithFlags{
   GFunType{isMutable, isTracked, params => paramsWithFlags, returnType}
 }
 
+private fun closureCallInfo(
+  className: GClassName,
+  callMethodType: GFunType,
+  tparams: Array<GTparam>,
+  yields: Bool,
+  pos: FileRange,
+  receiver: LazyGClass,
+): GFunInfo {
+  thisType: GType = GTapply(
+    receiver,
+    Mutability::fromFlag(callMethodType.isMutable),
+    tparams,
+  );
+  callFunType = callMethodType with {
+    params => Array[thisType].concat(callMethodType.params),
+  };
+  GFunInfo{
+    gfunction => GFunctionName(className.id + "::call"),
+    pos,
+    tparams,
+    annotations => SSet["@always_inline"],
+    funType => callFunType,
+    className => Some(className),
+    isGenerator => yields,
+  }
+}
+
+// This reference contains no lambda body or parameter source tree. Resolving
+// the enclosing conversion performs tracked reads and supplies the current
+// recipe, including its signature, captures and source positions.
+class ClosureLazyGFun{
+  parent: LazyGFun,
+  className: GClassName,
+} extends LazyGFun {
+  fun gname(): GFunctionName {
+    GFunctionName(this.className.id + "::call")
+  }
+
+  fun compile(
+    context: mutable SKStore.Context,
+    converter: Converter,
+  ): GFunction {
+    enclosing = converter.getGFunction(context, this.parent);
+    body = enclosing.closureBodies[this.className];
+    body.compileWithIdentity(context, converter, this)
+  }
+}
+
+private fun hasTrackedBodyIdentity(lazy: LazyGFun): Bool {
+  lazy match {
+  | DefLazyGFun _
+  | AsyncCoroutineLazyGFun{bodyProvider => DefLazyGFun _}
+  | ClosureLazyGFun _ ->
+    true
+  | _ -> false
+  }
+}
+
 class LazyGFunKey(value: LazyGFun) extends SKStore.Key {
   fun toString(): String {
     "LazyGFunKey(" + this.value.gname().id + ")"
@@ -959,7 +1031,13 @@ class Converter private (
   program: I.Program,
   private classes: SKStore.LHandle<LazyGClassKey, GClassFile>,
   lower: SKStore.LHandle<CallableDefRef, I.CallableDefFile>,
+  private functions: SKStore.LHandle<LazyGFunKey, GFunctionFile>,
+  trackedClosureBodies: Bool,
 ) {
+  fun forSequential(): this {
+    this with {trackedClosureBodies => false}
+  }
+
   fun getClassForConversion(
     context: mutable SKStore.Context,
     className: String,
@@ -984,6 +1062,7 @@ class Converter private (
     context: mutable SKStore.Context,
     name: SKStore.DirName,
     program: I.Program,
+    trackedClosureBodies: Bool,
   ): this {
     classDirName = name.sub("classes");
     classes = SKStore.LHandle(
@@ -997,7 +1076,26 @@ class Converter private (
       I.CallableDefFile::type,
       lowerDirName,
     );
-    converter = static(program, classes, lower);
+    functionDirName = name.sub("closure-functions");
+    functions = SKStore.LHandle(
+      LazyGFunKey::keyType,
+      GFunctionFile::type,
+      functionDirName,
+    );
+    converter = static(
+      program,
+      classes,
+      lower,
+      functions,
+      trackedClosureBodies,
+    );
+    _ = SKStore.LHandle::create(
+      LazyGFunKey::keyType,
+      GFunctionFile::type,
+      context,
+      functionDirName,
+      (context, _self, key) ~> converter.getGFunctionFun(context, key),
+    );
     _ = SKStore.LHandle::create(
       LazyGClassKey::keyType,
       GClassFile::type,
@@ -1092,7 +1190,12 @@ class Converter private (
     context: mutable SKStore.Context,
     lazy: LazyGFun,
   ): GFunction {
-    this.getGFunctionFun(context, LazyGFunKey(lazy))[0].value
+    key = LazyGFunKey(lazy);
+    if (this.trackedClosureBodies && hasTrackedBodyIdentity(lazy)) {
+      this.functions.get(context, key).value
+    } else {
+      this.getGFunctionFun(context, key)[0].value
+    }
   }
 
   private fun getGFunctionFun(
@@ -1466,25 +1569,14 @@ class Converter private (
       "call" => GMethodDef{
         function => generateBody.map(bodyFunc ~>
           (_context, receiver) ~> {
-            thisType: GType = GTapply(
-              receiver,
-              Mutability::fromFlag(callMethodType.isMutable),
+            funInfo = closureCallInfo(
+              className,
+              callMethodType,
               tparams,
-            );
-
-            callFunType = callMethodType with {
-              params => Array[thisType].concat(callMethodType.params),
-            };
-
-            funInfo = GFunInfo{
-              gfunction => GFunctionName(className.id + "::call"),
+              yields,
               pos,
-              tparams,
-              annotations => SSet["@always_inline"],
-              funType => callFunType,
-              className => Some(className),
-              isGenerator => yields,
-            };
+              receiver,
+            );
 
             bodyFunc(funInfo)
           }
@@ -3052,6 +3144,11 @@ mutable class OuterIstEmitter{
   converter: Converter,
   mutable funInfo: GFunInfo,
   lazy: ConcreteLazyGFun,
+  bodyIdentity: LazyGFun,
+  closureBodies: mutable UnorderedMap<
+    GClassName,
+    NormalLazyGFun,
+  > = mutable UnorderedMap[],
   mutable nextBlockID: Int = 0,
   // Reset for every enclosing function, keeping closure names reproducible.
   mutable nextClosureID: Int = 0,
@@ -3066,7 +3163,10 @@ mutable class OuterIstEmitter{
   // Maps local name to the GInstr providing its value and a flag indicating
   // whether that is the value (false) or a LocalVariable holding its value
   // indirectly (true).
-  locals: mutable UnorderedMap<String, (GInstr, Bool)> = mutable UnorderedMap[],
+  locals: mutable UnorderedMap<
+    String,
+    (GInstr, Bool, FileRange),
+  > = mutable UnorderedMap[],
   // Maps labels to JumpBlock entry block ids.
   labels: mutable UnorderedMap<String, GBlockID> = mutable UnorderedMap[],
   blocks: mutable Vector<mutable GBlock> = mutable Vector[],
@@ -3078,6 +3178,7 @@ mutable class OuterIstEmitter{
     context: mutable SKStore.Context,
     converter: Converter,
     lazy: ConcreteLazyGFun,
+    bodyIdentity: ?LazyGFun = None(),
   ): mutable OuterIstEmitter {
     funInfo = lazy.funInfo;
     if (funInfo.isGenerator) {
@@ -3092,7 +3193,13 @@ mutable class OuterIstEmitter{
       )
     };
 
-    mutable OuterIstEmitter{converter, funInfo, lazy, pos => lazy.funInfo.pos}
+    mutable OuterIstEmitter{
+      converter,
+      funInfo,
+      lazy,
+      bodyIdentity => bodyIdentity.default(lazy),
+      pos => lazy.funInfo.pos,
+    }
   }
 
   readonly fun constantBool(value: Bool): GConstantBool {
@@ -3145,11 +3252,11 @@ mutable class OuterIstEmitter{
   }
 
   // Returns the raw value of a local variable, which may be the value itself
-  // or may be a ref wrapping it.
+  // or may be a ref wrapping it, and the variable's binding position.
   private mutable fun getRawLocal(
     name: String,
     pos: FileRange,
-  ): (GInstr, Bool) {
+  ): (GInstr, Bool, FileRange) {
     this.locals.maybeGet(name) match {
     | Some(binding) -> binding
     | None() ->
@@ -3165,7 +3272,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun getLocal(name: String, pos: FileRange): GInstr {
-    (value, byRef) = this.getRawLocal(name, pos);
+    (value, byRef, _) = this.getRawLocal(name, pos);
     if (!byRef) {
       value
     } else {
@@ -3183,7 +3290,7 @@ mutable class OuterIstEmitter{
   }
 
   mutable fun setLocal(var: String, value: GInstr, pos: FileRange): void {
-    (ref, byRef) = this.getRawLocal(var, pos);
+    (ref, byRef, _) = this.getRawLocal(var, pos);
 
     if (byRef) {
       // Capture-by-reference, so set the field of the ref.
@@ -3259,8 +3366,8 @@ mutable class OuterIstEmitter{
       );
 
       closureCaptureKind match {
-      | CCByValue() -> this.locals.set(localName, (load, false))
-      | CCByRef() -> this.locals.set(localName, (load, true))
+      | CCByValue() -> this.locals.set(localName, (load, false, f.pos))
+      | CCByRef() -> this.locals.set(localName, (load, true, f.pos))
       | CCNotCaptured() -> f.pos.die("Expected captured field " + localName)
       }
     };
@@ -3849,7 +3956,7 @@ mutable class OuterIstEmitter{
     // We create one field per captured variable.
     fieldsAndValues = captured.map(posAndName -> {
       (capturePos, name) = (posAndName.pos, posAndName.id);
-      (rawValue, byRef) = this.getRawLocal(name, capturePos);
+      (rawValue, byRef, bindingPos) = this.getRawLocal(name, capturePos);
 
       (fieldPrefix, fieldValue) = if (!byRef) {
         ("captured:", rawValue)
@@ -3861,7 +3968,12 @@ mutable class OuterIstEmitter{
         GField{
           name => fieldPrefix + name,
           typ => fieldValue.getType(),
-          pos => capturePos,
+          // A generated field represents the binding. Using a body use here
+          // makes moving that use invalidate the closure's class metadata.
+          // Keep the use's own position on instructions in the current body.
+          pos => if (this.converter.trackedClosureBodies) bindingPos else {
+            capturePos
+          },
           isAssignable => false,
           index => -1,
         },
@@ -3871,7 +3983,7 @@ mutable class OuterIstEmitter{
 
     fields = fieldsAndValues.map(fv -> fv.i0);
 
-    generateBody = funInfo ~> {
+    generateBody: GFunInfo ~> NormalLazyGFun = funInfo ~> {
       paramInfos = Array::fillBy(funInfo.funType.params.size(), i -> {
         // Prepend a "this" parameter with a non-conflicting name.
         if (i == 0) {
@@ -3910,6 +4022,17 @@ mutable class OuterIstEmitter{
         this.getNextClosureID(),
     );
 
+    parent = this.bodyIdentity;
+    trackedBody =
+      this.converter.trackedClosureBodies &&
+      hasTrackedBodyIdentity(parent);
+    inlineBody: GFunInfo ~> LazyGFun = funInfo ~> generateBody(funInfo);
+    classBody: GFunInfo ~> LazyGFun = if (trackedBody) {
+      _ ~> ClosureLazyGFun{parent, className => closureClassName}
+    } else {
+      inlineBody
+    };
+
     closureGClass = this.converter.createClosureClass(
       context,
       closureClassName,
@@ -3921,9 +4044,24 @@ mutable class OuterIstEmitter{
       Array[closureBaseType],
       yields,
       pos,
-      Some(generateBody),
+      Some(classBody),
       fields,
     );
+
+    if (trackedBody) {
+      // Publish the body with the enclosing conversion, not in class metadata.
+      // The fresh receiver ensures changed captures/signatures are reflected
+      // even when the retained work key was created in an earlier revision.
+      info = closureCallInfo(
+        closureClassName,
+        callMethodType,
+        this.funInfo.tparams,
+        yields,
+        pos,
+        LiteralLazyGClass(closureGClass),
+      );
+      this.closureBodies.set(closureClassName, generateBody(info))
+    };
 
     closureType = GTapply(
       LiteralLazyGClass(closureGClass),
@@ -4784,7 +4922,7 @@ mutable class OuterIstEmitter{
         (ref, true)
       };
 
-      this.locals.set(name, bind)
+      this.locals.set(name, (bind.i0, bind.i1, pos))
     }
   }
 
@@ -5154,6 +5292,7 @@ fun createIR(
   specializer: mutable Specializer,
   incrementalFunctions: ?SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
   prepared: ?FunctionIRStateFile,
+  returnTuples: ?SKStore.EHandle<SClassIDKey, SClassInfoFile> = None(),
 ): GlobalEnv {
   // Incremental builds already attached these sets in a tracked map/merge
   // phase. Sequential builds keep the original local pass.
@@ -5210,6 +5349,7 @@ fun createIR(
     roots.disasm,
     incrementalFunctions,
     prepared,
+    returnTuples,
   );
 
   reportMemoryStatistics("native/createIR end");

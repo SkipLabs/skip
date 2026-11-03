@@ -1,0 +1,389 @@
+--- a/skiplang/compiler/src/SpecializerAudit.sk
++++ b/skiplang/compiler/src/SpecializerAudit.sk
+@@ -242,54 +242,161 @@
+ 
+ // A validated partition must be closed under all observed read/write conflicts.
+ // Re-run merged groups and validate again: merging can expose additional reads.
+-fun joinClassGroups(
++// Every cursor covers one sorted footprint. Equal keys are consumed together.
++private mutable class ClassAccessCursor(
++  root: String,
++  kind: Int,
++  iterator: mutable Iterator<SKStore.Key>,
++  mutable key: SKStore.Key,
++)
++
++private mutable class ClassAccessHeap{
++  entries: mutable Vector<mutable ClassAccessCursor> = mutable Vector[],
++} {
++  mutable fun add(root: String, kind: Int, keys: SortedSet<SKStore.Key>): void {
++    iterator = keys.values();
++    iterator.next().each(key -> {
++      cursor = mutable ClassAccessCursor(root, kind, iterator, key);
++      index = this.entries.size();
++      this.entries.push(cursor);
++      while (index > 0) {
++        parent = (index - 1) / 2;
++        if (this.entries[parent].key <= key) break void;
++        this.entries.set(index, this.entries[parent]);
++        !index = parent
++      };
++      this.entries.set(index, cursor)
++    })
++  }
++
++  readonly fun minimum(): ?SKStore.Key {
++    if (this.entries.isEmpty()) None() else Some(this.entries[0].key)
++  }
++
++  mutable fun pop(): (String, Int) {
++    cursor = this.entries[0];
++    result = (cursor.root, cursor.kind);
++    cursor.iterator.next() match {
++    | Some(next) -> cursor.!key = next
++    | None() ->
++      last = this.entries.pop();
++      if (this.entries.isEmpty()) return result;
++      this.entries.set(0, last)
++    };
++    // A cursor's next key can only increase. Restoring the root by sinking
++    // also handles replacement with the former last heap entry.
++    replacement = this.entries[0];
++    index = 0;
++    loop {
++      child = index * 2 + 1;
++      if (child >= this.entries.size()) break void;
++      if (
++        child + 1 < this.entries.size() &&
++        this.entries[child + 1].key < this.entries[child].key
++      ) {
++        !child = child + 1
++      };
++      if (replacement.key <= this.entries[child].key) break void;
++      this.entries.set(index, this.entries[child]);
++      !index = child
++    };
++    this.entries.set(index, replacement);
++    result
++  }
++}
++
++// Same rule as ClassAuditAccess: writers conflict with all readers; multiple
++// writers conflict only if at least one write is exclusive. Shared read-only
++// keys and unread mergeable contributions do not join any groups.
++private fun joinClassGroupsStreaming(
+   attempts: SortedMap<String, ClassGroupAttempt>,
+-): SortedMap<String, SortedSet<String>> {
+-  accesses = SortedMap<SKStore.Key, mutable ClassAuditAccess>[];
+-  parents = mutable Map<String, String>[];
++  parents: mutable Map<String, String>,
++): void {
++  heap = mutable ClassAccessHeap{};
+   for ((root, attempt) in attempts.items()) {
+-    parents.set(root, root);
+-    footprint = attempt.footprint;
+-    for (key in footprint.reads.union(footprint.writes)) {
+-      access = accesses.maybeGet(key) match {
+-      | Some(access) -> access
+-      | None() ->
+-        fresh = mutable ClassAuditAccess{};
+-        !accesses = accesses.set(key, fresh);
+-        fresh
+-      };
+-      if (footprint.reads.contains(key)) {
+-        access.!readers = access.readers.set(root)
+-      };
+-      if (footprint.writes.contains(key)) {
+-        access.!writers = access.writers.set(root)
+-      };
+-      access.!exclusive =
+-        access.exclusive ||
+-        footprint.exclusiveWrites.contains(key)
+-    }
+-  };
+-  for (access in accesses.values()) {
+-    if (access.writers.isEmpty()) continue;
+-    participants = if (access.exclusive || !access.readers.isEmpty()) {
+-      access.writers.union(access.readers)
+-    } else {
+-      SortedSet[]
+-    };
++    heap.add(root, 0, attempt.footprint.reads);
++    heap.add(root, 1, attempt.footprint.writes);
++    heap.add(root, 2, attempt.footprint.exclusiveWrites)
++  };
++  while (!heap.entries.isEmpty()) {
++    key = heap.minimum().fromSome();
++    readers = mutable Vector<String>[];
++    writers = mutable Vector<String>[];
++    exclusive = false;
++    while (heap.minimum().map(next -> next.compare(key) == EQ()).default(false)) {
++      (root, kind) = heap.pop();
++      if (kind == 0) readers.push(root)
++      else if (kind == 1) writers.push(root)
++      else !exclusive = true
++    };
++    if (writers.isEmpty() || (!exclusive && readers.isEmpty())) continue;
+     first: ?String = None();
+-    for (participant in participants) {
++    for (participant in writers.values().concat(readers.values())) {
+       root = classAttemptRoot(parents, participant);
+       first match {
+       | None() -> !first = Some(root)
+       | Some(previous) ->
+         previousRoot = classAttemptRoot(parents, previous);
+-        if (root < previousRoot) {
+-          parents.set(previousRoot, root)
+-        } else {
+-          parents.set(root, previousRoot)
++        if (root < previousRoot) parents.set(previousRoot, root)
++        else parents.set(root, previousRoot)
++      }
++    }
++  }
++}
++
++fun joinClassGroups(
++  attempts: SortedMap<String, ClassGroupAttempt>,
++  streaming: Bool = false,
++): SortedMap<String, SortedSet<String>> {
++  parents = mutable Map<String, String>[];
++  for (root in attempts.keys()) parents.set(root, root);
++  if (streaming) {
++    joinClassGroupsStreaming(attempts, parents)
++  } else {
++    accesses = SortedMap<SKStore.Key, mutable ClassAuditAccess>[];
++    for ((root, attempt) in attempts.items()) {
++      footprint = attempt.footprint;
++      for (key in footprint.reads.union(footprint.writes)) {
++        access = accesses.maybeGet(key) match {
++        | Some(access) -> access
++        | None() ->
++          fresh = mutable ClassAuditAccess{};
++          !accesses = accesses.set(key, fresh);
++          fresh
++        };
++        if (footprint.reads.contains(key)) {
++          access.!readers = access.readers.set(root)
++        };
++        if (footprint.writes.contains(key)) {
++          access.!writers = access.writers.set(root)
++        };
++        access.!exclusive =
++          access.exclusive ||
++          footprint.exclusiveWrites.contains(key)
++      }
++    };
++    for (access in accesses.values()) {
++      if (access.writers.isEmpty()) continue;
++      participants = if (access.exclusive || !access.readers.isEmpty()) {
++        access.writers.union(access.readers)
++      } else {
++        SortedSet[]
++      };
++      first: ?String = None();
++      for (participant in participants) {
++        root = classAttemptRoot(parents, participant);
++        first match {
++        | None() -> !first = Some(root)
++        | Some(previous) ->
++          previousRoot = classAttemptRoot(parents, previous);
++          if (root < previousRoot) {
++            parents.set(previousRoot, root)
++          } else {
++            parents.set(root, previousRoot)
++          }
+         }
+       }
+-    }
++    };
+   };
+   joined = SortedMap<String, SortedSet<String>>[];
+   for ((root, attempt) in attempts.items()) {
+--- a/skiplang/compiler/src/SpecializerGroups.sk
++++ b/skiplang/compiler/src/SpecializerGroups.sk
+@@ -23,6 +23,70 @@
+ 
+ private fun classRequestsName(round: Int): SKStore.DirName {
+   SKStore.DirName::create("/specializer/class-requests/" + round + "/")
++}
++
++// Optimization hints only. Every current transaction still runs or reuses
++// its tracked result, and the complete current footprints are validated.
++private const classGroupHintsKey: String = "COMPILER_CLASS_GROUP_HINTS";
++private class ClassGroupHintsFile(
++  rounds: SortedMap<Int, SortedMap<String, SortedSet<String>>>,
++) extends SKStore.File
++
++private fun readClassGroupHints(
++  context: readonly SKStore.Context,
++): SortedMap<Int, SortedMap<String, SortedSet<String>>> {
++  context.getPersistent(classGroupHintsKey) match {
++  | Some(ClassGroupHintsFile(rounds)) -> rounds
++  | _ -> SortedMap[]
++  }
++}
++
++// Intersect old groups with today's requests. Even malformed/overlapping hints
++// cannot duplicate or omit a current family, and new families start alone.
++fun seedClassGroupPartition(
++  families: SortedSet<String>,
++  previous: SortedMap<String, SortedSet<String>>,
++): SortedMap<String, SortedSet<String>> {
++  remaining = families;
++  groups = SortedMap<String, SortedSet<String>>[];
++  for (old in previous.values()) {
++    current = old.intersection(remaining);
++    if (current.isEmpty()) continue;
++    !groups[current.min().fromSome()] = current;
++    !remaining = remaining.difference(current)
++  };
++  for (family in remaining) !groups[family] = SortedSet[family];
++  groups
++}
++
++// Called only after discovery has completed. The current manifest is a tracked
++// read, including empty membership and directory lifetime. It removes hints
++// for vanished rounds and families, including rounds now doing function work.
++fun pruneClassGroupHints(
++  context: mutable SKStore.Context,
++  roundCount: Int,
++  enabled: Bool,
++): void {
++  if (!enabled) {
++    context.removePersistent(classGroupHintsKey);
++    return void
++  };
++  kept = SortedMap<Int, SortedMap<String, SortedSet<String>>>[];
++  for ((round, groups) in readClassGroupHints(context).items()) {
++    if (round >= roundCount) continue;
++    requests: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
++      (x: SKStore.Key) ~> x,
++      (x: SKStore.File) ~> x,
++      classRequestsName(round),
++    );
++    if (context.maybeGetDir(requests.dirName).isNone()) continue;
++    files = requests.getArray(context, ClassRequestFamiliesKey());
++    if (files.isEmpty()) continue;
++    families = ClassRequestFamiliesFile::type(files[0]).families;
++    if (families.isEmpty()) continue;
++    !kept[round] = seedClassGroupPartition(families, groups)
++  };
++  context.setPersistent(classGroupHintsKey, ClassGroupHintsFile(kept))
+ }
+ 
+ fun createClassRequests(
+@@ -172,11 +236,23 @@
+   config: Config.SpecializationConfig,
+   converter: Converter,
+ ): void {
++  if (config.classGroupHints && context.isParallelReadOnly()) {
++    throw SKStore.ParallelContextUnavailable()
++  };
+   manifest = ClassRequestFamiliesFile::type(
+     requests.getArray(context, ClassRequestFamiliesKey())[0],
+   );
+-  groups = SortedMap<String, SortedSet<String>>[];
+-  for (family in manifest.families) !groups[family] = SortedSet[family];
++  prior = if (config.classGroupHints) {
++    readClassGroupHints(context).maybeGet(round).default(SortedMap[])
++  } else {
++    SortedMap[]
++  };
++  groups = seedClassGroupPartition(manifest.families, prior);
++  initialGroups = groups.size();
++  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
++    print_error(`##CLASS_GROUP_POLICY## ${if (config.streamClassConflicts) 1 else 0} ${if (config.classGroupHints) 1 else 0}\n`);
++    print_error(`##CLASS_GROUP_SEED## ${round} ${manifest.families.size()} ${groups.size()} ${!prior.isEmpty()}\n`)
++  };
+   accepted = SortedMap<String, ClassGroupAttempt>[];
+   passes = 0;
+   loop {
+@@ -199,7 +275,11 @@
+       ,
+     );
+     !passes = passes + 1;
+-    joined = SKStore.withRegionValue(() ~> joinClassGroups(current));
++    joined = runCompilerPhase("specialization/class_conflicts", () ->
++      SKStore.withRegionValue(() ~>
++        joinClassGroups(current, config.streamClassConflicts)
++      )
++    );
+     if (joined.size() == groups.size()) {
+       !accepted = current;
+       break void
+@@ -228,6 +308,10 @@
+       _ = Specializer::getSClass2CPS(context, serial, request.hc, request.k)
+     };
+     _ = compareClassAttempts(context, view, accepted, serial, round)
++  };
++  if (config.classGroupHints) {
++    latest = readClassGroupHints(context).set(round, groups);
++    context.setPersistent(classGroupHintsKey, ClassGroupHintsFile(latest))
+   };
+   // Only complete, validated transactions reach the existing round reducer.
+   // Keep this publication adapter while measuring construction locality.
+@@ -260,7 +344,7 @@
+   };
+   if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+     print_error(
+-      `##CLASS_GROUPS## ${round} ${manifest.families.size()} ${accepted.size()} ${passes}\n`,
++      `##CLASS_GROUPS## ${round} ${initialGroups} ${accepted.size()} ${passes}\n`,
+     )
+   }
+ }
+--- a/skiplang/compiler/src/Config.sk
++++ b/skiplang/compiler/src/Config.sk
+@@ -45,6 +45,8 @@
+ value class SpecializationConfig(
+   ptrBitSize: Int,
+   indexedClassVariance: Bool = false,
++  streamClassConflicts: Bool = false,
++  classGroupHints: Bool = false,
+ )
+ 
+ class Config{
+@@ -94,6 +96,8 @@
+   trackedClosureBodies: Bool = false,
+   compactSpecializer: Bool = false,
+   partitionClasses: Bool = false,
++  streamClassConflicts: Bool = false,
++  classGroupHints: Bool = false,
+   // Set only for local semantic computations wrapped by Verify.withSourcePositions.
+   // Successful checks do not consume coordinates; failures resolve them there.
+   deferVerifierDiagnostics: Bool = false,
+@@ -337,6 +341,8 @@
+       trackedClosureBodies => results.getBool("tracked-closure-bodies"),
+       compactSpecializer => results.getBool("compact-specializer"),
+       partitionClasses => results.getBool("partition-classes"),
++      streamClassConflicts => Environ.varOpt("SKC_CLASS_CONFLICT_STREAM").isSome(),
++      classGroupHints => Environ.varOpt("SKC_CLASS_GROUP_HINTS").isSome(),
+       stackAlign,
+       stackAlignStr,
+       ptrByteSize,
+@@ -361,6 +367,9 @@
+       this.ptrBitSize,
+       this.incrementalSpecialization &&
+         Environ.varOpt("SKC_INDEX_VARIANCE").isSome(),
++      this.incrementalSpecialization && this.partitionClasses &&
++        this.streamClassConflicts,
++      this.incrementalSpecialization && this.partitionClasses && this.classGroupHints,
+     )
+   }
+ 
+--- a/skiplang/compiler/src/compile.sk
++++ b/skiplang/compiler/src/compile.sk
+@@ -1337,6 +1337,13 @@
+       if (config.verbose && complete) {
+         print_error(`Incremental specialization: ${phaseNumber} rounds`)
+       };
++      if (complete) {
++        O.pruneClassGroupHints(
++          context,
++          phaseNumber,
++          partitionClasses && config.classGroupHints,
++        )
++      };
+       if (complete && compact) {
+         !specializerAllDir = runCompilerPhase(
+           "specialization/checkpoint",

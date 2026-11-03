@@ -475,7 +475,9 @@ fun planFieldLayoutGroups(
         if (shape.fields.any(name -> other.fields.contains(name))) {
           left = fieldLayoutRoot(parents, shape.id);
           right = fieldLayoutRoot(parents, sub);
-          if (left < right) parents.set(right, left) else parents.set(left, right)
+          if (left < right) parents.set(right, left) else {
+            parents.set(left, right)
+          }
         }
       }
     }
@@ -511,6 +513,7 @@ fun layoutOneStandaloneClass(
   env: GlobalEnv,
   config: Config.Config,
   existingLayout: Array<LayoutSlot> = Array[],
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): Array<LayoutSlot> {
   builder = LayoutBuilder::mcreate(
     config.specializationConfig(),
@@ -518,7 +521,10 @@ fun layoutOneStandaloneClass(
   );
 
   for (field in fields) {
-    offset = builder.findOffset(0, field.typ.getScalarType(env));
+    offset = builder.findOffset(
+      0,
+      ClassInputs.getScalarType(field.typ, env, classReader),
+    );
     builder.reservePrevOffset(field.name, offset, false)
   };
 

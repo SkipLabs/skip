@@ -1,0 +1,121 @@
+{
+  "scope": "Compiler correctness and small finite-state retention; full language and full workload performance remain open.",
+  "host": {
+    "binary_sha256": "f88f8690f2499e5c13177b9e75b727637662be7ec02a9231880d939882f98f5a",
+    "generated_llvm_sha256": "704214d672aa2a297bdae0864b762adfc6897b11d7fccacdd3e4d39108913d36",
+    "optimization": "Skip O2 release, native Clang O2",
+    "source_identity": "host-reader-blocks-diag1-source-identity.json",
+    "runtime_identity": "runtime-reference-mask-native-identity.json"
+  },
+  "support": {
+    "archive_sha256": {
+      "std": "3b738c3ece93d5359f5847beb8aab43349061f2a21e9c10a501c1a69bad6c905",
+      "cli": "e60b57578512c69af22d0e624787d1bddb22a68bedce8a978bdb4c1b0593c7bd",
+      "arparser": "2763d6bcc7b995ee2fc2e301ac70eeb5cc5cdb0f01c79b09efa3d3964fa02d71",
+      "sktest": "bae8b91d6de1dc94c1ebbdbfc7069591bdc3f0e937196689a2e17d067d18ae8a"
+    },
+    "base_runtime": "host-support-reference-masks",
+    "changed_sources": [
+      "std/src/skstore/Context.sk",
+      "std/src/skstore/LazyDir.sk",
+      "std/src/skstore/Path.sk"
+    ]
+  },
+  "checks": [
+    {
+      "label": "reader-blocks-diag1-regressions",
+      "passed": 28,
+      "total": 28,
+      "run_seconds": 569.500679634,
+      "evidence": "reader-blocks-diag1-regressions/run.json"
+    },
+    {
+      "label": "reader-blocks-optimized-focused",
+      "passed": 10,
+      "total": 10,
+      "run_seconds": 70.437932741,
+      "evidence": "reader-blocks-optimized-focused/run.json"
+    }
+  ],
+  "cycles": [
+    {
+      "policy": "control",
+      "cycles": 150,
+      "successful_builds": 303,
+      "flags": [
+        "--stable-function-symbols",
+        "--partition-classes",
+        "--compact-specializer",
+        "--collection-emission",
+        "--collection-functions",
+        "--tracked-closure-bodies",
+        "--stable-function-declarations",
+        "--collection-classes"
+      ],
+      "census_checkpoints": [
+        {
+          "tick": 12,
+          "scope": "context root",
+          "objects": 5332056,
+          "strings": 699273,
+          "reachable_bytes": 302055752,
+          "persistent_live_bytes": 302070232,
+          "external_edges": 2259613,
+          "allocated_disk_bytes": 309448704
+        },
+        {
+          "tick": 304,
+          "scope": "context root",
+          "objects": 5181275,
+          "strings": 696559,
+          "reachable_bytes": 298568576,
+          "persistent_live_bytes": 298583056,
+          "external_edges": 2197700,
+          "allocated_disk_bytes": 316301312
+        }
+      ]
+    },
+    {
+      "policy": "blocks",
+      "cycles": 150,
+      "successful_builds": 303,
+      "flags": [
+        "--stable-function-symbols",
+        "--partition-classes",
+        "--compact-specializer",
+        "--collection-emission",
+        "--collection-functions",
+        "--tracked-closure-bodies",
+        "--stable-function-declarations",
+        "--collection-classes"
+      ],
+      "census_checkpoints": [
+        {
+          "tick": 12,
+          "scope": "context root",
+          "objects": 5111172,
+          "strings": 699275,
+          "reachable_bytes": 291580936,
+          "persistent_live_bytes": 291595416,
+          "external_edges": 2027243,
+          "allocated_disk_bytes": 299204608
+        },
+        {
+          "tick": 304,
+          "scope": "context root",
+          "objects": 4960391,
+          "strings": 696561,
+          "reachable_bytes": 288093760,
+          "persistent_live_bytes": 288108240,
+          "external_edges": 1965330,
+          "allocated_disk_bytes": 305942528
+        }
+      ]
+    }
+  ],
+  "emission_test_source": {
+    "file": "test_emission_text_before_spans.py",
+    "sha256": "4a2fcce4196d9ccb095c757e3aab14eaeda64de9e9840af93f6f73c3a8292187",
+    "note": "Reconstructed by reversing only the subsequent span test additions. Compact SKStore profile logging was used in this block-reader gate."
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "initial_wrapper_sha256": "2deeb74fe99c81ca43a6a72fa4576a6c1822019ec3e8138a586ce02d4c353a61",
+  "corrected_wrapper_sha256": "4561308996bbf088d2309a63c5926985b7f4a1fa492221dab0f8de2dfb52b808",
+  "compiler_unchanged": true,
+  "ordinary_fixture_policy_unchanged": true,
+  "repair_diff": [
+    "--- initial wrapper\n",
+    "+++ corrected wrapper\n",
+    "@@ -7,8 +7,11 @@\n",
+    " args = sys.argv[1:]",
+    " command = ['/tmp/skip-incremental-next/bin/skc-variance-index',",
+    "            '--tracked-closure-bodies', '--stable-function-declarations']",
+    "-if any(a in ['--init', '--data', '--version', '--help', '--release', '--batch']",
+    "-       or a.startswith(('--init=', '--data=')) for a in args):",
+    "+owns_mode = any(a in ['--init', '--data', '--version', '--help', '--release', '--batch']",
+    "+       or a.startswith(('--init=', '--data=')) for a in args)",
+    "+ordinary_fixture = any(a.startswith(('tests/', './tests/', 'invalid_tests/', './invalid_tests/'))",
+    "+                       and a.endswith('.sk') for a in args)",
+    "+if owns_mode or not ordinary_fixture:",
+    "     os.execv(command[0], command+args)",
+    " with tempfile.TemporaryDirectory(prefix='skip-variance-language-') as tmp:",
+    "     status = subprocess.call(command+['--compact-specializer', '--collection-functions',"
+  ],
+  "rerun": "variance-index-full-language-mode-controls",
+  "rerun_result": "28/28 passed; original full language run still in progress"
+}

@@ -1,0 +1,51 @@
+{
+  "policy": "control",
+  "host_identity": {
+    "binary_sha256": "f8408c0e41e1d736cb6320ada5d0ae553446836a18dfcdd2ff9f553c742f4551",
+    "generated_llvm_sha256": "55d24c8215f3cd77bd15361a47d3daa448e1648f73a899f134d5408dd6f7120e",
+    "optimization": "Skip O2 release, native Clang O2",
+    "source_identity": "host-callee-summaries-diag1-source-identity.json",
+    "runtime_identity": "capture-pipes-runtime-identity.json"
+  },
+  "labels": [
+    "optimizer-locality-control-cold",
+    "optimizer-locality-control-noop",
+    "optimizer-locality-control-literal-1",
+    "optimizer-locality-control-after-literal-1",
+    "optimizer-locality-control-literal-2",
+    "optimizer-locality-control-after-literal-2",
+    "optimizer-locality-control-control-flow-1",
+    "optimizer-locality-control-after-control-flow-1",
+    "optimizer-locality-control-control-flow-2",
+    "optimizer-locality-control-after-control-flow-2",
+    "optimizer-locality-control-method-body-1",
+    "optimizer-locality-control-after-method-body-1",
+    "optimizer-locality-control-method-body-2",
+    "optimizer-locality-control-after-method-body-2",
+    "optimizer-locality-control-generic-1",
+    "optimizer-locality-control-after-generic-1",
+    "optimizer-locality-control-generic-2",
+    "optimizer-locality-control-after-generic-2",
+    "optimizer-locality-control-unused-1",
+    "optimizer-locality-control-after-unused-1",
+    "optimizer-locality-control-unused-2",
+    "optimizer-locality-control-after-unused-2",
+    "optimizer-locality-control-history-historical-1",
+    "optimizer-locality-control-history-baseline-1"
+  ],
+  "final_validation_label": "optimizer-locality-control-history-baseline-1",
+  "target": "/tmp/skip-incremental-next/replay-optimizer-locality-control",
+  "samples_per_small_edit": 2,
+  "completed_screen": true,
+  "rejection": null,
+  "screen_limits": {
+    "cold_seconds": 480,
+    "literal_seconds": 5
+  },
+  "goals": {
+    "typical_seconds": 1,
+    "heavy_seconds": 10,
+    "branch_seconds": 30
+  },
+  "comparison": "Same frozen optimized host; separate fresh caches. Headers and non-self callee summaries vary independently. Other controls identical, including four Clang workers, LLD, indexed variance, compact/block readers and delta retention. Partitioning disabled. Limits stop severe regressions; they are not the user latency targets. All recorded outputs validate."
+}

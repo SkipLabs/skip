@@ -298,6 +298,11 @@ char* SKIP_posix_pipe() {
   return SKIP_js_pipe();
 }
 
+char* SKIP_posix_pipe_cloexec() {
+  // Wasm has no native descriptor inheritance. Keep the existing pipe bridge.
+  return SKIP_posix_pipe();
+}
+
 uint32_t SKIP_js_fork();
 
 int64_t SKIP_posix_fork() {

@@ -124,7 +124,7 @@ static char* SKIP_intern_obj(sk_stack_t* st, char* obj) {
       while (size > 0) {
         unsigned int i;
         for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
-          if (ty->m_refMask[mask_slot] & (1 << i)) {
+          if ((ty->m_refMask[mask_slot] >> i) & 1) {
             void** ptr = (void**)ohead;
             if (*ptr != NULL) {
               void** slot = (void**)rhead;

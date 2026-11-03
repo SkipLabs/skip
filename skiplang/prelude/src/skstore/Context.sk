@@ -200,18 +200,324 @@ fun defaultDependencyMode(): Int {
 /* Dependencies tracking. */
 /*****************************************************************************/
 
+// Small reader sets can avoid allocating a tree node per reader. Large fanout
+// still needs logarithmic updates, so arrays hold at most eight readers.
+// Both representations preserve ArrowKey order and immutable snapshots.
+private class ReaderBlockSet(
+  blocks: SortedMap<ArrowKey, Array<ArrowKey>>,
+  count: Int,
+) {
+  static fun fromSorted(values: Array<ArrowKey>): this {
+    invariant(!values.isEmpty());
+    static(SortedMap::singleton(values[0], values), values.size())
+  }
+
+  fun values(): mutable Iterator<ArrowKey> {
+    for (block in this.blocks.values()) for (value in block) yield value
+  }
+
+  private static fun lowerBound(values: Array<ArrowKey>, key: ArrowKey): Int {
+    lo = 0;
+    hi = values.size();
+    while (lo < hi) {
+      mid = (lo + hi) / 2;
+      if (values[mid].compare(key) == LT()) !lo = mid + 1 else !hi = mid
+    };
+    lo
+  }
+
+  // Each tree key is the first reader in its block. A key below the minimum
+  // belongs in the first block; other keys use the greatest preceding block.
+  private fun blockFor(key: ArrowKey): ?(ArrowKey, Array<ArrowKey>) {
+    tree = this.blocks;
+    previous: ?(ArrowKey, Array<ArrowKey>) = None();
+    loop {
+      tree match {
+      | SortedMap.Nil() ->
+        return previous match {
+        | Some _ -> previous
+        | None() -> this.blocks.minimum()
+        }
+      | node @ SortedMap.Node _ ->
+        if (key.compare(node.key) == LT()) !tree = node.left else {
+          !previous = Some((node.key, node.value));
+          !tree = node.right
+        }
+      }
+    }
+  }
+
+  private fun neighbor(
+    key: ArrowKey,
+    before: Bool,
+  ): ?(ArrowKey, Array<ArrowKey>) {
+    tree = this.blocks;
+    found: ?(ArrowKey, Array<ArrowKey>) = None();
+    loop {
+      tree match {
+      | SortedMap.Nil() -> return found
+      | node @ SortedMap.Node _ ->
+        order = node.key.compare(key);
+        if (if (before) order == LT() else order == GT()) {
+          !found = Some((node.key, node.value));
+          !tree = if (before) node.right else node.left
+        } else {
+          !tree = if (before) node.left else node.right
+        }
+      }
+    }
+  }
+
+  fun set(key: ArrowKey): this {
+    (first, values) = this.blockFor(key).fromSome();
+    index = static::lowerBound(values, key);
+    if (index < values.size() && values[index].compare(key) == EQ()) {
+      return this
+    };
+    updated = Array::fillBy(values.size() + 1, i ->
+      if (i < index) values[i] else if (i == index) key else values[i - 1]
+    );
+    blocks = this.blocks;
+    if (first.compare(updated[0]) != EQ()) !blocks = blocks.remove(first);
+    if (updated.size() <= 64) {
+      !blocks[updated[0]] = updated
+    } else {
+      left = updated.take(32);
+      right = updated.drop(32);
+      !blocks[left[0]] = left;
+      !blocks[right[0]] = right
+    };
+    static(blocks, this.count + 1)
+  }
+
+  fun remove(key: ArrowKey): this {
+    selected = this.blockFor(key);
+    if (selected.isNone()) return this;
+    (first, values) = selected.fromSome();
+    index = static::lowerBound(values, key);
+    if (index == values.size() || values[index].compare(key) != EQ()) {
+      return this
+    };
+    updated = Array::fillBy(values.size() - 1, i ->
+      if (i < index) values[i] else values[i + 1]
+    );
+    blocks = this.blocks;
+    if (updated.isEmpty() || first.compare(updated[0]) != EQ()) {
+      !blocks = blocks.remove(first)
+    };
+    if (!updated.isEmpty()) !blocks[updated[0]] = updated;
+    result = static(blocks, this.count - 1);
+    if (!updated.isEmpty() && updated.size() < 16 && result.count > 8) {
+      // Rebalance just two neighboring blocks. Repeated deletion must not
+      // leave one tree node per surviving reader in otherwise empty blocks.
+      neighbor = result.neighbor(updated[0], true) match {
+      | Some(entry) -> Some(entry)
+      | None() -> result.neighbor(updated[0], false)
+      };
+      neighbor.each(entry -> {
+        (otherFirst, other) = entry;
+        combined = if (otherFirst.compare(updated[0]) == LT()) {
+          other.concat(updated)
+        } else {
+          updated.concat(other)
+        };
+        !blocks = blocks.remove(updated[0]).remove(otherFirst);
+        if (combined.size() <= 64) {
+          !blocks[combined[0]] = combined
+        } else {
+          middle = combined.size() / 2;
+          left = combined.take(middle);
+          right = combined.drop(middle);
+          !blocks[left[0]] = left;
+          !blocks[right[0]] = right
+        }
+      });
+      !result = static(blocks, result.count)
+    };
+    result
+  }
+
+  fun hasSibling(arrow: ArrowKey): Bool {
+    comparePrefix = (other: ArrowKey) -> {
+      order = arrow.parentName.compare(other.parentName);
+      if (order == EQ()) arrow.childName.compare(other.childName) else order
+    };
+    tree = this.blocks;
+    previous: Array<ArrowKey> = Array[];
+    loop {
+      tree match {
+      | SortedMap.Nil() ->
+        return previous.any(reader -> comparePrefix(reader) == EQ())
+      | node @ SortedMap.Node _ ->
+        comparePrefix(node.key) match {
+        | EQ() -> return true
+        | LT() -> !tree = node.left
+        | GT() ->
+          !previous = node.value;
+          !tree = node.right
+        }
+      }
+    }
+  }
+}
+
+private base class DependencyReaders {
+  children =
+  | ReaderArray(items: Array<ArrowKey>)
+  | ReaderTree(tree: SortedMap<ArrowKey, void>)
+  | ReaderBlocks(blocks: ReaderBlockSet)
+
+  static fun empty(compact: Bool, blocks: Bool): DependencyReaders {
+    if (compact || blocks) ReaderArray(Array[]) else ReaderTree(SortedMap[])
+  }
+
+  fun size(): Int
+  | ReaderArray(values) -> values.size()
+  | ReaderTree(tree) -> tree.size()
+  | ReaderBlocks(blocks) -> blocks.count
+
+  fun isEmpty(): Bool {
+    this.size() == 0
+  }
+
+  fun values(): mutable Iterator<ArrowKey>
+  | ReaderArray(values) -> values.values()
+  | ReaderTree(tree) -> tree.keys()
+  | ReaderBlocks(blocks) -> blocks.values()
+
+  fun toSet(): SortedSet<ArrowKey>
+  | ReaderArray(values) -> SortedSet::createFromItems(values)
+  | ReaderTree(tree) -> SortedSet(tree)
+  | ReaderBlocks(blocks) -> SortedSet::createFromIterator(blocks.values())
+
+  fun set(key: ArrowKey, blockReaders: Bool): DependencyReaders
+  | ReaderTree(tree) -> ReaderTree(tree.set(key, void))
+  | ReaderBlocks(blocks) -> ReaderBlocks(blocks.set(key))
+  | ReaderArray(values) ->
+    index = 0;
+    while (index < values.size() && values[index].compare(key) == LT()) {
+      !index = index + 1
+    };
+    // As in SortedMap.set, preserve the existing representative when keys
+    // compare equal, even if their other fields differ.
+    if (index < values.size() && values[index].compare(key) == EQ()) {
+      this
+    } else if (values.size() < 8) {
+      ReaderArray(
+        Array::fillBy(values.size() + 1, i -> {
+          if (i < index) values[i] else if (i == index) key else values[i - 1]
+        }),
+      )
+    } else if (blockReaders) {
+      ReaderBlocks(ReaderBlockSet::fromSorted(values).set(key))
+    } else {
+      tree = SortedMap::createFromIterator(
+        values.values().map(value -> (value, void)),
+      );
+      ReaderTree(tree.set(key, void))
+    }
+
+  fun remove(key: ArrowKey, compact: Bool): DependencyReaders
+  | ReaderBlocks(blocks) ->
+    updated = blocks.remove(key);
+    if (updated.count <= 8) ReaderArray(updated.values().collect(Array)) else {
+      ReaderBlocks(updated)
+    }
+  | ReaderArray(values) ->
+    ReaderArray(values.filter(value -> value.compare(key) != EQ()))
+  | ReaderTree(tree) ->
+    updated = tree.remove(key);
+    if (compact && updated.size() <= 8) {
+      ReaderArray(updated.keys().collect(Array))
+    } else {
+      ReaderTree(updated)
+    }
+
+  fun hasChild(child: DirName): Bool {
+    this.values().any(reader -> reader.childName == child)
+  }
+
+  fun hasSibling(arrow: ArrowKey): Bool
+  | ReaderBlocks(blocks) -> blocks.hasSibling(arrow)
+  | ReaderArray(values) ->
+    values.any(reader ->
+      arrow.parentName.compare(reader.parentName) == EQ() &&
+        arrow.childName.compare(reader.childName) == EQ()
+    )
+  | ReaderTree(tree) ->
+    loop {
+      tree match {
+      | SortedMap.Nil() -> return false
+      | node @ SortedMap.Node _ ->
+        order = arrow.parentName.compare(node.key.parentName);
+        if (order == EQ()) {
+          !order = arrow.childName.compare(node.key.childName)
+        };
+        order match {
+        | EQ() -> return true
+        | LT() -> !tree = node.left
+        | GT() -> !tree = node.right
+        }
+      }
+    }
+}
+
 value class Deps private (
-  private data: SortedMap<Path, SortedSet<ArrowKey>> = SortedMap[],
+  private data: SortedMap<Path, DependencyReaders> = SortedMap[],
   private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
   filters: SortedMap<Path, SortedMap<Int, Array<ReadFilter>>> = SortedMap[],
   nextFilterID: Int = 0,
+  compactReaders: Bool = false,
+  canonicalReadPaths: Bool = false,
+  blockReaders: Bool = false,
 ) {
-  static fun empty(): this {
-    Deps()
+  static fun empty(
+    compactReaders: Bool = false,
+    canonicalReadPaths: Bool = false,
+    blockReaders: Bool = false,
+  ): this {
+    Deps() with {compactReaders, canonicalReadPaths, blockReaders}
+  }
+
+  // Observational counts of physically retained dependency records. This
+  // deliberately bypasses tracked reads and is only used by diagnostics.
+  fun retentionCounts(): SortedMap<DirName, (Int, Int, Int)> {
+    result = SortedMap<DirName, (Int, Int, Int)>[];
+    for ((path, readers) in this.data.items()) {
+      (paths, edges, filters) = result
+        .maybeGet(path.dirName)
+        .default((0, 0, 0));
+      !result[path.dirName] = (paths + 1, edges + readers.size(), filters)
+    };
+    for ((path, buckets) in this.filters.items()) {
+      (paths, edges, filters) = result
+        .maybeGet(path.dirName)
+        .default((0, 0, 0));
+      for (bucket in buckets.values()) !filters = filters + bucket.size();
+      !result[path.dirName] = (paths, edges, filters)
+    };
+    result
   }
 
   fun maybeGet(path: Path): ?SortedSet<ArrowKey> {
-    this.data.maybeGet(path)
+    this.data.maybeGet(path).map(readers -> readers.toSet())
+  }
+
+  // Reuse the reverse index's live representative, including its directory
+  // and key. This adds no interning table or lifetime beyond existing readers.
+  // Logical ordering defines dependency identity, even for structurally unequal
+  // keys. Absent paths remain ordinary reads and register normally afterward.
+  fun canonicalPath(path: Path): Path {
+    if (!this.canonicalReadPaths) return path;
+    this.data.maybeGetItem(path).map(entry -> entry.i0).default(path)
+  }
+
+  // Hot invalidation paths iterate without reconstructing a public SortedSet.
+  fun readers(path: Path): mutable Iterator<ArrowKey> {
+    this.data.maybeGet(path) match {
+    | Some(readers) -> readers.values()
+    | None() -> Array<ArrowKey>[].values()
+    }
   }
 
   fun setFilters(path: Path, filters: SortedMap<Int, Array<ReadFilter>>): this {
@@ -275,10 +581,10 @@ value class Deps private (
 
   fun set(path: Path, arrowKey: ArrowKey): this {
     set = this.data.maybeGet(path) match {
-    | None() -> SortedSet[]
+    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
     | Some(x) -> x
     };
-    !set = set.set(arrowKey);
+    !set = set.set(arrowKey, this.blockReaders);
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
     this
@@ -292,6 +598,7 @@ value class Deps private (
     this.idata.maybeGet(child).each(paths ->
       paths.each(path ->
         this.data.get(path)
+          .values()
           .filter(ak -> ak.parentName == parent && ak.childName == child)
           .each(ak ->
             reads.maybeGet(ak) match {
@@ -349,10 +656,10 @@ value class Deps private (
     skipInverseRemoval: Bool,
   ): this {
     set = this.data.maybeGet(path) match {
-    | None() -> SortedSet[]
+    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
     | Some(x) -> x
     };
-    !set = set.remove(arrowKey);
+    !set = set.remove(arrowKey, this.compactReaders);
     if (set.isEmpty()) {
       !this.data = this.data.remove(path);
       path.baseName match {
@@ -368,7 +675,8 @@ value class Deps private (
     // inverse-directory entry until the last such reader is removed.
     if (
       !skipInverseRemoval &&
-      !set.any(reader -> reader.childName == arrowKey.childName)
+      !set.hasSibling(arrowKey) &&
+      !set.hasChild(arrowKey.childName)
     ) {
       !this = this.iremove(arrowKey.childName, path)
     };
@@ -382,15 +690,11 @@ value class Deps private (
   fun removeDir(dirName: DirName): this {
     affected = this.idata.maybeGet(dirName).default(SortedSet[]);
     for (path in affected) {
-      for (reader in this.maybeGet(path).default(SortedSet[])) {
+      for (reader in this.readers(path)) {
         if (reader.parentName == dirName || reader.childName == dirName) {
           // The inverse index for this child is removed below. Avoid
           // searching every remaining reader on paths with large fanout.
-          !this = this.removeInternal(
-            path,
-            reader,
-            reader.childName == dirName,
-          )
+          !this = this.removeInternal(path, reader, reader.childName == dirName)
         }
       }
     };
@@ -558,17 +862,50 @@ mutable class Context private {
   static fun create{
     canReuse: CanReuse = CRIfMatch(),
     dependencyMode: Int = defaultDependencyMode(),
+    compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
+    canonicalReadPaths: Bool = Environ.varOpt(
+      "SKSTORE_CANONICAL_READ_PATHS",
+    ).isSome(),
+    blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
   }: this {
-    static{canReuse, dependencyMode}
+    static{
+      canReuse,
+      dependencyMode,
+      deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+    }
   }
 
   static fun mcreate{
     dependencyMode: Int = defaultDependencyMode(),
+    compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
+    canonicalReadPaths: Bool = Environ.varOpt(
+      "SKSTORE_CANONICAL_READ_PATHS",
+    ).isSome(),
+    blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
   }: mutable this {
-    mutable static{dependencyMode}
+    mutable static{
+      dependencyMode,
+      deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+    }
   }
 
-  readonly fun isParallelReadOnly(): Bool { this.parallelReadOnly }
+  readonly fun isParallelReadOnly(): Bool {
+    this.parallelReadOnly
+  }
+
+  // This policy belongs to the persisted context. Changing the environment
+  // does not rewrite the reader sets of an already initialized database.
+  readonly fun usesCompactDependencyReaders(): Bool {
+    this.deps.compactReaders
+  }
+
+  readonly fun usesCanonicalReadPaths(): Bool {
+    this.deps.canonicalReadPaths
+  }
+
+  readonly fun usesBlockDependencyReaders(): Bool {
+    this.deps.blockReaders
+  }
 
   readonly fun requireWritable(): void {
     if (this.parallelReadOnly) throw ParallelContextUnavailable()
@@ -798,11 +1135,8 @@ mutable class Context private {
     this.arrowStack.maybeHead().map(x -> x.i1)
   }
 
-  private readonly fun getDeps(path: Path): SortedSet<ArrowKey> {
-    this.deps.maybeGet(path) match {
-    | None() -> SortedSet[]
-    | Some(deps) -> deps
-    }
+  private readonly fun getDeps(path: Path): mutable Iterator<ArrowKey> {
+    this.deps.readers(path)
   }
 
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
@@ -1075,6 +1409,7 @@ mutable class Context private {
     after: DirName ~> Bool,
     eligible: DirName ~> Bool,
   ): (Bool, Bool, Bool) {
+    profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
     invariant(
       this.currentArrow().isNone(),
       "updateWithStatus cannot be called during update.",
@@ -1088,7 +1423,15 @@ mutable class Context private {
         this.!tick = ctx.tick
       }
     );
-    if (!this.updatePaused) this.updateLazyGets();
+    if (!this.updatePaused) {
+      retentionStart = if (profile) Time.time_ns() else 0;
+      this.updateLazyGets();
+      if (profile) {
+        print_error(
+          `##SPAN## ${retentionStart} ${Time.time_ns()} store lazy_retention\n`,
+        )
+      }
+    };
     heldUpdates: SortedMap<(TimeStack, Time), Arrow> = SortedMap[];
 
     loop {
@@ -1153,18 +1496,29 @@ mutable class Context private {
           this.!updatePaused = true;
           break (false, true, true)
         };
+        arrowStart = if (profile) Time.time_ns() else 0;
         this.unsafeMaybeGetDir(childName) match {
         | None()
         | Some(DeletedDir _) ->
           void
         | Some(dir @ LazyDir _) ->
           invariant(parentName == childName);
-          dir.update(this, this.dirtyReaders.maybeGet(dir.dirName))
+          // This lazy directory may be invalidated several times before the
+          // tick drains. Consume its pending batch before notifying readers:
+          // retaining it would invalidate already recomputed keys again when
+          // an unrelated later key becomes dirty. New invalidations (including
+          // dependencies between keys in this directory) enter a fresh batch.
+          pendingReaders = this.dirtyReaders.maybeGet(dir.dirName);
+          this.!dirtyReaders = this.dirtyReaders.remove(dir.dirName);
+          dir.update(this, pendingReaders)
         | Some(child @ EagerDir _) ->
           parentMaps = child.parents.maybeGet(parentName) match {
           | None() ->
             invariant_violation(
-              `Could not find parent: queued ${parentName} => ${childName}; current parents: ${child.parents.items().map(kv -> kv.i0).collect(Array)}`,
+              `Could not find parent: queued ${parentName} => ${childName}; current parents: ${child.parents
+                .items()
+                .map(kv -> kv.i0)
+                .collect(Array)}`,
             )
           | Some(f) -> f
           };
@@ -1175,6 +1529,11 @@ mutable class Context private {
             this.dirtyReaders.maybeGet(parentName),
             parentMaps,
             child,
+          )
+        };
+        if (profile) {
+          print_error(
+            `##SPAN## ${arrowStart} ${Time.time_ns()} arrow ${childName}\n`,
           )
         };
         if (after(childName)) {
@@ -1410,16 +1769,24 @@ mutable class Context private {
       parallelReadOnly => true,
       debugMode => this.debugMode,
       dependencyMode => this.dependencyMode,
+      deps => Deps::empty(
+        this.deps.compactReaders,
+        this.deps.canonicalReadPaths,
+        this.deps.blockReaders,
+      ),
     };
-    ParallelSnapshot(dirName ~> {
-      dirs.maybeGet(dirName) match {
-      | Some(eager @ EagerDir _) -> eager
-      | _ ->
-        invariant_violation(
-          `Parallel read requires an eager directory: ${dirName}`,
-        )
-      }
-    }, template)
+    ParallelSnapshot(
+      dirName ~> {
+        dirs.maybeGet(dirName) match {
+        | Some(eager @ EagerDir _) -> eager
+        | _ ->
+          invariant_violation(
+            `Parallel read requires an eager directory: ${dirName}`,
+          )
+        }
+      },
+      template,
+    )
   }
 
   readonly fun unsafeMaybeGetDir<T: File>(dirName: DirName): ?Dir {
@@ -1555,7 +1922,7 @@ mutable class Context private {
 
   mutable fun addRead(path: Path): void {
     if (!this.reads.contains(path)) {
-      this.!reads = this.reads.set(path);
+      this.!reads = this.reads.set(this.deps.canonicalPath(path));
     };
   }
 
@@ -1620,6 +1987,13 @@ mutable class Context private {
 
   readonly fun listDirs(): mutable Iterator<Dir> {
     this.dirs.values()
+  }
+
+  readonly fun dependencyRetentionCounts(): SortedMap<
+    DirName,
+    (Int, Int, Int),
+  > {
+    this.deps.retentionCounts()
   }
 
   readonly fun getDirsChangesAfter(start: Tick): SortedSet<DirName> {
@@ -2130,7 +2504,9 @@ fun runWithGcIntern(
   synchronizer: ?Synchronizer = None(),
   isync: Bool = false,
   fork: ?String = None(),
+  onError: .Exception ~> void = exn ~> print_error(exn.getMessage()),
 ): Contexts {
+  profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
   sync = UInt32::truncate(if (isync) 1 else 0);
   if (!gHasContext(fork)) {
     gContextInit(initCtx, fork);
@@ -2145,22 +2521,30 @@ fun runWithGcIntern(
   loop {
     context = contexts.get(fork);
     startTick = context.getTick();
+    stepStart = if (profile) Time.time_ns() else 0;
     pos = newObstack();
     (newContext, newContextOp) = (try {
-      Some(f(context.withGlobals(globals)))
+      Success(f(context.withGlobals(globals)))
     } catch {
-    | exn ->
-      print_error(exn.getMessage());
-      None()
+    | exn -> Failure(exn)
     }) match {
-    | Some(x) -> x
-    | None() ->
+    | Success(result) -> result
+    | Failure(exn) ->
+      // The handler may exit the process. Release the borrowed persistent
+      // snapshot first, or it remains live in the database across restarts.
+      cexn = destroyObstackWithValue(pos, exn);
+      replaceExn(cexn);
       if (synchronizer is None _) {
         gGlobalUnlock();
       };
-      destroyObstack(pos);
+      gUnsafeFree(contexts);
+      onError(cexn);
       return contexts
     };
+    if (profile) {
+      print_error(`##SPAN## ${stepStart} ${Time.time_ns()} store step\n`)
+    };
+    syncStart = if (profile) Time.time_ns() else 0;
     newContextOp match {
     | CContinue(underLockF) ->
       synchronizer match {
@@ -2211,6 +2595,9 @@ fun runWithGcIntern(
         !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
+        if (profile) {
+          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
+        };
         return contexts
       | Some _ ->
         new = gContextSync(
@@ -2227,8 +2614,14 @@ fun runWithGcIntern(
         !contexts = new.contexts;
         gUnsafeFree(contexts);
         destroyObstack(pos);
+        if (profile) {
+          print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
+        };
         return contexts
       }
+    };
+    if (profile) {
+      print_error(`##SPAN## ${syncStart} ${Time.time_ns()} store sync\n`)
     };
     !globals = contexts.get(fork).globals;
   }
@@ -2272,6 +2665,7 @@ fun runWithGc(
   synchronizer: ?Synchronizer = None(),
   sync: Bool = false,
   fork: ?String = None(),
+  onError: .Exception ~> void = exn ~> print_error(exn.getMessage()),
 ): void {
   _ = runWithGcIntern(
     initCtx,
@@ -2283,6 +2677,7 @@ fun runWithGc(
     synchronizer,
     sync,
     fork,
+    onError,
   )
 }
 
@@ -2297,6 +2692,9 @@ fun runWithGc(
 // steps choose their own updateUntilBoundary()/update() policy. For a checkpoint
 // after every dependency arrow, use one step returning:
 // context.updateUntilBoundary(_ ~> false, _ ~> true).isNone()
+// onError runs after the failed step's temporary region and borrowed persistent
+// snapshot have been released. It may terminate the process or rethrow safely;
+// failed step writes are discarded and the last committed checkpoint remains.
 fun runPipeline(
   initCtx: Context,
   progressKey: String,
@@ -2307,8 +2705,9 @@ fun runPipeline(
     throw exn
   },
 ): void {
-  runWithGc(initCtx, context ~> {
-    try {
+  runWithGc(
+    initCtx,
+    context ~> {
       step = context.getGlobal(progressKey) match {
       | Some(value) -> IntFile::type(value).value
       | None() -> 0
@@ -2329,12 +2728,12 @@ fun runPipeline(
         context.setGlobal(progressKey, IntFile(step));
         CContinue(None())
       }
-    } catch {
-    | exn ->
-      onError(exn);
-      throw exn
-    }
-  })
+    },
+    None(),
+    false,
+    None(),
+    onError,
+  )
 }
 
 fun withRegion<T>(
@@ -2685,17 +3084,28 @@ fun runWithResult<T>(
     gContextsGetNoLock()
   | Some _ -> gUnsafeContextsGet()
   };
-  try {
+  prepared = try {
     current = contexts.get(fork);
     context = current.mclone();
     res = f(context);
-    startTick = current.getTick();
+    Success((current.getTick(), context.clone(), res))
+  } catch {
+  | exn -> Failure(exn)
+  };
+  (startTick, newContext, res) = prepared match {
+  | Success(value) -> value
+  | Failure(exn) ->
+    if (synchronizer.isNone()) gGlobalUnlock();
+    gUnsafeFree(contexts);
+    return Failure(exn)
+  };
+  try {
     new = synchronizer match {
     | None() ->
       new = gContextSyncNoLock(
         startTick,
         contexts,
-        context.clone(),
+        newContext,
         synchronizer,
         sync,
         None(),
@@ -2707,7 +3117,7 @@ fun runWithResult<T>(
       gContextSync(
         startTick,
         contexts,
-        context.clone(),
+        newContext,
         synchronizer,
         sync,
         None(),

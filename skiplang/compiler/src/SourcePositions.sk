@@ -64,11 +64,17 @@ class Index{
   symbols: Map<Symbol, Position>,
 } {
   static fun create(tree: ParseTree.ParseTree): Index {
-    builder = mutable Builder{};
+    builder = mutable Builder{
+      lambdaAnchors => Environ.varOpt("SKC_LAMBDA_SOURCE_ANCHORS").isSome(),
+    };
     builder.visit(tree, Array[]);
     Index{
-      // getChildren() visits source order, and Map preserves insertion order.
-      markers => builder.markers.items().collect(Array),
+      // A declaration wrapping a LazyTree can end at the beginning of its
+      // body. Lambda anchors inside that body are visited before this earlier
+      // declaration end marker, so insertion order is not source order.
+      markers => builder.markers.items().collect(Array).sortedBy(marker ~>
+        marker.i0
+      ),
       symbols => builder.symbols.chill(),
     }
   }
@@ -98,6 +104,7 @@ class Index{
 }
 
 mutable class Builder{
+  lambdaAnchors: Bool = false,
   markers: mutable Map<Position, Marker> = mutable Map[],
   symbols: mutable Map<Symbol, Position> = mutable Map[],
   counts: mutable Map<Symbol, Int> = mutable Map[],
@@ -112,8 +119,15 @@ mutable class Builder{
     parent: Symbol,
     constructorFieldIndex: Int = -1,
   ): void {
-    // Bodies have no independently named declarations. In particular, do not
-    // force LazyTree here (doing so would parse every method body twice).
+    // LazyTree currently captures an already-validated block. Visit that block
+    // only for the experimental lambda anchors; its wrapper range is empty.
+    if (this.lambdaAnchors) {
+      tree match {
+      | ParseTree.LazyTree{builder} ->
+        return this.visit(builder(), parent, constructorFieldIndex)
+      | _ -> void
+      }
+    };
     nameOpt = tree match {
     | ParseTree.ModuleTree{name}
     | ParseTree.ModuleAliasTree{name}
@@ -140,6 +154,10 @@ mutable class Builder{
       Some((name.getTokens().map(t -> t.value).join(""), name.range.start))
     | None() ->
       tree match {
+      | ParseTree.LambdaExpressionTree _ if (this.lambdaAnchors) ->
+        // Match the existing ordinal model for anonymous closures. Nested
+        // syntax gets an independent ordinal scope within its enclosing lambda.
+        Some(("@lambda", tree.range.start))
       | ParseTree.PositionalParameterTree{
         typeSpecifier,
       } if (constructorFieldIndex >= 0) ->
@@ -197,9 +215,11 @@ mutable class Builder{
     | ParseTree.ConstantTree _
     | ParseTree.GlobalConstantTree _
     | ParseTree.TypeConstantTree _
-    | ParseTree.TypeAliasDeclarationTree _
-    | ParseTree.LazyTree _ ->
-      void
+    | ParseTree.TypeAliasDeclarationTree _ ->
+      if (this.lambdaAnchors) {
+        for (child in tree.getChildren()) this.visit(child, scope)
+      }
+    | ParseTree.LazyTree _ -> void
     | _ -> for (child in tree.getChildren()) this.visit(child, scope)
     };
     if (anchorOpt.isSome()) {

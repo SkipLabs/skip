@@ -125,6 +125,16 @@ class VTableRequest(
   }
 }
 
+// Placement hints are not semantic inputs: every reuse is checked against the
+// current requests, scalar layouts, and reserved runtime entries. Keep only the
+// requests used by the latest successful layout, not a history of branches.
+mutable class SlotHints(
+  previous: UnorderedMap<VTableRequest, Int>,
+  matchReceiverChanges: Bool = false,
+  used: mutable UnorderedMap<VTableRequest, Int> = mutable UnorderedMap[],
+  mutable receiverReused: Int = 0,
+)
+
 // An object that incrementally builds up a vtable by adding entries to it.
 // Holes between these entries can be used by later values inserted into
 // the vtable.
@@ -138,7 +148,11 @@ mutable private class VTableBuilder(
   mutable bitSizeLowerBound: Int = 0,
 ) {
   mutable fun insert(value: Constant, bitOffset: Int): void {
-    scalarType = ClassInputs.getScalarType(value.typ, this.env, this.classReader);
+    scalarType = ClassInputs.getScalarType(
+      value.typ,
+      this.env,
+      this.classReader,
+    );
     invariant(bitOffset % scalarType.bitAlignment == 0, "Buggy misalignment");
 
     // Find the index where to insert.
@@ -184,7 +198,9 @@ mutable private class VTableBuilderIterator(
   mutable fun next(begin: Int, align: Int): (Int, Int, Bool) {
     env = this.builder.env;
     classReader = this.builder.classReader;
-    end = begin + ClassInputs.getScalarType(this.value.typ, env, classReader).bitSize;
+    end =
+      begin +
+      ClassInputs.getScalarType(this.value.typ, env, classReader).bitSize;
 
     if (this.index >= this.builder.slots.size()) {
       // This is after all existing slots, so no overlap is possible.
@@ -195,7 +211,9 @@ mutable private class VTableBuilderIterator(
 
       slot = this.builder.slots[this.index];
       slotBegin = slot.bitOffset;
-      slotEnd = slotBegin + ClassInputs.getScalarType(slot.value.typ, env, classReader).bitSize;
+      slotEnd =
+        slotBegin +
+        ClassInputs.getScalarType(slot.value.typ, env, classReader).bitSize;
 
       if (begin == slotBegin && this.value == slot.value) {
         // Excellent, identical value already exists, zero-cost!
@@ -255,7 +273,13 @@ private fun createVTableBuilders(
 
       // Seed the VTable with its SkipGcType, which all vtables must have.
       // Note that it goes in the second possible pointer slot, not the first.
-      tentative = createGCType(sclass, env, config, typeIdentity + 1, classReader);
+      tentative = createGCType(
+        sclass,
+        env,
+        config,
+        typeIdentity + 1,
+        classReader,
+      );
       gct = gcTypes.maybeGet(tentative) match {
       | Some(old) -> old
       | None() ->
@@ -300,7 +324,8 @@ private fun createVTableBuilders(
     if (builder.sclass != SClassID::none) {
       bound = 0;
       for (value in uniqueEntriesPerVTable[builder.sclass]) {
-        !bound = bound + ClassInputs.getScalarType(value.typ, env, classReader).bitSize
+        !bound =
+          bound + ClassInputs.getScalarType(value.typ, env, classReader).bitSize
       };
       builder.!bitSizeLowerBound = roundUp(bound, 64);
     }
@@ -327,7 +352,11 @@ private fun allocateBestSlot(
     iterators.push(mutable VTableBuilderIterator(builders[sc], val))
   };
 
-  align = ClassInputs.getScalarType(request.mapping[0].i1.typ, env, classReader).bitAlignment;
+  align = ClassInputs.getScalarType(
+    request.mapping[0].i1.typ,
+    env,
+    classReader,
+  ).bitAlignment;
 
   if (align < 64) {
     !align = 64;
@@ -402,6 +431,32 @@ private fun allocateBestSlot(
   for (it in iterators) it.builder.insert(it.value, bestBitOffset);
 
   bestBitOffset
+}
+
+private fun tryPreviousSlot(
+  request: VTableRequest,
+  slot: Int,
+  builders: mutable Map<SClassID, mutable VTableBuilder>,
+  env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader,
+): Bool {
+  // Probe every class before mutating any builder. A newly reserved lambda or
+  // GC entry, or a changed scalar layout, can make an old placement illegal.
+  compatible =
+    slot >= 0 &&
+    request.mapping.all(pair -> {
+      (sc, value) = pair;
+      alignment = max(
+        64,
+        ClassInputs.getScalarType(value.typ, env, classReader).bitAlignment,
+      );
+      iterator = mutable VTableBuilderIterator(builders[sc], value);
+      slot % alignment == 0 && iterator.next(slot, alignment).i0 == slot
+    });
+  if (compatible) {
+    for ((sc, value) in request.mapping) builders[sc].insert(value, slot)
+  };
+  compatible
 }
 
 // This function maps logical vtable bit offsets to physical ones.
@@ -506,7 +561,9 @@ private fun createGCType(
 
     // Check whether there are pointers in array slots.
     // They go at the beginning of each slot (in the case of a tuple etc.)
-    hasGCPointers = slotInfo.types.any(t -> ClassInputs.getScalarType(t, env, classReader).isGCPointer());
+    hasGCPointers = slotInfo.types.any(t ->
+      ClassInputs.getScalarType(t, env, classReader).isGCPointer()
+    );
 
     userSize = slotInfo.bitSize / 8;
 
@@ -541,7 +598,9 @@ private fun createGCType(
   fieldBitOffset = 0;
   pushField = (f: Constant) -> {
     fields.push(StaticImageField(f, fieldBitOffset));
-    !fieldBitOffset = fieldBitOffset + ClassInputs.getScalarType(f.typ, env, classReader).bitSize
+    !fieldBitOffset =
+      fieldBitOffset +
+      ClassInputs.getScalarType(f.typ, env, classReader).bitSize
   };
 
   // m_refsHintMask
@@ -989,6 +1048,7 @@ fun populateVTables(
   env: GlobalEnv,
   config: Config.Config,
   classReader: ?mutable ClassInputs.Reader = None(),
+  slotHints: ?mutable SlotHints = None(),
 ): VTableInfo {
   // Choose a heuristic order in which to assign vtables (values that
   // appear in more vtables get assigned first).
@@ -1030,12 +1090,67 @@ fun populateVTables(
   // Track the bit offset that each request ended up with.
   bitOffsets = Array::mfill(requests.size(), Int::min);
 
-  for (r in requests) {
-    // Choose a slot for this entry.
-    slot = allocateBestSlot(r, builders, env, classReader);
+  // Install unchanged compatible requests first. Otherwise a newly popular
+  // request can steal a survivor's slot and change every dispatching function.
+  slotHints.each(hints -> {
+    for (r in requests) {
+      hints.previous.maybeGet(r).each(slot -> {
+        if (tryPreviousSlot(r, slot, builders, env, classReader)) {
+          bitOffsets.set(r.id.id, vtableLogicalToPhysicalBitOffset(slot));
+          hints.used.set(r, slot)
+        }
+      })
+    }
+  });
 
-    // Tell the caller what bit offset we picked for this entry.
-    bitOffsets.set(r.id.id, vtableLogicalToPhysicalBitOffset(slot))
+  // Exact survivors have priority. A changed receiver mapping can still use
+  // its old slot, but that is merely a placement hint: validate all current
+  // classes/values and reserved entries before changing any builder.
+  slotHints.each(hints -> {
+    if (!hints.matchReceiverChanges || hints.previous.isEmpty()) return void;
+    byReceiver = mutable Map<(String, SClassID), SortedSet<Int>>[];
+    for ((old, slot) in hints.previous.items()) {
+      for ((sc, _) in old.mapping) {
+        key = (old.name, sc);
+        byReceiver.set(
+          key,
+          byReceiver.maybeGet(key).default(SortedSet[]).set(slot),
+        )
+      }
+    };
+    for (r in requests) {
+      if (bitOffsets[r.id.id] != Int::min) continue;
+      votes = mutable Map<Int, Int>[];
+      for ((sc, _) in r.mapping) {
+        for (slot in byReceiver.maybeGet((r.name, sc)).default(SortedSet[])) {
+          votes.set(slot, votes.maybeGet(slot).default(0) + 1)
+        }
+      };
+      candidates = votes.items().collect(Array).sortedBy(pair ~>
+        (-pair.i1, pair.i0)
+      );
+      // Bound probing work. Missing a legal hint only falls back to the
+      // ordinary allocator; it cannot relax a representation constraint.
+      for ((slot, _) in candidates.take(min(candidates.size(), 8))) {
+        if (tryPreviousSlot(r, slot, builders, env, classReader)) {
+          bitOffsets.set(r.id.id, vtableLogicalToPhysicalBitOffset(slot));
+          hints.used.set(r, slot);
+          hints.!receiverReused = hints.receiverReused + 1;
+          break void
+        }
+      }
+    }
+  });
+
+  for (r in requests) {
+    if (bitOffsets[r.id.id] == Int::min) {
+      // Choose a slot for a new, changed, or incompatible request.
+      slot = allocateBestSlot(r, builders, env, classReader);
+
+      // Tell the caller what bit offset we picked for this entry.
+      bitOffsets.set(r.id.id, vtableLogicalToPhysicalBitOffset(slot));
+      slotHints.each(hints -> hints.used.set(r, slot))
+    }
   };
 
   // Place the "biggest" vtables first. The rough intuition is to place

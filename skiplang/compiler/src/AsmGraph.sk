@@ -87,23 +87,46 @@ private class GraphMegaFile(
   fields: Array<StaticImageField>,
 ) extends SKStore.File
 private class GraphLabelsFile(value: Function) extends SKStore.File
+// A reference needs a stable identity and the intrinsic's generic name. Body
+// optimization status, parameter instructions and source ranges belong to the
+// definition, and must not invalidate every vtable/caller that names it.
+private class GraphFunctionReference(
+  id: SFunctionID,
+  gfunction: GFunctionName,
+) uses AsmFormattable {
+  fun asmFormat(asm: mutable AsmDefBuilder, spec: Char): void {
+    spec match {
+    | 'n' ->
+      asm.print('@');
+      asm.writeRef(asm.common.functionRef(this.id))
+    | 't' -> asm.print("ptr")
+    | 'N' -> asm.print("%t %n" % this % this)
+    | _ -> asm.die(`Bad format for function reference: "${spec}"`)
+    }
+  }
+}
+private class GraphFunctionReferenceFile(
+  value: GraphFunctionReference,
+) extends SKStore.File
 private class GraphClassInfoKey(id: SClassID) extends SKStore.Key
 private class GraphClassInfoFile(value: SClass) extends SKStore.File
 private class GraphScalarInfoFile(value: ?ScalarType) extends SKStore.File
 private class GraphDebugEnvFile(value: GlobalEnv) extends SKStore.File
 
-
 // Only temporary builders own this object. The mapper supplies the current
 // context; handles identify constant collections, never captured snapshots.
 private mutable class GraphReads{
   context: mutable SKStore.Context,
-  functions: SKStore.EHandle<GraphFunctionKey, FunctionFile>,
+  functions: SKStore.EHandle<GraphFunctionKey, GraphFunctionReferenceFile>,
   labels: SKStore.EHandle<GraphFunctionKey, GraphLabelsFile>,
   offsets: SKStore.EHandle<SKStore.Key, SKStore.IntFile>,
   classes: SKStore.EHandle<SKStore.Key, SKStore.File>,
   memoize: Bool = Environ.varOpt("SKC_DISABLE_GRAPH_READER_MEMO").isNone(),
   classCache: mutable UnorderedMap<SClassID, SClass> = mutable UnorderedMap[],
-  scalarCache: mutable UnorderedMap<SClassID, ?ScalarType> = mutable UnorderedMap[],
+  scalarCache: mutable UnorderedMap<
+    SClassID,
+    ?ScalarType,
+  > = mutable UnorderedMap[],
 } {
   // A reader is fresh for one fragment callback and never enters stored output.
   // Shared mega-table rendering asks about the same scalar class for many
@@ -131,7 +154,9 @@ private mutable class GraphReads{
     };
     value = GraphScalarInfoFile::type(
       this.classes.getArrayFilter(this.context, GraphClassInfoKey(id), file ~>
-        GraphScalarInfoFile(GraphClassInfoFile::type(file).value.maybeGetScalarType())
+        GraphScalarInfoFile(
+          GraphClassInfoFile::type(file).value.maybeGetScalarType(),
+        )
       )[0],
     ).value;
     if (this.memoize) this.scalarCache.set(id, value);
@@ -425,60 +450,109 @@ class GraphCache(nodes: SKStore.EHandle<GraphKey, GraphFile>) {
 
 fun createGraphCache(
   context: mutable SKStore.Context,
-  input: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+  program: BackendProgram,
 ): GraphCache {
-  batches = FunctionBatches.create(context, input, "/llvm-graph/batches/");
-  files = batches.map(
-    x ~> x,
-    x ~> x,
+  input = program.header;
+  direct = input.map(
+    SKStore.IID::keyType,
+    SKStore.BoolFile::type,
     context,
-    SKStore.DirName::create("/llvm-graph/inputs/"),
-    (_context, writer, _, values) ~> {
-      values.first match {
-      | entry @ Optimize.InputFile _ ->
-        writer.set(
-          SKStore.IID(0),
-          GraphCommonFile(
-            entry.env with {
-              sfuns => FunctionIDToFunction::mcreate().chill(),
-              sclasses => SortedMap[],
-              consts => UnorderedMap[],
-              runtimeFunctions => UnorderedMap[],
-              vtables => None(),
-              sourcePositions => SourcePositions.Table{},
-            },
-            entry.config,
-          ),
-        );
-        writer.set(
-          SKStore.IID(1),
-          GraphMegaFile(entry.env.vtables.fromSome().megaVTable),
-        );
-        // Normal fragments depend on individual classes, not this snapshot.
-        // Retain complete class metadata only for explicit IR disassembly.
-        writer.set(
-          SKStore.IID(2),
-          GraphDebugEnvFile(entry.env with {
+    SKStore.DirName::create("/llvm-graph/collection-functions/"),
+    (context, writer, key, values) ~> {
+      config = values.first.config;
+      writer.set(
+        key,
+        SKStore.BoolFile(
+          config.collectionFunctions && collectionEmission(context, config),
+        ),
+      )
+    },
+  );
+  batches = FunctionBatches.create(context, input, "/llvm-graph/batches/");
+  publishInput: SKStore.TMapFun<
+    SKStore.Key,
+    SKStore.File,
+    SKStore.Key,
+    SKStore.File,
+  > = (_context, writer, _, values) ~> {
+    values.first match {
+    | entry @ Optimize.InputFile _ ->
+      writer.set(
+        SKStore.IID(0),
+        GraphCommonFile(
+          entry.env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            sclasses => SortedMap[],
+            consts => UnorderedMap[],
+            runtimeFunctions => UnorderedMap[],
+            vtables => None(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          entry.config,
+        ),
+      );
+      writer.set(
+        SKStore.IID(1),
+        GraphMegaFile(entry.env.vtables.fromSome().megaVTable),
+      );
+      // Normal fragments depend on individual classes, not this snapshot.
+      // Retain complete class metadata only for explicit IR disassembly.
+      writer.set(
+        SKStore.IID(2),
+        GraphDebugEnvFile(
+          entry.env with {
             sfuns => FunctionIDToFunction::mcreate().chill(),
             vtables => None(),
             sourcePositions => SourcePositions.Table{},
-          }),
-        );
-        for ((id, sc) in entry.env.sclasses.items()) {
-          writer.set(GraphClassInfoKey(id), GraphClassInfoFile(sc))
-        };
-        void
-      | FunctionBatches.FunctionsFile(functions) ->
-        for (f in functions) {
-          writer.set(GraphFunctionKey(f.id), FunctionFile(f))
-        }
-      | _ -> void
+          },
+        ),
+      );
+      for ((id, sc) in entry.env.sclasses.items()) {
+        writer.set(GraphClassInfoKey(id), GraphClassInfoFile(sc))
+      };
+      void
+    | FunctionBatches.FunctionsFile(functions) ->
+      for (f in functions) {
+        writer.set(GraphFunctionKey(f.id), FunctionFile(f))
       }
-    },
+    | _ -> void
+    }
+  };
+  files = SKStore.EHandle::multiMap(
+    (x: SKStore.Key) ~> x,
+    (x: SKStore.File) ~> x,
+    context,
+    Array[
+      (
+        SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          batches.dirName,
+        ),
+        (publishInput, None()),
+      ),
+      (
+        SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          program.functions.dirName,
+        ),
+        (
+          (context, writer, _, values) ~> {
+            enabled = direct.getArray(context, SKStore.IID(0));
+            if (enabled.isEmpty() || !enabled[0].value) return void;
+            f = FunctionFile::type(values.first).value;
+            writer.set(GraphFunctionKey(f.id), FunctionFile(f))
+          },
+          None(),
+        ),
+      ),
+    ],
+    SKStore.DirName::create("/llvm-graph/inputs/"),
   );
   functions = files.map(
     GraphFunctionKey::keyType,
-    FunctionFile::type,
+    GraphFunctionReferenceFile::type,
     context,
     SKStore.DirName::create("/llvm-graph/signatures/"),
     (_context, writer, _, values) ~>
@@ -486,9 +560,7 @@ fun createGraphCache(
       | FunctionFile(f) ->
         writer.set(
           GraphFunctionKey(f.id),
-          FunctionFile(
-            f with {blocks => Array[], constants => kEmptyConstants},
-          ),
+          GraphFunctionReferenceFile(GraphFunctionReference(f.id, f.gfunction)),
         )
       | _ -> void
       }
@@ -529,7 +601,9 @@ fun createGraphCache(
       };
       info = entry.env.vtables.fromSome();
       for (i => offset in info.vtableBitOffsets) {
-        if (_context.debugMode) print_string(`VTABLE_REQUEST_OFFSET: ${i} ${offset}`);
+        if (_context.debugMode) {
+          print_string(`VTABLE_REQUEST_OFFSET: ${i} ${offset}`)
+        };
         writer.set(
           GraphRequestOffsetKey(VTable.VTableRequestID(i)),
           SKStore.IntFile(offset),
@@ -557,7 +631,8 @@ fun createGraphCache(
           files.getArray(context, SKStore.IID(0))[0],
         );
         baseEnv = if (f.isDisasm || common.config.disasmAll) {
-          GraphDebugEnvFile::type(files.getArray(context, SKStore.IID(2))[0]).value
+          GraphDebugEnvFile::type(files.getArray(context, SKStore.IID(2))[0])
+            .value
         } else {
           common.env
         };
@@ -568,7 +643,13 @@ fun createGraphCache(
             common.env.sourcePositions
           },
         };
-        reads = mutable GraphReads{context, functions, labels, offsets, classes => files};
+        reads = mutable GraphReads{
+          context,
+          functions,
+          labels,
+          offsets,
+          classes => files,
+        };
         // A native function can have several specialized IDs but one C symbol.
         // Choose the same earliest specialization as the sequential builder.
         external = if (f.hasImplementation()) None() else {
@@ -608,7 +689,13 @@ fun createGraphCache(
       values.first match {
       | common @ GraphCommonFile _ ->
         if (context.debugMode) print_string("LLVM_SHARED");
-        reads = mutable GraphReads{context, functions, labels, offsets, classes => files};
+        reads = mutable GraphReads{
+          context,
+          functions,
+          labels,
+          offsets,
+          classes => files,
+        };
         builder = fragmentBuilder(
           common.env,
           common.config,
@@ -657,9 +744,10 @@ fun createGraphCache(
     (_context, writer, key, values) ~> {
       key match {
       | GraphClassOffsetKey(sc) ->
-        writer.set(GraphVTableKey(sc), GraphNodeFile(-1,
-          classVTableDefinition(sc, values.first.value)
-        ))
+        writer.set(
+          GraphVTableKey(sc),
+          GraphNodeFile(-1, classVTableDefinition(sc, values.first.value)),
+        )
       | _ -> void
       }
     },
@@ -672,7 +760,11 @@ fun createGraphCache(
     asGraphKey,
     asGraphFile,
     context,
-    Array[(functionNodes, (forward, None())), (sharedNodes, (forward, None())), (vtableAliases, (forward, None()))],
+    Array[
+      (functionNodes, (forward, None())),
+      (sharedNodes, (forward, None())),
+      (vtableAliases, (forward, None())),
+    ],
     SKStore.DirName::create("/llvm-graph/contributions/"),
   );
   nodes = contributions.map(

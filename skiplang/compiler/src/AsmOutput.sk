@@ -438,17 +438,25 @@ mutable class AsmDef{
       )
     };
 
-    for (c in this.text.getIter()) {
-      if (i == next) {
-        // NOTE: We assume we do not have two refs at the same char offset,
-        // etc. as that wouldn't be syntactically valid anyway. We could
-        // easily change this to a loop if we want.
-        !next = writeExternal()
-      };
+    if (out.fragmentWrites) {
+      cursor = mutable TextOutputStream.StringSpanCursor{text => this.text};
+      while (!cursor.atEnd()) {
+        if (i == next) !next = writeExternal();
+        !i = cursor.writeUntil(out, next)
+      }
+    } else {
+      for (c in this.text.getIter()) {
+        if (i == next) {
+          // NOTE: We assume we do not have two refs at the same char offset,
+          // etc. as that wouldn't be syntactically valid anyway. We could
+          // easily change this to a loop if we want.
+          !next = writeExternal()
+        };
 
-      out.writeChar(c);
+        out.writeChar(c);
 
-      !i = i + 1
+        !i = i + 1
+      }
     };
 
     last = writeExternal();
@@ -1027,12 +1035,7 @@ fun writeOutputFiles(
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
 
-  config.preambles.each(p -> sstr.write(FileSystem.readTextFile(p)));
-  for (dep in config.dependencies.values()) {
-    for (p in dep.i1.preambles) {
-      sstr.write(p)
-    }
-  };
+  sstr.write(nativePreamble(config));
 
   // arbitrarily pick some unique input file as the CU for this output file.
   metadata = AsmOutput.Metadata::create(
@@ -1098,7 +1101,10 @@ fun writeOutputFiles(
   output match {
   | "-" -> print_raw(contents)
   | _ ->
-    if (!FileSystem.exists(output) || FileSystem.readTextFile(output) != contents) {
+    if (
+      !FileSystem.exists(output) ||
+      FileSystem.readTextFile(output) != contents
+    ) {
       FileSystem.writeTextFile(output, contents)
     }
   }
@@ -1400,7 +1406,6 @@ private fun createStaticImageAsmDef{
   minByteAlignment: Int,
   id: ?AsmDefID,
 }: AsmDefID {
-
   // The overall alignment must be good enough for all fields.
   fieldBitAlignment = minByteAlignment * 8;
   bitSize = 0;
@@ -1867,7 +1872,10 @@ mutable class .AsmOutput{
   graphOrigin: Int = -1,
   graphKeys: mutable UnorderedMap<AsmDefID, GraphKey> = mutable UnorderedMap[],
   graphReads: ?mutable GraphReads = None(),
-  classVTables: mutable UnorderedMap<SClassID, AsmDefID> = mutable UnorderedMap[],
+  classVTables: mutable UnorderedMap<
+    SClassID,
+    AsmDefID,
+  > = mutable UnorderedMap[],
 
   // Skip String -> LLVM expression.
   strings: mutable UnorderedMap<UTF8String, AsmDefID> = mutable UnorderedMap[],
@@ -1935,11 +1943,16 @@ mutable class .AsmOutput{
     if (this.fragment) AsmDefID(0) else AsmDefID(fid.id)
   }
 
-  mutable fun getFunction(fid: SFunctionID, pos: Pos): Function {
+  mutable fun functionReference(
+    fid: SFunctionID,
+    pos: Pos,
+  ): GraphFunctionReference {
     this.graphReads match {
     | Some(reads) ->
       reads.functions.get(reads.context, GraphFunctionKey(fid)).value
-    | None() -> this.env.getFunction(fid, pos)
+    | None() ->
+      f = this.env.getFunction(fid, pos);
+      GraphFunctionReference(f.id, f.gfunction)
     }
   }
 
@@ -1993,8 +2006,11 @@ mutable class .AsmOutput{
       id = this.classVTables.getOrAdd(sc, () -> {
         // The physical offset belongs only to the alias definition. A normal
         // filtered read records membership, so moving the table keeps callers.
-        present = reads.offsets.getArrayFilter(reads.context, GraphClassOffsetKey(sc),
-          _ ~> SKStore.BoolFile(true));
+        present = reads.offsets.getArrayFilter(
+          reads.context,
+          GraphClassOffsetKey(sc),
+          _ ~> SKStore.BoolFile(true),
+        );
         invariant(!present.isEmpty(), "Missing class vtable: " + sc);
         id = this.defs.allocID();
         this.defs.set(id, graphPlaceholder(id, classVTableSymbol(sc)));
@@ -2003,18 +2019,27 @@ mutable class .AsmOutput{
       });
       id.writeGetPointer(asm, if (frozen_) VTable.kFrozenMask else 0)
     | None() ->
-      llvmWriteVTableRef(this.classByteOffset(sc) +
-        (if (frozen_) VTable.kFrozenMask else 0), asm)
+      llvmWriteVTableRef(
+        this.classByteOffset(sc) + (if (frozen_) VTable.kFrozenMask else 0),
+        asm,
+      )
     }
   }
 
   private mutable fun objectVTable(sc: SClassID): Constant {
     if (this.fragment) {
-      ConstantVTable{id => InstrID::none, typ => tNonGCPointer,
-        value => sc, frozen_ => true}
+      ConstantVTable{
+        id => InstrID::none,
+        typ => tNonGCPointer,
+        value => sc,
+        frozen_ => true,
+      }
     } else {
-      ConstantMegaVTableMember{id => InstrID::none, typ => tNonGCPointer,
-        value => this.classByteOffset(sc) + VTable.kFrozenMask}
+      ConstantMegaVTableMember{
+        id => InstrID::none,
+        typ => tNonGCPointer,
+        value => this.classByteOffset(sc) + VTable.kFrozenMask,
+      }
     }
   }
 
@@ -2396,7 +2421,10 @@ mutable class .AsmOutput{
     asm.print("void %n() {\n" % asm);
     asm.print(
       "  call void %n()\n" %
-        this.getFunction(this.env.initializeAllConstsID, FileRange.builtin),
+        this.functionReference(
+          this.env.initializeAllConstsID,
+          FileRange.builtin,
+        ),
     );
     asm.print("  ret void\n");
     asm.print("}\n\n");
@@ -2440,7 +2468,7 @@ private fun llvmWriteCall(
   };
   typedSymbol = code match {
   | ConstantFun{value} ->
-    asm.common.getFunction(value, asm.pos()).gfunction.id ==
+    asm.common.functionReference(value, asm.pos()).gfunction.id ==
       "SKStore.const_typed_symbol"
   | _ -> false
   };
@@ -2562,7 +2590,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
       asm.print(text)
     }
   | ConstantFun{value} ->
-    subf = asm.common.getFunction(value, asm.pos());
+    subf = asm.common.functionReference(value, asm.pos());
     asm.print("%n" % subf)
   | ConstantGlobalSingleton _ -> asm.writeRef(asm.common.globalsImage)
   | ConstantInt{value} -> asm.print(value)
@@ -2728,7 +2756,7 @@ private fun llvmWriteTypeAndName(
       asm.print("ptr null")
     }
   | ConstantFun{value} ->
-    subf = asm.common.getFunction(value, asm.pos());
+    subf = asm.common.functionReference(value, asm.pos());
     asm.print("%N" % subf)
   | ConstantVoid _ -> asm.print("void")
   | _ -> asm.print("%t %n" % instr % instr)
@@ -4006,6 +4034,7 @@ fun llvmWriteFunctionDefinition(
   asm.print(" %n(" % f);
   writeFunParams(f, asm);
   asm.print(")");
+  parameterEnd = asm.text.size();
 
   if (
     !f.isDisasm &&
@@ -4024,6 +4053,11 @@ fun llvmWriteFunctionDefinition(
     asm.print(" noinline")
   };
 
+  // Return/unwind analysis belongs to this definition's body. Advertising it
+  // on every importing declaration makes a body edit rewrite unrelated LLVM
+  // modules, including the complete vtable. Omitting these optional attributes
+  // is conservative; retain them on definitions and on the release path.
+  stableDeclarationEnd = asm.text.size();
   f.status match {
   | OptDone{returns, canThrow} ->
     if (!returns) {
@@ -4035,15 +4069,48 @@ fun llvmWriteFunctionDefinition(
   | OptPartial _ -> void
   };
 
-  // Gross hack to turn the definition info above into a declaration.
-  asm.declarationText.write("declare external ");
-  refOffsetDelta = asm.declarationText.size() - defineEndOffset;
-  for (ref in asm.refs) {
-    asm.declarationRefs.push((ref.i0 + refOffsetDelta, ref.i1))
+  stableDeclaration =
+    common.config.stableFunctionDeclarations &&
+    incrementalEmission(common.config);
+  if (stableDeclaration) {
+    // Parameter names are local to the definition, and can contain temporary
+    // counters from its body. Import only types and ABI attributes so changing
+    // those names cannot rewrite every importing module.
+    declaration = mutable StructAsmDefBuilder{
+      id => asm.id,
+      symbol,
+      canShare => false,
+      common,
+      typeString => None(),
+      typeRef => None(),
+    };
+    declaration.print("declare external ");
+    llvmWriteReturnTypeName(declaration, f.funType.returnType);
+    declaration.print(" %n(" % f);
+    writeFunParams(f, declaration, false);
+    declaration.print(")");
+    asm.text
+      .toString()
+      .getIter()
+      .forward(parameterEnd)
+      .take(stableDeclarationEnd - parameterEnd)
+      .each(declaration.text.writeChar);
+    asm.declarationText.write(declaration.text.toString());
+    for (ref in declaration.refs) asm.declarationRefs.push(ref)
+  } else {
+    // Preserve the existing definition-derived declaration on the ordinary
+    // path, including its optional return/unwind attributes.
+    asm.declarationText.write("declare external ");
+    refOffsetDelta = asm.declarationText.size() - defineEndOffset;
+    for (ref in asm.refs) {
+      asm.declarationRefs.push((ref.i0 + refOffsetDelta, ref.i1))
+    };
+    asm.text
+      .toString()
+      .getIter()
+      .forward(defineEndOffset)
+      .each(asm.declarationText.writeChar)
   };
-  asm.declarationText.write(
-    asm.text.toString().getIter().forward(defineEndOffset).collectString(),
-  );
   asm.declarationText.writeChar('\n');
 
   asm.print((" uwtable personality ptr @__gxx_personality_v0 %D {\n") % f);
@@ -4095,7 +4162,12 @@ fun llvmWriteFunctionDeclaration(
       // `llvmWriteReturnTypeName` alone, so match it.
       llvmWriteReturnTypeName(asm, f.funType.returnType);
       asm.print(" %n(" % asm);
-      writeFunParams(f, asm);
+      writeFunParams(
+        f,
+        asm,
+        !(common.config.stableFunctionDeclarations &&
+          incrementalEmission(common.config)),
+      );
       asm.print(")\n")
       // TODO: Shouldn't we insert nounwind, noreturn, etc.?
     };
@@ -4128,9 +4200,14 @@ fun llvmWriteFunction(f: Function, common: mutable AsmOutput): void {
   }
 }
 
-fun writeFunParams(f: Function, asm: mutable AsmDefBuilder): void {
+fun writeFunParams(
+  f: Function,
+  asm: mutable AsmDefBuilder,
+  includeNames: Bool = true,
+): void {
   f.params.eachWithIndex((i, p) -> {
-    asm.print("%s%t %A%n" % (if (i > 0) ", " else "") % p % p % p)
+    asm.print("%s%t %A" % (if (i > 0) ", " else "") % p % p);
+    if (includeNames) asm.print("%n" % p)
   })
 }
 

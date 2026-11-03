@@ -56,20 +56,22 @@ const kComputeConstSuffix: String = "..computeConst";
 private const kInitializeConstSuffix: String = "..initializeConst";
 
 mutable private class LowerConstPass{
-  initConstFuns: mutable UnorderedMap<ConstID, SFunctionID>,
+  initConstFuns: readonly UnorderedMap<ConstID, SFunctionID>,
 } extends Rewrite {
   // Inlines some calls.
   static fun run(
     f: Function,
     env: GlobalEnv,
     config: Config.Config,
-    initConstFuns: mutable UnorderedMap<ConstID, SFunctionID>,
+    initConstFuns: readonly UnorderedMap<ConstID, SFunctionID>,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
       config,
       initConstFuns,
+      classReader,
       pos => f.pos,
     };
     d.go("const", false)
@@ -207,6 +209,7 @@ private fun createInitializeConstFun(
   initAnnotations: SSet,
   env: GlobalEnv,
   config: Config.Config,
+  classReader: ?mutable ClassInputs.Reader,
 ): Function {
   pos = computeConst.pos;
   name = constName + kInitializeConstSuffix;
@@ -226,6 +229,7 @@ private fun createInitializeConstFun(
     env,
     config,
     UnorderedSet[FunSuperpositionID::empty],
+    classReader,
   );
 
   globals = s.constantGlobalSingleton().id;
@@ -333,6 +337,44 @@ private fun createInitializeConstFun(
 }
 
 // Lower all GetConst instrs to read global variables.
+fun referencedConsts(f: Function): Array<ConstID> {
+  names = mutable UnorderedSet[];
+  for (b in f.blocks) {
+    for (instr in b.instrs) {
+      instr match {
+      | GetConst{name} -> names.insert(name)
+      | _ -> void
+      }
+    }
+  };
+  names.toArray().sorted()
+}
+
+fun initializerName(id: ConstID): String {
+  id.id + kInitializeConstSuffix
+}
+
+fun lowerFunction(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+  initializers: readonly UnorderedMap<ConstID, SFunctionID>,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Function {
+  (result, passResult) = LowerConstPass::run(
+    f,
+    env,
+    config,
+    initializers,
+    classReader,
+  );
+  passResult match {
+  | PassUnchanged _ -> result.pos.die("GetConst not removed")
+  | PassChanged() -> void
+  };
+  result
+}
+
 fun generatedFunctionNames(env: GlobalEnv): Array<String> {
   names = mutable UnorderedSet[".initializeAllConsts"];
   for (f in env.sfuns) {
@@ -358,15 +400,27 @@ fun lowerAllConsts(
   newFuns = env.sfuns.clone();
   for (f in env.sfuns) {
     if (identifyGetConsts(f, newFuns, initConstFuns, stableIDs)) {
-      (f2, passResult) = LowerConstPass::run(f, env, config, initConstFuns);
-      passResult match {
-      | PassUnchanged _ -> f2.pos.die("GetConst not removed")
-      | PassChanged() -> void
-      };
-      newFuns.insert(f2);
+      newFuns.insert(lowerFunction(f, env, config, initConstFuns));
     }
   };
   !env.sfuns = newFuns.chill();
+
+  createInitializers(env, config, initConstFuns, stableIDs)
+}
+
+// This construction reads compute-const identities, signatures and positions,
+// not their bodies. The keyed optimizer supplies just those headers here.
+fun createInitializers(
+  env: GlobalEnv,
+  config: Config.Config,
+  initConstFuns: readonly UnorderedMap<ConstID, SFunctionID>,
+  stableIDs: UnorderedMap<String, SFunctionID>,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): GlobalEnv {
+  // Sequential lowering has already reserved IDs for per-constant helpers.
+  // clone() reuses empty slots and loses those reservations; copy() preserves
+  // the allocation cursor until all helpers have been inserted.
+  newFuns = env.sfuns.copy();
 
   // Find all "computeConst" functions and put them in a canonical order
   // (which we don't guarantee, but might as well be deterministic, and
@@ -410,6 +464,7 @@ fun lowerAllConsts(
     env,
     config,
     UnorderedSet[FunSuperpositionID::empty],
+    classReader,
   );
 
   for (f in allConsts) {
@@ -467,6 +522,7 @@ fun lowerAllConsts(
         initAnnotations,
         env,
         config,
+        classReader,
       );
 
       // Record it.
@@ -537,10 +593,22 @@ fun lowerAllConsts(
 
   // Choose bit offsets for all the fields.
   fields = fieldsBuf.toArray();
-  layout = Some(OuterIstToIR.layoutOneStandaloneClass(fields, env, config));
+  layout = Some(
+    OuterIstToIR.layoutOneStandaloneClass(
+      fields,
+      env,
+      config,
+      Array[],
+      classReader,
+    ),
+  );
 
   // Udpate our global singleton class to know about its new fields.
-  globals = tConstSingleton.sclass(env) with {fields, layout};
+  globals = ClassInputs.getSClass(
+    env,
+    tConstSingleton.sclassID,
+    classReader,
+  ) with {fields, layout};
 
   env with {
     sclasses => {

@@ -1,0 +1,59 @@
+// A maintenance microbenchmark, not an end-to-end compiler latency claim.
+class RetentionKey(name: String) extends SKStore.Key
+
+fun main(): void {
+  count = 65536;
+  inputName = SKStore.DirName::create("/retention-bench/input/");
+  lazyName = SKStore.DirName::create("/retention-bench/cache/");
+  keys = Range(0, count).map(i ->
+    RetentionKey(
+      "A.long.compiler.namespace.Generic<Other.Generic<Unrelated.Type>, " +
+        i +
+        ">",
+    )
+  ).collect(Array);
+  context = SKStore.run(context ~> {
+    input = context.mkdir(
+      RetentionKey::keyType,
+      SKStore.IntFile::type,
+      inputName,
+      keys.map(key -> (key, SKStore.IntFile(1))),
+    );
+    _ = SKStore.LHandle::create(
+      RetentionKey::keyType,
+      SKStore.IntFile::type,
+      context,
+      lazyName,
+      (context, _, key) ~> input.getArray(context, key),
+    )
+  });
+  context.update();
+  for (key in keys) {
+    invariant(
+      context
+        .unsafeGetLazyDir(lazyName)
+        .typed()
+        .getArray(context, key)
+        .size() == 1,
+      "Missing initial value",
+    )
+  };
+  _ = context.updateWithStatus();
+  for (step in Range(1, 12)) {
+    _ = context.unsafeGetLazyDir(lazyName).typed().getArray(context, keys[0]);
+    start = Time.time_ns();
+    _ = context.updateWithStatus();
+    elapsed = Time.time_ns() - start;
+    print_string(`RETENTION ${step} ${elapsed}`)
+  };
+  dir = context.unsafeGetLazyDir(lazyName).typed();
+  invariant(dir.getArrayRaw(keys[0]).size() == 1, "Live value expired");
+  for (key in keys.drop(1)) {
+    invariant(dir.getArrayRaw(key).isEmpty(), "Expired value survived")
+  };
+  invariant(
+    dir.getArray(context, keys.last()).size() == 1,
+    "Failed restoration",
+  );
+  print_string("RETENTION VALIDATED")
+}

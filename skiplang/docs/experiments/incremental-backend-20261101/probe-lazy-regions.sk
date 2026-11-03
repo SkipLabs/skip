@@ -1,0 +1,35 @@
+untracked fun main(): void {
+  args = Environ.args().collect(Array);
+  folded = args[1] == "fold";
+  n = args[2].toInt();
+  groups = args[3].toInt();
+  context = SKStore.Context::mcreate{};
+  input = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/probe/input/"),
+    Range(0, n).map(i -> (SKStore.IID(i), SKStore.IntFile(i))).collect(Array),
+  );
+  lazy = SKStore.LHandle::create(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/probe/lazy/"),
+    (context, _, key) ~> SKStore.withRegion(context, (_, context) ~> {
+      sum = key.value;
+      for (i in Range(0, n)) {
+        !sum = sum + input.getArray(context, SKStore.IID(i))[0].value
+      };
+      Array[SKStore.IntFile(sum)]
+    }),
+  );
+  result = SKStore.withRegionFold(
+    Some(context), Range(0, groups).values(), 0,
+    (contextOpt, i, sum) ~>
+      sum + lazy.getArray(contextOpt.fromSome(), SKStore.IID(i))[0].value,
+    folded,
+  );
+  expected = groups * n * (n - 1) / 2 + groups * (groups - 1) / 2;
+  invariant(result == expected, "Wrong lazy result");
+  print_raw("sum=" + result.toString() + "\n");
+}

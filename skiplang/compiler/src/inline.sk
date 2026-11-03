@@ -651,7 +651,9 @@ fun isLegalToInline(f: Function): Bool {
 // take into account speed, not just space.
 //
 // TODO: Return a Float?
-fun estimateSize(instr: Stmt, env: GlobalEnv,
+fun estimateSize(
+  instr: Stmt,
+  env: GlobalEnv,
   classReader: ?mutable ClassInputs.Reader = None(),
 ): Int {
   instr match {
@@ -692,7 +694,7 @@ fun estimateSize(instr: Stmt, env: GlobalEnv,
 
     // Creating a value class is considered "zero cost" since it
     // does not allocate any memory.
-    if (ClassInputs.exampleSClass(typ, env, classReader).kind.isValueClass()) {
+    if (ClassInputs.isValueClass(typ, env, classReader)) {
       0
     } else {
       defaultCost
@@ -742,10 +744,16 @@ private fun containsLoop(f: Function): Bool {
   }
 }
 
-private fun takesLambdaParameter(f: Function, env: GlobalEnv,
+private fun takesLambdaParameter(
+  f: Function,
+  env: GlobalEnv,
   classReader: ?mutable ClassInputs.Reader = None(),
 ): Bool {
-  f.params.any(p -> !p.typ.forEachTclass(tc -> !ClassInputs.getSClass(env, tc.sclassID, classReader).isLambda))
+  f.params.any(p ->
+    !p.typ.forEachTclass(tc ->
+      !ClassInputs.isLambda(env, tc.sclassID, classReader)
+    )
+  )
 }
 
 // Roughly estimate how many machine instructions this function would
@@ -759,7 +767,9 @@ private fun takesLambdaParameter(f: Function, env: GlobalEnv,
 // folding, it is important that for a zero-argument function this can
 // only return zero cost if it really is completely free (notably, no
 // memory allocation).
-fun computeInlineComplexity(f: Function, env: GlobalEnv,
+fun computeInlineComplexity(
+  f: Function,
+  env: GlobalEnv,
   classReader: ?mutable ClassInputs.Reader = None(),
 ): Int {
   if (!isLegalToInline(f)) {

@@ -1,0 +1,20 @@
+fun showLambdaAnchors(tree: ParseTree.ParseTree, index: SourcePositions.Index): void {
+  tree match {
+  | ParseTree.LazyTree{builder} -> showLambdaAnchors(builder(), index)
+  | ParseTree.LambdaExpressionTree _ ->
+    print_string(index.range(tree.range).toString());
+    for (child in tree.getChildren()) showLambdaAnchors(child, index)
+  | _ -> for (child in tree.getChildren()) showLambdaAnchors(child, index)
+  }
+}
+untracked fun anchorDiagnostic(): void {
+  for (source in Array[
+    "fun closureEdit(): Int { f = () -> 7; f() }\n",
+    "fun closureEdit(): Int { f = () -> {\n 9\n }; f() }\n",
+  ]) {
+    tree = SkipParser.parseSource(source, true).i0.tree;
+    index = SourcePositions.Index::create(tree);
+    print_string(index.symbols.toString());
+    showLambdaAnchors(tree, index)
+  }
+}

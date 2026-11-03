@@ -22,6 +22,7 @@ mutable class .Emitter{} extends Rewrite {
     env: GlobalEnv,
     config: Config.Config,
     superpositions: UnorderedSet<FunSuperpositionID>,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): mutable Emitter {
     optinfo = static::emptyOptInfo(funInfo, paramNames, superpositions);
     entryBlock = optinfo.getBlock(BlockID(0));
@@ -29,6 +30,7 @@ mutable class .Emitter{} extends Rewrite {
     mutable static{
       optinfo,
       env,
+      classReader,
       config,
       pos => funInfo.pos,
       funParams => optinfo.f.params,

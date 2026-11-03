@@ -1,0 +1,637 @@
+// Diagnostic footprints of the existing serialized class transaction. These
+// observations describe this execution; they are not a future grouping policy.
+module OuterIstToIR;
+
+// A membership observation is narrower than enumeration of the relation.
+// These keys exist only in the transaction footprint, never in class state.
+private class ClassRelationMemberKey(
+  relation: SKStore.Key,
+  member: SClassID,
+) extends SKStore.Key
+
+private mutable class ClassAuditAccess{
+  mutable readers: SortedSet<String> = SortedSet[],
+  mutable writers: SortedSet<String> = SortedSet[],
+  mutable exclusive: Bool = false,
+}
+
+class ClassAttemptFootprint(
+  reads: SortedSet<SKStore.Key>,
+  writes: SortedSet<SKStore.Key>,
+  exclusiveWrites: SortedSet<SKStore.Key>,
+  created: Int,
+)
+
+mutable class ClassWorkAudit{
+  detailed: Bool = true,
+  private mutable footprintReads: SortedSet<SKStore.Key> = SortedSet[],
+  private mutable footprintWrites: SortedSet<SKStore.Key> = SortedSet[],
+  private mutable footprintExclusive: SortedSet<SKStore.Key> = SortedSet[],
+  private mutable current: String = "",
+  private mutable accesses: SortedMap<
+    SKStore.Key,
+    mutable ClassAuditAccess,
+  > = SortedMap[],
+  private requests: mutable Map<String, Int> = mutable Map[],
+  private constructing: mutable Map<SClassID, String> = mutable Map[],
+  private mutable reads: Int = 0,
+  private mutable writes: Int = 0,
+  private mutable absent: Int = 0,
+  private mutable created: Int = 0,
+  private mutable partial: Int = 0,
+  private mutable crossPartial: Int = 0,
+} {
+  private mutable fun access(key: SKStore.Key): mutable ClassAuditAccess {
+    this.accesses.maybeGet(key) match {
+    | Some(access) -> access
+    | None() ->
+      access = mutable ClassAuditAccess{};
+      this.!accesses = this.accesses.set(key, access);
+      access
+    }
+  }
+
+  mutable fun begin(family: String): void {
+    invariant(
+      this.constructing.isEmpty(),
+      "Class request returned with unfinished construction",
+    );
+    if (!this.detailed) return void;
+    this.!current = family;
+    this.requests.set(family, this.requests.maybeGet(family).default(0) + 1)
+  }
+
+  mutable fun read(key: SKStore.Key, missing: Bool = false): void {
+    if (!this.detailed) {
+      this.!footprintReads = this.footprintReads.set(key);
+      return void
+    };
+    this.!reads = this.reads + 1;
+    if (missing) this.!absent = this.absent + 1;
+    access = this.access(key);
+    access.!readers = access.readers.set(this.current);
+    key match {
+    | SClassIDKey(id) ->
+      this.constructing.maybeGet(id).each(owner -> {
+        this.!partial = this.partial + 1;
+        if (owner != this.current) this.!crossPartial = this.crossPartial + 1
+      })
+    | _ -> void
+    }
+  }
+
+  mutable fun write(key: SKStore.Key, exclusive: Bool): void {
+    if (!this.detailed) {
+      this.!footprintWrites = this.footprintWrites.set(key);
+      if (exclusive) {
+        this.!footprintExclusive = this.footprintExclusive.set(key)
+      };
+      return void
+    };
+    this.!writes = this.writes + 1;
+    access = this.access(key);
+    access.!writers = access.writers.set(this.current);
+    access.!exclusive = access.exclusive || exclusive
+  }
+
+  mutable fun readRelationMember(
+    relation: SKStore.Key,
+    member: SClassID,
+  ): void {
+    this.read(ClassRelationMemberKey(relation, member))
+  }
+
+  mutable fun addRelationMember(relation: SKStore.Key, member: SClassID): void {
+    // Whole-relation readers still conflict with every contribution. A reader
+    // of one membership bit conflicts only with a writer of that same bit.
+    // Duplicate contributions remain mergeable when no attempt reads them.
+    this.write(relation, false);
+    this.write(ClassRelationMemberKey(relation, member), false)
+  }
+
+  mutable fun startClass(id: SClassID): void {
+    invariant(
+      !this.constructing.containsKey(id),
+      "Class constructed twice recursively",
+    );
+    this.constructing.set(id, this.current);
+    this.!created = this.created + 1
+  }
+
+  mutable fun finishClass(id: SClassID): void {
+    _ = this.constructing.remove(id)
+  }
+
+  readonly fun footprint(): ClassAttemptFootprint {
+    invariant(this.constructing.isEmpty(), "Unfinished class attempt");
+    if (!this.detailed) {
+      return ClassAttemptFootprint(
+        this.footprintReads,
+        this.footprintWrites,
+        this.footprintExclusive,
+        this.created,
+      )
+    };
+    reads = SortedSet[];
+    writes = SortedSet[];
+    exclusive = SortedSet[];
+    for ((key, access) in this.accesses.items()) {
+      if (!access.readers.isEmpty()) !reads = reads.set(key);
+      if (!access.writers.isEmpty()) {
+        !writes = writes.set(key);
+        if (access.exclusive) !exclusive = exclusive.set(key)
+      }
+    };
+    ClassAttemptFootprint(reads, writes, exclusive, this.created)
+  }
+
+  private mutable fun representative(
+    parents: mutable Map<String, String>,
+    name: String,
+  ): String {
+    root = name;
+    while (parents[root] != root) !root = parents[root];
+    while (parents[name] != name) {
+      next = parents[name];
+      parents.set(name, root);
+      !name = next
+    };
+    root
+  }
+
+  mutable fun report(round: Int): void {
+    invariant(this.detailed, "Detailed class audit was not enabled");
+    invariant(this.constructing.isEmpty(), "Unfinished class transaction");
+    parents = mutable Map[];
+    for (family in this.requests.keys()) parents.set(family, family);
+    conflicts = 0;
+    for ((_, access) in this.accesses.items()) {
+      // A missing read followed by another request's write is included. A
+      // relation with several writers and no reader is independently mergeable.
+      if (access.writers.isEmpty()) continue;
+      participants = if (access.exclusive || !access.readers.isEmpty()) {
+        access.writers.union(access.readers)
+      } else {
+        SortedSet[]
+      };
+      if (participants.size() <= 1) continue;
+      !conflicts = conflicts + 1;
+      representative: ?String = None();
+      for (family in participants) {
+        root = this.representative(parents, family);
+        representative match {
+        | None() -> !representative = Some(root)
+        | Some(first) -> parents.set(root, first)
+        }
+      }
+    };
+    sizes = mutable Map<String, (Int, Int)>[];
+    total = 0;
+    for ((family, count) in this.requests.items()) {
+      root = this.representative(parents, family);
+      (families, work) = sizes.maybeGet(root).default((0, 0));
+      sizes.set(root, (families + 1, work + count));
+      !total = total + count
+    };
+    largestFamilies = 0;
+    largestRequests = 0;
+    for ((families, requests) in sizes.values()) {
+      !largestFamilies = max(largestFamilies, families);
+      !largestRequests = max(largestRequests, requests)
+    };
+    print_error(
+      `##CLASS_AUDIT## ${round} ${total} ${this.requests.size()} ${sizes.size()} ${largestFamilies} ${largestRequests} ${
+        this.created
+      } ${this.accesses.size()} ${this.reads} ${this.writes} ${this.absent} ${
+        this.partial
+      } ${this.crossPartial} ${conflicts}\n`,
+    )
+  }
+}
+
+class ClassGroupAttempt(
+  families: SortedSet<String>,
+  footprint: ClassAttemptFootprint,
+  output: SortedMap<SKStore.Key, Array<SKStore.File>>,
+) extends SKStore.File
+
+type ClassAttemptWriter = SKStore.TWriter<SKStore.Key, SKStore.File>;
+
+fun classAttemptOutput(
+  specializer: readonly Specializer,
+): SortedMap<SKStore.Key, Array<SKStore.File>> {
+  writer = ClassAttemptWriter::mcreate(SortedMap[]);
+  specializer.writeDiff(writer);
+  for (function in specializer.funStack) writer.set(function, function);
+  writer.writes
+}
+
+private fun classAttemptRoot(
+  parents: mutable Map<String, String>,
+  name: String,
+): String {
+  root = name;
+  while (parents[root] != root) !root = parents[root];
+  while (parents[name] != name) {
+    next = parents[name];
+    parents.set(name, root);
+    !name = next
+  };
+  root
+}
+
+// A validated partition must be closed under all observed read/write conflicts.
+// Re-run merged groups and validate again: merging can expose additional reads.
+// Every cursor covers one sorted footprint. Equal keys are consumed together.
+private mutable class ClassAccessCursor(
+  root: String,
+  kind: Int,
+  iterator: mutable Iterator<SKStore.Key>,
+  mutable key: SKStore.Key,
+)
+
+private mutable class ClassAccessHeap{
+  entries: mutable Vector<mutable ClassAccessCursor> = mutable Vector[],
+} {
+  mutable fun add(root: String, kind: Int, keys: SortedSet<SKStore.Key>): void {
+    iterator = keys.values();
+    iterator.next().each(key -> {
+      cursor = mutable ClassAccessCursor(root, kind, iterator, key);
+      index = this.entries.size();
+      this.entries.push(cursor);
+      while (index > 0) {
+        parent = (index - 1) / 2;
+        if (this.entries[parent].key <= key) break void;
+        this.entries.set(index, this.entries[parent]);
+        !index = parent
+      };
+      this.entries.set(index, cursor)
+    })
+  }
+
+  readonly fun minimum(): ?SKStore.Key {
+    if (this.entries.isEmpty()) None() else Some(this.entries[0].key)
+  }
+
+  mutable fun pop(): (String, Int) {
+    cursor = this.entries[0];
+    result = (cursor.root, cursor.kind);
+    cursor.iterator.next() match {
+    | Some(next) -> cursor.!key = next
+    | None() ->
+      last = this.entries.pop();
+      if (this.entries.isEmpty()) return result;
+      this.entries.set(0, last)
+    };
+    // A cursor's next key can only increase. Restoring the root by sinking
+    // also handles replacement with the former last heap entry.
+    replacement = this.entries[0];
+    index = 0;
+    loop {
+      child = index * 2 + 1;
+      if (child >= this.entries.size()) break void;
+      if (
+        child + 1 < this.entries.size() &&
+        this.entries[child + 1].key < this.entries[child].key
+      ) {
+        !child = child + 1
+      };
+      if (replacement.key <= this.entries[child].key) break void;
+      this.entries.set(index, this.entries[child]);
+      !index = child
+    };
+    this.entries.set(index, replacement);
+    result
+  }
+}
+
+// Same rule as ClassAuditAccess: writers conflict with all readers; multiple
+// writers conflict only if at least one write is exclusive. Shared read-only
+// keys and unread mergeable contributions do not join any groups.
+private fun joinClassGroupsStreaming(
+  attempts: SortedMap<String, ClassGroupAttempt>,
+  parents: mutable Map<String, String>,
+): void {
+  heap = mutable ClassAccessHeap{};
+  for ((root, attempt) in attempts.items()) {
+    heap.add(root, 0, attempt.footprint.reads);
+    heap.add(root, 1, attempt.footprint.writes);
+    heap.add(root, 2, attempt.footprint.exclusiveWrites)
+  };
+  while (!heap.entries.isEmpty()) {
+    key = heap.minimum().fromSome();
+    readers = mutable Vector<String>[];
+    writers = mutable Vector<String>[];
+    exclusive = false;
+    while (
+      heap.minimum().map(next -> next.compare(key) == EQ()).default(false)
+    ) {
+      (root, kind) = heap.pop();
+      if (kind == 0) readers.push(root) else if (kind == 1) {
+        writers.push(root)
+      } else {
+        !exclusive = true
+      }
+    };
+    if (writers.isEmpty() || (!exclusive && readers.isEmpty())) continue;
+    first: ?String = None();
+    for (participant in writers.values().concat(readers.values())) {
+      root = classAttemptRoot(parents, participant);
+      first match {
+      | None() -> !first = Some(root)
+      | Some(previous) ->
+        previousRoot = classAttemptRoot(parents, previous);
+        if (root < previousRoot) parents.set(previousRoot, root) else {
+          parents.set(root, previousRoot)
+        }
+      }
+    }
+  }
+}
+
+fun joinClassGroups(
+  attempts: SortedMap<String, ClassGroupAttempt>,
+  streaming: Bool = false,
+): SortedMap<String, SortedSet<String>> {
+  parents = mutable Map<String, String>[];
+  for (root in attempts.keys()) parents.set(root, root);
+  if (streaming) {
+    joinClassGroupsStreaming(attempts, parents)
+  } else {
+    accesses = SortedMap<SKStore.Key, mutable ClassAuditAccess>[];
+    for ((root, attempt) in attempts.items()) {
+      footprint = attempt.footprint;
+      for (key in footprint.reads.union(footprint.writes)) {
+        access = accesses.maybeGet(key) match {
+        | Some(access) -> access
+        | None() ->
+          fresh = mutable ClassAuditAccess{};
+          !accesses = accesses.set(key, fresh);
+          fresh
+        };
+        if (footprint.reads.contains(key)) {
+          access.!readers = access.readers.set(root)
+        };
+        if (footprint.writes.contains(key)) {
+          access.!writers = access.writers.set(root)
+        };
+        access.!exclusive =
+          access.exclusive ||
+          footprint.exclusiveWrites.contains(key)
+      }
+    };
+    for (access in accesses.values()) {
+      if (access.writers.isEmpty()) continue;
+      participants = if (access.exclusive || !access.readers.isEmpty()) {
+        access.writers.union(access.readers)
+      } else {
+        SortedSet[]
+      };
+      first: ?String = None();
+      for (participant in participants) {
+        root = classAttemptRoot(parents, participant);
+        first match {
+        | None() -> !first = Some(root)
+        | Some(previous) ->
+          previousRoot = classAttemptRoot(parents, previous);
+          if (root < previousRoot) {
+            parents.set(previousRoot, root)
+          } else {
+            parents.set(root, previousRoot)
+          }
+        }
+      }
+    };
+  };
+  joined = SortedMap<String, SortedSet<String>>[];
+  for ((root, attempt) in attempts.items()) {
+    representative = classAttemptRoot(parents, root);
+    !joined[representative] = joined
+      .maybeGet(representative)
+      .default(SortedSet[])
+      .union(attempt.families)
+  };
+  joined
+}
+
+// Compare completed state, allowing redundant relation contributions already
+// supplied by the preceding round. Pending functions must match independently.
+fun compareClassAttempts(
+  context: mutable SKStore.Context,
+  view: SpecializerView,
+  attempts: SortedMap<String, ClassGroupAttempt>,
+  serialized: readonly Specializer,
+  round: Int,
+): Int {
+  // Normalize relation contributions, then compare completed state. Separate
+  // attempts may repeat contributions already present in the preceding round.
+  // Function requests, unlike state, must match without importing prior work.
+  combine = (outputs: Array<SortedMap<SKStore.Key, Array<SKStore.File>>>) -> {
+    result = SortedMap<SKStore.Key, Array<SKStore.File>>[];
+    for (output in outputs) {
+      for ((key, values) in output.items()) {
+        key match {
+        | GClassNameKey _
+        | GClassArgumentKey _
+        | SubtypesKey _
+        | SupertypesKey _ ->
+          ids = result.maybeGet(key) match {
+          | None() -> SortedSet[]
+          | Some(files) -> SortedSetSClassIDFile::type(files[0]).value
+          };
+          for (value in values) {
+            !ids = ids.set(SClassIDFile::type(value).value)
+          };
+          !result[key] = Array[SortedSetSClassIDFile(ids)]
+        | _ ->
+          result.maybeGet(key).each(previous ->
+            invariant(
+              SKStore.equalFileArrays(previous, values),
+              "Conflicting accepted class output: " + key.toString(),
+            )
+          );
+          !result[key] = values
+        }
+      }
+    };
+    result
+  };
+  expected = combine(Array[classAttemptOutput(serialized)]);
+  actual = combine(
+    attempts.values().map(attempt -> attempt.output).collect(Array),
+  );
+  keys = SortedSet[];
+  for (key in expected.keys()) !keys = keys.set(key);
+  for (key in actual.keys()) !keys = keys.set(key);
+  redundant = 0;
+  for (key in keys) {
+    expectedValues = expected.maybeGet(key).default(Array[]);
+    actualValues = actual.maybeGet(key).default(Array[]);
+    if (SKStore.equalFileArrays(expectedValues, actualValues)) continue;
+    prior = if (key is FStackElement _) Array[] else {
+      view.getArray(context, key)
+    };
+    key match {
+    | GClassNameKey _
+    | GClassArgumentKey _
+    | SubtypesKey _
+    | SupertypesKey _ ->
+      complete = (values: Array<SKStore.File>) -> {
+        ids = SortedSet<SClassID>[];
+        for (file in prior.concat(values)) {
+          file match {
+          | SortedSetSClassIDFile(members) -> !ids = ids.union(members)
+          | SClassIDFile(id) -> !ids = ids.set(id)
+          | _ -> invariant_violation("Unexpected isolated relation value")
+          }
+        };
+        // Native equality of SortedSet also compares its tree shape. Separate
+        // attempts can contribute the same members in a different insertion
+        // order, so compare the ordered relation elements themselves.
+        ids.values().map(id -> (SClassIDFile(id) : SKStore.File)).collect(Array)
+      };
+      !expectedValues = complete(expectedValues);
+      !actualValues = complete(actualValues);
+      if (!SKStore.equalFileArrays(expectedValues, actualValues)) {
+        print_error(
+          `##CLASS_ISOLATION_DIFFERENCE## ${round} ${key} expected=${inspect(
+            expectedValues,
+          ).toString()} actual=${inspect(actualValues).toString()}\n`,
+        )
+      }
+    | _ ->
+      if (expectedValues.isEmpty()) !expectedValues = prior;
+      if (actualValues.isEmpty()) !actualValues = prior
+    };
+    invariant(
+      SKStore.equalFileArrays(expectedValues, actualValues),
+      "Isolated class output differs: " + key.toString(),
+    );
+    !redundant = redundant + 1
+  };
+  redundant
+}
+
+// Differential check of the candidate scan against the original constructor.
+// Keep index publication identical so every completed state key and queued
+// function can be compared, including reentrant relation changes.
+fun auditVarianceIndex(
+  context: mutable SKStore.Context,
+  view: SpecializerView,
+  config: Config.SpecializationConfig,
+  converter: Converter,
+  requests: Array<CStackElement>,
+  round: Int,
+  indexed: readonly Specializer,
+): void {
+  reference = Specializer::makeView(view, context, config, converter);
+  reference.!forceFullVarianceScan = true;
+  for (request in requests) {
+    reference.!pos = request.pos;
+    _ = Specializer::getSClass2CPS(context, reference, request.hc, request.k)
+  };
+  reference.reportVarianceWork();
+  attempt = ClassGroupAttempt(
+    SortedSet["indexed"],
+    ClassAttemptFootprint(SortedSet[], SortedSet[], SortedSet[], 0),
+    classAttemptOutput(indexed),
+  );
+  _ = compareClassAttempts(
+    context,
+    view,
+    SortedMap["indexed" => attempt],
+    reference,
+    round,
+  )
+}
+
+// Validate the construction protocol before installing persistent group maps.
+// Every attempt reads the same preceding-round state. All attempted reads stay
+// on this diagnostic callback; no partial or rejected output is published.
+fun auditIsolatedClassGroups(
+  context: mutable SKStore.Context,
+  view: SpecializerView,
+  config: Config.SpecializationConfig,
+  converter: Converter,
+  requests: Array<CStackElement>,
+  round: Int,
+  serialized: readonly Specializer,
+): void {
+  groups = SortedMap<String, SortedSet<String>>[];
+  indices = SortedMap<FStackElement, Int>[];
+  previousToken: ?(FStackElement, Int) = None();
+  for (request in requests) {
+    index = indices.maybeGet(request.origin).default(0);
+    !indices = indices.set(request.origin, index + 1);
+    token = (request.origin, index);
+    previousToken.each(prior ->
+      invariant(prior < token, "Class request tokens changed producer order")
+    );
+    !previousToken = Some(token);
+    family = request.hc.generic.name().id;
+    !groups[family] = SortedSet[family]
+  };
+  initialGroups = groups.size();
+  attempts = SortedMap<String, ClassGroupAttempt>[];
+  executions = 0;
+  constructed = 0;
+  passes = 0;
+  loop {
+    nextAttempts = SortedMap<String, ClassGroupAttempt>[];
+    for ((root, families) in groups.items()) {
+      cached = attempts.maybeGet(root);
+      if (cached.isSome() && cached.fromSome().families == families) {
+        !nextAttempts[root] = cached.fromSome();
+        continue
+      };
+      !executions = executions + 1;
+      specializer = Specializer::makeView(view, context, config, converter);
+      audit = mutable ClassWorkAudit{};
+      specializer.!classAudit = Some(audit);
+      try {
+        // Preserve original producer order even when several families join.
+        for (request in requests) {
+          family = request.hc.generic.name().id;
+          if (families.contains(family)) {
+            audit.begin(family);
+            specializer.!pos = request.pos;
+            _ = Specializer::getSClass2CPS(
+              context,
+              specializer,
+              request.hc,
+              request.k,
+            )
+          }
+        }
+      } catch {
+      | exn ->
+        print_error(`##CLASS_ISOLATION_FAILURE## ${round} ${root}\n`);
+        throw exn
+      };
+      footprint = audit.footprint();
+      !constructed = constructed + footprint.created;
+      !nextAttempts[root] = ClassGroupAttempt(
+        families,
+        footprint,
+        classAttemptOutput(specializer),
+      )
+    };
+    !attempts = nextAttempts;
+    !passes = passes + 1;
+    joined = joinClassGroups(attempts);
+    if (joined.size() == groups.size()) break void;
+    invariant(joined.size() < groups.size(), "Class groups must converge");
+    !groups = joined
+  };
+
+  redundant = compareClassAttempts(context, view, attempts, serialized, round);
+  largest = 0;
+  for (attempt in attempts.values()) {
+    !largest = max(largest, attempt.families.size())
+  };
+  print_error(
+    `##CLASS_ISOLATION## ${round} ${requests.size()} ${initialGroups} ${attempts.size()} ${largest} ${passes} ${executions} ${constructed} ${redundant}\n`,
+  )
+}
+
+module end;

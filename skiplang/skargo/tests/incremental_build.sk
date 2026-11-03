@@ -18,9 +18,10 @@ untracked fun build(
   skargo: String,
   dir: String,
   prolix: Bool = false,
+  extra: Array<String> = Array[],
 ): System.CompletedProcess {
   result = System.popen{
-    args => Array[skargo, "build", if (prolix) "-vv" else "-v"],
+    args => Array[skargo, "build", if (prolix) "-vv" else "-v"].concat(extra),
     env => Map["SKARGO_BIN" => "skargo"],
     cwd => Some(dir),
   }.fromSuccess();
@@ -88,9 +89,12 @@ fun test_incremental_build_inputs_and_cached_link(): void {
     cwd => Some(pure),
   }.fromSuccess();
   T.expectTrue(release.success(), release.stderr);
-  releaseCommands = release.stderr.split("\n").filter(line ->
-    line.contains("--export-function-as IncrementalProbe.main=skip_main")
-  ).collect(Array);
+  releaseCommands = release.stderr
+    .split("\n")
+    .filter(line ->
+      line.contains("--export-function-as IncrementalProbe.main=skip_main")
+    )
+    .collect(Array);
   T.expectEq(releaseCommands.size(), 1, release.stderr);
   T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
   T.expectTrue(releaseCommands[0].contains("--release"), release.stderr);
@@ -125,6 +129,22 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   );
   updated = build(skargo, pure);
   T.expectTrue(updated.stderr.contains("--data "), updated.stderr);
+  run_probe(pure, "2");
+
+  // A compiler-policy change must invoke skc even with identical source bytes
+  // and timestamps. Repeating that policy should remain a no-op.
+  options = Array["--skcopt=--no-peephole"];
+  policy = build(skargo, pure, false, options);
+  T.expectTrue(policy.stderr.contains("--data "), policy.stderr);
+  T.expectTrue(policy.stderr.contains("--no-peephole"), policy.stderr);
+  run_probe(pure, "2");
+  samePolicy = build(skargo, pure, false, options);
+  T.expectTrue(!samePolicy.stderr.contains("--data "), samePolicy.stderr);
+  restoredPolicy = build(skargo, pure);
+  T.expectTrue(
+    restoredPolicy.stderr.contains("--data "),
+    restoredPolicy.stderr,
+  );
   run_probe(pure, "2");
 
   // A fingerprint cannot make a missing primary artifact fresh.
@@ -206,9 +226,16 @@ fun test_incremental_build_inputs_and_cached_link(): void {
 
   // An unused declaration changes frontend inputs but leaves native output
   // current. It must not trigger LLVM materialization or external linking.
-  FileSystem.writeTextFile(source, FileSystem.readTextFile(source) +
-    "\nfun unusedIncrementalHelper(): Int { 17 }\n");
-  T.expectTrue(System.subprocess(Array["touch", "-t", "200001010000.11", source]).fromSuccess().success());
+  FileSystem.writeTextFile(
+    source,
+    FileSystem.readTextFile(source) +
+      "\nfun unusedIncrementalHelper(): Int { 17 }\n",
+  );
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.11", source])
+      .fromSuccess()
+      .success(),
+  );
   unused = build(skargo, pure, true);
   T.expectTrue(!unused.stdout.contains("---LINK_ARGS_BEGIN---"), unused.stdout);
   T.expectTrue(!unused.stderr.contains("Running: `clang"), unused.stderr);

@@ -1,0 +1,358 @@
+// Experimental serial class transactions with independently tracked inputs.
+module OuterIstToIR;
+
+private class ClassRequestFamilyKey(family: String) extends SKStore.Key
+private class ClassRequestHeaderKey() extends SKStore.Key
+private class ClassRequestFamiliesKey() extends SKStore.Key
+private class ClassRequestHeaderFile(
+  view: SpecializerView,
+) extends SKStore.File
+private class ClassRequestFamiliesFile(
+  families: SortedSet<String>,
+) extends SKStore.File
+private class OrderedClassRequest(
+  origin: FStackElement,
+  index: Int,
+  request: CStackElement,
+) extends SKStore.File
+
+class ClassGroupKey(
+  round: Int,
+  families: SortedSet<String>,
+) extends SKStore.Key
+
+private fun classRequestsName(round: Int): SKStore.DirName {
+  SKStore.DirName::create("/specializer/class-requests/" + round + "/")
+}
+
+// Optimization hints only. Every current transaction still runs or reuses
+// its tracked result, and the complete current footprints are validated.
+private const classGroupHintsKey: String = "COMPILER_CLASS_GROUP_HINTS";
+private class ClassGroupHintsFile(
+  rounds: SortedMap<Int, SortedMap<String, SortedSet<String>>>,
+) extends SKStore.File
+
+private fun readClassGroupHints(
+  context: readonly SKStore.Context,
+): SortedMap<Int, SortedMap<String, SortedSet<String>>> {
+  context.getPersistent(classGroupHintsKey) match {
+  | Some(ClassGroupHintsFile(rounds)) -> rounds
+  | _ -> SortedMap[]
+  }
+}
+
+// Intersect old groups with today's requests. Even malformed/overlapping hints
+// cannot duplicate or omit a current family, and new families start alone.
+fun seedClassGroupPartition(
+  families: SortedSet<String>,
+  previous: SortedMap<String, SortedSet<String>>,
+): SortedMap<String, SortedSet<String>> {
+  remaining = families;
+  groups = SortedMap<String, SortedSet<String>>[];
+  for (old in previous.values()) {
+    current = old.intersection(remaining);
+    if (current.isEmpty()) continue;
+    !groups[current.min().fromSome()] = current;
+    !remaining = remaining.difference(current)
+  };
+  for (family in remaining) !groups[family] = SortedSet[family];
+  groups
+}
+
+// Called only after discovery has completed. The current manifest is a tracked
+// read, including empty membership and directory lifetime. It removes hints
+// for vanished rounds and families, including rounds now doing function work.
+fun pruneClassGroupHints(
+  context: mutable SKStore.Context,
+  roundCount: Int,
+  enabled: Bool,
+): void {
+  if (!enabled) {
+    context.removePersistent(classGroupHintsKey);
+    return void
+  };
+  kept = SortedMap<Int, SortedMap<String, SortedSet<String>>>[];
+  for ((round, groups) in readClassGroupHints(context).items()) {
+    if (round >= roundCount) continue;
+    requests: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
+      (x: SKStore.Key) ~> x,
+      (x: SKStore.File) ~> x,
+      classRequestsName(round),
+    );
+    if (context.maybeGetDir(requests.dirName).isNone()) continue;
+    files = requests.getArray(context, ClassRequestFamiliesKey());
+    if (files.isEmpty()) continue;
+    families = ClassRequestFamiliesFile::type(files[0]).families;
+    if (families.isEmpty()) continue;
+    !kept[round] = seedClassGroupPartition(families, groups)
+  };
+  context.setPersistent(classGroupHintsKey, ClassGroupHintsFile(kept))
+}
+
+fun createClassRequests(
+  context: mutable SKStore.Context,
+  source: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  view: SpecializerView,
+  round: Int,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  workKey: SKStore.Key = SKStore.IID(0);
+  source.map(
+    x ~> x,
+    x ~> x,
+    context,
+    classRequestsName(round),
+    (_, writer, _, values) ~> {
+      families = SortedMap<String, mutable Vector<OrderedClassRequest>>[];
+      indices = SortedMap<FStackElement, Int>[];
+      previous: ?(FStackElement, Int) = None();
+      for (value in values) {
+        value match {
+        | request @ CStackElement _ ->
+          index = indices.maybeGet(request.origin).default(0);
+          !indices[request.origin] = index + 1;
+          token = (request.origin, index);
+          previous.each(prior ->
+            invariant(prior < token, "Class routing changed producer order")
+          );
+          !previous = Some(token);
+          family = request.hc.generic.name().id;
+          requests = families.maybeGet(family) match {
+          | Some(existing) -> existing
+          | None() ->
+            fresh = mutable Vector[];
+            !families[family] = fresh;
+            fresh
+          };
+          requests.push(OrderedClassRequest(request.origin, index, request))
+        | SKStore.IntFile _ -> void
+        | _ -> invariant_violation("Unexpected class request")
+        }
+      };
+      if (families.isEmpty()) return void;
+      writer.set(ClassRequestHeaderKey(), ClassRequestHeaderFile(view));
+      writer.set(
+        ClassRequestFamiliesKey(),
+        ClassRequestFamiliesFile(
+          SortedSet::createFromItems(families.keys().collect(Array)),
+        ),
+      );
+      for ((family, requests) in families.items()) {
+        writer.setArray(ClassRequestFamilyKey(family), requests.toArray())
+      }
+    },
+    Some(Array[SKStore.KeyRange::create(workKey, workKey)]),
+  )
+}
+
+// One stable lazy collection serves all discovery rounds. The key describes a
+// transaction, not the current program snapshot. Reads of each family's input,
+// preceding state and declarations belong to that transaction's lazy row.
+fun createClassGroupAttempts(
+  context: mutable SKStore.Context,
+  configuration: mutable SKStore.Context ~> Config.SpecializationConfig,
+  converter: Converter,
+): SKStore.LHandle<ClassGroupKey, ClassGroupAttempt> {
+  SKStore.LHandle::create(
+    ClassGroupKey::keyType,
+    ClassGroupAttempt::type,
+    context,
+    SKStore.DirName::create("/specializer/class-attempts/"),
+    (context, _, key) ~>
+      SKStore.withRegion(context, (_, context) ~> {
+        requests: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          classRequestsName(key.round),
+        );
+        _ = context.getDir(requests.dirName);
+        header = ClassRequestHeaderFile::type(
+          requests.getArray(context, ClassRequestHeaderKey())[0],
+        );
+        ordered = SortedMap<(FStackElement, Int), CStackElement>[];
+        for (family in key.families) {
+          for (file in requests.getArray(
+            context,
+            ClassRequestFamilyKey(family),
+          )) {
+            request = OrderedClassRequest::type(file);
+            !ordered[(request.origin, request.index)] = request.request
+          }
+        };
+        specializer = Specializer::makeView(
+          header.view,
+          context,
+          configuration(context),
+          converter,
+        );
+        // Lazy collection retention does not collect temporary construction
+        // allocations. Each transaction has its own region so only its output
+        // and tracked context changes survive into the validation pass.
+        audit = mutable ClassWorkAudit{detailed => false};
+        specializer.!classAudit = Some(audit);
+        if (context.debugMode) {
+          print_debug(`CLASS_GROUP: ${key.round} ${key.families}`)
+        };
+        runCompilerPhase("specialization/classes", () -> {
+          for (request in ordered.values()) {
+            audit.begin(request.hc.generic.name().id);
+            specializer.!pos = request.pos;
+            _ = Specializer::getSClass2CPS(
+              context,
+              specializer,
+              request.hc,
+              request.k,
+            )
+          }
+        });
+        invariant(specializer.classStack.isEmpty(), "Unfinished class group");
+        specializer.reportVarianceWork();
+        footprint = audit.footprint();
+        if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+          print_error(
+            `##CLASS_GROUP_ATTEMPT## ${key.round} ${key.families.size()} ${
+              footprint.created
+            } ${footprint.reads.size()} ${footprint.writes.size()}\n`,
+          )
+        };
+        Array[
+          ClassGroupAttempt(
+            key.families,
+            footprint,
+            classAttemptOutput(specializer),
+          ),
+        ]
+      })
+    ,
+  )
+}
+
+fun publishClassGroups(
+  context: mutable SKStore.Context,
+  writer: mutable ClassAttemptWriter,
+  requests: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  attempts: SKStore.LHandle<ClassGroupKey, ClassGroupAttempt>,
+  round: Int,
+  view: SpecializerView,
+  config: Config.SpecializationConfig,
+  converter: Converter,
+): void {
+  if (config.classGroupHints && context.isParallelReadOnly()) {
+    throw SKStore.ParallelContextUnavailable()
+  };
+  manifest = ClassRequestFamiliesFile::type(
+    requests.getArray(context, ClassRequestFamiliesKey())[0],
+  );
+  prior = if (config.classGroupHints) {
+    readClassGroupHints(context).maybeGet(round).default(SortedMap[])
+  } else {
+    SortedMap[]
+  };
+  groups = seedClassGroupPartition(manifest.families, prior);
+  initialGroups = groups.size();
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    print_error(
+      `##CLASS_GROUP_POLICY## ${if (config.streamClassConflicts) 1 else {
+        0
+      }} ${if (config.classGroupHints) 1 else 0}\n`,
+    );
+    print_error(
+      `##CLASS_GROUP_SEED## ${round} ${manifest.families.size()} ${groups.size()} ${!prior.isEmpty()}\n`,
+    )
+  };
+  accepted = SortedMap<String, ClassGroupAttempt>[];
+  passes = 0;
+  loop {
+    // A lazy lookup registers its dependency edges after compute returns.
+    // Collect around the complete lookup sequence as well as construction:
+    // otherwise obsolete reverse-index tree nodes accumulate for the whole
+    // class round, outside the individual attempt's region.
+    current = SKStore.withRegionFold(
+      Some(context),
+      groups.items(),
+      SortedMap<String, ClassGroupAttempt>[],
+      (contextOpt, entry, current) ~>
+        current.set(
+          entry.i0,
+          attempts.getArray(
+            contextOpt.fromSome(),
+            ClassGroupKey(round, entry.i1),
+          )[0],
+        )
+      ,
+    );
+    !passes = passes + 1;
+    joined = runCompilerPhase("specialization/class_conflicts", () ->
+      SKStore.withRegionValue(() ~>
+        joinClassGroups(current, config.streamClassConflicts)
+      )
+    );
+    if (joined.size() == groups.size()) {
+      !accepted = current;
+      break void
+    };
+    invariant(joined.size() < groups.size(), "Class groups must converge");
+    !groups = joined
+  };
+  verifyVariance =
+    config.indexedClassVariance &&
+    Environ.varOpt("SKC_VERIFY_VARIANCE_INDEX").isSome();
+  if (
+    Environ.varOpt("SKC_SPECIALIZER_ISOLATION_AUDIT").isSome() ||
+    verifyVariance
+  ) {
+    ordered = SortedMap<(FStackElement, Int), CStackElement>[];
+    for (family in manifest.families) {
+      for (file in requests.getArray(context, ClassRequestFamilyKey(family))) {
+        request = OrderedClassRequest::type(file);
+        !ordered[(request.origin, request.index)] = request.request
+      }
+    };
+    serial = Specializer::makeView(view, context, config, converter);
+    serial.!forceFullVarianceScan = verifyVariance;
+    for (request in ordered.values()) {
+      serial.!pos = request.pos;
+      _ = Specializer::getSClass2CPS(context, serial, request.hc, request.k)
+    };
+    _ = compareClassAttempts(context, view, accepted, serial, round)
+  };
+  if (config.classGroupHints) {
+    latest = readClassGroupHints(context).set(round, groups);
+    context.setPersistent(classGroupHintsKey, ClassGroupHintsFile(latest))
+  };
+  // Only complete, validated transactions reach the existing round reducer.
+  // Keep this publication adapter while measuring construction locality.
+  for (attempt in accepted.values()) {
+    for ((key, values) in attempt.output.items()) {
+      key match {
+      | GClassNameKey _
+      | GClassArgumentKey _
+      | SubtypesKey _
+      | SupertypesKey _ ->
+        for (value in values) writer.append(key, value)
+      | _ ->
+        writer.writes.maybeGet(key).each(prior ->
+          invariant(
+            SKStore.equalFileArrays(prior, values),
+            "Conflicting class group output",
+          )
+        );
+        writer.setArray(key, values);
+        if (key is FStackElement _) {
+          writer.set(SKStore.IID(0), SKStore.IntFile(1))
+        }
+      }
+    }
+  };
+  if (context.debugMode) {
+    print_debug(
+      `CLASS_GROUPS_ACCEPTED: ${round} ${manifest.families.size()} ${accepted.size()} ${passes}`,
+    )
+  };
+  if (Environ.varOpt("SKC_TIME_PHASES").isSome()) {
+    print_error(
+      `##CLASS_GROUPS## ${round} ${initialGroups} ${accepted.size()} ${passes}\n`,
+    )
+  }
+}
+
+module end;
