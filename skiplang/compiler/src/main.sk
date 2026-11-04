@@ -84,7 +84,7 @@ fun main(): void {
     )
     .arg(
       Cli.Arg::bool("split-support-module").about(
-        "Emit incremental native vtables separately from initialization data.",
+        "Emit native vtables in a separate LLVM module.",
       ),
     )
     .arg(
@@ -221,7 +221,7 @@ fun main(): void {
   if (isInit && !cacheMetadata) {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
-  if (config.incrementalSpecialization && batchManifest.isNone()) {
+  if (batchManifest.isNone()) {
     runCompilerPipeline(config, debugSKStore)
   } else {
     SKStore.runWithGc(

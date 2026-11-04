@@ -360,6 +360,7 @@ mutable class AsmDef{
     out: mutable TextOutputStream.StringTextOutputStream,
     metadata: mutable Metadata,
     internalLinkage: Bool,
+    externalLinkage: String = "external ",
   ): void {
     refs = this.refs;
     dbg = this.debug;
@@ -376,7 +377,9 @@ mutable class AsmDef{
 
     writeExternal = () -> {
       if (i == this.linkageOffset) {
-        out.write(if (internalLinkage) this.internalLinkage else "external ")
+        out.write(
+          if (internalLinkage) this.internalLinkage else externalLinkage,
+        )
       };
 
       if (refsIndex < this.numDefinitionRefs) {
@@ -1001,6 +1004,77 @@ fun assignFinalSymbols(
   }
 }
 
+private class NativePartition(
+  vtables: Bool,
+  preamble: String,
+  externalDefs: UnorderedSet<AsmDefID>,
+)
+
+private fun isVTableDefinition(def: AsmDef): Bool {
+  def.symbol == ".allVTables" || def.symbol.startsWith(".classVTable.")
+}
+
+// A function that refers to the mega table appears to LLVM's LazyCallGraph to
+// refer to every function in that table. Keep the data in a separate module to
+// avoid the quadratic reference graph, while leaving all function bodies in
+// one module for ordinary interprocedural optimization.
+fun writeNativeOutputFiles(
+  defs: readonly AsmDefIDToAsmDef,
+  config: Config.Config,
+  positions: SourcePositions.Table,
+): Array<String> {
+  output = config.output + ".ll";
+  fullPreamble = nativePreamble(config);
+  declarations = if (config.splitSupportModule && !config.isWasm()) {
+    declarationPreamble(fullPreamble)
+  } else {
+    None()
+  };
+  declarations match {
+  | None() ->
+    writeOutputFiles(defs, config.input_files, output, config, positions);
+    // Promotion must never pair a monolithic output with an old table module
+    // left behind by a previous split invocation.
+    tableOutput = config.output + ".vtables.ll";
+    if (FileSystem.exists(tableOutput)) {
+      .runShell(Array["rm", tableOutput], config.verbose)
+    };
+    Array[output]
+  | Some(dataPreamble) ->
+    externalDefs = mutable UnorderedSet[];
+    for (def in defs) {
+      if (def.hasDefinition()) {
+        for ((_, ref) in def.refs.take(def.numDefinitionRefs)) {
+          target = defs[ref];
+          if (
+            target.hasDefinition() &&
+            isVTableDefinition(def) != isVTableDefinition(target)
+          ) externalDefs.insert(ref)
+        }
+      }
+    };
+    exports = externalDefs.chill();
+    tableOutput = config.output + ".vtables.ll";
+    writeOutputFile(
+      defs,
+      config.input_files,
+      output,
+      config,
+      positions,
+      Some(NativePartition(false, fullPreamble, exports)),
+    );
+    writeOutputFile(
+      defs,
+      config.input_files,
+      tableOutput,
+      config,
+      positions,
+      Some(NativePartition(true, dataPreamble, exports)),
+    );
+    Array[output, tableOutput]
+  }
+}
+
 fun writeOutputFiles(
   defs: readonly AsmOutput.AsmDefIDToAsmDef,
   inputFiles: Array<String>,
@@ -1008,9 +1082,25 @@ fun writeOutputFiles(
   config: Config.Config,
   positions: SourcePositions.Table,
 ): void {
+  writeOutputFile(defs, inputFiles, output, config, positions, None())
+}
+
+private fun writeOutputFile(
+  defs: readonly AsmDefIDToAsmDef,
+  inputFiles: Array<String>,
+  output: String,
+  config: Config.Config,
+  positions: SourcePositions.Table,
+  partition: ?NativePartition,
+): void {
+  owns = def ->
+    partition match {
+    | None() -> true
+    | Some(part) -> part.vtables == isVTableDefinition(def)
+    };
   // Complexity of each def to be emitted.
   real = mutable Vector[];
-  for (def in defs) if (def.hasDefinition()) real.push(def);
+  for (def in defs) if (def.hasDefinition() && owns(def)) real.push(def);
 
   // Put functions first, then sort in some canonical order.
   real.sortBy(x ~>
@@ -1029,13 +1119,23 @@ fun writeOutputFiles(
   maybePush = def -> {
     if (!emitted[def.id.id]) {
       emitted.set(def.id.id, true);
-      stack.push((def, 0));
+      stack.push(
+        (
+          def,
+          if (def.hasDefinition() && !owns(def)) def.numDefinitionRefs else 0,
+        ),
+      );
     }
   };
 
   sstr = mutable TextOutputStream.StringTextOutputStream{};
 
-  sstr.write(nativePreamble(config));
+  sstr.write(
+    partition match {
+    | None() -> nativePreamble(config)
+    | Some(part) -> part.preamble
+    },
+  );
 
   // arbitrarily pick some unique input file as the CU for this output file.
   metadata = AsmOutput.Metadata::create(
@@ -1068,8 +1168,19 @@ fun writeOutputFiles(
 
         if (!d.hasDefinition()) {
           d.write(sstr, metadata, false)
+        } else if (!owns(d)) {
+          d.writeDeclaration(sstr, defs)
         } else {
-          d.write(sstr, metadata, !d.forceExternal)
+          external = partition match {
+          | None() -> false
+          | Some(part) -> part.externalDefs.contains(d.id)
+          };
+          d.write(
+            sstr,
+            metadata,
+            !d.forceExternal && !external,
+            if (d.forceExternal) "external " else "hidden ",
+          )
         }
       }
     }

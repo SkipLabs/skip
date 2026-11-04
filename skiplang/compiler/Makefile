@@ -1,7 +1,9 @@
 OLEVEL   ?= -O3
 CXXFLAGS ?= $(OLEVEL)
 SKARGO_PROFILE ?= release
-SKC_ARGS ?= --canonize-paths
+# Older bootstrap compilers do not recognize the split-module option. The
+# optional vtable image marks bootstraps that support it.
+SKC_ARGS ?= --canonize-paths $(if $(wildcard bootstrap/skc_vtables64.ll.gz),--split-support-module)
 SKARGO_ARGS ?= --profile $(SKARGO_PROFILE) $(foreach opt,$(SKC_ARGS),--skcopt $(opt))
 STAGE    ?= 1
 
@@ -49,15 +51,17 @@ stage0/lib/libstd.sklib:
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
-stage0/bin/skc: build/skc_out64.ll build/libskip_runtime64.a build/libbacktrace.a
+bootstrap_vtable = $(patsubst bootstrap/%.gz,build/%,$(wildcard bootstrap/$(1)_vtables64.ll.gz))
+
+stage0/bin/skc: build/skc_out64.ll $(call bootstrap_vtable,skc) build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage0/bin/skargo: build/skargo_out64.ll stage0/lib/libstd.sklib
+stage0/bin/skargo: build/skargo_out64.ll $(call bootstrap_vtable,skargo) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage0/bin/skfmt: build/skfmt_out64.ll stage0/lib/libstd.sklib
+stage0/bin/skfmt: build/skfmt_out64.ll $(call bootstrap_vtable,skfmt) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ -no-pie $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
@@ -107,9 +111,22 @@ stageD/bin/skfmt: stageD/bin/skc stageD/lib/libstd.sklib
 
 .PHONY: promote
 promote: stage$(STAGE)
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll bootstrap/skc_out64.ll && gzip --best --force bootstrap/skc_out64.ll
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skargo-*.ll bootstrap/skargo_out64.ll && gzip --best --force bootstrap/skargo_out64.ll
-	cp stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skfmt-*.ll bootstrap/skfmt_out64.ll && gzip --best --force bootstrap/skfmt_out64.ll
+	@set -eu; for name in skc skargo skfmt; do \
+	  main=; for file in stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/$$name-*.ll; do \
+	    case "$$file" in *.vtables.ll) continue;; esac; \
+	    test -f "$$file" && test -z "$$main"; main=$$file; \
+	  done; \
+	  test -n "$$main"; \
+	  cp "$$main" "bootstrap/$${name}_out64.ll"; \
+	  gzip --best --force --no-name "bootstrap/$${name}_out64.ll"; \
+	  table=$${main%.ll}.vtables.ll; \
+	  if test -f "$$table"; then \
+	    cp "$$table" "bootstrap/$${name}_vtables64.ll"; \
+	    gzip --best --force --no-name "bootstrap/$${name}_vtables64.ll"; \
+	  else \
+	    rm -f "bootstrap/$${name}_vtables64.ll.gz"; \
+	  fi; \
+	done
 	@echo "Push to bootstrap repository: cd $$(realpath ./bootstrap); git add -A; git commit -m 'Update to $(shell git describe --always)'; git push; cd -"
 
 .PHONY: install

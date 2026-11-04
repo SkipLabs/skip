@@ -1907,6 +1907,17 @@ const backendMemoryBoundaries: SortedSet<String> = SortedSet[
   "/llvm-emit/modules/",
 ];
 
+// Sequential passes still allocate whole-program intermediates. Their output
+// rows are continuation state too: synchronize them before starting the next
+// phase so temporary versions from the previous phase can be reclaimed.
+const sequentialBackendMemoryBoundaries: SortedSet<String> = SortedSet[
+  "/backendReachable/",
+  "/backendLower/",
+  "/backendGraph/",
+  "/backendEmit/",
+];
+const sequentialPipelineKey: String = "COMPILER_SEQUENTIAL_PIPELINE";
+
 // Each callback leaves all continuation state in the context. runPipeline
 // synchronizes it and reclaims the callback's temporary heap before reentry.
 // Definitions are fixed for the whole compiler. Invocation options are backend
@@ -1919,6 +1930,10 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     config = ConfigFile::type(
       context.getGlobal(invocationConfigKey).fromSome(),
     ).value;
+    context.setGlobal(
+      sequentialPipelineKey,
+      SKStore.BoolFile(!config.incrementalSpecialization),
+    );
     compile(config, context, config.input_files, true);
     context.removeGlobal(invocationConfigKey);
     true
@@ -1976,6 +1991,10 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     }
   },
   context ~> {
+    sequential = context.getGlobal(sequentialPipelineKey) match {
+    | Some(SKStore.BoolFile(value)) -> value
+    | _ -> false
+    };
     (beforeLimit, afterLimit, afterConst) = context.getGlobal(
       Optimize.progressKey,
     ) match {
@@ -1994,7 +2013,9 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     };
     boundary = context.updateUntilBoundary(
       dir ~> dir == SKStore.DirName::create("/backendReachable/"),
-      dir ~> dir == SKStore.DirName::create("/backendOptimize/"),
+      dir ~>
+        dir == SKStore.DirName::create("/backendOptimize/") ||
+          (sequential && dir == SKStore.DirName::create("/backendPhase2/")),
       dir ~> {
         name = dir.toString();
         if (compilerAfterOptimizer(dir)) {
@@ -2027,10 +2048,19 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
     }
   },
   context ~> {
-    complete = if (Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome()) {
+    sequential = context.getGlobal(sequentialPipelineKey) match {
+    | Some(SKStore.BoolFile(value)) -> value
+    | _ -> false
+    };
+    fineBoundaries = Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome();
+    complete = if (sequential || fineBoundaries) {
       context.updateUntilBoundary(
         _ ~> false,
-        dir ~> backendMemoryBoundaries.contains(dir.toString()),
+        dir ~>
+          (sequential &&
+            sequentialBackendMemoryBoundaries.contains(dir.toString())) ||
+            (fineBoundaries && backendMemoryBoundaries.contains(dir.toString()))
+        ,
       ) != Some(false)
     } else {
       context.update();
@@ -2061,7 +2091,8 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
     context ~> {
       context.removeGlobal(specializationWorkKey);
       context.removeGlobal(specializationProgressKey);
-      context.removeGlobal(Optimize.progressKey)
+      context.removeGlobal(Optimize.progressKey);
+      context.removeGlobal(sequentialPipelineKey)
     },
     exn ~> {
       print_error(exn.getMessage());
@@ -2179,12 +2210,12 @@ fun compile_binary(
 ): void {
   // TODO: Use `mkstemp()` instead.
   llFile = conf.output + ".ll";
-  runCompilerPhase("native/write_asm_files", () -> {
-    AsmOutput.writeOutputFiles(defs, conf.input_files, llFile, conf, positions)
-  });
+  inputs = runCompilerPhase("native/write_asm_files", () ->
+    AsmOutput.writeNativeOutputFiles(defs, conf, positions)
+  );
 
   runCompilerPhase("native/link", () -> {
-    getLinkArgs(llFile, conf, exports).each(args -> {
+    getLinkArgs(llFile, conf, exports, Some(inputs)).each(args -> {
       if (conf.no_link) {
         print_string("---LINK_ARGS_BEGIN---");
         args.each(print_string);

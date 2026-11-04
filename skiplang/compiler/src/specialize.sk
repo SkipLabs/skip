@@ -1869,8 +1869,15 @@ mutable class Specializer{
   ): T {
     // The compiler pipeline owns this phase's temporary heap and reclaims it
     // after synchronization. Nested collection would copy survivors twice.
-    // Sequential and unphased callers still need the local collection boundary.
-    if (context.getGlobal(.pipelinePhaseKey).isSome()) return f(context, this);
+    // Sequential discovery drains all requests in one callback, so it still
+    // needs these per-request boundaries even when the outer pipeline is active.
+    sequential = context.getGlobal(.sequentialPipelineKey) match {
+    | Some(SKStore.BoolFile(value)) -> value
+    | _ -> false
+    };
+    if (!sequential && context.getGlobal(.pipelinePhaseKey).isSome()) {
+      return f(context, this)
+    };
     frozenSpecializer = this.chill();
     (newSpecializer, result) = SKStore.withRegion(context, (_, context) ~> {
       specializer = frozenSpecializer.mclone(context);

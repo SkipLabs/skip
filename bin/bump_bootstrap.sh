@@ -6,7 +6,8 @@
 #
 # Steps, matching the manual process:
 #   1. Build stage1 with the current (old) bootstrap and promote its IR into the
-#      bootstrap submodule -- bootstrap/{skc,skargo,skfmt}_out64.ll.gz.
+#      bootstrap submodule -- bootstrap/{skc,skargo,skfmt}_out64.ll.gz and
+#      their optional _vtables64.ll.gz modules.
 #   2. Verify the NEW bootstrap in isolation: a clean rebuild from those files,
 #      through stage3, must satisfy the self-hosting fixpoint (the compiler
 #      recompiles itself to an identical result), and the full test suite must
@@ -56,9 +57,23 @@ make stage3
 #     is the gate that actually blocks a bad bootstrap. Enforce it later if a
 #     real run shows the IR is reliably identical.
 shopt -s nullglob
-s2=(stage2/target/host/release/deps/skc-*.ll)
-s3=(stage3/target/host/release/deps/skc-*.ll)
-if [[ ${#s2[@]} -eq 1 && ${#s3[@]} -eq 1 ]] && diff -q "${s2[0]}" "${s3[0]}" >/dev/null; then
+s2=()
+s3=()
+for ir in stage2/target/host/release/deps/skc-*.ll; do
+    [[ $ir == *.vtables.ll ]] || s2+=("$ir")
+done
+for ir in stage3/target/host/release/deps/skc-*.ll; do
+    [[ $ir == *.vtables.ll ]] || s3+=("$ir")
+done
+same_ir() {
+    [[ ${#s2[@]} -eq 1 && ${#s3[@]} -eq 1 ]] || return 1
+    diff -q "${s2[0]}" "${s3[0]}" >/dev/null || return 1
+    local table2=${s2[0]%.ll}.vtables.ll table3=${s3[0]%.ll}.vtables.ll
+    if [[ -f $table2 || -f $table3 ]]; then
+        diff -q "$table2" "$table3" >/dev/null || return 1
+    fi
+}
+if same_ir; then
     echo "==> Fixpoint OK: stage2 and stage3 skc IR are identical"
 else
     echo "==> Fixpoint NOTE: stage2/stage3 skc IR not confirmed identical" \
@@ -80,4 +95,4 @@ make test
 
 echo ""
 echo "==> Bootstrap rebuilt and verified for $commit."
-echo "    Promoted, ready to commit: bootstrap/{skc,skargo,skfmt}_out64.ll.gz"
+echo "    Promoted, ready to commit: bootstrap/*_out64.ll.gz and optional *_vtables64.ll.gz"

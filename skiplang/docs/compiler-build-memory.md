@@ -1,6 +1,6 @@
 # Compiler build memory
 
-Checkpoint: 2026-11-04, review revision `b301f5042`.
+Initial checkpoint: 2026-11-04, review revision `b301f5042`.
 
 The full compiler build completed locally with a sampled peak of 26.52 GiB.
 CircleCI job [20769](https://circleci.com/gh/SkipLabs/skip/20769) exceeded its
@@ -56,3 +56,44 @@ build benefits. Do not infer success from a later self-build alone.
 
 Raw logs, samples and temporary databases stay outside the repository. Retire
 databases after each probe; retain bounded findings and compiler identities.
+
+## Implemented reduction
+
+Sequential non-batch compilation now uses the existing compiler pipeline. It
+synchronizes the IR before optimization and separates reachability, lowering,
+assembly graph construction and emission. Sequential specialization keeps its
+per-request regions: unlike incremental discovery, it drains all requests in
+one callback. Batch compilation retains its existing per-unit isolation.
+
+Clang had an independent peak. LLVM's
+[LazyCallGraph](https://github.com/llvm/llvm-project/blob/llvmorg-20.1.8/llvm/lib/Analysis/LazyCallGraph.cpp)
+recursively follows constant operands when collecting function references. Our
+large shared vtable connected many functions to nearly every other function.
+An experimental split of the same LLVM input completed at `-O2` with a sampled
+2.13 GiB peak; the unsplit input exceeded 14 GiB even at `-O1`.
+
+`--split-support-module` now also separates the sequential native vtable from
+the function module. All function bodies remain together for interprocedural
+optimization, and cross-module definitions receive hidden linkage unless they
+are explicit exports. Unsupported custom preambles use the monolithic path.
+Switching back removes the old vtable sidecar. Bootstrap promotion and stage0
+linking support the paired modules; older monolithic bootstraps remain usable.
+
+The completed local validation used AArch64, Clang 20.1.8 and `SKIP_CAPACITY=12G`:
+
+| Run | Result | Sampled process-group peak |
+| --- | --- | ---: |
+| Clean compiler and formatter build | Passed the 14 GiB guard | 13.23 GiB |
+| Language suite, eight jobs | 1,766 passed | 9.08 GiB |
+| Backend suite, three module workers | 176 passed, zero skipped | 5.42 GiB |
+
+Clang's compiler-binary invocation reported a 1.97 GiB peak via `wait4`, measured
+separately from Skip. The compiler process's kernel high-water mark was 13.85 GiB. Summing the
+high-water marks of processes present together gives a conservative 13.94 GiB
+bound for the build group. This is close to the target; the sampled number alone
+would overstate the available margin. These runs overlapped, so their elapsed
+times are not comparative latency benchmarks. The backend worker harness and
+raw profiles are scratch artifacts, not additional CI requirements.
+
+The source fix still needs a refreshed bootstrap and a successful clean CI run.
+Keep the existing 16 GB allocation and 14 GiB guard for that validation.
