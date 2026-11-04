@@ -60,6 +60,12 @@ mutable class Writer{
 
 base class Mapper<K: frozen, F: frozen> uses Unsafe.Downcastable, Equality {
   fun map(mutable Context, mutable Writer, K, mutable Iterator<F>): void;
+
+  // Mappers that collect their own temporary work may opt out of the
+  // enclosing row region, which otherwise copies all retained context state.
+  overridable fun collectsRows(): Bool {
+    true
+  }
 }
 
 /*****************************************************************************/
@@ -95,7 +101,12 @@ class Parent(
 
 class LambdaMapper<K: frozen, F: frozen>(
   lambda: MapFun<K, F>,
+  collect: Bool = true,
 ) extends Mapper<K, F> {
+  fun collectsRows(): Bool {
+    this.collect
+  }
+
   fun map(
     context: mutable Context,
     writer: mutable Writer,
@@ -107,7 +118,8 @@ class LambdaMapper<K: frozen, F: frozen>(
 
   fun ==(other: Mapper<K, F>): Bool {
     Unsafe.maybeCast(other, LambdaMapper<K, F>) match {
-    | Some(o) -> native_eq(this.lambda, o.lambda) == 0
+    | Some(o) ->
+      this.collect == o.collect && native_eq(this.lambda, o.lambda) == 0
     | _ -> false
     }
   }
@@ -777,6 +789,31 @@ base class EagerDir protected {
   protected tombLimit: ?Tick = None(),
   optOnDelete: ?Postponable = None(),
 } extends Dir {
+  fun withTimeStack(timeStack: TimeStack): this {
+    this with {timeStack}
+  }
+
+  // Count physical buffers separately from compacted rows: newer entries can
+  // shadow older ones, so these must not be described as logical row counts.
+  fun retentionCounts(): SortedMap<String, Int> {
+    values = 0;
+    tombs = 0;
+    for (sources in this.data.data.values()) {
+      for (_ in sources.items()) !values = values + 1
+    };
+    for (sources in this.data.tombs.values()) {
+      for (_ in sources.items()) !tombs = tombs + 1
+    };
+    SortedMap[
+      "eager_buffered_values" => values,
+      "eager_buffered_tombs" => tombs,
+      "eager_fixed_values" => this.fixedData.data.size(),
+      "eager_fixed_tombs" => this.fixedData.tombs.size(),
+      "eager_buffered_mappers" => this.old.size(),
+      "eager_fixed_mappers" => this.fixedOld.size(),
+    ]
+  }
+
   protected fun reset(
     context: mutable Context,
     writer: Path,
@@ -1077,7 +1114,7 @@ base class EagerDir protected {
   }
 
   protected static fun subMapData(
-    obstack: Obstack,
+    obstack: ?Obstack,
     context: mutable Context,
     parent: EagerDir,
     childName: DirName,
@@ -1119,7 +1156,7 @@ base class EagerDir protected {
           current,
         );
         !size = size + 1;
-        if (shouldGC(obstack) != 0) {
+        if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
           return (acc, oldVec, Some(fixedKey), current.value);
         }
       };
@@ -1142,7 +1179,7 @@ base class EagerDir protected {
         f,
       );
       !size = size + 1;
-      if (shouldGC(obstack) != 0) {
+      if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
         return (acc, oldVec, Some(key), current.value);
       }
     };
@@ -1160,7 +1197,7 @@ base class EagerDir protected {
         current,
       );
       !size = size + 1;
-      if (shouldGC(obstack) != 0) {
+      if (obstack.isSome() && shouldGC(obstack.fromSome()) != 0) {
         return (acc, oldVec, Some(fixedKey), current.value);
       }
     };
@@ -1177,6 +1214,78 @@ base class EagerDir protected {
     acc: mutable Vector<FixedRow<Key, Array<File>>>,
     rangeOpt: ?KeyRange<Key>,
   ): void {
+    if (f is ParallelMapper _) {
+      parallel = Unsafe.cast(f, ParallelMapper);
+      // Keep nonworker rows on the ordinary streaming iterator. Looking up
+      // each unchanged state key again would turn this pass into O(n log n).
+      parallel.serial.each(serial -> {
+        forwarding = LambdaMapper((context, writer, key, values) ~> {
+          if (!parallel.select(key)) serial(context, writer, key, values)
+        });
+        static::mapData(
+          context,
+          oldVec,
+          parent,
+          childName,
+          timeStack,
+          forwarding,
+          acc,
+          rangeOpt,
+        )
+      });
+      // Select before batching, so a sparse work set still fills worker jobs.
+      // Do not build another collection or index of the parent.
+      selected = parent
+        .unsafeGetFileIterNoReducer(rangeOpt.map(range -> range.start))
+        .map(row -> row.i0)
+        .takeWhile(key ~> rangeOpt.map(range -> key <= range.end).default(true))
+        .filter(parallel.select);
+      loop {
+        batch = mutable Vector<Key>[];
+        for (_ in Range(0, 256)) {
+          selected.next() match {
+          | None() -> break void
+          | Some(key) -> batch.push(key)
+          }
+        };
+        if (batch.isEmpty()) break void;
+        batchKeys = batch.toArray();
+        evaluateBatch = (context: mutable Context) ~> {
+          prepared = Unsafe.cast(f, ParallelMapper).prepare(
+            context,
+            parent,
+            batchKeys,
+            childName,
+            timeStack,
+          );
+          rows = mutable Vector[];
+          infos = mutable Vector[];
+          for (key in batchKeys) {
+            static::mapRow(
+              context,
+              rows,
+              infos,
+              parent.dirName,
+              childName,
+              timeStack,
+              key,
+              parent.getIterRaw(key),
+              prepared,
+            );
+          };
+          (rows, infos)
+        };
+        (rows, infos) = if (parallel.retainWorkerArenas) {
+          evaluateBatch(context)
+        } else {
+          withRegion(context, (_, context) ~> evaluateBatch(context))
+        };
+        acc.extend(rows);
+        oldVec.extend(infos);
+      };
+      return void;
+    };
+
     last: ?Boundary<Key> = rangeOpt.map(range -> Inclusive(range.start));
     current = rangeOpt match {
     | None() -> 0
@@ -1196,6 +1305,24 @@ base class EagerDir protected {
       min(parent.fixedData.data.size() - 1, pos)
     };
 
+    if (!f.collectsRows()) {
+      (localAcc, localOldVec, _, _) = static::subMapData(
+        None(),
+        context,
+        parent,
+        childName,
+        timeStack,
+        f,
+        current,
+        currentEnd,
+        last,
+        end,
+      );
+      acc.extend(localAcc);
+      oldVec.extend(localOldVec);
+      return void
+    };
+
     loop {
       lcurrent = current;
       llast = last;
@@ -1204,7 +1331,7 @@ base class EagerDir protected {
         context,
         (obstack, context) ~> {
           static::subMapData(
-            obstack,
+            Some(obstack),
             context,
             parent,
             childName,
@@ -1249,13 +1376,13 @@ base class EagerDir protected {
     newDirsCopy = context.newDirs;
     readsCopy = context.reads;
 
-    context.!newDirs = SortedSet[];
-    context.!reads = SortedSet[];
+    context.!newDirs = SortedSet<DirName>[];
+    context.!reads = SortedSet<Path>[];
 
     writer = mutable Writer{};
     mapper.map(context, writer, key, valueIter);
 
-    kvArray = writer.getWrites();
+    writes = writer.writes;
     newDirs = context.newDirs;
     reads = context.getReads();
     context.!newDirs = newDirsCopy;
@@ -1265,22 +1392,33 @@ base class EagerDir protected {
 
     source = Path::create(parentName, key);
 
-    for (kv in kvArray) {
-      (k, v) = kv;
-      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
-    };
-
-    if (!kvArray.isEmpty() || !newDirs.isEmpty()) {
-      oldVec.push(
-        (
-          source,
-          MInfo::create(
-            kvArray.map(kv -> kv.i0),
-            newDirs.toArray(),
-            reads.toArray(),
+    if (writes.size() == 1) {
+      // Most initial rows forward a single key. Avoid materializing the
+      // writer as an array of pairs and then allocating another key array.
+      (k, v) = writes.minimum().fromSome();
+      acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())));
+      minfo = if (newDirs.isEmpty() && reads.isEmpty()) {
+        MInfoSingle(k)
+      } else {
+        MInfo::create(Array[k], newDirs.toArray(), reads.toArray())
+      };
+      oldVec.push((source, minfo));
+    } else {
+      for (k => v in writes) {
+        acc.push(FixedRow(k, v, source, TickRange::create(context.getTick())))
+      };
+      if (!writes.isEmpty() || !newDirs.isEmpty() || !reads.isEmpty()) {
+        oldVec.push(
+          (
+            source,
+            MInfo::create(
+              writes.keys().collect(Array),
+              newDirs.toArray(),
+              reads.toArray(),
+            ),
           ),
-        ),
-      );
+        );
+      };
     };
 
     context.leave(arrow);
@@ -1361,7 +1499,7 @@ base class EagerDir protected {
     dir.parents.items().each(kv ->
       // TODO: Import Mapper from 'from' context env
       from.maybeGetReads(kv.i0, childName).each((arrow, reads) ->
-        context.updateNewDeps(arrow, reads)
+        context.importDeps(from, arrow, reads)
       )
     );
     // Import sub dir (shared sub dir)
@@ -1399,6 +1537,41 @@ base class EagerDir protected {
       rangeOpt,
       onUpdate,
       unsafeSkipInit,
+    )
+  }
+
+  static fun parallelMap(
+    context: mutable Context,
+    parentName: DirName,
+    childName: DirName,
+    f: RawParallelMapFun,
+    rangeOpt: ?Array<KeyRange<Key>> = None(),
+    workers: Int = 0,
+    select: Key ~> Bool = _ ~> true,
+    serial: ?MapFun<Key, File> = None(),
+    prepareRow: ?ParallelPrepareFun = None(),
+    recoverRow: ?ParallelRecoverFun = None(),
+    retainWorkerArenas: Bool = false,
+  ): void {
+    invariant(
+      workers >= 0 && workers <= 64,
+      "Invalid parallelMap worker count",
+    );
+    static::applyFor(
+      context,
+      parentName,
+      childName,
+      ParallelMapper(
+        f,
+        workers,
+        select,
+        serial,
+        prepareRow,
+        recoverRow,
+        retainWorkerArenas,
+      ),
+      None(),
+      rangeOpt,
     )
   }
 
@@ -1549,6 +1722,30 @@ base class EagerDir protected {
     }
   }
 
+  // Reuse only this source row's contribution, not the aggregate output row:
+  // several parents may write the same key. Comparing elements here lets a
+  // worker discard equal scratch objects before transferring its survivor graph.
+  fun reuseEqualOutputs(
+    source: Path,
+    writes: SortedMap<Key, Array<File>>,
+  ): (SortedMap<Key, Array<File>>, Int) {
+    result = SortedMap[];
+    reused = 0;
+    for ((key, values) in writes.items()) {
+      oldValues = this.getArraySourceKey(source, key);
+      !result = result.set(
+        key,
+        if (equalFileArrays(values, oldValues)) {
+          !reused = reused + 1;
+          oldValues
+        } else {
+          values
+        },
+      );
+    };
+    (result, reused)
+  }
+
   protected fun getArraySourceKey(source: Path, key: Key): Array<File> {
     this.data.maybeGet(key) match {
     | None() -> this.fixedData.data.getArraySourceKey(source, key).flatten()
@@ -1573,7 +1770,7 @@ base class EagerDir protected {
     childName = childRef.dirName;
     timeStack = childRef.timeStack;
 
-    dirty = SortedSet[];
+    dirty = SortedSet<Key>[];
     contextDirtyReadersOpt match {
     | None() -> void
     | Some(contextDirtyReaders) ->
@@ -1615,84 +1812,168 @@ base class EagerDir protected {
       })
     };
 
-    it = dirty.iterator();
-    !childRef = withRegionFold(
-      Some(context),
-      it,
-      childRef,
-      (contextOpt, key, child) ~> {
-        ctx = contextOpt.fromSome();
-        arrow = TArrowKey::create{parentName, childName, key};
-        ctx.enter(arrow, timeStack);
-        path = Path::create(parentName, key);
-        oldInfo = child.getOld(path);
-        oldKeys = SortedSet<Key>::createFromItems(oldInfo.getKeys());
-        newDirsCopy = ctx.newDirs;
-        readsCopy = ctx.reads;
-        ctx.!newDirs = SortedSet[];
-        ctx.!reads = SortedSet[];
+    runRows = (
+      context: mutable Context,
+      rowIter: mutable Iterator<Key>,
+      preparedMaps: Array<Parent>,
+      initialChild: EagerDir,
+    ) ~> {
+      withRegionFold(
+        Some(context),
+        rowIter,
+        initialChild,
+        (contextOpt, key, child) ~> {
+          ctx = contextOpt.fromSome();
+          arrow = TArrowKey::create{parentName, childName, key};
+          ctx.enter(arrow, timeStack);
+          path = Path::create(parentName, key);
+          oldInfo = child.getOld(path);
+          newDirsCopy = ctx.newDirs;
+          readsCopy = ctx.reads;
+          ctx.!newDirs = SortedSet<DirName>[];
+          ctx.!reads = SortedSet<Path>[];
 
-        keys = mutable Vector<Key>[];
-        mvalues = SortedMap<Key, mutable Vector<File>>[];
-
-        for (p in parentMaps) {
-          writer = mutable Writer{};
-          p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
-          mapped = writer.getWrites();
-          for (kv in mapped) {
-            (k, rvalues) = kv;
-
-            keys.push(k);
-            if (oldKeys.contains(k)) {
-              !oldKeys = oldKeys.remove(k);
+          writes = if (preparedMaps.size() == 1) {
+            // A single map already groups its writes by output key. Reuse its
+            // arrays instead of collecting them into vectors and copying again.
+            writer = mutable Writer{};
+            preparedMaps[0].mapper.map(
+              ctx,
+              writer,
+              key,
+              parent.getIterRaw(key),
+            );
+            writer.writes
+          } else {
+            // Multiple maps from the same parent contribute in callback order.
+            mvalues = SortedMap<Key, mutable Vector<File>>[];
+            for (p in preparedMaps) {
+              writer = mutable Writer{};
+              p.mapper.map(ctx, writer, key, parent.getIterRaw(key));
+              for (k => rvalues in writer.writes) {
+                if (!mvalues.containsKey(k)) {
+                  !mvalues = mvalues.set(k, mutable Vector[]);
+                };
+                mvalues[k].extend(rvalues);
+              };
             };
-
-            if (!mvalues.containsKey(k)) {
-              !mvalues = mvalues.set(k, mutable Vector[]);
-            };
-            mvalues[k].extend(rvalues);
+            mvalues.map((_, values) -> values.toArray())
           };
+
+          newDirs = ctx.newDirs;
+          reads = ctx.getReads();
+          ctx.!newDirs = newDirsCopy;
+          ctx.!reads = readsCopy;
+
+          !child = child.updateNewDirs(ctx, path, newDirs);
+
+          ctx.replaceDeps(arrow, oldInfo.getReads(), reads);
+
+          for (k => values in writes) {
+            !child = child.writeEntry(ctx, path, path, k, values);
+          };
+
+          // Let's remove the keys that no longer exist.
+          for (k in oldInfo.getKeys()) {
+            if (!writes.containsKey(k)) {
+              !child = child.writeEntry(ctx, path, path, k, Array[]);
+            };
+          };
+
+          // We need to remember what keys we produced for the next
+          // time around. Forwarding a single key needs no temporary key array.
+          minfo = if (
+            writes.size() == 1 &&
+            newDirs.isEmpty() &&
+            reads.isEmpty()
+          ) {
+            MInfoSingle(writes.minimum().fromSome().i0)
+          } else {
+            MInfo::create(
+              writes.keys().collect(Array),
+              newDirs.toArray(),
+              reads.toArray(),
+            )
+          };
+          // The source cannot be removed from old here
+          // => prevent getting fixed data minfo on multiple call during update
+          !child.old[path] = minfo;
+          ctx.leave(arrow);
+          child
+        },
+        preparedMaps.all(p -> p.mapper.collectsRows()),
+      );
+    };
+    if (!parentMaps.any(p -> p.mapper is ParallelMapper _)) {
+      // Ordinary maps retain their original single iterator and region policy.
+      !childRef = runRows(context, dirty.iterator(), parentMaps, childRef);
+    } else {
+      it = dirty.iterator();
+      loop {
+        batch = mutable Vector<Key>[];
+        for (_ in Range(0, 256)) {
+          it.next() match {
+          | None() -> break void
+          | Some(key) -> batch.push(key)
+          }
         };
-
-        newDirs = ctx.newDirs;
-        reads = ctx.getReads();
-        ctx.!newDirs = newDirsCopy;
-        ctx.!reads = readsCopy;
-
-        !child = child.updateNewDirs(ctx, path, newDirs);
-
-        ctx.updateNewDeps(arrow, reads);
-
-        ctx.removeDeps(
-          arrow,
-          oldInfo.getReads().iterator().filter(oldRead ~>
-            !reads.contains(oldRead)
-          ),
+        if (batch.isEmpty()) break void;
+        batchKeys = batch.toArray();
+        childCopy = childRef;
+        if (
+          !parentMaps.any(p ->
+            p.mapper match {
+            | parallel @ ParallelMapper _ -> parallel.hasWork(batchKeys)
+            | _ -> false
+            }
+          )
+        ) {
+          serialMaps = parentMaps.map(p ->
+            p.mapper match {
+            | parallel @ ParallelMapper _ ->
+              p with {mapper => parallel.serialMapper()}
+            | _ -> p
+            }
+          );
+          !childRef = runRows(
+            context,
+            batchKeys.iterator(),
+            serialMaps,
+            childCopy,
+          );
+          continue
+        };
+        evaluateBatch = (context: mutable Context) ~> {
+          preparedMaps = parentMaps.map(p -> {
+            p.mapper match {
+            | parallel @ ParallelMapper _ ->
+              p with {
+                mapper => parallel.prepare(
+                  context,
+                  parent,
+                  batchKeys,
+                  childName,
+                  timeStack,
+                ),
+              }
+            | _ -> p
+            }
+          });
+          runRows(context, batchKeys.iterator(), preparedMaps, childCopy)
+        };
+        retain = parentMaps.any(p ->
+          p.mapper match {
+          | parallel @ ParallelMapper _ -> parallel.retainWorkerArenas
+          | _ -> false
+          }
         );
-
-        for (k => v in mvalues) {
-          !child = child.writeEntry(ctx, path, path, k, v.toArray());
+        !childRef = if (retain) {
+          evaluateBatch(context)
+        } else {
+          withRegion(context, (_, context) ~> evaluateBatch(context))
         };
-
-        // Let's remove the keys that no longer exist.
-        for (k in oldKeys) {
-          !child = child.writeEntry(ctx, path, path, k, Array[]);
-        };
-
-        // We need to remember what keys we produced for the next
-        // time around.
-        minfo = MInfo::create(
-          keys.toArray(),
-          newDirs.toArray(),
-          reads.toArray(),
-        );
-        // The source cannot be removed from old here
-        // => prevent getting fixed data minfo on multiple call during update
-        !child.old[path] = minfo;
-        ctx.leave(arrow);
-        child
-      },
-    );
+      };
+    };
 
     context.setDir(childRef);
 
@@ -1706,6 +1987,18 @@ base class EagerDir protected {
 
   fun getArray(context: mutable Context, key: Key): Array<File> {
     this.getIter(context, key).collect(Array);
+  }
+
+  fun getArrayFilter<R: File>(
+    context: mutable Context,
+    key: Key,
+    project: File ~> R,
+  ): Array<R> {
+    values = this.getArrayRaw(key).map(project);
+    context.addFilteredDep(Path::create(this.dirName, key), project, values);
+    // A replaced collection can change its implementation without a row write.
+    context.addRead(Path::dirTag(this.dirName));
+    values
   }
 
   fun getIter(context: mutable Context, key: Key): mutable Iterator<File> {
@@ -1724,7 +2017,7 @@ base class EagerDir protected {
   ): this {
     oldValues = this.getArraySourceKey(origSource, k);
 
-    if (native_eq(rvalues, oldValues) == 0) {
+    if (equalFileArrays(rvalues, oldValues)) {
       return this;
     };
 
@@ -1804,7 +2097,12 @@ base class EagerDir protected {
 
     !this = this with {totalSize, reducer};
 
-    context.updateDirtyReaders(path);
+    projectedValues = if (context.hasReadFilters(path)) {
+      Some(this.getArrayRaw(k))
+    } else {
+      None()
+    };
+    context.updateDirtyReaders(path, projectedValues);
 
     parentTime = this.getTime();
     childDirs = SortedSet[];
@@ -1840,7 +2138,7 @@ base class EagerDir protected {
     };
 
     if (context.debugMode) {
-      print_string(`WRITTEN:  ${this.dirName}${k}`);
+      print_string(`WRITTEN:  ${this.dirName}${k}`.take(130));
     };
 
     if (purgeCount >= PURGE_LIMIT) {
@@ -1997,6 +2295,12 @@ base class EagerDir protected {
     this.fixedOld.items().each(e -> e.i1.getNewDirs().each(context.removeDir))
   }
 
+  // Checkpointed coordinators must retain the previous invocation's owned
+  // directories and reads until their replacement has completed.
+  fun mapperInfo(source: Path): MInfo {
+    this.getOld(source)
+  }
+
   protected fun getOld(key: Path): MInfo {
     if (this.old.containsKey(key)) {
       this.old[key]
@@ -2009,7 +2313,17 @@ base class EagerDir protected {
   }
 
   fun removeChildDir(dirName: DirName): this {
-    this with {childDirs => this.childDirs.remove(dirName)}
+    // A replacement may use a different parent or different key ranges.
+    // Remove ranged edges too, so an old range cannot schedule the new mapper.
+    slices = RangeMapList[];
+    for ((range, childNames) in this.slices) {
+      for (child in childNames) {
+        if (child != dirName) {
+          !slices = slices.add(range.i0, range.i1, child)
+        }
+      }
+    };
+    this with {childDirs => this.childDirs.remove(dirName), slices}
   }
 
   protected fun updateNewDirs(
@@ -2339,10 +2653,13 @@ class TEagerDir extends EagerDir, TDir {
     childName: DirName,
     reducerOpt: ?IReducer<File> = None(),
     unsafeSkipInit: Bool = false,
+    collect: Bool = true,
   ): void {
     static::applyManyFor(
       context,
-      parents.map(arr ~> arr.map(t -> Parent(LambdaMapper(t.i0), t.i1, t.i2))),
+      parents.map(arr ~>
+        arr.map(t -> Parent(LambdaMapper(t.i0, collect), t.i1, t.i2))
+      ),
       childName,
       reducerOpt,
       unsafeSkipInit,
@@ -2385,6 +2702,13 @@ class TEagerDir extends EagerDir, TDir {
       | _ -> void
       }
     });
+
+    // Replacing the named mapper must retire its former parents, reads and
+    // owned subdirectories before the new mapper registers any of them.
+    // Otherwise an old parent can later schedule an edge to the replacement.
+    if (context.unsafeMaybeGetEagerDir(childName).isSome()) {
+      context.removeDir(childName)
+    };
 
     globalName = "PRE_COMPUTED_" + childName;
 

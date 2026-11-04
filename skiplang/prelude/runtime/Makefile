@@ -43,13 +43,16 @@ magic.c:
 libskip_runtime32.bc: $(BCFILES32)
 	llvm-link $(BCFILES32) -o $@
 
+memory.bc: alloc_size_classes.h
+palloc.o: alloc_size_classes.h
+
 %.bc: %.c
 	clang $(CC32FLAGS) -o $@ -c $<
 
-libskip_runtime64.a: $(OFILES) runtime64_specific.o $(ONATIVE_FILES)
+libskip_runtime64.a: $(OFILES) runtime64_specific.o parallel_map.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
 
-runtime64_specific.o: runtime64_specific.cpp
+runtime64_specific.o parallel_map.o: %.o: %.cpp runtime64_support.h
 	clang++ -std=c++11 $(CC64FLAGS) -o $@ -c $<
 
 %.o: %.c

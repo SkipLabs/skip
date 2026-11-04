@@ -1,0 +1,293 @@
+/** Publish specialized IR without gathering all function bodies. */
+module OuterIstToIR;
+
+private class IRExportOptions(
+  config: Config.Config,
+  disasm: UnorderedSet<String>,
+  enabled: Bool,
+) extends SKStore.File
+private class CoroutineRampUp(id: SFunctionID) extends SKStore.File
+
+// The shared header needs runtime/constant roots, not every function identity
+// or class. Active plan reads check membership, including absence; the lazy
+// identity allocator alone would also return IDs for retired functions.
+fun createKeyedIRHeader(
+  context: mutable SKStore.Context,
+  config: Config.Config,
+  roots: RootsIR,
+): GlobalEnv {
+  plan: SKStore.EHandle<SKStore.Key, SKStore.File> = SKStore.EHandle(
+    x ~> x,
+    x ~> x,
+    SKStore.DirName::create("/specializer/function-ir-plan/"),
+  );
+  ids = FunctionIDs{active => Some(plan)};
+  runtime = mutable UnorderedMap<String, SFunctionID>[];
+  for (name in roots.runtimeFunctions) {
+    id = ids.maybeGet(context, GFunKey(name, FunSuperpositionID::empty));
+    invariant(id.isSome(), `Could not find runtime function ${name}`);
+    runtime.set(name.gname().id, id.fromSome())
+  };
+  consts = mutable UnorderedMap<ConstID, SFunctionID>[];
+  for (name in roots.consts) {
+    id = ids.maybeGet(context, GFunKey(name, FunSuperpositionID::empty));
+    invariant(id.isSome(), "Missing constant function");
+    consts.set(name.constName, id.fromSome())
+  };
+  GlobalEnv{
+    sclasses => SortedMap[],
+    runtimeFunctions => runtime.chill(),
+    consts => consts.chill(),
+    sourcePositions => if (config.needsIRSourcePositions()) {
+      SourcePositions.Table::read(context)
+    } else {
+      SourcePositions.Table{}
+    },
+  }
+}
+
+class FunctionIRProgram(
+  functions: SKStore.EHandle<BackendFunctionKey, FunctionFile>,
+  returnTuples: SKStore.EHandle<SClassIDKey, SClassInfoFile>,
+  classes: SKStore.EHandle<ClassInputs.Key, ClassInputs.File>,
+) {
+  static fun handles(): this {
+    static(
+      SKStore.EHandle(
+        BackendFunctionKey::keyType,
+        FunctionFile::type,
+        SKStore.DirName::create("/specializer/ir-functions/"),
+      ),
+      SKStore.EHandle(
+        SClassIDKey::keyType,
+        SClassInfoFile::type,
+        SKStore.DirName::create("/specializer/ir-return-tuples/"),
+      ),
+      SKStore.EHandle(
+        ClassInputs.Key::keyType,
+        ClassInputs.File::type,
+        SKStore.DirName::create("/specializer/ir-classes/"),
+      ),
+    )
+  }
+}
+
+fun createFunctionIRProgram(
+  context: mutable SKStore.Context,
+  input: SKStore.EHandle<SKStore.Key, SpecializedFunctionFile>,
+  classes: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  identities: SKStore.LHandle<GFunKeyKey, SKStore.IntFile>,
+  config: SKStore.EHandle<SKStore.IID, ConfigFile>,
+  roots: SKStore.EHandle<SKStore.IID, BackendPhase1File>,
+): FunctionIRProgram {
+  options = config.map(
+    SKStore.IID::keyType,
+    IRExportOptions::type,
+    context,
+    SKStore.DirName::create("/specializer/ir-export-options/"),
+    (context, writer, key, values) ~> {
+      conf = values.first.value;
+      root = roots.getArray(context, SKStore.IID(0));
+      if (root.isEmpty()) return void;
+      writer.set(
+        key,
+        IRExportOptions(
+          Optimize.workConfig(conf),
+          root[0].rootsIR.disasm,
+          BackendProgram::enabled(context, conf),
+        ),
+      )
+    },
+  );
+  returnTuples = input.map(
+    SClassIDKey::keyType,
+    SClassInfoFile::type,
+    context,
+    SKStore.DirName::create("/specializer/ir-return-tuples/"),
+    (context, writer, _, values) ~> {
+      opt = options.getArray(context, SKStore.IID(0));
+      if (opt.isEmpty() || !opt[0].enabled) return void;
+      for ((id, info) in values.first.returnTuples.items()) {
+        writer.set(SClassIDKey(id), SClassInfoFile(info))
+      }
+    },
+  );
+  raw = input.map(
+    BackendFunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/ir-exported-functions/"),
+    (context, writer, key, values) ~> {
+      opt = options.getArray(context, SKStore.IID(0));
+      if (opt.isEmpty() || !opt[0].enabled) return void;
+      settings = opt[0];
+      f = values.first.value;
+      invariant(
+        f.id.id ==
+          identities.getArray(context, GFunKeyKey::keyType(key))[0].value,
+        "Function IR identity mismatch",
+      );
+      if (f.hasImplementation()) {
+        !f = f with {
+          isDisasm => settings.disasm.contains(f.name),
+          isRuntimeExport => (AsmOutput.cppIsExported(
+            f.name,
+            f.annotations,
+            f.pos,
+            settings.config.exportedAsFunctions,
+            settings.config.isWasm(),
+          ) || AsmOutput.cppIsImported(f, f.pos)),
+        }
+      };
+      writer.set(BackendFunctionKey(f.id), FunctionFile(f))
+    },
+  );
+  dependencies = raw.map(
+    BackendFunctionKey::keyType,
+    CoroutineRampUp::type,
+    context,
+    SKStore.DirName::create("/specializer/ir-coroutine-dependencies/"),
+    (context, writer, _, values) ~> {
+      f = values.first.value;
+      f.coroutineInfo match {
+      | Some(UnfinishedCoroutine _) ->
+        f.pos.invariant(
+          f.funType.returnType.size() == 1,
+          "Expected coroutine return",
+        );
+        _ = f.funType.returnType[0].forEachTclass(tc -> {
+          info = SClassInfoFile::type(
+            classes.getArray(context, SClassIDKey(tc.sclassID))[0],
+          );
+          next = info.value.sclass.getMethod(
+            "next",
+            MethodSuperpositionID::empty,
+            f.pos,
+          );
+          invariant(
+            !raw
+              .getArrayFilter(context, BackendFunctionKey(next), _ ~>
+                SKStore.IntFile(1)
+              )
+              .isEmpty(),
+            "Missing coroutine next method",
+          );
+          writer.set(BackendFunctionKey(next), CoroutineRampUp(f.id));
+          true
+        })
+      | _ -> void
+      }
+    },
+  );
+  functions = raw.map(
+    BackendFunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/specializer/ir-functions/"),
+    (context, writer, key, values) ~> {
+      f = values.first.value;
+      for (dependency in dependencies.getArray(context, key)) {
+        f.coroutineInfo match {
+        | None() ->
+          !f = f with {
+            coroutineInfo => Some(UnfinishedNext{rampUpID => dependency.id}),
+          }
+        | Some(UnfinishedNext{rampUpID}) if (rampUpID == dependency.id) -> void
+        | _ -> f.pos.die("Bad coroutine dependencies")
+        }
+      };
+      writer.set(key, FunctionFile(f))
+    },
+  );
+  classProgram = createFunctionIRClasses(
+    context,
+    classes,
+    returnTuples,
+    options,
+  );
+  FunctionIRProgram(functions, returnTuples, classProgram)
+}
+
+// The ordinary discovery row owns a class when present; otherwise the synthetic
+// return-tuple row owns it. Both reads include absence, so additions/removals
+// transfer ownership and retract old outputs. Shared tuples must agree exactly,
+// preserving partitionFunctions' collision check without collecting all classes.
+private fun createFunctionIRClasses(
+  context: mutable SKStore.Context,
+  classes: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  tuples: SKStore.EHandle<SClassIDKey, SClassInfoFile>,
+  options: SKStore.EHandle<SKStore.IID, IRExportOptions>,
+): SKStore.EHandle<ClassInputs.Key, ClassInputs.File> {
+  enabled = (context: mutable SKStore.Context) ~> {
+    values = options.getArrayFilter(context, SKStore.IID(0), file ~>
+      SKStore.BoolFile(file.enabled && file.config.collectionClasses)
+    );
+    !values.isEmpty() && values[0].value
+  };
+  publishOrdinary: SKStore.TMapFun<
+    SKStore.Key,
+    SKStore.File,
+    ClassInputs.Key,
+    ClassInputs.File,
+  > = (context, writer, key, values) ~> {
+    key match {
+    | classKey @ SClassIDKey(id) ->
+      if (!enabled(context)) return void;
+      info = SClassInfoFile::type(values.first).value;
+      for (tuple in tuples.getArray(context, classKey)) {
+        invariant(
+          native_eq(info, tuple.value) == 0,
+          "Conflicting synthetic return tuple",
+        )
+      };
+      if (context.debugMode) print_string(`CLASS_IR: ${id}`);
+      writer.set(ClassInputs.Key(id), ClassInputs.File(info.sclass))
+    | _ -> void
+    }
+  };
+  publishTuple: SKStore.TMapFun<
+    SKStore.Key,
+    SKStore.File,
+    ClassInputs.Key,
+    ClassInputs.File,
+  > = (context, writer, key, values) ~> {
+    if (!enabled(context)) return void;
+    classKey = SClassIDKey::keyType(key);
+    info = SClassInfoFile::type(values.first).value;
+    for (value in values) {
+      invariant(
+        native_eq(info, SClassInfoFile::type(value).value) == 0,
+        "Conflicting synthetic return tuple",
+      )
+    };
+    ordinary = classes.getArray(context, classKey);
+    if (!ordinary.isEmpty()) {
+      invariant(
+        native_eq(info, SClassInfoFile::type(ordinary[0]).value) == 0,
+        "Conflicting synthetic return tuple",
+      );
+      return void
+    };
+    if (context.debugMode) print_string(`CLASS_IR: ${classKey.value}`);
+    writer.set(ClassInputs.Key(classKey.value), ClassInputs.File(info.sclass))
+  };
+  SKStore.EHandle::multiMap(
+    ClassInputs.Key::keyType,
+    ClassInputs.File::type,
+    context,
+    Array[
+      (classes, (publishOrdinary, None())),
+      (
+        SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          tuples.dirName,
+        ),
+        (publishTuple, None()),
+      ),
+    ],
+    SKStore.DirName::create("/specializer/ir-classes/"),
+  )
+}
+
+module end;

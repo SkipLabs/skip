@@ -9,16 +9,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "alloc_size_classes.h"
 #include "runtime.h"
 
-#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
+#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 64L)
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
-#define FTABLE_SIZE 64
+#define FTABLE_SIZE 512
+_Static_assert(SK_ALLOC_SLOT_COUNT <= FTABLE_SIZE,
+               "persistent free table too small");
 
 /*****************************************************************************/
 /* Persistent constants. */
@@ -87,6 +91,7 @@ void sk_check_has_lock() {
 }
 
 void sk_global_lock_init() {
+  memset(gmutex, 0, sizeof(*gmutex));
   pthread_mutexattr_init(gmutex_attr);
   pthread_mutexattr_setpshared(gmutex_attr, PTHREAD_PROCESS_SHARED);
 #ifndef __APPLE__
@@ -501,20 +506,24 @@ struct file_mapping {
 /*****************************************************************************/
 
 void sk_create_mapping(char* fileName, size_t icapacity) {
-  if (fileName != NULL && access(fileName, F_OK) == 0) {
-    fprintf(stderr, "ERROR: File %s already exists!\n", fileName);
-    exit(ERROR_MAPPING_EXISTS);
-  }
   file_mapping_t* mapping;
+  int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
   if (fileName == NULL) {
     mapping = mmap(NULL, icapacity, prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
   } else {
-    int fd = open(fileName, O_RDWR | O_CREAT, 0600);
+    fd = open(fileName, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
+    if (fd == -1) {
+      perror("ERROR: could not create persistent mapping");
+      exit(errno == EEXIST ? ERROR_MAPPING_EXISTS : ERROR_FILE_IO);
+    }
+    if (flock(fd, LOCK_EX) != 0) {
+      perror("ERROR: could not lock persistent mapping");
+      exit(ERROR_LOCKING);
+    }
     lseek(fd, icapacity, SEEK_SET);
     (void)write(fd, "", 1);
     mapping = mmap(BOTTOM_ADDR, icapacity, prot, MAP_SHARED | MAP_FIXED, fd, 0);
-    close(fd);
   }
 
   if (mapping == MAP_FAILED) {
@@ -569,6 +578,12 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
 
   if (ginfo->fileName != NULL) {
     sk_global_lock_init();
+    // Keep fd open with a shared lock until exit. A later process can acquire
+    // an exclusive lock only after all users of this mapping have exited.
+    if (flock(fd, LOCK_SH) != 0) {
+      perror("ERROR: could not share persistent mapping lock");
+      exit(ERROR_LOCKING);
+    }
   }
 }
 
@@ -577,11 +592,22 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
 /*****************************************************************************/
 
 void sk_load_mapping(char* fileName) {
-  int fd = open(fileName, O_RDWR, 0600);
+  int fd = open(fileName, O_RDWR | O_CLOEXEC, 0600);
 
   if (fd == -1) {
     fprintf(stderr, "Error: could not open file (did you run --init?)\n");
     exit(ERROR_FILE_IO);
+  }
+
+  // A mutex stored in the file can retain an owner from a previous process
+  // namespace. The first user in this runtime epoch resets it under an
+  // exclusive file lock. Other live users hold a shared lock until exit.
+  int first_user = flock(fd, LOCK_EX | LOCK_NB) == 0;
+  if (!first_user) {
+    if (errno != EWOULDBLOCK || flock(fd, LOCK_SH) != 0) {
+      perror("ERROR: could not lock persistent mapping");
+      exit(ERROR_LOCKING);
+    }
   }
 
   file_mapping_header_t header;
@@ -602,7 +628,6 @@ void sk_load_mapping(char* fileName) {
   int prot = PROT_READ | PROT_WRITE;
   file_mapping_t* mapping =
       mmap(header.bottom_addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
-  close(fd);
 
   if (mapping == MAP_FAILED) {
     perror("ERROR (MAP FAILED)");
@@ -610,10 +635,18 @@ void sk_load_mapping(char* fileName) {
   }
 
   gmutex = &mapping->gmutex;
+  gmutex_attr = &mapping->gmutex_attr;
   ginfo = &mapping->ginfo_data;
   gid = &mapping->gid;
   capacity = &mapping->capacity;
   pconsts = &mapping->pconsts;
+  if (first_user) {
+    sk_global_lock_init();
+    if (flock(fd, LOCK_SH) != 0) {
+      perror("ERROR: could not share persistent mapping lock");
+      exit(ERROR_LOCKING);
+    }
+  }
 }
 
 /*****************************************************************************/
@@ -629,29 +662,6 @@ int sk_is_static(void* ptr) {
 /*****************************************************************************/
 /* Free table. */
 /*****************************************************************************/
-
-typedef size_t slot_t;
-
-#if !(defined(__has_builtin) && __has_builtin(__builtin_stdc_bit_width))
-static inline size_t __builtin_stdc_bit_width(size_t size) {
-  return size ? (size_t)(sizeof(size_t) * 8UL - __builtin_clzl(size)) : 0;
-}
-#endif
-
-slot_t sk_slot_of_size(size_t size) {
-  // Must return a value between 0 and FTABLE_SIZE - 1 included
-  if (__builtin_expect(size < sizeof(void*), 0)) {
-    // sk_size_of_slot requires slot to be at least log2(sizeof(void*))
-    size = sizeof(void*);
-  }
-  return __builtin_stdc_bit_width(size - 1);
-}
-
-size_t sk_size_of_slot(slot_t slot) {
-  // Must return a multiple of sizeof(void*) and at least sizeof(void*)
-  // Hence slot is expected to be at least log2(sizeof(void*))
-  return 1 << slot;
-}
 
 void sk_add_ftable(void* ptr, slot_t slot) {
   *(void**)ptr = ginfo->ftable[slot];

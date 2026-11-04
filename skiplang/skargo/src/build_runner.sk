@@ -119,6 +119,9 @@ mutable class BuildRunner(
   }
 
   private mutable fun unit_is_dirty(unit: Unit): Bool {
+    if (this.outputs_for(unit).any(output -> !FileSystem.exists(output.path))) {
+      return true
+    };
     fingerprint_file = this.fingerprint_file_for(unit);
     if (!FileSystem.exists(fingerprint_file)) {
       return true
@@ -133,6 +136,9 @@ mutable class BuildRunner(
   private mutable fun fingerprint_for(unit: Unit): Int {
     if (!this.fingerprints.containsKey(unit)) {
       srcs = unit.target.srcs;
+      run_build_script =
+        unit.target.is_build_script() &&
+        unit.mode is CompileModeRunBuildScript _;
       merged_lib =
         unit.target.kind is LibTarget(LibraryTypeSklib _) &&
         should_merge_unit(unit, this.bctx.ws.package);
@@ -142,6 +148,12 @@ mutable class BuildRunner(
         unit.pkg.manifest.test_target().each(t -> !srcs = srcs.concat(t.srcs));
       };
       this.fingerprints![unit] = (
+        // Default compiler flags can change without a source or profile edit.
+        // Rebuild artifacts produced with the previous profile policy too.
+        skc_profile_options(unit.profile),
+        // Explicit options must invalidate artifacts even when every source
+        // timestamp is unchanged. They are applied to every compiler command.
+        this.bctx.build_config.skc_extra_options,
         srcs
           .map(f ->
             (
@@ -159,30 +171,47 @@ mutable class BuildRunner(
         } else {
           None()
         },
-        if (
-          unit.target.is_build_script() &&
-          unit.mode is CompileModeRunBuildScript _
-        ) {
+        if (run_build_script) {
           dep_file = this.fingerprint_dep_file_for(unit);
-          if (FileSystem.exists(dep_file)) {
-            // FIXME: If dep_file is empty, default to checking mtime of all
-            // files in the corresponding package.
+          declared = if (FileSystem.exists(dep_file)) {
             FileSystem.readTextFile(dep_file)
               .split("\n")
-              .map(f ->
-                (
-                  f,
-                  FileSystem.getLastModificationTime(
-                    Path.join(unit.pkg.root(), f),
-                  ),
-                )
-              )
+              .filter(f -> !f.isEmpty())
               .collect(Array)
           } else {
             Array[]
-          }
+          };
+          watched = if (declared.isEmpty()) {
+            // With no explicit dependencies, a build script may read any
+            // source in its package.
+            unit.pkg.manifest.targets.flatMap(t -> t.srcs)
+          } else {
+            declared
+          };
+          watched
+            .map(f ->
+              (
+                f,
+                FileSystem.getLastModificationTime(
+                  Path.join(unit.pkg.root(), f),
+                ),
+              )
+            )
+            .collect(Array)
         } else {
           Array[]
+        },
+        if (run_build_script && unit.pkg == this.bctx.ws.package) {
+          // Root build scripts commonly embed the repository revision.
+          // HEAD can change even when no package source file does.
+          System.subprocess(
+            Array["git", "-C", unit.pkg.root(), "rev-parse", "HEAD"],
+          ) match {
+          | Success(p) -> Some(p.stdout.trim())
+          | Failure(_) -> None()
+          }
+        } else {
+          None()
         },
       ).hash()
     };
@@ -275,8 +304,14 @@ mutable class BuildRunner(
   }
 
   private mutable fun link_or_copy(src: String, dst: String): void {
-    // TODO: Actually link when relevant.
-    _ = system(`cp ${src} ${dst}`)
+    // Replace atomically so rebuilding the running skargo executable works.
+    temporary = dst + ".tmp";
+    _ = this.run_cmd(
+      ProcessBuilder::create{cmd => "cp", args => Array[src, temporary]},
+    );
+    _ = this.run_cmd(
+      ProcessBuilder::create{cmd => "mv", args => Array[temporary, dst]},
+    )
   }
 
   private mutable fun run_build_script(unit: Unit): BuildScriptOutput {
@@ -432,14 +467,13 @@ mutable class BuildRunner(
     };
 
     if (!unit.target.is_build_script()) {
-      // TODO: Once we have namespaced packages, we can share the state.db
-      // across architectures.
-      state_db_path = Path.join(
-        this.layout_for(unit).build,
-        // FIXME: This is a dirty hack that splits out the state.db between pic
-        // and static, which is required until `skc` namespaces packages.
-        `${unit.build_opts.relocation_model}_state.db`,
-      );
+      // A compiler database belongs to one compilation unit. Sharing it across
+      // packages or targets replaces the cached source/config inputs each time
+      // the next unit builds. The artifact hash includes target, architecture,
+      // profile, relocation model and whether sources are merged.
+      state_dir = this.fingerprint_dir_for(unit);
+      this.create_dir(state_dir);
+      state_db_path = Path.join(state_dir, "state.db");
       skc.args(
         Array[
           if (FileSystem.exists(state_db_path)) {
@@ -464,12 +498,7 @@ mutable class BuildRunner(
       void
     };
 
-    // TODO: Proper Profile class.
-    unit.profile match {
-    | "release" -> skc.arg("-O2")
-    | "debug" | "dev" -> skc.arg("-O0")
-    | _ -> invariant_violation("unreachable")
-    };
+    skc.args(skc_profile_options(unit.profile));
 
     separate_link = if (check) {
       skc.arg("--check");
@@ -496,7 +525,33 @@ mutable class BuildRunner(
     p = this.run_cmd(skc);
 
     if (separate_link) {
-      (cmd, args) = parse_link_args(p.stdout) match {
+      link_status_path = Path.join(
+        this.fingerprint_dir_for(unit),
+        "link-status",
+      );
+      // A clean backend emits no link plan. Its inputs include native archive
+      // hashes and linker options, so an existing output is already current.
+      // Still replay the saved plan when the primary output was removed.
+      if (
+        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+        this.outputs_for(unit).all(output -> FileSystem.exists(output.path)) &&
+        FileSystem.exists(link_status_path) &&
+        FileSystem.readTextFile(link_status_path) == "complete"
+      ) {
+        return void
+      };
+      // A cached compiler backend has no new stdout side effect. Retain its
+      // link plan per unit so an unchanged LLVM module can still be linked.
+      link_plan_path = Path.join(this.fingerprint_dir_for(unit), "link-args");
+      link_output = if (
+        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+        FileSystem.exists(link_plan_path)
+      ) {
+        FileSystem.readTextFile(link_plan_path)
+      } else {
+        p.stdout
+      };
+      (cmd, args) = parse_link_args(link_output) match {
       | Success(v) -> v
       | Failure(msg) ->
         this.bctx.gctx.console.error(
@@ -504,8 +559,18 @@ mutable class BuildRunner(
         );
         skipExit(3)
       };
+      FileSystem.writeTextFile(
+        link_plan_path,
+        "---LINK_ARGS_BEGIN---\n" +
+          Array[cmd].concat(args).join("\n") +
+          "\n---LINK_ARGS_END---\n",
+      );
       link_cmd = ProcessBuilder::create{cmd, args};
-      _ = this.run_cmd(link_cmd)
+      // skc commits its cache before the external linker runs. A failed link
+      // must be retried even when an older executable still exists.
+      FileSystem.writeTextFile(link_status_path, "pending");
+      _ = this.run_cmd(link_cmd);
+      FileSystem.writeTextFile(link_status_path, "complete")
     }
   }
 
@@ -691,7 +756,12 @@ mutable class BuildRunner(
     lines.push("module end;");
 
     content = lines.join("\n");
-    FileSystem.writeTextFile(dispatcher_path, content);
+    if (
+      !FileSystem.exists(dispatcher_path) ||
+      FileSystem.readTextFile(dispatcher_path) != content
+    ) {
+      FileSystem.writeTextFile(dispatcher_path, content)
+    };
     dispatcher_path
   }
 
@@ -717,6 +787,20 @@ mutable class BuildRunner(
     hash = this.hashes[unit].toStringHex();
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
+  }
+}
+
+// TODO: Proper Profile class.
+private fun skc_profile_options(profile: String): Array<String> {
+  profile match {
+  // -O2 selects optimizations; --release also selects the sequential compiler
+  // algorithms when skargo supplies a persistent database.
+  | "release" -> Array["--release", "-O2"]
+  // Development builds favor incremental compilation over interprocedural
+  // optimization (inlining and IPA), just as
+  // their native code generation favors compile time over optimization.
+  | "debug" | "dev" -> Array["-O0", "--no-inline", "--no-ipa"]
+  | _ -> invariant_violation("unreachable")
   }
 }
 

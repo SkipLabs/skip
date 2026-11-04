@@ -190,8 +190,27 @@ const moduleDir: SKStore.EHandle<
   moduleDirName,
 );
 
+class MemberKey(moduleName: String, tag: String) extends SKStore.Key
+const members: SKStore.EHandle<MemberKey, SKStore.BoolFile> = SKStore.EHandle(
+  MemberKey::keyType,
+  SKStore.BoolFile::type,
+  SKStore.DirName::create("/moduleMembers/"),
+);
+
 fun containsKey(context: mutable SKStore.Context, key: String): Bool {
-  moduleDir.getArray(context, SKStore.SID(key)).size() > 0
+  !members.getArray(context, MemberKey(key, "")).isEmpty()
+}
+
+// Each successful lookup reads one name. Only error suggestions need the full
+// module name list; adding an unrelated declaration must not dirty this reader.
+fun member(
+  context: mutable SKStore.Context,
+  moduleName: String,
+  tag: String,
+): ?Bool {
+  members.getArray(context, MemberKey(moduleName, tag)).maybeGet(0).map(f ->
+    f.value
+  )
 }
 
 fun populateCache(
@@ -270,6 +289,24 @@ fun populateCache(
           ),
         );
       })
+    },
+  );
+  _ = moduleDir.map(
+    MemberKey::keyType,
+    SKStore.BoolFile::type,
+    context,
+    members.dirName,
+    (_context, writer, key, values) ~> {
+      names = values.first.value.collect(UnorderedSet);
+      writer.set(MemberKey(key.value, ""), SKStore.BoolFile(false));
+      for (tag in names) {
+        if (!tag.startsWith("private:")) {
+          writer.set(
+            MemberKey(key.value, tag),
+            SKStore.BoolFile(names.contains("private:" + tag)),
+          )
+        }
+      }
     },
   )
 }
@@ -782,6 +819,26 @@ fun element_privacy(md: DefNames, field_str: String): ?Bool {
   }
 }
 
+fun module_element_privacy(
+  context: mutable SKStore.Context,
+  moduleName: Module_,
+  name: String,
+): ?Bool {
+  for (kind in Array["class:", "fun:", "type:", "const:"]) {
+    found = ModuleMap.member(context, name_of_module(moduleName), kind + name);
+    if (found.isSome()) return found
+  };
+  None()
+}
+
+fun has_module_name(
+  context: mutable SKStore.Context,
+  moduleName: Module_,
+  tag: String,
+): Bool {
+  ModuleMap.member(context, name_of_module(moduleName), tag).isSome()
+}
+
 fun get_module(
   context: mutable SKStore.Context,
   env: Env,
@@ -790,8 +847,12 @@ fun get_module(
   module_names_find(context, expand_module_name(env, mname))
 }
 
-fun is_module(context: mutable SKStore.Context, env: Env, mname: A.Name): Bool {
-  is_uppercase(mname) && get_module(context, env, mname).isSome()
+fun is_module(
+  _context: mutable SKStore.Context,
+  _env: Env,
+  mname: A.Name,
+): Bool {
+  is_uppercase(mname) // module_names_find currently always returns Some, even for an empty module.
 }
 
 fun is_const_cstr(
@@ -814,10 +875,11 @@ fun is_const_name(
   mname: A.Name,
   cname: A.Name,
 ): Bool {
-  get_module(context, env, mname) match {
-  | Some(m) -> m.containsConst(cname.i1)
-  | None() -> false
-  }
+  ModuleMap.member(
+    context,
+    name_of_module(expand_module_name(env, mname)),
+    "const:" + cname.i1,
+  ).isSome()
 }
 
 fun check_module(
@@ -835,9 +897,9 @@ fun check_module(
     if (!module_names_mem(context, md_name)) {
       SkipError.error(mpos, "Unbound module: " + m_str)
     };
-    md = module_names_find_unsafe(context, md_name);
-    is_private = element_privacy(md, field_str);
+    is_private = module_element_privacy(context, md_name, field_str);
     if (!is_private.isSome()) {
+      md = module_names_find_unsafe(context, md_name);
       defs = md.names().map(s -> (s, s)).collect(Map);
       didYouMeanTypos = SkipDidYouMean.didYouMeanTypos(defs, field_str);
       SkipError.errorl(
@@ -968,8 +1030,10 @@ fun cstr_name(
     !nameStr = nameStr.getIter().forward(1).collectString();
     make_qualified_name(namePos, Unqualified(), (namePos, nameStr))
   } else {
-    mdefs = current_defs_names(context, env);
-    module_ = if (mdefs.containsClass(name.i1) || mdefs.containsType(name.i1)) {
+    module_ = if (
+      has_module_name(context, env.current_module, "class:" + name.i1) ||
+      has_module_name(context, env.current_module, "type:" + name.i1)
+    ) {
       env.current_module
     } else {
       Unqualified()
@@ -1007,10 +1071,10 @@ fun var_name(
   env: Env,
   name: (FileRange, String),
 ): (FileRange, String) {
-  mdefs = current_defs_names(context, env);
   module_ = if (
     !env.locals.contains(name.i1) &&
-    (mdefs.containsFun(name.i1) || mdefs.containsConst(name.i1))
+    (has_module_name(context, env.current_module, "fun:" + name.i1) ||
+      has_module_name(context, env.current_module, "const:" + name.i1))
   ) {
     env.current_module
   } else {
@@ -3434,8 +3498,11 @@ fun expr_(
       // unbound-name fallbacks may be swallowed, never a Some(true) privacy
       // failure from element_privacy.
       isPrivacyViolation = if (is_module(context, env, cname)) {
-        md = module_names_find_unsafe(context, expand_module_name(env, cname));
-        element_privacy(md, field_name.i1) match {
+        module_element_privacy(
+          context,
+          expand_module_name(env, cname),
+          field_name.i1,
+        ) match {
         | Some(true) -> true
         | _ -> false
         }
@@ -3444,7 +3511,7 @@ fun expr_(
       };
       if (
         !isPrivacyViolation &&
-        current_defs_names(context, env).containsClass(cname_str)
+        has_module_name(context, env.current_module, "class:" + cname_str)
       ) {
         // Don't error out if there is a class by the same name in scope
         // so as to produce clearer error messages

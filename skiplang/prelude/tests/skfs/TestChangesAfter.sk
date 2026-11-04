@@ -59,7 +59,13 @@ fun testChangesAfter(): void {
       key = SKStore.IID(rand.random(0, 1000));
       current = dir.getArrayRaw(key);
       value = Array[SKStore.StringFile(rand.random(44, 48).toString())];
-      if (native_eq(current, value) != 0) {
+      // The store returns Array<File>, while value is Array<StringFile>.
+      // Compare the contents: the arrays' concrete runtime types are not a
+      // change to the files stored at this key.
+      if (
+        current.size() != 1 ||
+        SKStore.StringFile::type(current[0]).value != value[0].value
+      ) {
         !changes = changes.set(key);
       };
       write(context, dirName, key, value);

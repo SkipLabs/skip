@@ -1,0 +1,185 @@
+/** Incremental post-optimization reachability and class escape analysis. */
+module Reachability;
+
+private type FunctionKey = BackendFunctionKey;
+private class ClassesFile(
+  classes: SortedMap<SClassID, SClass>,
+  source: ?SKStore.EHandle<ClassInputs.Key, ClassInputs.File> = None(),
+) extends SKStore.File
+private class RootsFile(ids: Array<SFunctionID>) extends SKStore.File
+private class EdgesFile(ids: Array<SFunctionID>) extends SKStore.File
+private class LiveFile(ids: Array<SFunctionID>) extends SKStore.File
+
+class Cache(
+  live: SKStore.EHandle<SKStore.IID, LiveFile>,
+  escapes: SKStore.EHandle<SKStore.IID, ClassesFile>,
+  functions: SKStore.EHandle<BackendFunctionKey, FunctionFile>,
+) {
+  fun finish(
+    context: mutable SKStore.Context,
+    env: GlobalEnv,
+    config: Config.Config,
+  ): GlobalEnv {
+    functions = FunctionIDToFunction::mcreate();
+    if (!BackendProgram::enabled(context, config)) {
+      for (id in this.live.getArray(context, SKStore.IID(1))[0].ids) {
+        functions.insert(env.getFunction(id, FileRange.builtin))
+      }
+    };
+    env with {
+      sfuns => functions.chill(),
+      sclasses => this.escapes.getArray(context, SKStore.IID(0))[0].classes,
+    }
+  }
+}
+
+fun createCache(
+  context: mutable SKStore.Context,
+  program: BackendProgram,
+): Cache {
+  files = program.publishInputs(
+    context,
+    "/reachability/inputs/",
+    (context, writer, env, config) ~> {
+      writer.set(
+        SKStore.IID(0),
+        ClassesFile(
+          env.sclasses,
+          if (BackendProgram::classHeadersEnabled(context, config)) {
+            program.classes
+          } else {
+            None()
+          },
+        ),
+      );
+      roots = mutable UnorderedSet[env.initializeAllConstsID];
+      env.runtimeFunctions.values().each(roots.insert);
+      writer.set(SKStore.IID(1), RootsFile(roots.toArray().sorted()))
+    },
+  );
+  rootInputs = files.map(
+    SKStore.IID::keyType,
+    RootsFile::type,
+    context,
+    SKStore.DirName::create("/reachability/roots/"),
+    (_, writer, _, values) ~> {
+      values.first match {
+      | roots @ RootsFile _ -> writer.set(SKStore.IID(1), roots)
+      | FunctionFile(f) if (f.isDisasm || f.isRuntimeExport) ->
+        writer.set(SKStore.IID(1), RootsFile(Array[f.id]))
+      | _ -> void
+      }
+    },
+  );
+  edges = files.map(
+    FunctionKey::keyType,
+    EdgesFile::type,
+    context,
+    SKStore.DirName::create("/reachability/edges/"),
+    (context, writer, key, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        if (context.debugMode) print_string(`REACHABILITY_EDGES: ${f.name}`);
+        // Only virtual calls need class metadata. Track those keyed reads
+        // rather than invalidating every edge whenever any class changes.
+        reader = mutable ClassInputs.Reader(context, files);
+        dependencies = mutable UnorderedSet[];
+        findDirectDependencies(
+          f,
+          dependencies.insert,
+          GlobalEnv::make(SortedMap[]),
+          Some(reader),
+        );
+        writer.set(
+          FunctionKey::keyType(key),
+          EdgesFile(dependencies.toArray().sorted()),
+        )
+      | _ -> void
+      }
+    },
+  );
+  escapes = files.map(
+    SKStore.IID::keyType,
+    ClassesFile::type,
+    context,
+    SKStore.DirName::create("/reachability/escapes/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | classes @ ClassesFile _ ->
+        if (context.debugMode) print_string("POINTER_ESCAPE");
+        current = classes.classes;
+        classes.source.each(source -> {
+          // Escape analysis remains a global class pass. Its collection read
+          // sees only final class rows, never unrelated function body updates.
+          for ((key, entries) in source.items(context)) {
+            for (entry in entries) !current[key.id] = entry.value
+          }
+        });
+        writer.set(
+          SKStore.IID(0),
+          ClassesFile(
+            Escape.computeWhetherPointersCanEscape(GlobalEnv::make(current))
+              .sclasses,
+          ),
+        )
+      | _ -> void
+      }
+    },
+  );
+  live = rootInputs.map(
+    SKStore.IID::keyType,
+    LiveFile::type,
+    context,
+    SKStore.DirName::create("/reachability/live/"),
+    (context, writer, _, values) ~> {
+      if (context.debugMode) print_string("REACHABILITY_LIVE");
+      roots = values.toArray().flatMap(file -> RootsFile::type(file).ids);
+      // Traversal consumes the complete graph. A normal collection read
+      // tracks that once rather than recording one dependency per function.
+      graph = mutable UnorderedMap[];
+      for ((key, entries) in edges.items(context)) {
+        entries.next().each(entry -> graph.set(key.id, entry.ids))
+      };
+      pending = Vector::mcreateFromItems(roots);
+      visited = mutable UnorderedSet[];
+      while (!pending.isEmpty()) {
+        id = pending.pop();
+        if (visited.maybeInsert(id)) pending.extend(graph[id])
+      };
+      writer.set(SKStore.IID(1), LiveFile(visited.toArray().sorted()))
+    },
+  );
+  liveKeys = live.map(
+    BackendFunctionKey::keyType,
+    SKStore.BoolFile::type,
+    context,
+    SKStore.DirName::create("/reachability/live-keys/"),
+    (context, writer, _, values) ~> {
+      enabled = program.header.getArrayFilter(context, SKStore.IID(0), entry ~>
+        SKStore.BoolFile(entry.config.collectionFunctions)
+      );
+      if (enabled.isEmpty() || !enabled[0].value) return void;
+      for (id in values.first.ids) {
+        writer.set(BackendFunctionKey(id), SKStore.BoolFile(true))
+      }
+    },
+  );
+  functions = files.map(
+    BackendFunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/reachability/functions/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | file @ FunctionFile(f) ->
+        if (!liveKeys.getArray(context, BackendFunctionKey(f.id)).isEmpty()) {
+          writer.set(BackendFunctionKey(f.id), file)
+        }
+      | _ -> void
+      }
+    },
+  );
+  Cache(live, escapes, functions)
+}
+
+module end;

@@ -11,6 +11,7 @@ fun findDirectDependencies(
   f: Function,
   visit: SFunctionID -> void,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   for (c in f.constants) {
     c match {
@@ -34,10 +35,15 @@ fun findDirectDependencies(
           key = (optinfo.getInstr(call.obj()).typ, call.method, call.smap);
           if (seen.maybeInsert(key)) {
             // Visit every method implementation this might be calling.
-            _ = optinfo.allMethodImplementations(call, env, (_, code, _, _) -> {
-              _ = visit(code);
-              true
-            })
+            _ = optinfo.allMethodImplementations(
+              call,
+              env,
+              (_, code, _, _) -> {
+                _ = visit(code);
+                true
+              },
+              classReader,
+            )
           }
         | _ -> void
         }

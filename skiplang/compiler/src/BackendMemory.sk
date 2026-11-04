@@ -1,0 +1,70 @@
+// Opt-in diagnostics. These counters are observational and do not become
+// dependencies of compiler callbacks. Persistent bytes are size-class-rounded
+// live allocations across the runtime's contexts, not RSS or file length.
+@allow_tracked_call
+@cpp_extern("SKIP_print_persistent_size")
+untracked native fun printCompilerPersistentBytes(): void;
+
+fun profileCompilerMemory(
+  context: readonly SKStore.Context,
+  label: String,
+): void {
+  if (Environ.varOpt("SKC_MEMORY_STATS").isNone()) return void;
+  tick = context.getTick().value;
+  print_raw(`##PERSISTENT## ${tick} ${label} `);
+  printCompilerPersistentBytes();
+  if (label == "complete") {
+    print_error(
+      `##DEPENDENCY_POLICY## compact_readers=${context.usesCompactDependencyReaders()}\n`,
+    )
+  };
+  // size() normally records a dependency. Use a disposable context so this
+  // diagnostic never broadens the reads of the active compiler operation.
+  diagnostic = context.clone().mclone();
+  counts = mutable Map<String, Int>[];
+  for (dir in context.listDirs()) {
+    dir match {
+    | eager @ SKStore.EagerDir _ ->
+      name = dir.getDirName().toString();
+      parts = name.split("/");
+      owner = if (parts.size() > 1) parts[1] else name;
+      counts.set(
+        owner,
+        counts.maybeGet(owner).default(0) + eager.size(diagnostic),
+      )
+    | _ -> void
+    }
+  };
+  for ((owner, count) in counts.items()) {
+    print_error(`##ROWS## ${tick} ${label} ${owner} ${count}\n`)
+  };
+  if (label == "complete" && Environ.varOpt("SKC_MEMORY_DETAIL").isSome()) {
+    totals = mutable Map<(String, String), Int>[];
+    add = (name: SKStore.DirName, kind: String, count: Int) -> {
+      parts = name.toString().split("/");
+      owner = if (parts.size() > 1) parts[1] else name.toString();
+      key = (owner, kind);
+      totals.set(key, totals.maybeGet(key).default(0) + count)
+    };
+    for ((name, dependencyCounts) in context
+      .dependencyRetentionCounts()
+      .items()) {
+      (paths, edges, filters) = dependencyCounts;
+      add(name, "dependency_paths", paths);
+      add(name, "dependency_edges", edges);
+      add(name, "dependency_filters", filters)
+    };
+    for (dir in context.listDirs()) {
+      retained = dir match {
+      | eager @ SKStore.EagerDir _ -> eager.retentionCounts()
+      | lazy @ SKStore.LazyDir _ -> lazy.typed().retentionCounts()
+      | _ -> SortedMap[]
+      };
+      for ((kind, count) in retained.items()) add(dir.getDirName(), kind, count)
+    };
+    for ((key, count) in totals.items()) {
+      (owner, kind) = key;
+      print_error(`##RETAIN## ${tick} ${owner} ${kind} ${count}\n`)
+    }
+  }
+}

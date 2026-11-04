@@ -41,6 +41,11 @@ fun main(): void {
         .about("Use verbose output."),
     )
     .arg(Cli.Arg::bool("debug").about("Print debug information."))
+    .arg(
+      Cli.Arg::bool("debug-skstore").about(
+        "Trace SKStore dependencies and updates.",
+      ),
+    )
     // Optimization config flags
     // .arg(Cli.Arg::bool("localopts").default(true).negatable())
     .arg(Cli.Arg::bool("dce").default(true).negatable())
@@ -58,12 +63,80 @@ fun main(): void {
     .arg(Cli.Arg::bool("canonize-paths").negatable())
     .arg(Cli.Arg::bool("check").about("Run the front end only."))
     .arg(
+      Cli.Arg::bool("collection-emission").about(
+        "Use keyed LLVM sharing and emission in incremental native builds.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("stable-function-symbols").about(
+        "Keep distinct function symbols when using keyed LLVM emission.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("stable-function-declarations").about(
+        "Omit body-derived attributes from incremental native declarations.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("stable-vtable-slots").about(
+        "Reuse compatible virtual dispatch slots in incremental native builds.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("split-support-module").about(
+        "Emit native vtables in a separate LLVM module.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("balanced-function-modules").about(
+        "Distribute keyed LLVM functions across 256 stable identity buckets.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("compact-specializer").about(
+        "Use bounded discovery-state overlays in the incremental specializer.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("partition-classes").about(
+        "Use validated class construction groups in the incremental specializer.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("collection-functions").about(
+        "Pass lowered function collections directly to keyed LLVM emission.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("collection-classes").about(
+        "Pass specialized class collections directly to optimizer inputs.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("tracked-closure-bodies").about(
+        "Resolve incremental closure bodies separately from class metadata.",
+      ),
+    )
+    .arg(
+      Cli.Arg::bool("incremental-backend")
+        .default(true)
+        .negatable()
+        .about(
+          "Use the incremental backend with persistent storage; disabling it keeps frontend caching and output/debug flags.",
+        ),
+    )
+    .arg(
       Cli.Arg::bool("link")
         .negatable()
         .default(true)
         .about(
           "Link the output binary (use --no-link to print link command instead).",
         ),
+    )
+    .arg(
+      Cli.Arg::bool("stop-after-specialization").about(
+        "Stop after specialization for performance experiments; save incremental state without emitting code.",
+      ),
     )
     .arg(
       Cli.Arg::string("sklib-name")
@@ -120,32 +193,60 @@ fun main(): void {
     skipExit(0);
   };
 
-  config = Config.Config::make(results);
+  isInit = results.maybeGetString("init").isSome();
+  cacheMetadata =
+    Environ.varOpt("SKC_ARCHIVE_METADATA_CACHE").isSome() &&
+    (isInit || results.maybeGetString("data").isSome());
+  config = runCompilerPhase("frontend/config_and_archives", () -> {
+    if (cacheMetadata) {
+      if (isInit || !SKStore.gHasContext()) {
+        _ = SKStore.gContextInit(SKStore.Context::create{})
+      };
+      SKStore.runWithResult(context ~>
+        Sklib.withMetadataCache(context, cache ~>
+          Config.Config::make(results, Some(cache))
+        )
+      ) match {
+      | Success(config) -> config
+      | Failure(exn) -> throw exn
+      }
+    } else {
+      Config.Config::make(results)
+    }
+  });
+  debugSKStore = results.getBool("debug-skstore");
 
   batchManifest = results.maybeGetString("batch");
 
-  isInit = results.maybeGetString("init").isSome();
-  if (isInit) {
+  if (isInit && !cacheMetadata) {
     _ = SKStore.gContextInit(SKStore.Context::create{});
   };
-  SKStore.runWithGc(
-    SKStore.Context::create{},
-    _context ~> {
-      SKStore.CStop(
-        Some((context, _, _) ~> {
-          try {
-            batchManifest match {
-            | Some(manifest) -> compile_batch(config, context, manifest)
-            | None() -> compile(config, context, config.input_files)
+  if (batchManifest.isNone()) {
+    runCompilerPipeline(config, debugSKStore)
+  } else {
+    SKStore.runWithGc(
+      SKStore.Context::create{},
+      _context ~> {
+        SKStore.CStop(
+          Some((context, _, _) ~> {
+            // Tracing is an invocation option, even when the saved context has
+            // debugging enabled and all compiler collections remain cached.
+            context.!debugMode = debugSKStore;
+            context.!newDirs = SortedSet[];
+            try {
+              batchManifest match {
+              | Some(manifest) -> compile_batch(config, context, manifest)
+              | None() -> compile(config, context, config.input_files)
+              }
+            } catch {
+            | exn ->
+              print_error(exn.getMessage());
+              skipExit(2)
             }
-          } catch {
-          | exn ->
-            print_error(exn.getMessage());
-            skipExit(2)
-          }
-        }),
-      )
-    },
-    Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
-  )
+          }),
+        )
+      },
+      Some(SKStore.Synchronizer(SKStore.import, SKStore.export, _ ~> void)),
+    )
+  }
 }

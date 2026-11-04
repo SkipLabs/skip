@@ -7,6 +7,21 @@
 
 module TextOutputStream;
 
+// The runtime entry point accepts an ordinary Array<String> and copies its
+// UTF-8 bytes. Keep this compiler-local: emission can opt in without changing
+// the standard library's generic Sequence.join behavior.
+@cpp_extern("SKIP_String_concatN")
+@may_alloc
+native private fun concatStringFragments(parts: readonly Array<String>): String;
+
+@cpp_extern("SKIP_String_unsafeSlice")
+@may_alloc
+native private fun sliceStringFragment(
+  text: String,
+  begin: Int,
+  end: Int,
+): String;
+
 private fun maxDigit(n: Int, d: Int): Int {
   if (d * 10 > n) {
     d
@@ -88,7 +103,7 @@ mutable base class .TextOutputStream {
   }
 
   mutable fun writeEscapedString(s: String): void {
-    this.writeEscapedBytes(UTF8String::make(s).utf8)
+    this.writeEscapedBytes(s.utf8())
   }
 
   private static fun throwBadFormatString(why: String, fmt: String): _ {
@@ -325,6 +340,9 @@ mutable base class DelegatingTextOutputStream{
 // keep the total number of Strings logarithmic in the number of characters.
 // When toString() is called, we concatenate all of these Strings.
 mutable class StringTextOutputStream{
+  // Module emission can keep literal spans as UTF-8 fragments until the final
+  // native concatenation, rather than decode and rebuild every character.
+  fragmentWrites: Bool = false,
   private mutable charBuf: mutable Array<Char> = mutable Array[],
   private mutable charBufSize: Int = 0,
 
@@ -351,6 +369,10 @@ mutable class StringTextOutputStream{
   }
 
   mutable fun writeString(s: String): void {
+    if (this.fragmentWrites) {
+      this.writeFragment(s, s.length());
+      return void
+    };
     if (
       this.charBufSize != 0 ||
       {
@@ -369,7 +391,25 @@ mutable class StringTextOutputStream{
     }
   }
 
+  // The cursor already counted characters while finding UTF-8 boundaries.
+  // Keeping that count avoids a second traversal of every copied span.
+  mutable fun writeFragment(s: String, characters: Int): void {
+    invariant(characters >= 0);
+    if (s.isEmpty()) return void;
+    this.flushCharBuf();
+    this.strBuf.push(s);
+    this.!totalStrChars = this.totalStrChars + characters
+  }
+
   mutable fun toString(): String {
+    this.finish(false)
+  }
+
+  mutable fun toStringNative(): String {
+    this.finish(true)
+  }
+
+  private mutable fun finish(nativeConcat: Bool): String {
     this.flushCharBuf();
 
     buf = this.strBuf;
@@ -377,7 +417,18 @@ mutable class StringTextOutputStream{
     | 0 -> ""
     | 1 -> buf[0]
     | _ ->
-      s = this.strBuf.join("");
+      // concatN uses a 32-bit byte count. Fall back to the existing path for
+      // exceptionally large strings rather than narrowing an overflowing sum.
+      bytes = if (nativeConcat) {
+        buf.reduce((size, part) -> size + String.byteSize(part).toInt(), 0)
+      } else {
+        0
+      };
+      s = if (nativeConcat && bytes < 0x7FFFFFFF) {
+        concatStringFragments(buf.toArray())
+      } else {
+        buf.join("")
+      };
       buf.clear();
       buf.push(s);
       s
@@ -402,7 +453,7 @@ mutable class StringTextOutputStream{
 
     // Use an exponentially larger buffer each time, but with a low
     // growth factor since Char is so much larger than a byte.
-    newSize = max(this.totalStrChars / 8, 32);
+    newSize = if (this.fragmentWrites) 256 else max(this.totalStrChars / 8, 32);
     if (newSize > this.charBuf.size()) {
       this.!charBuf = Array::mfill(newSize, '\0')
     }
@@ -411,6 +462,52 @@ mutable class StringTextOutputStream{
   // Total number of chars written to this.
   readonly fun size(): Int {
     this.totalStrChars + this.charBufSize
+  }
+}
+
+// Reference/debug offsets in AsmDef are character offsets, while native slices
+// use byte offsets. Advance monotonically and copy only at valid boundaries.
+mutable class StringSpanCursor{
+  text: String,
+  private mutable byteOffset: Int = 0,
+  private mutable characters: Int = 0,
+} {
+  readonly fun atEnd(): Bool {
+    this.byteOffset == String.byteSize(this.text).toInt()
+  }
+
+  mutable fun writeUntil(out: mutable StringTextOutputStream, limit: Int): Int {
+    invariant(limit >= this.characters, "Unordered text reference");
+    startByte = this.byteOffset;
+    startChar = this.characters;
+    bytes = String.byteSize(this.text).toInt();
+    offset = startByte;
+    chars = startChar;
+    while (chars < limit && offset < bytes) {
+      first = String.getByte(this.text, offset).toInt();
+      width = if (first < 0x80) 1 else if (first < 0xE0) 2 else if (
+        first < 0xF0
+      ) 3 else {
+        4
+      };
+      invariant(
+        first < 0x80 || (first >= 0xC0 && first < 0xF8),
+        "Invalid UTF-8 text span",
+      );
+      invariant(offset + width <= bytes, "Truncated UTF-8 text span");
+      !offset = offset + width;
+      !chars = chars + 1
+    };
+    invariant(limit == Int::max || chars == limit, "Text reference past end");
+    if (offset > startByte) {
+      fragment = if (startByte == 0 && offset == bytes) this.text else {
+        sliceStringFragment(this.text, startByte, offset)
+      };
+      out.writeFragment(fragment, chars - startChar)
+    };
+    this.!byteOffset = offset;
+    this.!characters = chars;
+    chars
   }
 }
 

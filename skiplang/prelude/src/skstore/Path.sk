@@ -291,6 +291,10 @@ class TKeyMap<+K: Orderable, +V: frozen> private (
     TKeyMap(this.inner.set(key, value))
   }
 
+  fun remove<K2: Orderable>[K: K2](key: K2): TKeyMap<K, V> {
+    TKeyMap(this.inner.remove(key))
+  }
+
   fun mergeWith2<K2: Orderable, U: frozen, W: frozen, R: frozen>[K: K2](
     other1: TKeyMap<K2, U>,
     other2: TKeyMap<K2, W>,

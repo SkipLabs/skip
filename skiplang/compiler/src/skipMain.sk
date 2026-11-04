@@ -50,10 +50,12 @@ fun type_program(
     context,
     SkipParse.astDirName,
     (_context, writer, key, values) ~> {
-      writer.set(key, SkipParse.DefsFile(values.getUnique().fromSome().defs))
+      parsed = values.getUnique().fromSome();
+      writer.set(key, SkipParse.DefsFile(parsed.defs, parsed.symbols))
     },
   );
 
+  SourcePositions.populate(context, ast);
   (defsDir, childDir) = SkipExpand.program(context, ast);
   inhDir = SkipInherit.populateClassesDir(context);
   SkipNaming.populateClasses(context, defsDir, inhDir, childDir);

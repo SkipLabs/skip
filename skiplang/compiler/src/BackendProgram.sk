@@ -1,0 +1,162 @@
+/** Collection boundary: common metadata and independently tracked function bodies. */
+class BackendFunctionKey(id: SFunctionID) extends SKStore.Key
+
+class BackendProgram(
+  header: SKStore.EHandle<SKStore.IID, Optimize.InputFile>,
+  functions: SKStore.EHandle<BackendFunctionKey, FunctionFile>,
+  classes: ?SKStore.EHandle<ClassInputs.Key, ClassInputs.File> = None(),
+  classRowsRequireHeaders: Bool = false,
+) {
+  static fun enabled(
+    context: mutable SKStore.Context,
+    config: Config.Config,
+  ): Bool {
+    config.collectionFunctions && AsmOutput.collectionEmission(context, config)
+  }
+
+  // Local passes consume precise class rows. Inlining, IPA and full debug
+  // output need a complete class environment for most functions; keep one
+  // shared environment in those modes instead of rebuilding it per callback.
+  static fun classHeadersEnabled(
+    context: mutable SKStore.Context,
+    config: Config.Config,
+  ): Bool {
+    config.collectionClassHeaders &&
+      config.optConfig.inline == 0 &&
+      config.optConfig.ipa == 0 &&
+      !config.debug &&
+      config.collectionClasses &&
+      static::enabled(context, config)
+  }
+
+  // Adapt the complete-environment control and keyed candidate to the same
+  // consumer rows. A body edit on the candidate never enumerates the header's
+  // function map; only its function producer executes.
+  fun publishInputs(
+    context: mutable SKStore.Context,
+    name: String,
+    publishHeader: (
+      mutable SKStore.Context,
+      mutable SKStore.TWriter<SKStore.Key, SKStore.File>,
+      GlobalEnv,
+      Config.Config,
+    ) ~> void,
+  ): SKStore.EHandle<SKStore.Key, SKStore.File> {
+    direct = this.header.map(
+      SKStore.IID::keyType,
+      SKStore.BoolFile::type,
+      context,
+      SKStore.DirName::create(name + "direct/"),
+      (context, writer, key, values) ~>
+        writer.set(
+          key,
+          SKStore.BoolFile(static::enabled(context, values.first.config)),
+        )
+      ,
+    );
+    batches = FunctionBatches.create(context, this.header, name + "batches/");
+    classRows = this.classes;
+    requireClassHeaders = this.classRowsRequireHeaders;
+    directClasses = this.header.map(
+      SKStore.IID::keyType,
+      SKStore.BoolFile::type,
+      context,
+      SKStore.DirName::create(name + "direct-classes/"),
+      (context, writer, key, values) ~> {
+        config = values.first.config;
+        writer.set(
+          key,
+          SKStore.BoolFile(
+            classRows.isSome() &&
+              (!requireClassHeaders ||
+                static::classHeadersEnabled(context, config)) &&
+              config.collectionClasses &&
+              static::enabled(context, config),
+          ),
+        )
+      },
+    );
+    sources: Array<
+      (
+        SKStore.EHandle<SKStore.Key, SKStore.File>,
+        (
+          SKStore.TMapFun<SKStore.Key, SKStore.File, SKStore.Key, SKStore.File>,
+          ?Array<SKStore.KeyRange<SKStore.Key>>,
+        ),
+      ),
+    > = Array[
+      (
+        SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          batches.dirName,
+        ),
+        (
+          (context, writer, _, values) ~> {
+            values.first match {
+            | Optimize.InputFile(env, config) ->
+              if (!directClasses.getArray(context, SKStore.IID(0))[0].value) {
+                ClassInputs.writeClasses(writer, env.sclasses)
+              };
+              publishHeader(context, writer, env, config)
+            | FunctionBatches.FunctionsFile(functions) ->
+              for (f in functions) {
+                writer.set(BackendFunctionKey(f.id), FunctionFile(f))
+              }
+            | _ -> void
+            }
+          },
+          None(),
+        ),
+      ),
+      (
+        SKStore.EHandle(
+          (x: SKStore.Key) ~> x,
+          (x: SKStore.File) ~> x,
+          this.functions.dirName,
+        ),
+        (
+          (context, writer, key, values) ~> {
+            enabled = direct.getArray(context, SKStore.IID(0));
+            if (!enabled.isEmpty() && enabled[0].value) {
+              writer.setArray(key, values.toArray())
+            }
+          },
+          None(),
+        ),
+      ),
+    ];
+    classRows.each(classes -> {
+      publishClasses: SKStore.TMapFun<
+        SKStore.Key,
+        SKStore.File,
+        SKStore.Key,
+        SKStore.File,
+      > = (context, writer, key, values) ~> {
+        if (directClasses.getArray(context, SKStore.IID(0))[0].value) {
+          if (context.debugMode) print_string(`CLASS_INPUT: ${name}${key}`);
+          writer.setArray(key, values.toArray())
+        }
+      };
+      !sources = sources.concat(
+        Array[
+          (
+            SKStore.EHandle(
+              (x: SKStore.Key) ~> x,
+              (x: SKStore.File) ~> x,
+              classes.dirName,
+            ),
+            (publishClasses, None()),
+          ),
+        ],
+      )
+    });
+    SKStore.EHandle::multiMap(
+      (x: SKStore.Key) ~> x,
+      (x: SKStore.File) ~> x,
+      context,
+      sources,
+      SKStore.DirName::create(name),
+    )
+  }
+}

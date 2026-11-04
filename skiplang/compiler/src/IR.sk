@@ -94,11 +94,18 @@ mutable class FunctionIDToFunction extends
 }
 
 mutable base class ClassLookupEnv {
-  readonly fun untrackedGetSClass(sid: SClassID): SClass;
+  readonly fun getSClass(sid: SClassID): SClass;
+}
+
+// Directory-backed lookup records normal SKStore dependencies. Keep its effect
+// explicit instead of pretending that a tracked read is a readonly operation.
+mutable base class TrackedClassLookupEnv {
   mutable fun getSClass(sid: SClassID): SClass;
 }
 
 class GlobalEnv{
+  sourcePositions: SourcePositions.Table = SourcePositions.Table{},
+
   // Specialized classes.
   sclasses: SortedMap<SClassID, SClass>,
 

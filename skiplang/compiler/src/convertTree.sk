@@ -9,7 +9,7 @@ module ConvertTree;
 
 type ParseTree = ParseTree.ParseTree;
 
-class Converter{file: FileCache.InputSource} {
+class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
   fun treeToString(tree: ParseTree): String {
     this.file.toString() + tree.toDebugString();
   }
@@ -64,10 +64,10 @@ class Converter{file: FileCache.InputSource} {
   }
 
   fun convertPositions(start: Position, end: Position): FileRange {
-    FileRange.fromStartEnd(
-      this.convertPosition(start),
-      this.convertPosition(end),
-    )
+    FileRange{
+      file => this.file,
+      range => this.positions.range(TextRange.create(start, end)),
+    }
   }
 
   fun convertRange(range: TextRange): FileRange {
@@ -706,7 +706,7 @@ class Converter{file: FileCache.InputSource} {
     | ParseTree.ForEachFunctionMacroTree{range, params, body} ->
       this.convertForEachFunctionMacro(this.convertRange(range), params, body)
     | ParseTree.LogMacroTree{range, params} ->
-      this.convertLogMacro(this.convertRange(range), params)
+      this.convertLogMacro(this.convertRange(range), range.start.line(), params)
     | ParseTree.EnvMacroTree{range, varName} ->
       this.convertEnvMacro(this.convertRange(range), varName)
     | _ ->
@@ -830,7 +830,11 @@ class Converter{file: FileCache.InputSource} {
     );
   }
 
-  fun convertLogMacro(range: FileRange, params: ParseTree): SkipAst.Expr_ {
+  fun convertLogMacro(
+    range: FileRange,
+    line: Int,
+    params: ParseTree,
+  ): SkipAst.Expr_ {
     args = (params as ParseTree.PositionalArgumentsTree _).arguments.getList();
     metadata = (
       range,
@@ -863,13 +867,7 @@ class Converter{file: FileCache.InputSource} {
                 SkipAst.Literal(SkipAst.StringLiteral(range.file.toString())),
               ),
             ),
-            (
-              2,
-              (
-                range,
-                SkipAst.Literal(SkipAst.IntLiteral(range.range.start.line())),
-              ),
-            ),
+            (2, (range, SkipAst.Literal(SkipAst.IntLiteral(line)))),
           ],
         ),
       ),

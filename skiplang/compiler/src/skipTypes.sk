@@ -937,11 +937,11 @@ fun promote(
       promote(context, env, variance, subst, x1)
     }
   | (pos, N.Tapply(mode, cname, targs)) ->
-    cd = SkipNaming.getClass(context, cname);
+    cd = SkipNaming.getClassTypeInfo(context, cname);
     targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, env.promoted, SortedMap[], cname, targs1))
   | (pos, N.Tpromoted(_, mode, seen, tparams, cname, targs)) ->
-    cd = SkipNaming.getClass(context, cname);
+    cd = SkipNaming.getClassTypeInfo(context, cname);
     targs1 = promote_targs(context, env, variance, mode, subst, cd, targs);
     (pos, N.Tpromoted(variance, mode, seen, tparams, cname, targs1))
   | (pos, N.Tfun(_, ml, tyl, params, rty)) ->
@@ -978,7 +978,7 @@ fun promote_inter_elt(
   subst: IMap<N.Type_>,
   elt: N.InterElt,
 ): N.InterElt {
-  cd = SkipNaming.getClass(context, elt.name);
+  cd = SkipNaming.getClassTypeInfo(context, elt.name);
   targs = promote_targs(context, env, variance, mode, subst, cd, elt.targs);
   // dont promote the conditions, done lazily on filtering
   elt with {targs}
@@ -1013,7 +1013,7 @@ fun promote_tapply(
   class_name: N.Name,
   targs: Array<N.Type_>,
 ): N.Type_ {
-  cd = SkipNaming.getClass(context, class_name);
+  cd = SkipNaming.getClassTypeInfo(context, class_name);
   if (has_looped_promotion(env, class_name)) {
     (pos, N.Tpromoted(var, mode, env.promoted, tparams, class_name, targs))
   } else {
@@ -1041,7 +1041,7 @@ fun force_promote_tapply(
   subst: IMap<N.Type_>,
   pos: FileRange,
   tparams: SMap<String>,
-  cd: N.Class_def,
+  cd: SkipNaming.ClassTypeInfo,
   targs: Array<N.Type_>,
 ): N.Type_ {
   inter = make_promoted(
@@ -1064,7 +1064,7 @@ fun promote_targs(
   variance: N.Variance,
   mode: N.Modality,
   subst: IMap<N.Type_>,
-  cd: N.Class_def,
+  cd: SkipNaming.ClassTypeInfo,
   tyl: Array<N.Type_>,
 ): Array<N.Type_> {
   mode match {
@@ -1104,7 +1104,7 @@ fun make_promoted(
   mode: N.Modality,
   subst: IMap<N.Type_>,
   pos: FileRange,
-  cd: N.Class_def,
+  cd: SkipNaming.ClassTypeInfo,
   targs: Array<N.Type_>,
 ): Array<N.InterElt> {
   tparams = cd.tparams.map(N.tparam_ident);
@@ -1167,7 +1167,7 @@ fun make_promoted_elt(
   targs: Array<N.Type_>,
   wcs: Array<Array<N.Whenclause>>,
 ): N.InterElt {
-  cd = SkipNaming.getClass(context, name);
+  cd = SkipNaming.getClassTypeInfo(context, name);
   conditions = if (wcs.isEmpty()) N.ECNoConditions() else N.ECConditions(wcs);
   N.InterElt{depth => cd.depth, kind => cd.kind, name, targs, conditions}
 }
@@ -1595,7 +1595,7 @@ fun is_tset_all_ktype(
 ): Bool {
   unfold_type(subst, ty) match {
   | (_, N.Tpromoted(_, _, _, _, cname, _)) ->
-    cd = SkipNaming.getClass(context, cname);
+    cd = SkipNaming.getClassTypeInfo(context, cname);
     cd.kind == A.KTrait()
   | (_, N.Tset(_, _, _, elts)) -> all_ktype(elts)
   | _ -> false
@@ -1670,7 +1670,7 @@ fun drop_extraneous_ktype(
   kbases = elts.values().filter(elt -> elt.kind != A.KTrait());
   kbases_implement = mutable Set[];
   for (elt in kbases) {
-    for (parName in SkipNaming.getClass(context, elt.name).use.keys()) {
+    for (parName in SkipNaming.getClassTypeInfo(context, elt.name).use.keys()) {
       kbases_implement.insert(parName.i1)
     }
   };
@@ -1692,7 +1692,7 @@ fun promote_tpromoted(
 ): N.Type_ {
   (pos, p_) = p;
   !env = env with {promoted => p_.promoted_set};
-  cd = SkipNaming.getClass(context, p_.name);
+  cd = SkipNaming.getClassTypeInfo(context, p_.name);
   var = if (has_looped_promotion(env, p_.name)) A.Vnone() else p_.variance;
   force_promote_tapply(
     context,
@@ -1743,8 +1743,8 @@ fun join_tpromoted(
       plus_tp.i1.name.i1 != mn.i1,
       "ICE same elt tpromoted is a separate case",
     );
-    mkind = SkipNaming.getClass(context, mn).kind;
-    pkind = SkipNaming.getClass(context, plus_tp.i1.name).kind;
+    mkind = SkipNaming.getClassTypeInfo(context, mn).kind;
+    pkind = SkipNaming.getClassTypeInfo(context, plus_tp.i1.name).kind;
     pty_promoted = promote_tpromoted(context, next_id, env, acc.subst, plus_tp);
     (_, _, _, ptparams, interl) = assert_tset(pty_promoted);
     (facc, tyl) = join_tpromoted_tyl(
@@ -2767,7 +2767,7 @@ private class CheckMutPreservation(
     name: N.Name,
     tyl: Array<N.Type_>,
   ): IMap<TU.MutPreservationConstraint> {
-    cd = SkipNaming.getClass(context, name);
+    cd = SkipNaming.getClassTypeInfo(context, name);
     tyl
       .values()
       .zip(cd.tparams.values().zip(cd.tparam_parents.values()))
@@ -3014,7 +3014,7 @@ fun maybe_update_tpromoted_variance(
   (tp_.mode, joined_mode, tp_.variance) match {
   | (N.Mmutable _, N.Mreadonly _, A.Vplus())
   | (N.Mmutable _, N.Mreadonly _, A.Vminus()) ->
-    cd = SkipNaming.getClass(context, tp_.name);
+    cd = SkipNaming.getClassTypeInfo(context, tp_.name);
     fixed_targs = promote_targs(
       context,
       env,
@@ -3044,7 +3044,7 @@ fun maybe_update_tpromoted_targs_variance(
   (orig_mode, joined_mode, var) match {
   | (N.Mmutable _, N.Mreadonly _, A.Vplus())
   | (N.Mmutable _, N.Mreadonly _, A.Vminus()) ->
-    cd = SkipNaming.getClass(context, n);
+    cd = SkipNaming.getClassTypeInfo(context, n);
     promote_targs(context, env, var, joined_mode, acc.subst, cd, targs)
   | _ -> targs
   }

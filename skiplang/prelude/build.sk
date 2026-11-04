@@ -4,11 +4,19 @@ fun main(): void {
   out_dir = Environ.var("OUT_DIR");
   pic = (Environ.var("RELOCATION_MODEL") == "pic");
 
+  // Persistent files contain native layouts and allocator free-list classes.
+  // A rebuilt runtime must reject files produced by a different build.
+  // These persisted scheduler layouts can change without any C source change.
+  // Regenerate the runtime format version when they change as well.
+  print_string("skargo:rerun-if-changed=src/skstore/Context.sk");
+  print_string("skargo:rerun-if-changed=src/skstore/EagerDir.sk");
   magic_c = Path.join(out_dir, "magic.c");
   FileSystem.writeTextFile(
     magic_c,
     `int SKIP_get_version() { return (int)${Time.time_ms()}; }`,
   );
+
+  print_string("skargo:rerun-if-changed=runtime/alloc_size_classes.h");
 
   srcs = Array[
     "runtime/copy.c",
@@ -62,7 +70,11 @@ fun main(): void {
     native_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     cfg.files(native_srcs).define("SKIP64").compile("skip_runtime");
 
-    native_cpp_srcs = Array["runtime/runtime64_specific.cpp"];
+    native_cpp_srcs = Array[
+      "runtime/runtime64_specific.cpp",
+      "runtime/parallel_map.cpp",
+    ];
+    print_string("skargo:rerun-if-changed=runtime/runtime64_support.h");
     native_cpp_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     Cc.Build()
       .cpp(true)

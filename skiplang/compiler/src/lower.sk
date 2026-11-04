@@ -84,11 +84,13 @@ mutable class .Lower{
     classesNeedingVTables: mutable UnorderedSet<SClassID>,
     env: GlobalEnv,
     config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
   ): (Function, PassResult) {
     d = mutable static{
       optinfo => OptimizerInfo::make(f),
       env,
       config,
+      classReader,
       vtableRequests,
       classesNeedingVTables,
       pos => f.pos,
@@ -115,7 +117,9 @@ mutable class .Lower{
 
       doneSetFlagBlock = BlockID::none;
 
-      if (value.typ.mightBeInConstMemory(this.env)) {
+      if (
+        ClassInputs.mightBeInConstMemory(value.typ, this.env, this.classReader)
+      ) {
         // If the value we are no-op freezing is readonly, it might actually
         // be already frozen and stored in read-only memory, in which case
         // setting the kFrozenMask flag again would SEGV. So we check to
@@ -185,7 +189,7 @@ mutable class .Lower{
 
   private mutable fun lowerGetField(gf: GetField): void {
     obj = this.getInstr(gf.obj);
-    classType = obj.typ.exampleSClass(this.env);
+    classType = ClassInputs.exampleSClass(obj.typ, this.env, this.classReader);
     bitOffset = classType.getLayoutSlot(gf.field, gf.pos).bitOffset;
 
     // Create a raw memory load.
@@ -206,7 +210,7 @@ mutable class .Lower{
   private mutable fun lowerSetField(sf: SetField): void {
     pos = sf.pos;
     obj = this.getInstr(sf.obj);
-    classType = obj.typ.exampleSClass(this.env);
+    classType = ClassInputs.exampleSClass(obj.typ, this.env, this.classReader);
     bitOffset = classType.getLayoutSlot(sf.field, pos).bitOffset;
 
     // Create a raw memory store.
@@ -231,7 +235,7 @@ mutable class .Lower{
     pos = make.pos;
     env = this.env;
 
-    sc = make.typ.exampleSClass(env);
+    sc = ClassInputs.exampleSClass(make.typ, env, this.classReader);
     slotInfo = sc.getArraySlotInfo(pos);
 
     // We are definitely allocating a multiple of this many entries.
@@ -777,7 +781,8 @@ mutable class .Lower{
         for (i in needToLoad) {
           requests.clear();
 
-          _ = this.getInstr(switch.value).typ.forEachConcreteSubtype(
+          _ = ClassInputs.forEachConcreteSubtype(
+            this.getInstr(switch.value).typ,
             this.env,
             sc -> {
               if (!sc.kind.isKClass()) {
@@ -794,6 +799,7 @@ mutable class .Lower{
                 sc,
                 switch.cases,
                 this.env,
+                this.classReader,
               );
 
               // Figure out what constant to store in the vtable.
@@ -807,6 +813,7 @@ mutable class .Lower{
 
               true
             },
+            this.classReader,
           );
 
           requestID = this.makeVTableRequest(
@@ -858,45 +865,59 @@ mutable class .Lower{
     tag = ("typeswitch." + optinfo.f.id.id + "." + switch.id.id);
 
     switchValueType = this.getInstr(switch.value).typ;
-    _ = switchValueType.forEachConcreteSubtype(this.env, sc -> {
-      if (!sc.kind.isKClass()) {
-        pos.die(
-          "Attempting runtime TypeSwitch on value class " +
-            sc +
-            "; this should have been " +
-            "optimized away.",
-        )
-      };
+    _ = ClassInputs.forEachConcreteSubtype(
+      switchValueType,
+      this.env,
+      sc -> {
+        if (!sc.kind.isKClass()) {
+          pos.die(
+            "Attempting runtime TypeSwitch on value class " +
+              sc +
+              "; this should have been " +
+              "optimized away.",
+          )
+        };
 
-      // Figure out which successor handles this.
-      tsSucc = Control.findTypeSwitchSuccessor(sc, switch.cases, this.env);
+        // Figure out which successor handles this.
+        tsSucc = Control.findTypeSwitchSuccessor(
+          sc,
+          switch.cases,
+          this.env,
+          this.classReader,
+        );
 
-      succIndex = successorsMap[tsSucc];
+        succIndex = successorsMap[tsSucc];
 
-      val = if (useBool) {
-        // Stick a bool in the VTable.
-        ConstantBool{id => InstrID::none, typ => tBool, value => succIndex == 0}
-      } else if (kCanUseComputedGoto) {
-        // Put a code label in the VTable.
-        ConstantCodeLabel{
-          id => InstrID::none,
-          typ => tNonGCPointer,
-          function => optinfo.f.id,
-          tag,
-          case => succIndex,
-        }
-      } else {
-        ConstantInt{
-          id => InstrID::none,
-          typ => intSwitchIndexType,
-          value => succIndex,
-        }
-      };
+        val = if (useBool) {
+          // Stick a bool in the VTable.
+          ConstantBool{
+            id => InstrID::none,
+            typ => tBool,
+            value => succIndex == 0,
+          }
+        } else if (kCanUseComputedGoto) {
+          // Put a code label in the VTable.
+          ConstantCodeLabel{
+            id => InstrID::none,
+            typ => tNonGCPointer,
+            function => optinfo.f.id,
+            tag,
+            case => succIndex,
+          }
+        } else {
+          ConstantInt{
+            id => InstrID::none,
+            typ => intSwitchIndexType,
+            value => succIndex,
+          }
+        };
 
-      requests.push((sc.id, val));
+        requests.push((sc.id, val));
 
-      true
-    });
+        true
+      },
+      this.classReader,
+    );
 
     if (requests.isEmpty()) {
       _ = this.emitInstr(
@@ -991,25 +1012,34 @@ mutable class .Lower{
     // and constrain them all to agree on using the same vtable slot.
     requests = mutable Vector<(SClassID, Constant)>[];
 
-    _ = optinfo.allMethodImplementations(call, this.env, (sc, code, _, _) -> {
-      if (!sc.kind.isKClass()) {
-        pos.die(
-          "Attempting indirect method call on value class " +
-            sc +
-            "; this should have been " +
-            "devirtualized already.",
-        )
-      };
+    _ = optinfo.allMethodImplementations(
+      call,
+      this.env,
+      (sc, code, _, _) -> {
+        if (!sc.kind.isKClass()) {
+          pos.die(
+            "Attempting indirect method call on value class " +
+              sc +
+              "; this should have been " +
+              "devirtualized already.",
+          )
+        };
 
-      requests.push(
-        (
-          sc.id,
-          ConstantFun{id => InstrID::none, typ => tNonGCPointer, value => code},
-        ),
-      );
+        requests.push(
+          (
+            sc.id,
+            ConstantFun{
+              id => InstrID::none,
+              typ => tNonGCPointer,
+              value => code,
+            },
+          ),
+        );
 
-      true
-    });
+        true
+      },
+      this.classReader,
+    );
 
     if (requests.isEmpty()) {
       // This is a call on a base class that has no concrete subclasses.
@@ -1042,7 +1072,13 @@ mutable class .Lower{
         pos => call.pos,
       };
 
-      if (call.typ.maybeGetScalarType(this.env).isSome()) {
+      if (
+        ClassInputs.maybeGetScalarType(
+          call.typ,
+          this.env,
+          this.classReader,
+        ).isSome()
+      ) {
         optinfo.idToInstr.set(call.id, this.constantZero(call.typ))
       };
       this.unreachableCalls.add(call.id)
@@ -1111,7 +1147,7 @@ mutable class .Lower{
       this.lowerSetField(x);
       true
     | make @ Object _ ->
-      t = make.typ.exampleSClass(this.env);
+      t = ClassInputs.exampleSClass(make.typ, this.env, this.classReader);
       if (t.kind.isValueClass()) {
         false
       } else {
@@ -1138,7 +1174,7 @@ mutable class .Lower{
       this.lowerArraySize(x);
       true
     | w @ With _ ->
-      sc = w.typ.exampleSClass(this.env);
+      sc = ClassInputs.exampleSClass(w.typ, this.env, this.classReader);
       layout = sc.getLayout();
 
       // The bit size is determined by the end of the last field.
@@ -1191,12 +1227,13 @@ private fun requestVTablesForConstants(
   classesNeedingVTables: mutable UnorderedSet<SClassID>,
   seen: mutable UnorderedSet<Constant>,
   env: GlobalEnv,
+  classReader: ?mutable ClassInputs.Reader = None(),
 ): void {
   while (!stack.isEmpty()) {
     stack.pop() match {
     | c @ ConstantImage{typ, values} ->
       if (seen.maybeInsert(c)) {
-        sc = typ.exampleSClass(env);
+        sc = ClassInputs.exampleSClass(typ, env, classReader);
         sc.kind match {
         | KClass() -> classesNeedingVTables.insert(sc.id)
         | KValue() -> void
@@ -1216,17 +1253,25 @@ private fun requestVTablesForConstants(
   }
 }
 
-fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
-  classesNeedingVTables = mutable UnorderedSet[];
-  vtableRequests = mutable UnorderedSet[];
-  constantsSeen = mutable UnorderedSet[];
-  stack = mutable Vector[];
-  newFuns = env.sfuns.clone();
+// Local request IDs deliberately belong to one function. They are resolved only
+// after all functions' requirements have been merged; a cached body must never
+// depend on the insertion order of another function's mutable request set.
+private class FunctionResult(
+  f: Function,
+  requests: Array<VTable.VTableRequest>,
+  classes: Array<SClassID>,
+) extends SKStore.File
 
-  rng = Random::mcreate(
-    env.sfuns.reduce((h, f) -> Hashable.combine(h, f.name.hash()), 0),
-  );
-
+private fun lowerFunction(
+  f: Function,
+  env: GlobalEnv,
+  config: Config.Config,
+  vtableRequests: mutable UnorderedSet<VTable.VTableRequest>,
+  classesNeedingVTables: mutable UnorderedSet<SClassID>,
+  rng: mutable Random,
+  classReader: ?mutable ClassInputs.Reader = None(),
+): Function {
+  if (!f.hasImplementation()) return f;
   runPass = (name: String, f: Function, pass: Function -> Function) -> {
     f2 = pass(f);
     if (config.debug) {
@@ -1235,51 +1280,420 @@ fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
     };
     f2
   };
-
-  for (f in env.sfuns) {
-    if (f.hasImplementation()) {
-      if (config.debug) {
-        print_error(`\nAbout to run lower passes for ${f}.\n`);
-        f.dump(env, config);
-      };
-      f2 = runPass("Lower", f, f -> {
-        Lower::run(f, vtableRequests, classesNeedingVTables, env, config).i0
-      });
-
-      // Run a few more passes right now.
-      f3 = runPass("LowerLocalGC", f2, f2 -> {
-        LowerLocalGC::run(f2, env, config, rng).i0
-      });
-      f4 = runPass("Alloc", f3, f3 -> {
-        Alloc::run(f3, env, config).i0
-      });
-
-      // Scavenge the final result for any constants needing vtables.
-      stack.extend(f4.constants);
-      requestVTablesForConstants(
-        stack,
-        classesNeedingVTables,
-        constantsSeen,
-        env,
-      );
-
-      // Insert trampoline blocks to make LLVM phi nodes happy
-      // (this must be the last transformation we do).
-      f5 = runPass("trampoline", f4, f4 -> {
-        AsmOutput.maybeInsertTrampolineBlocks(f4)
-      });
-      newFuns.set(f5.id, f5)
-    }
+  if (config.debug) {
+    print_error(`\nAbout to run lower passes for ${f}.\n`);
+    f.dump(env, config);
   };
-
-  vtableInfo = VTable.populateVTables(
-    vtableRequests,
+  f2 = runPass("Lower", f, f -> {
+    Lower::run(
+      f,
+      vtableRequests,
+      classesNeedingVTables,
+      env,
+      config,
+      classReader,
+    ).i0
+  });
+  f3 = runPass("LowerLocalGC", f2, f2 -> {
+    LowerLocalGC::run(f2, env, config, rng, classReader).i0
+  });
+  f4 = runPass("Alloc", f3, f3 -> {
+    Alloc::run(f3, env, config, classReader).i0
+  });
+  requestVTablesForConstants(
+    Vector::mcreateFromIterator(f4.constants.values()),
     classesNeedingVTables,
+    mutable UnorderedSet[],
     env,
-    config,
+    classReader,
   );
+  // This must be the last transformation before resolving vtable request IDs.
+  runPass("trampoline", f4, f4 -> {
+    AsmOutput.maybeInsertTrampolineBlocks(f4)
+  })
+}
 
+fun lowerFunctions(env: GlobalEnv, config: Config.Config): GlobalEnv {
+  classesNeedingVTables = mutable UnorderedSet[];
+  vtableRequests = mutable UnorderedSet[];
+  newFuns = env.sfuns.clone();
+  rng = Random::mcreate(
+    env.sfuns.reduce((h, f) -> Hashable.combine(h, f.name.hash()), 0),
+  );
+  runCompilerPhase("native/lower_functions", () -> {
+    for (f in env.sfuns) {
+      newFuns.set(
+        f.id,
+        lowerFunction(
+          f,
+          env,
+          config,
+          vtableRequests,
+          classesNeedingVTables,
+          rng,
+        ),
+      )
+    }
+  });
+  vtableInfo = runCompilerPhase("native/layout_vtables", () -> {
+    VTable.populateVTables(vtableRequests, classesNeedingVTables, env, config)
+  });
   env with {sfuns => newFuns.chill(), vtables => Some(vtableInfo)}
+}
+
+private type FunctionKey = BackendFunctionKey;
+private class SharedFile(
+  env: GlobalEnv,
+  config: Config.Config,
+) extends SKStore.File
+private class RequirementsFile(
+  id: SFunctionID,
+  requests: Array<VTable.VTableRequest>,
+  classes: Array<SClassID>,
+) extends SKStore.File
+private class RequestIDsFile(
+  ids: Array<VTable.VTableRequestID>,
+) extends SKStore.File
+private class LayoutFile(info: VTable.VTableInfo) extends SKStore.File
+private class VTableSlotsFile(
+  ptrBitSize: Int,
+  slots: UnorderedMap<VTable.VTableRequest, Int>,
+) extends SKStore.File
+private const vtableSlotsKey: String = "COMPILER_VTABLE_SLOTS";
+private class LambdaFunctionsFile(
+  functions: Array<Function>,
+) extends SKStore.File
+private class LayoutInputFile(
+  requests: UnorderedSet<VTable.VTableRequest>,
+  classes: UnorderedSet<SClassID>,
+) extends SKStore.File
+
+// Callee bodies and constants are irrelevant to lowering. Keep their signatures
+// and optimization summaries separately so a literal edit cannot invalidate all
+// callers. Class metadata is shared conservatively in this first implementation.
+private fun functionSummary(f: Function): Function {
+  f with {blocks => Array[], constants => kEmptyConstants}
+}
+
+fun incrementalLower(
+  context: mutable SKStore.Context,
+  program: BackendProgram,
+): BackendProgram {
+  input = program.header;
+  files = program.publishInputs(
+    context,
+    "/native-lower/inputs/",
+    (_context, writer, env, config) ~> {
+      writer.set(
+        SKStore.IID(0),
+        SharedFile(
+          env with {
+            sfuns => FunctionIDToFunction::mcreate().chill(),
+            sourcePositions => SourcePositions.Table{},
+          },
+          config,
+        ),
+      )
+    },
+  );
+  summaries = files.map(
+    FunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/summaries/"),
+    (_context, writer, _key, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        writer.set(FunctionKey(f.id), FunctionFile(functionSummary(f)))
+      | _ -> void
+      }
+    },
+  );
+  lowered = ParallelPhases.map(
+    files,
+    FunctionKey::keyType,
+    FunctionResult::type,
+    context,
+    SKStore.DirName::create("/native-lower/functions/"),
+    "native-lower",
+    (context, writer, _key, values) ~> {
+      values.first match {
+      | FunctionFile(f) ->
+        common = files.getArrayFilter(context, SKStore.IID(0), file ~> {
+          value = SharedFile::type(file);
+          if (value.config.debug) value else {
+            SharedFile(value.env with {sclasses => SortedMap[]}, value.config)
+          }
+        })[0];
+        if (
+          context.isParallelReadOnly() &&
+          !common.config.incrementalSpecialization
+        ) {
+          throw SKStore.ParallelContextUnavailable()
+        };
+        if (context.debugMode && f.hasImplementation()) {
+          print_string(`NATIVE_LOWER: ${f.name}`)
+        };
+        classReader = if (common.config.debug) None() else {
+          Some(mutable ClassInputs.Reader(context, files))
+        };
+        functions = FunctionIDToFunction::mcreate();
+        keep = fid -> {
+          if (fid != SFunctionID::none && !functions.contains(fid)) {
+            summaries
+              .getArray(context, FunctionKey(fid))
+              .maybeGet(0)
+              .each(file -> {
+                functions.insert(file.value)
+              })
+          }
+        };
+        keep(f.id);
+        common.env.runtimeFunctions.values().each(keep);
+        findDirectDependencies(f, keep, common.env, classReader);
+        env = common.env with {
+          sfuns => functions.chill(),
+          // Successful normal lowering needs symbolic positions only. Explicit
+          // IR dumps also print source coordinates, so track those in debug mode.
+          sourcePositions => if (common.config.debug) {
+            SourcePositions.Table::read(context)
+          } else {
+            common.env.sourcePositions
+          },
+        };
+        requests = mutable UnorderedSet[];
+        classes = mutable UnorderedSet[];
+        result = Verify.withSourcePositions(context, () -> {
+          lowerFunction(
+            f,
+            env,
+            common.config with {deferVerifierDiagnostics => true},
+            requests,
+            classes,
+            Random::mcreate(f.name.hash()),
+            classReader,
+          )
+        });
+        writer.set(
+          FunctionKey(f.id),
+          FunctionResult(
+            result,
+            requests.toArray().sortedBy(r ~> r.id.id),
+            classes.toArray().sorted(),
+          ),
+        )
+      | _ -> void
+      }
+    },
+  );
+  requirements = lowered.map(
+    SKStore.IID::keyType,
+    RequirementsFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/requirements/"),
+    (_context, writer, _, values) ~> {
+      result = values.first;
+      writer.set(
+        SKStore.IID(0),
+        RequirementsFile(result.f.id, result.requests, result.classes),
+      )
+    },
+  );
+  merged = requirements.map(
+    x ~> x,
+    x ~> x,
+    context,
+    SKStore.DirName::create("/native-lower/merged/"),
+    (_context, writer, _, values) ~> {
+      requests = mutable UnorderedSet[];
+      classes = mutable UnorderedSet[];
+      for (entry in values.toArray().sortedBy(e ~> e.id)) {
+        ids = mutable Vector[];
+        for (request in entry.requests) {
+          canonical = request with {
+            id => VTable.VTableRequestID(requests.size()),
+          };
+          if (!requests.maybeInsert(canonical)) {
+            !canonical = requests[canonical]
+          };
+          ids.push(canonical.id)
+        };
+        for (sc in entry.classes) classes.insert(sc);
+        writer.set(FunctionKey(entry.id), RequestIDsFile(ids.toArray()))
+      };
+      writer.set(
+        SKStore.IID(0),
+        LayoutInputFile(requests.chill(), classes.chill()),
+      )
+    },
+  );
+  lambdaFunctions = files.map(
+    SKStore.IID::keyType,
+    LambdaFunctionsFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/lambda-functions/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | common @ SharedFile _ ->
+        functions = mutable Map[];
+        for ((_id, sc) in common.env.sclasses.items()) {
+          if (sc.isLambda) {
+            sc.methods
+              .maybeGet(MethodKey("call", MethodSuperpositionID::empty))
+              .each(id ->
+                summaries.getArray(context, FunctionKey(id)).each(file ->
+                  functions.set(id, file.value)
+                )
+              )
+          }
+        };
+        writer.set(
+          SKStore.IID(0),
+          LambdaFunctionsFile(functions.values().collect(Array)),
+        )
+      | _ -> void
+      }
+    },
+  );
+  layout = merged.map(
+    SKStore.IID::keyType,
+    LayoutFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/vtables/"),
+    (context, writer, _, values) ~> {
+      values.first match {
+      | requests @ LayoutInputFile _ ->
+        // Layout reads only the classes it actually uses. Keep the complete
+        // environment for debug dumps; normal reads remain tracked per key.
+        common = files.getArrayFilter(context, SKStore.IID(0), file ~> {
+          value = SharedFile::type(file);
+          if (value.config.debug) value else {
+            SharedFile(value.env with {sclasses => SortedMap[]}, value.config)
+          }
+        })[0];
+        classReader = if (common.config.debug) None() else {
+          Some(mutable ClassInputs.Reader(context, files))
+        };
+        functions = FunctionIDToFunction::mcreate();
+        // Vtable construction only tests compiled-function membership for
+        // lambda call methods. Reading every summary here would rerun layout
+        // whenever an unrelated helper was added or removed.
+        lambdaFunctions
+          .getArray(context, SKStore.IID(0))[0]
+          .functions.each(functions.insert);
+        env = common.env with {sfuns => functions.chill()};
+        // This cache influences placement only. Tracked inputs above describe
+        // all current semantics, and populateVTables validates every hint.
+        // Updating it requires the serial writable context.
+        if (context.isParallelReadOnly()) {
+          throw SKStore.ParallelContextUnavailable()
+        };
+        slotHints = if (common.config.stableVTableSlots) {
+          previous = context.getPersistent(vtableSlotsKey) match {
+          | Some(
+            VTableSlotsFile(ptrBitSize, slots),
+          ) if (ptrBitSize == common.config.ptrBitSize) ->
+            slots
+          | _ -> UnorderedMap[]
+          };
+          Some(
+            mutable VTable.SlotHints(
+              previous,
+              common.config.vtableReceiverHints,
+            ),
+          )
+        } else {
+          None()
+        };
+        if (context.debugMode) print_string("VTABLE_LAYOUT");
+        info = runCompilerPhase("native/layout_vtables", () -> {
+          VTable.populateVTables(
+            requests.requests.clone(),
+            requests.classes.clone(),
+            env,
+            common.config,
+            classReader,
+            slotHints,
+          )
+        });
+        slotHints match {
+        | Some(hints) ->
+          if (Environ.varOpt("SKC_VTABLE_HINT_STATS").isSome()) {
+            print_error(`##VTABLE_RECEIVER_HINTS## ${hints.receiverReused}\n`)
+          };
+          context.setPersistent(
+            vtableSlotsKey,
+            VTableSlotsFile(common.config.ptrBitSize, hints.used.chill()),
+          )
+        | None() -> context.removePersistent(vtableSlotsKey)
+        };
+        writer.set(SKStore.IID(0), LayoutFile(info))
+      | _ -> void
+      }
+    },
+  );
+  resolved = lowered.map(
+    FunctionKey::keyType,
+    FunctionFile::type,
+    context,
+    SKStore.DirName::create("/native-lower/resolved/"),
+    (context, writer, key, values) ~> {
+      f = values.first.f;
+      ids = RequestIDsFile::type(merged.getArray(context, key)[0]).ids;
+      // Compare the small ID table first: most functions have no requests or
+      // retain the same IDs, so do not scan/rebuild all their instructions.
+      identity = true;
+      for (i => id in ids) {
+        if (i != id.id) !identity = false
+      };
+      result = if (identity) f else {
+        f with {
+          blocks => f.blocks.map(b ->
+            b with {
+              instrs => b.instrs.map(instr ->
+                instr match {
+                | load @ LoadVTableEntry{offset} ->
+                  load with {offset => ids[offset.id]}
+                | _ -> instr
+                }
+              ),
+            }
+          ),
+        }
+      };
+      writer.set(key, FunctionFile(result))
+    },
+  );
+  header = input.map(
+    SKStore.IID::keyType,
+    Optimize.InputFile::type,
+    context,
+    SKStore.DirName::create("/backendLower/"),
+    (context, writer, key, values) ~> {
+      entry = values.first;
+      env = if (entry.config.incrementalSpecialization) {
+        functions = FunctionIDToFunction::mcreate();
+        if (
+          !(entry.config.collectionFunctions &&
+            AsmOutput.collectionEmission(context, entry.config))
+        ) {
+          // Sequential/opaque-preamble consumers still need the complete env.
+          // Removed functions leave keys with empty value iterators.
+          for ((_, entries) in resolved.items(context)) {
+            for (stored in entries) functions.insert(stored.value)
+          }
+        };
+        entry.env with {
+          sfuns => functions.chill(),
+          vtables => Some(layout.getArray(context, SKStore.IID(0))[0].info),
+        }
+      } else {
+        lowerFunctions(entry.env, entry.config)
+      };
+      writer.set(key, Optimize.InputFile(env, entry.config))
+    },
+  );
+  BackendProgram(header, resolved)
 }
 
 module end;

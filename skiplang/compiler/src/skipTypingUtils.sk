@@ -663,7 +663,7 @@ class RelationalConstraint(
     // Tsets are already promoted
     | N.Tpromoted(_, _, _, _, n, targs)
     | N.Tapply(_, n, targs) ->
-      cd = SkipNaming.getClass(context, n);
+      cd = SkipNaming.getClassTypeInfo(context, n);
       conditionalUses = cd.use.filter((_, _, p) -> !p.conditions.isEmpty());
       if (conditionalUses.isEmpty()) {
         true
@@ -706,7 +706,7 @@ class RelationalConstraint(
     Types.unfold_type(acc.subst, rty).i1 match {
     | N.Tpromoted(_, _, _, _, n, _)
     | N.Tapply(_, n, _) ->
-      cd = SkipNaming.getClass(context, n);
+      cd = SkipNaming.getClassTypeInfo(context, n);
       cd.kind match {
       | Ast.KTrait() ->
         s =
@@ -1137,7 +1137,7 @@ value class Constraints(
     child = t -> static::is_leaf_type(context, env, acc, t);
     Types.unfold_type(acc.subst, ty) match {
     | (_, N.Tapply(_, name, targs)) ->
-      SkipNaming.getClass(context, name).kind match {
+      SkipNaming.getClassTypeInfo(context, name).kind match {
       | Ast.KClass() -> targs.all(child)
       | _ -> false
       }
@@ -1228,7 +1228,7 @@ fun ktraits(
     ktraits(context, subst, inner)
   | N.Tpromoted(_, _, _, _, n, _)
   | N.Tapply(_, n, _) ->
-    SkipNaming.getClass(context, n).kind match {
+    SkipNaming.getClassTypeInfo(context, n).kind match {
     | Ast.KTrait() -> SSet[n.i1]
     | _ -> SSet[]
     }
@@ -1236,7 +1236,7 @@ fun ktraits(
     elts
       .values()
       .filter(elt ->
-        SkipNaming.getClass(context, elt.name).kind is Ast.KTrait()
+        SkipNaming.getClassTypeInfo(context, elt.name).kind is Ast.KTrait()
       )
       .map(elt -> elt.name.i1) |> SSet::createFromIterator
   | _ -> SSet[]
@@ -1267,7 +1267,7 @@ fun hasConditionalTraitPoint(
   traits: SSet,
   n: N.Name,
 ): Bool {
-  cd = SkipNaming.getClass(context, n);
+  cd = SkipNaming.getClassTypeInfo(context, n);
   cd.use.any((n, _, par) -> traits.contains(n.i1) && !par.conditions.isEmpty())
 }
 
@@ -3117,7 +3117,7 @@ fun instantiate_tapply(
   x: N.Name,
   targs: Array<N.Type_>,
 ): (Acc, Array<N.Type_>) {
-  cd = SkipNaming.getClass(context, x);
+  cd = SkipNaming.getClassTypeInfo(context, x);
   expected_length = cd.tparams.size();
   if (expected_length != targs.size()) {
     SkipError.errorl(
@@ -3529,7 +3529,7 @@ fun fix_mismatched_variance<Ta>(
   child_subst: SMap<N.Type_>,
   acc: Acc,
 ): Acc {
-  cd = SkipNaming.getClass(context, name);
+  cd = SkipNaming.getClassTypeInfo(context, name);
   mismatched = cd.tparam_mismatched;
   if (mismatched.isEmpty()) {
     acc
@@ -4080,7 +4080,7 @@ fun has_concrete_type_for_matching(
     None()
   | N.Tapply(_, n, _)
   | N.Tpromoted(_, _, _, _, n, _) ->
-    SkipNaming.getClass(context, n).kind match {
+    SkipNaming.getClassTypeInfo(context, n).kind match {
     | Ast.KTrait() -> Some(true)
     | _ -> None()
     }

@@ -115,6 +115,20 @@ void sk_obstack_attach_page(sk_obstack_t* lpage, sk_obstack_t* next) {
   page->previous = lpage;
 }
 
+// Keep predecessor descriptors current as source pages are removed. A saved
+// predecessor may otherwise already belong to the destination heap, so
+// unlinking through that stale pointer can create a cycle in the destination's
+// page chain.
+void sk_obstack_unlink_page(sk_cell_t* entry, sk_cell_t* pages, size_t count) {
+  sk_obstack_t* source = entry->key;
+  sk_obstack_t* previous = source->previous;
+  if (entry->next != NULL) {
+    ((sk_obstack_t*)entry->next)->previous = previous;
+  }
+  size_t index = sk_get_obstack_idx((char*)previous, pages, count);
+  if (index < count) pages[index].next = entry->next;
+}
+
 char* sk_large_page(size_t size) {
   size_t block_size = size + sizeof(sk_obstack_t);
   // SKIP32
@@ -451,3 +465,55 @@ size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t nbr_pages) {
   size_t result = binarySearch(pages, 0, nbr_pages - 1, ptr);
   return result;
 }
+
+#ifdef SKIP64
+// Worker heaps outlive their TLS. Page sets also track large-page adoption.
+typedef struct {
+  size_t count;
+  sk_cell_t* pages;
+} sk_detached_arena_t;
+
+void* SKIP_detach_Obstack(void) {
+  sk_detached_arena_t* arena = sk_malloc(sizeof(sk_detached_arena_t));
+  arena->count = sk_get_nbr_pages(page, NULL);
+  arena->pages = arena->count ? sk_get_pages(page, arena->count) : NULL;
+  page = NULL;
+  head = NULL;
+  end = NULL;
+  init_saved = (sk_saved_obstack_t){NULL, NULL, NULL};
+  return arena;
+}
+
+void* SKIP_transfer_Obstack(void* detached, void* root) {
+  sk_detached_arena_t* arena = detached;
+  if (!arena->count) return root;
+  return SKIP_copy_with_pages(root, arena->count, arena->pages);
+}
+
+// After all readers have joined, move ownership of every worker page into the
+// caller's current region. Objects keep their addresses. The enclosing region
+// must outlive all published results; its ordinary collection/destruction owns
+// these pages from here on, including pages containing only worker scratch.
+void SKIP_adopt_Obstack(void* detached) {
+  sk_detached_arena_t* arena = detached;
+  for (size_t i = 0; i < arena->count; i++) {
+    if ((uint64_t)arena->pages[i].key != arena->pages[i].value) {
+      sk_obstack_attach_page(arena->pages[i].key, NULL);
+      arena->pages[i].value = (uint64_t)arena->pages[i].key;
+    }
+  }
+}
+
+void SKIP_release_Obstack(void* detached) {
+  sk_detached_arena_t* arena = detached;
+  if (arena == NULL) return;
+  for (size_t i = 0; i < arena->count; i++) {
+    if ((uint64_t)arena->pages[i].key != arena->pages[i].value) {
+      sk_free_page(arena->pages[i].key);
+    }
+  }
+  if (arena->pages)
+    sk_free_size(arena->pages, sizeof(sk_cell_t) * arena->count);
+  sk_free_size(arena, sizeof(sk_detached_arena_t));
+}
+#endif

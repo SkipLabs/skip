@@ -1,0 +1,153 @@
+/** Bounded, tracked views of discovery state between specialization rounds. */
+module OuterIstToIR;
+
+private class DiscoveryVersionFile(
+  epoch: Int,
+  values: Array<SKStore.File>,
+) extends SKStore.File
+
+// Deltas contain complete values for the keys they change, not relation
+// additions. Absence means inherit the preceding value. Removing a producer
+// retracts its delta and exposes the earlier version; an absent read of every
+// newer layer makes that change visible to consumers.
+class SpecializerView(
+  base: SKStore.EHandle<SKStore.Key, SKStore.File>,
+  deltas: Array<SKStore.EHandle<SKStore.Key, SKStore.File>> = Array[],
+  // Hierarchical compaction carries only changed rows. Widths are decreasing
+  // powers of two, so a round reads at most logarithmically many layers.
+  widths: Array<Int> = Array[],
+) {
+  fun getArray(
+    context: mutable SKStore.Context,
+    key: SKStore.Key,
+  ): Array<SKStore.File> {
+    for (index in Range(0, this.deltas.size())) {
+      values = this.deltas[this.deltas.size() - index - 1].getArray(
+        context,
+        key,
+      );
+      if (!values.isEmpty()) return values;
+    };
+    this.base.getArray(context, key)
+  }
+
+  fun getArrayFilter<R: SKStore.File>(
+    context: mutable SKStore.Context,
+    key: SKStore.Key,
+    project: SKStore.File ~> R,
+  ): Array<R> {
+    for (index in Range(0, this.deltas.size())) {
+      values = this.deltas[this.deltas.size() - index - 1].getArrayFilter(
+        context,
+        key,
+        project,
+      );
+      if (!values.isEmpty()) return values;
+    };
+    this.base.getArrayFilter(context, key, project)
+  }
+
+  fun singleHandle(): SKStore.EHandle<SKStore.Key, SKStore.File> {
+    invariant(this.deltas.isEmpty(), "Discovery view must be materialized");
+    this.base
+  }
+
+  fun append(
+    context: mutable SKStore.Context,
+    delta: SKStore.EHandle<SKStore.Key, SKStore.File>,
+    round: Int,
+    hierarchical: Bool = false,
+  ): this {
+    if (hierarchical) {
+      invariant(
+        this.widths.size() == this.deltas.size(),
+        "Mixed discovery policies",
+      );
+      layers = this.deltas.concat(Array[delta]);
+      widths = this.widths.concat(Array[1]);
+      while (widths.size() >= 2 && widths.last() == widths[widths.size() - 2]) {
+        width = widths.last() * 2;
+        prefix = layers.size() - 2;
+        merged = runCompilerPhase("specialization/checkpoint", () ->
+          mergeDiscoveryLayers(
+            context,
+            Array[layers[prefix], layers[prefix + 1]],
+            "ranges/" + round + "/" + width,
+          )
+        );
+        !layers = layers.take(prefix).collect(Array).concat(Array[merged]);
+        !widths = widths.take(prefix).collect(Array).concat(Array[width]);
+      };
+      return this with {deltas => layers, widths};
+    };
+    invariant(this.widths.isEmpty(), "Mixed discovery policies");
+    view = this with {deltas => this.deltas.concat(Array[delta])};
+    if (view.deltas.size() < 8) view else {
+      SpecializerView(
+        runCompilerPhase("specialization/checkpoint", () ->
+          view.materialize(context, "checkpoint/" + round)
+        ),
+      )
+    }
+  }
+
+  // Checkpoints forward each state row once per eight rounds. The epoch is
+  // semantic precedence, independent of SKStore's producer iteration order.
+  // Keep every producer so removals can reveal an older version correctly.
+  fun materialize(
+    context: mutable SKStore.Context,
+    name: String,
+  ): SKStore.EHandle<SKStore.Key, SKStore.File> {
+    if (this.deltas.isEmpty()) return this.base;
+    handles = Array[this.base].concat(this.deltas);
+    mergeDiscoveryLayers(context, handles, name)
+  }
+}
+
+// Merge only the supplied layers. In particular, range compaction excludes
+// the initial state and earlier ranges; repeatedly forwarding those prefixes
+// would retain another copy of all their row/dependency metadata.
+private fun mergeDiscoveryLayers(
+  context: mutable SKStore.Context,
+  handles: Array<SKStore.EHandle<SKStore.Key, SKStore.File>>,
+  name: String,
+): SKStore.EHandle<SKStore.Key, SKStore.File> {
+  versions = SKStore.EHandle::multiMap(
+    (x: SKStore.Key) ~> x,
+    DiscoveryVersionFile::type,
+    context,
+    handles.mapWithIndex((epoch, handle) ->
+      (
+        handle,
+        (
+          ((_, writer, key, values) ~> {
+            key match {
+            | SKStore.IID _
+            | FStackElement _ ->
+              void
+            | _ ->
+              writer.set(key, DiscoveryVersionFile(epoch, values.toArray()))
+            }
+          }),
+          None(),
+        ),
+      )
+    ),
+    SKStore.DirName::create("/specializer/" + name + "/versions/"),
+  );
+  versions.map(
+    (x: SKStore.Key) ~> x,
+    (x: SKStore.File) ~> x,
+    context,
+    SKStore.DirName::create("/specializer/" + name + "/state/"),
+    (_, writer, key, values) ~> {
+      latest = values.first;
+      for (version in values) {
+        if (version.epoch > latest.epoch) !latest = version;
+      };
+      writer.setArray(key, latest.values)
+    },
+  )
+}
+
+module end;

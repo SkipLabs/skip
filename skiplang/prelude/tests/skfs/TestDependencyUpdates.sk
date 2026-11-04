@@ -1,0 +1,479 @@
+module alias T = SKTest;
+module SKStoreTest;
+
+@test
+fun testBlockDependencyReadersMatchTreeThroughSplitsAndRemoval(): void {
+  parents = Array["a", "b", "c"].map(name ->
+    SKStore.DirName::create("/blocks/parent/" + name + "/")
+  );
+  childNames = Range(0, 7).map(i ->
+    SKStore.DirName::create("/blocks/child/" + i + "/")
+  ).collect(Array);
+  path = SKStore.Path::iid(SKStore.DirName::create("/blocks/source/"), 0);
+  make = (i: Int, payload: Int) ->
+    SKStore.TArrowKey::create{
+      parentName => parents[i % parents.size()],
+      childName => childNames[i % childNames.size()],
+      key => DependencyAlias(i, payload),
+    };
+  for (compact in Array[false, true]) {
+    reference = SKStore.Deps::empty();
+    candidate = SKStore.Deps::empty(compact, false, true);
+    check = () -> {
+      T.expectEq(
+        candidate.readers(path).collect(Array),
+        reference.readers(path).collect(Array),
+      );
+      for (parent in parents) {
+        for (child in childNames) {
+          T.expectEq(
+            candidate.maybeGetReads(parent, child),
+            reference.maybeGetReads(parent, child),
+          )
+        }
+      }
+    };
+    for (round in Range(0, 3)) {
+      for (step in Range(0, 1024)) {
+        // Odd multiplier permutes all keys, visiting both ends of blocks.
+        i = (step * 513 + round * 71) % 1024;
+        !reference = reference.set(path, make(i, i));
+        !candidate = candidate.set(path, make(i, i));
+        if (step < 70 || step % 127 == 0) check()
+      };
+      check();
+      snapshot = candidate;
+      for (step in Range(0, 1024)) {
+        i = (step * 733 + round * 37) % 1024;
+        if (i % 4 != 0) {
+          !reference = reference.remove(path, make(i, -1));
+          !candidate = candidate.remove(path, make(i, -1))
+        };
+        if (step % 127 == 0) check()
+      };
+      check();
+      T.expectEq(snapshot.maybeGet(path).fromSome().size(), 1024);
+      for (i in Range(0, 1024)) {
+        !reference = reference.set(path, make(i, i + 10000));
+        !candidate = candidate.set(path, make(i, i + 10000))
+      };
+      check();
+      for (child in childNames) {
+        !reference = reference.removeDir(child);
+        !candidate = candidate.removeDir(child);
+        check()
+      };
+      T.expectTrue(candidate.maybeGet(path).isNone());
+      T.expectEq(snapshot.maybeGet(path).fromSome().size(), 1024);
+      // Removal of an absent row must not resurrect an inverse entry.
+      !candidate = candidate.remove(path, make(round, 0));
+      check()
+    }
+  }
+}
+
+@test
+fun testBlockDependencyReadersPreserveEqualKeyRepresentative(): void {
+  parent = SKStore.DirName::create("/blocks/alias/parent/");
+  child = SKStore.DirName::create("/blocks/alias/child/");
+  path = SKStore.Path::iid(SKStore.DirName::create("/blocks/alias/source/"), 0);
+  make = (i: Int, payload: Int) ->
+    SKStore.TArrowKey::create{
+      parentName => parent,
+      childName => child,
+      key => DependencyAlias(i, payload),
+    };
+  deps = SKStore.Deps::empty(true, true, true);
+  for (i in Range(0, 257)) !deps = deps.set(path, make(i, i));
+  snapshot = deps;
+  for (i in Range(0, 257)) !deps = deps.set(path, make(i, -1));
+  for (reader in deps.readers(path)) {
+    i = reader.getKeyString().toInt();
+    T.expectTrue(native_eq(reader, make(i, i)) == 0)
+  };
+  for (i in Range(0, 257)) {
+    !deps = deps.remove(path, make(i, -1));
+    T.expectEq(deps.readers(path).collect(Array).size(), 256 - i);
+    T.expectEq(snapshot.maybeGet(path).fromSome().size(), 257)
+  };
+  T.expectTrue(deps.maybeGet(path).isNone());
+  T.expectTrue(deps.maybeGetReads(parent, child).isEmpty())
+}
+
+@test
+fun testBlockDependencyReaderContextPolicy(): void {
+  for (blockReaders in Array[false, true]) {
+    context = SKStore.Context::create{blockReaders};
+    T.expectEq(context.usesBlockDependencyReaders(), blockReaders);
+    T.expectEq(context.mclone().usesBlockDependencyReaders(), blockReaders);
+    writable = SKStore.Context::mcreate{blockReaders};
+    T.expectEq(writable.usesBlockDependencyReaders(), blockReaders);
+    T.expectEq(writable.clone().usesBlockDependencyReaders(), blockReaders)
+  }
+}
+
+class DependencyAlias(id: Int, payload: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    this.id.compare(DependencyAlias::keyType(other).id)
+  }
+  fun toString(): String {
+    this.id.toString()
+  }
+}
+
+@test
+fun testDependencyInverseIndexSharedChild(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/exact/source/"),
+    SKStore.IID(0),
+  );
+  first = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  second = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(1),
+  };
+  deps = SKStore.Deps::empty()
+    .set(path, first)
+    .set(path, second)
+    .remove(path, first);
+  T.expectEq(deps.maybeGetReads(parent, child).size(), 1);
+  T.expectTrue(deps.maybeGetReads(parent, child).get(second).contains(path));
+  T.expectTrue(deps.removeDir(child).maybeGet(path).isNone());
+}
+
+@test
+fun testRemoveDirPreservesOtherChildOnSharedPath(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  removedChild = SKStore.DirName::create("/exact/removed/");
+  survivingChild = SKStore.DirName::create("/exact/surviving/");
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/exact/source/"),
+    SKStore.IID(0),
+  );
+  first = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => removedChild,
+    key => SKStore.IID(0),
+  };
+  second = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => removedChild,
+    key => SKStore.IID(1),
+  };
+  survivor = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => survivingChild,
+    key => SKStore.IID(2),
+  };
+  deps = SKStore.Deps::empty()
+    .set(path, first)
+    .set(path, second)
+    .set(path, survivor)
+    .removeDir(removedChild);
+  T.expectTrue(deps.maybeGetReads(parent, removedChild).isEmpty());
+  T.expectTrue(
+    deps.maybeGetReads(parent, survivingChild).get(survivor).contains(path),
+  );
+  T.expectTrue(deps.removeDir(survivingChild).maybeGet(path).isNone());
+}
+
+@test
+fun testExactDependencyReplacementAndSnapshots(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  source = SKStore.DirName::create("/exact/source/");
+  reader = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  oldReads = Array[0, 2, 4, 6].map(i ->
+    SKStore.Path::create(source, SKStore.IID(i))
+  );
+  newReads = SortedSet::createFromItems(
+    Array[1, 2, 5, 6].map(i -> SKStore.Path::create(source, SKStore.IID(i))),
+  );
+  for (mode in Array[0, 1]) {
+    ctx = SKStore.Context::mcreate{dependencyMode => mode};
+    ctx.updateNewDeps(reader, SortedSet::createFromItems(oldReads));
+    snapshot = ctx.clone();
+    ctx.replaceDeps(reader, oldReads, newReads);
+    T.expectEq(
+      ctx.maybeGetReads(parent, child).get(reader).toArray(),
+      newReads.toArray(),
+    );
+    T.expectEq(
+      snapshot.maybeGetReads(parent, child).get(reader).toArray(),
+      oldReads,
+    );
+    // A second unchanged update must preserve every edge before full removal.
+    ctx.replaceDeps(reader, newReads.toArray(), newReads);
+    T.expectEq(
+      ctx.maybeGetReads(parent, child).get(reader).toArray(),
+      newReads.toArray(),
+    );
+    ctx.replaceDeps(reader, newReads.toArray(), SortedSet[]);
+    T.expectTrue(ctx.maybeGetReads(parent, child).isEmpty());
+  }
+}
+
+@test
+fun testDependencyReplacementUsesLogicalKeyIdentity(): void {
+  parent = SKStore.DirName::create("/exact/parent/");
+  child = SKStore.DirName::create("/exact/child/");
+  source = SKStore.DirName::create("/exact/source/");
+  reader = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  before = SKStore.Path::create(source, DependencyAlias(7, 10));
+  after = SKStore.Path::create(source, DependencyAlias(7, 20));
+  ctx = SKStore.Context::mcreate{dependencyMode => 1};
+  ctx.updateNewDeps(reader, SortedSet[before]);
+  ctx.replaceDeps(reader, Array[before], SortedSet[after]);
+  T.expectEq(ctx.maybeGetReads(parent, child).get(reader).size(), 1);
+  T.expectTrue(ctx.maybeGetReads(parent, child).get(reader).contains(after));
+  ctx.replaceDeps(reader, Array[after], SortedSet[]);
+  T.expectTrue(ctx.maybeGetReads(parent, child).isEmpty());
+}
+@test
+fun testDependencyRemovalAcrossParentsAndChildren(): void {
+  checkDependencyRemovalAcrossParentsAndChildren(false)
+}
+
+@test
+fun testCompactDependencyRemovalAcrossParentsAndChildren(): void {
+  checkDependencyRemovalAcrossParentsAndChildren(true)
+}
+
+fun checkDependencyRemovalAcrossParentsAndChildren(compact: Bool): void {
+  parents = Array["a", "z"].map(name ->
+    SKStore.DirName::create("/fanout/parent/" + name + "/")
+  );
+  childNames = Range(0, 8).map(i ->
+    SKStore.DirName::create("/fanout/child/" + i + "/")
+  ).collect(Array);
+  path = SKStore.Path::create(
+    SKStore.DirName::create("/fanout/source/"),
+    SKStore.IID(0),
+  );
+  deps = SKStore.Deps::empty(compact);
+  for (parent in parents) {
+    for (child in childNames) {
+      for (i in Range(0, 16)) {
+        !deps = deps.set(
+          path,
+          SKStore.TArrowKey::create{
+            parentName => parent,
+            childName => child,
+            key => SKStore.IID(i),
+          },
+        )
+      }
+    }
+  };
+  snapshot = deps;
+  for (parentIndex in Range(0, parents.size())) {
+    parent = parents[parentIndex];
+    for (child in childNames) {
+      for (i in Range(0, 16)) {
+        !deps = deps.remove(
+          path,
+          SKStore.TArrowKey::create{
+            parentName => parent,
+            childName => child,
+            key => SKStore.IID(i),
+          },
+        );
+        T.expectEq(deps.maybeGetReads(parent, child).size(), 15 - i)
+      };
+      if (parentIndex == 0) {
+        // Exhausting one parent must preserve the child's inverse index while
+        // a different parent still has readers, even amid unrelated childNames.
+        T.expectEq(deps.maybeGetReads(parents[1], child).size(), 16)
+      }
+    }
+  };
+  T.expectTrue(deps.maybeGet(path).isNone());
+  T.expectEq(snapshot.maybeGet(path).fromSome().size(), 256);
+}
+
+@test
+fun testCompactDependencyReaderThresholdsAndSnapshots(): void {
+  parent = SKStore.DirName::create("/compact/parent/");
+  child = SKStore.DirName::create("/compact/child/");
+  path = SKStore.Path::iid(SKStore.DirName::create("/compact/source/"), 0);
+  readers = Range(0, 20).map(i ->
+    SKStore.TArrowKey::create{
+      parentName => parent,
+      childName => child,
+      key => SKStore.IID(i),
+    }
+  ).collect(Array);
+  reference = SKStore.Deps::empty();
+  compact = SKStore.Deps::empty(true);
+  for (round in Range(0, 3)) {
+    // Reverse insertion order exercises ordered insertion at every position.
+    for (index in Range(0, readers.size())) {
+      reader = readers[readers.size() - index - 1];
+      !reference = reference.set(path, reader);
+      !compact = compact.set(path, reader);
+      T.expectEq(
+        compact.readers(path).collect(Array),
+        reference.readers(path).collect(Array),
+      );
+      T.expectEq(
+        compact.maybeGetReads(parent, child),
+        reference.maybeGetReads(parent, child),
+      )
+    };
+    snapshot = compact;
+    for (reader in readers) {
+      !reference = reference.remove(path, reader);
+      !compact = compact.remove(path, reader);
+      T.expectEq(
+        compact.readers(path).collect(Array),
+        reference.readers(path).collect(Array),
+      );
+      T.expectEq(
+        compact.maybeGetReads(parent, child),
+        reference.maybeGetReads(parent, child),
+      );
+      T.expectEq(snapshot.maybeGet(path).fromSome().size(), readers.size())
+    };
+    T.expectTrue(compact.maybeGet(path).isNone());
+    T.expectTrue(compact.maybeGetReads(parent, child).isEmpty());
+    // Removing an already absent reader must leave the reverse index empty.
+    !compact = compact.remove(path, readers[round]);
+    T.expectTrue(compact.maybeGet(path).isNone())
+  }
+}
+
+@test
+fun testCompactDependencyReaderContextPolicy(): void {
+  for (compactReaders in Array[false, true]) {
+    context = SKStore.Context::create{compactReaders};
+    T.expectEq(context.usesCompactDependencyReaders(), compactReaders);
+    T.expectEq(context.mclone().usesCompactDependencyReaders(), compactReaders);
+    writable = SKStore.Context::mcreate{compactReaders};
+    T.expectEq(writable.usesCompactDependencyReaders(), compactReaders);
+    T.expectEq(writable.clone().usesCompactDependencyReaders(), compactReaders)
+  }
+}
+
+@test
+fun testCompactDependencyReadersPreserveEqualKeyRepresentative(): void {
+  parent = SKStore.DirName::create("/compact/alias/parent/");
+  child = SKStore.DirName::create("/compact/alias/child/");
+  path = SKStore.Path::iid(
+    SKStore.DirName::create("/compact/alias/source/"),
+    0,
+  );
+  make = (id, payload) ->
+    SKStore.TArrowKey::create{
+      parentName => parent,
+      childName => child,
+      key => DependencyAlias(id, payload),
+    };
+  first = make(0, 11);
+  equalKey = make(0, 22);
+  compact = SKStore.Deps::empty(true).set(path, first).set(path, equalKey);
+  T.expectEq(compact.maybeGet(path).fromSome().size(), 1);
+  T.expectTrue(native_eq(compact.readers(path).next().fromSome(), first) == 0);
+  snapshot = compact;
+  for (i in Range(1, 10)) !compact = compact.set(path, make(i, i));
+  !compact = compact.set(path, equalKey);
+  stored = compact
+    .readers(path)
+    .find(reader -> reader.getKeyString() == "0")
+    .fromSome();
+  T.expectTrue(native_eq(stored, first) == 0);
+  !compact = compact.remove(path, equalKey);
+  for (i in Range(1, 10)) !compact = compact.remove(path, make(i, i));
+  T.expectTrue(compact.maybeGet(path).isNone());
+  T.expectTrue(native_eq(snapshot.readers(path).next().fromSome(), first) == 0)
+}
+
+@test
+fun testCanonicalDependencyPathsUseLiveLogicalRepresentatives(): void {
+  parent = SKStore.DirName::create("/canonical/parent/");
+  child = SKStore.DirName::create("/canonical/child/");
+  source = SKStore.DirName::create("/canonical/source/");
+  reader = SKStore.TArrowKey::create{
+    parentName => parent,
+    childName => child,
+    key => SKStore.IID(0),
+  };
+  original = SKStore.Path::create(source, DependencyAlias(7, 10));
+  equivalent = SKStore.Path::create(source, DependencyAlias(7, 20));
+  missing = SKStore.Path::create(source, DependencyAlias(8, 30));
+  for (compact in Array[false, true]) {
+    for (canonical in Array[false, true]) {
+      deps = SKStore.Deps::empty(compact, canonical).set(original, reader);
+      T.expectTrue(
+        native_eq(
+          deps.canonicalPath(equivalent),
+          if (canonical) original else equivalent,
+        ) == 0,
+      );
+      T.expectTrue(native_eq(deps.canonicalPath(missing), missing) == 0);
+      snapshot = deps;
+      !deps = deps.remove(original, reader);
+      T.expectTrue(native_eq(deps.canonicalPath(equivalent), equivalent) == 0);
+      T.expectTrue(
+        native_eq(
+          snapshot.canonicalPath(equivalent),
+          if (canonical) original else equivalent,
+        ) == 0,
+      )
+    }
+  }
+}
+
+@test
+fun testCanonicalDependencyReadsAndContextCopies(): void {
+  source = SKStore.DirName::create("/canonical/source/");
+  first = SKStore.Path::create(source, DependencyAlias(1, 10));
+  equal = SKStore.Path::create(source, DependencyAlias(1, 20));
+  absent = SKStore.Path::create(source, DependencyAlias(2, 30));
+  reader = SKStore.TArrowKey::create{
+    parentName => source,
+    childName => SKStore.DirName::create("/canonical/reader/"),
+    key => SKStore.IID(0),
+  };
+  for (canonicalReadPaths in Array[false, true]) {
+    context = SKStore.Context::mcreate{canonicalReadPaths};
+    context.updateNewDeps(reader, SortedSet[first]);
+    context.addRead(equal);
+    context.addRead(absent);
+    T.expectEq(context.getReads().size(), 2);
+    T.expectTrue(
+      native_eq(
+        context.getReads().find(path -> path.compare(equal) == EQ()).fromSome(),
+        if (canonicalReadPaths) first else equal,
+      ) == 0,
+    );
+    snapshot = context.clone();
+    T.expectEq(snapshot.usesCanonicalReadPaths(), canonicalReadPaths);
+    T.expectEq(snapshot.mclone().usesCanonicalReadPaths(), canonicalReadPaths);
+    T.expectEq(
+      SKStore.Context::create{canonicalReadPaths}.usesCanonicalReadPaths(),
+      canonicalReadPaths,
+    );
+    context.replaceDeps(reader, Array[first], SortedSet[absent]);
+    context.!reads = SortedSet[];
+    context.addRead(equal);
+    T.expectTrue(native_eq(context.getReads().min().fromSome(), equal) == 0);
+    T.expectEq(snapshot.getReads().size(), 2)
+  }
+}
+
+module end;
