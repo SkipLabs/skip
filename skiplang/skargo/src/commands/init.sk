@@ -21,16 +21,15 @@ fun init(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
   )
 }
 
-fun execInit(_gctx: GlobalContext, args: Cli.ParseResults): void {
+fun execInit(gctx: GlobalContext, args: Cli.ParseResults): void {
   path = args
     .maybeGetString("path")
     .map(p -> Path.resolve(p))
     .default(getcwd());
-  _ = system("mkdir -p " + path);
   rootDir = path;
   optManifestFile = loop {
     if (FileSystem.exists(Path.join(path, Skargo.kManifestFile))) {
-      break Some(path)
+      break Some(Path.join(path, Skargo.kManifestFile))
     };
     if (Path.isRoot(path)) {
       break None()
@@ -41,33 +40,26 @@ fun execInit(_gctx: GlobalContext, args: Cli.ParseResults): void {
   | Some(manifestFile) ->
     print_string(`\`${Path.parentname(manifestFile)}\` already initialized.`)
   | _ ->
+    srcDir = Path.join(rootDir, "src");
+    mkdir = System.subprocess(Array["mkdir", "-p", "--", srcDir]).fromSuccess();
+    if (mkdir.exitcode() != 0) {
+      gctx.console.error(subprocess_error_message(mkdir));
+      skipExit(1)
+    };
     manifestFile = Path.join(rootDir, Skargo.kManifestFile);
     name = Path.basename(rootDir);
     FileSystem.writeTextFile(
       manifestFile,
       generateManifestTemplate(name, args.maybeGetString("test-harness")),
     );
-    srcDir = Path.join(rootDir, "src");
-    _ = system("mkdir -p " + srcDir)
+    mainFile = Path.join(srcDir, "main.sk");
+    if (!FileSystem.exists(mainFile)) {
+      FileSystem.writeTextFile(
+        mainFile,
+        "module Main;\n\nfun main(): void {\n  print_string(\"Hello, world!\")\n}\n\nmodule end;\n",
+      )
+    }
   }
-}
-
-private fun pascalCase(name: String): String {
-  toupper = true;
-  String::fromChars(
-    name
-      .chars()
-      .map(c -> {
-        if (c == '_') {
-          !toupper = true;
-        } else {
-          !c = if (toupper) c.capitalize() else c;
-          !toupper = false;
-        };
-        c
-      })
-      .toArray(),
-  ).replace("_", "");
 }
 
 private fun generateManifestTemplate(
@@ -75,6 +67,7 @@ private fun generateManifestTemplate(
   optTestHarness: ?String = None(),
   version: String = "0.1.0",
 ): String {
+  !name = name.replace("\\", "\\\\").replace("\"", "\\\"");
   Array["[package]", `name = "${name}"`, `version = "${version}"`].concat(
     optTestHarness.map(th -> Array[`test-harness = "${th}"`]).default(Array[]),
   )
@@ -82,14 +75,12 @@ private fun generateManifestTemplate(
       Array[
         "",
         "[dependencies]",
-        "prelude = *",
+        "# The installed standard library is linked automatically.",
         "#depname = { \"path\" = \"deppath\" }",
-        "#depname = { \"version\" = \"version\"  }",
-        "#depname = { \"path\" = \"deppath\", \"version\" = \"version\"  }",
         "",
-        "#[[bin]]",
-        `#name = "${name.replace("_", "")}"`,
-        `#main = "${pascalCase(name)}.main"`,
+        "[[bin]]",
+        `name = "${name}"`,
+        "main = \"Main.main\"",
         "",
       ],
     )

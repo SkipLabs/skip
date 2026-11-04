@@ -1,0 +1,67 @@
+module alias T = SKTest;
+
+module SkargoInitTests;
+
+private fun command(args: Array<String>): System.CompletedProcess {
+  result = System.popen{
+    args,
+    env => Map["SKARGO_BIN" => "skargo"],
+  }.fromSuccess();
+  T.expectEq(result.exitcode(), 0, result.stderr);
+  result
+}
+
+@test
+fun test_init_runnable_project(): void {
+  if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+    print_string("skipping: merged-mode only");
+    return void
+  };
+  skargo = Environ.current_exe();
+  root = command(
+    Array["mktemp", "-d", "/tmp/skargo-init-test-XXXXXX"],
+  ).stdout.trim();
+  project = Path.join(root, "hello-world");
+  _ = command(Array[skargo, "init", project]);
+  manifest = Path.join(project, "Skargo.toml");
+  source = Path.join(project, "src", "main.sk");
+  originalManifest = FileSystem.readTextFile(manifest);
+  originalSource = FileSystem.readTextFile(source);
+  run = command(Array[skargo, "run", "--manifest-path", manifest]);
+  T.expectEq(run.stdout.trim(), "Hello, world!");
+  again = command(Array[skargo, "init", "--color", "never", project]);
+  T.expectTrue(
+    again.stdout.contains(`\`${project}\` already initialized.`),
+    again.stdout,
+  );
+  T.expectEq(FileSystem.readTextFile(manifest), originalManifest);
+  T.expectEq(FileSystem.readTextFile(source), originalSource);
+  child = Path.join(project, "nested");
+  _ = command(Array[skargo, "init", child]);
+  T.expectFalse(FileSystem.exists(child));
+  // Shell metacharacters must survive as literal path/name text.
+  unusual = Path.join(root, "hello-world ' $skip");
+  _ = command(Array[skargo, "init", unusual]);
+  T.expectTrue(
+    FileSystem.exists(Path.join(unusual, "src", "main.sk")),
+    unusual,
+  );
+  // Existing source files must remain intact when adding a manifest.
+  existing = Path.join(root, "existing");
+  _ = command(Array["mkdir", "-p", Path.join(existing, "src")]);
+  existingMain = Path.join(existing, "src", "main.sk");
+  FileSystem.writeTextFile(existingMain, originalSource + "\n// preserved\n");
+  _ = command(Array[skargo, "init", "--test-harness", "Tests.main", existing]);
+  T.expectEq(
+    FileSystem.readTextFile(existingMain),
+    originalSource + "\n// preserved\n",
+  );
+  T.expectTrue(
+    FileSystem.readTextFile(Path.join(existing, "Skargo.toml")).contains(
+      "test-harness = \"Tests.main\"",
+    ),
+  );
+  _ = command(Array["rm", "-rf", root])
+}
+
+module end;
