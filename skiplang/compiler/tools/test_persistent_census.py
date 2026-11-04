@@ -85,7 +85,10 @@ int main(int argc, char **argv) {
 """
 
 
-@unittest.skipUnless(shutil.which("cc"), "C compiler unavailable")
+C_COMPILER = shutil.which("cc") or shutil.which("clang")
+
+
+@unittest.skipUnless(C_COMPILER, "C compiler unavailable")
 class PersistentCensusTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -93,7 +96,7 @@ class PersistentCensusTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         runtime = Path(__file__).resolve().parents[2] / "prelude/runtime"
         common = [
-            "cc",
+            C_COMPILER,
             "-O2",
             "-DSKIP64",
             "-Wall",

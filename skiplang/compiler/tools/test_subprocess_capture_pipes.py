@@ -133,8 +133,11 @@ int main(int argc, char **argv) {
 """
 
 
+C_COMPILER = shutil.which("cc") or shutil.which("clang")
+
+
 @unittest.skipUnless(
-    sys.platform == "linux" and shutil.which("cc"),
+    sys.platform == "linux" and C_COMPILER,
     "Native Linux C toolchain required",
 )
 class CapturePipeTests(unittest.TestCase):
@@ -153,7 +156,7 @@ class CapturePipeTests(unittest.TestCase):
             output = root / ("portable" if portable else "atomic")
             subprocess.run(
                 [
-                    "cc",
+                    C_COMPILER,
                     "-O2",
                     "-g",
                     "-DSKIP64",

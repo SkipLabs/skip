@@ -310,7 +310,11 @@ class ContainmentTests(unittest.TestCase):
             self.assertEqual(group_memory(report["process_group"]), [])
 
 
-@unittest.skipUnless(shutil.which("cc"), "C compiler unavailable")
+# Minimal LLVM installations may provide clang without a cc alias.
+C_COMPILER = shutil.which("cc") or shutil.which("clang")
+
+
+@unittest.skipUnless(C_COMPILER, "C compiler unavailable")
 class NativeWrapperTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -318,7 +322,7 @@ class NativeWrapperTests(unittest.TestCase):
         cls.binary = str(Path(cls.build.name) / "wrap")
         subprocess.run(
             [
-                "cc",
+                C_COMPILER,
                 "-O2",
                 "-Wall",
                 "-Wextra",
