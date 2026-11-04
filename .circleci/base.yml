@@ -72,6 +72,9 @@ jobs:
       - custom-checkout:
           submodules: true
       - run:
+          name: Run runtime regressions
+          command: bash skiplang/prelude/runtime/tests/run.sh
+      - run:
           name: Run compiler tests
           no_output_timeout: 30m
           # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
@@ -95,9 +98,8 @@ jobs:
               SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
               "$root/bin/run-sktest.sh" || { tail -n 100 runs/ci-compiler-tests/command.log; exit 1; }
       - run:
-          name: Run backend and runtime regressions
+          name: Run backend regressions
           command: |
-            bash skiplang/prelude/runtime/tests/run.sh
             cd skiplang/compiler
             python3 tools/incremental_profile.py run \
               --root /tmp/skc-backend-checks --label regressions \

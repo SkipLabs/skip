@@ -15,9 +15,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 "$runtime_test_dir/mutex"
 
 for runtime_test_opt in -O0 -O2; do
+  # Keep every UBSan check, using traps so the optional diagnostic runtime is
+  # not required by minimal LLVM installations such as the CI image.
   clang -std=c2x "$runtime_test_opt" -g -Wall -Wextra -Werror \
     -ffunction-sections -fdata-sections -Wl,--gc-sections \
-    -fsanitize=undefined -fno-sanitize-recover=all \
+    -fsanitize=undefined -fsanitize-trap=all \
     "$runtime_test_sources/reference_masks.c" -o "$runtime_test_dir/reference-masks"
   "$runtime_test_dir/reference-masks"
 done

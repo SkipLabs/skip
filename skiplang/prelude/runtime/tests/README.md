@@ -52,7 +52,7 @@ stacks, including scalar fields between references and mask-word boundaries.
 ```sh
 clang -std=c2x -O2 -g -Wall -Wextra -Werror \
   -ffunction-sections -fdata-sections -Wl,--gc-sections \
-  -fsanitize=undefined -fno-sanitize-recover=all \
+  -fsanitize=undefined -fsanitize-trap=all \
   skiplang/prelude/runtime/tests/reference_masks.c -o /tmp/reference-masks
 /tmp/reference-masks
 ```
@@ -62,3 +62,7 @@ shifts a signed 32-bit integer and fails UBSan at bit 31. Testing the selected
 bit by shifting the unsigned 64-bit mask avoids both signed overflow and
 out-of-range shifts. Allocator/target-following stubs keep this test focused on
 the real traversal routines; it is not an end-to-end allocator or Wasm test.
+
+[UBSan trap mode](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#usage)
+keeps the enabled checks and terminates on a failure without linking the optional
+compiler-rt diagnostic library. This also works in minimal LLVM installations.

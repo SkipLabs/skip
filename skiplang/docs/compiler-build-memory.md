@@ -118,7 +118,20 @@ this is not an isolated latency measurement. The fresh-build databases were
 retired after validation, reclaiming 16.89 GiB. The language-suite database
 cleanup reclaimed another 3.00 GiB.
 
-These are local AArch64 results. CI retains its 16 GB allocation and 14 GiB RSS
-guard and must validate the pinned bootstrap on its own worker. The margin is
-small; neither the sampled peak nor the local fixpoint proves CI success or
-establishes a bound for arbitrary compiler workloads.
+CircleCI job [20830](https://circleci.com/gh/SkipLabs/skip/20830), on revision
+`eecca396a`, then passed its clean stage1 build and language-test phases with the
+existing 16 GB allocation and 14 GiB RSS guard. The build peaked at 13.52 GiB
+sampled RSS; the compiler process's kernel high-water mark was 13.82 GiB and
+the conservative sum for live processes was 13.90 GiB. The language-test phase
+peaked at 8.04 GiB. Clang was measured separately in the local runs above, not
+in this CI job.
+
+The job's later runtime-test step could not link the image's missing UBSan
+diagnostic library. The test runner now uses UBSan trap mode, preserving the
+checks without that optional dependency; a deliberately restored signed-shift
+bug traps at both `-O0` and `-O2`. Runtime tests run before the compiler build so
+environment failures are reported early. The final commit's CI status remains
+the authority for the complete suite result.
+
+The margin below 14 GiB is small. These measurements do not establish a bound
+for arbitrary compiler workloads.
