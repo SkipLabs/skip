@@ -59,8 +59,9 @@ Standalone checks exercise native and Wasm allocation, persistent mutex recovery
 The bootstrap linker regression and SQL dependency-type compatibility are also
 checked explicitly.
 
-The compiler language suite passes all 1,766 cases. All 166 Python backend
-checks pass with no skips. The suite supplies explicit compiler/library paths
+The compiler language suite passes all 1,766 cases. The consolidation passed
+all 166 Python backend checks; the memory follow-up expands that to 176, all
+passing with no skips. The suite supplies explicit compiler/library paths
 and checks output after edits,
 retractions, branch-like round trips, errors and option changes. Its command and
 resource limits are documented in [the tool guide](../compiler/tools/README.md).
@@ -80,6 +81,13 @@ implement the no-change backend behavior these integration tests exercise.
 | Regression tools | All 166 backend checks with explicit candidate and legacy compiler paths, with no skips. |
 | Skargo | Optimized driver build; all seven tests using the candidate compiler; capacity inheritance in all three environments; CI producer/consumer selection and wrapper argument checks. |
 | Documentation | Relative-link and patch-whitespace checks; no compiler behavior changes. |
+
+The subsequent [compiler-memory fix](compiler-build-memory.md) checkpoints
+sequential backend heaps and separates the large vtable from Clang
+optimization. It adds regressions for sequential checkpoint recovery, split
+modules and bootstrap packaging. Its bootstrap is rebuilt from the tested
+source; the memory report records fresh-build results separately from the
+original consolidation.
 
 Formatting corrections and the bootstrap/SQL compatibility fixes are folded into
 their owning commits. Validation runs use separate output directories and bounded

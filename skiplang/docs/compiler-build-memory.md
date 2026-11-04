@@ -78,22 +78,47 @@ optimization, and cross-module definitions receive hidden linkage unless they
 are explicit exports. Unsupported custom preambles use the monolithic path.
 Switching back removes the old vtable sidecar. Bootstrap promotion and stage0
 linking support the paired modules; older monolithic bootstraps remain usable.
+The compiler Makefile enables the split when the bootstrap carries paired
+modules. Other native builds opt in with `--split-support-module`.
 
 The completed local validation used AArch64, Clang 20.1.8 and `SKIP_CAPACITY=12G`:
 
-| Run | Result | Sampled process-group peak |
-| --- | --- | ---: |
-| Clean compiler and formatter build | Passed the 14 GiB guard | 13.23 GiB |
-| Language suite, eight jobs | 1,766 passed | 9.08 GiB |
-| Backend suite, three module workers | 176 passed, zero skipped | 5.42 GiB |
+| Run                                 | Result                   | Sampled process-group peak |
+| ----------------------------------- | ------------------------ | -------------------------: |
+| Clean compiler and formatter build  | Passed the 14 GiB guard  |                  13.23 GiB |
+| Language suite, eight jobs          | 1,766 passed             |                   9.08 GiB |
+| Backend suite, three module workers | 176 passed, zero skipped |                   5.42 GiB |
 
 Clang's compiler-binary invocation reported a 1.97 GiB peak via `wait4`, measured
-separately from Skip. The compiler process's kernel high-water mark was 13.85 GiB. Summing the
-high-water marks of processes present together gives a conservative 13.94 GiB
+separately from Skip. The compiler process's kernel high-water mark was
+13.85 GiB. Summing the high-water marks of processes present together gives a conservative 13.94 GiB
 bound for the build group. This is close to the target; the sampled number alone
 would overstate the available margin. These runs overlapped, so their elapsed
 times are not comparative latency benchmarks. The backend worker harness and
 raw profiles are scratch artifacts, not additional CI requirements.
 
-The source fix still needs a refreshed bootstrap and a successful clean CI run.
-Keep the existing 16 GB allocation and 14 GiB guard for that validation.
+## Refreshed bootstrap
+
+Bootstrap `7aa59d1261f145f76f47b2210c7e456a390c847f` contains the canonical
+paired LLVM modules generated from source `51d31217b`. A separate checkout,
+starting from those compressed images and no build products, completed
+`make STAGE=3` under the unchanged 14 GiB guard. Its stage0 compiler reports
+`skc 0.3.3 (51d31217b)`.
+
+| Fresh-bootstrap check                                    | Result                                                           |                  Peak |
+| -------------------------------------------------------- | ---------------------------------------------------------------- | --------------------: |
+| Entire stage0 through stage3 build                       | Passed                                                           | 13.72 GiB sampled RSS |
+| Conservative sum of live processes' high-water marks     | Below the guard                                                  |             13.90 GiB |
+| Clang, measured separately with `wait4`                  | Passed                                                           |              2.02 GiB |
+| Language suite using rebuilt stage1, eight jobs          | 1,766 passed                                                     |  8.05 GiB sampled RSS |
+| LLVM fixpoint, all three tools and both modules per tool | All six files identical across source, stage1, stage2 and stage3 |                     — |
+
+The build took 1,067 seconds across all four stages while other validation ran;
+this is not an isolated latency measurement. The fresh-build databases were
+retired after validation, reclaiming 16.89 GiB. The language-suite database
+cleanup reclaimed another 3.00 GiB.
+
+These are local AArch64 results. CI retains its 16 GB allocation and 14 GiB RSS
+guard and must validate the pinned bootstrap on its own worker. The margin is
+small; neither the sampled peak nor the local fixpoint proves CI success or
+establishes a bound for arbitrary compiler workloads.
