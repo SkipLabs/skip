@@ -58,6 +58,22 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-no-file-mapping-noreserve
 ```
 
+# Persistent file lock under signals
+
+A process opening a mapping while another holds its exclusive file lock blocks
+in `flock(LOCK_SH)`. A signal handler installed without `SA_RESTART` makes that
+call fail with `EINTR`; the runtime must retry rather than exit with
+`ERROR_LOCKING`. This test interrupts the waiting process every 5 ms until the
+lock is released.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/persistent_flock_eintr.c \
+  -o /tmp/test-persistent-flock-eintr
+/tmp/test-persistent-flock-eintr
+```
+
 # Reference masks
 
 The object traversals use 64-bit reference masks. This regression exercises
