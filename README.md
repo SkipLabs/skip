@@ -70,6 +70,8 @@ The issue tracker is kept up-to-date with our roadmap and is a good place to beg
 
 You can also join our [Discord](https://discord.gg/bsnXyw2F9P) to ask any questions or get involved.
 
+See [AGENTS.md](./AGENTS.md) for build/test commands and the commit and PR policy, and `.github/PULL_REQUEST_TEMPLATE.md` for the PR checklist.
+
 ## License
 
 Skip is [MIT licensed](./LICENSE).
