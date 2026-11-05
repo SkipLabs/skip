@@ -4,14 +4,27 @@
 
 BASE="$(git merge-base main HEAD)"
 
-git diff --quiet HEAD "$BASE" -- examples/
+# Doc-only changes must not trigger tests or compilation, so every diff below
+# excludes documentation files (markdown anywhere in the tree).
+DOC_EXCLUDES=(
+  ':(exclude)*.md'
+  ':(glob,exclude)**/*.md'
+  ':(glob,exclude)**/*.mdx'
+)
+
+# Exit 0 when the diff restricted to the given paths has no non-doc change.
+changed() {
+  git diff --quiet HEAD "$BASE" -- "$@" "${DOC_EXCLUDES[@]}"
+}
+
+changed examples/
 examples=$?
 
 shopt -s globstar
 declare -A SK_CHANGED
 for skargo_toml in **/Skargo.toml; do
   dir=$(dirname "$skargo_toml")
-  git diff --quiet HEAD "$BASE" -- "$dir" :^"$dir/ts" \
+  changed "$dir" :^"$dir/ts" \
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
@@ -62,7 +75,7 @@ check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 for dir in $(jq --raw-output ".workspaces[]" package.json); do
-  git diff --quiet HEAD "$BASE" -- "$dir" \
+  changed "$dir" \
     && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
   ${TS_CHANGED["$dir"]} && check_ts=true
 done
@@ -97,7 +110,7 @@ fi
 # Makefiles/bin scripts drive those builds. Without this a change to e.g. the
 # lockfile or skipruntime-ts/Makefile runs no CI at all, even though it can break
 # those builds -- so route it to the TS job set.
-if ! git diff --quiet HEAD "$BASE" -- \
+if ! changed \
      Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile; then
   check_ts=true
   TS_CHANGED[skipruntime-ts]=true
