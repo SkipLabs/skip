@@ -510,7 +510,11 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
   if (fileName == NULL) {
-    mapping = mmap(NULL, icapacity, prot, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    // The capacity is a sparse upper bound (64 GiB by default), not memory to
+    // commit up front. Without MAP_NORESERVE, heuristic overcommit refuses a
+    // private writable mapping larger than RAM plus swap.
+    mapping = mmap(NULL, icapacity, prot,
+                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   } else {
     fd = open(fileName, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     if (fd == -1) {

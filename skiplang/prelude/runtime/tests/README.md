@@ -42,6 +42,22 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-persistent-mutex-recovery
 ```
 
+# Sparse heap without a persistent file
+
+Without a persistent file, the runtime reserves its whole capacity (64 GiB by
+default) as one anonymous mapping. It must use `MAP_NORESERVE`, or heuristic
+overcommit refuses it on hosts with less RAM plus swap (#1589). This test
+checks the kernel's `nr` flag on the mapping, which does not depend on the
+host's overcommit policy.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/no_file_mapping_noreserve.c \
+  -o /tmp/test-no-file-mapping-noreserve
+/tmp/test-no-file-mapping-noreserve
+```
+
 # Reference masks
 
 The object traversals use 64-bit reference masks. This regression exercises
