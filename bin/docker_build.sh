@@ -275,7 +275,7 @@ fi
 
 # Forward SKIP_CAPACITY to targets that invoke the Skip toolchain at build
 # time. Required on memory-constrained hosts (e.g. gen2 CircleCI builders)
-# where the runtime's 16 GB default mmap would fail.
+# where the runtime's 64 GiB default mapping would fail.
 if [[ -n "${SKIP_CAPACITY:-}" ]]; then
     BAKE_ARGS+=(
         --set "skiplang.args.SKIP_CAPACITY=$SKIP_CAPACITY"

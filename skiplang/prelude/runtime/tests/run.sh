@@ -14,6 +14,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -o "$runtime_test_dir/mutex"
 "$runtime_test_dir/mutex"
 
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread "$runtime_test_sources/no_file_mapping_noreserve.c" \
+  -o "$runtime_test_dir/noreserve"
+"$runtime_test_dir/noreserve"
+
 for runtime_test_opt in -O0 -O2; do
   # Keep every UBSan check, using traps so the optional diagnostic runtime is
   # not required by minimal LLVM installations such as the CI image.
