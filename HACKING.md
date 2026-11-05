@@ -27,6 +27,43 @@ registry secrets and only makes sense on `main`, so seeing those checks as
 `skipped` on a PR is expected, not a failure. CodeQL runs on a weekly schedule,
 not per PR.
 
+### Publishing CI Docker images
+
+CircleCI jobs run inside the `skiplabs/*:latest` images published from the
+`ci` group in `docker-bake.hcl`. Those images carry a prebuilt stage0 compiler
+(`skc`, `skargo`, `skfmt`) built from the pinned `skiplang/compiler/bootstrap`
+submodule, plus the apt/npm/pip tooling from `bin/apt-install.sh` and the
+Dockerfiles. `docker-publish` rebuilds them from `main` every Monday, so
+between runs CI uses the images from the last successful publish.
+
+Run `docker-publish` manually on `main` (Actions → docker-publish → Run
+workflow) after merging a change that **both**:
+
+1. **changes what goes into an image**: a bootstrap bump, the prelude runtime
+   (`skiplang/prelude/runtime/`), `bin/apt-install.sh`, `requirements-dev.txt`,
+   a Dockerfile or `docker-bake.hcl`; **and**
+2. **is needed by CI before the next weekly publish**, in a job that uses the
+   image's toolchain rather than building its own. For example, Skip code that
+   needs the newer compiler from a bootstrap bump, or a test that needs a newly
+   added apt/npm/pip tool. The jobs that use the image's toolchain are
+   `skip-package-build`/`skip-package-tests`, `skdb`, `skdb-wasm`, `check-ts`,
+   `skipruntime` and `skipruntime-bun`. `compiler` and `skargo` use the
+   compiler built from the PR itself, so they never need a republish.
+
+A change that meets only the first condition can wait for the weekly run. A PR's
+own CI always runs against the already-published images, so it cannot validate
+an image change; the publish after merge is the first real test.
+
+CircleCI never builds the images. The publish builds the compiler inside Docker
+on GitHub's 16 GiB runners, so a bootstrap or runtime change can pass CI and
+still break the publish (#1589). After merging one, run the publish promptly, or
+at least check the next scheduled run. A failed publish pushes nothing, so
+`:latest` keeps the last good images.
+
+`bin/release_docker_ci_images.sh` publishes the same images by hand if the
+workflow is unavailable. `skiplabs/skdb` is not in the `ci` group and is
+published only by the manual `docker-publish-skdb` workflow, as a release.
+
 ### Building skip client in Docker against unreleased skip packages
 
 Sometimes it is useful to be able to build a skip client against locally modified, unreleased, skip framework packages.
