@@ -1,6 +1,191 @@
 module alias T = SKTest;
 module SKStoreTest;
 
+// A relation model with no inverse index or compact reader representations.
+private value class DependencyReference(
+  data: SortedMap<SKStore.Path, SortedSet<SKStore.ArrowKey>> = SortedMap[],
+) {
+  fun set(path: SKStore.Path, reader: SKStore.ArrowKey): this {
+    !this.data[path] = this.data.maybeGet(path)
+      .default(SortedSet[])
+      .set(reader);
+    this
+  }
+
+  fun remove(path: SKStore.Path, reader: SKStore.ArrowKey): this {
+    remaining = this.data.maybeGet(path).default(SortedSet[]).remove(reader);
+    !this.data = if (remaining.isEmpty()) this.data.remove(path) else {
+      this.data.set(path, remaining)
+    };
+    this
+  }
+
+  fun readers(path: SKStore.Path): mutable Iterator<SKStore.ArrowKey> {
+    this.data.maybeGet(path).default(SortedSet[]).values()
+  }
+
+  fun maybeGetReads(
+    parent: SKStore.DirName,
+    child: SKStore.DirName,
+  ): SortedMap<SKStore.ArrowKey, SortedSet<SKStore.Path>> {
+    result = SortedMap<SKStore.ArrowKey, SortedSet<SKStore.Path>>[];
+    for ((path, readers) in this.data.items()) {
+      for (reader in readers) {
+        if (reader.parentName == parent && reader.childName == child) {
+          !result[reader] = result
+            .maybeGet(reader)
+            .default(SortedSet[])
+            .set(path)
+        }
+      }
+    };
+    result
+  }
+
+  fun removeChild(child: SKStore.DirName): this {
+    for ((path, readers) in this.data.items()) {
+      for (reader in readers) {
+        if (reader.childName == child) !this = this.remove(path, reader)
+      }
+    };
+    this
+  }
+}
+
+@test
+fun testSingletonReadersPreserveRepresentativesAndSnapshots(): void {
+  parent = SKStore.DirName::create("/single/parent/");
+  child = SKStore.DirName::create("/single/child/");
+  path = SKStore.Path::iid(SKStore.DirName::create("/single/source/"), 0);
+  make = (id, payload) ->
+    SKStore.TArrowKey::create{
+      parentName => parent,
+      childName => child,
+      key => DependencyAlias(id, payload),
+    };
+  for (compact in Array[false, true]) {
+    for (blocks in Array[false, true]) {
+      reference = DependencyReference();
+      candidate = SKStore.Deps::empty(compact, false, blocks);
+      for (round in Range(0, 3)) {
+        for (i in Range(0, 130)) {
+          reader = make(129 - i, i);
+          !reference = reference.set(path, reader);
+          !candidate = candidate.set(path, reader);
+          !candidate = candidate.set(path, make(129 - i, -1));
+          T.expectEq(
+            candidate.readers(path).collect(Array),
+            reference.readers(path).collect(Array),
+          )
+        };
+        snapshot = candidate;
+        for (i in Range(0, 130)) {
+          reader = make(i, -1);
+          !reference = reference.remove(path, reader);
+          !candidate = candidate.remove(path, reader);
+          T.expectEq(
+            candidate.readers(path).collect(Array),
+            reference.readers(path).collect(Array),
+          );
+          T.expectEq(
+            candidate.maybeGetReads(parent, child),
+            reference.maybeGetReads(parent, child),
+          );
+          T.expectEq(snapshot.maybeGet(path).fromSome().size(), 130)
+        };
+        !candidate = candidate.remove(path, make(round, 0));
+        T.expectTrue(candidate.maybeGet(path).isNone())
+      }
+    }
+  }
+}
+
+@test
+fun testBlockDependencyPathsMatchTreeAcrossUpdates(): void {
+  parents = Array["a", "b"].map(n ->
+    SKStore.DirName::create("/path-blocks/parent/" + n + "/")
+  );
+  childNames = Array["a", "b"].map(n ->
+    SKStore.DirName::create("/path-blocks/child/" + n + "/")
+  );
+  source = SKStore.DirName::create("/path-blocks/source/");
+  path = (i, payload) ->
+    SKStore.Path::create(source, DependencyAlias(i, payload));
+  readers = Array::fillBy(4, i ->
+    SKStore.TArrowKey::create{
+      parentName => parents[i / 2],
+      childName => childNames[i % 2],
+      key => SKStore.IID(i),
+    }
+  );
+  for (blocks in Array[false, true]) {
+    reference = DependencyReference();
+    candidate = SKStore.Deps::empty(true, true, blocks);
+    check = () -> {
+      for (parent in parents) {
+        for (child in childNames) {
+          T.expectEq(
+            candidate.maybeGetReads(parent, child),
+            reference.maybeGetReads(parent, child),
+          )
+        }
+      }
+    };
+    for (round in Range(0, 3)) {
+      for (step in Range(0, 1024)) {
+        i = (step * 513 + round * 71) % 1024;
+        for (reader in readers) {
+          !reference = reference.set(path(i, i), reader);
+          !candidate = candidate.set(path(i, i), reader);
+          !candidate = candidate.set(path(i, -1), reader)
+        };
+        if (step < 70 || step % 127 == 0) check()
+      };
+      check();
+      snapshot = candidate;
+      for (step in Range(0, 1024)) {
+        i = (step * 733 + round * 37) % 1024;
+        for (reader in readers) {
+          !reference = reference.remove(path(i, -1), reader);
+          !candidate = candidate.remove(path(i, -1), reader);
+          // Other parents can still read this path through the same child.
+          if (step % 127 == 0) check()
+        };
+        if (step % 127 == 0 || step > 1013) check()
+      };
+      check();
+      for (i in Range(0, 1024)) {
+        for (reader in readers) {
+          !reference = reference.set(path(i, i), reader);
+          !candidate = candidate.set(path(i, i), reader)
+        }
+      };
+      for (child in childNames) {
+        !reference = reference.removeChild(child);
+        !candidate = candidate.removeDir(child);
+        check()
+      };
+      T.expectEq(
+        snapshot
+          .maybeGetReads(parents[0], childNames[0])
+          .get(readers[0])
+          .size(),
+        1024,
+      );
+      T.expectEq(
+        snapshot
+          .maybeGetReads(parents[0], childNames[0])
+          .get(readers[0])
+          .min()
+          .fromSome().baseName,
+        DependencyAlias(0, 0),
+      );
+      !candidate = candidate.remove(path(round, 0), readers[0]);
+      check()
+    }
+  }
+}
+
 @test
 fun testBlockDependencyReadersMatchTreeThroughSplitsAndRemoval(): void {
   parents = Array["a", "b", "c"].map(name ->
