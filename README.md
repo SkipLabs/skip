@@ -61,7 +61,7 @@ The Skip Framework's native runtime is implemented in Skiplang. The compiler, ru
 
 ## SKDB
 
-SKDB is a reactive SQL database, part of the Skip ecosystem. The TypeScript client is published as the [`skdb`](https://www.npmjs.com/package/skdb) NPM package; sources for the client, server, and runtime live under [`sql/`](./sql).
+SKDB is a reactive SQL database, part of the Skip ecosystem. The TypeScript client is published as the [`skdb`](https://www.npmjs.com/package/skdb) npm package; sources for the client, server, and runtime live under [`sql/`](./sql).
 
 ## Contributing
 
@@ -69,6 +69,8 @@ We welcome contributions and pull requests and are happy to help you get started
 The issue tracker is kept up-to-date with our roadmap and is a good place to begin if you're looking for ideas of ways to contribute.
 
 You can also join our [Discord](https://discord.gg/bsnXyw2F9P) to ask any questions or get involved.
+
+See [AGENTS.md](./AGENTS.md) for build/test commands and the commit and PR policy.
 
 ## License
 
