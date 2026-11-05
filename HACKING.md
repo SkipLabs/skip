@@ -14,6 +14,19 @@ There is a CI job that checks that code is auto-formatted by running `make check
 This can be run manually prior to submitting a PR if desired.
 If desired, a git pre-commit hook that automatically formats changed files when committing can be installed by running `make setup-git-hooks`.
 
+### Continuous integration
+
+Pull requests are gated by CircleCI (`.circleci/`): the required `ci/circleci: *`
+statuses run the compiler, prelude, skargo, skdb and runtime test suites.
+
+GitHub Actions (`.github/workflows/`) complements CircleCI but does not gate
+PRs. Only `actionlint`, `docs` and the docker `check-images` job run on pull
+requests, and only for the paths they watch. The docker publish pipeline
+(`check-push-access`, `build`, `merge`) is skipped on PRs by design: it needs
+registry secrets and only makes sense on `main`, so seeing those checks as
+`skipped` on a PR is expected, not a failure. CodeQL runs on a weekly schedule,
+not per PR.
+
 ### Building skip client in Docker against unreleased skip packages
 
 Sometimes it is useful to be able to build a skip client against locally modified, unreleased, skip framework packages.
