@@ -1,0 +1,555 @@
+module L4_Std_Time_Zoned_ZoneRules;
+
+// "Std.Time.TimeZone.Transition.findTransitionIndexForTimestamp"
+fun f_TimeZone_Transition_findTransitionIndexForTimestamp_3f753fb449(
+  _transitions_0: LeanValue,
+  _timestamp_1: LeanValue,
+): LeanValue {
+  leanTag(_timestamp_1) match {
+  | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+    _second_2: LeanValue = leanField(_timestamp_1, 0);
+    _nano_3: LeanValue = leanField(_timestamp_1, 1);
+    _proof_4: LeanValue = leanField(_timestamp_1, 2);
+    _x_1_5: LeanValue = LeanScalar("nat", "0");
+    _x_2_6: LeanValue = f_Transition_findTransitionIndexForTimestamp_spec_0_68b6b38b42(
+      _second_2,
+      _transitions_0,
+      _x_1_5,
+    );
+    leanTag(_x_2_6) match {
+    | "[\"Option\",\"none\"]" ->
+      _x_3_8: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+        LeanErased(),
+        _transitions_0,
+      );
+      _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _x_3_8,
+        _x_1_5,
+      );
+      leanTag(_x_4_9) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_6_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _x_3_8,
+          LeanScalar("nat", "1"),
+        );
+        LeanCtor("[\"Option\",\"some\"]", Array[_x_6_11])
+      | "[\"Bool\",\"true\"]" -> _x_2_6
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Option\",\"some\"]" ->
+      _val_8_7: LeanValue = leanField(_x_2_6, 0);
+      _x_9_13: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _val_8_7,
+        _x_1_5,
+      );
+      leanTag(_x_9_13) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_11_15: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _val_8_7,
+          LeanScalar("nat", "1"),
+        );
+        LeanCtor("[\"Option\",\"some\"]", Array[_x_11_15])
+      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.TimeZone.RecurringRule.timezoneAt"
+fun f_TimeZone_RecurringRule_timezoneAt_d7a5198a1b(
+  _rule_0: LeanValue,
+  _tm_1: LeanValue,
+): LeanValue {
+  leanTag(_rule_0) match {
+  | "[\"Std\",\"Time\",\"TimeZone\",\"RecurringRule\",\"mk\"]" ->
+    _stdName_2: LeanValue = leanField(_rule_0, 0);
+    _stdOffset_3: LeanValue = leanField(_rule_0, 1);
+    _dst_4: LeanValue = leanField(_rule_0, 2);
+    _stdTz_6: LeanValue = LeanCtor(
+      "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]",
+      Array[
+        _stdOffset_3,
+        _stdName_2,
+        _stdName_2,
+        LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      ],
+    );
+    leanTag(_dst_4) match {
+    | "[\"Option\",\"some\"]" ->
+      _val_2_7: LeanValue = leanField(_dst_4, 0);
+      leanTag(_val_2_7) match {
+      | "[\"Std\",\"Time\",\"TimeZone\",\"DaylightSavingRule\",\"mk\"]" ->
+        _name_8: LeanValue = leanField(_val_2_7, 0);
+        _offset_9: LeanValue = leanField(_val_2_7, 1);
+        _start_10: LeanValue = leanField(_val_2_7, 2);
+        _end_11: LeanValue = leanField(_val_2_7, 3);
+        _dstTz_13: LeanValue = LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]",
+          Array[
+            _offset_9,
+            _name_8,
+            _name_8,
+            LeanCtor("[\"Bool\",\"true\"]", Array[]),
+          ],
+        );
+        leanTag(_start_10) match {
+        | "[\"Option\",\"some\"]" ->
+          _val_4_14: LeanValue = leanField(_start_10, 0);
+          leanTag(_end_11) match {
+          | "[\"Option\",\"some\"]" ->
+            _val_5_15: LeanValue = leanField(_end_11, 0);
+            leanTag(_tm_1) match {
+            | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+              _second_16: LeanValue = leanField(_tm_1, 0);
+              _nano_17: LeanValue = leanField(_tm_1, 1);
+              _proof_18: LeanValue = leanField(_tm_1, 2);
+              _x_7_20: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+                LeanScalar("nat", "86400"),
+              );
+              _x_8_21: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+                _second_16,
+                _x_7_20,
+              );
+              _x_9_22: LeanValue = L4_Std_Time_Date_PlainDate.f_Time_PlainDate_ofEpochDay_4048257a21(
+                _x_8_21,
+              );
+              leanTag(_x_9_22) match {
+              | "[\"Std\",\"Time\",\"PlainDate\",\"mk\"]" ->
+                _year_23: LeanValue = leanField(_x_9_22, 0);
+                _month_24: LeanValue = leanField(_x_9_22, 1);
+                _day_25: LeanValue = leanField(_x_9_22, 2);
+                _valid_26: LeanValue = leanField(_x_9_22, 3);
+                _dstStart_27: LeanValue = f_TimeZone_RecurringRule_transitionUtcSeconds_d22b750c49(
+                  _val_4_14,
+                  _year_23,
+                  _stdOffset_3,
+                );
+                _dstEnd_28: LeanValue = f_TimeZone_RecurringRule_transitionUtcSeconds_d22b750c49(
+                  _val_5_15,
+                  _year_23,
+                  _offset_9,
+                );
+                _x_10_29: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+                  _dstStart_27,
+                  _dstEnd_28,
+                );
+                leanTag(_x_10_29) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _x_11_30: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
+                    _second_16,
+                    _dstEnd_28,
+                  );
+                  leanTag(_x_11_30) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    _x_12_31: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+                      _dstStart_27,
+                      _second_16,
+                    );
+                    leanTag(_x_12_31) match {
+                    | "[\"Bool\",\"false\"]" -> _stdTz_6
+                    | "[\"Bool\",\"true\"]" -> _dstTz_13
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | "[\"Bool\",\"true\"]" -> _dstTz_13
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Bool\",\"true\"]" ->
+                  _x_13_32: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+                    _dstStart_27,
+                    _second_16,
+                  );
+                  leanTag(_x_13_32) match {
+                  | "[\"Bool\",\"false\"]" -> _stdTz_6
+                  | "[\"Bool\",\"true\"]" ->
+                    _x_14_33: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
+                      _second_16,
+                      _dstEnd_28,
+                    );
+                    leanTag(_x_14_33) match {
+                    | "[\"Bool\",\"false\"]" -> _stdTz_6
+                    | "[\"Bool\",\"true\"]" -> _dstTz_13
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> _stdTz_6
+          }
+        | _ -> _stdTz_6
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> _stdTz_6
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.TimeZone.LocalTimeType.getTimeZone"
+fun f_TimeZone_LocalTimeType_getTimeZone_7ca35f4cc7(
+  _time_0: LeanValue,
+): LeanValue {
+  leanTag(_time_0) match {
+  | "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]" ->
+    _gmtOffset_1: LeanValue = leanField(_time_0, 0);
+    _isDst_2: LeanValue = leanField(_time_0, 1);
+    _abbreviation_3: LeanValue = leanField(_time_0, 2);
+    _wall_4: LeanValue = leanField(_time_0, 3);
+    _utLocal_5: LeanValue = leanField(_time_0, 4);
+    _identifier_6: LeanValue = leanField(_time_0, 5);
+    LeanCtor(
+      "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]",
+      Array[_gmtOffset_1, _identifier_6, _abbreviation_3, _isDst_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.TimeZone.ZoneRules.findLocalTimeTypeForTimestamp"
+fun f_TimeZone_ZoneRules_findLocalTimeTypeForTimestamp_91a48f168c(
+  _zr_0: LeanValue,
+  _timestamp_1: LeanValue,
+): LeanValue {
+  leanTag(_zr_0) match {
+  | "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]" ->
+    _initialLocalTimeType_2: LeanValue = leanField(_zr_0, 0);
+    _transitions_3: LeanValue = leanField(_zr_0, 1);
+    _transitionRule_4: LeanValue = leanField(_zr_0, 2);
+    _x_1_5: LeanValue = f_TimeZone_Transition_findTransitionIndexForTimestamp_3f753fb449(
+      _transitions_3,
+      _timestamp_1,
+    );
+    leanTag(_x_1_5) match {
+    | "[\"Option\",\"some\"]" ->
+      _val_2_6: LeanValue = leanField(_x_1_5, 0);
+      _x_3_7: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+        LeanErased(),
+        _transitions_3,
+      );
+      _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _val_2_6,
+        _x_3_7,
+      );
+      leanTag(_x_4_8) match {
+      | "[\"Bool\",\"false\"]" -> _initialLocalTimeType_2
+      | "[\"Bool\",\"true\"]" ->
+        _x_5_9: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+          LeanErased(),
+          _transitions_3,
+          _val_2_6,
+          LeanErased(),
+        );
+        _x_7_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _val_2_6,
+          LeanScalar("nat", "1"),
+        );
+        _x_8_12: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _x_7_11,
+          _x_3_7,
+        );
+        leanTag(_x_8_12) match {
+        | "[\"Bool\",\"false\"]" ->
+          leanTag(_x_5_9) match {
+          | "[\"Std\",\"Time\",\"TimeZone\",\"Transition\",\"mk\"]" ->
+            _time_13: LeanValue = leanField(_x_5_9, 0);
+            _localTimeType_14: LeanValue = leanField(_x_5_9, 1);
+            _localTimeType_14
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          leanTag(_transitionRule_4) match {
+          | "[\"Option\",\"some\"]" ->
+            _val_9_15: LeanValue = leanField(_transitionRule_4, 0);
+            leanTag(_x_5_9) match {
+            | "[\"Std\",\"Time\",\"TimeZone\",\"Transition\",\"mk\"]" ->
+              _time_16: LeanValue = leanField(_x_5_9, 0);
+              _localTimeType_17: LeanValue = leanField(_x_5_9, 1);
+              _tz_18: LeanValue = f_TimeZone_RecurringRule_timezoneAt_d7a5198a1b(
+                _val_9_15,
+                _timestamp_1,
+              );
+              leanTag(_tz_18) match {
+              | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+                _offset_19: LeanValue = leanField(_tz_18, 0);
+                _name_20: LeanValue = leanField(_tz_18, 1);
+                _abbreviation_21: LeanValue = leanField(_tz_18, 2);
+                _isDST_22: LeanValue = leanField(_tz_18, 3);
+                leanTag(_localTimeType_17) match {
+                | "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]" ->
+                  _gmtOffset_23: LeanValue = leanField(_localTimeType_17, 0);
+                  _isDst_24: LeanValue = leanField(_localTimeType_17, 1);
+                  _abbreviation_25: LeanValue = leanField(_localTimeType_17, 2);
+                  _wall_26: LeanValue = leanField(_localTimeType_17, 3);
+                  _utLocal_27: LeanValue = leanField(_localTimeType_17, 4);
+                  _identifier_28: LeanValue = leanField(_localTimeType_17, 5);
+                  LeanCtor(
+                    "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+                    Array[
+                      _offset_19,
+                      _isDST_22,
+                      _abbreviation_21,
+                      _wall_26,
+                      _utLocal_27,
+                      _name_20,
+                    ],
+                  )
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ ->
+            leanTag(_x_5_9) match {
+            | "[\"Std\",\"Time\",\"TimeZone\",\"Transition\",\"mk\"]" ->
+              _time_30: LeanValue = leanField(_x_5_9, 0);
+              _localTimeType_31: LeanValue = leanField(_x_5_9, 1);
+              _localTimeType_31
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> _initialLocalTimeType_2
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.TimeZone.ZoneRules.timezoneAt"
+fun f_TimeZone_ZoneRules_timezoneAt_cd3c48a9d5(
+  _zr_0: LeanValue,
+  _tm_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = f_TimeZone_ZoneRules_findLocalTimeTypeForTimestamp_91a48f168c(
+    _zr_0,
+    _tm_1,
+  );
+  f_TimeZone_LocalTimeType_getTimeZone_7ca35f4cc7(_x_1_2)
+}
+// "Std.Time.TimeZone.ZoneRules.fixedOffsetZone._lam_0"
+fun f_ZoneRules_fixedOffsetZone_lam_0_f68792285a(
+  _second_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  L4_Std_Time_Zoned_TimeZone.f_TimeZone_Offset_toIsoString_2f01dd5768(
+    _second_0,
+    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+  )
+}
+// "_private.Std.Time.Zoned.ZoneRules.0.Std.Time.TimeZone.RecurringRule.transitionUtcSeconds"
+fun f_TimeZone_RecurringRule_transitionUtcSeconds_d22b750c49(
+  _rule_0: LeanValue,
+  _year_1: LeanValue,
+  _wallOffset_2: LeanValue,
+): LeanValue {
+  leanTag(_rule_0) match {
+  | "[\"Std\",\"Time\",\"TimeZone\",\"TransitionRule\",\"mk\"]" ->
+    _spec_3: LeanValue = leanField(_rule_0, 0);
+    _time_4: LeanValue = leanField(_rule_0, 1);
+    _x_1_5: LeanValue = L4_Std_Time_Zoned_RecurringRule.f_TimeZone_TransitionSpec_toEpochDay_06dfc3e120(
+      _spec_3,
+      _year_1,
+    );
+    _x_3_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "86400"),
+    );
+    _x_4_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _x_1_5,
+      _x_3_7,
+    );
+    _x_5_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+      _x_4_8,
+      _time_4,
+    );
+    L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(_x_5_9, _wallOffset_2)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.TimeZone.instInhabitedLocalTimeType.default"
+fun f_TimeZone_instInhabitedLocalTimeType_default_9197585aa2(): LeanValue {
+  _x_2_1: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "0"),
+  );
+  _x_4_3: LeanValue = LeanText("");
+  LeanCtor(
+    "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+    Array[
+      _x_2_1,
+      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      _x_4_3,
+      LeanCtor("[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"wall\"]", Array[]),
+      LeanCtor("[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"ut\"]", Array[]),
+      _x_4_3,
+    ],
+  )
+}
+// "Std.Time.TimeZone.ZoneRules.fixedOffsetZone"
+fun f_TimeZone_ZoneRules_fixedOffsetZone_7c8f71b884(
+  _second_0_input: LeanValue,
+  _identifier_1_input: LeanValue,
+  _abbreviation_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_second_0, 1=_identifier_1, 2=_abbreviation_2, 3=_x_1_3, 4=_y_3_4, 5=_y_4_5, 6=_y_5_6, 7=_y_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_y_13_13, 14=_x_14_14, 15=_x_15_15, 16=_val_18_16, 17=_x_16_17, 18=_x_17_18, 19=_val_21_19, 20=_x_19_20, 21=_x_20_21
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    22,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _second_0_input);
+  _frame.set(1, _identifier_1_input);
+  _frame.set(2, _abbreviation_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(3, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+      leanTag(_frame[2]) match {
+      | "[\"Option\",\"none\"]" ->
+        _frame.set(20, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+        _frame.set(
+          21,
+          f_ZoneRules_fixedOffsetZone_lam_0_f68792285a(_frame[0], _frame[20]),
+        );
+        _jump0 = _frame[21];
+        _frame.set(13, _jump0);
+        !pc = 2;
+        void
+      | "[\"Option\",\"some\"]" ->
+        _frame.set(19, leanField(_frame[2], 0));
+        _jump0 = _frame[19];
+        _frame.set(13, _jump0);
+        !pc = 2;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        8,
+        LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+          Array[
+            _frame[0],
+            _frame[3],
+            _frame[6],
+            _frame[4],
+            _frame[5],
+            _frame[7],
+          ],
+        ),
+      );
+      _frame.set(9, LeanScalar("nat", "0"));
+      _frame.set(
+        10,
+        L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(LeanErased(), _frame[9]),
+      );
+      _frame.set(11, LeanCtor("[\"Option\",\"none\"]", Array[]));
+      _frame.set(
+        12,
+        LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]",
+          Array[_frame[8], _frame[10], _frame[11]],
+        ),
+      );
+      return _frame[12]
+    | 2 ->
+      _frame.set(
+        14,
+        LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"standard\"]",
+          Array[],
+        ),
+      );
+      _frame.set(
+        15,
+        LeanCtor("[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"ut\"]", Array[]),
+      );
+      leanTag(_frame[1]) match {
+      | "[\"Option\",\"none\"]" ->
+        _frame.set(17, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+        _frame.set(
+          18,
+          f_ZoneRules_fixedOffsetZone_lam_0_f68792285a(_frame[0], _frame[17]),
+        );
+        _jump0 = _frame[14];
+        _jump1 = _frame[15];
+        _jump2 = _frame[13];
+        _jump3 = _frame[18];
+        _frame.set(4, _jump0);
+        _frame.set(5, _jump1);
+        _frame.set(6, _jump2);
+        _frame.set(7, _jump3);
+        !pc = 1;
+        void
+      | "[\"Option\",\"some\"]" ->
+        _frame.set(16, leanField(_frame[1], 0));
+        _jump0 = _frame[14];
+        _jump1 = _frame[15];
+        _jump2 = _frame[13];
+        _jump3 = _frame[16];
+        _frame.set(4, _jump0);
+        _frame.set(5, _jump1);
+        _frame.set(6, _jump2);
+        _frame.set(7, _jump3);
+        !pc = 1;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Array.findIdx?.loop._at_.Std.Time.TimeZone.Transition.findTransitionIndexForTimestamp.spec_0"
+fun f_Transition_findTransitionIndexForTimestamp_spec_0_68b6b38b42(
+  _value_0: LeanValue,
+  _as_1: LeanValue,
+  _j_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _as_1,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_j_2, _x_1_3);
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Bool\",\"true\"]" ->
+    _x_4_6: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _as_1,
+      _j_2,
+      LeanErased(),
+    );
+    leanTag(_x_4_6) match {
+    | "[\"Std\",\"Time\",\"TimeZone\",\"Transition\",\"mk\"]" ->
+      _time_7: LeanValue = leanField(_x_4_6, 0);
+      _localTimeType_8: LeanValue = leanField(_x_4_6, 1);
+      _x_5_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
+        _value_0,
+        _time_7,
+      );
+      leanTag(_x_5_9) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_7_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _j_2,
+          LeanScalar("nat", "1"),
+        );
+        f_Transition_findTransitionIndexForTimestamp_spec_0_68b6b38b42(
+          _value_0,
+          _as_1,
+          _x_7_11,
+        )
+      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_j_2])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

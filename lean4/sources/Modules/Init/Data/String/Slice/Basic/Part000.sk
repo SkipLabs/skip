@@ -1,0 +1,152 @@
+module L4_Init_Data_String_Slice_Basic;
+
+// "String.Slice.beq"
+fun f_String_Slice_beq_3b93d469f9(
+  _s1_0: LeanValue,
+  _s2_1: LeanValue,
+): LeanValue {
+  leanTag(_s1_0) match {
+  | "[\"String\",\"Slice\",\"mk\"]" ->
+    _str_2: LeanValue = leanField(_s1_0, 0);
+    _startInclusive_3: LeanValue = leanField(_s1_0, 1);
+    _endExclusive_4: LeanValue = leanField(_s1_0, 2);
+    _startInclusive_le_endExc_5: LeanValue = leanField(_s1_0, 3);
+    leanTag(_s2_1) match {
+    | "[\"String\",\"Slice\",\"mk\"]" ->
+      _str_6: LeanValue = leanField(_s2_1, 0);
+      _startInclusive_7: LeanValue = leanField(_s2_1, 1);
+      _endExclusive_8: LeanValue = leanField(_s2_1, 2);
+      _startInclusive_le_endExc_9: LeanValue = leanField(_s2_1, 3);
+      _x_1_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _endExclusive_4,
+        _startInclusive_3,
+      );
+      _x_2_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _endExclusive_8,
+        _startInclusive_7,
+      );
+      _x_3_12: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _x_1_10,
+        _x_2_11,
+      );
+      leanTag(_x_3_12) match {
+      | "[\"Bool\",\"false\"]" -> _x_3_12
+      | "[\"Bool\",\"true\"]" ->
+        L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+          _str_2,
+          _str_6,
+          _startInclusive_3,
+          _startInclusive_7,
+          _x_1_10,
+          LeanErased(),
+          LeanErased(),
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_String_Slice_beq_3b93d469f9(_args: Array<LeanValue>): LeanValue {
+  f_String_Slice_beq_3b93d469f9(_args[0], _args[1])
+}
+// "String.Slice.intercalate"
+fun f_String_Slice_intercalate_abd680823f(
+  _s_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"List\",\"nil\"]" -> LeanText("")
+  | "[\"List\",\"cons\"]" ->
+    _head_3_2: LeanValue = leanField(_x_1_1, 0);
+    _tail_4_3: LeanValue = leanField(_x_1_1, 1);
+    leanTag(_head_3_2) match {
+    | "[\"String\",\"Slice\",\"mk\"]" ->
+      _str_5: LeanValue = leanField(_head_3_2, 0);
+      _startInclusive_6: LeanValue = leanField(_head_3_2, 1);
+      _endExclusive_7: LeanValue = leanField(_head_3_2, 2);
+      _startInclusive_le_endExc_8: LeanValue = leanField(_head_3_2, 3);
+      _x_5_9: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+        _str_5,
+        _startInclusive_6,
+        _endExclusive_7,
+      );
+      f_Slice_intercalate_go_024c01c2bb(_x_5_9, _s_0, _tail_4_3)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "String.Slice.toString"
+fun f_String_Slice_toString_2634d7a086(_s_0: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"String\",\"Slice\",\"mk\"]" ->
+    _str_1: LeanValue = leanField(_s_0, 0);
+    _startInclusive_2: LeanValue = leanField(_s_0, 1);
+    _endExclusive_3: LeanValue = leanField(_s_0, 2);
+    _startInclusive_le_endExc_4: LeanValue = leanField(_s_0, 3);
+    L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+      _str_1,
+      _startInclusive_2,
+      _endExclusive_3,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_String_Slice_toString_2634d7a086(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_String_Slice_toString_2634d7a086(_args[0])
+}
+// "_private.Init.Data.String.Slice.Basic.0.String.Slice.intercalate.go"
+fun f_Slice_intercalate_go_024c01c2bb(
+  _acc_0: LeanValue,
+  _s_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  leanTag(_a_1_2) match {
+  | "[\"List\",\"nil\"]" -> _acc_0
+  | "[\"List\",\"cons\"]" ->
+    _head_2_3: LeanValue = leanField(_a_1_2, 0);
+    _tail_3_4: LeanValue = leanField(_a_1_2, 1);
+    leanTag(_s_1) match {
+    | "[\"String\",\"Slice\",\"mk\"]" ->
+      _str_5: LeanValue = leanField(_s_1, 0);
+      _startInclusive_6: LeanValue = leanField(_s_1, 1);
+      _endExclusive_7: LeanValue = leanField(_s_1, 2);
+      _startInclusive_le_endExc_8: LeanValue = leanField(_s_1, 3);
+      leanTag(_head_2_3) match {
+      | "[\"String\",\"Slice\",\"mk\"]" ->
+        _str_9: LeanValue = leanField(_head_2_3, 0);
+        _startInclusive_10: LeanValue = leanField(_head_2_3, 1);
+        _endExclusive_11: LeanValue = leanField(_head_2_3, 2);
+        _startInclusive_le_endExc_12: LeanValue = leanField(_head_2_3, 3);
+        _x_4_13: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+          _str_5,
+          _startInclusive_6,
+          _endExclusive_7,
+        );
+        _x_5_14: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _acc_0,
+          _x_4_13,
+        );
+        _x_6_15: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+          _str_9,
+          _startInclusive_10,
+          _endExclusive_11,
+        );
+        _x_7_16: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _x_5_14,
+          _x_6_15,
+        );
+        f_Slice_intercalate_go_024c01c2bb(_x_7_16, _s_1, _tail_3_4)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

@@ -1,0 +1,102 @@
+module L4_Std_Http_Data_Headers;
+
+// "Std.Http.Headers.empty"
+fun f_Http_Headers_empty_5f47ff2cf0(): LeanValue {
+  f_Headers_empty_spec_0_0e83032e91(LeanErased())
+}
+// "Std.Internal.IndexMultiMap.empty._at_.Std.Http.Headers.empty.spec_0._redArg"
+fun f_Headers_empty_spec_0_0e83032e91(_dummy_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_2_2: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    _x_1_1,
+  );
+  _x_5_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    LeanScalar("nat", "16"),
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"Internal\",\"IndexMultiMap\",\"mk\"]",
+    Array[
+      _x_2_2,
+      LeanCtor("[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]", Array[_x_1_1, _x_5_5]),
+      LeanErased(),
+    ],
+  )
+}
+// "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Std.Http.Headers.fold.spec_0._redArg"
+fun f_Headers_fold_spec_0_de9e01b6ae(
+  _f_0: LeanValue,
+  _as_1: LeanValue,
+  _i_2: LeanValue,
+  _stop_3: LeanValue,
+  _b_4: LeanValue,
+): LeanValue {
+  _x_1_5: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_i_2, _stop_3);
+  leanTag(_x_1_5) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_2_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _as_1,
+      _i_2,
+      LeanErased(),
+    );
+    leanTag(_x_2_6) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_3_7: LeanValue = leanField(_x_2_6, 0);
+      _snd_4_8: LeanValue = leanField(_x_2_6, 1);
+      _x_5_9: LeanValue = leanApply(_f_0, Array[_b_4, _fst_3_7, _snd_4_8]);
+      _x_7_11: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        _i_2,
+        LeanScalar("usize", "1"),
+      );
+      f_Headers_fold_spec_0_de9e01b6ae(_f_0, _as_1, _x_7_11, _stop_3, _x_5_9)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Bool\",\"true\"]" -> _b_4
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Http.Headers.fold._redArg"
+fun f_Http_Headers_fold_3570ad40d7(
+  _headers_0: LeanValue,
+  _init_1: LeanValue,
+  _f_2: LeanValue,
+): LeanValue {
+  leanTag(_headers_0) match {
+  | "[\"Std\",\"Internal\",\"IndexMultiMap\",\"mk\"]" ->
+    _entries_3: LeanValue = leanField(_headers_0, 0);
+    _indexes_4: LeanValue = leanField(_headers_0, 1);
+    _validity_5: LeanValue = leanField(_headers_0, 2);
+    _x_2_7: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _entries_3,
+    );
+    _x_3_8: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      LeanScalar("nat", "0"),
+      _x_2_7,
+    );
+    leanTag(_x_3_8) match {
+    | "[\"Bool\",\"false\"]" -> _init_1
+    | "[\"Bool\",\"true\"]" ->
+      _x_5_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _x_2_7,
+      );
+      f_Headers_fold_spec_0_de9e01b6ae(
+        _f_2,
+        _entries_3,
+        LeanScalar("usize", "0"),
+        _x_5_10,
+        _init_1,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

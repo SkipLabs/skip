@@ -1,0 +1,151 @@
+module L4_Init_Data_List_OfFn;
+
+// "List.ofFnM._redArg"
+fun f_List_ofFnM_343975ea2a(
+  _n_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _f_2: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_1) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_3: LeanValue = leanField(_inst_1_1, 0);
+    _toBind_4: LeanValue = leanField(_inst_1_1, 1);
+    leanTag(_toApplicative_3) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_5: LeanValue = leanField(_toApplicative_3, 0);
+      _toPure_6: LeanValue = leanField(_toApplicative_3, 1);
+      _toSeq_7: LeanValue = leanField(_toApplicative_3, 2);
+      _toSeqLeft_8: LeanValue = leanField(_toApplicative_3, 3);
+      _toSeqRight_9: LeanValue = leanField(_toApplicative_3, 4);
+      leanTag(_toFunctor_5) match {
+      | "[\"Functor\",\"mk\"]" ->
+        _map_10: LeanValue = leanField(_toFunctor_5, 0);
+        _mapConst_11: LeanValue = leanField(_toFunctor_5, 1);
+        _f_2_12: LeanValue = LeanClosure(
+          L4_Init_Data_List_OfFn.apply_f_List_ofFnM_lam_1_da11722d50,
+          4,
+          Array[_f_2, _map_10],
+        );
+        _x_3_13: LeanValue = LeanClosure(
+          L4_Init_Data_List_Basic.apply_f_List_reverse_885b875771,
+          2,
+          Array[LeanErased()],
+        );
+        _x_6_16: LeanValue = L4_Init_Data_Fin_Fold.f_Fin_foldlM_loop_44c18d23c3(
+          LeanErased(),
+          LeanErased(),
+          _inst_1_1,
+          _n_0,
+          _f_2_12,
+          LeanCtor("[\"List\",\"nil\"]", Array[]),
+          LeanScalar("nat", "0"),
+        );
+        leanApply(_map_10, Array[LeanErased(), LeanErased(), _x_3_13, _x_6_16])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "List.ofFn"
+fun f_List_ofFn_66443c586c(
+  _value_0: LeanValue,
+  _n_1: LeanValue,
+  _f_2: LeanValue,
+): LeanValue {
+  f_List_ofFn_718ffa6079(_n_1, _f_2)
+}
+// "Fin.foldr.loop._at_.List.ofFn.spec_0"
+fun f_List_ofFn_spec_0_c118fe5f94(
+  _value_0: LeanValue,
+  _f_1: LeanValue,
+  _n_2: LeanValue,
+  _i_3: LeanValue,
+  _a_1_4: LeanValue,
+  _a_2_5: LeanValue,
+): LeanValue {
+  f_List_ofFn_spec_0_028d799ea8(_f_1, _i_3, _a_2_5)
+}
+// "List.ofFnM._redArg._lam_0"
+fun f_List_ofFnM_lam_0_123dbcf7d8(
+  _xs_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  LeanCtor("[\"List\",\"cons\"]", Array[_x_1_1, _xs_0])
+}
+fun apply_f_List_ofFnM_lam_0_123dbcf7d8(_args: Array<LeanValue>): LeanValue {
+  f_List_ofFnM_lam_0_123dbcf7d8(_args[0], _args[1])
+}
+// "List.ofFnM._redArg._lam_1"
+fun f_List_ofFnM_lam_1_da11722d50(
+  _f_0: LeanValue,
+  _map_1: LeanValue,
+  _xs_2: LeanValue,
+  _i_3: LeanValue,
+): LeanValue {
+  _f_1_4: LeanValue = LeanClosure(
+    L4_Init_Data_List_OfFn.apply_f_List_ofFnM_lam_0_123dbcf7d8,
+    2,
+    Array[_xs_2],
+  );
+  _x_2_5: LeanValue = leanApply(_f_0, Array[_i_3]);
+  leanApply(_map_1, Array[LeanErased(), LeanErased(), _f_1_4, _x_2_5])
+}
+fun apply_f_List_ofFnM_lam_1_da11722d50(_args: Array<LeanValue>): LeanValue {
+  f_List_ofFnM_lam_1_da11722d50(_args[0], _args[1], _args[2], _args[3])
+}
+// "List.ofFnM._redArg._closed_0"
+fun f_List_ofFnM_closed_0_36b23a424c(): LeanValue {
+  LeanClosure(
+    L4_Init_Data_List_Basic.apply_f_List_reverse_885b875771,
+    2,
+    Array[LeanErased()],
+  )
+}
+// "Fin.foldr.loop._at_.List.ofFn.spec_0._redArg"
+fun f_List_ofFn_spec_0_028d799ea8(
+  _f_0: LeanValue,
+  _i_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _i_1,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" -> _a_1_2
+  | "[\"Bool\",\"false\"]" ->
+    _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _i_1,
+      LeanScalar("nat", "1"),
+    );
+    _x_3_7: LeanValue = leanApply(_f_0, Array[_n_2_6]);
+    f_List_ofFn_spec_0_028d799ea8(
+      _f_0,
+      _n_2_6,
+      LeanCtor("[\"List\",\"cons\"]", Array[_x_3_7, _a_1_2]),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "List.ofFn._redArg"
+fun f_List_ofFn_718ffa6079(_n_0: LeanValue, _f_1: LeanValue): LeanValue {
+  f_List_ofFn_spec_0_028d799ea8(
+    _f_1,
+    _n_0,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "List.ofFnM"
+fun f_List_ofFnM_59266c9dbc(
+  _m_0: LeanValue,
+  _value_1: LeanValue,
+  _n_2: LeanValue,
+  _inst_1_3: LeanValue,
+  _f_4: LeanValue,
+): LeanValue {
+  f_List_ofFnM_343975ea2a(_n_2, _inst_1_3, _f_4)
+}
+
+module end;

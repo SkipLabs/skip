@@ -1,0 +1,1127 @@
+module L4_Lean_Meta_Sym_Reduce;
+
+// "Lean.Meta.Sym.reduceZeta?"
+fun f_Meta_Sym_reduceZeta_33b15e7c43(
+  _e_0: LeanValue,
+  _a_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_1_7: LeanValue,
+): LeanValue {
+  _f_8: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_e_0);
+  leanTag(_f_8) match {
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    _data_9: LeanValue = leanField(_f_8, 0);
+    _declName_2_10: LeanValue = leanField(_f_8, 1);
+    _type_3_11: LeanValue = leanField(_f_8, 2);
+    _value_4_12: LeanValue = leanField(_f_8, 3);
+    _body_5_13: LeanValue = leanField(_f_8, 4);
+    _nondep_6_14: LeanValue = leanField(_f_8, 5);
+    _x_8_16: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      LeanErased(),
+      LeanScalar("nat", "0"),
+    );
+    _x_9_17: LeanValue = f_Sym_reduceZeta_go_11336916b9(
+      _f_8,
+      _x_8_16,
+      _a_1,
+      _a_2,
+      _a_3,
+      _a_4,
+      _a_5,
+      _a_6,
+      _a_1_7,
+    );
+    leanTag(_x_9_17) match {
+    | "[\"EST\",\"Out\",\"ok\"]" ->
+      _a_10_18: LeanValue = leanField(_x_9_17, 0);
+      _a_11_19: LeanValue = leanField(_x_9_17, 1);
+      _x_12_22: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_e_0);
+      leanTag(_x_12_22) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"EST\",\"Out\",\"ok\"]",
+          Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_10_18]), _a_11_19],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _dummy_26: LeanValue = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+          LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+        );
+        _nargs_27: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+          _e_0,
+        );
+        _x_16_28: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+          LeanErased(),
+          _nargs_27,
+          _dummy_26,
+        );
+        _x_18_30: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _nargs_27,
+          LeanScalar("nat", "1"),
+        );
+        _x_19_31: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+          _e_0,
+          _x_16_28,
+          _x_18_30,
+        );
+        _x_20_32: LeanValue = f_Sym_reduceZeta_spec_0_eba46f48f5(
+          _a_10_18,
+          _x_19_31,
+          _a_1,
+          _a_2,
+          _a_3,
+          _a_4,
+          _a_5,
+          _a_6,
+          _a_11_19,
+        );
+        leanTag(_x_20_32) match {
+        | "[\"EST\",\"Out\",\"ok\"]" ->
+          _a_21_33: LeanValue = leanField(_x_20_32, 0);
+          _a_22_34: LeanValue = leanField(_x_20_32, 1);
+          LeanCtor(
+            "[\"EST\",\"Out\",\"ok\"]",
+            Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_21_33]), _a_22_34],
+          )
+        | "[\"EST\",\"Out\",\"error\"]" ->
+          _a_25_35: LeanValue = leanField(_x_20_32, 0);
+          _a_26_36: LeanValue = leanField(_x_20_32, 1);
+          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_25_35, _a_26_36])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"EST\",\"Out\",\"error\"]" ->
+      _a_28_20: LeanValue = leanField(_x_9_17, 0);
+      _a_29_21: LeanValue = leanField(_x_9_17, 1);
+      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_28_20, _a_29_21])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ ->
+    LeanCtor(
+      "[\"EST\",\"Out\",\"ok\"]",
+      Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_1_7],
+    )
+  }
+}
+// "_private.Lean.Meta.Sym.Reduce.0.Lean.Meta.Sym.reduceZeta?.go"
+fun f_Sym_reduceZeta_go_11336916b9(
+  _e_0: LeanValue,
+  _subst_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_7: LeanValue,
+  _a_1_8: LeanValue,
+): LeanValue {
+  leanTag(_e_0) match {
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    _data_9: LeanValue = leanField(_e_0, 0);
+    _declName_2_10: LeanValue = leanField(_e_0, 1);
+    _type_3_11: LeanValue = leanField(_e_0, 2);
+    _value_4_12: LeanValue = leanField(_e_0, 3);
+    _body_5_13: LeanValue = leanField(_e_0, 4);
+    _nondep_6_14: LeanValue = leanField(_e_0, 5);
+    _x_8_16: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _subst_1,
+    );
+    _x_9_17: LeanValue = L4_Lean_Meta_Sym_InstantiateS.f_Meta_Sym_instantiateRevRangeS_4a450d59dd(
+      _value_4_12,
+      LeanScalar("nat", "0"),
+      _x_8_16,
+      _subst_1,
+      _a_2,
+      _a_3,
+      _a_4,
+      _a_5,
+      _a_6,
+      _a_7,
+      _a_1_8,
+    );
+    leanTag(_x_9_17) match {
+    | "[\"EST\",\"Out\",\"ok\"]" ->
+      _a_10_18: LeanValue = leanField(_x_9_17, 0);
+      _a_11_19: LeanValue = leanField(_x_9_17, 1);
+      _x_12_22: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        LeanErased(),
+        _subst_1,
+        _a_10_18,
+      );
+      f_Sym_reduceZeta_go_11336916b9(
+        _body_5_13,
+        _x_12_22,
+        _a_2,
+        _a_3,
+        _a_4,
+        _a_5,
+        _a_6,
+        _a_7,
+        _a_11_19,
+      )
+    | "[\"EST\",\"Out\",\"error\"]" ->
+      _a_14_20: LeanValue = leanField(_x_9_17, 0);
+      _a_15_21: LeanValue = leanField(_x_9_17, 1);
+      _x_9_17
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ ->
+    _x_17_25: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _subst_1,
+    );
+    L4_Lean_Meta_Sym_InstantiateS.f_Meta_Sym_instantiateRevRangeS_4a450d59dd(
+      _e_0,
+      LeanScalar("nat", "0"),
+      _x_17_25,
+      _subst_1,
+      _a_2,
+      _a_3,
+      _a_4,
+      _a_5,
+      _a_6,
+      _a_7,
+      _a_1_8,
+    )
+  }
+}
+// "Lean.Meta.Sym.Internal.mkAppS._at_._private.Lean.Meta.Sym.AlphaShareBuilder.0.Lean.Meta.Sym.Internal.mkAppRangeS.go._at_.Lean.Meta.Sym.Internal.mkAppNS._at_.Lean.Meta.Sym.reduceZeta?.spec_0.spec_0.spec_1"
+fun f_spec_0_spec_0_spec_1_96ec12ed3b(
+  _f_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _y_1_2_input: LeanValue,
+  _y_2_3_input: LeanValue,
+  _y_3_4_input: LeanValue,
+  _y_4_5_input: LeanValue,
+  _y_5_6_input: LeanValue,
+  _y_6_7_input: LeanValue,
+  _y_7_8_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_f_0, 1=_a_1, 2=_y_1_2, 3=_y_2_3, 4=_y_3_4, 5=_y_4_5, 6=_y_5_6, 7=_y_6_7, 8=_y_7_8, 9=_y_9_9, 10=_y_10_10, 11=_x_11_11, 12=_x_12_12, 13=_x_13_13, 14=_val_14_14, 15=_state_15_15, 16=_debug_29, 17=_x_16_30, 18=_a_18_32, 19=_a_25_33, 20=_a_26_34, 21=_x_19_35, 22=_a_21_37, 23=_a_22_38, 24=_a_23_39, 25=_x_24_40, 26=_x_27_41
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    27,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _f_0_input);
+  _frame.set(1, _a_1_input);
+  _frame.set(2, _y_1_2_input);
+  _frame.set(3, _y_2_3_input);
+  _frame.set(4, _y_3_4_input);
+  _frame.set(5, _y_4_5_input);
+  _frame.set(6, _y_5_6_input);
+  _frame.set(7, _y_6_7_input);
+  _frame.set(8, _y_7_8_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        13,
+        L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+          LeanErased(),
+          LeanErased(),
+          _frame[3],
+          _frame[8],
+        ),
+      );
+      leanTag(_frame[13]) match {
+      | "[\"ST\",\"Out\",\"mk\"]" ->
+        _frame.set(14, leanField(_frame[13], 0));
+        _frame.set(15, leanField(_frame[13], 1));
+        leanTag(_frame[14]) match {
+        | "[\"Lean\",\"Meta\",\"Sym\",\"State\",\"mk\"]" ->
+          _ = leanField(_frame[14], 0);
+          _ = leanField(_frame[14], 1);
+          _ = leanField(_frame[14], 2);
+          _ = leanField(_frame[14], 3);
+          _ = leanField(_frame[14], 4);
+          _ = leanField(_frame[14], 5);
+          _ = leanField(_frame[14], 6);
+          _ = leanField(_frame[14], 7);
+          _ = leanField(_frame[14], 8);
+          _ = leanField(_frame[14], 9);
+          _ = leanField(_frame[14], 10);
+          _ = leanField(_frame[14], 11);
+          _ = leanField(_frame[14], 12);
+          _frame.set(16, leanField(_frame[14], 13));
+          leanTag(_frame[16]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _jump0 = _frame[3];
+            _jump1 = _frame[15];
+            _frame.set(9, _jump0);
+            _frame.set(10, _jump1);
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              17,
+              L4_Lean_Meta_Sym_AlphaShareBuilder.f_Internal_Sym_assertShared_b5bfcae68b(
+                _frame[0],
+                _frame[2],
+                _frame[3],
+                _frame[4],
+                _frame[5],
+                _frame[6],
+                _frame[7],
+                _frame[15],
+              ),
+            );
+            leanTag(_frame[17]) match {
+            | "[\"EST\",\"Out\",\"ok\"]" ->
+              _ = leanField(_frame[17], 0);
+              _frame.set(18, leanField(_frame[17], 1));
+              _frame.set(
+                21,
+                L4_Lean_Meta_Sym_AlphaShareBuilder.f_Internal_Sym_assertShared_b5bfcae68b(
+                  _frame[1],
+                  _frame[2],
+                  _frame[3],
+                  _frame[4],
+                  _frame[5],
+                  _frame[6],
+                  _frame[7],
+                  _frame[18],
+                ),
+              );
+              leanTag(_frame[21]) match {
+              | "[\"EST\",\"Out\",\"ok\"]" ->
+                _ = leanField(_frame[21], 0);
+                _frame.set(22, leanField(_frame[21], 1));
+                _jump0 = _frame[3];
+                _jump1 = _frame[22];
+                _frame.set(9, _jump0);
+                _frame.set(10, _jump1);
+                !pc = 1;
+                void
+              | "[\"EST\",\"Out\",\"error\"]" ->
+                _frame.set(23, leanField(_frame[21], 0));
+                _frame.set(24, leanField(_frame[21], 1));
+                _frame.set(
+                  25,
+                  LeanCtor(
+                    "[\"EST\",\"Out\",\"error\"]",
+                    Array[_frame[23], _frame[24]],
+                  ),
+                );
+                return _frame[25]
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"EST\",\"Out\",\"error\"]" ->
+              _frame.set(19, leanField(_frame[17], 0));
+              _frame.set(20, leanField(_frame[17], 1));
+              _frame.set(
+                26,
+                LeanCtor(
+                  "[\"EST\",\"Out\",\"error\"]",
+                  Array[_frame[19], _frame[20]],
+                ),
+              );
+              return _frame[26]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        11,
+        L4_Lean_Expr.f_Expr_app_override_84f3f08ede(_frame[0], _frame[1]),
+      );
+      _frame.set(
+        12,
+        L4_Lean_Meta_Sym_AlphaShareBuilder.f_Internal_Sym_share1_012656ac41(
+          _frame[11],
+          _frame[9],
+          _frame[10],
+        ),
+      );
+      return _frame[12]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.Sym.reduceBeta?"
+fun f_Meta_Sym_reduceBeta_98d336ffe2(
+  _e_0: LeanValue,
+  _a_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_1_7: LeanValue,
+): LeanValue {
+  _x_2_8: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_e_0);
+  leanTag(_x_2_8) match {
+  | "[\"Bool\",\"false\"]" ->
+    LeanCtor(
+      "[\"EST\",\"Out\",\"ok\"]",
+      Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_1_7],
+    )
+  | "[\"Bool\",\"true\"]" ->
+    _f_11: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_e_0);
+    _x_6_13: LeanValue = L4_Lean_Expr.f_Lean_Expr_isHeadBetaTargetFn_f767ced258(
+      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      _f_11,
+    );
+    leanTag(_x_6_13) match {
+    | "[\"Bool\",\"false\"]" ->
+      LeanCtor(
+        "[\"EST\",\"Out\",\"ok\"]",
+        Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_1_7],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_9_16: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+        _e_0,
+      );
+      _x_10_17: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+        LeanErased(),
+        _x_9_16,
+      );
+      _x_11_18: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppRevArgsAux_45acc94c99(
+        _e_0,
+        _x_10_17,
+      );
+      _x_12_19: LeanValue = L4_Lean_Meta_Sym_InstantiateS.f_Meta_Sym_betaRevS_2755f29326(
+        _f_11,
+        _x_11_18,
+        _a_1,
+        _a_2,
+        _a_3,
+        _a_4,
+        _a_5,
+        _a_6,
+        _a_1_7,
+      );
+      leanTag(_x_12_19) match {
+      | "[\"EST\",\"Out\",\"ok\"]" ->
+        _a_13_20: LeanValue = leanField(_x_12_19, 0);
+        _a_14_21: LeanValue = leanField(_x_12_19, 1);
+        LeanCtor(
+          "[\"EST\",\"Out\",\"ok\"]",
+          Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_13_20]), _a_14_21],
+        )
+      | "[\"EST\",\"Out\",\"error\"]" ->
+        _a_17_22: LeanValue = leanField(_x_12_19, 0);
+        _a_18_23: LeanValue = leanField(_x_12_19, 1);
+        LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_17_22, _a_18_23])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Sym.reduceZetaDelta?"
+fun f_Meta_Sym_reduceZetaDelta_7eee353401(
+  _e_0: LeanValue,
+  _unfold_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_7: LeanValue,
+  _a_1_8: LeanValue,
+): LeanValue {
+  _x_2_9: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_e_0);
+  leanTag(_x_2_9) match {
+  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]" ->
+    _data_10: LeanValue = leanField(_x_2_9, 0);
+    _fvarId_3_11: LeanValue = leanField(_x_2_9, 1);
+    _x_4_12: LeanValue = leanApply(_unfold_1, Array[_fvarId_3_11]);
+    leanTag(_x_4_12) match {
+    | "[\"Bool\",\"false\"]" ->
+      LeanCtor(
+        "[\"EST\",\"Out\",\"ok\"]",
+        Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_1_8],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_7_15: LeanValue = L4_Lean_Meta_Sym_SymM.f_Meta_Sym_getLetValueS_c6f20fe6af(
+        _fvarId_3_11,
+        _a_2,
+        _a_3,
+        _a_4,
+        _a_5,
+        _a_6,
+        _a_7,
+        _a_1_8,
+      );
+      leanTag(_x_7_15) match {
+      | "[\"EST\",\"Out\",\"ok\"]" ->
+        _a_8_16: LeanValue = leanField(_x_7_15, 0);
+        _a_9_17: LeanValue = leanField(_x_7_15, 1);
+        leanTag(_a_8_16) match {
+        | "[\"Option\",\"some\"]" ->
+          _val_10_20: LeanValue = leanField(_a_8_16, 0);
+          _x_11_21: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_e_0);
+          leanTag(_x_11_21) match {
+          | "[\"Bool\",\"false\"]" -> _x_7_15
+          | "[\"Bool\",\"true\"]" ->
+            _dummy_23: LeanValue = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+              LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+            );
+            _nargs_24: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+              _e_0,
+            );
+            _x_13_25: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+              LeanErased(),
+              _nargs_24,
+              _dummy_23,
+            );
+            _x_15_27: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+              _nargs_24,
+              LeanScalar("nat", "1"),
+            );
+            _x_16_28: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+              _e_0,
+              _x_13_25,
+              _x_15_27,
+            );
+            _x_17_29: LeanValue = f_Sym_reduceZeta_spec_0_eba46f48f5(
+              _val_10_20,
+              _x_16_28,
+              _a_2,
+              _a_3,
+              _a_4,
+              _a_5,
+              _a_6,
+              _a_7,
+              _a_9_17,
+            );
+            leanTag(_x_17_29) match {
+            | "[\"EST\",\"Out\",\"ok\"]" ->
+              _a_18_30: LeanValue = leanField(_x_17_29, 0);
+              _a_19_31: LeanValue = leanField(_x_17_29, 1);
+              LeanCtor(
+                "[\"EST\",\"Out\",\"ok\"]",
+                Array[
+                  LeanCtor("[\"Option\",\"some\"]", Array[_a_18_30]),
+                  _a_19_31,
+                ],
+              )
+            | "[\"EST\",\"Out\",\"error\"]" ->
+              _a_22_32: LeanValue = leanField(_x_17_29, 0);
+              _a_23_33: LeanValue = leanField(_x_17_29, 1);
+              LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_22_32, _a_23_33])
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ ->
+          LeanCtor(
+            "[\"EST\",\"Out\",\"ok\"]",
+            Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_9_17],
+          )
+        }
+      | "[\"EST\",\"Out\",\"error\"]" ->
+        _a_27_18: LeanValue = leanField(_x_7_15, 0);
+        _a_28_19: LeanValue = leanField(_x_7_15, 1);
+        _x_7_15
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ ->
+    LeanCtor(
+      "[\"EST\",\"Out\",\"ok\"]",
+      Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_1_8],
+    )
+  }
+}
+// "Lean.Meta.Sym.reduceMatcherApp?"
+fun f_Meta_Sym_reduceMatcherApp_b9ab4dfe0b(
+  _e_0: LeanValue,
+  _a_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_1_7: LeanValue,
+): LeanValue {
+  _x_2_8: LeanValue = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceRecMatcher_93c2f3d1f4(
+    _e_0,
+    _a_3,
+    _a_4,
+    _a_5,
+    _a_6,
+    _a_1_7,
+  );
+  leanTag(_x_2_8) match {
+  | "[\"EST\",\"Out\",\"ok\"]" ->
+    _a_3_9: LeanValue = leanField(_x_2_8, 0);
+    _a_4_10: LeanValue = leanField(_x_2_8, 1);
+    leanTag(_a_3_9) match {
+    | "[\"Option\",\"some\"]" ->
+      _val_5_13: LeanValue = leanField(_a_3_9, 0);
+      _x_6_14: LeanValue = L4_Lean_Meta_Sym_SymM.f_Meta_Sym_foldProjs_091efc3367(
+        _val_5_13,
+        _a_3,
+        _a_4,
+        _a_5,
+        _a_6,
+        _a_4_10,
+      );
+      leanTag(_x_6_14) match {
+      | "[\"EST\",\"Out\",\"ok\"]" ->
+        _a_7_15: LeanValue = leanField(_x_6_14, 0);
+        _a_8_16: LeanValue = leanField(_x_6_14, 1);
+        _x_9_19: LeanValue = L4_Lean_Meta_Sym_SymM.f_Meta_Sym_shareCommonInc_f161f06706(
+          _a_7_15,
+          _a_1,
+          _a_2,
+          _a_3,
+          _a_4,
+          _a_5,
+          _a_6,
+          _a_8_16,
+        );
+        leanTag(_x_9_19) match {
+        | "[\"EST\",\"Out\",\"ok\"]" ->
+          _a_10_20: LeanValue = leanField(_x_9_19, 0);
+          _a_11_21: LeanValue = leanField(_x_9_19, 1);
+          LeanCtor(
+            "[\"EST\",\"Out\",\"ok\"]",
+            Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_10_20]), _a_11_21],
+          )
+        | "[\"EST\",\"Out\",\"error\"]" ->
+          _a_14_22: LeanValue = leanField(_x_9_19, 0);
+          _a_15_23: LeanValue = leanField(_x_9_19, 1);
+          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_14_22, _a_15_23])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"EST\",\"Out\",\"error\"]" ->
+        _a_17_17: LeanValue = leanField(_x_6_14, 0);
+        _a_18_18: LeanValue = leanField(_x_6_14, 1);
+        LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_17_17, _a_18_18])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ ->
+      LeanCtor(
+        "[\"EST\",\"Out\",\"ok\"]",
+        Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_4_10],
+      )
+    }
+  | "[\"EST\",\"Out\",\"error\"]" ->
+    _a_22_11: LeanValue = leanField(_x_2_8, 0);
+    _a_23_12: LeanValue = leanField(_x_2_8, 1);
+    _x_2_8
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.getProjectionFnInfo?._at_.Lean.Meta.Sym.reduceProjApp?.spec_0._redArg"
+fun f_Sym_reduceProjApp_spec_0_f6568f4f07(
+  _declName_0: LeanValue,
+  _y_1_1: LeanValue,
+  _y_2_2: LeanValue,
+): LeanValue {
+  _x_3_3: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    LeanErased(),
+    LeanErased(),
+    _y_1_1,
+    _y_2_2,
+  );
+  leanTag(_x_3_3) match {
+  | "[\"ST\",\"Out\",\"mk\"]" ->
+    _val_4_4: LeanValue = leanField(_x_3_3, 0);
+    _state_5_5: LeanValue = leanField(_x_3_3, 1);
+    leanTag(_val_4_4) match {
+    | "[\"Lean\",\"Core\",\"State\",\"mk\"]" ->
+      _env_6: LeanValue = leanField(_val_4_4, 0);
+      _nextMacroScope_7: LeanValue = leanField(_val_4_4, 1);
+      _ngen_8: LeanValue = leanField(_val_4_4, 2);
+      _auxDeclNGen_9: LeanValue = leanField(_val_4_4, 3);
+      _traceState_10: LeanValue = leanField(_val_4_4, 4);
+      _cache_11: LeanValue = leanField(_val_4_4, 5);
+      _recordedDeps_12: LeanValue = leanField(_val_4_4, 6);
+      _messages_13: LeanValue = leanField(_val_4_4, 7);
+      _infoState_14: LeanValue = leanField(_val_4_4, 8);
+      _snapshotTasks_15: LeanValue = leanField(_val_4_4, 9);
+      _x_6_16: LeanValue = L4_Lean_ProjFns.f_Lean_Environment_getProjectionFnInfo_80b39bac8d(
+        _env_6,
+        _declName_0,
+      );
+      LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_6_16, _state_5_5])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Sym.Internal.mkAppNS._at_.Lean.Meta.Sym.reduceZeta?.spec_0"
+fun f_Sym_reduceZeta_spec_0_eba46f48f5(
+  _f_0: LeanValue,
+  _args_1: LeanValue,
+  _y_1_2: LeanValue,
+  _y_2_3: LeanValue,
+  _y_3_4: LeanValue,
+  _y_4_5: LeanValue,
+  _y_5_6: LeanValue,
+  _y_6_7: LeanValue,
+  _y_7_8: LeanValue,
+): LeanValue {
+  _x_9_10: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _args_1,
+  );
+  f_reduceZeta_spec_0_spec_0_5f3d0f6f38(
+    _args_1,
+    _x_9_10,
+    _f_0,
+    LeanScalar("nat", "0"),
+    _y_1_2,
+    _y_2_3,
+    _y_3_4,
+    _y_4_5,
+    _y_5_6,
+    _y_6_7,
+    _y_7_8,
+  )
+}
+// "Lean.Meta.Sym.reduceProjApp?"
+fun f_Meta_Sym_reduceProjApp_a10c45bc8c(
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_e_0, 1=_a_1, 2=_a_2, 3=_a_3, 4=_a_4, 5=_a_5, 6=_a_6, 7=_a_1_7, 8=_x_2_8, 9=_declName_3_10, 10=_x_5_12, 11=_a_6_13, 12=_a_7_14, 13=_val_8_17, 14=_fromClass_21, 15=_x_9_22, 16=_a_10_23, 17=_a_11_24, 18=_val_12_27, 19=_y_14_28, 20=_a_15_29, 21=_a_16_30, 22=_a_34_31, 23=_a_35_32, 24=_val_17_33, 25=_x_18_34, 26=_dummy_35, 27=_nargs_36, 28=_x_19_37, 29=_x_20_38, 30=_x_21_39, 31=_x_22_40, 32=_x_23_41, 33=_x_24_42, 34=_a_25_43, 35=_a_26_44, 36=_a_29_45, 37=_a_30_46, 38=_x_27_47, 39=_x_28_48, 40=_x_31_49, 41=_x_32_50, 42=_x_33_51, 43=_x_36_52, 44=_x_37_53, 45=_transparency_63, 46=_x_38_74, 47=_x_39_75, 48=_x_40_76, 49=_keyedConfig_77, 50=_trackZetaDelta_78, 51=_zetaDeltaSet_79, 52=_lctx_80, 53=_localInstances_81, 54=_defEqCtx_82, 55=_synthPendingDepth_83, 56=_customCanUnfoldPredicate_84, 57=_univApprox_85, 58=_inTypeClassResolution_86, 59=_cacheInferType_87, 60=_x_41_88, 61=_x_42_89, 62=_x_43_90, 63=_x_44_91, 64=_x_45_92, 65=_x_46_93, 66=_x_49_94, 67=_x_50_95, 68=_x_51_96, 69=_x_52_97, 70=_x_55_98, 71=_x_56_99
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    72,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _e_0_input);
+  _frame.set(1, _a_1_input);
+  _frame.set(2, _a_2_input);
+  _frame.set(3, _a_3_input);
+  _frame.set(4, _a_4_input);
+  _frame.set(5, _a_5_input);
+  _frame.set(6, _a_6_input);
+  _frame.set(7, _a_1_7_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(8, L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_frame[0]));
+      leanTag(_frame[8]) match {
+      | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+        _ = leanField(_frame[8], 0);
+        _frame.set(9, leanField(_frame[8], 1));
+        _ = leanField(_frame[8], 2);
+        _frame.set(
+          10,
+          f_Sym_reduceProjApp_spec_0_f6568f4f07(
+            _frame[9],
+            _frame[6],
+            _frame[7],
+          ),
+        );
+        leanTag(_frame[10]) match {
+        | "[\"EST\",\"Out\",\"ok\"]" ->
+          _frame.set(11, leanField(_frame[10], 0));
+          _frame.set(12, leanField(_frame[10], 1));
+          leanTag(_frame[11]) match {
+          | "[\"Option\",\"some\"]" ->
+            _frame.set(13, leanField(_frame[11], 0));
+            leanTag(_frame[13]) match {
+            | "[\"Lean\",\"ProjectionFunctionInfo\",\"mk\"]" ->
+              _ = leanField(_frame[13], 0);
+              _ = leanField(_frame[13], 1);
+              _ = leanField(_frame[13], 2);
+              _frame.set(14, leanField(_frame[13], 3));
+              leanTag(_frame[14]) match {
+              | "[\"Bool\",\"false\"]" ->
+                _frame.set(
+                  15,
+                  L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013(
+                    _frame[0],
+                    _frame[14],
+                    _frame[3],
+                    _frame[4],
+                    _frame[5],
+                    _frame[6],
+                    _frame[12],
+                  ),
+                );
+                leanTag(_frame[15]) match {
+                | "[\"EST\",\"Out\",\"ok\"]" ->
+                  _frame.set(16, leanField(_frame[15], 0));
+                  _frame.set(17, leanField(_frame[15], 1));
+                  leanTag(_frame[16]) match {
+                  | "[\"Option\",\"some\"]" ->
+                    _frame.set(18, leanField(_frame[16], 0));
+                    _frame.set(
+                      44,
+                      L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+                        _frame[3],
+                      ),
+                    );
+                    leanTag(_frame[44]) match {
+                    | "[\"Lean\",\"Meta\",\"Config\",\"mk\"]" ->
+                      _ = leanField(_frame[44], 0);
+                      _ = leanField(_frame[44], 1);
+                      _ = leanField(_frame[44], 2);
+                      _ = leanField(_frame[44], 3);
+                      _ = leanField(_frame[44], 4);
+                      _ = leanField(_frame[44], 5);
+                      _ = leanField(_frame[44], 6);
+                      _ = leanField(_frame[44], 7);
+                      _ = leanField(_frame[44], 8);
+                      _frame.set(45, leanField(_frame[44], 9));
+                      _ = leanField(_frame[44], 10);
+                      _ = leanField(_frame[44], 11);
+                      _ = leanField(_frame[44], 12);
+                      _ = leanField(_frame[44], 13);
+                      _ = leanField(_frame[44], 14);
+                      _ = leanField(_frame[44], 15);
+                      _ = leanField(_frame[44], 16);
+                      _ = leanField(_frame[44], 17);
+                      _ = leanField(_frame[44], 18);
+                      _ = leanField(_frame[44], 19);
+                      _frame.set(
+                        46,
+                        L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+                          _frame[18],
+                        ),
+                      );
+                      _frame.set(
+                        47,
+                        LeanCtor(
+                          "[\"Lean\",\"Meta\",\"TransparencyMode\",\"reducible\"]",
+                          Array[],
+                        ),
+                      );
+                      _frame.set(
+                        48,
+                        L4_Init_MetaTypes.f_Meta_instBEqTransparencyMode_beq_1ac79fc3aa(
+                          _frame[45],
+                          _frame[47],
+                        ),
+                      );
+                      leanTag(_frame[48]) match {
+                      | "[\"Bool\",\"false\"]" ->
+                        leanTag(_frame[3]) match {
+                        | "[\"Lean\",\"Meta\",\"Context\",\"mk\"]" ->
+                          _frame.set(49, leanField(_frame[3], 0));
+                          _frame.set(50, leanField(_frame[3], 1));
+                          _frame.set(51, leanField(_frame[3], 2));
+                          _frame.set(52, leanField(_frame[3], 3));
+                          _frame.set(53, leanField(_frame[3], 4));
+                          _frame.set(54, leanField(_frame[3], 5));
+                          _frame.set(55, leanField(_frame[3], 6));
+                          _frame.set(56, leanField(_frame[3], 7));
+                          _frame.set(57, leanField(_frame[3], 8));
+                          _frame.set(58, leanField(_frame[3], 9));
+                          _frame.set(59, leanField(_frame[3], 10));
+                          _frame.set(
+                            60,
+                            L4_Lean_Meta_Basic.f_Meta_ConfigWithKey_setTransparency_d2874c92d7(
+                              _frame[47],
+                              _frame[49],
+                            ),
+                          );
+                          _frame.set(
+                            61,
+                            LeanCtor(
+                              "[\"Lean\",\"Meta\",\"Context\",\"mk\"]",
+                              Array[
+                                _frame[60],
+                                _frame[50],
+                                _frame[51],
+                                _frame[52],
+                                _frame[53],
+                                _frame[54],
+                                _frame[55],
+                                _frame[56],
+                                _frame[57],
+                                _frame[58],
+                                _frame[59],
+                              ],
+                            ),
+                          );
+                          _frame.set(
+                            62,
+                            L4_Lean_Meta_WHNF.f_Lean_Meta_reduceProj_8a3cb50ccc(
+                              _frame[46],
+                              _frame[61],
+                              _frame[4],
+                              _frame[5],
+                              _frame[6],
+                              _frame[17],
+                            ),
+                          );
+                          _jump0 = _frame[62];
+                          _frame.set(19, _jump0);
+                          !pc = 1;
+                          void
+                        | _ -> return leanFail("non-exhaustive Lean case")
+                        }
+                      | "[\"Bool\",\"true\"]" ->
+                        _frame.set(
+                          63,
+                          L4_Lean_Meta_WHNF.f_Lean_Meta_reduceProj_8a3cb50ccc(
+                            _frame[46],
+                            _frame[3],
+                            _frame[4],
+                            _frame[5],
+                            _frame[6],
+                            _frame[17],
+                          ),
+                        );
+                        _jump0 = _frame[63];
+                        _frame.set(19, _jump0);
+                        !pc = 1;
+                        void
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | _ ->
+                    _frame.set(64, LeanCtor("[\"Option\",\"none\"]", Array[]));
+                    _frame.set(
+                      65,
+                      LeanCtor(
+                        "[\"EST\",\"Out\",\"ok\"]",
+                        Array[_frame[64], _frame[17]],
+                      ),
+                    );
+                    return _frame[65]
+                  }
+                | "[\"EST\",\"Out\",\"error\"]" ->
+                  _ = leanField(_frame[15], 0);
+                  _ = leanField(_frame[15], 1);
+                  return _frame[15]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Bool\",\"true\"]" ->
+                _frame.set(66, LeanCtor("[\"Option\",\"none\"]", Array[]));
+                _frame.set(
+                  67,
+                  LeanCtor(
+                    "[\"EST\",\"Out\",\"ok\"]",
+                    Array[_frame[66], _frame[12]],
+                  ),
+                );
+                return _frame[67]
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ ->
+            _frame.set(68, LeanCtor("[\"Option\",\"none\"]", Array[]));
+            _frame.set(
+              69,
+              LeanCtor(
+                "[\"EST\",\"Out\",\"ok\"]",
+                Array[_frame[68], _frame[12]],
+              ),
+            );
+            return _frame[69]
+          }
+        | "[\"EST\",\"Out\",\"error\"]" ->
+          _ = leanField(_frame[10], 0);
+          _ = leanField(_frame[10], 1);
+          return leanFail("unreachable: Lean.Meta.Sym.reduceProjApp?")
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ ->
+        _frame.set(70, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        _frame.set(
+          71,
+          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[70], _frame[7]]),
+        );
+        return _frame[71]
+      }
+    | 1 ->
+      leanTag(_frame[19]) match {
+      | "[\"EST\",\"Out\",\"ok\"]" ->
+        _frame.set(20, leanField(_frame[19], 0));
+        _frame.set(21, leanField(_frame[19], 1));
+        leanTag(_frame[20]) match {
+        | "[\"Option\",\"some\"]" ->
+          _frame.set(24, leanField(_frame[20], 0));
+          _frame.set(
+            25,
+            LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+          );
+          _frame.set(
+            26,
+            L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(_frame[25]),
+          );
+          _frame.set(
+            27,
+            L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(_frame[18]),
+          );
+          _frame.set(
+            28,
+            L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+              LeanErased(),
+              _frame[27],
+              _frame[26],
+            ),
+          );
+          _frame.set(29, LeanScalar("nat", "1"));
+          _frame.set(
+            30,
+            L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[27], _frame[29]),
+          );
+          _frame.set(
+            31,
+            L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+              _frame[18],
+              _frame[28],
+              _frame[30],
+            ),
+          );
+          _frame.set(
+            32,
+            L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(_frame[24], _frame[31]),
+          );
+          _frame.set(
+            33,
+            L4_Lean_Meta_Sym_SymM.f_Meta_Sym_shareCommon_95394e2f99(
+              _frame[32],
+              _frame[1],
+              _frame[2],
+              _frame[3],
+              _frame[4],
+              _frame[5],
+              _frame[6],
+              _frame[21],
+            ),
+          );
+          leanTag(_frame[33]) match {
+          | "[\"EST\",\"Out\",\"ok\"]" ->
+            _frame.set(34, leanField(_frame[33], 0));
+            _frame.set(35, leanField(_frame[33], 1));
+            _frame.set(
+              38,
+              LeanCtor("[\"Option\",\"some\"]", Array[_frame[34]]),
+            );
+            _frame.set(
+              39,
+              LeanCtor(
+                "[\"EST\",\"Out\",\"ok\"]",
+                Array[_frame[38], _frame[35]],
+              ),
+            );
+            return _frame[39]
+          | "[\"EST\",\"Out\",\"error\"]" ->
+            _frame.set(36, leanField(_frame[33], 0));
+            _frame.set(37, leanField(_frame[33], 1));
+            _frame.set(
+              40,
+              LeanCtor(
+                "[\"EST\",\"Out\",\"error\"]",
+                Array[_frame[36], _frame[37]],
+              ),
+            );
+            return _frame[40]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ ->
+          _frame.set(41, LeanCtor("[\"Option\",\"none\"]", Array[]));
+          _frame.set(
+            42,
+            LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[41], _frame[21]]),
+          );
+          return _frame[42]
+        }
+      | "[\"EST\",\"Out\",\"error\"]" ->
+        _frame.set(22, leanField(_frame[19], 0));
+        _frame.set(23, leanField(_frame[19], 1));
+        _frame.set(
+          43,
+          LeanCtor(
+            "[\"EST\",\"Out\",\"error\"]",
+            Array[_frame[22], _frame[23]],
+          ),
+        );
+        return _frame[43]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Lean.Meta.Sym.AlphaShareBuilder.0.Lean.Meta.Sym.Internal.mkAppRangeS.go._at_.Lean.Meta.Sym.Internal.mkAppNS._at_.Lean.Meta.Sym.reduceZeta?.spec_0.spec_0"
+fun f_reduceZeta_spec_0_spec_0_5f3d0f6f38(
+  _args_0: LeanValue,
+  _endIdx_1: LeanValue,
+  _b_2: LeanValue,
+  _i_3: LeanValue,
+  _y_1_4: LeanValue,
+  _y_2_5: LeanValue,
+  _y_3_6: LeanValue,
+  _y_4_7: LeanValue,
+  _y_5_8: LeanValue,
+  _y_6_9: LeanValue,
+  _y_7_10: LeanValue,
+): LeanValue {
+  _x_8_11: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_endIdx_1, _i_3);
+  leanTag(_x_8_11) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_9_12: LeanValue = L4_Lean_Expr.f_Lean_instInhabitedExpr_ed9f456de4();
+    _x_10_13: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      LeanErased(),
+      _x_9_12,
+      _args_0,
+      _i_3,
+    );
+    _x_11_14: LeanValue = f_spec_0_spec_0_spec_1_96ec12ed3b(
+      _b_2,
+      _x_10_13,
+      _y_1_4,
+      _y_2_5,
+      _y_3_6,
+      _y_4_7,
+      _y_5_8,
+      _y_6_9,
+      _y_7_10,
+    );
+    leanTag(_x_11_14) match {
+    | "[\"EST\",\"Out\",\"ok\"]" ->
+      _a_12_15: LeanValue = leanField(_x_11_14, 0);
+      _a_13_16: LeanValue = leanField(_x_11_14, 1);
+      _x_15_20: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _i_3,
+        LeanScalar("nat", "1"),
+      );
+      f_reduceZeta_spec_0_spec_0_5f3d0f6f38(
+        _args_0,
+        _endIdx_1,
+        _a_12_15,
+        _x_15_20,
+        _y_1_4,
+        _y_2_5,
+        _y_3_6,
+        _y_4_7,
+        _y_5_8,
+        _y_6_9,
+        _a_13_16,
+      )
+    | "[\"EST\",\"Out\",\"error\"]" ->
+      _a_17_17: LeanValue = leanField(_x_11_14, 0);
+      _a_18_18: LeanValue = leanField(_x_11_14, 1);
+      _x_11_14
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Bool\",\"true\"]" ->
+    LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_b_2, _y_7_10])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

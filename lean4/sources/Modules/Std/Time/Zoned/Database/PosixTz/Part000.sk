@@ -1,0 +1,3588 @@
+module L4_Std_Time_Zoned_Database_PosixTz;
+
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseSpec"
+fun f_Time_TimeZone_posixParseSpec_ed09dd9146(_a_1_0: LeanValue): LeanValue {
+  _x_2_1: LeanValue = f_Time_TimeZone_posixParseMwdSpec_d318fd3a7b(_a_1_0);
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+    _pos_3_2: LeanValue = leanField(_x_2_1, 0);
+    _res_4_3: LeanValue = leanField(_x_2_1, 1);
+    _x_2_1
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+    _pos_5_4: LeanValue = leanField(_x_2_1, 0);
+    _err_6_5: LeanValue = leanField(_x_2_1, 1);
+    leanTag(_a_1_0) match {
+    | "[\"Sigma\",\"mk\"]" ->
+      _fst_6: LeanValue = leanField(_a_1_0, 0);
+      _snd_7: LeanValue = leanField(_a_1_0, 1);
+      _decide_7_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _snd_7,
+        _snd_7,
+      );
+      leanTag(_decide_7_8) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_a_1_0, _err_6_5],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _x_9_10: LeanValue = f_Time_TimeZone_posixParseJulianSpec_c031f680dd(
+          _a_1_0,
+        );
+        leanTag(_x_9_10) match {
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+          _pos_10_11: LeanValue = leanField(_x_9_10, 0);
+          _res_11_12: LeanValue = leanField(_x_9_10, 1);
+          _x_9_10
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+          _pos_12_13: LeanValue = leanField(_x_9_10, 0);
+          _err_13_14: LeanValue = leanField(_x_9_10, 1);
+          f_Time_TimeZone_posixParseJulian0Spec_7244c58fc0(_a_1_0)
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseMwdSpec"
+fun f_Time_TimeZone_posixParseMwdSpec_d318fd3a7b(
+  _a_1_0_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_a_1_0, 1=_fst_1, 2=_snd_2, 3=_x_2_3, 4=_decide_3_4, 5=_x_4_5, 6=_c_6, 7=_x_5_7, 8=_x_6_8, 9=_x_7_9, 10=_x_8_10, 11=_f_9_11, 12=_x_10_12, 13=_it_13, 14=_x_11_14, 15=_x_12_15, 16=_x_13_16, 17=_x_14_17, 18=_x_15_18, 19=_x_16_19, 20=_pos_17_20, 21=_res_18_21, 22=_pos_95_22, 23=_err_96_23, 24=_fst_24, 25=_snd_25, 26=_x_19_26, 27=_decide_20_27, 28=_x_21_28, 29=_c_29, 30=_x_22_30, 31=_x_23_31, 32=_x_24_32, 33=_x_25_33, 34=_x_26_34, 35=_it_35, 36=_x_27_36, 37=_x_28_37, 38=_f_29_38, 39=_x_30_39, 40=_x_31_40, 41=_pos_32_41, 42=_res_33_42, 43=_pos_90_43, 44=_err_91_44, 45=_fst_45, 46=_snd_46, 47=_x_34_47, 48=_decide_35_48, 49=_c_49, 50=_x_36_50, 51=_x_37_51, 52=_x_38_52, 53=_x_39_53, 54=_x_40_54, 55=_it_55, 56=_x_42_56, 57=_x_43_57, 58=_x_44_58, 59=_decide_45_59, 60=_c_60, 61=_x_46_61, 62=_x_47_62, 63=_x_48_63, 64=_x_49_64, 65=_x_50_65, 66=_x_51_66, 67=_x_52_67, 68=_x_53_68, 69=_x_54_69, 70=_fst_55_70, 71=_snd_56_71, 72=_x_57_72, 73=_x_59_73, 74=_x_60_74, 75=_x_61_75, 76=_x_62_76, 77=_x_63_77, 78=_x_64_78, 79=_x_65_79, 80=_x_66_80, 81=_x_67_81, 82=_x_68_82, 83=_x_69_83, 84=_y_71_84, 85=_x_72_85, 86=_x_73_86, 87=_x_74_87, 88=_x_75_88, 89=_x_76_89, 90=_x_77_90, 91=_x_78_91, 92=_x_79_92, 93=_x_80_93, 94=_x_81_94, 95=_x_82_95, 96=_x_83_96, 97=_x_84_97, 98=_x_85_98, 99=_x_86_99, 100=_x_87_100, 101=_x_88_101, 102=_x_89_102, 103=_x_92_103, 104=_x_93_104, 105=_x_94_105, 106=_x_97_106, 107=_x_98_107, 108=_x_99_108
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    109,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _a_1_0_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(1, leanField(_frame[0], 0));
+        _frame.set(2, leanField(_frame[0], 1));
+        _frame.set(
+          3,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[1]),
+        );
+        _frame.set(
+          4,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[2], _frame[3]),
+        );
+        leanTag(_frame[4]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(5, LeanScalar("uint32", "77"));
+          _frame.set(
+            6,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[1],
+              _frame[2],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            7,
+            L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[6], _frame[5]),
+          );
+          leanTag(_frame[7]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(8, LeanText("expected: 'M'"));
+            _frame.set(
+              9,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                Array[_frame[8]],
+              ),
+            );
+            _frame.set(
+              10,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                Array[_frame[0], _frame[9]],
+              ),
+            );
+            return _frame[10]
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              11,
+              LeanClosure(
+                L4_Std_Time_Zoned_Database_PosixTz
+                  .apply_f_TimeZone_posixParseHMS_lam_0_1175bdedd9,
+                2,
+                Array[_frame[7]],
+              ),
+            );
+            _frame.set(
+              12,
+              L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                _frame[1],
+                _frame[2],
+                LeanErased(),
+              ),
+            );
+            _frame.set(
+              13,
+              LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[1], _frame[12]]),
+            );
+            _frame.set(14, LeanScalar("nat", "1"));
+            _frame.set(
+              15,
+              L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[14]),
+            );
+            _frame.set(16, LeanScalar("nat", "12"));
+            _frame.set(
+              17,
+              L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[16]),
+            );
+            _frame.set(18, LeanText("month"));
+            _frame.set(
+              19,
+              f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+                _frame[15],
+                _frame[17],
+                _frame[18],
+                _frame[11],
+                _frame[13],
+              ),
+            );
+            leanTag(_frame[19]) match {
+            | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+              _frame.set(20, leanField(_frame[19], 0));
+              _frame.set(21, leanField(_frame[19], 1));
+              leanTag(_frame[20]) match {
+              | "[\"Sigma\",\"mk\"]" ->
+                _frame.set(24, leanField(_frame[20], 0));
+                _frame.set(25, leanField(_frame[20], 1));
+                _frame.set(
+                  26,
+                  L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[24]),
+                );
+                _frame.set(
+                  27,
+                  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                    _frame[25],
+                    _frame[26],
+                  ),
+                );
+                leanTag(_frame[27]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(28, LeanScalar("uint32", "46"));
+                  _frame.set(
+                    29,
+                    L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                      _frame[24],
+                      _frame[25],
+                      LeanErased(),
+                    ),
+                  );
+                  _frame.set(
+                    30,
+                    L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                      _frame[29],
+                      _frame[28],
+                    ),
+                  );
+                  leanTag(_frame[30]) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    _frame.set(31, LeanText("expected: '.'"));
+                    _frame.set(
+                      32,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                        Array[_frame[31]],
+                      ),
+                    );
+                    _frame.set(
+                      33,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                        Array[_frame[20], _frame[32]],
+                      ),
+                    );
+                    return _frame[33]
+                  | "[\"Bool\",\"true\"]" ->
+                    _frame.set(
+                      34,
+                      L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                        _frame[24],
+                        _frame[25],
+                        LeanErased(),
+                      ),
+                    );
+                    _frame.set(
+                      35,
+                      LeanCtor(
+                        "[\"Sigma\",\"mk\"]",
+                        Array[_frame[24], _frame[34]],
+                      ),
+                    );
+                    _frame.set(36, LeanScalar("nat", "5"));
+                    _frame.set(
+                      37,
+                      L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[36]),
+                    );
+                    _frame.set(
+                      38,
+                      LeanClosure(
+                        L4_Std_Time_Zoned_Database_PosixTz
+                          .apply_f_TimeZone_posixParseMwdSpec_lam_1_99f1dfd2ad,
+                        2,
+                        Array[_frame[37]],
+                      ),
+                    );
+                    _frame.set(39, LeanText("week"));
+                    _frame.set(
+                      40,
+                      f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+                        _frame[15],
+                        _frame[37],
+                        _frame[39],
+                        _frame[38],
+                        _frame[35],
+                      ),
+                    );
+                    leanTag(_frame[40]) match {
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                      _frame.set(41, leanField(_frame[40], 0));
+                      _frame.set(42, leanField(_frame[40], 1));
+                      leanTag(_frame[41]) match {
+                      | "[\"Sigma\",\"mk\"]" ->
+                        _frame.set(45, leanField(_frame[41], 0));
+                        _frame.set(46, leanField(_frame[41], 1));
+                        _frame.set(
+                          47,
+                          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+                            _frame[45],
+                          ),
+                        );
+                        _frame.set(
+                          48,
+                          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                            _frame[46],
+                            _frame[47],
+                          ),
+                        );
+                        leanTag(_frame[48]) match {
+                        | "[\"Bool\",\"false\"]" ->
+                          _frame.set(
+                            49,
+                            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                              _frame[45],
+                              _frame[46],
+                              LeanErased(),
+                            ),
+                          );
+                          _frame.set(
+                            50,
+                            L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                              _frame[49],
+                              _frame[28],
+                            ),
+                          );
+                          leanTag(_frame[50]) match {
+                          | "[\"Bool\",\"false\"]" ->
+                            _frame.set(51, LeanText("expected: '.'"));
+                            _frame.set(
+                              52,
+                              LeanCtor(
+                                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                                Array[_frame[51]],
+                              ),
+                            );
+                            _frame.set(
+                              53,
+                              LeanCtor(
+                                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                                Array[_frame[41], _frame[52]],
+                              ),
+                            );
+                            return _frame[53]
+                          | "[\"Bool\",\"true\"]" ->
+                            _frame.set(
+                              54,
+                              L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                                _frame[45],
+                                _frame[46],
+                                LeanErased(),
+                              ),
+                            );
+                            _frame.set(
+                              55,
+                              LeanCtor(
+                                "[\"Sigma\",\"mk\"]",
+                                Array[_frame[45], _frame[54]],
+                              ),
+                            );
+                            _frame.set(
+                              59,
+                              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                                _frame[54],
+                                _frame[47],
+                              ),
+                            );
+                            leanTag(_frame[59]) match {
+                            | "[\"Bool\",\"false\"]" ->
+                              _frame.set(
+                                60,
+                                L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                                  _frame[45],
+                                  _frame[54],
+                                  LeanErased(),
+                                ),
+                              );
+                              _frame.set(61, LeanScalar("uint32", "48"));
+                              _frame.set(
+                                62,
+                                L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                                  _frame[61],
+                                  _frame[60],
+                                ),
+                              );
+                              leanTag(_frame[62]) match {
+                              | "[\"Bool\",\"false\"]" ->
+                                !pc = 1;
+                                void
+                              | "[\"Bool\",\"true\"]" ->
+                                _frame.set(63, LeanScalar("uint32", "57"));
+                                _frame.set(
+                                  64,
+                                  L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                                    _frame[60],
+                                    _frame[63],
+                                  ),
+                                );
+                                leanTag(_frame[64]) match {
+                                | "[\"Bool\",\"false\"]" ->
+                                  !pc = 1;
+                                  void
+                                | "[\"Bool\",\"true\"]" ->
+                                  _frame.set(
+                                    65,
+                                    L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                                      _frame[45],
+                                      _frame[54],
+                                      LeanErased(),
+                                    ),
+                                  );
+                                  _frame.set(
+                                    66,
+                                    L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+                                      _frame[60],
+                                    ),
+                                  );
+                                  _frame.set(67, LeanScalar("nat", "48"));
+                                  _frame.set(
+                                    68,
+                                    L4_Init_Prelude.f_Nat_sub_8647441ee5(
+                                      _frame[66],
+                                      _frame[67],
+                                    ),
+                                  );
+                                  _frame.set(
+                                    69,
+                                    L4_Std_Internal_Parsec_String.f_String_digitsCore_go_fe246f4f86(
+                                      _frame[45],
+                                      _frame[65],
+                                      _frame[68],
+                                    ),
+                                  );
+                                  leanTag(_frame[69]) match {
+                                  | "[\"Prod\",\"mk\"]" ->
+                                    _frame.set(70, leanField(_frame[69], 0));
+                                    _frame.set(71, leanField(_frame[69], 1));
+                                    _frame.set(
+                                      72,
+                                      LeanCtor(
+                                        "[\"Sigma\",\"mk\"]",
+                                        Array[_frame[45], _frame[71]],
+                                      ),
+                                    );
+                                    _frame.set(80, LeanScalar("nat", "6"));
+                                    _frame.set(
+                                      81,
+                                      L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                                        _frame[80],
+                                        _frame[70],
+                                      ),
+                                    );
+                                    leanTag(_frame[81]) match {
+                                    | "[\"Bool\",\"false\"]" ->
+                                      _frame.set(82, LeanScalar("nat", "7"));
+                                      _frame.set(
+                                        83,
+                                        L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+                                          _frame[82],
+                                        ),
+                                      );
+                                      _frame.set(89, LeanScalar("nat", "0"));
+                                      _frame.set(
+                                        90,
+                                        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                                          _frame[70],
+                                          _frame[89],
+                                        ),
+                                      );
+                                      leanTag(_frame[90]) match {
+                                      | "[\"Bool\",\"false\"]" ->
+                                        _frame.set(
+                                          91,
+                                          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+                                            _frame[70],
+                                          ),
+                                        );
+                                        _jump0 = _frame[91];
+                                        _frame.set(84, _jump0);
+                                        !pc = 3;
+                                        void
+                                      | "[\"Bool\",\"true\"]" ->
+                                        _jump0 = _frame[83];
+                                        _frame.set(84, _jump0);
+                                        !pc = 3;
+                                        void
+                                      | _ ->
+                                        return leanFail(
+                                          "non-exhaustive Lean case",
+                                        )
+                                      }
+                                    | "[\"Bool\",\"true\"]" ->
+                                      _frame.set(92, LeanText("day "));
+                                      _frame.set(
+                                        93,
+                                        L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+                                          _frame[70],
+                                        ),
+                                      );
+                                      _frame.set(
+                                        94,
+                                        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                                          _frame[92],
+                                          _frame[93],
+                                        ),
+                                      );
+                                      _frame.set(
+                                        95,
+                                        LeanText(" out of range 0-6"),
+                                      );
+                                      _frame.set(
+                                        96,
+                                        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                                          _frame[94],
+                                          _frame[95],
+                                        ),
+                                      );
+                                      _frame.set(
+                                        97,
+                                        LeanCtor(
+                                          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                                          Array[_frame[96]],
+                                        ),
+                                      );
+                                      _frame.set(
+                                        98,
+                                        LeanCtor(
+                                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                                          Array[_frame[72], _frame[97]],
+                                        ),
+                                      );
+                                      return _frame[98]
+                                    | _ ->
+                                      return leanFail(
+                                        "non-exhaustive Lean case",
+                                      )
+                                    }
+                                  | _ ->
+                                    return leanFail("non-exhaustive Lean case")
+                                  }
+                                | _ ->
+                                  return leanFail("non-exhaustive Lean case")
+                                }
+                              | _ -> return leanFail("non-exhaustive Lean case")
+                              }
+                            | "[\"Bool\",\"true\"]" ->
+                              _frame.set(
+                                99,
+                                LeanCtor(
+                                  "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                                  Array[],
+                                ),
+                              );
+                              _frame.set(
+                                100,
+                                LeanCtor(
+                                  "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                                  Array[_frame[55], _frame[99]],
+                                ),
+                              );
+                              return _frame[100]
+                            | _ -> return leanFail("non-exhaustive Lean case")
+                            }
+                          | _ -> return leanFail("non-exhaustive Lean case")
+                          }
+                        | "[\"Bool\",\"true\"]" ->
+                          _frame.set(
+                            101,
+                            LeanCtor(
+                              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                              Array[],
+                            ),
+                          );
+                          _frame.set(
+                            102,
+                            LeanCtor(
+                              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                              Array[_frame[41], _frame[101]],
+                            ),
+                          );
+                          return _frame[102]
+                        | _ -> return leanFail("non-exhaustive Lean case")
+                        }
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                      _frame.set(43, leanField(_frame[40], 0));
+                      _frame.set(44, leanField(_frame[40], 1));
+                      _frame.set(
+                        103,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                          Array[_frame[43], _frame[44]],
+                        ),
+                      );
+                      return _frame[103]
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Bool\",\"true\"]" ->
+                  _frame.set(
+                    104,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                      Array[],
+                    ),
+                  );
+                  _frame.set(
+                    105,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                      Array[_frame[20], _frame[104]],
+                    ),
+                  );
+                  return _frame[105]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+              _frame.set(22, leanField(_frame[19], 0));
+              _frame.set(23, leanField(_frame[19], 1));
+              _frame.set(
+                106,
+                LeanCtor(
+                  "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                  Array[_frame[22], _frame[23]],
+                ),
+              );
+              return _frame[106]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            107,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _frame.set(
+            108,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+              Array[_frame[0], _frame[107]],
+            ),
+          );
+          return _frame[108]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(56, LeanText("digit expected"));
+      _frame.set(
+        57,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[56]],
+        ),
+      );
+      _frame.set(
+        58,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_frame[55], _frame[57]],
+        ),
+      );
+      return _frame[58]
+    | 2 ->
+      _frame.set(73, LeanText("day "));
+      _frame.set(74, L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_frame[70]));
+      _frame.set(
+        75,
+        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _frame[73],
+          _frame[74],
+        ),
+      );
+      _frame.set(76, LeanText(" out of range 0-6"));
+      _frame.set(
+        77,
+        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _frame[75],
+          _frame[76],
+        ),
+      );
+      _frame.set(
+        78,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[77]],
+        ),
+      );
+      _frame.set(
+        79,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_frame[72], _frame[78]],
+        ),
+      );
+      return _frame[79]
+    | 3 ->
+      _frame.set(
+        85,
+        L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_frame[15], _frame[84]),
+      );
+      leanTag(_frame[85]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 2;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          86,
+          L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_frame[84], _frame[83]),
+        );
+        leanTag(_frame[86]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 2;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            87,
+            LeanCtor(
+              "[\"Std\",\"Time\",\"TimeZone\",\"TransitionSpec\",\"mwd\"]",
+              Array[_frame[21], _frame[42], _frame[84]],
+            ),
+          );
+          _frame.set(
+            88,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+              Array[_frame[72], _frame[87]],
+            ),
+          );
+          return _frame[88]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseRule"
+fun f_Time_TimeZone_posixParseRule_73fc9708db(
+  _extended_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_extended_0, 1=_a_1_1, 2=_x_2_2, 3=_pos_3_3, 4=_res_4_4, 5=_pos_43_5, 6=_err_44_6, 7=_pos_6_7, 8=_res_7_8, 9=_x_8_9, 10=_x_9_10, 11=_fst_11, 12=_snd_12, 13=_x_10_13, 14=_x_11_14, 15=_pos_13_15, 16=_snd_16, 17=_err_14_17, 18=_decide_15_18, 19=_x_16_19, 20=_x_17_20, 21=_x_18_21, 22=_x_19_22, 23=_x_20_23, 24=_decide_21_24, 25=_x_22_25, 26=_c_26, 27=_x_23_27, 28=_x_24_28, 29=_x_25_29, 30=_x_26_30, 31=_it_31, 32=_x_27_32, 33=_pos_28_33, 34=_res_29_34, 35=_err_41_36, 36=_y_31_37, 37=_x_32_38, 38=_pos_33_39, 39=_res_34_40, 40=_err_37_42, 41=_x_35_43, 42=_x_38_44, 43=_x_39_45, 44=_x_42_46, 45=_x_45_47
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    46,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _extended_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(2, f_Time_TimeZone_posixParseSpec_ed09dd9146(_frame[1]));
+      leanTag(_frame[2]) match {
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+        _frame.set(3, leanField(_frame[2], 0));
+        _frame.set(4, leanField(_frame[2], 1));
+        leanTag(_frame[3]) match {
+        | "[\"Sigma\",\"mk\"]" ->
+          _frame.set(11, leanField(_frame[3], 0));
+          _frame.set(12, leanField(_frame[3], 1));
+          _frame.set(13, LeanScalar("nat", "2"));
+          _frame.set(
+            14,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[13]),
+          );
+          _frame.set(
+            23,
+            L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[11]),
+          );
+          _frame.set(
+            24,
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[12], _frame[23]),
+          );
+          leanTag(_frame[24]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(25, LeanScalar("uint32", "47"));
+            _frame.set(
+              26,
+              L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                _frame[11],
+                _frame[12],
+                LeanErased(),
+              ),
+            );
+            _frame.set(
+              27,
+              L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[26], _frame[25]),
+            );
+            leanTag(_frame[27]) match {
+            | "[\"Bool\",\"false\"]" ->
+              _frame.set(28, LeanText("expected: '/'"));
+              _frame.set(
+                29,
+                LeanCtor(
+                  "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                  Array[_frame[28]],
+                ),
+              );
+              _jump0 = _frame[3];
+              _jump1 = _frame[12];
+              _jump2 = _frame[29];
+              _frame.set(15, _jump0);
+              _frame.set(16, _jump1);
+              _frame.set(17, _jump2);
+              !pc = 2;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                30,
+                L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                  _frame[11],
+                  _frame[12],
+                  LeanErased(),
+                ),
+              );
+              _frame.set(
+                31,
+                LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[11], _frame[30]]),
+              );
+              _frame.set(
+                32,
+                f_Time_TimeZone_posixParseSign_9e6c5fac87(_frame[31]),
+              );
+              leanTag(_frame[32]) match {
+              | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                _frame.set(33, leanField(_frame[32], 0));
+                _frame.set(34, leanField(_frame[32], 1));
+                leanTag(_frame[0]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(42, LeanScalar("nat", "24"));
+                  _jump0 = _frame[42];
+                  _frame.set(36, _jump0);
+                  !pc = 3;
+                  void
+                | "[\"Bool\",\"true\"]" ->
+                  _frame.set(43, LeanScalar("nat", "167"));
+                  _jump0 = _frame[43];
+                  _frame.set(36, _jump0);
+                  !pc = 3;
+                  void
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                _ = leanField(_frame[32], 0);
+                _frame.set(35, leanField(_frame[32], 1));
+                _jump0 = _frame[3];
+                _jump1 = _frame[12];
+                _jump2 = _frame[35];
+                _frame.set(15, _jump0);
+                _frame.set(16, _jump1);
+                _frame.set(17, _jump2);
+                !pc = 2;
+                void
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              44,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                Array[],
+              ),
+            );
+            _jump0 = _frame[3];
+            _jump1 = _frame[12];
+            _jump2 = _frame[44];
+            _frame.set(15, _jump0);
+            _frame.set(16, _jump1);
+            _frame.set(17, _jump2);
+            !pc = 2;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+        _frame.set(5, leanField(_frame[2], 0));
+        _frame.set(6, leanField(_frame[2], 1));
+        _frame.set(
+          45,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[5], _frame[6]],
+          ),
+        );
+        return _frame[45]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        9,
+        LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"TransitionRule\",\"mk\"]",
+          Array[_frame[4], _frame[8]],
+        ),
+      );
+      _frame.set(
+        10,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+          Array[_frame[7], _frame[9]],
+        ),
+      );
+      return _frame[10]
+    | 2 ->
+      _frame.set(
+        18,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[12], _frame[16]),
+      );
+      leanTag(_frame[18]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          19,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[15], _frame[17]],
+          ),
+        );
+        return _frame[19]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(20, LeanScalar("nat", "3600"));
+        _frame.set(
+          21,
+          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[20]),
+        );
+        _frame.set(
+          22,
+          L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_frame[14], _frame[21]),
+        );
+        _jump0 = _frame[15];
+        _jump1 = _frame[22];
+        _frame.set(7, _jump0);
+        _frame.set(8, _jump1);
+        !pc = 1;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 3 ->
+      _frame.set(
+        37,
+        f_Time_TimeZone_posixParseHMS_b3b4e63710(_frame[36], _frame[33]),
+      );
+      leanTag(_frame[37]) match {
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+        _frame.set(38, leanField(_frame[37], 0));
+        _frame.set(39, leanField(_frame[37], 1));
+        _frame.set(
+          41,
+          L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_frame[34], _frame[39]),
+        );
+        _jump0 = _frame[38];
+        _jump1 = _frame[41];
+        _frame.set(7, _jump0);
+        _frame.set(8, _jump1);
+        !pc = 1;
+        void
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+        _ = leanField(_frame[37], 0);
+        _frame.set(40, leanField(_frame[37], 1));
+        _jump0 = _frame[3];
+        _jump1 = _frame[12];
+        _jump2 = _frame[40];
+        _frame.set(15, _jump0);
+        _frame.set(16, _jump1);
+        _frame.set(17, _jump2);
+        !pc = 2;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseName"
+fun f_Time_TimeZone_posixParseName_1c443ab95f(_a_1_0: LeanValue): LeanValue {
+  _joined: Array<LeanValue> = {
+    leanTag(_a_1_0) match {
+    | "[\"Sigma\",\"mk\"]" ->
+      _fst_36: LeanValue = leanField(_a_1_0, 0);
+      _snd_37: LeanValue = leanField(_a_1_0, 1);
+      _x_32_38: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+        _fst_36,
+      );
+      _decide_33_39: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _snd_37,
+        _x_32_38,
+      );
+      leanTag(_decide_33_39) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_34_40: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+          _fst_36,
+          _snd_37,
+          LeanErased(),
+        );
+        Array[_a_1_0, LeanCtor("[\"Option\",\"some\"]", Array[_x_34_40])]
+      | "[\"Bool\",\"true\"]" ->
+        Array[_a_1_0, LeanCtor("[\"Option\",\"none\"]", Array[])]
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  _pos_3_1: LeanValue = _joined[0];
+  _res_4_2: LeanValue = _joined[1];
+  _x_7_5: LeanValue = f_TimeZone_posixParseName_spec_0_627dd05506(
+    _res_4_2,
+    LeanCtor("[\"Option\",\"some\"]", Array[LeanScalar("uint32", "60")]),
+  );
+  leanTag(_x_7_5) match {
+  | "[\"Bool\",\"false\"]" ->
+    f_TimeZone_posixParseName_spec_1_67285750d2(LeanText(""), _pos_3_1)
+  | "[\"Bool\",\"true\"]" ->
+    leanTag(_pos_3_1) match {
+    | "[\"Sigma\",\"mk\"]" ->
+      _fst_8: LeanValue = leanField(_pos_3_1, 0);
+      _snd_9: LeanValue = leanField(_pos_3_1, 1);
+      _x_10_10: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+        _fst_8,
+      );
+      _decide_11_11: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _snd_9,
+        _x_10_10,
+      );
+      leanTag(_decide_11_11) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_12_12: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+          _fst_8,
+          _snd_9,
+          LeanErased(),
+        );
+        _x_14_14: LeanValue = f_Time_TimeZone_quotedName_be5f7fdeff(
+          LeanCtor("[\"Sigma\",\"mk\"]", Array[_fst_8, _x_12_12]),
+        );
+        leanTag(_x_14_14) match {
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+          _pos_15_15: LeanValue = leanField(_x_14_14, 0);
+          _res_16_16: LeanValue = leanField(_x_14_14, 1);
+          leanTag(_pos_15_15) match {
+          | "[\"Sigma\",\"mk\"]" ->
+            _fst_19: LeanValue = leanField(_pos_15_15, 0);
+            _snd_20: LeanValue = leanField(_pos_15_15, 1);
+            _x_17_21: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+              _fst_19,
+            );
+            _decide_18_22: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _snd_20,
+              _x_17_21,
+            );
+            leanTag(_decide_18_22) match {
+            | "[\"Bool\",\"false\"]" ->
+              _c_24: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                _fst_19,
+                _snd_20,
+                LeanErased(),
+              );
+              _x_20_25: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                _c_24,
+                LeanScalar("uint32", "62"),
+              );
+              leanTag(_x_20_25) match {
+              | "[\"Bool\",\"false\"]" ->
+                LeanCtor(
+                  "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                  Array[
+                    _pos_15_15,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                      Array[LeanText("expected: '>'")],
+                    ),
+                  ],
+                )
+              | "[\"Bool\",\"true\"]" ->
+                _x_24_29: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                  _fst_19,
+                  _snd_20,
+                  LeanErased(),
+                );
+                LeanCtor(
+                  "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                  Array[
+                    LeanCtor("[\"Sigma\",\"mk\"]", Array[_fst_19, _x_24_29]),
+                    _res_16_16,
+                  ],
+                )
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Bool\",\"true\"]" ->
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                Array[
+                  _pos_15_15,
+                  LeanCtor(
+                    "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                    Array[],
+                  ),
+                ],
+              )
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+          _pos_28_17: LeanValue = leanField(_x_14_14, 0);
+          _err_29_18: LeanValue = leanField(_x_14_14, 1);
+          _x_14_14
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[
+            _pos_3_1,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          ],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseJulian0Spec._lam_0"
+fun f_TimeZone_posixParseJulian0Spec_lam_0_9dc8e97b57(
+  _x_1_0: LeanValue,
+): LeanValue {
+  LeanCtor("[\"Bool\",\"true\"]", Array[])
+}
+fun apply_f_TimeZone_posixParseJulian0Spec_lam_0_9dc8e97b57(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_posixParseJulian0Spec_lam_0_9dc8e97b57(_args[0])
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.parseBoundedNat"
+fun f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+  _lo_0_input: LeanValue,
+  _hi_1_input: LeanValue,
+  _name_2_input: LeanValue,
+  _extra_3_input: LeanValue,
+  _a_1_4_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_lo_0, 1=_hi_1, 2=_name_2, 3=_extra_3, 4=_a_1_4, 5=_x_3_5, 6=_x_4_6, 7=_x_5_7, 8=_fst_8, 9=_snd_9, 10=_x_6_10, 11=_decide_7_11, 12=_c_12, 13=_x_8_13, 14=_x_9_14, 15=_x_10_15, 16=_x_11_16, 17=_x_12_17, 18=_x_13_18, 19=_x_14_19, 20=_x_15_20, 21=_x_16_21, 22=_fst_17_22, 23=_snd_18_23, 24=_x_19_24, 25=_x_20_25, 26=_x_22_26, 27=_x_23_27, 28=_x_24_28, 29=_x_25_29, 30=_x_26_30, 31=_x_27_31, 32=_x_28_32, 33=_x_29_33, 34=_x_30_34, 35=_x_31_35, 36=_x_32_36, 37=_x_33_37, 38=_x_34_38, 39=_x_35_39, 40=_x_36_40, 41=_x_37_41, 42=_x_38_42, 43=_x_39_43, 44=_x_40_44, 45=_x_41_45, 46=_x_42_46, 47=_x_43_47
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    48,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _lo_0_input);
+  _frame.set(1, _hi_1_input);
+  _frame.set(2, _name_2_input);
+  _frame.set(3, _extra_3_input);
+  _frame.set(4, _a_1_4_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[4]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(8, leanField(_frame[4], 0));
+        _frame.set(9, leanField(_frame[4], 1));
+        _frame.set(
+          10,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[8]),
+        );
+        _frame.set(
+          11,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[9], _frame[10]),
+        );
+        leanTag(_frame[11]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            12,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[8],
+              _frame[9],
+              LeanErased(),
+            ),
+          );
+          _frame.set(13, LeanScalar("uint32", "48"));
+          _frame.set(
+            14,
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[13], _frame[12]),
+          );
+          leanTag(_frame[14]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(15, LeanScalar("uint32", "57"));
+            _frame.set(
+              16,
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[12], _frame[15]),
+            );
+            leanTag(_frame[16]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                17,
+                L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                  _frame[8],
+                  _frame[9],
+                  LeanErased(),
+                ),
+              );
+              _frame.set(
+                18,
+                L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_frame[12]),
+              );
+              _frame.set(19, LeanScalar("nat", "48"));
+              _frame.set(
+                20,
+                L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[18], _frame[19]),
+              );
+              _frame.set(
+                21,
+                L4_Std_Internal_Parsec_String.f_String_digitsCore_go_fe246f4f86(
+                  _frame[8],
+                  _frame[17],
+                  _frame[20],
+                ),
+              );
+              leanTag(_frame[21]) match {
+              | "[\"Prod\",\"mk\"]" ->
+                _frame.set(22, leanField(_frame[21], 0));
+                _frame.set(23, leanField(_frame[21], 1));
+                _frame.set(
+                  24,
+                  LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[8], _frame[23]]),
+                );
+                _frame.set(
+                  25,
+                  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[22]),
+                );
+                _frame.set(34, leanApply(_frame[3], Array[_frame[25]]));
+                leanTag(_frame[34]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(35, LeanText(" "));
+                  _frame.set(
+                    36,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[2],
+                      _frame[35],
+                    ),
+                  );
+                  _frame.set(
+                    37,
+                    L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(_frame[25]),
+                  );
+                  _frame.set(
+                    38,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[36],
+                      _frame[37],
+                    ),
+                  );
+                  _frame.set(39, LeanText(" out of range"));
+                  _frame.set(
+                    40,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[38],
+                      _frame[39],
+                    ),
+                  );
+                  _frame.set(
+                    41,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                      Array[_frame[40]],
+                    ),
+                  );
+                  _frame.set(
+                    42,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                      Array[_frame[24], _frame[41]],
+                    ),
+                  );
+                  return _frame[42]
+                | "[\"Bool\",\"true\"]" ->
+                  _frame.set(
+                    43,
+                    L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+                      _frame[0],
+                      _frame[25],
+                    ),
+                  );
+                  leanTag(_frame[43]) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    !pc = 2;
+                    void
+                  | "[\"Bool\",\"true\"]" ->
+                    _frame.set(
+                      44,
+                      L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+                        _frame[25],
+                        _frame[1],
+                      ),
+                    );
+                    leanTag(_frame[44]) match {
+                    | "[\"Bool\",\"false\"]" ->
+                      !pc = 2;
+                      void
+                    | "[\"Bool\",\"true\"]" ->
+                      _frame.set(
+                        45,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                          Array[_frame[24], _frame[25]],
+                        ),
+                      );
+                      return _frame[45]
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            46,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _frame.set(
+            47,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+              Array[_frame[4], _frame[46]],
+            ),
+          );
+          return _frame[47]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(5, LeanText("digit expected"));
+      _frame.set(
+        6,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[5]],
+        ),
+      );
+      _frame.set(
+        7,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_frame[4], _frame[6]],
+        ),
+      );
+      return _frame[7]
+    | 2 ->
+      _frame.set(26, LeanText(" "));
+      _frame.set(
+        27,
+        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _frame[2],
+          _frame[26],
+        ),
+      );
+      _frame.set(28, L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(_frame[25]));
+      _frame.set(
+        29,
+        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _frame[27],
+          _frame[28],
+        ),
+      );
+      _frame.set(30, LeanText(" out of range"));
+      _frame.set(
+        31,
+        L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _frame[29],
+          _frame[30],
+        ),
+      );
+      _frame.set(
+        32,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[31]],
+        ),
+      );
+      _frame.set(
+        33,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_frame[24], _frame[32]],
+        ),
+      );
+      return _frame[33]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseMwdSpec._lam_1"
+fun f_TimeZone_posixParseMwdSpec_lam_1_99f1dfd2ad(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_x_2_1, _x_1_0)
+}
+fun apply_f_TimeZone_posixParseMwdSpec_lam_1_99f1dfd2ad(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_posixParseMwdSpec_lam_1_99f1dfd2ad(_args[0], _args[1])
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.parsePosixTzP"
+fun f_Time_TimeZone_parsePosixTzP_68b6b61bb7(
+  _extended_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_extended_0, 1=_a_1_1, 2=_x_2_2, 3=_pos_3_3, 4=_res_4_4, 5=_pos_88_5, 6=_err_89_6, 7=_x_5_7, 8=_x_6_8, 9=_x_7_9, 10=_x_8_10, 11=_pos_9_11, 12=_res_10_12, 13=_pos_82_13, 14=_err_83_14, 15=_fst_15, 16=_snd_16, 17=_x_11_17, 18=_decide_12_18, 19=_x_13_19, 20=_pos_14_20, 21=_res_15_21, 22=_pos_76_22, 23=_err_77_23, 24=_x_16_24, 25=_x_17_25, 26=_x_18_26, 27=_pos_19_27, 28=_res_20_28, 29=_pos_70_29, 30=_err_71_30, 31=_pos_22_31, 32=_res_23_32, 33=_x_24_33, 34=_x_25_34, 35=_x_26_35, 36=_x_27_36, 37=_x_28_37, 38=_x_29_38, 39=_x_30_39, 40=_x_31_40, 41=_fst_41, 42=_snd_42, 43=_x_32_43, 44=_decide_33_44, 45=_x_34_45, 46=_x_35_46, 47=_x_36_47, 48=_pos_37_48, 49=_res_38_49, 50=_pos_60_50, 51=_err_61_51, 52=_fst_52, 53=_snd_53, 54=_x_39_54, 55=_decide_40_55, 56=_c_56, 57=_x_41_57, 58=_x_42_58, 59=_x_43_59, 60=_x_44_60, 61=_x_45_61, 62=_it_62, 63=_x_46_63, 64=_pos_47_64, 65=_res_48_65, 66=_pos_55_66, 67=_err_56_67, 68=_x_49_68, 69=_x_50_69, 70=_x_51_70, 71=_x_52_71, 72=_x_53_72, 73=_x_54_73, 74=_x_57_74, 75=_x_58_75, 76=_x_59_76, 77=_x_62_77, 78=_x_63_78, 79=_x_64_79, 80=_fst_80, 81=_snd_81, 82=_x_65_82, 83=_decide_66_83, 84=_x_67_84, 85=_x_68_85, 86=_x_69_86, 87=_x_72_87, 88=_x_73_88, 89=_x_74_89, 90=_x_75_90, 91=_x_78_91, 92=_x_79_92, 93=_x_80_93, 94=_x_81_94, 95=_x_84_95, 96=_x_85_96, 97=_x_86_97, 98=_x_87_98, 99=_x_90_99
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    100,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _extended_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(2, f_Time_TimeZone_posixParseName_1c443ab95f(_frame[1]));
+      leanTag(_frame[2]) match {
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+        _frame.set(3, leanField(_frame[2], 0));
+        _frame.set(4, leanField(_frame[2], 1));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[4]),
+        );
+        _frame.set(8, LeanScalar("nat", "0"));
+        _frame.set(
+          9,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[7], _frame[8]),
+        );
+        leanTag(_frame[9]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            10,
+            f_Time_TimeZone_posixParseOffset_bdbfc89cfb(_frame[3]),
+          );
+          leanTag(_frame[10]) match {
+          | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+            _frame.set(11, leanField(_frame[10], 0));
+            _frame.set(12, leanField(_frame[10], 1));
+            leanTag(_frame[11]) match {
+            | "[\"Sigma\",\"mk\"]" ->
+              _frame.set(15, leanField(_frame[11], 0));
+              _frame.set(16, leanField(_frame[11], 1));
+              _frame.set(
+                17,
+                L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[15]),
+              );
+              _frame.set(
+                18,
+                L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[16], _frame[17]),
+              );
+              leanTag(_frame[18]) match {
+              | "[\"Bool\",\"false\"]" ->
+                _frame.set(
+                  19,
+                  f_Time_TimeZone_posixParseName_1c443ab95f(_frame[11]),
+                );
+                leanTag(_frame[19]) match {
+                | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                  _frame.set(20, leanField(_frame[19], 0));
+                  _frame.set(21, leanField(_frame[19], 1));
+                  _frame.set(
+                    24,
+                    L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+                      _frame[21],
+                    ),
+                  );
+                  _frame.set(
+                    25,
+                    L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                      _frame[24],
+                      _frame[8],
+                    ),
+                  );
+                  leanTag(_frame[25]) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    _frame.set(
+                      26,
+                      f_Time_TimeZone_posixParseDstOffset_75e25f500f(
+                        _frame[12],
+                        _frame[20],
+                      ),
+                    );
+                    leanTag(_frame[26]) match {
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                      _frame.set(27, leanField(_frame[26], 0));
+                      _frame.set(28, leanField(_frame[26], 1));
+                      leanTag(_frame[27]) match {
+                      | "[\"Sigma\",\"mk\"]" ->
+                        _frame.set(80, leanField(_frame[27], 0));
+                        _frame.set(81, leanField(_frame[27], 1));
+                        _frame.set(
+                          82,
+                          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+                            _frame[80],
+                          ),
+                        );
+                        _frame.set(
+                          83,
+                          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                            _frame[81],
+                            _frame[82],
+                          ),
+                        );
+                        leanTag(_frame[83]) match {
+                        | "[\"Bool\",\"false\"]" ->
+                          _frame.set(
+                            84,
+                            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                              _frame[80],
+                              _frame[81],
+                              LeanErased(),
+                            ),
+                          );
+                          _frame.set(
+                            85,
+                            LeanCtor(
+                              "[\"Option\",\"some\"]",
+                              Array[_frame[84]],
+                            ),
+                          );
+                          _jump0 = _frame[27];
+                          _jump1 = _frame[85];
+                          _frame.set(31, _jump0);
+                          _frame.set(32, _jump1);
+                          !pc = 1;
+                          void
+                        | "[\"Bool\",\"true\"]" ->
+                          _frame.set(
+                            86,
+                            LeanCtor("[\"Option\",\"none\"]", Array[]),
+                          );
+                          _jump0 = _frame[27];
+                          _jump1 = _frame[86];
+                          _frame.set(31, _jump0);
+                          _frame.set(32, _jump1);
+                          !pc = 1;
+                          void
+                        | _ -> return leanFail("non-exhaustive Lean case")
+                        }
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                      _frame.set(29, leanField(_frame[26], 0));
+                      _frame.set(30, leanField(_frame[26], 1));
+                      _frame.set(
+                        87,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                          Array[_frame[29], _frame[30]],
+                        ),
+                      );
+                      return _frame[87]
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | "[\"Bool\",\"true\"]" ->
+                    _frame.set(88, LeanCtor("[\"Option\",\"none\"]", Array[]));
+                    _frame.set(
+                      89,
+                      LeanCtor(
+                        "[\"Std\",\"Time\",\"TimeZone\",\"RecurringRule\",\"mk\"]",
+                        Array[_frame[4], _frame[12], _frame[88]],
+                      ),
+                    );
+                    _frame.set(
+                      90,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                        Array[_frame[20], _frame[89]],
+                      ),
+                    );
+                    return _frame[90]
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                  _frame.set(22, leanField(_frame[19], 0));
+                  _frame.set(23, leanField(_frame[19], 1));
+                  _frame.set(
+                    91,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                      Array[_frame[22], _frame[23]],
+                    ),
+                  );
+                  return _frame[91]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Bool\",\"true\"]" ->
+                _frame.set(92, LeanCtor("[\"Option\",\"none\"]", Array[]));
+                _frame.set(
+                  93,
+                  LeanCtor(
+                    "[\"Std\",\"Time\",\"TimeZone\",\"RecurringRule\",\"mk\"]",
+                    Array[_frame[4], _frame[12], _frame[92]],
+                  ),
+                );
+                _frame.set(
+                  94,
+                  LeanCtor(
+                    "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                    Array[_frame[11], _frame[93]],
+                  ),
+                );
+                return _frame[94]
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+            _frame.set(13, leanField(_frame[10], 0));
+            _frame.set(14, leanField(_frame[10], 1));
+            _frame.set(
+              95,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                Array[_frame[13], _frame[14]],
+              ),
+            );
+            return _frame[95]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(96, LeanText("empty timezone name"));
+          _frame.set(
+            97,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+              Array[_frame[96]],
+            ),
+          );
+          _frame.set(
+            98,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+              Array[_frame[3], _frame[97]],
+            ),
+          );
+          return _frame[98]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+        _frame.set(5, leanField(_frame[2], 0));
+        _frame.set(6, leanField(_frame[2], 1));
+        _frame.set(
+          99,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[5], _frame[6]],
+          ),
+        );
+        return _frame[99]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(33, LeanScalar("uint32", "44"));
+      _frame.set(34, LeanCtor("[\"Option\",\"some\"]", Array[_frame[33]]));
+      _frame.set(
+        35,
+        f_TimeZone_posixParseName_spec_0_627dd05506(_frame[32], _frame[34]),
+      );
+      leanTag(_frame[35]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(36, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        _frame.set(
+          37,
+          LeanCtor(
+            "[\"Std\",\"Time\",\"TimeZone\",\"DaylightSavingRule\",\"mk\"]",
+            Array[_frame[21], _frame[28], _frame[36], _frame[36]],
+          ),
+        );
+        _frame.set(38, LeanCtor("[\"Option\",\"some\"]", Array[_frame[37]]));
+        _frame.set(
+          39,
+          LeanCtor(
+            "[\"Std\",\"Time\",\"TimeZone\",\"RecurringRule\",\"mk\"]",
+            Array[_frame[4], _frame[12], _frame[38]],
+          ),
+        );
+        _frame.set(
+          40,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+            Array[_frame[31], _frame[39]],
+          ),
+        );
+        return _frame[40]
+      | "[\"Bool\",\"true\"]" ->
+        leanTag(_frame[31]) match {
+        | "[\"Sigma\",\"mk\"]" ->
+          _frame.set(41, leanField(_frame[31], 0));
+          _frame.set(42, leanField(_frame[31], 1));
+          _frame.set(
+            43,
+            L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[41]),
+          );
+          _frame.set(
+            44,
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[42], _frame[43]),
+          );
+          leanTag(_frame[44]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(
+              45,
+              L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                _frame[41],
+                _frame[42],
+                LeanErased(),
+              ),
+            );
+            _frame.set(
+              46,
+              LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[41], _frame[45]]),
+            );
+            _frame.set(
+              47,
+              f_Time_TimeZone_posixParseRule_73fc9708db(_frame[0], _frame[46]),
+            );
+            leanTag(_frame[47]) match {
+            | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+              _frame.set(48, leanField(_frame[47], 0));
+              _frame.set(49, leanField(_frame[47], 1));
+              leanTag(_frame[48]) match {
+              | "[\"Sigma\",\"mk\"]" ->
+                _frame.set(52, leanField(_frame[48], 0));
+                _frame.set(53, leanField(_frame[48], 1));
+                _frame.set(
+                  54,
+                  L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[52]),
+                );
+                _frame.set(
+                  55,
+                  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                    _frame[53],
+                    _frame[54],
+                  ),
+                );
+                leanTag(_frame[55]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(
+                    56,
+                    L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                      _frame[52],
+                      _frame[53],
+                      LeanErased(),
+                    ),
+                  );
+                  _frame.set(
+                    57,
+                    L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                      _frame[56],
+                      _frame[33],
+                    ),
+                  );
+                  leanTag(_frame[57]) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    _frame.set(58, LeanText("expected: ','"));
+                    _frame.set(
+                      59,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                        Array[_frame[58]],
+                      ),
+                    );
+                    _frame.set(
+                      60,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                        Array[_frame[48], _frame[59]],
+                      ),
+                    );
+                    return _frame[60]
+                  | "[\"Bool\",\"true\"]" ->
+                    _frame.set(
+                      61,
+                      L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                        _frame[52],
+                        _frame[53],
+                        LeanErased(),
+                      ),
+                    );
+                    _frame.set(
+                      62,
+                      LeanCtor(
+                        "[\"Sigma\",\"mk\"]",
+                        Array[_frame[52], _frame[61]],
+                      ),
+                    );
+                    _frame.set(
+                      63,
+                      f_Time_TimeZone_posixParseRule_73fc9708db(
+                        _frame[0],
+                        _frame[62],
+                      ),
+                    );
+                    leanTag(_frame[63]) match {
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                      _frame.set(64, leanField(_frame[63], 0));
+                      _frame.set(65, leanField(_frame[63], 1));
+                      _frame.set(
+                        68,
+                        LeanCtor("[\"Option\",\"some\"]", Array[_frame[49]]),
+                      );
+                      _frame.set(
+                        69,
+                        LeanCtor("[\"Option\",\"some\"]", Array[_frame[65]]),
+                      );
+                      _frame.set(
+                        70,
+                        LeanCtor(
+                          "[\"Std\",\"Time\",\"TimeZone\",\"DaylightSavingRule\",\"mk\"]",
+                          Array[_frame[21], _frame[28], _frame[68], _frame[69]],
+                        ),
+                      );
+                      _frame.set(
+                        71,
+                        LeanCtor("[\"Option\",\"some\"]", Array[_frame[70]]),
+                      );
+                      _frame.set(
+                        72,
+                        LeanCtor(
+                          "[\"Std\",\"Time\",\"TimeZone\",\"RecurringRule\",\"mk\"]",
+                          Array[_frame[4], _frame[12], _frame[71]],
+                        ),
+                      );
+                      _frame.set(
+                        73,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                          Array[_frame[64], _frame[72]],
+                        ),
+                      );
+                      return _frame[73]
+                    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                      _frame.set(66, leanField(_frame[63], 0));
+                      _frame.set(67, leanField(_frame[63], 1));
+                      _frame.set(
+                        74,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                          Array[_frame[66], _frame[67]],
+                        ),
+                      );
+                      return _frame[74]
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Bool\",\"true\"]" ->
+                  _frame.set(
+                    75,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                      Array[],
+                    ),
+                  );
+                  _frame.set(
+                    76,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                      Array[_frame[48], _frame[75]],
+                    ),
+                  );
+                  return _frame[76]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+              _frame.set(50, leanField(_frame[47], 0));
+              _frame.set(51, leanField(_frame[47], 1));
+              _frame.set(
+                77,
+                LeanCtor(
+                  "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                  Array[_frame[50], _frame[51]],
+                ),
+              );
+              return _frame[77]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              78,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                Array[],
+              ),
+            );
+            _frame.set(
+              79,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                Array[_frame[31], _frame[78]],
+              ),
+            );
+            return _frame[79]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+fun apply_f_Time_TimeZone_parsePosixTzP_68b6b61bb7(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Time_TimeZone_parsePosixTzP_68b6b61bb7(_args[0], _args[1])
+}
+// "instBEqOption.beq._at_._private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseName.spec_0"
+fun f_TimeZone_posixParseName_spec_0_627dd05506(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Option\",\"none\"]" ->
+    leanTag(_x_2_1) match {
+    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
+    | "[\"Option\",\"some\"]" ->
+      _val_4_3: LeanValue = leanField(_x_2_1, 0);
+      LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Option\",\"some\"]" ->
+    _val_6_2: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | "[\"Option\",\"some\"]" ->
+      _val_8_6: LeanValue = leanField(_x_2_1, 0);
+      L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_val_6_2, _val_8_6)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseHMS"
+fun f_Time_TimeZone_posixParseHMS_b3b4e63710(
+  _maxHour_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_maxHour_0, 1=_a_1_1, 2=_x_3_2, 3=_x_4_3, 4=_x_5_4, 5=_fst_5, 6=_snd_6, 7=_x_6_7, 8=_decide_7_8, 9=_c_9, 10=_x_8_10, 11=_x_9_11, 12=_x_10_12, 13=_x_11_13, 14=_x_12_14, 15=_x_13_15, 16=_x_14_16, 17=_x_15_17, 18=_x_16_18, 19=_fst_17_19, 20=_snd_18_20, 21=_x_19_21, 22=_x_20_22, 23=_x_21_23, 24=_x_22_24, 25=_x_23_25, 26=_x_24_26, 27=_x_25_27, 28=_x_26_28, 29=_x_27_29, 30=_x_28_30, 31=_x_29_31, 32=_x_30_32, 33=_x_31_33, 34=_x_32_34, 35=_y_34_35, 36=_pos_35_36, 37=_res_36_37, 38=_x_37_38, 39=_x_38_39, 40=_x_39_40, 41=_x_40_41, 42=_x_41_42, 43=_x_42_43, 44=_x_43_44, 45=_x_44_45, 46=_x_45_46, 47=_y_47_47, 48=_snd_48, 49=_y_48_49, 50=_err_49_50, 51=_decide_50_51, 52=_x_51_52, 53=_x_52_53, 54=_x_53_54, 55=_x_54_55, 56=_pos_56_56, 57=_fst_57, 58=_snd_58, 59=_res_57_59, 60=_x_58_60, 61=_decide_59_61, 62=_c_62, 63=_x_60_63, 64=_x_61_64, 65=_x_62_65, 66=_f_63_66, 67=_x_64_67, 68=_it_68, 69=_x_65_69, 70=_x_66_70, 71=_x_67_71, 72=_x_68_72, 73=_x_69_73, 74=_x_70_74, 75=_pos_71_75, 76=_res_72_76, 77=_err_74_78, 78=_x_75_79, 79=_err_77_80, 80=_decide_78_81, 81=_x_79_82, 82=_x_80_83, 83=_x_81_84, 84=_decide_82_85, 85=_c_86, 86=_x_83_87, 87=_x_84_88, 88=_x_85_89, 89=_f_86_90, 90=_x_87_91, 91=_it_92, 92=_x_88_93, 93=_x_89_94, 94=_x_90_95, 95=_x_91_96, 96=_x_92_97, 97=_x_93_98, 98=_pos_94_99, 99=_res_95_100, 100=_err_97_102, 101=_fst_103, 102=_snd_104, 103=_x_98_105, 104=_x_99_106, 105=_x_100_107, 106=_x_101_108, 107=_x_102_109, 108=_x_103_110, 109=_x_104_111, 110=_x_105_112, 111=_x_106_113, 112=_x_107_114, 113=_x_108_115, 114=_x_109_116
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    115,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _maxHour_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(5, leanField(_frame[1], 0));
+        _frame.set(6, leanField(_frame[1], 1));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[5]),
+        );
+        _frame.set(
+          8,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[6], _frame[7]),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[5],
+              _frame[6],
+              LeanErased(),
+            ),
+          );
+          _frame.set(10, LeanScalar("uint32", "48"));
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[10], _frame[9]),
+          );
+          leanTag(_frame[11]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(12, LeanScalar("uint32", "57"));
+            _frame.set(
+              13,
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[9], _frame[12]),
+            );
+            leanTag(_frame[13]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                14,
+                L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                  _frame[5],
+                  _frame[6],
+                  LeanErased(),
+                ),
+              );
+              _frame.set(
+                15,
+                L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_frame[9]),
+              );
+              _frame.set(16, LeanScalar("nat", "48"));
+              _frame.set(
+                17,
+                L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[15], _frame[16]),
+              );
+              _frame.set(
+                18,
+                L4_Std_Internal_Parsec_String.f_String_digitsCore_go_fe246f4f86(
+                  _frame[5],
+                  _frame[14],
+                  _frame[17],
+                ),
+              );
+              leanTag(_frame[18]) match {
+              | "[\"Prod\",\"mk\"]" ->
+                _frame.set(19, leanField(_frame[18], 0));
+                _frame.set(20, leanField(_frame[18], 1));
+                _frame.set(
+                  21,
+                  LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[5], _frame[20]]),
+                );
+                _frame.set(
+                  22,
+                  L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[0], _frame[19]),
+                );
+                leanTag(_frame[22]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(23, LeanScalar("nat", "167"));
+                  _frame.set(
+                    24,
+                    L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+                      _frame[19],
+                      _frame[23],
+                    ),
+                  );
+                  leanTag(_frame[24]) match {
+                  | "[\"Bool\",\"false\"]" ->
+                    _frame.set(25, LeanText("hour "));
+                    _frame.set(
+                      26,
+                      L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_frame[19]),
+                    );
+                    _frame.set(
+                      27,
+                      L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                        _frame[25],
+                        _frame[26],
+                      ),
+                    );
+                    _frame.set(28, LeanText(" out of range 0-"));
+                    _frame.set(
+                      29,
+                      L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                        _frame[27],
+                        _frame[28],
+                      ),
+                    );
+                    _frame.set(30, LeanText("167"));
+                    _frame.set(
+                      31,
+                      L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                        _frame[29],
+                        _frame[30],
+                      ),
+                    );
+                    _frame.set(
+                      32,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                        Array[_frame[31]],
+                      ),
+                    );
+                    _frame.set(
+                      33,
+                      LeanCtor(
+                        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                        Array[_frame[21], _frame[32]],
+                      ),
+                    );
+                    return _frame[33]
+                  | "[\"Bool\",\"true\"]" ->
+                    _frame.set(
+                      34,
+                      L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[19]),
+                    );
+                    _frame.set(55, LeanScalar("uint32", "58"));
+                    _frame.set(
+                      84,
+                      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                        _frame[20],
+                        _frame[7],
+                      ),
+                    );
+                    leanTag(_frame[84]) match {
+                    | "[\"Bool\",\"false\"]" ->
+                      _frame.set(
+                        85,
+                        L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+                          _frame[5],
+                          _frame[20],
+                          LeanErased(),
+                        ),
+                      );
+                      _frame.set(
+                        86,
+                        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                          _frame[85],
+                          _frame[55],
+                        ),
+                      );
+                      leanTag(_frame[86]) match {
+                      | "[\"Bool\",\"false\"]" ->
+                        _frame.set(87, LeanText("expected: ':'"));
+                        _frame.set(
+                          88,
+                          LeanCtor(
+                            "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                            Array[_frame[87]],
+                          ),
+                        );
+                        _jump0 = _frame[88];
+                        _frame.set(79, _jump0);
+                        !pc = 5;
+                        void
+                      | "[\"Bool\",\"true\"]" ->
+                        _frame.set(
+                          89,
+                          LeanClosure(
+                            L4_Std_Time_Zoned_Database_PosixTz
+                              .apply_f_TimeZone_posixParseHMS_lam_0_1175bdedd9,
+                            2,
+                            Array[_frame[86]],
+                          ),
+                        );
+                        _frame.set(
+                          90,
+                          L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                            _frame[5],
+                            _frame[20],
+                            LeanErased(),
+                          ),
+                        );
+                        _frame.set(
+                          91,
+                          LeanCtor(
+                            "[\"Sigma\",\"mk\"]",
+                            Array[_frame[5], _frame[90]],
+                          ),
+                        );
+                        _frame.set(92, LeanScalar("nat", "0"));
+                        _frame.set(
+                          93,
+                          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+                            _frame[92],
+                          ),
+                        );
+                        _frame.set(94, LeanScalar("nat", "59"));
+                        _frame.set(
+                          95,
+                          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+                            _frame[94],
+                          ),
+                        );
+                        _frame.set(96, LeanText("minute"));
+                        _frame.set(
+                          97,
+                          f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+                            _frame[93],
+                            _frame[95],
+                            _frame[96],
+                            _frame[89],
+                            _frame[91],
+                          ),
+                        );
+                        leanTag(_frame[97]) match {
+                        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+                          _frame.set(98, leanField(_frame[97], 0));
+                          _frame.set(99, leanField(_frame[97], 1));
+                          leanTag(_frame[98]) match {
+                          | "[\"Sigma\",\"mk\"]" ->
+                            _frame.set(101, leanField(_frame[98], 0));
+                            _frame.set(102, leanField(_frame[98], 1));
+                            _jump0 = _frame[98];
+                            _jump1 = _frame[101];
+                            _jump2 = _frame[102];
+                            _jump3 = _frame[99];
+                            _frame.set(56, _jump0);
+                            _frame.set(57, _jump1);
+                            _frame.set(58, _jump2);
+                            _frame.set(59, _jump3);
+                            !pc = 4;
+                            void
+                          | _ -> return leanFail("non-exhaustive Lean case")
+                          }
+                        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+                          _ = leanField(_frame[97], 0);
+                          _frame.set(100, leanField(_frame[97], 1));
+                          _jump0 = _frame[100];
+                          _frame.set(79, _jump0);
+                          !pc = 5;
+                          void
+                        | _ -> return leanFail("non-exhaustive Lean case")
+                        }
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | "[\"Bool\",\"true\"]" ->
+                      _frame.set(
+                        103,
+                        LeanCtor(
+                          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+                          Array[],
+                        ),
+                      );
+                      _jump0 = _frame[103];
+                      _frame.set(79, _jump0);
+                      !pc = 5;
+                      void
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Bool\",\"true\"]" ->
+                  _frame.set(104, LeanText("hour "));
+                  _frame.set(
+                    105,
+                    L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_frame[19]),
+                  );
+                  _frame.set(
+                    106,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[104],
+                      _frame[105],
+                    ),
+                  );
+                  _frame.set(107, LeanText(" out of range 0-"));
+                  _frame.set(
+                    108,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[106],
+                      _frame[107],
+                    ),
+                  );
+                  _frame.set(
+                    109,
+                    L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_frame[0]),
+                  );
+                  _frame.set(
+                    110,
+                    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _frame[108],
+                      _frame[109],
+                    ),
+                  );
+                  _frame.set(
+                    111,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                      Array[_frame[110]],
+                    ),
+                  );
+                  _frame.set(
+                    112,
+                    LeanCtor(
+                      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+                      Array[_frame[21], _frame[111]],
+                    ),
+                  );
+                  return _frame[112]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            113,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _frame.set(
+            114,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+              Array[_frame[1], _frame[113]],
+            ),
+          );
+          return _frame[114]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(2, LeanText("digit expected"));
+      _frame.set(
+        3,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[2]],
+        ),
+      );
+      _frame.set(
+        4,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[_frame[1], _frame[3]],
+        ),
+      );
+      return _frame[4]
+    | 2 ->
+      _frame.set(38, LeanScalar("nat", "3600"));
+      _frame.set(39, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[38]));
+      _frame.set(
+        40,
+        L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_frame[34], _frame[39]),
+      );
+      _frame.set(41, LeanScalar("nat", "60"));
+      _frame.set(42, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[41]));
+      _frame.set(
+        43,
+        L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_frame[35], _frame[42]),
+      );
+      _frame.set(
+        44,
+        L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_frame[40], _frame[43]),
+      );
+      _frame.set(
+        45,
+        L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_frame[44], _frame[37]),
+      );
+      _frame.set(
+        46,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+          Array[_frame[36], _frame[45]],
+        ),
+      );
+      return _frame[46]
+    | 3 ->
+      _frame.set(
+        51,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[48], _frame[48]),
+      );
+      leanTag(_frame[51]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          52,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[47], _frame[50]],
+          ),
+        );
+        return _frame[52]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(53, LeanScalar("nat", "0"));
+        _frame.set(
+          54,
+          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[53]),
+        );
+        _jump0 = _frame[49];
+        _jump1 = _frame[47];
+        _jump2 = _frame[54];
+        _frame.set(35, _jump0);
+        _frame.set(36, _jump1);
+        _frame.set(37, _jump2);
+        !pc = 2;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 4 ->
+      _frame.set(
+        60,
+        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[57]),
+      );
+      _frame.set(
+        61,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[58], _frame[60]),
+      );
+      leanTag(_frame[61]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          62,
+          L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+            _frame[57],
+            _frame[58],
+            LeanErased(),
+          ),
+        );
+        _frame.set(
+          63,
+          L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[62], _frame[55]),
+        );
+        leanTag(_frame[63]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(64, LeanText("expected: ':'"));
+          _frame.set(
+            65,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+              Array[_frame[64]],
+            ),
+          );
+          _jump0 = _frame[56];
+          _jump1 = _frame[58];
+          _jump2 = _frame[59];
+          _jump3 = _frame[65];
+          _frame.set(47, _jump0);
+          _frame.set(48, _jump1);
+          _frame.set(49, _jump2);
+          _frame.set(50, _jump3);
+          !pc = 3;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            66,
+            LeanClosure(
+              L4_Std_Time_Zoned_Database_PosixTz
+                .apply_f_TimeZone_posixParseHMS_lam_0_1175bdedd9,
+              2,
+              Array[_frame[63]],
+            ),
+          );
+          _frame.set(
+            67,
+            L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+              _frame[57],
+              _frame[58],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            68,
+            LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[57], _frame[67]]),
+          );
+          _frame.set(69, LeanScalar("nat", "0"));
+          _frame.set(
+            70,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[69]),
+          );
+          _frame.set(71, LeanScalar("nat", "59"));
+          _frame.set(
+            72,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[71]),
+          );
+          _frame.set(73, LeanText("second"));
+          _frame.set(
+            74,
+            f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+              _frame[70],
+              _frame[72],
+              _frame[73],
+              _frame[66],
+              _frame[68],
+            ),
+          );
+          leanTag(_frame[74]) match {
+          | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+            _frame.set(75, leanField(_frame[74], 0));
+            _frame.set(76, leanField(_frame[74], 1));
+            _jump0 = _frame[59];
+            _jump1 = _frame[75];
+            _jump2 = _frame[76];
+            _frame.set(35, _jump0);
+            _frame.set(36, _jump1);
+            _frame.set(37, _jump2);
+            !pc = 2;
+            void
+          | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+            _ = leanField(_frame[74], 0);
+            _frame.set(77, leanField(_frame[74], 1));
+            _jump0 = _frame[56];
+            _jump1 = _frame[58];
+            _jump2 = _frame[59];
+            _jump3 = _frame[77];
+            _frame.set(47, _jump0);
+            _frame.set(48, _jump1);
+            _frame.set(49, _jump2);
+            _frame.set(50, _jump3);
+            !pc = 3;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          78,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+            Array[],
+          ),
+        );
+        _jump0 = _frame[56];
+        _jump1 = _frame[58];
+        _jump2 = _frame[59];
+        _jump3 = _frame[78];
+        _frame.set(47, _jump0);
+        _frame.set(48, _jump1);
+        _frame.set(49, _jump2);
+        _frame.set(50, _jump3);
+        !pc = 3;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 5 ->
+      _frame.set(
+        80,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[20], _frame[20]),
+      );
+      leanTag(_frame[80]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          81,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[21], _frame[79]],
+          ),
+        );
+        return _frame[81]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(82, LeanScalar("nat", "0"));
+        _frame.set(
+          83,
+          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[82]),
+        );
+        _jump0 = _frame[21];
+        _jump1 = _frame[5];
+        _jump2 = _frame[20];
+        _jump3 = _frame[83];
+        _frame.set(56, _jump0);
+        _frame.set(57, _jump1);
+        _frame.set(58, _jump2);
+        _frame.set(59, _jump3);
+        !pc = 4;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseJulian0Spec"
+fun f_Time_TimeZone_posixParseJulian0Spec_7244c58fc0(
+  _a_1_0: LeanValue,
+): LeanValue {
+  _f_2_1: LeanValue = LeanClosure(
+    L4_Std_Time_Zoned_Database_PosixTz
+      .apply_f_TimeZone_posixParseJulian0Spec_lam_0_9dc8e97b57,
+    1,
+    Array[],
+  );
+  _x_4_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "0"),
+  );
+  _x_6_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "365"),
+  );
+  _x_8_7: LeanValue = f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+    _x_4_3,
+    _x_6_5,
+    LeanText("day"),
+    _f_2_1,
+    _a_1_0,
+  );
+  leanTag(_x_8_7) match {
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+    _pos_9_8: LeanValue = leanField(_x_8_7, 0);
+    _res_10_9: LeanValue = leanField(_x_8_7, 1);
+    LeanCtor(
+      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+      Array[
+        _pos_9_8,
+        LeanCtor(
+          "[\"Std\",\"Time\",\"TimeZone\",\"TransitionSpec\",\"julian0\"]",
+          Array[_res_10_9],
+        ),
+      ],
+    )
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+    _pos_13_10: LeanValue = leanField(_x_8_7, 0);
+    _err_14_11: LeanValue = leanField(_x_8_7, 1);
+    LeanCtor(
+      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+      Array[_pos_13_10, _err_14_11],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseOffset"
+fun f_Time_TimeZone_posixParseOffset_bdbfc89cfb(_a_1_0: LeanValue): LeanValue {
+  _x_2_1: LeanValue = f_Time_TimeZone_posixParseSign_9e6c5fac87(_a_1_0);
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+    _pos_3_2: LeanValue = leanField(_x_2_1, 0);
+    _res_4_3: LeanValue = leanField(_x_2_1, 1);
+    _x_6_7: LeanValue = f_Time_TimeZone_posixParseHMS_b3b4e63710(
+      LeanScalar("nat", "24"),
+      _pos_3_2,
+    );
+    leanTag(_x_6_7) match {
+    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+      _pos_7_8: LeanValue = leanField(_x_6_7, 0);
+      _res_8_9: LeanValue = leanField(_x_6_7, 1);
+      _x_9_12: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
+        _res_4_3,
+      );
+      _x_10_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+        _x_9_12,
+        _res_8_9,
+      );
+      LeanCtor(
+        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+        Array[_pos_7_8, _x_10_13],
+      )
+    | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+      _pos_12_10: LeanValue = leanField(_x_6_7, 0);
+      _err_13_11: LeanValue = leanField(_x_6_7, 1);
+      LeanCtor(
+        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+        Array[_pos_12_10, _err_13_11],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+    _pos_15_4: LeanValue = leanField(_x_2_1, 0);
+    _err_16_5: LeanValue = leanField(_x_2_1, 1);
+    LeanCtor(
+      "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+      Array[_pos_15_4, _err_16_5],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Internal.Parsec.manyCharsCore._at_._private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseName.spec_1"
+fun f_TimeZone_posixParseName_spec_1_67285750d2(
+  _acc_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_acc_0, 1=_a_1_1, 2=_pos_3_2, 3=_res_4_3, 4=_x_5_4, 5=_x_6_5, 6=_fst_6, 7=_snd_7, 8=_pos_8_8, 9=_snd_9, 10=_err_9_10, 11=_decide_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_14_14, 15=_x_15_15, 16=_x_16_16, 17=_decide_17_17, 18=_c_18, 19=_x_18_19, 20=_it_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24, 25=_x_24_25, 26=_x_25_26, 27=_x_26_27, 28=_x_27_28, 29=_x_28_29
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    30,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _acc_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(6, leanField(_frame[1], 0));
+        _frame.set(7, leanField(_frame[1], 1));
+        _frame.set(
+          16,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[6]),
+        );
+        _frame.set(
+          17,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[7], _frame[16]),
+        );
+        leanTag(_frame[17]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            18,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[6],
+              _frame[7],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            19,
+            L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+              _frame[6],
+              _frame[7],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            20,
+            LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[6], _frame[19]]),
+          );
+          _frame.set(25, LeanScalar("uint32", "65"));
+          _frame.set(
+            26,
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[25], _frame[18]),
+          );
+          leanTag(_frame[26]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 4;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(27, LeanScalar("uint32", "90"));
+            _frame.set(
+              28,
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[18], _frame[27]),
+            );
+            leanTag(_frame[28]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 4;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _jump0 = _frame[20];
+              _jump1 = _frame[18];
+              _frame.set(2, _jump0);
+              _frame.set(3, _jump1);
+              !pc = 1;
+              void
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            29,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _jump0 = _frame[1];
+          _jump1 = _frame[7];
+          _jump2 = _frame[29];
+          _frame.set(8, _jump0);
+          _frame.set(9, _jump1);
+          _frame.set(10, _jump2);
+          !pc = 2;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        4,
+        L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
+          _frame[0],
+          _frame[3],
+        ),
+      );
+      _frame.set(
+        5,
+        f_TimeZone_posixParseName_spec_1_67285750d2(_frame[4], _frame[2]),
+      );
+      return _frame[5]
+    | 2 ->
+      _frame.set(
+        11,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[7], _frame[9]),
+      );
+      leanTag(_frame[11]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          12,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[8], _frame[10]],
+          ),
+        );
+        return _frame[12]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          13,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+            Array[_frame[8], _frame[0]],
+          ),
+        );
+        return _frame[13]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 3 ->
+      _frame.set(14, LeanText("ASCII letter expected"));
+      _frame.set(
+        15,
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+          Array[_frame[14]],
+        ),
+      );
+      _jump0 = _frame[1];
+      _jump1 = _frame[7];
+      _jump2 = _frame[15];
+      _frame.set(8, _jump0);
+      _frame.set(9, _jump1);
+      _frame.set(10, _jump2);
+      !pc = 2;
+      void
+    | 4 ->
+      _frame.set(21, LeanScalar("uint32", "97"));
+      _frame.set(
+        22,
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[21], _frame[18]),
+      );
+      leanTag(_frame[22]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 3;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(23, LeanScalar("uint32", "122"));
+        _frame.set(
+          24,
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[18], _frame[23]),
+        );
+        leanTag(_frame[24]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 3;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _jump0 = _frame[20];
+          _jump1 = _frame[18];
+          _frame.set(2, _jump0);
+          _frame.set(3, _jump1);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseJulianSpec"
+fun f_Time_TimeZone_posixParseJulianSpec_c031f680dd(
+  _a_1_0: LeanValue,
+): LeanValue {
+  leanTag(_a_1_0) match {
+  | "[\"Sigma\",\"mk\"]" ->
+    _fst_1: LeanValue = leanField(_a_1_0, 0);
+    _snd_2: LeanValue = leanField(_a_1_0, 1);
+    _x_2_3: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+      _fst_1,
+    );
+    _decide_3_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _snd_2,
+      _x_2_3,
+    );
+    leanTag(_decide_3_4) match {
+    | "[\"Bool\",\"false\"]" ->
+      _c_6: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+        _fst_1,
+        _snd_2,
+        LeanErased(),
+      );
+      _x_5_7: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+        _c_6,
+        LeanScalar("uint32", "74"),
+      );
+      leanTag(_x_5_7) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+          Array[
+            _a_1_0,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+              Array[LeanText("expected: 'J'")],
+            ),
+          ],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _f_9_11: LeanValue = LeanClosure(
+          L4_Std_Time_Zoned_Database_PosixTz
+            .apply_f_TimeZone_posixParseHMS_lam_0_1175bdedd9,
+          2,
+          Array[_x_5_7],
+        );
+        _x_10_12: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+          _fst_1,
+          _snd_2,
+          LeanErased(),
+        );
+        _x_12_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+          LeanScalar("nat", "1"),
+        );
+        _x_14_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+          LeanScalar("nat", "365"),
+        );
+        _x_16_19: LeanValue = f_Time_TimeZone_parseBoundedNat_dc5c9ce6ea(
+          _x_12_15,
+          _x_14_17,
+          LeanText("Julian day"),
+          _f_9_11,
+          LeanCtor("[\"Sigma\",\"mk\"]", Array[_fst_1, _x_10_12]),
+        );
+        leanTag(_x_16_19) match {
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
+          _pos_17_20: LeanValue = leanField(_x_16_19, 0);
+          _res_18_21: LeanValue = leanField(_x_16_19, 1);
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+            Array[
+              _pos_17_20,
+              LeanCtor(
+                "[\"Std\",\"Time\",\"TimeZone\",\"TransitionSpec\",\"julian\"]",
+                Array[_res_18_21],
+              ),
+            ],
+          )
+        | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]" ->
+          _pos_21_22: LeanValue = leanField(_x_16_19, 0);
+          _err_22_23: LeanValue = leanField(_x_16_19, 1);
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_pos_21_22, _err_22_23],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(
+        "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+        Array[
+          _a_1_0,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+            Array[],
+          ),
+        ],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseHMS._lam_0"
+fun f_TimeZone_posixParseHMS_lam_0_1175bdedd9(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _x_1_0
+}
+fun apply_f_TimeZone_posixParseHMS_lam_0_1175bdedd9(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_posixParseHMS_lam_0_1175bdedd9(_args[0], _args[1])
+}
+// "Std.Internal.Parsec.manyCharsCore._at_._private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.quotedName.spec_0"
+fun f_TimeZone_quotedName_spec_0_04bf09ae4f(
+  _acc_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_acc_0, 1=_a_1_1, 2=_pos_3_2, 3=_res_4_3, 4=_x_5_4, 5=_x_6_5, 6=_fst_6, 7=_snd_7, 8=_pos_8_8, 9=_snd_9, 10=_err_9_10, 11=_decide_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_decide_14_15, 16=_c_16, 17=_x_15_17, 18=_it_18, 19=_x_17_19, 20=_x_18_20, 21=_x_19_21, 22=_x_20_22, 23=_x_21_23, 24=_x_22_24, 25=_x_24_25, 26=_x_25_26, 27=_x_26_27, 28=_x_27_28, 29=_x_29_29, 30=_x_30_30, 31=_x_31_31, 32=_x_32_32, 33=_x_33_33, 34=_x_34_34, 35=_x_35_35, 36=_x_36_36, 37=_x_37_37
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    38,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _acc_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(6, leanField(_frame[1], 0));
+        _frame.set(7, leanField(_frame[1], 1));
+        _frame.set(
+          14,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[6]),
+        );
+        _frame.set(
+          15,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[7], _frame[14]),
+        );
+        leanTag(_frame[15]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            16,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[6],
+              _frame[7],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            17,
+            L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+              _frame[6],
+              _frame[7],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            18,
+            LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[6], _frame[17]]),
+          );
+          _frame.set(33, LeanScalar("uint32", "65"));
+          _frame.set(
+            34,
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[33], _frame[16]),
+          );
+          leanTag(_frame[34]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 5;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(35, LeanScalar("uint32", "90"));
+            _frame.set(
+              36,
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[16], _frame[35]),
+            );
+            leanTag(_frame[36]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 5;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _jump0 = _frame[18];
+              _jump1 = _frame[16];
+              _frame.set(2, _jump0);
+              _frame.set(3, _jump1);
+              !pc = 1;
+              void
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            37,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _jump0 = _frame[1];
+          _jump1 = _frame[7];
+          _jump2 = _frame[37];
+          _frame.set(8, _jump0);
+          _frame.set(9, _jump1);
+          _frame.set(10, _jump2);
+          !pc = 2;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        4,
+        L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
+          _frame[0],
+          _frame[3],
+        ),
+      );
+      _frame.set(
+        5,
+        f_TimeZone_quotedName_spec_0_04bf09ae4f(_frame[4], _frame[2]),
+      );
+      return _frame[5]
+    | 2 ->
+      _frame.set(
+        11,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[7], _frame[9]),
+      );
+      leanTag(_frame[11]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          12,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[8], _frame[10]],
+          ),
+        );
+        return _frame[12]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          13,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+            Array[_frame[8], _frame[0]],
+          ),
+        );
+        return _frame[13]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 3 ->
+      _frame.set(19, LeanScalar("uint32", "43"));
+      _frame.set(
+        20,
+        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[16], _frame[19]),
+      );
+      leanTag(_frame[20]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(21, LeanScalar("uint32", "45"));
+        _frame.set(
+          22,
+          L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[16], _frame[21]),
+        );
+        leanTag(_frame[22]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(23, LeanText("condition not satisfied"));
+          _frame.set(
+            24,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+              Array[_frame[23]],
+            ),
+          );
+          _jump0 = _frame[1];
+          _jump1 = _frame[7];
+          _jump2 = _frame[24];
+          _frame.set(8, _jump0);
+          _frame.set(9, _jump1);
+          _frame.set(10, _jump2);
+          !pc = 2;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _jump0 = _frame[18];
+          _jump1 = _frame[16];
+          _frame.set(2, _jump0);
+          _frame.set(3, _jump1);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _jump0 = _frame[18];
+        _jump1 = _frame[16];
+        _frame.set(2, _jump0);
+        _frame.set(3, _jump1);
+        !pc = 1;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 4 ->
+      _frame.set(25, LeanScalar("uint32", "48"));
+      _frame.set(
+        26,
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[25], _frame[16]),
+      );
+      leanTag(_frame[26]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 3;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(27, LeanScalar("uint32", "57"));
+        _frame.set(
+          28,
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[16], _frame[27]),
+        );
+        leanTag(_frame[28]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 3;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _jump0 = _frame[18];
+          _jump1 = _frame[16];
+          _frame.set(2, _jump0);
+          _frame.set(3, _jump1);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 5 ->
+      _frame.set(29, LeanScalar("uint32", "97"));
+      _frame.set(
+        30,
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[29], _frame[16]),
+      );
+      leanTag(_frame[30]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 4;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(31, LeanScalar("uint32", "122"));
+        _frame.set(
+          32,
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[16], _frame[31]),
+        );
+        leanTag(_frame[32]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 4;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _jump0 = _frame[18];
+          _jump1 = _frame[16];
+          _frame.set(2, _jump0);
+          _frame.set(3, _jump1);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseDstOffset"
+fun f_Time_TimeZone_posixParseDstOffset_75e25f500f(
+  _stdOffset_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_stdOffset_0, 1=_a_1_1, 2=_fst_2, 3=_snd_3, 4=_x_2_4, 5=_decide_3_5, 6=_x_4_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_19_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24, 25=_x_24_25
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    26,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _stdOffset_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(2, leanField(_frame[1], 0));
+        _frame.set(3, leanField(_frame[1], 1));
+        _frame.set(
+          4,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[2]),
+        );
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[3], _frame[4]),
+        );
+        leanTag(_frame[5]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            6,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[2],
+              _frame[3],
+              LeanErased(),
+            ),
+          );
+          _frame.set(17, LeanScalar("uint32", "48"));
+          _frame.set(
+            18,
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[17], _frame[6]),
+          );
+          leanTag(_frame[18]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(19, LeanScalar("uint32", "57"));
+            _frame.set(
+              20,
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[6], _frame[19]),
+            );
+            leanTag(_frame[20]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                21,
+                f_Time_TimeZone_posixParseOffset_bdbfc89cfb(_frame[1]),
+              );
+              return _frame[21]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(22, LeanScalar("nat", "3600"));
+          _frame.set(
+            23,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[22]),
+          );
+          _frame.set(
+            24,
+            L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_frame[0], _frame[23]),
+          );
+          _frame.set(
+            25,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+              Array[_frame[1], _frame[24]],
+            ),
+          );
+          return _frame[25]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(7, LeanScalar("uint32", "43"));
+      _frame.set(
+        8,
+        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[6], _frame[7]),
+      );
+      leanTag(_frame[8]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(9, LeanScalar("uint32", "45"));
+        _frame.set(
+          10,
+          L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[6], _frame[9]),
+        );
+        leanTag(_frame[10]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(11, LeanScalar("nat", "3600"));
+          _frame.set(
+            12,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[11]),
+          );
+          _frame.set(
+            13,
+            L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_frame[0], _frame[12]),
+          );
+          _frame.set(
+            14,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+              Array[_frame[1], _frame[13]],
+            ),
+          );
+          return _frame[14]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            15,
+            f_Time_TimeZone_posixParseOffset_bdbfc89cfb(_frame[1]),
+          );
+          return _frame[15]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(16, f_Time_TimeZone_posixParseOffset_bdbfc89cfb(_frame[1]));
+        return _frame[16]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.quotedName"
+fun f_Time_TimeZone_quotedName_be5f7fdeff(_a_1_0: LeanValue): LeanValue {
+  f_TimeZone_quotedName_spec_0_04bf09ae4f(LeanText(""), _a_1_0)
+}
+// "_private.Std.Time.Zoned.Database.PosixTz.0.Std.Time.TimeZone.posixParseSign"
+fun f_Time_TimeZone_posixParseSign_9e6c5fac87(
+  _a_1_0_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_a_1_0, 1=_fst_1, 2=_snd_2, 3=_err_3_3, 4=_decide_4_4, 5=_x_5_5, 6=_x_6_6, 7=_x_7_7, 8=_x_8_8, 9=_err_10_9, 10=_decide_11_10, 11=_x_12_11, 12=_x_13_12, 13=_decide_14_13, 14=_x_15_14, 15=_c_15, 16=_x_16_16, 17=_x_17_17, 18=_x_18_18, 19=_x_19_19, 20=_it_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24, 25=_x_24_25, 26=_decide_25_26, 27=_x_26_27, 28=_c_28, 29=_x_27_29, 30=_x_28_30, 31=_x_29_31, 32=_x_30_32, 33=_it_33, 34=_x_31_34, 35=_x_32_35, 36=_x_33_36, 37=_x_34_37, 38=_x_35_38
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    39,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _a_1_0_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Sigma\",\"mk\"]" ->
+        _frame.set(1, leanField(_frame[0], 0));
+        _frame.set(2, leanField(_frame[0], 1));
+        _frame.set(
+          25,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[1]),
+        );
+        _frame.set(
+          26,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[2], _frame[25]),
+        );
+        leanTag(_frame[26]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(27, LeanScalar("uint32", "45"));
+          _frame.set(
+            28,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[1],
+              _frame[2],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            29,
+            L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[28], _frame[27]),
+          );
+          leanTag(_frame[29]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(30, LeanText("expected: '-'"));
+            _frame.set(
+              31,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                Array[_frame[30]],
+              ),
+            );
+            _jump0 = _frame[31];
+            _frame.set(9, _jump0);
+            !pc = 2;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              32,
+              L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                _frame[1],
+                _frame[2],
+                LeanErased(),
+              ),
+            );
+            _frame.set(
+              33,
+              LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[1], _frame[32]]),
+            );
+            _frame.set(34, LeanScalar("nat", "1"));
+            _frame.set(
+              35,
+              L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[34]),
+            );
+            _frame.set(
+              36,
+              L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(_frame[35]),
+            );
+            _frame.set(
+              37,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                Array[_frame[33], _frame[36]],
+              ),
+            );
+            return _frame[37]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            38,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _jump0 = _frame[38];
+          _frame.set(9, _jump0);
+          !pc = 2;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[2], _frame[2]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[0], _frame[3]],
+          ),
+        );
+        return _frame[5]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(7, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[6]));
+        _frame.set(
+          8,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+            Array[_frame[0], _frame[7]],
+          ),
+        );
+        return _frame[8]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 2 ->
+      _frame.set(
+        10,
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[2], _frame[2]),
+      );
+      leanTag(_frame[10]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          11,
+          LeanCtor(
+            "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"error\"]",
+            Array[_frame[0], _frame[9]],
+          ),
+        );
+        return _frame[11]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          12,
+          L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[1]),
+        );
+        _frame.set(
+          13,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[2], _frame[12]),
+        );
+        leanTag(_frame[13]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(14, LeanScalar("uint32", "43"));
+          _frame.set(
+            15,
+            L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+              _frame[1],
+              _frame[2],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            16,
+            L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[15], _frame[14]),
+          );
+          leanTag(_frame[16]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(17, LeanText("expected: '+'"));
+            _frame.set(
+              18,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"other\"]",
+                Array[_frame[17]],
+              ),
+            );
+            _jump0 = _frame[18];
+            _frame.set(3, _jump0);
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              19,
+              L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+                _frame[1],
+                _frame[2],
+                LeanErased(),
+              ),
+            );
+            _frame.set(
+              20,
+              LeanCtor("[\"Sigma\",\"mk\"]", Array[_frame[1], _frame[19]]),
+            );
+            _frame.set(21, LeanScalar("nat", "1"));
+            _frame.set(
+              22,
+              L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[21]),
+            );
+            _frame.set(
+              23,
+              LeanCtor(
+                "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
+                Array[_frame[20], _frame[22]],
+              ),
+            );
+            return _frame[23]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            24,
+            LeanCtor(
+              "[\"Std\",\"Internal\",\"Parsec\",\"Error\",\"eof\"]",
+              Array[],
+            ),
+          );
+          _jump0 = _frame[24];
+          _frame.set(3, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Std.Time.TimeZone.parsePosixTz"
+fun f_Time_TimeZone_parsePosixTz_1d82102592(
+  _s_0: LeanValue,
+  _extended_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = LeanClosure(
+    L4_Std_Time_Zoned_Database_PosixTz
+      .apply_f_Time_TimeZone_parsePosixTzP_68b6b61bb7,
+    2,
+    Array[_extended_1],
+  );
+  L4_Std_Internal_Parsec_String.f_String_Parser_run_854e5324ea(_x_1_2, _s_0)
+}
+
+module end;

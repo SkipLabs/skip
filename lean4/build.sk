@@ -1,15 +1,13 @@
-// Generate the complete Lean.Elab closure before Skargo collects extra sources.
+// The maintained Skip files are authoritative. This hook only lists inputs.
 fun main(): void {
-  result = System.subprocess(Array["python3", "tools/build.py"]) match {
-  | Success(p) -> p
-  | Failure(err) ->
-    print_error(`Lean source generation failed: ${err}`);
-    skipExit(1)
+  for (path in FileSystem.readTextFile("sources/build.txt").split("\n")) {
+    if (path.isEmpty()) continue;
+    invariant(
+      path.startsWith("sources/Modules/"),
+      "Invalid source manifest entry",
+    );
+    invariant(FileSystem.exists(path), "Missing maintained source: " + path);
+    print_string("skargo:skc-extra-source=" + path)
   };
-  print_error(result.stderr);
-  if (!result.success()) {
-    print_error(result.stdout);
-    skipExit(result.exitcode())
-  };
-  print_raw(result.stdout)
+  print_string("skargo:rerun-if-changed=sources/build.txt")
 }

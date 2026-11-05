@@ -1,0 +1,56 @@
+module L4_Std_Data_Internal_List_Defs;
+
+// "Std.Internal.List.keys._redArg"
+fun f_Internal_List_keys_e28b02b94e(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"List\",\"nil\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
+  | "[\"List\",\"cons\"]" ->
+    _head_3_1: LeanValue = leanField(_x_1_0, 0);
+    _tail_4_2: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_head_3_1) match {
+    | "[\"Sigma\",\"mk\"]" ->
+      _fst_5_4: LeanValue = leanField(_head_3_1, 0);
+      _snd_6_5: LeanValue = leanField(_head_3_1, 1);
+      _x_7_6: LeanValue = f_Internal_List_keys_e28b02b94e(_tail_4_2);
+      LeanCtor("[\"List\",\"cons\"]", Array[_fst_5_4, _x_7_6])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Internal.List.values"
+fun f_Internal_List_values_2eb947ea66(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  f_Internal_List_values_0ea1bcb5eb(_x_1_2)
+}
+// "Std.Internal.List.values._redArg"
+fun f_Internal_List_values_0ea1bcb5eb(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"List\",\"nil\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
+  | "[\"List\",\"cons\"]" ->
+    _head_3_1: LeanValue = leanField(_x_1_0, 0);
+    _tail_4_2: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_head_3_1) match {
+    | "[\"Sigma\",\"mk\"]" ->
+      _fst_5_4: LeanValue = leanField(_head_3_1, 0);
+      _snd_6_5: LeanValue = leanField(_head_3_1, 1);
+      _x_7_6: LeanValue = f_Internal_List_values_0ea1bcb5eb(_tail_4_2);
+      LeanCtor("[\"List\",\"cons\"]", Array[_snd_6_5, _x_7_6])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Internal.List.keys"
+fun f_Internal_List_keys_24ca39ac50(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  f_Internal_List_keys_e28b02b94e(_x_1_2)
+}
+
+module end;

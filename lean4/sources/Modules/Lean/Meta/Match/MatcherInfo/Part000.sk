@@ -1,0 +1,4115 @@
+module L4_Lean_Meta_Match_MatcherInfo;
+
+// "Lean.Meta.isMatcherCore"
+fun f_Lean_Meta_isMatcherCore_fbb4f24c8b(
+  _env_0: LeanValue,
+  _declName_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = f_Match_Extension_getMatcherInfo_61f2fbaa36(
+    _env_0,
+    _declName_1,
+  );
+  leanTag(_x_1_2) match {
+  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Option\",\"some\"]" ->
+    _val_3_3: LeanValue = leanField(_x_1_2, 0);
+    LeanCtor("[\"Bool\",\"true\"]", Array[])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.SMap.switch._at_.Lean.Meta.Match.Extension.State.switch.spec_0._redArg"
+fun f_State_switch_spec_0_215459d5b6(_m_0: LeanValue): LeanValue {
+  leanTag(_m_0) match {
+  | "[\"Lean\",\"SMap\",\"mk\"]" ->
+    _stage_1: LeanValue = leanField(_m_0, 0);
+    _map_2: LeanValue = leanField(_m_0, 1);
+    _map_3: LeanValue = leanField(_m_0, 2);
+    leanTag(_stage_1) match {
+    | "[\"Bool\",\"false\"]" -> _m_0
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(
+        "[\"Lean\",\"SMap\",\"mk\"]",
+        Array[LeanCtor("[\"Bool\",\"false\"]", Array[]), _map_2, _map_3],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.getFirstAltPos"
+fun f_Match_MatcherInfo_getFirstAltPos_d554607a6f(
+  _info_0: LeanValue,
+): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    _x_2_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _numParams_1,
+      LeanScalar("nat", "1"),
+    );
+    L4_Init_Prelude.f_Nat_add_86990f4822(_x_2_8, _numDiscrs_2)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Overlaps.overlapping"
+fun f_Match_Overlaps_overlapping_32485c09d3(
+  _o_0_input: LeanValue,
+  _overlapped_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_o_0, 1=_overlapped_1, 2=_x_1_2, 3=_val_4_3, 4=_x_2_4, 5=_x_3_5, 6=_y_6_6, 7=_x_7_7, 8=_x_8_8, 9=_size_9_9, 10=_x_14_14
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    11,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _o_0_input);
+  _frame.set(1, _overlapped_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        2,
+        f_Overlaps_overlapping_spec_0_ec3923a44f(_frame[0], _frame[1]),
+      );
+      leanTag(_frame[2]) match {
+      | "[\"Option\",\"none\"]" ->
+        _frame.set(4, LeanScalar("nat", "0"));
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(LeanErased(), _frame[4]),
+        );
+        return _frame[5]
+      | "[\"Option\",\"some\"]" ->
+        _frame.set(3, leanField(_frame[2], 0));
+        leanTag(_frame[3]) match {
+        | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+          _frame.set(9, leanField(_frame[3], 0));
+          _ = leanField(_frame[3], 1);
+          _ = leanField(_frame[3], 2);
+          _ = leanField(_frame[3], 3);
+          _ = leanField(_frame[3], 4);
+          _jump0 = _frame[9];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+          _frame.set(10, LeanScalar("nat", "0"));
+          _jump0 = _frame[10];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        7,
+        L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+          LeanErased(),
+          _frame[6],
+        ),
+      );
+      _frame.set(
+        8,
+        f_overlapping_spec_1_spec_2_c840732d13(_frame[7], _frame[3]),
+      );
+      return _frame[8]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.getMatcherInfoCore?"
+fun f_Lean_Meta_getMatcherInfoCore_1c101d378d(
+  _env_0: LeanValue,
+  _declName_1: LeanValue,
+): LeanValue {
+  f_Match_Extension_getMatcherInfo_61f2fbaa36(_env_0, _declName_1)
+}
+// "Std.DHashMap.Internal.AssocList.Const.alter._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_4"
+fun f_insert_spec_2_spec_4_5903b6c7e3(
+  _overlapping_0: LeanValue,
+  _a_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_2) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    _x_3_7: LeanValue = f_spec_2_spec_4_lam_0_7efdd1bfaa(
+      _overlapping_0,
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+    );
+    leanTag(_x_3_7) match {
+    | "[\"Option\",\"none\"]" ->
+      leanFail(
+        "unreachable: Std.DHashMap.Internal.AssocList.Const.alter._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_4",
+      )
+    | "[\"Option\",\"some\"]" ->
+      _val_4_8: LeanValue = leanField(_x_3_7, 0);
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_a_1, _val_4_8, _x_1_2],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_6_3: LeanValue = leanField(_x_1_2, 0);
+    _value_7_4: LeanValue = leanField(_x_1_2, 1);
+    _tail_8_5: LeanValue = leanField(_x_1_2, 2);
+    _x_9_10: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_key_6_3, _a_1);
+    leanTag(_x_9_10) match {
+    | "[\"Bool\",\"false\"]" ->
+      _tail_11: LeanValue = f_insert_spec_2_spec_4_5903b6c7e3(
+        _overlapping_0,
+        _a_1,
+        _tail_8_5,
+      );
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_key_6_3, _value_7_4, _tail_11],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_12_14: LeanValue = f_spec_2_spec_4_lam_0_7efdd1bfaa(
+        _overlapping_0,
+        LeanCtor("[\"Option\",\"some\"]", Array[_value_7_4]),
+      );
+      leanTag(_x_12_14) match {
+      | "[\"Option\",\"none\"]" ->
+        leanFail(
+          "unreachable: Std.DHashMap.Internal.AssocList.Const.alter._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_4",
+        )
+      | "[\"Option\",\"some\"]" ->
+        _val_13_15: LeanValue = leanField(_x_12_14, 0);
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+          Array[_a_1, _val_13_15, _tail_8_5],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_._private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn.«_@».Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2.spec_0"
+fun f_hygCtx_hyg_spec_0_a9234ec053(
+  _env_0_input: LeanValue,
+  _as_1_input: LeanValue,
+  _i_2_input: LeanValue,
+  _stop_3_input: LeanValue,
+  _b_4_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_env_0, 1=_as_1, 2=_i_2, 3=_stop_3, 4=_b_4, 5=_y_2_5, 6=_x_3_6, 7=_x_4_7, 8=_x_5_8, 9=_x_6_9, 10=_x_7_10, 11=_name_11, 12=_x_8_13, 13=_x_9_14, 14=_x_10_15, 15=_x_11_16
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    16,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _env_0_input);
+  _frame.set(1, _as_1_input);
+  _frame.set(2, _i_2_input);
+  _frame.set(3, _stop_3_input);
+  _frame.set(4, _b_4_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        9,
+        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_frame[2], _frame[3]),
+      );
+      leanTag(_frame[9]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          10,
+          L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            LeanErased(),
+            _frame[1],
+            _frame[2],
+            LeanErased(),
+          ),
+        );
+        leanTag(_frame[10]) match {
+        | "[\"Lean\",\"Meta\",\"Match\",\"Extension\",\"Entry\",\"mk\"]" ->
+          _frame.set(11, leanField(_frame[10], 0));
+          _ = leanField(_frame[10], 1);
+          _frame.set(12, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+          _frame.set(
+            13,
+            L4_Lean_Environment.f_Lean_Environment_setExporting_5a35fee75b(
+              _frame[0],
+              _frame[12],
+            ),
+          );
+          _frame.set(
+            14,
+            L4_Lean_Environment.f_Lean_Environment_contains_0afe6850fd(
+              _frame[13],
+              _frame[11],
+              _frame[9],
+            ),
+          );
+          leanTag(_frame[14]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _jump0 = _frame[4];
+            _frame.set(5, _jump0);
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              15,
+              L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+                LeanErased(),
+                _frame[4],
+                _frame[10],
+              ),
+            );
+            _jump0 = _frame[15];
+            _frame.set(5, _jump0);
+            !pc = 1;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" -> return _frame[4]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(6, LeanScalar("usize", "1"));
+      _frame.set(
+        7,
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[2], _frame[6]),
+      );
+      _frame.set(
+        8,
+        f_hygCtx_hyg_spec_0_a9234ec053(
+          _frame[0],
+          _frame[1],
+          _frame[7],
+          _frame[3],
+          _frame[5],
+        ),
+      );
+      return _frame[8]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0.spec_1._redArg"
+fun f_getMatcherInfo_spec_0_spec_1_af6c3a61be(
+  _m_0_input: LeanValue,
+  _a_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_m_0, 1=_a_1, 2=_buckets_2_3, 3=_x_3_4, 4=_y_5_5, 5=_x_6_6, 6=_x_7_7, 7=_fold_8, 8=_x_8_9, 9=_x_9_10, 10=_x_10_11, 11=_x_11_12, 12=_x_12_13, 13=_x_13_14, 14=_x_14_15, 15=_x_15_16, 16=_x_16_17, 17=_x_17_18, 18=_hash_19, 19=_hash_22, 20=_x_18_25
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    21,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _m_0_input);
+  _frame.set(1, _a_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+        _ = leanField(_frame[0], 0);
+        _frame.set(2, leanField(_frame[0], 1));
+        _frame.set(
+          3,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[2]),
+        );
+        leanTag(_frame[1]) match {
+        | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+          _frame.set(20, LeanScalar("uint64", "1723"));
+          _jump0 = _frame[20];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+          _frame.set(18, leanField(_frame[1], 0));
+          _ = leanField(_frame[1], 1);
+          _ = leanField(_frame[1], 2);
+          _jump0 = _frame[18];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+          _frame.set(19, leanField(_frame[1], 0));
+          _ = leanField(_frame[1], 1);
+          _ = leanField(_frame[1], 2);
+          _jump0 = _frame[19];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(5, LeanScalar("uint64", "32"));
+      _frame.set(
+        6,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[4],
+          _frame[5],
+        ),
+      );
+      _frame.set(
+        7,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[4], _frame[6]),
+      );
+      _frame.set(8, LeanScalar("uint64", "16"));
+      _frame.set(
+        9,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[7],
+          _frame[8],
+        ),
+      );
+      _frame.set(
+        10,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[7], _frame[9]),
+      );
+      _frame.set(
+        11,
+        L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(_frame[10]),
+      );
+      _frame.set(
+        12,
+        L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_frame[3]),
+      );
+      _frame.set(13, LeanScalar("usize", "1"));
+      _frame.set(
+        14,
+        L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+          _frame[12],
+          _frame[13],
+        ),
+      );
+      _frame.set(
+        15,
+        L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(_frame[11], _frame[14]),
+      );
+      _frame.set(
+        16,
+        L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+          LeanErased(),
+          _frame[2],
+          _frame[15],
+          LeanErased(),
+        ),
+      );
+      _frame.set(17, f_spec_0_spec_1_spec_3_0f53937a3f(_frame[1], _frame[16]));
+      return _frame[17]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.matcherLikeExt"
+fun f_Lean_Meta_matcherLikeExt_75c65263b1(): LeanValue {
+  leanPrimitive("Lean.Meta.matcherLikeExt []")
+}
+// "Lean.Meta.getMatcherInfo?._redArg"
+fun f_Lean_Meta_getMatcherInfo_fe36e57975(
+  _inst_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+  _declName_2: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_0) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_3: LeanValue = leanField(_inst_1_0, 0);
+    _toBind_4: LeanValue = leanField(_inst_1_0, 1);
+    leanTag(_inst_2_1) match {
+    | "[\"Lean\",\"MonadEnv\",\"mk\"]" ->
+      _getEnv_5: LeanValue = leanField(_inst_2_1, 0);
+      _modifyEnv_6: LeanValue = leanField(_inst_2_1, 1);
+      leanTag(_toApplicative_3) match {
+      | "[\"Applicative\",\"mk\"]" ->
+        _toFunctor_7: LeanValue = leanField(_toApplicative_3, 0);
+        _toPure_8: LeanValue = leanField(_toApplicative_3, 1);
+        _toSeq_9: LeanValue = leanField(_toApplicative_3, 2);
+        _toSeqLeft_10: LeanValue = leanField(_toApplicative_3, 3);
+        _toSeqRight_11: LeanValue = leanField(_toApplicative_3, 4);
+        _f_3_12: LeanValue = LeanClosure(
+          L4_Lean_Meta_Match_MatcherInfo
+            .apply_f_Meta_getMatcherInfo_lam_0_94d5a9a9a8,
+          3,
+          Array[_declName_2, _toPure_8],
+        );
+        leanApply(
+          _toBind_4,
+          Array[LeanErased(), LeanErased(), _getEnv_5, _f_3_12],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Extension.addMatcherInfo._lam_0"
+fun f_Extension_addMatcherInfo_lam_0_cffeaa140b(
+  _addEntryFn_0: LeanValue,
+  _x_1_1: LeanValue,
+  _s_2: LeanValue,
+): LeanValue {
+  leanTag(_s_2) match {
+  | "[\"Lean\",\"PersistentEnvExtensionState\",\"mk\"]" ->
+    _importedEntries_3: LeanValue = leanField(_s_2, 0);
+    _state_4: LeanValue = leanField(_s_2, 1);
+    _state_5: LeanValue = leanApply(_addEntryFn_0, Array[_state_4, _x_1_1]);
+    LeanCtor(
+      "[\"Lean\",\"PersistentEnvExtensionState\",\"mk\"]",
+      Array[_importedEntries_3, _state_5],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Extension_addMatcherInfo_lam_0_cffeaa140b(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Extension_addMatcherInfo_lam_0_cffeaa140b(_args[0], _args[1], _args[2])
+}
+// "Std.DHashMap.Internal.AssocList.foldlM._at_._private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1.spec_4.spec_7.spec_9._redArg"
+fun f_spec_4_spec_7_spec_9_85c689ced0(
+  _x_1_0_input: LeanValue,
+  _x_2_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_x_1_0, 1=_x_2_1, 2=_key_3_2, 3=_value_4_3, 4=_tail_5_4, 5=_x_6_5, 6=_y_8_6, 7=_x_9_7, 8=_x_10_8, 9=_fold_9, 10=_x_11_10, 11=_x_12_11, 12=_x_13_12, 13=_x_14_13, 14=_x_15_14, 15=_x_16_15, 16=_x_17_16, 17=_x_18_17, 18=_x_19_18, 19=_x_20_19, 20=_x_21_20, 21=_x_22_21, 22=_hash_22, 23=_hash_25, 24=_x_23_28
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    25,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _x_1_0_input);
+  _frame.set(1, _x_2_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+        return _frame[0]
+      | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+        _frame.set(2, leanField(_frame[1], 0));
+        _frame.set(3, leanField(_frame[1], 1));
+        _frame.set(4, leanField(_frame[1], 2));
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[0]),
+        );
+        leanTag(_frame[2]) match {
+        | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+          _frame.set(24, LeanScalar("uint64", "1723"));
+          _jump0 = _frame[24];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+          _frame.set(22, leanField(_frame[2], 0));
+          _ = leanField(_frame[2], 1);
+          _ = leanField(_frame[2], 2);
+          _jump0 = _frame[22];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+          _frame.set(23, leanField(_frame[2], 0));
+          _ = leanField(_frame[2], 1);
+          _ = leanField(_frame[2], 2);
+          _jump0 = _frame[23];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(7, LeanScalar("uint64", "32"));
+      _frame.set(
+        8,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[6],
+          _frame[7],
+        ),
+      );
+      _frame.set(
+        9,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[6], _frame[8]),
+      );
+      _frame.set(10, LeanScalar("uint64", "16"));
+      _frame.set(
+        11,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[9],
+          _frame[10],
+        ),
+      );
+      _frame.set(
+        12,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[9], _frame[11]),
+      );
+      _frame.set(
+        13,
+        L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(_frame[12]),
+      );
+      _frame.set(
+        14,
+        L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_frame[5]),
+      );
+      _frame.set(15, LeanScalar("usize", "1"));
+      _frame.set(
+        16,
+        L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+          _frame[14],
+          _frame[15],
+        ),
+      );
+      _frame.set(
+        17,
+        L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(_frame[13], _frame[16]),
+      );
+      _frame.set(
+        18,
+        L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+          LeanErased(),
+          _frame[0],
+          _frame[17],
+          LeanErased(),
+        ),
+      );
+      _frame.set(
+        19,
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+          Array[_frame[2], _frame[3], _frame[18]],
+        ),
+      );
+      _frame.set(
+        20,
+        L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+          LeanErased(),
+          _frame[0],
+          _frame[17],
+          _frame[19],
+          LeanErased(),
+        ),
+      );
+      _frame.set(21, f_spec_4_spec_7_spec_9_85c689ced0(_frame[20], _frame[4]));
+      return _frame[21]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Std.DHashMap.Internal.AssocList.foldlM._at_._private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_3.spec_4.spec_5._redArg"
+fun f_spec_3_spec_4_spec_5_3c8bf4fb04(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" -> _x_1_0
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_2_1, 0);
+    _value_4_3: LeanValue = leanField(_x_2_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_2_1, 2);
+    _x_6_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _x_1_0,
+    );
+    _x_7_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _key_3_2,
+    );
+    _x_9_8: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _x_7_6,
+      LeanScalar("uint64", "32"),
+    );
+    _fold_9: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _x_7_6,
+      _x_9_8,
+    );
+    _x_11_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _fold_9,
+      LeanScalar("uint64", "16"),
+    );
+    _x_12_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _fold_9,
+      _x_11_11,
+    );
+    _x_13_13: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_12_12,
+    );
+    _x_14_14: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_6_5,
+    );
+    _x_16_16: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _x_14_14,
+      LeanScalar("usize", "1"),
+    );
+    _x_17_17: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_13_13,
+      _x_16_16,
+    );
+    _x_18_18: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _x_1_0,
+      _x_17_17,
+      LeanErased(),
+    );
+    _x_20_20: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+      LeanErased(),
+      _x_1_0,
+      _x_17_17,
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_key_3_2, _value_4_3, _x_18_18],
+      ),
+      LeanErased(),
+    );
+    f_spec_3_spec_4_spec_5_3c8bf4fb04(_x_20_20, _tail_5_4)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.arity"
+fun f_Match_MatcherInfo_arity_e4534e7d23(_info_0: LeanValue): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    _x_2_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _numParams_1,
+      LeanScalar("nat", "1"),
+    );
+    _x_3_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _x_2_8,
+      _numDiscrs_2,
+    );
+    _x_4_10: LeanValue = f_Match_MatcherInfo_numAlts_e527c3cf00(_info_0);
+    L4_Init_Prelude.f_Nat_add_86990f4822(_x_3_9, _x_4_10)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0._redArg"
+fun f_State_addEntry_spec_0_baa20f0433(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"SMap\",\"mk\"]" ->
+    _stage_4_3: LeanValue = leanField(_x_1_0, 0);
+    _map_5_4: LeanValue = leanField(_x_1_0, 1);
+    _map_6_5: LeanValue = leanField(_x_1_0, 2);
+    leanTag(_stage_4_3) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_7_6: LeanValue = f_addEntry_spec_0_spec_0_b40e910f81(
+        _map_6_5,
+        _x_2_1,
+        _x_3_2,
+      );
+      LeanCtor(
+        "[\"Lean\",\"SMap\",\"mk\"]",
+        Array[_stage_4_3, _map_5_4, _x_7_6],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_9_8: LeanValue = f_addEntry_spec_0_spec_1_943ea4c8c2(
+        _map_5_4,
+        _x_2_1,
+        _x_3_2,
+      );
+      LeanCtor(
+        "[\"Lean\",\"SMap\",\"mk\"]",
+        Array[_stage_4_3, _x_9_8, _map_6_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Overlaps.insert"
+fun f_Match_Overlaps_insert_ae828f193e(
+  _o_0: LeanValue,
+  _overlapping_1: LeanValue,
+  _overlapped_2: LeanValue,
+): LeanValue {
+  f_Overlaps_insert_spec_2_97bf265bb5(_overlapping_1, _o_0, _overlapped_2)
+}
+// "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.Meta.Match.MatcherInfo.altNumParams.spec_0"
+fun f_MatcherInfo_altNumParams_spec_0_16bc7d500c(
+  _info_0_input: LeanValue,
+  _sz_1_input: LeanValue,
+  _i_2_input: LeanValue,
+  _bs_3_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_info_0, 1=_sz_1, 2=_i_2, 3=_bs_3, 4=_x_1_4, 5=_v_5, 6=_numFields_2_6, 7=_numOverlaps_3_7, 8=_hasUnitThunk_4_8, 9=_x_5_9, 10=_bs_10, 11=_x_6_11, 12=_y_8_12, 13=_x_9_13, 14=_x_10_14, 15=_x_11_15, 16=_x_12_16, 17=_x_13_17, 18=_x_14_18, 19=_x_15_19, 20=_x_16_20
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    21,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _info_0_input);
+  _frame.set(1, _sz_1_input);
+  _frame.set(2, _i_2_input);
+  _frame.set(3, _bs_3_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        4,
+        L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+          _frame[2],
+          _frame[1],
+        ),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" -> return _frame[3]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          5,
+          L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            LeanErased(),
+            _frame[3],
+            _frame[2],
+            LeanErased(),
+          ),
+        );
+        leanTag(_frame[5]) match {
+        | "[\"Lean\",\"Meta\",\"Match\",\"AltParamInfo\",\"mk\"]" ->
+          _frame.set(6, leanField(_frame[5], 0));
+          _frame.set(7, leanField(_frame[5], 1));
+          _frame.set(8, leanField(_frame[5], 2));
+          _frame.set(9, LeanScalar("nat", "0"));
+          _frame.set(
+            10,
+            L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+              LeanErased(),
+              _frame[3],
+              _frame[2],
+              _frame[9],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_Nat_add_86990f4822(_frame[6], _frame[7]),
+          );
+          leanTag(_frame[8]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _jump0 = _frame[9];
+            _frame.set(12, _jump0);
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(20, LeanScalar("nat", "1"));
+            _jump0 = _frame[20];
+            _frame.set(12, _jump0);
+            !pc = 1;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        13,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[11], _frame[12]),
+      );
+      _frame.set(14, f_Match_MatcherInfo_getNumDiscrEqs_3aeea94885(_frame[0]));
+      _frame.set(
+        15,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[13], _frame[14]),
+      );
+      _frame.set(16, LeanScalar("usize", "1"));
+      _frame.set(
+        17,
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _frame[2],
+          _frame[16],
+        ),
+      );
+      _frame.set(
+        18,
+        L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+          LeanErased(),
+          _frame[10],
+          _frame[2],
+          _frame[15],
+          LeanErased(),
+        ),
+      );
+      _frame.set(
+        19,
+        f_MatcherInfo_altNumParams_spec_0_16bc7d500c(
+          _frame[0],
+          _frame[1],
+          _frame[17],
+          _frame[18],
+        ),
+      );
+      return _frame[19]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.PersistentHashMap.find?._at_.Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0.spec_0._redArg"
+fun f_getMatcherInfo_spec_0_spec_0_2a268dc5da(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _joined: Array<LeanValue> = {
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+      Array[LeanScalar("uint64", "1723")]
+    | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+      _hash_5: LeanValue = leanField(_x_2_1, 0);
+      _pre_6: LeanValue = leanField(_x_2_1, 1);
+      _str_7: LeanValue = leanField(_x_2_1, 2);
+      Array[_hash_5]
+    | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+      _hash_8: LeanValue = leanField(_x_2_1, 0);
+      _pre_9: LeanValue = leanField(_x_2_1, 1);
+      _i_10: LeanValue = leanField(_x_2_1, 2);
+      Array[_hash_8]
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  _y_4_2: LeanValue = _joined[0];
+  _x_5_3: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+    _y_4_2,
+  );
+  f_spec_0_spec_0_spec_1_547888cb49(_x_1_0, _x_5_3, _x_2_1)
+}
+// "_private.Lean.Data.PersistentHashMap.0.Lean.PersistentHashMap.insertAux.traverse._at_.Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1.spec_3._redArg"
+fun f_spec_0_spec_1_spec_3_3eb39e8547(
+  _depth_0_input: LeanValue,
+  _keys_1_input: LeanValue,
+  _vals_2_input: LeanValue,
+  _i_3_input: LeanValue,
+  _entries_4_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_depth_0, 1=_keys_1, 2=_vals_2, 3=_i_3, 4=_entries_4, 5=_x_1_5, 6=_x_2_6, 7=_k_7, 8=_v_8, 9=_y_4_9, 10=_h_10, 11=_x_5_11, 12=_x_6_12, 13=_x_7_13, 14=_x_8_14, 15=_x_9_15, 16=_h_16, 17=_x_10_17, 18=_x_11_18, 19=_x_12_19, 20=_hash_20, 21=_hash_23, 22=_x_13_26
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    23,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _depth_0_input);
+  _frame.set(1, _keys_1_input);
+  _frame.set(2, _vals_2_input);
+  _frame.set(3, _i_3_input);
+  _frame.set(4, _entries_4_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        5,
+        L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[1]),
+      );
+      _frame.set(
+        6,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[5]),
+      );
+      leanTag(_frame[6]) match {
+      | "[\"Bool\",\"false\"]" -> return _frame[4]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+            LeanErased(),
+            _frame[1],
+            _frame[3],
+            LeanErased(),
+          ),
+        );
+        _frame.set(
+          8,
+          L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+            LeanErased(),
+            _frame[2],
+            _frame[3],
+            LeanErased(),
+          ),
+        );
+        leanTag(_frame[7]) match {
+        | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+          _frame.set(22, LeanScalar("uint64", "1723"));
+          _jump0 = _frame[22];
+          _frame.set(9, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+          _frame.set(20, leanField(_frame[7], 0));
+          _ = leanField(_frame[7], 1);
+          _ = leanField(_frame[7], 2);
+          _jump0 = _frame[20];
+          _frame.set(9, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+          _frame.set(21, leanField(_frame[7], 0));
+          _ = leanField(_frame[7], 1);
+          _ = leanField(_frame[7], 2);
+          _jump0 = _frame[21];
+          _frame.set(9, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        10,
+        L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(_frame[9]),
+      );
+      _frame.set(11, LeanScalar("usize", "5"));
+      _frame.set(12, LeanScalar("nat", "1"));
+      _frame.set(13, LeanScalar("usize", "1"));
+      _frame.set(
+        14,
+        L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+          _frame[0],
+          _frame[13],
+        ),
+      );
+      _frame.set(
+        15,
+        L4_Init_Data_UInt_Basic.f_USize_mul_409e03f718(_frame[11], _frame[14]),
+      );
+      _frame.set(
+        16,
+        L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+          _frame[10],
+          _frame[15],
+        ),
+      );
+      _frame.set(
+        17,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[12]),
+      );
+      _frame.set(
+        18,
+        f_spec_0_spec_0_spec_1_d1b5ee11ae(
+          _frame[4],
+          _frame[16],
+          _frame[0],
+          _frame[7],
+          _frame[8],
+        ),
+      );
+      _frame.set(
+        19,
+        f_spec_0_spec_1_spec_3_3eb39e8547(
+          _frame[0],
+          _frame[1],
+          _frame[2],
+          _frame[17],
+          _frame[18],
+        ),
+      );
+      return _frame[19]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_3.spec_4._redArg"
+fun f_spec_2_spec_3_spec_4_55a7185ed3(
+  _i_0: LeanValue,
+  _source_1: LeanValue,
+  _target_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _source_1,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_0, _x_1_3);
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" -> _target_2
+  | "[\"Bool\",\"true\"]" ->
+    _es_5: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanErased(),
+    );
+    _source_7: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+        Array[],
+      ),
+      LeanErased(),
+    );
+    _target_8: LeanValue = f_spec_3_spec_4_spec_5_3c8bf4fb04(_target_2, _es_5);
+    _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _i_0,
+      LeanScalar("nat", "1"),
+    );
+    f_spec_2_spec_3_spec_4_55a7185ed3(_x_5_10, _source_7, _target_8)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.mkStateFromImportedEntries._at_._private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn.«_@».Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2.spec_1.spec_2"
+fun f_hyg_spec_1_spec_2_c643dbf619(
+  _as_0_input: LeanValue,
+  _i_1_input: LeanValue,
+  _stop_2_input: LeanValue,
+  _b_3_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_as_0, 1=_i_1, 2=_stop_2, 3=_b_3, 4=_y_2_4, 5=_x_3_5, 6=_x_4_6, 7=_x_5_7, 8=_x_6_8, 9=_x_7_9, 10=_x_8_10, 11=_x_9_11, 12=_x_10_12, 13=_x_11_13, 14=_x_12_14, 15=_x_13_15
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    16,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _as_0_input);
+  _frame.set(1, _i_1_input);
+  _frame.set(2, _stop_2_input);
+  _frame.set(3, _b_3_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        8,
+        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_frame[1], _frame[2]),
+      );
+      leanTag(_frame[8]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          9,
+          L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            LeanErased(),
+            _frame[0],
+            _frame[1],
+            LeanErased(),
+          ),
+        );
+        _frame.set(10, LeanScalar("nat", "0"));
+        _frame.set(
+          11,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[9]),
+        );
+        _frame.set(
+          12,
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[10], _frame[11]),
+        );
+        leanTag(_frame[12]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _jump0 = _frame[3];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(13, LeanScalar("usize", "0"));
+          _frame.set(
+            14,
+            L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_frame[11]),
+          );
+          _frame.set(
+            15,
+            f_hyg_spec_1_spec_1_db8e864e25(
+              _frame[9],
+              _frame[13],
+              _frame[14],
+              _frame[3],
+            ),
+          );
+          _jump0 = _frame[15];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" -> return _frame[3]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(
+        6,
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[1], _frame[5]),
+      );
+      _frame.set(
+        7,
+        f_hyg_spec_1_spec_2_c643dbf619(
+          _frame[0],
+          _frame[6],
+          _frame[2],
+          _frame[4],
+        ),
+      );
+      return _frame[7]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.Match.Extension.instInhabitedState"
+fun f_Match_Extension_instInhabitedState_3ca1ea7fef(): LeanValue {
+  _x_5_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    LeanScalar("nat", "16"),
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  _x_7_6: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+    LeanErased(),
+  );
+  LeanCtor(
+    "[\"Lean\",\"SMap\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+        Array[LeanScalar("nat", "0"), _x_5_4],
+      ),
+      LeanCtor(
+        "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+        Array[_x_7_6],
+      ),
+    ],
+  )
+}
+// "Lean.Meta.Match.Extension.State.addEntry"
+fun f_Extension_State_addEntry_f20cd9047b(
+  _s_0: LeanValue,
+  _e_1: LeanValue,
+): LeanValue {
+  leanTag(_e_1) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"Extension\",\"Entry\",\"mk\"]" ->
+    _name_2: LeanValue = leanField(_e_1, 0);
+    _info_3: LeanValue = leanField(_e_1, 1);
+    f_State_addEntry_spec_0_baa20f0433(_s_0, _name_2, _info_3)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Extension_State_addEntry_f20cd9047b(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Extension_State_addEntry_f20cd9047b(_args[0], _args[1])
+}
+// "Lean.PersistentHashMap.findAtAux._at_.Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0.spec_0.spec_1.spec_2._redArg"
+fun f_spec_0_spec_1_spec_2_b794a5096d(
+  _keys_0: LeanValue,
+  _vals_1: LeanValue,
+  _i_2: LeanValue,
+  _k_3: LeanValue,
+): LeanValue {
+  _x_1_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _keys_0,
+  );
+  _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_2, _x_1_4);
+  leanTag(_x_2_5) match {
+  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Bool\",\"true\"]" ->
+    _k_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _keys_0,
+      _i_2,
+      LeanErased(),
+    );
+    _x_4_8: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_k_3, _k_7);
+    leanTag(_x_4_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _i_2,
+        LeanScalar("nat", "1"),
+      );
+      f_spec_0_spec_1_spec_2_b794a5096d(_keys_0, _vals_1, _x_6_10, _k_3)
+    | "[\"Bool\",\"true\"]" ->
+      _x_8_12: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        LeanErased(),
+        _vals_1,
+        _i_2,
+        LeanErased(),
+      );
+      LeanCtor("[\"Option\",\"some\"]", Array[_x_8_12])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.AssocList.contains._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_2._redArg"
+fun f_insert_spec_2_spec_2_76af510053(
+  _a_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_1_1, 0);
+    _value_4_3: LeanValue = leanField(_x_1_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_1_1, 2);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_key_3_2, _a_0);
+    leanTag(_x_6_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      f_insert_spec_2_spec_2_76af510053(_a_0, _tail_5_4)
+    | "[\"Bool\",\"true\"]" -> _x_6_6
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Lean.Meta.Match.getNumEqsFromDiscrInfos.spec_0"
+fun f_Match_getNumEqsFromDiscrInfos_spec_0_d3d8b82f52(
+  _as_0_input: LeanValue,
+  _sz_1_input: LeanValue,
+  _i_2_input: LeanValue,
+  _b_3_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_as_0, 1=_sz_1, 2=_i_2, 3=_b_3, 4=_a_2_4, 5=_x_3_5, 6=_x_4_6, 7=_x_5_7, 8=_x_6_8, 9=_a_9, 10=_x_8_11, 11=_x_9_12
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    12,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _as_0_input);
+  _frame.set(1, _sz_1_input);
+  _frame.set(2, _i_2_input);
+  _frame.set(3, _b_3_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        8,
+        L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+          _frame[2],
+          _frame[1],
+        ),
+      );
+      leanTag(_frame[8]) match {
+      | "[\"Bool\",\"false\"]" -> return _frame[3]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          9,
+          L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            LeanErased(),
+            _frame[0],
+            _frame[2],
+            LeanErased(),
+          ),
+        );
+        leanTag(_frame[9]) match {
+        | "[\"Option\",\"none\"]" ->
+          _jump0 = _frame[3];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Option\",\"some\"]" ->
+          _ = leanField(_frame[9], 0);
+          _frame.set(10, LeanScalar("nat", "1"));
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[10]),
+          );
+          _jump0 = _frame[11];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(
+        6,
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[2], _frame[5]),
+      );
+      _frame.set(
+        7,
+        f_Match_getNumEqsFromDiscrInfos_spec_0_d3d8b82f52(
+          _frame[0],
+          _frame[1],
+          _frame[6],
+          _frame[4],
+        ),
+      );
+      return _frame[7]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn._lam_0._@.Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2"
+fun f_MatcherInfo_hygCtx_hyg_ede7fb6999(
+  _env_0: LeanValue,
+  _x_1_1: LeanValue,
+  _entries_2: LeanValue,
+): LeanValue {
+  _all_3: LeanValue = L4_Init_Prelude.f_Array_mk_15c9e2d6d9(
+    LeanErased(),
+    _entries_2,
+  );
+  _x_2_4: LeanValue = LeanScalar("nat", "0");
+  _x_3_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _all_3,
+  );
+  _x_4_6: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    _x_2_4,
+  );
+  _x_5_7: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_2_4, _x_3_5);
+  leanTag(_x_5_7) match {
+  | "[\"Bool\",\"false\"]" ->
+    LeanCtor(
+      "[\"Lean\",\"OLeanEntries\",\"mk\"]",
+      Array[_x_4_6, _x_4_6, _all_3],
+    )
+  | "[\"Bool\",\"true\"]" ->
+    _x_8_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_3_5,
+    );
+    _x_9_11: LeanValue = f_hygCtx_hyg_spec_0_a9234ec053(
+      _env_0,
+      _all_3,
+      LeanScalar("usize", "0"),
+      _x_8_10,
+      _x_4_6,
+    );
+    LeanCtor(
+      "[\"Lean\",\"OLeanEntries\",\"mk\"]",
+      Array[_x_9_11, _x_9_11, _all_3],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_MatcherInfo_hygCtx_hyg_ede7fb6999(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_MatcherInfo_hygCtx_hyg_ede7fb6999(_args[0], _args[1], _args[2])
+}
+// "Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_3._redArg"
+fun f_insert_spec_2_spec_3_8434339f42(_data_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _data_0,
+  );
+  _nbuckets_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+    _x_1_1,
+    LeanScalar("nat", "2"),
+  );
+  _x_5_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    _nbuckets_3,
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  _x_6_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_propagateMark_cb052002ff(
+    LeanErased(),
+    LeanErased(),
+    _data_0,
+    _x_5_6,
+  );
+  f_spec_2_spec_3_spec_4_55a7185ed3(LeanScalar("nat", "0"), _data_0, _x_6_7)
+}
+// "Lean.Meta.Match.MatcherInfo.altNumParams"
+fun f_Match_MatcherInfo_altNumParams_27a16cd7ce(_info_0: LeanValue): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    _sz_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+      LeanErased(),
+      _altInfos_3,
+    );
+    f_MatcherInfo_altNumParams_spec_0_16bc7d500c(
+      _info_0,
+      _sz_7,
+      LeanScalar("usize", "0"),
+      _altInfos_3,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Extension.getMatcherInfo?"
+fun f_Match_Extension_getMatcherInfo_61f2fbaa36(
+  _env_0: LeanValue,
+  _declName_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = L4_Init_Prelude.f_Lean_Name_eraseMacroScopes_788e8400bd(
+    _declName_1,
+  );
+  leanTag(_x_1_2) match {
+  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+    _hash_3: LeanValue = leanField(_x_1_2, 0);
+    _pre_2_4: LeanValue = leanField(_x_1_2, 1);
+    _str_3_5: LeanValue = leanField(_x_1_2, 2);
+    _x_4_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+      _str_3_5,
+    );
+    _x_5_7: LeanValue = LeanScalar("nat", "6");
+    _x_6_8: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_5_7, _x_4_6);
+    leanTag(_x_6_8) match {
+    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | "[\"Bool\",\"true\"]" ->
+      _x_9_11: LeanValue = LeanScalar("nat", "0");
+      _x_10_12: LeanValue = L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+        _str_3_5,
+        LeanText("match_"),
+        _x_9_11,
+        _x_9_11,
+        _x_5_7,
+        LeanErased(),
+        LeanErased(),
+      );
+      leanTag(_x_10_12) match {
+      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | "[\"Bool\",\"true\"]" ->
+        _x_12_14: LeanValue = leanFail(
+          "module initialization required: Lean.Meta.Match.Extension.extension",
+        );
+        leanTag(_x_12_14) match {
+        | "[\"Lean\",\"PersistentEnvExtension\",\"mk\"]" ->
+          _toEnvExtension_15: LeanValue = leanField(_x_12_14, 0);
+          _name_16: LeanValue = leanField(_x_12_14, 1);
+          _addImportedFn_17: LeanValue = leanField(_x_12_14, 2);
+          _addEntryFn_18: LeanValue = leanField(_x_12_14, 3);
+          _exportEntriesFn_19: LeanValue = leanField(_x_12_14, 4);
+          _statsFn_20: LeanValue = leanField(_x_12_14, 5);
+          leanTag(_toEnvExtension_15) match {
+          | "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvExtension\",\"mk\"]" ->
+            _idx_21: LeanValue = leanField(_toEnvExtension_15, 0);
+            _mkInitial_22: LeanValue = leanField(_toEnvExtension_15, 1);
+            _asyncMode_23: LeanValue = leanField(_toEnvExtension_15, 2);
+            _replay_24: LeanValue = leanField(_toEnvExtension_15, 3);
+            _name_25: LeanValue = leanField(_toEnvExtension_15, 4);
+            _genIdx_26: LeanValue = leanField(_toEnvExtension_15, 5);
+            _logWrites_27: LeanValue = leanField(_toEnvExtension_15, 6);
+            _x_13_28: LeanValue = f_Match_Extension_instInhabitedState_3ca1ea7fef();
+            _x_14_29: LeanValue = L4_Lean_EnvExtension.f_Lean_SimplePersistentEnvExtension_getState_b8458c7569(
+              _x_13_28,
+              _x_12_14,
+              _env_0,
+              _asyncMode_23,
+              _declName_1,
+            );
+            f_Extension_getMatcherInfo_spec_0_efb5340daa(_x_14_29, _declName_1)
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  }
+}
+// "Lean.PersistentHashMap.insertAtCollisionNodeAux._at_.Lean.PersistentHashMap.insertAtCollisionNode._at_.Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1.spec_2.spec_4._redArg"
+fun f_spec_1_spec_2_spec_4_d98e65f73d(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+  _x_4_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+    _es_5_4: LeanValue = leanField(_x_1_0, 0);
+    leanFail(
+      "unreachable: Lean.PersistentHashMap.insertAtCollisionNodeAux._at_.Lean.PersistentHashMap.insertAtCollisionNode._at_.Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1.spec_2.spec_4._redArg",
+    )
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+    _ks_6_5: LeanValue = leanField(_x_1_0, 0);
+    _vs_7_6: LeanValue = leanField(_x_1_0, 1);
+    _h_8_7: LeanValue = leanField(_x_1_0, 2);
+    _x_9_8: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _ks_6_5,
+    );
+    _x_10_9: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_2_1, _x_9_8);
+    leanTag(_x_10_9) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_11_10: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        LeanErased(),
+        _ks_6_5,
+        _x_3_2,
+      );
+      _x_12_11: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        LeanErased(),
+        _vs_7_6,
+        _x_4_3,
+      );
+      LeanCtor(
+        "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+        Array[_x_11_10, _x_12_11, LeanErased()],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _k_13: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        LeanErased(),
+        _ks_6_5,
+        _x_2_1,
+        LeanErased(),
+      );
+      _x_14_14: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+        _x_3_2,
+        _k_13,
+      );
+      leanTag(_x_14_14) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_17_17: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _x_2_1,
+          LeanScalar("nat", "1"),
+        );
+        f_spec_1_spec_2_spec_4_d98e65f73d(
+          LeanCtor(
+            "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+            Array[_ks_6_5, _vs_7_6, LeanErased()],
+          ),
+          _x_17_17,
+          _x_3_2,
+          _x_4_3,
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _x_19_19: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+          LeanErased(),
+          _ks_6_5,
+          _x_2_1,
+          _x_3_2,
+          LeanErased(),
+        );
+        _x_20_20: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+          LeanErased(),
+          _vs_7_6,
+          _x_2_1,
+          _x_4_3,
+          LeanErased(),
+        );
+        LeanCtor(
+          "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+          Array[_x_19_19, _x_20_20, LeanErased()],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.getMotivePos"
+fun f_Match_MatcherInfo_getMotivePos_00c8238ffa(_info_0: LeanValue): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    _numParams_1
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn._@.Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2"
+fun f_MatcherInfo_hygCtx_hyg_89b5cff17d(_a_1_0: LeanValue): LeanValue {
+  _f_2_1: LeanValue = LeanClosure(
+    L4_Lean_Meta_Match_MatcherInfo.apply_f_MatcherInfo_hygCtx_hyg_ede7fb6999,
+    3,
+    Array[],
+  );
+  _f_3_2: LeanValue = LeanClosure(
+    L4_Lean_Meta_Match_MatcherInfo.apply_f_MatcherInfo_hygCtx_hyg_8bd10dab66,
+    1,
+    Array[],
+  );
+  _f_4_3: LeanValue = LeanClosure(
+    L4_Lean_Meta_Match_MatcherInfo.apply_f_MatcherInfo_hygCtx_hyg_a5799ceba8,
+    1,
+    Array[],
+  );
+  _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    LeanText("Lean"),
+    LeanText("Meta"),
+    LeanText("Match"),
+    LeanText("Extension"),
+    LeanText("extension"),
+  );
+  _x_11_10: LeanValue = LeanClosure(
+    L4_Lean_Meta_Match_MatcherInfo.apply_f_Extension_State_addEntry_f20cd9047b,
+    2,
+    Array[],
+  );
+  _x_17_16: LeanValue = LeanCtor(
+    "[\"Lean\",\"SimplePersistentEnvExtensionDescr\",\"mk\"]",
+    Array[
+      _x_10_9,
+      _x_11_10,
+      _f_4_3,
+      _f_3_2,
+      LeanCtor("[\"Option\",\"some\"]", Array[_f_2_1]),
+      LeanCtor(
+        "[\"Lean\",\"EnvExtension\",\"AsyncMode\",\"async\"]",
+        Array[LeanCtor("[\"Lean\",\"AsyncBranch\",\"mainEnv\"]", Array[])],
+      ),
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    ],
+  );
+  L4_Lean_EnvExtension.f_Lean_registerSimplePersistentEnvExtension_0f85b01a0b(
+    _x_17_16,
+    _a_1_0,
+  )
+}
+// "_private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1.spec_4.spec_7._redArg"
+fun f_spec_1_spec_4_spec_7_df74ea2f17(
+  _i_0: LeanValue,
+  _source_1: LeanValue,
+  _target_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _source_1,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_0, _x_1_3);
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" -> _target_2
+  | "[\"Bool\",\"true\"]" ->
+    _es_5: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanErased(),
+    );
+    _source_7: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+        Array[],
+      ),
+      LeanErased(),
+    );
+    _target_8: LeanValue = f_spec_4_spec_7_spec_9_85c689ced0(_target_2, _es_5);
+    _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _i_0,
+      LeanScalar("nat", "1"),
+    );
+    f_spec_1_spec_4_spec_7_df74ea2f17(_x_5_10, _source_7, _target_8)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.numAlts"
+fun f_Match_MatcherInfo_numAlts_e527c3cf00(_info_0: LeanValue): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _altInfos_3)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.getFirstDiscrPos"
+fun f_Match_MatcherInfo_getFirstDiscrPos_3cd33ff67c(
+  _info_0: LeanValue,
+): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    L4_Init_Prelude.f_Nat_add_86990f4822(_numParams_1, LeanScalar("nat", "1"))
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.AssocList.replace._at_.Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1.spec_5._redArg"
+fun f_spec_0_spec_1_spec_5_df43642102(
+  _a_0: LeanValue,
+  _b_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_2) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" -> _x_1_2
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_2_3: LeanValue = leanField(_x_1_2, 0);
+    _value_3_4: LeanValue = leanField(_x_1_2, 1);
+    _tail_4_5: LeanValue = leanField(_x_1_2, 2);
+    _x_5_6: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+      _key_2_3,
+      _a_0,
+    );
+    leanTag(_x_5_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_6_7: LeanValue = f_spec_0_spec_1_spec_5_df43642102(
+        _a_0,
+        _b_1,
+        _tail_4_5,
+      );
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_key_2_3, _value_3_4, _x_6_7],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_a_0, _b_1, _tail_4_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.initFn._@.Lean.Meta.Match.MatcherInfo.3189009982._hygCtx._hyg.2"
+fun f_MatcherInfo_hygCtx_hyg_2d3398cb4f(_a_1_0: LeanValue): LeanValue {
+  _x_5_4: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+    LeanText("Lean"),
+    LeanText("Meta"),
+    LeanText("matcherLikeExt"),
+  );
+  L4_Lean_EnvExtension.f_Lean_mkTagDeclarationExtension_f4ca0dc04c(
+    _x_5_4,
+    LeanCtor("[\"Lean\",\"EnvExtension\",\"AsyncMode\",\"sync\"]", Array[]),
+    LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    _a_1_0,
+  )
+}
+// "Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg"
+fun f_Overlaps_insert_spec_1_20d9577d14(
+  _k_0_input: LeanValue,
+  _v_1_input: LeanValue,
+  _t_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_k_0, 1=_v_1, 2=_t_2, 3=_size_1_3, 4=_k_2_4, 5=_v_3_5, 6=_l_4_6, 7=_r_5_7, 8=_x_6_8, 9=_x_7_9, 10=_impl_8_10, 11=_x_9_11, 12=_size_10_12, 13=_size_15_17, 14=_k_16_18, 15=_v_17_19, 16=_l_18_20, 17=_r_19_21, 18=_x_20_22, 19=_x_21_23, 20=_x_22_24, 21=_x_23_25, 22=_x_24_26, 23=_x_25_27, 24=_size_26_28, 25=_k_27_29, 26=_v_28_30, 27=_l_29_31, 28=_r_30_32, 29=_size_31_33, 30=_x_36_38, 31=_x_37_39, 32=_x_38_40, 33=_x_39_41, 34=_x_40_42, 35=_y_42_43, 36=_y_43_44, 37=_y_44_45, 38=_x_45_46, 39=_x_46_47, 40=_x_47_48, 41=_y_49_49, 42=_x_50_50, 43=_x_51_51, 44=_x_52_52, 45=_size_53_53, 46=_x_58_58, 47=_size_59_59, 48=_x_64_64, 49=_x_65_65, 50=_x_66_66, 51=_x_67_67, 52=_x_68_68, 53=_x_69_69, 54=_k_71_71, 55=_v_72_72, 56=_l_73_73, 57=_r_74_74, 58=_k_76_76, 59=_v_77_77, 60=_x_85_85, 61=_x_86_86, 62=_x_87_87, 63=_x_88_88, 64=_x_94_94, 65=_x_95_95, 66=_x_96_96, 67=_x_97_97, 68=_x_98_98, 69=_x_99_99, 70=_impl_100_100, 71=_x_101_101, 72=_size_102_102, 73=_size_107_107, 74=_k_108_108, 75=_v_109_109, 76=_l_110_110, 77=_r_111_111, 78=_x_112_112, 79=_x_113_113, 80=_x_114_114, 81=_x_115_115, 82=_x_116_116, 83=_x_117_117, 84=_size_118_118, 85=_size_123_123, 86=_k_124_124, 87=_v_125_125, 88=_l_126_126, 89=_r_127_127, 90=_x_128_128, 91=_x_129_129, 92=_x_130_130, 93=_x_131_131, 94=_x_132_132, 95=_y_134_133, 96=_y_135_134, 97=_y_136_135, 98=_x_137_136, 99=_x_138_137, 100=_x_139_138, 101=_x_140_139, 102=_y_142_140, 103=_x_143_141, 104=_x_144_142, 105=_x_145_143, 106=_size_146_144, 107=_x_151_149, 108=_size_152_150, 109=_x_157_155, 110=_x_158_156, 111=_x_159_157, 112=_x_160_158, 113=_x_161_159, 114=_x_162_160, 115=_x_163_161, 116=_k_165_163, 117=_v_166_164, 118=_l_167_165, 119=_r_168_166, 120=_x_179_177, 121=_x_180_178, 122=_x_181_179, 123=_k_183_181, 124=_v_184_182, 125=_x_187_185, 126=_x_188_186, 127=_x_189_187, 128=_x_190_188, 129=_x_191_189, 130=_x_192_190, 131=_x_193_191, 132=_x_194_192
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    133,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _k_0_input);
+  _frame.set(1, _v_1_input);
+  _frame.set(2, _t_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[2]) match {
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+        _frame.set(3, leanField(_frame[2], 0));
+        _frame.set(4, leanField(_frame[2], 1));
+        _frame.set(5, leanField(_frame[2], 2));
+        _frame.set(6, leanField(_frame[2], 3));
+        _frame.set(7, leanField(_frame[2], 4));
+        _frame.set(
+          8,
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[0], _frame[4]),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[0], _frame[4]),
+          );
+          leanTag(_frame[9]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(
+              10,
+              f_Overlaps_insert_spec_1_20d9577d14(
+                _frame[0],
+                _frame[1],
+                _frame[7],
+              ),
+            );
+            _frame.set(11, LeanScalar("nat", "1"));
+            leanTag(_frame[6]) match {
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+              _frame.set(12, leanField(_frame[6], 0));
+              _ = leanField(_frame[6], 1);
+              _ = leanField(_frame[6], 2);
+              _ = leanField(_frame[6], 3);
+              _ = leanField(_frame[6], 4);
+              leanTag(_frame[10]) match {
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                _frame.set(13, leanField(_frame[10], 0));
+                _frame.set(14, leanField(_frame[10], 1));
+                _frame.set(15, leanField(_frame[10], 2));
+                _frame.set(16, leanField(_frame[10], 3));
+                _frame.set(17, leanField(_frame[10], 4));
+                _frame.set(18, LeanScalar("nat", "3"));
+                _frame.set(
+                  19,
+                  L4_Init_Prelude.f_Nat_mul_8d6effc865(_frame[18], _frame[12]),
+                );
+                _frame.set(
+                  20,
+                  L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                    _frame[19],
+                    _frame[13],
+                  ),
+                );
+                leanTag(_frame[20]) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _frame.set(
+                    21,
+                    L4_Init_Prelude.f_Nat_add_86990f4822(
+                      _frame[11],
+                      _frame[12],
+                    ),
+                  );
+                  _frame.set(
+                    22,
+                    L4_Init_Prelude.f_Nat_add_86990f4822(
+                      _frame[21],
+                      _frame[13],
+                    ),
+                  );
+                  _frame.set(
+                    23,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[22],
+                        _frame[4],
+                        _frame[5],
+                        _frame[6],
+                        _frame[10],
+                      ],
+                    ),
+                  );
+                  return _frame[23]
+                | "[\"Bool\",\"true\"]" ->
+                  leanTag(_frame[16]) match {
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                    _frame.set(24, leanField(_frame[16], 0));
+                    _frame.set(25, leanField(_frame[16], 1));
+                    _frame.set(26, leanField(_frame[16], 2));
+                    _frame.set(27, leanField(_frame[16], 3));
+                    _frame.set(28, leanField(_frame[16], 4));
+                    leanTag(_frame[17]) match {
+                    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                      _frame.set(29, leanField(_frame[17], 0));
+                      _ = leanField(_frame[17], 1);
+                      _ = leanField(_frame[17], 2);
+                      _ = leanField(_frame[17], 3);
+                      _ = leanField(_frame[17], 4);
+                      _frame.set(30, LeanScalar("nat", "2"));
+                      _frame.set(
+                        31,
+                        L4_Init_Prelude.f_Nat_mul_8d6effc865(
+                          _frame[30],
+                          _frame[29],
+                        ),
+                      );
+                      _frame.set(
+                        32,
+                        L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                          _frame[24],
+                          _frame[31],
+                        ),
+                      );
+                      leanTag(_frame[32]) match {
+                      | "[\"Bool\",\"false\"]" ->
+                        _frame.set(
+                          33,
+                          L4_Init_Prelude.f_Nat_add_86990f4822(
+                            _frame[11],
+                            _frame[12],
+                          ),
+                        );
+                        _frame.set(
+                          34,
+                          L4_Init_Prelude.f_Nat_add_86990f4822(
+                            _frame[33],
+                            _frame[13],
+                          ),
+                        );
+                        leanTag(_frame[27]) match {
+                        | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                          _frame.set(47, leanField(_frame[27], 0));
+                          _ = leanField(_frame[27], 1);
+                          _ = leanField(_frame[27], 2);
+                          _ = leanField(_frame[27], 3);
+                          _ = leanField(_frame[27], 4);
+                          _jump0 = _frame[47];
+                          _frame.set(41, _jump0);
+                          !pc = 2;
+                          void
+                        | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                          _frame.set(48, LeanScalar("nat", "0"));
+                          _jump0 = _frame[48];
+                          _frame.set(41, _jump0);
+                          !pc = 2;
+                          void
+                        | _ -> return leanFail("non-exhaustive Lean case")
+                        }
+                      | "[\"Bool\",\"true\"]" ->
+                        _frame.set(
+                          49,
+                          L4_Init_Prelude.f_Nat_add_86990f4822(
+                            _frame[11],
+                            _frame[12],
+                          ),
+                        );
+                        _frame.set(
+                          50,
+                          L4_Init_Prelude.f_Nat_add_86990f4822(
+                            _frame[49],
+                            _frame[13],
+                          ),
+                        );
+                        _frame.set(
+                          51,
+                          L4_Init_Prelude.f_Nat_add_86990f4822(
+                            _frame[49],
+                            _frame[24],
+                          ),
+                        );
+                        _frame.set(
+                          52,
+                          LeanCtor(
+                            "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                            Array[
+                              _frame[51],
+                              _frame[4],
+                              _frame[5],
+                              _frame[6],
+                              _frame[16],
+                            ],
+                          ),
+                        );
+                        _frame.set(
+                          53,
+                          LeanCtor(
+                            "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                            Array[
+                              _frame[50],
+                              _frame[14],
+                              _frame[15],
+                              _frame[52],
+                              _frame[17],
+                            ],
+                          ),
+                        );
+                        return _frame[53]
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                      return leanFail(
+                        "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                      )
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                    return leanFail(
+                      "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                    )
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                return leanFail(
+                  "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                )
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+              leanTag(_frame[10]) match {
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                _ = leanField(_frame[10], 0);
+                _frame.set(54, leanField(_frame[10], 1));
+                _frame.set(55, leanField(_frame[10], 2));
+                _frame.set(56, leanField(_frame[10], 3));
+                _frame.set(57, leanField(_frame[10], 4));
+                leanTag(_frame[56]) match {
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  _ = leanField(_frame[56], 0);
+                  _frame.set(58, leanField(_frame[56], 1));
+                  _frame.set(59, leanField(_frame[56], 2));
+                  _ = leanField(_frame[56], 3);
+                  _ = leanField(_frame[56], 4);
+                  leanTag(_frame[57]) match {
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                    _ = leanField(_frame[57], 0);
+                    _ = leanField(_frame[57], 1);
+                    _ = leanField(_frame[57], 2);
+                    _ = leanField(_frame[57], 3);
+                    _ = leanField(_frame[57], 4);
+                    return leanFail(
+                      "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                    )
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                    _frame.set(60, LeanScalar("nat", "3"));
+                    _frame.set(
+                      61,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[11],
+                          _frame[4],
+                          _frame[5],
+                          _frame[57],
+                          _frame[57],
+                        ],
+                      ),
+                    );
+                    _frame.set(
+                      62,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[11],
+                          _frame[54],
+                          _frame[55],
+                          _frame[57],
+                          _frame[57],
+                        ],
+                      ),
+                    );
+                    _frame.set(
+                      63,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[60],
+                          _frame[58],
+                          _frame[59],
+                          _frame[61],
+                          _frame[62],
+                        ],
+                      ),
+                    );
+                    return _frame[63]
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  leanTag(_frame[57]) match {
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                    _ = leanField(_frame[57], 0);
+                    _ = leanField(_frame[57], 1);
+                    _ = leanField(_frame[57], 2);
+                    _ = leanField(_frame[57], 3);
+                    _ = leanField(_frame[57], 4);
+                    _frame.set(64, LeanScalar("nat", "3"));
+                    _frame.set(
+                      65,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[11],
+                          _frame[4],
+                          _frame[5],
+                          _frame[56],
+                          _frame[56],
+                        ],
+                      ),
+                    );
+                    _frame.set(
+                      66,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[64],
+                          _frame[54],
+                          _frame[55],
+                          _frame[65],
+                          _frame[57],
+                        ],
+                      ),
+                    );
+                    return _frame[66]
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                    _frame.set(67, LeanScalar("nat", "2"));
+                    _frame.set(
+                      68,
+                      LeanCtor(
+                        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                        Array[
+                          _frame[67],
+                          _frame[4],
+                          _frame[5],
+                          _frame[57],
+                          _frame[10],
+                        ],
+                      ),
+                    );
+                    return _frame[68]
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                return leanFail(
+                  "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                )
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(
+              69,
+              LeanCtor(
+                "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                Array[_frame[3], _frame[0], _frame[1], _frame[6], _frame[7]],
+              ),
+            );
+            return _frame[69]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            70,
+            f_Overlaps_insert_spec_1_20d9577d14(
+              _frame[0],
+              _frame[1],
+              _frame[6],
+            ),
+          );
+          _frame.set(71, LeanScalar("nat", "1"));
+          leanTag(_frame[7]) match {
+          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+            _frame.set(72, leanField(_frame[7], 0));
+            _ = leanField(_frame[7], 1);
+            _ = leanField(_frame[7], 2);
+            _ = leanField(_frame[7], 3);
+            _ = leanField(_frame[7], 4);
+            leanTag(_frame[70]) match {
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+              _frame.set(73, leanField(_frame[70], 0));
+              _frame.set(74, leanField(_frame[70], 1));
+              _frame.set(75, leanField(_frame[70], 2));
+              _frame.set(76, leanField(_frame[70], 3));
+              _frame.set(77, leanField(_frame[70], 4));
+              _frame.set(78, LeanScalar("nat", "3"));
+              _frame.set(
+                79,
+                L4_Init_Prelude.f_Nat_mul_8d6effc865(_frame[78], _frame[72]),
+              );
+              _frame.set(
+                80,
+                L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[79], _frame[73]),
+              );
+              leanTag(_frame[80]) match {
+              | "[\"Bool\",\"false\"]" ->
+                _frame.set(
+                  81,
+                  L4_Init_Prelude.f_Nat_add_86990f4822(_frame[71], _frame[73]),
+                );
+                _frame.set(
+                  82,
+                  L4_Init_Prelude.f_Nat_add_86990f4822(_frame[81], _frame[72]),
+                );
+                _frame.set(
+                  83,
+                  LeanCtor(
+                    "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                    Array[
+                      _frame[82],
+                      _frame[4],
+                      _frame[5],
+                      _frame[70],
+                      _frame[7],
+                    ],
+                  ),
+                );
+                return _frame[83]
+              | "[\"Bool\",\"true\"]" ->
+                leanTag(_frame[76]) match {
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  _frame.set(84, leanField(_frame[76], 0));
+                  _ = leanField(_frame[76], 1);
+                  _ = leanField(_frame[76], 2);
+                  _ = leanField(_frame[76], 3);
+                  _ = leanField(_frame[76], 4);
+                  leanTag(_frame[77]) match {
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                    _frame.set(85, leanField(_frame[77], 0));
+                    _frame.set(86, leanField(_frame[77], 1));
+                    _frame.set(87, leanField(_frame[77], 2));
+                    _frame.set(88, leanField(_frame[77], 3));
+                    _frame.set(89, leanField(_frame[77], 4));
+                    _frame.set(90, LeanScalar("nat", "2"));
+                    _frame.set(
+                      91,
+                      L4_Init_Prelude.f_Nat_mul_8d6effc865(
+                        _frame[90],
+                        _frame[84],
+                      ),
+                    );
+                    _frame.set(
+                      92,
+                      L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                        _frame[85],
+                        _frame[91],
+                      ),
+                    );
+                    leanTag(_frame[92]) match {
+                    | "[\"Bool\",\"false\"]" ->
+                      _frame.set(
+                        93,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[71],
+                          _frame[73],
+                        ),
+                      );
+                      _frame.set(
+                        94,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[93],
+                          _frame[72],
+                        ),
+                      );
+                      _frame.set(
+                        101,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[71],
+                          _frame[84],
+                        ),
+                      );
+                      leanTag(_frame[88]) match {
+                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                        _frame.set(108, leanField(_frame[88], 0));
+                        _ = leanField(_frame[88], 1);
+                        _ = leanField(_frame[88], 2);
+                        _ = leanField(_frame[88], 3);
+                        _ = leanField(_frame[88], 4);
+                        _jump0 = _frame[108];
+                        _frame.set(102, _jump0);
+                        !pc = 4;
+                        void
+                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                        _frame.set(109, LeanScalar("nat", "0"));
+                        _jump0 = _frame[109];
+                        _frame.set(102, _jump0);
+                        !pc = 4;
+                        void
+                      | _ -> return leanFail("non-exhaustive Lean case")
+                      }
+                    | "[\"Bool\",\"true\"]" ->
+                      _frame.set(
+                        110,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[71],
+                          _frame[73],
+                        ),
+                      );
+                      _frame.set(
+                        111,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[110],
+                          _frame[72],
+                        ),
+                      );
+                      _frame.set(
+                        112,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[71],
+                          _frame[72],
+                        ),
+                      );
+                      _frame.set(
+                        113,
+                        L4_Init_Prelude.f_Nat_add_86990f4822(
+                          _frame[112],
+                          _frame[85],
+                        ),
+                      );
+                      _frame.set(
+                        114,
+                        LeanCtor(
+                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          Array[
+                            _frame[113],
+                            _frame[4],
+                            _frame[5],
+                            _frame[77],
+                            _frame[7],
+                          ],
+                        ),
+                      );
+                      _frame.set(
+                        115,
+                        LeanCtor(
+                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          Array[
+                            _frame[111],
+                            _frame[74],
+                            _frame[75],
+                            _frame[76],
+                            _frame[114],
+                          ],
+                        ),
+                      );
+                      return _frame[115]
+                    | _ -> return leanFail("non-exhaustive Lean case")
+                    }
+                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                    return leanFail(
+                      "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                    )
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  return leanFail(
+                    "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                  )
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+              return leanFail(
+                "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+              )
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+            leanTag(_frame[70]) match {
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+              _ = leanField(_frame[70], 0);
+              _frame.set(116, leanField(_frame[70], 1));
+              _frame.set(117, leanField(_frame[70], 2));
+              _frame.set(118, leanField(_frame[70], 3));
+              _frame.set(119, leanField(_frame[70], 4));
+              leanTag(_frame[118]) match {
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                _ = leanField(_frame[118], 0);
+                _ = leanField(_frame[118], 1);
+                _ = leanField(_frame[118], 2);
+                _ = leanField(_frame[118], 3);
+                _ = leanField(_frame[118], 4);
+                leanTag(_frame[119]) match {
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  _ = leanField(_frame[119], 0);
+                  _ = leanField(_frame[119], 1);
+                  _ = leanField(_frame[119], 2);
+                  _ = leanField(_frame[119], 3);
+                  _ = leanField(_frame[119], 4);
+                  return leanFail(
+                    "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+                  )
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  _frame.set(120, LeanScalar("nat", "3"));
+                  _frame.set(
+                    121,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[71],
+                        _frame[4],
+                        _frame[5],
+                        _frame[119],
+                        _frame[119],
+                      ],
+                    ),
+                  );
+                  _frame.set(
+                    122,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[120],
+                        _frame[116],
+                        _frame[117],
+                        _frame[118],
+                        _frame[121],
+                      ],
+                    ),
+                  );
+                  return _frame[122]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                leanTag(_frame[119]) match {
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  _ = leanField(_frame[119], 0);
+                  _frame.set(123, leanField(_frame[119], 1));
+                  _frame.set(124, leanField(_frame[119], 2));
+                  _ = leanField(_frame[119], 3);
+                  _ = leanField(_frame[119], 4);
+                  _frame.set(125, LeanScalar("nat", "3"));
+                  _frame.set(
+                    126,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[71],
+                        _frame[116],
+                        _frame[117],
+                        _frame[118],
+                        _frame[118],
+                      ],
+                    ),
+                  );
+                  _frame.set(
+                    127,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[71],
+                        _frame[4],
+                        _frame[5],
+                        _frame[118],
+                        _frame[118],
+                      ],
+                    ),
+                  );
+                  _frame.set(
+                    128,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[125],
+                        _frame[123],
+                        _frame[124],
+                        _frame[126],
+                        _frame[127],
+                      ],
+                    ),
+                  );
+                  return _frame[128]
+                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  _frame.set(129, LeanScalar("nat", "2"));
+                  _frame.set(
+                    130,
+                    LeanCtor(
+                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      Array[
+                        _frame[129],
+                        _frame[4],
+                        _frame[5],
+                        _frame[70],
+                        _frame[119],
+                      ],
+                    ),
+                  );
+                  return _frame[130]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+              return leanFail(
+                "unreachable: Std.DTreeMap.Internal.Impl.insert._at_.Lean.Meta.Match.Overlaps.insert.spec_1._redArg",
+              )
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+        _frame.set(131, LeanScalar("nat", "1"));
+        _frame.set(
+          132,
+          LeanCtor(
+            "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+            Array[_frame[131], _frame[0], _frame[1], _frame[2], _frame[2]],
+          ),
+        );
+        return _frame[132]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        38,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[35], _frame[37]),
+      );
+      _frame.set(
+        39,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[38], _frame[14], _frame[15], _frame[28], _frame[17]],
+        ),
+      );
+      _frame.set(
+        40,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[34], _frame[25], _frame[26], _frame[36], _frame[39]],
+        ),
+      );
+      return _frame[40]
+    | 2 ->
+      _frame.set(
+        42,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[33], _frame[41]),
+      );
+      _frame.set(
+        43,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[42], _frame[4], _frame[5], _frame[6], _frame[27]],
+        ),
+      );
+      _frame.set(
+        44,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[11], _frame[29]),
+      );
+      leanTag(_frame[28]) match {
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+        _frame.set(45, leanField(_frame[28], 0));
+        _ = leanField(_frame[28], 1);
+        _ = leanField(_frame[28], 2);
+        _ = leanField(_frame[28], 3);
+        _ = leanField(_frame[28], 4);
+        _jump0 = _frame[44];
+        _jump1 = _frame[43];
+        _jump2 = _frame[45];
+        _frame.set(35, _jump0);
+        _frame.set(36, _jump1);
+        _frame.set(37, _jump2);
+        !pc = 1;
+        void
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+        _frame.set(46, LeanScalar("nat", "0"));
+        _jump0 = _frame[44];
+        _jump1 = _frame[43];
+        _jump2 = _frame[46];
+        _frame.set(35, _jump0);
+        _frame.set(36, _jump1);
+        _frame.set(37, _jump2);
+        !pc = 1;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 3 ->
+      _frame.set(
+        98,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[96], _frame[97]),
+      );
+      _frame.set(
+        99,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[98], _frame[4], _frame[5], _frame[89], _frame[7]],
+        ),
+      );
+      _frame.set(
+        100,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[94], _frame[86], _frame[87], _frame[95], _frame[99]],
+        ),
+      );
+      return _frame[100]
+    | 4 ->
+      _frame.set(
+        103,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[101], _frame[102]),
+      );
+      _frame.set(
+        104,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          Array[_frame[103], _frame[74], _frame[75], _frame[76], _frame[88]],
+        ),
+      );
+      _frame.set(
+        105,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[71], _frame[72]),
+      );
+      leanTag(_frame[89]) match {
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+        _frame.set(106, leanField(_frame[89], 0));
+        _ = leanField(_frame[89], 1);
+        _ = leanField(_frame[89], 2);
+        _ = leanField(_frame[89], 3);
+        _ = leanField(_frame[89], 4);
+        _jump0 = _frame[104];
+        _jump1 = _frame[105];
+        _jump2 = _frame[106];
+        _frame.set(95, _jump0);
+        _frame.set(96, _jump1);
+        _frame.set(97, _jump2);
+        !pc = 3;
+        void
+      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+        _frame.set(107, LeanScalar("nat", "0"));
+        _jump0 = _frame[104];
+        _jump1 = _frame[105];
+        _jump2 = _frame[107];
+        _frame.set(95, _jump0);
+        _frame.set(96, _jump1);
+        _frame.set(97, _jump2);
+        !pc = 3;
+        void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Std.DTreeMap.Internal.Impl.contains._at_.Lean.Meta.Match.Overlaps.insert.spec_0._redArg"
+fun f_Overlaps_insert_spec_0_36df112749(
+  _k_0: LeanValue,
+  _t_1: LeanValue,
+): LeanValue {
+  leanTag(_t_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_1_2: LeanValue = leanField(_t_1, 0);
+    _k_2_3: LeanValue = leanField(_t_1, 1);
+    _v_3_4: LeanValue = leanField(_t_1, 2);
+    _l_4_5: LeanValue = leanField(_t_1, 3);
+    _r_5_6: LeanValue = leanField(_t_1, 4);
+    _x_6_7: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_k_0, _k_2_3);
+    leanTag(_x_6_7) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_7_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_k_0, _k_2_3);
+      leanTag(_x_7_8) match {
+      | "[\"Bool\",\"false\"]" ->
+        f_Overlaps_insert_spec_0_36df112749(_k_0, _r_5_6)
+      | "[\"Bool\",\"true\"]" -> _x_7_8
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" -> f_Overlaps_insert_spec_0_36df112749(_k_0, _l_4_5)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+    LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.isMatcherAppCore?"
+fun f_Lean_Meta_isMatcherAppCore_1cbda10bbf(
+  _env_0: LeanValue,
+  _e_1: LeanValue,
+): LeanValue {
+  _fn_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_e_1);
+  _x_1_3: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConst_c54d56be4f(_fn_2);
+  leanTag(_x_1_3) match {
+  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_5: LeanValue = L4_Lean_Expr.f_Lean_Expr_constName_a0c6339167(_fn_2);
+    _x_4_6: LeanValue = f_Match_Extension_getMatcherInfo_61f2fbaa36(
+      _env_0,
+      _x_3_5,
+    );
+    leanTag(_x_4_6) match {
+    | "[\"Option\",\"some\"]" ->
+      _val_5_7: LeanValue = leanField(_x_4_6, 0);
+      _x_6_8: LeanValue = f_Match_MatcherInfo_arity_e4534e7d23(_val_5_7);
+      _x_7_9: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+        _e_1,
+      );
+      _x_8_10: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+        _x_6_8,
+        _x_7_9,
+      );
+      leanTag(_x_8_10) match {
+      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | "[\"Bool\",\"true\"]" -> _x_4_6
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1._redArg"
+fun f_addEntry_spec_0_spec_1_943ea4c8c2(
+  _m_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _b_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_m_0, 1=_a_1, 2=_b_2, 3=_size_1_3, 4=_buckets_2_4, 5=_x_3_5, 6=_y_5_6, 7=_x_6_7, 8=_x_7_8, 9=_fold_9, 10=_x_8_10, 11=_x_9_11, 12=_x_10_12, 13=_x_11_13, 14=_x_12_14, 15=_x_13_15, 16=_x_14_16, 17=_x_15_17, 18=_bkt_18, 19=_x_16_19, 20=_x_17_20, 21=_size_21, 22=_x_18_22, 23=_buckets_23, 24=_x_19_24, 25=_x_20_25, 26=_x_21_26, 27=_x_22_27, 28=_x_23_28, 29=_x_24_29, 30=_val_25_30, 31=_x_26_31, 32=_x_27_32, 33=_x_28_33, 34=_buckets_34, 35=_x_29_35, 36=_x_30_36, 37=_x_31_37, 38=_hash_38, 39=_hash_41, 40=_x_32_44
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    41,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _m_0_input);
+  _frame.set(1, _a_1_input);
+  _frame.set(2, _b_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+        _frame.set(3, leanField(_frame[0], 0));
+        _frame.set(4, leanField(_frame[0], 1));
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[4]),
+        );
+        leanTag(_frame[1]) match {
+        | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+          _frame.set(40, LeanScalar("uint64", "1723"));
+          _jump0 = _frame[40];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+          _frame.set(38, leanField(_frame[1], 0));
+          _ = leanField(_frame[1], 1);
+          _ = leanField(_frame[1], 2);
+          _jump0 = _frame[38];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+          _frame.set(39, leanField(_frame[1], 0));
+          _ = leanField(_frame[1], 1);
+          _ = leanField(_frame[1], 2);
+          _jump0 = _frame[39];
+          _frame.set(6, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(7, LeanScalar("uint64", "32"));
+      _frame.set(
+        8,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[6],
+          _frame[7],
+        ),
+      );
+      _frame.set(
+        9,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[6], _frame[8]),
+      );
+      _frame.set(10, LeanScalar("uint64", "16"));
+      _frame.set(
+        11,
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          _frame[9],
+          _frame[10],
+        ),
+      );
+      _frame.set(
+        12,
+        L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[9], _frame[11]),
+      );
+      _frame.set(
+        13,
+        L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(_frame[12]),
+      );
+      _frame.set(
+        14,
+        L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_frame[5]),
+      );
+      _frame.set(15, LeanScalar("usize", "1"));
+      _frame.set(
+        16,
+        L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+          _frame[14],
+          _frame[15],
+        ),
+      );
+      _frame.set(
+        17,
+        L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(_frame[13], _frame[16]),
+      );
+      _frame.set(
+        18,
+        L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+          LeanErased(),
+          _frame[4],
+          _frame[17],
+          LeanErased(),
+        ),
+      );
+      _frame.set(19, f_spec_0_spec_1_spec_3_da9d047514(_frame[1], _frame[18]));
+      leanTag(_frame[19]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(20, LeanScalar("nat", "1"));
+        _frame.set(
+          21,
+          L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[20]),
+        );
+        _frame.set(
+          22,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+            Array[_frame[1], _frame[2], _frame[18]],
+          ),
+        );
+        _frame.set(
+          23,
+          L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+            LeanErased(),
+            _frame[4],
+            _frame[17],
+            _frame[22],
+            LeanErased(),
+          ),
+        );
+        _frame.set(24, LeanScalar("nat", "4"));
+        _frame.set(
+          25,
+          L4_Init_Prelude.f_Nat_mul_8d6effc865(_frame[21], _frame[24]),
+        );
+        _frame.set(26, LeanScalar("nat", "3"));
+        _frame.set(
+          27,
+          L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[25], _frame[26]),
+        );
+        _frame.set(
+          28,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[23]),
+        );
+        _frame.set(
+          29,
+          L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[27], _frame[28]),
+        );
+        leanTag(_frame[29]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(30, f_spec_0_spec_1_spec_4_b1a9c0f9e0(_frame[23]));
+          _frame.set(
+            31,
+            LeanCtor(
+              "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+              Array[_frame[21], _frame[30]],
+            ),
+          );
+          return _frame[31]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            32,
+            LeanCtor(
+              "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+              Array[_frame[21], _frame[23]],
+            ),
+          );
+          return _frame[32]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          33,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            Array[],
+          ),
+        );
+        _frame.set(
+          34,
+          L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+            LeanErased(),
+            _frame[4],
+            _frame[17],
+            _frame[33],
+            LeanErased(),
+          ),
+        );
+        _frame.set(
+          35,
+          f_spec_0_spec_1_spec_5_df43642102(_frame[1], _frame[2], _frame[18]),
+        );
+        _frame.set(
+          36,
+          L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+            LeanErased(),
+            _frame[34],
+            _frame[17],
+            _frame[35],
+            LeanErased(),
+          ),
+        );
+        _frame.set(
+          37,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+            Array[_frame[3], _frame[36]],
+          ),
+        );
+        return _frame[37]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0.spec_0.spec_1._redArg"
+fun f_spec_0_spec_0_spec_1_547888cb49(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+    _es_4_3: LeanValue = leanField(_x_1_0, 0);
+    _x_7_9: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_2_1,
+      LeanScalar("usize", "31"),
+    );
+    _j_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(
+      _x_7_9,
+    );
+    _x_8_11: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      LeanErased(),
+      LeanCtor("[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]", Array[]),
+      _es_4_3,
+      _j_10,
+    );
+    leanTag(_x_8_11) match {
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]" ->
+      _key_9_12: LeanValue = leanField(_x_8_11, 0);
+      _val_10_13: LeanValue = leanField(_x_8_11, 1);
+      _x_11_15: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+        _x_3_2,
+        _key_9_12,
+      );
+      leanTag(_x_11_15) match {
+      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor("[\"Option\",\"some\"]", Array[_val_10_13])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]" ->
+      _node_14_14: LeanValue = leanField(_x_8_11, 0);
+      _x_16_19: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+        _x_2_1,
+        LeanScalar("usize", "5"),
+      );
+      f_spec_0_spec_0_spec_1_547888cb49(_node_14_14, _x_16_19, _x_3_2)
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]" ->
+      LeanCtor("[\"Option\",\"none\"]", Array[])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+    _ks_19_4: LeanValue = leanField(_x_1_0, 0);
+    _vs_20_5: LeanValue = leanField(_x_1_0, 1);
+    _h_21_6: LeanValue = leanField(_x_1_0, 2);
+    f_spec_0_spec_1_spec_2_b794a5096d(
+      _ks_19_4,
+      _vs_20_5,
+      LeanScalar("nat", "0"),
+      _x_3_2,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.markMatcherLike"
+fun f_Lean_Meta_markMatcherLike_46c316181d(
+  _env_0: LeanValue,
+  _declName_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = leanFail(
+    "module initialization required: Lean.Meta.matcherLikeExt",
+  );
+  L4_Lean_EnvExtension.f_Lean_TagDeclarationExtension_tag_c6375041f3(
+    _x_1_2,
+    _env_0,
+    _declName_1,
+  )
+}
+// "Lean.PersistentHashMap.insertAtCollisionNode._at_.Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1.spec_2._redArg"
+fun f_spec_0_spec_1_spec_2_cb5a3a11a7(
+  _n_0: LeanValue,
+  _k_1: LeanValue,
+  _v_2: LeanValue,
+): LeanValue {
+  f_spec_1_spec_2_spec_4_d98e65f73d(_n_0, LeanScalar("nat", "0"), _k_1, _v_2)
+}
+// "_private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn._lam_2._@.Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2"
+fun f_MatcherInfo_hygCtx_hyg_a5799ceba8(_es_0: LeanValue): LeanValue {
+  _x_5_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    LeanScalar("nat", "16"),
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  _x_7_7: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+    LeanErased(),
+  );
+  _x_9_9: LeanValue = LeanCtor(
+    "[\"Lean\",\"SMap\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+        Array[LeanScalar("nat", "0"), _x_5_5],
+      ),
+      LeanCtor(
+        "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+        Array[_x_7_7],
+      ),
+    ],
+  );
+  _x_10_10: LeanValue = f_hygCtx_hyg_spec_1_bfb9a5a690(_x_9_9, _es_0);
+  f_State_switch_spec_0_215459d5b6(_x_10_10)
+}
+fun apply_f_MatcherInfo_hygCtx_hyg_a5799ceba8(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_MatcherInfo_hygCtx_hyg_a5799ceba8(_args[0])
+}
+// "Std.DHashMap.Internal.AssocList.Const.alter._at_.Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2.spec_4._lam_0"
+fun f_spec_2_spec_4_lam_0_7efdd1bfaa(
+  _overlapping_0: LeanValue,
+  _s_1: LeanValue,
+): LeanValue {
+  _joined: Array<LeanValue> = {
+    leanTag(_s_1) match {
+    | "[\"Option\",\"none\"]" ->
+      Array[
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+          Array[],
+        ),
+      ]
+    | "[\"Option\",\"some\"]" ->
+      _val_9_8: LeanValue = leanField(_s_1, 0);
+      Array[_val_9_8]
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  _y_2_2: LeanValue = _joined[0];
+  _x_3_3: LeanValue = f_Overlaps_insert_spec_0_36df112749(
+    _overlapping_0,
+    _y_2_2,
+  );
+  leanTag(_x_3_3) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_5_5: LeanValue = f_Overlaps_insert_spec_1_20d9577d14(
+      _overlapping_0,
+      LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+      _y_2_2,
+    );
+    LeanCtor("[\"Option\",\"some\"]", Array[_x_5_5])
+  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_y_2_2])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Extension.addMatcherInfo"
+fun f_Match_Extension_addMatcherInfo_c6808cf377(
+  _env_0: LeanValue,
+  _matcherName_1: LeanValue,
+  _info_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = leanFail(
+    "module initialization required: Lean.Meta.Match.Extension.extension",
+  );
+  leanTag(_x_1_3) match {
+  | "[\"Lean\",\"PersistentEnvExtension\",\"mk\"]" ->
+    _toEnvExtension_4: LeanValue = leanField(_x_1_3, 0);
+    _name_5: LeanValue = leanField(_x_1_3, 1);
+    _addImportedFn_6: LeanValue = leanField(_x_1_3, 2);
+    _addEntryFn_7: LeanValue = leanField(_x_1_3, 3);
+    _exportEntriesFn_8: LeanValue = leanField(_x_1_3, 4);
+    _statsFn_9: LeanValue = leanField(_x_1_3, 5);
+    leanTag(_toEnvExtension_4) match {
+    | "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvExtension\",\"mk\"]" ->
+      _idx_10: LeanValue = leanField(_toEnvExtension_4, 0);
+      _mkInitial_11: LeanValue = leanField(_toEnvExtension_4, 1);
+      _asyncMode_12: LeanValue = leanField(_toEnvExtension_4, 2);
+      _replay_13: LeanValue = leanField(_toEnvExtension_4, 3);
+      _name_14: LeanValue = leanField(_toEnvExtension_4, 4);
+      _genIdx_15: LeanValue = leanField(_toEnvExtension_4, 5);
+      _logWrites_16: LeanValue = leanField(_toEnvExtension_4, 6);
+      _f_3_18: LeanValue = LeanClosure(
+        L4_Lean_Meta_Match_MatcherInfo
+          .apply_f_Extension_addMatcherInfo_lam_0_cffeaa140b,
+        3,
+        Array[
+          _addEntryFn_7,
+          LeanCtor(
+            "[\"Lean\",\"Meta\",\"Match\",\"Extension\",\"Entry\",\"mk\"]",
+            Array[_matcherName_1, _info_2],
+          ),
+        ],
+      );
+      _x_4_19: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      leanTag(_logWrites_16) match {
+      | "[\"Bool\",\"false\"]" ->
+        L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_cf88bc20c9(
+          LeanErased(),
+          _toEnvExtension_4,
+          _env_0,
+          _f_3_18,
+          _asyncMode_12,
+          _matcherName_1,
+          _x_4_19,
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _x_6_21: LeanValue = L4_Lean_Environment.f_Lean_Environment_logDeclChange_ccaf3c342f(
+          _env_0,
+          _matcherName_1,
+        );
+        L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_cf88bc20c9(
+          LeanErased(),
+          _toEnvExtension_4,
+          _x_6_21,
+          _f_3_18,
+          _asyncMode_12,
+          _matcherName_1,
+          _x_4_19,
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.isMatcherAppCore"
+fun f_Lean_Meta_isMatcherAppCore_7230213c5a(
+  _env_0: LeanValue,
+  _e_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = f_Lean_Meta_isMatcherAppCore_1cbda10bbf(_env_0, _e_1);
+  leanTag(_x_1_2) match {
+  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Option\",\"some\"]" ->
+    _val_3_3: LeanValue = leanField(_x_1_2, 0);
+    LeanCtor("[\"Bool\",\"true\"]", Array[])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.Const.alter._at_.Lean.Meta.Match.Overlaps.insert.spec_2"
+fun f_Overlaps_insert_spec_2_97bf265bb5(
+  _overlapping_0_input: LeanValue,
+  _m_1_input: LeanValue,
+  _a_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_overlapping_0, 1=_m_1, 2=_a_2, 3=_size_1_3, 4=_buckets_2_4, 5=_x_3_5, 6=_x_4_6, 7=_x_5_7, 8=_x_6_8, 9=_fold_9, 10=_x_7_10, 11=_x_8_11, 12=_x_9_12, 13=_x_10_13, 14=_x_11_14, 15=_x_12_15, 16=_x_13_16, 17=_x_14_17, 18=_bkt_18, 19=_y_16_19, 20=_x_17_20, 21=_size_21, 22=_x_18_22, 23=_buckets_23, 24=_x_19_24, 25=_x_20_25, 26=_x_21_26, 27=_x_22_27, 28=_x_23_28, 29=_x_24_29, 30=_val_25_30, 31=_x_26_31, 32=_x_27_32, 33=_x_28_33, 34=_x_29_34, 35=_x_30_35, 36=_x_31_36, 37=_x_32_37, 38=_x_33_38, 39=_buckets_39, 40=_bkt_40, 41=_y_35_41, 42=_x_36_42, 43=_x_37_43, 44=_x_38_44, 45=_x_39_45, 46=_x_40_46
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    47,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _overlapping_0_input);
+  _frame.set(1, _m_1_input);
+  _frame.set(2, _a_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+        _frame.set(3, leanField(_frame[1], 0));
+        _frame.set(4, leanField(_frame[1], 1));
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[4]),
+        );
+        _frame.set(
+          6,
+          L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(_frame[2]),
+        );
+        _frame.set(7, LeanScalar("uint64", "32"));
+        _frame.set(
+          8,
+          L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+            _frame[6],
+            _frame[7],
+          ),
+        );
+        _frame.set(
+          9,
+          L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(_frame[6], _frame[8]),
+        );
+        _frame.set(10, LeanScalar("uint64", "16"));
+        _frame.set(
+          11,
+          L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+            _frame[9],
+            _frame[10],
+          ),
+        );
+        _frame.set(
+          12,
+          L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+            _frame[9],
+            _frame[11],
+          ),
+        );
+        _frame.set(
+          13,
+          L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(_frame[12]),
+        );
+        _frame.set(
+          14,
+          L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_frame[5]),
+        );
+        _frame.set(15, LeanScalar("usize", "1"));
+        _frame.set(
+          16,
+          L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+            _frame[14],
+            _frame[15],
+          ),
+        );
+        _frame.set(
+          17,
+          L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+            _frame[13],
+            _frame[16],
+          ),
+        );
+        _frame.set(
+          18,
+          L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            LeanErased(),
+            _frame[4],
+            _frame[17],
+            LeanErased(),
+          ),
+        );
+        _frame.set(
+          33,
+          f_insert_spec_2_spec_2_76af510053(_frame[2], _frame[18]),
+        );
+        leanTag(_frame[33]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            34,
+            LeanCtor(
+              "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+              Array[],
+            ),
+          );
+          _frame.set(
+            35,
+            f_Overlaps_insert_spec_0_36df112749(_frame[0], _frame[34]),
+          );
+          leanTag(_frame[35]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(36, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+            _frame.set(
+              37,
+              f_Overlaps_insert_spec_1_20d9577d14(
+                _frame[0],
+                _frame[36],
+                _frame[34],
+              ),
+            );
+            _jump0 = _frame[37];
+            _frame.set(19, _jump0);
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _jump0 = _frame[34];
+            _frame.set(19, _jump0);
+            !pc = 1;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            38,
+            LeanCtor(
+              "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+              Array[],
+            ),
+          );
+          _frame.set(
+            39,
+            L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+              LeanErased(),
+              _frame[4],
+              _frame[17],
+              _frame[38],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            40,
+            f_insert_spec_2_spec_4_5903b6c7e3(_frame[0], _frame[2], _frame[18]),
+          );
+          _frame.set(
+            44,
+            f_insert_spec_2_spec_2_76af510053(_frame[2], _frame[40]),
+          );
+          leanTag(_frame[44]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(45, LeanScalar("nat", "1"));
+            _frame.set(
+              46,
+              L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[3], _frame[45]),
+            );
+            _jump0 = _frame[46];
+            _frame.set(41, _jump0);
+            !pc = 2;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _jump0 = _frame[3];
+            _frame.set(41, _jump0);
+            !pc = 2;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(20, LeanScalar("nat", "1"));
+      _frame.set(
+        21,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[20]),
+      );
+      _frame.set(
+        22,
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+          Array[_frame[2], _frame[19], _frame[18]],
+        ),
+      );
+      _frame.set(
+        23,
+        L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+          LeanErased(),
+          _frame[4],
+          _frame[17],
+          _frame[22],
+          LeanErased(),
+        ),
+      );
+      _frame.set(24, LeanScalar("nat", "4"));
+      _frame.set(
+        25,
+        L4_Init_Prelude.f_Nat_mul_8d6effc865(_frame[21], _frame[24]),
+      );
+      _frame.set(26, LeanScalar("nat", "3"));
+      _frame.set(
+        27,
+        L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[25], _frame[26]),
+      );
+      _frame.set(
+        28,
+        L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[23]),
+      );
+      _frame.set(
+        29,
+        L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[27], _frame[28]),
+      );
+      leanTag(_frame[29]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(30, f_insert_spec_2_spec_3_8434339f42(_frame[23]));
+        _frame.set(
+          31,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+            Array[_frame[21], _frame[30]],
+          ),
+        );
+        return _frame[31]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          32,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+            Array[_frame[21], _frame[23]],
+          ),
+        );
+        return _frame[32]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 2 ->
+      _frame.set(
+        42,
+        L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+          LeanErased(),
+          _frame[39],
+          _frame[17],
+          _frame[40],
+          LeanErased(),
+        ),
+      );
+      _frame.set(
+        43,
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+          Array[_frame[41], _frame[42]],
+        ),
+      );
+      return _frame[43]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.Match.getNumEqsFromDiscrInfos"
+fun f_Meta_Match_getNumEqsFromDiscrInfos_d2d23554bd(
+  _infos_0: LeanValue,
+): LeanValue {
+  _sz_2: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+    LeanErased(),
+    _infos_0,
+  );
+  f_Match_getNumEqsFromDiscrInfos_spec_0_d3d8b82f52(
+    _infos_0,
+    _sz_2,
+    LeanScalar("usize", "0"),
+    LeanScalar("nat", "0"),
+  )
+}
+// "Lean.Meta.Match.MatcherInfo.getDiscrRange"
+fun f_Match_MatcherInfo_getDiscrRange_9f8ebcaa07(
+  _info_0: LeanValue,
+): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    _x_1_7: LeanValue = f_Match_MatcherInfo_getFirstDiscrPos_3cd33ff67c(
+      _info_0,
+    );
+    _x_2_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _x_1_7,
+      _numDiscrs_2,
+    );
+    LeanCtor("[\"Std\",\"Rco\",\"mk\"]", Array[_x_1_7, _x_2_8])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.mkStateFromImportedEntries._at_._private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn.«_@».Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2.spec_1.spec_1"
+fun f_hyg_spec_1_spec_1_db8e864e25(
+  _as_0: LeanValue,
+  _i_1: LeanValue,
+  _stop_2: LeanValue,
+  _b_3: LeanValue,
+): LeanValue {
+  _x_1_4: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_i_1, _stop_2);
+  leanTag(_x_1_4) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _as_0,
+      _i_1,
+      LeanErased(),
+    );
+    _x_3_6: LeanValue = f_Extension_State_addEntry_f20cd9047b(_b_3, _x_2_5);
+    _x_5_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+      _i_1,
+      LeanScalar("usize", "1"),
+    );
+    f_hyg_spec_1_spec_1_db8e864e25(_as_0, _x_5_8, _stop_2, _x_3_6)
+  | "[\"Bool\",\"true\"]" -> _b_3
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.Meta.Match.Overlaps.overlapping.spec_0._redArg"
+fun f_Overlaps_overlapping_spec_0_ec3923a44f(
+  _m_0: LeanValue,
+  _a_1: LeanValue,
+): LeanValue {
+  leanTag(_m_0) match {
+  | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+    _size_1_2: LeanValue = leanField(_m_0, 0);
+    _buckets_2_3: LeanValue = leanField(_m_0, 1);
+    _x_3_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _buckets_2_3,
+    );
+    _x_4_5: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _a_1,
+    );
+    _x_6_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _x_4_5,
+      LeanScalar("uint64", "32"),
+    );
+    _fold_8: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _x_4_5,
+      _x_6_7,
+    );
+    _x_8_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _fold_8,
+      LeanScalar("uint64", "16"),
+    );
+    _x_9_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _fold_8,
+      _x_8_10,
+    );
+    _x_10_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_9_11,
+    );
+    _x_11_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_3_4,
+    );
+    _x_13_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _x_11_13,
+      LeanScalar("usize", "1"),
+    );
+    _x_14_16: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_10_12,
+      _x_13_15,
+    );
+    _x_15_17: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _buckets_2_3,
+      _x_14_16,
+      LeanErased(),
+    );
+    f_overlapping_spec_0_spec_0_743402fae7(_a_1, _x_15_17)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.instInhabitedAltParamInfo.default"
+fun f_Match_instInhabitedAltParamInfo_default_29c4e480ea(): LeanValue {
+  _x_1_0: LeanValue = LeanScalar("nat", "0");
+  LeanCtor(
+    "[\"Lean\",\"Meta\",\"Match\",\"AltParamInfo\",\"mk\"]",
+    Array[_x_1_0, _x_1_0, LeanCtor("[\"Bool\",\"false\"]", Array[])],
+  )
+}
+// "Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0._redArg"
+fun f_addEntry_spec_0_spec_0_b40e910f81(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+): LeanValue {
+  _joined: Array<LeanValue> = {
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+      Array[LeanScalar("uint64", "1723")]
+    | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+      _hash_7: LeanValue = leanField(_x_2_1, 0);
+      _pre_8: LeanValue = leanField(_x_2_1, 1);
+      _str_9: LeanValue = leanField(_x_2_1, 2);
+      Array[_hash_7]
+    | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+      _hash_10: LeanValue = leanField(_x_2_1, 0);
+      _pre_11: LeanValue = leanField(_x_2_1, 1);
+      _i_12: LeanValue = leanField(_x_2_1, 2);
+      Array[_hash_10]
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  _y_5_3: LeanValue = _joined[0];
+  _x_6_4: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+    _y_5_3,
+  );
+  f_spec_0_spec_0_spec_1_d1b5ee11ae(
+    _x_1_0,
+    _x_6_4,
+    LeanScalar("usize", "1"),
+    _x_2_1,
+    _x_3_2,
+  )
+}
+// "Lean.Meta.getMatcherInfo?._redArg._lam_0"
+fun f_Meta_getMatcherInfo_lam_0_94d5a9a9a8(
+  _declName_0: LeanValue,
+  _toPure_1: LeanValue,
+  _do_lift_1_2: LeanValue,
+): LeanValue {
+  _x_2_3: LeanValue = f_Match_Extension_getMatcherInfo_61f2fbaa36(
+    _do_lift_1_2,
+    _declName_0,
+  );
+  leanApply(_toPure_1, Array[LeanErased(), _x_2_3])
+}
+fun apply_f_Meta_getMatcherInfo_lam_0_94d5a9a9a8(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Meta_getMatcherInfo_lam_0_94d5a9a9a8(_args[0], _args[1], _args[2])
+}
+// "Std.DHashMap.Internal.AssocList.get?._at_.Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0.spec_1.spec_3._redArg"
+fun f_spec_0_spec_1_spec_3_0f53937a3f(
+  _a_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_1_1, 0);
+    _value_4_3: LeanValue = leanField(_x_1_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_1_1, 2);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+      _key_3_2,
+      _a_0,
+    );
+    leanTag(_x_6_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      f_spec_0_spec_1_spec_3_0f53937a3f(_a_0, _tail_5_4)
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor("[\"Option\",\"some\"]", Array[_value_4_3])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.mkStateFromImportedEntries._at_._private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn.«_@».Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2.spec_1"
+fun f_hygCtx_hyg_spec_1_bfb9a5a690(
+  _initState_0: LeanValue,
+  _as_1: LeanValue,
+): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _as_1,
+  );
+  _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    LeanScalar("nat", "0"),
+    _x_2_3,
+  );
+  leanTag(_x_3_4) match {
+  | "[\"Bool\",\"false\"]" -> _initState_0
+  | "[\"Bool\",\"true\"]" ->
+    _x_5_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_2_3,
+    );
+    f_hyg_spec_1_spec_2_c643dbf619(
+      _as_1,
+      LeanScalar("usize", "0"),
+      _x_5_6,
+      _initState_0,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.instInhabitedOverlaps.default"
+fun f_Match_instInhabitedOverlaps_default_4730f69016(): LeanValue {
+  _x_4_3: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    LeanScalar("nat", "16"),
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+    Array[LeanScalar("nat", "0"), _x_4_3],
+  )
+}
+// "Std.DHashMap.Internal.AssocList.contains._at_.Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1.spec_3._redArg"
+fun f_spec_0_spec_1_spec_3_da9d047514(
+  _a_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_1_1, 0);
+    _value_4_3: LeanValue = leanField(_x_1_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_1_1, 2);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+      _key_3_2,
+      _a_0,
+    );
+    leanTag(_x_6_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      f_spec_0_spec_1_spec_3_da9d047514(_a_0, _tail_5_4)
+    | "[\"Bool\",\"true\"]" -> _x_6_6
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.SMap.find?._at_.Lean.Meta.Match.Extension.getMatcherInfo?.spec_0._redArg"
+fun f_Extension_getMatcherInfo_spec_0_efb5340daa(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"SMap\",\"mk\"]" ->
+    _stage_3_2: LeanValue = leanField(_x_1_0, 0);
+    _map_4_3: LeanValue = leanField(_x_1_0, 1);
+    _map_5_4: LeanValue = leanField(_x_1_0, 2);
+    leanTag(_stage_3_2) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_6_5: LeanValue = f_getMatcherInfo_spec_0_spec_0_2a268dc5da(
+        _map_5_4,
+        _x_2_1,
+      );
+      leanTag(_x_6_5) match {
+      | "[\"Option\",\"none\"]" ->
+        f_getMatcherInfo_spec_0_spec_1_af6c3a61be(_map_4_3, _x_2_1)
+      | "[\"Option\",\"some\"]" ->
+        _val_8_6: LeanValue = leanField(_x_6_5, 0);
+        _x_6_5
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" ->
+      f_getMatcherInfo_spec_0_spec_1_af6c3a61be(_map_4_3, _x_2_1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.MatcherInfo.getNumDiscrEqs"
+fun f_Match_MatcherInfo_getNumDiscrEqs_3aeea94885(
+  _info_0: LeanValue,
+): LeanValue {
+  leanTag(_info_0) match {
+  | "[\"Lean\",\"Meta\",\"Match\",\"MatcherInfo\",\"mk\"]" ->
+    _numParams_1: LeanValue = leanField(_info_0, 0);
+    _numDiscrs_2: LeanValue = leanField(_info_0, 1);
+    _altInfos_3: LeanValue = leanField(_info_0, 2);
+    _uElimPos_4: LeanValue = leanField(_info_0, 3);
+    _discrInfos_5: LeanValue = leanField(_info_0, 4);
+    _overlaps_6: LeanValue = leanField(_info_0, 5);
+    f_Meta_Match_getNumEqsFromDiscrInfos_d2d23554bd(_discrInfos_5)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_1.spec_4._redArg"
+fun f_spec_0_spec_1_spec_4_b1a9c0f9e0(_data_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _data_0,
+  );
+  _nbuckets_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+    _x_1_1,
+    LeanScalar("nat", "2"),
+  );
+  _x_5_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    _nbuckets_3,
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  _x_6_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_propagateMark_cb052002ff(
+    LeanErased(),
+    LeanErased(),
+    _data_0,
+    _x_5_6,
+  );
+  f_spec_1_spec_4_spec_7_df74ea2f17(LeanScalar("nat", "0"), _data_0, _x_6_7)
+}
+// "_private.Lean.Meta.Match.MatcherInfo.0.Lean.Meta.Match.Extension.initFn._lam_1._@.Lean.Meta.Match.MatcherInfo.367541193._hygCtx._hyg.2"
+fun f_MatcherInfo_hygCtx_hyg_8bd10dab66(_es_0: LeanValue): LeanValue {
+  L4_Init_Prelude.f_Array_mk_15c9e2d6d9(LeanErased(), _es_0)
+}
+fun apply_f_MatcherInfo_hygCtx_hyg_8bd10dab66(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_MatcherInfo_hygCtx_hyg_8bd10dab66(_args[0])
+}
+// "Std.DHashMap.Internal.AssocList.get?._at_.Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.Meta.Match.Overlaps.overlapping.spec_0.spec_0._redArg"
+fun f_overlapping_spec_0_spec_0_743402fae7(
+  _a_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_1_1, 0);
+    _value_4_3: LeanValue = leanField(_x_1_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_1_1, 2);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_key_3_2, _a_0);
+    leanTag(_x_6_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      f_overlapping_spec_0_spec_0_743402fae7(_a_0, _tail_5_4)
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor("[\"Option\",\"some\"]", Array[_value_4_3])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1._redArg"
+fun f_spec_0_spec_0_spec_1_d1b5ee11ae(
+  _x_1_0_input: LeanValue,
+  _x_2_1_input: LeanValue,
+  _x_3_2_input: LeanValue,
+  _x_4_3_input: LeanValue,
+  _x_5_4_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_x_1_0, 1=_x_2_1, 2=_x_3_2, 3=_x_4_3, 4=_x_5_4, 5=_es_6_5, 6=_ks_30_6, 7=_vs_31_7, 8=_x_7_9, 9=_x_8_10, 10=_j_11, 11=_x_9_12, 12=_x_10_13, 13=_v_14, 14=_x_11_15, 15=_xs_16, 16=_y_13_17, 17=_x_14_18, 18=_x_15_19, 19=_key_16_20, 20=_val_17_21, 21=_node_22_22, 22=_x_18_23, 23=_x_19_24, 24=_x_20_25, 25=_x_21_26, 26=_x_23_27, 27=_x_24_28, 28=_x_25_29, 29=_x_26_30, 30=_x_27_31, 31=_x_28_32, 32=_x_29_33, 33=_x_33_34, 34=_newNode_35, 35=_x_34_36, 36=_x_35_37, 37=_x_36_38, 38=_x_37_39, 39=_x_38_40, 40=_ks_40_42, 41=_vs_41_43, 42=_x_43_45, 43=_x_44_46, 44=_x_45_47
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    45,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _x_1_0_input);
+  _frame.set(1, _x_2_1_input);
+  _frame.set(2, _x_3_2_input);
+  _frame.set(3, _x_4_3_input);
+  _frame.set(4, _x_5_4_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+        _frame.set(5, leanField(_frame[0], 0));
+        _frame.set(8, LeanScalar("usize", "31"));
+        _frame.set(
+          9,
+          L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(_frame[1], _frame[8]),
+        );
+        _frame.set(
+          10,
+          L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(_frame[9]),
+        );
+        _frame.set(
+          11,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[5]),
+        );
+        _frame.set(
+          12,
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[10], _frame[11]),
+        );
+        leanTag(_frame[12]) match {
+        | "[\"Bool\",\"false\"]" -> return _frame[0]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            13,
+            L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+              LeanErased(),
+              _frame[5],
+              _frame[10],
+              LeanErased(),
+            ),
+          );
+          _frame.set(14, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+          _frame.set(
+            15,
+            L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+              LeanErased(),
+              _frame[5],
+              _frame[10],
+              _frame[14],
+              LeanErased(),
+            ),
+          );
+          leanTag(_frame[13]) match {
+          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]" ->
+            _frame.set(19, leanField(_frame[13], 0));
+            _frame.set(20, leanField(_frame[13], 1));
+            _frame.set(
+              22,
+              L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_frame[3], _frame[19]),
+            );
+            leanTag(_frame[22]) match {
+            | "[\"Bool\",\"false\"]" ->
+              _frame.set(
+                23,
+                L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkCollisionNode_6a9ae0c1b1(
+                  _frame[19],
+                  _frame[20],
+                  _frame[3],
+                  _frame[4],
+                ),
+              );
+              _frame.set(
+                24,
+                LeanCtor(
+                  "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]",
+                  Array[_frame[23]],
+                ),
+              );
+              _jump0 = _frame[24];
+              _frame.set(16, _jump0);
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                25,
+                LeanCtor(
+                  "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]",
+                  Array[_frame[3], _frame[4]],
+                ),
+              );
+              _jump0 = _frame[25];
+              _frame.set(16, _jump0);
+              !pc = 1;
+              void
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]" ->
+            _frame.set(21, leanField(_frame[13], 0));
+            _frame.set(26, LeanScalar("usize", "5"));
+            _frame.set(
+              27,
+              L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+                _frame[1],
+                _frame[26],
+              ),
+            );
+            _frame.set(28, LeanScalar("usize", "1"));
+            _frame.set(
+              29,
+              L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+                _frame[2],
+                _frame[28],
+              ),
+            );
+            _frame.set(
+              30,
+              f_spec_0_spec_0_spec_1_d1b5ee11ae(
+                _frame[21],
+                _frame[27],
+                _frame[29],
+                _frame[3],
+                _frame[4],
+              ),
+            );
+            _frame.set(
+              31,
+              LeanCtor(
+                "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]",
+                Array[_frame[30]],
+              ),
+            );
+            _jump0 = _frame[31];
+            _frame.set(16, _jump0);
+            !pc = 1;
+            void
+          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]" ->
+            _frame.set(
+              32,
+              LeanCtor(
+                "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]",
+                Array[_frame[3], _frame[4]],
+              ),
+            );
+            _jump0 = _frame[32];
+            _frame.set(16, _jump0);
+            !pc = 1;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+        _frame.set(6, leanField(_frame[0], 0));
+        _frame.set(7, leanField(_frame[0], 1));
+        _ = leanField(_frame[0], 2);
+        _frame.set(
+          33,
+          LeanCtor(
+            "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+            Array[_frame[6], _frame[7], LeanErased()],
+          ),
+        );
+        _frame.set(
+          34,
+          f_spec_0_spec_1_spec_2_cb5a3a11a7(_frame[33], _frame[3], _frame[4]),
+        );
+        _frame.set(35, LeanScalar("usize", "7"));
+        _frame.set(
+          36,
+          L4_Init_Data_UInt_BasicAux.f_USize_decLe_6ddbd478b6(
+            _frame[35],
+            _frame[2],
+          ),
+        );
+        leanTag(_frame[36]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            37,
+            L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_getCollisionNodeSize_4ef93619b3(
+              _frame[34],
+            ),
+          );
+          _frame.set(38, LeanScalar("nat", "4"));
+          _frame.set(
+            39,
+            L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[37], _frame[38]),
+          );
+          leanTag(_frame[39]) match {
+          | "[\"Bool\",\"false\"]" ->
+            leanTag(_frame[34]) match {
+            | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+              _ = leanField(_frame[34], 0);
+              return leanFail(
+                "unreachable: Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.SMap.insert._at_.Lean.Meta.Match.Extension.State.addEntry.spec_0.spec_0.spec_1._redArg",
+              )
+            | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+              _frame.set(40, leanField(_frame[34], 0));
+              _frame.set(41, leanField(_frame[34], 1));
+              _ = leanField(_frame[34], 2);
+              _frame.set(42, LeanScalar("nat", "0"));
+              _frame.set(
+                43,
+                L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntries_8e6ec2b40b(
+                  LeanErased(),
+                ),
+              );
+              _frame.set(
+                44,
+                f_spec_0_spec_1_spec_3_3eb39e8547(
+                  _frame[2],
+                  _frame[40],
+                  _frame[41],
+                  _frame[42],
+                  _frame[43],
+                ),
+              );
+              return _frame[44]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" -> return _frame[34]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" -> return _frame[34]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        17,
+        L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+          LeanErased(),
+          _frame[15],
+          _frame[10],
+          _frame[16],
+          LeanErased(),
+        ),
+      );
+      _frame.set(
+        18,
+        LeanCtor(
+          "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+          Array[_frame[17]],
+        ),
+      );
+      return _frame[18]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Std.DTreeMap.Internal.Impl.foldlM._at_.Std.DTreeMap.Internal.Impl.foldl._at_.Lean.Meta.Match.Overlaps.overlapping.spec_1.spec_2"
+fun f_overlapping_spec_1_spec_2_c840732d13(
+  _init_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_2: LeanValue = leanField(_x_1_1, 0);
+    _k_3_3: LeanValue = leanField(_x_1_1, 1);
+    _v_4_4: LeanValue = leanField(_x_1_1, 2);
+    _l_5_5: LeanValue = leanField(_x_1_1, 3);
+    _r_6_6: LeanValue = leanField(_x_1_1, 4);
+    _x_7_7: LeanValue = f_overlapping_spec_1_spec_2_c840732d13(_init_0, _l_5_5);
+    _x_8_8: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+      LeanErased(),
+      _x_7_7,
+      _k_3_3,
+    );
+    f_overlapping_spec_1_spec_2_c840732d13(_x_8_8, _r_6_6)
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _init_0
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Match.Extension.extension"
+fun f_Match_Extension_extension_0b726eb2aa(): LeanValue {
+  leanPrimitive("Lean.Meta.Match.Extension.extension []")
+}
+
+module end;

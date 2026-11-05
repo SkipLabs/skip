@@ -1,0 +1,3176 @@
+module L4_Lean_Meta_DiscrTree_Basic;
+
+// "Lean.Meta.DiscrTree.Key.format"
+fun f_DiscrTree_Key_format_b00418d9e4(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"star\"]" ->
+    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText("*")])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"other\"]" ->
+    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText("◾")])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"lit\"]" ->
+    _a_6_1: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_a_6_1) match {
+    | "[\"Lean\",\"Literal\",\"natVal\"]" ->
+      _val_7_13: LeanValue = leanField(_a_6_1, 0);
+      _x_8_15: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+        _val_7_13,
+      );
+      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_8_15])
+    | "[\"Lean\",\"Literal\",\"strVal\"]" ->
+      _val_10_14: LeanValue = leanField(_a_6_1, 0);
+      _x_11_17: LeanValue = L4_Init_Data_Repr.f_String_quote_e53217cacf(
+        _val_10_14,
+      );
+      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_11_17])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"fvar\"]" ->
+    _a_13_2: LeanValue = leanField(_x_1_0, 0);
+    _a_14_3: LeanValue = leanField(_x_1_0, 1);
+    _x_16_20: LeanValue = L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+      _a_13_2,
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    );
+    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_16_20])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"const\"]" ->
+    _a_18_4: LeanValue = leanField(_x_1_0, 0);
+    _a_19_5: LeanValue = leanField(_x_1_0, 1);
+    _x_21_23: LeanValue = L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+      _a_18_4,
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    );
+    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_21_23])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"arrow\"]" ->
+    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText("∀")])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"proj\"]" ->
+    _a_25_6: LeanValue = leanField(_x_1_0, 0);
+    _a_26_7: LeanValue = leanField(_x_1_0, 1);
+    _a_27_8: LeanValue = leanField(_x_1_0, 2);
+    _x_29_28: LeanValue = L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+      _a_25_6,
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    );
+    _x_33_32: LeanValue = LeanCtor(
+      "[\"Std\",\"Format\",\"append\"]",
+      Array[
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_29_28]),
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText(".")]),
+      ],
+    );
+    _x_34_33: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_a_26_7);
+    LeanCtor(
+      "[\"Std\",\"Format\",\"append\"]",
+      Array[
+        _x_33_32,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_34_33]),
+      ],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_DiscrTree_Key_format_b00418d9e4(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_Key_format_b00418d9e4(_args[0])
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg"
+fun f_Meta_DiscrTree_insertKeyValue_4d070af2df(
+  _inst_1_0: LeanValue,
+  _d_1: LeanValue,
+  _keys_2: LeanValue,
+  _v_3: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _keys_2,
+  );
+  _x_3_5: LeanValue = LeanScalar("nat", "0");
+  _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_2_4, _x_3_5);
+  leanTag(_x_4_6) match {
+  | "[\"Bool\",\"false\"]" ->
+    _f_5_7: LeanValue = LeanClosure(
+      L4_Lean_Meta_DiscrTree_Basic
+        .apply_f_DiscrTree_insertKeyValue_lam_0_3372371c9f,
+      4,
+      Array[_keys_2, _v_3, _inst_1_0],
+    );
+    _x_7_9: LeanValue = LeanClosure(
+      L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_instBEqKey_beq_5d3d2e2dd7,
+      2,
+      Array[],
+    );
+    _x_8_10: LeanValue = LeanClosure(
+      L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_Key_hash_d0f27b96fa,
+      1,
+      Array[],
+    );
+    _k_11: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      LeanErased(),
+      LeanCtor("[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"star\"]", Array[]),
+      _keys_2,
+      _x_3_5,
+    );
+    _x_9_12: LeanValue = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+      _k_11,
+    );
+    _h_13: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_9_12,
+    );
+    L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_alterAux_3d39364a92(
+      _x_7_9,
+      _x_8_10,
+      _f_5_7,
+      _d_1,
+      _h_13,
+      LeanScalar("usize", "1"),
+      _k_11,
+    )
+  | "[\"Bool\",\"true\"]" ->
+    _x_12_16: LeanValue = f_Meta_DiscrTree_instInhabited_7a7cdffa9f(
+      LeanErased(),
+    );
+    _x_18_22: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      LeanText("Lean.Meta.DiscrTree.Basic"),
+      LeanText("Lean.Meta.DiscrTree.insertKeyValue"),
+      LeanScalar("nat", "179"),
+      LeanScalar("nat", "23"),
+      LeanText("invalid key sequence"),
+    );
+    L4_Init_Prelude.f_panic_105135c0b4(_x_12_16, _x_18_22)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_2"
+fun f_DiscrTree_insertKeyValue_closed_2_97d25d923c(): LeanValue {
+  LeanText("Lean.Meta.DiscrTree.Basic")
+}
+// "Lean.Meta.DiscrTree.instInhabitedTrie._closed_0"
+fun f_DiscrTree_instInhabitedTrie_closed_0_8af6b31f98(): LeanValue {
+  f_Meta_DiscrTree_instInhabitedTrie_74cd2d0003(LeanErased())
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_1"
+fun f_DiscrTree_insertAux_closed_1_c39f936544(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_1_91ebcf203e,
+    4,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_3"
+fun f_Key_format_closed_3_0e15e3686d(): LeanValue {
+  _x_193_0: LeanValue = f_Key_format_closed_2_dd9d9f7434();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_193_0])
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_2"
+fun f_spec_7_spec_8_closed_2_0fc89e59de(): LeanValue {
+  LeanText(
+    "` (from the current module) exists but would need to be public to access here.",
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_12"
+fun f_instToExprKey_lam_0_closed_12_d5e1789a5d(): LeanValue {
+  _x_467_1: LeanValue = f_instToExprKey_lam_0_closed_11_3455720f34();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_467_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_7"
+fun f_instToExprKey_lam_0_closed_7_a1b2202177(): LeanValue {
+  LeanText("other")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0"
+fun f_DiscrTree_instToExprKey_lam_0_ad66d3931c(_k_0: LeanValue): LeanValue {
+  leanTag(_k_0) match {
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"star\"]" ->
+    _x_6_14: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      LeanText("Lean"),
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("star"),
+    );
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_6_14,
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    )
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"other\"]" ->
+    _x_14_22: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      LeanText("Lean"),
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("other"),
+    );
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_14_22,
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    )
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"lit\"]" ->
+    _a_17_1: LeanValue = leanField(_k_0, 0);
+    _x_18_25: LeanValue = LeanText("Lean");
+    _x_23_30: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      _x_18_25,
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("lit"),
+    );
+    _x_24_31: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_25_32: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_23_30,
+      _x_24_31,
+    );
+    leanTag(_a_17_1) match {
+    | "[\"Lean\",\"Literal\",\"natVal\"]" ->
+      _val_26_33: LeanValue = leanField(_a_17_1, 0);
+      _x_29_37: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+        _x_18_25,
+        LeanText("Literal"),
+        LeanText("natVal"),
+      );
+      _x_30_38: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+        _x_29_37,
+        _x_24_31,
+      );
+      _x_31_39: LeanValue = L4_Lean_Expr.f_Expr_lit_override_362af36df7(
+        _a_17_1,
+      );
+      _x_32_40: LeanValue = L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+        _x_30_38,
+        _x_31_39,
+      );
+      L4_Lean_Expr.f_Expr_app_override_84f3f08ede(_x_25_32, _x_32_40)
+    | "[\"Lean\",\"Literal\",\"strVal\"]" ->
+      _val_34_34: LeanValue = leanField(_a_17_1, 0);
+      _x_37_44: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+        _x_18_25,
+        LeanText("Literal"),
+        LeanText("strVal"),
+      );
+      _x_38_45: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+        _x_37_44,
+        _x_24_31,
+      );
+      _x_39_46: LeanValue = L4_Lean_Expr.f_Expr_lit_override_362af36df7(
+        _a_17_1,
+      );
+      _x_40_47: LeanValue = L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+        _x_38_45,
+        _x_39_46,
+      );
+      L4_Lean_Expr.f_Expr_app_override_84f3f08ede(_x_25_32, _x_40_47)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"fvar\"]" ->
+    _a_42_2: LeanValue = leanField(_k_0, 0);
+    _a_43_3: LeanValue = leanField(_k_0, 1);
+    _x_44_49: LeanValue = LeanText("Lean");
+    _x_49_54: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      _x_44_49,
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("fvar"),
+    );
+    _x_50_55: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_51_56: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_49_54,
+      _x_50_55,
+    );
+    _x_54_59: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+      _x_44_49,
+      LeanText("FVarId"),
+      LeanText("mk"),
+    );
+    _x_55_60: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_54_59,
+      _x_50_55,
+    );
+    _x_56_61: LeanValue = L4_Lean_ToExpr.f_Lean_Name_toExprAux_ebe9e9134e(
+      _a_42_2,
+    );
+    _x_57_62: LeanValue = L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+      _x_55_60,
+      _x_56_61,
+    );
+    _x_58_63: LeanValue = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(_a_43_3);
+    L4_Lean_Expr.f_Lean_mkAppB_d2dbf5139e(_x_51_56, _x_57_62, _x_58_63)
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"const\"]" ->
+    _a_60_4: LeanValue = leanField(_k_0, 0);
+    _a_61_5: LeanValue = leanField(_k_0, 1);
+    _x_67_70: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      LeanText("Lean"),
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("const"),
+    );
+    _x_69_72: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_67_70,
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    );
+    _x_70_73: LeanValue = L4_Lean_ToExpr.f_Lean_Name_toExprAux_ebe9e9134e(
+      _a_60_4,
+    );
+    _x_71_74: LeanValue = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(_a_61_5);
+    L4_Lean_Expr.f_Lean_mkAppB_d2dbf5139e(_x_69_72, _x_70_73, _x_71_74)
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"arrow\"]" ->
+    _x_78_81: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      LeanText("Lean"),
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("arrow"),
+    );
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_78_81,
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    )
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"proj\"]" ->
+    _a_81_6: LeanValue = leanField(_k_0, 0);
+    _a_82_7: LeanValue = leanField(_k_0, 1);
+    _a_83_8: LeanValue = leanField(_k_0, 2);
+    _x_89_89: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      LeanText("Lean"),
+      LeanText("Meta"),
+      LeanText("DiscrTree"),
+      LeanText("Key"),
+      LeanText("proj"),
+    );
+    _x_91_91: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _x_89_89,
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    );
+    _x_92_92: LeanValue = L4_Lean_ToExpr.f_Lean_Name_toExprAux_ebe9e9134e(
+      _a_81_6,
+    );
+    _x_93_93: LeanValue = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(_a_82_7);
+    _x_94_94: LeanValue = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(_a_83_8);
+    L4_Lean_Expr.f_Lean_mkApp3_ee0cbcd00e(
+      _x_91_91,
+      _x_92_92,
+      _x_93_93,
+      _x_94_94,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_DiscrTree_instToExprKey_lam_0_ad66d3931c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_instToExprKey_lam_0_ad66d3931c(_args[0])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_11"
+fun f_instToExprKey_lam_0_closed_11_3455720f34(): LeanValue {
+  _x_460_0: LeanValue = f_instToExprKey_lam_0_closed_10_dacf907331();
+  _x_461_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_462_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_463_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_464_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_464_4,
+    _x_463_3,
+    _x_462_2,
+    _x_461_1,
+    _x_460_0,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._lam_4"
+fun f_DiscrTree_insertAux_lam_4_44ffe8e3a6(
+  _x_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+  _keys_2: LeanValue,
+  _v_3: LeanValue,
+  _k_4: LeanValue,
+  _x_3_5: LeanValue,
+): LeanValue {
+  leanTag(_x_3_5) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_4_6: LeanValue = leanField(_x_3_5, 0);
+    _snd_5_7: LeanValue = leanField(_x_3_5, 1);
+    _x_7_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _x_1_0,
+      LeanScalar("nat", "1"),
+    );
+    _c_10: LeanValue = f_Meta_DiscrTree_insertAux_d6b213817b(
+      _inst_2_1,
+      _keys_2,
+      _v_3,
+      _x_7_9,
+      _snd_5_7,
+    );
+    LeanCtor("[\"Prod\",\"mk\"]", Array[_k_4, _c_10])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_DiscrTree_insertAux_lam_4_44ffe8e3a6(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertAux_lam_4_44ffe8e3a6(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+  )
+}
+// "Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0.spec_0._redArg"
+fun f_getEntriesWithKeys_spec_0_spec_0_edc95115ab(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+    _es_4_3: LeanValue = leanField(_x_1_0, 0);
+    _x_7_9: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_2_1,
+      LeanScalar("usize", "31"),
+    );
+    _j_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(
+      _x_7_9,
+    );
+    _x_8_11: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      LeanErased(),
+      LeanCtor("[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]", Array[]),
+      _es_4_3,
+      _j_10,
+    );
+    leanTag(_x_8_11) match {
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]" ->
+      _key_9_12: LeanValue = leanField(_x_8_11, 0);
+      _val_10_13: LeanValue = leanField(_x_8_11, 1);
+      _x_11_15: LeanValue = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_instBEqKey_beq_5d3d2e2dd7(
+        _x_3_2,
+        _key_9_12,
+      );
+      leanTag(_x_11_15) match {
+      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor("[\"Option\",\"some\"]", Array[_val_10_13])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]" ->
+      _node_14_14: LeanValue = leanField(_x_8_11, 0);
+      _x_16_19: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+        _x_2_1,
+        LeanScalar("usize", "5"),
+      );
+      f_getEntriesWithKeys_spec_0_spec_0_edc95115ab(
+        _node_14_14,
+        _x_16_19,
+        _x_3_2,
+      )
+    | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]" ->
+      LeanCtor("[\"Option\",\"none\"]", Array[])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+    _ks_19_4: LeanValue = leanField(_x_1_0, 0);
+    _vs_20_5: LeanValue = leanField(_x_1_0, 1);
+    _h_21_6: LeanValue = leanField(_x_1_0, 2);
+    f_spec_0_spec_0_spec_2_c6ad4118df(
+      _ks_19_4,
+      _vs_20_5,
+      LeanScalar("nat", "0"),
+      _x_3_2,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.mkApp.spec_0"
+fun f_keysAsPattern_mkApp_spec_0_241e30f98c(
+  _as_0: LeanValue,
+  _sz_1: LeanValue,
+  _i_2: LeanValue,
+  _b_3: LeanValue,
+  _y_1_4: LeanValue,
+  _y_2_5: LeanValue,
+  _y_3_6: LeanValue,
+): LeanValue {
+  f_keysAsPattern_mkApp_spec_0_93e0354354(_as_0, _sz_1, _i_2, _b_3, _y_3_6)
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_10"
+fun f_spec_7_spec_8_closed_10_7d1636ebd5(): LeanValue {
+  LeanText("` (from `")
+}
+// "Lean.Meta.DiscrTree.instInhabitedTrie._redArg._closed_1"
+fun f_DiscrTree_instInhabitedTrie_closed_1_f506fa8022(): LeanValue {
+  _x_15_0: LeanValue = f_DiscrTree_instInhabitedTrie_closed_0_41c4968253();
+  _x_16_1: LeanValue = f_DiscrTree_instInhabitedTrie_closed_0_41c4968253();
+  LeanCtor(
+    "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+    Array[_x_16_1, _x_16_1],
+  )
+}
+// "Lean.Meta.DiscrTree.format._redArg._closed_0"
+fun f_DiscrTree_format_closed_0_be1b4d2046(): LeanValue {
+  LeanCtor(
+    "[\"Prod\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanCtor("[\"Std\",\"Format\",\"nil\"]", Array[]),
+    ],
+  )
+}
+// "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4._redArg._closed_0"
+fun f_spec_2_spec_4_closed_0_78369b2aca(): LeanValue {
+  LeanText("Unknown constant `")
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_9"
+fun f_spec_7_spec_8_closed_9_e23112a66e(): LeanValue {
+  _x_7298_0: LeanValue = f_spec_7_spec_8_closed_8_2e992e26ba();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7298_0)
+}
+// "Lean.Meta.DiscrTree.instInhabited"
+fun f_Meta_DiscrTree_instInhabited_137a330eb1(_value_0: LeanValue): LeanValue {
+  f_Meta_DiscrTree_instInhabited_7a7cdffa9f(LeanErased())
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_0"
+fun f_Trie_format_closed_0_a618723338(): LeanValue {
+  LeanText("chain ")
+}
+// "Lean.Meta.DiscrTree.instDecidableLtKey"
+fun f_Meta_DiscrTree_instDecidableLtKey_2ac1a7f19b(
+  _a_0: LeanValue,
+  _b_1: LeanValue,
+): LeanValue {
+  f_DiscrTree_Key_lt_f15791e26d(_a_0, _b_1)
+}
+// "Lean.Meta.DiscrTree.insertCore._redArg"
+fun f_Meta_DiscrTree_insertCore_7e755987c1(
+  _inst_1_0: LeanValue,
+  _d_1: LeanValue,
+  _keys_2: LeanValue,
+  _v_3: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_insertKeyValue_4d070af2df(_inst_1_0, _d_1, _keys_2, _v_3)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux"
+fun f_Meta_DiscrTree_insertAux_269a397a4e(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _keys_2: LeanValue,
+  _v_3: LeanValue,
+  _x_2_4: LeanValue,
+  _x_3_5: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_insertAux_d6b213817b(
+    _inst_1_1,
+    _keys_2,
+    _v_3,
+    _x_2_4,
+    _x_3_5,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.Trie.format.match_1.splitter"
+fun f_format_match_1_splitter_8e9e9cf432(
+  _value_0: LeanValue,
+  _motive_1: LeanValue,
+  _x_1_2: LeanValue,
+  _h_1_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_2) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_2_4: LeanValue = leanField(_x_1_2, 0);
+    _snd_3_5: LeanValue = leanField(_x_1_2, 1);
+    leanApply(_h_1_3, Array[_fst_2_4, _snd_3_5])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_1"
+fun f_spec_7_spec_8_closed_1_80d5c272e5(): LeanValue {
+  _x_7286_0: LeanValue = f_spec_7_spec_8_closed_0_02733b84ff();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7286_0)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_6"
+fun f_instToExprKey_lam_0_closed_6_e4e1ca4153(): LeanValue {
+  _x_439_1: LeanValue = f_instToExprKey_lam_0_closed_5_1b864ca4c0();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_439_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.instLTKey"
+fun f_Meta_DiscrTree_instLTKey_ba91b94560(): LeanValue {
+  LeanCtor("[\"LT\",\"mk\"]", Array[LeanErased()])
+}
+// "Lean.Meta.DiscrTree.getEntriesWithKeys._redArg._closed_1"
+fun f_DiscrTree_getEntriesWithKeys_closed_1_7b2b94e17b(): LeanValue {
+  _x_298_0: LeanValue = f_DiscrTree_insertKeyValue_closed_4_0f061e56a9();
+  _x_301_3: LeanValue = f_DiscrTree_getEntriesWithKeys_closed_0_6f6f130742();
+  _x_302_4: LeanValue = f_DiscrTree_insertKeyValue_closed_2_97d25d923c();
+  L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _x_302_4,
+    _x_301_3,
+    LeanScalar("nat", "215"),
+    LeanScalar("nat", "23"),
+    _x_298_0,
+  )
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_5"
+fun f_spec_7_spec_8_closed_5_8ef8bd1ea2(): LeanValue {
+  _x_7292_0: LeanValue = f_spec_7_spec_8_closed_4_c31522c587();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7292_0)
+}
+// "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10.spec_11._closed_3"
+fun f_spec_10_spec_11_closed_3_c233743506(): LeanValue {
+  _x_7127_0: LeanValue = LeanScalar("nat", "0");
+  _x_7129_2: LeanValue = LeanScalar("nat", "0");
+  _x_7131_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "32"),
+  );
+  _x_7132_5: LeanValue = f_spec_10_spec_11_closed_2_4db640963d();
+  LeanCtor(
+    "[\"Lean\",\"PersistentArray\",\"mk\"]",
+    Array[_x_7132_5, _x_7131_4, _x_7129_2, LeanScalar("usize", "5"), _x_7129_2],
+  )
+}
+// "Lean.Meta.DiscrTree.format._redArg._lam_0"
+fun f_DiscrTree_format_lam_0_c5487b9bc3(
+  _inst_1_0_input: LeanValue,
+  _p_1_input: LeanValue,
+  _k_2_input: LeanValue,
+  _c_3_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_inst_1_0, 1=_p_1, 2=_k_2, 3=_c_3, 4=_fst_4, 5=_snd_5, 6=_x_2_6, 7=_y_4_7, 8=_x_5_8, 9=_x_6_9, 10=_x_7_10, 11=_x_8_11, 12=_x_9_12, 13=_x_10_13, 14=_x_11_14, 15=_x_12_15, 16=_x_13_16, 17=_x_14_17, 18=_x_15_18, 19=_x_16_19, 20=_x_17_20, 21=_x_18_21, 22=_x_19_22, 23=_x_20_23, 24=_x_21_24, 25=_x_22_25, 26=_x_23_26, 27=_x_24_27, 28=_x_25_28, 29=_x_26_29
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    30,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _inst_1_0_input);
+  _frame.set(1, _p_1_input);
+  _frame.set(2, _k_2_input);
+  _frame.set(3, _c_3_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Prod\",\"mk\"]" ->
+        _frame.set(4, leanField(_frame[1], 0));
+        _frame.set(5, leanField(_frame[1], 1));
+        _frame.set(6, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+        leanTag(_frame[4]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(28, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]));
+          _jump0 = _frame[28];
+          _frame.set(7, _jump0);
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(29, LeanCtor("[\"Std\",\"Format\",\"nil\"]", Array[]));
+          _jump0 = _frame[29];
+          _frame.set(7, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        8,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[5], _frame[7]],
+        ),
+      );
+      _frame.set(9, f_DiscrTree_Key_format_b00418d9e4(_frame[2]));
+      _frame.set(10, LeanText(" => "));
+      _frame.set(
+        11,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[10]]),
+      );
+      _frame.set(
+        12,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[9], _frame[11]],
+        ),
+      );
+      _frame.set(13, f_DiscrTree_Trie_format_1cc915466a(_frame[0], _frame[3]));
+      _frame.set(
+        14,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[12], _frame[13]],
+        ),
+      );
+      _frame.set(15, LeanText("("));
+      _frame.set(16, LeanText(")"));
+      _frame.set(
+        17,
+        L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(
+          _frame[15],
+        ),
+      );
+      _frame.set(18, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[17]));
+      _frame.set(
+        19,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[15]]),
+      );
+      _frame.set(
+        20,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[19], _frame[14]],
+        ),
+      );
+      _frame.set(
+        21,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[16]]),
+      );
+      _frame.set(
+        22,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[20], _frame[21]],
+        ),
+      );
+      _frame.set(
+        23,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"nest\"]",
+          Array[_frame[18], _frame[22]],
+        ),
+      );
+      _frame.set(
+        24,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      );
+      _frame.set(
+        25,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"group\"]",
+          Array[_frame[23], _frame[24]],
+        ),
+      );
+      _frame.set(
+        26,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[8], _frame[25]],
+        ),
+      );
+      _frame.set(
+        27,
+        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[6], _frame[26]]),
+      );
+      return _frame[27]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+fun apply_f_DiscrTree_format_lam_0_c5487b9bc3(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_format_lam_0_c5487b9bc3(_args[0], _args[1], _args[2], _args[3])
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_5"
+fun f_DiscrTree_insertAux_closed_5_223170ebe3(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_5_4db1d10e8c,
+    4,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.mkNoindexAnnotation._closed_1"
+fun f_DiscrTree_mkNoindexAnnotation_closed_1_fbc6cfa688(): LeanValue {
+  _x_6_0: LeanValue = f_DiscrTree_mkNoindexAnnotation_closed_0_c38bbfbd22();
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_6_0)
+}
+// "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4._redArg._closed_2"
+fun f_spec_2_spec_4_closed_2_7cdf9a70b8(): LeanValue {
+  LeanText("`")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux.match_1.splitter"
+fun f_getEntriesWithKeysAux_match_1_splitter_84c66264b8(
+  _value_0: LeanValue,
+  _motive_1: LeanValue,
+  _x_1_2: LeanValue,
+  _h_1_3: LeanValue,
+  _h_2_4: LeanValue,
+): LeanValue {
+  leanTag(_x_1_2) match {
+  | "[\"Option\",\"none\"]" ->
+    leanApply(_h_1_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Option\",\"some\"]" ->
+    _val_4_5: LeanValue = leanField(_x_1_2, 0);
+    leanTag(_val_4_5) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_5_8: LeanValue = leanField(_val_4_5, 0);
+      _snd_6_9: LeanValue = leanField(_val_4_5, 1);
+      leanApply(_h_2_4, Array[_fst_5_8, _snd_6_9])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_1"
+fun f_keysAsPattern_go_closed_1_f1ac0e5616(): LeanValue {
+  _x_7695_0: LeanValue = f_keysAsPattern_go_closed_0_03789dbe28();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_7695_0])
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_12"
+fun f_spec_7_spec_8_closed_12_3c2f939422(): LeanValue {
+  LeanText("`) exists but would need to be public to access here.")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_4"
+fun f_keysAsPattern_go_closed_4_c93b3dbd55(): LeanValue {
+  _x_7700_0: LeanValue = f_keysAsPattern_go_closed_3_189aa3bda1();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_7700_0])
+}
+// "Lean.Meta.DiscrTree.instInhabited._redArg._closed_0"
+fun f_DiscrTree_instInhabited_closed_0_d026e15b6a(): LeanValue {
+  L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+    LeanErased(),
+  )
+}
+// "Lean.Meta.DiscrTree.instToFormat"
+fun f_Meta_DiscrTree_instToFormat_9c0bc57765(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_Meta_DiscrTree_format_9f2da40188,
+    3,
+    Array[LeanErased(), _inst_1_1],
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._lam_0"
+fun f_DiscrTree_insertAux_lam_0_5c2ba16d11(
+  _a_0: LeanValue,
+  _b_1: LeanValue,
+): LeanValue {
+  leanTag(_a_0) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_2: LeanValue = leanField(_a_0, 0);
+    _snd_3: LeanValue = leanField(_a_0, 1);
+    leanTag(_b_1) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_4: LeanValue = leanField(_b_1, 0);
+      _snd_5: LeanValue = leanField(_b_1, 1);
+      f_DiscrTree_Key_lt_f15791e26d(_fst_2, _fst_4)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_DiscrTree_insertAux_lam_0_5c2ba16d11(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertAux_lam_0_5c2ba16d11(_args[0], _args[1])
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_0"
+fun f_spec_7_spec_8_closed_0_02733b84ff(): LeanValue {
+  LeanText("A private declaration `")
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_0"
+fun f_format_lam_0_closed_0_0a3740e64a(): LeanValue {
+  LeanText(" => ")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_0"
+fun f_keysAsPattern_go_closed_0_03789dbe28(): LeanValue {
+  LeanText("_")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_14"
+fun f_instToExprKey_lam_0_closed_14_d97d095c68(): LeanValue {
+  LeanText("natVal")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_5"
+fun f_instToExprKey_lam_0_closed_5_1b864ca4c0(): LeanValue {
+  _x_432_0: LeanValue = f_instToExprKey_lam_0_closed_4_b4ee4874d0();
+  _x_433_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_434_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_435_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_436_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_436_4,
+    _x_435_3,
+    _x_434_2,
+    _x_433_1,
+    _x_432_0,
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_32"
+fun f_instToExprKey_lam_0_closed_32_146a1ca87f(): LeanValue {
+  _x_536_1: LeanValue = f_instToExprKey_lam_0_closed_31_5f36e3d467();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_536_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.PersistentHashMap.findAtAux._at_.Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0.spec_0.spec_2._redArg"
+fun f_spec_0_spec_0_spec_2_c6ad4118df(
+  _keys_0: LeanValue,
+  _vals_1: LeanValue,
+  _i_2: LeanValue,
+  _k_3: LeanValue,
+): LeanValue {
+  _x_1_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _keys_0,
+  );
+  _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_2, _x_1_4);
+  leanTag(_x_2_5) match {
+  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | "[\"Bool\",\"true\"]" ->
+    _k_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _keys_0,
+      _i_2,
+      LeanErased(),
+    );
+    _x_4_8: LeanValue = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_instBEqKey_beq_5d3d2e2dd7(
+      _k_3,
+      _k_7,
+    );
+    leanTag(_x_4_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _i_2,
+        LeanScalar("nat", "1"),
+      );
+      f_spec_0_spec_0_spec_2_c6ad4118df(_keys_0, _vals_1, _x_6_10, _k_3)
+    | "[\"Bool\",\"true\"]" ->
+      _x_8_12: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        LeanErased(),
+        _vals_1,
+        _i_2,
+        LeanErased(),
+      );
+      LeanCtor("[\"Option\",\"some\"]", Array[_x_8_12])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_2"
+fun f_Trie_format_closed_2_37af2dff87(): LeanValue {
+  LeanText("node")
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_0"
+fun f_Key_format_closed_0_9d21a34da4(): LeanValue {
+  LeanText("*")
+}
+// "Lean.Meta.DiscrTree.format"
+fun f_Meta_DiscrTree_format_9f2da40188(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _d_2: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_format_d85fe8551f(_inst_1_1, _d_2)
+}
+fun apply_f_Meta_DiscrTree_format_9f2da40188(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Meta_DiscrTree_format_9f2da40188(_args[0], _args[1], _args[2])
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_1"
+fun f_DiscrTree_insertKeyValue_closed_1_473db54274(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_Key_hash_d0f27b96fa,
+    1,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_28"
+fun f_instToExprKey_lam_0_closed_28_c581bbeaeb(): LeanValue {
+  _x_515_0: LeanValue = f_instToExprKey_lam_0_closed_27_0340343f50();
+  _x_516_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_517_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_518_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_519_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_519_4,
+    _x_518_3,
+    _x_517_2,
+    _x_516_1,
+    _x_515_0,
+  )
+}
+// "Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6"
+fun f_spec_2_spec_4_spec_6_2cd3a2ea88(
+  _value_0: LeanValue,
+  _ref_1: LeanValue,
+  _msg_2: LeanValue,
+  _declHint_3: LeanValue,
+  _y_1_4: LeanValue,
+  _y_2_5: LeanValue,
+  _y_3_6: LeanValue,
+  _y_4_7: LeanValue,
+): LeanValue {
+  f_spec_2_spec_4_spec_6_b6367713e1(
+    _ref_1,
+    _msg_2,
+    _declHint_3,
+    _y_1_4,
+    _y_2_5,
+    _y_3_6,
+    _y_4_7,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._lam_3"
+fun f_DiscrTree_insertAux_lam_3_72ac76fc1f(
+  _x_1_0: LeanValue,
+  _keys_1: LeanValue,
+  _v_2: LeanValue,
+  _k_3: LeanValue,
+  _x_2_4: LeanValue,
+): LeanValue {
+  _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _x_1_0,
+    LeanScalar("nat", "1"),
+  );
+  _c_7: LeanValue = f_Meta_DiscrTree_createNodes_e542de69a4(
+    _keys_1,
+    _v_2,
+    _x_4_6,
+  );
+  LeanCtor("[\"Prod\",\"mk\"]", Array[_k_3, _c_7])
+}
+fun apply_f_DiscrTree_insertAux_lam_3_72ac76fc1f(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertAux_lam_3_72ac76fc1f(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+  )
+}
+// "panic._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_1"
+fun f_DiscrTree_getEntriesWithKeys_spec_1_5eba46c6e7(
+  _value_0: LeanValue,
+  _msg_1: LeanValue,
+): LeanValue {
+  f_DiscrTree_getEntriesWithKeys_spec_1_d2ad2df517(_msg_1)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_17"
+fun f_instToExprKey_lam_0_closed_17_1a4f9b241e(): LeanValue {
+  LeanText("strVal")
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_7"
+fun f_spec_7_spec_8_closed_7_5cba2e8dda(): LeanValue {
+  _x_7295_0: LeanValue = f_spec_7_spec_8_closed_6_bded6327ae();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7295_0)
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.mkApp.spec_0._redArg._closed_0"
+fun f_mkApp_spec_0_closed_0_96e26c3d92(): LeanValue {
+  L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]),
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_6"
+fun f_keysAsPattern_go_closed_6_8cdcd9ba05(): LeanValue {
+  LeanText("∀ ")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_3"
+fun f_DiscrTree_insertAux_closed_3_12bf77639e(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_3_f3d9d44434,
+    4,
+    Array[],
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertVal.loop"
+fun f_DiscrTree_insertVal_loop_fd96334fae(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _vs_2: LeanValue,
+  _v_3: LeanValue,
+  _i_4: LeanValue,
+): LeanValue {
+  f_DiscrTree_insertVal_loop_cc1e549603(_inst_1_1, _vs_2, _v_3, _i_4)
+}
+// "Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0"
+fun f_DiscrTree_getEntriesWithKeys_spec_0_207bfde98b(
+  _value_0: LeanValue,
+  _x_1_1: LeanValue,
+  _x_2_2: LeanValue,
+): LeanValue {
+  f_DiscrTree_getEntriesWithKeys_spec_0_1db51a8e0e(_x_1_1, _x_2_2)
+}
+// "Lean.Meta.DiscrTree.getEntriesWithKeys._redArg"
+fun f_Meta_DiscrTree_getEntriesWithKeys_ecd687830c(
+  _d_0: LeanValue,
+  _keys_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _keys_1,
+  );
+  _x_2_3: LeanValue = LeanScalar("nat", "0");
+  _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_1_2, _x_2_3);
+  leanTag(_x_3_4) match {
+  | "[\"Bool\",\"false\"]" ->
+    _k_6: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      LeanErased(),
+      LeanCtor("[\"Lean\",\"Meta\",\"DiscrTree\",\"Key\",\"star\"]", Array[]),
+      _keys_1,
+      _x_2_3,
+    );
+    _x_5_7: LeanValue = f_DiscrTree_getEntriesWithKeys_spec_0_1db51a8e0e(
+      _d_0,
+      _k_6,
+    );
+    leanTag(_x_5_7) match {
+    | "[\"Option\",\"none\"]" ->
+      L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(LeanErased(), _x_2_3)
+    | "[\"Option\",\"some\"]" ->
+      _val_7_8: LeanValue = leanField(_x_5_7, 0);
+      f_Meta_DiscrTree_getEntriesWithKeysAux_f6f6b484ce(
+        _keys_1,
+        LeanScalar("nat", "1"),
+        _val_7_8,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Bool\",\"true\"]" ->
+    _x_15_17: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      LeanText("Lean.Meta.DiscrTree.Basic"),
+      LeanText("Lean.Meta.DiscrTree.getEntriesWithKeys"),
+      LeanScalar("nat", "215"),
+      LeanScalar("nat", "23"),
+      LeanText("invalid key sequence"),
+    );
+    f_DiscrTree_getEntriesWithKeys_spec_1_d2ad2df517(_x_15_17)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.instInhabited._redArg._closed_1"
+fun f_DiscrTree_instInhabited_closed_1_c8783e7ae3(): LeanValue {
+  _x_14_0: LeanValue = f_DiscrTree_instInhabited_closed_0_d026e15b6a();
+  LeanCtor(
+    "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+    Array[_x_14_0],
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_1"
+fun f_Trie_format_closed_1_73d06fbe74(): LeanValue {
+  _x_380_0: LeanValue = f_Trie_format_closed_0_a618723338();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_380_0])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_9"
+fun f_instToExprKey_lam_0_closed_9_a49c4ff051(): LeanValue {
+  _x_453_1: LeanValue = f_instToExprKey_lam_0_closed_8_62858d8c87();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_453_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Array.binSearchAux._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux.spec_0._redArg"
+fun f_DiscrTree_getEntriesWithKeysAux_spec_0_8a7cf5ee10(
+  _as_0: LeanValue,
+  _k_1: LeanValue,
+  _x_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_x_1_2, _x_2_3);
+  _x_4_5: LeanValue = LeanScalar("nat", "1");
+  _m_6: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+    _x_3_4,
+    _x_4_5,
+  );
+  _a_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+    LeanErased(),
+    _as_0,
+    _m_6,
+    LeanErased(),
+  );
+  _x_5_8: LeanValue = f_DiscrTree_insertAux_lam_0_5c2ba16d11(_a_7, _k_1);
+  leanTag(_x_5_8) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_6_9: LeanValue = f_DiscrTree_insertAux_lam_0_5c2ba16d11(_k_1, _a_7);
+    leanTag(_x_6_9) match {
+    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_a_7])
+    | "[\"Bool\",\"true\"]" ->
+      _x_9_12: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _m_6,
+        LeanScalar("nat", "0"),
+      );
+      leanTag(_x_9_12) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_10_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _m_6,
+          _x_4_5,
+        );
+        _x_11_14: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+          _x_10_13,
+          _x_1_2,
+        );
+        leanTag(_x_11_14) match {
+        | "[\"Bool\",\"false\"]" ->
+          f_DiscrTree_getEntriesWithKeysAux_spec_0_8a7cf5ee10(
+            _as_0,
+            _k_1,
+            _x_1_2,
+            _x_10_13,
+          )
+        | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Bool\",\"true\"]" ->
+    _x_15_18: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_m_6, _x_4_5);
+    _x_16_19: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _x_15_18,
+      _x_2_3,
+    );
+    leanTag(_x_16_19) match {
+    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | "[\"Bool\",\"true\"]" ->
+      f_DiscrTree_getEntriesWithKeysAux_spec_0_8a7cf5ee10(
+        _as_0,
+        _k_1,
+        _x_15_18,
+        _x_2_3,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_29"
+fun f_instToExprKey_lam_0_closed_29_d9229833cd(): LeanValue {
+  _x_522_1: LeanValue = f_instToExprKey_lam_0_closed_28_c581bbeaeb();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_522_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_1"
+fun f_Key_format_closed_1_7df10c6703(): LeanValue {
+  _x_190_0: LeanValue = f_Key_format_closed_0_9d21a34da4();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_190_0])
+}
+// "Lean.Meta.DiscrTree.instToFormatTrie._redArg"
+fun f_Meta_DiscrTree_instToFormatTrie_56f5dbf1c2(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_Trie_format_e8bb525fbf,
+    3,
+    Array[LeanErased(), _inst_1_0],
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_3"
+fun f_Trie_format_closed_3_b3d646e3b1(): LeanValue {
+  _x_396_0: LeanValue = f_Trie_format_closed_2_37af2dff87();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_396_0])
+}
+// "Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0._redArg"
+fun f_DiscrTree_getEntriesWithKeys_spec_0_1db51a8e0e(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _x_3_2: LeanValue = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+    _x_2_1,
+  );
+  _x_4_3: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+    _x_3_2,
+  );
+  f_getEntriesWithKeys_spec_0_spec_0_edc95115ab(_x_1_0, _x_4_3, _x_2_1)
+}
+// "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4"
+fun f_spec_0_spec_2_spec_4_5a40f6f291(
+  _value_0: LeanValue,
+  _ref_1: LeanValue,
+  _constName_2: LeanValue,
+  _y_1_3: LeanValue,
+  _y_2_4: LeanValue,
+  _y_3_5: LeanValue,
+  _y_4_6: LeanValue,
+): LeanValue {
+  f_spec_0_spec_2_spec_4_8767fcbe3f(
+    _ref_1,
+    _constName_2,
+    _y_1_3,
+    _y_2_4,
+    _y_3_5,
+    _y_4_6,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_7"
+fun f_keysAsPattern_go_closed_7_fb143d3196(): LeanValue {
+  _x_7705_0: LeanValue = f_keysAsPattern_go_closed_6_8cdcd9ba05();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7705_0)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_2"
+fun f_instToExprKey_lam_0_closed_2_0137eb68b7(): LeanValue {
+  LeanText("DiscrTree")
+}
+// "Lean.Meta.DiscrTree.empty"
+fun f_Meta_DiscrTree_empty_8859b4ab90(_value_0: LeanValue): LeanValue {
+  f_Meta_DiscrTree_empty_b109d1b88b(LeanErased())
+}
+// "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4._redArg._closed_3"
+fun f_spec_2_spec_4_closed_3_bab08f5350(): LeanValue {
+  _x_7523_0: LeanValue = f_spec_2_spec_4_closed_2_7cdf9a70b8();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7523_0)
+}
+// "Lean.Meta.DiscrTree.instToFormatKey._closed_0"
+fun f_DiscrTree_instToFormatKey_closed_0_7008dd1aab(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_Key_format_b00418d9e4,
+    1,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_8"
+fun f_instToExprKey_lam_0_closed_8_62858d8c87(): LeanValue {
+  _x_446_0: LeanValue = f_instToExprKey_lam_0_closed_7_a1b2202177();
+  _x_447_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_448_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_449_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_450_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_450_4,
+    _x_449_3,
+    _x_448_2,
+    _x_447_1,
+    _x_446_0,
+  )
+}
+// "Lean.Meta.DiscrTree.getEntriesWithKeys._redArg._closed_0"
+fun f_DiscrTree_getEntriesWithKeys_closed_0_6f6f130742(): LeanValue {
+  LeanText("Lean.Meta.DiscrTree.getEntriesWithKeys")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_23"
+fun f_instToExprKey_lam_0_closed_23_8656dbefe7(): LeanValue {
+  LeanText("FVarId")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_15"
+fun f_instToExprKey_lam_0_closed_15_f55dbd9ab4(): LeanValue {
+  _x_471_0: LeanValue = f_instToExprKey_lam_0_closed_14_d97d095c68();
+  _x_472_1: LeanValue = f_instToExprKey_lam_0_closed_13_a5a99f2523();
+  _x_473_2: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(_x_473_2, _x_472_1, _x_471_0)
+}
+// "panic._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_1._redArg"
+fun f_DiscrTree_getEntriesWithKeys_spec_1_d2ad2df517(
+  _msg_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Data_Array_Basic.f_Array_instInhabited_af67de0d5e(
+    LeanErased(),
+  );
+  L4_Init_Prelude.f_panicCore_3292f922f8(LeanErased(), _x_1_1, _msg_0)
+}
+// "Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10"
+fun f_spec_6_spec_8_spec_10_6bfb59cbff(
+  _value_0: LeanValue,
+  _msg_1: LeanValue,
+  _y_1_2: LeanValue,
+  _y_2_3: LeanValue,
+  _y_3_4: LeanValue,
+  _y_4_5: LeanValue,
+): LeanValue {
+  f_spec_6_spec_8_spec_10_5bd0b727b7(_msg_1, _y_2_3, _y_3_4, _y_4_5)
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_6"
+fun f_Key_format_closed_6_a7a58e3955(): LeanValue {
+  LeanText(".")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_24"
+fun f_instToExprKey_lam_0_closed_24_a197224d99(): LeanValue {
+  LeanText("mk")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_8"
+fun f_DiscrTree_insertAux_closed_8_1a94b40ccc(): LeanValue {
+  _f_345_0: LeanValue = f_DiscrTree_insertAux_closed_5_223170ebe3();
+  _f_346_1: LeanValue = f_DiscrTree_insertAux_closed_4_79f47929dc();
+  _f_347_2: LeanValue = f_DiscrTree_insertAux_closed_3_12bf77639e();
+  _f_348_3: LeanValue = f_DiscrTree_insertAux_closed_2_1f75c47054();
+  _x_349_4: LeanValue = f_DiscrTree_insertAux_closed_7_39a8f5f49a();
+  LeanCtor(
+    "[\"Applicative\",\"mk\"]",
+    Array[_x_349_4, _f_348_3, _f_347_2, _f_346_1, _f_345_0],
+  )
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._lam_0"
+fun f_DiscrTree_insertKeyValue_lam_0_3372371c9f(
+  _keys_0: LeanValue,
+  _v_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  leanTag(_x_2_3) match {
+  | "[\"Option\",\"none\"]" ->
+    _x_4_6: LeanValue = f_Meta_DiscrTree_createNodes_e542de69a4(
+      _keys_0,
+      _v_1,
+      LeanScalar("nat", "1"),
+    );
+    LeanCtor("[\"Option\",\"some\"]", Array[_x_4_6])
+  | "[\"Option\",\"some\"]" ->
+    _val_6_4: LeanValue = leanField(_x_2_3, 0);
+    _x_8_9: LeanValue = f_Meta_DiscrTree_insertAux_d6b213817b(
+      _inst_1_2,
+      _keys_0,
+      _v_1,
+      LeanScalar("nat", "1"),
+      _val_6_4,
+    );
+    LeanCtor("[\"Option\",\"some\"]", Array[_x_8_9])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_DiscrTree_insertKeyValue_lam_0_3372371c9f(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertKeyValue_lam_0_3372371c9f(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_6"
+fun f_Trie_format_closed_6_eb185d4bed(): LeanValue {
+  LeanText("#")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_33"
+fun f_instToExprKey_lam_0_closed_33_45f4de9854(): LeanValue {
+  LeanText("proj")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_3"
+fun f_instToExprKey_lam_0_closed_3_6107c72758(): LeanValue {
+  LeanText("Key")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_22"
+fun f_instToExprKey_lam_0_closed_22_f89a061f3b(): LeanValue {
+  _x_499_1: LeanValue = f_instToExprKey_lam_0_closed_21_6608ae30ef();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_499_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._closed_2"
+fun f_DiscrTree_instToExprKey_closed_2_5348a36de2(): LeanValue {
+  _x_835_1: LeanValue = f_DiscrTree_instToExprKey_closed_1_572189ff37();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_835_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_16"
+fun f_instToExprKey_lam_0_closed_16_3a50213fd7(): LeanValue {
+  _x_476_1: LeanValue = f_instToExprKey_lam_0_closed_15_f55dbd9ab4();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_476_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_18"
+fun f_instToExprKey_lam_0_closed_18_fa35ee2032(): LeanValue {
+  _x_480_0: LeanValue = f_instToExprKey_lam_0_closed_17_1a4f9b241e();
+  _x_481_1: LeanValue = f_instToExprKey_lam_0_closed_13_a5a99f2523();
+  _x_482_2: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(_x_482_2, _x_481_1, _x_480_0)
+}
+// "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10.spec_11._closed_1"
+fun f_spec_10_spec_11_closed_1_aef259ef82(): LeanValue {
+  _x_7111_0: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59();
+  _x_7112_1: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7113_2: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7114_3: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7115_4: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7116_5: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7117_6: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7118_7: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  _x_7119_8: LeanValue = LeanScalar("nat", "0");
+  _x_7120_9: LeanValue = LeanScalar("nat", "0");
+  _x_7121_10: LeanValue = LeanScalar("nat", "0");
+  _x_7122_11: LeanValue = LeanScalar("nat", "0");
+  LeanCtor(
+    "[\"Lean\",\"MetavarContext\",\"mk\"]",
+    Array[
+      _x_7122_11,
+      _x_7122_11,
+      _x_7122_11,
+      _x_7122_11,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7118_7,
+      _x_7111_0,
+    ],
+  )
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_0"
+fun f_DiscrTree_insertKeyValue_closed_0_7b5c87a054(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_instBEqKey_beq_5d3d2e2dd7,
+    2,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_3"
+fun f_DiscrTree_insertKeyValue_closed_3_b4fff29598(): LeanValue {
+  LeanText("Lean.Meta.DiscrTree.insertKeyValue")
+}
+// "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10.spec_11._closed_4"
+fun f_spec_10_spec_11_closed_4_a0920e46c0(): LeanValue {
+  _x_7135_1: LeanValue = f_spec_10_spec_11_closed_3_c233743506();
+  _x_7136_2: LeanValue = f_spec_10_spec_11_closed_0_77f855fccd();
+  LeanCtor(
+    "[\"Lean\",\"LocalContext\",\"mk\"]",
+    Array[
+      _x_7136_2,
+      _x_7135_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        Array[],
+      ),
+    ],
+  )
+}
+// "Lean.Meta.DiscrTree.instToFormatTrie"
+fun f_Meta_DiscrTree_instToFormatTrie_3ec80897c7(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_Trie_format_e8bb525fbf,
+    3,
+    Array[LeanErased(), _inst_1_1],
+  )
+}
+// "Array.binSearchAux._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux.spec_0"
+fun f_DiscrTree_getEntriesWithKeysAux_spec_0_532213af4b(
+  _value_0: LeanValue,
+  _as_1: LeanValue,
+  _k_2: LeanValue,
+  _x_1_3: LeanValue,
+  _x_2_4: LeanValue,
+  _x_3_5: LeanValue,
+): LeanValue {
+  f_DiscrTree_getEntriesWithKeysAux_spec_0_8a7cf5ee10(
+    _as_1,
+    _k_2,
+    _x_1_3,
+    _x_2_4,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_9"
+fun f_DiscrTree_insertAux_closed_9_b832a99c7d(): LeanValue {
+  _f_351_0: LeanValue = f_DiscrTree_insertAux_closed_6_64d43fcd23();
+  _x_352_1: LeanValue = f_DiscrTree_insertAux_closed_8_1a94b40ccc();
+  LeanCtor("[\"Monad\",\"mk\"]", Array[_x_352_1, _f_351_0])
+}
+// "Lean.Meta.DiscrTree.mkNoindexAnnotation._closed_0"
+fun f_DiscrTree_mkNoindexAnnotation_closed_0_c38bbfbd22(): LeanValue {
+  LeanText("noindex")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_31"
+fun f_instToExprKey_lam_0_closed_31_5f36e3d467(): LeanValue {
+  _x_529_0: LeanValue = f_instToExprKey_lam_0_closed_30_efa0871d20();
+  _x_530_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_531_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_532_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_533_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_533_4,
+    _x_532_3,
+    _x_531_2,
+    _x_530_1,
+    _x_529_0,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.next?"
+fun f_DiscrTree_keysAsPattern_next_514561b887(
+  _a_0: LeanValue,
+  _a_1: LeanValue,
+  _a_2: LeanValue,
+  _a_1_3: LeanValue,
+): LeanValue {
+  f_DiscrTree_keysAsPattern_next_aa126e50b6(_a_0, _a_1_3)
+}
+// "Lean.Meta.DiscrTree.instToExprKey"
+fun f_Meta_DiscrTree_instToExprKey_656459bafe(): LeanValue {
+  _f_1_0: LeanValue = LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic
+      .apply_f_DiscrTree_instToExprKey_lam_0_ad66d3931c,
+    1,
+    Array[],
+  );
+  _x_6_5: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    LeanText("Lean"),
+    LeanText("Meta"),
+    LeanText("DiscrTree"),
+    LeanText("Key"),
+  );
+  _x_8_7: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_6_5,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  );
+  LeanCtor("[\"Lean\",\"ToExpr\",\"mk\"]", Array[_f_1_0, _x_8_7])
+}
+// "Lean.Meta.DiscrTree.instInhabitedTrie._redArg._closed_0"
+fun f_DiscrTree_instInhabitedTrie_closed_0_41c4968253(): LeanValue {
+  L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "0"),
+  )
+}
+// "Lean.Meta.DiscrTree.getEntriesWithKeys"
+fun f_Meta_DiscrTree_getEntriesWithKeys_bb76aef383(
+  _value_0: LeanValue,
+  _d_1: LeanValue,
+  _keys_2: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_getEntriesWithKeys_ecd687830c(_d_1, _keys_2)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._closed_0"
+fun f_DiscrTree_instToExprKey_closed_0_8b1fe9c498(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic
+      .apply_f_DiscrTree_instToExprKey_lam_0_ad66d3931c,
+    1,
+    Array[],
+  )
+}
+// "Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0.spec_0"
+fun f_getEntriesWithKeys_spec_0_spec_0_66c0a53903(
+  _value_0: LeanValue,
+  _x_1_1: LeanValue,
+  _x_2_2: LeanValue,
+  _x_3_3: LeanValue,
+): LeanValue {
+  f_getEntriesWithKeys_spec_0_spec_0_edc95115ab(_x_1_1, _x_2_2, _x_3_3)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux.match_1.splitter._redArg"
+fun f_insertAux_match_1_splitter_5de22a0e80(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]" ->
+    _key_3_4: LeanValue = leanField(_x_2_1, 0);
+    _child_4_5: LeanValue = leanField(_x_2_1, 1);
+    leanApply(_h_1_2, Array[_x_1_0, _key_3_4, _child_4_5])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]" ->
+    _vs_6_6: LeanValue = leanField(_x_2_1, 0);
+    _children_7_7: LeanValue = leanField(_x_2_1, 1);
+    leanApply(_h_2_3, Array[_x_1_0, _vs_6_6, _children_7_7])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10.spec_11._closed_2"
+fun f_spec_10_spec_11_closed_2_4db640963d(): LeanValue {
+  _x_7125_1: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "32"),
+  );
+  LeanCtor("[\"Lean\",\"PersistentArrayNode\",\"node\"]", Array[_x_7125_1])
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_13"
+fun f_spec_7_spec_8_closed_13_5d5d2e942e(): LeanValue {
+  _x_7307_0: LeanValue = f_spec_7_spec_8_closed_12_3c2f939422();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7307_0)
+}
+// "Lean.Meta.DiscrTree.instToFormat._redArg"
+fun f_Meta_DiscrTree_instToFormat_c9198e0d4d(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_Meta_DiscrTree_format_9f2da40188,
+    3,
+    Array[LeanErased(), _inst_1_0],
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_27"
+fun f_instToExprKey_lam_0_closed_27_0340343f50(): LeanValue {
+  LeanText("const")
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_3"
+fun f_format_lam_0_closed_3_1fa4c190a7(): LeanValue {
+  LeanText(")")
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_6"
+fun f_spec_7_spec_8_closed_6_bded6327ae(): LeanValue {
+  LeanText(
+    "` exists but is imported privately; consider adding `public import ",
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.createNodes._redArg._closed_0"
+fun f_DiscrTree_createNodes_closed_0_25a6a59422(): LeanValue {
+  L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "0"),
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_4"
+fun f_instToExprKey_lam_0_closed_4_b4ee4874d0(): LeanValue {
+  LeanText("star")
+}
+// "Lean.Meta.DiscrTree.insertKeyValue"
+fun f_Meta_DiscrTree_insertKeyValue_e3803560e0(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _d_2: LeanValue,
+  _keys_3: LeanValue,
+  _v_4: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_insertKeyValue_4d070af2df(_inst_1_1, _d_2, _keys_3, _v_4)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.mkApp._closed_0"
+fun f_keysAsPattern_mkApp_closed_0_2b84d9a724(): LeanValue {
+  LeanText("")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.mkApp._closed_1"
+fun f_keysAsPattern_mkApp_closed_1_b3f2eb7b06(): LeanValue {
+  _x_861_0: LeanValue = f_keysAsPattern_mkApp_closed_0_2b84d9a724();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_861_0)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_20"
+fun f_instToExprKey_lam_0_closed_20_116f50e249(): LeanValue {
+  LeanText("fvar")
+}
+// "Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2"
+fun f_spec_0_spec_0_spec_2_d287b03285(
+  _value_0: LeanValue,
+  _constName_1: LeanValue,
+  _y_1_2: LeanValue,
+  _y_2_3: LeanValue,
+  _y_3_4: LeanValue,
+  _y_4_5: LeanValue,
+): LeanValue {
+  f_spec_0_spec_0_spec_2_fc7295d13e(
+    _constName_1,
+    _y_1_2,
+    _y_2_3,
+    _y_3_4,
+    _y_4_5,
+  )
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_3"
+fun f_spec_7_spec_8_closed_3_457e5106b5(): LeanValue {
+  _x_7289_0: LeanValue = f_spec_7_spec_8_closed_2_0fc89e59de();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7289_0)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_2"
+fun f_DiscrTree_insertAux_closed_2_1f75c47054(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_2_9fa65b8698,
+    2,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_5"
+fun f_Key_format_closed_5_f62c983ee6(): LeanValue {
+  _x_196_0: LeanValue = f_Key_format_closed_4_5c2d1d3243();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_196_0])
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_7"
+fun f_DiscrTree_insertAux_closed_7_39a8f5f49a(): LeanValue {
+  _f_342_0: LeanValue = f_DiscrTree_insertAux_closed_1_c39f936544();
+  _f_343_1: LeanValue = f_DiscrTree_insertAux_closed_0_7e962d9301();
+  LeanCtor("[\"Functor\",\"mk\"]", Array[_f_343_1, _f_342_0])
+}
+// "Lean.PersistentHashMap.findAtAux._at_.Lean.PersistentHashMap.findAux._at_.Lean.PersistentHashMap.find?._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_0.spec_0.spec_2"
+fun f_spec_0_spec_0_spec_2_0e65b3792c(
+  _value_0: LeanValue,
+  _keys_1: LeanValue,
+  _vals_2: LeanValue,
+  _heq_3: LeanValue,
+  _i_4: LeanValue,
+  _k_5: LeanValue,
+): LeanValue {
+  f_spec_0_spec_0_spec_2_c6ad4118df(_keys_1, _vals_2, _i_4, _k_5)
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_6"
+fun f_format_lam_0_closed_6_12e62d2632(): LeanValue {
+  _x_375_0: LeanValue = f_format_lam_0_closed_2_7d82f31431();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_375_0])
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_5"
+fun f_DiscrTree_insertKeyValue_closed_5_e8d346a78b(): LeanValue {
+  _x_156_0: LeanValue = f_DiscrTree_insertKeyValue_closed_4_0f061e56a9();
+  _x_159_3: LeanValue = f_DiscrTree_insertKeyValue_closed_3_b4fff29598();
+  _x_160_4: LeanValue = f_DiscrTree_insertKeyValue_closed_2_97d25d923c();
+  L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _x_160_4,
+    _x_159_3,
+    LeanScalar("nat", "179"),
+    LeanScalar("nat", "23"),
+    _x_156_0,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._lam_2"
+fun f_DiscrTree_insertAux_lam_2_70d77cb1d1(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _x_1_0
+}
+fun apply_f_DiscrTree_insertAux_lam_2_70d77cb1d1(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertAux_lam_2_70d77cb1d1(_args[0], _args[1])
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_6"
+fun f_DiscrTree_insertAux_closed_6_64d43fcd23(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_6_8dfbf3e2cd,
+    4,
+    Array[],
+  )
+}
+// "WellFounded.opaqueFix₃._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.goN.spec_2"
+fun f_keysAsPattern_goN_spec_2_71b6cd6e9d(
+  _upperBound_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+  _R_2: LeanValue,
+  _a_3: LeanValue,
+  _b_4: LeanValue,
+  _c_5: LeanValue,
+  _y_3_6: LeanValue,
+  _y_4_7: LeanValue,
+  _y_5_8: LeanValue,
+  _y_6_9: LeanValue,
+): LeanValue {
+  f_keysAsPattern_goN_spec_2_f297fdf40e(
+    _upperBound_1_0,
+    _a_3,
+    _b_4,
+    _y_3_6,
+    _y_4_7,
+    _y_5_8,
+    _y_6_9,
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_7"
+fun f_format_lam_0_closed_7_ddd92e8633(): LeanValue {
+  _x_377_0: LeanValue = f_format_lam_0_closed_3_1fa4c190a7();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_377_0])
+}
+// "Lean.Meta.DiscrTree.instInhabitedTrie"
+fun f_Meta_DiscrTree_instInhabitedTrie_e5c8f276e1(
+  _value_0: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_instInhabitedTrie_74cd2d0003(LeanErased())
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_34"
+fun f_instToExprKey_lam_0_closed_34_cd659c7b14(): LeanValue {
+  _x_543_0: LeanValue = f_instToExprKey_lam_0_closed_33_45f4de9854();
+  _x_544_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_545_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_546_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_547_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_547_4,
+    _x_546_3,
+    _x_545_2,
+    _x_544_1,
+    _x_543_0,
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg"
+fun f_DiscrTree_Trie_format_1cc915466a(
+  _inst_1_0_input: LeanValue,
+  _x_2_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_inst_1_0, 1=_x_2_1, 2=_key_3_2, 3=_child_4_3, 4=_vs_26_4, 5=_children_27_5, 6=_x_5_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_19_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24, 25=_x_24_25, 26=_x_25_26, 27=_f_28_27, 28=_x_29_28, 29=_x_30_29, 30=_y_32_30, 31=_x_33_31, 32=_x_34_32, 33=_x_35_33, 34=_x_36_34, 35=_x_37_35, 36=_x_38_36, 37=_x_39_37, 38=_x_40_38, 39=_x_41_39, 40=_x_42_40, 41=_x_43_41, 42=_x_44_42, 43=_x_45_43, 44=_x_46_44, 45=_x_47_45, 46=_x_48_46, 47=_x_49_47, 48=_x_50_48, 49=_x_51_49, 50=_x_52_50, 51=_x_53_51, 52=_x_54_52, 53=_x_55_53, 54=_x_56_54, 55=_x_57_55, 56=_x_58_56, 57=_x_59_57, 58=_x_60_58, 59=_x_61_59, 60=_x_62_60
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    61,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _inst_1_0_input);
+  _frame.set(1, _x_2_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]" ->
+        _frame.set(2, leanField(_frame[1], 0));
+        _frame.set(3, leanField(_frame[1], 1));
+        _frame.set(6, LeanText("chain "));
+        _frame.set(
+          7,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[6]]),
+        );
+        _frame.set(8, f_DiscrTree_Key_format_b00418d9e4(_frame[2]));
+        _frame.set(
+          9,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"append\"]",
+            Array[_frame[7], _frame[8]],
+          ),
+        );
+        _frame.set(10, LeanText(" => "));
+        _frame.set(
+          11,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[10]]),
+        );
+        _frame.set(
+          12,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"append\"]",
+            Array[_frame[9], _frame[11]],
+          ),
+        );
+        _frame.set(
+          13,
+          f_DiscrTree_Trie_format_1cc915466a(_frame[0], _frame[3]),
+        );
+        _frame.set(
+          14,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"append\"]",
+            Array[_frame[12], _frame[13]],
+          ),
+        );
+        _frame.set(15, LeanText("("));
+        _frame.set(16, LeanText(")"));
+        _frame.set(
+          17,
+          L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(
+            _frame[15],
+          ),
+        );
+        _frame.set(
+          18,
+          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[17]),
+        );
+        _frame.set(
+          19,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[15]]),
+        );
+        _frame.set(
+          20,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"append\"]",
+            Array[_frame[19], _frame[14]],
+          ),
+        );
+        _frame.set(
+          21,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[16]]),
+        );
+        _frame.set(
+          22,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"append\"]",
+            Array[_frame[20], _frame[21]],
+          ),
+        );
+        _frame.set(
+          23,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"nest\"]",
+            Array[_frame[18], _frame[22]],
+          ),
+        );
+        _frame.set(
+          24,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+            Array[],
+          ),
+        );
+        _frame.set(
+          25,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"group\"]",
+            Array[_frame[23], _frame[24]],
+          ),
+        );
+        _frame.set(
+          26,
+          LeanCtor(
+            "[\"Std\",\"Format\",\"group\"]",
+            Array[_frame[25], _frame[24]],
+          ),
+        );
+        return _frame[26]
+      | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]" ->
+        _frame.set(4, leanField(_frame[1], 0));
+        _frame.set(5, leanField(_frame[1], 1));
+        _frame.set(
+          27,
+          LeanClosure(
+            L4_Lean_Meta_DiscrTree_Basic.apply_f_Trie_format_lam_0_2781385d66,
+            2,
+            Array[_frame[0]],
+          ),
+        );
+        _frame.set(28, LeanText("node"));
+        _frame.set(
+          29,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[28]]),
+        );
+        _frame.set(
+          49,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[4]),
+        );
+        _frame.set(50, LeanScalar("nat", "0"));
+        _frame.set(
+          51,
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[49], _frame[50]),
+        );
+        leanTag(_frame[51]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(52, LeanText(" "));
+          _frame.set(
+            53,
+            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[52]]),
+          );
+          _frame.set(54, LeanText("#"));
+          _frame.set(
+            55,
+            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[54]]),
+          );
+          _frame.set(
+            56,
+            L4_Init_Prelude.f_Array_toList_2f8b2ba454(LeanErased(), _frame[4]),
+          );
+          _frame.set(
+            57,
+            L4_Init_Data_Format_Instances.f_List_format_13a5b01276(
+              _frame[0],
+              _frame[56],
+            ),
+          );
+          _frame.set(
+            58,
+            LeanCtor(
+              "[\"Std\",\"Format\",\"append\"]",
+              Array[_frame[55], _frame[57]],
+            ),
+          );
+          _frame.set(
+            59,
+            LeanCtor(
+              "[\"Std\",\"Format\",\"append\"]",
+              Array[_frame[53], _frame[58]],
+            ),
+          );
+          _jump0 = _frame[59];
+          _frame.set(30, _jump0);
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(60, LeanCtor("[\"Std\",\"Format\",\"nil\"]", Array[]));
+          _jump0 = _frame[60];
+          _frame.set(30, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        31,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[29], _frame[30]],
+        ),
+      );
+      _frame.set(
+        32,
+        L4_Init_Prelude.f_Array_toList_2f8b2ba454(LeanErased(), _frame[5]),
+      );
+      _frame.set(33, LeanCtor("[\"List\",\"nil\"]", Array[]));
+      _frame.set(
+        34,
+        L4_Init_Data_List_Basic.f_List_mapTR_loop_d4197faab1(
+          _frame[27],
+          _frame[32],
+          _frame[33],
+        ),
+      );
+      _frame.set(
+        35,
+        L4_Init_Data_Format_Basic.f_Std_Format_join_e7272686d3(_frame[34]),
+      );
+      _frame.set(
+        36,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[31], _frame[35]],
+        ),
+      );
+      _frame.set(37, LeanText("("));
+      _frame.set(38, LeanText(")"));
+      _frame.set(
+        39,
+        L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(
+          _frame[37],
+        ),
+      );
+      _frame.set(40, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[39]));
+      _frame.set(
+        41,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[37]]),
+      );
+      _frame.set(
+        42,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[41], _frame[36]],
+        ),
+      );
+      _frame.set(
+        43,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[38]]),
+      );
+      _frame.set(
+        44,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[42], _frame[43]],
+        ),
+      );
+      _frame.set(
+        45,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"nest\"]",
+          Array[_frame[40], _frame[44]],
+        ),
+      );
+      _frame.set(
+        46,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      );
+      _frame.set(
+        47,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"group\"]",
+          Array[_frame[45], _frame[46]],
+        ),
+      );
+      _frame.set(
+        48,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"group\"]",
+          Array[_frame[47], _frame[46]],
+        ),
+      );
+      return _frame[48]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_4"
+fun f_DiscrTree_insertAux_closed_4_79f47929dc(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_4_552185c942,
+    4,
+    Array[],
+  )
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_4"
+fun f_format_lam_0_closed_4_910a7f542b(): LeanValue {
+  _x_371_0: LeanValue = f_format_lam_0_closed_2_7d82f31431();
+  L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(_x_371_0)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.goN._closed_0"
+fun f_keysAsPattern_goN_closed_0_336c62ce78(): LeanValue {
+  L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "0"),
+  )
+}
+// "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8.spec_10.spec_11._closed_0"
+fun f_spec_10_spec_11_closed_0_77f855fccd(): LeanValue {
+  _x_7109_0: LeanValue = f_DiscrTree_instInhabited_closed_0_d026e15b6a();
+  LeanCtor(
+    "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+    Array[_x_7109_0],
+  )
+}
+// "Lean.Meta.DiscrTree.instToFormatKey"
+fun f_Meta_DiscrTree_instToFormatKey_727ecf04b8(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_Key_format_b00418d9e4,
+    1,
+    Array[],
+  )
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_11"
+fun f_spec_7_spec_8_closed_11_f3e39dbfc8(): LeanValue {
+  _x_7304_0: LeanValue = f_spec_7_spec_8_closed_10_7d1636ebd5();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7304_0)
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_4"
+fun f_Key_format_closed_4_5c2d1d3243(): LeanValue {
+  LeanText("∀")
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_4"
+fun f_spec_7_spec_8_closed_4_c31522c587(): LeanValue {
+  LeanText("A public declaration `")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_30"
+fun f_instToExprKey_lam_0_closed_30_efa0871d20(): LeanValue {
+  LeanText("arrow")
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_1"
+fun f_format_lam_0_closed_1_5e2e28434d(): LeanValue {
+  _x_367_0: LeanValue = f_format_lam_0_closed_0_0a3740e64a();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_367_0])
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg"
+fun f_Meta_DiscrTree_insertAux_d6b213817b(
+  _inst_1_0: LeanValue,
+  _keys_1: LeanValue,
+  _v_2: LeanValue,
+  _x_2_3: LeanValue,
+  _x_3_4: LeanValue,
+): LeanValue {
+  _f_4_5: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_0_cc398566b3,
+    4,
+    Array[],
+  );
+  _f_5_6: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_1_91ebcf203e,
+    4,
+    Array[],
+  );
+  _f_6_7: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_2_9fa65b8698,
+    2,
+    Array[],
+  );
+  _f_7_8: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_3_f3d9d44434,
+    4,
+    Array[],
+  );
+  _f_8_9: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_4_552185c942,
+    4,
+    Array[],
+  );
+  _f_9_10: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_5_4db1d10e8c,
+    4,
+    Array[],
+  );
+  _f_10_11: LeanValue = LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_6_8dfbf3e2cd,
+    4,
+    Array[],
+  );
+  _x_13_14: LeanValue = LeanCtor(
+    "[\"Monad\",\"mk\"]",
+    Array[
+      LeanCtor(
+        "[\"Applicative\",\"mk\"]",
+        Array[
+          LeanCtor("[\"Functor\",\"mk\"]", Array[_f_4_5, _f_5_6]),
+          _f_6_7,
+          _f_7_8,
+          _f_8_9,
+          _f_9_10,
+        ],
+      ),
+      _f_10_11,
+    ],
+  );
+  leanTag(_x_3_4) match {
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]" ->
+    _key_14_15: LeanValue = leanField(_x_3_4, 0);
+    _child_15_16: LeanValue = leanField(_x_3_4, 1);
+    _x_16_19: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _keys_1,
+    );
+    _x_17_20: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _x_2_3,
+      _x_16_19,
+    );
+    leanTag(_x_17_20) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_19_22: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+        LeanErased(),
+        LeanScalar("nat", "1"),
+      );
+      _x_20_23: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        LeanErased(),
+        _x_19_22,
+        _v_2,
+      );
+      _x_22_25: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        LeanErased(),
+        _x_19_22,
+        LeanCtor("[\"Prod\",\"mk\"]", Array[_key_14_15, _child_15_16]),
+      );
+      LeanCtor(
+        "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+        Array[_x_20_23, _x_22_25],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_24_27: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        LeanErased(),
+        _keys_1,
+        _x_2_3,
+        LeanErased(),
+      );
+      _x_25_28: LeanValue = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_instBEqKey_beq_5d3d2e2dd7(
+        _x_24_27,
+        _key_14_15,
+      );
+      leanTag(_x_25_28) match {
+      | "[\"Bool\",\"false\"]" ->
+        _f_26_29: LeanValue = LeanClosure(
+          L4_Lean_Meta_DiscrTree_Basic
+            .apply_f_DiscrTree_insertAux_lam_0_5c2ba16d11,
+          2,
+          Array[],
+        );
+        _x_28_31: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+          LeanErased(),
+          LeanScalar("nat", "0"),
+        );
+        _x_30_33: LeanValue = LeanScalar("nat", "1");
+        _x_31_34: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+          LeanErased(),
+          _x_30_33,
+        );
+        _x_32_35: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+          LeanErased(),
+          _x_31_34,
+          LeanCtor("[\"Prod\",\"mk\"]", Array[_key_14_15, _child_15_16]),
+        );
+        _x_33_36: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _x_2_3,
+          _x_30_33,
+        );
+        _x_34_37: LeanValue = f_Meta_DiscrTree_createNodes_e542de69a4(
+          _keys_1,
+          _v_2,
+          _x_33_36,
+        );
+        _x_35_38: LeanValue = LeanCtor(
+          "[\"Prod\",\"mk\"]",
+          Array[_x_24_27, _x_34_37],
+        );
+        _f_36_39: LeanValue = LeanClosure(
+          L4_Lean_Meta_DiscrTree_Basic
+            .apply_f_DiscrTree_insertAux_lam_1_7e2f62b106,
+          2,
+          Array[_x_35_38],
+        );
+        _f_37_40: LeanValue = LeanClosure(
+          L4_Lean_Meta_DiscrTree_Basic
+            .apply_f_DiscrTree_insertAux_lam_2_70d77cb1d1,
+          2,
+          Array[_x_35_38],
+        );
+        _x_38_41: LeanValue = L4_Init_Data_Array_BinSearch.f_Array_binInsertM_0784888525(
+          _x_13_14,
+          _f_26_29,
+          _f_36_39,
+          _f_37_40,
+          _x_32_35,
+          _x_35_38,
+        );
+        LeanCtor(
+          "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+          Array[_x_28_31, _x_38_41],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _x_41_44: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _x_2_3,
+          LeanScalar("nat", "1"),
+        );
+        _x_42_45: LeanValue = f_Meta_DiscrTree_insertAux_d6b213817b(
+          _inst_1_0,
+          _keys_1,
+          _v_2,
+          _x_41_44,
+          _child_15_16,
+        );
+        LeanCtor(
+          "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]",
+          Array[_key_14_15, _x_42_45],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]" ->
+    _vs_44_17: LeanValue = leanField(_x_3_4, 0);
+    _children_45_18: LeanValue = leanField(_x_3_4, 1);
+    _x_46_47: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _keys_1,
+    );
+    _x_47_48: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _x_2_3,
+      _x_46_47,
+    );
+    leanTag(_x_47_48) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_48_49: LeanValue = f_Meta_DiscrTree_insertVal_644fc3cf04(
+        _inst_1_0,
+        _vs_44_17,
+        _v_2,
+      );
+      LeanCtor(
+        "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+        Array[_x_48_49, _children_45_18],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _f_50_51: LeanValue = LeanClosure(
+        L4_Lean_Meta_DiscrTree_Basic
+          .apply_f_DiscrTree_insertAux_lam_0_5c2ba16d11,
+        2,
+        Array[],
+      );
+      _k_52: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        LeanErased(),
+        _keys_1,
+        _x_2_3,
+        LeanErased(),
+      );
+      _f_51_53: LeanValue = LeanClosure(
+        L4_Lean_Meta_DiscrTree_Basic
+          .apply_f_DiscrTree_insertAux_lam_4_44ffe8e3a6,
+        6,
+        Array[_x_2_3, _inst_1_0, _keys_1, _v_2, _k_52],
+      );
+      _f_52_54: LeanValue = LeanClosure(
+        L4_Lean_Meta_DiscrTree_Basic
+          .apply_f_DiscrTree_insertAux_lam_3_72ac76fc1f,
+        5,
+        Array[_x_2_3, _keys_1, _v_2, _k_52],
+      );
+      _x_54_56: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+        LeanErased(),
+        LeanScalar("nat", "0"),
+      );
+      _c_59: LeanValue = L4_Init_Data_Array_BinSearch.f_Array_binInsertM_0784888525(
+        _x_13_14,
+        _f_50_51,
+        _f_51_53,
+        _f_52_54,
+        _children_45_18,
+        LeanCtor(
+          "[\"Prod\",\"mk\"]",
+          Array[
+            _k_52,
+            LeanCtor(
+              "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+              Array[_x_54_56, _x_54_56],
+            ),
+          ],
+        ),
+      );
+      LeanCtor(
+        "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+        Array[_vs_44_17, _c_59],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_26"
+fun f_instToExprKey_lam_0_closed_26_431805e9b6(): LeanValue {
+  _x_508_1: LeanValue = f_instToExprKey_lam_0_closed_25_a21454c720();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_508_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_2"
+fun f_keysAsPattern_go_closed_2_5eccd03def(): LeanValue {
+  _x_7697_0: LeanValue = f_keysAsPattern_go_closed_1_f1ac0e5616();
+  L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(_x_7697_0)
+}
+// "panic._at_.Lean.Meta.DiscrTree.getEntriesWithKeys.spec_1._redArg._closed_0"
+fun f_getEntriesWithKeys_spec_1_closed_0_92d7faf4ad(): LeanValue {
+  L4_Init_Data_Array_Basic.f_Array_instInhabited_af67de0d5e(LeanErased())
+}
+// "Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_8"
+fun f_spec_4_spec_6_spec_8_7e1339a88c(
+  _value_0: LeanValue,
+  _ref_1: LeanValue,
+  _msg_2: LeanValue,
+  _y_1_3: LeanValue,
+  _y_2_4: LeanValue,
+  _y_3_5: LeanValue,
+  _y_4_6: LeanValue,
+): LeanValue {
+  f_spec_4_spec_6_spec_8_a746d3d7b3(
+    _ref_1,
+    _msg_2,
+    _y_1_3,
+    _y_2_4,
+    _y_3_5,
+    _y_4_6,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertVal._redArg"
+fun f_Meta_DiscrTree_insertVal_644fc3cf04(
+  _inst_1_0: LeanValue,
+  _vs_1: LeanValue,
+  _v_2: LeanValue,
+): LeanValue {
+  f_DiscrTree_insertVal_loop_cc1e549603(
+    _inst_1_0,
+    _vs_1,
+    _v_2,
+    LeanScalar("nat", "0"),
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_8"
+fun f_keysAsPattern_go_closed_8_89b099a861(): LeanValue {
+  _x_7708_0: LeanValue = f_Key_format_closed_6_a7a58e3955();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7708_0)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_13"
+fun f_instToExprKey_lam_0_closed_13_a5a99f2523(): LeanValue {
+  LeanText("Literal")
+}
+// "Lean.Meta.DiscrTree.format._redArg"
+fun f_Meta_DiscrTree_format_d85fe8551f(
+  _inst_1_0: LeanValue,
+  _d_1: LeanValue,
+): LeanValue {
+  _f_2_2: LeanValue = LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_format_lam_0_c5487b9bc3,
+    4,
+    Array[_inst_1_0],
+  );
+  _x_6_6: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_foldl_16c7f253b5(
+    _d_1,
+    _f_2_2,
+    LeanCtor(
+      "[\"Prod\",\"mk\"]",
+      Array[
+        LeanCtor("[\"Bool\",\"true\"]", Array[]),
+        LeanCtor("[\"Std\",\"Format\",\"nil\"]", Array[]),
+      ],
+    ),
+  );
+  leanTag(_x_6_6) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_7_7: LeanValue = leanField(_x_6_6, 0);
+    _snd_8_8: LeanValue = leanField(_x_6_6, 1);
+    LeanCtor(
+      "[\"Std\",\"Format\",\"group\"]",
+      Array[
+        _snd_8_8,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      ],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_10"
+fun f_instToExprKey_lam_0_closed_10_dacf907331(): LeanValue {
+  LeanText("lit")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_0"
+fun f_instToExprKey_lam_0_closed_0_377fd3714a(): LeanValue {
+  LeanText("Lean")
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8"
+fun f_spec_6_spec_7_spec_8_32d9d41758(
+  _msg_0: LeanValue,
+  _declHint_1: LeanValue,
+  _y_1_2: LeanValue,
+  _y_2_3: LeanValue,
+  _y_3_4: LeanValue,
+  _y_4_5: LeanValue,
+): LeanValue {
+  f_spec_6_spec_7_spec_8_983e14aa8e(_msg_0, _declHint_1, _y_3_4, _y_4_5)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux._redArg"
+fun f_Meta_DiscrTree_getEntriesWithKeysAux_f6f6b484ce(
+  _keys_0_input: LeanValue,
+  _x_1_1_input: LeanValue,
+  _x_2_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_keys_0, 1=_x_1_1, 2=_x_2_2, 3=_x_4_3, 4=_x_5_4, 5=_key_6_5, 6=_child_7_6, 7=_vs_19_7, 8=_children_20_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_21_20, 21=_x_22_21, 22=_x_23_22, 23=_x_24_23, 24=_x_25_24, 25=_x_26_25, 26=_x_27_26, 27=_x_28_27, 28=_k_28, 29=_x_29_29, 30=_x_30_30, 31=_x_31_31, 32=_x_32_32, 33=_val_33_33, 34=_snd_35_35, 35=_x_36_36, 36=_x_37_37
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    37,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _keys_0_input);
+  _frame.set(1, _x_1_1_input);
+  _frame.set(2, _x_2_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[2]) match {
+      | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]" ->
+        _frame.set(5, leanField(_frame[2], 0));
+        _frame.set(6, leanField(_frame[2], 1));
+        _frame.set(
+          9,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[0]),
+        );
+        _frame.set(
+          10,
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[1], _frame[9]),
+        );
+        leanTag(_frame[10]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(11, LeanScalar("nat", "0"));
+          _frame.set(
+            12,
+            L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+              LeanErased(),
+              _frame[11],
+            ),
+          );
+          return _frame[12]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            13,
+            L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+              LeanErased(),
+              _frame[0],
+              _frame[1],
+              LeanErased(),
+            ),
+          );
+          _frame.set(
+            14,
+            L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_instBEqKey_beq_5d3d2e2dd7(
+              _frame[13],
+              _frame[5],
+            ),
+          );
+          leanTag(_frame[14]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(15, LeanScalar("nat", "0"));
+            _frame.set(
+              16,
+              L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+                LeanErased(),
+                _frame[15],
+              ),
+            );
+            return _frame[16]
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(17, LeanScalar("nat", "1"));
+            _frame.set(
+              18,
+              L4_Init_Prelude.f_Nat_add_86990f4822(_frame[1], _frame[17]),
+            );
+            _frame.set(
+              19,
+              f_Meta_DiscrTree_getEntriesWithKeysAux_f6f6b484ce(
+                _frame[0],
+                _frame[18],
+                _frame[6],
+              ),
+            );
+            return _frame[19]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]" ->
+        _frame.set(7, leanField(_frame[2], 0));
+        _frame.set(8, leanField(_frame[2], 1));
+        _frame.set(
+          20,
+          L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[0]),
+        );
+        _frame.set(
+          21,
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[1], _frame[20]),
+        );
+        leanTag(_frame[21]) match {
+        | "[\"Bool\",\"false\"]" -> return _frame[7]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(22, LeanScalar("nat", "0"));
+          _frame.set(
+            23,
+            L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[8]),
+          );
+          _frame.set(
+            24,
+            L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[22], _frame[23]),
+          );
+          leanTag(_frame[24]) match {
+          | "[\"Bool\",\"false\"]" ->
+            !pc = 1;
+            void
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(25, LeanScalar("nat", "1"));
+            _frame.set(
+              26,
+              L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[23], _frame[25]),
+            );
+            _frame.set(
+              27,
+              L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[22], _frame[26]),
+            );
+            leanTag(_frame[27]) match {
+            | "[\"Bool\",\"false\"]" ->
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                28,
+                L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+                  LeanErased(),
+                  _frame[0],
+                  _frame[1],
+                  LeanErased(),
+                ),
+              );
+              _frame.set(
+                29,
+                L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+                  LeanErased(),
+                  _frame[22],
+                ),
+              );
+              _frame.set(
+                30,
+                LeanCtor(
+                  "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]",
+                  Array[_frame[29], _frame[29]],
+                ),
+              );
+              _frame.set(
+                31,
+                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[28], _frame[30]]),
+              );
+              _frame.set(
+                32,
+                f_DiscrTree_getEntriesWithKeysAux_spec_0_8a7cf5ee10(
+                  _frame[8],
+                  _frame[31],
+                  _frame[22],
+                  _frame[26],
+                ),
+              );
+              leanTag(_frame[32]) match {
+              | "[\"Option\",\"none\"]" ->
+                !pc = 1;
+                void
+              | "[\"Option\",\"some\"]" ->
+                _frame.set(33, leanField(_frame[32], 0));
+                leanTag(_frame[33]) match {
+                | "[\"Prod\",\"mk\"]" ->
+                  _ = leanField(_frame[33], 0);
+                  _frame.set(34, leanField(_frame[33], 1));
+                  _frame.set(
+                    35,
+                    L4_Init_Prelude.f_Nat_add_86990f4822(_frame[1], _frame[25]),
+                  );
+                  _frame.set(
+                    36,
+                    f_Meta_DiscrTree_getEntriesWithKeysAux_f6f6b484ce(
+                      _frame[0],
+                      _frame[35],
+                      _frame[34],
+                    ),
+                  );
+                  return _frame[36]
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(3, LeanScalar("nat", "0"));
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(LeanErased(), _frame[3]),
+      );
+      return _frame[4]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_5"
+fun f_Trie_format_closed_5_3287750b4c(): LeanValue {
+  _x_409_0: LeanValue = f_Trie_format_closed_4_6c598bc619();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_409_0])
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_4"
+fun f_Trie_format_closed_4_6c598bc619(): LeanValue {
+  LeanText(" ")
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._closed_7"
+fun f_Trie_format_closed_7_343334363d(): LeanValue {
+  _x_412_0: LeanValue = f_Trie_format_closed_6_eb185d4bed();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_412_0])
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux"
+fun f_Meta_DiscrTree_getEntriesWithKeysAux_93a8ed33fc(
+  _value_0: LeanValue,
+  _keys_1: LeanValue,
+  _x_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_getEntriesWithKeysAux_f6f6b484ce(_keys_1, _x_1_2, _x_2_3)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertVal"
+fun f_Meta_DiscrTree_insertVal_d2c2020eb3(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _vs_2: LeanValue,
+  _v_3: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_insertVal_644fc3cf04(_inst_1_1, _vs_2, _v_3)
+}
+// "Lean.Meta.DiscrTree.Trie.format"
+fun f_DiscrTree_Trie_format_e8bb525fbf(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _x_2_2: LeanValue,
+): LeanValue {
+  f_DiscrTree_Trie_format_1cc915466a(_inst_1_1, _x_2_2)
+}
+fun apply_f_DiscrTree_Trie_format_e8bb525fbf(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_Trie_format_e8bb525fbf(_args[0], _args[1], _args[2])
+}
+// "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4._redArg._closed_1"
+fun f_spec_2_spec_4_closed_1_8fdff5a460(): LeanValue {
+  _x_7520_0: LeanValue = f_spec_2_spec_4_closed_0_78369b2aca();
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_7520_0)
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_10"
+fun f_DiscrTree_insertAux_closed_10_0afffda13c(): LeanValue {
+  LeanClosure(
+    L4_Lean_Meta_DiscrTree_Basic.apply_f_DiscrTree_insertAux_lam_0_5c2ba16d11,
+    2,
+    Array[],
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux.match_1.splitter"
+fun f_insertAux_match_1_splitter_5009d8f407(
+  _value_0: LeanValue,
+  _motive_1: LeanValue,
+  _x_1_2: LeanValue,
+  _x_2_3: LeanValue,
+  _h_1_4: LeanValue,
+  _h_2_5: LeanValue,
+): LeanValue {
+  leanTag(_x_2_3) match {
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"chain\"]" ->
+    _key_3_6: LeanValue = leanField(_x_2_3, 0);
+    _child_4_7: LeanValue = leanField(_x_2_3, 1);
+    leanApply(_h_1_4, Array[_x_1_2, _key_3_6, _child_4_7])
+  | "[\"Lean\",\"Meta\",\"DiscrTree\",\"Trie\",\"node\"]" ->
+    _vs_6_8: LeanValue = leanField(_x_2_3, 0);
+    _children_7_9: LeanValue = leanField(_x_2_3, 1);
+    leanApply(_h_2_5, Array[_x_1_2, _vs_6_8, _children_7_9])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstVal._at_.Lean.mkConstWithLevelParams._at_._private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go.spec_0.spec_0.spec_2.spec_4.spec_6.spec_7.spec_8._redArg._closed_8"
+fun f_spec_7_spec_8_closed_8_2e992e26ba(): LeanValue {
+  LeanText("`.")
+}
+// "Lean.Meta.DiscrTree.instInhabited._closed_0"
+fun f_DiscrTree_instInhabited_closed_0_831c7a930e(): LeanValue {
+  f_Meta_DiscrTree_instInhabited_7a7cdffa9f(LeanErased())
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._closed_0"
+fun f_DiscrTree_insertAux_closed_0_7e962d9301(): LeanValue {
+  LeanClosure(
+    L4_Init_Control_Id.apply_f_Id_instMonad_lam_0_cc398566b3,
+    4,
+    Array[],
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.Trie.format.match_1.splitter._redArg"
+fun f_format_match_1_splitter_61363a22ca(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_2_2: LeanValue = leanField(_x_1_0, 0);
+    _snd_3_3: LeanValue = leanField(_x_1_0, 1);
+    leanApply(_h_1_1, Array[_fst_2_2, _snd_3_3])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.DiscrTree.empty._closed_0"
+fun f_DiscrTree_empty_closed_0_e6ff3c1212(): LeanValue {
+  f_Meta_DiscrTree_empty_b109d1b88b(LeanErased())
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_5"
+fun f_format_lam_0_closed_5_832f4ddd09(): LeanValue {
+  _x_373_0: LeanValue = f_format_lam_0_closed_4_910a7f542b();
+  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_373_0)
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0._closed_2"
+fun f_format_lam_0_closed_2_7d82f31431(): LeanValue {
+  LeanText("(")
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertAux._redArg._lam_1"
+fun f_DiscrTree_insertAux_lam_1_7e2f62b106(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _x_1_0
+}
+fun apply_f_DiscrTree_insertAux_lam_1_7e2f62b106(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_DiscrTree_insertAux_lam_1_7e2f62b106(_args[0], _args[1])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_1"
+fun f_instToExprKey_lam_0_closed_1_55d4afbd6b(): LeanValue {
+  LeanText("Meta")
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_2"
+fun f_Key_format_closed_2_dd9d9f7434(): LeanValue {
+  LeanText("◾")
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_19"
+fun f_instToExprKey_lam_0_closed_19_6185d22636(): LeanValue {
+  _x_485_1: LeanValue = f_instToExprKey_lam_0_closed_18_fa35ee2032();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_485_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Lean.Meta.DiscrTree.insertKeyValue._redArg._closed_4"
+fun f_DiscrTree_insertKeyValue_closed_4_0f061e56a9(): LeanValue {
+  LeanText("invalid key sequence")
+}
+// "Lean.Meta.DiscrTree.Key.format._closed_7"
+fun f_Key_format_closed_7_366dee5895(): LeanValue {
+  _x_199_0: LeanValue = f_Key_format_closed_6_a7a58e3955();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_199_0])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._closed_3"
+fun f_DiscrTree_instToExprKey_closed_3_5538a4c2f4(): LeanValue {
+  _x_837_0: LeanValue = f_DiscrTree_instToExprKey_closed_2_5348a36de2();
+  _f_838_1: LeanValue = f_DiscrTree_instToExprKey_closed_0_8b1fe9c498();
+  LeanCtor("[\"Lean\",\"ToExpr\",\"mk\"]", Array[_f_838_1, _x_837_0])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._closed_1"
+fun f_DiscrTree_instToExprKey_closed_1_572189ff37(): LeanValue {
+  _x_829_0: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_830_1: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_831_2: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_832_3: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _x_832_3,
+    _x_831_2,
+    _x_830_1,
+    _x_829_0,
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.insertVal.loop._redArg"
+fun f_DiscrTree_insertVal_loop_cc1e549603(
+  _inst_1_0: LeanValue,
+  _vs_1: LeanValue,
+  _v_2: LeanValue,
+  _i_3: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _vs_1,
+  );
+  _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_3, _x_2_4);
+  leanTag(_x_3_5) match {
+  | "[\"Bool\",\"false\"]" ->
+    L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _vs_1, _v_2)
+  | "[\"Bool\",\"true\"]" ->
+    _x_5_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _vs_1,
+      _i_3,
+      LeanErased(),
+    );
+    _x_6_8: LeanValue = leanApply(_inst_1_0, Array[_v_2, _x_5_7]);
+    leanTag(_x_6_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_8_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _i_3,
+        LeanScalar("nat", "1"),
+      );
+      f_DiscrTree_insertVal_loop_cc1e549603(_inst_1_0, _vs_1, _v_2, _x_8_10)
+    | "[\"Bool\",\"true\"]" ->
+      L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+        LeanErased(),
+        _vs_1,
+        _i_3,
+        _v_2,
+        LeanErased(),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.getEntriesWithKeysAux.match_1.splitter._redArg"
+fun f_getEntriesWithKeysAux_match_1_splitter_356258912c(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Option\",\"none\"]" ->
+    leanApply(_h_1_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Option\",\"some\"]" ->
+    _val_4_3: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_val_4_3) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_5_6: LeanValue = leanField(_val_4_3, 0);
+      _snd_6_7: LeanValue = leanField(_val_4_3, 1);
+      leanApply(_h_2_2, Array[_fst_5_6, _snd_6_7])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_5"
+fun f_keysAsPattern_go_closed_5_d3477af130(): LeanValue {
+  _x_7702_0: LeanValue = f_keysAsPattern_go_closed_4_c93b3dbd55();
+  L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(_x_7702_0)
+}
+// "Lean.Meta.DiscrTree.Trie.format._redArg._lam_0"
+fun f_Trie_format_lam_0_2781385d66(
+  _inst_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Prod\",\"mk\"]" ->
+    _fst_3_2: LeanValue = leanField(_x_2_1, 0);
+    _snd_4_3: LeanValue = leanField(_x_2_1, 1);
+    _x_6_5: LeanValue = f_DiscrTree_Key_format_b00418d9e4(_fst_3_2);
+    _x_10_9: LeanValue = f_DiscrTree_Trie_format_1cc915466a(
+      _inst_1_0,
+      _snd_4_3,
+    );
+    _x_11_10: LeanValue = LeanCtor(
+      "[\"Std\",\"Format\",\"append\"]",
+      Array[
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[
+            _x_6_5,
+            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText(" => ")]),
+          ],
+        ),
+        _x_10_9,
+      ],
+    );
+    _x_12_11: LeanValue = LeanText("(");
+    _x_14_13: LeanValue = L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(
+      _x_12_11,
+    );
+    _x_15_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      _x_14_13,
+    );
+    _x_19_18: LeanValue = LeanCtor(
+      "[\"Std\",\"Format\",\"append\"]",
+      Array[
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[
+            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_12_11]),
+            _x_11_10,
+          ],
+        ),
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText(")")]),
+      ],
+    );
+    _x_22_21: LeanValue = LeanCtor(
+      "[\"Std\",\"Format\",\"group\"]",
+      Array[
+        LeanCtor("[\"Std\",\"Format\",\"nest\"]", Array[_x_15_14, _x_19_18]),
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      ],
+    );
+    LeanCtor(
+      "[\"Std\",\"Format\",\"append\"]",
+      Array[LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]), _x_22_21],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Trie_format_lam_0_2781385d66(_args: Array<LeanValue>): LeanValue {
+  f_Trie_format_lam_0_2781385d66(_args[0], _args[1])
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_21"
+fun f_instToExprKey_lam_0_closed_21_6608ae30ef(): LeanValue {
+  _x_492_0: LeanValue = f_instToExprKey_lam_0_closed_20_116f50e249();
+  _x_493_1: LeanValue = f_instToExprKey_lam_0_closed_3_6107c72758();
+  _x_494_2: LeanValue = f_instToExprKey_lam_0_closed_2_0137eb68b7();
+  _x_495_3: LeanValue = f_instToExprKey_lam_0_closed_1_55d4afbd6b();
+  _x_496_4: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _x_496_4,
+    _x_495_3,
+    _x_494_2,
+    _x_493_1,
+    _x_492_0,
+  )
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_25"
+fun f_instToExprKey_lam_0_closed_25_a21454c720(): LeanValue {
+  _x_503_0: LeanValue = f_instToExprKey_lam_0_closed_24_a197224d99();
+  _x_504_1: LeanValue = f_instToExprKey_lam_0_closed_23_8656dbefe7();
+  _x_505_2: LeanValue = f_instToExprKey_lam_0_closed_0_377fd3714a();
+  L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(_x_505_2, _x_504_1, _x_503_0)
+}
+// "Lean.Meta.DiscrTree.insertCore"
+fun f_Meta_DiscrTree_insertCore_459f0a76dd(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _d_2: LeanValue,
+  _keys_3: LeanValue,
+  _v_4: LeanValue,
+): LeanValue {
+  f_Meta_DiscrTree_insertKeyValue_4d070af2df(_inst_1_1, _d_2, _keys_3, _v_4)
+}
+// "Lean.Meta.DiscrTree.instToExprKey._lam_0._closed_35"
+fun f_instToExprKey_lam_0_closed_35_ce13e05e0b(): LeanValue {
+  _x_550_1: LeanValue = f_instToExprKey_lam_0_closed_34_cd659c7b14();
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_550_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "_private.Lean.Meta.DiscrTree.Basic.0.Lean.Meta.DiscrTree.keysAsPattern.go._closed_3"
+fun f_keysAsPattern_go_closed_3_189aa3bda1(): LeanValue {
+  LeanText("<other>")
+}
+
+module end;

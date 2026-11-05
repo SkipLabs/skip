@@ -1,0 +1,134 @@
+module L4_Init_Task;
+
+// "Task.mapList._redArg"
+fun f_Task_mapList_8230529313(
+  _f_0: LeanValue,
+  _tasks_1: LeanValue,
+  _prio_2: LeanValue,
+  _sync_3: LeanValue,
+): LeanValue {
+  f_Task_mapList_go_a1315b592e(
+    _f_0,
+    _prio_2,
+    _sync_3,
+    _tasks_1,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "_private.Init.Task.0.Task.mapList.go._redArg._lam_1"
+fun f_mapList_go_lam_1_7249bed013(
+  _x_1_0: LeanValue,
+  _f_1: LeanValue,
+  _a_2: LeanValue,
+): LeanValue {
+  _x_3_4: LeanValue = L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(
+    LeanCtor("[\"List\",\"cons\"]", Array[_a_2, _x_1_0]),
+  );
+  leanApply(_f_1, Array[_x_3_4])
+}
+fun apply_f_mapList_go_lam_1_7249bed013(_args: Array<LeanValue>): LeanValue {
+  f_mapList_go_lam_1_7249bed013(_args[0], _args[1], _args[2])
+}
+// "_private.Init.Task.0.Task.mapList.go._redArg"
+fun f_Task_mapList_go_a1315b592e(
+  _f_0: LeanValue,
+  _prio_1: LeanValue,
+  _sync_2: LeanValue,
+  _x_1_3: LeanValue,
+  _x_2_4: LeanValue,
+): LeanValue {
+  leanTag(_x_1_3) match {
+  | "[\"List\",\"nil\"]" ->
+    leanTag(_sync_2) match {
+    | "[\"Bool\",\"false\"]" ->
+      _f_3_7: LeanValue = LeanClosure(
+        L4_Init_Task.apply_f_mapList_go_lam_0_3d25d3b625,
+        3,
+        Array[_x_2_4, _f_0],
+      );
+      L4_Init_Core.f_Task_spawn_38c38a2f86(LeanErased(), _f_3_7, _prio_1)
+    | "[\"Bool\",\"true\"]" ->
+      _x_5_9: LeanValue = L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(
+        _x_2_4,
+      );
+      _x_6_10: LeanValue = leanApply(_f_0, Array[_x_5_9]);
+      L4_Init_Core.f_Task_pure_8e8af46293(LeanErased(), _x_6_10)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"List\",\"cons\"]" ->
+    _head_8_5: LeanValue = leanField(_x_1_3, 0);
+    _tail_9_6: LeanValue = leanField(_x_1_3, 1);
+    leanTag(_tail_9_6) match {
+    | "[\"List\",\"nil\"]" ->
+      _f_10_12: LeanValue = LeanClosure(
+        L4_Init_Task.apply_f_mapList_go_lam_1_7249bed013,
+        3,
+        Array[_x_2_4, _f_0],
+      );
+      L4_Init_Core.f_Task_map_58d98f7eb6(
+        LeanErased(),
+        LeanErased(),
+        _f_10_12,
+        _head_8_5,
+        _prio_1,
+        _sync_2,
+      )
+    | _ ->
+      _f_12_14: LeanValue = LeanClosure(
+        L4_Init_Task.apply_f_mapList_go_lam_2_cf7011972b,
+        6,
+        Array[_x_2_4, _f_0, _prio_1, _sync_2, _tail_9_6],
+      );
+      L4_Init_Core.f_Task_bind_e6411a2c5d(
+        LeanErased(),
+        LeanErased(),
+        _head_8_5,
+        _f_12_14,
+        _prio_1,
+        _sync_2,
+      )
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Task.0.Task.mapList.go._redArg._lam_2"
+fun f_mapList_go_lam_2_cf7011972b(
+  _x_1_0: LeanValue,
+  _f_1: LeanValue,
+  _prio_2: LeanValue,
+  _sync_3: LeanValue,
+  _tail_2_4: LeanValue,
+  _a_5: LeanValue,
+): LeanValue {
+  f_Task_mapList_go_a1315b592e(
+    _f_1,
+    _prio_2,
+    _sync_3,
+    _tail_2_4,
+    LeanCtor("[\"List\",\"cons\"]", Array[_a_5, _x_1_0]),
+  )
+}
+fun apply_f_mapList_go_lam_2_cf7011972b(_args: Array<LeanValue>): LeanValue {
+  f_mapList_go_lam_2_cf7011972b(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+  )
+}
+// "_private.Init.Task.0.Task.mapList.go._redArg._lam_0"
+fun f_mapList_go_lam_0_3d25d3b625(
+  _x_1_0: LeanValue,
+  _f_1: LeanValue,
+  _x_2_2: LeanValue,
+): LeanValue {
+  _x_3_3: LeanValue = L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_x_1_0);
+  leanApply(_f_1, Array[_x_3_3])
+}
+fun apply_f_mapList_go_lam_0_3d25d3b625(_args: Array<LeanValue>): LeanValue {
+  f_mapList_go_lam_0_3d25d3b625(_args[0], _args[1], _args[2])
+}
+
+module end;

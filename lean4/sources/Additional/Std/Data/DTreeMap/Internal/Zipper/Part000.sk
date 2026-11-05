@@ -1,0 +1,4690 @@
+module L4_Std_Data_DTreeMap_Internal_Zipper;
+
+// "Std.DTreeMap.Internal.Unit.RccSlice.instToIterator._redArg._lam_0"
+fun f_RccSlice_instToIterator_lam_0_a3069b2da3(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RccSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rcc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RccSlice_instToIterator_lam_0_a3069b2da3(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RccSlice_instToIterator_lam_0_a3069b2da3(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRciSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RciSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRicSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RicSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLE._redArg"
+fun f_Internal_Impl_pruneLE_5b695c8a33(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+): LeanValue {
+  leanTag(_t_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_3: LeanValue = leanField(_t_1, 0);
+    _k_3_4: LeanValue = leanField(_t_1, 1);
+    _v_4_5: LeanValue = leanField(_t_1, 2);
+    _l_5_6: LeanValue = leanField(_t_1, 3);
+    _r_6_7: LeanValue = leanField(_t_1, 4);
+    _x_7_8: LeanValue = leanApply(_inst_1_0, Array[_lowerBound_2, _k_3_4]);
+    leanTag(_x_7_8) match {
+    | "[\"Ordering\",\"lt\"]" ->
+      _x_8_9: LeanValue = f_Internal_Impl_pruneLE_5b695c8a33(
+        _inst_1_0,
+        _l_5_6,
+        _lowerBound_2,
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+        Array[_size_2_3, _k_3_4, _v_4_5, _x_8_9, _r_6_7],
+      )
+    | "[\"Ordering\",\"eq\"]" ->
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+        Array[
+          _size_2_3,
+          _k_3_4,
+          _v_4_5,
+          LeanCtor(
+            "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+            Array[],
+          ),
+          _r_6_7,
+        ],
+      )
+    | "[\"Ordering\",\"gt\"]" ->
+      f_Internal_Impl_pruneLE_5b695c8a33(_inst_1_0, _r_6_7, _lowerBound_2)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _t_1
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.rocIterator"
+fun f_DTreeMap_Internal_rocIterator_0fe46c3a1c(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _upperBound_5: LeanValue,
+): LeanValue {
+  _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+    Array[_x_3_7, _upperBound_5],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RoiSlice.instToIterator._redArg"
+fun f_Unit_RoiSlice_instToIterator_aad41e47ac(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_958b77beb7,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRiiSlice._redArg"
+fun f_Internal_Const_instSliceableImplRiiSlice_13bfbf55ca(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRiiSlice_lam_0_7407936290,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxoIterator.step"
+fun f_Internal_RxoIterator_step_dd9ed4a6e4(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  f_Internal_RxoIterator_step_ae25b282ab(_inst_1_2, _x_2_3)
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRoiSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRoiSlice_closed_0_e6e4bc11e4(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxoIterator.instFinitenessRelation._redArg"
+fun f_Internal_RxoIterator_instFinitenessRelation_33a83b7e77(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RciSlice.instToIterator._redArg._lam_0"
+fun f_RciSlice_instToIterator_lam_0_ec67a8a297(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RciSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGE_55403a9e08(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RciSlice_instToIterator_lam_0_ec67a8a297(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RciSlice_instToIterator_lam_0_ec67a8a297(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop._redArg"
+fun f_Internal_Zipper_instIteratorLoop_4d0a393a27(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instIteratorLoop_lam_3_9b4323c074,
+    7,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.roiIterator"
+fun f_DTreeMap_Internal_roiIterator_bf07f72627(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRocSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRocSlice_closed_0_7df28cfca6(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRocSlice_lam_0_65017a862e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RciSlice.instToIterator"
+fun f_Unit_RciSlice_instToIterator_fa6246680b(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_ec67a8a297,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RicSlice.instToIterator"
+fun f_Unit_RicSlice_instToIterator_62772f0a1e(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_e6d01ec873,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRoiSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RoiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRioSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RioSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLE.match_1.splitter._redArg"
+fun f_pruneLE_match_1_splitter_2370dcab16(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+  _h_3_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Ordering\",\"lt\"]" ->
+    leanApply(_h_1_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Ordering\",\"eq\"]" ->
+    leanApply(_h_2_2, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Ordering\",\"gt\"]" ->
+    leanApply(_h_3_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.rocIterator._redArg"
+fun f_DTreeMap_Internal_rocIterator_d2598682ad(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _upperBound_3: LeanValue,
+): LeanValue {
+  _x_3_5: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+    Array[_x_3_5, _upperBound_3],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRooSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRooSlice_closed_0_73fb36bf02(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.toList._redArg"
+fun f_Internal_Zipper_toList_7a14648d6d(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+    LeanCtor("[\"List\",\"nil\"]", Array[])
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_3_1: LeanValue = leanField(_x_1_0, 0);
+    _v_4_2: LeanValue = leanField(_x_1_0, 1);
+    _tree_5_3: LeanValue = leanField(_x_1_0, 2);
+    _next_6_4: LeanValue = leanField(_x_1_0, 3);
+    _x_9_8: LeanValue = f_Zipper_toList_spec_0_622e0b1c5f(
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      _tree_5_3,
+    );
+    _x_11_10: LeanValue = f_Internal_Zipper_toList_7a14648d6d(_next_6_4);
+    L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(
+      LeanCtor(
+        "[\"List\",\"cons\"]",
+        Array[LeanCtor("[\"Sigma\",\"mk\"]", Array[_k_3_1, _v_4_2]), _x_9_8],
+      ),
+      _x_11_10,
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop._redArg._lam_2"
+fun f_RxcIterator_instIteratorLoop_lam_2_6c21a4c3a7(
+  _toPure_0: LeanValue,
+  _y_1_1: LeanValue,
+  _toBind_2: LeanValue,
+  _inst_2_3: LeanValue,
+  _lift_4: LeanValue,
+  _it_5: LeanValue,
+  _acc_6: LeanValue,
+  _hP_7: LeanValue,
+  _recur_8: LeanValue,
+): LeanValue {
+  _f_3_9: LeanValue = LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxcIterator_instIteratorLoop_lam_1_35fd035e7c,
+    6,
+    Array[_toPure_0, _recur_8, _y_1_1, _acc_6, _toBind_2],
+  );
+  _x_4_10: LeanValue = f_Internal_RxcIterator_step_446d374006(_inst_2_3, _it_5);
+  leanApply(_lift_4, Array[LeanErased(), LeanErased(), _f_3_9, _x_4_10])
+}
+fun apply_f_RxcIterator_instIteratorLoop_lam_2_6c21a4c3a7(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxcIterator_instIteratorLoop_lam_2_6c21a4c3a7(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+    _args[7],
+    _args[8],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RooSlice.instToIterator._redArg"
+fun f_Const_RooSlice_instToIterator_1033e00c1e(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_d78321013a,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RiiSlice.instToIterator._redArg._closed_0"
+fun f_RiiSlice_instToIterator_closed_0_dd496a18e0(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_d83287f9e5,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RciSlice.instToIterator._redArg"
+fun f_Internal_RciSlice_instToIterator_62a768731c(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_eedaf782b9,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RooSlice.instToIterator._redArg._lam_0"
+fun f_RooSlice_instToIterator_lam_0_04388561b6(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RooSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roo\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RooSlice_instToIterator_lam_0_04388561b6(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RooSlice_instToIterator_lam_0_04388561b6(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instIteratorRxcIteratorIdSigma._redArg"
+fun f_DTreeMap_Internal_instIteratorRxcIteratorIdSigma_fd775750be(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instIteratorRxcIteratorIdSigma_lam_0_862e810cb6,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.prependMap._redArg"
+fun f_Internal_Zipper_prependMap_0dab450730(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_3_2: LeanValue = leanField(_x_1_0, 0);
+    _k_4_3: LeanValue = leanField(_x_1_0, 1);
+    _v_5_4: LeanValue = leanField(_x_1_0, 2);
+    _l_6_5: LeanValue = leanField(_x_1_0, 3);
+    _r_7_6: LeanValue = leanField(_x_1_0, 4);
+    f_Internal_Zipper_prependMap_0dab450730(
+      _l_6_5,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]",
+        Array[_k_4_3, _v_5_4, _r_7_6, _x_2_1],
+      ),
+    )
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _x_2_1
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.rcoIterator"
+fun f_DTreeMap_Internal_rcoIterator_c5124034ee(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _upperBound_5: LeanValue,
+): LeanValue {
+  _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+    Array[_x_3_7, _upperBound_5],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRicSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRicSlice_closed_0_5075ac7c6f(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRocSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRocSlice_2e5311eeb2(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRioSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRioSlice_6292ae8fc8(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRioSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRioSlice_d540e219d0(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.rooIterator"
+fun f_DTreeMap_Internal_rooIterator_91424b5639(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _upperBound_5: LeanValue,
+): LeanValue {
+  _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+    Array[_x_3_7, _upperBound_5],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRooSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRooSlice_9c01cd7591(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.rccIterator"
+fun f_DTreeMap_Internal_rccIterator_796202402c(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _upperBound_5: LeanValue,
+): LeanValue {
+  _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+    Array[_x_3_7, _upperBound_5],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RooSlice.instToIterator"
+fun f_Unit_RooSlice_instToIterator_9d77be154f(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_04388561b6,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxoIterator.instFinitenessRelation"
+fun f_Internal_RxoIterator_instFinitenessRelation_af758c0fb8(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "Std.DTreeMap.Internal.RcoSlice.instToIterator._redArg._lam_0"
+fun f_RcoSlice_instToIterator_lam_0_49045dd1be(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RcoSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rco\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RcoSlice_instToIterator_lam_0_49045dd1be(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RcoSlice_instToIterator_lam_0_49045dd1be(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxoIterator.step.match_1.splitter"
+fun f_step_match_1_splitter_5914312b70(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _motive_3: LeanValue,
+  _x_2_4: LeanValue,
+  _h_1_5: LeanValue,
+  _h_2_6: LeanValue,
+): LeanValue {
+  leanTag(_x_2_4) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]" ->
+    _iter_3_7: LeanValue = leanField(_x_2_4, 0);
+    _upper_4_8: LeanValue = leanField(_x_2_4, 1);
+    leanTag(_iter_3_7) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      leanApply(_h_1_5, Array[_upper_4_8])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_6_9: LeanValue = leanField(_iter_3_7, 0);
+      _v_7_10: LeanValue = leanField(_iter_3_7, 1);
+      _tree_8_11: LeanValue = leanField(_iter_3_7, 2);
+      _next_9_12: LeanValue = leanField(_iter_3_7, 3);
+      leanApply(
+        _h_2_6,
+        Array[_k_6_9, _v_7_10, _tree_8_11, _next_9_12, _upper_4_8],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.RoiSlice.instToIterator._redArg._lam_0"
+fun f_RoiSlice_instToIterator_lam_0_16dc47b854(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RoiSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGT_f68530ccb4(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RoiSlice_instToIterator_lam_0_16dc47b854(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RoiSlice_instToIterator_lam_0_16dc47b854(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop._redArg._lam_1"
+fun f_Zipper_instIteratorLoop_lam_1_6e17329239(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _y_1_2: LeanValue,
+  _acc_3: LeanValue,
+  _toBind_4: LeanValue,
+  _s_5: LeanValue,
+): LeanValue {
+  leanTag(_s_5) match {
+  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+    _it_2_6: LeanValue = leanField(_s_5, 0);
+    _out_3_7: LeanValue = leanField(_s_5, 1);
+    _f_4_9: LeanValue = LeanClosure(
+      L4_Std_Data_DTreeMap_Internal_Zipper
+        .apply_f_Zipper_instIteratorLoop_lam_0_9f33b9fa1a,
+      4,
+      Array[_toPure_0, _recur_1, _it_2_6],
+    );
+    _x_5_10: LeanValue = leanApply(
+      _y_1_2,
+      Array[_out_3_7, LeanErased(), _acc_3],
+    );
+    leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _x_5_10, _f_4_9])
+  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+    _it_7_8: LeanValue = leanField(_s_5, 0);
+    leanApply(_recur_1, Array[_it_7_8, _acc_3, LeanErased(), LeanErased()])
+  | "[\"Std\",\"IterStep\",\"done\"]" ->
+    leanApply(_toPure_0, Array[LeanErased(), _acc_3])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Zipper_instIteratorLoop_lam_1_6e17329239(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Zipper_instIteratorLoop_lam_1_6e17329239(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.ctorIdx._impl._redArg"
+fun f_Zipper_ctorIdx_impl_3b9db63ab6(_x_1_0: LeanValue): LeanValue {
+  L4_Init_Prelude.f_getObjTagNat_fc9363532b(LeanErased(), _x_1_0)
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.IterM.toArray_eq_match_step.match_1.splitter._redArg"
+fun f_toArray_eq_match_step_match_1_splitter_a4b3aae8b5(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+  _h_3_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+    _it_2_4: LeanValue = leanField(_x_1_0, 0);
+    _out_3_5: LeanValue = leanField(_x_1_0, 1);
+    leanApply(_h_1_1, Array[_it_2_4, _out_3_5])
+  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+    _it_5_6: LeanValue = leanField(_x_1_0, 0);
+    leanApply(_h_2_2, Array[_it_5_6])
+  | "[\"Std\",\"IterStep\",\"done\"]" ->
+    leanApply(_h_3_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.RcoSlice.instToIterator"
+fun f_Internal_RcoSlice_instToIterator_a89e9e9c9b(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_49045dd1be,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RciSlice.instToIterator._redArg"
+fun f_Const_RciSlice_instToIterator_5febd68e20(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_a6010b6927,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.cons.elim"
+fun f_Zipper_cons_elim_1a09a00552(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _motive_2: LeanValue,
+  _t_3: LeanValue,
+  _h_4: LeanValue,
+  _cons_5: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_ctorElim_72dc67e316(_t_3, _cons_5)
+}
+// "Std.DTreeMap.Internal.RccSlice.instToIterator._redArg"
+fun f_Internal_RccSlice_instToIterator_758cae212f(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_c57d522690,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRocSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRocSlice_closed_0_642fa1ed3b(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRccSlice._redArg"
+fun f_Internal_Const_instSliceableImplRccSlice_f3f9cc9ae0(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRccSlice_lam_0_30f0af200c,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RiiSlice.instToIterator._redArg._lam_0"
+fun f_RiiSlice_instToIterator_lam_0_f26fbdb368(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RiiSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    f_DTreeMap_Internal_riiIterator_cae988f04e(_treeMap_1)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RiiSlice_instToIterator_lam_0_f26fbdb368(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RiiSlice_instToIterator_lam_0_f26fbdb368(_args[0])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRccSlice"
+fun f_DTreeMap_Internal_instSliceableImplRccSlice_1d2e9a316f(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRccSlice_lam_0_1940617462,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop._redArg._lam_0"
+fun f_RxcIterator_instIteratorLoop_lam_0_3b03508f69(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _it_1_2: LeanValue,
+  _do_lift_2_3: LeanValue,
+): LeanValue {
+  leanTag(_do_lift_2_3) match {
+  | "[\"ForInStep\",\"done\"]" ->
+    _a_3_4: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_toPure_0, Array[LeanErased(), _a_3_4])
+  | "[\"ForInStep\",\"yield\"]" ->
+    _a_5_5: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_recur_1, Array[_it_1_2, _a_5_5, LeanErased(), LeanErased()])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxcIterator_instIteratorLoop_lam_0_3b03508f69(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxcIterator_instIteratorLoop_lam_0_3b03508f69(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
+}
+// "Std.DTreeMap.Internal.RicSlice.instToIterator"
+fun f_Internal_RicSlice_instToIterator_cad5ebfda2(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_7170cbeb7b,
+    1,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxcIterator.FinitenessRelation._redArg"
+fun f_Internal_RxcIterator_FinitenessRelation_326991616d(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxoIterator.step.match_1.splitter._redArg"
+fun f_step_match_1_splitter_4bfffa6c2d(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]" ->
+    _iter_2_3: LeanValue = leanField(_x_1_0, 0);
+    _upper_3_4: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_iter_2_3) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      leanApply(_h_1_1, Array[_upper_3_4])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_5_5: LeanValue = leanField(_iter_2_3, 0);
+      _v_6_6: LeanValue = leanField(_iter_2_3, 1);
+      _tree_7_7: LeanValue = leanField(_iter_2_3, 2);
+      _next_8_8: LeanValue = leanField(_iter_2_3, 3);
+      leanApply(_h_2_2, Array[_k_5_5, _v_6_6, _tree_7_7, _next_8_8, _upper_3_4])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRocSlice"
+fun f_Internal_Const_instSliceableImplRocSlice_e3343b36a2(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRocSlice_lam_0_65017a862e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instIteratorRxcIteratorIdSigma._redArg._lam_0"
+fun f_Internal_instIteratorRxcIteratorIdSigma_lam_0_862e810cb6(
+  _inst_1_0: LeanValue,
+  _it_1: LeanValue,
+): LeanValue {
+  f_Internal_RxcIterator_step_446d374006(_inst_1_0, _it_1)
+}
+fun apply_f_Internal_instIteratorRxcIteratorIdSigma_lam_0_862e810cb6(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instIteratorRxcIteratorIdSigma_lam_0_862e810cb6(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRocSlice._redArg"
+fun f_Internal_Const_instSliceableImplRocSlice_2772789a64(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRocSlice_lam_0_65017a862e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RicSlice.instToIterator._redArg"
+fun f_Unit_RicSlice_instToIterator_ffafa42570(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_e6d01ec873,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RoiSlice.instToIterator._redArg._lam_0"
+fun f_RoiSlice_instToIterator_lam_0_057b89f170(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RoiSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGT_f68530ccb4(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RoiSlice_instToIterator_lam_0_057b89f170(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RoiSlice_instToIterator_lam_0_057b89f170(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.RocSlice.instToIterator._redArg"
+fun f_Unit_RocSlice_instToIterator_ddc56472e7(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_61cbf7e38f,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRccSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRccSlice_closed_0_35aa94c384(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRccSlice_lam_0_1940617462,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.List.filter.match_1.splitter"
+fun f_filter_match_1_splitter_9285a185e0(
+  _motive_0: LeanValue,
+  _x_1_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Bool\",\"false\"]" ->
+    leanApply(_h_2_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Bool\",\"true\"]" ->
+    leanApply(_h_1_2, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.RccSlice.instToIterator._redArg"
+fun f_Const_RccSlice_instToIterator_fe37b311e2(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_d31bbff7e5,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RioSlice.instToIterator._redArg._closed_0"
+fun f_RioSlice_instToIterator_closed_0_872cd5c78b(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_2605284915,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RoiSlice.instToIterator._redArg"
+fun f_Const_RoiSlice_instToIterator_c1c267df95(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_16dc47b854,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRciSlice"
+fun f_Internal_Unit_instSliceableImplUnitRciSlice_c33beb4d3f(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.step"
+fun f_Internal_Zipper_step_d2d9491b00(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_step_c36cfa7001(_x_1_2)
+}
+// "Std.DTreeMap.Internal.Const.RicSlice.instToIterator"
+fun f_Const_RicSlice_instToIterator_07b29a7845(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_90eaa7202e,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RoiSlice.instToIterator"
+fun f_Const_RoiSlice_instToIterator_44ff681e5a(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_16dc47b854,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.done.elim"
+fun f_Zipper_done_elim_27d800c3f1(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _motive_2: LeanValue,
+  _t_3: LeanValue,
+  _h_4: LeanValue,
+  _done_5: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_ctorElim_72dc67e316(_t_3, _done_5)
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLT._redArg"
+fun f_Internal_Impl_pruneLT_fdb3e4be07(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+): LeanValue {
+  leanTag(_t_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_3: LeanValue = leanField(_t_1, 0);
+    _k_3_4: LeanValue = leanField(_t_1, 1);
+    _v_4_5: LeanValue = leanField(_t_1, 2);
+    _l_5_6: LeanValue = leanField(_t_1, 3);
+    _r_6_7: LeanValue = leanField(_t_1, 4);
+    _x_7_8: LeanValue = leanApply(_inst_1_0, Array[_lowerBound_2, _k_3_4]);
+    leanTag(_x_7_8) match {
+    | "[\"Ordering\",\"lt\"]" ->
+      _x_8_9: LeanValue = f_Internal_Impl_pruneLT_fdb3e4be07(
+        _inst_1_0,
+        _l_5_6,
+        _lowerBound_2,
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+        Array[_size_2_3, _k_3_4, _v_4_5, _x_8_9, _r_6_7],
+      )
+    | "[\"Ordering\",\"eq\"]" -> _r_6_7
+    | "[\"Ordering\",\"gt\"]" ->
+      f_Internal_Impl_pruneLT_fdb3e4be07(_inst_1_0, _r_6_7, _lowerBound_2)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _t_1
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.RoiSlice.instToIterator._redArg._lam_0"
+fun f_RoiSlice_instToIterator_lam_0_958b77beb7(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RoiSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGT_f68530ccb4(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RoiSlice_instToIterator_lam_0_958b77beb7(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RoiSlice_instToIterator_lam_0_958b77beb7(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RioSlice.instToIterator._redArg._lam_0"
+fun f_RioSlice_instToIterator_lam_0_595d2006d7(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RioSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RioSlice_instToIterator_lam_0_595d2006d7(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RioSlice_instToIterator_lam_0_595d2006d7(_args[0])
+}
+// "Std.DTreeMap.Internal.Unit.RciSlice.instToIterator._redArg"
+fun f_Unit_RciSlice_instToIterator_b0f178fe71(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_ec67a8a297,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop._redArg._lam_3"
+fun f_RxoIterator_instIteratorLoop_lam_3_4cbed39c98(
+  _inst_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+  _lift_2: LeanValue,
+  _value_3: LeanValue,
+  _Pl_4: LeanValue,
+  _it_5: LeanValue,
+  _init_6: LeanValue,
+  _y_3_7: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_0) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_8: LeanValue = leanField(_inst_1_0, 0);
+    _toBind_9: LeanValue = leanField(_inst_1_0, 1);
+    leanTag(_toApplicative_8) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_10: LeanValue = leanField(_toApplicative_8, 0);
+      _toPure_11: LeanValue = leanField(_toApplicative_8, 1);
+      _toSeq_12: LeanValue = leanField(_toApplicative_8, 2);
+      _toSeqLeft_13: LeanValue = leanField(_toApplicative_8, 3);
+      _toSeqRight_14: LeanValue = leanField(_toApplicative_8, 4);
+      _f_4_15: LeanValue = LeanClosure(
+        L4_Std_Data_DTreeMap_Internal_Zipper
+          .apply_f_RxoIterator_instIteratorLoop_lam_2_b4731e153c,
+        9,
+        Array[_toPure_11, _y_3_7, _toBind_9, _inst_2_1, _lift_2],
+      );
+      L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
+        _f_4_15,
+        _it_5,
+        _init_6,
+        LeanErased(),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxoIterator_instIteratorLoop_lam_3_4cbed39c98(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxoIterator_instIteratorLoop_lam_3_4cbed39c98(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+    _args[7],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRciSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRciSlice_ccb3c9fecd(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.prependMapGT._redArg"
+fun f_Internal_Zipper_prependMapGT_f68530ccb4(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _it_3: LeanValue,
+): LeanValue {
+  leanTag(_t_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_4: LeanValue = leanField(_t_1, 0);
+    _k_3_5: LeanValue = leanField(_t_1, 1);
+    _v_4_6: LeanValue = leanField(_t_1, 2);
+    _l_5_7: LeanValue = leanField(_t_1, 3);
+    _r_6_8: LeanValue = leanField(_t_1, 4);
+    _x_7_9: LeanValue = leanApply(_inst_1_0, Array[_lowerBound_2, _k_3_5]);
+    leanTag(_x_7_9) match {
+    | "[\"Ordering\",\"lt\"]" ->
+      f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _l_5_7,
+        _lowerBound_2,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]",
+          Array[_k_3_5, _v_4_6, _r_6_8, _it_3],
+        ),
+      )
+    | "[\"Ordering\",\"eq\"]" ->
+      f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _r_6_8,
+        _lowerBound_2,
+        _it_3,
+      )
+    | "[\"Ordering\",\"gt\"]" ->
+      f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _r_6_8,
+        _lowerBound_2,
+        _it_3,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _it_3
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.RcoSlice.instToIterator._redArg._lam_0"
+fun f_RcoSlice_instToIterator_lam_0_5f9c0de860(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RcoSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rco\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RcoSlice_instToIterator_lam_0_5f9c0de860(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RcoSlice_instToIterator_lam_0_5f9c0de860(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRooSlice"
+fun f_DTreeMap_Internal_instSliceableImplRooSlice_747525e773(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRocSlice"
+fun f_Internal_Unit_instSliceableImplUnitRocSlice_20aff2114a(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.toList.match_1.splitter"
+fun f_toList_match_1_splitter_45b322c354(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _motive_2: LeanValue,
+  _x_1_3: LeanValue,
+  _h_1_4: LeanValue,
+  _h_2_5: LeanValue,
+): LeanValue {
+  leanTag(_x_1_3) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+    leanApply(_h_1_4, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_4_6: LeanValue = leanField(_x_1_3, 0);
+    _v_5_7: LeanValue = leanField(_x_1_3, 1);
+    _tree_6_8: LeanValue = leanField(_x_1_3, 2);
+    _next_7_9: LeanValue = leanField(_x_1_3, 3);
+    leanApply(_h_2_5, Array[_k_4_6, _v_5_7, _tree_6_8, _next_7_9])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.RooSlice.instToIterator._redArg._lam_0"
+fun f_RooSlice_instToIterator_lam_0_d78321013a(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RooSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roo\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RooSlice_instToIterator_lam_0_d78321013a(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RooSlice_instToIterator_lam_0_d78321013a(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Impl.foldrM._at_.Std.DTreeMap.Internal.Zipper.toList.spec_0._redArg"
+fun f_Zipper_toList_spec_0_622e0b1c5f(
+  _init_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_2: LeanValue = leanField(_x_1_1, 0);
+    _k_3_3: LeanValue = leanField(_x_1_1, 1);
+    _v_4_4: LeanValue = leanField(_x_1_1, 2);
+    _l_5_5: LeanValue = leanField(_x_1_1, 3);
+    _r_6_6: LeanValue = leanField(_x_1_1, 4);
+    _x_7_7: LeanValue = f_Zipper_toList_spec_0_622e0b1c5f(_init_0, _r_6_6);
+    f_Zipper_toList_spec_0_622e0b1c5f(
+      LeanCtor(
+        "[\"List\",\"cons\"]",
+        Array[LeanCtor("[\"Sigma\",\"mk\"]", Array[_k_3_3, _v_4_4]), _x_7_7],
+      ),
+      _l_5_5,
+    )
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _init_0
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRioSlice"
+fun f_Internal_Unit_instSliceableImplUnitRioSlice_41c0d96b38(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.FinitenessRelation._redArg"
+fun f_Internal_Zipper_FinitenessRelation_c119a234ba(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRoiSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRoiSlice_closed_0_24ab67a8e6(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.ctorElim._redArg"
+fun f_Internal_Zipper_ctorElim_72dc67e316(
+  _t_0: LeanValue,
+  _k_1: LeanValue,
+): LeanValue {
+  leanTag(_t_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" -> _k_1
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_2: LeanValue = leanField(_t_0, 0);
+    _v_3: LeanValue = leanField(_t_0, 1);
+    _tree_4: LeanValue = leanField(_t_0, 2);
+    _next_5: LeanValue = leanField(_t_0, 3);
+    leanApply(_k_1, Array[_k_2, _v_3, _tree_4, _next_5])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.rciIterator._redArg"
+fun f_DTreeMap_Internal_rciIterator_1cc6305e4d(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRiiSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRiiSlice_96d82304ee(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRciSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRciSlice_closed_0_80c1d777ef(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRicSlice"
+fun f_DTreeMap_Internal_instSliceableImplRicSlice_d78c982e6b(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRioSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRioSlice_closed_0_cc02bf72b4(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRioSlice_lam_0_c96c307751,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.prependMap"
+fun f_Internal_Zipper_prependMap_b3a1af7467(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMap_0dab450730(_x_1_2, _x_2_3)
+}
+// "Std.DTreeMap.Internal.Const.RiiSlice.instToIterator._redArg._closed_0"
+fun f_RiiSlice_instToIterator_closed_0_bd528b9be7(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_6f5b49bece,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RoiSlice.instToIterator"
+fun f_Unit_RoiSlice_instToIterator_ebff7a16c8(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_958b77beb7,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRocSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRocSlice_closed_0_1653bd6010(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instToIterator._redArg"
+fun f_Internal_Zipper_instToIterator_322c7dc018(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instToIterator_lam_0_4a5e790099,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRiiSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRiiSlice_closed_0_22e76ad8f0(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRooSlice"
+fun f_Internal_Unit_instSliceableImplUnitRooSlice_9611e57471(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instIteratorRxoIteratorIdSigma"
+fun f_DTreeMap_Internal_instIteratorRxoIteratorIdSigma_1a570b7a73(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instIteratorRxoIteratorIdSigma_lam_0_bc03f2491c,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RccSlice.instToIterator"
+fun f_Unit_RccSlice_instToIterator_95dde9c2e8(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_a3069b2da3,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRccSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRccSlice_lam_0_30f0af200c(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RccSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRccSlice_lam_0_30f0af200c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRccSlice_lam_0_30f0af200c(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instIteratorRxoIteratorIdSigma._redArg._lam_0"
+fun f_Internal_instIteratorRxoIteratorIdSigma_lam_0_bc03f2491c(
+  _inst_1_0: LeanValue,
+  _it_1: LeanValue,
+): LeanValue {
+  f_Internal_RxoIterator_step_ae25b282ab(_inst_1_0, _it_1)
+}
+fun apply_f_Internal_instIteratorRxoIteratorIdSigma_lam_0_bc03f2491c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instIteratorRxoIteratorIdSigma_lam_0_bc03f2491c(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.RooSlice.instToIterator"
+fun f_Const_RooSlice_instToIterator_940650c35d(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_d78321013a,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.RicSlice.instToIterator._redArg._closed_0"
+fun f_RicSlice_instToIterator_closed_0_1e9c2e4753(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_7170cbeb7b,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRciSlice._redArg"
+fun f_Internal_Const_instSliceableImplRciSlice_757bfa8188(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxcIterator.FinitenessRelation"
+fun f_Internal_RxcIterator_FinitenessRelation_ba8f1dc1a3(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.size._redArg"
+fun f_Internal_Zipper_size_8184315690(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+    LeanScalar("nat", "0")
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_3_1: LeanValue = leanField(_x_1_0, 0);
+    _v_4_2: LeanValue = leanField(_x_1_0, 1);
+    _tree_5_3: LeanValue = leanField(_x_1_0, 2);
+    _next_6_4: LeanValue = leanField(_x_1_0, 3);
+    _x_8_7: LeanValue = L4_Std_Data_DTreeMap_Internal_Def.f_Internal_Impl_treeSize_34f678d9b8(
+      _tree_5_3,
+    );
+    _x_9_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      LeanScalar("nat", "1"),
+      _x_8_7,
+    );
+    _x_10_9: LeanValue = f_Internal_Zipper_size_8184315690(_next_6_4);
+    L4_Init_Prelude.f_Nat_add_86990f4822(_x_9_8, _x_10_9)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRiiSlice"
+fun f_Internal_Const_instSliceableImplRiiSlice_ba83603e99(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRiiSlice_lam_0_7407936290,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLT"
+fun f_Internal_Impl_pruneLT_bc0b3c6e58(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+): LeanValue {
+  f_Internal_Impl_pruneLT_fdb3e4be07(_inst_1_2, _t_3, _lowerBound_4)
+}
+// "Std.DTreeMap.Internal.Const.RioSlice.instToIterator._redArg._closed_0"
+fun f_RioSlice_instToIterator_closed_0_34b92b24e3(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_8deb3ca53f,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop._redArg._lam_0"
+fun f_RxoIterator_instIteratorLoop_lam_0_64cd0019d9(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _it_1_2: LeanValue,
+  _do_lift_2_3: LeanValue,
+): LeanValue {
+  leanTag(_do_lift_2_3) match {
+  | "[\"ForInStep\",\"done\"]" ->
+    _a_3_4: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_toPure_0, Array[LeanErased(), _a_3_4])
+  | "[\"ForInStep\",\"yield\"]" ->
+    _a_5_5: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_recur_1, Array[_it_1_2, _a_5_5, LeanErased(), LeanErased()])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxoIterator_instIteratorLoop_lam_0_64cd0019d9(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxoIterator_instIteratorLoop_lam_0_64cd0019d9(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRoiSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RoiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instIteratorRxcIteratorIdSigma"
+fun f_DTreeMap_Internal_instIteratorRxcIteratorIdSigma_b60686bf4f(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instIteratorRxcIteratorIdSigma_lam_0_862e810cb6,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RocSlice.instToIterator._redArg._lam_0"
+fun f_RocSlice_instToIterator_lam_0_193c9bcf6a(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RocSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RocSlice_instToIterator_lam_0_193c9bcf6a(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RocSlice_instToIterator_lam_0_193c9bcf6a(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop._redArg"
+fun f_Internal_RxoIterator_instIteratorLoop_cdb7500d18(
+  _inst_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxoIterator_instIteratorLoop_lam_3_4cbed39c98,
+    8,
+    Array[_inst_2_1, _inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RocSlice.instToIterator"
+fun f_Const_RocSlice_instToIterator_4b67cc1409(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_193c9bcf6a,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRoiSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRoiSlice_86c6336ead(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.iter._redArg"
+fun f_Internal_Zipper_iter_9abc2f2251(_t_0: LeanValue): LeanValue {
+  _t_0
+}
+// "Std.DTreeMap.Internal.RioSlice.instToIterator._redArg._closed_0"
+fun f_RioSlice_instToIterator_closed_0_ae0fcac8bc(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_595d2006d7,
+    1,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxcIterator.step.match_1.splitter"
+fun f_step_match_1_splitter_3ff8376770(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _motive_3: LeanValue,
+  _x_2_4: LeanValue,
+  _h_1_5: LeanValue,
+  _h_2_6: LeanValue,
+): LeanValue {
+  leanTag(_x_2_4) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]" ->
+    _iter_3_7: LeanValue = leanField(_x_2_4, 0);
+    _upper_4_8: LeanValue = leanField(_x_2_4, 1);
+    leanTag(_iter_3_7) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      leanApply(_h_1_5, Array[_upper_4_8])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_6_9: LeanValue = leanField(_iter_3_7, 0);
+      _v_7_10: LeanValue = leanField(_iter_3_7, 1);
+      _tree_8_11: LeanValue = leanField(_iter_3_7, 2);
+      _next_9_12: LeanValue = leanField(_iter_3_7, 3);
+      leanApply(
+        _h_2_6,
+        Array[_k_6_9, _v_7_10, _tree_8_11, _next_9_12, _upper_4_8],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.instSliceableImplRiiSlice"
+fun f_DTreeMap_Internal_instSliceableImplRiiSlice_177460ab9a(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRccSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRccSlice_closed_0_380d4b3964(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRccSlice_lam_0_30f0af200c,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.prependMap.match_1.splitter._redArg"
+fun f_prependMap_match_1_splitter_0b3cce7818(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_3_4: LeanValue = leanField(_x_1_0, 0);
+    _k_4_5: LeanValue = leanField(_x_1_0, 1);
+    _v_5_6: LeanValue = leanField(_x_1_0, 2);
+    _l_6_7: LeanValue = leanField(_x_1_0, 3);
+    _r_7_8: LeanValue = leanField(_x_1_0, 4);
+    leanApply(_h_2_3, Array[_size_3_4, _k_4_5, _v_5_6, _l_6_7, _r_7_8, _x_2_1])
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+    leanApply(_h_1_2, Array[_x_2_1])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.RocSlice.instToIterator"
+fun f_Unit_RocSlice_instToIterator_f69a27a574(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_61cbf7e38f,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRooSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RooSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.List.filter.match_1.splitter._redArg"
+fun f_filter_match_1_splitter_1577bfa048(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Bool\",\"false\"]" ->
+    leanApply(_h_2_2, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Bool\",\"true\"]" ->
+    leanApply(_h_1_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.riiIterator"
+fun f_DTreeMap_Internal_riiIterator_35bdd7f4bd(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _t_2: LeanValue,
+): LeanValue {
+  f_DTreeMap_Internal_riiIterator_cae988f04e(_t_2)
+}
+// "Std.DTreeMap.Internal.instSliceableImplRcoSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RcoSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRicSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RicSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.RooSlice.instToIterator._redArg"
+fun f_Unit_RooSlice_instToIterator_4576b39401(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_04388561b6,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.RccSlice.instToIterator"
+fun f_Internal_RccSlice_instToIterator_26a625e885(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_c57d522690,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRooSlice._redArg"
+fun f_Internal_Const_instSliceableImplRooSlice_b38c417899(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRoiSlice"
+fun f_DTreeMap_Internal_instSliceableImplRoiSlice_b6d24b239d(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRiiSlice"
+fun f_Internal_Unit_instSliceableImplUnitRiiSlice_c7511137e2(
+  _value_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRcoSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRcoSlice_589a7af949(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRiiSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RiiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRiiSlice_lam_0_7f1616f089(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop._redArg._lam_2"
+fun f_Zipper_instIteratorLoop_lam_2_09b06fe62e(
+  _toPure_0: LeanValue,
+  _y_1_1: LeanValue,
+  _toBind_2: LeanValue,
+  _lift_3: LeanValue,
+  _it_4: LeanValue,
+  _acc_5: LeanValue,
+  _hP_6: LeanValue,
+  _recur_7: LeanValue,
+): LeanValue {
+  _f_2_8: LeanValue = LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instIteratorLoop_lam_1_6e17329239,
+    6,
+    Array[_toPure_0, _recur_7, _y_1_1, _acc_5, _toBind_2],
+  );
+  _x_3_9: LeanValue = f_Internal_Zipper_step_c36cfa7001(_it_4);
+  leanApply(_lift_3, Array[LeanErased(), LeanErased(), _f_2_8, _x_3_9])
+}
+fun apply_f_Zipper_instIteratorLoop_lam_2_09b06fe62e(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Zipper_instIteratorLoop_lam_2_09b06fe62e(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+    _args[7],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RioSlice.instToIterator"
+fun f_Const_RioSlice_instToIterator_32b22aba57(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_8deb3ca53f,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RcoSlice.instToIterator"
+fun f_Unit_RcoSlice_instToIterator_36834f4b57(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_5f9c0de860,
+    2,
+    Array[_inst_1_1],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RcoSlice.instToIterator"
+fun f_Const_RcoSlice_instToIterator_681f883d21(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_84e82fac16,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRioSlice"
+fun f_DTreeMap_Internal_instSliceableImplRioSlice_37800ca005(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRciSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RciSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instIteratorZipperIdSigma._redArg._closed_0"
+fun f_Internal_instIteratorZipperIdSigma_closed_0_be1aabcebd(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_Zipper_step_c36cfa7001,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRciSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RciSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRiiSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRiiSlice_1a97f9ec5f(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRicSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRicSlice_closed_0_0b2346e433(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RcoSlice.instToIterator._redArg"
+fun f_Internal_RcoSlice_instToIterator_f65f95a0f4(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_49045dd1be,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRoiSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRoiSlice_lam_0_9494647614(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RoiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRoiSlice_lam_0_9494647614(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRoiSlice_lam_0_9494647614(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRcoSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RcoSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RioSlice.instToIterator"
+fun f_Internal_RioSlice_instToIterator_f0fc80d4da(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_595d2006d7,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRiiSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRiiSlice_closed_0_947f2718eb(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.rciIterator"
+fun f_DTreeMap_Internal_rciIterator_6e3bd9de19(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.RoiSlice.instToIterator"
+fun f_Internal_RoiSlice_instToIterator_cdae5110d3(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_057b89f170,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop._redArg"
+fun f_Internal_RxcIterator_instIteratorLoop_92fc70f844(
+  _inst_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxcIterator_instIteratorLoop_lam_3_8a3b26c3d4,
+    8,
+    Array[_inst_2_1, _inst_1_0],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.prependMap.match_1.splitter"
+fun f_prependMap_match_1_splitter_93c0390035(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _motive_2: LeanValue,
+  _x_1_3: LeanValue,
+  _x_2_4: LeanValue,
+  _h_1_5: LeanValue,
+  _h_2_6: LeanValue,
+): LeanValue {
+  leanTag(_x_1_3) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_3_7: LeanValue = leanField(_x_1_3, 0);
+    _k_4_8: LeanValue = leanField(_x_1_3, 1);
+    _v_5_9: LeanValue = leanField(_x_1_3, 2);
+    _l_6_10: LeanValue = leanField(_x_1_3, 3);
+    _r_7_11: LeanValue = leanField(_x_1_3, 4);
+    leanApply(
+      _h_2_6,
+      Array[_size_3_7, _k_4_8, _v_5_9, _l_6_10, _r_7_11, _x_2_4],
+    )
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+    leanApply(_h_1_5, Array[_x_2_4])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop"
+fun f_Internal_RxoIterator_instIteratorLoop_3d3b964ebc(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _m_3: LeanValue,
+  _inst_2_4: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxoIterator_instIteratorLoop_lam_3_4cbed39c98,
+    8,
+    Array[_inst_2_4, _inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.ctorIdx._impl"
+fun f_Zipper_ctorIdx_impl_177d7f9520(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  L4_Init_Prelude.f_getObjTagNat_fc9363532b(LeanErased(), _x_1_2)
+}
+// "Std.DTreeMap.Internal.Unit.RccSlice.instToIterator._redArg"
+fun f_Unit_RccSlice_instToIterator_969a70550c(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_a3069b2da3,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRooSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RooSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RiiSlice.instToIterator._redArg"
+fun f_Internal_RiiSlice_instToIterator_81924e5117(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_f26fbdb368,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.rcoIterator._redArg"
+fun f_DTreeMap_Internal_rcoIterator_6c879c2195(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _upperBound_3: LeanValue,
+): LeanValue {
+  _x_3_5: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+    Array[_x_3_5, _upperBound_3],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.prependMapGT"
+fun f_Internal_Zipper_prependMapGT_2f203d0088(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _it_5: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    _it_5,
+  )
+}
+// "Std.DTreeMap.Internal.Impl.foldrM._at_.Std.DTreeMap.Internal.Zipper.toList.spec_0"
+fun f_Zipper_toList_spec_0_7d78d4f5a7(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _init_2: LeanValue,
+  _x_1_3: LeanValue,
+): LeanValue {
+  f_Zipper_toList_spec_0_622e0b1c5f(_init_2, _x_1_3)
+}
+// "Std.DTreeMap.Internal.Const.RcoSlice.instToIterator._redArg"
+fun f_Const_RcoSlice_instToIterator_635d427afb(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_84e82fac16,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.iter"
+fun f_Internal_Zipper_iter_269ba6af44(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _t_2: LeanValue,
+): LeanValue {
+  _t_2
+}
+// "Std.DTreeMap.Internal.instSliceableImplRocSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RocSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Zipper.toList"
+fun f_Internal_Zipper_toList_7397d1785f(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_toList_7a14648d6d(_x_1_2)
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRicSlice"
+fun f_Internal_Unit_instSliceableImplUnitRicSlice_03fbd2489d(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRciSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRciSlice_closed_0_04f0d40f2c(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instToIterator"
+fun f_Internal_Zipper_instToIterator_87fcd5a605(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instToIterator_lam_0_4a5e790099,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.ctorElim"
+fun f_Internal_Zipper_ctorElim_2a2aa9b2be(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _motive_2: LeanValue,
+  _ctorIdx_3: LeanValue,
+  _t_4: LeanValue,
+  _h_5: LeanValue,
+  _k_6: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_ctorElim_72dc67e316(_t_4, _k_6)
+}
+// "Std.DTreeMap.Internal.RocSlice.instToIterator._redArg"
+fun f_Internal_RocSlice_instToIterator_3ac5fc10d9(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_adc470b68f,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RiiSlice.instToIterator._redArg"
+fun f_Unit_RiiSlice_instToIterator_f08eda6965(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_d83287f9e5,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRcoSlice._redArg"
+fun f_Internal_Const_instSliceableImplRcoSlice_bcddd9e88b(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRcoSlice_lam_0_70711791e0,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRioSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRioSlice_closed_0_6dafec740b(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRioSlice_lam_0_e43cd16942,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.cons.elim._redArg"
+fun f_Zipper_cons_elim_3a602dc795(
+  _t_0: LeanValue,
+  _cons_1: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_ctorElim_72dc67e316(_t_0, _cons_1)
+}
+// "Std.DTreeMap.Internal.Zipper.iterOfTree"
+fun f_Internal_Zipper_iterOfTree_e9d1531543(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _t_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_iterOfTree_48435e4d65(_t_2)
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRocSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RocSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRocSlice_lam_0_f2c85bdcaa(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.size"
+fun f_Internal_Zipper_size_dbec44d153(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _x_1_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_size_8184315690(_x_1_2)
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLE"
+fun f_Internal_Impl_pruneLE_7b974ea522(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+): LeanValue {
+  f_Internal_Impl_pruneLE_5b695c8a33(_inst_1_2, _t_3, _lowerBound_4)
+}
+// "Std.DTreeMap.Internal.rooIterator._redArg"
+fun f_DTreeMap_Internal_rooIterator_ced2f9941d(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _upperBound_3: LeanValue,
+): LeanValue {
+  _x_3_5: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+    Array[_x_3_5, _upperBound_3],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.done.elim._redArg"
+fun f_Zipper_done_elim_c378379501(
+  _t_0: LeanValue,
+  _done_1: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_ctorElim_72dc67e316(_t_0, _done_1)
+}
+// "Std.DTreeMap.Internal.Const.RicSlice.instToIterator._redArg"
+fun f_Const_RicSlice_instToIterator_8cd1c29a87(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_90eaa7202e,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxoIterator.step._redArg"
+fun f_Internal_RxoIterator_step_ae25b282ab(
+  _inst_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]" ->
+    _iter_3_2: LeanValue = leanField(_x_2_1, 0);
+    _upper_4_3: LeanValue = leanField(_x_2_1, 1);
+    leanTag(_iter_3_2) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_6_4: LeanValue = leanField(_iter_3_2, 0);
+      _v_7_5: LeanValue = leanField(_iter_3_2, 1);
+      _tree_8_6: LeanValue = leanField(_iter_3_2, 2);
+      _next_9_7: LeanValue = leanField(_iter_3_2, 3);
+      _x_10_9: LeanValue = leanApply(_inst_1_0, Array[_k_6_4, _upper_4_3]);
+      leanTag(_x_10_9) match {
+      | "[\"Ordering\",\"lt\"]" ->
+        _x_11_10: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+          _tree_8_6,
+          _next_9_7,
+        );
+        LeanCtor(
+          "[\"Std\",\"IterStep\",\"yield\"]",
+          Array[
+            LeanCtor(
+              "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+              Array[_x_11_10, _upper_4_3],
+            ),
+            LeanCtor("[\"Sigma\",\"mk\"]", Array[_k_6_4, _v_7_5]),
+          ],
+        )
+      | _ -> LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.instIteratorZipperIdSigma._redArg"
+fun f_DTreeMap_Internal_instIteratorZipperIdSigma_abd44b6a75(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_Zipper_step_c36cfa7001,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RicSlice.instToIterator._redArg._closed_0"
+fun f_RicSlice_instToIterator_closed_0_c7ad36aa76(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_e6d01ec873,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RioSlice.instToIterator._redArg._lam_0"
+fun f_RioSlice_instToIterator_lam_0_8deb3ca53f(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RioSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RioSlice_instToIterator_lam_0_8deb3ca53f(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RioSlice_instToIterator_lam_0_8deb3ca53f(_args[0])
+}
+// "Std.DTreeMap.Internal.Const.RciSlice.instToIterator"
+fun f_Const_RciSlice_instToIterator_8e0b0ed2d6(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_a6010b6927,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop._redArg._lam_2"
+fun f_RxoIterator_instIteratorLoop_lam_2_b4731e153c(
+  _toPure_0: LeanValue,
+  _y_1_1: LeanValue,
+  _toBind_2: LeanValue,
+  _inst_2_3: LeanValue,
+  _lift_4: LeanValue,
+  _it_5: LeanValue,
+  _acc_6: LeanValue,
+  _hP_7: LeanValue,
+  _recur_8: LeanValue,
+): LeanValue {
+  _f_3_9: LeanValue = LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxoIterator_instIteratorLoop_lam_1_cb4eecd505,
+    6,
+    Array[_toPure_0, _recur_8, _y_1_1, _acc_6, _toBind_2],
+  );
+  _x_4_10: LeanValue = f_Internal_RxoIterator_step_ae25b282ab(_inst_2_3, _it_5);
+  leanApply(_lift_4, Array[LeanErased(), LeanErased(), _f_3_9, _x_4_10])
+}
+fun apply_f_RxoIterator_instIteratorLoop_lam_2_b4731e153c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxoIterator_instIteratorLoop_lam_2_b4731e153c(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+    _args[7],
+    _args[8],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRioSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRioSlice_lam_0_c96c307751(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RioSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRioSlice_lam_0_c96c307751(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRioSlice_lam_0_c96c307751(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRcoSlice"
+fun f_Internal_Const_instSliceableImplRcoSlice_5b35896527(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRcoSlice_lam_0_70711791e0,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRicSlice"
+fun f_Internal_Const_instSliceableImplRicSlice_de80c05fa1(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RioSlice.instToIterator._redArg"
+fun f_Internal_RioSlice_instToIterator_94a74cf4d8(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_595d2006d7,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRicSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRicSlice_c265d205e0(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRicSlice_lam_0_294520f289,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRiiSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RiiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRiiSlice_lam_0_3e8c64a9d5(_args[0], _args[1])
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.toList.match_1.splitter._redArg"
+fun f_toList_match_1_splitter_2fe13c08ee(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+    leanApply(_h_1_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_4_3: LeanValue = leanField(_x_1_0, 0);
+    _v_5_4: LeanValue = leanField(_x_1_0, 1);
+    _tree_6_5: LeanValue = leanField(_x_1_0, 2);
+    _next_7_6: LeanValue = leanField(_x_1_0, 3);
+    leanApply(_h_2_2, Array[_k_4_3, _v_5_4, _tree_6_5, _next_7_6])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.RcoSlice.instToIterator._redArg"
+fun f_Unit_RcoSlice_instToIterator_d0ed221fda(_inst_1_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RcoSlice_instToIterator_lam_0_5f9c0de860,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RocSlice.instToIterator._redArg._lam_0"
+fun f_RocSlice_instToIterator_lam_0_61cbf7e38f(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RocSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RocSlice_instToIterator_lam_0_61cbf7e38f(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RocSlice_instToIterator_lam_0_61cbf7e38f(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRioSlice._redArg"
+fun f_Internal_Const_instSliceableImplRioSlice_0c979e4656(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRioSlice_lam_0_c96c307751,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Zipper.FinitenessRelation"
+fun f_Internal_Zipper_FinitenessRelation_c3d1854305(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    Array[LeanErased(), LeanErased(), LeanErased()],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop"
+fun f_Internal_Zipper_instIteratorLoop_5ac4ec289b(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _m_2: LeanValue,
+  _inst_1_3: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instIteratorLoop_lam_3_9b4323c074,
+    7,
+    Array[_inst_1_3],
+  )
+}
+// "Std.DTreeMap.Internal.instIteratorZipperIdSigma"
+fun f_DTreeMap_Internal_instIteratorZipperIdSigma_cfd63e94c1(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_Zipper_step_c36cfa7001,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RicSlice.instToIterator._redArg._lam_0"
+fun f_RicSlice_instToIterator_lam_0_e6d01ec873(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RicSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RicSlice_instToIterator_lam_0_e6d01ec873(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RicSlice_instToIterator_lam_0_e6d01ec873(_args[0])
+}
+// "Std.DTreeMap.Internal.RciSlice.instToIterator"
+fun f_Internal_RciSlice_instToIterator_1430e88df0(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RciSlice_instToIterator_lam_0_eedaf782b9,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.RciSlice.instToIterator._redArg._lam_0"
+fun f_RciSlice_instToIterator_lam_0_eedaf782b9(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RciSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGE_55403a9e08(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RciSlice_instToIterator_lam_0_eedaf782b9(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RciSlice_instToIterator_lam_0_eedaf782b9(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRccSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRccSlice_lam_0_1940617462(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RccSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRccSlice_lam_0_1940617462(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRccSlice_lam_0_1940617462(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.RiiSlice.instToIterator._redArg._lam_0"
+fun f_RiiSlice_instToIterator_lam_0_d83287f9e5(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RiiSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RiiSlice_instToIterator_lam_0_d83287f9e5(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RiiSlice_instToIterator_lam_0_d83287f9e5(_args[0])
+}
+// "Std.DTreeMap.Internal.Const.RcoSlice.instToIterator._redArg._lam_0"
+fun f_RcoSlice_instToIterator_lam_0_84e82fac16(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RcoSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rco\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RcoSlice_instToIterator_lam_0_84e82fac16(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RcoSlice_instToIterator_lam_0_84e82fac16(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop"
+fun f_Internal_RxcIterator_instIteratorLoop_afaebc3be4(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _m_3: LeanValue,
+  _inst_2_4: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RxcIterator_instIteratorLoop_lam_3_8a3b26c3d4,
+    8,
+    Array[_inst_2_4, _inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RciSlice.instToIterator._redArg._lam_0"
+fun f_RciSlice_instToIterator_lam_0_a6010b6927(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RciSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    f_Internal_Zipper_prependMapGE_55403a9e08(
+      _inst_1_0,
+      _treeMap_2,
+      _range_3,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RciSlice_instToIterator_lam_0_a6010b6927(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RciSlice_instToIterator_lam_0_a6010b6927(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Zipper.step._redArg"
+fun f_Internal_Zipper_step_c36cfa7001(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+    LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+    _k_3_1: LeanValue = leanField(_x_1_0, 0);
+    _v_4_2: LeanValue = leanField(_x_1_0, 1);
+    _tree_5_3: LeanValue = leanField(_x_1_0, 2);
+    _next_6_4: LeanValue = leanField(_x_1_0, 3);
+    _x_7_6: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _tree_5_3,
+      _next_6_4,
+    );
+    LeanCtor(
+      "[\"Std\",\"IterStep\",\"yield\"]",
+      Array[_x_7_6, LeanCtor("[\"Sigma\",\"mk\"]", Array[_k_3_1, _v_4_2])],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Internal_Zipper_step_c36cfa7001(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_Zipper_step_c36cfa7001(_args[0])
+}
+// "Std.DTreeMap.Internal.riiIterator._redArg"
+fun f_DTreeMap_Internal_riiIterator_cae988f04e(_t_0: LeanValue): LeanValue {
+  f_Internal_Zipper_prependMap_0dab450730(
+    _t_0,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.RocSlice.instToIterator._redArg._lam_0"
+fun f_RocSlice_instToIterator_lam_0_adc470b68f(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RocSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RocSlice_instToIterator_lam_0_adc470b68f(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RocSlice_instToIterator_lam_0_adc470b68f(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRooSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RooSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RooSlice.instToIterator"
+fun f_Internal_RooSlice_instToIterator_a2d942a344(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_7ab6320325,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RiiSlice.instToIterator"
+fun f_Const_RiiSlice_instToIterator_7595761f95(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_6f5b49bece,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RiiSlice.instToIterator"
+fun f_Internal_RiiSlice_instToIterator_b34a826693(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_f26fbdb368,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RooSlice.instToIterator._redArg"
+fun f_Internal_RooSlice_instToIterator_8f23b13756(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RooSlice_instToIterator_lam_0_7ab6320325,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop._redArg._lam_0"
+fun f_Zipper_instIteratorLoop_lam_0_9f33b9fa1a(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _it_1_2: LeanValue,
+  _do_lift_2_3: LeanValue,
+): LeanValue {
+  leanTag(_do_lift_2_3) match {
+  | "[\"ForInStep\",\"done\"]" ->
+    _a_3_4: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_toPure_0, Array[LeanErased(), _a_3_4])
+  | "[\"ForInStep\",\"yield\"]" ->
+    _a_5_5: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_recur_1, Array[_it_1_2, _a_5_5, LeanErased(), LeanErased()])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Zipper_instIteratorLoop_lam_0_9f33b9fa1a(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Zipper_instIteratorLoop_lam_0_9f33b9fa1a(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRiiSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRiiSlice_lam_0_7407936290(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RiiSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRiiSlice_lam_0_7407936290(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRiiSlice_lam_0_7407936290(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RiiSlice.instToIterator._redArg._closed_0"
+fun f_RiiSlice_instToIterator_closed_0_3258a05883(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_f26fbdb368,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRcoSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRcoSlice_closed_0_9ee143a8cc(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRioSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RioSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Const.RiiSlice.instToIterator._redArg._lam_0"
+fun f_RiiSlice_instToIterator_lam_0_6f5b49bece(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RiiSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RiiSlice_instToIterator_lam_0_6f5b49bece(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RiiSlice_instToIterator_lam_0_6f5b49bece(_args[0])
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRciSlice"
+fun f_Internal_Const_instSliceableImplRciSlice_d2d04d8b3d(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRciSlice_lam_0_e98ea835fc,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRooSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRooSlice_closed_0_320ccdb9f8(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RioSlice.instToIterator"
+fun f_Unit_RioSlice_instToIterator_00d23239c3(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_2605284915,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxcIterator.step._redArg"
+fun f_Internal_RxcIterator_step_446d374006(
+  _inst_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]" ->
+    _iter_3_2: LeanValue = leanField(_x_2_1, 0);
+    _upper_4_3: LeanValue = leanField(_x_2_1, 1);
+    leanTag(_iter_3_2) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_6_4: LeanValue = leanField(_iter_3_2, 0);
+      _v_7_5: LeanValue = leanField(_iter_3_2, 1);
+      _tree_8_6: LeanValue = leanField(_iter_3_2, 2);
+      _next_9_7: LeanValue = leanField(_iter_3_2, 3);
+      _x_10_9: LeanValue = leanApply(_inst_1_0, Array[_k_6_4, _upper_4_3]);
+      leanTag(_x_10_9) match {
+      | "[\"Ordering\",\"gt\"]" ->
+        LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
+      | _ ->
+        _x_12_11: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+          _tree_8_6,
+          _next_9_7,
+        );
+        LeanCtor(
+          "[\"Std\",\"IterStep\",\"yield\"]",
+          Array[
+            LeanCtor(
+              "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+              Array[_x_12_11, _upper_4_3],
+            ),
+            LeanCtor("[\"Sigma\",\"mk\"]", Array[_k_6_4, _v_7_5]),
+          ],
+        )
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.RccSlice.instToIterator._redArg._lam_0"
+fun f_RccSlice_instToIterator_lam_0_d31bbff7e5(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RccSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rcc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RccSlice_instToIterator_lam_0_d31bbff7e5(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RccSlice_instToIterator_lam_0_d31bbff7e5(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RicSlice.instToIterator._redArg"
+fun f_Internal_RicSlice_instToIterator_47500cea73(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_7170cbeb7b,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRccSlice._redArg._lam_0"
+fun f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RccSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRciSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRciSlice_d86015bff3(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRiiSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRiiSlice_closed_0_bb21dce5bf(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRiiSlice_lam_0_7407936290,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRicSlice._redArg._lam_0"
+fun f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RicSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RoiSlice.instToIterator._redArg"
+fun f_Internal_RoiSlice_instToIterator_d2bf33a30d(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RoiSlice_instToIterator_lam_0_057b89f170,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRicSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRicSlice_01597badfe(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRicSlice_lam_0_0c474ac735,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RxcIterator.step"
+fun f_Internal_RxcIterator_step_826fadf818(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _x_2_3: LeanValue,
+): LeanValue {
+  f_Internal_RxcIterator_step_446d374006(_inst_1_2, _x_2_3)
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRccSlice"
+fun f_Internal_Const_instSliceableImplRccSlice_16dc87e883(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRccSlice_lam_0_30f0af200c,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRcoSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRcoSlice_lam_0_70711791e0(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RcoSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRcoSlice_lam_0_70711791e0(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRcoSlice_lam_0_70711791e0(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop._redArg._lam_3"
+fun f_RxcIterator_instIteratorLoop_lam_3_8a3b26c3d4(
+  _inst_1_0: LeanValue,
+  _inst_2_1: LeanValue,
+  _lift_2: LeanValue,
+  _value_3: LeanValue,
+  _Pl_4: LeanValue,
+  _it_5: LeanValue,
+  _init_6: LeanValue,
+  _y_3_7: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_0) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_8: LeanValue = leanField(_inst_1_0, 0);
+    _toBind_9: LeanValue = leanField(_inst_1_0, 1);
+    leanTag(_toApplicative_8) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_10: LeanValue = leanField(_toApplicative_8, 0);
+      _toPure_11: LeanValue = leanField(_toApplicative_8, 1);
+      _toSeq_12: LeanValue = leanField(_toApplicative_8, 2);
+      _toSeqLeft_13: LeanValue = leanField(_toApplicative_8, 3);
+      _toSeqRight_14: LeanValue = leanField(_toApplicative_8, 4);
+      _f_4_15: LeanValue = LeanClosure(
+        L4_Std_Data_DTreeMap_Internal_Zipper
+          .apply_f_RxcIterator_instIteratorLoop_lam_2_6c21a4c3a7,
+        9,
+        Array[_toPure_11, _y_3_7, _toBind_9, _inst_2_1, _lift_2],
+      );
+      L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
+        _f_4_15,
+        _it_5,
+        _init_6,
+        LeanErased(),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxcIterator_instIteratorLoop_lam_3_8a3b26c3d4(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxcIterator_instIteratorLoop_lam_3_8a3b26c3d4(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+    _args[7],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.Impl.pruneLE.match_1.splitter"
+fun f_pruneLE_match_1_splitter_18726e5e99(
+  _motive_0: LeanValue,
+  _x_1_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+  _h_3_4: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Ordering\",\"lt\"]" ->
+    leanApply(_h_1_2, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Ordering\",\"eq\"]" ->
+    leanApply(_h_2_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | "[\"Ordering\",\"gt\"]" ->
+    leanApply(_h_3_4, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Zipper.iterOfTree._redArg"
+fun f_Internal_Zipper_iterOfTree_48435e4d65(_t_0: LeanValue): LeanValue {
+  f_Internal_Zipper_prependMap_0dab450730(
+    _t_0,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instIteratorLoop._redArg._lam_3"
+fun f_Zipper_instIteratorLoop_lam_3_9b4323c074(
+  _inst_1_0: LeanValue,
+  _lift_1: LeanValue,
+  _value_2: LeanValue,
+  _Pl_3: LeanValue,
+  _it_4: LeanValue,
+  _init_5: LeanValue,
+  _y_2_6: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_0) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_7: LeanValue = leanField(_inst_1_0, 0);
+    _toBind_8: LeanValue = leanField(_inst_1_0, 1);
+    leanTag(_toApplicative_7) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_9: LeanValue = leanField(_toApplicative_7, 0);
+      _toPure_10: LeanValue = leanField(_toApplicative_7, 1);
+      _toSeq_11: LeanValue = leanField(_toApplicative_7, 2);
+      _toSeqLeft_12: LeanValue = leanField(_toApplicative_7, 3);
+      _toSeqRight_13: LeanValue = leanField(_toApplicative_7, 4);
+      _f_3_14: LeanValue = LeanClosure(
+        L4_Std_Data_DTreeMap_Internal_Zipper
+          .apply_f_Zipper_instIteratorLoop_lam_2_09b06fe62e,
+        8,
+        Array[_toPure_10, _y_2_6, _toBind_8, _lift_1],
+      );
+      L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
+        _f_3_14,
+        _it_4,
+        _init_5,
+        LeanErased(),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Zipper_instIteratorLoop_lam_3_9b4323c074(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Zipper_instIteratorLoop_lam_3_9b4323c074(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRciSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRciSlice_closed_0_e4dd42dd0d(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRciSlice_lam_0_68b79f0bda,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RooSlice.instToIterator._redArg._lam_0"
+fun f_RooSlice_instToIterator_lam_0_7ab6320325(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RooSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Roo\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGT_f68530ccb4(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RooSlice_instToIterator_lam_0_7ab6320325(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RooSlice_instToIterator_lam_0_7ab6320325(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRccSlice"
+fun f_Internal_Unit_instSliceableImplUnitRccSlice_7ebb9853f1(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.DTreeMap.Internal.RxcIterator.step.match_1.splitter._redArg"
+fun f_step_match_1_splitter_15c4f5ddb7(
+  _x_1_0: LeanValue,
+  _h_1_1: LeanValue,
+  _h_2_2: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]" ->
+    _iter_2_3: LeanValue = leanField(_x_1_0, 0);
+    _upper_3_4: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_iter_2_3) match {
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]" ->
+      leanApply(_h_1_1, Array[_upper_3_4])
+    | "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]" ->
+      _k_5_5: LeanValue = leanField(_iter_2_3, 0);
+      _v_6_6: LeanValue = leanField(_iter_2_3, 1);
+      _tree_7_7: LeanValue = leanField(_iter_2_3, 2);
+      _next_8_8: LeanValue = leanField(_iter_2_3, 3);
+      leanApply(_h_2_2, Array[_k_5_5, _v_6_6, _tree_7_7, _next_8_8, _upper_3_4])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRooSlice"
+fun f_Internal_Const_instSliceableImplRooSlice_eee94a605c(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRooSlice_lam_0_8f715abb5e,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRoiSlice"
+fun f_Internal_Unit_instSliceableImplUnitRoiSlice_898efc10f6(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRoiSlice_lam_0_6b08500112,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RioSlice.instToIterator._redArg"
+fun f_Unit_RioSlice_instToIterator_10fd4b6538(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_2605284915,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RiiSlice.instToIterator._redArg"
+fun f_Const_RiiSlice_instToIterator_c422440940(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_6f5b49bece,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRioSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRioSlice_closed_0_824aada187(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRioSlice_lam_0_3e586690ab,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRoiSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRoiSlice_c614064d0d(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRoiSlice_lam_0_23ea9cfbdb,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRcoSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRcoSlice_closed_0_a7f1756cd1(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.prependMapGE"
+fun f_Internal_Zipper_prependMapGE_101e8b0594(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+  _t_3: LeanValue,
+  _lowerBound_4: LeanValue,
+  _it_5: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_2,
+    _t_3,
+    _lowerBound_4,
+    _it_5,
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRicSlice._redArg"
+fun f_Internal_Const_instSliceableImplRicSlice_bf12a546e3(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRoiSlice"
+fun f_Internal_Const_instSliceableImplRoiSlice_fb50cdcf89(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRoiSlice_lam_0_9494647614,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRoiSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRoiSlice_closed_0_3973d08387(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRoiSlice_lam_0_9494647614,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RocSlice.instToIterator._redArg"
+fun f_Const_RocSlice_instToIterator_0abda115d9(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_193c9bcf6a,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRicSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRicSlice_closed_0_b732bcf194(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRicSlice_lam_0_f02be3ec5c,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instToIterator._redArg._closed_0"
+fun f_Zipper_instToIterator_closed_0_b555507918(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Zipper_instToIterator_lam_0_4a5e790099,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRioSlice"
+fun f_Internal_Const_instSliceableImplRioSlice_5b2560a58f(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRioSlice_lam_0_c96c307751,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RccSlice.instToIterator"
+fun f_Const_RccSlice_instToIterator_69af6f5163(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RccSlice_instToIterator_lam_0_d31bbff7e5,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRoiSlice._redArg"
+fun f_Internal_Const_instSliceableImplRoiSlice_7d5bcfdc1b(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRoiSlice_lam_0_9494647614,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instIteratorRxoIteratorIdSigma._redArg"
+fun f_DTreeMap_Internal_instIteratorRxoIteratorIdSigma_0b531a813a(
+  _inst_1_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instIteratorRxoIteratorIdSigma_lam_0_bc03f2491c,
+    2,
+    Array[_inst_1_0],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRccSlice._redArg._closed_0"
+fun f_Unit_instSliceableImplUnitRccSlice_closed_0_9895b887af(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRooSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRooSlice_96fe328b3f(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRooSlice_lam_0_f7cb64caf7,
+    2,
+    Array[],
+  )
+}
+// "_private.Std.Data.DTreeMap.Internal.Zipper.0.Std.IterM.toArray_eq_match_step.match_1.splitter"
+fun f_toArray_eq_match_step_match_1_splitter_dd8dbd8192(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _m_2: LeanValue,
+  _motive_3: LeanValue,
+  _x_1_4: LeanValue,
+  _h_1_5: LeanValue,
+  _h_2_6: LeanValue,
+  _h_3_7: LeanValue,
+): LeanValue {
+  leanTag(_x_1_4) match {
+  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+    _it_2_8: LeanValue = leanField(_x_1_4, 0);
+    _out_3_9: LeanValue = leanField(_x_1_4, 1);
+    leanApply(_h_1_5, Array[_it_2_8, _out_3_9])
+  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+    _it_5_10: LeanValue = leanField(_x_1_4, 0);
+    leanApply(_h_2_6, Array[_it_5_10])
+  | "[\"Std\",\"IterStep\",\"done\"]" ->
+    leanApply(_h_3_7, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRccSlice._redArg"
+fun f_Internal_Unit_instSliceableImplUnitRccSlice_de6a5e41d6(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRccSlice_lam_0_3d1400f67d,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.rccIterator._redArg"
+fun f_DTreeMap_Internal_rccIterator_032262e44d(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _upperBound_3: LeanValue,
+): LeanValue {
+  _x_3_5: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  );
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+    Array[_x_3_5, _upperBound_3],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRocSlice._redArg._lam_0"
+fun f_Const_instSliceableImplRocSlice_lam_0_65017a862e(
+  _carrier_0: LeanValue,
+  _range_1: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RocSliceData\",\"mk\"]",
+    Array[_carrier_0, _range_1],
+  )
+}
+fun apply_f_Const_instSliceableImplRocSlice_lam_0_65017a862e(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Const_instSliceableImplRocSlice_lam_0_65017a862e(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.Unit.RiiSlice.instToIterator"
+fun f_Unit_RiiSlice_instToIterator_e8a49f74a0(_value_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RiiSlice_instToIterator_lam_0_d83287f9e5,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.RioSlice.instToIterator._redArg._lam_0"
+fun f_RioSlice_instToIterator_lam_0_2605284915(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Unit\",\"RioSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxoIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RioSlice_instToIterator_lam_0_2605284915(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RioSlice_instToIterator_lam_0_2605284915(_args[0])
+}
+// "Std.DTreeMap.Internal.Zipper.prependMapGE._redArg"
+fun f_Internal_Zipper_prependMapGE_55403a9e08(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+  _it_3: LeanValue,
+): LeanValue {
+  leanTag(_t_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+    _size_2_4: LeanValue = leanField(_t_1, 0);
+    _k_3_5: LeanValue = leanField(_t_1, 1);
+    _v_4_6: LeanValue = leanField(_t_1, 2);
+    _l_5_7: LeanValue = leanField(_t_1, 3);
+    _r_6_8: LeanValue = leanField(_t_1, 4);
+    _x_7_9: LeanValue = leanApply(_inst_1_0, Array[_lowerBound_2, _k_3_5]);
+    leanTag(_x_7_9) match {
+    | "[\"Ordering\",\"lt\"]" ->
+      f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _l_5_7,
+        _lowerBound_2,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]",
+          Array[_k_3_5, _v_4_6, _r_6_8, _it_3],
+        ),
+      )
+    | "[\"Ordering\",\"eq\"]" ->
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"cons\"]",
+        Array[_k_3_5, _v_4_6, _r_6_8, _it_3],
+      )
+    | "[\"Ordering\",\"gt\"]" ->
+      f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _r_6_8,
+        _lowerBound_2,
+        _it_3,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _it_3
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DTreeMap.Internal.Const.RicSlice.instToIterator._redArg._lam_0"
+fun f_RicSlice_instToIterator_lam_0_90eaa7202e(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Const\",\"RicSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RicSlice_instToIterator_lam_0_90eaa7202e(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RicSlice_instToIterator_lam_0_90eaa7202e(_args[0])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRooSlice._redArg._closed_0"
+fun f_Internal_instSliceableImplRooSlice_closed_0_4c8c55aa42(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRooSlice_lam_0_ae4e577344,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Zipper.instToIterator._redArg._lam_0"
+fun f_Zipper_instToIterator_lam_0_4a5e790099(_x_0: LeanValue): LeanValue {
+  _x_0
+}
+fun apply_f_Zipper_instToIterator_lam_0_4a5e790099(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Zipper_instToIterator_lam_0_4a5e790099(_args[0])
+}
+// "Std.DTreeMap.Internal.instSliceableImplRocSlice"
+fun f_DTreeMap_Internal_instSliceableImplRocSlice_de3da04012(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRciSlice"
+fun f_DTreeMap_Internal_instSliceableImplRciSlice_2bf56224a6(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRciSlice_lam_0_d33e9e4137,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRccSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRccSlice_4329f64788(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRccSlice_lam_0_1940617462,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.roiIterator._redArg"
+fun f_DTreeMap_Internal_roiIterator_14012caf0e(
+  _inst_1_0: LeanValue,
+  _t_1: LeanValue,
+  _lowerBound_2: LeanValue,
+): LeanValue {
+  f_Internal_Zipper_prependMapGT_f68530ccb4(
+    _inst_1_0,
+    _t_1,
+    _lowerBound_2,
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+      Array[],
+    ),
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRcoSlice"
+fun f_DTreeMap_Internal_instSliceableImplRcoSlice_a4f8981be8(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RicSlice.instToIterator._redArg._closed_0"
+fun f_RicSlice_instToIterator_closed_0_f7790f74af(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RicSlice_instToIterator_lam_0_90eaa7202e,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.RioSlice.instToIterator._redArg"
+fun f_Const_RioSlice_instToIterator_59157a0246(_dummy_0: LeanValue): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RioSlice_instToIterator_lam_0_8deb3ca53f,
+    1,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RccSlice.instToIterator._redArg._lam_0"
+fun f_RccSlice_instToIterator_lam_0_c57d522690(
+  _inst_1_0: LeanValue,
+  _x_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RccSliceData\",\"mk\"]" ->
+    _treeMap_2: LeanValue = leanField(_x_1, 0);
+    _range_3: LeanValue = leanField(_x_1, 1);
+    leanTag(_range_3) match {
+    | "[\"Std\",\"Rcc\",\"mk\"]" ->
+      _lower_4: LeanValue = leanField(_range_3, 0);
+      _upper_5: LeanValue = leanField(_range_3, 1);
+      _x_3_7: LeanValue = f_Internal_Zipper_prependMapGE_55403a9e08(
+        _inst_1_0,
+        _treeMap_2,
+        _lower_4,
+        LeanCtor(
+          "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+          Array[],
+        ),
+      );
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+        Array[_x_3_7, _upper_5],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RccSlice_instToIterator_lam_0_c57d522690(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RccSlice_instToIterator_lam_0_c57d522690(_args[0], _args[1])
+}
+// "Std.DTreeMap.Internal.RxcIterator.instIteratorLoop._redArg._lam_1"
+fun f_RxcIterator_instIteratorLoop_lam_1_35fd035e7c(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _y_1_2: LeanValue,
+  _acc_3: LeanValue,
+  _toBind_4: LeanValue,
+  _s_5: LeanValue,
+): LeanValue {
+  leanTag(_s_5) match {
+  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+    _it_2_6: LeanValue = leanField(_s_5, 0);
+    _out_3_7: LeanValue = leanField(_s_5, 1);
+    _f_4_9: LeanValue = LeanClosure(
+      L4_Std_Data_DTreeMap_Internal_Zipper
+        .apply_f_RxcIterator_instIteratorLoop_lam_0_3b03508f69,
+      4,
+      Array[_toPure_0, _recur_1, _it_2_6],
+    );
+    _x_5_10: LeanValue = leanApply(
+      _y_1_2,
+      Array[_out_3_7, LeanErased(), _acc_3],
+    );
+    leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _x_5_10, _f_4_9])
+  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+    _it_7_8: LeanValue = leanField(_s_5, 0);
+    leanApply(_recur_1, Array[_it_7_8, _acc_3, LeanErased(), LeanErased()])
+  | "[\"Std\",\"IterStep\",\"done\"]" ->
+    leanApply(_toPure_0, Array[LeanErased(), _acc_3])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxcIterator_instIteratorLoop_lam_1_35fd035e7c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxcIterator_instIteratorLoop_lam_1_35fd035e7c(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+  )
+}
+// "Std.DTreeMap.Internal.Unit.instSliceableImplUnitRcoSlice"
+fun f_Internal_Unit_instSliceableImplUnitRcoSlice_35d22bc21b(
+  _value_0: LeanValue,
+  _inst_1_1: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Unit_instSliceableImplUnitRcoSlice_lam_0_bb2eecdf10,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.Const.instSliceableImplRcoSlice._redArg._closed_0"
+fun f_Const_instSliceableImplRcoSlice_closed_0_bd0013bc18(): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Const_instSliceableImplRcoSlice_lam_0_70711791e0,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RocSlice.instToIterator"
+fun f_Internal_RocSlice_instToIterator_6f3d0141af(
+  _value_0: LeanValue,
+  _value_1: LeanValue,
+  _inst_1_2: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_RocSlice_instToIterator_lam_0_adc470b68f,
+    2,
+    Array[_inst_1_2],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRocSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRocSlice_3d7a88b33f(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRocSlice_lam_0_e5d6b8db98,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.instSliceableImplRcoSlice._redArg"
+fun f_DTreeMap_Internal_instSliceableImplRcoSlice_9bb59101f4(
+  _dummy_0: LeanValue,
+): LeanValue {
+  LeanClosure(
+    L4_Std_Data_DTreeMap_Internal_Zipper
+      .apply_f_Internal_instSliceableImplRcoSlice_lam_0_f1a9cd7505,
+    2,
+    Array[],
+  )
+}
+// "Std.DTreeMap.Internal.RicSlice.instToIterator._redArg._lam_0"
+fun f_RicSlice_instToIterator_lam_0_7170cbeb7b(_x_0: LeanValue): LeanValue {
+  leanTag(_x_0) match {
+  | "[\"Std\",\"DTreeMap\",\"Internal\",\"RicSliceData\",\"mk\"]" ->
+    _treeMap_1: LeanValue = leanField(_x_0, 0);
+    _range_2: LeanValue = leanField(_x_0, 1);
+    _x_2_4: LeanValue = f_Internal_Zipper_prependMap_0dab450730(
+      _treeMap_1,
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Zipper\",\"done\"]",
+        Array[],
+      ),
+    );
+    LeanCtor(
+      "[\"Std\",\"DTreeMap\",\"Internal\",\"RxcIterator\",\"mk\"]",
+      Array[_x_2_4, _range_2],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RicSlice_instToIterator_lam_0_7170cbeb7b(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RicSlice_instToIterator_lam_0_7170cbeb7b(_args[0])
+}
+// "Std.DTreeMap.Internal.RxoIterator.instIteratorLoop._redArg._lam_1"
+fun f_RxoIterator_instIteratorLoop_lam_1_cb4eecd505(
+  _toPure_0: LeanValue,
+  _recur_1: LeanValue,
+  _y_1_2: LeanValue,
+  _acc_3: LeanValue,
+  _toBind_4: LeanValue,
+  _s_5: LeanValue,
+): LeanValue {
+  leanTag(_s_5) match {
+  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+    _it_2_6: LeanValue = leanField(_s_5, 0);
+    _out_3_7: LeanValue = leanField(_s_5, 1);
+    _f_4_9: LeanValue = LeanClosure(
+      L4_Std_Data_DTreeMap_Internal_Zipper
+        .apply_f_RxoIterator_instIteratorLoop_lam_0_64cd0019d9,
+      4,
+      Array[_toPure_0, _recur_1, _it_2_6],
+    );
+    _x_5_10: LeanValue = leanApply(
+      _y_1_2,
+      Array[_out_3_7, LeanErased(), _acc_3],
+    );
+    leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _x_5_10, _f_4_9])
+  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+    _it_7_8: LeanValue = leanField(_s_5, 0);
+    leanApply(_recur_1, Array[_it_7_8, _acc_3, LeanErased(), LeanErased()])
+  | "[\"Std\",\"IterStep\",\"done\"]" ->
+    leanApply(_toPure_0, Array[LeanErased(), _acc_3])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_RxoIterator_instIteratorLoop_lam_1_cb4eecd505(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_RxoIterator_instIteratorLoop_lam_1_cb4eecd505(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+  )
+}
+
+module end;

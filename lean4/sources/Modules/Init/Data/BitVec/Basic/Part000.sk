@@ -1,0 +1,1016 @@
+module L4_Init_Data_BitVec_Basic;
+
+// "BitVec.abs"
+fun f_BitVec_abs_89eba2ddb6(_n_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    LeanScalar("nat", "0"),
+    _n_0,
+  );
+  leanTag(_x_2_3) match {
+  | "[\"Bool\",\"false\"]" -> _x_1
+  | "[\"Bool\",\"true\"]" ->
+    _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _n_0,
+      LeanScalar("nat", "1"),
+    );
+    _x_5_6: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+      _x_1,
+      _x_4_5,
+    );
+    leanTag(_x_5_6) match {
+    | "[\"Bool\",\"false\"]" -> _x_1
+    | "[\"Bool\",\"true\"]" -> f_BitVec_neg_8a8410c13a(_n_0, _x_1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.rotateLeftAux"
+fun f_BitVec_rotateLeftAux_f3ba28c953(
+  _w_0: LeanValue,
+  _x_1: LeanValue,
+  _n_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_BitVec_shiftLeft_4a4b020dbb(_w_0, _x_1, _n_2);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_w_0, _n_2);
+  _x_3_5: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+    _x_1,
+    _x_2_4,
+  );
+  L4_Init_Data_Nat_Bitwise_Basic.f_Nat_lor_2d49e86891(_x_1_3, _x_3_5)
+}
+// "BitVec.setWidth"
+fun f_BitVec_setWidth_c7469634b4(
+  _w_0: LeanValue,
+  _v_1: LeanValue,
+  _x_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_w_0, _v_1);
+  leanTag(_x_1_3) match {
+  | "[\"Bool\",\"false\"]" ->
+    L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_v_1, _x_2)
+  | "[\"Bool\",\"true\"]" -> _x_2
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_BitVec_setWidth_c7469634b4(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_setWidth_c7469634b4(_args[0], _args[1], _args[2])
+}
+// "BitVec.replicate"
+fun f_BitVec_replicate_93db8aed0b(
+  _w_0: LeanValue,
+  _x_1_1: LeanValue,
+  _x_2_2: LeanValue,
+): LeanValue {
+  _zero_3: LeanValue = LeanScalar("nat", "0");
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _x_1_1,
+    _zero_3,
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_zero_3, _zero_3)
+  | "[\"Bool\",\"false\"]" ->
+    _n_4_7: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _x_1_1,
+      LeanScalar("nat", "1"),
+    );
+    _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(_w_0, _n_4_7);
+    _x_6_9: LeanValue = f_BitVec_replicate_93db8aed0b(_w_0, _n_4_7, _x_2_2);
+    f_BitVec_append_9f02258dc6(_x_5_8, _x_2_2, _x_6_9)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.extractLsb'._redArg"
+fun f_BitVec_extractLsb_671811e706(
+  _start_0: LeanValue,
+  _len_1: LeanValue,
+  _x_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+    _x_2,
+    _start_0,
+  );
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_len_1, _x_1_3)
+}
+// "BitVec.cpopNatRec._redArg"
+fun f_BitVec_cpopNatRec_25616e7f4f(
+  _x_0: LeanValue,
+  _pos_1: LeanValue,
+  _acc_2: LeanValue,
+): LeanValue {
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _pos_1,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" -> _acc_2
+  | "[\"Bool\",\"false\"]" ->
+    _n_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _pos_1,
+      LeanScalar("nat", "1"),
+    );
+    _x_2_7: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+      _x_0,
+      _n_1_6,
+    );
+    _x_3_8: LeanValue = L4_Init_Data_Bool.f_Bool_toNat_38b6eb3498(_x_2_7);
+    _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_acc_2, _x_3_8);
+    f_BitVec_cpopNatRec_25616e7f4f(_x_0, _n_1_6, _x_4_9)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.append._redArg"
+fun f_BitVec_append_9f02258dc6(
+  _m_0: LeanValue,
+  _msbs_1: LeanValue,
+  _lsbs_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftLeft_d5b2caad1d(
+    _msbs_1,
+    _m_0,
+  );
+  L4_Init_Data_Nat_Bitwise_Basic.f_Nat_lor_2d49e86891(_x_1_3, _lsbs_2)
+}
+// "BitVec.shiftLeft"
+fun f_BitVec_shiftLeft_4a4b020dbb(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _s_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftLeft_d5b2caad1d(
+    _x_1,
+    _s_2,
+  );
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_n_0, _x_1_3)
+}
+fun apply_f_BitVec_shiftLeft_4a4b020dbb(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_shiftLeft_4a4b020dbb(_args[0], _args[1], _args[2])
+}
+// "BitVec.reverse"
+fun f_BitVec_reverse_07f1cdc137(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  _zero_2: LeanValue = LeanScalar("nat", "0");
+  _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _x_1_0,
+    _zero_2,
+  );
+  leanTag(_isZero_3) match {
+  | "[\"Bool\",\"true\"]" -> _x_2_1
+  | "[\"Bool\",\"false\"]" ->
+    _one_4: LeanValue = LeanScalar("nat", "1");
+    _n_3_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_1_0, _one_4);
+    _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_n_3_5, _one_4);
+    _x_5_7: LeanValue = f_BitVec_setWidth_c7469634b4(_x_4_6, _n_3_5, _x_2_1);
+    _x_6_8: LeanValue = f_BitVec_reverse_07f1cdc137(_n_3_5, _x_5_7);
+    _x_7_9: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_zero_2, _x_4_6);
+    leanTag(_x_7_9) match {
+    | "[\"Bool\",\"false\"]" -> f_BitVec_concat_3f076ff79a(_x_6_8, _x_7_9)
+    | "[\"Bool\",\"true\"]" ->
+      _x_9_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_4_6, _one_4);
+      _x_10_12: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+        _x_2_1,
+        _x_9_11,
+      );
+      f_BitVec_concat_3f076ff79a(_x_6_8, _x_10_12)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.smtUDiv"
+fun f_BitVec_smtUDiv_b307e754d5(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _y_2: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+    _n_0,
+    LeanScalar("nat", "0"),
+  );
+  _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_y_2, _x_2_4);
+  leanTag(_x_3_5) match {
+  | "[\"Bool\",\"false\"]" -> L4_Init_Prelude.f_Nat_div_d9df18e4c4(_x_1, _y_2)
+  | "[\"Bool\",\"true\"]" -> f_BitVec_allOnes_539c9bc180(_n_0)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.clzFast"
+fun f_BitVec_clzFast_33d8c5f803(_w_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _x_1,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_x_2_3) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_3_4: LeanValue = L4_Init_Data_Nat_Log2.f_Nat_log2_fba11add7b(_x_1);
+    _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _x_3_4,
+      LeanScalar("nat", "1"),
+    );
+    L4_Init_Prelude.f_Nat_sub_8647441ee5(_w_0, _x_5_6)
+  | "[\"Bool\",\"true\"]" -> _w_0
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.allOnes"
+fun f_BitVec_allOnes_539c9bc180(_n_0: LeanValue): LeanValue {
+  _x_2_2: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
+    LeanScalar("nat", "2"),
+    _n_0,
+  );
+  L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_2_2, LeanScalar("nat", "1"))
+}
+// "BitVec.hash"
+fun f_BitVec_hash_8663abfb46(_n_0: LeanValue, _bv_1: LeanValue): LeanValue {
+  _x_1_2: LeanValue = LeanScalar("nat", "64");
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_n_0, _x_1_2);
+  leanTag(_x_2_3) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_3_4: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _bv_1,
+    );
+    _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_n_0, _x_1_2);
+    _x_5_6: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+      _bv_1,
+      _x_1_2,
+    );
+    _x_6_7: LeanValue = f_BitVec_setWidth_c7469634b4(_n_0, _x_4_5, _x_5_6);
+    _x_7_8: LeanValue = f_BitVec_hash_8663abfb46(_x_4_5, _x_6_7);
+    L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_x_3_4, _x_7_8)
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(_bv_1)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_BitVec_hash_8663abfb46(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_hash_8663abfb46(_args[0], _args[1])
+}
+// "BitVec.neg"
+fun f_BitVec_neg_8a8410c13a(_n_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
+    LeanScalar("nat", "2"),
+    _n_0,
+  );
+  _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_2_3, _x_1);
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_n_0, _x_3_4)
+}
+fun apply_f_BitVec_neg_8a8410c13a(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_neg_8a8410c13a(_args[0], _args[1])
+}
+// "BitVec.ofInt"
+fun f_BitVec_ofInt_da79fd7c59(_n_0: LeanValue, _i_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
+    LeanScalar("nat", "2"),
+    _n_0,
+  );
+  _x_3_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_2_3);
+  _x_4_5: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+    _i_1,
+    _x_3_4,
+  );
+  L4_Init_Data_Int_Basic.f_Int_toNat_23da39749d(_x_4_5)
+}
+fun apply_f_BitVec_ofInt_da79fd7c59(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_ofInt_da79fd7c59(_args[0], _args[1])
+}
+// "BitVec.not"
+fun f_BitVec_not_915d9bdde0(_n_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_1_2: LeanValue = f_BitVec_allOnes_539c9bc180(_n_0);
+  L4_Init_Data_Nat_Bitwise_Basic.f_Nat_xor_9810693650(_x_1_2, _x_1)
+}
+fun apply_f_BitVec_not_915d9bdde0(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_not_915d9bdde0(_args[0], _args[1])
+}
+// "BitVec.smtSDiv"
+fun f_BitVec_smtSDiv_da2f756fec(
+  _n_0_input: LeanValue,
+  _x_1_input: LeanValue,
+  _y_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_n_0, 1=_x_1, 2=_y_2, 3=_x_2_3, 4=_x_3_4, 5=_x_4_5, 6=_x_5_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_19_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    25,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _n_0_input);
+  _frame.set(1, _x_1_input);
+  _frame.set(2, _y_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(13, LeanScalar("nat", "0"));
+      _frame.set(
+        14,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[13], _frame[0]),
+      );
+      leanTag(_frame[14]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 1;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(15, LeanScalar("nat", "1"));
+        _frame.set(
+          16,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[15]),
+        );
+        _frame.set(
+          17,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[1],
+            _frame[16],
+          ),
+        );
+        leanTag(_frame[17]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            18,
+            L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+              _frame[2],
+              _frame[16],
+            ),
+          );
+          leanTag(_frame[18]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(19, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(
+              20,
+              f_BitVec_smtUDiv_b307e754d5(_frame[0], _frame[19], _frame[2]),
+            );
+            _frame.set(21, f_BitVec_neg_8a8410c13a(_frame[0], _frame[20]));
+            return _frame[21]
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(22, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(23, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+            _frame.set(
+              24,
+              f_BitVec_smtUDiv_b307e754d5(_frame[0], _frame[22], _frame[23]),
+            );
+            return _frame[24]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(3, LeanScalar("nat", "0"));
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[0]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          f_BitVec_smtUDiv_b307e754d5(_frame[0], _frame[1], _frame[2]),
+        );
+        return _frame[5]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[6]),
+        );
+        _frame.set(
+          8,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[2],
+            _frame[7],
+          ),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            f_BitVec_smtUDiv_b307e754d5(_frame[0], _frame[1], _frame[2]),
+          );
+          return _frame[9]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(10, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+          _frame.set(
+            11,
+            f_BitVec_smtUDiv_b307e754d5(_frame[0], _frame[1], _frame[10]),
+          );
+          _frame.set(12, f_BitVec_neg_8a8410c13a(_frame[0], _frame[11]));
+          return _frame[12]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "BitVec.srem"
+fun f_BitVec_srem_48675dd31c(
+  _n_0_input: LeanValue,
+  _x_1_input: LeanValue,
+  _y_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_n_0, 1=_x_1, 2=_y_2, 3=_x_2_3, 4=_x_3_4, 5=_x_4_5, 6=_x_5_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_19_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    25,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _n_0_input);
+  _frame.set(1, _x_1_input);
+  _frame.set(2, _y_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(12, LeanScalar("nat", "0"));
+      _frame.set(
+        13,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[12], _frame[0]),
+      );
+      leanTag(_frame[13]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 1;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(14, LeanScalar("nat", "1"));
+        _frame.set(
+          15,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[14]),
+        );
+        _frame.set(
+          16,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[1],
+            _frame[15],
+          ),
+        );
+        leanTag(_frame[16]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            17,
+            L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+              _frame[2],
+              _frame[15],
+            ),
+          );
+          leanTag(_frame[17]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(18, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(
+              19,
+              L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[18], _frame[2]),
+            );
+            _frame.set(20, f_BitVec_neg_8a8410c13a(_frame[0], _frame[19]));
+            return _frame[20]
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(21, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(22, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+            _frame.set(
+              23,
+              L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[21], _frame[22]),
+            );
+            _frame.set(24, f_BitVec_neg_8a8410c13a(_frame[0], _frame[23]));
+            return _frame[24]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(3, LeanScalar("nat", "0"));
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[0]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[2]),
+        );
+        return _frame[5]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[6]),
+        );
+        _frame.set(
+          8,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[2],
+            _frame[7],
+          ),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[2]),
+          );
+          return _frame[9]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(10, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[10]),
+          );
+          return _frame[11]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "BitVec.extractLsb._redArg"
+fun f_BitVec_extractLsb_b7fa8a4c46(
+  _hi_0: LeanValue,
+  _lo_1: LeanValue,
+  _x_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_hi_0, _lo_1);
+  _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _x_1_3,
+    LeanScalar("nat", "1"),
+  );
+  f_BitVec_extractLsb_671811e706(_lo_1, _x_3_5, _x_2)
+}
+// "BitVec.sdiv"
+fun f_BitVec_sdiv_e715ba0aeb(
+  _n_0_input: LeanValue,
+  _x_1_input: LeanValue,
+  _y_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_n_0, 1=_x_1, 2=_y_2, 3=_x_2_3, 4=_x_3_4, 5=_x_4_5, 6=_x_5_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_x_17_18, 19=_x_18_19, 20=_x_19_20, 21=_x_20_21, 22=_x_21_22, 23=_x_22_23, 24=_x_23_24
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    25,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _n_0_input);
+  _frame.set(1, _x_1_input);
+  _frame.set(2, _y_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(13, LeanScalar("nat", "0"));
+      _frame.set(
+        14,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[13], _frame[0]),
+      );
+      leanTag(_frame[14]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 1;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(15, LeanScalar("nat", "1"));
+        _frame.set(
+          16,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[15]),
+        );
+        _frame.set(
+          17,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[1],
+            _frame[16],
+          ),
+        );
+        leanTag(_frame[17]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            18,
+            L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+              _frame[2],
+              _frame[16],
+            ),
+          );
+          leanTag(_frame[18]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(19, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(
+              20,
+              L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[19], _frame[2]),
+            );
+            _frame.set(21, f_BitVec_neg_8a8410c13a(_frame[0], _frame[20]));
+            return _frame[21]
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(22, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(23, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+            _frame.set(
+              24,
+              L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[22], _frame[23]),
+            );
+            return _frame[24]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(3, LeanScalar("nat", "0"));
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[0]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[1], _frame[2]),
+        );
+        return _frame[5]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[6]),
+        );
+        _frame.set(
+          8,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[2],
+            _frame[7],
+          ),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[1], _frame[2]),
+          );
+          return _frame[9]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(10, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_Nat_div_d9df18e4c4(_frame[1], _frame[10]),
+          );
+          _frame.set(12, f_BitVec_neg_8a8410c13a(_frame[0], _frame[11]));
+          return _frame[12]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "BitVec.sshiftRight"
+fun f_BitVec_sshiftRight_99eddf642e(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _s_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_BitVec_toInt_5eecfe4867(_n_0, _x_1);
+  _x_2_4: LeanValue = L4_Init_Data_Int_Bitwise_Basic.f_Int_shiftRight_bdbf1cd0b1(
+    _x_1_3,
+    _s_2,
+  );
+  f_BitVec_ofInt_da79fd7c59(_n_0, _x_2_4)
+}
+// "BitVec.slt"
+fun f_BitVec_slt_472d95d1f8(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _y_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_BitVec_toInt_5eecfe4867(_n_0, _x_1);
+  _x_2_4: LeanValue = f_BitVec_toInt_5eecfe4867(_n_0, _y_2);
+  L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(_x_1_3, _x_2_4)
+}
+// "BitVec.concat._redArg"
+fun f_BitVec_concat_3f076ff79a(
+  _msbs_0: LeanValue,
+  _lsb_1: LeanValue,
+): LeanValue {
+  _x_2_3: LeanValue = f_BitVec_ofBool_250726ba68(_lsb_1);
+  f_BitVec_append_9f02258dc6(LeanScalar("nat", "1"), _msbs_0, _x_2_3)
+}
+// "BitVec.rotateRight"
+fun f_BitVec_rotateRight_8268b8036d(
+  _w_0: LeanValue,
+  _x_1: LeanValue,
+  _n_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_n_2, _w_0);
+  f_BitVec_rotateRightAux_455728a104(_w_0, _x_1, _x_1_3)
+}
+// "BitVec.repr"
+fun f_BitVec_repr_5feac12c0a(_n_0: LeanValue, _a_1: LeanValue): LeanValue {
+  _x_3_4: LeanValue = f_BitVec_toHex_4b9ee97c19(_n_0, _a_1);
+  _x_5_6: LeanValue = LeanCtor(
+    "[\"Std\",\"Format\",\"append\"]",
+    Array[
+      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText("0x")]),
+      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_3_4]),
+    ],
+  );
+  _x_9_10: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_n_0);
+  LeanCtor(
+    "[\"Std\",\"Format\",\"append\"]",
+    Array[
+      LeanCtor(
+        "[\"Std\",\"Format\",\"append\"]",
+        Array[
+          _x_5_6,
+          LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText("#")]),
+        ],
+      ),
+      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_9_10]),
+    ],
+  )
+}
+// "BitVec.signExtend"
+fun f_BitVec_signExtend_4e41324589(
+  _w_0: LeanValue,
+  _v_1: LeanValue,
+  _x_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_BitVec_toInt_5eecfe4867(_w_0, _x_2);
+  f_BitVec_ofInt_da79fd7c59(_v_1, _x_1_3)
+}
+fun apply_f_BitVec_signExtend_4e41324589(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_signExtend_4e41324589(_args[0], _args[1], _args[2])
+}
+// "BitVec.cpop"
+fun f_BitVec_cpop_e1f242f74c(_w_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = f_BitVec_cpopNatRec_25616e7f4f(
+    _x_1,
+    _w_0,
+    LeanScalar("nat", "0"),
+  );
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_w_0, _x_2_3)
+}
+// "BitVec.rotateLeft"
+fun f_BitVec_rotateLeft_3f5fa14bda(
+  _w_0: LeanValue,
+  _x_1: LeanValue,
+  _n_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_n_2, _w_0);
+  f_BitVec_rotateLeftAux_f3ba28c953(_w_0, _x_1, _x_1_3)
+}
+// "BitVec.toInt"
+fun f_BitVec_toInt_5eecfe4867(_n_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_1_2: LeanValue = LeanScalar("nat", "2");
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(_x_1_2, _x_1);
+  _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(_x_1_2, _n_0);
+  _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_2_3, _x_3_4);
+  leanTag(_x_4_5) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_5_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_1);
+    _x_6_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_3_4);
+    L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(_x_5_6, _x_6_7)
+  | "[\"Bool\",\"true\"]" -> L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_1)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.smod"
+fun f_BitVec_smod_ff5c70617f(
+  _m_0_input: LeanValue,
+  _x_1_input: LeanValue,
+  _y_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_m_0, 1=_x_1, 2=_y_2, 3=_x_2_3, 4=_x_3_4, 5=_x_4_5, 6=_x_5_6, 7=_x_6_7, 8=_x_7_8, 9=_x_8_9, 10=_x_9_10, 11=_u_11, 12=_x_10_12, 13=_x_11_13, 14=_x_12_14, 15=_x_13_15, 16=_x_14_16, 17=_x_15_17, 18=_x_16_18, 19=_x_17_19, 20=_x_18_20, 21=_u_21, 22=_x_19_22, 23=_x_20_23, 24=_x_21_24, 25=_x_22_25, 26=_x_23_26, 27=_x_24_27
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    28,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _m_0_input);
+  _frame.set(1, _x_1_input);
+  _frame.set(2, _y_2_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(14, LeanScalar("nat", "0"));
+      _frame.set(
+        15,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[14], _frame[0]),
+      );
+      leanTag(_frame[15]) match {
+      | "[\"Bool\",\"false\"]" ->
+        !pc = 1;
+        void
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(16, LeanScalar("nat", "1"));
+        _frame.set(
+          17,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[16]),
+        );
+        _frame.set(
+          18,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[1],
+            _frame[17],
+          ),
+        );
+        leanTag(_frame[18]) match {
+        | "[\"Bool\",\"false\"]" ->
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(
+            19,
+            L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+              _frame[2],
+              _frame[17],
+            ),
+          );
+          leanTag(_frame[19]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(20, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(
+              21,
+              L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[20], _frame[2]),
+            );
+            _frame.set(
+              22,
+              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[21], _frame[14]),
+            );
+            leanTag(_frame[22]) match {
+            | "[\"Bool\",\"false\"]" ->
+              _frame.set(
+                23,
+                L4_Init_Data_BitVec_BasicAux.f_BitVec_sub_1d6dfb40c2(
+                  _frame[0],
+                  _frame[2],
+                  _frame[21],
+                ),
+              );
+              return _frame[23]
+            | "[\"Bool\",\"true\"]" -> return _frame[21]
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" ->
+            _frame.set(24, f_BitVec_neg_8a8410c13a(_frame[0], _frame[1]));
+            _frame.set(25, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+            _frame.set(
+              26,
+              L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[24], _frame[25]),
+            );
+            _frame.set(27, f_BitVec_neg_8a8410c13a(_frame[0], _frame[26]));
+            return _frame[27]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(3, LeanScalar("nat", "0"));
+      _frame.set(
+        4,
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[0]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[2]),
+        );
+        return _frame[5]
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(
+          7,
+          L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[0], _frame[6]),
+        );
+        _frame.set(
+          8,
+          L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
+            _frame[2],
+            _frame[7],
+          ),
+        );
+        leanTag(_frame[8]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            9,
+            L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[2]),
+          );
+          return _frame[9]
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(10, f_BitVec_neg_8a8410c13a(_frame[0], _frame[2]));
+          _frame.set(
+            11,
+            L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_frame[1], _frame[10]),
+          );
+          _frame.set(
+            12,
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[11], _frame[3]),
+          );
+          leanTag(_frame[12]) match {
+          | "[\"Bool\",\"false\"]" ->
+            _frame.set(
+              13,
+              L4_Init_Data_BitVec_BasicAux.f_BitVec_add_1fecef398f(
+                _frame[0],
+                _frame[11],
+                _frame[2],
+              ),
+            );
+            return _frame[13]
+          | "[\"Bool\",\"true\"]" -> return _frame[11]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "BitVec.mul"
+fun f_BitVec_mul_67072f5714(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _y_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(_x_1, _y_2);
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_n_0, _x_1_3)
+}
+fun apply_f_BitVec_mul_67072f5714(_args: Array<LeanValue>): LeanValue {
+  f_BitVec_mul_67072f5714(_args[0], _args[1], _args[2])
+}
+// "BitVec.toHex"
+fun f_BitVec_toHex_4b9ee97c19(_n_0: LeanValue, _x_1: LeanValue): LeanValue {
+  _x_2_3: LeanValue = L4_Init_Data_Repr.f_Nat_toDigits_0dd6e1cf71(
+    LeanScalar("nat", "16"),
+    _x_1,
+  );
+  _s_4: LeanValue = L4_Init_Prelude.f_String_ofList_5aeede063c(_x_2_3);
+  _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _n_0,
+    LeanScalar("nat", "3"),
+  );
+  _x_6_8: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+    _x_4_6,
+    LeanScalar("nat", "2"),
+  );
+  _x_7_9: LeanValue = L4_Init_Data_String_Bootstrap.f_String_Internal_length_f663f9cdcd(
+    _s_4,
+  );
+  _x_8_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_6_8, _x_7_9);
+  _x_10_12: LeanValue = L4_Init_Data_List_Basic.f_List_replicateTR_e8c53acd26(
+    _x_8_10,
+    LeanScalar("uint32", "48"),
+  );
+  _t_13: LeanValue = L4_Init_Prelude.f_String_ofList_5aeede063c(_x_10_12);
+  L4_Init_Data_String_Bootstrap.f_String_Internal_append_aa316577ea(_t_13, _s_4)
+}
+// "BitVec.rotateRightAux"
+fun f_BitVec_rotateRightAux_455728a104(
+  _w_0: LeanValue,
+  _x_1: LeanValue,
+  _n_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+    _x_1,
+    _n_2,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_w_0, _n_2);
+  _x_3_5: LeanValue = f_BitVec_shiftLeft_4a4b020dbb(_w_0, _x_1, _x_2_4);
+  L4_Init_Data_Nat_Bitwise_Basic.f_Nat_lor_2d49e86891(_x_1_3, _x_3_5)
+}
+// "BitVec.ofBool"
+fun f_BitVec_ofBool_250726ba68(_b_0: LeanValue): LeanValue {
+  leanTag(_b_0) match {
+  | "[\"Bool\",\"false\"]" ->
+    L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+      LeanScalar("nat", "1"),
+      LeanScalar("nat", "0"),
+    )
+  | "[\"Bool\",\"true\"]" ->
+    _x_4_4: LeanValue = LeanScalar("nat", "1");
+    L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_x_4_4, _x_4_4)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "BitVec.sle"
+fun f_BitVec_sle_019c6b8453(
+  _n_0: LeanValue,
+  _x_1: LeanValue,
+  _y_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_BitVec_toInt_5eecfe4867(_n_0, _x_1);
+  _x_2_4: LeanValue = f_BitVec_toInt_5eecfe4867(_n_0, _y_2);
+  L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_x_1_3, _x_2_4)
+}
+
+module end;

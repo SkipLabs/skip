@@ -1,0 +1,1070 @@
+module L4_Lean_Meta_Tactic_Grind_Arith_Util;
+
+// "Lean.Meta.Grind.Arith.gcdExt"
+fun f_Grind_Arith_gcdExt_70c0249524(
+  _a_0_input: LeanValue,
+  _b_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_a_0, 1=_b_1, 2=_x_1_2, 3=_x_2_3, 4=_x_3_4, 5=_x_4_5, 6=_x_5_6, 7=_fst_6_7, 8=_snd_7_8, 9=_fst_8_9, 10=_snd_9_10, 11=_x_10_11, 12=_x_11_12, 13=_x_12_13, 14=_x_13_14, 15=_x_14_15, 16=_x_15_16, 17=_x_16_17, 18=_y_18_18, 19=_x_19_19, 20=_x_20_20, 21=_x_21_21, 22=_x_22_22
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    23,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _a_0_input);
+  _frame.set(1, _b_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(2, LeanScalar("nat", "0"));
+      _frame.set(3, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[2]));
+      _frame.set(
+        4,
+        L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(_frame[1], _frame[3]),
+      );
+      leanTag(_frame[4]) match {
+      | "[\"Bool\",\"false\"]" ->
+        _frame.set(
+          5,
+          L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+            _frame[0],
+            _frame[1],
+          ),
+        );
+        _frame.set(6, f_Grind_Arith_gcdExt_70c0249524(_frame[1], _frame[5]));
+        leanTag(_frame[6]) match {
+        | "[\"Prod\",\"mk\"]" ->
+          _frame.set(7, leanField(_frame[6], 0));
+          _frame.set(8, leanField(_frame[6], 1));
+          leanTag(_frame[8]) match {
+          | "[\"Prod\",\"mk\"]" ->
+            _frame.set(9, leanField(_frame[8], 0));
+            _frame.set(10, leanField(_frame[8], 1));
+            _frame.set(
+              11,
+              L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+                _frame[0],
+                _frame[1],
+              ),
+            );
+            _frame.set(
+              12,
+              L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+                _frame[11],
+                _frame[10],
+              ),
+            );
+            _frame.set(
+              13,
+              L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(
+                _frame[9],
+                _frame[12],
+              ),
+            );
+            _frame.set(
+              14,
+              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[10], _frame[13]]),
+            );
+            _frame.set(
+              15,
+              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[7], _frame[14]]),
+            );
+            return _frame[15]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _frame.set(
+          16,
+          L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(_frame[0]),
+        );
+        _frame.set(
+          17,
+          L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[16]),
+        );
+        _frame.set(
+          21,
+          L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(_frame[0], _frame[3]),
+        );
+        leanTag(_frame[21]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(
+            22,
+            L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+              _frame[0],
+              _frame[17],
+            ),
+          );
+          _jump0 = _frame[22];
+          _frame.set(18, _jump0);
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _jump0 = _frame[3];
+          _frame.set(18, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        19,
+        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[18], _frame[3]]),
+      );
+      _frame.set(
+        20,
+        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[17], _frame[19]]),
+      );
+      return _frame[20]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.Meta.Grind.Arith.CollectDecVars.markAsFound._redArg"
+fun f_Arith_CollectDecVars_markAsFound_ace599edeb(
+  _fvarId_0: LeanValue,
+  _a_1_1: LeanValue,
+): LeanValue {
+  leanTag(_a_1_1) match {
+  | "[\"Lean\",\"Meta\",\"Grind\",\"Arith\",\"CollectDecVars\",\"State\",\"mk\"]" ->
+    _visited_2: LeanValue = leanField(_a_1_1, 0);
+    _found_3: LeanValue = leanField(_a_1_1, 1);
+    _x_3_5: LeanValue = L4_Lean_Expr.f_Lean_FVarIdSet_insert_0a48435746(
+      _found_3,
+      _fvarId_0,
+    );
+    LeanCtor(
+      "[\"Prod\",\"mk\"]",
+      Array[
+        LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+        LeanCtor(
+          "[\"Lean\",\"Meta\",\"Grind\",\"Arith\",\"CollectDecVars\",\"State\",\"mk\"]",
+          Array[_visited_2, _x_3_5],
+        ),
+      ],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.quoteIfArithTerm"
+fun f_Grind_Arith_quoteIfArithTerm_9300870926(_e_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = f_Grind_Arith_isArithTerm_809ba8643c(_e_0);
+  leanTag(_x_1_1) match {
+  | "[\"Bool\",\"false\"]" ->
+    L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_e_0)
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_3: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+      _e_0,
+    );
+    L4_Lean_Message.f_Lean_aquote_b566c5a650(_x_3_3)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isNatType"
+fun f_Grind_Arith_isNatType_c39715a21f(_e_0: LeanValue): LeanValue {
+  _x_2_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    LeanText("Nat"),
+  );
+  L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(_e_0, _x_2_2)
+}
+// "Lean.Meta.Grind.Arith.isNatNum"
+fun f_Grind_Arith_isNatNum_da6df42487(_e_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    _e_0,
+  );
+  _x_2_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_1_1);
+  leanTag(_x_2_2) match {
+  | "[\"Bool\",\"false\"]" -> _x_2_2
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_3: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+      _x_1_1,
+    );
+    _x_4_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_3_3);
+    leanTag(_x_4_4) match {
+    | "[\"Bool\",\"false\"]" -> _x_4_4
+    | "[\"Bool\",\"true\"]" ->
+      _x_5_5: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+        _x_3_3,
+      );
+      _x_6_6: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_5_5);
+      leanTag(_x_6_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_6_6
+      | "[\"Bool\",\"true\"]" ->
+        _x_7_7: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+          _x_5_5,
+        );
+        _x_10_10: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          LeanText("OfNat"),
+          LeanText("ofNat"),
+        );
+        _x_11_11: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+          _x_7_7,
+          _x_10_10,
+        );
+        leanTag(_x_11_11) match {
+        | "[\"Bool\",\"false\"]" -> _x_11_11
+        | "[\"Bool\",\"true\"]" ->
+          leanTag(_x_1_1) match {
+          | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+            _data_12: LeanValue = leanField(_x_1_1, 0);
+            _fn_12_13: LeanValue = leanField(_x_1_1, 1);
+            _arg_13_14: LeanValue = leanField(_x_1_1, 2);
+            _x_14_15: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+              _arg_13_14,
+            );
+            _x_15_16: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+              _x_14_15,
+            );
+            leanTag(_x_15_16) match {
+            | "[\"Bool\",\"false\"]" -> _x_15_16
+            | "[\"Bool\",\"true\"]" ->
+              _x_16_17: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+                _x_14_15,
+              );
+              _x_18_19: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+                LeanText("instOfNatNat"),
+              );
+              L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(_x_16_17, _x_18_19)
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("unreachable: Lean.Meta.Grind.Arith.isNatNum")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited._redArg"
+fun f_Arith_CollectDecVars_alreadyVisited_d8b1cc1006(
+  _c_0: LeanValue,
+  _a_1_1: LeanValue,
+): LeanValue {
+  leanTag(_a_1_1) match {
+  | "[\"Lean\",\"Meta\",\"Grind\",\"Arith\",\"CollectDecVars\",\"State\",\"mk\"]" ->
+    _visited_2: LeanValue = leanField(_a_1_1, 0);
+    _found_3: LeanValue = leanField(_a_1_1, 1);
+    _x_2_4: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      LeanErased(),
+      _c_0,
+    );
+    _x_3_5: LeanValue = L4_Init_Data_UInt_Basic.f_USize_toUInt64_158104741e(
+      _x_2_4,
+    );
+    _addr_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _x_3_5,
+      LeanScalar("uint64", "2"),
+    );
+    _x_5_8: LeanValue = f_CollectDecVars_alreadyVisited_spec_0_c5873888b9(
+      _visited_2,
+      _addr_7,
+    );
+    leanTag(_x_5_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_7_10: LeanValue = f_CollectDecVars_alreadyVisited_spec_1_99fdf08801(
+        _visited_2,
+        _addr_7,
+        LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+      );
+      LeanCtor(
+        "[\"Prod\",\"mk\"]",
+        Array[
+          _x_5_8,
+          LeanCtor(
+            "[\"Lean\",\"Meta\",\"Grind\",\"Arith\",\"CollectDecVars\",\"State\",\"mk\"]",
+            Array[_x_7_10, _found_3],
+          ),
+        ],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor("[\"Prod\",\"mk\"]", Array[_x_5_8, _a_1_1])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isNonnegIntNum"
+fun f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_e_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    _e_0,
+  );
+  _x_2_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_1_1);
+  leanTag(_x_2_2) match {
+  | "[\"Bool\",\"false\"]" -> _x_2_2
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_3: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+      _x_1_1,
+    );
+    _x_4_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_3_3);
+    leanTag(_x_4_4) match {
+    | "[\"Bool\",\"false\"]" -> _x_4_4
+    | "[\"Bool\",\"true\"]" ->
+      _x_5_5: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+        _x_3_3,
+      );
+      _x_6_6: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_5_5);
+      leanTag(_x_6_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_6_6
+      | "[\"Bool\",\"true\"]" ->
+        _x_7_7: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+          _x_5_5,
+        );
+        _x_10_10: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          LeanText("OfNat"),
+          LeanText("ofNat"),
+        );
+        _x_11_11: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+          _x_7_7,
+          _x_10_10,
+        );
+        leanTag(_x_11_11) match {
+        | "[\"Bool\",\"false\"]" -> _x_11_11
+        | "[\"Bool\",\"true\"]" ->
+          leanTag(_x_1_1) match {
+          | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+            _data_12: LeanValue = leanField(_x_1_1, 0);
+            _fn_12_13: LeanValue = leanField(_x_1_1, 1);
+            _arg_13_14: LeanValue = leanField(_x_1_1, 2);
+            _x_14_15: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+              _arg_13_14,
+            );
+            _x_15_16: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+              _x_14_15,
+            );
+            leanTag(_x_15_16) match {
+            | "[\"Bool\",\"false\"]" -> _x_15_16
+            | "[\"Bool\",\"true\"]" ->
+              _x_16_17: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+                _x_14_15,
+              );
+              _x_18_19: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+                LeanText("instOfNat"),
+              );
+              L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(_x_16_17, _x_18_19)
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("unreachable: Lean.Meta.Grind.Arith.isNonnegIntNum")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_1.spec_2._redArg"
+fun f_alreadyVisited_spec_1_spec_2_892cc2cc08(_data_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _data_0,
+  );
+  _nbuckets_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+    _x_1_1,
+    LeanScalar("nat", "2"),
+  );
+  _x_5_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    LeanErased(),
+    _nbuckets_3,
+    LeanCtor(
+      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      Array[],
+    ),
+  );
+  _x_6_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_propagateMark_cb052002ff(
+    LeanErased(),
+    LeanErased(),
+    _data_0,
+    _x_5_6,
+  );
+  f_spec_1_spec_2_spec_3_6485edc499(LeanScalar("nat", "0"), _data_0, _x_6_7)
+}
+// "Lean.Meta.Grind.Arith.shrink"
+fun f_Grind_Arith_shrink_c73b452ca4(
+  _a_0: LeanValue,
+  _sz_1: LeanValue,
+): LeanValue {
+  leanTag(_a_0) match {
+  | "[\"Lean\",\"PersistentArray\",\"mk\"]" ->
+    _root_2: LeanValue = leanField(_a_0, 0);
+    _tail_3: LeanValue = leanField(_a_0, 1);
+    _size_4: LeanValue = leanField(_a_0, 2);
+    _shift_5: LeanValue = leanField(_a_0, 3);
+    _tailOff_6: LeanValue = leanField(_a_0, 4);
+    _x_1_7: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_sz_1, _size_4);
+    leanTag(_x_1_7) match {
+    | "[\"Bool\",\"false\"]" -> _a_0
+    | "[\"Bool\",\"true\"]" ->
+      _x_2_8: LeanValue = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_pop_d1eb35aba0(
+        _a_0,
+      );
+      f_Grind_Arith_shrink_c73b452ca4(_x_2_8, _sz_1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.contains._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_0._redArg"
+fun f_CollectDecVars_alreadyVisited_spec_0_c5873888b9(
+  _m_0: LeanValue,
+  _a_1: LeanValue,
+): LeanValue {
+  leanTag(_m_0) match {
+  | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+    _size_1_2: LeanValue = leanField(_m_0, 0);
+    _buckets_2_3: LeanValue = leanField(_m_0, 1);
+    _x_3_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _buckets_2_3,
+    );
+    _x_5_6: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _a_1,
+      LeanScalar("uint64", "32"),
+    );
+    _fold_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _a_1,
+      _x_5_6,
+    );
+    _x_7_9: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _fold_7,
+      LeanScalar("uint64", "16"),
+    );
+    _x_8_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _fold_7,
+      _x_7_9,
+    );
+    _x_9_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_8_10,
+    );
+    _x_10_12: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_3_4,
+    );
+    _x_12_14: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _x_10_12,
+      LeanScalar("usize", "1"),
+    );
+    _x_13_15: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_9_11,
+      _x_12_14,
+    );
+    _x_14_16: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _buckets_2_3,
+      _x_13_15,
+      LeanErased(),
+    );
+    f_alreadyVisited_spec_0_spec_0_a99d5ed4ea(_a_1, _x_14_16)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isArithTerm"
+fun f_Grind_Arith_isArithTerm_809ba8643c(_e_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    _e_0,
+  );
+  _x_2_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_1_1);
+  leanTag(_x_2_2) match {
+  | "[\"Bool\",\"false\"]" -> _x_2_2
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_3: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+      _x_1_1,
+    );
+    _x_4_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_3_3);
+    leanTag(_x_4_4) match {
+    | "[\"Bool\",\"false\"]" -> _x_4_4
+    | "[\"Bool\",\"true\"]" ->
+      _x_5_5: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+        _x_3_3,
+      );
+      _x_6_6: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_5_5);
+      leanTag(_x_6_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_6_6
+      | "[\"Bool\",\"true\"]" ->
+        _x_7_7: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+          _x_5_5,
+        );
+        _x_10_10: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          LeanText("IntCast"),
+          LeanText("intCast"),
+        );
+        _x_11_11: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+          _x_7_7,
+          _x_10_10,
+        );
+        leanTag(_x_11_11) match {
+        | "[\"Bool\",\"false\"]" ->
+          _x_14_14: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+            LeanText("NatCast"),
+            LeanText("natCast"),
+          );
+          _x_15_15: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+            _x_7_7,
+            _x_14_14,
+          );
+          leanTag(_x_15_15) match {
+          | "[\"Bool\",\"false\"]" ->
+            _x_18_18: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+              LeanText("OfNat"),
+              LeanText("ofNat"),
+            );
+            _x_19_19: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+              _x_7_7,
+              _x_18_18,
+            );
+            leanTag(_x_19_19) match {
+            | "[\"Bool\",\"false\"]" ->
+              _x_22_22: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                LeanText("Neg"),
+                LeanText("neg"),
+              );
+              _x_23_23: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                _x_7_7,
+                _x_22_22,
+              );
+              leanTag(_x_23_23) match {
+              | "[\"Bool\",\"false\"]" ->
+                _x_24_24: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+                  _x_7_7,
+                );
+                leanTag(_x_24_24) match {
+                | "[\"Bool\",\"false\"]" -> _x_24_24
+                | "[\"Bool\",\"true\"]" ->
+                  _x_25_25: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+                    _x_7_7,
+                  );
+                  _x_26_26: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+                    _x_25_25,
+                  );
+                  leanTag(_x_26_26) match {
+                  | "[\"Bool\",\"false\"]" -> _x_26_26
+                  | "[\"Bool\",\"true\"]" ->
+                    _x_27_27: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+                      _x_25_25,
+                    );
+                    _x_28_28: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+                      _x_27_27,
+                    );
+                    leanTag(_x_28_28) match {
+                    | "[\"Bool\",\"false\"]" -> _x_28_28
+                    | "[\"Bool\",\"true\"]" ->
+                      _x_29_29: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+                        _x_27_27,
+                      );
+                      _x_32_32: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                        LeanText("HSMul"),
+                        LeanText("hSMul"),
+                      );
+                      _x_33_33: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                        _x_29_29,
+                        _x_32_32,
+                      );
+                      leanTag(_x_33_33) match {
+                      | "[\"Bool\",\"false\"]" ->
+                        _x_36_36: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                          LeanText("HPow"),
+                          LeanText("hPow"),
+                        );
+                        _x_37_37: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                          _x_29_29,
+                          _x_36_36,
+                        );
+                        leanTag(_x_37_37) match {
+                        | "[\"Bool\",\"false\"]" ->
+                          _x_40_40: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                            LeanText("HMod"),
+                            LeanText("hMod"),
+                          );
+                          _x_41_41: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                            _x_29_29,
+                            _x_40_40,
+                          );
+                          leanTag(_x_41_41) match {
+                          | "[\"Bool\",\"false\"]" ->
+                            _x_44_44: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                              LeanText("HDiv"),
+                              LeanText("hDiv"),
+                            );
+                            _x_45_45: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                              _x_29_29,
+                              _x_44_44,
+                            );
+                            leanTag(_x_45_45) match {
+                            | "[\"Bool\",\"false\"]" ->
+                              _x_48_48: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                                LeanText("HMul"),
+                                LeanText("hMul"),
+                              );
+                              _x_49_49: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                                _x_29_29,
+                                _x_48_48,
+                              );
+                              leanTag(_x_49_49) match {
+                              | "[\"Bool\",\"false\"]" ->
+                                _x_52_52: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                                  LeanText("HSub"),
+                                  LeanText("hSub"),
+                                );
+                                _x_53_53: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                                  _x_29_29,
+                                  _x_52_52,
+                                );
+                                leanTag(_x_53_53) match {
+                                | "[\"Bool\",\"false\"]" ->
+                                  _x_56_56: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+                                    LeanText("HAdd"),
+                                    LeanText("hAdd"),
+                                  );
+                                  L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+                                    _x_29_29,
+                                    _x_56_56,
+                                  )
+                                | "[\"Bool\",\"true\"]" -> _x_53_53
+                                | _ -> leanFail("non-exhaustive Lean case")
+                                }
+                              | "[\"Bool\",\"true\"]" -> _x_49_49
+                              | _ -> leanFail("non-exhaustive Lean case")
+                              }
+                            | "[\"Bool\",\"true\"]" -> _x_45_45
+                            | _ -> leanFail("non-exhaustive Lean case")
+                            }
+                          | "[\"Bool\",\"true\"]" -> _x_41_41
+                          | _ -> leanFail("non-exhaustive Lean case")
+                          }
+                        | "[\"Bool\",\"true\"]" -> _x_37_37
+                        | _ -> leanFail("non-exhaustive Lean case")
+                        }
+                      | "[\"Bool\",\"true\"]" -> _x_33_33
+                      | _ -> leanFail("non-exhaustive Lean case")
+                      }
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Bool\",\"true\"]" -> _x_23_23
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Bool\",\"true\"]" -> _x_19_19
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" -> _x_15_15
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" -> _x_11_11
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.AssocList.foldlM._at_._private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_1.spec_2.spec_3.spec_4._redArg"
+fun f_spec_2_spec_3_spec_4_b740231607(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" -> _x_1_0
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_2_1, 0);
+    _value_4_3: LeanValue = leanField(_x_2_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_2_1, 2);
+    _x_6_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _x_1_0,
+    );
+    _x_8_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _key_3_2,
+      LeanScalar("uint64", "32"),
+    );
+    _fold_8: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _key_3_2,
+      _x_8_7,
+    );
+    _x_10_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _fold_8,
+      LeanScalar("uint64", "16"),
+    );
+    _x_11_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _fold_8,
+      _x_10_10,
+    );
+    _x_12_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_11_11,
+    );
+    _x_13_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_6_5,
+    );
+    _x_15_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _x_13_13,
+      LeanScalar("usize", "1"),
+    );
+    _x_16_16: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_12_12,
+      _x_15_15,
+    );
+    _x_17_17: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _x_1_0,
+      _x_16_16,
+      LeanErased(),
+    );
+    _x_19_19: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+      LeanErased(),
+      _x_1_0,
+      _x_16_16,
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        Array[_key_3_2, _value_4_3, _x_17_17],
+      ),
+      LeanErased(),
+    );
+    f_spec_2_spec_3_spec_4_b740231607(_x_19_19, _tail_5_4)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isIntNum"
+fun f_Grind_Arith_isIntNum_79afd48be8(_e_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    _e_0,
+  );
+  _x_2_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_1_1);
+  leanTag(_x_2_2) match {
+  | "[\"Bool\",\"false\"]" -> f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_e_0)
+  | "[\"Bool\",\"true\"]" ->
+    _x_4_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+      _x_1_1,
+    );
+    _x_5_5: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_4_4);
+    leanTag(_x_5_5) match {
+    | "[\"Bool\",\"false\"]" -> f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_e_0)
+    | "[\"Bool\",\"true\"]" ->
+      _x_7_7: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+        _x_4_4,
+      );
+      _x_8_8: LeanValue = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(_x_7_7);
+      leanTag(_x_8_8) match {
+      | "[\"Bool\",\"false\"]" -> f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_e_0)
+      | "[\"Bool\",\"true\"]" ->
+        _x_10_10: LeanValue = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+          _x_7_7,
+        );
+        _x_13_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          LeanText("Neg"),
+          LeanText("neg"),
+        );
+        _x_14_14: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+          _x_10_10,
+          _x_13_13,
+        );
+        leanTag(_x_14_14) match {
+        | "[\"Bool\",\"false\"]" ->
+          f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_e_0)
+        | "[\"Bool\",\"true\"]" ->
+          leanTag(_x_4_4) match {
+          | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+            _data_16: LeanValue = leanField(_x_4_4, 0);
+            _fn_16_17: LeanValue = leanField(_x_4_4, 1);
+            _arg_17_18: LeanValue = leanField(_x_4_4, 2);
+            _x_18_19: LeanValue = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+              _arg_17_18,
+            );
+            _x_21_22: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+              LeanText("Int"),
+              LeanText("instNegInt"),
+            );
+            _x_22_23: LeanValue = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+              _x_18_19,
+              _x_21_22,
+            );
+            leanTag(_x_22_23) match {
+            | "[\"Bool\",\"false\"]" -> _x_22_23
+            | "[\"Bool\",\"true\"]" ->
+              leanTag(_x_1_1) match {
+              | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+                _data_24: LeanValue = leanField(_x_1_1, 0);
+                _fn_23_25: LeanValue = leanField(_x_1_1, 1);
+                _arg_24_26: LeanValue = leanField(_x_1_1, 2);
+                f_Grind_Arith_isNonnegIntNum_b05a08eb4d(_arg_24_26)
+              | _ -> leanFail("unreachable: Lean.Meta.Grind.Arith.isIntNum")
+              }
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("unreachable: Lean.Meta.Grind.Arith.isIntNum")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_1.spec_2.spec_3._redArg"
+fun f_spec_1_spec_2_spec_3_6485edc499(
+  _i_0: LeanValue,
+  _source_1: LeanValue,
+  _target_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    LeanErased(),
+    _source_1,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_0, _x_1_3);
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" -> _target_2
+  | "[\"Bool\",\"true\"]" ->
+    _es_5: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanErased(),
+    );
+    _source_7: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      LeanErased(),
+      _source_1,
+      _i_0,
+      LeanCtor(
+        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+        Array[],
+      ),
+      LeanErased(),
+    );
+    _target_8: LeanValue = f_spec_2_spec_3_spec_4_b740231607(_target_2, _es_5);
+    _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _i_0,
+      LeanScalar("nat", "1"),
+    );
+    f_spec_1_spec_2_spec_3_6485edc499(_x_5_10, _source_7, _target_8)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isIntModuleVirtualParent"
+fun f_Grind_Arith_isIntModuleVirtualParent_c947d6c277(
+  _parent_0: LeanValue,
+): LeanValue {
+  leanTag(_parent_0) match {
+  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Option\",\"some\"]" ->
+    _val_2_1: LeanValue = leanField(_parent_0, 0);
+    _x_3_3: LeanValue = f_Grind_Arith_getIntModuleVirtualParent_2fffa2c23c();
+    L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(_val_2_1, _x_3_3)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_1._redArg"
+fun f_CollectDecVars_alreadyVisited_spec_1_99fdf08801(
+  _m_0: LeanValue,
+  _a_1: LeanValue,
+  _b_2: LeanValue,
+): LeanValue {
+  leanTag(_m_0) match {
+  | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+    _size_1_3: LeanValue = leanField(_m_0, 0);
+    _buckets_2_4: LeanValue = leanField(_m_0, 1);
+    _x_3_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      LeanErased(),
+      _buckets_2_4,
+    );
+    _x_5_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _a_1,
+      LeanScalar("uint64", "32"),
+    );
+    _fold_8: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _a_1,
+      _x_5_7,
+    );
+    _x_7_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _fold_8,
+      LeanScalar("uint64", "16"),
+    );
+    _x_8_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _fold_8,
+      _x_7_10,
+    );
+    _x_9_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _x_8_11,
+    );
+    _x_10_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _x_3_5,
+    );
+    _x_12_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _x_10_13,
+      LeanScalar("usize", "1"),
+    );
+    _x_13_16: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _x_9_12,
+      _x_12_15,
+    );
+    _bkt_17: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _buckets_2_4,
+      _x_13_16,
+      LeanErased(),
+    );
+    _x_14_18: LeanValue = f_alreadyVisited_spec_0_spec_0_a99d5ed4ea(
+      _a_1,
+      _bkt_17,
+    );
+    leanTag(_x_14_18) match {
+    | "[\"Bool\",\"false\"]" ->
+      _size_20: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _size_1_3,
+        LeanScalar("nat", "1"),
+      );
+      _buckets_22: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        LeanErased(),
+        _buckets_2_4,
+        _x_13_16,
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+          Array[_a_1, _b_2, _bkt_17],
+        ),
+        LeanErased(),
+      );
+      _x_18_24: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+        _size_20,
+        LeanScalar("nat", "4"),
+      );
+      _x_20_26: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(
+        _x_18_24,
+        LeanScalar("nat", "3"),
+      );
+      _x_21_27: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+        LeanErased(),
+        _buckets_22,
+      );
+      _x_22_28: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+        _x_20_26,
+        _x_21_27,
+      );
+      leanTag(_x_22_28) match {
+      | "[\"Bool\",\"false\"]" ->
+        _val_23_29: LeanValue = f_alreadyVisited_spec_1_spec_2_892cc2cc08(
+          _buckets_22,
+        );
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+          Array[_size_20, _val_23_29],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor(
+          "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+          Array[_size_20, _buckets_22],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" -> _m_0
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.getIntModuleVirtualParent"
+fun f_Grind_Arith_getIntModuleVirtualParent_2fffa2c23c(): LeanValue {
+  _x_3_2: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+    LeanText("_private"),
+  );
+  _x_4_3: LeanValue = LeanText("Lean");
+  _x_5_4: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_3_2,
+    _x_4_3,
+  );
+  _x_6_5: LeanValue = LeanText("Meta");
+  _x_7_6: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_5_4,
+    _x_6_5,
+  );
+  _x_9_8: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_7_6,
+    LeanText("Tactic"),
+  );
+  _x_10_9: LeanValue = LeanText("Grind");
+  _x_11_10: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_9_8,
+    _x_10_9,
+  );
+  _x_12_11: LeanValue = LeanText("Arith");
+  _x_13_12: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_11_10,
+    _x_12_11,
+  );
+  _x_15_14: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_13_12,
+    LeanText("Util"),
+  );
+  _x_17_16: LeanValue = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    _x_15_14,
+    LeanScalar("nat", "0"),
+  );
+  _x_18_17: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_17_16,
+    _x_4_3,
+  );
+  _x_19_18: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_18_17,
+    _x_6_5,
+  );
+  _x_20_19: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_19_18,
+    _x_10_9,
+  );
+  _x_21_20: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_20_19,
+    _x_12_11,
+  );
+  _x_23_22: LeanValue = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    _x_21_20,
+    LeanText("____intModuleMarker____"),
+  );
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    _x_23_22,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Std.DHashMap.Internal.AssocList.contains._at_.Std.DHashMap.Internal.Raw₀.contains._at_.Lean.Meta.Grind.Arith.CollectDecVars.alreadyVisited.spec_0.spec_0._redArg"
+fun f_alreadyVisited_spec_0_spec_0_a99d5ed4ea(
+  _a_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+    LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+    _key_3_2: LeanValue = leanField(_x_1_1, 0);
+    _value_4_3: LeanValue = leanField(_x_1_1, 1);
+    _tail_5_4: LeanValue = leanField(_x_1_1, 2);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_UInt64_decEq_97f4edb260(
+      _key_3_2,
+      _a_0,
+    );
+    leanTag(_x_6_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      f_alreadyVisited_spec_0_spec_0_a99d5ed4ea(_a_0, _tail_5_4)
+    | "[\"Bool\",\"true\"]" -> _x_6_6
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Meta.Grind.Arith.isIntType"
+fun f_Grind_Arith_isIntType_5617a75b33(_e_0: LeanValue): LeanValue {
+  _x_2_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    LeanText("Int"),
+  );
+  L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(_e_0, _x_2_2)
+}
+
+module end;

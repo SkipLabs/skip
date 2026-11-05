@@ -1,0 +1,352 @@
+module L4_Init_Grind_Ring_FieldSolver;
+
+// "Lean.Grind.CommRing.PolyQ.substInv"
+fun f_CommRing_PolyQ_substInv_4a91a69ae8(
+  _q_0: LeanValue,
+  _x_1: LeanValue,
+  _c_2: LeanValue,
+): LeanValue {
+  leanTag(_q_0) match {
+  | "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]" ->
+    _num_3: LeanValue = leanField(_q_0, 0);
+    _den_4: LeanValue = leanField(_q_0, 1);
+    _q_5: LeanValue = f_CommRing_Poly_substInv_f34743a06d(_num_3, _x_1, _c_2);
+    leanTag(_q_5) match {
+    | "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]" ->
+      _num_6: LeanValue = leanField(_q_5, 0);
+      _den_7: LeanValue = leanField(_q_5, 1);
+      _x_1_8: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(_den_4, _den_7);
+      LeanCtor(
+        "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]",
+        Array[_num_6, _x_1_8],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.instBEqPolyQ.beq"
+fun f_CommRing_instBEqPolyQ_beq_1e711b4999(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]" ->
+    _num_3_2: LeanValue = leanField(_x_1_0, 0);
+    _den_4_3: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]" ->
+      _num_5_4: LeanValue = leanField(_x_2_1, 0);
+      _den_6_5: LeanValue = leanField(_x_2_1, 1);
+      _x_7_6: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_instBEqPoly_beq_d81cfa3f25(
+        _num_3_2,
+        _num_5_4,
+      );
+      leanTag(_x_7_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_7_6
+      | "[\"Bool\",\"true\"]" ->
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_den_4_3, _den_6_5)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_CommRing_instBEqPolyQ_beq_1e711b4999(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_CommRing_instBEqPolyQ_beq_1e711b4999(_args[0], _args[1])
+}
+// "Lean.Grind.CommRing.Poly.substInv"
+fun f_CommRing_Poly_substInv_f34743a06d(
+  _p_0: LeanValue,
+  _x_1: LeanValue,
+  _c_2: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _c_2,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" ->
+    _n_5: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_maxDegreeOf_8749237578(
+      _p_0,
+      _x_1,
+    );
+    _x_3_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_c_2);
+    _x_4_7: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(_c_2, _n_5);
+    _x_5_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_x_4_7);
+    _x_6_9: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_mulConst_11a5344dbc(
+      _x_5_8,
+      _p_0,
+    );
+    _x_7_10: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_cancelVar_704ea5d1aa(
+      _x_3_6,
+      _x_1,
+      _x_6_9,
+    );
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]",
+      Array[_x_7_10, _x_4_7],
+    )
+  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]",
+      Array[_p_0, LeanScalar("nat", "1")],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "List.foldl._at_.Lean.Grind.CommRing.Poly.toPolyQ.spec_0"
+fun f_Poly_toPolyQ_spec_0_2df98894c5(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"List\",\"nil\"]" -> _x_1_0
+  | "[\"List\",\"cons\"]" ->
+    _head_3_2: LeanValue = leanField(_x_2_1, 0);
+    _tail_4_3: LeanValue = leanField(_x_2_1, 1);
+    leanTag(_head_3_2) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_4: LeanValue = leanField(_head_3_2, 0);
+      _snd_5: LeanValue = leanField(_head_3_2, 1);
+      _x_5_6: LeanValue = f_CommRing_PolyQ_substInv_4a91a69ae8(
+        _x_1_0,
+        _fst_4,
+        _snd_5,
+      );
+      f_Poly_toPolyQ_spec_0_2df98894c5(_x_5_6, _tail_4_3)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.Poly.cancelInv"
+fun f_CommRing_Poly_cancelInv_b84a79e9f2(
+  _x_0: LeanValue,
+  _y_1: LeanValue,
+  _p_2: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "0"),
+  );
+  f_Poly_cancelInv_go_2268930863(
+    _x_0,
+    _y_1,
+    _p_2,
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"CommRing\",\"Poly\",\"num\"]",
+      Array[_x_2_4],
+    ),
+  )
+}
+// "List.foldl._at_.Lean.Grind.CommRing.Poly.cancelInvs.spec_0"
+fun f_Poly_cancelInvs_spec_0_13dc1dd302(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"List\",\"nil\"]" -> _x_1_0
+  | "[\"List\",\"cons\"]" ->
+    _head_3_2: LeanValue = leanField(_x_2_1, 0);
+    _tail_4_3: LeanValue = leanField(_x_2_1, 1);
+    leanTag(_head_3_2) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_4: LeanValue = leanField(_head_3_2, 0);
+      _snd_5: LeanValue = leanField(_head_3_2, 1);
+      _x_5_6: LeanValue = f_CommRing_Poly_cancelInv_b84a79e9f2(
+        _snd_5,
+        _fst_4,
+        _x_1_0,
+      );
+      f_Poly_cancelInvs_spec_0_13dc1dd302(_x_5_6, _tail_4_3)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.Poly.cancelInv.go"
+fun f_Poly_cancelInv_go_2268930863(
+  _x_0: LeanValue,
+  _y_1: LeanValue,
+  _a_1_2: LeanValue,
+  _a_2_3: LeanValue,
+): LeanValue {
+  leanTag(_a_1_2) match {
+  | "[\"Lean\",\"Grind\",\"CommRing\",\"Poly\",\"num\"]" ->
+    _k_3_4: LeanValue = leanField(_a_1_2, 0);
+    L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_addConst_77203e3d6d(
+      _a_2_3,
+      _k_3_4,
+    )
+  | "[\"Lean\",\"Grind\",\"CommRing\",\"Poly\",\"add\"]" ->
+    _k_5_5: LeanValue = leanField(_a_1_2, 0);
+    _v_6_6: LeanValue = leanField(_a_1_2, 1);
+    _p_7_7: LeanValue = leanField(_a_1_2, 2);
+    _x_8_9: LeanValue = f_CommRing_Mon_cancelInv_62854b809c(_x_0, _y_1, _v_6_6);
+    _x_9_10: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_insert_cf197c7419(
+      _k_5_5,
+      _x_8_9,
+      _a_2_3,
+    );
+    f_Poly_cancelInv_go_2268930863(_x_0, _y_1, _p_7_7, _x_9_10)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.PolyQ.reduce"
+fun f_CommRing_PolyQ_reduce_cb9b5e6721(_q_0: LeanValue): LeanValue {
+  leanTag(_q_0) match {
+  | "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]" ->
+    _num_1: LeanValue = leanField(_q_0, 0);
+    _den_2: LeanValue = leanField(_q_0, 1);
+    _x_1_3: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_gcdCoeffs_513e4c1b16(
+      _num_1,
+    );
+    _g_4: LeanValue = L4_Init_Data_Nat_Gcd.f_Nat_gcd_ee21c096be(_x_1_3, _den_2);
+    _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _g_4,
+      LeanScalar("nat", "1"),
+    );
+    leanTag(_x_3_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_4_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_g_4);
+      _num_8: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_divConst_3f09670ab4(
+        _num_1,
+        _x_4_7,
+      );
+      _x_5_9: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Poly_mulConst_11a5344dbc(
+        _x_4_7,
+        _num_8,
+      );
+      _x_6_10: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_instBEqPoly_beq_d81cfa3f25(
+        _x_5_9,
+        _num_1,
+      );
+      leanTag(_x_6_10) match {
+      | "[\"Bool\",\"false\"]" -> _q_0
+      | "[\"Bool\",\"true\"]" ->
+        _den_11: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(_den_2, _g_4);
+        _x_7_12: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+          _den_11,
+          _g_4,
+        );
+        _x_8_13: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _x_7_12,
+          _den_2,
+        );
+        leanTag(_x_8_13) match {
+        | "[\"Bool\",\"false\"]" -> _q_0
+        | "[\"Bool\",\"true\"]" ->
+          LeanCtor(
+            "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]",
+            Array[_num_8, _den_11],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" -> _q_0
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.Mon.cancelInv"
+fun f_CommRing_Mon_cancelInv_62854b809c(
+  _x_0: LeanValue,
+  _y_1: LeanValue,
+  _m_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_0, _y_1);
+  leanTag(_x_1_3) match {
+  | "[\"Bool\",\"false\"]" ->
+    _a_4: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_degreeOf_477f460d33(
+      _m_2,
+      _x_0,
+    );
+    _x_2_5: LeanValue = LeanScalar("nat", "0");
+    _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_a_4, _x_2_5);
+    leanTag(_x_3_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      _b_7: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_degreeOf_477f460d33(
+        _m_2,
+        _y_1,
+      );
+      _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_b_7, _x_2_5);
+      leanTag(_x_4_8) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_5_9: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_cancelVar_4bd569c04e(
+          _m_2,
+          _x_0,
+        );
+        _m_10: LeanValue = L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_cancelVar_4bd569c04e(
+          _x_5_9,
+          _y_1,
+        );
+        _x_6_11: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_a_4, _b_7);
+        leanTag(_x_6_11) match {
+        | "[\"Bool\",\"false\"]" ->
+          _x_7_12: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _b_7,
+            _a_4,
+          );
+          leanTag(_x_7_12) match {
+          | "[\"Bool\",\"false\"]" -> _m_10
+          | "[\"Bool\",\"true\"]" ->
+            _x_8_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+              _a_4,
+              _b_7,
+            );
+            L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_mulPow_7ed3e43393(
+              LeanCtor(
+                "[\"Lean\",\"Grind\",\"CommRing\",\"Power\",\"mk\"]",
+                Array[_x_0, _x_8_13],
+              ),
+              _m_10,
+            )
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _x_11_16: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+            _b_7,
+            _a_4,
+          );
+          L4_Init_Grind_Ring_CommSolver.f_CommRing_Mon_mulPow_7ed3e43393(
+            LeanCtor(
+              "[\"Lean\",\"Grind\",\"CommRing\",\"Power\",\"mk\"]",
+              Array[_y_1, _x_11_16],
+            ),
+            _m_10,
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" -> _m_2
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" -> _m_2
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Bool\",\"true\"]" -> _m_2
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.CommRing.Poly.toPolyQ"
+fun f_CommRing_Poly_toPolyQ_0a0ad47269(
+  _p_0: LeanValue,
+  _invs_1: LeanValue,
+  _ainvs_2: LeanValue,
+): LeanValue {
+  _x_1_3: LeanValue = f_Poly_cancelInvs_spec_0_13dc1dd302(_p_0, _ainvs_2);
+  _x_4_6: LeanValue = f_Poly_toPolyQ_spec_0_2df98894c5(
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"CommRing\",\"PolyQ\",\"mk\"]",
+      Array[_x_1_3, LeanScalar("nat", "1")],
+    ),
+    _invs_1,
+  );
+  f_CommRing_PolyQ_reduce_cb9b5e6721(_x_4_6)
+}
+
+module end;

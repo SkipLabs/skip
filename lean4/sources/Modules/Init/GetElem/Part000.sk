@@ -1,0 +1,83 @@
+module L4_Init_GetElem;
+
+// "List.get?Internal._redArg"
+fun f_List_get_Internal_15ceb6541b(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"List\",\"cons\"]" ->
+    _head_3_2: LeanValue = leanField(_x_1_0, 0);
+    _tail_4_3: LeanValue = leanField(_x_1_0, 1);
+    _isZero_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _x_2_1,
+      LeanScalar("nat", "0"),
+    );
+    leanTag(_isZero_5) match {
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor("[\"Option\",\"some\"]", Array[_head_3_2])
+    | "[\"Bool\",\"false\"]" ->
+      _n_6_8: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _x_2_1,
+        LeanScalar("nat", "1"),
+      );
+      f_List_get_Internal_15ceb6541b(_tail_4_3, _n_6_8)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  }
+}
+fun apply_f_List_get_Internal_15ceb6541b(_args: Array<LeanValue>): LeanValue {
+  f_List_get_Internal_15ceb6541b(_args[0], _args[1])
+}
+// "outOfBounds._redArg"
+fun f_outOfBounds_bd4123e15f(_inst_1_0: LeanValue): LeanValue {
+  _x_7_6: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    LeanText("Init.GetElem"),
+    LeanText("outOfBounds"),
+    LeanScalar("nat", "18"),
+    LeanScalar("nat", "2"),
+    LeanText("index out of bounds"),
+  );
+  L4_Init_Prelude.f_panic_105135c0b4(_inst_1_0, _x_7_6)
+}
+// "List.get!Internal._redArg"
+fun f_List_get_Internal_b028f6147e(
+  _inst_1_0: LeanValue,
+  _x_2_1: LeanValue,
+  _x_3_2: LeanValue,
+): LeanValue {
+  leanTag(_x_2_1) match {
+  | "[\"List\",\"cons\"]" ->
+    _head_4_3: LeanValue = leanField(_x_2_1, 0);
+    _tail_5_4: LeanValue = leanField(_x_2_1, 1);
+    _isZero_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _x_3_2,
+      LeanScalar("nat", "0"),
+    );
+    leanTag(_isZero_6) match {
+    | "[\"Bool\",\"true\"]" -> _head_4_3
+    | "[\"Bool\",\"false\"]" ->
+      _n_6_8: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _x_3_2,
+        LeanScalar("nat", "1"),
+      );
+      f_List_get_Internal_b028f6147e(_inst_1_0, _tail_5_4, _n_6_8)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ ->
+    _x_13_15: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      LeanText("Init.GetElem"),
+      LeanText("List.get!Internal"),
+      LeanScalar("nat", "333"),
+      LeanScalar("nat", "18"),
+      LeanText("invalid index"),
+    );
+    L4_Init_Prelude.f_panic_105135c0b4(_inst_1_0, _x_13_15)
+  }
+}
+fun apply_f_List_get_Internal_b028f6147e(_args: Array<LeanValue>): LeanValue {
+  f_List_get_Internal_b028f6147e(_args[0], _args[1], _args[2])
+}
+
+module end;

@@ -1,0 +1,638 @@
+module L4_Init_Data_Nat_Internal_SOM;
+
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.mul.go"
+fun f_Poly_mul_go_47f4cfb451(
+  _p_0: LeanValue,
+  _p_1: LeanValue,
+  _acc_2: LeanValue,
+): LeanValue {
+  leanTag(_p_1) match {
+  | "[\"List\",\"nil\"]" -> _acc_2
+  | "[\"List\",\"cons\"]" ->
+    _head_1_3: LeanValue = leanField(_p_1, 0);
+    _tail_2_4: LeanValue = leanField(_p_1, 1);
+    leanTag(_head_1_3) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_3_5: LeanValue = leanField(_head_1_3, 0);
+      _snd_4_6: LeanValue = leanField(_head_1_3, 1);
+      _x_5_7: LeanValue = f_SOM_Poly_mulMon_894a04900d(
+        _p_0,
+        _fst_3_5,
+        _snd_4_6,
+      );
+      _x_6_8: LeanValue = f_SOM_Poly_add_eec728d8f6(_acc_2, _x_5_7);
+      f_Poly_mul_go_47f4cfb451(_p_0, _tail_2_4, _x_6_8)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Mon.mul.go"
+fun f_Mon_mul_go_8f92ccbc00(
+  _fuel_0: LeanValue,
+  _m_1: LeanValue,
+  _m_2: LeanValue,
+): LeanValue {
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _fuel_0,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(_m_1, _m_2)
+  | "[\"Bool\",\"false\"]" ->
+    leanTag(_m_2) match {
+    | "[\"List\",\"nil\"]" -> _m_1
+    | "[\"List\",\"cons\"]" ->
+      _head_2_6: LeanValue = leanField(_m_2, 0);
+      _tail_3_7: LeanValue = leanField(_m_2, 1);
+      leanTag(_m_1) match {
+      | "[\"List\",\"nil\"]" -> _m_2
+      | "[\"List\",\"cons\"]" ->
+        _head_4_8: LeanValue = leanField(_m_1, 0);
+        _tail_5_9: LeanValue = leanField(_m_1, 1);
+        _n_6_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _fuel_0,
+          LeanScalar("nat", "1"),
+        );
+        _x_7_12: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+          _head_4_8,
+          _head_2_6,
+        );
+        leanTag(_x_7_12) match {
+        | "[\"Bool\",\"false\"]" ->
+          _x_8_13: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+            _head_2_6,
+            _head_4_8,
+          );
+          leanTag(_x_8_13) match {
+          | "[\"Bool\",\"false\"]" ->
+            _x_9_14: LeanValue = f_Mon_mul_go_8f92ccbc00(
+              _n_6_11,
+              _tail_5_9,
+              _tail_3_7,
+            );
+            LeanCtor(
+              "[\"List\",\"cons\"]",
+              Array[
+                _head_4_8,
+                LeanCtor("[\"List\",\"cons\"]", Array[_head_2_6, _x_9_14]),
+              ],
+            )
+          | "[\"Bool\",\"true\"]" ->
+            _x_12_17: LeanValue = f_Mon_mul_go_8f92ccbc00(
+              _n_6_11,
+              _m_1,
+              _tail_3_7,
+            );
+            LeanCtor("[\"List\",\"cons\"]", Array[_head_2_6, _x_12_17])
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | "[\"Bool\",\"true\"]" ->
+          _x_14_19: LeanValue = f_Mon_mul_go_8f92ccbc00(
+            _n_6_11,
+            _tail_5_9,
+            _m_2,
+          );
+          LeanCtor("[\"List\",\"cons\"]", Array[_head_4_8, _x_14_19])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Expr.toPoly"
+fun f_SOM_Expr_toPoly_a062e4d71e(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"num\"]" ->
+    _i_2_1: LeanValue = leanField(_x_1_0, 0);
+    _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _i_2_1,
+      LeanScalar("nat", "0"),
+    );
+    leanTag(_x_4_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_5_9: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+      LeanCtor(
+        "[\"List\",\"cons\"]",
+        Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_i_2_1, _x_5_9]), _x_5_9],
+      )
+    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"var\"]" ->
+    _v_9_2: LeanValue = leanField(_x_1_0, 0);
+    _x_11_14: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    LeanCtor(
+      "[\"List\",\"cons\"]",
+      Array[
+        LeanCtor(
+          "[\"Prod\",\"mk\"]",
+          Array[
+            LeanScalar("nat", "1"),
+            LeanCtor("[\"List\",\"cons\"]", Array[_v_9_2, _x_11_14]),
+          ],
+        ),
+        _x_11_14,
+      ],
+    )
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"add\"]" ->
+    _a_15_3: LeanValue = leanField(_x_1_0, 0);
+    _b_16_4: LeanValue = leanField(_x_1_0, 1);
+    _x_17_18: LeanValue = f_SOM_Expr_toPoly_a062e4d71e(_a_15_3);
+    _x_18_19: LeanValue = f_SOM_Expr_toPoly_a062e4d71e(_b_16_4);
+    f_SOM_Poly_add_eec728d8f6(_x_17_18, _x_18_19)
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"mul\"]" ->
+    _a_20_5: LeanValue = leanField(_x_1_0, 0);
+    _b_21_6: LeanValue = leanField(_x_1_0, 1);
+    _x_22_21: LeanValue = f_SOM_Expr_toPoly_a062e4d71e(_a_20_5);
+    _x_23_22: LeanValue = f_SOM_Expr_toPoly_a062e4d71e(_b_21_6);
+    f_SOM_Poly_mul_c529c9bdb3(_x_22_21, _x_23_22)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.instInhabitedExpr"
+fun f_Internal_SOM_instInhabitedExpr_7e882a2eca(): LeanValue {
+  f_SOM_instInhabitedExpr_default_df2acf6781()
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Mon.mul.go.match_1.splitter"
+fun f_go_match_1_splitter_d6391802c4(
+  _motive_0: LeanValue,
+  _m_1_1: LeanValue,
+  _m_2_2: LeanValue,
+  _h_1_3: LeanValue,
+  _h_2_4: LeanValue,
+  _h_3_5: LeanValue,
+): LeanValue {
+  leanTag(_m_2_2) match {
+  | "[\"List\",\"nil\"]" -> leanApply(_h_1_3, Array[_m_1_1])
+  | "[\"List\",\"cons\"]" ->
+    _head_4_6: LeanValue = leanField(_m_2_2, 0);
+    _tail_5_7: LeanValue = leanField(_m_2_2, 1);
+    leanTag(_m_1_1) match {
+    | "[\"List\",\"nil\"]" -> leanApply(_h_2_4, Array[_m_2_2, LeanErased()])
+    | "[\"List\",\"cons\"]" ->
+      _head_7_9: LeanValue = leanField(_m_1_1, 0);
+      _tail_8_10: LeanValue = leanField(_m_1_1, 1);
+      leanApply(_h_3_5, Array[_head_7_9, _tail_8_10, _head_4_6, _tail_5_7])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Poly.add"
+fun f_SOM_Poly_add_eec728d8f6(_p_0: LeanValue, _p_1: LeanValue): LeanValue {
+  f_Poly_add_go_0a632515de(LeanScalar("nat", "1000000"), _p_0, _p_1)
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Mon.mul.go.match_1.splitter._redArg"
+fun f_go_match_1_splitter_b3835db7b2(
+  _m_1_0: LeanValue,
+  _m_2_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+  _h_3_4: LeanValue,
+): LeanValue {
+  leanTag(_m_2_1) match {
+  | "[\"List\",\"nil\"]" -> leanApply(_h_1_2, Array[_m_1_0])
+  | "[\"List\",\"cons\"]" ->
+    _head_4_5: LeanValue = leanField(_m_2_1, 0);
+    _tail_5_6: LeanValue = leanField(_m_2_1, 1);
+    leanTag(_m_1_0) match {
+    | "[\"List\",\"nil\"]" -> leanApply(_h_2_3, Array[_m_2_1, LeanErased()])
+    | "[\"List\",\"cons\"]" ->
+      _head_7_8: LeanValue = leanField(_m_1_0, 0);
+      _tail_8_9: LeanValue = leanField(_m_1_0, 1);
+      leanApply(_h_3_4, Array[_head_7_8, _tail_8_9, _head_4_5, _tail_5_6])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Expr.ctorElim._redArg"
+fun f_SOM_Expr_ctorElim_09943fce8d(
+  _t_0: LeanValue,
+  _k_1: LeanValue,
+): LeanValue {
+  leanTag(_t_0) match {
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"num\"]" ->
+    _i_2: LeanValue = leanField(_t_0, 0);
+    leanApply(_k_1, Array[_i_2])
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"var\"]" ->
+    _v_3: LeanValue = leanField(_t_0, 0);
+    leanApply(_k_1, Array[_v_3])
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"add\"]" ->
+    _a_4: LeanValue = leanField(_t_0, 0);
+    _b_5: LeanValue = leanField(_t_0, 1);
+    leanApply(_k_1, Array[_a_4, _b_5])
+  | "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"mul\"]" ->
+    _a_6: LeanValue = leanField(_t_0, 0);
+    _b_7: LeanValue = leanField(_t_0, 1);
+    leanApply(_k_1, Array[_a_6, _b_7])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Expr.ctorElim"
+fun f_SOM_Expr_ctorElim_4859732d1c(
+  _motive_0: LeanValue,
+  _ctorIdx_1: LeanValue,
+  _t_2: LeanValue,
+  _h_3: LeanValue,
+  _k_4: LeanValue,
+): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_2, _k_4)
+}
+// "Nat.Internal.SOM.Expr.num.elim._redArg"
+fun f_Expr_num_elim_9a03f9f7d1(_t_0: LeanValue, _num_1: LeanValue): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_0, _num_1)
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.add.go.match_1.splitter._redArg"
+fun f_go_match_1_splitter_403aa1f738(
+  _p_1_0: LeanValue,
+  _p_2_1: LeanValue,
+  _h_1_2: LeanValue,
+  _h_2_3: LeanValue,
+  _h_3_4: LeanValue,
+): LeanValue {
+  leanTag(_p_2_1) match {
+  | "[\"List\",\"nil\"]" -> leanApply(_h_1_2, Array[_p_1_0])
+  | "[\"List\",\"cons\"]" ->
+    _head_4_5: LeanValue = leanField(_p_2_1, 0);
+    _tail_5_6: LeanValue = leanField(_p_2_1, 1);
+    leanTag(_p_1_0) match {
+    | "[\"List\",\"nil\"]" -> leanApply(_h_2_3, Array[_p_2_1, LeanErased()])
+    | "[\"List\",\"cons\"]" ->
+      _head_7_8: LeanValue = leanField(_p_1_0, 0);
+      _tail_8_9: LeanValue = leanField(_p_1_0, 1);
+      leanTag(_head_7_8) match {
+      | "[\"Prod\",\"mk\"]" ->
+        _fst_9_11: LeanValue = leanField(_head_7_8, 0);
+        _snd_10_12: LeanValue = leanField(_head_7_8, 1);
+        leanTag(_head_4_5) match {
+        | "[\"Prod\",\"mk\"]" ->
+          _fst_11_13: LeanValue = leanField(_head_4_5, 0);
+          _snd_12_14: LeanValue = leanField(_head_4_5, 1);
+          leanApply(
+            _h_3_4,
+            Array[
+              _fst_9_11,
+              _snd_10_12,
+              _tail_8_9,
+              _fst_11_13,
+              _snd_12_14,
+              _tail_5_6,
+            ],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Expr.ctorIdx._impl"
+fun f_Expr_ctorIdx_impl_898d1fcbe7(_x_1_0: LeanValue): LeanValue {
+  L4_Init_Prelude.f_getObjTagNat_fc9363532b(LeanErased(), _x_1_0)
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.mulMon.go"
+fun f_Poly_mulMon_go_045efe3d9b(
+  _k_0: LeanValue,
+  _m_1: LeanValue,
+  _p_2: LeanValue,
+  _acc_3: LeanValue,
+): LeanValue {
+  leanTag(_p_2) match {
+  | "[\"List\",\"nil\"]" -> _acc_3
+  | "[\"List\",\"cons\"]" ->
+    _head_1_4: LeanValue = leanField(_p_2, 0);
+    _tail_2_5: LeanValue = leanField(_p_2, 1);
+    leanTag(_head_1_4) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_3_6: LeanValue = leanField(_head_1_4, 0);
+      _snd_4_7: LeanValue = leanField(_head_1_4, 1);
+      _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(_k_0, _fst_3_6);
+      _x_6_9: LeanValue = f_SOM_Mon_mul_cdb04eb2de(_m_1, _snd_4_7);
+      _x_7_10: LeanValue = f_SOM_Poly_insertSorted_c8486c477d(
+        _x_5_8,
+        _x_6_9,
+        _acc_3,
+      );
+      f_Poly_mulMon_go_045efe3d9b(_k_0, _m_1, _tail_2_5, _x_7_10)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.add.go"
+fun f_Poly_add_go_0a632515de(
+  _fuel_0: LeanValue,
+  _p_1: LeanValue,
+  _p_2: LeanValue,
+): LeanValue {
+  _zero_3: LeanValue = LeanScalar("nat", "0");
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _fuel_0,
+    _zero_3,
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(_p_1, _p_2)
+  | "[\"Bool\",\"false\"]" ->
+    leanTag(_p_2) match {
+    | "[\"List\",\"nil\"]" -> _p_1
+    | "[\"List\",\"cons\"]" ->
+      _head_2_6: LeanValue = leanField(_p_2, 0);
+      _tail_3_7: LeanValue = leanField(_p_2, 1);
+      leanTag(_p_1) match {
+      | "[\"List\",\"nil\"]" -> _p_2
+      | "[\"List\",\"cons\"]" ->
+        _head_4_8: LeanValue = leanField(_p_1, 0);
+        _tail_5_9: LeanValue = leanField(_p_1, 1);
+        leanTag(_head_4_8) match {
+        | "[\"Prod\",\"mk\"]" ->
+          _fst_6_10: LeanValue = leanField(_head_4_8, 0);
+          _snd_7_11: LeanValue = leanField(_head_4_8, 1);
+          leanTag(_head_2_6) match {
+          | "[\"Prod\",\"mk\"]" ->
+            _fst_8_12: LeanValue = leanField(_head_2_6, 0);
+            _snd_9_13: LeanValue = leanField(_head_2_6, 1);
+            _n_10_15: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+              _fuel_0,
+              LeanScalar("nat", "1"),
+            );
+            _x_11_16: LeanValue = LeanClosure(
+              L4_Init_Prelude.apply_f_instDecidableEqNat_780a838140,
+              2,
+              Array[],
+            );
+            _x_12_17: LeanValue = LeanClosure(
+              L4_Init_Prelude.apply_f_Nat_decLt_b34d01d051,
+              2,
+              Array[],
+            );
+            _x_13_18: LeanValue = L4_Init_Data_List_Basic.f_List_decidableLex_bd6a9cda4d(
+              _x_11_16,
+              _x_12_17,
+              _snd_7_11,
+              _snd_9_13,
+            );
+            leanTag(_x_13_18) match {
+            | "[\"Bool\",\"false\"]" ->
+              _x_14_19: LeanValue = L4_Init_Data_List_Basic.f_List_decidableLex_bd6a9cda4d(
+                _x_11_16,
+                _x_12_17,
+                _snd_9_13,
+                _snd_7_11,
+              );
+              leanTag(_x_14_19) match {
+              | "[\"Bool\",\"false\"]" ->
+                _x_15_20: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+                  _fst_6_10,
+                  _fst_8_12,
+                );
+                _x_16_21: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                  _x_15_20,
+                  _zero_3,
+                );
+                leanTag(_x_16_21) match {
+                | "[\"Bool\",\"false\"]" ->
+                  _x_18_23: LeanValue = f_Poly_add_go_0a632515de(
+                    _n_10_15,
+                    _tail_5_9,
+                    _tail_3_7,
+                  );
+                  LeanCtor(
+                    "[\"List\",\"cons\"]",
+                    Array[
+                      LeanCtor("[\"Prod\",\"mk\"]", Array[_x_15_20, _snd_7_11]),
+                      _x_18_23,
+                    ],
+                  )
+                | "[\"Bool\",\"true\"]" ->
+                  f_Poly_add_go_0a632515de(_n_10_15, _tail_5_9, _tail_3_7)
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | "[\"Bool\",\"true\"]" ->
+                _x_21_26: LeanValue = f_Poly_add_go_0a632515de(
+                  _n_10_15,
+                  _p_1,
+                  _tail_3_7,
+                );
+                LeanCtor("[\"List\",\"cons\"]", Array[_head_2_6, _x_21_26])
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Bool\",\"true\"]" ->
+              _x_23_28: LeanValue = f_Poly_add_go_0a632515de(
+                _n_10_15,
+                _tail_5_9,
+                _p_2,
+              );
+              LeanCtor("[\"List\",\"cons\"]", Array[_head_4_8, _x_23_28])
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.Poly.mul"
+fun f_SOM_Poly_mul_c529c9bdb3(_p_0: LeanValue, _p_1: LeanValue): LeanValue {
+  f_Poly_mul_go_47f4cfb451(_p_1, _p_0, LeanCtor("[\"List\",\"nil\"]", Array[]))
+}
+// "Nat.Internal.SOM.Poly.insertSorted"
+fun f_SOM_Poly_insertSorted_c8486c477d(
+  _k_0: LeanValue,
+  _m_1: LeanValue,
+  _p_2: LeanValue,
+): LeanValue {
+  leanTag(_p_2) match {
+  | "[\"List\",\"nil\"]" ->
+    LeanCtor(
+      "[\"List\",\"cons\"]",
+      Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _m_1]), _p_2],
+    )
+  | "[\"List\",\"cons\"]" ->
+    _head_3_3: LeanValue = leanField(_p_2, 0);
+    _tail_4_4: LeanValue = leanField(_p_2, 1);
+    leanTag(_head_3_3) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_5_7: LeanValue = leanField(_head_3_3, 0);
+      _snd_6_8: LeanValue = leanField(_head_3_3, 1);
+      _x_7_9: LeanValue = LeanClosure(
+        L4_Init_Prelude.apply_f_instDecidableEqNat_780a838140,
+        2,
+        Array[],
+      );
+      _x_8_10: LeanValue = LeanClosure(
+        L4_Init_Prelude.apply_f_Nat_decLt_b34d01d051,
+        2,
+        Array[],
+      );
+      _x_9_11: LeanValue = L4_Init_Data_List_Basic.f_List_decidableLex_bd6a9cda4d(
+        _x_7_9,
+        _x_8_10,
+        _m_1,
+        _snd_6_8,
+      );
+      leanTag(_x_9_11) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_10_12: LeanValue = f_SOM_Poly_insertSorted_c8486c477d(
+          _k_0,
+          _m_1,
+          _tail_4_4,
+        );
+        LeanCtor("[\"List\",\"cons\"]", Array[_head_3_3, _x_10_12])
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor(
+          "[\"List\",\"cons\"]",
+          Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _m_1]), _p_2],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Nat.Internal.SOM.instInhabitedExpr.default"
+fun f_SOM_instInhabitedExpr_default_df2acf6781(): LeanValue {
+  LeanCtor(
+    "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"num\"]",
+    Array[LeanScalar("nat", "0")],
+  )
+}
+// "Nat.Internal.SOM.Expr.add.elim"
+fun f_Expr_add_elim_ef6f4f4382(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _add_3: LeanValue,
+): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_1, _add_3)
+}
+// "Nat.Internal.SOM.Expr.mul.elim._redArg"
+fun f_Expr_mul_elim_0a0961b8c5(_t_0: LeanValue, _mul_1: LeanValue): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_0, _mul_1)
+}
+// "Nat.Internal.SOM.instInhabitedExpr.default._closed_0"
+fun f_instInhabitedExpr_default_closed_0_5b99169783(): LeanValue {
+  LeanCtor(
+    "[\"Nat\",\"Internal\",\"SOM\",\"Expr\",\"num\"]",
+    Array[LeanScalar("nat", "0")],
+  )
+}
+// "Nat.Internal.SOM.Poly.mulMon"
+fun f_SOM_Poly_mulMon_894a04900d(
+  _p_0: LeanValue,
+  _k_1: LeanValue,
+  _m_2: LeanValue,
+): LeanValue {
+  f_Poly_mulMon_go_045efe3d9b(
+    _k_1,
+    _m_2,
+    _p_0,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+// "Nat.Internal.SOM.Expr.num.elim"
+fun f_Expr_num_elim_dc7bd49fa7(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _num_3: LeanValue,
+): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_1, _num_3)
+}
+// "Nat.Internal.SOM.Expr.var.elim._redArg"
+fun f_Expr_var_elim_9c7165fc45(_t_0: LeanValue, _var_1: LeanValue): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_0, _var_1)
+}
+// "Nat.Internal.SOM.Mon.mul"
+fun f_SOM_Mon_mul_cdb04eb2de(_m_0: LeanValue, _m_1: LeanValue): LeanValue {
+  f_Mon_mul_go_8f92ccbc00(LeanScalar("nat", "1000000"), _m_0, _m_1)
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.add.go._closed_0"
+fun f_add_go_closed_0_4b5735d6d8(): LeanValue {
+  LeanClosure(L4_Init_Prelude.apply_f_Nat_decLt_b34d01d051, 2, Array[])
+}
+// "Nat.Internal.SOM.Expr.add.elim._redArg"
+fun f_Expr_add_elim_6b08194362(_t_0: LeanValue, _add_1: LeanValue): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_0, _add_1)
+}
+// "Nat.Internal.SOM.Expr.mul.elim"
+fun f_Expr_mul_elim_341f6c49b8(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _mul_3: LeanValue,
+): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_1, _mul_3)
+}
+// "Nat.Internal.SOM.Expr.var.elim"
+fun f_Expr_var_elim_b78f120dc4(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _var_3: LeanValue,
+): LeanValue {
+  f_SOM_Expr_ctorElim_09943fce8d(_t_1, _var_3)
+}
+// "_private.Init.Data.Nat.Internal.SOM.0.Nat.Internal.SOM.Poly.add.go.match_1.splitter"
+fun f_go_match_1_splitter_9110ce8c5f(
+  _motive_0: LeanValue,
+  _p_1_1: LeanValue,
+  _p_2_2: LeanValue,
+  _h_1_3: LeanValue,
+  _h_2_4: LeanValue,
+  _h_3_5: LeanValue,
+): LeanValue {
+  leanTag(_p_2_2) match {
+  | "[\"List\",\"nil\"]" -> leanApply(_h_1_3, Array[_p_1_1])
+  | "[\"List\",\"cons\"]" ->
+    _head_4_6: LeanValue = leanField(_p_2_2, 0);
+    _tail_5_7: LeanValue = leanField(_p_2_2, 1);
+    leanTag(_p_1_1) match {
+    | "[\"List\",\"nil\"]" -> leanApply(_h_2_4, Array[_p_2_2, LeanErased()])
+    | "[\"List\",\"cons\"]" ->
+      _head_7_9: LeanValue = leanField(_p_1_1, 0);
+      _tail_8_10: LeanValue = leanField(_p_1_1, 1);
+      leanTag(_head_7_9) match {
+      | "[\"Prod\",\"mk\"]" ->
+        _fst_9_12: LeanValue = leanField(_head_7_9, 0);
+        _snd_10_13: LeanValue = leanField(_head_7_9, 1);
+        leanTag(_head_4_6) match {
+        | "[\"Prod\",\"mk\"]" ->
+          _fst_11_14: LeanValue = leanField(_head_4_6, 0);
+          _snd_12_15: LeanValue = leanField(_head_4_6, 1);
+          leanApply(
+            _h_3_5,
+            Array[
+              _fst_9_12,
+              _snd_10_13,
+              _tail_8_10,
+              _fst_11_14,
+              _snd_12_15,
+              _tail_5_7,
+            ],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

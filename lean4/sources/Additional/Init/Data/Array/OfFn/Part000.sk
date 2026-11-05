@@ -1,0 +1,78 @@
+module L4_Init_Data_Array_OfFn;
+
+// "Array.ofFnM._redArg"
+fun f_Array_ofFnM_6ab5e01e8b(
+  _n_0: LeanValue,
+  _inst_1_1: LeanValue,
+  _f_2: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_1) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_3: LeanValue = leanField(_inst_1_1, 0);
+    _toBind_4: LeanValue = leanField(_inst_1_1, 1);
+    leanTag(_toApplicative_3) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_5: LeanValue = leanField(_toApplicative_3, 0);
+      _toPure_6: LeanValue = leanField(_toApplicative_3, 1);
+      _toSeq_7: LeanValue = leanField(_toApplicative_3, 2);
+      _toSeqLeft_8: LeanValue = leanField(_toApplicative_3, 3);
+      _toSeqRight_9: LeanValue = leanField(_toApplicative_3, 4);
+      _f_2_10: LeanValue = LeanClosure(
+        L4_Init_Data_Array_OfFn.apply_f_Array_ofFnM_lam_0_338273bf91,
+        4,
+        Array[_toFunctor_5, _f_2],
+      );
+      _x_3_11: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+        LeanErased(),
+        _n_0,
+      );
+      L4_Init_Data_Fin_Fold.f_Fin_foldlM_loop_44c18d23c3(
+        LeanErased(),
+        LeanErased(),
+        _inst_1_1,
+        _n_0,
+        _f_2_10,
+        _x_3_11,
+        LeanScalar("nat", "0"),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Array.ofFnM"
+fun f_Array_ofFnM_22588f8268(
+  _m_0: LeanValue,
+  _value_1: LeanValue,
+  _n_2: LeanValue,
+  _inst_1_3: LeanValue,
+  _f_4: LeanValue,
+): LeanValue {
+  f_Array_ofFnM_6ab5e01e8b(_n_2, _inst_1_3, _f_4)
+}
+// "Array.ofFnM._redArg._lam_0"
+fun f_Array_ofFnM_lam_0_338273bf91(
+  _toFunctor_0: LeanValue,
+  _f_1: LeanValue,
+  _xs_2: LeanValue,
+  _i_3: LeanValue,
+): LeanValue {
+  leanTag(_toFunctor_0) match {
+  | "[\"Functor\",\"mk\"]" ->
+    _map_4: LeanValue = leanField(_toFunctor_0, 0);
+    _mapConst_5: LeanValue = leanField(_toFunctor_0, 1);
+    _x_1_6: LeanValue = LeanClosure(
+      L4_Init_Prelude.apply_f_Array_push_9cb6e9b3cb,
+      3,
+      Array[LeanErased(), _xs_2],
+    );
+    _x_2_7: LeanValue = leanApply(_f_1, Array[_i_3]);
+    leanApply(_map_4, Array[LeanErased(), LeanErased(), _x_1_6, _x_2_7])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Array_ofFnM_lam_0_338273bf91(_args: Array<LeanValue>): LeanValue {
+  f_Array_ofFnM_lam_0_338273bf91(_args[0], _args[1], _args[2], _args[3])
+}
+
+module end;

@@ -1,0 +1,730 @@
+module L4_Std_Time_Zoned_Database_TZdb;
+
+// "Std.Time.Database.TZdb.resolveZonesPaths._closed_0"
+fun f_TZdb_resolveZonesPaths_closed_0_31548f0b40(): LeanValue {
+  LeanText("TZDIR")
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_0"
+fun f_TZdb_resolveLocalPath_closed_0_73b33966c4(): LeanValue {
+  LeanText("TZ")
+}
+// "Std.Time.Database.TZdb.TZSpec.zoneId.elim"
+fun f_TZSpec_zoneId_elim_2b065b50e6(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _zoneId_3: LeanValue,
+): LeanValue {
+  f_TZdb_TZSpec_ctorElim_3d1aaff576(_t_1, _zoneId_3)
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Std.Time.Database.TZdb.getZoneRules.spec_0"
+fun f_TZdb_getZoneRules_spec_0_0bb8bda83c(
+  _id_0: LeanValue,
+  _as_1: LeanValue,
+  _sz_2: LeanValue,
+  _i_3: LeanValue,
+  _b_4: LeanValue,
+  _y_1_5: LeanValue,
+): LeanValue {
+  _x_2_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _i_3,
+    _sz_2,
+  );
+  leanTag(_x_2_6) match {
+  | "[\"Bool\",\"false\"]" ->
+    LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_b_4, _y_1_5])
+  | "[\"Bool\",\"true\"]" ->
+    _x_5_9: LeanValue = LeanCtor("[\"PUnit\",\"unit\"]", Array[]);
+    _a_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _as_1,
+      _i_3,
+      LeanErased(),
+    );
+    _x_7_12: LeanValue = L4_Init_System_FilePath.f_System_FilePath_join_56aa4f5bc1(
+      _a_11,
+      _id_0,
+    );
+    _x_8_13: LeanValue = L4_Init_System_IO.f_System_FilePath_pathExists_f339242c40(
+      _x_7_12,
+      _y_1_5,
+    );
+    leanTag(_x_8_13) match {
+    | "[\"ST\",\"Out\",\"mk\"]" ->
+      _val_9_14: LeanValue = leanField(_x_8_13, 0);
+      _state_10_15: LeanValue = leanField(_x_8_13, 1);
+      leanTag(_val_9_14) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_12_17: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _i_3,
+          LeanScalar("usize", "1"),
+        );
+        f_TZdb_getZoneRules_spec_0_0bb8bda83c(
+          _id_0,
+          _as_1,
+          _sz_2,
+          _x_12_17,
+          LeanCtor(
+            "[\"Prod\",\"mk\"]",
+            Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _x_5_9],
+          ),
+          _state_10_15,
+        )
+      | "[\"Bool\",\"true\"]" ->
+        _x_14_19: LeanValue = f_Database_TZdb_readRulesFromDisk_7e2f7f4c28(
+          _a_11,
+          _id_0,
+          _state_10_15,
+        );
+        leanTag(_x_14_19) match {
+        | "[\"EST\",\"Out\",\"ok\"]" ->
+          _a_15_20: LeanValue = leanField(_x_14_19, 0);
+          _a_16_21: LeanValue = leanField(_x_14_19, 1);
+          LeanCtor(
+            "[\"EST\",\"Out\",\"ok\"]",
+            Array[
+              LeanCtor(
+                "[\"Prod\",\"mk\"]",
+                Array[
+                  LeanCtor("[\"Option\",\"some\"]", Array[_a_15_20]),
+                  _x_5_9,
+                ],
+              ),
+              _a_16_21,
+            ],
+          )
+        | "[\"EST\",\"Out\",\"error\"]" ->
+          _a_20_22: LeanValue = leanField(_x_14_19, 0);
+          _a_21_23: LeanValue = leanField(_x_14_19, 1);
+          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_20_22, _a_21_23])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.Database.TZdb.instBEqTZSpec._closed_0"
+fun f_TZdb_instBEqTZSpec_closed_0_202b754576(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb.apply_f_TZdb_instBEqTZSpec_beq_4bfe7cc0e4,
+    2,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr"
+fun f_TZdb_instReprTZSpec_repr_c7d67154e8(
+  _x_1_0_input: LeanValue,
+  _prec_2_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_x_1_0, 1=_prec_2_1, 2=_p_3_2, 3=_id_23_3, 4=_y_5_4, 5=_x_6_5, 6=_x_7_6, 7=_x_8_7, 8=_x_9_8, 9=_x_10_9, 10=_x_11_10, 11=_x_12_11, 12=_x_13_12, 13=_x_14_13, 14=_x_15_14, 15=_x_16_15, 16=_x_17_16, 17=_x_18_17, 18=_x_19_18, 19=_x_20_19, 20=_x_21_20, 21=_x_22_21, 22=_y_25_22, 23=_x_26_23, 24=_x_27_24, 25=_x_28_25, 26=_x_29_26, 27=_x_30_27, 28=_x_31_28, 29=_x_32_29, 30=_x_33_30, 31=_x_34_31, 32=_x_35_32, 33=_x_36_33, 34=_x_37_34, 35=_x_38_35, 36=_x_39_36, 37=_x_40_37, 38=_x_41_38, 39=_x_42_39
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    40,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _x_1_0_input);
+  _frame.set(1, _prec_2_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"filePath\"]" ->
+        _frame.set(2, leanField(_frame[0], 0));
+        _frame.set(16, LeanScalar("nat", "1024"));
+        _frame.set(
+          17,
+          L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[16], _frame[1]),
+        );
+        leanTag(_frame[17]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(18, LeanScalar("nat", "2"));
+          _frame.set(
+            19,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[18]),
+          );
+          _jump0 = _frame[19];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(20, LeanScalar("nat", "1"));
+          _frame.set(
+            21,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[20]),
+          );
+          _jump0 = _frame[21];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"zoneId\"]" ->
+        _frame.set(3, leanField(_frame[0], 0));
+        _frame.set(34, LeanScalar("nat", "1024"));
+        _frame.set(
+          35,
+          L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[34], _frame[1]),
+        );
+        leanTag(_frame[35]) match {
+        | "[\"Bool\",\"false\"]" ->
+          _frame.set(36, LeanScalar("nat", "2"));
+          _frame.set(
+            37,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[36]),
+          );
+          _jump0 = _frame[37];
+          _frame.set(22, _jump0);
+          !pc = 2;
+          void
+        | "[\"Bool\",\"true\"]" ->
+          _frame.set(38, LeanScalar("nat", "1"));
+          _frame.set(
+            39,
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[38]),
+          );
+          _jump0 = _frame[39];
+          _frame.set(22, _jump0);
+          !pc = 2;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(5, LeanText("Std.Time.Database.TZdb.TZSpec.filePath"));
+      _frame.set(
+        6,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[5]]),
+      );
+      _frame.set(7, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]));
+      _frame.set(
+        8,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[6], _frame[7]],
+        ),
+      );
+      _frame.set(9, L4_Init_Data_Repr.f_String_quote_e53217cacf(_frame[2]));
+      _frame.set(
+        10,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[9]]),
+      );
+      _frame.set(
+        11,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[8], _frame[10]],
+        ),
+      );
+      _frame.set(
+        12,
+        LeanCtor("[\"Std\",\"Format\",\"nest\"]", Array[_frame[4], _frame[11]]),
+      );
+      _frame.set(
+        13,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      );
+      _frame.set(
+        14,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"group\"]",
+          Array[_frame[12], _frame[13]],
+        ),
+      );
+      _frame.set(
+        15,
+        L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(_frame[14], _frame[1]),
+      );
+      return _frame[15]
+    | 2 ->
+      _frame.set(23, LeanText("Std.Time.Database.TZdb.TZSpec.zoneId"));
+      _frame.set(
+        24,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[23]]),
+      );
+      _frame.set(25, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]));
+      _frame.set(
+        26,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[24], _frame[25]],
+        ),
+      );
+      _frame.set(27, L4_Init_Data_Repr.f_String_quote_e53217cacf(_frame[3]));
+      _frame.set(
+        28,
+        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[27]]),
+      );
+      _frame.set(
+        29,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"append\"]",
+          Array[_frame[26], _frame[28]],
+        ),
+      );
+      _frame.set(
+        30,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"nest\"]",
+          Array[_frame[22], _frame[29]],
+        ),
+      );
+      _frame.set(
+        31,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          Array[],
+        ),
+      );
+      _frame.set(
+        32,
+        LeanCtor(
+          "[\"Std\",\"Format\",\"group\"]",
+          Array[_frame[30], _frame[31]],
+        ),
+      );
+      _frame.set(
+        33,
+        L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(_frame[32], _frame[1]),
+      );
+      return _frame[33]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+fun apply_f_TZdb_instReprTZSpec_repr_c7d67154e8(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TZdb_instReprTZSpec_repr_c7d67154e8(_args[0], _args[1])
+}
+// "Std.Time.Database.TZdb.instBEqTZSpec.beq"
+fun f_TZdb_instBEqTZSpec_beq_4bfe7cc0e4(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"filePath\"]" ->
+    _p_3_2: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"filePath\"]" ->
+      _p_4_4: LeanValue = leanField(_x_2_1, 0);
+      L4_Init_Prelude.f_String_decEq_88c69973f8(_p_3_2, _p_4_4)
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"zoneId\"]" ->
+    _id_7_3: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"zoneId\"]" ->
+      _id_8_7: LeanValue = leanField(_x_2_1, 0);
+      L4_Init_Prelude.f_String_decEq_88c69973f8(_id_7_3, _id_8_7)
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_TZdb_instBEqTZSpec_beq_4bfe7cc0e4(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TZdb_instBEqTZSpec_beq_4bfe7cc0e4(_args[0], _args[1])
+}
+// "Std.Time.Database.TZdb.getZoneRules._closed_0"
+fun f_TZdb_getZoneRules_closed_0_9129c7049d(): LeanValue {
+  LeanText("cannot find ")
+}
+// "Std.Time.Database.TZdb.TZSpec.zoneId.elim._redArg"
+fun f_TZSpec_zoneId_elim_197c117a52(
+  _t_0: LeanValue,
+  _zoneId_1: LeanValue,
+): LeanValue {
+  f_TZdb_TZSpec_ctorElim_3d1aaff576(_t_0, _zoneId_1)
+}
+// "Std.Time.Database.TZdb.default._closed_0"
+fun f_TZdb_default_closed_0_ff1d1378ed(): LeanValue {
+  LeanText("/usr/share/zoneinfo")
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_1"
+fun f_TZdb_resolveLocalPath_closed_1_06191f8829(): LeanValue {
+  LeanText("TZ='")
+}
+// "Std.Time.Database.TZdb.getZoneRules"
+fun f_Database_TZdb_getZoneRules_b1573cc24e(
+  _db_0: LeanValue,
+  _id_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  _x_2_3: LeanValue = f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
+    _db_0,
+    _a_1_2,
+  );
+  leanTag(_x_2_3) match {
+  | "[\"EST\",\"Out\",\"ok\"]" ->
+    _a_3_4: LeanValue = leanField(_x_2_3, 0);
+    _a_4_5: LeanValue = leanField(_x_2_3, 1);
+    _sz_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+      LeanErased(),
+      _a_3_4,
+    );
+    _x_9_13: LeanValue = f_TZdb_getZoneRules_spec_0_0bb8bda83c(
+      _id_1,
+      _a_3_4,
+      _sz_11,
+      LeanScalar("usize", "0"),
+      LeanCtor(
+        "[\"Prod\",\"mk\"]",
+        Array[
+          LeanCtor("[\"Option\",\"none\"]", Array[]),
+          LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+        ],
+      ),
+      _a_4_5,
+    );
+    leanTag(_x_9_13) match {
+    | "[\"EST\",\"Out\",\"ok\"]" ->
+      _a_10_14: LeanValue = leanField(_x_9_13, 0);
+      _a_11_15: LeanValue = leanField(_x_9_13, 1);
+      leanTag(_a_10_14) match {
+      | "[\"Prod\",\"mk\"]" ->
+        _fst_18: LeanValue = leanField(_a_10_14, 0);
+        _snd_19: LeanValue = leanField(_a_10_14, 1);
+        leanTag(_fst_18) match {
+        | "[\"Option\",\"none\"]" ->
+          _x_13_22: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            LeanText("cannot find "),
+            _id_1,
+          );
+          _x_15_24: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _x_13_22,
+            LeanText(" in the local timezone database"),
+          );
+          _x_16_25: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+            _x_15_24,
+          );
+          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_16_25, _a_11_15])
+        | "[\"Option\",\"some\"]" ->
+          _val_18_20: LeanValue = leanField(_fst_18, 0);
+          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_val_18_20, _a_11_15])
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"EST\",\"Out\",\"error\"]" ->
+      _a_20_16: LeanValue = leanField(_x_9_13, 0);
+      _a_21_17: LeanValue = leanField(_x_9_13, 1);
+      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_20_16, _a_21_17])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"EST\",\"Out\",\"error\"]" ->
+    _a_23_6: LeanValue = leanField(_x_2_3, 0);
+    _a_24_7: LeanValue = leanField(_x_2_3, 1);
+    leanFail("unreachable: Std.Time.Database.TZdb.getZoneRules")
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Database_TZdb_getZoneRules_b1573cc24e(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Database_TZdb_getZoneRules_b1573cc24e(_args[0], _args[1], _args[2])
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_4"
+fun f_TZdb_resolveLocalPath_closed_4_92e3b18f44(): LeanValue {
+  LeanText("': timezone not found in any zoneinfo directory")
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Std.Time.Database.TZdb.findInPaths.spec_0._closed_0"
+fun f_findInPaths_spec_0_closed_0_00e936fbe4(): LeanValue {
+  LeanCtor(
+    "[\"Prod\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+    ],
+  )
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_2"
+fun f_instReprTZSpec_repr_closed_2_e144393b42(): LeanValue {
+  _x_183_1: LeanValue = f_instReprTZSpec_repr_closed_1_a5aff52fc2();
+  LeanCtor(
+    "[\"Std\",\"Format\",\"append\"]",
+    Array[_x_183_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+  )
+}
+// "Std.Time.Database.TZdb.inst._closed_2"
+fun f_TZdb_inst_closed_2_a98b60fef9(): LeanValue {
+  _f_12_0: LeanValue = f_TZdb_inst_closed_1_f984b47c17();
+  _f_13_1: LeanValue = f_TZdb_inst_closed_0_1892ef403d();
+  LeanCtor("[\"Std\",\"Time\",\"Database\",\"mk\"]", Array[_f_13_1, _f_12_0])
+}
+// "Std.Time.Database.TZdb.inst"
+fun f_Database_TZdb_inst_56eabf7655(): LeanValue {
+  _f_1_0: LeanValue = LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb
+      .apply_f_Database_TZdb_getZoneRules_b1573cc24e,
+    3,
+    Array[],
+  );
+  _f_2_1: LeanValue = LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb
+      .apply_f_Database_TZdb_getLocalZoneRules_5c9db60f04,
+    2,
+    Array[],
+  );
+  LeanCtor("[\"Std\",\"Time\",\"Database\",\"mk\"]", Array[_f_1_0, _f_2_1])
+}
+// "Std.Time.Database.TZdb.parseTZIfFromDisk._closed_2"
+fun f_TZdb_parseTZIfFromDisk_closed_2_ed935e5a24(): LeanValue {
+  LeanText("'")
+}
+// "Std.Time.Database.TZdb.instReprTZSpec"
+fun f_Database_TZdb_instReprTZSpec_995c28981d(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb.apply_f_TZdb_instReprTZSpec_repr_c7d67154e8,
+    2,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.idFromPath._closed_0"
+fun f_TZdb_idFromPath_closed_0_f588c8f9d4(): LeanValue {
+  LeanText("zoneinfo")
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_3"
+fun f_TZdb_resolveLocalPath_closed_3_16cb936702(): LeanValue {
+  LeanText("' not found in any zoneinfo directory")
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_5"
+fun f_instReprTZSpec_repr_closed_5_8d945a62e8(): LeanValue {
+  LeanText("Std.Time.Database.TZdb.TZSpec.zoneId")
+}
+// "Std.Time.Database.TZdb.parseTZIfFromDisk._closed_1"
+fun f_TZdb_parseTZIfFromDisk_closed_1_012eab949c(): LeanValue {
+  LeanText(" in the local timezone database at '")
+}
+// "Std.Time.Database.TZdb.parseTZIfFromDisk._closed_0"
+fun f_TZdb_parseTZIfFromDisk_closed_0_b3d7dd4a90(): LeanValue {
+  LeanText("unable to locate ")
+}
+// "Std.Time.Database.TZdb.default._closed_4"
+fun f_TZdb_default_closed_4_c387ce9c52(): LeanValue {
+  _x_26_0: LeanValue = f_TZdb_default_closed_3_866bc014e9();
+  _x_27_1: LeanValue = f_TZdb_default_closed_2_30e2984ddb();
+  _x_28_2: LeanValue = f_TZdb_default_closed_1_6953fa2d57();
+  _x_29_3: LeanValue = f_TZdb_default_closed_0_ff1d1378ed();
+  _x_31_5: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    LeanErased(),
+    LeanScalar("nat", "4"),
+  );
+  _x_32_6: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    LeanErased(),
+    _x_31_5,
+    _x_29_3,
+  );
+  _x_33_7: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    LeanErased(),
+    _x_32_6,
+    _x_28_2,
+  );
+  _x_34_8: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    LeanErased(),
+    _x_33_7,
+    _x_27_1,
+  );
+  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _x_34_8, _x_26_0)
+}
+// "Std.Time.Database.TZdb.parseTZValue._closed_0"
+fun f_TZdb_parseTZValue_closed_0_12d7b72d92(): LeanValue {
+  LeanText(":")
+}
+// "Std.Time.Database.TZdb.TZSpec.ctorElim._redArg"
+fun f_TZdb_TZSpec_ctorElim_3d1aaff576(
+  _t_0: LeanValue,
+  _k_1: LeanValue,
+): LeanValue {
+  leanTag(_t_0) match {
+  | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"filePath\"]" ->
+    _p_2: LeanValue = leanField(_t_0, 0);
+    leanApply(_k_1, Array[_p_2])
+  | "[\"Std\",\"Time\",\"Database\",\"TZdb\",\"TZSpec\",\"zoneId\"]" ->
+    _id_3: LeanValue = leanField(_t_0, 0);
+    leanApply(_k_1, Array[_id_3])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.Database.TZdb.parseTZif._closed_0"
+fun f_TZdb_parseTZif_closed_0_83f36e2a27(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TzIf.apply_f_TimeZone_TZif_parse_36d5a041db,
+    1,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_0"
+fun f_instReprTZSpec_repr_closed_0_f1817c2fbb(): LeanValue {
+  LeanText("Std.Time.Database.TZdb.TZSpec.filePath")
+}
+// "Std.Time.Database.TZdb.default._closed_1"
+fun f_TZdb_default_closed_1_6953fa2d57(): LeanValue {
+  LeanText("/share/zoneinfo")
+}
+// "Std.Time.Database.TZdb.TZSpec.filePath.elim"
+fun f_TZSpec_filePath_elim_62e0a05b31(
+  _motive_0: LeanValue,
+  _t_1: LeanValue,
+  _h_2: LeanValue,
+  _filePath_3: LeanValue,
+): LeanValue {
+  f_TZdb_TZSpec_ctorElim_3d1aaff576(_t_1, _filePath_3)
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_4"
+fun f_instReprTZSpec_repr_closed_4_b2ae1f1a1a(): LeanValue {
+  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(LeanScalar("nat", "1"))
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_5"
+fun f_TZdb_resolveLocalPath_closed_5_f67941a426(): LeanValue {
+  LeanText("/etc/localtime")
+}
+// "Std.Time.Database.TZdb.instReprTZSpec._closed_0"
+fun f_TZdb_instReprTZSpec_closed_0_e0202134b8(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb.apply_f_TZdb_instReprTZSpec_repr_c7d67154e8,
+    2,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_1"
+fun f_instReprTZSpec_repr_closed_1_a5aff52fc2(): LeanValue {
+  _x_180_0: LeanValue = f_instReprTZSpec_repr_closed_0_f1817c2fbb();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_180_0])
+}
+// "Std.Time.Database.TZdb.localRules._closed_1"
+fun f_TZdb_localRules_closed_1_4638ae8b10(): LeanValue {
+  _x_84_0: LeanValue = f_TZdb_localRules_closed_0_bdeb795708();
+  L4_Init_System_IOError.f_IO_userError_436e50ab44(_x_84_0)
+}
+// "Std.Time.Database.TZdb.TZSpec.filePath.elim._redArg"
+fun f_TZSpec_filePath_elim_d4c17566d1(
+  _t_0: LeanValue,
+  _filePath_1: LeanValue,
+): LeanValue {
+  f_TZdb_TZSpec_ctorElim_3d1aaff576(_t_0, _filePath_1)
+}
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Std.Time.Database.TZdb.getZoneRules.spec_0._closed_0"
+fun f_getZoneRules_spec_0_closed_0_67440c39c8(): LeanValue {
+  LeanCtor(
+    "[\"Prod\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+    ],
+  )
+}
+// "Std.Time.Database.TZdb.instBEqTZSpec"
+fun f_Database_TZdb_instBEqTZSpec_435d401fd6(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb.apply_f_TZdb_instBEqTZSpec_beq_4bfe7cc0e4,
+    2,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.resolveZonesPaths._closed_1"
+fun f_TZdb_resolveZonesPaths_closed_1_b7616027f9(): LeanValue {
+  LeanText("")
+}
+// "Std.Time.Database.TZdb.inst._closed_0"
+fun f_TZdb_inst_closed_0_1892ef403d(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb
+      .apply_f_Database_TZdb_getZoneRules_b1573cc24e,
+    3,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.localRules._closed_0"
+fun f_TZdb_localRules_closed_0_bdeb795708(): LeanValue {
+  LeanText("cannot read the id of the path.")
+}
+// "Std.Time.Database.TZdb.TZSpec.ctorElim"
+fun f_TZdb_TZSpec_ctorElim_74908ed791(
+  _motive_0: LeanValue,
+  _ctorIdx_1: LeanValue,
+  _t_2: LeanValue,
+  _h_3: LeanValue,
+  _k_4: LeanValue,
+): LeanValue {
+  f_TZdb_TZSpec_ctorElim_3d1aaff576(_t_2, _k_4)
+}
+// "Std.Time.Database.TZdb.resolveLocalPath._closed_2"
+fun f_TZdb_resolveLocalPath_closed_2_79d5a3c223(): LeanValue {
+  LeanText("': path '")
+}
+// "Std.Time.Database.TZdb.TZSpec.ctorIdx._impl"
+fun f_TZSpec_ctorIdx_impl_a98a1c4d7d(_x_1_0: LeanValue): LeanValue {
+  L4_Init_Prelude.f_getObjTagNat_fc9363532b(LeanErased(), _x_1_0)
+}
+// "Std.Time.Database.TZdb.inst._closed_1"
+fun f_TZdb_inst_closed_1_f984b47c17(): LeanValue {
+  LeanClosure(
+    L4_Std_Time_Zoned_Database_TZdb
+      .apply_f_Database_TZdb_getLocalZoneRules_5c9db60f04,
+    2,
+    Array[],
+  )
+}
+// "Std.Time.Database.TZdb.default._closed_2"
+fun f_TZdb_default_closed_2_30e2984ddb(): LeanValue {
+  LeanText("/etc/zoneinfo")
+}
+// "Std.Time.Database.TZdb.readRulesFromDisk"
+fun f_Database_TZdb_readRulesFromDisk_7e2f7f4c28(
+  _path_0: LeanValue,
+  _id_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  _x_2_3: LeanValue = L4_Init_System_FilePath.f_System_FilePath_join_56aa4f5bc1(
+    _path_0,
+    _id_1,
+  );
+  f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(_x_2_3, _id_1, _a_1_2)
+}
+// "IO.ofExcept._at_.Std.Time.Database.TZdb.parseTZIfFromDisk.spec_0"
+fun f_TZdb_parseTZIfFromDisk_spec_0_55edb64b95(
+  _value_0: LeanValue,
+  _e_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(_e_1, _a_1_2)
+}
+// "Std.Time.Database.TZdb.default._closed_3"
+fun f_TZdb_default_closed_3_866bc014e9(): LeanValue {
+  LeanText("/usr/share/lib/zoneinfo")
+}
+// "Std.Time.Database.TZdb.getZoneRules._closed_1"
+fun f_TZdb_getZoneRules_closed_1_5821ecb542(): LeanValue {
+  LeanText(" in the local timezone database")
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_7"
+fun f_instReprTZSpec_repr_closed_7_51e49c39de(): LeanValue {
+  _x_193_1: LeanValue = f_instReprTZSpec_repr_closed_6_1882baa259();
+  LeanCtor(
+    "[\"Std\",\"Format\",\"append\"]",
+    Array[_x_193_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+  )
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_3"
+fun f_instReprTZSpec_repr_closed_3_d5072c010e(): LeanValue {
+  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(LeanScalar("nat", "2"))
+}
+// "Std.Time.Database.TZdb.instReprTZSpec.repr._closed_6"
+fun f_instReprTZSpec_repr_closed_6_1882baa259(): LeanValue {
+  _x_190_0: LeanValue = f_instReprTZSpec_repr_closed_5_8d945a62e8();
+  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_190_0])
+}
+// "Std.Time.Database.TZdb.idFromPath._closed_1"
+fun f_TZdb_idFromPath_closed_1_07895cba33(): LeanValue {
+  LeanText("/")
+}
+
+module end;

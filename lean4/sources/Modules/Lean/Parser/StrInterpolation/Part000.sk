@@ -1,0 +1,425 @@
+module L4_Lean_Parser_StrInterpolation;
+
+// "_private.Lean.Parser.StrInterpolation.0.Lean.Parser.interpolatedStr._regBuiltin.Lean.Parser.interpolatedStr.docString_1"
+fun f_Parser_interpolatedStr_docString_1_e9d9169edb(
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_5_4: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+    LeanText("Lean"),
+    LeanText("Parser"),
+    LeanText("interpolatedStr"),
+  );
+  _x_6_5: LeanValue = LeanText(
+    "The parser `interpolatedStr(p)` parses a string literal like `\"foo\"` (see `str`), but the string\nmay also contain `{}` escapes, and within the escapes the parser `p` is used. For example,\n`interpolatedStr(term)` will parse `\"foo {2 + 2}\"`, where `2 + 2` is parsed as a term rather than\nas a string. Note that the full Lean term grammar is available here, including string literals,\nso for example `\"foo {\"bar\" ++ \"baz\"}\"` is a legal interpolated string (which evaluates to\n`foo barbaz`).\n\nThis parser has arity 1, and returns a `interpolatedStrKind` with an odd number of arguments,\nalternating between chunks of literal text and results from `p`. The literal chunks contain\nuninterpreted substrings of the input. For example, `\"foo\\n{2 + 2}\"` would have three arguments:\nan atom `\"foo\\n{`, the parsed `2 + 2` term, and then the atom `}\"`.",
+  );
+  L4_Lean_DocString_Extension.f_Lean_addBuiltinDocString_e430758a4e(
+    _x_5_4,
+    _x_6_5,
+    _a_1_0,
+  )
+}
+// "Lean.Parser.interpolatedStr"
+fun f_Lean_Parser_interpolatedStr_719276c653(_p_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Parser_Basic.f_Lean_Parser_withoutPosition_d532f38804(
+    _p_0,
+  );
+  leanTag(_x_1_1) match {
+  | "[\"Lean\",\"Parser\",\"Parser\",\"mk\"]" ->
+    _info_2: LeanValue = leanField(_x_1_1, 0);
+    _fn_3: LeanValue = leanField(_x_1_1, 1);
+    _x_2_4: LeanValue = LeanText("interpolatedStr");
+    _x_4_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      LeanText("interpolatedStrKind"),
+    );
+    _x_7_9: LeanValue = L4_Lean_Parser_Basic.f_Lean_Parser_mkAntiquot_e65a4c46e7(
+      _x_2_4,
+      _x_4_6,
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    );
+    _x_8_10: LeanValue = L4_Lean_Parser_Basic.f_Lean_Parser_mkAtomicInfo_416d203cac(
+      _x_2_4,
+    );
+    _x_9_11: LeanValue = LeanClosure(
+      L4_Lean_Parser_StrInterpolation
+        .apply_f_Lean_Parser_interpolatedStrFn_92a4a32a6d,
+      3,
+      Array[_fn_3],
+    );
+    L4_Lean_Parser_Basic.f_Lean_Parser_withAntiquot_e48137aef8(
+      _x_7_9,
+      LeanCtor(
+        "[\"Lean\",\"Parser\",\"Parser\",\"mk\"]",
+        Array[_x_8_10, _x_9_11],
+      ),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lean_Parser_interpolatedStr_719276c653(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_Parser_interpolatedStr_719276c653(_args[0])
+}
+// "Lean.Parser.isQuotableCharForStrInterpolant"
+fun f_Lean_Parser_isQuotableCharForStrInterpolant_5395e0aa9c(
+  _c_0: LeanValue,
+): LeanValue {
+  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+    _c_0,
+    LeanScalar("uint32", "123"),
+  );
+  leanTag(_x_2_2) match {
+  | "[\"Bool\",\"false\"]" ->
+    L4_Lean_Parser_Basic.f_Lean_Parser_isQuotableCharDefault_5324d0fb08(_c_0)
+  | "[\"Bool\",\"true\"]" -> _x_2_2
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lean_Parser_isQuotableCharForStrInterpolant_5395e0aa9c(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_Parser_isQuotableCharForStrInterpolant_5395e0aa9c(_args[0])
+}
+// "instBEqOption.beq._at_._private.Lean.Parser.StrInterpolation.0.Lean.Parser.interpolatedStrFn.parse.spec_0"
+fun f_interpolatedStrFn_parse_spec_0_dbcabd3de8(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Option\",\"none\"]" ->
+    leanTag(_x_2_1) match {
+    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
+    | "[\"Option\",\"some\"]" ->
+      _val_4_3: LeanValue = leanField(_x_2_1, 0);
+      LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Option\",\"some\"]" ->
+    _val_6_2: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | "[\"Option\",\"some\"]" ->
+      _val_8_6: LeanValue = leanField(_x_2_1, 0);
+      L4_Lean_Parser_Types.f_Parser_instBEqError_beq_ab4ac3e4c5(
+        _val_6_2,
+        _val_8_6,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Parser.StrInterpolation.0.Lean.Parser.interpolatedStrFn.parse"
+fun f_Parser_interpolatedStrFn_parse_fdfac67feb(
+  _p_0: LeanValue,
+  _stackSize_1: LeanValue,
+  _startPos_2: LeanValue,
+  _c_3: LeanValue,
+  _s_4: LeanValue,
+): LeanValue {
+  leanTag(_s_4) match {
+  | "[\"Lean\",\"Parser\",\"ParserState\",\"mk\"]" ->
+    _stxStack_5: LeanValue = leanField(_s_4, 0);
+    _lhsPrec_6: LeanValue = leanField(_s_4, 1);
+    _pos_7: LeanValue = leanField(_s_4, 2);
+    _cache_8: LeanValue = leanField(_s_4, 3);
+    _errorMsg_9: LeanValue = leanField(_s_4, 4);
+    _recoveredErrors_10: LeanValue = leanField(_s_4, 5);
+    leanTag(_c_3) match {
+    | "[\"Lean\",\"Parser\",\"ParserContextCore\",\"mk\"]" ->
+      _toInputContext_11: LeanValue = leanField(_c_3, 0);
+      _toParserModuleContext_12: LeanValue = leanField(_c_3, 1);
+      _toCacheableParserContext_13: LeanValue = leanField(_c_3, 2);
+      _tokens_14: LeanValue = leanField(_c_3, 3);
+      _x_1_15: LeanValue = L4_Lean_Parser_Types.f_Parser_InputContext_atEnd_2795c49548(
+        _toInputContext_11,
+        _pos_7,
+      );
+      leanTag(_x_1_15) match {
+      | "[\"Bool\",\"false\"]" ->
+        leanTag(_toInputContext_11) match {
+        | "[\"Lean\",\"Parser\",\"InputContext\",\"mk'\"]" ->
+          _inputString_16: LeanValue = leanField(_toInputContext_11, 0);
+          _fileName_17: LeanValue = leanField(_toInputContext_11, 1);
+          _fileMap_18: LeanValue = leanField(_toInputContext_11, 2);
+          _endPos_19: LeanValue = leanField(_toInputContext_11, 3);
+          _endPos_valid_20: LeanValue = leanField(_toInputContext_11, 4);
+          _x_2_21: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+          _curr_22: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
+            _inputString_16,
+            _pos_7,
+          );
+          _x_3_23: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
+            _inputString_16,
+            _pos_7,
+          );
+          _s_24: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_setPos_72cfa927e8(
+            _s_4,
+            _x_3_23,
+          );
+          _x_5_26: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+            _curr_22,
+            LeanScalar("uint32", "34"),
+          );
+          leanTag(_x_5_26) match {
+          | "[\"Bool\",\"false\"]" ->
+            _x_7_28: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+              _curr_22,
+              LeanScalar("uint32", "92"),
+            );
+            leanTag(_x_7_28) match {
+            | "[\"Bool\",\"false\"]" ->
+              _x_9_30: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                _curr_22,
+                LeanScalar("uint32", "123"),
+              );
+              leanTag(_x_9_30) match {
+              | "[\"Bool\",\"false\"]" ->
+                f_Parser_interpolatedStrFn_parse_fdfac67feb(
+                  _p_0,
+                  _stackSize_1,
+                  _startPos_2,
+                  _c_3,
+                  _s_24,
+                )
+              | "[\"Bool\",\"true\"]" ->
+                _x_12_33: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+                  LeanText("interpolatedStrLitKind"),
+                );
+                _s_34: LeanValue = L4_Lean_Parser_Basic.f_Lean_Parser_mkNodeToken_c730f9efd2(
+                  _x_12_33,
+                  _startPos_2,
+                  _x_2_21,
+                  _c_3,
+                  _s_24,
+                );
+                _s_35: LeanValue = leanApply(_p_0, Array[_c_3, _s_34]);
+                leanTag(_s_35) match {
+                | "[\"Lean\",\"Parser\",\"ParserState\",\"mk\"]" ->
+                  _stxStack_36: LeanValue = leanField(_s_35, 0);
+                  _lhsPrec_37: LeanValue = leanField(_s_35, 1);
+                  _pos_38: LeanValue = leanField(_s_35, 2);
+                  _cache_39: LeanValue = leanField(_s_35, 3);
+                  _errorMsg_40: LeanValue = leanField(_s_35, 4);
+                  _recoveredErrors_41: LeanValue = leanField(_s_35, 5);
+                  _x_14_43: LeanValue = f_interpolatedStrFn_parse_spec_0_dbcabd3de8(
+                    _errorMsg_40,
+                    LeanCtor("[\"Option\",\"none\"]", Array[]),
+                  );
+                  leanTag(_x_14_43) match {
+                  | "[\"Bool\",\"false\"]" -> _s_35
+                  | "[\"Bool\",\"true\"]" ->
+                    _curr_44: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
+                      _inputString_16,
+                      _pos_38,
+                    );
+                    _x_16_46: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+                      _curr_44,
+                      LeanScalar("uint32", "125"),
+                    );
+                    leanTag(_x_16_46) match {
+                    | "[\"Bool\",\"false\"]" ->
+                      _s_48: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_mkError_a1d6cdbe46(
+                        _s_35,
+                        LeanText("'}'"),
+                      );
+                      _x_19_50: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+                        LeanText("interpolatedStrKind"),
+                      );
+                      L4_Lean_Parser_Types.f_Parser_ParserState_mkNode_59b9ef1590(
+                        _s_48,
+                        _x_19_50,
+                        _stackSize_1,
+                      )
+                    | "[\"Bool\",\"true\"]" ->
+                      _x_21_52: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
+                        _inputString_16,
+                        _pos_38,
+                      );
+                      _s_53: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_setPos_72cfa927e8(
+                        _s_35,
+                        _x_21_52,
+                      );
+                      f_Parser_interpolatedStrFn_parse_fdfac67feb(
+                        _p_0,
+                        _stackSize_1,
+                        _pos_38,
+                        _c_3,
+                        _s_53,
+                      )
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | "[\"Bool\",\"true\"]" ->
+              _x_23_55: LeanValue = LeanClosure(
+                L4_Lean_Parser_StrInterpolation
+                  .apply_f_Lean_Parser_isQuotableCharForStrInterpolant_5395e0aa9c,
+                1,
+                Array[],
+              );
+              _x_24_56: LeanValue = LeanClosure(
+                L4_Lean_Parser_Basic
+                  .apply_f_Lean_Parser_quotedCharCoreFn_cb65e1f57d,
+                4,
+                Array[_x_23_55, _x_2_21],
+              );
+              _x_25_57: LeanValue = LeanClosure(
+                L4_Lean_Parser_StrInterpolation
+                  .apply_f_Parser_interpolatedStrFn_parse_fdfac67feb,
+                5,
+                Array[_p_0, _stackSize_1, _startPos_2],
+              );
+              L4_Lean_Parser_Basic.f_Lean_Parser_andthenFn_e90f252acf(
+                _x_24_56,
+                _x_25_57,
+                _c_3,
+                _s_24,
+              )
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" ->
+            _x_28_60: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+              LeanText("interpolatedStrLitKind"),
+            );
+            _s_61: LeanValue = L4_Lean_Parser_Basic.f_Lean_Parser_mkNodeToken_c730f9efd2(
+              _x_28_60,
+              _startPos_2,
+              _x_2_21,
+              _c_3,
+              _s_24,
+            );
+            _x_30_63: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+              LeanText("interpolatedStrKind"),
+            );
+            L4_Lean_Parser_Types.f_Parser_ParserState_mkNode_59b9ef1590(
+              _s_61,
+              _x_30_63,
+              _stackSize_1,
+            )
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        _s_66: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_mkError_a1d6cdbe46(
+          _s_4,
+          LeanText("unterminated string literal"),
+        );
+        _x_34_68: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+          LeanText("interpolatedStrKind"),
+        );
+        L4_Lean_Parser_Types.f_Parser_ParserState_mkNode_59b9ef1590(
+          _s_66,
+          _x_34_68,
+          _stackSize_1,
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Parser_interpolatedStrFn_parse_fdfac67feb(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Parser_interpolatedStrFn_parse_fdfac67feb(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+  )
+}
+// "Lean.Parser.interpolatedStrFn"
+fun f_Lean_Parser_interpolatedStrFn_92a4a32a6d(
+  _p_0: LeanValue,
+  _c_1: LeanValue,
+  _s_2: LeanValue,
+): LeanValue {
+  leanTag(_s_2) match {
+  | "[\"Lean\",\"Parser\",\"ParserState\",\"mk\"]" ->
+    _stxStack_3: LeanValue = leanField(_s_2, 0);
+    _lhsPrec_4: LeanValue = leanField(_s_2, 1);
+    _pos_5: LeanValue = leanField(_s_2, 2);
+    _cache_6: LeanValue = leanField(_s_2, 3);
+    _errorMsg_7: LeanValue = leanField(_s_2, 4);
+    _recoveredErrors_8: LeanValue = leanField(_s_2, 5);
+    leanTag(_c_1) match {
+    | "[\"Lean\",\"Parser\",\"ParserContextCore\",\"mk\"]" ->
+      _toInputContext_9: LeanValue = leanField(_c_1, 0);
+      _toParserModuleContext_10: LeanValue = leanField(_c_1, 1);
+      _toCacheableParserContext_11: LeanValue = leanField(_c_1, 2);
+      _tokens_12: LeanValue = leanField(_c_1, 3);
+      _x_1_13: LeanValue = L4_Lean_Parser_Types.f_Parser_InputContext_atEnd_2795c49548(
+        _toInputContext_9,
+        _pos_5,
+      );
+      leanTag(_x_1_13) match {
+      | "[\"Bool\",\"false\"]" ->
+        leanTag(_toInputContext_9) match {
+        | "[\"Lean\",\"Parser\",\"InputContext\",\"mk'\"]" ->
+          _inputString_14: LeanValue = leanField(_toInputContext_9, 0);
+          _fileName_15: LeanValue = leanField(_toInputContext_9, 1);
+          _fileMap_16: LeanValue = leanField(_toInputContext_9, 2);
+          _endPos_17: LeanValue = leanField(_toInputContext_9, 3);
+          _endPos_valid_18: LeanValue = leanField(_toInputContext_9, 4);
+          _curr_19: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
+            _inputString_14,
+            _pos_5,
+          );
+          _x_3_21: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+            _curr_19,
+            LeanScalar("uint32", "34"),
+          );
+          leanTag(_x_3_21) match {
+          | "[\"Bool\",\"false\"]" ->
+            L4_Lean_Parser_Types.f_Parser_ParserState_mkError_a1d6cdbe46(
+              _s_2,
+              LeanText("interpolated string"),
+            )
+          | "[\"Bool\",\"true\"]" ->
+            _stackSize_24: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_stackSize_fe6997f172(
+              _s_2,
+            );
+            _s_25: LeanValue = L4_Lean_Parser_Types.f_Parser_ParserState_next_06dcfdb1e3(
+              _s_2,
+              _c_1,
+              _pos_5,
+            );
+            f_Parser_interpolatedStrFn_parse_fdfac67feb(
+              _p_0,
+              _stackSize_24,
+              _pos_5,
+              _c_1,
+              _s_25,
+            )
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" ->
+        L4_Lean_Parser_Types.f_Parser_ParserState_mkEOIError_b3496a5365(
+          _s_2,
+          LeanCtor("[\"List\",\"nil\"]", Array[]),
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lean_Parser_interpolatedStrFn_92a4a32a6d(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_Parser_interpolatedStrFn_92a4a32a6d(_args[0], _args[1], _args[2])
+}
+
+module end;

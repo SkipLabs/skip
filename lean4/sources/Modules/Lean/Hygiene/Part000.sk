@@ -1,0 +1,592 @@
+module L4_Lean_Hygiene;
+
+// "Lean.Option.register._at_._private.Lean.Hygiene.0.Lean.initFn.«_@».Lean.Hygiene.3990390237._hygCtx._hyg.4.spec_0"
+fun f_hygCtx_hyg_spec_0_13be6815bf(
+  _name_0: LeanValue,
+  _decl_1: LeanValue,
+  _ref_2: LeanValue,
+  _a_1_3: LeanValue,
+): LeanValue {
+  leanTag(_decl_1) match {
+  | "[\"Lean\",\"Option\",\"Decl\",\"mk\"]" ->
+    _defValue_4: LeanValue = leanField(_decl_1, 0);
+    _descr_5: LeanValue = leanField(_decl_1, 1);
+    _deprecation_6: LeanValue = leanField(_decl_1, 2);
+    _x_3_8: LeanValue = LeanCtor(
+      "[\"Lean\",\"OptionDecl\",\"mk\"]",
+      Array[
+        _name_0,
+        _ref_2,
+        LeanCtor("[\"Lean\",\"DataValue\",\"ofBool\"]", Array[_defValue_4]),
+        _descr_5,
+        _deprecation_6,
+      ],
+    );
+    _x_4_9: LeanValue = L4_Lean_Data_Options.f_Lean_registerOption_53d2a3c012(
+      _name_0,
+      _x_3_8,
+      _a_1_3,
+    );
+    leanTag(_x_4_9) match {
+    | "[\"EST\",\"Out\",\"ok\"]" ->
+      _a_5_10: LeanValue = leanField(_x_4_9, 0);
+      _a_6_11: LeanValue = leanField(_x_4_9, 1);
+      LeanCtor(
+        "[\"EST\",\"Out\",\"ok\"]",
+        Array[
+          LeanCtor("[\"Lean\",\"Option\",\"mk\"]", Array[_name_0, _defValue_4]),
+          _a_6_11,
+        ],
+      )
+    | "[\"EST\",\"Out\",\"error\"]" ->
+      _a_9_12: LeanValue = leanField(_x_4_9, 0);
+      _a_10_13: LeanValue = leanField(_x_4_9, 1);
+      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_9_12, _a_10_13])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Option.get._at_.Lean.getSanitizeNames.spec_0"
+fun f_Lean_getSanitizeNames_spec_0_0f850f4057(
+  _opts_0: LeanValue,
+  _opt_1: LeanValue,
+): LeanValue {
+  leanTag(_opt_1) match {
+  | "[\"Lean\",\"Option\",\"mk\"]" ->
+    _name_2: LeanValue = leanField(_opt_1, 0);
+    _defValue_3: LeanValue = leanField(_opt_1, 1);
+    leanTag(_opts_0) match {
+    | "[\"_private\",\"Lean\",\"Data\",\"Options\",0,\"Lean\",\"Options\",\"mk\"]" ->
+      _map_4: LeanValue = leanField(_opts_0, 0);
+      _hasTrace_5: LeanValue = leanField(_opts_0, 1);
+      _x_1_6: LeanValue = L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+        _map_4,
+        _name_2,
+      );
+      leanTag(_x_1_6) match {
+      | "[\"Option\",\"none\"]" -> _defValue_3
+      | "[\"Option\",\"some\"]" ->
+        _val_2_7: LeanValue = leanField(_x_1_6, 0);
+        leanTag(_val_2_7) match {
+        | "[\"Lean\",\"DataValue\",\"ofBool\"]" ->
+          _v_3_8: LeanValue = leanField(_val_2_7, 0);
+          _v_3_8
+        | _ -> _defValue_3
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Hygiene.0.Lean.mkInaccessibleUserNameAux"
+fun f_Hygiene_Lean_mkInaccessibleUserNameAux_21f15a3935(
+  _unicode_0: LeanValue,
+  _name_1: LeanValue,
+  _idx_2: LeanValue,
+): LeanValue {
+  leanTag(_unicode_0) match {
+  | "[\"Bool\",\"false\"]" ->
+    _x_2_4: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      LeanText("_inaccessible"),
+    );
+    _x_3_5: LeanValue = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+      _x_2_4,
+      _idx_2,
+    );
+    L4_Init_Prelude.f_Lean_Name_append_54ec01d162(_name_1, _x_3_5)
+  | "[\"Bool\",\"true\"]" ->
+    _x_6_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _idx_2,
+      LeanScalar("nat", "0"),
+    );
+    leanTag(_x_6_8) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_8_10: LeanValue = L4_Init_Data_Repr.f_Nat_toSuperscriptString_fde019d991(
+        _idx_2,
+      );
+      _x_9_11: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        LeanText("✝"),
+        _x_8_10,
+      );
+      L4_Init_Meta_Defs.f_Lean_Name_appendAfter_1c99cc61d2(_name_1, _x_9_11)
+    | "[\"Bool\",\"true\"]" ->
+      L4_Init_Meta_Defs.f_Lean_Name_appendAfter_1c99cc61d2(
+        _name_1,
+        LeanText("✝"),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_._private.Lean.Hygiene.0.Lean.sanitizeSyntaxAux.spec_0"
+fun f_Lean_sanitizeSyntaxAux_spec_0_e865a3f225(
+  _sz_0: LeanValue,
+  _i_1: LeanValue,
+  _bs_2: LeanValue,
+  _y_1_3: LeanValue,
+): LeanValue {
+  _x_2_4: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _i_1,
+    _sz_0,
+  );
+  leanTag(_x_2_4) match {
+  | "[\"Bool\",\"false\"]" ->
+    LeanCtor("[\"Prod\",\"mk\"]", Array[_bs_2, _y_1_3])
+  | "[\"Bool\",\"true\"]" ->
+    _v_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      LeanErased(),
+      _bs_2,
+      _i_1,
+      LeanErased(),
+    );
+    _x_4_7: LeanValue = f_Hygiene_Lean_sanitizeSyntaxAux_f6778b1584(
+      _v_6,
+      _y_1_3,
+    );
+    leanTag(_x_4_7) match {
+    | "[\"Prod\",\"mk\"]" ->
+      _fst_5_8: LeanValue = leanField(_x_4_7, 0);
+      _snd_6_9: LeanValue = leanField(_x_4_7, 1);
+      _bs_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        LeanErased(),
+        _bs_2,
+        _i_1,
+        LeanScalar("nat", "0"),
+        LeanErased(),
+      );
+      _x_9_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        _i_1,
+        LeanScalar("usize", "1"),
+      );
+      _x_10_14: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        LeanErased(),
+        _bs_11,
+        _i_1,
+        _fst_5_8,
+        LeanErased(),
+      );
+      f_Lean_sanitizeSyntaxAux_spec_0_e865a3f225(
+        _sz_0,
+        _x_9_13,
+        _x_10_14,
+        _snd_6_9,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.getSanitizeNames"
+fun f_Lean_getSanitizeNames_6734f6cbab(_o_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = leanFail(
+    "module initialization required: Lean.pp.sanitizeNames",
+  );
+  f_Lean_getSanitizeNames_spec_0_0f850f4057(_o_0, _x_1_1)
+}
+// "_private.Lean.Hygiene.0.Lean.sanitizeSyntaxAux"
+fun f_Hygiene_Lean_sanitizeSyntaxAux_f6778b1584(
+  _x_1_0_input: LeanValue,
+  _a_2_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_x_1_0, 1=_a_2_1, 2=_n_2, 3=_y_4_3, 4=_x_5_4, 5=_x_6_5, 6=_x_7_6, 7=_val_10_9, 8=_info_18_11, 9=_kind_19_12, 10=_args_20_13, 11=_userName2Sanitized_16, 12=_x_12_17, 13=_val_17_18, 14=_x_13_19, 15=_x_14_20, 16=_fst_15_21, 17=_snd_16_22, 18=_sz_23, 19=_x_21_24, 20=_x_22_25, 21=_fst_23_26, 22=_snd_24_27, 23=_x_25_28, 24=_x_26_29, 25=_x_27_30
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    26,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _x_1_0_input);
+  _frame.set(1, _a_2_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[0]) match {
+      | "[\"Lean\",\"Syntax\",\"ident\"]" ->
+        _ = leanField(_frame[0], 0);
+        _ = leanField(_frame[0], 1);
+        _frame.set(7, leanField(_frame[0], 2));
+        _ = leanField(_frame[0], 3);
+        leanTag(_frame[1]) match {
+        | "[\"Lean\",\"NameSanitizerState\",\"mk\"]" ->
+          _ = leanField(_frame[1], 0);
+          _ = leanField(_frame[1], 1);
+          _frame.set(11, leanField(_frame[1], 2));
+          _frame.set(
+            12,
+            L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+              _frame[11],
+              _frame[7],
+            ),
+          );
+          leanTag(_frame[12]) match {
+          | "[\"Option\",\"none\"]" ->
+            _frame.set(
+              14,
+              L4_Init_Prelude.f_Lean_Name_hasMacroScopes_c07042ef1d(_frame[7]),
+            );
+            leanTag(_frame[14]) match {
+            | "[\"Bool\",\"false\"]" ->
+              _jump0 = _frame[7];
+              _jump1 = _frame[1];
+              _frame.set(2, _jump0);
+              _frame.set(3, _jump1);
+              !pc = 1;
+              void
+            | "[\"Bool\",\"true\"]" ->
+              _frame.set(
+                15,
+                f_Lean_sanitizeName_943a89588a(_frame[7], _frame[1]),
+              );
+              leanTag(_frame[15]) match {
+              | "[\"Prod\",\"mk\"]" ->
+                _frame.set(16, leanField(_frame[15], 0));
+                _frame.set(17, leanField(_frame[15], 1));
+                _jump0 = _frame[16];
+                _jump1 = _frame[17];
+                _frame.set(2, _jump0);
+                _frame.set(3, _jump1);
+                !pc = 1;
+                void
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Option\",\"some\"]" ->
+            _frame.set(13, leanField(_frame[12], 0));
+            _jump0 = _frame[13];
+            _jump1 = _frame[1];
+            _frame.set(2, _jump0);
+            _frame.set(3, _jump1);
+            !pc = 1;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Lean\",\"Syntax\",\"node\"]" ->
+        _frame.set(8, leanField(_frame[0], 0));
+        _frame.set(9, leanField(_frame[0], 1));
+        _frame.set(10, leanField(_frame[0], 2));
+        _frame.set(
+          18,
+          L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+            LeanErased(),
+            _frame[10],
+          ),
+        );
+        _frame.set(19, LeanScalar("usize", "0"));
+        _frame.set(
+          20,
+          f_Lean_sanitizeSyntaxAux_spec_0_e865a3f225(
+            _frame[18],
+            _frame[19],
+            _frame[10],
+            _frame[1],
+          ),
+        );
+        leanTag(_frame[20]) match {
+        | "[\"Prod\",\"mk\"]" ->
+          _frame.set(21, leanField(_frame[20], 0));
+          _frame.set(22, leanField(_frame[20], 1));
+          _frame.set(
+            23,
+            LeanCtor(
+              "[\"Lean\",\"Syntax\",\"node\"]",
+              Array[_frame[8], _frame[9], _frame[21]],
+            ),
+          );
+          _frame.set(
+            24,
+            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[23], _frame[22]]),
+          );
+          return _frame[24]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ ->
+        _frame.set(
+          25,
+          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[0], _frame[1]]),
+        );
+        return _frame[25]
+      }
+    | 1 ->
+      _frame.set(4, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+      _frame.set(
+        5,
+        L4_Init_Meta_Defs.f_Lean_mkIdentFrom_37028b47f5(
+          _frame[0],
+          _frame[2],
+          _frame[4],
+        ),
+      );
+      _frame.set(6, LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[5], _frame[3]]));
+      return _frame[6]
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.sanitizeSyntax"
+fun f_Lean_sanitizeSyntax_64573df11e(
+  _stx_0: LeanValue,
+  _a_1_1: LeanValue,
+): LeanValue {
+  leanTag(_a_1_1) match {
+  | "[\"Lean\",\"NameSanitizerState\",\"mk\"]" ->
+    _options_2: LeanValue = leanField(_a_1_1, 0);
+    _nameStem2Idx_3: LeanValue = leanField(_a_1_1, 1);
+    _userName2Sanitized_4: LeanValue = leanField(_a_1_1, 2);
+    _x_2_5: LeanValue = f_Lean_getSanitizeNames_6734f6cbab(_options_2);
+    leanTag(_x_2_5) match {
+    | "[\"Bool\",\"false\"]" ->
+      LeanCtor("[\"Prod\",\"mk\"]", Array[_stx_0, _a_1_1])
+    | "[\"Bool\",\"true\"]" ->
+      f_Hygiene_Lean_sanitizeSyntaxAux_f6778b1584(_stx_0, _a_1_1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "_private.Lean.Hygiene.0.Lean.mkInaccessibleUserName"
+fun f_Hygiene_Lean_mkInaccessibleUserName_95aa45746c(
+  _unicode_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_1) match {
+  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+    _hash_2: LeanValue = leanField(_x_1_1, 0);
+    _pre_2_3: LeanValue = leanField(_x_1_1, 1);
+    _i_3_4: LeanValue = leanField(_x_1_1, 2);
+    leanTag(_pre_2_3) match {
+    | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+      _hash_5: LeanValue = leanField(_pre_2_3, 0);
+      _pre_4_6: LeanValue = leanField(_pre_2_3, 1);
+      _str_5_7: LeanValue = leanField(_pre_2_3, 2);
+      f_Hygiene_Lean_mkInaccessibleUserNameAux_21f15a3935(
+        _unicode_0,
+        _pre_2_3,
+        _i_3_4,
+      )
+    | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+      f_Hygiene_Lean_mkInaccessibleUserNameAux_21f15a3935(
+        _unicode_0,
+        _pre_2_3,
+        _i_3_4,
+      )
+    | _ ->
+      leanTag(_unicode_0) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_8_10: LeanValue = f_Hygiene_Lean_mkInaccessibleUserName_95aa45746c(
+          _unicode_0,
+          _pre_2_3,
+        );
+        L4_Init_Prelude.f_Name_num_override_ca591eddf2(_x_8_10, _i_3_4)
+      | "[\"Bool\",\"true\"]" ->
+        _x_10_12: LeanValue = f_Hygiene_Lean_mkInaccessibleUserName_95aa45746c(
+          _unicode_0,
+          _pre_2_3,
+        );
+        _x_12_14: LeanValue = L4_Init_Data_Repr.f_Nat_toSuperscriptString_fde019d991(
+          _i_3_4,
+        );
+        _x_13_15: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          LeanText("⁻"),
+          _x_12_14,
+        );
+        L4_Init_Meta_Defs.f_Lean_Name_appendAfter_1c99cc61d2(_x_10_12, _x_13_15)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    }
+  | _ -> _x_1_1
+  }
+}
+// "Lean.sanitizeName"
+fun f_Lean_sanitizeName_943a89588a(
+  _userName_0_input: LeanValue,
+  _a_1_1_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_userName_0, 1=_a_1_1, 2=_nameStem2Idx_3, 3=_stem_5, 4=_y_3_6, 5=_x_4_7, 6=_fst_5_8, 7=_snd_6_9, 8=_options_10, 9=_nameStem2Idx_11, 10=_userName2Sanitized_12, 11=_x_7_13, 12=_x_8_14, 13=_x_9_15, 14=_x_10_16, 15=_val_12_17, 16=_x_11_18
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    17,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _userName_0_input);
+  _frame.set(1, _a_1_1_input);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      leanTag(_frame[1]) match {
+      | "[\"Lean\",\"NameSanitizerState\",\"mk\"]" ->
+        _ = leanField(_frame[1], 0);
+        _frame.set(2, leanField(_frame[1], 1));
+        _ = leanField(_frame[1], 2);
+        _frame.set(
+          3,
+          L4_Init_Prelude.f_Lean_Name_eraseMacroScopes_788e8400bd(_frame[0]),
+        );
+        _frame.set(
+          14,
+          L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+            _frame[2],
+            _frame[3],
+          ),
+        );
+        leanTag(_frame[14]) match {
+        | "[\"Option\",\"none\"]" ->
+          _frame.set(16, LeanScalar("nat", "0"));
+          _jump0 = _frame[16];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | "[\"Option\",\"some\"]" ->
+          _frame.set(15, leanField(_frame[14], 0));
+          _jump0 = _frame[15];
+          _frame.set(4, _jump0);
+          !pc = 1;
+          void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      _frame.set(
+        5,
+        f_Hygiene_Lean_mkFreshInaccessibleUserName_bd2157f021(
+          _frame[3],
+          _frame[4],
+          _frame[1],
+        ),
+      );
+      leanTag(_frame[5]) match {
+      | "[\"Prod\",\"mk\"]" ->
+        _frame.set(6, leanField(_frame[5], 0));
+        _frame.set(7, leanField(_frame[5], 1));
+        leanTag(_frame[7]) match {
+        | "[\"Lean\",\"NameSanitizerState\",\"mk\"]" ->
+          _frame.set(8, leanField(_frame[7], 0));
+          _frame.set(9, leanField(_frame[7], 1));
+          _frame.set(10, leanField(_frame[7], 2));
+          _frame.set(
+            11,
+            L4_Lean_Data_NameMap_Basic.f_NameMap_insert_spec_0_aaae6c2a87(
+              _frame[0],
+              _frame[6],
+              _frame[10],
+            ),
+          );
+          _frame.set(
+            12,
+            LeanCtor(
+              "[\"Lean\",\"NameSanitizerState\",\"mk\"]",
+              Array[_frame[8], _frame[9], _frame[11]],
+            ),
+          );
+          _frame.set(
+            13,
+            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[6], _frame[12]]),
+          );
+          return _frame[13]
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+// "Lean.pp.sanitizeNames"
+fun f_Lean_pp_sanitizeNames_6a5bf3c952(): LeanValue {
+  leanPrimitive("Lean.pp.sanitizeNames []")
+}
+// "_private.Lean.Hygiene.0.Lean.initFn._@.Lean.Hygiene.3990390237._hygCtx._hyg.4"
+fun f_Hygiene_hygCtx_hyg_fa89442d5f(_a_1_0: LeanValue): LeanValue {
+  _x_2_1: LeanValue = LeanText("pp");
+  _x_3_2: LeanValue = LeanText("sanitizeNames");
+  _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _x_2_1,
+    _x_3_2,
+  );
+  _x_8_7: LeanValue = LeanCtor(
+    "[\"Lean\",\"Option\",\"Decl\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanText(
+        "add suffix to shadowed/inaccessible variables when pretty printing",
+      ),
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+    ],
+  );
+  _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+    LeanText("Lean"),
+    _x_2_1,
+    _x_3_2,
+  );
+  f_hygCtx_hyg_spec_0_13be6815bf(_x_4_3, _x_8_7, _x_10_9, _a_1_0)
+}
+// "_private.Lean.Hygiene.0.Lean.mkFreshInaccessibleUserName"
+fun f_Hygiene_Lean_mkFreshInaccessibleUserName_bd2157f021(
+  _userName_0: LeanValue,
+  _idx_1: LeanValue,
+  _a_1_2: LeanValue,
+): LeanValue {
+  leanTag(_a_1_2) match {
+  | "[\"Lean\",\"NameSanitizerState\",\"mk\"]" ->
+    _options_3: LeanValue = leanField(_a_1_2, 0);
+    _nameStem2Idx_4: LeanValue = leanField(_a_1_2, 1);
+    _userName2Sanitized_5: LeanValue = leanField(_a_1_2, 2);
+    _x_2_6: LeanValue = L4_Lean_Data_Format.f_Std_Format_getUnicode_7955ad6de7(
+      _options_3,
+    );
+    _x_3_7: LeanValue = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+      _userName_0,
+      _idx_1,
+    );
+    _x_4_8: LeanValue = f_Hygiene_Lean_mkInaccessibleUserName_95aa45746c(
+      _x_2_6,
+      _x_3_7,
+    );
+    _x_5_9: LeanValue = L4_Lean_Data_NameMap_Basic.f_NameMap_contains_spec_0_6f5a1fd859(
+      _x_4_8,
+      _nameStem2Idx_4,
+    );
+    leanTag(_x_5_9) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_7_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _idx_1,
+        LeanScalar("nat", "1"),
+      );
+      _x_8_12: LeanValue = L4_Lean_Data_NameMap_Basic.f_NameMap_insert_spec_0_aaae6c2a87(
+        _userName_0,
+        _x_7_11,
+        _nameStem2Idx_4,
+      );
+      LeanCtor(
+        "[\"Prod\",\"mk\"]",
+        Array[
+          _x_4_8,
+          LeanCtor(
+            "[\"Lean\",\"NameSanitizerState\",\"mk\"]",
+            Array[_options_3, _x_8_12, _userName2Sanitized_5],
+          ),
+        ],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      _x_12_16: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _idx_1,
+        LeanScalar("nat", "1"),
+      );
+      f_Hygiene_Lean_mkFreshInaccessibleUserName_bd2157f021(
+        _userName_0,
+        _x_12_16,
+        _a_1_2,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

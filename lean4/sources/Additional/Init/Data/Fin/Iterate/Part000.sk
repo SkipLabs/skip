@@ -1,0 +1,52 @@
+module L4_Init_Data_Fin_Iterate;
+
+// "Fin.hIterateFrom._redArg"
+fun f_Fin_hIterateFrom_6e4b1f7a0d(
+  _n_0: LeanValue,
+  _f_1: LeanValue,
+  _i_2: LeanValue,
+  _a_3: LeanValue,
+): LeanValue {
+  _x_1_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_2, _n_0);
+  leanTag(_x_1_4) match {
+  | "[\"Bool\",\"false\"]" -> _a_3
+  | "[\"Bool\",\"true\"]" ->
+    _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _i_2,
+      LeanScalar("nat", "1"),
+    );
+    _x_4_7: LeanValue = leanApply(_f_1, Array[_i_2, _a_3]);
+    f_Fin_hIterateFrom_6e4b1f7a0d(_n_0, _f_1, _x_3_6, _x_4_7)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Fin.hIterateFrom"
+fun f_Fin_hIterateFrom_ddd30feeaa(
+  _P_0: LeanValue,
+  _n_1: LeanValue,
+  _f_2: LeanValue,
+  _i_3: LeanValue,
+  _ubnd_4: LeanValue,
+  _a_5: LeanValue,
+): LeanValue {
+  f_Fin_hIterateFrom_6e4b1f7a0d(_n_1, _f_2, _i_3, _a_5)
+}
+// "Fin.hIterate._redArg"
+fun f_Fin_hIterate_22f29543e9(
+  _n_0: LeanValue,
+  _init_1: LeanValue,
+  _f_2: LeanValue,
+): LeanValue {
+  f_Fin_hIterateFrom_6e4b1f7a0d(_n_0, _f_2, LeanScalar("nat", "0"), _init_1)
+}
+// "Fin.hIterate"
+fun f_Fin_hIterate_32bec3e763(
+  _P_0: LeanValue,
+  _n_1: LeanValue,
+  _init_2: LeanValue,
+  _f_3: LeanValue,
+): LeanValue {
+  f_Fin_hIterate_22f29543e9(_n_1, _init_2, _f_3)
+}
+
+module end;

@@ -1,0 +1,140 @@
+module L4_Std_Time_Time_PlainTime;
+
+// "Std.Time.PlainTime.toNanoseconds"
+fun f_Time_PlainTime_toNanoseconds_2f0abdd765(_time_0: LeanValue): LeanValue {
+  leanTag(_time_0) match {
+  | "[\"Std\",\"Time\",\"PlainTime\",\"mk\"]" ->
+    _hour_1: LeanValue = leanField(_time_0, 0);
+    _minute_2: LeanValue = leanField(_time_0, 1);
+    _second_3: LeanValue = leanField(_time_0, 2);
+    _nanosecond_4: LeanValue = leanField(_time_0, 3);
+    _x_2_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "3600000000000"),
+    );
+    _x_4_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _hour_1,
+      _x_2_6,
+    );
+    _x_6_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "60000000000"),
+    );
+    _x_7_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _minute_2,
+      _x_6_10,
+    );
+    _x_8_12: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+      _x_4_8,
+      _x_7_11,
+    );
+    _x_9_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "1000000000"),
+    );
+    _x_10_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _second_3,
+      _x_9_13,
+    );
+    _x_11_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+      _x_8_12,
+      _x_10_14,
+    );
+    L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_x_11_15, _nanosecond_4)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Time.PlainTime.ofNanoseconds"
+fun f_Time_PlainTime_ofNanoseconds_adc77230fb(_nanos_0: LeanValue): LeanValue {
+  _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "1000000000"),
+  );
+  _x_3_3: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+    _nanos_0,
+    _x_2_2,
+  );
+  _remainingNanos_4: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+    _nanos_0,
+    _x_2_2,
+  );
+  _x_5_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "3600"),
+  );
+  _x_6_7: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+    _x_3_3,
+    _x_5_6,
+  );
+  _x_8_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "24"),
+  );
+  _hours_10: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+    _x_6_7,
+    _x_8_9,
+  );
+  _x_9_11: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+    _x_3_3,
+    _x_5_6,
+  );
+  _x_11_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    LeanScalar("nat", "60"),
+  );
+  _minutes_14: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
+    _x_9_11,
+    _x_11_13,
+  );
+  _seconds_15: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_emod_3bccaaae08(
+    _x_3_3,
+    _x_11_13,
+  );
+  LeanCtor(
+    "[\"Std\",\"Time\",\"PlainTime\",\"mk\"]",
+    Array[_hours_10, _minutes_14, _seconds_15, _remainingNanos_4],
+  )
+}
+// "Std.Time.PlainTime.toMilliseconds"
+fun f_Time_PlainTime_toMilliseconds_fcca37a252(_time_0: LeanValue): LeanValue {
+  leanTag(_time_0) match {
+  | "[\"Std\",\"Time\",\"PlainTime\",\"mk\"]" ->
+    _hour_1: LeanValue = leanField(_time_0, 0);
+    _minute_2: LeanValue = leanField(_time_0, 1);
+    _second_3: LeanValue = leanField(_time_0, 2);
+    _nanosecond_4: LeanValue = leanField(_time_0, 3);
+    _x_2_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "3600000"),
+    );
+    _x_4_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _hour_1,
+      _x_2_6,
+    );
+    _x_6_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "60000"),
+    );
+    _x_7_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _minute_2,
+      _x_6_10,
+    );
+    _x_8_12: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+      _x_4_8,
+      _x_7_11,
+    );
+    _x_9_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "1000"),
+    );
+    _x_10_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
+      _second_3,
+      _x_9_13,
+    );
+    _x_11_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+      _x_8_12,
+      _x_10_14,
+    );
+    _x_13_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      LeanScalar("nat", "1000000"),
+    );
+    _x_14_18: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_tdiv_7fb4feb95e(
+      _nanosecond_4,
+      _x_13_17,
+    );
+    L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(_x_11_15, _x_14_18)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

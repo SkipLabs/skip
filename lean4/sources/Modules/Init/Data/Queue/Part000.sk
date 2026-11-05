@@ -1,0 +1,99 @@
+module L4_Init_Data_Queue;
+
+// "Std.Queue.empty._redArg"
+fun f_Std_Queue_empty_602e84c5f7(_dummy_0: LeanValue): LeanValue {
+  _x_1_1: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  LeanCtor("[\"Std\",\"Queue\",\"mk\"]", Array[_x_1_1, _x_1_1])
+}
+// "Std.Queue.enqueue._redArg"
+fun f_Std_Queue_enqueue_98e6d68da4(
+  _v_0: LeanValue,
+  _q_1: LeanValue,
+): LeanValue {
+  leanTag(_q_1) match {
+  | "[\"Std\",\"Queue\",\"mk\"]" ->
+    _eList_2: LeanValue = leanField(_q_1, 0);
+    _dList_3: LeanValue = leanField(_q_1, 1);
+    LeanCtor(
+      "[\"Std\",\"Queue\",\"mk\"]",
+      Array[LeanCtor("[\"List\",\"cons\"]", Array[_v_0, _eList_2]), _dList_3],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Queue.dequeue?._redArg"
+fun f_Std_Queue_dequeue_247162a7f6(_q_0: LeanValue): LeanValue {
+  leanTag(_q_0) match {
+  | "[\"Std\",\"Queue\",\"mk\"]" ->
+    _eList_1: LeanValue = leanField(_q_0, 0);
+    _dList_2: LeanValue = leanField(_q_0, 1);
+    leanTag(_dList_2) match {
+    | "[\"List\",\"nil\"]" ->
+      _x_1_5: LeanValue = L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(
+        _eList_1,
+      );
+      leanTag(_x_1_5) match {
+      | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | "[\"List\",\"cons\"]" ->
+        _head_3_6: LeanValue = leanField(_x_1_5, 0);
+        _tail_4_7: LeanValue = leanField(_x_1_5, 1);
+        LeanCtor(
+          "[\"Option\",\"some\"]",
+          Array[
+            LeanCtor(
+              "[\"Prod\",\"mk\"]",
+              Array[
+                _head_3_6,
+                LeanCtor(
+                  "[\"Std\",\"Queue\",\"mk\"]",
+                  Array[_dList_2, _tail_4_7],
+                ),
+              ],
+            ),
+          ],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"List\",\"cons\"]" ->
+      _head_8_3: LeanValue = leanField(_dList_2, 0);
+      _tail_9_4: LeanValue = leanField(_dList_2, 1);
+      LeanCtor(
+        "[\"Option\",\"some\"]",
+        Array[
+          LeanCtor(
+            "[\"Prod\",\"mk\"]",
+            Array[
+              _head_8_3,
+              LeanCtor(
+                "[\"Std\",\"Queue\",\"mk\"]",
+                Array[_eList_1, _tail_9_4],
+              ),
+            ],
+          ),
+        ],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Std.Queue.isEmpty._redArg"
+fun f_Std_Queue_isEmpty_66096654b6(_q_0: LeanValue): LeanValue {
+  leanTag(_q_0) match {
+  | "[\"Std\",\"Queue\",\"mk\"]" ->
+    _eList_1: LeanValue = leanField(_q_0, 0);
+    _dList_2: LeanValue = leanField(_q_0, 1);
+    _x_1_3: LeanValue = L4_Init_Data_List_Basic.f_List_isEmpty_31ee95efb7(
+      _dList_2,
+    );
+    leanTag(_x_1_3) match {
+    | "[\"Bool\",\"false\"]" -> _x_1_3
+    | "[\"Bool\",\"true\"]" ->
+      L4_Init_Data_List_Basic.f_List_isEmpty_31ee95efb7(_eList_1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

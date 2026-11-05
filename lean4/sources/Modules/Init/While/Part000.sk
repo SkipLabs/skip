@@ -1,0 +1,55 @@
+module L4_Init_While;
+
+// "_private.Init.While.0.repeatM.erased._redArg._lam_0"
+fun f_repeatM_erased_lam_0_800bf61df3(
+  _inst_1_0: LeanValue,
+  _f_1: LeanValue,
+  _toPure_2: LeanValue,
+  _do_lift_2_3: LeanValue,
+): LeanValue {
+  leanTag(_do_lift_2_3) match {
+  | "[\"Sum\",\"inl\"]" ->
+    _val_3_4: LeanValue = leanField(_do_lift_2_3, 0);
+    f_While_repeatM_erased_e00068e0e0(_inst_1_0, _f_1, _val_3_4)
+  | "[\"Sum\",\"inr\"]" ->
+    _val_5_5: LeanValue = leanField(_do_lift_2_3, 0);
+    leanApply(_toPure_2, Array[LeanErased(), _val_5_5])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_repeatM_erased_lam_0_800bf61df3(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_repeatM_erased_lam_0_800bf61df3(_args[0], _args[1], _args[2], _args[3])
+}
+// "_private.Init.While.0.repeatM.erased._redArg"
+fun f_While_repeatM_erased_e00068e0e0(
+  _inst_1_0: LeanValue,
+  _f_1: LeanValue,
+  _a_2: LeanValue,
+): LeanValue {
+  leanTag(_inst_1_0) match {
+  | "[\"Monad\",\"mk\"]" ->
+    _toApplicative_3: LeanValue = leanField(_inst_1_0, 0);
+    _toBind_4: LeanValue = leanField(_inst_1_0, 1);
+    leanTag(_toApplicative_3) match {
+    | "[\"Applicative\",\"mk\"]" ->
+      _toFunctor_5: LeanValue = leanField(_toApplicative_3, 0);
+      _toPure_6: LeanValue = leanField(_toApplicative_3, 1);
+      _toSeq_7: LeanValue = leanField(_toApplicative_3, 2);
+      _toSeqLeft_8: LeanValue = leanField(_toApplicative_3, 3);
+      _toSeqRight_9: LeanValue = leanField(_toApplicative_3, 4);
+      _x_2_10: LeanValue = leanApply(_f_1, Array[_a_2]);
+      _f_3_11: LeanValue = LeanClosure(
+        L4_Init_While.apply_f_repeatM_erased_lam_0_800bf61df3,
+        4,
+        Array[_inst_1_0, _f_1, _toPure_6],
+      );
+      leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _x_2_10, _f_3_11])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

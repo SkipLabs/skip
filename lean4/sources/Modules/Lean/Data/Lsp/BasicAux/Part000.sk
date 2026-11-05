@@ -1,0 +1,581 @@
+module L4_Lean_Data_Lsp_BasicAux;
+
+// "Lean.Lsp.instOrdPosition.ord"
+fun f_Lsp_instOrdPosition_ord_5c959dedf0(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+    _line_3_2: LeanValue = leanField(_x_1_0, 0);
+    _character_4_3: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+      _line_5_4: LeanValue = leanField(_x_2_1, 0);
+      _character_6_5: LeanValue = leanField(_x_2_1, 1);
+      _x_7_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _line_3_2,
+        _line_5_4,
+      );
+      leanTag(_x_7_6) match {
+      | "[\"Bool\",\"false\"]" ->
+        _x_8_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _line_3_2,
+          _line_5_4,
+        );
+        leanTag(_x_8_7) match {
+        | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
+        | "[\"Bool\",\"true\"]" ->
+          _x_10_9: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _character_4_3,
+            _character_6_5,
+          );
+          leanTag(_x_10_9) match {
+          | "[\"Bool\",\"false\"]" ->
+            _x_11_10: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _character_4_3,
+              _character_6_5,
+            );
+            leanTag(_x_11_10) match {
+            | "[\"Bool\",\"false\"]" ->
+              LeanCtor("[\"Ordering\",\"gt\"]", Array[])
+            | "[\"Bool\",\"true\"]" ->
+              LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instOrdPosition_ord_5c959dedf0(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instOrdPosition_ord_5c959dedf0(_args[0], _args[1])
+}
+// "Lean.Lsp.instBEqRange.beq"
+fun f_Lsp_instBEqRange_beq_bff8a258d2(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+    _start_3_2: LeanValue = leanField(_x_1_0, 0);
+    _end_4_3: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+      _start_5_4: LeanValue = leanField(_x_2_1, 0);
+      _end_6_5: LeanValue = leanField(_x_2_1, 1);
+      _x_7_6: LeanValue = f_Lsp_instBEqPosition_beq_a54bdee9f6(
+        _start_3_2,
+        _start_5_4,
+      );
+      leanTag(_x_7_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_7_6
+      | "[\"Bool\",\"true\"]" ->
+        f_Lsp_instBEqPosition_beq_a54bdee9f6(_end_4_3, _end_6_5)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instBEqRange_beq_bff8a258d2(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instBEqRange_beq_bff8a258d2(_args[0], _args[1])
+}
+// "Lean.Lsp.instToJsonPosition.toJson"
+fun f_Lsp_instToJsonPosition_toJson_4ecb22c787(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+    _line_1: LeanValue = leanField(_x_1_0, 0);
+    _character_2: LeanValue = leanField(_x_1_0, 1);
+    _x_3_4: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
+      _line_1,
+    );
+    _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_9_10: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
+      _character_2,
+    );
+    _x_12_13: LeanValue = LeanCtor(
+      "[\"List\",\"cons\"]",
+      Array[
+        LeanCtor(
+          "[\"Prod\",\"mk\"]",
+          Array[
+            LeanText("character"),
+            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_9_10]),
+          ],
+        ),
+        _x_6_7,
+      ],
+    );
+    _x_14_15: LeanValue = LeanCtor(
+      "[\"List\",\"cons\"]",
+      Array[
+        LeanCtor(
+          "[\"List\",\"cons\"]",
+          Array[
+            LeanCtor(
+              "[\"Prod\",\"mk\"]",
+              Array[
+                LeanText("line"),
+                LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_3_4]),
+              ],
+            ),
+            _x_6_7,
+          ],
+        ),
+        LeanCtor("[\"List\",\"cons\"]", Array[_x_12_13, _x_6_7]),
+      ],
+    );
+    _x_16_17: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      LeanErased(),
+      LeanScalar("nat", "0"),
+    );
+    _x_17_18: LeanValue = f_instToJsonPosition_toJson_spec_0_84d06e2f2c(
+      _x_14_15,
+      _x_16_17,
+    );
+    L4_Lean_Data_Json_Basic.f_Lean_Json_mkObj_45a0766b3b(_x_17_18)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instToJsonPosition_toJson_4ecb22c787(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instToJsonPosition_toJson_4ecb22c787(_args[0])
+}
+// "Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonRange.fromJson.spec_0"
+fun f_instFromJsonRange_fromJson_spec_0_ba6d14a303(
+  _j_0: LeanValue,
+  _k_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_Json_getObjValD_2f1acf23b4(
+    _j_0,
+    _k_1,
+  );
+  f_Lsp_instFromJsonPosition_fromJson_44572f2ea6(_x_1_2)
+}
+// "Lean.Lsp.instFromJsonPosition.fromJson"
+fun f_Lsp_instFromJsonPosition_fromJson_44572f2ea6(
+  _json_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = LeanText("line");
+  _x_3_2: LeanValue = f_instFromJsonPosition_fromJson_spec_0_c5e03cb0d2(
+    _json_1_0,
+    _x_2_1,
+  );
+  leanTag(_x_3_2) match {
+  | "[\"Except\",\"error\"]" ->
+    _a_4_3: LeanValue = leanField(_x_3_2, 0);
+    _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+      LeanText("Lean"),
+      LeanText("Lsp"),
+      LeanText("Position"),
+    );
+    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+      _x_8_8,
+      _x_9_9,
+    );
+    _x_12_12: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_10_10,
+      LeanText("."),
+    );
+    _x_13_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_2_1);
+    _x_14_14: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+      _x_13_13,
+      _x_9_9,
+    );
+    _x_15_15: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_12_12,
+      _x_14_14,
+    );
+    _x_17_17: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_15_15,
+      LeanText(": "),
+    );
+    _x_18_18: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_17_17,
+      _a_4_3,
+    );
+    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
+  | "[\"Except\",\"ok\"]" ->
+    _a_20_4: LeanValue = leanField(_x_3_2, 0);
+    _x_21_20: LeanValue = LeanText("character");
+    _x_22_21: LeanValue = f_instFromJsonPosition_fromJson_spec_0_c5e03cb0d2(
+      _json_1_0,
+      _x_21_20,
+    );
+    leanTag(_x_22_21) match {
+    | "[\"Except\",\"error\"]" ->
+      _a_23_22: LeanValue = leanField(_x_22_21, 0);
+      _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+        LeanText("Lean"),
+        LeanText("Lsp"),
+        LeanText("Position"),
+      );
+      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+        _x_27_27,
+        _x_28_28,
+      );
+      _x_31_31: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_29_29,
+        LeanText("."),
+      );
+      _x_32_32: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        _x_21_20,
+      );
+      _x_33_33: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+        _x_32_32,
+        _x_28_28,
+      );
+      _x_34_34: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_31_31,
+        _x_33_33,
+      );
+      _x_36_36: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_34_34,
+        LeanText(": "),
+      );
+      _x_37_37: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_36_36,
+        _a_23_22,
+      );
+      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
+    | "[\"Except\",\"ok\"]" ->
+      _a_39_23: LeanValue = leanField(_x_22_21, 0);
+      LeanCtor(
+        "[\"Except\",\"ok\"]",
+        Array[
+          LeanCtor(
+            "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]",
+            Array[_a_20_4, _a_39_23],
+          ),
+        ],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instFromJsonPosition_fromJson_44572f2ea6(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instFromJsonPosition_fromJson_44572f2ea6(_args[0])
+}
+// "Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonPosition.fromJson.spec_0"
+fun f_instFromJsonPosition_fromJson_spec_0_c5e03cb0d2(
+  _j_0: LeanValue,
+  _k_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_Json_getObjValD_2f1acf23b4(
+    _j_0,
+    _k_1,
+  );
+  L4_Lean_Data_Json_Basic.f_Lean_Json_getNat_f1859a16f6(_x_1_2)
+}
+// "Lean.Lsp.instToJsonRange.toJson"
+fun f_Lsp_instToJsonRange_toJson_3863a218ca(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+    _start_1: LeanValue = leanField(_x_1_0, 0);
+    _end_2: LeanValue = leanField(_x_1_0, 1);
+    _x_3_4: LeanValue = f_Lsp_instToJsonPosition_toJson_4ecb22c787(_start_1);
+    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_8_9: LeanValue = f_Lsp_instToJsonPosition_toJson_4ecb22c787(_end_2);
+    _x_12_13: LeanValue = LeanCtor(
+      "[\"List\",\"cons\"]",
+      Array[
+        LeanCtor(
+          "[\"List\",\"cons\"]",
+          Array[
+            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("start"), _x_3_4]),
+            _x_5_6,
+          ],
+        ),
+        LeanCtor(
+          "[\"List\",\"cons\"]",
+          Array[
+            LeanCtor(
+              "[\"List\",\"cons\"]",
+              Array[
+                LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("end"), _x_8_9]),
+                _x_5_6,
+              ],
+            ),
+            _x_5_6,
+          ],
+        ),
+      ],
+    );
+    _x_14_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      LeanErased(),
+      LeanScalar("nat", "0"),
+    );
+    _x_15_16: LeanValue = f_instToJsonPosition_toJson_spec_0_84d06e2f2c(
+      _x_12_13,
+      _x_14_15,
+    );
+    L4_Lean_Data_Json_Basic.f_Lean_Json_mkObj_45a0766b3b(_x_15_16)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instToJsonRange_toJson_3863a218ca(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instToJsonRange_toJson_3863a218ca(_args[0])
+}
+// "Lean.Lsp.instOrdRange.ord"
+fun f_Lsp_instOrdRange_ord_736fa0bd69(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+    _start_3_2: LeanValue = leanField(_x_1_0, 0);
+    _end_4_3: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+      _start_5_4: LeanValue = leanField(_x_2_1, 0);
+      _end_6_5: LeanValue = leanField(_x_2_1, 1);
+      _x_7_6: LeanValue = f_Lsp_instOrdPosition_ord_5c959dedf0(
+        _start_3_2,
+        _start_5_4,
+      );
+      leanTag(_x_7_6) match {
+      | "[\"Ordering\",\"eq\"]" ->
+        f_Lsp_instOrdPosition_ord_5c959dedf0(_end_4_3, _end_6_5)
+      | _ -> _x_7_6
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instOrdRange_ord_736fa0bd69(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instOrdRange_ord_736fa0bd69(_args[0], _args[1])
+}
+// "_private.Init.Data.List.Impl.0.List.flatMapTR.go._at_.Lean.Lsp.instToJsonPosition.toJson.spec_0"
+fun f_instToJsonPosition_toJson_spec_0_84d06e2f2c(
+  _a_1_0: LeanValue,
+  _a_2_1: LeanValue,
+): LeanValue {
+  leanTag(_a_1_0) match {
+  | "[\"List\",\"nil\"]" ->
+    L4_Init_Prelude.f_Array_toList_2f8b2ba454(LeanErased(), _a_2_1)
+  | "[\"List\",\"cons\"]" ->
+    _head_4_2: LeanValue = leanField(_a_1_0, 0);
+    _tail_5_3: LeanValue = leanField(_a_1_0, 1);
+    _x_6_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_appendList_spec_0_b6133577ee(
+      _a_2_1,
+      _head_4_2,
+    );
+    f_instToJsonPosition_toJson_spec_0_84d06e2f2c(_tail_5_3, _x_6_5)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Lsp.instBEqPosition.beq"
+fun f_Lsp_instBEqPosition_beq_a54bdee9f6(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+    _line_3_2: LeanValue = leanField(_x_1_0, 0);
+    _character_4_3: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+      _line_5_4: LeanValue = leanField(_x_2_1, 0);
+      _character_6_5: LeanValue = leanField(_x_2_1, 1);
+      _x_7_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _line_3_2,
+        _line_5_4,
+      );
+      leanTag(_x_7_6) match {
+      | "[\"Bool\",\"false\"]" -> _x_7_6
+      | "[\"Bool\",\"true\"]" ->
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_character_4_3, _character_6_5)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instBEqPosition_beq_a54bdee9f6(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instBEqPosition_beq_a54bdee9f6(_args[0], _args[1])
+}
+// "Lean.Lsp.instFromJsonRange.fromJson"
+fun f_Lsp_instFromJsonRange_fromJson_8aefe10644(
+  _json_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = LeanText("start");
+  _x_3_2: LeanValue = f_instFromJsonRange_fromJson_spec_0_ba6d14a303(
+    _json_1_0,
+    _x_2_1,
+  );
+  leanTag(_x_3_2) match {
+  | "[\"Except\",\"error\"]" ->
+    _a_4_3: LeanValue = leanField(_x_3_2, 0);
+    _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+      LeanText("Lean"),
+      LeanText("Lsp"),
+      LeanText("Range"),
+    );
+    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+      _x_8_8,
+      _x_9_9,
+    );
+    _x_12_12: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_10_10,
+      LeanText("."),
+    );
+    _x_13_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_2_1);
+    _x_14_14: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+      _x_13_13,
+      _x_9_9,
+    );
+    _x_15_15: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_12_12,
+      _x_14_14,
+    );
+    _x_17_17: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_15_15,
+      LeanText(": "),
+    );
+    _x_18_18: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _x_17_17,
+      _a_4_3,
+    );
+    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
+  | "[\"Except\",\"ok\"]" ->
+    _a_20_4: LeanValue = leanField(_x_3_2, 0);
+    _x_21_20: LeanValue = LeanText("end");
+    _x_22_21: LeanValue = f_instFromJsonRange_fromJson_spec_0_ba6d14a303(
+      _json_1_0,
+      _x_21_20,
+    );
+    leanTag(_x_22_21) match {
+    | "[\"Except\",\"error\"]" ->
+      _a_23_22: LeanValue = leanField(_x_22_21, 0);
+      _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+        LeanText("Lean"),
+        LeanText("Lsp"),
+        LeanText("Range"),
+      );
+      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+        _x_27_27,
+        _x_28_28,
+      );
+      _x_31_31: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_29_29,
+        LeanText("."),
+      );
+      _x_32_32: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        _x_21_20,
+      );
+      _x_33_33: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+        _x_32_32,
+        _x_28_28,
+      );
+      _x_34_34: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_31_31,
+        _x_33_33,
+      );
+      _x_36_36: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_34_34,
+        LeanText(": "),
+      );
+      _x_37_37: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_36_36,
+        _a_23_22,
+      );
+      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
+    | "[\"Except\",\"ok\"]" ->
+      _a_39_23: LeanValue = leanField(_x_22_21, 0);
+      LeanCtor(
+        "[\"Except\",\"ok\"]",
+        Array[
+          LeanCtor(
+            "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]",
+            Array[_a_20_4, _a_39_23],
+          ),
+        ],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instFromJsonRange_fromJson_8aefe10644(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instFromJsonRange_fromJson_8aefe10644(_args[0])
+}
+// "Lean.Lsp.instHashableRange.hash"
+fun f_Lsp_instHashableRange_hash_ca3aa3d8da(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Range\",\"mk\"]" ->
+    _start_2_1: LeanValue = leanField(_x_1_0, 0);
+    _end_3_2: LeanValue = leanField(_x_1_0, 1);
+    _x_5_4: LeanValue = f_Lsp_instHashablePosition_hash_028ba05147(_start_2_1);
+    _x_6_5: LeanValue = L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+      LeanScalar("uint64", "0"),
+      _x_5_4,
+    );
+    _x_7_6: LeanValue = f_Lsp_instHashablePosition_hash_028ba05147(_end_3_2);
+    L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_x_6_5, _x_7_6)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instHashableRange_hash_ca3aa3d8da(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instHashableRange_hash_ca3aa3d8da(_args[0])
+}
+// "Lean.Lsp.instHashablePosition.hash"
+fun f_Lsp_instHashablePosition_hash_028ba05147(_x_1_0: LeanValue): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Lsp\",\"Position\",\"mk\"]" ->
+    _line_2_1: LeanValue = leanField(_x_1_0, 0);
+    _character_3_2: LeanValue = leanField(_x_1_0, 1);
+    _x_5_4: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _line_2_1,
+    );
+    _x_6_5: LeanValue = L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+      LeanScalar("uint64", "0"),
+      _x_5_4,
+    );
+    _x_7_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _character_3_2,
+    );
+    L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_x_6_5, _x_7_6)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lsp_instHashablePosition_hash_028ba05147(
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lsp_instHashablePosition_hash_028ba05147(_args[0])
+}
+
+module end;

@@ -1,0 +1,384 @@
+module L4_Init_Grind_AC;
+
+// "Lean.Grind.AC.Seq.concat"
+fun f_AC_Seq_concat_35537010cb(_s_0: LeanValue, _s_1: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_2: LeanValue = leanField(_s_0, 0);
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+      Array[_x_1_2, _s_1],
+    )
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_3_3: LeanValue = leanField(_s_0, 0);
+    _s_4_4: LeanValue = leanField(_s_0, 1);
+    _x_5_6: LeanValue = f_AC_Seq_concat_35537010cb(_s_4_4, _s_1);
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+      Array[_x_3_3, _x_5_6],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_AC_Seq_concat_35537010cb(_args: Array<LeanValue>): LeanValue {
+  f_AC_Seq_concat_35537010cb(_args[0], _args[1])
+}
+// "Lean.Grind.AC.instBEqSeq.beq"
+fun f_AC_instBEqSeq_beq_ac26db1790(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_3_2: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+      _x_4_5: LeanValue = leanField(_x_2_1, 0);
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_3_2, _x_4_5)
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_7_3: LeanValue = leanField(_x_1_0, 0);
+    _s_8_4: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+      _x_9_8: LeanValue = leanField(_x_2_1, 0);
+      _s_10_9: LeanValue = leanField(_x_2_1, 1);
+      _x_11_10: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _x_7_3,
+        _x_9_8,
+      );
+      leanTag(_x_11_10) match {
+      | "[\"Bool\",\"false\"]" -> _x_11_10
+      | "[\"Bool\",\"true\"]" -> f_AC_instBEqSeq_beq_ac26db1790(_s_8_4, _s_10_9)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_AC_instBEqSeq_beq_ac26db1790(_args: Array<LeanValue>): LeanValue {
+  f_AC_instBEqSeq_beq_ac26db1790(_args[0], _args[1])
+}
+// "Lean.Grind.AC.Expr.toSeq"
+fun f_AC_Expr_toSeq_8b0867ba70(_e_0: LeanValue): LeanValue {
+  leanTag(_e_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
+    _x_1_1: LeanValue = leanField(_e_0, 0);
+    LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_1_1])
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
+    _lhs_3_2: LeanValue = leanField(_e_0, 0);
+    _rhs_4_3: LeanValue = leanField(_e_0, 1);
+    _x_5_5: LeanValue = f_AC_Expr_toSeq_8b0867ba70(_rhs_4_3);
+    f_AC_Expr_toSeq_8a9307fa57(_lhs_3_2, _x_5_5)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Seq.sort'"
+fun f_AC_Seq_sort_253f60586d(_s_0: LeanValue, _acc_1: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_2: LeanValue = leanField(_s_0, 0);
+    f_AC_Seq_insert_838f03abac(_x_1_2, _acc_1)
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_3_3: LeanValue = leanField(_s_0, 0);
+    _s_4_4: LeanValue = leanField(_s_0, 1);
+    _x_5_6: LeanValue = f_AC_Seq_insert_838f03abac(_x_3_3, _acc_1);
+    f_AC_Seq_sort_253f60586d(_s_4_4, _x_5_6)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Seq.union"
+fun f_AC_Seq_union_cc96beb2d6(_s_0: LeanValue, _s_1: LeanValue): LeanValue {
+  f_AC_Seq_unionFuel_1e247de0a4(LeanScalar("nat", "1000000"), _s_0, _s_1)
+}
+// "Lean.Grind.AC.Seq.eraseDup"
+fun f_AC_Seq_eraseDup_a5ba9a068e(_s_0: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_1: LeanValue = leanField(_s_0, 0);
+    _s_0
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_2_2: LeanValue = leanField(_s_0, 0);
+    _s_3_3: LeanValue = leanField(_s_0, 1);
+    _s_4: LeanValue = f_AC_Seq_eraseDup_a5ba9a068e(_s_3_3);
+    leanTag(_s_4) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+      _x_4_5: LeanValue = leanField(_s_4, 0);
+      _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_beq_ebfe7df9fa(_x_2_2, _x_4_5);
+      leanTag(_x_5_8) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+          Array[_x_2_2, _s_4],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_2_2])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+      _x_8_6: LeanValue = leanField(_s_4, 0);
+      _s_9_7: LeanValue = leanField(_s_4, 1);
+      _x_10_11: LeanValue = L4_Init_Prelude.f_Nat_beq_ebfe7df9fa(
+        _x_2_2,
+        _x_8_6,
+      );
+      leanTag(_x_10_11) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+          Array[_x_2_2, _s_4],
+        )
+      | "[\"Bool\",\"true\"]" -> _s_4
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Seq.unionFuel"
+fun f_AC_Seq_unionFuel_1e247de0a4(
+  _fuel_0: LeanValue,
+  _s_1: LeanValue,
+  _s_2: LeanValue,
+): LeanValue {
+  _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _fuel_0,
+    LeanScalar("nat", "0"),
+  );
+  leanTag(_isZero_4) match {
+  | "[\"Bool\",\"true\"]" -> f_AC_Seq_concat_35537010cb(_s_1, _s_2)
+  | "[\"Bool\",\"false\"]" ->
+    leanTag(_s_1) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+      _x_2_6: LeanValue = leanField(_s_1, 0);
+      leanTag(_s_2) match {
+      | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+        _x_3_9: LeanValue = leanField(_s_2, 0);
+        _x_4_12: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+          _x_2_6,
+          _x_3_9,
+        );
+        leanTag(_x_4_12) match {
+        | "[\"Bool\",\"false\"]" ->
+          LeanCtor(
+            "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+            Array[_x_3_9, _s_1],
+          )
+        | "[\"Bool\",\"true\"]" ->
+          LeanCtor(
+            "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+            Array[_x_2_6, _s_2],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+        _x_7_10: LeanValue = leanField(_s_2, 0);
+        _s_8_11: LeanValue = leanField(_s_2, 1);
+        f_AC_Seq_insert_838f03abac(_x_2_6, _s_2)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+      _x_10_7: LeanValue = leanField(_s_1, 0);
+      _s_11_8: LeanValue = leanField(_s_1, 1);
+      leanTag(_s_2) match {
+      | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+        _x_12_16: LeanValue = leanField(_s_2, 0);
+        f_AC_Seq_insert_838f03abac(_x_12_16, _s_1)
+      | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+        _x_14_17: LeanValue = leanField(_s_2, 0);
+        _s_15_18: LeanValue = leanField(_s_2, 1);
+        _n_16_21: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _fuel_0,
+          LeanScalar("nat", "1"),
+        );
+        _x_17_22: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+          _x_10_7,
+          _x_14_17,
+        );
+        leanTag(_x_17_22) match {
+        | "[\"Bool\",\"false\"]" ->
+          _x_18_23: LeanValue = f_AC_Seq_unionFuel_1e247de0a4(
+            _n_16_21,
+            _s_1,
+            _s_15_18,
+          );
+          LeanCtor(
+            "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+            Array[_x_14_17, _x_18_23],
+          )
+        | "[\"Bool\",\"true\"]" ->
+          _x_20_25: LeanValue = f_AC_Seq_unionFuel_1e247de0a4(
+            _n_16_21,
+            _s_11_8,
+            _s_2,
+          );
+          LeanCtor(
+            "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+            Array[_x_10_7, _x_20_25],
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Seq.erase0"
+fun f_AC_Seq_erase0_94b15ea720(_s_0: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_1: LeanValue = leanField(_s_0, 0);
+    _s_0
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_2_2: LeanValue = leanField(_s_0, 0);
+    _s_3_3: LeanValue = leanField(_s_0, 1);
+    _s_4: LeanValue = f_AC_Seq_erase0_94b15ea720(_s_3_3);
+    _x_4_5: LeanValue = LeanScalar("nat", "0");
+    _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_2_2, _x_4_5);
+    leanTag(_x_5_6) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_7_8: LeanValue = f_AC_instBEqSeq_beq_ac26db1790(
+        _s_4,
+        LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_4_5]),
+      );
+      leanTag(_x_7_8) match {
+      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(
+          "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+          Array[_x_2_2, _s_4],
+        )
+      | "[\"Bool\",\"true\"]" ->
+        LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_2_2])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | "[\"Bool\",\"true\"]" -> _s_4
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Seq.insert"
+fun f_AC_Seq_insert_838f03abac(_x_0: LeanValue, _s_1: LeanValue): LeanValue {
+  leanTag(_s_1) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_2: LeanValue = leanField(_s_1, 0);
+    _x_2_5: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+      _x_0,
+      _x_1_2,
+    );
+    leanTag(_x_2_5) match {
+    | "[\"Bool\",\"false\"]" ->
+      LeanCtor(
+        "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+        Array[
+          _x_1_2,
+          LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_0]),
+        ],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(
+        "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+        Array[_x_0, _s_1],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_6_3: LeanValue = leanField(_s_1, 0);
+    _s_7_4: LeanValue = leanField(_s_1, 1);
+    _x_8_9: LeanValue = L4_Init_Data_Nat_Basic.f_Nat_blt_63f0f3b8c4(
+      _x_0,
+      _x_6_3,
+    );
+    leanTag(_x_8_9) match {
+    | "[\"Bool\",\"false\"]" ->
+      _x_9_10: LeanValue = f_AC_Seq_insert_838f03abac(_x_0, _s_7_4);
+      LeanCtor(
+        "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+        Array[_x_6_3, _x_9_10],
+      )
+    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(
+        "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+        Array[_x_0, _s_1],
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.Expr.toSeq'"
+fun f_AC_Expr_toSeq_8a9307fa57(_e_0: LeanValue, _s_1: LeanValue): LeanValue {
+  leanTag(_e_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
+    _x_1_2: LeanValue = leanField(_e_0, 0);
+    LeanCtor(
+      "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]",
+      Array[_x_1_2, _s_1],
+    )
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
+    _lhs_3_3: LeanValue = leanField(_e_0, 0);
+    _rhs_4_4: LeanValue = leanField(_e_0, 1);
+    _x_5_6: LeanValue = f_AC_Expr_toSeq_8a9307fa57(_rhs_4_4, _s_1);
+    f_AC_Expr_toSeq_8a9307fa57(_lhs_3_3, _x_5_6)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+// "Lean.Grind.AC.instBEqExpr.beq"
+fun f_AC_instBEqExpr_beq_aee9325525(
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
+    _x_3_2: LeanValue = leanField(_x_1_0, 0);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
+      _x_4_5: LeanValue = leanField(_x_2_1, 0);
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_3_2, _x_4_5)
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
+    _lhs_7_3: LeanValue = leanField(_x_1_0, 0);
+    _rhs_8_4: LeanValue = leanField(_x_1_0, 1);
+    leanTag(_x_2_1) match {
+    | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
+      _lhs_9_8: LeanValue = leanField(_x_2_1, 0);
+      _rhs_10_9: LeanValue = leanField(_x_2_1, 1);
+      _x_11_10: LeanValue = f_AC_instBEqExpr_beq_aee9325525(_lhs_7_3, _lhs_9_8);
+      leanTag(_x_11_10) match {
+      | "[\"Bool\",\"false\"]" -> _x_11_10
+      | "[\"Bool\",\"true\"]" ->
+        f_AC_instBEqExpr_beq_aee9325525(_rhs_8_4, _rhs_10_9)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_AC_instBEqExpr_beq_aee9325525(_args: Array<LeanValue>): LeanValue {
+  f_AC_instBEqExpr_beq_aee9325525(_args[0], _args[1])
+}
+// "Lean.Grind.AC.Seq.sort"
+fun f_AC_Seq_sort_ee7a30bf8e(_s_0: LeanValue): LeanValue {
+  leanTag(_s_0) match {
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
+    _x_1_1: LeanValue = leanField(_s_0, 0);
+    _s_0
+  | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"cons\"]" ->
+    _x_2_2: LeanValue = leanField(_s_0, 0);
+    _s_3_3: LeanValue = leanField(_s_0, 1);
+    f_AC_Seq_sort_253f60586d(
+      _s_3_3,
+      LeanCtor("[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]", Array[_x_2_2]),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

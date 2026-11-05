@@ -1,0 +1,99 @@
+module L4_Lean_DocString;
+
+// "Lean.findDocString?"
+fun f_Lean_findDocString_0f8f588ff2(
+  _env_0: LeanValue,
+  _declName_1: LeanValue,
+  _includeBuiltin_2: LeanValue,
+  _options_3: LeanValue,
+  _currNamespace_4: LeanValue,
+  _openDecls_5: LeanValue,
+  _a_1_6: LeanValue,
+): LeanValue {
+  _joined: Array<LeanValue> = {
+    _x_18_24: LeanValue = L4_Lean_Parser_Tactic_Doc.f_Tactic_Doc_alternativeOfTactic_d17d484c15(
+      _env_0,
+      _declName_1,
+    );
+    leanTag(_x_18_24) match {
+    | "[\"Option\",\"none\"]" -> Array[_declName_1]
+    | "[\"Option\",\"some\"]" ->
+      _val_19_25: LeanValue = leanField(_x_18_24, 0);
+      Array[_val_19_25]
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  _y_3_7: LeanValue = _joined[0];
+  _exts_8: LeanValue = L4_Lean_Parser_Tactic_Doc.f_Tactic_Doc_getTacticExtensionString_0242d5a94b(
+    _env_0,
+    _y_3_7,
+  );
+  _spellings_9: LeanValue = L4_Lean_Parser_Term_Doc.f_Term_Doc_getRecommendedSpellingString_f1500235a1(
+    _env_0,
+    _y_3_7,
+  );
+  _x_5_11: LeanValue = L4_Lean_DocString_Markdown.f_Lean_findSimpleDocString_42bd8b728a(
+    _env_0,
+    _y_3_7,
+    _includeBuiltin_2,
+    _options_3,
+    _currNamespace_4,
+    _openDecls_5,
+    LeanCtor("[\"Option\",\"none\"]", Array[]),
+    _a_1_6,
+  );
+  leanTag(_x_5_11) match {
+  | "[\"EST\",\"Out\",\"ok\"]" ->
+    _a_6_12: LeanValue = leanField(_x_5_11, 0);
+    _a_7_13: LeanValue = leanField(_x_5_11, 1);
+    leanTag(_a_6_12) match {
+    | "[\"Option\",\"none\"]" -> _x_5_11
+    | "[\"Option\",\"some\"]" ->
+      _val_8_16: LeanValue = leanField(_a_6_12, 0);
+      _x_9_17: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _val_8_16,
+        _exts_8,
+      );
+      _x_10_18: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _x_9_17,
+        _spellings_9,
+      );
+      _x_11_19: LeanValue = L4_Lean_DocString_Links.f_Lean_rewriteManualLinks_78b6dd3e18(
+        _x_10_18,
+        _a_7_13,
+      );
+      leanTag(_x_11_19) match {
+      | "[\"ST\",\"Out\",\"mk\"]" ->
+        _val_12_20: LeanValue = leanField(_x_11_19, 0);
+        _state_13_21: LeanValue = leanField(_x_11_19, 1);
+        LeanCtor(
+          "[\"EST\",\"Out\",\"ok\"]",
+          Array[
+            LeanCtor("[\"Option\",\"some\"]", Array[_val_12_20]),
+            _state_13_21,
+          ],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | "[\"EST\",\"Out\",\"error\"]" ->
+    _a_16_14: LeanValue = leanField(_x_5_11, 0);
+    _a_17_15: LeanValue = leanField(_x_5_11, 1);
+    _x_5_11
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+fun apply_f_Lean_findDocString_0f8f588ff2(_args: Array<LeanValue>): LeanValue {
+  f_Lean_findDocString_0f8f588ff2(
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+  )
+}
+
+module end;
