@@ -1954,7 +1954,12 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = Array[
       dir ~> dir == SKStore.DirName::create("/backendPhase2/"),
       dir ~> {
         name = dir.toString();
-        dir == SKStore.DirName::create("/specializer/") ||
+        // Large generated programs retain substantial naming/typing scratch
+        // space. Commit these complete arrows before archive packaging or
+        // specialization adds another whole-program allocation graph.
+        dir == SkipNaming.funsDirName ||
+          dir == SkipTyping.dirName ||
+          dir == SKStore.DirName::create("/specializer/") ||
           (partitioned &&
             (name.startsWith("/specializer/reduced1/") ||
               name == "/specializer/class-attempts/"))

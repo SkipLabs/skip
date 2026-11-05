@@ -211,7 +211,9 @@ fun main(): void {
       | Failure(exn) -> throw exn
       }
     } else {
-      Config.Config::make(results)
+      // Archive decoding can allocate far more scratch than its retained
+      // source text. Release it before the frontend starts building its ASTs.
+      SKStore.withRegionValue(() ~> Config.Config::make(results))
     }
   });
   debugSKStore = results.getBool("debug-skstore");

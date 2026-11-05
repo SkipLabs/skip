@@ -64,6 +64,15 @@ class ArchiveMetadataCacheTests(test_archive_index.ArchiveIndexTests):
             self.assertEqual(
                 self.member(cached, member), self.member(control, member)
             )
+        legacy = os.environ.get("SKC_ARCHIVE_LEGACY_COMPILER")
+        if legacy:
+            previous = self.root / "previous.sklib"
+            result = self.invoke([*args, "-o", previous], compiler=legacy)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for member in ["lib.skmeta", "lib.skindex"]:
+                self.assertEqual(
+                    self.member(control, member), self.member(previous, member)
+                )
 
     def test_unchanged_member_reuses_decoding_and_replacement_is_observed(self):
         cache = self.root / "metadata-cache"

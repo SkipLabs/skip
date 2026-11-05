@@ -1,0 +1,15 @@
+// Generate the complete Lean.Elab closure before Skargo collects extra sources.
+fun main(): void {
+  result = System.subprocess(Array["python3", "tools/build.py"]) match {
+  | Success(p) -> p
+  | Failure(err) ->
+    print_error(`Lean source generation failed: ${err}`);
+    skipExit(1)
+  };
+  print_error(result.stderr);
+  if (!result.success()) {
+    print_error(result.stdout);
+    skipExit(result.exitcode())
+  };
+  print_raw(result.stdout)
+}

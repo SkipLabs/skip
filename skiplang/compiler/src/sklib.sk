@@ -76,18 +76,26 @@ class Metadata{
   fun serialize(
     sourceCache: ?mutable SourceEncodingCache = None(),
   ): readonly Bytes {
-    json = this.toJSON();
-    sourceCache.each(cache -> {
-      !json = json.set(
-        "sources",
-        JSON.Array(
-          Vector::createFromItems(
-            this.sources.map(source -> cache.encode(source)),
+    // JSON escaping creates per-character scratch objects. Bound their lifetime
+    // to one source, including when persistent encoding reuse is disabled.
+    json = this.toJSON().set(
+      "sources",
+      JSON.Array(
+        Vector::createFromItems(
+          this.sources.map(source ->
+            sourceCache match {
+            | Some(cache) -> cache.encode(source)
+            | None() -> EncodedSourceJSON(encodeSource(source))
+            }
           ),
         ),
-      )
-    });
-    json.toString().bytes()
+      ),
+    );
+    out = mutable TextOutputStream.StringTextOutputStream{
+      fragmentWrites => true,
+    };
+    json.writeToStream(out.writeString);
+    out.toStringNative().bytes()
   }
 
   static fun read(bytes: readonly Bytes): Metadata {
@@ -226,6 +234,17 @@ private class EncodedSourceJSON(text: String) extends JSON.Value {
   }
 }
 
+private fun encodeSource(source: (String, Int, String)): String {
+  SKStore.withRegionValue(() ~> {
+    (path, mtime, contents) = source;
+    JSON.Object[
+      "path" => JSON.String(path),
+      "mtime" => JSON.IntNumber(mtime),
+      "contents" => JSON.String(contents),
+    ].toString()
+  })
+}
+
 mutable class SourceEncodingCache(
   previous: Map<String, EncodedSource>,
   used: mutable Map<String, EncodedSource> = mutable Map[],
@@ -241,15 +260,7 @@ mutable class SourceEncodingCache(
       if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
         print_error(`ARCHIVE_ENCODING_MISS: ${source.i0}\n`)
       };
-      (path, mtime, contents) = source;
-      EncodedSource(
-        source,
-        JSON.Object[
-          "path" => JSON.String(path),
-          "mtime" => JSON.IntNumber(mtime),
-          "contents" => JSON.String(contents),
-        ].toString(),
-      )
+      EncodedSource(source, encodeSource(source))
     };
     this.used.set(source.i0, entry);
     EncodedSourceJSON(entry.text)

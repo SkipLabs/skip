@@ -1,0 +1,23 @@
+// Exercise two real translated functions from Lean.Data.Name.
+fun leanSmoke(): void {
+  anonymous: LeanValue = LeanCtor(
+    "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+    Array[],
+  );
+  named: LeanValue = LeanCtor(
+    "[\"Lean\",\"Name\",\"str\",\"_impl\"]",
+    Array[LeanScalar("uint64", "0"), anonymous, LeanText("smoke")],
+  );
+  assert(
+    leanTag(L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(anonymous)) ==
+      "[\"Bool\",\"true\"]",
+  );
+  assert(
+    leanTag(L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(named)) ==
+      "[\"Bool\",\"false\"]",
+  );
+  assert(
+    leanTag(L4_Lean_Data_Name.f_Lean_Name_getPrefix_0e6a878b3f(named)) ==
+      "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+  )
+}

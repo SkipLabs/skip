@@ -64,7 +64,11 @@ mutable class LexingPosition private {
 
   // Peek operations.
   readonly fun peekOffset(offset: Int): Char {
-    static::peekIterOffset(this.iter.clone(), offset);
+    if (offset == 0) {
+      static::peekIterCurrent(this.iter)
+    } else {
+      static::peekIterOffset(this.iter.clone(), offset)
+    }
   }
 
   private static fun peekIterCurrent(

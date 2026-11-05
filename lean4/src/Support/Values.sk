@@ -1,0 +1,52 @@
+// Representation support only. Lean foreign primitives remain aborting stubs.
+
+base class LeanValue {
+  children =
+  | LeanErased()
+  | LeanCtor(name: String, fields: Array<LeanValue>)
+  | LeanScalar(kind: String, decimal: String)
+  | LeanText(value: String)
+  | LeanClosure(
+    invoke: Array<LeanValue> ~> LeanValue,
+    arity: Int,
+    captured: Array<LeanValue>,
+  )
+}
+
+fun leanFail<T>(message: String): T {
+  print_error("Lean-to-Skip: " + message);
+  skipExit(86)
+}
+
+fun leanPrimitive(name: String): LeanValue {
+  leanFail("unimplemented primitive: " + name)
+}
+
+fun leanTag(v: LeanValue): String {
+  v match {
+  | LeanCtor(name, _) -> name
+  | _ -> invariant_violation("Lean-to-Skip: case on non-constructor")
+  }
+}
+
+fun leanField(v: LeanValue, index: Int): LeanValue {
+  v match {
+  | LeanCtor(_, fields) -> fields[index]
+  | _ -> invariant_violation("Lean-to-Skip: projection from non-constructor")
+  }
+}
+
+fun leanApply(v: LeanValue, args: Array<LeanValue>): LeanValue {
+  if (args.isEmpty()) return v;
+  v match {
+  | LeanClosure(invoke, arity, captured) ->
+    all = captured.concat(args);
+    if (all.size() < arity) {
+      LeanClosure(invoke, arity, all)
+    } else {
+      result = invoke(all.take(arity));
+      if (all.size() == arity) result else leanApply(result, all.drop(arity))
+    }
+  | _ -> leanFail("application of non-closure")
+  }
+}
