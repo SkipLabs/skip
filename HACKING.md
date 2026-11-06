@@ -27,6 +27,28 @@ registry secrets and only makes sense on `main`, so seeing those checks as
 `skipped` on a PR is expected, not a failure. CodeQL runs on a weekly schedule,
 not per PR.
 
+#### CI time budget
+
+Keep a full CircleCI pipeline (first job start to last job end, for a PR that
+triggers every job) **under 15-20 minutes**. Slow CI delays every merge and
+encourages batching unrelated changes.
+
+- When a PR adds tests or CI steps, check the job durations on its CircleCI
+  run against a recent run on `main`, and say in the PR description how much
+  the critical path moves. The critical path today is `compiler` followed by
+  the jobs that wait for it (`skargo`, `backend-regressions`).
+- If a change pushes the pipeline past the budget, fix that in the same PR:
+  run the work concurrently, split it into a job that runs in parallel, or move
+  checks that don't need to gate every PR (e.g. for disabled experimental
+  options) to a scheduled job. If that isn't possible, open an issue with the
+  measurements before merging.
+- Long Python test suites should report per-test durations (as
+  `skiplang/compiler/tools/run_backend_tests.py` does) so regressions in a
+  single test are visible in the CI log.
+- Doc-only and `.gitignore`-only changes schedule no test jobs
+  (`.circleci/generate_config.sh`); keep it that way for other paths that
+  cannot affect a build.
+
 ### Publishing CI Docker images
 
 CircleCI jobs run inside the `skiplabs/*:latest` images published from the
