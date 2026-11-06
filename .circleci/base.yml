@@ -44,8 +44,16 @@ commands:
   # - The lockfile is snapshotted before any install, because check-ts
   #   rewrites it (`npm install --save-dev typescript@...`) before the save.
   # - The fallback key restores the job's cache for an older lockfile; npm
-  #   fetches only what changed. Old tarballs then accumulate across lockfile
-  #   bumps: to drop them (or to bust a bad cache), bump v1 in both commands.
+  #   fetches only what changed.
+  #
+  # Eviction (bin/ci_npm_cache.sh): after restoring, `mark` resets the access
+  # time of every cached tarball; before saving, `prune` deletes those this
+  # job's npm commands did not read and runs `npm cache verify` to drop their
+  # index entries. So a saved cache holds exactly what its job used, tarballs
+  # superseded by a lockfile change do not carry over, and archives stay
+  # bounded without manual busting. Both steps log the cache size. On an exact
+  # key hit save_cache is a no-op, so prune skips. Bump v1 in both commands
+  # only to bust a bad cache.
   npm-cache-restore:
     description: "Restore npm's download cache (~/.npm)"
     steps:
@@ -56,10 +64,18 @@ commands:
           keys:
             - npm-v1-{{ .Environment.CIRCLE_JOB }}-{{ checksum "/tmp/npm-cache-key" }}
             - npm-v1-{{ .Environment.CIRCLE_JOB }}-
+      - run:
+          name: Mark the restored npm cache as unused
+          command: |
+            bin/ci_npm_cache.sh mark || echo "WARNING: marking failed; this job's save will evict less"
 
   npm-cache-save:
     description: "Save npm's download cache (~/.npm); pairs with npm-cache-restore"
     steps:
+      - run:
+          name: Evict npm cache entries this job did not use
+          command: |
+            bin/ci_npm_cache.sh prune || echo "WARNING: pruning failed; saving the cache as is"
       - save_cache:
           key: npm-v1-{{ .Environment.CIRCLE_JOB }}-{{ checksum "/tmp/npm-cache-key" }}
           paths:
