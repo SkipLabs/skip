@@ -238,6 +238,60 @@ then
   TS_CHANGED[skipruntime-ts]=true
 fi
 
+# A PR that edits a job's definition in base.yml must run that job, or the edit
+# goes untested until an unrelated PR triggers it (#1601). Split base.yml into
+# sections (each job under `jobs:`, every other top-level key) and print the
+# names of those that differ between BASE and HEAD, ignoring comment-only and
+# blank lines (a comment above a job would otherwise count towards the previous
+# one). config.yml and this script need no rule: every pipeline runs them in its
+# setup and fast-checks jobs.
+changed_base_yml_sections() {
+  awk '
+    FNR == 1 { f = (FILENAME == ARGV[1]) ? 1 : 2; top = ""; key = "" }
+    /^[ \t]*(#.*)?$/ { next }
+    /^[^ ]/ { top = $1; sub(/:.*/, "", top); key = top }
+    top == "jobs" && /^  [^ #]/ { key = $1; sub(/:.*/, "", key) }
+    { text[f, key] = text[f, key] $0 "\n"; keys[key] }
+    END { for (k in keys) if (text[1, k] != text[2, k]) print k }
+  ' <(git show "$BASE:.circleci/base.yml" 2>/dev/null) \
+    <(git show "HEAD:.circleci/base.yml" 2>/dev/null)
+}
+if ! changed .circleci/base.yml; then
+  while IFS= read -r section; do
+    case "$section" in
+      # skargo and backend-regressions run on the compiler job's workspace.
+      compiler)
+        SK_CHANGED[skiplang/compiler]=true
+        SK_CHANGED[skiplang/skargo]=true ;;
+      backend-regressions) SK_CHANGED[skiplang/compiler]=true ;;
+      skdb) SK_CHANGED[sql]=true ;;
+      skdb-wasm) TS_CHANGED[sql]=true ;;
+      check-ts) check_ts=true ;;
+      skipruntime | skipruntime-bun) TS_CHANGED[skipruntime-ts]=true ;;
+      check-examples) examples=1 ;;
+      all-checks) ;;
+      # Every Skargo package except these three gets a skip-package-* job below.
+      # skargo's job needs compiler, which is therefore scheduled too.
+      skip-package-build | skip-package-tests)
+        for dir in "${!SK_CHANGED[@]}"; do
+          case "$dir" in
+            sql | skipruntime-ts/*) ;;
+            *) SK_CHANGED["$dir"]=true ;;
+          esac
+        done ;;
+      # `commands:` (custom-checkout), `version:`, or a job this list does not
+      # know: schedule everything.
+      *)
+        for dir in "${!SK_CHANGED[@]}"; do SK_CHANGED["$dir"]=true; done
+        check_ts=true
+        TS_CHANGED[sql]=true
+        TS_CHANGED[skipruntime-ts]=true
+        examples=1
+        ;;
+    esac
+  done < <(changed_base_yml_sections)
+fi
+
 cat .circleci/base.yml
 
 JOBS=$(mktemp)
