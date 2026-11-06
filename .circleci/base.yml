@@ -191,6 +191,32 @@ jobs:
             - skiplang/compiler/stage0/lib/*.a
             - skiplang/compiler/stage0/lib/*.sklib
 
+  # Experiment job: build a toolchain from this checkout and run selected
+  # downstream repros (skdb's privacy tests, one skjs test) with it. Only
+  # scheduled when skiplang/compiler/tools/ci_repro.env exists; that file
+  # selects the toolchain and repros (see skiplang/compiler/tools/ci_repro.sh).
+  repro:
+    docker:
+      # skdb-base has the image toolchain, Clang and sqlite3.
+      - image: skiplabs/skdb-base:latest
+    resource_class: xlarge.gen2
+    environment:
+      SKIP_CAPACITY: 12G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - run:
+          name: Run repros
+          no_output_timeout: 30m
+          command: |
+            set -a
+            . skiplang/compiler/tools/ci_repro.env
+            set +a
+            bash skiplang/compiler/tools/ci_repro.sh
+      - store_artifacts:
+          path: skiplang/compiler/runs/repro
+          destination: repro
+
   backend-regressions:
     parameters:
       shards:
