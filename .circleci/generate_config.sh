@@ -4,17 +4,20 @@
 
 BASE="$(git merge-base main HEAD)"
 
-# Doc-only changes must not trigger tests or compilation, so every diff below
-# excludes documentation files (markdown anywhere in the tree).
-DOC_EXCLUDES=(
+# Changes that cannot affect a build or test result must not trigger tests or
+# compilation, so every diff below excludes them: documentation (markdown
+# anywhere in the tree) and .gitignore files (builds and Docker contexts do not
+# read them; the latter use .dockerignore).
+NON_BUILD_EXCLUDES=(
   ':(exclude)*.md'
   ':(glob,exclude)**/*.md'
   ':(glob,exclude)**/*.mdx'
+  ':(glob,exclude)**/.gitignore'
 )
 
-# Exit 0 when the diff restricted to the given paths has no non-doc change.
+# Exit 0 when the diff restricted to the given paths has no build-relevant change.
 changed() {
-  git diff --quiet HEAD "$BASE" -- "$@" "${DOC_EXCLUDES[@]}"
+  git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}"
 }
 
 changed examples/

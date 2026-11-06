@@ -16,7 +16,7 @@ take precedence for their directory — the closest file to the edited code wins
 
 - Do add or update tests with every code change.
 - Do keep one logical change per commit; an "and"/"also"/";" in the subject is a red flag.
-- Don't commit build artifacts or caches: `skiplang/compiler/{build,stage*}/`, `**/state.db`, `skiplang/compiler/tools/runs/`, `.env` — all gitignored.
+- Don't commit build artifacts or caches: `skiplang/compiler/{build,stage*}/`, `**/state.db`, `skiplang/compiler/{runs,tools/runs}/`, `.env` — all gitignored.
 - Don't edit `skiplang/compiler/bootstrap/*.ll.gz` directly; bump the submodule via `bin/bump_bootstrap.sh` only.
 - Don't push to `main`; open a PR.
 
