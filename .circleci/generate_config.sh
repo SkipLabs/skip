@@ -218,11 +218,24 @@ fi
 # Makefiles/bin scripts drive those builds. Without this a change to e.g. the
 # lockfile or skipruntime-ts/Makefile runs no CI at all, even though it can break
 # those builds -- so route it to the TS job set.
+# prebuild.mjs links the Skip runtime TS sources into the workspaces whose
+# typecheck/build scripts run it.
 if ! changed \
-     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile; then
+     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile \
+     prebuild.mjs; then
   check_ts=true
   TS_CHANGED[skipruntime-ts]=true
   TS_CHANGED[sql]=true
+fi
+
+# The skipruntime job's native addon test builds libskipruntime in Docker
+# (skipruntime-ts/tests/native_addon_unreleased/run.sh -> bin/build_runtime.sh
+# -> the `skipruntime` bake target), which builds skiplang/Dockerfile and
+# skipruntime-ts/Dockerfile with the build contexts filtered by .dockerignore.
+if ! changed \
+     skiplang/Dockerfile skipruntime-ts/Dockerfile docker-bake.hcl .dockerignore
+then
+  TS_CHANGED[skipruntime-ts]=true
 fi
 
 cat .circleci/base.yml
