@@ -97,31 +97,52 @@ jobs:
               GIT_COMMIT_HASH="$(git rev-parse --short HEAD)" SKTEST_PROFILE=release \
               SKTEST_JOBS=8 SKTEST_JUNIT=$HOME/test-results/skc.xml \
               "$root/bin/run-sktest.sh" || { tail -n 100 runs/ci-compiler-tests/command.log; exit 1; }
-      - run:
-          name: Run backend regressions
-          command: |
-            cd skiplang/compiler
-            python3 tools/incremental_profile.py run \
-              --root /tmp/skc-backend-checks --label regressions \
-              --disk-gib 12 --reserve-gib 8 --rss-gib 14 --timeout 3600 \
-              -- python3 tools/run_backend_tests.py \
-              --compiler stage1/bin/skc \
-              --sysroot stage1/target/host/release/deps \
-              --legacy-compiler stage0/bin/skc \
-              --scratch /tmp/skc-backend-checks/tmp
       - store_artifacts:
           path: skiplang/compiler/runs
           destination: compiler-resources
-      - store_artifacts:
-          path: /tmp/skc-backend-checks/runs
-          destination: backend-regressions
       - store_test_results:
           path: ~/test-results
+      # skargo's tests use stage1/{bin,lib}. backend-regressions also needs the
+      # matching .sklib archives (not the much larger .ll intermediates in the
+      # same directory) and the stage0 compiler for archive compatibility.
       - persist_to_workspace:
           root: .
           paths:
             - skiplang/compiler/stage1/bin
             - skiplang/compiler/stage1/lib
+            - skiplang/compiler/stage1/target/host/release/deps/*.sklib
+            - skiplang/compiler/stage0/bin
+
+  backend-regressions:
+    docker:
+      # Includes Python for the test runner and Clang for native fixtures.
+      - image: skiplabs/skip:latest
+    resource_class: xlarge.gen2
+    environment:
+      SKIP_CAPACITY: 12G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run backend regressions
+          no_output_timeout: 30m
+          # Test modules run concurrently, each in its own process and TMPDIR;
+          # the monitor bounds their summed RSS, scratch disk and wall time.
+          command: |
+            cd skiplang/compiler
+            python3 tools/incremental_profile.py run \
+              --root /tmp/skc-backend-checks --label regressions \
+              --disk-gib 40 --reserve-gib 8 --rss-gib 14 --timeout 2400 \
+              -- python3 tools/run_backend_tests.py --jobs 8 \
+              --compiler stage1/bin/skc \
+              --sysroot stage1/target/host/release/deps \
+              --legacy-compiler stage0/bin/skc \
+              --scratch /tmp/skc-backend-checks/tmp
+      - store_artifacts:
+          path: /tmp/skc-backend-checks/runs
+          destination: backend-regressions
 
   skdb:
     docker:
