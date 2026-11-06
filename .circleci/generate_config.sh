@@ -142,7 +142,13 @@ check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 for dir in $(jq --raw-output ".workspaces[]" package.json); do
-  changed "$dir" \
+  # A workspace's own lockfiles (e.g. Dependabot bumps of
+  # examples/blogger/reactive_service/package-lock.json) do not affect the TS
+  # jobs: they install with npm from the root, which resolves every workspace
+  # from the root package-lock.json and ignores lockfiles inside workspaces.
+  # check-examples still sees them through the examples/ diff.
+  changed "$dir" ":^$dir/package-lock.json" ":^$dir/pnpm-lock.yaml" \
+          ":^$dir/pnpm-workspace.yaml" \
     && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
   ${TS_CHANGED["$dir"]} && check_ts=true
 done
