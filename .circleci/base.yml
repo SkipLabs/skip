@@ -32,6 +32,39 @@ commands:
             git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
             git submodule update
 
+  # Cache ~/.npm, npm's content-addressed download cache, not node_modules: npm
+  # still resolves from the lockfile and checks each tarball's integrity hash,
+  # so a stale or partial cache only costs downloads, never correctness.
+  #
+  # Key: npm-v1-<job>-<checksum of the root package-lock.json at checkout>.
+  # - Per job, because jobs install different package sets (`-w` subsets,
+  #   extra TypeScript versions, bun), and CircleCI caches are immutable per
+  #   key (first writer wins), so a shared key would freeze whichever job
+  #   saved first. Concurrent runs of the same job save identical content.
+  # - The lockfile is snapshotted before any install, because check-ts
+  #   rewrites it (`npm install --save-dev typescript@...`) before the save.
+  # - The fallback key restores the job's cache for an older lockfile; npm
+  #   fetches only what changed. Old tarballs then accumulate across lockfile
+  #   bumps: to drop them (or to bust a bad cache), bump v1 in both commands.
+  npm-cache-restore:
+    description: "Restore npm's download cache (~/.npm)"
+    steps:
+      - run:
+          name: Snapshot package-lock.json for the npm cache key
+          command: cp package-lock.json /tmp/npm-cache-key
+      - restore_cache:
+          keys:
+            - npm-v1-{{ .Environment.CIRCLE_JOB }}-{{ checksum "/tmp/npm-cache-key" }}
+            - npm-v1-{{ .Environment.CIRCLE_JOB }}-
+
+  npm-cache-save:
+    description: "Save npm's download cache (~/.npm); pairs with npm-cache-restore"
+    steps:
+      - save_cache:
+          key: npm-v1-{{ .Environment.CIRCLE_JOB }}-{{ checksum "/tmp/npm-cache-key" }}
+          paths:
+            - ~/.npm
+
 jobs:
   check-ts:
     docker:
@@ -42,6 +75,7 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      - npm-cache-restore
       - run:
           name: Typecheck and lint typescript sources
           command: make check-ts
@@ -60,6 +94,7 @@ jobs:
       - run:
           name: Typecheck with TypeScript ~6.0.0
           command: npm install --save-dev typescript@~6.0.0 --ignore-scripts && SKIP_LINT=1 bin/check-ts.sh
+      - npm-cache-save
 
   compiler:
     docker:
@@ -178,10 +213,12 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      - npm-cache-restore
       - run:
           name: Run wasm skdb tests
           no_output_timeout: 15m
           command: make test-wasm
+      - npm-cache-save
       - store_test_results:
           path: ~/test-results
 
@@ -266,12 +303,15 @@ jobs:
       - custom-checkout:
           submodules: true
       - setup_remote_docker
+      - npm-cache-restore
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
           command: |
             mkdir -p ~/test-results
             make test-skipruntime-ts
+      # The next step's npm installs are up to date or run in its Docker build.
+      - npm-cache-save
       - run:
           name: Run native addon unreleased test
           no_output_timeout: 10m
@@ -309,6 +349,8 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      # Restored before installing Bun so the cache also holds its tarballs.
+      - npm-cache-restore
       - run:
           name: Install Bun
           command: npm install -g bun@1.3.14
@@ -317,6 +359,7 @@ jobs:
           no_output_timeout: 10m
           command: |
             make test-skipruntime-ts-bun
+      - npm-cache-save
 
   check-examples:
     docker:
