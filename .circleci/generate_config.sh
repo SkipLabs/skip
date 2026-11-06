@@ -24,12 +24,44 @@ changed examples/
 examples=$?
 
 shopt -s globstar
-declare -A SK_CHANGED
+
+# Test-only paths are read by a single package's job and are not part of what
+# its dependents compile against, so a change confined to them schedules that
+# job alone: no reverse dependencies, no TS jobs. Each package's own tests/ is
+# one: skargo compiles tests/*.sk only into the test target of the package it
+# builds (manifest_targets in skiplang/skargo/src/manifest.sk), never into the
+# library a dependent links, and no package, Makefile or script reads another
+# package's tests/. A `tests = [...]` key in any Skargo.toml could point a test
+# target elsewhere, so that disables the rule. TEST_ONLY_PATHS adds other such
+# paths, mapped to the package whose job reads them.
+declare -A TEST_ONLY_PATHS=(
+  # C regression tests run by the compiler job's "Run runtime regressions"
+  # step only; prelude's build.sk and runtime/Makefile do not compile them.
+  [skiplang/prelude/runtime/tests]=skiplang/compiler
+)
+narrow_tests=true
+grep -qE '^tests *=' -- **/Skargo.toml && narrow_tests=false
+
+# SK_LIB_CHANGED: the package's library or binaries changed, which its
+# dependents and the TS jobs see. SK_CHANGED: the package's own job must run.
+declare -A SK_CHANGED SK_LIB_CHANGED
 for skargo_toml in **/Skargo.toml; do
   dir=$(dirname "$skargo_toml")
-  changed "$dir" :^"$dir/ts" \
-    && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
+  test_only=()
+  if $narrow_tests; then
+    test_only=(":^$dir/tests")
+    for path in "${!TEST_ONLY_PATHS[@]}"; do test_only+=(":^$path"); done
+  fi
+  changed "$dir" :^"$dir/ts" "${test_only[@]}" \
+    && SK_LIB_CHANGED["$dir"]=false || SK_LIB_CHANGED["$dir"]=true
+  SK_CHANGED["$dir"]=${SK_LIB_CHANGED["$dir"]}
+  $narrow_tests && ! changed "$dir/tests" && SK_CHANGED["$dir"]=true
 done
+if $narrow_tests; then
+  for path in "${!TEST_ONLY_PATHS[@]}"; do
+    changed "$path" || SK_CHANGED["${TEST_ONLY_PATHS[$path]}"]=true
+  done
+fi
 
 # The Docker images ship a stage0 toolchain built from the pinned bootstrap and
 # the prelude runtime. When this diff changes those inputs, jobs that compile
@@ -46,7 +78,9 @@ if ! changed skiplang/compiler/bootstrap skiplang/compiler/Makefile \
      skiplang/prelude/Makefile skiplang/prelude/libbacktrace; then
   candidate=true
   SK_CHANGED[skiplang/compiler]=true
+  SK_LIB_CHANGED[skiplang/compiler]=true
   SK_CHANGED[skiplang/prelude]=true
+  SK_LIB_CHANGED[skiplang/prelude]=true
 fi
 
 # Emit the parameters that make an image-toolchain job use the candidate
@@ -83,13 +117,15 @@ for pkg in "${!SK_DEPS[@]}"; do
   done
 done
 
-# Cycle-safe BFS over the reverse graph, seeded with the directly-changed packages.
+# Cycle-safe BFS over the reverse graph, seeded with the packages whose library
+# changed (a test-only change does not reach dependents).
 queue=()
-for pkg in "${!SK_CHANGED[@]}"; do ${SK_CHANGED["$pkg"]} && queue+=("$pkg"); done
+for pkg in "${!SK_LIB_CHANGED[@]}"; do ${SK_LIB_CHANGED["$pkg"]} && queue+=("$pkg"); done
 while [ "${#queue[@]}" -gt 0 ]; do
   cur="${queue[0]}"; queue=("${queue[@]:1}")
   for dependent in ${SK_RDEPS["$cur"]:-}; do
-    if [ "${SK_CHANGED[$dependent]:-false}" != true ]; then
+    if [ "${SK_LIB_CHANGED[$dependent]:-false}" != true ]; then
+      SK_LIB_CHANGED["$dependent"]=true
       SK_CHANGED["$dependent"]=true
       queue+=("$dependent")
     fi
@@ -111,8 +147,9 @@ for dir in $(jq --raw-output ".workspaces[]" package.json); do
   ${TS_CHANGED["$dir"]} && check_ts=true
 done
 
-for dir in "${!SK_CHANGED[@]}"; do
-  ${SK_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
+# The TS packages build against the Skip libraries, not their tests.
+for dir in "${!SK_LIB_CHANGED[@]}"; do
+  ${SK_LIB_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
 done
 
 for dir in "${!TS_CHANGED[@]}"; do
