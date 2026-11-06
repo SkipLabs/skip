@@ -15,9 +15,43 @@ NON_BUILD_EXCLUDES=(
   ':(glob,exclude)**/.gitignore'
 )
 
+# Files that no CircleCI job reads, although they sit under a path that
+# triggers jobs (bin/ or the sql package). List a path here only when nothing
+# a job runs (its steps, Makefiles, scripts, npm/skargo/gradle builds) reads it;
+# anything not listed keeps triggering.
+NO_CI_JOB_EXCLUDES=(
+  # Docker image build, publish and bootstrap-bump scripts, run by GitHub
+  # Actions or by hand. CircleCI jobs use the already-published images and
+  # never build these (HACKING.md, "Publishing CI Docker images").
+  ':(exclude)bin/apt-install.sh'
+  ':(exclude)bin/build_docker_images.sh'
+  ':(exclude)bin/build_prod_skdb_images.sh'
+  ':(exclude)bin/bump_bootstrap.sh'
+  ':(exclude)bin/check_bootstrap_token.sh'
+  ':(exclude)bin/check_ci_images.sh'
+  ':(exclude)bin/check_push_access.sh'
+  ':(glob,exclude)bin/release_docker*.sh'
+  ':(exclude)sql/Dockerfile'
+  ':(exclude)sql/server/core/Dockerfile'
+  ':(exclude)sql/server/dev/Dockerfile'
+  # npm publishing, run only by the root Makefile's publish-* targets.
+  ':(exclude)bin/release_npm.sh'
+  # Local developer tooling. The formatting gate (fast-checks) always runs and
+  # does not use these hooks.
+  ':(exclude)bin/claude_hooks/'
+  ':(exclude)bin/git_hooks/'
+  ':(exclude)bin/migrate-old-history-branches.sh'
+  # skdb consumer smoke tests for `make check-vite` and `make test-bun`, which no
+  # job runs. sql/ts's tsconfig.json and eslint.config.js exclude them, and they
+  # are not npm workspaces.
+  ':(exclude)sql/ts/bun/'
+  ':(exclude)sql/ts/vitejs/'
+)
+
 # Exit 0 when the diff restricted to the given paths has no build-relevant change.
 changed() {
-  git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}"
+  git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}" \
+    "${NO_CI_JOB_EXCLUDES[@]}"
 }
 
 changed examples/
