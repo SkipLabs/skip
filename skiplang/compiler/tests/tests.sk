@@ -1284,16 +1284,29 @@ private fun nativeTypeIdentity(): void {
         "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 }\n" +
         "untracked fun main(): void { print_raw(if (differs(A(1), B(1))) \"pass\" else \"fail\") }\n",
     );
-    // Aa and BB collide under the runtime's polynomial string hash, including
-    // when embedded in IdentityCollisionBox<...>. Collapsed names/layouts must stay nominal.
-    generic =
-      "class Aa() {}\nclass BB() {}\n" +
+    // Aa and BB collide under the runtime's polynomial string hash. Collapsed
+    // names/layouts must stay nominal.
+    collision =
       "base class Kind() {}\n" +
-      "class IdentityCollisionBox<T>(value: ?T) extends Kind\n" +
-      "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 }\n" +
-      "untracked fun main(): void { print_raw(if (differs(IdentityCollisionBox<Aa>(None()), IdentityCollisionBox<BB>(None()))) \"pass\" else \"fail\") }\n";
-    for (genericCase in Array[false, true]) {
-      if (genericCase) FileSystem.writeTextFile(source, generic);
+      "class Aa() extends Kind\nclass BB() extends Kind\n" +
+      "@no_inline fun differs(a: Kind, b: Kind): Bool { native_eq(a, b) != 0 && hash(a) != hash(b) }\n" +
+      "untracked fun main(): void { print_raw(if (differs(Aa(), BB())) \"pass\" else \"fail\") }\n";
+    // Identity is per class, not per specialization: covariance lets equal
+    // values reach the runtime as Array<IASC> and Array<IKind>, or Some<IASC>
+    // and Some<IKind>, and native_eq and hash must agree on them (#1602).
+    specializations =
+      "base class IKind uses Orderable { children = | IASC() | INONE() }\n" +
+      "class Pair<+T: frozen>(value: T, n: Int)\n" +
+      "@no_inline fun narrowArray(): Array<(Int, IKind)> { Array<(Int, IASC)>[(0, IASC())] }\n" +
+      "@no_inline fun wideArray(): Array<(Int, IKind)> { Array<(Int, IKind)>[(0, IASC())] }\n" +
+      "@no_inline fun narrowOption(): ?IKind { Some<IASC>(IASC()) }\n" +
+      "@no_inline fun wideOption(): ?IKind { Some<IKind>(IASC()) }\n" +
+      "@no_inline fun narrowPair(): Pair<IKind> { Pair<IASC>(IASC(), 1) }\n" +
+      "@no_inline fun widePair(): Pair<IKind> { Pair<IKind>(IASC(), 1) }\n" +
+      "@no_inline fun same<T: frozen>(a: T, b: T): Bool { native_eq(a, b) == 0 && hash(a) == hash(b) }\n" +
+      "untracked fun main(): void { print_raw(if (same(narrowArray(), wideArray()) && same(narrowOption(), wideOption()) && same(narrowPair(), widePair())) \"pass\" else \"fail\") }\n";
+    for (program in Array[None(), Some(collision), Some(specializations)]) {
+      program.each(text -> FileSystem.writeTextFile(source, text));
       for (release in Array[false, true]) {
         compiled = System.subprocess(
           compile_cmd(Array[source], output).concat(
