@@ -65,6 +65,45 @@ commands:
           paths:
             - ~/.npm
 
+  # Replace the image's toolchain with the one the `compiler` job built from
+  # this checkout. The images ship stage0 (skc, skargo, skfmt and their
+  # libraries, built from the pinned bootstrap and this prelude runtime), so a
+  # job on an image only exercises a bootstrap or runtime change after the next
+  # Docker publish (#1602). Installing this checkout's stage0 the way the
+  # Dockerfile does (bin/ -> /usr/bin, lib/ -> /usr/lib) tests it now. skc
+  # finds its sysroot relative to its own path, so both must move together.
+  use-candidate-toolchain:
+    description: "Install this checkout's stage0 toolchain over the image's"
+    parameters:
+      enabled:
+        type: boolean
+        default: false
+    steps:
+      - when:
+          condition: << parameters.enabled >>
+          steps:
+            - attach_workspace:
+                at: /tmp/candidate
+            - run:
+                name: Install the candidate stage0 toolchain
+                # `skc --version` names the skip commit the bootstrap IR was
+                # generated from, not this checkout, so a runtime-only change
+                # keeps the same string. The checksums show the binaries and
+                # std actually changed.
+                command: |
+                  stage0=/tmp/candidate/skiplang/compiler/stage0
+                  sudo=""; [ "$(id -u)" -eq 0 ] || sudo=sudo
+                  toolchain() {
+                    echo "$1: $(skc --version 2>&1 | tail -n 1)"
+                    for f in /usr/bin/skc /usr/bin/skargo /usr/lib/libstd.sklib; do
+                      echo "  $(sha256sum "$f" 2>/dev/null | cut -c1-16 || echo missing) $f"
+                    done
+                  }
+                  toolchain "Image toolchain"
+                  $sudo cp -a "$stage0/bin/." /usr/bin/
+                  $sudo cp -a "$stage0/lib/." /usr/lib/
+                  toolchain "Candidate toolchain"
+
 jobs:
   check-ts:
     docker:
@@ -140,6 +179,8 @@ jobs:
       # skargo's tests use stage1/{bin,lib}. backend-regressions also needs the
       # matching .sklib archives (not the much larger .ll intermediates in the
       # same directory) and the stage0 compiler for archive compatibility.
+      # stage0/{bin,lib} is the toolchain the images ship; jobs with
+      # candidate_toolchain install it (see use-candidate-toolchain).
       - persist_to_workspace:
           root: .
           paths:
@@ -147,6 +188,8 @@ jobs:
             - skiplang/compiler/stage1/lib
             - skiplang/compiler/stage1/target/host/release/deps/*.sklib
             - skiplang/compiler/stage0/bin
+            - skiplang/compiler/stage0/lib/*.a
+            - skiplang/compiler/stage0/lib/*.sklib
 
   backend-regressions:
     parameters:
@@ -196,9 +239,15 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+    parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       - run:
           name: Run native skdb tests
           command: |
@@ -210,9 +259,15 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+    parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       - npm-cache-restore
       - run:
           name: Run wasm skdb tests
@@ -227,11 +282,16 @@ jobs:
       - image: skiplabs/skiplang:latest
     resource_class: medium
     parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
       dir:
         type: string
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       - run:
           name: Build << parameters.dir >>
           command: |
@@ -242,6 +302,9 @@ jobs:
       - image: skiplabs/skiplang:latest
     resource_class: medium
     parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
       dir:
         type: string
       candidate_compiler:
@@ -250,6 +313,8 @@ jobs:
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       - when:
           condition: << parameters.candidate_compiler >>
           steps:
@@ -299,9 +364,15 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+    parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       - setup_remote_docker
       - npm-cache-restore
       - run:
@@ -346,9 +417,15 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+    parameters:
+      candidate_toolchain:
+        type: boolean
+        default: false
     steps:
       - custom-checkout:
           submodules: true
+      - use-candidate-toolchain:
+          enabled: << parameters.candidate_toolchain >>
       # Restored before installing Bun so the cache also holds its tarballs.
       - npm-cache-restore
       - run:
