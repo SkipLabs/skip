@@ -15,21 +15,87 @@ NON_BUILD_EXCLUDES=(
   ':(glob,exclude)**/.gitignore'
 )
 
+# Files that no CircleCI job reads, although they sit under a path that
+# triggers jobs (bin/ or the sql package). List a path here only when nothing
+# a job runs (its steps, Makefiles, scripts, npm/skargo/gradle builds) reads it;
+# anything not listed keeps triggering.
+NO_CI_JOB_EXCLUDES=(
+  # Docker image build, publish and bootstrap-bump scripts, run by GitHub
+  # Actions or by hand. CircleCI jobs use the already-published images and
+  # never build these (HACKING.md, "Publishing CI Docker images").
+  ':(exclude)bin/apt-install.sh'
+  ':(exclude)bin/build_docker_images.sh'
+  ':(exclude)bin/build_prod_skdb_images.sh'
+  ':(exclude)bin/bump_bootstrap.sh'
+  ':(exclude)bin/check_bootstrap_token.sh'
+  ':(exclude)bin/check_ci_images.sh'
+  ':(exclude)bin/check_push_access.sh'
+  ':(glob,exclude)bin/release_docker*.sh'
+  ':(exclude)sql/Dockerfile'
+  ':(exclude)sql/server/core/Dockerfile'
+  ':(exclude)sql/server/dev/Dockerfile'
+  # npm publishing, run only by the root Makefile's publish-* targets.
+  ':(exclude)bin/release_npm.sh'
+  # Local developer tooling. The formatting gate (fast-checks) always runs and
+  # does not use these hooks.
+  ':(exclude)bin/claude_hooks/'
+  ':(exclude)bin/git_hooks/'
+  ':(exclude)bin/migrate-old-history-branches.sh'
+  # skdb consumer smoke tests for `make check-vite` and `make test-bun`, which no
+  # job runs. sql/ts's tsconfig.json and eslint.config.js exclude them, and they
+  # are not npm workspaces.
+  ':(exclude)sql/ts/bun/'
+  ':(exclude)sql/ts/vitejs/'
+)
+
 # Exit 0 when the diff restricted to the given paths has no build-relevant change.
 changed() {
-  git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}"
+  git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}" \
+    "${NO_CI_JOB_EXCLUDES[@]}"
 }
 
 changed examples/
 examples=$?
 
 shopt -s globstar
-declare -A SK_CHANGED
+
+# Test-only paths are read by a single package's job and are not part of what
+# its dependents compile against, so a change confined to them schedules that
+# job alone: no reverse dependencies, no TS jobs. Each package's own tests/ is
+# one: skargo compiles tests/*.sk only into the test target of the package it
+# builds (manifest_targets in skiplang/skargo/src/manifest.sk), never into the
+# library a dependent links, and no package, Makefile or script reads another
+# package's tests/. A `tests = [...]` key in any Skargo.toml could point a test
+# target elsewhere, so that disables the rule. TEST_ONLY_PATHS adds other such
+# paths, mapped to the package whose job reads them.
+declare -A TEST_ONLY_PATHS=(
+  # C regression tests run by the compiler job's "Run runtime regressions"
+  # step only; prelude's build.sk and runtime/Makefile do not compile them.
+  [skiplang/prelude/runtime/tests]=skiplang/compiler
+)
+narrow_tests=true
+grep -qE '^tests *=' -- **/Skargo.toml && narrow_tests=false
+
+# SK_LIB_CHANGED: the package's library or binaries changed, which its
+# dependents and the TS jobs see. SK_CHANGED: the package's own job must run.
+declare -A SK_CHANGED SK_LIB_CHANGED
 for skargo_toml in **/Skargo.toml; do
   dir=$(dirname "$skargo_toml")
-  changed "$dir" :^"$dir/ts" \
-    && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
+  test_only=()
+  if $narrow_tests; then
+    test_only=(":^$dir/tests")
+    for path in "${!TEST_ONLY_PATHS[@]}"; do test_only+=(":^$path"); done
+  fi
+  changed "$dir" :^"$dir/ts" "${test_only[@]}" \
+    && SK_LIB_CHANGED["$dir"]=false || SK_LIB_CHANGED["$dir"]=true
+  SK_CHANGED["$dir"]=${SK_LIB_CHANGED["$dir"]}
+  $narrow_tests && ! changed "$dir/tests" && SK_CHANGED["$dir"]=true
 done
+if $narrow_tests; then
+  for path in "${!TEST_ONLY_PATHS[@]}"; do
+    changed "$path" || SK_CHANGED["${TEST_ONLY_PATHS[$path]}"]=true
+  done
+fi
 
 # The Docker images ship a stage0 toolchain built from the pinned bootstrap and
 # the prelude runtime. When this diff changes those inputs, jobs that compile
@@ -46,7 +112,9 @@ if ! changed skiplang/compiler/bootstrap skiplang/compiler/Makefile \
      skiplang/prelude/Makefile skiplang/prelude/libbacktrace; then
   candidate=true
   SK_CHANGED[skiplang/compiler]=true
+  SK_LIB_CHANGED[skiplang/compiler]=true
   SK_CHANGED[skiplang/prelude]=true
+  SK_LIB_CHANGED[skiplang/prelude]=true
 fi
 
 # Emit the parameters that make an image-toolchain job use the candidate
@@ -83,13 +151,15 @@ for pkg in "${!SK_DEPS[@]}"; do
   done
 done
 
-# Cycle-safe BFS over the reverse graph, seeded with the directly-changed packages.
+# Cycle-safe BFS over the reverse graph, seeded with the packages whose library
+# changed (a test-only change does not reach dependents).
 queue=()
-for pkg in "${!SK_CHANGED[@]}"; do ${SK_CHANGED["$pkg"]} && queue+=("$pkg"); done
+for pkg in "${!SK_LIB_CHANGED[@]}"; do ${SK_LIB_CHANGED["$pkg"]} && queue+=("$pkg"); done
 while [ "${#queue[@]}" -gt 0 ]; do
   cur="${queue[0]}"; queue=("${queue[@]:1}")
   for dependent in ${SK_RDEPS["$cur"]:-}; do
-    if [ "${SK_CHANGED[$dependent]:-false}" != true ]; then
+    if [ "${SK_LIB_CHANGED[$dependent]:-false}" != true ]; then
+      SK_LIB_CHANGED["$dependent"]=true
       SK_CHANGED["$dependent"]=true
       queue+=("$dependent")
     fi
@@ -106,13 +176,20 @@ check_ts=false
 declare -A TS_CHANGED
 # shellcheck disable=SC2046 # We actually want splitting in jq command output
 for dir in $(jq --raw-output ".workspaces[]" package.json); do
-  changed "$dir" \
+  # A workspace's own lockfiles (e.g. Dependabot bumps of
+  # examples/blogger/reactive_service/package-lock.json) do not affect the TS
+  # jobs: they install with npm from the root, which resolves every workspace
+  # from the root package-lock.json and ignores lockfiles inside workspaces.
+  # check-examples still sees them through the examples/ diff.
+  changed "$dir" ":^$dir/package-lock.json" ":^$dir/pnpm-lock.yaml" \
+          ":^$dir/pnpm-workspace.yaml" \
     && TS_CHANGED["$dir"]=false || TS_CHANGED["$dir"]=true
   ${TS_CHANGED["$dir"]} && check_ts=true
 done
 
-for dir in "${!SK_CHANGED[@]}"; do
-  ${SK_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
+# The TS packages build against the Skip libraries, not their tests.
+for dir in "${!SK_LIB_CHANGED[@]}"; do
+  ${SK_LIB_CHANGED["$dir"]} && TS_CHANGED["$dir"]=true
 done
 
 for dir in "${!TS_CHANGED[@]}"; do
@@ -141,11 +218,78 @@ fi
 # Makefiles/bin scripts drive those builds. Without this a change to e.g. the
 # lockfile or skipruntime-ts/Makefile runs no CI at all, even though it can break
 # those builds -- so route it to the TS job set.
+# prebuild.mjs links the Skip runtime TS sources into the workspaces whose
+# typecheck/build scripts run it.
 if ! changed \
-     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile; then
+     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile \
+     prebuild.mjs; then
   check_ts=true
   TS_CHANGED[skipruntime-ts]=true
   TS_CHANGED[sql]=true
+fi
+
+# The skipruntime job's native addon test builds libskipruntime in Docker
+# (skipruntime-ts/tests/native_addon_unreleased/run.sh -> bin/build_runtime.sh
+# -> the `skipruntime` bake target), which builds skiplang/Dockerfile and
+# skipruntime-ts/Dockerfile with the build contexts filtered by .dockerignore.
+if ! changed \
+     skiplang/Dockerfile skipruntime-ts/Dockerfile docker-bake.hcl .dockerignore
+then
+  TS_CHANGED[skipruntime-ts]=true
+fi
+
+# A PR that edits a job's definition in base.yml must run that job, or the edit
+# goes untested until an unrelated PR triggers it (#1601). Split base.yml into
+# sections (each job under `jobs:`, every other top-level key) and print the
+# names of those that differ between BASE and HEAD, ignoring comment-only and
+# blank lines (a comment above a job would otherwise count towards the previous
+# one). config.yml and this script need no rule: every pipeline runs them in its
+# setup and fast-checks jobs.
+changed_base_yml_sections() {
+  awk '
+    FNR == 1 { f = (FILENAME == ARGV[1]) ? 1 : 2; top = ""; key = "" }
+    /^[ \t]*(#.*)?$/ { next }
+    /^[^ ]/ { top = $1; sub(/:.*/, "", top); key = top }
+    top == "jobs" && /^  [^ #]/ { key = $1; sub(/:.*/, "", key) }
+    { text[f, key] = text[f, key] $0 "\n"; keys[key] }
+    END { for (k in keys) if (text[1, k] != text[2, k]) print k }
+  ' <(git show "$BASE:.circleci/base.yml" 2>/dev/null) \
+    <(git show "HEAD:.circleci/base.yml" 2>/dev/null)
+}
+if ! changed .circleci/base.yml; then
+  while IFS= read -r section; do
+    case "$section" in
+      # skargo and backend-regressions run on the compiler job's workspace.
+      compiler)
+        SK_CHANGED[skiplang/compiler]=true
+        SK_CHANGED[skiplang/skargo]=true ;;
+      backend-regressions) SK_CHANGED[skiplang/compiler]=true ;;
+      skdb) SK_CHANGED[sql]=true ;;
+      skdb-wasm) TS_CHANGED[sql]=true ;;
+      check-ts) check_ts=true ;;
+      skipruntime | skipruntime-bun) TS_CHANGED[skipruntime-ts]=true ;;
+      check-examples) examples=1 ;;
+      all-checks) ;;
+      # Every Skargo package except these three gets a skip-package-* job below.
+      # skargo's job needs compiler, which is therefore scheduled too.
+      skip-package-build | skip-package-tests)
+        for dir in "${!SK_CHANGED[@]}"; do
+          case "$dir" in
+            sql | skipruntime-ts/*) ;;
+            *) SK_CHANGED["$dir"]=true ;;
+          esac
+        done ;;
+      # `commands:` (custom-checkout), `version:`, or a job this list does not
+      # know: schedule everything.
+      *)
+        for dir in "${!SK_CHANGED[@]}"; do SK_CHANGED["$dir"]=true; done
+        check_ts=true
+        TS_CHANGED[sql]=true
+        TS_CHANGED[skipruntime-ts]=true
+        examples=1
+        ;;
+    esac
+  done < <(changed_base_yml_sections)
 fi
 
 cat .circleci/base.yml
