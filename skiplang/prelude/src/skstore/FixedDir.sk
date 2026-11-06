@@ -183,10 +183,14 @@ class SingletonFixedDir protected {
     if (vec.size() == 0) return SharedSingletonFixedDir::create(vec);
     first = vec[0];
     for (row in vec) {
+      // `get` rebuilds each source from the output key, so they must be the
+      // same value. Don't compare them through Key.compare: a mapped
+      // collection's source and output keys can be different Key classes,
+      // and a key's compare may reject other classes.
       if (
         row.value.size() != 1 ||
         row.source.dirName != first.source.dirName ||
-        row.source.baseName != row.key ||
+        native_eq(row.source.baseName, row.key) != 0 ||
         row.tag.current != first.tag.current
       ) {
         return SharedSingletonFixedDir::create(vec)
