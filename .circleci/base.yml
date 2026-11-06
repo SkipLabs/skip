@@ -114,6 +114,14 @@ jobs:
             - skiplang/compiler/stage0/bin
 
   backend-regressions:
+    parameters:
+      shards:
+        description: >-
+          Containers to split the test modules across, balanced by
+          EXPECTED_SECONDS in skiplang/compiler/tools/run_backend_tests.py.
+        type: integer
+        default: 2
+    parallelism: << parameters.shards >>
     docker:
       # Includes Python for the test runner and Clang for native fixtures.
       - image: skiplabs/skip:latest
@@ -128,14 +136,17 @@ jobs:
       - run:
           name: Run backend regressions
           no_output_timeout: 30m
-          # Test modules run concurrently, each in its own process and TMPDIR;
-          # the monitor bounds their summed RSS, scratch disk and wall time.
+          # Each container runs one shard of the test modules. Within it,
+          # modules run concurrently, each in its own process and TMPDIR; the
+          # monitor bounds their summed RSS, scratch disk and wall time.
           command: |
             cd skiplang/compiler
             python3 tools/incremental_profile.py run \
-              --root /tmp/skc-backend-checks --label regressions \
+              --root /tmp/skc-backend-checks \
+              --label "regressions-$CIRCLE_NODE_INDEX" \
               --disk-gib 40 --reserve-gib 8 --rss-gib 14 --timeout 2400 \
               -- python3 tools/run_backend_tests.py --jobs 8 \
+              --shard "$CIRCLE_NODE_INDEX/$CIRCLE_NODE_TOTAL" \
               --compiler stage1/bin/skc \
               --sysroot stage1/target/host/release/deps \
               --legacy-compiler stage0/bin/skc \

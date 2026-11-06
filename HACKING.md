@@ -45,6 +45,10 @@ encourages batching unrelated changes.
 - Long Python test suites should report per-test durations (as
   `skiplang/compiler/tools/run_backend_tests.py` does) so regressions in a
   single test are visible in the CI log.
+- `backend-regressions` is split across parallel containers; the count is its
+  `shards` parameter in `.circleci/base.yml`. See
+  [`skiplang/compiler/tools/README.md`](skiplang/compiler/tools/README.md#sharding-in-ci)
+  for how modules are balanced and how to refresh their expected durations.
 - Doc-only and `.gitignore`-only changes schedule no test jobs
   (`.circleci/generate_config.sh`); keep it that way for other paths that
   cannot affect a build.

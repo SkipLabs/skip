@@ -24,6 +24,25 @@ The compiler CI job uses a 14 GiB RSS guard within its existing 16 GB allocation
 It also monitors the compiler build and language suite, preserving the logs as
 artifacts so resource-limit failures identify the command that exceeded them.
 
+## Sharding in CI
+
+CircleCI's `backend-regressions` job splits the test modules across
+`parallelism` containers. The count is the `shards` parameter of that job in
+`.circleci/base.yml` (default 2); change it only there. Each container runs
+`run_backend_tests.py --shard "$CIRCLE_NODE_INDEX/$CIRCLE_NODE_TOTAL"` with the
+same `--jobs 8` and 14 GiB RSS guard as a single `xlarge.gen2` container, and
+stores its evidence under `backend-regressions/regressions-<index>/`.
+
+`--shard INDEX/TOTAL` assigns modules longest first to the least-loaded shard,
+using the `EXPECTED_SECONDS` table in `run_backend_tests.py`. The split is
+deterministic and every module runs in exactly one shard. A module missing from
+the table, such as a new test file, still runs: it is weighted as a median
+module and the shard's log names it. To refresh the table, copy the times from
+the "Modules by elapsed time" block at the end of each shard's `command.log`
+artifact. A shard takes at least as long as its slowest module (about 180 s
+today), so more shards stop helping once each shard's expected total divided by
+`--jobs` falls below that.
+
 The runner supplies compiler wrappers with explicit library paths for all
 executable tests. Individual modules can also be run with `python3 -m unittest`;
 their docstrings name the required environment variables. Running discovery
