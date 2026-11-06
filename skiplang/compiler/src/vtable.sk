@@ -258,12 +258,29 @@ private fun createVTableBuilders(
   // Intern table for SkipGcType structs.
   gcTypes = mutable UnorderedSet[];
 
-  for (typeIdentity => sc in classesNeedingVTables.toArray().sorted()) {
+  // The runtime's native_eq and SKIP_hash identify a class by its GC type
+  // pointer. Number nominal (generic) classes, not their specializations:
+  // equal values of Array<A> and Array<Base>, or Some<A> and Some<Base>,
+  // must hash and compare equal, as they did when only debug names (which
+  // collapse type arguments) distinguished GC types. A closure's code can
+  // depend on its type arguments, so each lambda specialization keeps its
+  // own identity.
+  sclasses = classesNeedingVTables.toArray().sorted().map(sc ->
+    ClassInputs.getSClass(env, sc, classReader)
+  );
+  typeIdentityName = (sclass: SClass) ->
+    if (sclass.isLambda) "lambda " + sclass.id.id else sclass.gclassName.id;
+  typeIdentities = mutable UnorderedMap<String, Int>[];
+  for (name in sclasses.map(typeIdentityName).sorted()) {
+    _ = typeIdentities.maybeSet(name, typeIdentities.size() + 1)
+  };
+
+  for (sclass in sclasses) {
+    sc = sclass.id;
     _ = builders.getOrAdd(sc, () -> {
       builder = mutable VTableBuilder(sc, env, classReader);
 
       // Sanity check what we are being asked to create a VTable for.
-      sclass = ClassInputs.getSClass(env, sc, classReader);
       if (!sclass.kind.isKClass()) {
         sclass.die(
           "Trying to create VTable for class " +
@@ -277,7 +294,7 @@ private fun createVTableBuilders(
         sclass,
         env,
         config,
-        typeIdentity + 1,
+        typeIdentities[typeIdentityName(sclass)],
         classReader,
       );
       gct = gcTypes.maybeGet(tentative) match {
