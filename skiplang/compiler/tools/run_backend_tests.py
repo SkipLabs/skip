@@ -7,6 +7,9 @@ incremental_profile.py to bound aggregate memory, disk use and elapsed time.
 Test modules run concurrently (--jobs), each in its own unittest process with
 its own TMPDIR. Tests within a module stay serial. A module's output is printed
 as one block when it finishes, followed by the slowest tests overall.
+
+--shard INDEX/TOTAL runs one of TOTAL disjoint subsets of the modules, balanced
+by EXPECTED_SECONDS, so CI can split the suite across containers.
 """
 
 import argparse
@@ -15,6 +18,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import statistics
 import subprocess
 import sys
 import tempfile
@@ -37,10 +41,91 @@ COMPILER_SELECTORS = (
 DURATION = re.compile(r"^(?P<seconds>\d+(?:\.\d+)?)s\s+(?P<test>\S.*)$")
 
 
+# Elapsed seconds per module in CircleCI's backend-regressions job (xlarge.gen2,
+# --jobs 8, all 28 modules in one container; job 21025, #1598), plus this
+# runner's own pure-Python tests. Only --shard uses them, to balance shards.
+# Refresh from the "Modules by elapsed time" block of each shard's log when a
+# module's time changes a lot or a module is added.
+EXPECTED_SECONDS = {
+    "test_archive_metadata_cache": 178.6,
+    "test_native_artifact_workers": 153.0,
+    "test_shared_class_view": 148.3,
+    "test_shared_callee_views": 138.4,
+    "test_variance_index": 135.1,
+    "test_class_headers": 132.7,
+    "test_optimizer_policy": 120.4,
+    "test_collection_graph": 116.3,
+    "test_closure_bodies": 99.7,
+    "test_optimizer_callee_summaries": 88.7,
+    "test_archive_index": 82.0,
+    "test_class_collections": 76.6,
+    "test_discovery_state": 74.8,
+    "test_array_slot_reads": 70.9,
+    "test_class_groups": 69.6,
+    "test_sequential_checkpoints": 52.8,
+    "test_lambda_anchors": 44.5,
+    "test_function_collections": 39.4,
+    "test_emission_text": 34.5,
+    "test_vtable_receiver_hints": 23.5,
+    "test_subprocess_capture_pipes": 16.5,
+    "test_vtable_slots": 13.0,
+    "test_persistent_census": 0.3,
+    "test_branch_replay": 0.2,
+    "test_incremental_profile": 0.2,
+    "test_bootstrap_modules": 0.1,
+    "test_parallel_clang_accounting": 0.1,
+    "test_llvm_artifact_diff": 0.0,
+    "test_run_backend_tests": 0.1,
+}
+
+# Modules missing from the table (e.g. a new test file) still run, in exactly
+# one shard, weighted as a typical module.
+DEFAULT_SECONDS = statistics.median(EXPECTED_SECONDS.values())
+
+
 def default_jobs():
     # Each module runs one skc (plus its clang children) at a time; leave
     # headroom for those children rather than matching the core count.
     return max(1, min(8, (os.cpu_count() or 2) // 2))
+
+
+def expected_seconds(module, expected=None):
+    expected = EXPECTED_SECONDS if expected is None else expected
+    return expected.get(module, DEFAULT_SECONDS)
+
+
+def shard_modules(modules, index, total, expected=None):
+    """Return the modules of shard `index` (0-based) out of `total`.
+
+    Modules go, longest expected time first, to the shard with the least
+    expected time so far; ties break by name and shard index, so every
+    invocation computes the same disjoint partition of `modules`.
+    """
+    if not 0 <= index < total:
+        raise ValueError(f"shard index {index} not in 0..{total - 1}")
+    loads = [0.0] * total
+    shards = [[] for _ in range(total)]
+    for module in sorted(
+        set(modules), key=lambda m: (-expected_seconds(m, expected), m)
+    ):
+        target = min(range(total), key=lambda i: (loads[i], i))
+        loads[target] += expected_seconds(module, expected)
+        shards[target].append(module)
+    return sorted(shards[index])
+
+
+def parse_shard(value):
+    try:
+        index, total = (int(part) for part in value.split("/"))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"expected INDEX/TOTAL, e.g. 0/2, got {value!r}"
+        )
+    if total < 1 or not 0 <= index < total:
+        raise argparse.ArgumentTypeError(
+            f"need 0 <= INDEX < TOTAL, got {value!r}"
+        )
+    return index, total
 
 
 def run_module(module, tools, env, root):
@@ -110,6 +195,12 @@ def main():
         help="Report this many slowest tests (default: %(default)s)",
     )
     parser.add_argument(
+        "--shard",
+        type=parse_shard,
+        metavar="INDEX/TOTAL",
+        help="Run only shard INDEX (0-based) of TOTAL balanced shards",
+    )
+    parser.add_argument(
         "modules",
         nargs="*",
         help="Test modules to run, e.g. test_vtable_slots (default: all)",
@@ -123,6 +214,22 @@ def main():
         parser.error("--sysroot must contain .sklib archives")
     tools = Path(__file__).resolve().parent
     modules = args.modules or sorted(p.stem for p in tools.glob("test_*.py"))
+    if args.shard:
+        index, total = args.shard
+        modules = shard_modules(modules, index, total)
+        expected = sum(expected_seconds(m) for m in modules)
+        print(
+            f"Shard {index}/{total}: {len(modules)} modules, "
+            f"{expected:.0f}s expected in total: {' '.join(modules)}",
+            flush=True,
+        )
+        unknown = [m for m in modules if m not in EXPECTED_SECONDS]
+        if unknown:
+            print(
+                f"No expected time for {' '.join(unknown)}; assumed "
+                f"{DEFAULT_SECONDS:.0f}s each. Add them to EXPECTED_SECONDS.",
+                flush=True,
+            )
     with tempfile.TemporaryDirectory(
         prefix="backend-tests-", dir=args.scratch
     ) as temporary:
