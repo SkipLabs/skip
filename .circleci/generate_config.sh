@@ -31,6 +31,34 @@ for skargo_toml in **/Skargo.toml; do
     && SK_CHANGED["$dir"]=false || SK_CHANGED["$dir"]=true
 done
 
+# The Docker images ship a stage0 toolchain built from the pinned bootstrap and
+# the prelude runtime. When this diff changes those inputs, jobs that compile
+# with the image's toolchain would still test the previously published one, so
+# a broken bootstrap or runtime only shows up after the next publish (#1602).
+# Instead, run every job that compiles Skip code, have each wait for `compiler`,
+# and install the stage0 it built (base.yml: use-candidate-toolchain). Marking
+# the prelude changed reaches all of them: every package depends on it, and it
+# routes to the skdb and skipruntime job sets below. check-ts and
+# check-examples don't use the Skip toolchain and are unaffected.
+candidate=false
+if ! changed skiplang/compiler/bootstrap skiplang/compiler/Makefile \
+     skiplang/prelude/runtime ':^skiplang/prelude/runtime/tests' \
+     skiplang/prelude/Makefile skiplang/prelude/libbacktrace; then
+  candidate=true
+  SK_CHANGED[skiplang/compiler]=true
+  SK_CHANGED[skiplang/prelude]=true
+fi
+
+# Emit the parameters that make an image-toolchain job use the candidate
+# toolchain, when there is one.
+candidate_params() {
+  if $candidate; then
+    echo "          candidate_toolchain: true"
+    echo "          requires:"
+    echo "            - compiler"
+  fi
+}
+
 # Retest every package that (transitively) depends on a changed one, so a change
 # to a shared library reaches its dependents' jobs. The reverse dependency graph
 # is derived from the `path = "..."` entries in each Skargo.toml (all dependency
@@ -144,7 +172,12 @@ for dir in "${!SK_CHANGED[@]}"; do
         TS_CHANGED[skipruntime-ts]=true
         ;;
       sql)
-        echo "      - skdb"
+        if $candidate; then
+          echo "      - skdb:"
+          candidate_params
+        else
+          echo "      - skdb"
+        fi
         NAMES+=(skdb)
         ;;
       skiplang/compiler)
@@ -174,6 +207,7 @@ for dir in "${!SK_CHANGED[@]}"; do
         fi
         echo "          dir: $dir"
         echo "          name: $name"
+        candidate_params
         NAMES+=("$name")
     esac
   fi
@@ -181,14 +215,25 @@ done
 
 if ${TS_CHANGED[sql]}
 then
-    echo "      - skdb-wasm"
+    if $candidate; then
+        echo "      - skdb-wasm:"
+        candidate_params
+    else
+        echo "      - skdb-wasm"
+    fi
     NAMES+=(skdb-wasm)
 fi
 
 if ${TS_CHANGED[skipruntime-ts]}
 then
-    echo "      - skipruntime"
-    echo "      - skipruntime-bun"
+    for job in skipruntime skipruntime-bun; do
+        if $candidate; then
+            echo "      - $job:"
+            candidate_params
+        else
+            echo "      - $job"
+        fi
+    done
     NAMES+=(skipruntime skipruntime-bun)
 fi
 
