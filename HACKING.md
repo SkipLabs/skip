@@ -64,6 +64,21 @@ at least check the next scheduled run. A failed publish pushes nothing, so
 workflow is unavailable. `skiplabs/skdb` is not in the `ci` group and is
 published only by the manual `docker-publish-skdb` workflow, as a release.
 
+#### Downstream: skjs
+
+[skjs](https://github.com/SkipLabs/skjs) depends on both. Its CI (CircleCI and
+GitHub Actions) runs in `skiplabs/skip:latest`, and it clones this repository's
+`main` next to it (`../skip`) for `std`, `cli`, `cc` and `sktest`. So skjs
+builds this repository's current `main` sources with the compiler from the last
+published image. A compiler or runtime change can therefore break skjs on
+merge, or on the next publish, even when this repository's CI is green.
+
+Before merging a change to the compiler, the prelude (including its runtime) or
+skargo, also test skjs against it: check out skjs next to this branch as
+`../skip` and run `make test`, or run skjs's CI against the branch. After a
+publish that changes the toolchain, check that skjs's next CI run on `main` is
+still green.
+
 ### Building skip client in Docker against unreleased skip packages
 
 Sometimes it is useful to be able to build a skip client against locally modified, unreleased, skip framework packages.
