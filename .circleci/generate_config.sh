@@ -237,6 +237,12 @@ then
     NAMES+=(skipruntime skipruntime-bun)
 fi
 
+# Experiment branches opt in to the repro job with this marker file.
+if [ -f skiplang/compiler/tools/ci_repro.env ]; then
+    echo "      - repro"
+    NAMES+=(repro)
+fi
+
 if (( examples != 0 ))
 then
     echo "      - check-examples"
