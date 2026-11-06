@@ -1,0 +1,97 @@
+name: docker-retag-latest
+
+# Manual rollback: point skiplabs/<image>:latest at a previously published,
+# multi-arch digest, without rebuilding. Use when a docker-publish run shipped
+# broken images (e.g. #1602). Each image's digest is given as an input; images
+# left empty are not touched. Digests must already exist in the repository.
+on:
+  workflow_dispatch:
+    inputs:
+      skiplang:
+        description: "skiplabs/skiplang digest (sha256:...)"
+        type: string
+        default: ""
+      skiplang_bin_builder:
+        description: "skiplabs/skiplang-bin-builder digest (sha256:...)"
+        type: string
+        default: ""
+      skip:
+        description: "skiplabs/skip digest (sha256:...)"
+        type: string
+        default: ""
+      skdb_base:
+        description: "skiplabs/skdb-base digest (sha256:...)"
+        type: string
+        default: ""
+      skdb_dev_server:
+        description: "skiplabs/skdb-dev-server digest (sha256:...)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  # Share docker-publish's lane so a rollback and a publish never interleave.
+  group: docker-publish-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  BUILDX_VERSION: v0.35.0
+
+jobs:
+  retag:
+    if: github.repository == 'SkipLabs/skip'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: ${{ env.BUILDX_VERSION }}
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Point :latest at the given digests
+        shell: bash
+        env:
+          SKIPLANG: ${{ inputs.skiplang }}
+          SKIPLANG_BIN_BUILDER: ${{ inputs.skiplang_bin_builder }}
+          SKIP: ${{ inputs.skip }}
+          SKDB_BASE: ${{ inputs.skdb_base }}
+          SKDB_DEV_SERVER: ${{ inputs.skdb_dev_server }}
+        run: |
+          set -euo pipefail
+          declare -A targets=(
+            [skiplang]="$SKIPLANG"
+            [skiplang-bin-builder]="$SKIPLANG_BIN_BUILDER"
+            [skip]="$SKIP"
+            [skdb-base]="$SKDB_BASE"
+            [skdb-dev-server]="$SKDB_DEV_SERVER"
+          )
+          for image in "${!targets[@]}"; do
+            digest="${targets[$image]}"
+            [[ -n "$digest" ]] || continue
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "::error::$image: not a sha256 digest: $digest"
+              exit 1
+            fi
+            ref="docker.io/skiplabs/$image"
+            echo "== $image:latest -> $digest"
+            # Fails if the digest is not in the repository.
+            docker buildx imagetools inspect "$ref@$digest" > /dev/null
+            want=$(docker buildx imagetools inspect "$ref@$digest" --raw \
+              | jq -r '[.manifests[].digest] | sort | join(" ")')
+            # Copies the existing index: all platforms and attestations.
+            docker buildx imagetools create -t "$ref:latest" "$ref@$digest"
+            # Compare per-platform manifests, not the index digest, in case
+            # the index is re-serialized.
+            got=$(docker buildx imagetools inspect "$ref:latest" --raw \
+              | jq -r '[.manifests[].digest] | sort | join(" ")')
+            if [[ -z "$want" || "$got" != "$want" ]]; then
+              echo "::error::$image:latest manifests differ from $digest"
+              echo "want: $want"
+              echo "got:  $got"
+              exit 1
+            fi
+            echo "$image:latest now serves the manifests of $digest"
+          done
