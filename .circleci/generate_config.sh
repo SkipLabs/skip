@@ -149,7 +149,12 @@ for dir in "${!SK_CHANGED[@]}"; do
         ;;
       skiplang/compiler)
         echo "      - compiler"
-        NAMES+=(compiler)
+        # Runs on the compiler job's stage1 build, beside the other jobs that
+        # wait for it, instead of extending the compiler job itself.
+        echo "      - backend-regressions:"
+        echo "          requires:"
+        echo "            - compiler"
+        NAMES+=(compiler backend-regressions)
         ;;
       skiplang/skargo)
         echo "      - skip-package-tests:"
