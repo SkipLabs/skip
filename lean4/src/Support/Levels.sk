@@ -1,0 +1,35 @@
+// Structural level equality. Cached hash/data words are not part of identity.
+fun leanLevelEqual(a: LeanValue, b: LeanValue): Bool {
+  if (leanTag(a) != leanTag(b)) return false;
+  leanTag(a) match {
+  | "[\"Lean\",\"Level\",\"zero\",\"_impl\"]" -> true
+  | "[\"Lean\",\"Level\",\"param\",\"_impl\"]"
+  | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
+    leanNameEqual(leanField(a, 1), leanField(b, 1))
+  | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+    leanLevelEqual(leanField(a, 1), leanField(b, 1))
+  | "[\"Lean\",\"Level\",\"max\",\"_impl\"]"
+  | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+    leanLevelEqual(leanField(a, 1), leanField(b, 1)) &&
+      leanLevelEqual(leanField(a, 2), leanField(b, 2))
+  | _ -> leanFail("invalid Lean universe level")
+  }
+}
+
+fun leanLevelListEqual(a: LeanValue, b: LeanValue): Bool {
+  left = a;
+  right = b;
+  loop {
+    if (leanTag(left) != leanTag(right)) return false;
+    leanTag(left) match {
+    | "[\"List\",\"nil\"]" -> return true
+    | "[\"List\",\"cons\"]" ->
+      if (!leanLevelEqual(leanField(left, 0), leanField(right, 0))) {
+        return false
+      };
+      !left = leanField(left, 1);
+      !right = leanField(right, 1)
+    | _ -> return leanFail("invalid Lean universe level list")
+    }
+  }
+}

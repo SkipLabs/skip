@@ -1,0 +1,169 @@
+// Decoder for immutable data exported by tools/ExportData.lean. It cannot encode
+// executable closures, ST references, or a native Lean subprocess computation.
+class LeanImportData(
+  constants: Array<(LeanValue, LeanValue, Int)>,
+  moduleNames: Array<String>,
+  nodeCount: Int,
+  extensions: Array<LeanImportExtension>,
+  trackedGeneration: LeanValue,
+  extraConstants: ?Array<(LeanValue, Int)>,
+)
+
+class LeanImportExtension(
+  binding: String,
+  name: LeanValue,
+  state: LeanValue,
+  generation: ?LeanValue,
+)
+
+fun leanImportReference(
+  nodes: readonly Vector<LeanValue>,
+  ref: JSON.Value,
+): LeanValue {
+  index = ref.expectInt();
+  if (index < 0 || index >= nodes.size()) {
+    leanFail("invalid or forward reference in Lean import data")
+  };
+  nodes[index]
+}
+
+fun leanImportNode(
+  nodes: readonly Vector<LeanValue>,
+  checkedTags: readonly Map<String, String>,
+  input: JSON.Value,
+): LeanValue {
+  fields = input.expectVector();
+  kind = fields[0].expectString();
+  kind match {
+  | "erased" -> LeanErased()
+  | "ctor" ->
+    decodedTag = fields[1].expectString();
+    tag = checkedTags.maybeGet(decodedTag).default(decodedTag);
+    LeanCtor(
+      tag,
+      fields[2]
+        .expectVector()
+        .map(ref -> leanImportReference(nodes, ref))
+        .toArray(),
+    )
+  | "array" ->
+    LeanArray(
+      fields[1]
+        .expectVector()
+        .map(ref -> leanImportReference(nodes, ref))
+        .toArray(),
+    )
+  | "text" -> LeanText(fields[1].expectString())
+  | "nat" -> LeanNatural(LeanNat::parse(fields[1].expectString()))
+  | "uint8" | "uint16" | "uint32" | "uint64" | "usize" ->
+    bits = leanParseWord(fields[1].expectString());
+    if (leanWordWidth(kind) < 64 && bits.ugt(1.shl(leanWordWidth(kind)) - 1)) {
+      leanFail("Lean import word exceeds its declared width")
+    };
+    leanWordValue(kind, bits)
+  | _ -> leanFail("unsupported Lean import data node: " + kind)
+  }
+}
+
+fun leanDecodeImportData(source: String): LeanImportData {
+  lines = source.split("\n").filter(line -> !line.isEmpty());
+  if (lines.size() < 2) leanFail("truncated Lean import data");
+  header = JSON.decode(lines[0]).expectObject();
+  if (header.getInt("schema") != 1) {
+    leanFail("unsupported Lean import data schema")
+  };
+  if (
+    header.getString("leanCommit") != "63fbf3d3588b404bbe707721df61ecd41885a6f6"
+  ) {
+    leanFail("Lean import data was exported from a different Lean revision")
+  };
+  nodes: mutable Vector<LeanValue> = mutable Vector[];
+  checkedTags: mutable Map<String, String> = mutable Map[];
+  for (i in Range(1, lines.size() - 1)) {
+    // Parsing allocates temporary JSON trees. Reclaim them after each node;
+    // only the immutable decoded value escapes into the outer node table.
+    // The lambda only reads outer state, and Some's value is copied out.
+    node = SKStore.withRegionLoop(() ->
+      Some(leanImportNode(nodes, checkedTags, JSON.decode(lines[i])))
+    );
+    // Validate each constructor identity once, and share its string across
+    // nodes. Insert only after copying the node out of the temporary region.
+    node match {
+    | LeanCtor(tag, _) ->
+      if (checkedTags.maybeGet(tag).isNone()) {
+        _ = leanConstructorOrdinal(tag);
+        checkedTags.set(tag, tag)
+      }
+    | _ -> void
+    };
+    nodes.push(node)
+  };
+  footer = JSON.decode(lines.last()).expectObject();
+  if (footer.getInt("nodeCount") != nodes.size()) {
+    leanFail("truncated Lean import data nodes")
+  };
+  constants = footer
+    .getArray("constants")
+    .value.map(entry -> {
+      parts = entry.expectVector();
+      index = parts[2].expectInt();
+      if (index < 0 || index >= header.getArray("moduleNames").value.size()) {
+        leanFail("invalid module index in Lean import data")
+      };
+      (
+        leanImportReference(nodes, parts[0]),
+        leanImportReference(nodes, parts[1]),
+        index,
+      )
+    })
+    .toArray();
+  extensions = footer.maybeGetArray("extensions") match {
+  | None() -> Array[]
+  | Some(values) ->
+    values.value
+      .map(value -> {
+        entry = value.expectObject();
+        generation = entry.get("generation") match {
+        | JSON.Null() -> None()
+        | ref -> Some(leanImportReference(nodes, ref))
+        };
+        LeanImportExtension(
+          entry.getString("binding"),
+          leanImportReference(nodes, entry.get("name")),
+          leanImportReference(nodes, entry.get("state")),
+          generation,
+        )
+      })
+      .toArray()
+  };
+  extraConstants = footer.maybeGetArray("extraConstants") match {
+  | None() -> None()
+  | Some(values) ->
+    Some(
+      values.value
+        .map(value -> {
+          fields = value.expectVector();
+          index = fields[1].expectInt();
+          if (
+            index < 0 ||
+            index >= header.getArray("moduleNames").value.size()
+          ) {
+            leanFail("invalid extra constant module index")
+          };
+          (leanImportReference(nodes, fields[0]), index)
+        })
+        .toArray(),
+    )
+  };
+  LeanImportData(
+    constants,
+    header.getArray("moduleNames").value.map(n -> n.expectString()).toArray(),
+    nodes.size(),
+    extensions,
+    header.maybeGetString("trackedGeneration") match {
+    | Some(value) -> LeanNatural(LeanNat::parse(value))
+    | None() -> LeanUnavailable("imported tracked generation")
+    },
+    extraConstants,
+  )
+}

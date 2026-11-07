@@ -2,6 +2,7 @@ module L4_Lean_Util_FindLevelMVar;
 
 // "Lean.FindLevelMVar.mainLevel"
 fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
+  _runtime: mutable LeanExecution,
   _p_0_input: LeanValue,
   _x_1_1_input: LeanValue,
   _a_2_2_input: LeanValue,
@@ -25,6 +26,7 @@ fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
         _frame.set(
           14,
           f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
+            _runtime,
             _frame[0],
             _frame[8],
             _frame[2],
@@ -58,7 +60,7 @@ fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
       | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
         _ = leanField(_frame[1], 0);
         _frame.set(13, leanField(_frame[1], 1));
-        _frame.set(15, leanApply(_frame[0], Array[_frame[13]]));
+        _frame.set(15, leanApply(_runtime, _frame[0], Array[_frame[13]]));
         leanTag(_frame[15]) match {
         | "[\"Bool\",\"false\"]" -> return _frame[2]
         | "[\"Bool\",\"true\"]" ->
@@ -72,6 +74,7 @@ fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
       _frame.set(
         6,
         f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
+          _runtime,
           _frame[0],
           _frame[4],
           _frame[5],
@@ -80,6 +83,7 @@ fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
       _frame.set(
         7,
         f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
+          _runtime,
           _frame[0],
           _frame[3],
           _frame[6],
@@ -92,27 +96,36 @@ fun f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(
 }
 // "List.foldrTR._at_.Lean.FindLevelMVar.main.spec_1"
 fun f_FindLevelMVar_main_spec_1_af6e590b7f(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _init_1: LeanValue,
   _l_2: LeanValue,
   _y_1_3: LeanValue,
 ): LeanValue {
-  _x_2_4: LeanValue = L4_Init_Prelude.f_Array_mk_15c9e2d6d9(LeanErased(), _l_2);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Array_mk_15c9e2d6d9(
+    _runtime,
+    LeanErased(),
+    _l_2,
+  );
   _x_3_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _x_2_4,
   );
   _x_5_7: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     LeanScalar("nat", "0"),
     _x_3_5,
   );
   leanTag(_x_5_7) match {
-  | "[\"Bool\",\"false\"]" -> leanApply(_init_1, Array[_y_1_3])
+  | "[\"Bool\",\"false\"]" -> leanApply(_runtime, _init_1, Array[_y_1_3])
   | "[\"Bool\",\"true\"]" ->
     _x_7_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_3_5,
     );
     f_main_spec_1_spec_1_a967fb3c4f(
+      _runtime,
       _p_0,
       _x_2_4,
       _x_7_9,
@@ -125,17 +138,21 @@ fun f_FindLevelMVar_main_spec_1_af6e590b7f(
 }
 // "Lean.FindLevelMVar.visit"
 fun f_Lean_FindLevelMVar_visit_9e9b11595c(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _e_1: LeanValue,
   _s_2: LeanValue,
 ): LeanValue {
   leanTag(_s_2) match {
   | "[\"Option\",\"none\"]" ->
-    _x_1_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_hasLevelMVar_f0ac0ca94d(_e_1);
+    _x_1_4: LeanValue = L4_Lean_Expr.f_Lean_Expr_hasLevelMVar_f0ac0ca94d(
+      _runtime,
+      _e_1,
+    );
     leanTag(_x_1_4) match {
     | "[\"Bool\",\"false\"]" -> _s_2
     | "[\"Bool\",\"true\"]" ->
-      f_Lean_FindLevelMVar_main_40864ec3b0(_p_0, _e_1, _s_2)
+      f_Lean_FindLevelMVar_main_40864ec3b0(_runtime, _p_0, _e_1, _s_2)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | "[\"Option\",\"some\"]" ->
@@ -146,17 +163,21 @@ fun f_Lean_FindLevelMVar_visit_9e9b11595c(
 }
 // "Lean.FindLevelMVar.visitLevel"
 fun f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _l_1: LeanValue,
   _s_2: LeanValue,
 ): LeanValue {
   leanTag(_s_2) match {
   | "[\"Option\",\"none\"]" ->
-    _x_1_4: LeanValue = L4_Lean_Level.f_Lean_Level_hasMVar_1e5dea1793(_l_1);
+    _x_1_4: LeanValue = L4_Lean_Level.f_Lean_Level_hasMVar_1e5dea1793(
+      _runtime,
+      _l_1,
+    );
     leanTag(_x_1_4) match {
     | "[\"Bool\",\"false\"]" -> _s_2
     | "[\"Bool\",\"true\"]" ->
-      f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(_p_0, _l_1, _s_2)
+      f_Lean_FindLevelMVar_mainLevel_9de7afa8e2(_runtime, _p_0, _l_1, _s_2)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | "[\"Option\",\"some\"]" ->
@@ -167,19 +188,30 @@ fun f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
 }
 // "_private.Init.Data.Array.Basic.0.Array.foldrMUnsafe.fold._at_.List.foldrTR._at_.Lean.FindLevelMVar.main.spec_1.spec_1._lam_0"
 fun f_spec_1_spec_1_lam_0_c496f7490e(
+  _runtime: mutable LeanExecution,
   _b_0: LeanValue,
   _p_1: LeanValue,
   _x_1_2: LeanValue,
   _y_2_3: LeanValue,
 ): LeanValue {
-  _x_3_4: LeanValue = leanApply(_b_0, Array[_y_2_3]);
-  f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(_p_1, _x_1_2, _x_3_4)
+  _x_3_4: LeanValue = leanApply(_runtime, _b_0, Array[_y_2_3]);
+  f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(_runtime, _p_1, _x_1_2, _x_3_4)
 }
-fun apply_f_spec_1_spec_1_lam_0_c496f7490e(_args: Array<LeanValue>): LeanValue {
-  f_spec_1_spec_1_lam_0_c496f7490e(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_spec_1_spec_1_lam_0_c496f7490e(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_spec_1_spec_1_lam_0_c496f7490e(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.FindLevelMVar.main"
 fun f_Lean_FindLevelMVar_main_40864ec3b0(
+  _runtime: mutable LeanExecution,
   _p_0_input: LeanValue,
   _x_1_1_input: LeanValue,
   _a_2_2_input: LeanValue,
@@ -203,6 +235,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           21,
           f_Lean_FindLevelMVar_visitLevel_111f1d8bf6(
+            _runtime,
             _frame[0],
             _frame[8],
             _frame[2],
@@ -225,6 +258,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           23,
           f_FindLevelMVar_main_spec_1_af6e590b7f(
+            _runtime,
             _frame[0],
             _frame[22],
             _frame[9],
@@ -270,6 +304,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           24,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[14],
             _frame[2],
@@ -278,6 +313,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           25,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[15],
             _frame[24],
@@ -286,6 +322,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           26,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[16],
             _frame[25],
@@ -299,6 +336,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           27,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[17],
             _frame[2],
@@ -307,6 +345,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           28,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[18],
             _frame[27],
@@ -320,6 +359,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           29,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[19],
             _frame[2],
@@ -334,6 +374,7 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
         _frame.set(
           30,
           f_Lean_FindLevelMVar_visit_9e9b11595c(
+            _runtime,
             _frame[0],
             _frame[20],
             _frame[2],
@@ -345,11 +386,21 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
     | 1 ->
       _frame.set(
         6,
-        f_Lean_FindLevelMVar_visit_9e9b11595c(_frame[0], _frame[3], _frame[5]),
+        f_Lean_FindLevelMVar_visit_9e9b11595c(
+          _runtime,
+          _frame[0],
+          _frame[3],
+          _frame[5],
+        ),
       );
       _frame.set(
         7,
-        f_Lean_FindLevelMVar_visit_9e9b11595c(_frame[0], _frame[4], _frame[6]),
+        f_Lean_FindLevelMVar_visit_9e9b11595c(
+          _runtime,
+          _frame[0],
+          _frame[4],
+          _frame[6],
+        ),
       );
       return _frame[7]
     | _ -> return leanFail("invalid join point")
@@ -357,16 +408,21 @@ fun f_Lean_FindLevelMVar_main_40864ec3b0(
   }
 }
 // "Lean.FindLevelMVar.main._lam_0"
-fun f_FindLevelMVar_main_lam_0_980cf76279(_y_1_0: LeanValue): LeanValue {
+fun f_FindLevelMVar_main_lam_0_980cf76279(
+  _runtime: mutable LeanExecution,
+  _y_1_0: LeanValue,
+): LeanValue {
   _y_1_0
 }
 fun apply_f_FindLevelMVar_main_lam_0_980cf76279(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_FindLevelMVar_main_lam_0_980cf76279(_args[0])
+  f_FindLevelMVar_main_lam_0_980cf76279(_runtime, _args[0])
 }
 // "_private.Init.Data.Array.Basic.0.Array.foldrMUnsafe.fold._at_.List.foldrTR._at_.Lean.FindLevelMVar.main.spec_1.spec_1"
 fun f_main_spec_1_spec_1_a967fb3c4f(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _as_1: LeanValue,
   _i_2: LeanValue,
@@ -374,14 +430,20 @@ fun f_main_spec_1_spec_1_a967fb3c4f(
   _b_4: LeanValue,
   _y_1_5: LeanValue,
 ): LeanValue {
-  _x_2_6: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_i_2, _stop_3);
+  _x_2_6: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+    _runtime,
+    _i_2,
+    _stop_3,
+  );
   leanTag(_x_2_6) match {
   | "[\"Bool\",\"false\"]" ->
     _x_4_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _runtime,
       _i_2,
       LeanScalar("usize", "1"),
     );
     _x_5_9: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_1,
       _x_4_8,
@@ -393,6 +455,7 @@ fun f_main_spec_1_spec_1_a967fb3c4f(
       Array[_b_4, _p_0, _x_5_9],
     );
     f_main_spec_1_spec_1_a967fb3c4f(
+      _runtime,
       _p_0,
       _as_1,
       _x_4_8,
@@ -400,7 +463,7 @@ fun f_main_spec_1_spec_1_a967fb3c4f(
       _f_6_10,
       _y_1_5,
     )
-  | "[\"Bool\",\"true\"]" -> leanApply(_b_4, Array[_y_1_5])
+  | "[\"Bool\",\"true\"]" -> leanApply(_runtime, _b_4, Array[_y_1_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

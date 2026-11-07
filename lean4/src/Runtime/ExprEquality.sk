@@ -1,0 +1,97 @@
+// Expr.eqv ignores binder names and binder annotations; Expr.equal includes
+// them. Both compare let nondependency flags and metadata, as Lean does.
+// Work is iterative to avoid consuming the host stack on long applications.
+fun leanExprEqual(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  binders: Bool,
+): Bool {
+  pending = mutable Vector[(a, b)];
+  while (!pending.isEmpty()) {
+    (left, right) = pending.pop();
+    tag = leanTag(left);
+    if (tag != leanTag(right)) return false;
+    tag match {
+    | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]" ->
+      if (leanNat(leanField(left, 1)) != leanNat(leanField(right, 1))) {
+        return false
+      }
+    | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
+    | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
+      if (!leanNameEqual(leanField(left, 1), leanField(right, 1))) return false
+    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+      if (!leanLevelEqual(leanField(left, 1), leanField(right, 1))) return false
+    | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+      if (!leanNameEqual(leanField(left, 1), leanField(right, 1))) return false;
+      levelsLeft = leanField(left, 2);
+      levelsRight = leanField(right, 2);
+      loop {
+        if (leanTag(levelsLeft) != leanTag(levelsRight)) return false;
+        if (leanTag(levelsLeft) == "[\"List\",\"nil\"]") break void;
+        if (
+          !leanLevelEqual(leanField(levelsLeft, 0), leanField(levelsRight, 0))
+        ) return false;
+        !levelsLeft = leanField(levelsLeft, 1);
+        !levelsRight = leanField(levelsRight, 1)
+      }
+    | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
+    | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+      if (
+        binders &&
+        (!leanNameEqual(leanField(left, 1), leanField(right, 1)) ||
+          leanTag(leanField(left, 4)) != leanTag(leanField(right, 4)))
+      ) return false
+    | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+      if (leanIsTrue(leanField(left, 5)) != leanIsTrue(leanField(right, 5))) {
+        return false
+      };
+      if (binders && !leanNameEqual(leanField(left, 1), leanField(right, 1))) {
+        return false
+      }
+    | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+      l = leanField(left, 1);
+      r = leanField(right, 1);
+      if (leanTag(l) != leanTag(r)) return false;
+      leanTag(l) match {
+      | "[\"Lean\",\"Literal\",\"natVal\"]" ->
+        if (leanNat(leanField(l, 0)) != leanNat(leanField(r, 0))) return false
+      | "[\"Lean\",\"Literal\",\"strVal\"]" ->
+        if (leanText(leanField(l, 0)) != leanText(leanField(r, 0))) return false
+      | _ -> leanFail("invalid Lean literal in expression equality")
+      }
+    | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+      entriesLeft = leanField(left, 1);
+      entriesRight = leanField(right, 1);
+      loop {
+        if (leanTag(entriesLeft) != leanTag(entriesRight)) return false;
+        if (leanTag(entriesLeft) == "[\"List\",\"nil\"]") break void;
+        l = leanField(entriesLeft, 0);
+        r = leanField(entriesRight, 0);
+        if (!leanNameEqual(leanField(l, 0), leanField(r, 0))) return false;
+        if (
+          !leanIsTrue(
+            L4_Lean_Data_KVMap.f_Lean_instBEqDataValue_beq_d8e17c1f13(
+              runtime,
+              leanField(l, 1),
+              leanField(r, 1),
+            ),
+          )
+        ) return false;
+        !entriesLeft = leanField(entriesLeft, 1);
+        !entriesRight = leanField(entriesRight, 1)
+      }
+    | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+      if (
+        !leanNameEqual(leanField(left, 1), leanField(right, 1)) ||
+        leanNat(leanField(left, 2)) != leanNat(leanField(right, 2))
+      ) return false
+    | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" -> void
+    | _ -> leanFail("invalid Lean expression in equality")
+    };
+    for ((field, _) in leanExprChildren(left)) {
+      pending.push((leanField(left, field), leanField(right, field)))
+    }
+  };
+  true
+}

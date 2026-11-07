@@ -1,17 +1,29 @@
 module L4_Lean_Message;
 
 // "Lean.toMessageList"
-fun f_Lean_toMessageList_570b1d3503(_msgs_0: LeanValue): LeanValue {
+fun f_Lean_toMessageList_570b1d3503(
+  _runtime: mutable LeanExecution,
+  _msgs_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = L4_Init_Prelude.f_Array_toList_2f8b2ba454(
+    _runtime,
     LeanErased(),
     _msgs_0,
   );
-  _x_3_3: LeanValue = f_Lean_stringToMessageData_1e55fa4f40(LeanText("\n\n"));
-  _x_4_4: LeanValue = f_Lean_MessageData_joinSep_34c8df9879(_x_1_1, _x_3_3);
-  f_Lean_indentD_a692a66355(_x_4_4)
+  _x_3_3: LeanValue = f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
+    LeanText("\n\n"),
+  );
+  _x_4_4: LeanValue = f_Lean_MessageData_joinSep_34c8df9879(
+    _runtime,
+    _x_1_1,
+    _x_3_3,
+  );
+  f_Lean_indentD_a692a66355(_runtime, _x_4_4)
 }
 // "Std.Format.joinSep._at_.Lean.MessageData.formatAux.spec_2"
 fun f_MessageData_formatAux_spec_2_91e4b1b950(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -22,13 +34,20 @@ fun f_MessageData_formatAux_spec_2_91e4b1b950(
     _tail_5_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_tail_5_3) match {
     | "[\"List\",\"nil\"]" -> _head_4_2
-    | _ -> f_formatAux_spec_2_spec_2_ffbc93970d(_x_2_1, _head_4_2, _tail_5_3)
+    | _ ->
+      f_formatAux_spec_2_spec_2_ffbc93970d(
+        _runtime,
+        _x_2_1,
+        _head_4_2,
+        _tail_5_3,
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.PersistentArray.foldlM._at_.Lean.MessageLog.getWarningMessages.spec_0.spec_1"
 fun f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
+  _runtime: mutable LeanExecution,
   _as_0_input: LeanValue,
   _i_1_input: LeanValue,
   _stop_2_input: LeanValue,
@@ -49,13 +68,18 @@ fun f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
     | 0 ->
       _frame.set(
         8,
-        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_frame[1], _frame[2]),
+        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+          _runtime,
+          _frame[1],
+          _frame[2],
+        ),
       );
       leanTag(_frame[8]) match {
       | "[\"Bool\",\"false\"]" ->
         _frame.set(
           9,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            _runtime,
             LeanErased(),
             _frame[0],
             _frame[1],
@@ -77,6 +101,7 @@ fun f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
             _frame.set(
               11,
               L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_push_8ec9d2434c(
+                _runtime,
                 _frame[3],
                 _frame[9],
               ),
@@ -100,11 +125,16 @@ fun f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
       _frame.set(5, LeanScalar("usize", "1"));
       _frame.set(
         6,
-        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[1], _frame[5]),
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
+          _frame[1],
+          _frame[5],
+        ),
       );
       _frame.set(
         7,
         f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
+          _runtime,
           _frame[0],
           _frame[6],
           _frame[2],
@@ -118,6 +148,7 @@ fun f_getWarningMessages_spec_0_spec_1_1bc5bb9ef9(
 }
 // "String.Slice.splitToSubslice._at_.Lean.stringToMessageData.spec_0._redArg"
 fun f_Lean_stringToMessageData_spec_0_b1e63761fa(
+  _runtime: mutable LeanExecution,
   _dummy_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = LeanScalar("nat", "0");
@@ -128,6 +159,7 @@ fun f_Lean_stringToMessageData_spec_0_b1e63761fa(
 }
 // "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.MessageData.formatAux.spec_1"
 fun f_MessageData_formatAux_spec_1_26700e84bf(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
   _sz_2: LeanValue,
@@ -136,6 +168,7 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
   _y_3_5: LeanValue,
 ): LeanValue {
   _x_4_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _runtime,
     _i_3,
     _sz_2,
   );
@@ -144,12 +177,14 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
     LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_bs_4, _y_3_5])
   | "[\"Bool\",\"true\"]" ->
     _v_8: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _bs_4,
       _i_3,
       LeanErased(),
     );
     _bs_10: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+      _runtime,
       LeanErased(),
       _bs_4,
       _i_3,
@@ -157,6 +192,7 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
       LeanErased(),
     );
     _x_7_11: LeanValue = f_Lean_MessageData_formatAux_939caae81d(
+      _runtime,
       _x_1_0,
       _x_2_1,
       _v_8,
@@ -167,10 +203,12 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
       _val_8_12: LeanValue = leanField(_x_7_11, 0);
       _state_9_13: LeanValue = leanField(_x_7_11, 1);
       _x_11_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        _runtime,
         _i_3,
         LeanScalar("usize", "1"),
       );
       _x_12_16: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        _runtime,
         LeanErased(),
         _bs_10,
         _i_3,
@@ -178,6 +216,7 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
         LeanErased(),
       );
       f_MessageData_formatAux_spec_1_26700e84bf(
+        _runtime,
         _x_1_0,
         _x_2_1,
         _sz_2,
@@ -192,6 +231,7 @@ fun f_MessageData_formatAux_spec_1_26700e84bf(
 }
 // "Lean.PersistentArray.anyMAux._at_.Lean.PersistentArray.anyM._at_.Lean.MessageLog.hasErrors.spec_1.spec_3"
 fun f_hasErrors_spec_1_spec_3_9249ceeabc(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -199,10 +239,12 @@ fun f_hasErrors_spec_1_spec_3_9249ceeabc(
   | "[\"Lean\",\"PersistentArrayNode\",\"node\"]" ->
     _cs_3_2: LeanValue = leanField(_x_2_1, 0);
     _x_5_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _cs_3_2,
     );
     _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
       LeanScalar("nat", "0"),
       _x_5_5,
     );
@@ -210,9 +252,11 @@ fun f_hasErrors_spec_1_spec_3_9249ceeabc(
     | "[\"Bool\",\"false\"]" -> _x_6_6
     | "[\"Bool\",\"true\"]" ->
       _x_8_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _x_5_5,
       );
       f_spec_1_spec_3_spec_5_b7742b873d(
+        _runtime,
         _x_1_0,
         _cs_3_2,
         LeanScalar("usize", "0"),
@@ -223,10 +267,12 @@ fun f_hasErrors_spec_1_spec_3_9249ceeabc(
   | "[\"Lean\",\"PersistentArrayNode\",\"leaf\"]" ->
     _vs_10_3: LeanValue = leanField(_x_2_1, 0);
     _x_12_11: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _vs_10_3,
     );
     _x_13_12: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
       LeanScalar("nat", "0"),
       _x_12_11,
     );
@@ -234,9 +280,11 @@ fun f_hasErrors_spec_1_spec_3_9249ceeabc(
     | "[\"Bool\",\"false\"]" -> _x_13_12
     | "[\"Bool\",\"true\"]" ->
       _x_15_14: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _x_12_11,
       );
       f_hasErrors_spec_1_spec_4_c8f0b374b3(
+        _runtime,
         _x_1_0,
         _vs_10_3,
         LeanScalar("usize", "0"),
@@ -249,6 +297,7 @@ fun f_hasErrors_spec_1_spec_3_9249ceeabc(
 }
 // "Lean.MessageLog.append"
 fun f_Lean_MessageLog_append_2c6f0d1553(
+  _runtime: mutable LeanExecution,
   _l_0: LeanValue,
   _l_1: LeanValue,
 ): LeanValue {
@@ -263,14 +312,17 @@ fun f_Lean_MessageLog_append_2c6f0d1553(
       _unreported_6: LeanValue = leanField(_l_1, 1);
       _loggedKinds_7: LeanValue = leanField(_l_1, 2);
       _x_1_8: LeanValue = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_append_13fd86477b(
+        _runtime,
         _reported_2,
         _reported_5,
       );
       _x_2_9: LeanValue = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_append_13fd86477b(
+        _runtime,
         _unreported_3,
         _unreported_6,
       );
       _x_3_10: LeanValue = f_append_spec_1_spec_1_d78bad70f4(
+        _runtime,
         _loggedKinds_4,
         _loggedKinds_7,
       );
@@ -284,12 +336,14 @@ fun f_Lean_MessageLog_append_2c6f0d1553(
   }
 }
 fun apply_f_Lean_MessageLog_append_2c6f0d1553(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_MessageLog_append_2c6f0d1553(_args[0], _args[1])
+  f_Lean_MessageLog_append_2c6f0d1553(_runtime, _args[0], _args[1])
 }
 // "Lean.Option.register._at_._private.Lean.Message.0.Lean.MessageData.initFn.«_@».Lean.Message.1828196597._hygCtx._hyg.4.spec_0"
 fun f_hygCtx_hyg_spec_0_4d4b196358(
+  _runtime: mutable LeanExecution,
   _name_0: LeanValue,
   _decl_1: LeanValue,
   _ref_2: LeanValue,
@@ -311,6 +365,7 @@ fun f_hygCtx_hyg_spec_0_4d4b196358(
       ],
     );
     _x_4_9: LeanValue = L4_Lean_Data_Options.f_Lean_registerOption_53d2a3c012(
+      _runtime,
       _name_0,
       _x_3_8,
       _a_1_3,
@@ -337,6 +392,7 @@ fun f_hygCtx_hyg_spec_0_4d4b196358(
 }
 // "Lean.addMessageContextFull._redArg"
 fun f_Lean_addMessageContextFull_657398a73e(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -372,6 +428,7 @@ fun f_Lean_addMessageContextFull_657398a73e(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_8, _f_6_15],
         )
@@ -383,11 +440,14 @@ fun f_Lean_addMessageContextFull_657398a73e(
   }
 }
 // "Lean.MessageData.maxTraceChildren"
-fun f_Lean_MessageData_maxTraceChildren_293a759d52(): LeanValue {
-  leanPrimitive("Lean.MessageData.maxTraceChildren []")
+fun f_Lean_MessageData_maxTraceChildren_293a759d52(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.MessageData.maxTraceChildren")
 }
 // "Lean.addMessageContextFull._redArg._lam_2"
 fun f_Lean_addMessageContextFull_lam_2_bee0bd13e1(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _env_1: LeanValue,
   _msgData_2: LeanValue,
@@ -401,12 +461,18 @@ fun f_Lean_addMessageContextFull_lam_2_bee0bd13e1(
     7,
     Array[_inst_1_0, _env_1, _mctx_6, _msgData_2, _toPure_3, _toBind_4],
   );
-  leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _inst_2_5, _f_3_7])
+  leanApply(
+    _runtime,
+    _toBind_4,
+    Array[LeanErased(), LeanErased(), _inst_2_5, _f_3_7],
+  )
 }
 fun apply_f_Lean_addMessageContextFull_lam_2_bee0bd13e1(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_addMessageContextFull_lam_2_bee0bd13e1(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -418,6 +484,7 @@ fun apply_f_Lean_addMessageContextFull_lam_2_bee0bd13e1(
 }
 // "List.foldl._at_.Std.Format.joinSep._at_.Lean.MessageData.formatAux.spec_2.spec_2"
 fun f_formatAux_spec_2_spec_2_ffbc93970d(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
   _x_3_2: LeanValue,
@@ -428,6 +495,7 @@ fun f_formatAux_spec_2_spec_2_ffbc93970d(
     _head_4_3: LeanValue = leanField(_x_3_2, 0);
     _tail_5_4: LeanValue = leanField(_x_3_2, 1);
     f_formatAux_spec_2_spec_2_ffbc93970d(
+      _runtime,
       _x_1_0,
       LeanCtor(
         "[\"Std\",\"Format\",\"append\"]",
@@ -443,14 +511,20 @@ fun f_formatAux_spec_2_spec_2_ffbc93970d(
 }
 // "_private.Init.Data.Array.Basic.0.Array.anyMUnsafe.any._at_.Lean.PersistentArray.anyM._at_.Lean.MessageLog.hasErrors.spec_0.spec_1"
 fun f_hasErrors_spec_0_spec_1_30a4b21e16(
+  _runtime: mutable LeanExecution,
   _as_0: LeanValue,
   _i_1: LeanValue,
   _stop_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_i_1, _stop_2);
+  _x_1_3: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+    _runtime,
+    _i_1,
+    _stop_2,
+  );
   leanTag(_x_1_3) match {
   | "[\"Bool\",\"false\"]" ->
     _x_2_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_0,
       _i_1,
@@ -471,10 +545,11 @@ fun f_hasErrors_spec_0_spec_1_30a4b21e16(
         LeanCtor("[\"Bool\",\"true\"]", Array[])
       | _ ->
         _x_5_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
           _i_1,
           LeanScalar("usize", "1"),
         );
-        f_hasErrors_spec_0_spec_1_30a4b21e16(_as_0, _x_5_15, _stop_2)
+        f_hasErrors_spec_0_spec_1_30a4b21e16(_runtime, _as_0, _x_5_15, _stop_2)
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -483,7 +558,10 @@ fun f_hasErrors_spec_0_spec_1_30a4b21e16(
   }
 }
 // "Lean.TraceResult.toEmoji"
-fun f_Lean_TraceResult_toEmoji_211b4cf576(_x_1_0: LeanValue): LeanValue {
+fun f_Lean_TraceResult_toEmoji_211b4cf576(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"TraceResult\",\"success\"]" -> LeanText("✅️")
   | "[\"Lean\",\"TraceResult\",\"failure\"]" -> LeanText("❌️")
@@ -493,6 +571,7 @@ fun f_Lean_TraceResult_toEmoji_211b4cf576(_x_1_0: LeanValue): LeanValue {
 }
 // "Lean.MessageData.formatAux"
 fun f_Lean_MessageData_formatAux_939caae81d(
+  _runtime: mutable LeanExecution,
   _x_1_0_input: LeanValue,
   _x_2_1_input: LeanValue,
   _x_3_2_input: LeanValue,
@@ -531,7 +610,10 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         | "[\"Option\",\"none\"]" ->
           _frame.set(
             25,
-            L4_Lean_Util_PPExt.f_Lean_formatRawGoal_e44e7d3e0a(_frame[5]),
+            L4_Lean_Util_PPExt.f_Lean_formatRawGoal_e44e7d3e0a(
+              _runtime,
+              _frame[5],
+            ),
           );
           _frame.set(
             26,
@@ -542,11 +624,16 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(24, leanField(_frame[1], 0));
           _frame.set(
             27,
-            f_Lean_MessageData_mkPPContext_a47d2bc65c(_frame[0], _frame[24]),
+            f_Lean_MessageData_mkPPContext_a47d2bc65c(
+              _runtime,
+              _frame[0],
+              _frame[24],
+            ),
           );
           _frame.set(
             28,
             L4_Lean_Util_PPExt.f_Lean_ppGoal_eba31c8f7f(
+              _runtime,
               _frame[27],
               _frame[5],
               _frame[3],
@@ -561,6 +648,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           29,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[6],
@@ -575,6 +663,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           31,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[30],
             _frame[8],
@@ -588,6 +677,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           32,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[9],
             _frame[1],
             _frame[10],
@@ -601,6 +691,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           33,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[12],
@@ -613,7 +704,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(35, leanField(_frame[33], 1));
           _frame.set(
             36,
-            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[11]),
+            L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[11]),
           );
           _frame.set(
             37,
@@ -634,6 +725,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           39,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[13],
@@ -671,6 +763,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           45,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[14],
@@ -684,6 +777,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             48,
             f_Lean_MessageData_formatAux_939caae81d(
+              _runtime,
               _frame[0],
               _frame[1],
               _frame[15],
@@ -719,6 +813,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           53,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[16],
@@ -733,6 +828,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           54,
           L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+            _runtime,
             LeanErased(),
             _frame[19],
           ),
@@ -741,6 +837,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           56,
           f_MessageData_formatAux_spec_1_26700e84bf(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[54],
@@ -763,7 +860,10 @@ fun f_Lean_MessageData_formatAux_939caae81d(
             _ = leanField(_frame[17], 5);
             _frame.set(
               92,
-              L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(_frame[76]),
+              L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(
+                _runtime,
+                _frame[76],
+              ),
             );
             leanTag(_frame[92]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -776,6 +876,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
               _frame.set(
                 96,
                 L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+                  _runtime,
                   _frame[76],
                   _frame[95],
                 ),
@@ -806,11 +907,15 @@ fun f_Lean_MessageData_formatAux_939caae81d(
               _frame.set(102, LeanScalar("nat", "0"));
               _frame.set(
                 103,
-                L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(_frame[102]),
+                L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
+                  _runtime,
+                  _frame[102],
+                ),
               );
               _frame.set(
                 104,
                 L4_Init_Data_Float_Float.f_Float_beq_349ab44b9d(
+                  _runtime,
                   _frame[78],
                   _frame[103],
                 ),
@@ -832,6 +937,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
                 _frame.set(
                   108,
                   L4_Init_Data_Float_Float.f_Float_sub_52462ad04e(
+                    _runtime,
                     _frame[79],
                     _frame[78],
                   ),
@@ -839,6 +945,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
                 _frame.set(
                   109,
                   L4_Init_Data_Float_Float.f_Float_toString_d8e1b54cdd(
+                    _runtime,
                     _frame[108],
                   ),
                 );
@@ -879,6 +986,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
               _frame.set(
                 113,
                 L4_Init_Prelude.f_Array_toList_2f8b2ba454(
+                  _runtime,
                   LeanErased(),
                   _frame[57],
                 ),
@@ -891,6 +999,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
               _frame.set(
                 116,
                 f_MessageData_formatAux_spec_2_91e4b1b950(
+                  _runtime,
                   _frame[113],
                   _frame[115],
                 ),
@@ -912,7 +1021,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
       | "[\"Lean\",\"MessageData\",\"ofLazy\"]" ->
         _frame.set(20, leanField(_frame[2], 0));
         _ = leanField(_frame[2], 1);
-        _frame.set(118, f_Message_hygCtx_hyg_9b0cd87e08());
+        _frame.set(118, f_Message_hygCtx_hyg_9b0cd87e08(_runtime));
         leanTag(_frame[1]) match {
         | "[\"Option\",\"none\"]" ->
           _frame.set(138, LeanCtor("[\"Option\",\"none\"]", Array[]));
@@ -924,7 +1033,11 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(137, leanField(_frame[1], 0));
           _frame.set(
             139,
-            f_Lean_MessageData_mkPPContext_a47d2bc65c(_frame[0], _frame[137]),
+            f_Lean_MessageData_mkPPContext_a47d2bc65c(
+              _runtime,
+              _frame[0],
+              _frame[137],
+            ),
           );
           _frame.set(
             140,
@@ -942,6 +1055,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           141,
           f_Lean_MessageData_formatAux_939caae81d(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[21],
@@ -965,7 +1079,10 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         ),
       );
       _frame.set(65, LeanScalar("nat", "2"));
-      _frame.set(66, L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_frame[65]));
+      _frame.set(
+        66,
+        L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[65]),
+      );
       _frame.set(
         67,
         LeanCtor(
@@ -982,7 +1099,11 @@ fun f_Lean_MessageData_formatAux_939caae81d(
       );
       _frame.set(
         69,
-        L4_Init_Prelude.f_Array_toList_2f8b2ba454(LeanErased(), _frame[57]),
+        L4_Init_Prelude.f_Array_toList_2f8b2ba454(
+          _runtime,
+          LeanErased(),
+          _frame[57],
+        ),
       );
       _frame.set(
         70,
@@ -995,7 +1116,11 @@ fun f_Lean_MessageData_formatAux_939caae81d(
       );
       _frame.set(
         73,
-        f_MessageData_formatAux_spec_2_91e4b1b950(_frame[70], _frame[72]),
+        f_MessageData_formatAux_spec_2_91e4b1b950(
+          _runtime,
+          _frame[70],
+          _frame[72],
+        ),
       );
       _frame.set(
         74,
@@ -1013,6 +1138,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
       _frame.set(
         82,
         f_Lean_MessageData_formatAux_939caae81d(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[18],
@@ -1035,7 +1161,10 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           void
         | "[\"Option\",\"some\"]" ->
           _frame.set(85, leanField(_frame[77], 0));
-          _frame.set(86, f_Lean_TraceResult_toEmoji_211b4cf576(_frame[85]));
+          _frame.set(
+            86,
+            f_Lean_TraceResult_toEmoji_211b4cf576(_runtime, _frame[85]),
+          );
           _frame.set(
             87,
             LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[86]]),
@@ -1072,7 +1201,10 @@ fun f_Lean_MessageData_formatAux_939caae81d(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 3 ->
-      _frame.set(120, leanApply(_frame[20], Array[_frame[119], _frame[3]]));
+      _frame.set(
+        120,
+        leanApply(_runtime, _frame[20], Array[_frame[119], _frame[3]]),
+      );
       leanTag(_frame[120]) match {
       | "[\"ST\",\"Out\",\"mk\"]" ->
         _frame.set(121, leanField(_frame[120], 0));
@@ -1080,6 +1212,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
         _frame.set(
           123,
           L4_Init_Dynamic.f_Dynamic_Dynamic_get_Impl_60837d945e(
+            _runtime,
             _frame[121],
             _frame[118],
           ),
@@ -1090,6 +1223,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             125,
             f_Lean_MessageData_formatAux_939caae81d(
+              _runtime,
               _frame[0],
               _frame[1],
               _frame[124],
@@ -1111,6 +1245,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             131,
             L4_Init_Dynamic.f_Dynamic_Dynamic_typeNameImpl_8a10188557(
+              _runtime,
               _frame[121],
             ),
           );
@@ -1118,6 +1253,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             133,
             L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+              _runtime,
               _frame[131],
               _frame[132],
             ),
@@ -1125,6 +1261,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             134,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[130],
               _frame[133],
             ),
@@ -1132,6 +1269,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           _frame.set(
             135,
             L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+              _runtime,
               _frame[126],
               _frame[127],
               _frame[128],
@@ -1141,7 +1279,11 @@ fun f_Lean_MessageData_formatAux_939caae81d(
           );
           _frame.set(
             136,
-            f_MessageData_formatAux_spec_3_3284211c4c(_frame[135], _frame[122]),
+            f_MessageData_formatAux_spec_3_3284211c4c(
+              _runtime,
+              _frame[135],
+              _frame[122],
+            ),
           );
           return _frame[136]
         }
@@ -1153,6 +1295,7 @@ fun f_Lean_MessageData_formatAux_939caae81d(
 }
 // "Lean.instToJsonMessageSeverity.toJson"
 fun f_Lean_instToJsonMessageSeverity_toJson_ce664ebd59(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
@@ -1166,12 +1309,14 @@ fun f_Lean_instToJsonMessageSeverity_toJson_ce664ebd59(
   }
 }
 fun apply_f_Lean_instToJsonMessageSeverity_toJson_ce664ebd59(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_instToJsonMessageSeverity_toJson_ce664ebd59(_args[0])
+  f_Lean_instToJsonMessageSeverity_toJson_ce664ebd59(_runtime, _args[0])
 }
 // "WellFounded.opaqueFix₃._at_.String.Slice.contains._at_.Lean.inlineExpr.spec_1.spec_1._redArg"
 fun f_inlineExpr_spec_1_spec_1_8102b4f060(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _a_1: LeanValue,
   _b_2: LeanValue,
@@ -1183,40 +1328,47 @@ fun f_inlineExpr_spec_1_spec_1_8102b4f060(
     _endExclusive_5: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_6: LeanValue = leanField(_s_0, 3);
     _x_1_7: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_5,
       _startInclusive_4,
     );
     _decide_2_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _a_1,
       _x_1_7,
     );
     leanTag(_decide_2_8) match {
     | "[\"Bool\",\"false\"]" ->
       _x_3_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_4,
         _a_1,
       );
       _x_4_10: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
+        _runtime,
         _str_3,
         _x_3_9,
         LeanErased(),
       );
       _x_6_12: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+        _runtime,
         _x_4_10,
         LeanScalar("uint32", "10"),
       );
       leanTag(_x_6_12) match {
       | "[\"Bool\",\"false\"]" ->
         _x_7_13: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
+          _runtime,
           _str_3,
           _x_3_9,
           LeanErased(),
         );
         _x_8_14: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _x_7_13,
           _startInclusive_4,
         );
-        f_inlineExpr_spec_1_spec_1_8102b4f060(_s_0, _x_8_14, _x_6_12)
+        f_inlineExpr_spec_1_spec_1_8102b4f060(_runtime, _s_0, _x_8_14, _x_6_12)
       | "[\"Bool\",\"true\"]" -> _x_6_12
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -1228,28 +1380,45 @@ fun f_inlineExpr_spec_1_spec_1_8102b4f060(
 }
 // "_private.Init.Data.Array.Basic.0.Array.anyMUnsafe.any._at_.Lean.PersistentArray.anyMAux._at_.Lean.PersistentArray.anyM._at_.Lean.MessageLog.hasErrors.spec_1.spec_3.spec_5"
 fun f_spec_1_spec_3_spec_5_b7742b873d(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _as_1: LeanValue,
   _i_2: LeanValue,
   _stop_3: LeanValue,
 ): LeanValue {
-  _x_2_4: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_i_2, _stop_3);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+    _runtime,
+    _i_2,
+    _stop_3,
+  );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
     _x_3_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_1,
       _i_2,
       LeanErased(),
     );
-    _x_4_6: LeanValue = f_hasErrors_spec_1_spec_3_9249ceeabc(_x_1_0, _x_3_5);
+    _x_4_6: LeanValue = f_hasErrors_spec_1_spec_3_9249ceeabc(
+      _runtime,
+      _x_1_0,
+      _x_3_5,
+    );
     leanTag(_x_4_6) match {
     | "[\"Bool\",\"false\"]" ->
       _x_6_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        _runtime,
         _i_2,
         LeanScalar("usize", "1"),
       );
-      f_spec_1_spec_3_spec_5_b7742b873d(_x_1_0, _as_1, _x_6_8, _stop_3)
+      f_spec_1_spec_3_spec_5_b7742b873d(
+        _runtime,
+        _x_1_0,
+        _as_1,
+        _x_6_8,
+        _stop_3,
+      )
     | "[\"Bool\",\"true\"]" -> _x_4_6
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -1258,13 +1427,17 @@ fun f_spec_1_spec_3_spec_5_b7742b873d(
   }
 }
 // "Lean.MessageLog.toArray"
-fun f_Lean_MessageLog_toArray_329322a40f(_log_0: LeanValue): LeanValue {
+fun f_Lean_MessageLog_toArray_329322a40f(
+  _runtime: mutable LeanExecution,
+  _log_0: LeanValue,
+): LeanValue {
   leanTag(_log_0) match {
   | "[\"Lean\",\"MessageLog\",\"mk\"]" ->
     _reported_1: LeanValue = leanField(_log_0, 0);
     _unreported_2: LeanValue = leanField(_log_0, 1);
     _loggedKinds_3: LeanValue = leanField(_log_0, 2);
     L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_toArray_35eebe4fe9(
+      _runtime,
       _unreported_2,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1272,17 +1445,21 @@ fun f_Lean_MessageLog_toArray_329322a40f(_log_0: LeanValue): LeanValue {
 }
 // "Lean.MessageData.bracket"
 fun f_Lean_MessageData_bracket_58338fb809(
+  _runtime: mutable LeanExecution,
   _l_0: LeanValue,
   _f_1: LeanValue,
   _r_2: LeanValue,
 ): LeanValue {
   _x_1_3: LeanValue = L4_Init_Data_String_Length.f_String_length_c0c5aec899(
+    _runtime,
     _l_0,
   );
   _x_3_5: LeanValue = f_Lean_MessageData_ofFormat_9fc6d2a204(
+    _runtime,
     LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_l_0]),
   );
   _x_6_8: LeanValue = f_Lean_MessageData_ofFormat_9fc6d2a204(
+    _runtime,
     LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_r_2]),
   );
   _x_8_10: LeanValue = LeanCtor(
@@ -1305,6 +1482,7 @@ fun f_Lean_MessageData_bracket_58338fb809(
 }
 // "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.PersistentArray.mapM._at_.Lean.MessageLog.errorsToInfos.spec_0.spec_1"
 fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
+  _runtime: mutable LeanExecution,
   _sz_0_input: LeanValue,
   _i_1_input: LeanValue,
   _bs_2_input: LeanValue,
@@ -1324,6 +1502,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
       _frame.set(
         3,
         L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+          _runtime,
           _frame[1],
           _frame[0],
         ),
@@ -1334,6 +1513,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
         _frame.set(
           4,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            _runtime,
             LeanErased(),
             _frame[2],
             _frame[1],
@@ -1354,6 +1534,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
           _frame.set(
             14,
             L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+              _runtime,
               LeanErased(),
               _frame[2],
               _frame[1],
@@ -1405,6 +1586,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
       _frame.set(
         17,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
           _frame[1],
           _frame[16],
         ),
@@ -1412,6 +1594,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
       _frame.set(
         18,
         L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+          _runtime,
           LeanErased(),
           _frame[14],
           _frame[1],
@@ -1422,6 +1605,7 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
       _frame.set(
         19,
         f_errorsToInfos_spec_0_spec_1_208a8977b6(
+          _runtime,
           _frame[0],
           _frame[17],
           _frame[18],
@@ -1434,11 +1618,12 @@ fun f_errorsToInfos_spec_0_spec_1_208a8977b6(
 }
 // "Lean.MessageData.lazy"
 fun f_Lean_MessageData_lazy_b98ab07adc(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _hasSyntheticSorry_1: LeanValue,
   _onMissingContext_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = f_Message_hygCtx_hyg_9b0cd87e08();
+  _x_1_3: LeanValue = f_Message_hygCtx_hyg_9b0cd87e08(_runtime);
   _f_2_4: LeanValue = LeanClosure(
     L4_Lean_Message.apply_f_MessageData_lazy_lam_0_7c2cc72253,
     5,
@@ -1450,17 +1635,22 @@ fun f_Lean_MessageData_lazy_b98ab07adc(
   )
 }
 // "Lean.MessageLog.markAllReported"
-fun f_Lean_MessageLog_markAllReported_86d8d95dd2(_log_0: LeanValue): LeanValue {
+fun f_Lean_MessageLog_markAllReported_86d8d95dd2(
+  _runtime: mutable LeanExecution,
+  _log_0: LeanValue,
+): LeanValue {
   leanTag(_log_0) match {
   | "[\"Lean\",\"MessageLog\",\"mk\"]" ->
     _reported_1: LeanValue = leanField(_log_0, 0);
     _unreported_2: LeanValue = leanField(_log_0, 1);
     _loggedKinds_3: LeanValue = leanField(_log_0, 2);
     _x_1_4: LeanValue = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_append_13fd86477b(
+      _runtime,
       _reported_1,
       _unreported_2,
     );
     _x_3_6: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      _runtime,
       LeanErased(),
       LeanScalar("nat", "32"),
     );
@@ -1484,6 +1674,7 @@ fun f_Lean_MessageLog_markAllReported_86d8d95dd2(_log_0: LeanValue): LeanValue {
 }
 // "Std.DTreeMap.Internal.Impl.Const.alter._at_.Lean.MessageLog.append.spec_0._redArg"
 fun f_MessageLog_append_spec_0_c86e9635ae(
+  _runtime: mutable LeanExecution,
   _b_0: LeanValue,
   _k_1: LeanValue,
   _t_2: LeanValue,
@@ -1496,17 +1687,20 @@ fun f_MessageLog_append_spec_0_c86e9635ae(
     _l_4_6: LeanValue = leanField(_t_2, 3);
     _r_5_7: LeanValue = leanField(_t_2, 4);
     _x_6_8: LeanValue = L4_Lean_Data_Name.f_Lean_Name_quickCmpImpl_fa3996fc71(
+      _runtime,
       _k_1,
       _k_2_4,
     );
     leanTag(_x_6_8) match {
     | "[\"Ordering\",\"lt\"]" ->
       _impl_7_9: LeanValue = f_MessageLog_append_spec_0_c86e9635ae(
+        _runtime,
         _b_0,
         _k_1,
         _l_4_6,
       );
       L4_Std_Data_DTreeMap_Internal_Balancing.f_Internal_Impl_balance_ec7d1862f0(
+        _runtime,
         _k_2_4,
         _v_3_5,
         _impl_7_9,
@@ -1514,6 +1708,7 @@ fun f_MessageLog_append_spec_0_c86e9635ae(
       )
     | "[\"Ordering\",\"eq\"]" ->
       _x_10_12: LeanValue = f_append_spec_0_lam_0_e4d8e8e788(
+        _runtime,
         _b_0,
         LeanCtor("[\"Option\",\"some\"]", Array[_v_3_5]),
       );
@@ -1532,11 +1727,13 @@ fun f_MessageLog_append_spec_0_c86e9635ae(
       }
     | "[\"Ordering\",\"gt\"]" ->
       _impl_13_15: LeanValue = f_MessageLog_append_spec_0_c86e9635ae(
+        _runtime,
         _b_0,
         _k_1,
         _r_5_7,
       );
       L4_Std_Data_DTreeMap_Internal_Balancing.f_Internal_Impl_balance_ec7d1862f0(
+        _runtime,
         _k_2_4,
         _v_3_5,
         _l_4_6,
@@ -1546,6 +1743,7 @@ fun f_MessageLog_append_spec_0_c86e9635ae(
     }
   | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
     _x_16_18: LeanValue = f_append_spec_0_lam_0_e4d8e8e788(
+      _runtime,
       _b_0,
       LeanCtor("[\"Option\",\"none\"]", Array[]),
     );
@@ -1566,24 +1764,36 @@ fun f_MessageLog_append_spec_0_c86e9635ae(
   }
 }
 // "Lean.MessageData.ofName"
-fun f_Lean_MessageData_ofName_d42ea5e93c(_n_0: LeanValue): LeanValue {
+fun f_Lean_MessageData_ofName_d42ea5e93c(
+  _runtime: mutable LeanExecution,
+  _n_0: LeanValue,
+): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+    _runtime,
     _n_0,
     LeanCtor("[\"Bool\",\"true\"]", Array[]),
   );
   f_Lean_MessageData_ofFormat_9fc6d2a204(
+    _runtime,
     LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_2_2]),
   )
 }
 fun apply_f_Lean_MessageData_ofName_d42ea5e93c(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_MessageData_ofName_d42ea5e93c(_args[0])
+  f_Lean_MessageData_ofName_d42ea5e93c(_runtime, _args[0])
 }
 // "_private.Lean.Message.0.Lean.MessageData.initFn._@.Lean.Message.1828196597._hygCtx._hyg.4"
-fun f_Message_hygCtx_hyg_2beb6f0e90(_a_1_0: LeanValue): LeanValue {
+fun f_Message_hygCtx_hyg_2beb6f0e90(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_2_1: LeanValue = LeanText("maxTraceChildren");
-  _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_2_1);
+  _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
+    _x_2_1,
+  );
   _x_7_6: LeanValue = LeanCtor(
     "[\"Lean\",\"Option\",\"Decl\",\"mk\"]",
     Array[
@@ -1593,14 +1803,16 @@ fun f_Message_hygCtx_hyg_2beb6f0e90(_a_1_0: LeanValue): LeanValue {
     ],
   );
   _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+    _runtime,
     LeanText("Lean"),
     LeanText("MessageData"),
     _x_2_1,
   );
-  f_hygCtx_hyg_spec_0_4d4b196358(_x_3_2, _x_7_6, _x_10_9, _a_1_0)
+  f_hygCtx_hyg_spec_0_4d4b196358(_runtime, _x_3_2, _x_7_6, _x_10_9, _a_1_0)
 }
 // "Lean.MessageData.format"
 fun f_Lean_MessageData_format_4ec7b79047(
+  _runtime: mutable LeanExecution,
   _msgData_0: LeanValue,
   _ctx_1: LeanValue,
   _a_1_2: LeanValue,
@@ -1612,15 +1824,23 @@ fun f_Lean_MessageData_format_4ec7b79047(
       LeanCtor("[\"List\",\"nil\"]", Array[]),
     ],
   );
-  f_Lean_MessageData_formatAux_939caae81d(_x_4_5, _ctx_1, _msgData_0, _a_1_2)
+  f_Lean_MessageData_formatAux_939caae81d(
+    _runtime,
+    _x_4_5,
+    _ctx_1,
+    _msgData_0,
+    _a_1_2,
+  )
 }
 fun apply_f_Lean_MessageData_format_4ec7b79047(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_MessageData_format_4ec7b79047(_args[0], _args[1], _args[2])
+  f_Lean_MessageData_format_4ec7b79047(_runtime, _args[0], _args[1], _args[2])
 }
 // "Lean.MessageLog.add"
 fun f_Lean_MessageLog_add_007621762c(
+  _runtime: mutable LeanExecution,
   _msg_0: LeanValue,
   _log_1: LeanValue,
 ): LeanValue {
@@ -1630,6 +1850,7 @@ fun f_Lean_MessageLog_add_007621762c(
     _unreported_3: LeanValue = leanField(_log_1, 1);
     _loggedKinds_4: LeanValue = leanField(_log_1, 2);
     _x_1_5: LeanValue = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_push_8ec9d2434c(
+      _runtime,
       _unreported_3,
       _msg_0,
     );
@@ -1642,23 +1863,28 @@ fun f_Lean_MessageLog_add_007621762c(
 }
 // "_private.Lean.Message.0.Lean.Kernel.Exception.mkCtx"
 fun f_Kernel_Exception_mkCtx_90721c0068(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _lctx_1: LeanValue,
   _opts_2: LeanValue,
   _msg_3: LeanValue,
 ): LeanValue {
   _x_1_4: LeanValue = L4_Lean_Environment.f_Lean_Environment_ofKernelEnv_492b798ba4(
+    _runtime,
     _env_0,
   );
   _x_2_5: LeanValue = LeanScalar("nat", "0");
   _x_3_6: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+    _runtime,
     LeanErased(),
   );
   _x_4_7: LeanValue = LeanCtor(
     "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
     Array[_x_3_6],
   );
-  _x_5_8: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59();
+  _x_5_8: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59(
+    _runtime,
+  );
   _x_7_10: LeanValue = LeanCtor(
     "[\"Lean\",\"MessageDataContext\",\"mk\"]",
     Array[
@@ -1688,6 +1914,7 @@ fun f_Kernel_Exception_mkCtx_90721c0068(
 }
 // "Lean.Message.toString"
 fun f_Lean_Message_toString_34fa93ac3a(
+  _runtime: mutable LeanExecution,
   _msg_0_input: LeanValue,
   _includeEndPos_1_input: LeanValue,
   _a_1_2_input: LeanValue,
@@ -1716,13 +1943,20 @@ fun f_Lean_Message_toString_34fa93ac3a(
         _frame.set(8, leanField(_frame[0], 7));
         _frame.set(
           9,
-          f_Lean_MessageData_toString_8479724eb9(_frame[8], _frame[2]),
+          f_Lean_MessageData_toString_8479724eb9(
+            _runtime,
+            _frame[8],
+            _frame[2],
+          ),
         );
         leanTag(_frame[9]) match {
         | "[\"ST\",\"Out\",\"mk\"]" ->
           _frame.set(10, leanField(_frame[9], 0));
           _frame.set(11, leanField(_frame[9], 1));
-          _frame.set(32, f_Lean_MessageData_kind_1ca506818c(_frame[8]));
+          _frame.set(
+            32,
+            f_Lean_MessageData_kind_1ca506818c(_runtime, _frame[8]),
+          );
           leanTag(_frame[1]) match {
           | "[\"Bool\",\"false\"]" ->
             _frame.set(49, LeanCtor("[\"Option\",\"none\"]", Array[]));
@@ -1746,6 +1980,7 @@ fun f_Lean_Message_toString_34fa93ac3a(
       _frame.set(
         14,
         L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _runtime,
           _frame[12],
           _frame[13],
         ),
@@ -1759,7 +1994,11 @@ fun f_Lean_Message_toString_34fa93ac3a(
       _frame.set(18, LeanScalar("uint32", "10"));
       _frame.set(
         19,
-        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[17], _frame[18]),
+        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+          _runtime,
+          _frame[17],
+          _frame[18],
+        ),
       );
       leanTag(_frame[19]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -1786,12 +2025,16 @@ fun f_Lean_Message_toString_34fa93ac3a(
     | 4 ->
       _frame.set(
         24,
-        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[23]),
+        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, _frame[23]),
       );
       _frame.set(25, LeanScalar("nat", "0"));
       _frame.set(
         26,
-        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[24], _frame[25]),
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _runtime,
+          _frame[24],
+          _frame[25],
+        ),
       );
       leanTag(_frame[26]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -1805,6 +2048,7 @@ fun f_Lean_Message_toString_34fa93ac3a(
         _frame.set(
           28,
           L4_Init_Data_String_FindPos.f_Slice_Pos_prev_9d62afcc23(
+            _runtime,
             _frame[27],
             _frame[24],
           ),
@@ -1820,6 +2064,7 @@ fun f_Lean_Message_toString_34fa93ac3a(
           _frame.set(
             30,
             L4_Init_Data_String_Basic.f_Slice_Pos_get_5eec1d405e(
+              _runtime,
               _frame[27],
               _frame[29],
             ),
@@ -1859,10 +2104,11 @@ fun f_Lean_Message_toString_34fa93ac3a(
       | "[\"Lean\",\"MessageSeverity\",\"warning\"]" ->
         _frame.set(35, LeanText("warning"));
         _frame.set(36, LeanCtor("[\"Option\",\"some\"]", Array[_frame[35]]));
-        _frame.set(37, f_Lean_errorNameOfKind_450605f5f0(_frame[32]));
+        _frame.set(37, f_Lean_errorNameOfKind_450605f5f0(_runtime, _frame[32]));
         _frame.set(
           38,
           f_Lean_mkErrorStringWithPos_7ff0bb9dd0(
+            _runtime,
             _frame[3],
             _frame[4],
             _frame[34],
@@ -1878,10 +2124,11 @@ fun f_Lean_Message_toString_34fa93ac3a(
       | "[\"Lean\",\"MessageSeverity\",\"error\"]" ->
         _frame.set(39, LeanText("error"));
         _frame.set(40, LeanCtor("[\"Option\",\"some\"]", Array[_frame[39]]));
-        _frame.set(41, f_Lean_errorNameOfKind_450605f5f0(_frame[32]));
+        _frame.set(41, f_Lean_errorNameOfKind_450605f5f0(_runtime, _frame[32]));
         _frame.set(
           42,
           f_Lean_mkErrorStringWithPos_7ff0bb9dd0(
+            _runtime,
             _frame[3],
             _frame[4],
             _frame[34],
@@ -1900,7 +2147,11 @@ fun f_Lean_Message_toString_34fa93ac3a(
       _frame.set(44, LeanText(""));
       _frame.set(
         45,
-        L4_Init_Prelude.f_String_decEq_88c69973f8(_frame[7], _frame[44]),
+        L4_Init_Prelude.f_String_decEq_88c69973f8(
+          _runtime,
+          _frame[7],
+          _frame[44],
+        ),
       );
       leanTag(_frame[45]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -1908,6 +2159,7 @@ fun f_Lean_Message_toString_34fa93ac3a(
         _frame.set(
           47,
           L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _runtime,
             _frame[7],
             _frame[46],
           ),
@@ -1915,6 +2167,7 @@ fun f_Lean_Message_toString_34fa93ac3a(
         _frame.set(
           48,
           L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _runtime,
             _frame[47],
             _frame[10],
           ),
@@ -1940,9 +2193,11 @@ fun f_Lean_Message_toString_34fa93ac3a(
 }
 // "Lean.MessageLog.getWarningMessages"
 fun f_Lean_MessageLog_getWarningMessages_5566c8f85c(
+  _runtime: mutable LeanExecution,
   _log_0: LeanValue,
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "32"),
   );
@@ -1963,11 +2218,14 @@ fun f_Lean_MessageLog_getWarningMessages_5566c8f85c(
     _unreported_8: LeanValue = leanField(_log_0, 1);
     _loggedKinds_9: LeanValue = leanField(_log_0, 2);
     _x_7_10: LeanValue = f_MessageLog_getWarningMessages_spec_0_18451a0d8a(
+      _runtime,
       _unreported_8,
       _x_6_6,
       _x_4_4,
     );
-    _x_8_11: LeanValue = L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_empty_f26a97f0dc();
+    _x_8_11: LeanValue = L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_empty_f26a97f0dc(
+      _runtime,
+    );
     LeanCtor(
       "[\"Lean\",\"MessageLog\",\"mk\"]",
       Array[_x_6_6, _x_7_10, _x_8_11],
@@ -1976,16 +2234,22 @@ fun f_Lean_MessageLog_getWarningMessages_5566c8f85c(
   }
 }
 // "Lean.MessageLog.hasErrors"
-fun f_Lean_MessageLog_hasErrors_a0ca999a07(_log_0: LeanValue): LeanValue {
+fun f_Lean_MessageLog_hasErrors_a0ca999a07(
+  _runtime: mutable LeanExecution,
+  _log_0: LeanValue,
+): LeanValue {
   leanTag(_log_0) match {
   | "[\"Lean\",\"MessageLog\",\"mk\"]" ->
     _reported_1: LeanValue = leanField(_log_0, 0);
     _unreported_2: LeanValue = leanField(_log_0, 1);
     _loggedKinds_3: LeanValue = leanField(_log_0, 2);
-    _x_1_4: LeanValue = f_MessageLog_hasErrors_spec_0_760b6f791b(_reported_1);
+    _x_1_4: LeanValue = f_MessageLog_hasErrors_spec_0_760b6f791b(
+      _runtime,
+      _reported_1,
+    );
     leanTag(_x_1_4) match {
     | "[\"Bool\",\"false\"]" ->
-      f_MessageLog_hasErrors_spec_1_09873c45c5(_x_1_4, _unreported_2)
+      f_MessageLog_hasErrors_spec_1_09873c45c5(_runtime, _x_1_4, _unreported_2)
     | "[\"Bool\",\"true\"]" -> _x_1_4
     | _ -> leanFail("non-exhaustive Lean case")
     }

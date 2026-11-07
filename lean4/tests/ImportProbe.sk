@@ -1,0 +1,23 @@
+// This checks the complete imported data set, not a theorem-specific slice.
+fun main(): void {
+  data = leanDecodeImportData(FileSystem.readTextFile("build/init-data.jsonl"));
+  assert(data.constants.size() == 67953);
+  assert(data.moduleNames.contains("Init.Prelude"));
+  found = 0;
+  for ((name, info, index) in data.constants) {
+    assert(index >= 0 && index < data.moduleNames.size());
+    assert(leanNameEqual(name, leanField(leanField(leanField(info, 0), 0), 0)));
+    if (leanNameKey(name) == "as3:Nats2:lt") {
+      assert(leanTag(info) == "[\"Lean\",\"ConstantInfo\",\"defnInfo\"]");
+      !found = found + 1
+    }
+  };
+  assert(found == 1);
+  print_string(
+    "Imported all " +
+      data.constants.size().toString() +
+      " Init declarations (" +
+      data.nodeCount.toString() +
+      " shared data nodes)",
+  )
+}

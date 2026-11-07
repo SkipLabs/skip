@@ -1,0 +1,104 @@
+// A deterministic, conservative budget for Skip values. Native Lean explicitly
+// permits sharing to affect whether this operation returns undef. We do not
+// inspect pointers: unfold both trees, charge composite nodes and string bytes,
+// and return undef before exact equality if that work does not fit the budget.
+// Definite answers always use the existing alpha/structural equality operation.
+// This may miss cache hits that native pointer sharing would make inexpensive.
+mutable class LeanEqualityBudget{mutable remaining: LeanNat} {
+  mutable fun consume(n: Int): Bool {
+    cost = LeanNat::fromInt(n);
+    if (cost > this.remaining) return false;
+    this.!remaining = this.remaining.sub(cost);
+    true
+  }
+
+  mutable fun metadata(value: LeanValue): Bool {
+    entries = value;
+    while (leanTag(entries) == "[\"List\",\"cons\"]") {
+      if (!this.consume(1)) return false;
+      data = leanField(leanField(entries, 0), 1);
+      leanTag(data) match {
+      | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+        if (!this.consume(leanText(leanField(data, 0)).bytes().size())) {
+          return false
+        }
+      | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+        leanFail(
+          "not implemented: syntax metadata in budgeted expression equality",
+        )
+      | _ -> void
+      };
+      !entries = leanField(entries, 1)
+    };
+    true
+  }
+}
+
+fun leanBudgetedExprEqual(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  fuel: LeanValue,
+  binders: Bool,
+  world: LeanValue,
+): LeanValue {
+  budget = mutable LeanEqualityBudget{
+    remaining => LeanNat::fromWord(leanWordBits(fuel)),
+  };
+  pending = mutable Vector[(a, b)];
+  exhausted = false;
+  while (!pending.isEmpty() && !exhausted) {
+    (left, right) = pending.pop();
+    if (
+      leanTag(left) != leanTag(right) ||
+      leanExprData(left).and(4294967295) != leanExprData(right).and(4294967295)
+    ) {
+      return leanSTResult(
+        LeanCtor("[\"Lean\",\"LBool\",\"false\"]", Array[]),
+        world,
+      )
+    };
+    leanTag(left) match {
+    | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
+    | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
+    | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
+    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+      void
+    | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+      l = leanField(left, 1);
+      r = leanField(right, 1);
+      if (leanTag(l) != leanTag(r)) {
+        return leanSTResult(
+          LeanCtor("[\"Lean\",\"LBool\",\"false\"]", Array[]),
+          world,
+        )
+      };
+      if (leanTag(l) == "[\"Lean\",\"Literal\",\"strVal\"]") {
+        !exhausted =
+          !budget.consume(leanText(leanField(l, 0)).bytes().size()) ||
+          !budget.consume(leanText(leanField(r, 0)).bytes().size())
+      }
+    | _ ->
+      !exhausted = !budget.consume(1);
+      if (
+        !exhausted &&
+        leanTag(left) == "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]"
+      ) {
+        !exhausted =
+          !budget.metadata(leanField(left, 1)) ||
+          !budget.metadata(leanField(right, 1))
+      }
+    };
+    if (!exhausted) {
+      for ((index, _) in leanExprChildren(left)) {
+        pending.push((leanField(left, index), leanField(right, index)))
+      }
+    }
+  };
+  tag = if (exhausted) "[\"Lean\",\"LBool\",\"undef\"]" else if (
+    leanExprEqual(runtime, a, b, binders)
+  ) "[\"Lean\",\"LBool\",\"true\"]" else {
+    "[\"Lean\",\"LBool\",\"false\"]"
+  };
+  leanSTResult(LeanCtor(tag, Array[]), world)
+}

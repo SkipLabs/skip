@@ -2,6 +2,7 @@ module L4_Lean_Meta_Tactic_Grind_AC_VarRename;
 
 // "Lean.Grind.AC.Seq.renameVars"
 fun f_AC_Seq_renameVars_5c2822ee1c(
+  _runtime: mutable LeanExecution,
   _s_0_input: LeanValue,
   _f_1_input: LeanValue,
 ): LeanValue {
@@ -19,7 +20,10 @@ fun f_AC_Seq_renameVars_5c2822ee1c(
       leanTag(_frame[0]) match {
       | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
         _frame.set(2, leanField(_frame[0], 0));
-        _frame.set(5, f_Seq_renameVars_spec_0_6bdf98177f(_frame[1], _frame[2]));
+        _frame.set(
+          5,
+          f_Seq_renameVars_spec_0_6bdf98177f(_runtime, _frame[1], _frame[2]),
+        );
         leanTag(_frame[5]) match {
         | "[\"Option\",\"none\"]" ->
           _frame.set(7, LeanScalar("nat", "0"));
@@ -48,7 +52,7 @@ fun f_AC_Seq_renameVars_5c2822ee1c(
         _frame.set(4, leanField(_frame[0], 1));
         _frame.set(
           13,
-          f_Seq_renameVars_spec_0_6bdf98177f(_frame[1], _frame[3]),
+          f_Seq_renameVars_spec_0_6bdf98177f(_runtime, _frame[1], _frame[3]),
         );
         leanTag(_frame[13]) match {
         | "[\"Option\",\"none\"]" ->
@@ -68,7 +72,10 @@ fun f_AC_Seq_renameVars_5c2822ee1c(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(11, f_AC_Seq_renameVars_5c2822ee1c(_frame[4], _frame[1]));
+      _frame.set(
+        11,
+        f_AC_Seq_renameVars_5c2822ee1c(_runtime, _frame[4], _frame[1]),
+      );
       _frame.set(
         12,
         LeanCtor(
@@ -83,6 +90,7 @@ fun f_AC_Seq_renameVars_5c2822ee1c(
 }
 // "Std.DHashMap.Internal.AssocList.get?._at_.Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.Grind.AC.Seq.renameVars.spec_0.spec_0._redArg"
 fun f_renameVars_spec_0_spec_0_fd0977b7f6(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -93,10 +101,14 @@ fun f_renameVars_spec_0_spec_0_fd0977b7f6(
     _key_3_2: LeanValue = leanField(_x_1_1, 0);
     _value_4_3: LeanValue = leanField(_x_1_1, 1);
     _tail_5_4: LeanValue = leanField(_x_1_1, 2);
-    _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_key_3_2, _a_0);
+    _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
+      _key_3_2,
+      _a_0,
+    );
     leanTag(_x_6_6) match {
     | "[\"Bool\",\"false\"]" ->
-      f_renameVars_spec_0_spec_0_fd0977b7f6(_a_0, _tail_5_4)
+      f_renameVars_spec_0_spec_0_fd0977b7f6(_runtime, _a_0, _tail_5_4)
     | "[\"Bool\",\"true\"]" ->
       LeanCtor("[\"Option\",\"some\"]", Array[_value_4_3])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -106,6 +118,7 @@ fun f_renameVars_spec_0_spec_0_fd0977b7f6(
 }
 // "Lean.Grind.AC.Expr.collectVars"
 fun f_AC_Expr_collectVars_6abec654aa(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -113,22 +126,31 @@ fun f_AC_Expr_collectVars_6abec654aa(
   | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
     _x_2_2: LeanValue = leanField(_e_0, 0);
     L4_Lean_Meta_Tactic_Grind_VarRename.f_Meta_Grind_collectVar_0e24a7bc72(
+      _runtime,
       _x_2_2,
       _a_1_1,
     )
   | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
     _lhs_4_3: LeanValue = leanField(_e_0, 0);
     _rhs_5_4: LeanValue = leanField(_e_0, 1);
-    _x_6_6: LeanValue = f_AC_Expr_collectVars_6abec654aa(_lhs_4_3, _a_1_1);
-    f_AC_Expr_collectVars_6abec654aa(_rhs_5_4, _x_6_6)
+    _x_6_6: LeanValue = f_AC_Expr_collectVars_6abec654aa(
+      _runtime,
+      _lhs_4_3,
+      _a_1_1,
+    );
+    f_AC_Expr_collectVars_6abec654aa(_runtime, _rhs_5_4, _x_6_6)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_AC_Expr_collectVars_6abec654aa(_args: Array<LeanValue>): LeanValue {
-  f_AC_Expr_collectVars_6abec654aa(_args[0], _args[1])
+fun apply_f_AC_Expr_collectVars_6abec654aa(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_AC_Expr_collectVars_6abec654aa(_runtime, _args[0], _args[1])
 }
 // "Std.DHashMap.Internal.Raw₀.Const.get?._at_.Lean.Grind.AC.Seq.renameVars.spec_0._redArg"
 fun f_Seq_renameVars_spec_0_6bdf98177f(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _a_1: LeanValue,
 ): LeanValue {
@@ -137,54 +159,66 @@ fun f_Seq_renameVars_spec_0_6bdf98177f(
     _size_1_2: LeanValue = leanField(_m_0, 0);
     _buckets_2_3: LeanValue = leanField(_m_0, 1);
     _x_3_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _buckets_2_3,
     );
     _x_4_5: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+      _runtime,
       _a_1,
     );
     _x_6_7: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _x_4_5,
       LeanScalar("uint64", "32"),
     );
     _fold_8: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _x_4_5,
       _x_6_7,
     );
     _x_8_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _fold_8,
       LeanScalar("uint64", "16"),
     );
     _x_9_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _fold_8,
       _x_8_10,
     );
     _x_10_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _runtime,
       _x_9_11,
     );
     _x_11_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_3_4,
     );
     _x_13_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _runtime,
       _x_11_13,
       LeanScalar("usize", "1"),
     );
     _x_14_16: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _runtime,
       _x_10_12,
       _x_13_15,
     );
     _x_15_17: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _buckets_2_3,
       _x_14_16,
       LeanErased(),
     );
-    f_renameVars_spec_0_spec_0_fd0977b7f6(_a_1, _x_15_17)
+    f_renameVars_spec_0_spec_0_fd0977b7f6(_runtime, _a_1, _x_15_17)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Grind.AC.Seq.collectVars"
 fun f_AC_Seq_collectVars_8cfc8f666a(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -192,6 +226,7 @@ fun f_AC_Seq_collectVars_8cfc8f666a(
   | "[\"Lean\",\"Grind\",\"AC\",\"Seq\",\"var\"]" ->
     _x_2_2: LeanValue = leanField(_s_0, 0);
     L4_Lean_Meta_Tactic_Grind_VarRename.f_Meta_Grind_collectVar_0e24a7bc72(
+      _runtime,
       _x_2_2,
       _a_1_1,
     )
@@ -199,25 +234,34 @@ fun f_AC_Seq_collectVars_8cfc8f666a(
     _x_4_3: LeanValue = leanField(_s_0, 0);
     _s_5_4: LeanValue = leanField(_s_0, 1);
     _x_6_6: LeanValue = L4_Lean_Meta_Tactic_Grind_VarRename.f_Meta_Grind_collectVar_0e24a7bc72(
+      _runtime,
       _x_4_3,
       _a_1_1,
     );
-    f_AC_Seq_collectVars_8cfc8f666a(_s_5_4, _x_6_6)
+    f_AC_Seq_collectVars_8cfc8f666a(_runtime, _s_5_4, _x_6_6)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_AC_Seq_collectVars_8cfc8f666a(_args: Array<LeanValue>): LeanValue {
-  f_AC_Seq_collectVars_8cfc8f666a(_args[0], _args[1])
+fun apply_f_AC_Seq_collectVars_8cfc8f666a(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_AC_Seq_collectVars_8cfc8f666a(_runtime, _args[0], _args[1])
 }
 // "Lean.Grind.AC.Expr.renameVars"
 fun f_AC_Expr_renameVars_71ad6b235c(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _f_1: LeanValue,
 ): LeanValue {
   leanTag(_e_0) match {
   | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"var\"]" ->
     _x_1_2: LeanValue = leanField(_e_0, 0);
-    _x_2_5: LeanValue = f_Seq_renameVars_spec_0_6bdf98177f(_f_1, _x_1_2);
+    _x_2_5: LeanValue = f_Seq_renameVars_spec_0_6bdf98177f(
+      _runtime,
+      _f_1,
+      _x_1_2,
+    );
     leanTag(_x_2_5) match {
     | "[\"Option\",\"none\"]" ->
       LeanCtor(
@@ -232,8 +276,16 @@ fun f_AC_Expr_renameVars_71ad6b235c(
   | "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]" ->
     _lhs_7_3: LeanValue = leanField(_e_0, 0);
     _rhs_8_4: LeanValue = leanField(_e_0, 1);
-    _x_9_10: LeanValue = f_AC_Expr_renameVars_71ad6b235c(_lhs_7_3, _f_1);
-    _x_10_11: LeanValue = f_AC_Expr_renameVars_71ad6b235c(_rhs_8_4, _f_1);
+    _x_9_10: LeanValue = f_AC_Expr_renameVars_71ad6b235c(
+      _runtime,
+      _lhs_7_3,
+      _f_1,
+    );
+    _x_10_11: LeanValue = f_AC_Expr_renameVars_71ad6b235c(
+      _runtime,
+      _rhs_8_4,
+      _f_1,
+    );
     LeanCtor(
       "[\"Lean\",\"Grind\",\"AC\",\"Expr\",\"op\"]",
       Array[_x_9_10, _x_10_11],

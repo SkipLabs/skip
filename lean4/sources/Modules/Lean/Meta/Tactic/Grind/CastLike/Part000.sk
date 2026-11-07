@@ -2,12 +2,14 @@ module L4_Lean_Meta_Tactic_Grind_CastLike;
 
 // "_private.Lean.Meta.Tactic.Grind.CastLike.0.Lean.Meta.Grind.isEnvelopeEmbeddingDeclName"
 fun f_Meta_Grind_isEnvelopeEmbeddingDeclName_dda2ab32db(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = LeanText("Lean");
   _x_2_2: LeanValue = LeanText("Grind");
   _x_5_5: LeanValue = LeanText("toQ");
   _x_6_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+    _runtime,
     _x_1_1,
     _x_2_2,
     LeanText("Ring"),
@@ -15,47 +17,54 @@ fun f_Meta_Grind_isEnvelopeEmbeddingDeclName_dda2ab32db(
     _x_5_5,
   );
   _x_7_7: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+    _runtime,
     _declName_0,
     _x_6_6,
   );
   leanTag(_x_7_7) match {
   | "[\"Bool\",\"false\"]" ->
     _x_10_10: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr5_196cd55bbd(
+      _runtime,
       _x_1_1,
       _x_2_2,
       LeanText("IntModule"),
       LeanText("OfNatModule"),
       _x_5_5,
     );
-    L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_declName_0, _x_10_10)
+    L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_runtime, _declName_0, _x_10_10)
   | "[\"Bool\",\"true\"]" -> _x_7_7
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Meta.Grind.isCastLikeDeclName"
 fun f_Meta_Grind_isCastLikeDeclName_44bf133f1c(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = f_Meta_Grind_isEnvelopeEmbeddingDeclName_dda2ab32db(
+    _runtime,
     _declName_0,
   );
   leanTag(_x_1_1) match {
   | "[\"Bool\",\"false\"]" ->
     _x_4_4: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      _runtime,
       LeanText("NatCast"),
       LeanText("natCast"),
     );
     _x_5_5: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+      _runtime,
       _declName_0,
       _x_4_4,
     );
     leanTag(_x_5_5) match {
     | "[\"Bool\",\"false\"]" ->
       _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        _runtime,
         LeanText("IntCast"),
         LeanText("intCast"),
       );
-      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_declName_0, _x_8_8)
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_runtime, _declName_0, _x_8_8)
     | "[\"Bool\",\"true\"]" -> _x_5_5
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -64,29 +73,41 @@ fun f_Meta_Grind_isCastLikeDeclName_44bf133f1c(
   }
 }
 // "Lean.Meta.Grind.isCastLikeApp"
-fun f_Meta_Grind_isCastLikeApp_cdecad7ae0(_e_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_e_0);
-  f_Meta_Grind_isCastLikeFn_565f299051(_x_1_1)
+fun f_Meta_Grind_isCastLikeApp_cdecad7ae0(
+  _runtime: mutable LeanExecution,
+  _e_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+    _runtime,
+    _e_0,
+  );
+  f_Meta_Grind_isCastLikeFn_565f299051(_runtime, _x_1_1)
 }
 // "Lean.Meta.Grind.isEnvelopeEmbeddingFn"
-fun f_Meta_Grind_isEnvelopeEmbeddingFn_3a4b342755(_f_0: LeanValue): LeanValue {
+fun f_Meta_Grind_isEnvelopeEmbeddingFn_3a4b342755(
+  _runtime: mutable LeanExecution,
+  _f_0: LeanValue,
+): LeanValue {
   leanTag(_f_0) match {
   | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_f_0, 0);
     _declName_1_2: LeanValue = leanField(_f_0, 1);
     _us_2_3: LeanValue = leanField(_f_0, 2);
-    f_Meta_Grind_isEnvelopeEmbeddingDeclName_dda2ab32db(_declName_1_2)
+    f_Meta_Grind_isEnvelopeEmbeddingDeclName_dda2ab32db(_runtime, _declName_1_2)
   | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   }
 }
 // "Lean.Meta.Grind.isCastLikeFn"
-fun f_Meta_Grind_isCastLikeFn_565f299051(_f_0: LeanValue): LeanValue {
+fun f_Meta_Grind_isCastLikeFn_565f299051(
+  _runtime: mutable LeanExecution,
+  _f_0: LeanValue,
+): LeanValue {
   leanTag(_f_0) match {
   | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_f_0, 0);
     _declName_1_2: LeanValue = leanField(_f_0, 1);
     _us_2_3: LeanValue = leanField(_f_0, 2);
-    f_Meta_Grind_isCastLikeDeclName_44bf133f1c(_declName_1_2)
+    f_Meta_Grind_isCastLikeDeclName_44bf133f1c(_runtime, _declName_1_2)
   | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   }
 }

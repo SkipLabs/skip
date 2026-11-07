@@ -2,6 +2,7 @@ module L4_Init_Data_Range_Basic;
 
 // "_private.Init.Data.Range.Basic.0.Std.Legacy.Range.forIn'.loop._redArg"
 fun f_Range_forIn_loop_16ddf4da00(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _range_1: LeanValue,
   _f_2: LeanValue,
@@ -26,20 +27,26 @@ fun f_Range_forIn_loop_16ddf4da00(
         _toSeqLeft_14: LeanValue = leanField(_toApplicative_9, 3);
         _toSeqRight_15: LeanValue = leanField(_toApplicative_9, 4);
         _x_2_16: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+          _runtime,
           _i_4,
           _stop_6,
         );
         leanTag(_x_2_16) match {
         | "[\"Bool\",\"false\"]" ->
-          leanApply(_toPure_12, Array[LeanErased(), _b_3])
+          leanApply(_runtime, _toPure_12, Array[LeanErased(), _b_3])
         | "[\"Bool\",\"true\"]" ->
           _f_4_18: LeanValue = LeanClosure(
             L4_Init_Data_Range_Basic.apply_f_forIn_loop_lam_0_56b0ce2496,
             7,
             Array[_toPure_12, _i_4, _step_7, _inst_1_0, _range_1, _f_2],
           );
-          _x_5_19: LeanValue = leanApply(_f_2, Array[_i_4, LeanErased(), _b_3]);
+          _x_5_19: LeanValue = leanApply(
+            _runtime,
+            _f_2,
+            Array[_i_4, LeanErased(), _b_3],
+          );
           leanApply(
+            _runtime,
             _toBind_10,
             Array[LeanErased(), LeanErased(), _x_5_19, _f_4_18],
           )
@@ -54,6 +61,7 @@ fun f_Range_forIn_loop_16ddf4da00(
 }
 // "_private.Init.Data.Range.Basic.0.Std.Legacy.Range.forIn'.loop"
 fun f_Range_forIn_loop_a2693ca7ce(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -64,10 +72,11 @@ fun f_Range_forIn_loop_a2693ca7ce(
   _hs_7: LeanValue,
   _hl_8: LeanValue,
 ): LeanValue {
-  f_Range_forIn_loop_16ddf4da00(_inst_1_2, _range_3, _f_4, _b_5, _i_6)
+  f_Range_forIn_loop_16ddf4da00(_runtime, _inst_1_2, _range_3, _f_4, _b_5, _i_6)
 }
 // "_private.Init.Data.Range.Basic.0.Std.Legacy.Range.forIn'.loop._redArg._lam_0"
 fun f_forIn_loop_lam_0_56b0ce2496(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _i_1: LeanValue,
   _step_2: LeanValue,
@@ -79,16 +88,31 @@ fun f_forIn_loop_lam_0_56b0ce2496(
   leanTag(_do_lift_2_6) match {
   | "[\"ForInStep\",\"done\"]" ->
     _a_3_7: LeanValue = leanField(_do_lift_2_6, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_3_7])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_3_7])
   | "[\"ForInStep\",\"yield\"]" ->
     _a_5_8: LeanValue = leanField(_do_lift_2_6, 0);
-    _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_i_1, _step_2);
-    f_Range_forIn_loop_16ddf4da00(_inst_1_3, _range_4, _f_5, _a_5_8, _x_6_10)
+    _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
+      _i_1,
+      _step_2,
+    );
+    f_Range_forIn_loop_16ddf4da00(
+      _runtime,
+      _inst_1_3,
+      _range_4,
+      _f_5,
+      _a_5_8,
+      _x_6_10,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_forIn_loop_lam_0_56b0ce2496(_args: Array<LeanValue>): LeanValue {
+fun apply_f_forIn_loop_lam_0_56b0ce2496(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_forIn_loop_lam_0_56b0ce2496(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],

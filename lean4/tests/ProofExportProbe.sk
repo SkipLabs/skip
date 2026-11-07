@@ -1,0 +1,48 @@
+// Known constructor proof plus an ill-typed value verify the export/check
+// boundary. This is not evidence that the decide elaborator works.
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  typeName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("True"),
+  );
+  ctorName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("True"),
+    LeanText("intro"),
+  );
+  type = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, typeName, nil);
+  proof = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, ctorName, nil);
+  FileSystem.writeTextFile(
+    "build/proof-export-valid.json",
+    leanProofDocument(type, proof),
+  );
+  FileSystem.writeTextFile(
+    "build/proof-export-invalid.json",
+    leanProofDocument(
+      type,
+      L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(0)),
+    ),
+  );
+  good = leanNatDefinition(
+    runtime,
+    leanSimpleName(runtime, "limit"),
+    leanNatValue(3),
+  );
+  bad = leanReplaceField(
+    good,
+    0,
+    leanReplaceField(leanField(good, 0), 1, proof),
+  );
+  FileSystem.writeTextFile(
+    "build/proof-definition-valid.json",
+    leanProofDocument(type, proof, Array[good]),
+  );
+  FileSystem.writeTextFile(
+    "build/proof-definition-invalid.json",
+    leanProofDocument(type, proof, Array[bad]),
+  );
+  print_string("Exported known valid and invalid kernel-check fixtures")
+}

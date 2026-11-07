@@ -1,7 +1,10 @@
 module L4_Lean_Meta_Match_MatcherApp_Basic;
 
 // "Lean.Meta.MatcherApp.toExpr"
-fun f_Meta_MatcherApp_toExpr_8a8c819bd7(_matcherApp_0: LeanValue): LeanValue {
+fun f_Meta_MatcherApp_toExpr_8a8c819bd7(
+  _runtime: mutable LeanExecution,
+  _matcherApp_0: LeanValue,
+): LeanValue {
   leanTag(_matcherApp_0) match {
   | "[\"Lean\",\"Meta\",\"MatcherApp\",\"mk\"]" ->
     _toMatcherInfo_1: LeanValue = leanField(_matcherApp_0, 0);
@@ -13,40 +16,48 @@ fun f_Meta_MatcherApp_toExpr_8a8c819bd7(_matcherApp_0: LeanValue): LeanValue {
     _alts_7: LeanValue = leanField(_matcherApp_0, 6);
     _remaining_8: LeanValue = leanField(_matcherApp_0, 7);
     _x_1_9: LeanValue = L4_Init_Prelude.f_Array_toList_2f8b2ba454(
+      _runtime,
       LeanErased(),
       _matcherLevels_3,
     );
     _x_2_10: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _runtime,
       _matcherName_2,
       _x_1_9,
     );
     _result_11: LeanValue = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(
+      _runtime,
       _x_2_10,
       _params_4,
     );
     _result_12: LeanValue = L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+      _runtime,
       _result_11,
       _motive_5,
     );
     _result_13: LeanValue = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(
+      _runtime,
       _result_12,
       _discrs_6,
     );
     _result_14: LeanValue = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(
+      _runtime,
       _result_13,
       _alts_7,
     );
-    L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(_result_14, _remaining_8)
+    L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(_runtime, _result_14, _remaining_8)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Meta_MatcherApp_toExpr_8a8c819bd7(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Meta_MatcherApp_toExpr_8a8c819bd7(_args[0])
+  f_Meta_MatcherApp_toExpr_8a8c819bd7(_runtime, _args[0])
 }
 // "Lean.Meta.MatcherApp.altNumParams"
 fun f_Meta_MatcherApp_altNumParams_34d228eb59(
+  _runtime: mutable LeanExecution,
   _matcherApp_0: LeanValue,
 ): LeanValue {
   leanTag(_matcherApp_0) match {
@@ -60,6 +71,7 @@ fun f_Meta_MatcherApp_altNumParams_34d228eb59(
     _alts_7: LeanValue = leanField(_matcherApp_0, 6);
     _remaining_8: LeanValue = leanField(_matcherApp_0, 7);
     L4_Lean_Meta_Match_MatcherInfo.f_Match_MatcherInfo_altNumParams_27a16cd7ce(
+      _runtime,
       _toMatcherInfo_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")

@@ -2,6 +2,7 @@ module L4_Init_Data_ToString_Extra;
 
 // "List.toString._redArg"
 fun f_List_toString_5f0cf5e07e(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -12,29 +13,37 @@ fun f_List_toString_5f0cf5e07e(
     _tail_5_3: LeanValue = leanField(_x_2_1, 1);
     leanTag(_tail_5_3) match {
     | "[\"List\",\"nil\"]" ->
-      _x_7_6: LeanValue = leanApply(_inst_1_0, Array[_head_4_2]);
+      _x_7_6: LeanValue = leanApply(_runtime, _inst_1_0, Array[_head_4_2]);
       _x_8_7: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         LeanText("["),
         _x_7_6,
       );
-      L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_8_7, LeanText("]"))
+      L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
+        _x_8_7,
+        LeanText("]"),
+      )
     | _ ->
       _f_11_10: LeanValue = LeanClosure(
         L4_Init_Data_ToString_Extra.apply_f_List_toString_lam_0_0294d38757,
         3,
         Array[_inst_1_0],
       );
-      _x_13_12: LeanValue = leanApply(_inst_1_0, Array[_head_4_2]);
+      _x_13_12: LeanValue = leanApply(_runtime, _inst_1_0, Array[_head_4_2]);
       _x_14_13: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         LeanText("["),
         _x_13_12,
       );
       _x_15_14: LeanValue = L4_Init_Prelude.f_List_foldl_d2df05a48a(
+        _runtime,
         _f_11_10,
         _x_14_13,
         _tail_5_3,
       );
       L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
+        _runtime,
         _x_15_14,
         LeanScalar("uint32", "93"),
       )
@@ -44,19 +53,24 @@ fun f_List_toString_5f0cf5e07e(
 }
 // "List.toString._redArg._lam_0"
 fun f_List_toString_lam_0_0294d38757(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _l_1: LeanValue,
   _r_2: LeanValue,
 ): LeanValue {
   _x_3_4: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+    _runtime,
     _l_1,
     LeanText(", "),
   );
-  _x_4_5: LeanValue = leanApply(_inst_1_0, Array[_r_2]);
-  L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_3_4, _x_4_5)
+  _x_4_5: LeanValue = leanApply(_runtime, _inst_1_0, Array[_r_2]);
+  L4_Init_Data_String_Defs.f_String_append_61d243de93(_runtime, _x_3_4, _x_4_5)
 }
-fun apply_f_List_toString_lam_0_0294d38757(_args: Array<LeanValue>): LeanValue {
-  f_List_toString_lam_0_0294d38757(_args[0], _args[1], _args[2])
+fun apply_f_List_toString_lam_0_0294d38757(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_List_toString_lam_0_0294d38757(_runtime, _args[0], _args[1], _args[2])
 }
 
 module end;

@@ -1,7 +1,9 @@
 module L4_Init_Data_String_Defs;
 
 // "String.instInhabitedSlice"
-fun f_String_instInhabitedSlice_cbc0cf417d(): LeanValue {
+fun f_String_instInhabitedSlice_cbc0cf417d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_2_1: LeanValue = LeanScalar("nat", "0");
   LeanCtor(
     "[\"String\",\"Slice\",\"mk\"]",
@@ -10,6 +12,7 @@ fun f_String_instInhabitedSlice_cbc0cf417d(): LeanValue {
 }
 // "String.intercalate"
 fun f_String_intercalate_57e8ca8200(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -18,34 +21,47 @@ fun f_String_intercalate_57e8ca8200(
   | "[\"List\",\"cons\"]" ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
-    f_String_intercalate_go_1751246b4d(_head_3_2, _s_0, _tail_4_3)
+    f_String_intercalate_go_1751246b4d(_runtime, _head_3_2, _s_0, _tail_4_3)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "String.append"
-fun f_String_append_61d243de93(_s_0: LeanValue, _t_1: LeanValue): LeanValue {
-  leanPrimitive(
-    "String.append [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_append\"}]",
+fun f_String_append_61d243de93(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _t_1: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "String.append",
+    "lean_string_append",
+    Array[_s_0, _t_1],
   )
 }
-fun apply_f_String_append_61d243de93(_args: Array<LeanValue>): LeanValue {
-  f_String_append_61d243de93(_args[0], _args[1])
+fun apply_f_String_append_61d243de93(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_String_append_61d243de93(_runtime, _args[0], _args[1])
 }
 // "String.instDecidableEqPos"
 fun f_String_instDecidableEqPos_98120a02cd(
+  _runtime: mutable LeanExecution,
   _s_1_0: LeanValue,
   _x_2_1: LeanValue,
   _x_3_2: LeanValue,
 ): LeanValue {
-  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_2_1, _x_3_2)
+  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _x_2_1, _x_3_2)
 }
 fun apply_f_String_instDecidableEqPos_98120a02cd(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_String_instDecidableEqPos_98120a02cd(_args[0], _args[1], _args[2])
+  f_String_instDecidableEqPos_98120a02cd(_runtime, _args[0], _args[1], _args[2])
 }
 // "_private.Init.Data.String.Defs.0.String.intercalate.go"
 fun f_String_intercalate_go_1751246b4d(
+  _runtime: mutable LeanExecution,
   _acc_0: LeanValue,
   _s_1: LeanValue,
   _a_1_2: LeanValue,
@@ -55,9 +71,9 @@ fun f_String_intercalate_go_1751246b4d(
   | "[\"List\",\"cons\"]" ->
     _head_2_3: LeanValue = leanField(_a_1_2, 0);
     _tail_3_4: LeanValue = leanField(_a_1_2, 1);
-    _x_4_5: LeanValue = f_String_append_61d243de93(_acc_0, _s_1);
-    _x_5_6: LeanValue = f_String_append_61d243de93(_x_4_5, _head_2_3);
-    f_String_intercalate_go_1751246b4d(_x_5_6, _s_1, _tail_3_4)
+    _x_4_5: LeanValue = f_String_append_61d243de93(_runtime, _acc_0, _s_1);
+    _x_5_6: LeanValue = f_String_append_61d243de93(_runtime, _x_4_5, _head_2_3);
+    f_String_intercalate_go_1751246b4d(_runtime, _x_5_6, _s_1, _tail_3_4)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

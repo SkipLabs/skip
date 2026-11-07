@@ -2,6 +2,7 @@ module L4_Init_Data_FloatArray_Basic;
 
 // "_private.Init.Data.FloatArray.Basic.0.List.toFloatArray.loop"
 fun f_List_toFloatArray_loop_cfe03a24cf(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -10,18 +11,25 @@ fun f_List_toFloatArray_loop_cfe03a24cf(
   | "[\"List\",\"cons\"]" ->
     _head_3_2: LeanValue = leanField(_x_1_0, 0);
     _tail_4_3: LeanValue = leanField(_x_1_0, 1);
-    _x_5_4: LeanValue = f_FloatArray_push_5aba6c17e0(_x_2_1, _head_3_2);
-    f_List_toFloatArray_loop_cfe03a24cf(_tail_4_3, _x_5_4)
+    _x_5_4: LeanValue = f_FloatArray_push_5aba6c17e0(
+      _runtime,
+      _x_2_1,
+      _head_3_2,
+    );
+    f_List_toFloatArray_loop_cfe03a24cf(_runtime, _tail_4_3, _x_5_4)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "FloatArray.get._auto_1._closed_7"
-fun f_get_auto_1_closed_7_97f9848ad0(): LeanValue {
-  _x_38_0: LeanValue = f_get_auto_1_closed_6_6fdeaa7dd7();
-  _x_39_1: LeanValue = f_get_auto_1_closed_2_3515d67711();
-  _x_40_2: LeanValue = f_get_auto_1_closed_1_1d322a8002();
-  _x_41_3: LeanValue = f_get_auto_1_closed_0_a6b94e6e7b();
+fun f_get_auto_1_closed_7_97f9848ad0(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_38_0: LeanValue = f_get_auto_1_closed_6_6fdeaa7dd7(_runtime);
+  _x_39_1: LeanValue = f_get_auto_1_closed_2_3515d67711(_runtime);
+  _x_40_2: LeanValue = f_get_auto_1_closed_1_1d322a8002(_runtime);
+  _x_41_3: LeanValue = f_get_auto_1_closed_0_a6b94e6e7b(_runtime);
   L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_41_3,
     _x_40_2,
     _x_39_1,
@@ -30,6 +38,7 @@ fun f_get_auto_1_closed_7_97f9848ad0(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlM.loop._redArg"
 fun f_FloatArray_foldlM_loop_07e0798142(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _f_1: LeanValue,
   _as_2: LeanValue,
@@ -50,22 +59,25 @@ fun f_FloatArray_foldlM_loop_07e0798142(
       _toSeqLeft_12: LeanValue = leanField(_toApplicative_7, 3);
       _toSeqRight_13: LeanValue = leanField(_toApplicative_7, 4);
       _x_2_14: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _j_5,
         _stop_3,
       );
       leanTag(_x_2_14) match {
       | "[\"Bool\",\"false\"]" ->
-        leanApply(_toPure_10, Array[LeanErased(), _b_6])
+        leanApply(_runtime, _toPure_10, Array[LeanErased(), _b_6])
       | "[\"Bool\",\"true\"]" ->
         _isZero_17: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _runtime,
           _i_4,
           LeanScalar("nat", "0"),
         );
         leanTag(_isZero_17) match {
         | "[\"Bool\",\"true\"]" ->
-          leanApply(_toPure_10, Array[LeanErased(), _b_6])
+          leanApply(_runtime, _toPure_10, Array[LeanErased(), _b_6])
         | "[\"Bool\",\"false\"]" ->
           _n_5_20: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+            _runtime,
             _i_4,
             LeanScalar("nat", "1"),
           );
@@ -75,12 +87,14 @@ fun f_FloatArray_foldlM_loop_07e0798142(
             Array[_j_5, _inst_1_0, _f_1, _as_2, _stop_3, _n_5_20],
           );
           _x_7_22: LeanValue = f_FloatArray_get_3bedf9f28a(
+            _runtime,
             _as_2,
             _j_5,
             LeanErased(),
           );
-          _x_8_23: LeanValue = leanApply(_f_1, Array[_b_6, _x_7_22]);
+          _x_8_23: LeanValue = leanApply(_runtime, _f_1, Array[_b_6, _x_7_22]);
           leanApply(
+            _runtime,
             _toBind_8,
             Array[LeanErased(), LeanErased(), _x_8_23, _f_6_21],
           )
@@ -95,14 +109,16 @@ fun f_FloatArray_foldlM_loop_07e0798142(
 }
 // "FloatArray.instForInFloatOfMonad._redArg._lam_0"
 fun f_FloatArray_instForInFloatOfMonad_lam_0_9c57a2b243(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _n_2_1: LeanValue,
   _y_3_2: LeanValue,
   _y_4_3: LeanValue,
   _y_5_4: LeanValue,
 ): LeanValue {
-  _sz_5: LeanValue = f_FloatArray_usize_70786a09b6(_y_3_2);
+  _sz_5: LeanValue = f_FloatArray_usize_70786a09b6(_runtime, _y_3_2);
   f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+    _runtime,
     _inst_1_0,
     _y_3_2,
     _y_5_4,
@@ -112,9 +128,11 @@ fun f_FloatArray_instForInFloatOfMonad_lam_0_9c57a2b243(
   )
 }
 fun apply_f_FloatArray_instForInFloatOfMonad_lam_0_9c57a2b243(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_FloatArray_instForInFloatOfMonad_lam_0_9c57a2b243(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -123,42 +141,52 @@ fun apply_f_FloatArray_instForInFloatOfMonad_lam_0_9c57a2b243(
   )
 }
 // "FloatArray.set._auto_1"
-fun f_FloatArray_set_auto_1_ba4959c5ab(): LeanValue {
+fun f_FloatArray_set_auto_1_ba4959c5ab(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_1_0: LeanValue = LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]);
   _x_2_1: LeanValue = LeanText("Lean");
   _x_3_2: LeanValue = LeanText("Parser");
   _x_4_3: LeanValue = LeanText("Tactic");
   _x_6_5: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq"),
   );
   _x_8_7: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   );
   _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq1Indented"),
   );
   _x_12_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("null"),
   );
   _x_14_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("tacticGet_elem_tactic"),
   );
   _x_16_15: LeanValue = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+    _runtime,
     LeanText("get_elem_tactic"),
   );
   _x_17_16: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     _x_16_15,
   );
   _x_19_18: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -167,6 +195,7 @@ fun f_FloatArray_set_auto_1_ba4959c5ab(): LeanValue {
     ),
   );
   _x_21_20: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -175,6 +204,7 @@ fun f_FloatArray_set_auto_1_ba4959c5ab(): LeanValue {
     ),
   );
   _x_23_22: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -185,17 +215,27 @@ fun f_FloatArray_set_auto_1_ba4959c5ab(): LeanValue {
   LeanCtor("[\"Lean\",\"Syntax\",\"node\"]", Array[_x_1_0, _x_6_5, _x_23_22])
 }
 // "FloatArray.instInhabited"
-fun f_FloatArray_instInhabited_318da9f604(): LeanValue {
-  f_FloatArray_empty_31e63105a0()
+fun f_FloatArray_instInhabited_318da9f604(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  f_FloatArray_empty_31e63105a0(_runtime)
 }
 // "FloatArray.data"
-fun f_FloatArray_data_7a4ee84846(_self_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.data [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_data\"}]",
+fun f_FloatArray_data_7a4ee84846(
+  _runtime: mutable LeanExecution,
+  _self_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.data",
+    "lean_float_array_data",
+    Array[_self_0],
   )
 }
 // "FloatArray.foldl._redArg._closed_5"
-fun f_FloatArray_foldl_closed_5_614ab41d06(): LeanValue {
+fun f_FloatArray_foldl_closed_5_614ab41d06(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_5_4db1d10e8c,
     4,
@@ -204,24 +244,33 @@ fun f_FloatArray_foldl_closed_5_614ab41d06(): LeanValue {
 }
 // "FloatArray.push"
 fun f_FloatArray_push_5aba6c17e0(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.push [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_push\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.push",
+    "lean_float_array_push",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 // "FloatArray.get._auto_1._closed_11"
-fun f_get_auto_1_closed_11_69b55f7ed5(): LeanValue {
-  _x_47_0: LeanValue = f_get_auto_1_closed_10_2bd06fdecf();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_47_0)
+fun f_get_auto_1_closed_11_69b55f7ed5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_47_0: LeanValue = f_get_auto_1_closed_10_2bd06fdecf(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_47_0)
 }
 // "FloatArray.get._auto_1._closed_8"
-fun f_get_auto_1_closed_8_c180ab18af(): LeanValue {
+fun f_get_auto_1_closed_8_c180ab18af(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("null")
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forIn.loop._redArg._lam_0"
 fun f_forIn_loop_lam_0_3e08db9299(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _inst_1_1: LeanValue,
   _as_2: LeanValue,
@@ -232,15 +281,26 @@ fun f_forIn_loop_lam_0_3e08db9299(
   leanTag(_do_lift_3_5) match {
   | "[\"ForInStep\",\"done\"]" ->
     _a_4_6: LeanValue = leanField(_do_lift_3_5, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_4_6])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_4_6])
   | "[\"ForInStep\",\"yield\"]" ->
     _a_6_7: LeanValue = leanField(_do_lift_3_5, 0);
-    f_FloatArray_forIn_loop_4cb4feddbb(_inst_1_1, _as_2, _f_3, _n_2_4, _a_6_7)
+    f_FloatArray_forIn_loop_4cb4feddbb(
+      _runtime,
+      _inst_1_1,
+      _as_2,
+      _f_3,
+      _n_2_4,
+      _a_6_7,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_forIn_loop_lam_0_3e08db9299(_args: Array<LeanValue>): LeanValue {
+fun apply_f_forIn_loop_lam_0_3e08db9299(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_forIn_loop_lam_0_3e08db9299(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -250,17 +310,26 @@ fun apply_f_forIn_loop_lam_0_3e08db9299(_args: Array<LeanValue>): LeanValue {
   )
 }
 // "FloatArray.get._auto_1._closed_10"
-fun f_get_auto_1_closed_10_2bd06fdecf(): LeanValue {
+fun f_get_auto_1_closed_10_2bd06fdecf(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("tacticGet_elem_tactic")
 }
 // "FloatArray.size"
-fun f_FloatArray_size_dab4898e78(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.size [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_size\"}]",
+fun f_FloatArray_size_dab4898e78(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.size",
+    "lean_float_array_size",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlMUnsafe.fold._redArg"
 fun f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _f_1: LeanValue,
   _as_2: LeanValue,
@@ -280,6 +349,7 @@ fun f_FloatArray_foldlMUnsafe_fold_253f9f7188(
       _toSeqLeft_11: LeanValue = leanField(_toApplicative_6, 3);
       _toSeqRight_12: LeanValue = leanField(_toApplicative_6, 4);
       _x_2_13: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+        _runtime,
         _i_3,
         _stop_4,
       );
@@ -292,16 +362,19 @@ fun f_FloatArray_foldlMUnsafe_fold_253f9f7188(
           Array[_i_3, _inst_1_0, _f_1, _as_2, _stop_4],
         );
         _x_4_15: LeanValue = f_FloatArray_uget_3fb7851c38(
+          _runtime,
           _as_2,
           _i_3,
           LeanErased(),
         );
-        _x_5_16: LeanValue = leanApply(_f_1, Array[_b_5, _x_4_15]);
+        _x_5_16: LeanValue = leanApply(_runtime, _f_1, Array[_b_5, _x_4_15]);
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _x_5_16, _f_3_14],
         )
-      | "[\"Bool\",\"true\"]" -> leanApply(_toPure_9, Array[LeanErased(), _b_5])
+      | "[\"Bool\",\"true\"]" ->
+        leanApply(_runtime, _toPure_9, Array[LeanErased(), _b_5])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -310,7 +383,9 @@ fun f_FloatArray_foldlMUnsafe_fold_253f9f7188(
   }
 }
 // "FloatArray.foldl._redArg._closed_4"
-fun f_FloatArray_foldl_closed_4_51099436a1(): LeanValue {
+fun f_FloatArray_foldl_closed_4_51099436a1(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_4_552185c942,
     4,
@@ -318,23 +393,38 @@ fun f_FloatArray_foldl_closed_4_51099436a1(): LeanValue {
   )
 }
 // "FloatArray.markLinear"
-fun f_FloatArray_markLinear_4fffc59b8b(_ds_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.markLinear [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_sarray_mark_linear\"}]",
+fun f_FloatArray_markLinear_4fffc59b8b(
+  _runtime: mutable LeanExecution,
+  _ds_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.markLinear",
+    "lean_sarray_mark_linear",
+    Array[_ds_0],
   )
 }
 // "FloatArray.mk"
-fun f_FloatArray_mk_390e9f064a(_data_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.mk [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_mk\"}]",
+fun f_FloatArray_mk_390e9f064a(
+  _runtime: mutable LeanExecution,
+  _data_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.mk",
+    "lean_float_array_mk",
+    Array[_data_0],
   )
 }
 // "FloatArray.get._auto_1._closed_12"
-fun f_get_auto_1_closed_12_257e0efa58(): LeanValue {
+fun f_get_auto_1_closed_12_257e0efa58(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("get_elem_tactic")
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlMUnsafe.fold._redArg._lam_0"
 fun f_foldlMUnsafe_fold_lam_0_8bffc88df2(
+  _runtime: mutable LeanExecution,
   _i_0: LeanValue,
   _inst_1_1: LeanValue,
   _f_2: LeanValue,
@@ -343,10 +433,12 @@ fun f_foldlMUnsafe_fold_lam_0_8bffc88df2(
   _do_lift_2_5: LeanValue,
 ): LeanValue {
   _x_4_7: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+    _runtime,
     _i_0,
     LeanScalar("usize", "1"),
   );
   f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+    _runtime,
     _inst_1_1,
     _f_2,
     _as_3,
@@ -356,9 +448,11 @@ fun f_foldlMUnsafe_fold_lam_0_8bffc88df2(
   )
 }
 fun apply_f_foldlMUnsafe_fold_lam_0_8bffc88df2(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_foldlMUnsafe_fold_lam_0_8bffc88df2(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -369,27 +463,35 @@ fun apply_f_foldlMUnsafe_fold_lam_0_8bffc88df2(
 }
 // "FloatArray.set"
 fun f_FloatArray_set_d58b098abd(
+  _runtime: mutable LeanExecution,
   _ds_0: LeanValue,
   _i_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
   _h_3: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.set [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_fset\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.set",
+    "lean_float_array_fset",
+    Array[_ds_0, _i_1, _a_internal_hyg_1_2, _h_3],
   )
 }
 // "FloatArray.empty"
-fun f_FloatArray_empty_31e63105a0(): LeanValue {
-  f_FloatArray_emptyWithCapacity_b3cecd3fd2(LeanScalar("nat", "0"))
+fun f_FloatArray_empty_31e63105a0(_runtime: mutable LeanExecution): LeanValue {
+  f_FloatArray_emptyWithCapacity_b3cecd3fd2(_runtime, LeanScalar("nat", "0"))
 }
 // "FloatArray.foldl._redArg._closed_7"
-fun f_FloatArray_foldl_closed_7_6996be6cdb(): LeanValue {
-  _f_203_0: LeanValue = f_FloatArray_foldl_closed_1_5d25460aeb();
-  _f_204_1: LeanValue = f_FloatArray_foldl_closed_0_7233be1ec8();
+fun f_FloatArray_foldl_closed_7_6996be6cdb(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _f_203_0: LeanValue = f_FloatArray_foldl_closed_1_5d25460aeb(_runtime);
+  _f_204_1: LeanValue = f_FloatArray_foldl_closed_0_7233be1ec8(_runtime);
   LeanCtor("[\"Functor\",\"mk\"]", Array[_f_204_1, _f_203_0])
 }
 // "FloatArray.instBEq._closed_0"
-fun f_FloatArray_instBEq_closed_0_ebd74db3ed(): LeanValue {
+fun f_FloatArray_instBEq_closed_0_ebd74db3ed(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic.apply_f_FloatArray_instBEq_beq_f9aaca4a9a,
     2,
@@ -397,7 +499,9 @@ fun f_FloatArray_instBEq_closed_0_ebd74db3ed(): LeanValue {
   )
 }
 // "FloatArray.foldl._redArg._closed_0"
-fun f_FloatArray_foldl_closed_0_7233be1ec8(): LeanValue {
+fun f_FloatArray_foldl_closed_0_7233be1ec8(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_0_cc398566b3,
     4,
@@ -406,22 +510,34 @@ fun f_FloatArray_foldl_closed_0_7233be1ec8(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.toList.loop"
 fun f_FloatArray_toList_loop_6c6653edaa(
+  _runtime: mutable LeanExecution,
   _ds_0: LeanValue,
   _i_1: LeanValue,
   _r_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = f_FloatArray_size_dab4898e78(_ds_0);
-  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_1, _x_1_3);
+  _x_1_3: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _ds_0);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    _i_1,
+    _x_1_3,
+  );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
-    L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_r_2)
+    L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _r_2)
   | "[\"Bool\",\"true\"]" ->
     _x_5_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _i_1,
       LeanScalar("nat", "1"),
     );
-    _x_6_8: LeanValue = f_FloatArray_get_3bedf9f28a(_ds_0, _i_1, LeanErased());
+    _x_6_8: LeanValue = f_FloatArray_get_3bedf9f28a(
+      _runtime,
+      _ds_0,
+      _i_1,
+      LeanErased(),
+    );
     f_FloatArray_toList_loop_6c6653edaa(
+      _runtime,
       _ds_0,
       _x_5_7,
       LeanCtor("[\"List\",\"cons\"]", Array[_x_6_8, _r_2]),
@@ -430,24 +546,39 @@ fun f_FloatArray_toList_loop_6c6653edaa(
   }
 }
 // "FloatArray.usize"
-fun f_FloatArray_usize_70786a09b6(_a_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.usize [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_sarray_size\"}]",
+fun f_FloatArray_usize_70786a09b6(
+  _runtime: mutable LeanExecution,
+  _a_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.usize",
+    "lean_sarray_size",
+    Array[_a_0],
   )
 }
 // "FloatArray.get._auto_1._closed_16"
-fun f_get_auto_1_closed_16_afe6680b13(): LeanValue {
-  _x_59_0: LeanValue = f_get_auto_1_closed_15_70389a10fe();
-  _x_60_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d();
-  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _x_60_1, _x_59_0)
+fun f_get_auto_1_closed_16_afe6680b13(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_59_0: LeanValue = f_get_auto_1_closed_15_70389a10fe(_runtime);
+  _x_60_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d(_runtime);
+  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
+    LeanErased(),
+    _x_60_1,
+    _x_59_0,
+  )
 }
 // "Array.isEqvAux._at_.FloatArray.instBEq.beq.spec_0._redArg"
 fun f_instBEq_beq_spec_0_f4b977c16f(
+  _runtime: mutable LeanExecution,
   _xs_0: LeanValue,
   _ys_1: LeanValue,
   _x_1_2: LeanValue,
 ): LeanValue {
   _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _x_1_2,
     LeanScalar("nat", "0"),
   );
@@ -455,38 +586,44 @@ fun f_instBEq_beq_spec_0_f4b977c16f(
   | "[\"Bool\",\"true\"]" -> _isZero_4
   | "[\"Bool\",\"false\"]" ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _x_1_2,
       LeanScalar("nat", "1"),
     );
     _x_3_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
       LeanErased(),
       _xs_0,
       _n_2_6,
       LeanErased(),
     );
     _x_4_8: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
       LeanErased(),
       _ys_1,
       _n_2_6,
       LeanErased(),
     );
     _x_5_9: LeanValue = L4_Init_Data_Float_Float.f_Float_beq_349ab44b9d(
+      _runtime,
       _x_3_7,
       _x_4_8,
     );
     leanTag(_x_5_9) match {
     | "[\"Bool\",\"false\"]" -> _x_5_9
     | "[\"Bool\",\"true\"]" ->
-      f_instBEq_beq_spec_0_f4b977c16f(_xs_0, _ys_1, _n_2_6)
+      f_instBEq_beq_spec_0_f4b977c16f(_runtime, _xs_0, _ys_1, _n_2_6)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "FloatArray.get._auto_1._closed_15"
-fun f_get_auto_1_closed_15_70389a10fe(): LeanValue {
-  _x_55_0: LeanValue = f_get_auto_1_closed_14_dc60a11ed0();
-  _x_56_1: LeanValue = f_get_auto_1_closed_11_69b55f7ed5();
+fun f_get_auto_1_closed_15_70389a10fe(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_55_0: LeanValue = f_get_auto_1_closed_14_dc60a11ed0(_runtime);
+  _x_56_1: LeanValue = f_get_auto_1_closed_11_69b55f7ed5(_runtime);
   LeanCtor(
     "[\"Lean\",\"Syntax\",\"node\"]",
     Array[
@@ -497,9 +634,11 @@ fun f_get_auto_1_closed_15_70389a10fe(): LeanValue {
   )
 }
 // "FloatArray.get._auto_1._closed_19"
-fun f_get_auto_1_closed_19_fa0b6af3a5(): LeanValue {
-  _x_69_0: LeanValue = f_get_auto_1_closed_18_d8a0d11171();
-  _x_70_1: LeanValue = f_get_auto_1_closed_7_97f9848ad0();
+fun f_get_auto_1_closed_19_fa0b6af3a5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_69_0: LeanValue = f_get_auto_1_closed_18_d8a0d11171(_runtime);
+  _x_70_1: LeanValue = f_get_auto_1_closed_7_97f9848ad0(_runtime);
   LeanCtor(
     "[\"Lean\",\"Syntax\",\"node\"]",
     Array[
@@ -511,21 +650,25 @@ fun f_get_auto_1_closed_19_fa0b6af3a5(): LeanValue {
 }
 // "FloatArray.foldl._redArg._lam_0"
 fun f_FloatArray_foldl_lam_0_b06060f211(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _x1_1_1: LeanValue,
   _x2_2_2: LeanValue,
 ): LeanValue {
-  leanApply(_f_0, Array[_x1_1_1, _x2_2_2])
+  leanApply(_runtime, _f_0, Array[_x1_1_1, _x2_2_2])
 }
 fun apply_f_FloatArray_foldl_lam_0_b06060f211(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_FloatArray_foldl_lam_0_b06060f211(_args[0], _args[1], _args[2])
+  f_FloatArray_foldl_lam_0_b06060f211(_runtime, _args[0], _args[1], _args[2])
 }
 // "FloatArray.get._auto_1._closed_21"
-fun f_get_auto_1_closed_21_b93cbf7c8b(): LeanValue {
-  _x_76_0: LeanValue = f_get_auto_1_closed_20_0f7bc8445e();
-  _x_77_1: LeanValue = f_get_auto_1_closed_4_51442fa1ca();
+fun f_get_auto_1_closed_21_b93cbf7c8b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_76_0: LeanValue = f_get_auto_1_closed_20_0f7bc8445e(_runtime);
+  _x_77_1: LeanValue = f_get_auto_1_closed_4_51442fa1ca(_runtime);
   LeanCtor(
     "[\"Lean\",\"Syntax\",\"node\"]",
     Array[
@@ -536,37 +679,61 @@ fun f_get_auto_1_closed_21_b93cbf7c8b(): LeanValue {
   )
 }
 // "FloatArray.get._auto_1._closed_20"
-fun f_get_auto_1_closed_20_0f7bc8445e(): LeanValue {
-  _x_73_0: LeanValue = f_get_auto_1_closed_19_fa0b6af3a5();
-  _x_74_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d();
-  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _x_74_1, _x_73_0)
+fun f_get_auto_1_closed_20_0f7bc8445e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_73_0: LeanValue = f_get_auto_1_closed_19_fa0b6af3a5(_runtime);
+  _x_74_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d(_runtime);
+  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
+    LeanErased(),
+    _x_74_1,
+    _x_73_0,
+  )
 }
 // "FloatArray.get?"
-fun f_FloatArray_get_7a9cedb420(_ds_0: LeanValue, _i_1: LeanValue): LeanValue {
-  _x_1_2: LeanValue = f_FloatArray_size_dab4898e78(_ds_0);
-  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_1, _x_1_2);
+fun f_FloatArray_get_7a9cedb420(
+  _runtime: mutable LeanExecution,
+  _ds_0: LeanValue,
+  _i_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _ds_0);
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    _i_1,
+    _x_1_2,
+  );
   leanTag(_x_2_3) match {
   | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"Bool\",\"true\"]" ->
-    _x_4_5: LeanValue = f_FloatArray_get_3bedf9f28a(_ds_0, _i_1, LeanErased());
+    _x_4_5: LeanValue = f_FloatArray_get_3bedf9f28a(
+      _runtime,
+      _ds_0,
+      _i_1,
+      LeanErased(),
+    );
     LeanCtor("[\"Option\",\"some\"]", Array[_x_4_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "FloatArray.foldl._redArg._closed_8"
-fun f_FloatArray_foldl_closed_8_4141e13901(): LeanValue {
-  _f_206_0: LeanValue = f_FloatArray_foldl_closed_5_614ab41d06();
-  _f_207_1: LeanValue = f_FloatArray_foldl_closed_4_51099436a1();
-  _f_208_2: LeanValue = f_FloatArray_foldl_closed_3_71cf07615a();
-  _f_209_3: LeanValue = f_FloatArray_foldl_closed_2_51814d8c2e();
-  _x_210_4: LeanValue = f_FloatArray_foldl_closed_7_6996be6cdb();
+fun f_FloatArray_foldl_closed_8_4141e13901(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _f_206_0: LeanValue = f_FloatArray_foldl_closed_5_614ab41d06(_runtime);
+  _f_207_1: LeanValue = f_FloatArray_foldl_closed_4_51099436a1(_runtime);
+  _f_208_2: LeanValue = f_FloatArray_foldl_closed_3_71cf07615a(_runtime);
+  _f_209_3: LeanValue = f_FloatArray_foldl_closed_2_51814d8c2e(_runtime);
+  _x_210_4: LeanValue = f_FloatArray_foldl_closed_7_6996be6cdb(_runtime);
   LeanCtor(
     "[\"Applicative\",\"mk\"]",
     Array[_x_210_4, _f_209_3, _f_208_2, _f_207_1, _f_206_0],
   )
 }
 // "FloatArray.instGetElemNatFloatLtSize"
-fun f_FloatArray_instGetElemNatFloatLtSize_c759100537(): LeanValue {
+fun f_FloatArray_instGetElemNatFloatLtSize_c759100537(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic
       .apply_f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51,
@@ -576,6 +743,7 @@ fun f_FloatArray_instGetElemNatFloatLtSize_c759100537(): LeanValue {
 }
 // "FloatArray.foldl._redArg"
 fun f_FloatArray_foldl_a2a9f5147d(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _init_1: LeanValue,
   _as_2: LeanValue,
@@ -634,6 +802,7 @@ fun f_FloatArray_foldl_a2a9f5147d(
     ],
   );
   _x_11_15: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _start_3,
     _stop_4,
   );
@@ -645,14 +814,16 @@ fun f_FloatArray_foldl_a2a9f5147d(
       3,
       Array[_f_0],
     );
-    _x_13_17: LeanValue = f_FloatArray_size_dab4898e78(_as_2);
+    _x_13_17: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _as_2);
     _x_14_18: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _stop_4,
       _x_13_17,
     );
     leanTag(_x_14_18) match {
     | "[\"Bool\",\"false\"]" ->
       _x_15_19: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _start_3,
         _x_13_17,
       );
@@ -660,12 +831,15 @@ fun f_FloatArray_foldl_a2a9f5147d(
       | "[\"Bool\",\"false\"]" -> _init_1
       | "[\"Bool\",\"true\"]" ->
         _x_16_20: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+          _runtime,
           _start_3,
         );
         _x_17_21: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+          _runtime,
           _x_13_17,
         );
         f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+          _runtime,
           _x_10_14,
           _f_12_16,
           _as_2,
@@ -677,12 +851,15 @@ fun f_FloatArray_foldl_a2a9f5147d(
       }
     | "[\"Bool\",\"true\"]" ->
       _x_19_23: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _start_3,
       );
       _x_20_24: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _stop_4,
       );
       f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+        _runtime,
         _x_10_14,
         _f_12_16,
         _as_2,
@@ -697,6 +874,7 @@ fun f_FloatArray_foldl_a2a9f5147d(
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forIn.loop._redArg"
 fun f_FloatArray_forIn_loop_4cb4feddbb(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _as_1: LeanValue,
   _f_2: LeanValue,
@@ -715,14 +893,17 @@ fun f_FloatArray_forIn_loop_4cb4feddbb(
       _toSeqLeft_10: LeanValue = leanField(_toApplicative_5, 3);
       _toSeqRight_11: LeanValue = leanField(_toApplicative_5, 4);
       _isZero_13: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _i_3,
         LeanScalar("nat", "0"),
       );
       leanTag(_isZero_13) match {
-      | "[\"Bool\",\"true\"]" -> leanApply(_toPure_8, Array[LeanErased(), _b_4])
+      | "[\"Bool\",\"true\"]" ->
+        leanApply(_runtime, _toPure_8, Array[LeanErased(), _b_4])
       | "[\"Bool\",\"false\"]" ->
         _one_15: LeanValue = LeanScalar("nat", "1");
         _n_3_16: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _i_3,
           _one_15,
         );
@@ -731,22 +912,26 @@ fun f_FloatArray_forIn_loop_4cb4feddbb(
           6,
           Array[_toPure_8, _inst_1_0, _as_1, _f_2, _n_3_16],
         );
-        _x_5_18: LeanValue = f_FloatArray_size_dab4898e78(_as_1);
+        _x_5_18: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _as_1);
         _x_6_19: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _x_5_18,
           _one_15,
         );
         _x_7_20: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _x_6_19,
           _n_3_16,
         );
         _x_8_21: LeanValue = f_FloatArray_get_3bedf9f28a(
+          _runtime,
           _as_1,
           _x_7_20,
           LeanErased(),
         );
-        _x_9_22: LeanValue = leanApply(_f_2, Array[_x_8_21, _b_4]);
+        _x_9_22: LeanValue = leanApply(_runtime, _f_2, Array[_x_8_21, _b_4]);
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _x_9_22, _f_4_17],
         )
@@ -759,16 +944,21 @@ fun f_FloatArray_forIn_loop_4cb4feddbb(
 }
 // "FloatArray.get"
 fun f_FloatArray_get_3bedf9f28a(
+  _runtime: mutable LeanExecution,
   _ds_0: LeanValue,
   _i_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.get [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_fget\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.get",
+    "lean_float_array_fget",
+    Array[_ds_0, _i_1, _h_2],
   )
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlM.loop._redArg._lam_0"
 fun f_foldlM_loop_lam_0_c18bc4ca4d(
+  _runtime: mutable LeanExecution,
   _j_0: LeanValue,
   _inst_1_1: LeanValue,
   _f_2: LeanValue,
@@ -778,10 +968,12 @@ fun f_foldlM_loop_lam_0_c18bc4ca4d(
   _do_lift_3_6: LeanValue,
 ): LeanValue {
   _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _runtime,
     _j_0,
     LeanScalar("nat", "1"),
   );
   f_FloatArray_foldlM_loop_07e0798142(
+    _runtime,
     _inst_1_1,
     _f_2,
     _as_3,
@@ -791,8 +983,12 @@ fun f_foldlM_loop_lam_0_c18bc4ca4d(
     _do_lift_3_6,
   )
 }
-fun apply_f_foldlM_loop_lam_0_c18bc4ca4d(_args: Array<LeanValue>): LeanValue {
+fun apply_f_foldlM_loop_lam_0_c18bc4ca4d(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_foldlM_loop_lam_0_c18bc4ca4d(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -804,16 +1000,19 @@ fun apply_f_foldlM_loop_lam_0_c18bc4ca4d(_args: Array<LeanValue>): LeanValue {
 }
 // "FloatArray.instGetElemNatFloatLtSize._lam_0"
 fun f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51(
+  _runtime: mutable LeanExecution,
   _xs_0: LeanValue,
   _i_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  f_FloatArray_get_3bedf9f28a(_xs_0, _i_1, LeanErased())
+  f_FloatArray_get_3bedf9f28a(_runtime, _xs_0, _i_1, LeanErased())
 }
 fun apply_f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -821,6 +1020,7 @@ fun apply_f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51(
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forInUnsafe.loop._redArg._lam_0"
 fun f_forInUnsafe_loop_lam_0_4188c4614a(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _i_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -832,14 +1032,16 @@ fun f_forInUnsafe_loop_lam_0_4188c4614a(
   leanTag(_do_lift_2_6) match {
   | "[\"ForInStep\",\"done\"]" ->
     _a_3_7: LeanValue = leanField(_do_lift_2_6, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_3_7])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_3_7])
   | "[\"ForInStep\",\"yield\"]" ->
     _a_5_8: LeanValue = leanField(_do_lift_2_6, 0);
     _x_7_11: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+      _runtime,
       _i_1,
       LeanScalar("usize", "1"),
     );
     f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+      _runtime,
       _inst_1_2,
       _as_3,
       _f_4,
@@ -851,9 +1053,11 @@ fun f_forInUnsafe_loop_lam_0_4188c4614a(
   }
 }
 fun apply_f_forInUnsafe_loop_lam_0_4188c4614a(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_forInUnsafe_loop_lam_0_4188c4614a(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -864,32 +1068,48 @@ fun apply_f_forInUnsafe_loop_lam_0_4188c4614a(
   )
 }
 // "FloatArray.get._auto_1._closed_18"
-fun f_get_auto_1_closed_18_d8a0d11171(): LeanValue {
-  _x_66_0: LeanValue = f_get_auto_1_closed_17_b20f9d2073();
-  _x_67_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d();
-  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _x_67_1, _x_66_0)
+fun f_get_auto_1_closed_18_d8a0d11171(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_66_0: LeanValue = f_get_auto_1_closed_17_b20f9d2073(_runtime);
+  _x_67_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d(_runtime);
+  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
+    LeanErased(),
+    _x_67_1,
+    _x_66_0,
+  )
 }
 // "FloatArray.uset"
 fun f_FloatArray_uset_8768e1a97a(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _i_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
   _h_3: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.uset [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_uset\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.uset",
+    "lean_float_array_uset",
+    Array[_a_0, _i_1, _a_internal_hyg_1_2, _h_3],
   )
 }
 // "FloatArray.get._auto_1._closed_3"
-fun f_get_auto_1_closed_3_88647712f5(): LeanValue {
+fun f_get_auto_1_closed_3_88647712f5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("tacticSeq")
 }
 // "FloatArray.get._auto_1._closed_6"
-fun f_get_auto_1_closed_6_6fdeaa7dd7(): LeanValue {
+fun f_get_auto_1_closed_6_6fdeaa7dd7(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("tacticSeq1Indented")
 }
 // "FloatArray.instForInFloatOfMonad"
 fun f_FloatArray_instForInFloatOfMonad_773807fcea(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
 ): LeanValue {
@@ -901,8 +1121,10 @@ fun f_FloatArray_instForInFloatOfMonad_773807fcea(
   )
 }
 // "instToStringFloatArray._closed_1"
-fun f_instToStringFloatArray_closed_1_1a71f367ea(): LeanValue {
-  _x_19_0: LeanValue = f_instToStringFloatArray_closed_0_7aca490902();
+fun f_instToStringFloatArray_closed_1_1a71f367ea(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_19_0: LeanValue = f_instToStringFloatArray_closed_0_7aca490902(_runtime);
   LeanClosure(
     L4_Init_Data_FloatArray_Basic
       .apply_f_instToStringFloatArray_lam_0_107e398c22,
@@ -912,6 +1134,7 @@ fun f_instToStringFloatArray_closed_1_1a71f367ea(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forInUnsafe.loop"
 fun f_FloatArray_forInUnsafe_loop_02aa33a0ae(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -922,6 +1145,7 @@ fun f_FloatArray_forInUnsafe_loop_02aa33a0ae(
   _b_7: LeanValue,
 ): LeanValue {
   f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+    _runtime,
     _inst_1_2,
     _as_3,
     _f_4,
@@ -931,7 +1155,9 @@ fun f_FloatArray_forInUnsafe_loop_02aa33a0ae(
   )
 }
 // "FloatArray.foldl._redArg._closed_3"
-fun f_FloatArray_foldl_closed_3_71cf07615a(): LeanValue {
+fun f_FloatArray_foldl_closed_3_71cf07615a(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_3_f3d9d44434,
     4,
@@ -940,6 +1166,7 @@ fun f_FloatArray_foldl_closed_3_71cf07615a(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlMUnsafe.fold"
 fun f_FloatArray_foldlMUnsafe_fold_50318a02fb(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -950,6 +1177,7 @@ fun f_FloatArray_foldlMUnsafe_fold_50318a02fb(
   _b_7: LeanValue,
 ): LeanValue {
   f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+    _runtime,
     _inst_1_2,
     _f_3,
     _as_4,
@@ -960,6 +1188,7 @@ fun f_FloatArray_foldlMUnsafe_fold_50318a02fb(
 }
 // "FloatArray.instForInFloatOfMonad._redArg"
 fun f_FloatArray_instForInFloatOfMonad_49dc742677(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
 ): LeanValue {
   LeanClosure(
@@ -970,46 +1199,58 @@ fun f_FloatArray_instForInFloatOfMonad_49dc742677(
   )
 }
 // "FloatArray.empty._closed_0"
-fun f_FloatArray_empty_closed_0_a65dc1191d(): LeanValue {
-  f_FloatArray_emptyWithCapacity_b3cecd3fd2(LeanScalar("nat", "0"))
+fun f_FloatArray_empty_closed_0_a65dc1191d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  f_FloatArray_emptyWithCapacity_b3cecd3fd2(_runtime, LeanScalar("nat", "0"))
 }
 // "FloatArray.uset._auto_1"
-fun f_FloatArray_uset_auto_1_ef8cdd233e(): LeanValue {
+fun f_FloatArray_uset_auto_1_ef8cdd233e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_1_0: LeanValue = LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]);
   _x_2_1: LeanValue = LeanText("Lean");
   _x_3_2: LeanValue = LeanText("Parser");
   _x_4_3: LeanValue = LeanText("Tactic");
   _x_6_5: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq"),
   );
   _x_8_7: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   );
   _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq1Indented"),
   );
   _x_12_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("null"),
   );
   _x_14_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("tacticGet_elem_tactic"),
   );
   _x_16_15: LeanValue = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+    _runtime,
     LeanText("get_elem_tactic"),
   );
   _x_17_16: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     _x_16_15,
   );
   _x_19_18: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1018,6 +1259,7 @@ fun f_FloatArray_uset_auto_1_ef8cdd233e(): LeanValue {
     ),
   );
   _x_21_20: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1026,6 +1268,7 @@ fun f_FloatArray_uset_auto_1_ef8cdd233e(): LeanValue {
     ),
   );
   _x_23_22: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1036,13 +1279,22 @@ fun f_FloatArray_uset_auto_1_ef8cdd233e(): LeanValue {
   LeanCtor("[\"Lean\",\"Syntax\",\"node\"]", Array[_x_1_0, _x_6_5, _x_23_22])
 }
 // "FloatArray.get._auto_1._closed_14"
-fun f_get_auto_1_closed_14_dc60a11ed0(): LeanValue {
-  _x_52_0: LeanValue = f_get_auto_1_closed_13_df3fc4477b();
-  _x_53_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d();
-  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(LeanErased(), _x_53_1, _x_52_0)
+fun f_get_auto_1_closed_14_dc60a11ed0(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_52_0: LeanValue = f_get_auto_1_closed_13_df3fc4477b(_runtime);
+  _x_53_1: LeanValue = f_get_auto_1_closed_5_3c68ef3f0d(_runtime);
+  L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
+    LeanErased(),
+    _x_53_1,
+    _x_52_0,
+  )
 }
 // "FloatArray.foldl._redArg._closed_1"
-fun f_FloatArray_foldl_closed_1_5d25460aeb(): LeanValue {
+fun f_FloatArray_foldl_closed_1_5d25460aeb(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_1_91ebcf203e,
     4,
@@ -1051,26 +1303,33 @@ fun f_FloatArray_foldl_closed_1_5d25460aeb(): LeanValue {
 }
 // "FloatArray.set!"
 fun f_FloatArray_set_5a24a7202a(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
   _a_internal_hyg_3_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.set! [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_set\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.set!",
+    "lean_float_array_set",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1, _a_internal_hyg_3_2],
   )
 }
 // "Array.isEqvAux._at_.FloatArray.instBEq.beq.spec_0"
 fun f_instBEq_beq_spec_0_c076b87c57(
+  _runtime: mutable LeanExecution,
   _xs_0: LeanValue,
   _ys_1: LeanValue,
   _hsz_2: LeanValue,
   _x_1_3: LeanValue,
   _x_2_4: LeanValue,
 ): LeanValue {
-  f_instBEq_beq_spec_0_f4b977c16f(_xs_0, _ys_1, _x_1_3)
+  f_instBEq_beq_spec_0_f4b977c16f(_runtime, _xs_0, _ys_1, _x_1_3)
 }
 // "FloatArray.instGetElemUSizeFloatLtNatToNatSize._closed_0"
-fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_closed_0_02317f02cd(): LeanValue {
+fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_closed_0_02317f02cd(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic
       .apply_f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_lam_0_6b1abdc226,
@@ -1080,6 +1339,7 @@ fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_closed_0_02317f02cd(): Lean
 }
 // "FloatArray.foldlMUnsafe._redArg"
 fun f_FloatArray_foldlMUnsafe_18893b09c7(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _f_1: LeanValue,
   _init_2: LeanValue,
@@ -1099,35 +1359,41 @@ fun f_FloatArray_foldlMUnsafe_18893b09c7(
       _toSeqLeft_11: LeanValue = leanField(_toApplicative_6, 3);
       _toSeqRight_12: LeanValue = leanField(_toApplicative_6, 4);
       _x_2_13: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _start_4,
         _stop_5,
       );
       leanTag(_x_2_13) match {
       | "[\"Bool\",\"false\"]" ->
-        leanApply(_toPure_9, Array[LeanErased(), _init_2])
+        leanApply(_runtime, _toPure_9, Array[LeanErased(), _init_2])
       | "[\"Bool\",\"true\"]" ->
-        _x_4_15: LeanValue = f_FloatArray_size_dab4898e78(_as_3);
+        _x_4_15: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _as_3);
         _x_5_16: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+          _runtime,
           _stop_5,
           _x_4_15,
         );
         leanTag(_x_5_16) match {
         | "[\"Bool\",\"false\"]" ->
           _x_6_17: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _runtime,
             _start_4,
             _x_4_15,
           );
           leanTag(_x_6_17) match {
           | "[\"Bool\",\"false\"]" ->
-            leanApply(_toPure_9, Array[LeanErased(), _init_2])
+            leanApply(_runtime, _toPure_9, Array[LeanErased(), _init_2])
           | "[\"Bool\",\"true\"]" ->
             _x_8_19: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+              _runtime,
               _start_4,
             );
             _x_9_20: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+              _runtime,
               _x_4_15,
             );
             f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+              _runtime,
               _inst_1_0,
               _f_1,
               _as_3,
@@ -1139,12 +1405,15 @@ fun f_FloatArray_foldlMUnsafe_18893b09c7(
           }
         | "[\"Bool\",\"true\"]" ->
           _x_11_22: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+            _runtime,
             _start_4,
           );
           _x_12_23: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+            _runtime,
             _stop_5,
           );
           f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+            _runtime,
             _inst_1_0,
             _f_1,
             _as_3,
@@ -1163,29 +1432,41 @@ fun f_FloatArray_foldlMUnsafe_18893b09c7(
 }
 // "FloatArray.propagateMark"
 fun f_FloatArray_propagateMark_27de4944fa(
+  _runtime: mutable LeanExecution,
   _ds_0: LeanValue,
   _es_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.propagateMark [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_sarray_propagate_mark\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.propagateMark",
+    "lean_sarray_propagate_mark",
+    Array[_ds_0, _es_1],
   )
 }
 // "FloatArray.get._auto_1._closed_2"
-fun f_get_auto_1_closed_2_3515d67711(): LeanValue {
+fun f_get_auto_1_closed_2_3515d67711(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Tactic")
 }
 // "FloatArray.uget"
 fun f_FloatArray_uget_3fb7851c38(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _i_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.uget [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_uget\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.uget",
+    "lean_float_array_uget",
+    Array[_a_0, _i_1, _a_internal_hyg_1_2],
   )
 }
 // "FloatArray.instBEq"
-fun f_FloatArray_instBEq_8bbd84e16e(): LeanValue {
+fun f_FloatArray_instBEq_8bbd84e16e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic.apply_f_FloatArray_instBEq_beq_f9aaca4a9a,
     2,
@@ -1193,7 +1474,9 @@ fun f_FloatArray_instBEq_8bbd84e16e(): LeanValue {
   )
 }
 // "FloatArray.instGetElemNatFloatLtSize._closed_0"
-fun f_FloatArray_instGetElemNatFloatLtSize_closed_0_fbae7818ee(): LeanValue {
+fun f_FloatArray_instGetElemNatFloatLtSize_closed_0_fbae7818ee(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic
       .apply_f_FloatArray_instGetElemNatFloatLtSize_lam_0_9f487f1d51,
@@ -1203,6 +1486,7 @@ fun f_FloatArray_instGetElemNatFloatLtSize_closed_0_fbae7818ee(): LeanValue {
 }
 // "FloatArray.forInUnsafe"
 fun f_FloatArray_forInUnsafe_000e4360b8(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1210,8 +1494,9 @@ fun f_FloatArray_forInUnsafe_000e4360b8(
   _b_4: LeanValue,
   _f_5: LeanValue,
 ): LeanValue {
-  _sz_6: LeanValue = f_FloatArray_usize_70786a09b6(_as_3);
+  _sz_6: LeanValue = f_FloatArray_usize_70786a09b6(_runtime, _as_3);
   f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+    _runtime,
     _inst_1_2,
     _as_3,
     _f_5,
@@ -1221,18 +1506,28 @@ fun f_FloatArray_forInUnsafe_000e4360b8(
   )
 }
 // "FloatArray.get._auto_1._closed_9"
-fun f_get_auto_1_closed_9_463309918f(): LeanValue {
-  _x_44_0: LeanValue = f_get_auto_1_closed_8_c180ab18af();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_44_0)
+fun f_get_auto_1_closed_9_463309918f(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_44_0: LeanValue = f_get_auto_1_closed_8_c180ab18af(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_44_0)
 }
 // "FloatArray.emptyWithCapacity"
-fun f_FloatArray_emptyWithCapacity_b3cecd3fd2(_c_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "FloatArray.emptyWithCapacity [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_mk_empty_float_array\"}]",
+fun f_FloatArray_emptyWithCapacity_b3cecd3fd2(
+  _runtime: mutable LeanExecution,
+  _c_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.emptyWithCapacity",
+    "lean_mk_empty_float_array",
+    Array[_c_0],
   )
 }
 // "FloatArray.instGetElemUSizeFloatLtNatToNatSize"
-fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_3d3d8737c4(): LeanValue {
+fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_3d3d8737c4(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_FloatArray_Basic
       .apply_f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_lam_0_6b1abdc226,
@@ -1241,12 +1536,15 @@ fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_3d3d8737c4(): LeanValue {
   )
 }
 // "FloatArray.get._auto_1._closed_4"
-fun f_get_auto_1_closed_4_51442fa1ca(): LeanValue {
-  _x_30_0: LeanValue = f_get_auto_1_closed_3_88647712f5();
-  _x_31_1: LeanValue = f_get_auto_1_closed_2_3515d67711();
-  _x_32_2: LeanValue = f_get_auto_1_closed_1_1d322a8002();
-  _x_33_3: LeanValue = f_get_auto_1_closed_0_a6b94e6e7b();
+fun f_get_auto_1_closed_4_51442fa1ca(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_30_0: LeanValue = f_get_auto_1_closed_3_88647712f5(_runtime);
+  _x_31_1: LeanValue = f_get_auto_1_closed_2_3515d67711(_runtime);
+  _x_32_2: LeanValue = f_get_auto_1_closed_1_1d322a8002(_runtime);
+  _x_33_3: LeanValue = f_get_auto_1_closed_0_a6b94e6e7b(_runtime);
   L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_33_3,
     _x_32_2,
     _x_31_1,
@@ -1255,6 +1553,7 @@ fun f_get_auto_1_closed_4_51442fa1ca(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.foldlM.loop"
 fun f_FloatArray_foldlM_loop_3c2dad5fc6(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1267,6 +1566,7 @@ fun f_FloatArray_foldlM_loop_3c2dad5fc6(
   _b_9: LeanValue,
 ): LeanValue {
   f_FloatArray_foldlM_loop_07e0798142(
+    _runtime,
     _inst_1_2,
     _f_3,
     _as_4,
@@ -1278,61 +1578,83 @@ fun f_FloatArray_foldlM_loop_3c2dad5fc6(
 }
 // "FloatArray.instBEq.beq"
 fun f_FloatArray_instBEq_beq_f9aaca4a9a(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
-  _data_3_2: LeanValue = f_FloatArray_data_7a4ee84846(_x_1_0);
-  _data_4_3: LeanValue = f_FloatArray_data_7a4ee84846(_x_2_1);
+  _data_3_2: LeanValue = f_FloatArray_data_7a4ee84846(_runtime, _x_1_0);
+  _data_4_3: LeanValue = f_FloatArray_data_7a4ee84846(_runtime, _x_2_1);
   _x_5_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _data_3_2,
   );
   _x_6_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _data_4_3,
   );
-  _x_7_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_5_4, _x_6_5);
+  _x_7_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
+    _x_5_4,
+    _x_6_5,
+  );
   leanTag(_x_7_6) match {
   | "[\"Bool\",\"false\"]" -> _x_7_6
   | "[\"Bool\",\"true\"]" ->
-    f_instBEq_beq_spec_0_f4b977c16f(_data_3_2, _data_4_3, _x_5_4)
+    f_instBEq_beq_spec_0_f4b977c16f(_runtime, _data_3_2, _data_4_3, _x_5_4)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_FloatArray_instBEq_beq_f9aaca4a9a(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_FloatArray_instBEq_beq_f9aaca4a9a(_args[0], _args[1])
+  f_FloatArray_instBEq_beq_f9aaca4a9a(_runtime, _args[0], _args[1])
 }
 // "FloatArray.get._auto_1._closed_0"
-fun f_get_auto_1_closed_0_a6b94e6e7b(): LeanValue {
+fun f_get_auto_1_closed_0_a6b94e6e7b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean")
 }
 // "instToStringFloatArray._lam_0"
 fun f_instToStringFloatArray_lam_0_107e398c22(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _ds_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_FloatArray_toList_1676517f3f(_ds_1);
-  L4_Init_Data_ToString_Extra.f_List_toString_5f0cf5e07e(_x_1_0, _x_2_2)
+  _x_2_2: LeanValue = f_FloatArray_toList_1676517f3f(_runtime, _ds_1);
+  L4_Init_Data_ToString_Extra.f_List_toString_5f0cf5e07e(
+    _runtime,
+    _x_1_0,
+    _x_2_2,
+  )
 }
 fun apply_f_instToStringFloatArray_lam_0_107e398c22(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_instToStringFloatArray_lam_0_107e398c22(_args[0], _args[1])
+  f_instToStringFloatArray_lam_0_107e398c22(_runtime, _args[0], _args[1])
 }
 // "FloatArray.foldl._redArg._closed_9"
-fun f_FloatArray_foldl_closed_9_9966368429(): LeanValue {
-  _f_212_0: LeanValue = f_FloatArray_foldl_closed_6_ae48ad2d71();
-  _x_213_1: LeanValue = f_FloatArray_foldl_closed_8_4141e13901();
+fun f_FloatArray_foldl_closed_9_9966368429(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _f_212_0: LeanValue = f_FloatArray_foldl_closed_6_ae48ad2d71(_runtime);
+  _x_213_1: LeanValue = f_FloatArray_foldl_closed_8_4141e13901(_runtime);
   LeanCtor("[\"Monad\",\"mk\"]", Array[_x_213_1, _f_212_0])
 }
 // "FloatArray.get._auto_1._closed_1"
-fun f_get_auto_1_closed_1_1d322a8002(): LeanValue {
+fun f_get_auto_1_closed_1_1d322a8002(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Parser")
 }
 // "FloatArray.foldl._redArg._closed_6"
-fun f_FloatArray_foldl_closed_6_ae48ad2d71(): LeanValue {
+fun f_FloatArray_foldl_closed_6_ae48ad2d71(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_6_8dfbf3e2cd,
     4,
@@ -1340,12 +1662,16 @@ fun f_FloatArray_foldl_closed_6_ae48ad2d71(): LeanValue {
   )
 }
 // "List.toFloatArray"
-fun f_List_toFloatArray_aef2a8acb9(_ds_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_FloatArray_empty_31e63105a0();
-  f_List_toFloatArray_loop_cfe03a24cf(_ds_0, _x_1_1)
+fun f_List_toFloatArray_aef2a8acb9(
+  _runtime: mutable LeanExecution,
+  _ds_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_FloatArray_empty_31e63105a0(_runtime);
+  f_List_toFloatArray_loop_cfe03a24cf(_runtime, _ds_0, _x_1_1)
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forInUnsafe.loop._redArg"
 fun f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _as_1: LeanValue,
   _f_2: LeanValue,
@@ -1365,12 +1691,13 @@ fun f_FloatArray_forInUnsafe_loop_2e22c55fdf(
       _toSeqLeft_11: LeanValue = leanField(_toApplicative_6, 3);
       _toSeqRight_12: LeanValue = leanField(_toApplicative_6, 4);
       _x_2_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+        _runtime,
         _i_4,
         _sz_3,
       );
       leanTag(_x_2_13) match {
       | "[\"Bool\",\"false\"]" ->
-        leanApply(_toPure_9, Array[LeanErased(), _b_5])
+        leanApply(_runtime, _toPure_9, Array[LeanErased(), _b_5])
       | "[\"Bool\",\"true\"]" ->
         _f_4_15: LeanValue = LeanClosure(
           L4_Init_Data_FloatArray_Basic
@@ -1379,12 +1706,14 @@ fun f_FloatArray_forInUnsafe_loop_2e22c55fdf(
           Array[_toPure_9, _i_4, _inst_1_0, _as_1, _f_2, _sz_3],
         );
         _a_16: LeanValue = f_FloatArray_uget_3fb7851c38(
+          _runtime,
           _as_1,
           _i_4,
           LeanErased(),
         );
-        _x_5_17: LeanValue = leanApply(_f_2, Array[_a_16, _b_5]);
+        _x_5_17: LeanValue = leanApply(_runtime, _f_2, Array[_a_16, _b_5]);
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _x_5_17, _f_4_15],
         )
@@ -1396,9 +1725,11 @@ fun f_FloatArray_forInUnsafe_loop_2e22c55fdf(
   }
 }
 // "FloatArray.get._auto_1._closed_17"
-fun f_get_auto_1_closed_17_b20f9d2073(): LeanValue {
-  _x_62_0: LeanValue = f_get_auto_1_closed_16_afe6680b13();
-  _x_63_1: LeanValue = f_get_auto_1_closed_9_463309918f();
+fun f_get_auto_1_closed_17_b20f9d2073(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_62_0: LeanValue = f_get_auto_1_closed_16_afe6680b13(_runtime);
+  _x_63_1: LeanValue = f_get_auto_1_closed_9_463309918f(_runtime);
   LeanCtor(
     "[\"Lean\",\"Syntax\",\"node\"]",
     Array[
@@ -1410,15 +1741,20 @@ fun f_get_auto_1_closed_17_b20f9d2073(): LeanValue {
 }
 // "FloatArray.get!"
 fun f_FloatArray_get_74e8d57ccc(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "FloatArray.get! [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_float_array_get\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "FloatArray.get!",
+    "lean_float_array_get",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 // "FloatArray.foldlMUnsafe"
 fun f_FloatArray_foldlMUnsafe_fdc7fbd543(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1440,35 +1776,41 @@ fun f_FloatArray_foldlMUnsafe_fdc7fbd543(
       _toSeqLeft_13: LeanValue = leanField(_toApplicative_8, 3);
       _toSeqRight_14: LeanValue = leanField(_toApplicative_8, 4);
       _x_2_15: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _start_6,
         _stop_7,
       );
       leanTag(_x_2_15) match {
       | "[\"Bool\",\"false\"]" ->
-        leanApply(_toPure_11, Array[LeanErased(), _init_4])
+        leanApply(_runtime, _toPure_11, Array[LeanErased(), _init_4])
       | "[\"Bool\",\"true\"]" ->
-        _x_4_17: LeanValue = f_FloatArray_size_dab4898e78(_as_5);
+        _x_4_17: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _as_5);
         _x_5_18: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+          _runtime,
           _stop_7,
           _x_4_17,
         );
         leanTag(_x_5_18) match {
         | "[\"Bool\",\"false\"]" ->
           _x_6_19: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _runtime,
             _start_6,
             _x_4_17,
           );
           leanTag(_x_6_19) match {
           | "[\"Bool\",\"false\"]" ->
-            leanApply(_toPure_11, Array[LeanErased(), _init_4])
+            leanApply(_runtime, _toPure_11, Array[LeanErased(), _init_4])
           | "[\"Bool\",\"true\"]" ->
             _x_8_21: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+              _runtime,
               _start_6,
             );
             _x_9_22: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+              _runtime,
               _x_4_17,
             );
             f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+              _runtime,
               _inst_1_2,
               _f_3,
               _as_5,
@@ -1480,12 +1822,15 @@ fun f_FloatArray_foldlMUnsafe_fdc7fbd543(
           }
         | "[\"Bool\",\"true\"]" ->
           _x_11_24: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+            _runtime,
             _start_6,
           );
           _x_12_25: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+            _runtime,
             _stop_7,
           );
           f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+            _runtime,
             _inst_1_2,
             _f_3,
             _as_5,
@@ -1503,25 +1848,41 @@ fun f_FloatArray_foldlMUnsafe_fdc7fbd543(
   }
 }
 // "FloatArray.get._auto_1._closed_5"
-fun f_get_auto_1_closed_5_3c68ef3f0d(): LeanValue {
+fun f_get_auto_1_closed_5_3c68ef3f0d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   )
 }
 // "FloatArray.isEmpty"
-fun f_FloatArray_isEmpty_b4797c9881(_s_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_FloatArray_size_dab4898e78(_s_0);
-  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_1_1, LeanScalar("nat", "0"))
+fun f_FloatArray_isEmpty_b4797c9881(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _s_0);
+  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
+    _x_1_1,
+    LeanScalar("nat", "0"),
+  )
 }
 // "FloatArray.get._auto_1._closed_13"
-fun f_get_auto_1_closed_13_df3fc4477b(): LeanValue {
-  _x_50_0: LeanValue = f_get_auto_1_closed_12_257e0efa58();
-  L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(_x_50_0)
+fun f_get_auto_1_closed_13_df3fc4477b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_50_0: LeanValue = f_get_auto_1_closed_12_257e0efa58(_runtime);
+  L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(_runtime, _x_50_0)
 }
 // "FloatArray.toList"
-fun f_FloatArray_toList_1676517f3f(_ds_0: LeanValue): LeanValue {
+fun f_FloatArray_toList_1676517f3f(
+  _runtime: mutable LeanExecution,
+  _ds_0: LeanValue,
+): LeanValue {
   f_FloatArray_toList_loop_6c6653edaa(
+    _runtime,
     _ds_0,
     LeanScalar("nat", "0"),
     LeanCtor("[\"List\",\"nil\"]", Array[]),
@@ -1529,23 +1890,28 @@ fun f_FloatArray_toList_1676517f3f(_ds_0: LeanValue): LeanValue {
 }
 // "FloatArray.instGetElemUSizeFloatLtNatToNatSize._lam_0"
 fun f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_lam_0_6b1abdc226(
+  _runtime: mutable LeanExecution,
   _xs_0: LeanValue,
   _i_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  f_FloatArray_uget_3fb7851c38(_xs_0, _i_1, LeanErased())
+  f_FloatArray_uget_3fb7851c38(_runtime, _xs_0, _i_1, LeanErased())
 }
 fun apply_f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_lam_0_6b1abdc226(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_FloatArray_instGetElemUSizeFloatLtNatToNatSize_lam_0_6b1abdc226(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
   )
 }
 // "instToStringFloatArray"
-fun f_instToStringFloatArray_01ed2a1ab2(): LeanValue {
+fun f_instToStringFloatArray_01ed2a1ab2(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_1_0: LeanValue = LeanClosure(
     L4_Init_Data_Float_Float.apply_f_Float_toString_d8e1b54cdd,
     1,
@@ -1559,7 +1925,9 @@ fun f_instToStringFloatArray_01ed2a1ab2(): LeanValue {
   )
 }
 // "FloatArray.foldl._redArg._closed_2"
-fun f_FloatArray_foldl_closed_2_51814d8c2e(): LeanValue {
+fun f_FloatArray_foldl_closed_2_51814d8c2e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_Id.apply_f_Id_instMonad_lam_2_9fa65b8698,
     2,
@@ -1568,6 +1936,7 @@ fun f_FloatArray_foldl_closed_2_51814d8c2e(): LeanValue {
 }
 // "_private.Init.Data.FloatArray.Basic.0.FloatArray.forIn.loop"
 fun f_FloatArray_forIn_loop_6f4abad11e(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1577,10 +1946,18 @@ fun f_FloatArray_forIn_loop_6f4abad11e(
   _h_6: LeanValue,
   _b_7: LeanValue,
 ): LeanValue {
-  f_FloatArray_forIn_loop_4cb4feddbb(_inst_1_2, _as_3, _f_4, _i_5, _b_7)
+  f_FloatArray_forIn_loop_4cb4feddbb(
+    _runtime,
+    _inst_1_2,
+    _as_3,
+    _f_4,
+    _i_5,
+    _b_7,
+  )
 }
 // "FloatArray.foldl"
 fun f_FloatArray_foldl_e8be350a83(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _f_1: LeanValue,
   _init_2: LeanValue,
@@ -1640,6 +2017,7 @@ fun f_FloatArray_foldl_e8be350a83(
     ],
   );
   _x_11_16: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _start_4,
     _stop_5,
   );
@@ -1651,14 +2029,16 @@ fun f_FloatArray_foldl_e8be350a83(
       3,
       Array[_f_1],
     );
-    _x_13_18: LeanValue = f_FloatArray_size_dab4898e78(_as_3);
+    _x_13_18: LeanValue = f_FloatArray_size_dab4898e78(_runtime, _as_3);
     _x_14_19: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _stop_5,
       _x_13_18,
     );
     leanTag(_x_14_19) match {
     | "[\"Bool\",\"false\"]" ->
       _x_15_20: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _start_4,
         _x_13_18,
       );
@@ -1666,12 +2046,15 @@ fun f_FloatArray_foldl_e8be350a83(
       | "[\"Bool\",\"false\"]" -> _init_2
       | "[\"Bool\",\"true\"]" ->
         _x_16_21: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+          _runtime,
           _start_4,
         );
         _x_17_22: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+          _runtime,
           _x_13_18,
         );
         f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+          _runtime,
           _x_10_15,
           _f_12_17,
           _as_3,
@@ -1683,12 +2066,15 @@ fun f_FloatArray_foldl_e8be350a83(
       }
     | "[\"Bool\",\"true\"]" ->
       _x_19_24: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _start_4,
       );
       _x_20_25: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+        _runtime,
         _stop_5,
       );
       f_FloatArray_foldlMUnsafe_fold_253f9f7188(
+        _runtime,
         _x_10_15,
         _f_12_17,
         _as_3,
@@ -1702,42 +2088,52 @@ fun f_FloatArray_foldl_e8be350a83(
   }
 }
 // "FloatArray.get._auto_1"
-fun f_FloatArray_get_auto_1_4094c0012d(): LeanValue {
+fun f_FloatArray_get_auto_1_4094c0012d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_1_0: LeanValue = LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]);
   _x_2_1: LeanValue = LeanText("Lean");
   _x_3_2: LeanValue = LeanText("Parser");
   _x_4_3: LeanValue = LeanText("Tactic");
   _x_6_5: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq"),
   );
   _x_8_7: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   );
   _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
     _x_2_1,
     _x_3_2,
     _x_4_3,
     LeanText("tacticSeq1Indented"),
   );
   _x_12_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("null"),
   );
   _x_14_13: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("tacticGet_elem_tactic"),
   );
   _x_16_15: LeanValue = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+    _runtime,
     LeanText("get_elem_tactic"),
   );
   _x_17_16: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     _x_16_15,
   );
   _x_19_18: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1746,6 +2142,7 @@ fun f_FloatArray_get_auto_1_4094c0012d(): LeanValue {
     ),
   );
   _x_21_20: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1754,6 +2151,7 @@ fun f_FloatArray_get_auto_1_4094c0012d(): LeanValue {
     ),
   );
   _x_23_22: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanCtor(
@@ -1764,7 +2162,9 @@ fun f_FloatArray_get_auto_1_4094c0012d(): LeanValue {
   LeanCtor("[\"Lean\",\"Syntax\",\"node\"]", Array[_x_1_0, _x_6_5, _x_23_22])
 }
 // "instToStringFloatArray._closed_0"
-fun f_instToStringFloatArray_closed_0_7aca490902(): LeanValue {
+fun f_instToStringFloatArray_closed_0_7aca490902(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Data_Float_Float.apply_f_Float_toString_d8e1b54cdd,
     1,
@@ -1772,18 +2172,22 @@ fun f_instToStringFloatArray_closed_0_7aca490902(): LeanValue {
   )
 }
 // "FloatArray.instEmptyCollection"
-fun f_FloatArray_instEmptyCollection_ad246af3ef(): LeanValue {
-  f_FloatArray_empty_31e63105a0()
+fun f_FloatArray_instEmptyCollection_ad246af3ef(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  f_FloatArray_empty_31e63105a0(_runtime)
 }
 // "FloatArray.forInUnsafe._redArg"
 fun f_FloatArray_forInUnsafe_b144f7e8c5(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _as_1: LeanValue,
   _b_2: LeanValue,
   _f_3: LeanValue,
 ): LeanValue {
-  _sz_4: LeanValue = f_FloatArray_usize_70786a09b6(_as_1);
+  _sz_4: LeanValue = f_FloatArray_usize_70786a09b6(_runtime, _as_1);
   f_FloatArray_forInUnsafe_loop_2e22c55fdf(
+    _runtime,
     _inst_1_0,
     _as_1,
     _f_3,

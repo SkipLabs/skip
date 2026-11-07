@@ -2,6 +2,7 @@ module L4_Lean_MonadEnv;
 
 // "Lean.evalConstCheck._redArg._lam_0"
 fun f_Lean_evalConstCheck_lam_0_f38f64f2d4(
+  _runtime: mutable LeanExecution,
   _do_lift_1_0: LeanValue,
   _typeName_1: LeanValue,
   _constName_2: LeanValue,
@@ -11,12 +12,14 @@ fun f_Lean_evalConstCheck_lam_0_f38f64f2d4(
   _do_lift_5_6: LeanValue,
 ): LeanValue {
   _x_6_7: LeanValue = L4_Lean_Environment.f_Lean_Environment_evalConstCheck_c5e94539a9(
+    _runtime,
     _do_lift_1_0,
     _do_lift_5_6,
     _typeName_1,
     _constName_2,
   );
   L4_Lean_Exception.f_Lean_ofExcept_bbb8e64e67(
+    _runtime,
     _inst_2_3,
     _inst_3_4,
     _x_4_5,
@@ -24,9 +27,11 @@ fun f_Lean_evalConstCheck_lam_0_f38f64f2d4(
   )
 }
 fun apply_f_Lean_evalConstCheck_lam_0_f38f64f2d4(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_evalConstCheck_lam_0_f38f64f2d4(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -38,6 +43,7 @@ fun apply_f_Lean_evalConstCheck_lam_0_f38f64f2d4(
 }
 // "Lean.matchConstStructure._redArg._lam_0"
 fun f_Lean_matchConstStructure_lam_0_ae961abd46(
+  _runtime: mutable LeanExecution,
   _k_0: LeanValue,
   _val_1_1: LeanValue,
   _us_2_2: LeanValue,
@@ -47,14 +53,21 @@ fun f_Lean_matchConstStructure_lam_0_ae961abd46(
   leanTag(_do_lift_3_4) match {
   | "[\"Lean\",\"ConstantInfo\",\"ctorInfo\"]" ->
     _val_4_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_k_0, Array[_val_1_1, _us_2_2, _val_4_5])
-  | _ -> leanApply(_failK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(_runtime, _k_0, Array[_val_1_1, _us_2_2, _val_4_5])
+  | _ ->
+    leanApply(
+      _runtime,
+      _failK_3,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   }
 }
 fun apply_f_Lean_matchConstStructure_lam_0_ae961abd46(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstStructure_lam_0_ae961abd46(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -64,6 +77,7 @@ fun apply_f_Lean_matchConstStructure_lam_0_ae961abd46(
 }
 // "Lean.matchConstRec._redArg"
 fun f_Lean_matchConstRec_06cb39cb8a(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _e_2: LeanValue,
@@ -89,28 +103,42 @@ fun f_Lean_matchConstRec_06cb39cb8a(
           Array[_declName_3_8, _failK_3, _k_4, _us_4_9],
         );
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _getEnv_10, _f_5_12],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_3,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfo"
 fun f_Lean_getConstInfo_49ba33cfea(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _inst_3_3: LeanValue,
   _constName_4: LeanValue,
 ): LeanValue {
-  f_Lean_getConstInfo_8a75a8d553(_inst_1_1, _inst_2_2, _inst_3_3, _constName_4)
+  f_Lean_getConstInfo_8a75a8d553(
+    _runtime,
+    _inst_1_1,
+    _inst_2_2,
+    _inst_3_3,
+    _constName_4,
+  )
 }
 // "Lean.isLargeEliminating._redArg._lam_1"
 fun f_Lean_isLargeEliminating_lam_1_7f35773ad3(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _declName_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -128,26 +156,35 @@ fun f_Lean_isLargeEliminating_lam_1_7f35773ad3(
       Array[_val_5_7, _toPure_0],
     );
     _x_7_9: LeanValue = L4_Lean_Declaration.f_Lean_mkRecName_7cbd21df52(
+      _runtime,
       _declName_1,
     );
     _x_8_10: LeanValue = f_Lean_getConstInfo_8a75a8d553(
+      _runtime,
       _inst_1_2,
       _inst_2_3,
       _inst_3_4,
       _x_7_9,
     );
-    leanApply(_toBind_5, Array[LeanErased(), LeanErased(), _x_8_10, _f_6_8])
+    leanApply(
+      _runtime,
+      _toBind_5,
+      Array[LeanErased(), LeanErased(), _x_8_10, _f_6_8],
+    )
   | _ ->
     leanApply(
+      _runtime,
       _toPure_0,
       Array[LeanErased(), LeanCtor("[\"Bool\",\"false\"]", Array[])],
     )
   }
 }
 fun apply_f_Lean_isLargeEliminating_lam_1_7f35773ad3(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_isLargeEliminating_lam_1_7f35773ad3(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -158,7 +195,10 @@ fun apply_f_Lean_isLargeEliminating_lam_1_7f35773ad3(
   )
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_0"
-fun f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(_x_1_0: LeanValue): LeanValue {
+fun f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Prod\",\"mk\"]" ->
     _fst_1: LeanValue = leanField(_x_1_0, 0);
@@ -168,12 +208,14 @@ fun f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(_x_1_0: LeanValue): LeanValue {
   }
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(_args[0])
+  f_Lean_withoutModifyingEnv_lam_0_cfe75ff460(_runtime, _args[0])
 }
 // "Lean.getAsyncConstInfo"
 fun f_Lean_getAsyncConstInfo_833d1dad72(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -182,6 +224,7 @@ fun f_Lean_getAsyncConstInfo_833d1dad72(
   _skipRealize_5: LeanValue,
 ): LeanValue {
   f_Lean_getAsyncConstInfo_7c780ac8fa(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -191,28 +234,34 @@ fun f_Lean_getAsyncConstInfo_833d1dad72(
 }
 // "Lean.isInductive?._redArg._lam_0"
 fun f_Lean_isInductive_lam_0_ee6912f67c(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _toPure_1: LeanValue,
   _do_lift_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = f_Lean_isInductiveCore_b45760d615(
+    _runtime,
     _do_lift_1_2,
     _declName_0,
   );
-  leanApply(_toPure_1, Array[LeanErased(), _x_2_3])
+  leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_2_3])
 }
 fun apply_f_Lean_isInductive_lam_0_ee6912f67c(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_isInductive_lam_0_ee6912f67c(_args[0], _args[1], _args[2])
+  f_Lean_isInductive_lam_0_ee6912f67c(_runtime, _args[0], _args[1], _args[2])
 }
 // "Lean.getConstInfoInduct._redArg._lam_0._closed_1"
-fun f_getConstInfoInduct_lam_0_closed_1_97aac5d3a1(): LeanValue {
-  _x_96_0: LeanValue = f_getConstInfoInduct_lam_0_closed_0_5f02603645();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_96_0)
+fun f_getConstInfoInduct_lam_0_closed_1_97aac5d3a1(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_96_0: LeanValue = f_getConstInfoInduct_lam_0_closed_0_5f02603645(_runtime);
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_96_0)
 }
 // "Lean.getConstInfoRec._redArg._lam_0"
 fun f_Lean_getConstInfoRec_lam_0_51e0060f35(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -222,16 +271,20 @@ fun f_Lean_getConstInfoRec_lam_0_51e0060f35(
   leanTag(_do_lift_3_4) match {
   | "[\"Option\",\"none\"]" ->
     _x_5_7: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("`"),
     );
     _x_7_9: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+      _runtime,
       _constName_0,
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
     );
     _x_10_12: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("` is not a recursor"),
     );
     L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+      _runtime,
       _inst_1_1,
       _inst_2_2,
       LeanCtor(
@@ -247,14 +300,16 @@ fun f_Lean_getConstInfoRec_lam_0_51e0060f35(
     )
   | "[\"Option\",\"some\"]" ->
     _val_13_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_toPure_3, Array[LeanErased(), _val_13_5])
+    leanApply(_runtime, _toPure_3, Array[LeanErased(), _val_13_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getConstInfoRec_lam_0_51e0060f35(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getConstInfoRec_lam_0_51e0060f35(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -263,16 +318,21 @@ fun apply_f_Lean_getConstInfoRec_lam_0_51e0060f35(
   )
 }
 // "Lean.getConstInfoDefn._redArg._lam_0._closed_1"
-fun f_getConstInfoDefn_lam_0_closed_1_f60401db2b(): LeanValue {
-  _x_138_0: LeanValue = f_getConstInfoDefn_lam_0_closed_0_30327686f1();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_138_0)
+fun f_getConstInfoDefn_lam_0_closed_1_f60401db2b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_138_0: LeanValue = f_getConstInfoDefn_lam_0_closed_0_30327686f1(_runtime);
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_138_0)
 }
 // "Lean.getConstInfoRec._redArg._lam_0._closed_0"
-fun f_getConstInfoRec_lam_0_closed_0_4bb12fb9e1(): LeanValue {
+fun f_getConstInfoRec_lam_0_closed_0_4bb12fb9e1(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("` is not a recursor")
 }
 // "Lean.isDefn?._redArg"
 fun f_Lean_isDefn_42d0b2d7d1(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _constName_2: LeanValue,
@@ -293,6 +353,7 @@ fun f_Lean_isDefn_42d0b2d7d1(
         _toSeqLeft_10: LeanValue = leanField(_toApplicative_3, 3);
         _toSeqRight_11: LeanValue = leanField(_toApplicative_3, 4);
         _x_4_13: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -302,6 +363,7 @@ fun f_Lean_isDefn_42d0b2d7d1(
           Array[_toPure_8, _constName_2, _x_4_13],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_5_14],
         )
@@ -313,7 +375,9 @@ fun f_Lean_isDefn_42d0b2d7d1(
   }
 }
 // "Lean.withEnv._redArg._closed_0"
-fun f_Lean_withEnv_closed_0_b7804fa088(): LeanValue {
+fun f_Lean_withEnv_closed_0_b7804fa088(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Lean_MonadEnv.apply_f_Lean_withEnv_lam_0_df74a4dfd8,
     1,
@@ -321,20 +385,24 @@ fun f_Lean_withEnv_closed_0_b7804fa088(): LeanValue {
   )
 }
 // "Lean.getConstInfoCtor._redArg._lam_0._closed_0"
-fun f_getConstInfoCtor_lam_0_closed_0_a9d950c9af(): LeanValue {
+fun f_getConstInfoCtor_lam_0_closed_0_a9d950c9af(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("` is not a constructor")
 }
 // "Lean.isRec"
 fun f_Lean_isRec_98240c97e8(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _declName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isRec_4439da9966(_inst_1_1, _inst_2_2, _declName_3)
+  f_Lean_isRec_4439da9966(_runtime, _inst_1_1, _inst_2_2, _declName_3)
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_5"
 fun f_Lean_withoutModifyingEnv_lam_5_1165e37752(
+  _runtime: mutable LeanExecution,
   _toFunctor_0: LeanValue,
   _toBind_1: LeanValue,
   _x_2: LeanValue,
@@ -350,31 +418,40 @@ fun f_Lean_withoutModifyingEnv_lam_5_1165e37752(
     _map_9: LeanValue = leanField(_toFunctor_0, 0);
     _mapConst_10: LeanValue = leanField(_toFunctor_0, 1);
     _x_6_11: LeanValue = leanApply(
+      _runtime,
       _toBind_1,
       Array[LeanErased(), LeanErased(), _x_2, _f_1_3],
     );
-    _x_7_12: LeanValue = f_Lean_setEnv_fbb947b6eb(_inst_2_4, _env_8);
+    _x_7_12: LeanValue = f_Lean_setEnv_fbb947b6eb(_runtime, _inst_2_4, _env_8);
     _f_8_13: LeanValue = LeanClosure(
       L4_Lean_MonadEnv.apply_f_Lean_withoutModifyingEnv_lam_4_ce7431bc8a,
       2,
       Array[_x_7_12],
     );
     _y_14: LeanValue = leanApply(
+      _runtime,
       _inst_3_5,
       Array[LeanErased(), LeanErased(), _x_6_11, _f_8_13],
     );
     _x_9_15: LeanValue = leanApply(
+      _runtime,
       _map_9,
       Array[LeanErased(), LeanErased(), _f_4_6, _y_14],
     );
-    leanApply(_toBind_1, Array[LeanErased(), LeanErased(), _x_9_15, _f_5_7])
+    leanApply(
+      _runtime,
+      _toBind_1,
+      Array[LeanErased(), LeanErased(), _x_9_15, _f_5_7],
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_5_1165e37752(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_withoutModifyingEnv_lam_5_1165e37752(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -388,6 +465,7 @@ fun apply_f_Lean_withoutModifyingEnv_lam_5_1165e37752(
 }
 // "Lean.matchConstNonRecStructure._redArg._lam_1"
 fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
+  _runtime: mutable LeanExecution,
   _declName_1_0_input: LeanValue,
   _failK_1_input: LeanValue,
   _k_2_input: LeanValue,
@@ -420,6 +498,7 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
       _frame.set(
         14,
         L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+          _runtime,
           _frame[8],
           _frame[0],
           _frame[13],
@@ -428,7 +507,7 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
       leanTag(_frame[14]) match {
       | "[\"Option\",\"none\"]" ->
         _frame.set(16, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-        _frame.set(17, leanApply(_frame[1], Array[_frame[16]]));
+        _frame.set(17, leanApply(_runtime, _frame[1], Array[_frame[16]]));
         return _frame[17]
       | "[\"Option\",\"some\"]" ->
         _frame.set(15, leanField(_frame[14], 0));
@@ -451,7 +530,11 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
               _frame.set(22, LeanScalar("nat", "0"));
               _frame.set(
                 23,
-                L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[19], _frame[22]),
+                L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                  _runtime,
+                  _frame[19],
+                  _frame[22],
+                ),
               );
               leanTag(_frame[23]) match {
               | "[\"Bool\",\"false\"]" ->
@@ -476,6 +559,7 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
                     _frame.set(
                       27,
                       f_Lean_getConstInfo_8a75a8d553(
+                        _runtime,
                         _frame[4],
                         _frame[5],
                         _frame[6],
@@ -485,6 +569,7 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
                     _frame.set(
                       28,
                       leanApply(
+                        _runtime,
                         _frame[7],
                         Array[
                           LeanErased(),
@@ -514,27 +599,29 @@ fun f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
           }
         | _ ->
           _frame.set(29, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-          _frame.set(30, leanApply(_frame[1], Array[_frame[29]]));
+          _frame.set(30, leanApply(_runtime, _frame[1], Array[_frame[29]]));
           return _frame[30]
         }
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       _frame.set(9, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-      _frame.set(10, leanApply(_frame[1], Array[_frame[9]]));
+      _frame.set(10, leanApply(_runtime, _frame[1], Array[_frame[9]]));
       return _frame[10]
     | 2 ->
       _frame.set(11, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-      _frame.set(12, leanApply(_frame[1], Array[_frame[11]]));
+      _frame.set(12, leanApply(_runtime, _frame[1], Array[_frame[11]]));
       return _frame[12]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
 fun apply_f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -548,6 +635,7 @@ fun apply_f_Lean_matchConstNonRecStructure_lam_1_4246e6d3ce(
 }
 // "Lean.matchConstNonRecStructure._redArg"
 fun f_Lean_matchConstNonRecStructure_b310629cea(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -584,22 +672,31 @@ fun f_Lean_matchConstNonRecStructure_b310629cea(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_11, _f_6_13],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_4, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_4,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.isRec?._redArg._lam_0._closed_1"
-fun f_isRec_lam_0_closed_1_172fe96baa(): LeanValue {
-  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773();
-  _x_135_3: LeanValue = f_isRec_lam_0_closed_0_f3814416ba();
-  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af();
+fun f_isRec_lam_0_closed_1_172fe96baa(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773(_runtime);
+  _x_135_3: LeanValue = f_isRec_lam_0_closed_0_f3814416ba(_runtime);
+  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af(_runtime);
   L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _runtime,
     _x_136_4,
     _x_135_3,
     LeanScalar("nat", "129"),
@@ -608,11 +705,14 @@ fun f_isRec_lam_0_closed_1_172fe96baa(): LeanValue {
   )
 }
 // "Lean.isDefn?._redArg._lam_0._closed_1"
-fun f_isDefn_lam_0_closed_1_184ff6bf0d(): LeanValue {
-  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773();
-  _x_135_3: LeanValue = f_isDefn_lam_0_closed_0_f492034c6b();
-  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af();
+fun f_isDefn_lam_0_closed_1_184ff6bf0d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773(_runtime);
+  _x_135_3: LeanValue = f_isDefn_lam_0_closed_0_f492034c6b(_runtime);
+  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af(_runtime);
   L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _runtime,
     _x_136_4,
     _x_135_3,
     LeanScalar("nat", "115"),
@@ -622,15 +722,17 @@ fun f_isDefn_lam_0_closed_1_184ff6bf0d(): LeanValue {
 }
 // "Lean.isInductive"
 fun f_Lean_isInductive_c8d5bb15ac(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _declName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isInductive_7c7e5668c8(_inst_1_1, _inst_2_2, _declName_3)
+  f_Lean_isInductive_7c7e5668c8(_runtime, _inst_1_1, _inst_2_2, _declName_3)
 }
 // "Lean.matchConstStructure._redArg._lam_1"
 fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
+  _runtime: mutable LeanExecution,
   _declName_1_0_input: LeanValue,
   _failK_1_input: LeanValue,
   _k_2_input: LeanValue,
@@ -663,6 +765,7 @@ fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
       _frame.set(
         12,
         L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+          _runtime,
           _frame[8],
           _frame[0],
           _frame[11],
@@ -671,7 +774,7 @@ fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
       leanTag(_frame[12]) match {
       | "[\"Option\",\"none\"]" ->
         _frame.set(14, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-        _frame.set(15, leanApply(_frame[1], Array[_frame[14]]));
+        _frame.set(15, leanApply(_runtime, _frame[1], Array[_frame[14]]));
         return _frame[15]
       | "[\"Option\",\"some\"]" ->
         _frame.set(13, leanField(_frame[12], 0));
@@ -707,6 +810,7 @@ fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
                 _frame.set(
                   21,
                   f_Lean_getConstInfo_8a75a8d553(
+                    _runtime,
                     _frame[4],
                     _frame[5],
                     _frame[6],
@@ -716,6 +820,7 @@ fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
                 _frame.set(
                   22,
                   leanApply(
+                    _runtime,
                     _frame[7],
                     Array[LeanErased(), LeanErased(), _frame[21], _frame[20]],
                   ),
@@ -733,23 +838,25 @@ fun f_Lean_matchConstStructure_lam_1_49ad6d646f(
           }
         | _ ->
           _frame.set(23, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-          _frame.set(24, leanApply(_frame[1], Array[_frame[23]]));
+          _frame.set(24, leanApply(_runtime, _frame[1], Array[_frame[23]]));
           return _frame[24]
         }
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       _frame.set(9, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-      _frame.set(10, leanApply(_frame[1], Array[_frame[9]]));
+      _frame.set(10, leanApply(_runtime, _frame[1], Array[_frame[9]]));
       return _frame[10]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
 fun apply_f_Lean_matchConstStructure_lam_1_49ad6d646f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstStructure_lam_1_49ad6d646f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -762,11 +869,14 @@ fun apply_f_Lean_matchConstStructure_lam_1_49ad6d646f(
   )
 }
 // "Lean.isDefn?._redArg._lam_0._closed_0"
-fun f_isDefn_lam_0_closed_0_f492034c6b(): LeanValue {
+fun f_isDefn_lam_0_closed_0_f492034c6b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean.isDefn?")
 }
 // "Lean.evalConstCheck._redArg._lam_1"
 fun f_Lean_evalConstCheck_lam_1_b7b184d59b(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _typeName_1: LeanValue,
   _constName_2: LeanValue,
@@ -793,6 +903,7 @@ fun f_Lean_evalConstCheck_lam_1_b7b184d59b(
       ],
     );
     leanApply(
+      _runtime,
       _toBind_6,
       Array[LeanErased(), LeanErased(), _getOptions_8, _f_6_10],
     )
@@ -800,9 +911,11 @@ fun f_Lean_evalConstCheck_lam_1_b7b184d59b(
   }
 }
 fun apply_f_Lean_evalConstCheck_lam_1_b7b184d59b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_evalConstCheck_lam_1_b7b184d59b(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -814,12 +927,15 @@ fun apply_f_Lean_evalConstCheck_lam_1_b7b184d59b(
   )
 }
 // "Lean.getConstInfoRec._redArg._lam_0._closed_1"
-fun f_getConstInfoRec_lam_0_closed_1_d9dad808bf(): LeanValue {
-  _x_141_0: LeanValue = f_getConstInfoRec_lam_0_closed_0_4bb12fb9e1();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_141_0)
+fun f_getConstInfoRec_lam_0_closed_1_d9dad808bf(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_141_0: LeanValue = f_getConstInfoRec_lam_0_closed_0_4bb12fb9e1(_runtime);
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_141_0)
 }
 // "Lean.isInductive._redArg"
 fun f_Lean_isInductive_7c7e5668c8(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _declName_2: LeanValue,
@@ -845,6 +961,7 @@ fun f_Lean_isInductive_7c7e5668c8(
           Array[_declName_2, _toPure_8],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_3_12],
         )
@@ -857,6 +974,7 @@ fun f_Lean_isInductive_7c7e5668c8(
 }
 // "Lean.getConstInfoCtor"
 fun f_Lean_getConstInfoCtor_3f814b5ca5(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -864,6 +982,7 @@ fun f_Lean_getConstInfoCtor_3f814b5ca5(
   _constName_4: LeanValue,
 ): LeanValue {
   f_Lean_getConstInfoCtor_41ea53349a(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -872,6 +991,7 @@ fun f_Lean_getConstInfoCtor_3f814b5ca5(
 }
 // "Lean.getConstInfoDefn._redArg"
 fun f_Lean_getConstInfoDefn_181ad500a4(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -898,6 +1018,7 @@ fun f_Lean_getConstInfoDefn_181ad500a4(
           Array[_constName_3, _inst_1_0, _inst_3_2, _toPure_9],
         );
         _x_6_15: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -907,10 +1028,12 @@ fun f_Lean_getConstInfoDefn_181ad500a4(
           Array[_toPure_9, _constName_3, _x_6_15],
         );
         _x_8_17: LeanValue = leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_7_16],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_8_17, _f_5_14],
         )
@@ -923,26 +1046,29 @@ fun f_Lean_getConstInfoDefn_181ad500a4(
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_3"
 fun f_Lean_withoutModifyingEnv_lam_3_5432697191(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _e_1_1: LeanValue,
 ): LeanValue {
   leanTag(_e_1_1) match {
   | "[\"Except\",\"error\"]" ->
     _a_2_2: LeanValue = leanField(_e_1_1, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_2_2])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_2_2])
   | "[\"Except\",\"ok\"]" ->
     _a_4_3: LeanValue = leanField(_e_1_1, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_4_3])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_4_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_3_5432697191(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_withoutModifyingEnv_lam_3_5432697191(_args[0], _args[1])
+  f_Lean_withoutModifyingEnv_lam_3_5432697191(_runtime, _args[0], _args[1])
 }
 // "Lean.isLargeEliminating._redArg._lam_0"
 fun f_Lean_isLargeEliminating_lam_0_2d5d47fffb(
+  _runtime: mutable LeanExecution,
   _val_1_0: LeanValue,
   _toPure_1: LeanValue,
   _recInfo_2: LeanValue,
@@ -964,29 +1090,42 @@ fun f_Lean_isLargeEliminating_lam_0_2d5d47fffb(
       _levelParams_13: LeanValue = leanField(_toConstantVal_3, 1);
       _type_14: LeanValue = leanField(_toConstantVal_3, 2);
       _x_2_15: LeanValue = L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(
+        _runtime,
         _levelParams_13,
       );
       _x_3_16: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_levelParams_3f5c87f376(
+        _runtime,
         _recInfo_2,
       );
-      _x_4_17: LeanValue = L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(_x_3_16);
+      _x_4_17: LeanValue = L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(
+        _runtime,
+        _x_3_16,
+      );
       _x_5_18: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+        _runtime,
         _x_2_15,
         _x_4_17,
       );
-      leanApply(_toPure_1, Array[LeanErased(), _x_5_18])
+      leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_5_18])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_isLargeEliminating_lam_0_2d5d47fffb(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_isLargeEliminating_lam_0_2d5d47fffb(_args[0], _args[1], _args[2])
+  f_Lean_isLargeEliminating_lam_0_2d5d47fffb(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+  )
 }
 // "Lean.matchConstRec"
 fun f_Lean_matchConstRec_1d4d17fcf0(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1014,18 +1153,25 @@ fun f_Lean_matchConstRec_1d4d17fcf0(
           Array[_declName_3_10, _failK_5, _k_6, _us_4_11],
         );
         leanApply(
+          _runtime,
           _toBind_8,
           Array[LeanErased(), LeanErased(), _getEnv_12, _f_5_14],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_5, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_5,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfoInduct._redArg"
 fun f_Lean_getConstInfoInduct_57b43080ef(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -1057,10 +1203,12 @@ fun f_Lean_getConstInfoInduct_57b43080ef(
           Array[_constName_3, _toPure_9],
         );
         _x_6_15: LeanValue = leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_5_14],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_6_15, _f_4_13],
         )
@@ -1072,11 +1220,14 @@ fun f_Lean_getConstInfoInduct_57b43080ef(
   }
 }
 // "Lean.isCtor?._redArg._lam_0._closed_1"
-fun f_isCtor_lam_0_closed_1_752cd23156(): LeanValue {
-  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773();
-  _x_135_3: LeanValue = f_isCtor_lam_0_closed_0_b956753803();
-  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af();
+fun f_isCtor_lam_0_closed_1_752cd23156(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_132_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773(_runtime);
+  _x_135_3: LeanValue = f_isCtor_lam_0_closed_0_b956753803(_runtime);
+  _x_136_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af(_runtime);
   L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _runtime,
     _x_136_4,
     _x_135_3,
     LeanScalar("nat", "122"),
@@ -1085,11 +1236,14 @@ fun f_isCtor_lam_0_closed_1_752cd23156(): LeanValue {
   )
 }
 // "Lean.isInductiveCore?._closed_2"
-fun f_Lean_isInductiveCore_closed_2_9b210c6773(): LeanValue {
+fun f_Lean_isInductiveCore_closed_2_9b210c6773(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("unreachable code has been reached")
 }
 // "Lean.matchConstNonRecStructure"
 fun f_Lean_matchConstNonRecStructure_658c5da2b9(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1128,18 +1282,25 @@ fun f_Lean_matchConstNonRecStructure_658c5da2b9(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_9,
           Array[LeanErased(), LeanErased(), _getEnv_13, _f_6_15],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_6, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_6,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.matchConstInduct._redArg"
 fun f_Lean_matchConstInduct_4adf270e9b(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _e_2: LeanValue,
@@ -1165,18 +1326,25 @@ fun f_Lean_matchConstInduct_4adf270e9b(
           Array[_declName_3_8, _failK_3, _k_4, _us_4_9],
         );
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _getEnv_10, _f_5_12],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_3,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfoRec"
 fun f_Lean_getConstInfoRec_13be77203e(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1184,6 +1352,7 @@ fun f_Lean_getConstInfoRec_13be77203e(
   _constName_4: LeanValue,
 ): LeanValue {
   f_Lean_getConstInfoRec_3964ad4e15(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -1192,6 +1361,7 @@ fun f_Lean_getConstInfoRec_13be77203e(
 }
 // "Lean.getConstInfoInduct._redArg._lam_0"
 fun f_Lean_getConstInfoInduct_lam_0_22898fce08(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1201,16 +1371,20 @@ fun f_Lean_getConstInfoInduct_lam_0_22898fce08(
   leanTag(_do_lift_3_4) match {
   | "[\"Option\",\"none\"]" ->
     _x_5_7: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("`"),
     );
     _x_7_9: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+      _runtime,
       _constName_0,
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
     );
     _x_10_12: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("` is not an inductive type"),
     );
     L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+      _runtime,
       _inst_1_1,
       _inst_2_2,
       LeanCtor(
@@ -1226,14 +1400,16 @@ fun f_Lean_getConstInfoInduct_lam_0_22898fce08(
     )
   | "[\"Option\",\"some\"]" ->
     _val_13_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_toPure_3, Array[LeanErased(), _val_13_5])
+    leanApply(_runtime, _toPure_3, Array[LeanErased(), _val_13_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getConstInfoInduct_lam_0_22898fce08(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getConstInfoInduct_lam_0_22898fce08(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1242,11 +1418,14 @@ fun apply_f_Lean_getConstInfoInduct_lam_0_22898fce08(
   )
 }
 // "Lean.isInductiveCore?._closed_3"
-fun f_Lean_isInductiveCore_closed_3_c16bad8501(): LeanValue {
-  _x_90_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773();
-  _x_93_3: LeanValue = f_Lean_isInductiveCore_closed_1_4515770021();
-  _x_94_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af();
+fun f_Lean_isInductiveCore_closed_3_c16bad8501(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_90_0: LeanValue = f_Lean_isInductiveCore_closed_2_9b210c6773(_runtime);
+  _x_93_3: LeanValue = f_Lean_isInductiveCore_closed_1_4515770021(_runtime);
+  _x_94_4: LeanValue = f_Lean_isInductiveCore_closed_0_cb26a604af(_runtime);
   L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    _runtime,
     _x_94_4,
     _x_93_3,
     LeanScalar("nat", "105"),
@@ -1256,6 +1435,7 @@ fun f_Lean_isInductiveCore_closed_3_c16bad8501(): LeanValue {
 }
 // "Lean.evalConst._redArg._lam_1"
 fun f_Lean_evalConst_lam_1_a2d33ea00b(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _constName_1: LeanValue,
   _checkMeta_2: LeanValue,
@@ -1282,6 +1462,7 @@ fun f_Lean_evalConst_lam_1_a2d33ea00b(
       ],
     );
     leanApply(
+      _runtime,
       _toBind_6,
       Array[LeanErased(), LeanErased(), _getOptions_8, _f_6_10],
     )
@@ -1289,9 +1470,11 @@ fun f_Lean_evalConst_lam_1_a2d33ea00b(
   }
 }
 fun apply_f_Lean_evalConst_lam_1_a2d33ea00b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_evalConst_lam_1_a2d33ea00b(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1304,6 +1487,7 @@ fun apply_f_Lean_evalConst_lam_1_a2d33ea00b(
 }
 // "Lean.isDefn?._redArg._lam_0"
 fun f_Lean_isDefn_lam_0_29aa49a6ea(
+  _runtime: mutable LeanExecution,
   _toPure_0_input: LeanValue,
   _constName_1_input: LeanValue,
   _x_1_2_input: LeanValue,
@@ -1326,6 +1510,7 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
       _frame.set(
         7,
         L4_Lean_Environment.f_Lean_Environment_findAsync_009cd03844(
+          _runtime,
           _frame[3],
           _frame[1],
           _frame[6],
@@ -1345,6 +1530,7 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
             _frame.set(
               10,
               L4_Lean_Environment.f_Lean_AsyncConstantInfo_toConstantInfo_3abe393c44(
+                _runtime,
                 _frame[8],
               ),
             );
@@ -1357,7 +1543,7 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
               );
               _frame.set(
                 13,
-                leanApply(_frame[0], Array[LeanErased(), _frame[12]]),
+                leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[12]]),
               );
               return _frame[13]
             | _ ->
@@ -1369,6 +1555,7 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
               _frame.set(
                 19,
                 L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+                  _runtime,
                   _frame[14],
                   _frame[15],
                   _frame[16],
@@ -1378,7 +1565,11 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
               );
               _frame.set(
                 20,
-                L4_Init_Prelude.f_panic_105135c0b4(_frame[2], _frame[19]),
+                L4_Init_Prelude.f_panic_105135c0b4(
+                  _runtime,
+                  _frame[2],
+                  _frame[19],
+                ),
               );
               return _frame[20]
             }
@@ -1394,17 +1585,30 @@ fun f_Lean_isDefn_lam_0_29aa49a6ea(
       }
     | 1 ->
       _frame.set(4, LeanCtor("[\"Option\",\"none\"]", Array[]));
-      _frame.set(5, leanApply(_frame[0], Array[LeanErased(), _frame[4]]));
+      _frame.set(
+        5,
+        leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[4]]),
+      );
       return _frame[5]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
-fun apply_f_Lean_isDefn_lam_0_29aa49a6ea(_args: Array<LeanValue>): LeanValue {
-  f_Lean_isDefn_lam_0_29aa49a6ea(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_Lean_isDefn_lam_0_29aa49a6ea(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_isDefn_lam_0_29aa49a6ea(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.matchConstStructure"
 fun f_Lean_matchConstStructure_2c90141f1e(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1442,28 +1646,42 @@ fun f_Lean_matchConstStructure_2c90141f1e(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_9,
           Array[LeanErased(), LeanErased(), _getEnv_13, _f_6_15],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_6, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_6,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.findModuleOf?"
 fun f_Lean_findModuleOf_6a6da1e7db(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _inst_3_3: LeanValue,
   _declName_4: LeanValue,
 ): LeanValue {
-  f_Lean_findModuleOf_c062b921c7(_inst_1_1, _inst_2_2, _inst_3_3, _declName_4)
+  f_Lean_findModuleOf_c062b921c7(
+    _runtime,
+    _inst_1_1,
+    _inst_2_2,
+    _inst_3_3,
+    _declName_4,
+  )
 }
 // "Lean.evalConst._redArg._lam_3"
 fun f_Lean_evalConst_lam_3_c787b84b83(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _toBind_1: LeanValue,
   _getEnv_2: LeanValue,
@@ -1473,24 +1691,36 @@ fun f_Lean_evalConst_lam_3_c787b84b83(
   _do_lift_4_6: LeanValue,
 ): LeanValue {
   _x_5_7: LeanValue = f_Lean_hasCompileError_a055245242(
+    _runtime,
     _do_lift_4_6,
     _constName_0,
   );
   leanTag(_x_5_7) match {
   | "[\"Bool\",\"false\"]" ->
-    leanApply(_toBind_1, Array[LeanErased(), LeanErased(), _getEnv_2, _f_1_3])
+    leanApply(
+      _runtime,
+      _toBind_1,
+      Array[LeanErased(), LeanErased(), _getEnv_2, _f_1_3],
+    )
   | "[\"Bool\",\"true\"]" ->
     _x_7_9: LeanValue = L4_Lean_Elab_Exception.f_Lean_Elab_throwAbortCommand_a0aacdb7ae(
+      _runtime,
       _x_2_4,
     );
-    leanApply(_toBind_1, Array[LeanErased(), LeanErased(), _x_7_9, _f_3_5])
+    leanApply(
+      _runtime,
+      _toBind_1,
+      Array[LeanErased(), LeanErased(), _x_7_9, _f_3_5],
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_evalConst_lam_3_c787b84b83(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_evalConst_lam_3_c787b84b83(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1502,6 +1732,7 @@ fun apply_f_Lean_evalConst_lam_3_c787b84b83(
 }
 // "Lean.withoutModifyingEnv._redArg._lam_0"
 fun f_Lean_withoutModifyingEnv_lam_0_60c5c3587e(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -1509,14 +1740,24 @@ fun f_Lean_withoutModifyingEnv_lam_0_60c5c3587e(
   _do_lift_4_4: LeanValue,
 ): LeanValue {
   _x_5_5: LeanValue = L4_Lean_Environment.f_Lean_Environment_unlockAsync_1e5fa05d44(
+    _runtime,
     _do_lift_4_4,
   );
-  f_Lean_withEnv_8552259c2b(_inst_1_0, _inst_2_1, _inst_3_2, _x_5_5, _x_3)
+  f_Lean_withEnv_8552259c2b(
+    _runtime,
+    _inst_1_0,
+    _inst_2_1,
+    _inst_3_2,
+    _x_5_5,
+    _x_3,
+  )
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_0_60c5c3587e(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_withoutModifyingEnv_lam_0_60c5c3587e(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1526,6 +1767,7 @@ fun apply_f_Lean_withoutModifyingEnv_lam_0_60c5c3587e(
 }
 // "Lean.isLargeEliminating._redArg"
 fun f_Lean_isLargeEliminating_8686683106(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -1543,6 +1785,7 @@ fun f_Lean_isLargeEliminating_8686683106(
       _toSeqLeft_9: LeanValue = leanField(_toApplicative_4, 3);
       _toSeqRight_10: LeanValue = leanField(_toApplicative_4, 4);
       _x_4_11: LeanValue = f_Lean_getConstInfo_8a75a8d553(
+        _runtime,
         _inst_1_0,
         _inst_2_1,
         _inst_3_2,
@@ -1560,7 +1803,11 @@ fun f_Lean_isLargeEliminating_8686683106(
           _toBind_5,
         ],
       );
-      leanApply(_toBind_5, Array[LeanErased(), LeanErased(), _x_4_11, _f_5_12])
+      leanApply(
+        _runtime,
+        _toBind_5,
+        Array[LeanErased(), LeanErased(), _x_4_11, _f_5_12],
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1568,6 +1815,7 @@ fun f_Lean_isLargeEliminating_8686683106(
 }
 // "Lean.evalConst"
 fun f_Lean_evalConst_553c20d0c4(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1578,6 +1826,7 @@ fun f_Lean_evalConst_553c20d0c4(
   _checkMeta_7: LeanValue,
 ): LeanValue {
   f_Lean_evalConst_4ae715749e(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -1587,11 +1836,14 @@ fun f_Lean_evalConst_553c20d0c4(
   )
 }
 // "Lean.isInductiveCore?._closed_0"
-fun f_Lean_isInductiveCore_closed_0_cb26a604af(): LeanValue {
+fun f_Lean_isInductiveCore_closed_0_cb26a604af(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean.MonadEnv")
 }
 // "Lean.matchConstInduct._redArg._lam_0"
 fun f_Lean_matchConstInduct_lam_0_0c6c708f6b(
+  _runtime: mutable LeanExecution,
   _declName_1_0: LeanValue,
   _failK_1: LeanValue,
   _k_2: LeanValue,
@@ -1599,28 +1851,40 @@ fun f_Lean_matchConstInduct_lam_0_0c6c708f6b(
   _do_lift_3_4: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    _runtime,
     _do_lift_3_4,
     _declName_1_0,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
   );
   leanTag(_x_5_6) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _failK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_8_7: LeanValue = leanField(_x_5_6, 0);
     leanTag(_val_8_7) match {
     | "[\"Lean\",\"ConstantInfo\",\"inductInfo\"]" ->
       _val_9_10: LeanValue = leanField(_val_8_7, 0);
-      leanApply(_k_2, Array[_val_9_10, _us_2_3])
-    | _ -> leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+      leanApply(_runtime, _k_2, Array[_val_9_10, _us_2_3])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_1,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_matchConstInduct_lam_0_0c6c708f6b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstInduct_lam_0_0c6c708f6b(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1630,6 +1894,7 @@ fun apply_f_Lean_matchConstInduct_lam_0_0c6c708f6b(
 }
 // "Lean.findModuleOf?._redArg._lam_1"
 fun f_Lean_findModuleOf_lam_1_0478908ffd(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _toPure_1: LeanValue,
   _x_1_2: LeanValue,
@@ -1638,12 +1903,14 @@ fun f_Lean_findModuleOf_lam_1_0478908ffd(
   _do_lift_2_5: LeanValue,
 ): LeanValue {
   _x_3_6: LeanValue = L4_Lean_Environment.f_Lean_Environment_getModuleIdxFor_01e73ed4b6(
+    _runtime,
     _do_lift_2_5,
     _declName_0,
   );
   leanTag(_x_3_6) match {
   | "[\"Option\",\"none\"]" ->
     leanApply(
+      _runtime,
       _toPure_1,
       Array[LeanErased(), LeanCtor("[\"Option\",\"none\"]", Array[])],
     )
@@ -1654,14 +1921,20 @@ fun f_Lean_findModuleOf_lam_1_0478908ffd(
       4,
       Array[_x_1_2, _val_6_7, _toPure_1],
     );
-    leanApply(_toBind_3, Array[LeanErased(), LeanErased(), _getEnv_4, _f_7_10])
+    leanApply(
+      _runtime,
+      _toBind_3,
+      Array[LeanErased(), LeanErased(), _getEnv_4, _f_7_10],
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_findModuleOf_lam_1_0478908ffd(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_findModuleOf_lam_1_0478908ffd(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1672,6 +1945,7 @@ fun apply_f_Lean_findModuleOf_lam_1_0478908ffd(
 }
 // "Lean.isRec?._redArg._lam_0"
 fun f_Lean_isRec_lam_0_ae9d4d0ef6(
+  _runtime: mutable LeanExecution,
   _toPure_0_input: LeanValue,
   _constName_1_input: LeanValue,
   _x_1_2_input: LeanValue,
@@ -1694,6 +1968,7 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
       _frame.set(
         7,
         L4_Lean_Environment.f_Lean_Environment_findAsync_009cd03844(
+          _runtime,
           _frame[3],
           _frame[1],
           _frame[6],
@@ -1713,6 +1988,7 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
             _frame.set(
               10,
               L4_Lean_Environment.f_Lean_AsyncConstantInfo_toConstantInfo_3abe393c44(
+                _runtime,
                 _frame[8],
               ),
             );
@@ -1725,7 +2001,7 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
               );
               _frame.set(
                 13,
-                leanApply(_frame[0], Array[LeanErased(), _frame[12]]),
+                leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[12]]),
               );
               return _frame[13]
             | _ ->
@@ -1737,6 +2013,7 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
               _frame.set(
                 19,
                 L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+                  _runtime,
                   _frame[14],
                   _frame[15],
                   _frame[16],
@@ -1746,7 +2023,11 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
               );
               _frame.set(
                 20,
-                L4_Init_Prelude.f_panic_105135c0b4(_frame[2], _frame[19]),
+                L4_Init_Prelude.f_panic_105135c0b4(
+                  _runtime,
+                  _frame[2],
+                  _frame[19],
+                ),
               );
               return _frame[20]
             }
@@ -1762,17 +2043,30 @@ fun f_Lean_isRec_lam_0_ae9d4d0ef6(
       }
     | 1 ->
       _frame.set(4, LeanCtor("[\"Option\",\"none\"]", Array[]));
-      _frame.set(5, leanApply(_frame[0], Array[LeanErased(), _frame[4]]));
+      _frame.set(
+        5,
+        leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[4]]),
+      );
       return _frame[5]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
-fun apply_f_Lean_isRec_lam_0_ae9d4d0ef6(_args: Array<LeanValue>): LeanValue {
-  f_Lean_isRec_lam_0_ae9d4d0ef6(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_Lean_isRec_lam_0_ae9d4d0ef6(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_isRec_lam_0_ae9d4d0ef6(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.hasConst._redArg"
 fun f_Lean_hasConst_af8167d9cb(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _constName_2: LeanValue,
@@ -1799,6 +2093,7 @@ fun f_Lean_hasConst_af8167d9cb(
           Array[_constName_2, _skipRealize_3, _toPure_9],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_3_13],
         )
@@ -1811,6 +2106,7 @@ fun f_Lean_hasConst_af8167d9cb(
 }
 // "Lean.matchConstCtor"
 fun f_Lean_matchConstCtor_9f94d71f84(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -1838,18 +2134,25 @@ fun f_Lean_matchConstCtor_9f94d71f84(
           Array[_declName_3_10, _failK_5, _k_6, _us_4_11],
         );
         leanApply(
+          _runtime,
           _toBind_8,
           Array[LeanErased(), LeanErased(), _getEnv_12, _f_5_14],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_5, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_5,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfoCtor._redArg._lam_0"
 fun f_Lean_getConstInfoCtor_lam_0_071c961a6b(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1859,16 +2162,20 @@ fun f_Lean_getConstInfoCtor_lam_0_071c961a6b(
   leanTag(_do_lift_3_4) match {
   | "[\"Option\",\"none\"]" ->
     _x_5_7: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("`"),
     );
     _x_7_9: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+      _runtime,
       _constName_0,
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
     );
     _x_10_12: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("` is not a constructor"),
     );
     L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+      _runtime,
       _inst_1_1,
       _inst_2_2,
       LeanCtor(
@@ -1884,14 +2191,16 @@ fun f_Lean_getConstInfoCtor_lam_0_071c961a6b(
     )
   | "[\"Option\",\"some\"]" ->
     _val_13_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_toPure_3, Array[LeanErased(), _val_13_5])
+    leanApply(_runtime, _toPure_3, Array[LeanErased(), _val_13_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getConstInfoCtor_lam_0_071c961a6b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getConstInfoCtor_lam_0_071c961a6b(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1901,6 +2210,7 @@ fun apply_f_Lean_getConstInfoCtor_lam_0_071c961a6b(
 }
 // "Lean.getConstInfo._redArg._lam_0"
 fun f_Lean_getConstInfo_lam_0_bdfa1ca083(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1909,6 +2219,7 @@ fun f_Lean_getConstInfo_lam_0_bdfa1ca083(
   _do_lift_4_5: LeanValue,
 ): LeanValue {
   _x_6_7: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    _runtime,
     _do_lift_4_5,
     _constName_0,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
@@ -1916,6 +2227,7 @@ fun f_Lean_getConstInfo_lam_0_bdfa1ca083(
   leanTag(_x_6_7) match {
   | "[\"Option\",\"none\"]" ->
     L4_Lean_Exception.f_Lean_throwUnknownConstant_42ae9548d0(
+      _runtime,
       _inst_1_1,
       _inst_2_2,
       _inst_3_3,
@@ -1923,14 +2235,16 @@ fun f_Lean_getConstInfo_lam_0_bdfa1ca083(
     )
   | "[\"Option\",\"some\"]" ->
     _val_8_8: LeanValue = leanField(_x_6_7, 0);
-    leanApply(_toPure_4, Array[LeanErased(), _val_8_8])
+    leanApply(_runtime, _toPure_4, Array[LeanErased(), _val_8_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getConstInfo_lam_0_bdfa1ca083(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getConstInfo_lam_0_bdfa1ca083(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1941,23 +2255,27 @@ fun apply_f_Lean_getConstInfo_lam_0_bdfa1ca083(
 }
 // "Lean.isInductive._redArg._lam_0"
 fun f_Lean_isInductive_lam_0_24d6a32656(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _toPure_1: LeanValue,
   _do_lift_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = f_Lean_isInductiveCore_732c6a01ff(
+    _runtime,
     _do_lift_1_2,
     _declName_0,
   );
-  leanApply(_toPure_1, Array[LeanErased(), _x_2_3])
+  leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_2_3])
 }
 fun apply_f_Lean_isInductive_lam_0_24d6a32656(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_isInductive_lam_0_24d6a32656(_args[0], _args[1], _args[2])
+  f_Lean_isInductive_lam_0_24d6a32656(_runtime, _args[0], _args[1], _args[2])
 }
 // "Lean.getConstInfoDefn._redArg._lam_0"
 fun f_Lean_getConstInfoDefn_lam_0_6475448a65(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -1967,16 +2285,20 @@ fun f_Lean_getConstInfoDefn_lam_0_6475448a65(
   leanTag(_do_lift_3_4) match {
   | "[\"Option\",\"none\"]" ->
     _x_5_7: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("`"),
     );
     _x_7_9: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+      _runtime,
       _constName_0,
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
     );
     _x_10_12: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
       LeanText("` is not a definition"),
     );
     L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+      _runtime,
       _inst_1_1,
       _inst_2_2,
       LeanCtor(
@@ -1992,14 +2314,16 @@ fun f_Lean_getConstInfoDefn_lam_0_6475448a65(
     )
   | "[\"Option\",\"some\"]" ->
     _val_13_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_toPure_3, Array[LeanErased(), _val_13_5])
+    leanApply(_runtime, _toPure_3, Array[LeanErased(), _val_13_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getConstInfoDefn_lam_0_6475448a65(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getConstInfoDefn_lam_0_6475448a65(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -2009,20 +2333,30 @@ fun apply_f_Lean_getConstInfoDefn_lam_0_6475448a65(
 }
 // "Lean.isEnumType"
 fun f_Lean_isEnumType_008d4353bb(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _inst_3_3: LeanValue,
   _declName_4: LeanValue,
 ): LeanValue {
-  f_Lean_isEnumType_59fdcc5bd2(_inst_1_1, _inst_2_2, _inst_3_3, _declName_4)
+  f_Lean_isEnumType_59fdcc5bd2(
+    _runtime,
+    _inst_1_1,
+    _inst_2_2,
+    _inst_3_3,
+    _declName_4,
+  )
 }
 // "Lean.isRec?._redArg._lam_0._closed_0"
-fun f_isRec_lam_0_closed_0_f3814416ba(): LeanValue {
+fun f_isRec_lam_0_closed_0_f3814416ba(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean.isRec?")
 }
 // "Lean.withoutModifyingEnv'"
 fun f_Lean_withoutModifyingEnv_a227f912f6(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2075,6 +2409,7 @@ fun f_Lean_withoutModifyingEnv_a227f912f6(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_8, _f_7_18],
         )
@@ -2087,6 +2422,7 @@ fun f_Lean_withoutModifyingEnv_a227f912f6(
 }
 // "Lean.matchConst._redArg"
 fun f_Lean_matchConst_5eba17ba03(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _e_2: LeanValue,
@@ -2112,18 +2448,25 @@ fun f_Lean_matchConst_5eba17ba03(
           Array[_declName_3_8, _failK_3, _k_4, _us_4_9],
         );
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _getEnv_10, _f_5_12],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_3,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.isRec._redArg"
 fun f_Lean_isRec_4439da9966(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _declName_2: LeanValue,
@@ -2149,6 +2492,7 @@ fun f_Lean_isRec_4439da9966(
           Array[_declName_2, _toPure_8],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_3_12],
         )
@@ -2160,11 +2504,14 @@ fun f_Lean_isRec_4439da9966(
   }
 }
 // "Lean.getConstInfoDefn._redArg._lam_0._closed_2"
-fun f_getConstInfoDefn_lam_0_closed_2_4061980603(): LeanValue {
+fun f_getConstInfoDefn_lam_0_closed_2_4061980603(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("` is not a definition")
 }
 // "Lean.getAsyncConstInfo._redArg._lam_0"
 fun f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _skipRealize_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -2174,6 +2521,7 @@ fun f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
   _do_lift_4_6: LeanValue,
 ): LeanValue {
   _x_5_7: LeanValue = L4_Lean_Environment.f_Lean_Environment_findAsync_009cd03844(
+    _runtime,
     _do_lift_4_6,
     _constName_0,
     _skipRealize_1,
@@ -2181,6 +2529,7 @@ fun f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
   leanTag(_x_5_7) match {
   | "[\"Option\",\"none\"]" ->
     L4_Lean_Exception.f_Lean_throwUnknownConstant_42ae9548d0(
+      _runtime,
       _inst_1_2,
       _inst_2_3,
       _inst_3_4,
@@ -2188,14 +2537,16 @@ fun f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
     )
   | "[\"Option\",\"some\"]" ->
     _val_7_8: LeanValue = leanField(_x_5_7, 0);
-    leanApply(_toPure_5, Array[LeanErased(), _val_7_8])
+    leanApply(_runtime, _toPure_5, Array[LeanErased(), _val_7_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -2207,6 +2558,7 @@ fun apply_f_Lean_getAsyncConstInfo_lam_0_aef25d076f(
 }
 // "Lean.matchConstStructure._redArg"
 fun f_Lean_matchConstStructure_195b430d29(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2242,18 +2594,25 @@ fun f_Lean_matchConstStructure_195b430d29(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_11, _f_6_13],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_4, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_4,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfo._redArg"
 fun f_Lean_getConstInfo_8a75a8d553(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2280,6 +2639,7 @@ fun f_Lean_getConstInfo_8a75a8d553(
           Array[_constName_3, _inst_1_0, _inst_2_1, _inst_3_2, _toPure_9],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_4_13],
         )
@@ -2292,6 +2652,7 @@ fun f_Lean_getConstInfo_8a75a8d553(
 }
 // "Lean.isEnumType._redArg._lam_0"
 fun f_Lean_isEnumType_lam_0_0f742b025e(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _toPure_1: LeanValue,
   _isUnsafe_2: LeanValue,
@@ -2309,34 +2670,51 @@ fun f_Lean_isEnumType_lam_0_0f742b025e(
       _numFields_9: LeanValue = leanField(_val_3_4, 4);
       _isUnsafe_10: LeanValue = leanField(_val_3_4, 5);
       _x_4_11: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _numFields_9,
         _x_1_0,
       );
-      leanApply(_toPure_1, Array[LeanErased(), _x_4_11])
+      leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_4_11])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | _ -> leanApply(_toPure_1, Array[LeanErased(), _isUnsafe_2])
+  | _ -> leanApply(_runtime, _toPure_1, Array[LeanErased(), _isUnsafe_2])
   }
 }
 fun apply_f_Lean_isEnumType_lam_0_0f742b025e(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_isEnumType_lam_0_0f742b025e(_args[0], _args[1], _args[2], _args[3])
+  f_Lean_isEnumType_lam_0_0f742b025e(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.isRec._redArg._lam_0"
 fun f_Lean_isRec_lam_0_d3fddbe097(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _toPure_1: LeanValue,
   _do_lift_1_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = f_Lean_isRecCore_dcaab1b366(_do_lift_1_2, _declName_0);
-  leanApply(_toPure_1, Array[LeanErased(), _x_2_3])
+  _x_2_3: LeanValue = f_Lean_isRecCore_dcaab1b366(
+    _runtime,
+    _do_lift_1_2,
+    _declName_0,
+  );
+  leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_2_3])
 }
-fun apply_f_Lean_isRec_lam_0_d3fddbe097(_args: Array<LeanValue>): LeanValue {
-  f_Lean_isRec_lam_0_d3fddbe097(_args[0], _args[1], _args[2])
+fun apply_f_Lean_isRec_lam_0_d3fddbe097(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_isRec_lam_0_d3fddbe097(_runtime, _args[0], _args[1], _args[2])
 }
 // "Lean.getConstInfoInduct"
 fun f_Lean_getConstInfoInduct_4c36301ae9(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2344,6 +2722,7 @@ fun f_Lean_getConstInfoInduct_4c36301ae9(
   _constName_4: LeanValue,
 ): LeanValue {
   f_Lean_getConstInfoInduct_57b43080ef(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -2352,11 +2731,13 @@ fun f_Lean_getConstInfoInduct_4c36301ae9(
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_1"
 fun f_Lean_withoutModifyingEnv_lam_1_9ae2a19591(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _toPure_1: LeanValue,
   _do_lift_1_2: LeanValue,
 ): LeanValue {
   leanApply(
+    _runtime,
     _toPure_1,
     Array[
       LeanErased(),
@@ -2368,16 +2749,25 @@ fun f_Lean_withoutModifyingEnv_lam_1_9ae2a19591(
   )
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_1_9ae2a19591(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_withoutModifyingEnv_lam_1_9ae2a19591(_args[0], _args[1], _args[2])
+  f_Lean_withoutModifyingEnv_lam_1_9ae2a19591(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+  )
 }
 // "Lean.mkConstWithLevelParams._redArg._lam_0._closed_0"
-fun f_mkConstWithLevelParams_lam_0_closed_0_abaa9d98fa(): LeanValue {
+fun f_mkConstWithLevelParams_lam_0_closed_0_abaa9d98fa(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(L4_Lean_Level.apply_f_Lean_mkLevelParam_810abd49d1, 1, Array[])
 }
 // "Lean.mkConstWithLevelParams"
 fun f_Lean_mkConstWithLevelParams_c291557b1d(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2385,6 +2775,7 @@ fun f_Lean_mkConstWithLevelParams_c291557b1d(
   _constName_4: LeanValue,
 ): LeanValue {
   f_Lean_mkConstWithLevelParams_6c20f69284(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -2392,7 +2783,9 @@ fun f_Lean_mkConstWithLevelParams_c291557b1d(
   )
 }
 // "Lean.withoutModifyingEnv'._redArg._closed_0"
-fun f_Lean_withoutModifyingEnv_closed_0_9a6c206cfc(): LeanValue {
+fun f_Lean_withoutModifyingEnv_closed_0_9a6c206cfc(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Lean_MonadEnv.apply_f_Lean_withoutModifyingEnv_lam_0_cfe75ff460,
     1,
@@ -2401,6 +2794,7 @@ fun f_Lean_withoutModifyingEnv_closed_0_9a6c206cfc(): LeanValue {
 }
 // "Lean.getConstInfoCtor._redArg"
 fun f_Lean_getConstInfoCtor_41ea53349a(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2427,6 +2821,7 @@ fun f_Lean_getConstInfoCtor_41ea53349a(
           Array[_constName_3, _inst_1_0, _inst_3_2, _toPure_9],
         );
         _x_6_15: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -2436,10 +2831,12 @@ fun f_Lean_getConstInfoCtor_41ea53349a(
           Array[_toPure_9, _constName_3, _x_6_15],
         );
         _x_8_17: LeanValue = leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_7_16],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_8_17, _f_5_14],
         )
@@ -2452,6 +2849,7 @@ fun f_Lean_getConstInfoCtor_41ea53349a(
 }
 // "Lean.evalConst._redArg"
 fun f_Lean_evalConst_4ae715749e(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2496,6 +2894,7 @@ fun f_Lean_evalConst_4ae715749e(
           Array[_toBind_7, _getEnv_8, _f_6_14],
         );
         _x_8_16: LeanValue = L4_Init_Prelude.f_instMonadExceptOfMonadExceptOf_682a088ff0(
+          _runtime,
           _toMonadExceptOf_10,
         );
         _f_9_17: LeanValue = LeanClosure(
@@ -2504,6 +2903,7 @@ fun f_Lean_evalConst_4ae715749e(
           Array[_constName_4, _toBind_7, _getEnv_8, _f_6_14, _x_8_16, _f_7_15],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_8, _f_9_17],
         )
@@ -2516,15 +2916,17 @@ fun f_Lean_evalConst_4ae715749e(
 }
 // "Lean.isCtor?"
 fun f_Lean_isCtor_0c80b19805(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _constName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isCtor_bdf509cf40(_inst_1_1, _inst_2_2, _constName_3)
+  f_Lean_isCtor_bdf509cf40(_runtime, _inst_1_1, _inst_2_2, _constName_3)
 }
 // "Lean.withEnv"
 fun f_Lean_withEnv_113b1df8a2(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -2533,10 +2935,18 @@ fun f_Lean_withEnv_113b1df8a2(
   _env_5: LeanValue,
   _x_6: LeanValue,
 ): LeanValue {
-  f_Lean_withEnv_8552259c2b(_inst_1_2, _inst_2_3, _inst_3_4, _env_5, _x_6)
+  f_Lean_withEnv_8552259c2b(
+    _runtime,
+    _inst_1_2,
+    _inst_2_3,
+    _inst_3_4,
+    _env_5,
+    _x_6,
+  )
 }
 // "Lean.isInductive?._redArg"
 fun f_Lean_isInductive_2a10cf59a7(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _declName_2: LeanValue,
@@ -2562,6 +2972,7 @@ fun f_Lean_isInductive_2a10cf59a7(
           Array[_declName_2, _toPure_8],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_3_12],
         )
@@ -2574,6 +2985,7 @@ fun f_Lean_isInductive_2a10cf59a7(
 }
 // "Lean.withoutModifyingEnv"
 fun f_Lean_withoutModifyingEnv_547c0c36e5(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2595,6 +3007,7 @@ fun f_Lean_withoutModifyingEnv_547c0c36e5(
         Array[_inst_1_1, _inst_3_3, _inst_2_2, _x_5],
       );
       leanApply(
+        _runtime,
         _toBind_7,
         Array[LeanErased(), LeanErased(), _getEnv_8, _f_4_10],
       )
@@ -2605,20 +3018,30 @@ fun f_Lean_withoutModifyingEnv_547c0c36e5(
 }
 // "Lean.hasConst"
 fun f_Lean_hasConst_707b9d21fa(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _constName_3: LeanValue,
   _skipRealize_4: LeanValue,
 ): LeanValue {
-  f_Lean_hasConst_af8167d9cb(_inst_1_1, _inst_2_2, _constName_3, _skipRealize_4)
+  f_Lean_hasConst_af8167d9cb(
+    _runtime,
+    _inst_1_1,
+    _inst_2_2,
+    _constName_3,
+    _skipRealize_4,
+  )
 }
 // "Lean.isCtor?._redArg._lam_0._closed_0"
-fun f_isCtor_lam_0_closed_0_b956753803(): LeanValue {
+fun f_isCtor_lam_0_closed_0_b956753803(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean.isCtor?")
 }
 // "Lean.withoutModifyingEnv'._redArg"
 fun f_Lean_withoutModifyingEnv_fe3d6faf11(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2669,6 +3092,7 @@ fun f_Lean_withoutModifyingEnv_fe3d6faf11(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_7_16],
         )
@@ -2681,6 +3105,7 @@ fun f_Lean_withoutModifyingEnv_fe3d6faf11(
 }
 // "Lean.isEnumType._redArg._lam_1"
 fun f_Lean_isEnumType_lam_1_b8b33e59b8(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2689,17 +3114,24 @@ fun f_Lean_isEnumType_lam_1_b8b33e59b8(
   _ctorName_5: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = f_Lean_getConstInfo_8a75a8d553(
+    _runtime,
     _inst_1_0,
     _inst_2_1,
     _inst_3_2,
     _ctorName_5,
   );
-  leanApply(_toBind_3, Array[LeanErased(), LeanErased(), _x_5_6, _f_4_4])
+  leanApply(
+    _runtime,
+    _toBind_3,
+    Array[LeanErased(), LeanErased(), _x_5_6, _f_4_4],
+  )
 }
 fun apply_f_Lean_isEnumType_lam_1_b8b33e59b8(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_isEnumType_lam_1_b8b33e59b8(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -2710,6 +3142,7 @@ fun apply_f_Lean_isEnumType_lam_1_b8b33e59b8(
 }
 // "Lean.withoutModifyingEnv._redArg"
 fun f_Lean_withoutModifyingEnv_4a16e36748(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2728,7 +3161,11 @@ fun f_Lean_withoutModifyingEnv_4a16e36748(
         5,
         Array[_inst_1_0, _inst_3_2, _inst_2_1, _x_3],
       );
-      leanApply(_toBind_5, Array[LeanErased(), LeanErased(), _getEnv_6, _f_4_8])
+      leanApply(
+        _runtime,
+        _toBind_5,
+        Array[LeanErased(), LeanErased(), _getEnv_6, _f_4_8],
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2736,27 +3173,38 @@ fun f_Lean_withoutModifyingEnv_4a16e36748(
 }
 // "Lean.getConstInfoInduct._redArg._lam_1"
 fun f_Lean_getConstInfoInduct_lam_1_35db3db5dd(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _toPure_1: LeanValue,
   _do_lift_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = f_Lean_isInductiveCore_b45760d615(
+    _runtime,
     _do_lift_1_2,
     _constName_0,
   );
-  leanApply(_toPure_1, Array[LeanErased(), _x_2_3])
+  leanApply(_runtime, _toPure_1, Array[LeanErased(), _x_2_3])
 }
 fun apply_f_Lean_getConstInfoInduct_lam_1_35db3db5dd(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_getConstInfoInduct_lam_1_35db3db5dd(_args[0], _args[1], _args[2])
+  f_Lean_getConstInfoInduct_lam_1_35db3db5dd(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+  )
 }
 // "Lean.getConstInfoDefn._redArg._lam_0._closed_0"
-fun f_getConstInfoDefn_lam_0_closed_0_30327686f1(): LeanValue {
+fun f_getConstInfoDefn_lam_0_closed_0_30327686f1(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("`")
 }
 // "Lean.getConstInfoDefn"
 fun f_Lean_getConstInfoDefn_57cece5da3(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2764,6 +3212,7 @@ fun f_Lean_getConstInfoDefn_57cece5da3(
   _constName_4: LeanValue,
 ): LeanValue {
   f_Lean_getConstInfoDefn_181ad500a4(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -2772,6 +3221,7 @@ fun f_Lean_getConstInfoDefn_57cece5da3(
 }
 // "Lean.evalConstCheck"
 fun f_Lean_evalConstCheck_534cc2a6fb(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2782,6 +3232,7 @@ fun f_Lean_evalConstCheck_534cc2a6fb(
   _constName_7: LeanValue,
 ): LeanValue {
   f_Lean_evalConstCheck_2eda720ec4(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -2792,6 +3243,7 @@ fun f_Lean_evalConstCheck_534cc2a6fb(
 }
 // "Lean.matchConst._redArg._lam_0"
 fun f_Lean_matchConst_lam_0_faaebf244f(
+  _runtime: mutable LeanExecution,
   _declName_1_0: LeanValue,
   _failK_1: LeanValue,
   _k_2: LeanValue,
@@ -2799,23 +3251,30 @@ fun f_Lean_matchConst_lam_0_faaebf244f(
   _do_lift_3_4: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    _runtime,
     _do_lift_3_4,
     _declName_1_0,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
   );
   leanTag(_x_5_6) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _failK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_8_7: LeanValue = leanField(_x_5_6, 0);
-    leanApply(_k_2, Array[_val_8_7, _us_2_3])
+    leanApply(_runtime, _k_2, Array[_val_8_7, _us_2_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_matchConst_lam_0_faaebf244f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConst_lam_0_faaebf244f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -2824,12 +3283,15 @@ fun apply_f_Lean_matchConst_lam_0_faaebf244f(
   )
 }
 // "Lean.getConstInfoDefn._redArg._lam_0._closed_3"
-fun f_getConstInfoDefn_lam_0_closed_3_0ca1c50d1d(): LeanValue {
-  _x_141_0: LeanValue = f_getConstInfoDefn_lam_0_closed_2_4061980603();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_141_0)
+fun f_getConstInfoDefn_lam_0_closed_3_0ca1c50d1d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_141_0: LeanValue = f_getConstInfoDefn_lam_0_closed_2_4061980603(_runtime);
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_141_0)
 }
 // "Lean.findModuleOf?._redArg"
 fun f_Lean_findModuleOf_c062b921c7(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -2862,12 +3324,14 @@ fun f_Lean_findModuleOf_c062b921c7(
           ],
         );
         _x_6_15: LeanValue = f_Lean_getConstInfo_8a75a8d553(
+          _runtime,
           _inst_1_0,
           _inst_2_1,
           _inst_3_2,
           _declName_3,
         );
         _x_8_17: LeanValue = leanApply(
+          _runtime,
           _mapConst_12,
           Array[
             LeanErased(),
@@ -2877,6 +3341,7 @@ fun f_Lean_findModuleOf_c062b921c7(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_8_17, _f_5_14],
         )
@@ -2889,6 +3354,7 @@ fun f_Lean_findModuleOf_c062b921c7(
 }
 // "Lean.isCtor?._redArg"
 fun f_Lean_isCtor_bdf509cf40(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _constName_2: LeanValue,
@@ -2909,6 +3375,7 @@ fun f_Lean_isCtor_bdf509cf40(
         _toSeqLeft_10: LeanValue = leanField(_toApplicative_3, 3);
         _toSeqRight_11: LeanValue = leanField(_toApplicative_3, 4);
         _x_4_13: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -2918,6 +3385,7 @@ fun f_Lean_isCtor_bdf509cf40(
           Array[_toPure_8, _constName_2, _x_4_13],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_5_14],
         )
@@ -2930,6 +3398,7 @@ fun f_Lean_isCtor_bdf509cf40(
 }
 // "Lean.isLargeEliminating"
 fun f_Lean_isLargeEliminating_752e06438c(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -2937,6 +3406,7 @@ fun f_Lean_isLargeEliminating_752e06438c(
   _declName_4: LeanValue,
 ): LeanValue {
   f_Lean_isLargeEliminating_8686683106(
+    _runtime,
     _inst_1_1,
     _inst_2_2,
     _inst_3_3,
@@ -2945,6 +3415,7 @@ fun f_Lean_isLargeEliminating_752e06438c(
 }
 // "Lean.matchConst"
 fun f_Lean_matchConst_b328d19fea(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -2972,18 +3443,25 @@ fun f_Lean_matchConst_b328d19fea(
           Array[_declName_3_10, _failK_5, _k_6, _us_4_11],
         );
         leanApply(
+          _runtime,
           _toBind_8,
           Array[LeanErased(), LeanErased(), _getEnv_12, _f_5_14],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_5, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_5,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfoRec._redArg"
 fun f_Lean_getConstInfoRec_3964ad4e15(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -3010,6 +3488,7 @@ fun f_Lean_getConstInfoRec_3964ad4e15(
           Array[_constName_3, _inst_1_0, _inst_3_2, _toPure_9],
         );
         _x_6_15: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -3019,10 +3498,12 @@ fun f_Lean_getConstInfoRec_3964ad4e15(
           Array[_toPure_9, _constName_3, _x_6_15],
         );
         _x_8_17: LeanValue = leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _getEnv_6, _f_7_16],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_8_17, _f_5_14],
         )
@@ -3035,20 +3516,33 @@ fun f_Lean_getConstInfoRec_3964ad4e15(
 }
 // "Lean.evalConst._redArg._lam_2"
 fun f_Lean_evalConst_lam_2_1ab5e12166(
+  _runtime: mutable LeanExecution,
   _toBind_0: LeanValue,
   _getEnv_1: LeanValue,
   _f_1_2: LeanValue,
   _r_2_3: LeanValue,
 ): LeanValue {
-  leanApply(_toBind_0, Array[LeanErased(), LeanErased(), _getEnv_1, _f_1_2])
+  leanApply(
+    _runtime,
+    _toBind_0,
+    Array[LeanErased(), LeanErased(), _getEnv_1, _f_1_2],
+  )
 }
 fun apply_f_Lean_evalConst_lam_2_1ab5e12166(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_evalConst_lam_2_1ab5e12166(_args[0], _args[1], _args[2], _args[3])
+  f_Lean_evalConst_lam_2_1ab5e12166(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.isEnumType._redArg"
 fun f_Lean_isEnumType_59fdcc5bd2(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -3066,6 +3560,7 @@ fun f_Lean_isEnumType_59fdcc5bd2(
       _toSeqLeft_9: LeanValue = leanField(_toApplicative_4, 3);
       _toSeqRight_10: LeanValue = leanField(_toApplicative_4, 4);
       _x_4_11: LeanValue = f_Lean_getConstInfo_8a75a8d553(
+        _runtime,
         _inst_1_0,
         _inst_2_1,
         _inst_3_2,
@@ -3076,7 +3571,11 @@ fun f_Lean_isEnumType_59fdcc5bd2(
         6,
         Array[_toPure_7, _inst_1_0, _inst_2_1, _inst_3_2, _toBind_5],
       );
-      leanApply(_toBind_5, Array[LeanErased(), LeanErased(), _x_4_11, _f_5_12])
+      leanApply(
+        _runtime,
+        _toBind_5,
+        Array[LeanErased(), LeanErased(), _x_4_11, _f_5_12],
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3084,6 +3583,7 @@ fun f_Lean_isEnumType_59fdcc5bd2(
 }
 // "Lean.matchConstRec._redArg._lam_0"
 fun f_Lean_matchConstRec_lam_0_bb46156f72(
+  _runtime: mutable LeanExecution,
   _declName_1_0: LeanValue,
   _failK_1: LeanValue,
   _k_2: LeanValue,
@@ -3091,28 +3591,40 @@ fun f_Lean_matchConstRec_lam_0_bb46156f72(
   _do_lift_3_4: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    _runtime,
     _do_lift_3_4,
     _declName_1_0,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
   );
   leanTag(_x_5_6) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _failK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_8_7: LeanValue = leanField(_x_5_6, 0);
     leanTag(_val_8_7) match {
     | "[\"Lean\",\"ConstantInfo\",\"recInfo\"]" ->
       _val_9_10: LeanValue = leanField(_val_8_7, 0);
-      leanApply(_k_2, Array[_val_9_10, _us_2_3])
-    | _ -> leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+      leanApply(_runtime, _k_2, Array[_val_9_10, _us_2_3])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_1,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_matchConstRec_lam_0_bb46156f72(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstRec_lam_0_bb46156f72(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3122,6 +3634,7 @@ fun apply_f_Lean_matchConstRec_lam_0_bb46156f72(
 }
 // "Lean.isRec?._redArg"
 fun f_Lean_isRec_819716dfde(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _constName_2: LeanValue,
@@ -3142,6 +3655,7 @@ fun f_Lean_isRec_819716dfde(
         _toSeqLeft_10: LeanValue = leanField(_toApplicative_3, 3);
         _toSeqRight_11: LeanValue = leanField(_toApplicative_3, 4);
         _x_4_13: LeanValue = L4_Init_Prelude.f_instInhabitedOfMonad_22156e5bc0(
+          _runtime,
           _inst_1_0,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
         );
@@ -3151,6 +3665,7 @@ fun f_Lean_isRec_819716dfde(
           Array[_toPure_8, _constName_2, _x_4_13],
         );
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _getEnv_5, _f_5_14],
         )
@@ -3163,6 +3678,7 @@ fun f_Lean_isRec_819716dfde(
 }
 // "Lean.isEnumType._redArg._lam_2"
 fun f_Lean_isEnumType_lam_2_bd9cdaaa3f(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
@@ -3190,39 +3706,45 @@ fun f_Lean_isEnumType_lam_2_bd9cdaaa3f(
         _levelParams_17: LeanValue = leanField(_toConstantVal_7, 1);
         _type_18: LeanValue = leanField(_toConstantVal_7, 2);
         _x_6_19: LeanValue = L4_Lean_Expr.f_Lean_Expr_isProp_8c83249b4f(
+          _runtime,
           _type_18,
         );
         leanTag(_x_6_19) match {
         | "[\"Bool\",\"false\"]" ->
           _x_7_20: LeanValue = L4_Lean_Declaration.f_Lean_InductiveVal_numTypeFormers_7f4b2e3ce5(
+            _runtime,
             _val_5_6,
           );
           _x_9_22: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+            _runtime,
             _x_7_20,
             LeanScalar("nat", "1"),
           );
           leanTag(_x_9_22) match {
           | "[\"Bool\",\"false\"]" ->
-            leanApply(_toPure_0, Array[LeanErased(), _x_9_22])
+            leanApply(_runtime, _toPure_0, Array[LeanErased(), _x_9_22])
           | "[\"Bool\",\"true\"]" ->
             _x_11_24: LeanValue = LeanScalar("nat", "0");
             _x_12_25: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _runtime,
               _numIndices_9,
               _x_11_24,
             );
             leanTag(_x_12_25) match {
             | "[\"Bool\",\"false\"]" ->
-              leanApply(_toPure_0, Array[LeanErased(), _x_12_25])
+              leanApply(_runtime, _toPure_0, Array[LeanErased(), _x_12_25])
             | "[\"Bool\",\"true\"]" ->
               _x_14_27: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                _runtime,
                 _numParams_8,
                 _x_11_24,
               );
               leanTag(_x_14_27) match {
               | "[\"Bool\",\"false\"]" ->
-                leanApply(_toPure_0, Array[LeanErased(), _x_14_27])
+                leanApply(_runtime, _toPure_0, Array[LeanErased(), _x_14_27])
               | "[\"Bool\",\"true\"]" ->
                 _x_16_29: LeanValue = L4_Init_Data_List_Basic.f_List_isEmpty_31ee95efb7(
+                  _runtime,
                   _ctors_11,
                 );
                 leanTag(_x_16_29) match {
@@ -3250,20 +3772,29 @@ fun f_Lean_isEnumType_lam_2_bd9cdaaa3f(
                         ],
                       );
                       L4_Init_Data_List_Control.f_List_allM_0f0828497b(
+                        _runtime,
                         _inst_1_1,
                         _f_18_31,
                         _ctors_11,
                       )
                     | "[\"Bool\",\"true\"]" ->
-                      leanApply(_toPure_0, Array[LeanErased(), _isRec_13])
+                      leanApply(
+                        _runtime,
+                        _toPure_0,
+                        Array[LeanErased(), _isRec_13],
+                      )
                     | _ -> leanFail("non-exhaustive Lean case")
                     }
                   | "[\"Bool\",\"true\"]" ->
-                    leanApply(_toPure_0, Array[LeanErased(), _x_16_29])
+                    leanApply(
+                      _runtime,
+                      _toPure_0,
+                      Array[LeanErased(), _x_16_29],
+                    )
                   | _ -> leanFail("non-exhaustive Lean case")
                   }
                 | "[\"Bool\",\"true\"]" ->
-                  leanApply(_toPure_0, Array[LeanErased(), _x_6_19])
+                  leanApply(_runtime, _toPure_0, Array[LeanErased(), _x_6_19])
                 | _ -> leanFail("non-exhaustive Lean case")
                 }
               | _ -> leanFail("non-exhaustive Lean case")
@@ -3274,6 +3805,7 @@ fun f_Lean_isEnumType_lam_2_bd9cdaaa3f(
           }
         | "[\"Bool\",\"true\"]" ->
           leanApply(
+            _runtime,
             _toPure_0,
             Array[LeanErased(), LeanCtor("[\"Bool\",\"false\"]", Array[])],
           )
@@ -3285,15 +3817,18 @@ fun f_Lean_isEnumType_lam_2_bd9cdaaa3f(
     }
   | _ ->
     leanApply(
+      _runtime,
       _toPure_0,
       Array[LeanErased(), LeanCtor("[\"Bool\",\"false\"]", Array[])],
     )
   }
 }
 fun apply_f_Lean_isEnumType_lam_2_bd9cdaaa3f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_isEnumType_lam_2_bd9cdaaa3f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3304,6 +3839,7 @@ fun apply_f_Lean_isEnumType_lam_2_bd9cdaaa3f(
 }
 // "Lean.evalConstCheck._redArg"
 fun f_Lean_evalConstCheck_2eda720ec4(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -3348,6 +3884,7 @@ fun f_Lean_evalConstCheck_2eda720ec4(
           Array[_toBind_7, _getEnv_8, _f_6_14],
         );
         _x_8_16: LeanValue = L4_Init_Prelude.f_instMonadExceptOfMonadExceptOf_682a088ff0(
+          _runtime,
           _toMonadExceptOf_10,
         );
         _f_9_17: LeanValue = LeanClosure(
@@ -3356,6 +3893,7 @@ fun f_Lean_evalConstCheck_2eda720ec4(
           Array[_constName_5, _toBind_7, _getEnv_8, _f_6_14, _x_8_16, _f_7_15],
         );
         leanApply(
+          _runtime,
           _toBind_7,
           Array[LeanErased(), LeanErased(), _getEnv_8, _f_9_17],
         )
@@ -3368,6 +3906,7 @@ fun f_Lean_evalConstCheck_2eda720ec4(
 }
 // "Lean.getAsyncConstInfo._redArg"
 fun f_Lean_getAsyncConstInfo_7c780ac8fa(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _inst_3_2: LeanValue,
@@ -3402,6 +3941,7 @@ fun f_Lean_getAsyncConstInfo_7c780ac8fa(
           ],
         );
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _getEnv_7, _f_4_14],
         )
@@ -3414,6 +3954,7 @@ fun f_Lean_getAsyncConstInfo_7c780ac8fa(
 }
 // "Lean.matchConstCtor._redArg._lam_0"
 fun f_Lean_matchConstCtor_lam_0_f577f47267(
+  _runtime: mutable LeanExecution,
   _declName_1_0: LeanValue,
   _failK_1: LeanValue,
   _k_2: LeanValue,
@@ -3421,28 +3962,40 @@ fun f_Lean_matchConstCtor_lam_0_f577f47267(
   _do_lift_3_4: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    _runtime,
     _do_lift_3_4,
     _declName_1_0,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
   );
   leanTag(_x_5_6) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _failK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_8_7: LeanValue = leanField(_x_5_6, 0);
     leanTag(_val_8_7) match {
     | "[\"Lean\",\"ConstantInfo\",\"ctorInfo\"]" ->
       _val_9_10: LeanValue = leanField(_val_8_7, 0);
-      leanApply(_k_2, Array[_val_9_10, _us_2_3])
-    | _ -> leanApply(_failK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+      leanApply(_runtime, _k_2, Array[_val_9_10, _us_2_3])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_1,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_matchConstCtor_lam_0_f577f47267(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_matchConstCtor_lam_0_f577f47267(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3452,16 +4005,24 @@ fun apply_f_Lean_matchConstCtor_lam_0_f577f47267(
 }
 // "Lean.getConstVal"
 fun f_Lean_getConstVal_9824cd4007(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _inst_3_3: LeanValue,
   _constName_4: LeanValue,
 ): LeanValue {
-  f_Lean_getConstVal_d1c75eebdf(_inst_1_1, _inst_2_2, _inst_3_3, _constName_4)
+  f_Lean_getConstVal_d1c75eebdf(
+    _runtime,
+    _inst_1_1,
+    _inst_2_2,
+    _inst_3_3,
+    _constName_4,
+  )
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_2"
 fun f_Lean_withoutModifyingEnv_lam_2_54d4f3c3a5(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _toBind_1: LeanValue,
   _getEnv_2: LeanValue,
@@ -3472,12 +4033,18 @@ fun f_Lean_withoutModifyingEnv_lam_2_54d4f3c3a5(
     3,
     Array[_a_3, _toPure_0],
   );
-  leanApply(_toBind_1, Array[LeanErased(), LeanErased(), _getEnv_2, _f_1_4])
+  leanApply(
+    _runtime,
+    _toBind_1,
+    Array[LeanErased(), LeanErased(), _getEnv_2, _f_1_4],
+  )
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_2_54d4f3c3a5(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_withoutModifyingEnv_lam_2_54d4f3c3a5(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3486,14 +4053,16 @@ fun apply_f_Lean_withoutModifyingEnv_lam_2_54d4f3c3a5(
 }
 // "Lean.setEnv"
 fun f_Lean_setEnv_e347296a92(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _env_2: LeanValue,
 ): LeanValue {
-  f_Lean_setEnv_fbb947b6eb(_inst_1_1, _env_2)
+  f_Lean_setEnv_fbb947b6eb(_runtime, _inst_1_1, _env_2)
 }
 // "Lean.evalConst._redArg._lam_0"
 fun f_Lean_evalConst_lam_0_7d1f51b293(
+  _runtime: mutable LeanExecution,
   _do_lift_1_0: LeanValue,
   _constName_1: LeanValue,
   _checkMeta_2: LeanValue,
@@ -3503,12 +4072,14 @@ fun f_Lean_evalConst_lam_0_7d1f51b293(
   _do_lift_5_6: LeanValue,
 ): LeanValue {
   _x_6_7: LeanValue = L4_Lean_Environment.f_Lean_Environment_evalConst_1b4cce70b6(
+    _runtime,
     _do_lift_1_0,
     _do_lift_5_6,
     _constName_1,
     _checkMeta_2,
   );
   L4_Lean_Exception.f_Lean_ofExcept_bbb8e64e67(
+    _runtime,
     _inst_2_3,
     _inst_3_4,
     _x_4_5,
@@ -3516,9 +4087,11 @@ fun f_Lean_evalConst_lam_0_7d1f51b293(
   )
 }
 fun apply_f_Lean_evalConst_lam_0_7d1f51b293(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_evalConst_lam_0_7d1f51b293(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3530,19 +4103,23 @@ fun apply_f_Lean_evalConst_lam_0_7d1f51b293(
 }
 // "Lean.isInductive?"
 fun f_Lean_isInductive_c2f1374383(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _declName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isInductive_2a10cf59a7(_inst_1_1, _inst_2_2, _declName_3)
+  f_Lean_isInductive_2a10cf59a7(_runtime, _inst_1_1, _inst_2_2, _declName_3)
 }
 // "Lean.isInductiveCore?._closed_1"
-fun f_Lean_isInductiveCore_closed_1_4515770021(): LeanValue {
+fun f_Lean_isInductiveCore_closed_1_4515770021(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("Lean.isInductiveCore?")
 }
 // "Lean.matchConstInduct"
 fun f_Lean_matchConstInduct_4aa0ba92b6(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -3570,18 +4147,25 @@ fun f_Lean_matchConstInduct_4aa0ba92b6(
           Array[_declName_3_10, _failK_5, _k_6, _us_4_11],
         );
         leanApply(
+          _runtime,
           _toBind_8,
           Array[LeanErased(), LeanErased(), _getEnv_12, _f_5_14],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_5, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_5,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.matchConstCtor._redArg"
 fun f_Lean_matchConstCtor_7bd159f79f(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _e_2: LeanValue,
@@ -3607,62 +4191,85 @@ fun f_Lean_matchConstCtor_7bd159f79f(
           Array[_declName_3_8, _failK_3, _k_4, _us_4_9],
         );
         leanApply(
+          _runtime,
           _toBind_6,
           Array[LeanErased(), LeanErased(), _getEnv_10, _f_5_12],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> leanApply(_failK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    | _ ->
+      leanApply(
+        _runtime,
+        _failK_3,
+        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      )
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.getConstInfoInduct._redArg._lam_0._closed_0"
-fun f_getConstInfoInduct_lam_0_closed_0_5f02603645(): LeanValue {
+fun f_getConstInfoInduct_lam_0_closed_0_5f02603645(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("` is not an inductive type")
 }
 // "Lean.isDefn?"
 fun f_Lean_isDefn_ec95ccd97f(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _constName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isDefn_42d0b2d7d1(_inst_1_1, _inst_2_2, _constName_3)
+  f_Lean_isDefn_42d0b2d7d1(_runtime, _inst_1_1, _inst_2_2, _constName_3)
 }
 // "Lean.getConstInfoCtor._redArg._lam_0._closed_1"
-fun f_getConstInfoCtor_lam_0_closed_1_09f24b3a20(): LeanValue {
-  _x_141_0: LeanValue = f_getConstInfoCtor_lam_0_closed_0_a9d950c9af();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_141_0)
+fun f_getConstInfoCtor_lam_0_closed_1_09f24b3a20(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_141_0: LeanValue = f_getConstInfoCtor_lam_0_closed_0_a9d950c9af(_runtime);
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_141_0)
 }
 // "Lean.findModuleOf?._redArg._lam_0"
 fun f_Lean_findModuleOf_lam_0_66af70b128(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _val_2_1: LeanValue,
   _toPure_2: LeanValue,
   _do_lift_3_3: LeanValue,
 ): LeanValue {
   _x_4_4: LeanValue = L4_Lean_Environment.f_Lean_Environment_allImportedModuleNames_3dc7cf0524(
+    _runtime,
     _do_lift_3_3,
   );
   _x_5_5: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+    _runtime,
     LeanErased(),
     _x_1_0,
     _x_4_4,
     _val_2_1,
   );
   leanApply(
+    _runtime,
     _toPure_2,
     Array[LeanErased(), LeanCtor("[\"Option\",\"some\"]", Array[_x_5_5])],
   )
 }
 fun apply_f_Lean_findModuleOf_lam_0_66af70b128(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_findModuleOf_lam_0_66af70b128(_args[0], _args[1], _args[2], _args[3])
+  f_Lean_findModuleOf_lam_0_66af70b128(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.isCtor?._redArg._lam_0"
 fun f_Lean_isCtor_lam_0_e10b29f615(
+  _runtime: mutable LeanExecution,
   _toPure_0_input: LeanValue,
   _constName_1_input: LeanValue,
   _x_1_2_input: LeanValue,
@@ -3685,6 +4292,7 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
       _frame.set(
         7,
         L4_Lean_Environment.f_Lean_Environment_findAsync_009cd03844(
+          _runtime,
           _frame[3],
           _frame[1],
           _frame[6],
@@ -3704,6 +4312,7 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
             _frame.set(
               10,
               L4_Lean_Environment.f_Lean_AsyncConstantInfo_toConstantInfo_3abe393c44(
+                _runtime,
                 _frame[8],
               ),
             );
@@ -3716,7 +4325,7 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
               );
               _frame.set(
                 13,
-                leanApply(_frame[0], Array[LeanErased(), _frame[12]]),
+                leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[12]]),
               );
               return _frame[13]
             | _ ->
@@ -3728,6 +4337,7 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
               _frame.set(
                 19,
                 L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+                  _runtime,
                   _frame[14],
                   _frame[15],
                   _frame[16],
@@ -3737,7 +4347,11 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
               );
               _frame.set(
                 20,
-                L4_Init_Prelude.f_panic_105135c0b4(_frame[2], _frame[19]),
+                L4_Init_Prelude.f_panic_105135c0b4(
+                  _runtime,
+                  _frame[2],
+                  _frame[19],
+                ),
               );
               return _frame[20]
             }
@@ -3753,38 +4367,54 @@ fun f_Lean_isCtor_lam_0_e10b29f615(
       }
     | 1 ->
       _frame.set(4, LeanCtor("[\"Option\",\"none\"]", Array[]));
-      _frame.set(5, leanApply(_frame[0], Array[LeanErased(), _frame[4]]));
+      _frame.set(
+        5,
+        leanApply(_runtime, _frame[0], Array[LeanErased(), _frame[4]]),
+      );
       return _frame[5]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
-fun apply_f_Lean_isCtor_lam_0_e10b29f615(_args: Array<LeanValue>): LeanValue {
-  f_Lean_isCtor_lam_0_e10b29f615(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_Lean_isCtor_lam_0_e10b29f615(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_isCtor_lam_0_e10b29f615(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Lean.isRec?"
 fun f_Lean_isRec_411eb75681(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _inst_1_1: LeanValue,
   _inst_2_2: LeanValue,
   _constName_3: LeanValue,
 ): LeanValue {
-  f_Lean_isRec_819716dfde(_inst_1_1, _inst_2_2, _constName_3)
+  f_Lean_isRec_819716dfde(_runtime, _inst_1_1, _inst_2_2, _constName_3)
 }
 // "Lean.withoutModifyingEnv'._redArg._lam_4"
 fun f_Lean_withoutModifyingEnv_lam_4_ce7431bc8a(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
   _x_1_0
 }
 fun apply_f_Lean_withoutModifyingEnv_lam_4_ce7431bc8a(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_withoutModifyingEnv_lam_4_ce7431bc8a(_args[0], _args[1])
+  f_Lean_withoutModifyingEnv_lam_4_ce7431bc8a(_runtime, _args[0], _args[1])
 }
 // "Lean.findModuleOf?._redArg._lam_2"
 fun f_Lean_findModuleOf_lam_2_f5f8da5246(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _declName_1: LeanValue,
   _toPure_2: LeanValue,
@@ -3801,14 +4431,20 @@ fun f_Lean_findModuleOf_lam_2_f5f8da5246(
       6,
       Array[_declName_1, _toPure_2, _x_2_3, _toBind_4, _getEnv_6],
     );
-    leanApply(_toBind_4, Array[LeanErased(), LeanErased(), _getEnv_6, _f_4_8])
+    leanApply(
+      _runtime,
+      _toBind_4,
+      Array[LeanErased(), LeanErased(), _getEnv_6, _f_4_8],
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_Lean_findModuleOf_lam_2_f5f8da5246(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_findModuleOf_lam_2_f5f8da5246(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -3818,7 +4454,9 @@ fun apply_f_Lean_findModuleOf_lam_2_f5f8da5246(
   )
 }
 // "Lean.evalConst._redArg._closed_0"
-fun f_Lean_evalConst_closed_0_637d43a957(): LeanValue {
+fun f_Lean_evalConst_closed_0_637d43a957(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Lean_Message.apply_f_Lean_stringToMessageData_1e55fa4f40,
     1,
@@ -3827,19 +4465,30 @@ fun f_Lean_evalConst_closed_0_637d43a957(): LeanValue {
 }
 // "Lean.hasConst._redArg._lam_0"
 fun f_Lean_hasConst_lam_0_87d696193c(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _skipRealize_1: LeanValue,
   _toPure_2: LeanValue,
   _do_lift_1_3: LeanValue,
 ): LeanValue {
   _x_2_4: LeanValue = L4_Lean_Environment.f_Lean_Environment_contains_0afe6850fd(
+    _runtime,
     _do_lift_1_3,
     _constName_0,
     _skipRealize_1,
   );
-  leanApply(_toPure_2, Array[LeanErased(), _x_2_4])
+  leanApply(_runtime, _toPure_2, Array[LeanErased(), _x_2_4])
 }
-fun apply_f_Lean_hasConst_lam_0_87d696193c(_args: Array<LeanValue>): LeanValue {
-  f_Lean_hasConst_lam_0_87d696193c(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_Lean_hasConst_lam_0_87d696193c(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_hasConst_lam_0_87d696193c(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 module end;

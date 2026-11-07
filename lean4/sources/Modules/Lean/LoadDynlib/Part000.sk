@@ -1,7 +1,10 @@
 module L4_Lean_LoadDynlib;
 
 // "String.Slice.dropSuffix._at_.Lean.loadPlugin.spec_1"
-fun f_Lean_loadPlugin_spec_1_fb7b24422d(_s_0: LeanValue): LeanValue {
+fun f_Lean_loadPlugin_spec_1_fb7b24422d(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_1: LeanValue = leanField(_s_0, 0);
@@ -10,19 +13,30 @@ fun f_Lean_loadPlugin_spec_1_fb7b24422d(_s_0: LeanValue): LeanValue {
     _startInclusive_le_endExc_4: LeanValue = leanField(_s_0, 3);
     _x_1_5: LeanValue = LeanScalar("nat", "7");
     _x_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_3,
       _startInclusive_2,
     );
-    _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_1_5, _x_2_6);
+    _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      _x_1_5,
+      _x_2_6,
+    );
     leanTag(_x_3_7) match {
     | "[\"Bool\",\"false\"]" -> _s_0
     | "[\"Bool\",\"true\"]" ->
-      _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_2_6, _x_1_5);
+      _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _runtime,
+        _x_2_6,
+        _x_1_5,
+      );
       _x_7_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_2,
         _x_6_10,
       );
       _x_8_12: LeanValue = L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+        _runtime,
         _str_1,
         LeanText("_shared"),
         _x_7_11,
@@ -35,10 +49,12 @@ fun f_Lean_loadPlugin_spec_1_fb7b24422d(_s_0: LeanValue): LeanValue {
       | "[\"Bool\",\"false\"]" -> _s_0
       | "[\"Bool\",\"true\"]" ->
         _x_9_13: LeanValue = L4_Init_Data_String_Basic.f_String_Slice_pos_a57f8a7a1f(
+          _runtime,
           _s_0,
           _x_6_10,
         );
         _x_10_14: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
           _startInclusive_2,
           _x_9_13,
         );
@@ -55,20 +71,29 @@ fun f_Lean_loadPlugin_spec_1_fb7b24422d(_s_0: LeanValue): LeanValue {
 }
 // "Lean.Dynlib.get?"
 fun f_Lean_Dynlib_get_95a96b5c10(
+  _runtime: mutable LeanExecution,
   _dynlib_0: LeanValue,
   _sym_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.Dynlib.get? [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_dynlib_get\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.Dynlib.get?",
+    "lean_dynlib_get",
+    Array[_dynlib_0, _sym_1],
   )
 }
 // "String.dropPrefix._at_.Lean.loadPlugin.spec_0"
 fun f_Lean_loadPlugin_spec_0_d8cd2e8be3(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _pat_1: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_s_0);
+  _x_2_3: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+    _runtime,
+    _s_0,
+  );
   f_loadPlugin_spec_0_spec_0_a28b183dde(
+    _runtime,
     LeanCtor(
       "[\"String\",\"Slice\",\"mk\"]",
       Array[_s_0, LeanScalar("nat", "0"), _x_2_3, LeanErased()],
@@ -77,16 +102,21 @@ fun f_Lean_loadPlugin_spec_0_d8cd2e8be3(
 }
 // "Lean.Dynlib.Symbol.runAsInit"
 fun f_Dynlib_Symbol_runAsInit_79b55fcd43(
+  _runtime: mutable LeanExecution,
   _dynlib_0: LeanValue,
   _sym_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.Dynlib.Symbol.runAsInit [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_dynlib_symbol_run_as_init\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.Dynlib.Symbol.runAsInit",
+    "lean_dynlib_symbol_run_as_init",
+    Array[_dynlib_0, _sym_1, _a_internal_hyg_1_2],
   )
 }
 // "Lean.loadPlugin"
 fun f_Lean_loadPlugin_cd18361459(
+  _runtime: mutable LeanExecution,
   _path_0_input: LeanValue,
   _initFn_1_input: LeanValue,
   _a_1_2_input: LeanValue,
@@ -105,7 +135,11 @@ fun f_Lean_loadPlugin_cd18361459(
     | 0 ->
       _frame.set(
         3,
-        L4_Init_System_IO.f_IO_FS_realPath_3b0d32020a(_frame[0], _frame[2]),
+        L4_Init_System_IO.f_IO_FS_realPath_3b0d32020a(
+          _runtime,
+          _frame[0],
+          _frame[2],
+        ),
       );
       leanTag(_frame[3]) match {
       | "[\"EST\",\"Out\",\"ok\"]" ->
@@ -116,6 +150,7 @@ fun f_Lean_loadPlugin_cd18361459(
           _frame.set(
             27,
             L4_Init_System_FilePath.f_System_FilePath_fileStem_c55dc59e72(
+              _runtime,
               _frame[4],
             ),
           );
@@ -125,19 +160,28 @@ fun f_Lean_loadPlugin_cd18361459(
             _frame.set(29, LeanText("lib"));
             _frame.set(
               30,
-              f_Lean_loadPlugin_spec_0_d8cd2e8be3(_frame[28], _frame[29]),
+              f_Lean_loadPlugin_spec_0_d8cd2e8be3(
+                _runtime,
+                _frame[28],
+                _frame[29],
+              ),
             );
-            _frame.set(31, f_Lean_loadPlugin_spec_1_fb7b24422d(_frame[30]));
+            _frame.set(
+              31,
+              f_Lean_loadPlugin_spec_1_fb7b24422d(_runtime, _frame[30]),
+            );
             _frame.set(32, LeanText("initialize_"));
             _frame.set(
               33,
               L4_Init_Data_String_Slice_Basic.f_String_Slice_toString_2634d7a086(
+                _runtime,
                 _frame[31],
               ),
             );
             _frame.set(
               34,
               L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                _runtime,
                 _frame[32],
                 _frame[33],
               ),
@@ -151,6 +195,7 @@ fun f_Lean_loadPlugin_cd18361459(
             _frame.set(
               36,
               L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                _runtime,
                 _frame[35],
                 _frame[4],
               ),
@@ -159,13 +204,17 @@ fun f_Lean_loadPlugin_cd18361459(
             _frame.set(
               38,
               L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                _runtime,
                 _frame[36],
                 _frame[37],
               ),
             );
             _frame.set(
               39,
-              L4_Init_System_IOError.f_IO_userError_436e50ab44(_frame[38]),
+              L4_Init_System_IOError.f_IO_userError_436e50ab44(
+                _runtime,
+                _frame[38],
+              ),
             );
             _frame.set(
               40,
@@ -195,18 +244,25 @@ fun f_Lean_loadPlugin_cd18361459(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(9, f_Lean_Dynlib_load_63dd570fe3(_frame[4], _frame[5]));
+      _frame.set(
+        9,
+        f_Lean_Dynlib_load_63dd570fe3(_runtime, _frame[4], _frame[5]),
+      );
       leanTag(_frame[9]) match {
       | "[\"EST\",\"Out\",\"ok\"]" ->
         _frame.set(10, leanField(_frame[9], 0));
         _frame.set(11, leanField(_frame[9], 1));
-        _frame.set(14, f_Lean_Dynlib_get_95a96b5c10(_frame[10], _frame[8]));
+        _frame.set(
+          14,
+          f_Lean_Dynlib_get_95a96b5c10(_runtime, _frame[10], _frame[8]),
+        );
         leanTag(_frame[14]) match {
         | "[\"Option\",\"some\"]" ->
           _frame.set(15, leanField(_frame[14], 0));
           _frame.set(
             16,
             L4_Init_System_IO.f_Runtime_markPersistent_3c5b5d167b(
+              _runtime,
               LeanErased(),
               _frame[10],
               _frame[11],
@@ -219,6 +275,7 @@ fun f_Lean_loadPlugin_cd18361459(
             _frame.set(
               18,
               f_Dynlib_Symbol_runAsInit_79b55fcd43(
+                _runtime,
                 _frame[10],
                 _frame[15],
                 _frame[17],
@@ -235,6 +292,7 @@ fun f_Lean_loadPlugin_cd18361459(
           _frame.set(
             20,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[19],
               _frame[8],
             ),
@@ -243,13 +301,17 @@ fun f_Lean_loadPlugin_cd18361459(
           _frame.set(
             22,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[20],
               _frame[21],
             ),
           );
           _frame.set(
             23,
-            L4_Init_System_IOError.f_IO_userError_436e50ab44(_frame[22]),
+            L4_Init_System_IOError.f_IO_userError_436e50ab44(
+              _runtime,
+              _frame[22],
+            ),
           );
           _frame.set(
             24,
@@ -278,7 +340,10 @@ fun f_Lean_loadPlugin_cd18361459(
   }
 }
 // "String.Slice.dropPrefix._at_.String.dropPrefix._at_.Lean.loadPlugin.spec_0.spec_0._redArg"
-fun f_loadPlugin_spec_0_spec_0_a28b183dde(_s_0: LeanValue): LeanValue {
+fun f_loadPlugin_spec_0_spec_0_a28b183dde(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_1: LeanValue = leanField(_s_0, 0);
@@ -287,14 +352,20 @@ fun f_loadPlugin_spec_0_spec_0_a28b183dde(_s_0: LeanValue): LeanValue {
     _startInclusive_le_endExc_4: LeanValue = leanField(_s_0, 3);
     _x_1_5: LeanValue = LeanScalar("nat", "3");
     _x_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_3,
       _startInclusive_2,
     );
-    _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_1_5, _x_2_6);
+    _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      _x_1_5,
+      _x_2_6,
+    );
     leanTag(_x_3_7) match {
     | "[\"Bool\",\"false\"]" -> _s_0
     | "[\"Bool\",\"true\"]" ->
       _x_6_10: LeanValue = L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+        _runtime,
         _str_1,
         LeanText("lib"),
         _startInclusive_2,
@@ -307,10 +378,12 @@ fun f_loadPlugin_spec_0_spec_0_a28b183dde(_s_0: LeanValue): LeanValue {
       | "[\"Bool\",\"false\"]" -> _s_0
       | "[\"Bool\",\"true\"]" ->
         _x_7_11: LeanValue = L4_Init_Data_String_Basic.f_String_Slice_pos_a57f8a7a1f(
+          _runtime,
           _s_0,
           _x_1_5,
         );
         _x_8_12: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
           _startInclusive_2,
           _x_7_11,
         );
@@ -327,15 +400,17 @@ fun f_loadPlugin_spec_0_spec_0_a28b183dde(_s_0: LeanValue): LeanValue {
 }
 // "Lean.loadDynlib"
 fun f_Lean_loadDynlib_47219559a7(
+  _runtime: mutable LeanExecution,
   _path_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_Lean_Dynlib_load_63dd570fe3(_path_0, _a_1_1);
+  _x_2_2: LeanValue = f_Lean_Dynlib_load_63dd570fe3(_runtime, _path_0, _a_1_1);
   leanTag(_x_2_2) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
     _a_4_4: LeanValue = leanField(_x_2_2, 1);
     _x_5_7: LeanValue = L4_Init_System_IO.f_Runtime_markPersistent_3c5b5d167b(
+      _runtime,
       LeanErased(),
       _a_3_3,
       _a_4_4,
@@ -359,11 +434,15 @@ fun f_Lean_loadDynlib_47219559a7(
 }
 // "Lean.Dynlib.load"
 fun f_Lean_Dynlib_load_63dd570fe3(
+  _runtime: mutable LeanExecution,
   _path_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.Dynlib.load [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_dynlib_load\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.Dynlib.load",
+    "lean_dynlib_load",
+    Array[_path_0, _a_internal_hyg_1_1],
   )
 }
 

@@ -2,31 +2,43 @@ module L4_Lean_Util_FindExpr;
 
 // "Lean.Expr.occurs._lam_0"
 fun f_Expr_occurs_lam_0_8c66f8c4b9(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _s_1: LeanValue,
 ): LeanValue {
-  L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(_s_1, _e_0)
+  L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(_runtime, _s_1, _e_0)
 }
-fun apply_f_Expr_occurs_lam_0_8c66f8c4b9(_args: Array<LeanValue>): LeanValue {
-  f_Expr_occurs_lam_0_8c66f8c4b9(_args[0], _args[1])
+fun apply_f_Expr_occurs_lam_0_8c66f8c4b9(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Expr_occurs_lam_0_8c66f8c4b9(_runtime, _args[0], _args[1])
 }
 // "Lean.Expr.findExtImpl?"
 fun f_Lean_Expr_findExtImpl_a038ece3a1(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _e_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.Expr.findExtImpl? [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_find_ext_expr\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.Expr.findExtImpl?",
+    "lean_find_ext_expr",
+    Array[_p_0, _e_1],
   )
 }
 // "Lean.Expr.occurs"
-fun f_Lean_Expr_occurs_6043448ef2(_e_0: LeanValue, _t_1: LeanValue): LeanValue {
+fun f_Lean_Expr_occurs_6043448ef2(
+  _runtime: mutable LeanExecution,
+  _e_0: LeanValue,
+  _t_1: LeanValue,
+): LeanValue {
   _f_1_2: LeanValue = LeanClosure(
     L4_Lean_Util_FindExpr.apply_f_Expr_occurs_lam_0_8c66f8c4b9,
     2,
     Array[_e_0],
   );
-  _x_2_3: LeanValue = f_Lean_Expr_findImpl_6534067b74(_f_1_2, _t_1);
+  _x_2_3: LeanValue = f_Lean_Expr_findImpl_6534067b74(_runtime, _f_1_2, _t_1);
   leanTag(_x_2_3) match {
   | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   | "[\"Option\",\"some\"]" ->
@@ -37,11 +49,15 @@ fun f_Lean_Expr_occurs_6043448ef2(_e_0: LeanValue, _t_1: LeanValue): LeanValue {
 }
 // "Lean.Expr.findImpl?"
 fun f_Lean_Expr_findImpl_6534067b74(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _e_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.Expr.findImpl? [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_find_expr\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.Expr.findImpl?",
+    "lean_find_expr",
+    Array[_p_0, _e_1],
   )
 }
 

@@ -2,6 +2,7 @@ module L4_Init_Data_ByteArray_Basic;
 
 // "ByteArray.copySlice"
 fun f_ByteArray_copySlice_70b6c056b1(
+  _runtime: mutable LeanExecution,
   _src_0: LeanValue,
   _srcOff_1: LeanValue,
   _dest_2: LeanValue,
@@ -9,22 +10,32 @@ fun f_ByteArray_copySlice_70b6c056b1(
   _len_4: LeanValue,
   _exact_5: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "ByteArray.copySlice [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_byte_array_copy_slice\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.copySlice",
+    "lean_byte_array_copy_slice",
+    Array[_src_0, _srcOff_1, _dest_2, _destOff_3, _len_4, _exact_5],
   )
 }
 // "ByteArray.get"
 fun f_ByteArray_get_fdae4c5c53(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _i_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "ByteArray.get [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_byte_array_fget\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.get",
+    "lean_byte_array_fget",
+    Array[_a_0, _i_1, _h_2],
   )
 }
 // "ByteArray.mkIterator"
-fun f_ByteArray_mkIterator_5a55fe6b3f(_arr_0: LeanValue): LeanValue {
+fun f_ByteArray_mkIterator_5a55fe6b3f(
+  _runtime: mutable LeanExecution,
+  _arr_0: LeanValue,
+): LeanValue {
   LeanCtor(
     "[\"ByteArray\",\"Iterator\",\"mk\"]",
     Array[_arr_0, LeanScalar("nat", "0")],
@@ -32,31 +43,51 @@ fun f_ByteArray_mkIterator_5a55fe6b3f(_arr_0: LeanValue): LeanValue {
 }
 // "ByteArray.Iterator.remainingBytes"
 fun f_ByteArray_Iterator_remainingBytes_535d0c88e6(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"ByteArray\",\"Iterator\",\"mk\"]" ->
     _array_2_1: LeanValue = leanField(_x_1_0, 0);
     _idx_3_2: LeanValue = leanField(_x_1_0, 1);
-    _x_4_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_array_2_1);
-    L4_Init_Prelude.f_Nat_sub_8647441ee5(_x_4_3, _idx_3_2)
+    _x_4_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+      _runtime,
+      _array_2_1,
+    );
+    L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_4_3, _idx_3_2)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "ByteArray.isEmpty"
-fun f_ByteArray_isEmpty_9ea0149c42(_s_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_s_0);
-  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_x_1_1, LeanScalar("nat", "0"))
+fun f_ByteArray_isEmpty_9ea0149c42(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+    _runtime,
+    _s_0,
+  );
+  L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
+    _x_1_1,
+    LeanScalar("nat", "0"),
+  )
 }
 // "ByteArray.extract"
 fun f_ByteArray_extract_1aa209d344(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _b_1: LeanValue,
   _e_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = L4_Init_Prelude.f_ByteArray_empty_97a63abe76();
-  _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_e_2, _b_1);
+  _x_1_3: LeanValue = L4_Init_Prelude.f_ByteArray_empty_97a63abe76(_runtime);
+  _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+    _runtime,
+    _e_2,
+    _b_1,
+  );
   f_ByteArray_copySlice_70b6c056b1(
+    _runtime,
     _a_0,
     _b_1,
     _x_1_3,
@@ -67,31 +98,43 @@ fun f_ByteArray_extract_1aa209d344(
 }
 // "ByteArray.set!"
 fun f_ByteArray_set_3c14026717(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
   _a_internal_hyg_3_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "ByteArray.set! [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_byte_array_set\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.set!",
+    "lean_byte_array_set",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1, _a_internal_hyg_3_2],
   )
 }
 // "ByteArray.uget"
 fun f_ByteArray_uget_712cdcbc70(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _i_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "ByteArray.uget [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_byte_array_uget\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.uget",
+    "lean_byte_array_uget",
+    Array[_a_0, _i_1, _h_2],
   )
 }
 // "ByteArray.get!"
 fun f_ByteArray_get_55eaeba688(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "ByteArray.get! [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_byte_array_get\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.get!",
+    "lean_byte_array_get",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 

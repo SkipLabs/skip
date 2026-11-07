@@ -2,6 +2,7 @@ module L4_Init_Data_Float_Model_Unpacked_Pack_Basic;
 
 // "Float.Model.UnpackedFloat.unpack"
 fun f_Model_UnpackedFloat_unpack_2d06ce7da4(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
@@ -12,71 +13,88 @@ fun f_Model_UnpackedFloat_unpack_2d06ce7da4(
     _exponentBits_4: LeanValue = leanField(_spec_0, 2);
     _he_5: LeanValue = leanField(_spec_0, 3);
     _mantissaVec_6: LeanValue = f_Model_UnpackedFloat_unpackMantissa_84537fbd5d(
+      _runtime,
       _spec_0,
       _b_1,
     );
     _exponentVec_7: LeanValue = f_Model_UnpackedFloat_unpackExponent_0014da2f5e(
+      _runtime,
       _spec_0,
       _b_1,
     );
     _signVec_8: LeanValue = f_Model_UnpackedFloat_unpackSign_5ae95fd5f7(
+      _runtime,
       _spec_0,
       _b_1,
     );
     _sign_9: LeanValue = L4_Init_Data_Float_Model_Unpacked_Sign.f_UnpackedFloat_Sign_ofBitVec_c19ad26bae(
+      _runtime,
       _signVec_8,
     );
     _x_1_10: LeanValue = LeanScalar("nat", "1");
     _x_2_11: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+      _runtime,
       _exponentBits_4,
       _x_1_10,
     );
     _x_3_12: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_neg_8a8410c13a(
+      _runtime,
       _exponentBits_4,
       _x_2_11,
     );
     _x_4_13: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _exponentVec_7,
       _x_3_12,
     );
     leanTag(_x_4_13) match {
     | "[\"Bool\",\"false\"]" ->
       _x_5_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+        _runtime,
         _exponentVec_7,
       );
       _x_6_15: LeanValue = L4_Init_Data_Float_Model_Format_Basic.f_Model_Format_exponentBias_4bbf5641f7(
+        _runtime,
         _spec_0,
       );
       _x_7_16: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+        _runtime,
         _x_6_15,
       );
       _x_8_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+        _runtime,
         _mantissaBitsWithoutImpli_2,
       );
       _x_9_18: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+        _runtime,
         _x_7_16,
         _x_8_17,
       );
       _exponent_19: LeanValue = L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(
+        _runtime,
         _x_5_14,
         _x_9_18,
       );
       _x_10_20: LeanValue = LeanScalar("nat", "0");
       _x_11_21: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+        _runtime,
         _exponentBits_4,
         _x_10_20,
       );
       _x_12_22: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _exponentVec_7,
         _x_11_21,
       );
       leanTag(_x_12_22) match {
       | "[\"Bool\",\"false\"]" ->
         _x_13_23: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+          _runtime,
           _x_1_10,
           _x_1_10,
         );
         _x_14_24: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_append_9f02258dc6(
+          _runtime,
           _mantissaBitsWithoutImpli_2,
           _x_13_23,
           _mantissaVec_6,
@@ -87,19 +105,23 @@ fun f_Model_UnpackedFloat_unpack_2d06ce7da4(
         )
       | "[\"Bool\",\"true\"]" ->
         _x_16_26: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+          _runtime,
           _mantissaBitsWithoutImpli_2,
           _x_10_20,
         );
         _x_17_27: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          _runtime,
           _mantissaVec_6,
           _x_16_26,
         );
         leanTag(_x_17_27) match {
         | "[\"Bool\",\"false\"]" ->
           _x_18_28: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+            _runtime,
             _x_1_10,
           );
           _x_19_29: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
+            _runtime,
             _exponent_19,
             _x_18_28,
           );
@@ -118,10 +140,12 @@ fun f_Model_UnpackedFloat_unpack_2d06ce7da4(
       }
     | "[\"Bool\",\"true\"]" ->
       _x_23_33: LeanValue = L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(
+        _runtime,
         _mantissaBitsWithoutImpli_2,
         LeanScalar("nat", "0"),
       );
       _x_24_34: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _mantissaVec_6,
         _x_23_33,
       );
@@ -144,13 +168,16 @@ fun f_Model_UnpackedFloat_unpack_2d06ce7da4(
   }
 }
 // "Float.Model.UnpackedFloat.unpack._closed_0"
-fun f_UnpackedFloat_unpack_closed_0_4883181f7d(): LeanValue {
+fun f_UnpackedFloat_unpack_closed_0_4883181f7d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_137_0: LeanValue = LeanScalar("nat", "1");
   _x_138_1: LeanValue = LeanScalar("nat", "1");
-  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_x_138_1, _x_138_1)
+  L4_Init_Prelude.f_BitVec_ofNat_5826e253fd(_runtime, _x_138_1, _x_138_1)
 }
 // "Float.Model.UnpackedFloat.unpackExponent"
 fun f_Model_UnpackedFloat_unpackExponent_0014da2f5e(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
@@ -161,6 +188,7 @@ fun f_Model_UnpackedFloat_unpackExponent_0014da2f5e(
     _exponentBits_4: LeanValue = leanField(_spec_0, 2);
     _he_5: LeanValue = leanField(_spec_0, 3);
     L4_Init_Data_BitVec_Basic.f_BitVec_extractLsb_671811e706(
+      _runtime,
       _mantissaBitsWithoutImpli_2,
       _exponentBits_4,
       _b_1,
@@ -170,6 +198,7 @@ fun f_Model_UnpackedFloat_unpackExponent_0014da2f5e(
 }
 // "Float.Model.UnpackedFloat.unpackSign"
 fun f_Model_UnpackedFloat_unpackSign_5ae95fd5f7(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
@@ -180,10 +209,12 @@ fun f_Model_UnpackedFloat_unpackSign_5ae95fd5f7(
     _exponentBits_4: LeanValue = leanField(_spec_0, 2);
     _he_5: LeanValue = leanField(_spec_0, 3);
     _x_2_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _mantissaBitsWithoutImpli_2,
       _exponentBits_4,
     );
     L4_Init_Data_BitVec_Basic.f_BitVec_extractLsb_671811e706(
+      _runtime,
       _x_2_7,
       LeanScalar("nat", "1"),
       _b_1,
@@ -192,15 +223,24 @@ fun f_Model_UnpackedFloat_unpackSign_5ae95fd5f7(
   }
 }
 // "Nat.cast._at_.Float.Model.UnpackedFloat.pack.spec_0"
-fun f_UnpackedFloat_pack_spec_0_0e64061137(_a_1_0: LeanValue): LeanValue {
-  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_a_1_0)
+fun f_UnpackedFloat_pack_spec_0_0e64061137(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _a_1_0)
 }
 // "Float.Model.UnpackedFloat.unpack._closed_1"
-fun f_UnpackedFloat_unpack_closed_1_7400f69a47(): LeanValue {
-  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(LeanScalar("nat", "1"))
+fun f_UnpackedFloat_unpack_closed_1_7400f69a47(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    _runtime,
+    LeanScalar("nat", "1"),
+  )
 }
 // "Float.Model.UnpackedFloat.unpackMantissa"
 fun f_Model_UnpackedFloat_unpackMantissa_84537fbd5d(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
@@ -211,6 +251,7 @@ fun f_Model_UnpackedFloat_unpackMantissa_84537fbd5d(
     _exponentBits_4: LeanValue = leanField(_spec_0, 2);
     _he_5: LeanValue = leanField(_spec_0, 3);
     L4_Init_Data_BitVec_Basic.f_BitVec_extractLsb_671811e706(
+      _runtime,
       LeanScalar("nat", "0"),
       _mantissaBitsWithoutImpli_2,
       _b_1,

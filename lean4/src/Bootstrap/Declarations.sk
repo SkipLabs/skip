@@ -1,0 +1,108 @@
+// Typed input construction for the fixed Nat-definition workload. Parsing and
+// definition elaboration are not implemented here. The numeral shape, regular
+// height 2 and singleton `all` match LocalDefinitionReference.lean; the exported
+// declarations are independently checked by the kernel before checking proofs.
+fun leanSimpleName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun leanNamedConstant(runtime: mutable LeanExecution, name: String): LeanValue {
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    leanSimpleName(runtime, name),
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
+}
+
+fun leanApplyExpr(
+  runtime: mutable LeanExecution,
+  fn: LeanValue,
+  args: Array<LeanValue>,
+): LeanValue {
+  result = fn;
+  for (arg in args) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, arg)
+  };
+  result
+}
+
+fun leanNatNumeral(runtime: mutable LeanExecution, n: LeanValue): LeanValue {
+  literal = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, n);
+  zeroLevels = LeanCtor(
+    "[\"List\",\"cons\"]",
+    Array[
+      LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    ],
+  );
+  ofNat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("OfNat"),
+      LeanText("ofNat"),
+    ),
+    zeroLevels,
+  );
+  instance = leanApplyExpr(
+    runtime,
+    leanNamedConstant(runtime, "instOfNatNat"),
+    Array[literal],
+  );
+  leanApplyExpr(
+    runtime,
+    ofNat,
+    Array[leanNamedConstant(runtime, "Nat"), literal, instance],
+  )
+}
+
+fun leanNatDefinition(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  n: LeanValue,
+): LeanValue {
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  definition = L4_Lean_Declaration.f_Lean_mkDefinitionValEx_04433553ec(
+    runtime,
+    name,
+    nil,
+    leanNamedConstant(runtime, "Nat"),
+    leanNatNumeral(runtime, n),
+    LeanCtor(
+      "[\"Lean\",\"ReducibilityHints\",\"regular\"]",
+      Array[LeanWord("uint32", 2)],
+    ),
+    LeanCtor("[\"Lean\",\"DefinitionSafety\",\"safe\"]", Array[]),
+    LeanCtor("[\"List\",\"cons\"]", Array[name, nil]),
+  );
+  LeanCtor("[\"Lean\",\"ConstantInfo\",\"defnInfo\"]", Array[definition])
+}
+
+fun leanLimitTheoremType(runtime: mutable LeanExecution): LeanValue {
+  zeroLevels = LeanCtor(
+    "[\"List\",\"cons\"]",
+    Array[
+      LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+      LeanCtor("[\"List\",\"nil\"]", Array[]),
+    ],
+  );
+  lt = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("LT"),
+      LeanText("lt"),
+    ),
+    zeroLevels,
+  );
+  leanApplyExpr(
+    runtime,
+    lt,
+    Array[
+      leanNamedConstant(runtime, "Nat"),
+      leanNamedConstant(runtime, "instLTNat"),
+      leanNamedConstant(runtime, "limit"),
+      leanNatNumeral(runtime, leanNatValue(10)),
+    ],
+  )
+}

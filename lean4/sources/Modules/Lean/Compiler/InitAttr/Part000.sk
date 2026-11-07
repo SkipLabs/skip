@@ -1,15 +1,21 @@
 module L4_Lean_Compiler_InitAttr;
 
 // "_private.Lean.Compiler.InitAttr.0.Lean.initFn._@.Lean.Compiler.InitAttr.3980671908._hygCtx._hyg.2"
-fun f_InitAttr_hygCtx_hyg_e42ea1511d(_a_1_0: LeanValue): LeanValue {
+fun f_InitAttr_hygCtx_hyg_e42ea1511d(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("init"),
   );
   _x_7_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("regularInitAttr"),
   );
   f_Lean_registerInitAttrUnsafe_67b62b88f6(
+    _runtime,
     _x_3_2,
     LeanCtor("[\"Bool\",\"true\"]", Array[]),
     _x_7_6,
@@ -17,7 +23,10 @@ fun f_InitAttr_hygCtx_hyg_e42ea1511d(_a_1_0: LeanValue): LeanValue {
   )
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.getIOTypeArg"
-fun f_InitAttr_Lean_getIOTypeArg_dcb5254e71(_x_1_0: LeanValue): LeanValue {
+fun f_InitAttr_Lean_getIOTypeArg_dcb5254e71(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_x_1_0, 0);
@@ -36,6 +45,7 @@ fun f_InitAttr_Lean_getIOTypeArg_dcb5254e71(_x_1_0: LeanValue): LeanValue {
         leanTag(_pre_6_8) match {
         | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
           _x_9_11: LeanValue = L4_Init_Prelude.f_String_decEq_88c69973f8(
+            _runtime,
             _str_7_9,
             LeanText("IO"),
           );
@@ -56,14 +66,17 @@ fun f_InitAttr_Lean_getIOTypeArg_dcb5254e71(_x_1_0: LeanValue): LeanValue {
 }
 // "Array.contains._at_._private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod.spec_0"
 fun f_Lean_runInitAttrForMod_spec_0_d5f329ac8d(
+  _runtime: mutable LeanExecution,
   _as_0: LeanValue,
   _a_1: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _as_0,
   );
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     LeanScalar("nat", "0"),
     _x_2_3,
   );
@@ -71,9 +84,11 @@ fun f_Lean_runInitAttrForMod_spec_0_d5f329ac8d(
   | "[\"Bool\",\"false\"]" -> _x_3_4
   | "[\"Bool\",\"true\"]" ->
     _x_5_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_2_3,
     );
     f_runInitAttrForMod_spec_0_spec_0_963595cc63(
+      _runtime,
       _a_1,
       _as_0,
       LeanScalar("usize", "0"),
@@ -84,14 +99,14 @@ fun f_Lean_runInitAttrForMod_spec_0_d5f329ac8d(
 }
 // "Lean.setBuiltinInitAttr"
 fun f_Lean_setBuiltinInitAttr_b52d5e85c5(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _declName_1: LeanValue,
   _initFnName_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = leanFail(
-    "module initialization required: Lean.builtinInitAttr",
-  );
+  _x_1_3: LeanValue = leanReadInitializer(_runtime, "Lean.builtinInitAttr");
   L4_Lean_Attributes.f_Lean_ParametricAttribute_setParam_5b21c1785d(
+    _runtime,
     _x_1_3,
     _env_0,
     _declName_1,
@@ -99,16 +114,20 @@ fun f_Lean_setBuiltinInitAttr_b52d5e85c5(
   )
 }
 // "Lean.interpretedModInits"
-fun f_Lean_interpretedModInits_a18801649e(): LeanValue {
-  leanPrimitive("Lean.interpretedModInits []")
+fun f_Lean_interpretedModInits_a18801649e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.interpretedModInits")
 }
 // "Lean.mkAuxDeclName._at_.Lean.declareBuiltin.spec_0._redArg"
 fun f_Lean_declareBuiltin_spec_0_9047292963(
+  _runtime: mutable LeanExecution,
   _kind_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_1_1,
@@ -131,6 +150,7 @@ fun f_Lean_declareBuiltin_spec_0_9047292963(
       _infoState_14: LeanValue = leanField(_val_4_4, 8);
       _snapshotTasks_15: LeanValue = leanField(_val_4_4, 9);
       _x_6_16: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _y_1_1,
@@ -153,6 +173,7 @@ fun f_Lean_declareBuiltin_spec_0_9047292963(
           _infoState_27: LeanValue = leanField(_val_7_17, 8);
           _snapshotTasks_28: LeanValue = leanField(_val_7_17, 9);
           _x_9_29: LeanValue = L4_Lean_CoreM.f_Lean_DeclNameGenerator_mkUniqueName_3f90fe6d7c(
+            _runtime,
             _env_19,
             _auxDeclNGen_9,
             _kind_0,
@@ -162,6 +183,7 @@ fun f_Lean_declareBuiltin_spec_0_9047292963(
             _fst_10_30: LeanValue = leanField(_x_9_29, 0);
             _snd_11_31: LeanValue = leanField(_x_9_29, 1);
             _x_12_32: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+              _runtime,
               LeanErased(),
               LeanErased(),
               _y_1_1,
@@ -199,6 +221,7 @@ fun f_Lean_declareBuiltin_spec_0_9047292963(
                   ],
                 );
                 _x_16_46: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+                  _runtime,
                   LeanErased(),
                   LeanErased(),
                   _y_1_1,
@@ -231,14 +254,18 @@ fun f_Lean_declareBuiltin_spec_0_9047292963(
   }
 }
 // "Lean.builtinInitAttr"
-fun f_Lean_builtinInitAttr_e3967c9751(): LeanValue {
-  leanPrimitive("Lean.builtinInitAttr []")
+fun f_Lean_builtinInitAttr_e3967c9751(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.builtinInitAttr")
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.regularInitAttr._regBuiltin.Lean.regularInitAttr.declRange_3"
 fun f_Lean_regularInitAttr_declRange_3_a9a16fdb4a(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
 ): LeanValue {
   _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("regularInitAttr"),
   );
@@ -269,6 +296,7 @@ fun f_Lean_regularInitAttr_declRange_3_a9a16fdb4a(
     ],
   );
   L4_Lean_DeclarationRange.f_Lean_addBuiltinDeclarationRanges_5b3f8ee58c(
+    _runtime,
     _x_4_3,
     LeanCtor(
       "[\"Lean\",\"DeclarationRanges\",\"mk\"]",
@@ -279,6 +307,7 @@ fun f_Lean_regularInitAttr_declRange_3_a9a16fdb4a(
 }
 // "Lean.registerInitAttrUnsafe._lam_3"
 fun f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
+  _runtime: mutable LeanExecution,
   _runAfterImport_0: LeanValue,
   _x_1_1: LeanValue,
   _env_2: LeanValue,
@@ -289,6 +318,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
   | "[\"Bool\",\"false\"]" -> _x_1_1
   | "[\"Bool\",\"true\"]" ->
     L4_Lean_Compiler_MetaAttr.f_Lean_isMarkedMeta_0065dfc467(
+      _runtime,
       _env_2,
       _declName_3,
     )
@@ -296,9 +326,11 @@ fun f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
   }
 }
 fun apply_f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -308,6 +340,7 @@ fun apply_f_Lean_registerInitAttrUnsafe_lam_3_a07dfbe48f(
 }
 // "Lean.registerInitAttrUnsafe._lam_2"
 fun f_Lean_registerInitAttrUnsafe_lam_2_b65244e6c7(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
   _x_3_2: LeanValue,
@@ -320,9 +353,11 @@ fun f_Lean_registerInitAttrUnsafe_lam_2_b65244e6c7(
   )
 }
 fun apply_f_Lean_registerInitAttrUnsafe_lam_2_b65244e6c7(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_registerInitAttrUnsafe_lam_2_b65244e6c7(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -332,6 +367,7 @@ fun apply_f_Lean_registerInitAttrUnsafe_lam_2_b65244e6c7(
 }
 // "Lean.withoutExporting._at_.Lean.registerInitAttrUnsafe.spec_2._redArg"
 fun f_Lean_registerInitAttrUnsafe_spec_2_6d3ed5eb2a(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _when_1: LeanValue,
   _y_1_2: LeanValue,
@@ -339,9 +375,11 @@ fun f_Lean_registerInitAttrUnsafe_spec_2_6d3ed5eb2a(
   _y_3_4: LeanValue,
 ): LeanValue {
   leanTag(_when_1) match {
-  | "[\"Bool\",\"false\"]" -> leanApply(_x_0, Array[_y_1_2, _y_2_3, _y_3_4])
+  | "[\"Bool\",\"false\"]" ->
+    leanApply(_runtime, _x_0, Array[_y_1_2, _y_2_3, _y_3_4])
   | "[\"Bool\",\"true\"]" ->
     f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
+      _runtime,
       _x_0,
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
       _y_1_2,
@@ -353,6 +391,7 @@ fun f_Lean_registerInitAttrUnsafe_spec_2_6d3ed5eb2a(
 }
 // "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_._private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod.spec_2"
 fun f_Lean_runInitAttrForMod_spec_2_da614b8be4(
+  _runtime: mutable LeanExecution,
   _x_1_0_input: LeanValue,
   _as_1_input: LeanValue,
   _i_2_input: LeanValue,
@@ -375,13 +414,18 @@ fun f_Lean_runInitAttrForMod_spec_2_da614b8be4(
     | 0 ->
       _frame.set(
         9,
-        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_frame[2], _frame[3]),
+        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+          _runtime,
+          _frame[2],
+          _frame[3],
+        ),
       );
       leanTag(_frame[9]) match {
       | "[\"Bool\",\"false\"]" ->
         _frame.set(
           10,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            _runtime,
             LeanErased(),
             _frame[1],
             _frame[2],
@@ -390,13 +434,18 @@ fun f_Lean_runInitAttrForMod_spec_2_da614b8be4(
         );
         _frame.set(
           11,
-          f_Lean_runInitAttrForMod_spec_0_d5f329ac8d(_frame[0], _frame[10]),
+          f_Lean_runInitAttrForMod_spec_0_d5f329ac8d(
+            _runtime,
+            _frame[0],
+            _frame[10],
+          ),
         );
         leanTag(_frame[11]) match {
         | "[\"Bool\",\"false\"]" ->
           _frame.set(
             12,
             L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+              _runtime,
               LeanErased(),
               _frame[4],
               _frame[10],
@@ -420,11 +469,16 @@ fun f_Lean_runInitAttrForMod_spec_2_da614b8be4(
       _frame.set(6, LeanScalar("usize", "1"));
       _frame.set(
         7,
-        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[2], _frame[6]),
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
+          _frame[2],
+          _frame[6],
+        ),
       );
       _frame.set(
         8,
         f_Lean_runInitAttrForMod_spec_2_da614b8be4(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[7],
@@ -439,9 +493,11 @@ fun f_Lean_runInitAttrForMod_spec_2_da614b8be4(
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.builtinInitAttr._regBuiltin.Lean.builtinInitAttr.declRange_3"
 fun f_Lean_builtinInitAttr_declRange_3_3a98495cc6(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
 ): LeanValue {
   _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("builtinInitAttr"),
   );
@@ -472,6 +528,7 @@ fun f_Lean_builtinInitAttr_declRange_3_3a98495cc6(
     ],
   );
   L4_Lean_DeclarationRange.f_Lean_addBuiltinDeclarationRanges_5b3f8ee58c(
+    _runtime,
     _x_4_3,
     LeanCtor(
       "[\"Lean\",\"DeclarationRanges\",\"mk\"]",
@@ -482,6 +539,7 @@ fun f_Lean_builtinInitAttr_declRange_3_3a98495cc6(
 }
 // "Lean.registerInitAttrUnsafe"
 fun f_Lean_registerInitAttrUnsafe_67b62b88f6(
+  _runtime: mutable LeanExecution,
   _attrName_0: LeanValue,
   _runAfterImport_1: LeanValue,
   _ref_2: LeanValue,
@@ -519,6 +577,7 @@ fun f_Lean_registerInitAttrUnsafe_67b62b88f6(
     Array[_runAfterImport_1, _x_7_9],
   );
   L4_Lean_Attributes.f_Lean_registerParametricAttribute_c6475b0e7b(
+    _runtime,
     LeanCtor(
       "[\"Lean\",\"ParametricAttributeImpl\",\"mk\"]",
       Array[_x_6_8, _f_2_4, _f_3_5, _x_7_9, _f_8_10],
@@ -527,9 +586,15 @@ fun f_Lean_registerInitAttrUnsafe_67b62b88f6(
   )
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.initFn._@.Lean.Compiler.InitAttr.3590725331._hygCtx._hyg.2"
-fun f_InitAttr_hygCtx_hyg_464b62c7da(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_empty_f26a97f0dc();
+fun f_InitAttr_hygCtx_hyg_464b62c7da(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_empty_f26a97f0dc(
+    _runtime,
+  );
   _x_3_2: LeanValue = L4_Init_System_ST.f_ST_Prim_mkRef_23b2310680(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _x_2_1,
@@ -545,6 +610,7 @@ fun f_InitAttr_hygCtx_hyg_464b62c7da(_a_1_0: LeanValue): LeanValue {
 }
 // "Lean.withExporting._at_.Lean.withoutExporting._at_.Lean.registerInitAttrUnsafe.spec_2.spec_4._redArg._lam_0"
 fun f_spec_2_spec_4_lam_0_83ca8f45cb(
+  _runtime: mutable LeanExecution,
   _y_1_0: LeanValue,
   _isExporting_1: LeanValue,
   _x_2_2: LeanValue,
@@ -552,6 +618,7 @@ fun f_spec_2_spec_4_lam_0_83ca8f45cb(
   _y_3_4: LeanValue,
 ): LeanValue {
   _x_4_5: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_1_0,
@@ -574,6 +641,7 @@ fun f_spec_2_spec_4_lam_0_83ca8f45cb(
       _infoState_16: LeanValue = leanField(_val_5_6, 8);
       _snapshotTasks_17: LeanValue = leanField(_val_5_6, 9);
       _x_8_19: LeanValue = L4_Lean_Environment.f_Lean_Environment_setExporting_5a35fee75b(
+        _runtime,
         _env_8,
         _isExporting_1,
       );
@@ -593,6 +661,7 @@ fun f_spec_2_spec_4_lam_0_83ca8f45cb(
         ],
       );
       _x_10_21: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _y_1_0,
@@ -615,17 +684,24 @@ fun f_spec_2_spec_4_lam_0_83ca8f45cb(
   }
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.isIOUnit"
-fun f_InitAttr_Lean_isIOUnit_3bc299b6e2(_type_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_InitAttr_Lean_getIOTypeArg_dcb5254e71(_type_0);
+fun f_InitAttr_Lean_isIOUnit_3bc299b6e2(
+  _runtime: mutable LeanExecution,
+  _type_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_InitAttr_Lean_getIOTypeArg_dcb5254e71(
+    _runtime,
+    _type_0,
+  );
   leanTag(_x_1_1) match {
   | "[\"Option\",\"some\"]" ->
     _val_2_2: LeanValue = leanField(_x_1_1, 0);
-    f_InitAttr_Lean_isUnitType_166547b3e9(_val_2_2)
+    f_InitAttr_Lean_isUnitType_166547b3e9(_runtime, _val_2_2)
   | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   }
 }
 // "Lean.registerInitAttrUnsafe._lam_1"
 fun f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _stx_1: LeanValue,
   _y_1_2: LeanValue,
@@ -639,6 +715,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
     Array[_declName_0, _stx_1],
   );
   f_Lean_registerInitAttrUnsafe_spec_2_6d3ed5eb2a(
+    _runtime,
     _f_4_5,
     LeanCtor("[\"Bool\",\"true\"]", Array[]),
     _y_1_2,
@@ -647,9 +724,11 @@ fun f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
   )
 }
 fun apply_f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -659,6 +738,7 @@ fun apply_f_Lean_registerInitAttrUnsafe_lam_1_39b2b4f6fc(
 }
 // "Lean.Option.get._at_._private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod.spec_3"
 fun f_Lean_runInitAttrForMod_spec_3_7e1a98d772(
+  _runtime: mutable LeanExecution,
   _opts_0: LeanValue,
   _opt_1: LeanValue,
 ): LeanValue {
@@ -671,6 +751,7 @@ fun f_Lean_runInitAttrForMod_spec_3_7e1a98d772(
       _map_4: LeanValue = leanField(_opts_0, 0);
       _hasTrace_5: LeanValue = leanField(_opts_0, 1);
       _x_1_6: LeanValue = L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+        _runtime,
         _map_4,
         _name_2,
       );
@@ -693,6 +774,7 @@ fun f_Lean_runInitAttrForMod_spec_3_7e1a98d772(
 }
 // "Lean.declareBuiltin"
 fun f_Lean_declareBuiltin_bcd38c5e75(
+  _runtime: mutable LeanExecution,
   _forDecl_0: LeanValue,
   _value_1: LeanValue,
   _a_2: LeanValue,
@@ -700,9 +782,11 @@ fun f_Lean_declareBuiltin_bcd38c5e75(
   _a_1_4: LeanValue,
 ): LeanValue {
   _x_3_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("_regBuiltin"),
   );
   _x_4_7: LeanValue = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+    _runtime,
     _x_3_6,
     _forDecl_0,
   );
@@ -712,6 +796,7 @@ fun f_Lean_declareBuiltin_bcd38c5e75(
     Array[_x_4_7, _value_1],
   );
   f_Lean_registerInitAttrUnsafe_spec_2_6d3ed5eb2a(
+    _runtime,
     _f_5_8,
     LeanCtor("[\"Bool\",\"true\"]", Array[]),
     _a_2,
@@ -721,6 +806,7 @@ fun f_Lean_declareBuiltin_bcd38c5e75(
 }
 // "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Lean.runInitAttrsForModules.spec_0"
 fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
+  _runtime: mutable LeanExecution,
   _env_0_input: LeanValue,
   _opts_1_input: LeanValue,
   _as_2_input: LeanValue,
@@ -748,6 +834,7 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
       _frame.set(
         12,
         L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+          _runtime,
           _frame[4],
           _frame[3],
         ),
@@ -762,7 +849,10 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
       | "[\"Bool\",\"true\"]" ->
         _frame.set(
           14,
-          L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(_frame[0]),
+          L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(
+            _runtime,
+            _frame[0],
+          ),
         );
         leanTag(_frame[14]) match {
         | "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]" ->
@@ -780,6 +870,7 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
           _frame.set(
             17,
             L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+              _runtime,
               LeanErased(),
               _frame[2],
               _frame[4],
@@ -788,11 +879,19 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
           );
           _frame.set(
             18,
-            L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[15]),
+            L4_Init_Prelude.f_Array_size_3866d4555a(
+              _runtime,
+              LeanErased(),
+              _frame[15],
+            ),
           );
           _frame.set(
             19,
-            L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[17], _frame[18]),
+            L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+              _runtime,
+              _frame[17],
+              _frame[18],
+            ),
           );
           leanTag(_frame[19]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -806,6 +905,7 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
             _frame.set(
               20,
               L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+                _runtime,
                 LeanErased(),
                 _frame[15],
                 _frame[17],
@@ -815,6 +915,7 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
             _frame.set(
               21,
               f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
+                _runtime,
                 _frame[0],
                 _frame[1],
                 _frame[20],
@@ -848,11 +949,16 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
       _frame.set(9, LeanScalar("usize", "1"));
       _frame.set(
         10,
-        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[4], _frame[9]),
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
+          _frame[4],
+          _frame[9],
+        ),
       );
       _frame.set(
         11,
         f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[2],
@@ -869,18 +975,23 @@ fun f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
 }
 // "Lean.runInit"
 fun f_Lean_runInit_22271d6753(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _opts_1: LeanValue,
   _decl_2: LeanValue,
   _initDecl_3: LeanValue,
   _a_internal_hyg_1_4: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Lean.runInit [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_run_init\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Lean.runInit",
+    "lean_run_init",
+    Array[_env_0, _opts_1, _decl_2, _initDecl_3, _a_internal_hyg_1_4],
   )
 }
 // "Lean.withExporting._at_.Lean.withoutExporting._at_.Lean.registerInitAttrUnsafe.spec_2.spec_4._redArg"
 fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
+  _runtime: mutable LeanExecution,
   _x_0_input: LeanValue,
   _isExporting_1_input: LeanValue,
   _y_1_2_input: LeanValue,
@@ -904,6 +1015,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
       _frame.set(
         5,
         L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+          _runtime,
           LeanErased(),
           LeanErased(),
           _frame[3],
@@ -928,7 +1040,10 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
           _ = leanField(_frame[6], 9);
           _frame.set(
             9,
-            L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(_frame[8]),
+            L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(
+              _runtime,
+              _frame[8],
+            ),
           );
           leanTag(_frame[9]) match {
           | "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]" ->
@@ -946,7 +1061,11 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
             | "[\"Bool\",\"false\"]" ->
               _frame.set(
                 11,
-                leanApply(_frame[0], Array[_frame[2], _frame[3], _frame[7]]),
+                leanApply(
+                  _runtime,
+                  _frame[0],
+                  Array[_frame[2], _frame[3], _frame[7]],
+                ),
               );
               return _frame[11]
             | "[\"Bool\",\"true\"]" ->
@@ -974,6 +1093,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
                     _frame.set(
                       45,
                       leanApply(
+                        _runtime,
                         _frame[0],
                         Array[_frame[2], _frame[3], _frame[7]],
                       ),
@@ -993,6 +1113,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
                     _frame.set(
                       46,
                       leanApply(
+                        _runtime,
                         _frame[0],
                         Array[_frame[2], _frame[3], _frame[7]],
                       ),
@@ -1016,6 +1137,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
       _frame.set(
         13,
         L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+          _runtime,
           LeanErased(),
           LeanErased(),
           _frame[3],
@@ -1041,6 +1163,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
           _frame.set(
             25,
             L4_Lean_Environment.f_Lean_Environment_setExporting_5a35fee75b(
+              _runtime,
               _frame[16],
               _frame[1],
             ),
@@ -1048,6 +1171,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
           _frame.set(
             26,
             L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+              _runtime,
               LeanErased(),
             ),
           );
@@ -1086,6 +1210,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
           _frame.set(
             30,
             L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+              _runtime,
               LeanErased(),
               LeanErased(),
               _frame[3],
@@ -1099,7 +1224,11 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
             _frame.set(31, leanField(_frame[30], 1));
             _frame.set(
               32,
-              leanApply(_frame[0], Array[_frame[2], _frame[3], _frame[31]]),
+              leanApply(
+                _runtime,
+                _frame[0],
+                Array[_frame[2], _frame[3], _frame[31]],
+              ),
             );
             leanTag(_frame[32]) match {
             | "[\"EST\",\"Out\",\"ok\"]" ->
@@ -1112,6 +1241,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
               _frame.set(
                 38,
                 f_spec_2_spec_4_lam_0_83ca8f45cb(
+                  _runtime,
                   _frame[3],
                   _frame[12],
                   _frame[28],
@@ -1146,6 +1276,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
               _frame.set(
                 42,
                 f_spec_2_spec_4_lam_0_83ca8f45cb(
+                  _runtime,
                   _frame[3],
                   _frame[12],
                   _frame[28],
@@ -1187,6 +1318,7 @@ fun f_registerInitAttrUnsafe_spec_2_spec_4_da4f7a473a(
 }
 // "Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0.spec_1.spec_6.spec_7"
 fun f_spec_1_spec_6_spec_7_73c98c4342(
+  _runtime: mutable LeanExecution,
   _msg_0: LeanValue,
   _declHint_1: LeanValue,
   _y_1_2: LeanValue,
@@ -1194,6 +1326,7 @@ fun f_spec_1_spec_6_spec_7_73c98c4342(
   _y_3_4: LeanValue,
 ): LeanValue {
   _x_4_5: LeanValue = f_spec_6_spec_7_spec_8_e3bfca139a(
+    _runtime,
     _msg_0,
     _declHint_1,
     _y_2_3,
@@ -1203,7 +1336,9 @@ fun f_spec_1_spec_6_spec_7_73c98c4342(
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_6: LeanValue = leanField(_x_4_5, 0);
     _a_6_7: LeanValue = leanField(_x_4_5, 1);
-    _x_7_10: LeanValue = L4_Lean_Exception.f_Lean_unknownIdentifierMessageTag_c6451344d1();
+    _x_7_10: LeanValue = L4_Lean_Exception.f_Lean_unknownIdentifierMessageTag_c6451344d1(
+      _runtime,
+    );
     LeanCtor(
       "[\"EST\",\"Out\",\"ok\"]",
       Array[
@@ -1225,9 +1360,11 @@ fun f_spec_1_spec_6_spec_7_73c98c4342(
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.regularInitAttr._regBuiltin.Lean.regularInitAttr.docString_1"
 fun f_Lean_regularInitAttr_docString_1_835a812ce1(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
 ): LeanValue {
   _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("regularInitAttr"),
   );
@@ -1235,6 +1372,7 @@ fun f_Lean_regularInitAttr_docString_1_835a812ce1(
     "Registers an initialization procedure. Initialization procedures are run in files that import the\nfile they are defined in.\n\nThis attribute comes in two kinds: Without arguments, the tagged declaration should have type\n`IO Unit` and are simply run during initialization. With a declaration name as a argument, the\ntagged declaration should be an opaque constant and the provided declaration name an action in `IO`\nthat returns a value of the type of the tagged declaration. Such initialization procedures store\nthe resulting value and make it accessible through the tagged declaration.\n\nThe `initialize` command should usually be preferred over using this attribute directly.",
   );
   L4_Lean_DocString_Extension.f_Lean_addBuiltinDocString_e430758a4e(
+    _runtime,
     _x_4_3,
     _x_5_4,
     _a_1_0,
@@ -1242,6 +1380,7 @@ fun f_Lean_regularInitAttr_docString_1_835a812ce1(
 }
 // "Lean.registerInitAttrUnsafe._lam_0"
 fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
+  _runtime: mutable LeanExecution,
   _declName_0: LeanValue,
   _stx_1: LeanValue,
   _y_1_2: LeanValue,
@@ -1249,6 +1388,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
   _y_3_4: LeanValue,
 ): LeanValue {
   _x_4_5: LeanValue = f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
+    _runtime,
     _declName_0,
     _y_1_2,
     _y_2_3,
@@ -1259,6 +1399,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
     _a_5_6: LeanValue = leanField(_x_4_5, 0);
     _a_6_7: LeanValue = leanField(_x_4_5, 1);
     _x_7_10: LeanValue = L4_Lean_Attributes.f_Attribute_Builtin_getIdent_3a75e470c4(
+      _runtime,
       _stx_1,
       _y_1_2,
       _y_2_3,
@@ -1271,15 +1412,21 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
       leanTag(_a_8_11) match {
       | "[\"Option\",\"none\"]" ->
         _x_10_16: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_type_317d1540a6(
+          _runtime,
           _a_5_6,
         );
-        _x_11_17: LeanValue = f_InitAttr_Lean_isIOUnit_3bc299b6e2(_x_10_16);
+        _x_11_17: LeanValue = f_InitAttr_Lean_isIOUnit_3bc299b6e2(
+          _runtime,
+          _x_10_16,
+        );
         leanTag(_x_11_17) match {
         | "[\"Bool\",\"false\"]" ->
           _x_13_19: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+            _runtime,
             LeanText("initialization function must have type `IO Unit`"),
           );
           f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
+            _runtime,
             _x_13_19,
             _y_1_2,
             _y_2_3,
@@ -1298,6 +1445,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
       | "[\"Option\",\"some\"]" ->
         _val_17_15: LeanValue = leanField(_a_8_11, 0);
         _x_19_24: LeanValue = L4_Lean_Elab_InfoTree_Main.f_Lean_Elab_realizeGlobalConstNoOverloadWithInfo_0d457024b5(
+          _runtime,
           _val_17_15,
           LeanCtor("[\"Option\",\"none\"]", Array[]),
           _y_1_2,
@@ -1309,6 +1457,7 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
           _a_20_25: LeanValue = leanField(_x_19_24, 0);
           _a_21_26: LeanValue = leanField(_x_19_24, 1);
           _x_22_29: LeanValue = f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
+            _runtime,
             _a_20_25,
             _y_1_2,
             _y_2_3,
@@ -1319,23 +1468,29 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
             _a_23_30: LeanValue = leanField(_x_22_29, 0);
             _a_24_31: LeanValue = leanField(_x_22_29, 1);
             _x_25_34: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_type_317d1540a6(
+              _runtime,
               _a_23_30,
             );
             _x_26_35: LeanValue = f_InitAttr_Lean_getIOTypeArg_dcb5254e71(
+              _runtime,
               _x_25_34,
             );
             leanTag(_x_26_35) match {
             | "[\"Option\",\"none\"]" ->
               _x_28_38: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                _runtime,
                 LeanText("initialization function `"),
               );
               _x_29_39: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofName_d42ea5e93c(
+                _runtime,
                 _a_20_25,
               );
               _x_32_42: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                _runtime,
                 LeanText("` must have type of the form `IO <type>`"),
               );
               f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
+                _runtime,
                 LeanCtor(
                   "[\"Lean\",\"MessageData\",\"compose\"]",
                   Array[
@@ -1353,24 +1508,30 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
             | "[\"Option\",\"some\"]" ->
               _val_35_36: LeanValue = leanField(_x_26_35, 0);
               _x_36_45: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_type_317d1540a6(
+                _runtime,
                 _a_5_6,
               );
               _x_37_46: LeanValue = L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(
+                _runtime,
                 _x_36_45,
                 _val_35_36,
               );
               leanTag(_x_37_46) match {
               | "[\"Bool\",\"false\"]" ->
                 _x_39_48: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                  _runtime,
                   LeanText("initialization function `"),
                 );
                 _x_40_49: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofName_d42ea5e93c(
+                  _runtime,
                   _a_20_25,
                 );
                 _x_43_52: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                  _runtime,
                   LeanText("` type mismatch"),
                 );
                 f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
+                  _runtime,
                   LeanCtor(
                     "[\"Lean\",\"MessageData\",\"compose\"]",
                     Array[
@@ -1419,9 +1580,11 @@ fun f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
   }
 }
 fun apply_f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1431,6 +1594,7 @@ fun apply_f_Lean_registerInitAttrUnsafe_lam_0_f2e674622a(
 }
 // "Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0._redArg"
 fun f_registerInitAttrUnsafe_spec_0_spec_0_1369af2b49(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
@@ -1447,6 +1611,7 @@ fun f_registerInitAttrUnsafe_spec_0_spec_0_1369af2b49(
     _checkDeprecated_10: LeanValue = leanField(_y_1_1, 6);
     _isRecordingDeps_11: LeanValue = leanField(_y_1_1, 7);
     f_spec_0_spec_0_spec_1_9a62dd076d(
+      _runtime,
       _ref_6,
       _constName_0,
       _y_1_1,
@@ -1458,6 +1623,7 @@ fun f_registerInitAttrUnsafe_spec_0_spec_0_1369af2b49(
 }
 // "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod.spec_1"
 fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
+  _runtime: mutable LeanExecution,
   _env_0_input: LeanValue,
   _opts_1_input: LeanValue,
   _y_1_2_input: LeanValue,
@@ -1489,6 +1655,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
       _frame.set(
         14,
         L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+          _runtime,
           _frame[6],
           _frame[5],
         ),
@@ -1504,6 +1671,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
         _frame.set(
           16,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+            _runtime,
             LeanErased(),
             _frame[4],
             _frame[6],
@@ -1520,6 +1688,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
             _frame.set(
               33,
               L4_Lean_Compiler_MetaAttr.f_Lean_getIRPhases_fc8b38628b(
+                _runtime,
                 _frame[0],
                 _frame[17],
               ),
@@ -1531,6 +1700,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
             _frame.set(
               35,
               L4_Lean_Setup.f_Lean_instBEqIRPhases_beq_ed6045a3e1(
+                _runtime,
                 _frame[33],
                 _frame[34],
               ),
@@ -1566,6 +1736,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
       _frame.set(
         12,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
           _frame[6],
           _frame[11],
         ),
@@ -1573,6 +1744,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
       _frame.set(
         13,
         f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[2],
@@ -1588,13 +1760,17 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
     | 2 ->
       _frame.set(
         21,
-        L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(_frame[18]),
+        L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(
+          _runtime,
+          _frame[18],
+        ),
       );
       leanTag(_frame[21]) match {
       | "[\"Bool\",\"false\"]" ->
         _frame.set(
           22,
           f_Lean_runInit_22271d6753(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[17],
@@ -1622,6 +1798,7 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
         _frame.set(
           24,
           L4_Lean_Environment.f_Lean_Environment_evalConst_1b4cce70b6(
+            _runtime,
             _frame[0],
             _frame[1],
             _frame[17],
@@ -1630,13 +1807,17 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
         );
         _frame.set(
           25,
-          f_Lean_declareBuiltin_spec_1_d9de356e9e(_frame[24], _frame[8]),
+          f_Lean_declareBuiltin_spec_1_d9de356e9e(
+            _runtime,
+            _frame[24],
+            _frame[8],
+          ),
         );
         leanTag(_frame[25]) match {
         | "[\"EST\",\"Out\",\"ok\"]" ->
           _frame.set(26, leanField(_frame[25], 0));
           _frame.set(27, leanField(_frame[25], 1));
-          _frame.set(30, leanApply(_frame[26], Array[_frame[27]]));
+          _frame.set(30, leanApply(_runtime, _frame[26], Array[_frame[27]]));
           leanTag(_frame[30]) match {
           | "[\"EST\",\"Out\",\"ok\"]" ->
             _ = leanField(_frame[30], 0);
@@ -1674,12 +1855,14 @@ fun f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
 }
 // "Lean.runInitAttrsForModules"
 fun f_Lean_runInitAttrsForModules_9b948cdb22(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _modIdxs_1: LeanValue,
   _opts_2: LeanValue,
   _a_1_3: LeanValue,
 ): LeanValue {
   _x_2_4: LeanValue = L4_Lean_ImportingFlag.f_Lean_isInitializerExecutionEnabled_4baff342ed(
+    _runtime,
     _a_1_3,
   );
   leanTag(_x_2_4) match {
@@ -1689,6 +1872,7 @@ fun f_Lean_runInitAttrsForModules_9b948cdb22(
     leanTag(_val_3_5) match {
     | "[\"Bool\",\"false\"]" ->
       _x_6_8: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+        _runtime,
         LeanText(
           "`enableInitializersExecution` must be run before reusing a `--incr-load` snapshot",
         ),
@@ -1697,10 +1881,12 @@ fun f_Lean_runInitAttrsForModules_9b948cdb22(
     | "[\"Bool\",\"true\"]" ->
       _x_8_10: LeanValue = LeanCtor("[\"PUnit\",\"unit\"]", Array[]);
       _sz_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+        _runtime,
         LeanErased(),
         _modIdxs_1,
       );
       _x_10_13: LeanValue = f_Lean_runInitAttrsForModules_spec_0_fbb8dd4322(
+        _runtime,
         _env_0,
         _opts_2,
         _modIdxs_1,
@@ -1727,12 +1913,14 @@ fun f_Lean_runInitAttrsForModules_9b948cdb22(
 }
 // "Lean.mkUnknownIdentifierMessageCore._at_.Lean.mkUnknownIdentifierMessage._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0.spec_1.spec_6.spec_7.spec_8._redArg"
 fun f_spec_6_spec_7_spec_8_e3bfca139a(
+  _runtime: mutable LeanExecution,
   _msg_0: LeanValue,
   _declHint_1: LeanValue,
   _y_1_2: LeanValue,
   _y_2_3: LeanValue,
 ): LeanValue {
   _x_4_5: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_1_2,
@@ -1755,6 +1943,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
       _infoState_16: LeanValue = leanField(_val_5_6, 8);
       _snapshotTasks_17: LeanValue = leanField(_val_5_6, 9);
       _x_7_18: LeanValue = L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(
+        _runtime,
         _declHint_1,
       );
       leanTag(_x_7_18) match {
@@ -1781,10 +1970,12 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
             LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_msg_0, _state_6_7])
           | "[\"Bool\",\"true\"]" ->
             _x_9_35: LeanValue = L4_Lean_Environment.f_Lean_Environment_setExporting_5a35fee75b(
+              _runtime,
               _env_8,
               _x_7_18,
             );
             _x_10_36: LeanValue = L4_Lean_Environment.f_Lean_Environment_contains_0afe6850fd(
+              _runtime,
               _x_9_35,
               _declHint_1,
               _isExporting_27,
@@ -1795,13 +1986,16 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
             | "[\"Bool\",\"true\"]" ->
               _x_12_38: LeanValue = LeanScalar("nat", "0");
               _x_13_39: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+                _runtime,
                 LeanErased(),
               );
               _x_14_40: LeanValue = LeanCtor(
                 "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
                 Array[_x_13_39],
               );
-              _x_15_41: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59();
+              _x_15_41: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59(
+                _runtime,
+              );
               _x_16_42: LeanValue = LeanCtor(
                 "[\"Lean\",\"MetavarContext\",\"mk\"]",
                 Array[
@@ -1820,6 +2014,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                 ],
               );
               _x_18_44: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+                _runtime,
                 LeanErased(),
                 LeanScalar("nat", "32"),
               );
@@ -1836,7 +2031,9 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                   _x_12_38,
                 ],
               );
-              _x_24_50: LeanValue = L4_Lean_Data_Options.f_Lean_Options_empty_b09f582afb();
+              _x_24_50: LeanValue = L4_Lean_Data_Options.f_Lean_Options_empty_b09f582afb(
+                _runtime,
+              );
               _x_25_51: LeanValue = LeanCtor(
                 "[\"Lean\",\"MessageDataContext\",\"mk\"]",
                 Array[
@@ -1857,6 +2054,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                 ],
               );
               _x_26_52: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+                _runtime,
                 _declHint_1,
                 _x_7_18,
               );
@@ -1865,20 +2063,24 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                 Array[_x_25_51, _x_26_52],
               );
               _x_27_54: LeanValue = L4_Lean_Environment.f_Lean_Environment_getModuleIdxFor_01e73ed4b6(
+                _runtime,
                 _x_9_35,
                 _declHint_1,
               );
               leanTag(_x_27_54) match {
               | "[\"Option\",\"none\"]" ->
                 _x_29_57: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                  _runtime,
                   LeanText("A private declaration `"),
                 );
                 _x_32_60: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                  _runtime,
                   LeanText(
                     "` (from the current module) exists but would need to be public to access here.",
                   ),
                 );
                 _x_34_62: LeanValue = L4_Lean_Message.f_Lean_MessageData_note_7de9284d07(
+                  _runtime,
                   LeanCtor(
                     "[\"Lean\",\"MessageData\",\"compose\"]",
                     Array[
@@ -1903,6 +2105,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
               | "[\"Option\",\"some\"]" ->
                 _val_37_55: LeanValue = leanField(_x_27_54, 0);
                 _x_38_65: LeanValue = L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(
+                  _runtime,
                   _env_8,
                 );
                 leanTag(_x_38_65) match {
@@ -1918,6 +2121,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                   _importAllModules_74: LeanValue = leanField(_x_38_65, 8);
                   _moduleData_75: LeanValue = leanField(_x_38_65, 9);
                   _mod_76: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+                    _runtime,
                     LeanErased(),
                     LeanCtor(
                       "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
@@ -1927,19 +2131,23 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                     _val_37_55,
                   );
                   _x_39_77: LeanValue = L4_Lean_PrivateName.f_Lean_isPrivateName_eace20130b(
+                    _runtime,
                     _declHint_1,
                   );
                   leanTag(_x_39_77) match {
                   | "[\"Bool\",\"false\"]" ->
                     _x_41_79: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText("A public declaration `"),
                     );
                     _x_44_82: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText(
                         "` exists but is imported privately; consider adding `public import ",
                       ),
                     );
                     _x_46_84: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofName_d42ea5e93c(
+                      _runtime,
                       _mod_76,
                     );
                     _x_47_85: LeanValue = LeanCtor(
@@ -1959,9 +2167,11 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                       ],
                     );
                     _x_49_87: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText("`."),
                     );
                     _x_51_89: LeanValue = L4_Lean_Message.f_Lean_MessageData_note_7de9284d07(
+                      _runtime,
                       LeanCtor(
                         "[\"Lean\",\"MessageData\",\"compose\"]",
                         Array[_x_47_85, _x_49_87],
@@ -1979,12 +2189,15 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                     )
                   | "[\"Bool\",\"true\"]" ->
                     _x_55_93: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText("A private declaration `"),
                     );
                     _x_58_96: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText("` (from `"),
                     );
                     _x_60_98: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofName_d42ea5e93c(
+                      _runtime,
                       _mod_76,
                     );
                     _x_61_99: LeanValue = LeanCtor(
@@ -2004,11 +2217,13 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
                       ],
                     );
                     _x_63_101: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      _runtime,
                       LeanText(
                         "`) exists but would need to be public to access here.",
                       ),
                     );
                     _x_65_103: LeanValue = L4_Lean_Message.f_Lean_MessageData_note_7de9284d07(
+                      _runtime,
                       LeanCtor(
                         "[\"Lean\",\"MessageData\",\"compose\"]",
                         Array[_x_61_99, _x_63_101],
@@ -2047,6 +2262,7 @@ fun f_spec_6_spec_7_spec_8_e3bfca139a(
 }
 // "Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0.spec_1._redArg"
 fun f_spec_0_spec_0_spec_1_9a62dd076d(
+  _runtime: mutable LeanExecution,
   _ref_0: LeanValue,
   _constName_1: LeanValue,
   _y_1_2: LeanValue,
@@ -2054,16 +2270,20 @@ fun f_spec_0_spec_0_spec_1_9a62dd076d(
   _y_3_4: LeanValue,
 ): LeanValue {
   _x_5_6: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
     LeanText("Unknown constant `"),
   );
   _x_7_8: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+    _runtime,
     _constName_1,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
   );
   _x_10_11: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
     LeanText("`"),
   );
   f_spec_0_spec_1_spec_6_ed1d129695(
+    _runtime,
     _ref_0,
     LeanCtor(
       "[\"Lean\",\"MessageData\",\"compose\"]",
@@ -2082,7 +2302,10 @@ fun f_spec_0_spec_0_spec_1_9a62dd076d(
   )
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.isUnitType"
-fun f_InitAttr_Lean_isUnitType_166547b3e9(_x_1_0: LeanValue): LeanValue {
+fun f_InitAttr_Lean_isUnitType_166547b3e9(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_x_1_0, 0);
@@ -2095,7 +2318,11 @@ fun f_InitAttr_Lean_isUnitType_166547b3e9(_x_1_0: LeanValue): LeanValue {
       _str_5_6: LeanValue = leanField(_declName_2_2, 2);
       leanTag(_pre_4_5) match {
       | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
-        L4_Init_Prelude.f_String_decEq_88c69973f8(_str_5_6, LeanText("Unit"))
+        L4_Init_Prelude.f_String_decEq_88c69973f8(
+          _runtime,
+          _str_5_6,
+          LeanText("Unit"),
+        )
       | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
       }
     | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
@@ -2105,6 +2332,7 @@ fun f_InitAttr_Lean_isUnitType_166547b3e9(_x_1_0: LeanValue): LeanValue {
 }
 // "Lean.declareBuiltin._lam_0"
 fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _value_1: LeanValue,
   _y_2_2: LeanValue,
@@ -2112,6 +2340,7 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
   _y_4_4: LeanValue,
 ): LeanValue {
   _x_5_5: LeanValue = f_Lean_declareBuiltin_spec_0_9047292963(
+    _runtime,
     _x_1_0,
     _y_3_3,
     _y_4_4,
@@ -2121,21 +2350,26 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
     _a_6_6: LeanValue = leanField(_x_5_5, 0);
     _a_7_7: LeanValue = leanField(_x_5_5, 1);
     _x_9_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      _runtime,
       LeanText("IO"),
     );
     _x_10_12: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
     _x_11_13: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _runtime,
       _x_9_11,
       _x_10_12,
     );
     _x_13_15: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      _runtime,
       LeanText("Unit"),
     );
     _x_14_16: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      _runtime,
       _x_13_15,
       _x_10_12,
     );
     _x_15_17: LeanValue = L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+      _runtime,
       _x_11_13,
       _x_14_16,
     );
@@ -2153,6 +2387,7 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
       ],
     );
     _x_24_26: LeanValue = L4_Lean_AddDecl.f_Lean_addAndCompile_3458219ad2(
+      _runtime,
       LeanCtor("[\"Lean\",\"Declaration\",\"defnDecl\"]", Array[_x_20_22]),
       LeanCtor("[\"Bool\",\"true\"]", Array[]),
       LeanCtor("[\"Bool\",\"false\"]", Array[]),
@@ -2165,6 +2400,7 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
       _a_25_27: LeanValue = leanField(_x_24_26, 0);
       _a_26_28: LeanValue = leanField(_x_24_26, 1);
       _x_27_31: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _y_3_3,
@@ -2197,11 +2433,13 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
             _checkDeprecated_50: LeanValue = leanField(_y_2_2, 6);
             _isRecordingDeps_51: LeanValue = leanField(_y_2_2, 7);
             _x_31_53: LeanValue = f_Lean_setBuiltinInitAttr_b52d5e85c5(
+              _runtime,
               _env_34,
               _a_6_6,
               LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
             );
             _x_32_54: LeanValue = f_Lean_declareBuiltin_spec_1_d9de356e9e(
+              _runtime,
               _x_31_53,
               _state_29_33,
             );
@@ -2210,6 +2448,7 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
               _a_33_55: LeanValue = leanField(_x_32_54, 0);
               _a_34_56: LeanValue = leanField(_x_32_54, 1);
               f_Lean_declareBuiltin_spec_2_1005a8d2af(
+                _runtime,
                 _a_33_55,
                 _y_3_3,
                 _a_34_56,
@@ -2218,9 +2457,11 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
               _a_36_57: LeanValue = leanField(_x_32_54, 0);
               _a_37_58: LeanValue = leanField(_x_32_54, 1);
               _x_38_60: LeanValue = L4_Init_System_IOError.f_IO_Error_toString_b58e96daa2(
+                _runtime,
                 _a_36_57,
               );
               _x_40_62: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+                _runtime,
                 LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_38_60]),
               );
               LeanCtor(
@@ -2255,9 +2496,11 @@ fun f_Lean_declareBuiltin_lam_0_b303ae94f2(
   }
 }
 fun apply_f_Lean_declareBuiltin_lam_0_b303ae94f2(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_Lean_declareBuiltin_lam_0_b303ae94f2(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -2266,17 +2509,21 @@ fun apply_f_Lean_declareBuiltin_lam_0_b303ae94f2(
   )
 }
 // "Lean.regularInitAttr"
-fun f_Lean_regularInitAttr_9037f5c3fd(): LeanValue {
-  leanPrimitive("Lean.regularInitAttr []")
+fun f_Lean_regularInitAttr_9037f5c3fd(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.regularInitAttr")
 }
 // "Lean.addMessageContextPartial._at_.Lean.throwError._at_.Lean.registerInitAttrUnsafe.spec_1.spec_2"
 fun f_registerInitAttrUnsafe_spec_1_spec_2_67bac80196(
+  _runtime: mutable LeanExecution,
   _msgData_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
   _y_3_3: LeanValue,
 ): LeanValue {
   _x_4_4: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_2_2,
@@ -2323,18 +2570,22 @@ fun f_registerInitAttrUnsafe_spec_1_spec_2_67bac80196(
           _cancelTk_35: LeanValue = leanField(_toCold_17, 10);
           _inheritedTraceOptions_36: LeanValue = leanField(_toCold_17, 11);
           _env_38: LeanValue = L4_Lean_Environment.f_Lean_Environment_setRecordingDeps_123c45e5c9(
+            _runtime,
             _env_7,
             LeanCtor("[\"Bool\",\"false\"]", Array[]),
           );
           _x_8_39: LeanValue = LeanScalar("nat", "0");
           _x_9_40: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+            _runtime,
             LeanErased(),
           );
           _x_10_41: LeanValue = LeanCtor(
             "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
             Array[_x_9_40],
           );
-          _x_11_42: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59();
+          _x_11_42: LeanValue = L4_Lean_MetavarContext.f_Lean_instInhabitedSynthNormMemoSlot_default_8d78cb8a59(
+            _runtime,
+          );
           _x_12_43: LeanValue = LeanCtor(
             "[\"Lean\",\"MetavarContext\",\"mk\"]",
             Array[
@@ -2353,6 +2604,7 @@ fun f_registerInitAttrUnsafe_spec_1_spec_2_67bac80196(
             ],
           );
           _x_14_45: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+            _runtime,
             LeanErased(),
             LeanScalar("nat", "32"),
           );
@@ -2409,6 +2661,7 @@ fun f_registerInitAttrUnsafe_spec_1_spec_2_67bac80196(
 }
 // "Lean.throwErrorAt._at_.Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0.spec_1.spec_6.spec_8._redArg"
 fun f_spec_1_spec_6_spec_8_90131a2bfc(
+  _runtime: mutable LeanExecution,
   _ref_0: LeanValue,
   _msg_1: LeanValue,
   _y_1_2: LeanValue,
@@ -2426,6 +2679,7 @@ fun f_spec_1_spec_6_spec_8_90131a2bfc(
     _checkDeprecated_11: LeanValue = leanField(_y_1_2, 6);
     _isRecordingDeps_12: LeanValue = leanField(_y_1_2, 7);
     _ref_13: LeanValue = L4_Init_Prelude.f_Lean_replaceRef_b8b2945239(
+      _runtime,
       _ref_0,
       _ref_7,
     );
@@ -2443,6 +2697,7 @@ fun f_spec_1_spec_6_spec_8_90131a2bfc(
       ],
     );
     f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
+      _runtime,
       _msg_1,
       _x_4_14,
       _y_2_3,
@@ -2453,9 +2708,11 @@ fun f_spec_1_spec_6_spec_8_90131a2bfc(
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.builtinInitAttr._regBuiltin.Lean.builtinInitAttr.docString_1"
 fun f_Lean_builtinInitAttr_docString_1_80b767e4ff(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
 ): LeanValue {
   _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("builtinInitAttr"),
   );
@@ -2463,6 +2720,7 @@ fun f_Lean_builtinInitAttr_docString_1_80b767e4ff(
     "Registers a builtin initialization procedure.\n\nThis attribute is used internally to define builtin initialization procedures for bootstrapping and\nshould not be used otherwise.",
   );
   L4_Lean_DocString_Extension.f_Lean_addBuiltinDocString_e430758a4e(
+    _runtime,
     _x_4_3,
     _x_5_4,
     _a_1_0,
@@ -2470,11 +2728,13 @@ fun f_Lean_builtinInitAttr_docString_1_80b767e4ff(
 }
 // "Lean.setEnv._at_.Lean.declareBuiltin.spec_2._redArg"
 fun f_Lean_declareBuiltin_spec_2_1005a8d2af(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_1_1,
@@ -2497,6 +2757,7 @@ fun f_Lean_declareBuiltin_spec_2_1005a8d2af(
       _infoState_14: LeanValue = leanField(_val_4_4, 8);
       _snapshotTasks_15: LeanValue = leanField(_val_4_4, 9);
       _x_7_17: LeanValue = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+        _runtime,
         LeanErased(),
       );
       _x_8_18: LeanValue = LeanCtor(
@@ -2522,6 +2783,7 @@ fun f_Lean_declareBuiltin_spec_2_1005a8d2af(
         ],
       );
       _x_11_21: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _y_1_1,
@@ -2545,6 +2807,7 @@ fun f_Lean_declareBuiltin_spec_2_1005a8d2af(
 }
 // "WellFounded.opaqueFix₃._at_.Lean.getRegularInitAttrModIdxs.spec_0._redArg"
 fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
+  _runtime: mutable LeanExecution,
   _upperBound_1_0_input: LeanValue,
   _env_1_input: LeanValue,
   _a_2_input: LeanValue,
@@ -2565,15 +2828,12 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
     | 0 ->
       _frame.set(
         9,
-        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[2], _frame[0]),
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, _frame[2], _frame[0]),
       );
       leanTag(_frame[9]) match {
       | "[\"Bool\",\"false\"]" -> return _frame[3]
       | "[\"Bool\",\"true\"]" ->
-        _frame.set(
-          10,
-          leanFail("module initialization required: Lean.regularInitAttr"),
-        );
+        _frame.set(10, leanReadInitializer(_runtime, "Lean.regularInitAttr"));
         leanTag(_frame[10]) match {
         | "[\"Lean\",\"ParametricAttribute\",\"mk\"]" ->
           _ = leanField(_frame[10], 0);
@@ -2598,6 +2858,7 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
           _frame.set(
             16,
             L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2(
+              _runtime,
               _frame[14],
               _frame[11],
               _frame[1],
@@ -2607,12 +2868,20 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
           );
           _frame.set(
             17,
-            L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[16]),
+            L4_Init_Prelude.f_Array_size_3866d4555a(
+              _runtime,
+              LeanErased(),
+              _frame[16],
+            ),
           );
           _frame.set(18, LeanScalar("nat", "0"));
           _frame.set(
             19,
-            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[17], _frame[18]),
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _runtime,
+              _frame[17],
+              _frame[18],
+            ),
           );
           leanTag(_frame[19]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -2622,6 +2891,7 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
             _frame.set(
               20,
               L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleIREntries_99a90df3e9(
+                _runtime,
                 _frame[14],
                 _frame[11],
                 _frame[1],
@@ -2630,11 +2900,19 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
             );
             _frame.set(
               21,
-              L4_Init_Prelude.f_Array_size_3866d4555a(LeanErased(), _frame[20]),
+              L4_Init_Prelude.f_Array_size_3866d4555a(
+                _runtime,
+                LeanErased(),
+                _frame[20],
+              ),
             );
             _frame.set(
               22,
-              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[21], _frame[18]),
+              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                _runtime,
+                _frame[21],
+                _frame[18],
+              ),
             );
             leanTag(_frame[22]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -2655,10 +2933,14 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
       }
     | 1 ->
       _frame.set(5, LeanScalar("nat", "1"));
-      _frame.set(6, L4_Init_Prelude.f_Nat_add_86990f4822(_frame[2], _frame[5]));
+      _frame.set(
+        6,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[2], _frame[5]),
+      );
       _frame.set(
         7,
         f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[6],
@@ -2670,6 +2952,7 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
       _frame.set(
         8,
         L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+          _runtime,
           LeanErased(),
           _frame[3],
           _frame[2],
@@ -2684,8 +2967,12 @@ fun f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
   }
 }
 // "Lean.getRegularInitAttrModIdxs"
-fun f_Lean_getRegularInitAttrModIdxs_1d3dd13cd6(_env_0: LeanValue): LeanValue {
+fun f_Lean_getRegularInitAttrModIdxs_1d3dd13cd6(
+  _runtime: mutable LeanExecution,
+  _env_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(
+    _runtime,
     _env_0,
   );
   leanTag(_x_1_1) match {
@@ -2701,14 +2988,17 @@ fun f_Lean_getRegularInitAttrModIdxs_1d3dd13cd6(_env_0: LeanValue): LeanValue {
     _importAllModules_10: LeanValue = leanField(_x_1_1, 8);
     _moduleData_11: LeanValue = leanField(_x_1_1, 9);
     _x_2_12: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _modules_7,
     );
     _idxs_13: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+      _runtime,
       LeanErased(),
       _x_2_12,
     );
     f_Lean_getRegularInitAttrModIdxs_spec_0_1d68fdf889(
+      _runtime,
       _x_2_12,
       _env_0,
       LeanScalar("nat", "0"),
@@ -2719,6 +3009,7 @@ fun f_Lean_getRegularInitAttrModIdxs_1d3dd13cd6(_env_0: LeanValue): LeanValue {
 }
 // "Lean.throwError._at_.Lean.registerInitAttrUnsafe.spec_1._redArg"
 fun f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
+  _runtime: mutable LeanExecution,
   _msg_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
@@ -2735,6 +3026,7 @@ fun f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
     _checkDeprecated_10: LeanValue = leanField(_y_1_1, 6);
     _isRecordingDeps_11: LeanValue = leanField(_y_1_1, 7);
     _x_4_12: LeanValue = f_registerInitAttrUnsafe_spec_1_spec_2_67bac80196(
+      _runtime,
       _msg_0,
       _y_1_1,
       _y_2_2,
@@ -2767,12 +3059,14 @@ fun f_Lean_registerInitAttrUnsafe_spec_1_6ac6a8ea8d(
 }
 // "Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0"
 fun f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
+  _runtime: mutable LeanExecution,
   _constName_0: LeanValue,
   _y_1_1: LeanValue,
   _y_2_2: LeanValue,
   _y_3_3: LeanValue,
 ): LeanValue {
   _x_4_4: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_2_2,
@@ -2795,6 +3089,7 @@ fun f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
       _infoState_15: LeanValue = leanField(_val_5_5, 8);
       _snapshotTasks_16: LeanValue = leanField(_val_5_5, 9);
       _x_8_18: LeanValue = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+        _runtime,
         _env_7,
         _constName_0,
         LeanCtor("[\"Bool\",\"false\"]", Array[]),
@@ -2802,6 +3097,7 @@ fun f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
       leanTag(_x_8_18) match {
       | "[\"Option\",\"none\"]" ->
         f_registerInitAttrUnsafe_spec_0_spec_0_1369af2b49(
+          _runtime,
           _constName_0,
           _y_1_1,
           _y_2_2,
@@ -2819,6 +3115,7 @@ fun f_Lean_registerInitAttrUnsafe_spec_0_ee822b9d3f(
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod"
 fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
+  _runtime: mutable LeanExecution,
   _env_0_input: LeanValue,
   _opts_1_input: LeanValue,
   _mod_2_input: LeanValue,
@@ -2851,13 +3148,14 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
         22,
         LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[20], _frame[21]]),
       );
-      _frame.set(
-        92,
-        leanFail("module initialization required: Lean.Elab.inServer"),
-      );
+      _frame.set(92, leanReadInitializer(_runtime, "Lean.Elab.inServer"));
       _frame.set(
         93,
-        f_Lean_runInitAttrForMod_spec_3_7e1a98d772(_frame[1], _frame[92]),
+        f_Lean_runInitAttrForMod_spec_3_7e1a98d772(
+          _runtime,
+          _frame[1],
+          _frame[92],
+        ),
       );
       leanTag(_frame[93]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -2873,6 +3171,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
           _frame.set(
             96,
             L4_Lean_Setup.f_Lean_instBEqIRPhases_beq_ed6045a3e1(
+              _runtime,
               _frame[94],
               _frame[95],
             ),
@@ -2904,6 +3203,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
       _frame.set(
         10,
         L4_Init_Data_Array_Basic.f_Array_append_156887c1ee(
+          _runtime,
           _frame[8],
           _frame[9],
         ),
@@ -2912,6 +3212,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
       _frame.set(
         12,
         L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+          _runtime,
           LeanErased(),
           _frame[10],
         ),
@@ -2920,6 +3221,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
       _frame.set(
         14,
         f_Lean_runInitAttrForMod_spec_1_e6e8cb897b(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[6],
@@ -2954,13 +3256,11 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
       );
       return _frame[19]
     | 3 ->
-      _frame.set(
-        25,
-        leanFail("module initialization required: Lean.interpretedModInits"),
-      );
+      _frame.set(25, leanReadInitializer(_runtime, "Lean.interpretedModInits"));
       _frame.set(
         26,
         L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+          _runtime,
           LeanErased(),
           LeanErased(),
           _frame[25],
@@ -2985,6 +3285,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
             _frame.set(
               31,
               L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_contains_27397191e2(
+                _runtime,
                 _frame[27],
                 _frame[30],
               ),
@@ -2994,6 +3295,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
               _frame.set(
                 32,
                 L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+                  _runtime,
                   LeanErased(),
                   LeanErased(),
                   _frame[25],
@@ -3007,6 +3309,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                 _frame.set(
                   35,
                   L4_Lean_Data_NameMap_Basic.f_Lean_NameSet_insert_4058080468(
+                    _runtime,
                     _frame[33],
                     _frame[30],
                   ),
@@ -3014,6 +3317,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                 _frame.set(
                   36,
                   L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+                    _runtime,
                     LeanErased(),
                     LeanErased(),
                     _frame[25],
@@ -3027,9 +3331,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                   _frame.set(37, leanField(_frame[36], 1));
                   _frame.set(
                     38,
-                    leanFail(
-                      "module initialization required: Lean.regularInitAttr",
-                    ),
+                    leanReadInitializer(_runtime, "Lean.regularInitAttr"),
                   );
                   leanTag(_frame[38]) match {
                   | "[\"Lean\",\"ParametricAttribute\",\"mk\"]" ->
@@ -3046,6 +3348,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                     _frame.set(
                       41,
                       L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2(
+                        _runtime,
                         _frame[22],
                         _frame[39],
                         _frame[0],
@@ -3056,6 +3359,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                     _frame.set(
                       42,
                       L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleIREntries_99a90df3e9(
+                        _runtime,
                         _frame[22],
                         _frame[39],
                         _frame[0],
@@ -3066,6 +3370,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                     _frame.set(
                       44,
                       L4_Init_Prelude.f_Array_size_3866d4555a(
+                        _runtime,
                         LeanErased(),
                         _frame[42],
                       ),
@@ -3073,6 +3378,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                     _frame.set(
                       45,
                       L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+                        _runtime,
                         LeanErased(),
                         _frame[43],
                       ),
@@ -3080,6 +3386,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                     _frame.set(
                       46,
                       L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                        _runtime,
                         _frame[43],
                         _frame[44],
                       ),
@@ -3103,12 +3410,14 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                       _frame.set(
                         48,
                         L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+                          _runtime,
                           _frame[44],
                         ),
                       );
                       _frame.set(
                         49,
                         f_Lean_runInitAttrForMod_spec_2_da614b8be4(
+                          _runtime,
                           _frame[41],
                           _frame[42],
                           _frame[47],
@@ -3173,6 +3482,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
           _frame.set(
             59,
             L4_Lean_Compiler_NameMangling.f_Lean_mkModuleInitializationFunctionName_ef28d24f0c(
+              _runtime,
               _frame[57],
               _frame[52],
               _frame[58],
@@ -3180,7 +3490,11 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
           );
           _frame.set(
             60,
-            f_InitAttr_Lean_runModInitCore_4ef01d8e2a(_frame[59], _frame[55]),
+            f_InitAttr_Lean_runModInitCore_4ef01d8e2a(
+              _runtime,
+              _frame[59],
+              _frame[55],
+            ),
           );
           leanTag(_frame[60]) match {
           | "[\"EST\",\"Out\",\"ok\"]" ->
@@ -3230,7 +3544,10 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
     | 5 ->
       _frame.set(
         67,
-        L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(_frame[0]),
+        L4_Lean_Environment.f_Lean_Environment_header_5b1ac1d858(
+          _runtime,
+          _frame[0],
+        ),
       );
       leanTag(_frame[67]) match {
       | "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]" ->
@@ -3247,6 +3564,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
         _frame.set(
           69,
           L4_Lean_Compiler_ModPkgExt.f_Lean_Environment_getModulePackageByIdx_f1a0cb0d0a(
+            _runtime,
             _frame[0],
             _frame[3],
           ),
@@ -3271,6 +3589,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
               _frame.set(
                 73,
                 L4_Lean_Compiler_NameMangling.f_Lean_mkModuleInitializationFunctionName_ef28d24f0c(
+                  _runtime,
                   _frame[71],
                   _frame[69],
                   _frame[72],
@@ -3279,6 +3598,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
               _frame.set(
                 74,
                 f_InitAttr_Lean_runModInitCore_4ef01d8e2a(
+                  _runtime,
                   _frame[73],
                   _frame[4],
                 ),
@@ -3356,6 +3676,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                 _frame.set(
                   85,
                   L4_Lean_Compiler_NameMangling.f_Lean_mkModuleInitializationFunctionName_ef28d24f0c(
+                    _runtime,
                     _frame[83],
                     _frame[69],
                     _frame[84],
@@ -3364,6 +3685,7 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
                 _frame.set(
                   86,
                   f_InitAttr_Lean_runModInitCore_4ef01d8e2a(
+                    _runtime,
                     _frame[85],
                     _frame[4],
                   ),
@@ -3411,15 +3733,20 @@ fun f_InitAttr_Lean_runInitAttrForMod_4ddb79f0c2(
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.runModInitCore"
 fun f_InitAttr_Lean_runModInitCore_4ef01d8e2a(
+  _runtime: mutable LeanExecution,
   _sym_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "_private.Lean.Compiler.InitAttr.0.Lean.runModInitCore [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_run_mod_init_core\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "_private.Lean.Compiler.InitAttr.0.Lean.runModInitCore",
+    "lean_run_mod_init_core",
+    Array[_sym_0, _a_internal_hyg_1_1],
   )
 }
 // "_private.Init.Data.Array.Basic.0.Array.anyMUnsafe.any._at_.Array.contains._at_._private.Lean.Compiler.InitAttr.0.Lean.runInitAttrForMod.spec_0.spec_0"
 fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
+  _runtime: mutable LeanExecution,
   _a_0_input: LeanValue,
   _as_1_input: LeanValue,
   _i_2_input: LeanValue,
@@ -3440,7 +3767,11 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
     | 0 ->
       _frame.set(
         7,
-        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(_frame[2], _frame[3]),
+        L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+          _runtime,
+          _frame[2],
+          _frame[3],
+        ),
       );
       leanTag(_frame[7]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -3451,6 +3782,7 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
           _frame.set(
             10,
             L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+              _runtime,
               LeanErased(),
               _frame[1],
               _frame[2],
@@ -3463,7 +3795,11 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
             _frame.set(12, leanField(_frame[10], 1));
             _frame.set(
               13,
-              L4_Init_Prelude.f_Lean_Name_beq_2965acc154(_frame[8], _frame[11]),
+              L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+                _runtime,
+                _frame[8],
+                _frame[11],
+              ),
             );
             leanTag(_frame[13]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -3473,6 +3809,7 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
               _frame.set(
                 14,
                 L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+                  _runtime,
                   _frame[9],
                   _frame[12],
                 ),
@@ -3499,11 +3836,16 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
       _frame.set(4, LeanScalar("usize", "1"));
       _frame.set(
         5,
-        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_frame[2], _frame[4]),
+        L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
+          _frame[2],
+          _frame[4],
+        ),
       );
       _frame.set(
         6,
         f_runInitAttrForMod_spec_0_spec_0_963595cc63(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[5],
@@ -3517,6 +3859,7 @@ fun f_runInitAttrForMod_spec_0_spec_0_963595cc63(
 }
 // "IO.ofExcept._at_.Lean.declareBuiltin.spec_1._redArg"
 fun f_Lean_declareBuiltin_spec_1_d9de356e9e(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -3524,6 +3867,7 @@ fun f_Lean_declareBuiltin_spec_1_d9de356e9e(
   | "[\"Except\",\"error\"]" ->
     _a_2_2: LeanValue = leanField(_e_0, 0);
     _x_3_4: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+      _runtime,
       _a_2_2,
     );
     LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_3_4, _a_1_1])
@@ -3535,6 +3879,7 @@ fun f_Lean_declareBuiltin_spec_1_d9de356e9e(
 }
 // "Lean.throwUnknownIdentifierAt._at_.Lean.throwUnknownConstantAt._at_.Lean.throwUnknownConstant._at_.Lean.getConstInfo._at_.Lean.registerInitAttrUnsafe.spec_0.spec_0.spec_1.spec_6._redArg"
 fun f_spec_0_spec_1_spec_6_ed1d129695(
+  _runtime: mutable LeanExecution,
   _ref_0: LeanValue,
   _msg_1: LeanValue,
   _declHint_2: LeanValue,
@@ -3543,6 +3888,7 @@ fun f_spec_0_spec_1_spec_6_ed1d129695(
   _y_3_5: LeanValue,
 ): LeanValue {
   _x_4_6: LeanValue = f_spec_1_spec_6_spec_7_73c98c4342(
+    _runtime,
     _msg_1,
     _declHint_2,
     _y_1_3,
@@ -3553,7 +3899,14 @@ fun f_spec_0_spec_1_spec_6_ed1d129695(
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
-    f_spec_1_spec_6_spec_8_90131a2bfc(_ref_0, _a_5_7, _y_1_3, _y_2_4, _a_6_8)
+    f_spec_1_spec_6_spec_8_90131a2bfc(
+      _runtime,
+      _ref_0,
+      _a_5_7,
+      _y_1_3,
+      _y_2_4,
+      _a_6_8,
+    )
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_8_9: LeanValue = leanField(_x_4_6, 0);
     _a_9_10: LeanValue = leanField(_x_4_6, 1);
@@ -3564,15 +3917,21 @@ fun f_spec_0_spec_1_spec_6_ed1d129695(
   }
 }
 // "_private.Lean.Compiler.InitAttr.0.Lean.initFn._@.Lean.Compiler.InitAttr.1632222590._hygCtx._hyg.2"
-fun f_InitAttr_hygCtx_hyg_d76a719e6d(_a_1_0: LeanValue): LeanValue {
+fun f_InitAttr_hygCtx_hyg_d76a719e6d(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("builtin_init"),
   );
   _x_7_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("builtinInitAttr"),
   );
   f_Lean_registerInitAttrUnsafe_67b62b88f6(
+    _runtime,
     _x_3_2,
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
     _x_7_6,

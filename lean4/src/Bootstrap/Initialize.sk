@@ -1,0 +1,23 @@
+// Run an existing Lean IO initializer once in this execution. This is not full
+// module initialization: callers explicitly select the supported bindings.
+fun leanInitializeBinding(
+  runtime: mutable LeanExecution,
+  name: String,
+  initialize: (mutable LeanExecution, LeanValue) ~> LeanValue,
+): void {
+  if (runtime.initializers.maybeGet(name).isSome()) return void;
+  wasInitializing = runtime.initializing;
+  runtime.!initializing = true;
+  result = try {
+    initialize(runtime, LeanErased())
+  } catch {
+  | error ->
+    runtime.!initializing = wasInitializing;
+    throw error
+  };
+  runtime.!initializing = wasInitializing;
+  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+    leanFail("Lean module initializer failed: " + name)
+  };
+  runtime.initializers.set(name, leanField(result, 0))
+}

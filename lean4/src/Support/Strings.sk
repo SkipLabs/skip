@@ -1,0 +1,78 @@
+// Byte-oriented comparison used by Lean's string slices and pattern matching.
+// Positions may be inside a UTF-8 character; this operation does not decode them.
+fun leanStringMemcmp(args: Array<LeanValue>): Int {
+  left = leanText(args[0]).bytes();
+  right = leanText(args[1]).bytes();
+  leftStart = leanNat(args[2]);
+  rightStart = leanNat(args[3]);
+  length = leanNat(args[4]);
+  if (
+    leftStart.add(length) > LeanNat::fromInt(left.size()) ||
+    rightStart.add(length) > LeanNat::fromInt(right.size())
+  ) {
+    leanFail("Lean string comparison range out of bounds")
+  };
+  l = leftStart.toInt();
+  r = rightStart.toInt();
+  for (i in Range(0, length.toInt())) {
+    a = left[l + i].toInt();
+    b = right[r + i].toInt();
+    if (a < b) return -1;
+    if (a > b) return 1
+  };
+  0
+}
+
+// The fast Lean entry point requires a valid character-start position. Check
+// that precondition here rather than accepting an interior or out-of-range byte.
+fun leanStringDecodeChar(text: String, position: LeanNat): Int {
+  bytes = text.bytes();
+  if (position >= LeanNat::fromInt(bytes.size())) {
+    leanFail("Lean UTF-8 character position out of bounds")
+  };
+  start = position.toInt();
+  first = bytes[start].toInt();
+  if (first < 128) return first;
+  width = if (first >= 194 && first <= 223) 2 else if (
+    first >= 224 &&
+    first <= 239
+  ) 3 else if (first >= 240 && first <= 244) 4 else {
+    return leanFail("invalid Lean UTF-8 character start")
+  };
+  if (width > bytes.size() - start) leanFail("truncated Lean UTF-8 character");
+  code = first.and(if (width == 2) 31 else if (width == 3) 15 else 7);
+  for (i in Range(1, width)) {
+    next = bytes[start + i].toInt();
+    if (next < 128 || next > 191) {
+      leanFail("invalid Lean UTF-8 continuation byte")
+    };
+    !code = code.shl(6).or(next.and(63))
+  };
+  if (
+    (width == 3 && code < 2048) ||
+    (width == 4 && code < 65536) ||
+    (code >= 55296 && code <= 57343) ||
+    code > 1114111
+  ) {
+    leanFail("invalid Lean UTF-8 scalar value")
+  };
+  code
+}
+
+fun leanStringExtract(text: String, begin: LeanNat, end: LeanNat): String {
+  bytes = text.bytes();
+  size = LeanNat::fromInt(bytes.size());
+  if (begin > size || end > size) {
+    leanFail("Lean UTF-8 slice range out of bounds")
+  };
+  if (begin >= end) return "";
+  b = begin.toInt();
+  e = end.toInt();
+  if (
+    (bytes[b].toInt().and(192) == 128) ||
+    (e < bytes.size() && bytes[e].toInt().and(192) == 128)
+  ) {
+    leanFail("invalid Lean UTF-8 slice boundary")
+  };
+  String.unsafeSlice(text, b, e)
+}

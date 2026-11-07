@@ -1,0 +1,211 @@
+// A data-only boundary for independent native kernel checking. It never runs
+// native elaboration. Metadata is omitted because the kernel ignores it.
+// This initial format is a tree; shared proof subexpressions are not deduplicated.
+fun leanProofNode(kind: String, fields: Array<JSON.Value>): JSON.Value {
+  JSON.Array(Vector::createFromItems(Array[JSON.String(kind)].concat(fields)))
+}
+
+fun leanProofName(name: LeanValue): JSON.Value {
+  leanTag(name) match {
+  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+    leanProofNode("anonymous", Array[])
+  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+    leanProofNode(
+      "str",
+      Array[
+        leanProofName(leanField(name, 1)),
+        JSON.String(leanText(leanField(name, 2))),
+      ],
+    )
+  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+    leanProofNode(
+      "num",
+      Array[
+        leanProofName(leanField(name, 1)),
+        JSON.String(leanNat(leanField(name, 2)).toString()),
+      ],
+    )
+  | _ -> leanFail("invalid proof Name")
+  }
+}
+
+fun leanProofLevel(level: LeanValue): JSON.Value {
+  leanTag(level) match {
+  | "[\"Lean\",\"Level\",\"zero\",\"_impl\"]" -> leanProofNode("zero", Array[])
+  | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+    leanProofNode("succ", Array[leanProofLevel(leanField(level, 1))])
+  | "[\"Lean\",\"Level\",\"max\",\"_impl\"]" ->
+    leanProofNode(
+      "max",
+      Array[
+        leanProofLevel(leanField(level, 1)),
+        leanProofLevel(leanField(level, 2)),
+      ],
+    )
+  | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+    leanProofNode(
+      "imax",
+      Array[
+        leanProofLevel(leanField(level, 1)),
+        leanProofLevel(leanField(level, 2)),
+      ],
+    )
+  | "[\"Lean\",\"Level\",\"param\",\"_impl\"]" ->
+    leanProofNode("param", Array[leanProofName(leanField(level, 1))])
+  | _ -> leanFail("proof contains an invalid or unresolved universe")
+  }
+}
+
+fun leanProofLevels(levels: LeanValue): JSON.Value {
+  values: mutable Vector<JSON.Value> = mutable Vector[];
+  while (leanTag(levels) == "[\"List\",\"cons\"]") {
+    values.push(leanProofLevel(leanField(levels, 0)));
+    !levels = leanField(levels, 1)
+  };
+  if (leanTag(levels) != "[\"List\",\"nil\"]") {
+    leanFail("invalid proof universe list")
+  };
+  JSON.Array(values.chill())
+}
+
+fun leanProofExpr(expr: LeanValue): JSON.Value {
+  leanTag(expr) match {
+  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]" ->
+    leanProofNode(
+      "bvar",
+      Array[JSON.String(leanNat(leanField(expr, 1)).toString())],
+    )
+  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    leanProofNode("sort", Array[leanProofLevel(leanField(expr, 1))])
+  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+    leanProofNode(
+      "const",
+      Array[
+        leanProofName(leanField(expr, 1)),
+        leanProofLevels(leanField(expr, 2)),
+      ],
+    )
+  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+    leanProofNode(
+      "app",
+      Array[
+        leanProofExpr(leanField(expr, 1)),
+        leanProofExpr(leanField(expr, 2)),
+      ],
+    )
+  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+    kind = if (leanTag(expr) == "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]") {
+      "lam"
+    } else {
+      "forall"
+    };
+    leanProofNode(
+      kind,
+      Array[
+        leanProofName(leanField(expr, 1)),
+        leanProofExpr(leanField(expr, 2)),
+        leanProofExpr(leanField(expr, 3)),
+        JSON.IntNumber(leanConstructorOrdinal(leanTag(leanField(expr, 4)))),
+      ],
+    )
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    leanProofNode(
+      "let",
+      Array[
+        leanProofName(leanField(expr, 1)),
+        leanProofExpr(leanField(expr, 2)),
+        leanProofExpr(leanField(expr, 3)),
+        leanProofExpr(leanField(expr, 4)),
+        JSON.Bool(leanIsTrue(leanField(expr, 5))),
+      ],
+    )
+  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+    lit = leanField(expr, 1);
+    leanTag(lit) match {
+    | "[\"Lean\",\"Literal\",\"natVal\"]" ->
+      leanProofNode(
+        "nat",
+        Array[JSON.String(leanNat(leanField(lit, 0)).toString())],
+      )
+    | "[\"Lean\",\"Literal\",\"strVal\"]" ->
+      leanProofNode("string", Array[JSON.String(leanText(leanField(lit, 0)))])
+    | _ -> leanFail("invalid proof literal")
+    }
+  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+    leanProofExpr(leanField(expr, 2))
+  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+    leanProofNode(
+      "proj",
+      Array[
+        leanProofName(leanField(expr, 1)),
+        JSON.String(leanNat(leanField(expr, 2)).toString()),
+        leanProofExpr(leanField(expr, 3)),
+      ],
+    )
+  | _ ->
+    leanFail(
+      "proof contains an invalid expression, free variable or metavariable",
+    )
+  }
+}
+
+fun leanProofDefinition(info: LeanValue): JSON.Value {
+  leanCheckPublishable(info);
+  if (leanTag(info) != "[\"Lean\",\"ConstantInfo\",\"defnInfo\"]") {
+    leanFail("proof export supports only local definitions")
+  };
+  definition = leanField(info, 0);
+  constant = leanField(definition, 0);
+  if (leanTag(leanField(constant, 1)) != "[\"List\",\"nil\"]") {
+    leanFail("local definition universe parameters are not implemented")
+  };
+  if (
+    leanTag(leanField(definition, 3)) !=
+    "[\"Lean\",\"DefinitionSafety\",\"safe\"]"
+  ) {
+    leanFail("proof export requires safe local definitions")
+  };
+  hints = leanField(definition, 2);
+  if (leanTag(hints) != "[\"Lean\",\"ReducibilityHints\",\"regular\"]") {
+    leanFail("proof export currently requires regular definition hints")
+  };
+  height = leanField(hints, 0) match {
+  | LeanWord("uint32", bits) -> bits
+  | _ -> leanFail("invalid definition height")
+  };
+  all: mutable Vector<JSON.Value> = mutable Vector[];
+  names = leanField(definition, 4);
+  while (leanTag(names) == "[\"List\",\"cons\"]") {
+    all.push(leanProofName(leanField(names, 0)));
+    !names = leanField(names, 1)
+  };
+  if (leanTag(names) != "[\"List\",\"nil\"]") {
+    leanFail("invalid definition group")
+  };
+  JSON.Object[
+    "name" => leanProofName(leanField(constant, 0)),
+    "type" => leanProofExpr(leanField(constant, 2)),
+    "value" => leanProofExpr(leanField(definition, 1)),
+    "height" => JSON.IntNumber(height),
+    "all" => JSON.Array(all.chill()),
+  ]
+}
+
+fun leanProofDocument(
+  type: LeanValue,
+  proof: LeanValue,
+  definitions: Array<LeanValue> = Array[],
+): String {
+  leanCheckPublishable(type);
+  leanCheckPublishable(proof);
+  JSON.Object[
+    "schema" => JSON.IntNumber(1),
+    "leanCommit" => JSON.String("63fbf3d3588b404bbe707721df61ecd41885a6f6"),
+    "definitions" => JSON.Array(
+      Vector::createFromItems(definitions.map(leanProofDefinition)),
+    ),
+    "type" => leanProofExpr(type),
+    "proof" => leanProofExpr(proof),
+  ].encode()
+}

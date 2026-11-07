@@ -1,0 +1,146 @@
+// Dependency tests through the maintained Lean.ConstMap lookup entry points.
+// This checks the store boundary; it does not elaborate a theorem.
+class ConstantLookupWork(map: LeanValue, name: LeanValue) extends SKStore.File
+class ConstantLookupResult(
+  value: LeanValue,
+  evaluatedAt: SKStore.Tick,
+) extends SKStore.File
+
+fun storeProbeName(text: String): LeanValue {
+  LeanCtor(
+    "[\"Lean\",\"Name\",\"str\",\"_impl\"]",
+    Array[
+      LeanWord("uint64", leanMixHash(1723, leanStringHash(text))),
+      LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+      LeanText(text),
+    ],
+  )
+}
+
+fun storeProbe(): void {
+  context = SKStore.Context::create{}.mclone();
+  limit = storeProbeName("limit");
+  noise = storeProbeName("noise");
+  absent = storeProbeName("permit");
+  constants = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/constants/"),
+    Array[
+      (
+        LeanConstantKey("prefix", leanNameKey(limit)),
+        LeanConstantFile(leanNatValue(3), None()),
+      ),
+      (
+        LeanConstantKey("prefix", leanNameKey(noise)),
+        LeanConstantFile(leanNatValue(99), None()),
+      ),
+    ],
+  );
+  local: LeanValue = LeanTrackedConstants(
+    LeanConstantsView("prefix", constants),
+  );
+  imported: LeanValue = LeanCtor(
+    "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanTrackedConstants(LeanConstantsView("imports", constants)),
+    ],
+  );
+  map: LeanValue = LeanCtor(
+    "[\"Lean\",\"ConstMap\",\"mk\"]",
+    Array[imported, local],
+  );
+  inputs = context.mkdir(
+    SKStore.SID::keyType,
+    ConstantLookupWork::type,
+    SKStore.DirName::create("/lean/lookup-inputs/"),
+    Array[
+      (SKStore.SID("limit"), ConstantLookupWork(map, limit)),
+      (SKStore.SID("missing"), ConstantLookupWork(map, absent)),
+    ],
+  );
+  results = inputs.map(
+    SKStore.SID::keyType,
+    ConstantLookupResult::type,
+    context,
+    SKStore.DirName::create("/lean/lookup-results/"),
+    (context, writer, key, values) ~> {
+      runtime = mutable LeanExecution{store => context};
+      work = values.first;
+      value = L4_Lean_ConstMap.f_Lean_ConstMap_find_cc35adf726(
+        runtime,
+        work.map,
+        work.name,
+      );
+      leanCheckPublishable(value);
+      writer.set(key, ConstantLookupResult(value, context.getTick()))
+    },
+  );
+  context.initPre();
+  before = results.get(context, SKStore.SID("limit"));
+  // Store files belong to their retained computation arena. Keep a scalar stamp
+  // across updates, not a borrowed old result whose arena may be reclaimed.
+  beforeTick = before.evaluatedAt.value;
+  assert(leanNat(leanField(before.value, 0)).toInt() == 3);
+  assert(
+    leanTag(results.get(context, SKStore.SID("missing")).value) ==
+      "[\"Option\",\"none\"]",
+  );
+  constants.writeArray(
+    context,
+    LeanConstantKey("prefix", leanNameKey(noise)),
+    Array[LeanConstantFile(leanNatValue(100), None())],
+  );
+  context.update();
+  assert(
+    beforeTick == results.get(context, SKStore.SID("limit")).evaluatedAt.value,
+  );
+  constants.writeArray(
+    context,
+    LeanConstantKey("prefix", leanNameKey(limit)),
+    Array[LeanConstantFile(leanNatValue(4), None())],
+  );
+  context.update();
+  after = results.get(context, SKStore.SID("limit"));
+  assert(leanNat(leanField(after.value, 0)).toInt() == 4);
+  assert(beforeTick != after.evaluatedAt.value);
+  constants.writeArray(
+    context,
+    LeanConstantKey("prefix", leanNameKey(absent)),
+    Array[LeanConstantFile(leanNatValue(0), None())],
+  );
+  context.update();
+  assert(
+    leanTag(results.get(context, SKStore.SID("missing")).value) ==
+      "[\"Option\",\"some\"]",
+  );
+  constants.writeArray(
+    context,
+    LeanConstantKey("prefix", leanNameKey(absent)),
+    Array[],
+  );
+  context.update();
+  assert(
+    leanTag(results.get(context, SKStore.SID("missing")).value) ==
+      "[\"Option\",\"none\"]",
+  );
+  // A later prefix is a separate view; it cannot satisfy an earlier lookup.
+  constants.writeArray(
+    context,
+    LeanConstantKey("later", leanNameKey(absent)),
+    Array[LeanConstantFile(leanNatValue(7), None())],
+  );
+  context.update();
+  assert(
+    leanTag(results.get(context, SKStore.SID("missing")).value) ==
+      "[\"Option\",\"none\"]",
+  );
+  print_string(
+    "SKStore constant reads passed: reuse, relevant edits, misses, deletion, prefix isolation",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> storeProbe())
+}

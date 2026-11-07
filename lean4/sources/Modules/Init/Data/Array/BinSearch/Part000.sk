@@ -2,6 +2,7 @@ module L4_Init_Data_Array_BinSearch;
 
 // "Array.binSearchAux._redArg"
 fun f_Array_binSearchAux_af53410b72(
+  _runtime: mutable LeanExecution,
   _lt_0_input: LeanValue,
   _found_1_input: LeanValue,
   _as_2_input: LeanValue,
@@ -24,11 +25,15 @@ fun f_Array_binSearchAux_af53410b72(
   loop {
     pc match {
     | 0 ->
-      _frame.set(8, L4_Init_Prelude.f_Nat_add_86990f4822(_frame[4], _frame[5]));
+      _frame.set(
+        8,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[4], _frame[5]),
+      );
       _frame.set(9, LeanScalar("nat", "1"));
       _frame.set(
         10,
         L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
+          _runtime,
           _frame[8],
           _frame[9],
         ),
@@ -36,42 +41,62 @@ fun f_Array_binSearchAux_af53410b72(
       _frame.set(
         11,
         L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+          _runtime,
           LeanErased(),
           _frame[2],
           _frame[10],
           LeanErased(),
         ),
       );
-      _frame.set(12, leanApply(_frame[0], Array[_frame[11], _frame[3]]));
+      _frame.set(
+        12,
+        leanApply(_runtime, _frame[0], Array[_frame[11], _frame[3]]),
+      );
       leanTag(_frame[12]) match {
       | "[\"Bool\",\"false\"]" ->
-        _frame.set(13, leanApply(_frame[0], Array[_frame[3], _frame[11]]));
+        _frame.set(
+          13,
+          leanApply(_runtime, _frame[0], Array[_frame[3], _frame[11]]),
+        );
         leanTag(_frame[13]) match {
         | "[\"Bool\",\"false\"]" ->
           _frame.set(14, LeanCtor("[\"Option\",\"some\"]", Array[_frame[11]]));
-          _frame.set(15, leanApply(_frame[1], Array[_frame[14]]));
+          _frame.set(15, leanApply(_runtime, _frame[1], Array[_frame[14]]));
           return _frame[15]
         | "[\"Bool\",\"true\"]" ->
           _frame.set(16, LeanScalar("nat", "0"));
           _frame.set(
             17,
-            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[10], _frame[16]),
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _runtime,
+              _frame[10],
+              _frame[16],
+            ),
           );
           leanTag(_frame[17]) match {
           | "[\"Bool\",\"false\"]" ->
             _frame.set(
               18,
-              L4_Init_Prelude.f_Nat_sub_8647441ee5(_frame[10], _frame[9]),
+              L4_Init_Prelude.f_Nat_sub_8647441ee5(
+                _runtime,
+                _frame[10],
+                _frame[9],
+              ),
             );
             _frame.set(
               19,
-              L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[18], _frame[4]),
+              L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                _runtime,
+                _frame[18],
+                _frame[4],
+              ),
             );
             leanTag(_frame[19]) match {
             | "[\"Bool\",\"false\"]" ->
               _frame.set(
                 20,
                 f_Array_binSearchAux_af53410b72(
+                  _runtime,
                   _frame[0],
                   _frame[1],
                   _frame[2],
@@ -96,21 +121,26 @@ fun f_Array_binSearchAux_af53410b72(
       | "[\"Bool\",\"true\"]" ->
         _frame.set(
           21,
-          L4_Init_Prelude.f_Nat_add_86990f4822(_frame[10], _frame[9]),
+          L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[10], _frame[9]),
         );
         _frame.set(
           22,
-          L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[21], _frame[5]),
+          L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+            _runtime,
+            _frame[21],
+            _frame[5],
+          ),
         );
         leanTag(_frame[22]) match {
         | "[\"Bool\",\"false\"]" ->
           _frame.set(23, LeanCtor("[\"Option\",\"none\"]", Array[]));
-          _frame.set(24, leanApply(_frame[1], Array[_frame[23]]));
+          _frame.set(24, leanApply(_runtime, _frame[1], Array[_frame[23]]));
           return _frame[24]
         | "[\"Bool\",\"true\"]" ->
           _frame.set(
             25,
             f_Array_binSearchAux_af53410b72(
+              _runtime,
               _frame[0],
               _frame[1],
               _frame[2],
@@ -126,7 +156,7 @@ fun f_Array_binSearchAux_af53410b72(
       }
     | 1 ->
       _frame.set(6, LeanCtor("[\"Option\",\"none\"]", Array[]));
-      _frame.set(7, leanApply(_frame[1], Array[_frame[6]]));
+      _frame.set(7, leanApply(_runtime, _frame[1], Array[_frame[6]]));
       return _frame[7]
     | _ -> return leanFail("invalid join point")
     }

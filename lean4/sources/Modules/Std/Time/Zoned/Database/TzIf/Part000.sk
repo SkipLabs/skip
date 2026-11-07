@@ -1,13 +1,19 @@
 module L4_Std_Time_Zoned_Database_TzIf;
 
 // "Std.Time.TimeZone.TZif.parse"
-fun f_TimeZone_TZif_parse_36d5a041db(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0);
+fun f_TimeZone_TZif_parse_36d5a041db(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = f_TimeZone_TZif_parseTZifV1_4187f22c7a(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_2: LeanValue = leanField(_x_2_1, 0);
     _res_4_3: LeanValue = leanField(_x_2_1, 1);
-    _x_5_6: LeanValue = f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_pos_3_2);
+    _x_5_6: LeanValue = f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(
+      _runtime,
+      _pos_3_2,
+    );
     leanTag(_x_5_6) match {
     | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
       _pos_6_7: LeanValue = leanField(_x_5_6, 0);
@@ -41,11 +47,15 @@ fun f_TimeZone_TZif_parse_36d5a041db(_a_1_0: LeanValue): LeanValue {
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_TimeZone_TZif_parse_36d5a041db(_args: Array<LeanValue>): LeanValue {
-  f_TimeZone_TZif_parse_36d5a041db(_args[0])
+fun apply_f_TimeZone_TZif_parse_36d5a041db(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_TZif_parse_36d5a041db(_runtime, _args[0])
 }
 // "Std.Internal.Parsec.manyCore._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseFooter.spec_0"
 fun f_TZif_parseFooter_spec_0_270d94f520(
+  _runtime: mutable LeanExecution,
   _acc_0_input: LeanValue,
   _a_1_1_input: LeanValue,
 ): LeanValue {
@@ -64,10 +74,17 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
       | "[\"ByteArray\",\"Iterator\",\"mk\"]" ->
         _frame.set(2, leanField(_frame[1], 0));
         _frame.set(3, leanField(_frame[1], 1));
-        _frame.set(10, L4_Init_Prelude.f_ByteArray_size_7351955367(_frame[2]));
+        _frame.set(
+          10,
+          L4_Init_Prelude.f_ByteArray_size_7351955367(_runtime, _frame[2]),
+        );
         _frame.set(
           11,
-          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[3], _frame[10]),
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _runtime,
+            _frame[3],
+            _frame[10],
+          ),
         );
         leanTag(_frame[11]) match {
         | "[\"Bool\",\"false\"]" ->
@@ -91,6 +108,7 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
           _frame.set(
             14,
             L4_Init_Data_ByteArray_Basic.f_ByteArray_get_fdae4c5c53(
+              _runtime,
               _frame[2],
               _frame[3],
               LeanErased(),
@@ -98,14 +116,22 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
           );
           _frame.set(
             15,
-            L4_Init_Prelude.f_UInt8_decEq_926bae36a1(_frame[14], _frame[13]),
+            L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+              _runtime,
+              _frame[14],
+              _frame[13],
+            ),
           );
           leanTag(_frame[15]) match {
           | "[\"Bool\",\"false\"]" ->
             _frame.set(16, LeanScalar("nat", "1"));
             _frame.set(
               17,
-              L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[16]),
+              L4_Init_Prelude.f_Nat_add_86990f4822(
+                _runtime,
+                _frame[3],
+                _frame[16],
+              ),
             );
             _frame.set(
               18,
@@ -117,6 +143,7 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
             _frame.set(
               19,
               L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+                _runtime,
                 LeanErased(),
                 _frame[0],
                 _frame[14],
@@ -124,7 +151,11 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
             );
             _frame.set(
               20,
-              f_TZif_parseFooter_spec_0_270d94f520(_frame[19], _frame[18]),
+              f_TZif_parseFooter_spec_0_270d94f520(
+                _runtime,
+                _frame[19],
+                _frame[18],
+              ),
             );
             return _frame[20]
           | "[\"Bool\",\"true\"]" ->
@@ -153,7 +184,7 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
     | 1 ->
       _frame.set(
         7,
-        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[3], _frame[5]),
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _frame[3], _frame[5]),
       );
       leanTag(_frame[7]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -182,15 +213,17 @@ fun f_TZif_parseFooter_spec_0_270d94f520(
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseTransitionTimes"
 fun f_TimeZone_TZif_parseTransitionTimes_1de6e11464(
+  _runtime: mutable LeanExecution,
   _size_0: LeanValue,
   _n_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_1);
-  f_TimeZone_TZif_manyN_f504e5a15f(_x_2_3, _size_0, _a_1_2)
+  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_1);
+  f_TimeZone_TZif_manyN_f504e5a15f(_runtime, _x_2_3, _size_0, _a_1_2)
 }
 // "WellFounded.opaqueFix₃._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseAbbreviations.spec_0._redArg"
 fun f_TZif_parseAbbreviations_spec_0_a96537b078(
+  _runtime: mutable LeanExecution,
   _upperBound_1_0: LeanValue,
   _res_2_1: LeanValue,
   _a_2: LeanValue,
@@ -198,6 +231,7 @@ fun f_TZif_parseAbbreviations_spec_0_a96537b078(
   _y_3_4: LeanValue,
 ): LeanValue {
   _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _a_2,
     _upperBound_1_0,
   );
@@ -214,29 +248,35 @@ fun f_TZif_parseAbbreviations_spec_0_a96537b078(
       _snd_8: LeanValue = leanField(_b_3, 1);
       _x_6_9: LeanValue = LeanScalar("uint8", "0");
       _x_7_10: LeanValue = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+        _runtime,
         LeanErased(),
         _x_6_9,
         _res_2_1,
         _a_2,
       );
       _x_8_11: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+        _runtime,
         _x_7_10,
         _x_6_9,
       );
       leanTag(_x_8_11) match {
       | "[\"Bool\",\"false\"]" ->
         _x_9_12: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+          _runtime,
           _x_7_10,
         );
         _x_10_13: LeanValue = L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
+          _runtime,
           _snd_8,
           _x_9_12,
         );
         _x_13_16: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
           _a_2,
           LeanScalar("nat", "1"),
         );
         f_TZif_parseAbbreviations_spec_0_a96537b078(
+          _runtime,
           _upperBound_1_0,
           _res_2_1,
           _x_13_16,
@@ -245,6 +285,7 @@ fun f_TZif_parseAbbreviations_spec_0_a96537b078(
         )
       | "[\"Bool\",\"true\"]" ->
         _x_15_19: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+          _runtime,
           LeanErased(),
           _fst_7,
           _snd_8,
@@ -264,8 +305,12 @@ fun f_TZif_parseAbbreviations_spec_0_a96537b078(
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.pi64"
-fun f_TimeZone_TZif_pi64_b67a7895c8(_a_1_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_pi64_b67a7895c8(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_Parsec_ByteArray_take_5201981f63(
+    _runtime,
     LeanScalar("nat", "8"),
     _a_1_0,
   );
@@ -274,9 +319,10 @@ fun f_TimeZone_TZif_pi64_b67a7895c8(_a_1_0: LeanValue): LeanValue {
     _pos_4_3: LeanValue = leanField(_x_3_2, 0);
     _res_5_4: LeanValue = leanField(_x_3_2, 1);
     _x_6_7: LeanValue = L4_Std_Data_ByteSlice.f_ByteSlice_toByteArray_cb08d5bc5e(
+      _runtime,
       _res_5_4,
     );
-    _x_7_8: LeanValue = f_TimeZone_TZif_toInt64_26c7ab6389(_x_6_7);
+    _x_7_8: LeanValue = f_TimeZone_TZif_toInt64_26c7ab6389(_runtime, _x_6_7);
     LeanCtor(
       "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
       Array[_pos_4_3, _x_7_8],
@@ -291,15 +337,23 @@ fun f_TimeZone_TZif_pi64_b67a7895c8(_a_1_0: LeanValue): LeanValue {
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_TimeZone_TZif_pi64_b67a7895c8(_args: Array<LeanValue>): LeanValue {
-  f_TimeZone_TZif_pi64_b67a7895c8(_args[0])
+fun apply_f_TimeZone_TZif_pi64_b67a7895c8(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_TZif_pi64_b67a7895c8(_runtime, _args[0])
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseHeader"
-fun f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_parseHeader_5f6dab170b(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _utf8_2: LeanValue = L4_Init_Prelude.f_String_toByteArray_f8944ff4b7(
+    _runtime,
     LeanText("TZif"),
   );
   _x_3_3: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_Parsec_ByteArray_skipBytes_e5f75b476f(
+    _runtime,
     _utf8_2,
     _a_1_0,
   );
@@ -307,12 +361,13 @@ fun f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0: LeanValue): LeanValue {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_4_4: LeanValue = leanField(_x_3_3, 0);
     _res_5_5: LeanValue = leanField(_x_3_3, 1);
-    _x_6_8: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_pos_4_4);
+    _x_6_8: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_runtime, _pos_4_4);
     leanTag(_x_6_8) match {
     | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
       _pos_7_9: LeanValue = leanField(_x_6_8, 0);
       _res_8_10: LeanValue = leanField(_x_6_8, 1);
       _x_10_14: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_Parsec_ByteArray_take_5201981f63(
+        _runtime,
         LeanScalar("nat", "15"),
         _pos_7_9,
       );
@@ -320,27 +375,40 @@ fun f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0: LeanValue): LeanValue {
       | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
         _pos_11_15: LeanValue = leanField(_x_10_14, 0);
         _res_12_16: LeanValue = leanField(_x_10_14, 1);
-        _x_13_19: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(_pos_11_15);
+        _x_13_19: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+          _runtime,
+          _pos_11_15,
+        );
         leanTag(_x_13_19) match {
         | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
           _pos_14_20: LeanValue = leanField(_x_13_19, 0);
           _res_15_21: LeanValue = leanField(_x_13_19, 1);
-          _x_16_24: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(_pos_14_20);
+          _x_16_24: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+            _runtime,
+            _pos_14_20,
+          );
           leanTag(_x_16_24) match {
           | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
             _pos_17_25: LeanValue = leanField(_x_16_24, 0);
             _res_18_26: LeanValue = leanField(_x_16_24, 1);
-            _x_19_29: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(_pos_17_25);
+            _x_19_29: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+              _runtime,
+              _pos_17_25,
+            );
             leanTag(_x_19_29) match {
             | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
               _pos_20_30: LeanValue = leanField(_x_19_29, 0);
               _res_21_31: LeanValue = leanField(_x_19_29, 1);
-              _x_22_34: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(_pos_20_30);
+              _x_22_34: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+                _runtime,
+                _pos_20_30,
+              );
               leanTag(_x_22_34) match {
               | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
                 _pos_23_35: LeanValue = leanField(_x_22_34, 0);
                 _res_24_36: LeanValue = leanField(_x_22_34, 1);
                 _x_25_39: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+                  _runtime,
                   _pos_23_35,
                 );
                 leanTag(_x_25_39) match {
@@ -348,6 +416,7 @@ fun f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0: LeanValue): LeanValue {
                   _pos_26_40: LeanValue = leanField(_x_25_39, 0);
                   _res_27_41: LeanValue = leanField(_x_25_39, 1);
                   _x_28_44: LeanValue = f_TimeZone_TZif_pu32_6be9d93faf(
+                    _runtime,
                     _pos_26_40,
                   );
                   leanTag(_x_28_44) match {
@@ -459,45 +528,56 @@ fun f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0: LeanValue): LeanValue {
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.toInt32"
-fun f_TimeZone_TZif_toInt32_4ece760857(_bs_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_TimeZone_TZif_toUInt32_56c257a1b3(_bs_0);
-  _n_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_x_1_1);
+fun f_TimeZone_TZif_toInt32_4ece760857(
+  _runtime: mutable LeanExecution,
+  _bs_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_TimeZone_TZif_toUInt32_56c257a1b3(_runtime, _bs_0);
+  _n_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _x_1_1);
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _n_2,
     LeanScalar("nat", "2147483648"),
   );
   leanTag(_x_3_4) match {
   | "[\"Bool\",\"false\"]" ->
     _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       LeanScalar("nat", "4294967296"),
       _n_2,
     );
-    L4_Init_Data_Int_Basic.f_Int_negOfNat_1e36ed1de9(_x_5_6)
-  | "[\"Bool\",\"true\"]" -> L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_n_2)
+    L4_Init_Data_Int_Basic.f_Int_negOfNat_1e36ed1de9(_runtime, _x_5_6)
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _n_2)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseTransitionIndices"
 fun f_TimeZone_TZif_parseTransitionIndices_7231673a34(
+  _runtime: mutable LeanExecution,
   _n_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_0);
+  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_0);
   _x_3_3: LeanValue = LeanClosure(
     L4_Std_Time_Zoned_Database_TzIf.apply_f_TimeZone_TZif_pu8_d339c7863a,
     1,
     Array[],
   );
-  f_TimeZone_TZif_manyN_f504e5a15f(_x_2_2, _x_3_3, _a_1_1)
+  f_TimeZone_TZif_manyN_f504e5a15f(_runtime, _x_2_2, _x_3_3, _a_1_1)
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseFooter"
-fun f_TimeZone_TZif_parseFooter_8fa811ef97(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_a_1_0);
+fun f_TimeZone_TZif_parseFooter_8fa811ef97(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_2: LeanValue = leanField(_x_2_1, 0);
     _res_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_6_7: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+      _runtime,
       _res_4_3,
       LeanScalar("uint8", "10"),
     );
@@ -509,10 +589,12 @@ fun f_TimeZone_TZif_parseFooter_8fa811ef97(_a_1_0: LeanValue): LeanValue {
       )
     | "[\"Bool\",\"true\"]" ->
       _x_10_11: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+        _runtime,
         LeanErased(),
         LeanScalar("nat", "0"),
       );
       _x_11_12: LeanValue = f_TZif_parseFooter_spec_0_270d94f520(
+        _runtime,
         _x_10_11,
         _pos_3_2,
       );
@@ -521,10 +603,12 @@ fun f_TimeZone_TZif_parseFooter_8fa811ef97(_a_1_0: LeanValue): LeanValue {
         _pos_12_13: LeanValue = leanField(_x_11_12, 0);
         _res_13_14: LeanValue = leanField(_x_11_12, 1);
         _sz_18: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+          _runtime,
           LeanErased(),
           _res_13_14,
         );
         _x_16_20: LeanValue = f_TZif_parseFooter_spec_1_11387f4d2c(
+          _runtime,
           _res_13_14,
           _sz_18,
           LeanScalar("usize", "0"),
@@ -580,43 +664,46 @@ fun f_TimeZone_TZif_parseFooter_8fa811ef97(_a_1_0: LeanValue): LeanValue {
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseIndicators"
 fun f_TimeZone_TZif_parseIndicators_73f1cae801(
+  _runtime: mutable LeanExecution,
   _n_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_0);
+  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_0);
   _x_3_3: LeanValue = LeanClosure(
     L4_Std_Time_Zoned_Database_TzIf.apply_f_TimeZone_TZif_pbool_52dde51f11,
     1,
     Array[],
   );
-  f_TimeZone_TZif_manyN_f504e5a15f(_x_2_2, _x_3_3, _a_1_1)
+  f_TimeZone_TZif_manyN_f504e5a15f(_runtime, _x_2_2, _x_3_3, _a_1_1)
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseLeapSeconds"
 fun f_TimeZone_TZif_parseLeapSeconds_f0d9b1b960(
+  _runtime: mutable LeanExecution,
   _size_0: LeanValue,
   _n_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_1);
+  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_1);
   _x_3_4: LeanValue = LeanClosure(
     L4_Std_Time_Zoned_Database_TzIf
       .apply_f_TimeZone_TZif_parseLeapSecond_4600a47d5d,
     2,
     Array[_size_0],
   );
-  f_TimeZone_TZif_manyN_f504e5a15f(_x_2_3, _x_3_4, _a_1_2)
+  f_TimeZone_TZif_manyN_f504e5a15f(_runtime, _x_2_3, _x_3_4, _a_1_2)
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseLeapSecond"
 fun f_TimeZone_TZif_parseLeapSecond_4600a47d5d(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = leanApply(_p_0, Array[_a_1_1]);
+  _x_2_2: LeanValue = leanApply(_runtime, _p_0, Array[_a_1_1]);
   leanTag(_x_2_2) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_3: LeanValue = leanField(_x_2_2, 0);
     _res_4_4: LeanValue = leanField(_x_2_2, 1);
-    _x_5_7: LeanValue = f_TimeZone_TZif_pi32_c1dce3aedd(_pos_3_3);
+    _x_5_7: LeanValue = f_TimeZone_TZif_pi32_c1dce3aedd(_runtime, _pos_3_3);
     leanTag(_x_5_7) match {
     | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
       _pos_6_8: LeanValue = leanField(_x_5_7, 0);
@@ -651,12 +738,14 @@ fun f_TimeZone_TZif_parseLeapSecond_4600a47d5d(
   }
 }
 fun apply_f_TimeZone_TZif_parseLeapSecond_4600a47d5d(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_TimeZone_TZif_parseLeapSecond_4600a47d5d(_args[0], _args[1])
+  f_TimeZone_TZif_parseLeapSecond_4600a47d5d(_runtime, _args[0], _args[1])
 }
 // "WellFounded.opaqueFix₃._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.manyN.spec_0._redArg"
 fun f_TZif_manyN_spec_0_8486077ad0(
+  _runtime: mutable LeanExecution,
   _upperBound_1_0: LeanValue,
   _p_1: LeanValue,
   _a_2: LeanValue,
@@ -664,6 +753,7 @@ fun f_TZif_manyN_spec_0_8486077ad0(
   _y_2_4: LeanValue,
 ): LeanValue {
   _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _a_2,
     _upperBound_1_0,
   );
@@ -674,21 +764,24 @@ fun f_TZif_manyN_spec_0_8486077ad0(
       Array[_y_2_4, _b_3],
     )
   | "[\"Bool\",\"true\"]" ->
-    _x_5_7: LeanValue = leanApply(_p_1, Array[_y_2_4]);
+    _x_5_7: LeanValue = leanApply(_runtime, _p_1, Array[_y_2_4]);
     leanTag(_x_5_7) match {
     | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
       _pos_6_8: LeanValue = leanField(_x_5_7, 0);
       _res_7_9: LeanValue = leanField(_x_5_7, 1);
       _x_8_12: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        _runtime,
         LeanErased(),
         _b_3,
         _res_7_9,
       );
       _x_10_14: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _a_2,
         LeanScalar("nat", "1"),
       );
       f_TZif_manyN_spec_0_8486077ad0(
+        _runtime,
         _upperBound_1_0,
         _p_1,
         _x_10_14,
@@ -709,26 +802,31 @@ fun f_TZif_manyN_spec_0_8486077ad0(
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseLocalTimeTypes"
 fun f_TimeZone_TZif_parseLocalTimeTypes_18d5f742af(
+  _runtime: mutable LeanExecution,
   _n_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_0);
+  _x_2_2: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_0);
   _x_3_3: LeanValue = LeanClosure(
     L4_Std_Time_Zoned_Database_TzIf
       .apply_f_TimeZone_TZif_parseLocalTimeType_8ba9085685,
     1,
     Array[],
   );
-  f_TimeZone_TZif_manyN_f504e5a15f(_x_2_2, _x_3_3, _a_1_1)
+  f_TimeZone_TZif_manyN_f504e5a15f(_runtime, _x_2_2, _x_3_3, _a_1_1)
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.pbool"
-fun f_TimeZone_TZif_pbool_52dde51f11(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_a_1_0);
+fun f_TimeZone_TZif_pbool_52dde51f11(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_2: LeanValue = leanField(_x_2_1, 0);
     _res_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_6_7: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+      _runtime,
       _res_4_3,
       LeanScalar("uint8", "0"),
     );
@@ -761,19 +859,30 @@ fun f_TimeZone_TZif_pbool_52dde51f11(_a_1_0: LeanValue): LeanValue {
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_TimeZone_TZif_pbool_52dde51f11(_args: Array<LeanValue>): LeanValue {
-  f_TimeZone_TZif_pbool_52dde51f11(_args[0])
+fun apply_f_TimeZone_TZif_pbool_52dde51f11(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_TZif_pbool_52dde51f11(_runtime, _args[0])
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.toUInt32"
-fun f_TimeZone_TZif_toUInt32_56c257a1b3(_bs_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_bs_0);
+fun f_TimeZone_TZif_toUInt32_56c257a1b3(
+  _runtime: mutable LeanExecution,
+  _bs_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+    _runtime,
+    _bs_0,
+  );
   _x_3_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _x_1_1,
     LeanScalar("nat", "4"),
   );
   leanTag(_x_3_3) match {
   | "[\"Bool\",\"false\"]" ->
     _x_9_9: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
       LeanText("Std.Time.Zoned.Database.TzIf"),
       LeanText(
         "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.toUInt32",
@@ -782,86 +891,115 @@ fun f_TimeZone_TZif_toUInt32_56c257a1b3(_bs_0: LeanValue): LeanValue {
       LeanScalar("nat", "2"),
       LeanText("assertion violation: bs.size == 4\n  "),
     );
-    f_TZif_toUInt32_spec_0_a08f7d3bfd(_x_9_9)
+    f_TZif_toUInt32_spec_0_a08f7d3bfd(_runtime, _x_9_9)
   | "[\"Bool\",\"true\"]" ->
     _x_12_12: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_55eaeba688(
+      _runtime,
       _bs_0,
       LeanScalar("nat", "0"),
     );
     _x_13_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+      _runtime,
       _x_12_12,
     );
     _x_15_15: LeanValue = L4_Init_Data_UInt_Basic.f_UInt32_shiftLeft_2be8f00e4b(
+      _runtime,
       _x_13_13,
       LeanScalar("uint32", "24"),
     );
     _x_17_17: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_55eaeba688(
+      _runtime,
       _bs_0,
       LeanScalar("nat", "1"),
     );
     _x_18_18: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+      _runtime,
       _x_17_17,
     );
     _x_20_20: LeanValue = L4_Init_Data_UInt_Basic.f_UInt32_shiftLeft_2be8f00e4b(
+      _runtime,
       _x_18_18,
       LeanScalar("uint32", "16"),
     );
     _x_21_21: LeanValue = L4_Init_Data_UInt_Basic.f_UInt32_lor_477ee673d4(
+      _runtime,
       _x_15_15,
       _x_20_20,
     );
     _x_23_23: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_55eaeba688(
+      _runtime,
       _bs_0,
       LeanScalar("nat", "2"),
     );
     _x_24_24: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+      _runtime,
       _x_23_23,
     );
     _x_26_26: LeanValue = L4_Init_Data_UInt_Basic.f_UInt32_shiftLeft_2be8f00e4b(
+      _runtime,
       _x_24_24,
       LeanScalar("uint32", "8"),
     );
     _x_27_27: LeanValue = L4_Init_Data_UInt_Basic.f_UInt32_lor_477ee673d4(
+      _runtime,
       _x_21_21,
       _x_26_26,
     );
     _x_29_29: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_55eaeba688(
+      _runtime,
       _bs_0,
       LeanScalar("nat", "3"),
     );
     _x_30_30: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+      _runtime,
       _x_29_29,
     );
-    L4_Init_Data_UInt_Basic.f_UInt32_lor_477ee673d4(_x_27_27, _x_30_30)
+    L4_Init_Data_UInt_Basic.f_UInt32_lor_477ee673d4(
+      _runtime,
+      _x_27_27,
+      _x_30_30,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.toInt64"
-fun f_TimeZone_TZif_toInt64_26c7ab6389(_bs_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_toInt64_26c7ab6389(
+  _runtime: mutable LeanExecution,
+  _bs_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = L4_Init_Data_ByteArray_Extra.f_ByteArray_toUInt64BE_6a4aaa1190(
+    _runtime,
     _bs_0,
   );
   _n_2: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt64_toNat_07186ec958(
+    _runtime,
     _x_1_1,
   );
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
     _n_2,
     LeanScalar("nat", "9223372036854775808"),
   );
   leanTag(_x_3_4) match {
   | "[\"Bool\",\"false\"]" ->
     _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       LeanScalar("nat", "18446744073709551616"),
       _n_2,
     );
-    L4_Init_Data_Int_Basic.f_Int_negOfNat_1e36ed1de9(_x_5_6)
-  | "[\"Bool\",\"true\"]" -> L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_n_2)
+    L4_Init_Data_Int_Basic.f_Int_negOfNat_1e36ed1de9(_runtime, _x_5_6)
+  | "[\"Bool\",\"true\"]" ->
+    L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _n_2)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.pu32"
-fun f_TimeZone_TZif_pu32_6be9d93faf(_a_1_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_pu32_6be9d93faf(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_Parsec_ByteArray_take_5201981f63(
+    _runtime,
     LeanScalar("nat", "4"),
     _a_1_0,
   );
@@ -870,9 +1008,10 @@ fun f_TimeZone_TZif_pu32_6be9d93faf(_a_1_0: LeanValue): LeanValue {
     _pos_4_3: LeanValue = leanField(_x_3_2, 0);
     _res_5_4: LeanValue = leanField(_x_3_2, 1);
     _x_6_7: LeanValue = L4_Std_Data_ByteSlice.f_ByteSlice_toByteArray_cb08d5bc5e(
+      _runtime,
       _res_5_4,
     );
-    _x_7_8: LeanValue = f_TimeZone_TZif_toUInt32_56c257a1b3(_x_6_7);
+    _x_7_8: LeanValue = f_TimeZone_TZif_toUInt32_56c257a1b3(_runtime, _x_6_7);
     LeanCtor(
       "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
       Array[_pos_4_3, _x_7_8],
@@ -888,7 +1027,10 @@ fun f_TimeZone_TZif_pu32_6be9d93faf(_a_1_0: LeanValue): LeanValue {
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseTZifV2"
-fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
+fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(
+  _runtime: mutable LeanExecution,
+  _a_1_0_input: LeanValue,
+): LeanValue {
   // Frame slots: 0=_a_1_0, 1=_pos_3_1, 2=_err_4_2, 3=_idx_4, 4=_idx_6, 5=_x_5_7, 6=_x_6_8, 7=_x_7_9, 8=_x_8_10, 9=_x_9_11, 10=_pos_10_12, 11=_res_11_13, 12=_pos_57_14, 13=_err_58_15, 14=_isutcnt_17, 15=_isstdcnt_18, 16=_leapcnt_19, 17=_timecnt_20, 18=_typecnt_21, 19=_charcnt_22, 20=_x_12_23, 21=_x_13_24, 22=_pos_14_25, 23=_res_15_26, 24=_pos_55_27, 25=_err_56_28, 26=_x_16_29, 27=_pos_17_30, 28=_res_18_31, 29=_pos_53_32, 30=_err_54_33, 31=_x_19_34, 32=_pos_20_35, 33=_res_21_36, 34=_pos_51_37, 35=_err_52_38, 36=_x_22_39, 37=_pos_23_40, 38=_res_24_41, 39=_pos_49_42, 40=_err_50_43, 41=_x_25_44, 42=_pos_26_45, 43=_res_27_46, 44=_pos_47_47, 45=_err_48_48, 46=_x_28_49, 47=_pos_29_50, 48=_res_30_51, 49=_pos_45_52, 50=_err_46_53, 51=_x_31_54, 52=_pos_32_55, 53=_res_33_56, 54=_pos_43_57, 55=_err_44_58, 56=_x_34_59, 57=_pos_35_60, 58=_res_36_61, 59=_pos_41_62, 60=_err_42_63, 61=_x_37_64, 62=_x_38_65, 63=_x_39_66, 64=_x_40_67
   _frame: mutable Array<LeanValue> = Array::mfill(
     65,
@@ -899,7 +1041,10 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
   loop {
     pc match {
     | 0 ->
-      _frame.set(9, f_TimeZone_TZif_parseHeader_5f6dab170b(_frame[0]));
+      _frame.set(
+        9,
+        f_TimeZone_TZif_parseHeader_5f6dab170b(_runtime, _frame[0]),
+      );
       leanTag(_frame[9]) match {
       | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
         _frame.set(10, leanField(_frame[9], 0));
@@ -925,6 +1070,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
           _frame.set(
             21,
             f_TimeZone_TZif_parseTransitionTimes_1de6e11464(
+              _runtime,
               _frame[20],
               _frame[17],
               _frame[10],
@@ -937,6 +1083,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
             _frame.set(
               26,
               f_TimeZone_TZif_parseTransitionIndices_7231673a34(
+                _runtime,
                 _frame[17],
                 _frame[22],
               ),
@@ -948,6 +1095,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
               _frame.set(
                 31,
                 f_TimeZone_TZif_parseLocalTimeTypes_18d5f742af(
+                  _runtime,
                   _frame[18],
                   _frame[27],
                 ),
@@ -959,6 +1107,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
                 _frame.set(
                   36,
                   f_TimeZone_TZif_parseAbbreviations_2af09b9ade(
+                    _runtime,
                     _frame[33],
                     _frame[19],
                     _frame[32],
@@ -971,6 +1120,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
                   _frame.set(
                     41,
                     f_TimeZone_TZif_parseLeapSeconds_f0d9b1b960(
+                      _runtime,
                       _frame[20],
                       _frame[16],
                       _frame[37],
@@ -983,6 +1133,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
                     _frame.set(
                       46,
                       f_TimeZone_TZif_parseIndicators_73f1cae801(
+                        _runtime,
                         _frame[15],
                         _frame[42],
                       ),
@@ -994,6 +1145,7 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
                       _frame.set(
                         51,
                         f_TimeZone_TZif_parseIndicators_73f1cae801(
+                          _runtime,
                           _frame[14],
                           _frame[47],
                         ),
@@ -1004,7 +1156,10 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
                         _frame.set(53, leanField(_frame[51], 1));
                         _frame.set(
                           56,
-                          f_TimeZone_TZif_parseFooter_8fa811ef97(_frame[52]),
+                          f_TimeZone_TZif_parseFooter_8fa811ef97(
+                            _runtime,
+                            _frame[52],
+                          ),
                         );
                         leanTag(_frame[56]) match {
                         | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
@@ -1160,7 +1315,11 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
           _frame.set(4, leanField(_frame[1], 1));
           _frame.set(
             5,
-            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[3], _frame[4]),
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _runtime,
+              _frame[3],
+              _frame[4],
+            ),
           );
           leanTag(_frame[5]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -1193,16 +1352,23 @@ fun f_TimeZone_TZif_parseTZifV2_5fa33cf4c1(_a_1_0_input: LeanValue): LeanValue {
   }
 }
 // "panic._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.toUInt32.spec_0"
-fun f_TZif_toUInt32_spec_0_a08f7d3bfd(_msg_0: LeanValue): LeanValue {
+fun f_TZif_toUInt32_spec_0_a08f7d3bfd(
+  _runtime: mutable LeanExecution,
+  _msg_0: LeanValue,
+): LeanValue {
   L4_Init_Prelude.f_panicCore_3292f922f8(
+    _runtime,
     LeanErased(),
     LeanScalar("uint32", "0"),
     _msg_0,
   )
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseTZifV1"
-fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = f_TimeZone_TZif_parseHeader_5f6dab170b(_a_1_0);
+fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = f_TimeZone_TZif_parseHeader_5f6dab170b(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_2: LeanValue = leanField(_x_2_1, 0);
@@ -1222,6 +1388,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
         Array[],
       );
       _x_6_14: LeanValue = f_TimeZone_TZif_parseTransitionTimes_1de6e11464(
+        _runtime,
         _x_5_13,
         _timecnt_10,
         _pos_3_2,
@@ -1231,6 +1398,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
         _pos_7_15: LeanValue = leanField(_x_6_14, 0);
         _res_8_16: LeanValue = leanField(_x_6_14, 1);
         _x_9_19: LeanValue = f_TimeZone_TZif_parseTransitionIndices_7231673a34(
+          _runtime,
           _timecnt_10,
           _pos_7_15,
         );
@@ -1239,6 +1407,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
           _pos_10_20: LeanValue = leanField(_x_9_19, 0);
           _res_11_21: LeanValue = leanField(_x_9_19, 1);
           _x_12_24: LeanValue = f_TimeZone_TZif_parseLocalTimeTypes_18d5f742af(
+            _runtime,
             _typecnt_11,
             _pos_10_20,
           );
@@ -1247,6 +1416,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
             _pos_13_25: LeanValue = leanField(_x_12_24, 0);
             _res_14_26: LeanValue = leanField(_x_12_24, 1);
             _x_15_29: LeanValue = f_TimeZone_TZif_parseAbbreviations_2af09b9ade(
+              _runtime,
               _res_14_26,
               _charcnt_12,
               _pos_13_25,
@@ -1256,6 +1426,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
               _pos_16_30: LeanValue = leanField(_x_15_29, 0);
               _res_17_31: LeanValue = leanField(_x_15_29, 1);
               _x_18_34: LeanValue = f_TimeZone_TZif_parseLeapSeconds_f0d9b1b960(
+                _runtime,
                 _x_5_13,
                 _leapcnt_9,
                 _pos_16_30,
@@ -1265,6 +1436,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
                 _pos_19_35: LeanValue = leanField(_x_18_34, 0);
                 _res_20_36: LeanValue = leanField(_x_18_34, 1);
                 _x_21_39: LeanValue = f_TimeZone_TZif_parseIndicators_73f1cae801(
+                  _runtime,
                   _isstdcnt_8,
                   _pos_19_35,
                 );
@@ -1273,6 +1445,7 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
                   _pos_22_40: LeanValue = leanField(_x_21_39, 0);
                   _res_23_41: LeanValue = leanField(_x_21_39, 1);
                   _x_24_44: LeanValue = f_TimeZone_TZif_parseIndicators_73f1cae801(
+                    _runtime,
                     _isutcnt_7,
                     _pos_22_40,
                   );
@@ -1373,8 +1546,12 @@ fun f_TimeZone_TZif_parseTZifV1_4187f22c7a(_a_1_0: LeanValue): LeanValue {
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.pi32"
-fun f_TimeZone_TZif_pi32_c1dce3aedd(_a_1_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_pi32_c1dce3aedd(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_Parsec_ByteArray_take_5201981f63(
+    _runtime,
     LeanScalar("nat", "4"),
     _a_1_0,
   );
@@ -1383,9 +1560,10 @@ fun f_TimeZone_TZif_pi32_c1dce3aedd(_a_1_0: LeanValue): LeanValue {
     _pos_4_3: LeanValue = leanField(_x_3_2, 0);
     _res_5_4: LeanValue = leanField(_x_3_2, 1);
     _x_6_7: LeanValue = L4_Std_Data_ByteSlice.f_ByteSlice_toByteArray_cb08d5bc5e(
+      _runtime,
       _res_5_4,
     );
-    _x_7_8: LeanValue = f_TimeZone_TZif_toInt32_4ece760857(_x_6_7);
+    _x_7_8: LeanValue = f_TimeZone_TZif_toInt32_4ece760857(_runtime, _x_6_7);
     LeanCtor(
       "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]",
       Array[_pos_4_3, _x_7_8],
@@ -1400,24 +1578,37 @@ fun f_TimeZone_TZif_pi32_c1dce3aedd(_a_1_0: LeanValue): LeanValue {
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_TimeZone_TZif_pi32_c1dce3aedd(_args: Array<LeanValue>): LeanValue {
-  f_TimeZone_TZif_pi32_c1dce3aedd(_args[0])
+fun apply_f_TimeZone_TZif_pi32_c1dce3aedd(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_TZif_pi32_c1dce3aedd(_runtime, _args[0])
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.manyN._redArg"
 fun f_TimeZone_TZif_manyN_f504e5a15f(
+  _runtime: mutable LeanExecution,
   _n_0: LeanValue,
   _p_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = LeanScalar("nat", "0");
   _result_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     _x_2_3,
   );
-  f_TZif_manyN_spec_0_8486077ad0(_n_0, _p_1, _x_2_3, _result_4, _a_1_2)
+  f_TZif_manyN_spec_0_8486077ad0(
+    _runtime,
+    _n_0,
+    _p_1,
+    _x_2_3,
+    _result_4,
+    _a_1_2,
+  )
 }
 // "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseFooter.spec_1"
 fun f_TZif_parseFooter_spec_1_11387f4d2c(
+  _runtime: mutable LeanExecution,
   _as_0: LeanValue,
   _sz_1: LeanValue,
   _i_2: LeanValue,
@@ -1425,6 +1616,7 @@ fun f_TZif_parseFooter_spec_1_11387f4d2c(
   _y_1_4: LeanValue,
 ): LeanValue {
   _x_2_5: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _runtime,
     _i_2,
     _sz_1,
   );
@@ -1436,52 +1628,72 @@ fun f_TZif_parseFooter_spec_1_11387f4d2c(
     )
   | "[\"Bool\",\"true\"]" ->
     _a_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_0,
       _i_2,
       LeanErased(),
     );
     _x_4_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+      _runtime,
       _a_7,
     );
     _x_5_9: LeanValue = L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
+      _runtime,
       _b_3,
       _x_4_8,
     );
     _x_7_11: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+      _runtime,
       _i_2,
       LeanScalar("usize", "1"),
     );
-    f_TZif_parseFooter_spec_1_11387f4d2c(_as_0, _sz_1, _x_7_11, _x_5_9, _y_1_4)
+    f_TZif_parseFooter_spec_1_11387f4d2c(
+      _runtime,
+      _as_0,
+      _sz_1,
+      _x_7_11,
+      _x_5_9,
+      _y_1_4,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseAbbreviations"
 fun f_TimeZone_TZif_parseAbbreviations_2af09b9ade(
+  _runtime: mutable LeanExecution,
   _times_0: LeanValue,
   _n_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_n_1);
+  _x_2_3: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _n_1);
   _x_3_4: LeanValue = LeanClosure(
     L4_Std_Time_Zoned_Database_TzIf.apply_f_TimeZone_TZif_pu8_d339c7863a,
     1,
     Array[],
   );
-  _x_4_5: LeanValue = f_TimeZone_TZif_manyN_f504e5a15f(_x_2_3, _x_3_4, _a_1_2);
+  _x_4_5: LeanValue = f_TimeZone_TZif_manyN_f504e5a15f(
+    _runtime,
+    _x_2_3,
+    _x_3_4,
+    _a_1_2,
+  );
   leanTag(_x_4_5) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_5_6: LeanValue = leanField(_x_4_5, 0);
     _res_6_7: LeanValue = leanField(_x_4_5, 1);
     _strings_11: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      _runtime,
       LeanErased(),
       LeanScalar("nat", "0"),
     );
     _sz_14: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+      _runtime,
       LeanErased(),
       _times_0,
     );
     _x_10_16: LeanValue = f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
+      _runtime,
       _x_2_3,
       _res_6_7,
       _times_0,
@@ -1524,13 +1736,20 @@ fun f_TimeZone_TZif_parseAbbreviations_2af09b9ade(
   }
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.pu8"
-fun f_TimeZone_TZif_pu8_d339c7863a(_a_1_0: LeanValue): LeanValue {
+fun f_TimeZone_TZif_pu8_d339c7863a(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   leanTag(_a_1_0) match {
   | "[\"ByteArray\",\"Iterator\",\"mk\"]" ->
     _array_2_1: LeanValue = leanField(_a_1_0, 0);
     _idx_3_2: LeanValue = leanField(_a_1_0, 1);
-    _x_4_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_array_2_1);
+    _x_4_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+      _runtime,
+      _array_2_1,
+    );
     _x_5_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
       _idx_3_2,
       _x_4_3,
     );
@@ -1548,11 +1767,13 @@ fun f_TimeZone_TZif_pu8_d339c7863a(_a_1_0: LeanValue): LeanValue {
       )
     | "[\"Bool\",\"true\"]" ->
       _c_7: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_fdae4c5c53(
+        _runtime,
         _array_2_1,
         _idx_3_2,
         LeanErased(),
       );
       _x_9_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _idx_3_2,
         LeanScalar("nat", "1"),
       );
@@ -1571,24 +1792,28 @@ fun f_TimeZone_TZif_pu8_d339c7863a(_a_1_0: LeanValue): LeanValue {
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_TimeZone_TZif_pu8_d339c7863a(_args: Array<LeanValue>): LeanValue {
-  f_TimeZone_TZif_pu8_d339c7863a(_args[0])
+fun apply_f_TimeZone_TZif_pu8_d339c7863a(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_TimeZone_TZif_pu8_d339c7863a(_runtime, _args[0])
 }
 // "_private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseLocalTimeType"
 fun f_TimeZone_TZif_parseLocalTimeType_8ba9085685(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
 ): LeanValue {
-  _x_2_1: LeanValue = f_TimeZone_TZif_pi32_c1dce3aedd(_a_1_0);
+  _x_2_1: LeanValue = f_TimeZone_TZif_pi32_c1dce3aedd(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
     _pos_3_2: LeanValue = leanField(_x_2_1, 0);
     _res_4_3: LeanValue = leanField(_x_2_1, 1);
-    _x_5_6: LeanValue = f_TimeZone_TZif_pbool_52dde51f11(_pos_3_2);
+    _x_5_6: LeanValue = f_TimeZone_TZif_pbool_52dde51f11(_runtime, _pos_3_2);
     leanTag(_x_5_6) match {
     | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
       _pos_6_7: LeanValue = leanField(_x_5_6, 0);
       _res_7_8: LeanValue = leanField(_x_5_6, 1);
-      _x_8_11: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_pos_6_7);
+      _x_8_11: LeanValue = f_TimeZone_TZif_pu8_d339c7863a(_runtime, _pos_6_7);
       leanTag(_x_8_11) match {
       | "[\"Std\",\"Internal\",\"Parsec\",\"ParseResult\",\"success\"]" ->
         _pos_9_12: LeanValue = leanField(_x_8_11, 0);
@@ -1644,12 +1869,14 @@ fun f_TimeZone_TZif_parseLocalTimeType_8ba9085685(
   }
 }
 fun apply_f_TimeZone_TZif_parseLocalTimeType_8ba9085685(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_TimeZone_TZif_parseLocalTimeType_8ba9085685(_args[0])
+  f_TimeZone_TZif_parseLocalTimeType_8ba9085685(_runtime, _args[0])
 }
 // "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Std.Time.Zoned.Database.TzIf.0.Std.Time.TimeZone.TZif.parseAbbreviations.spec_1"
 fun f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _res_2_1: LeanValue,
   _as_2: LeanValue,
@@ -1659,6 +1886,7 @@ fun f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
   _y_3_6: LeanValue,
 ): LeanValue {
   _x_4_7: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _runtime,
     _i_4,
     _sz_3,
   );
@@ -1670,6 +1898,7 @@ fun f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
     )
   | "[\"Bool\",\"true\"]" ->
     _a_9: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_2,
       _i_4,
@@ -1685,9 +1914,11 @@ fun f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
         _fst_13: LeanValue = leanField(_b_5, 0);
         _snd_14: LeanValue = leanField(_b_5, 1);
         _x_6_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt8_toNat_fc0446beb8(
+          _runtime,
           _abbreviationIndex_12,
         );
         _x_8_17: LeanValue = f_TZif_parseAbbreviations_spec_0_a96537b078(
+          _runtime,
           _x_1_0,
           _res_2_1,
           _x_6_15,
@@ -1703,10 +1934,12 @@ fun f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
             _fst_22: LeanValue = leanField(_res_10_19, 0);
             _snd_23: LeanValue = leanField(_res_10_19, 1);
             _x_13_26: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+              _runtime,
               _i_4,
               LeanScalar("usize", "1"),
             );
             f_TZif_parseAbbreviations_spec_1_cedcbf6c4c(
+              _runtime,
               _x_1_0,
               _res_2_1,
               _as_2,

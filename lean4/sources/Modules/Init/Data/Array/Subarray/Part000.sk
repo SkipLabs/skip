@@ -1,7 +1,11 @@
 module L4_Init_Data_Array_Subarray;
 
 // "Subarray.get._redArg"
-fun f_Subarray_get_dbe3a08a5b(_s_0: LeanValue, _i_1: LeanValue): LeanValue {
+fun f_Subarray_get_dbe3a08a5b(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _i_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
     _array_2: LeanValue = leanField(_s_0, 0);
@@ -9,8 +13,13 @@ fun f_Subarray_get_dbe3a08a5b(_s_0: LeanValue, _i_1: LeanValue): LeanValue {
     _stop_4: LeanValue = leanField(_s_0, 2);
     _start_le_stop_5: LeanValue = leanField(_s_0, 3);
     _stop_le_array_size_6: LeanValue = leanField(_s_0, 4);
-    _x_1_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_start_3, _i_1);
+    _x_1_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
+      _start_3,
+      _i_1,
+    );
     L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
       LeanErased(),
       _array_2,
       _x_1_7,
@@ -20,9 +29,13 @@ fun f_Subarray_get_dbe3a08a5b(_s_0: LeanValue, _i_1: LeanValue): LeanValue {
   }
 }
 // "Subarray.empty._redArg"
-fun f_Subarray_empty_5d85b4aa22(_dummy_0: LeanValue): LeanValue {
+fun f_Subarray_empty_5d85b4aa22(
+  _runtime: mutable LeanExecution,
+  _dummy_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = LeanScalar("nat", "0");
   _x_2_2: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     _x_1_1,
   );
@@ -33,18 +46,25 @@ fun f_Subarray_empty_5d85b4aa22(_dummy_0: LeanValue): LeanValue {
 }
 // "Array.toSubarray._redArg"
 fun f_Array_toSubarray_0ba25fcf44(
+  _runtime: mutable LeanExecution,
   _as_0: LeanValue,
   _start_1: LeanValue,
   _stop_2: LeanValue,
 ): LeanValue {
   _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _as_0,
   );
-  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_stop_2, _x_1_3);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
+    _stop_2,
+    _x_1_3,
+  );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
     _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _start_1,
       _x_1_3,
     );
@@ -63,6 +83,7 @@ fun f_Array_toSubarray_0ba25fcf44(
     }
   | "[\"Bool\",\"true\"]" ->
     _x_6_8: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _start_1,
       _stop_2,
     );

@@ -1,0 +1,112 @@
+class ExtraLookupResult(value: LeanValue, tick: Int) extends SKStore.File
+
+fun extraConstantsProbe(): void {
+  data = leanDecodeImportData(
+    FileSystem.readTextFile("build/init-extra-constants.jsonl"),
+  );
+  names = data.extraConstants.fromSome();
+  context = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store => context};
+  entries = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/extra/constants/"),
+    names.map(entry ->
+      (
+        LeanConstantKey("extra", leanNameKey(entry.i0)),
+        LeanConstantFile(LeanErased(), Some(entry.i1)),
+      )
+    ),
+  );
+  imported: LeanValue = LeanCtor(
+    "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+    Array[
+      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanTrackedConstants(LeanConstantsView("extra", entries)),
+    ],
+  );
+  env = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", entries),
+    LeanConstantsView("local", entries),
+    leanEmptyEnvironmentHeader(),
+    LeanArray(Array[]),
+    LeanArray(Array[]),
+    true,
+    leanNatValue(0),
+    imported,
+  );
+  absent = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("FutureExtraName"),
+  );
+  inputs = context.mkdir(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/extra/inputs/"),
+    Array[(SKStore.SID("query"), SKStore.IntFile(0))],
+  );
+  results = inputs.map(
+    SKStore.SID::keyType,
+    ExtraLookupResult::type,
+    context,
+    SKStore.DirName::create("/extra/results/"),
+    (context, writer, key, _) ~> {
+      execution = mutable LeanExecution{store => context};
+      value = L4_Lean_Environment.f_Lean_Environment_getModuleIdxFor_01e73ed4b6(
+        execution,
+        env,
+        absent,
+      );
+      writer.set(key, ExtraLookupResult(value, context.getTick().value))
+    },
+  );
+  context.initPre();
+  context.update();
+  for (entry in names) {
+    value = L4_Lean_ConstTrie.f_Lean_ImportedConsts_findExtraModIdxCachedImpl_fedbba73a3(
+      runtime,
+      LeanErased(),
+      imported,
+      entry.i0,
+    );
+    assert(leanNat(value).toInt() == entry.i1 + 1)
+  };
+  key = SKStore.SID("query");
+  assert(leanTag(results.get(context, key).value) == "[\"Option\",\"none\"]");
+  tick = results.get(context, key).tick;
+  entries.writeArray(
+    context,
+    LeanConstantKey("later", leanNameKey(absent)),
+    Array[LeanConstantFile(LeanErased(), Some(0))],
+  );
+  context.update();
+  assert(results.get(context, key).tick == tick);
+  entries.writeArray(
+    context,
+    LeanConstantKey("extra", leanNameKey(absent)),
+    Array[LeanConstantFile(LeanErased(), Some(0))],
+  );
+  context.update();
+  assert(results.get(context, key).tick != tick);
+  found = results.get(context, key).value;
+  assert(leanTag(found) == "[\"Option\",\"some\"]");
+  assert(leanNat(leanField(found, 0)).toInt() == 0);
+  foundTick = results.get(context, key).tick;
+  entries.writeArray(
+    context,
+    LeanConstantKey("extra", leanNameKey(absent)),
+    Array[],
+  );
+  context.update();
+  assert(results.get(context, key).tick != foundTick);
+  assert(leanTag(results.get(context, key).value) == "[\"Option\",\"none\"]");
+  print_string(
+    names.size().toString() +
+      " extra module indices and negative-read invalidation passed",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> extraConstantsProbe())
+}

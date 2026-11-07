@@ -1,5 +1,7 @@
-// Exercise two real translated functions from Lean.Data.Name.
+// Exercise maintained functions and the runtime needed to construct Meta state.
 fun leanSmoke(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
   anonymous: LeanValue = LeanCtor(
     "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
     Array[],
@@ -9,15 +11,33 @@ fun leanSmoke(): void {
     Array[LeanScalar("uint64", "0"), anonymous, LeanText("smoke")],
   );
   assert(
-    leanTag(L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(anonymous)) ==
-      "[\"Bool\",\"true\"]",
+    leanTag(
+      L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(runtime, anonymous),
+    ) == "[\"Bool\",\"true\"]",
   );
   assert(
-    leanTag(L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(named)) ==
-      "[\"Bool\",\"false\"]",
+    leanTag(
+      L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(runtime, named),
+    ) == "[\"Bool\",\"false\"]",
   );
   assert(
-    leanTag(L4_Lean_Data_Name.f_Lean_Name_getPrefix_0e6a878b3f(named)) ==
-      "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
-  )
+    leanTag(
+      L4_Lean_Data_Name.f_Lean_Name_getPrefix_0e6a878b3f(runtime, named),
+    ) == "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+  );
+  metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  assert(leanTag(metaContext) == "[\"Lean\",\"Meta\",\"Context\",\"mk\"]");
+  assert(leanTag(metaState) == "[\"Lean\",\"Meta\",\"State\",\"mk\"]");
+  leanCheckPublishable(metaContext);
+  leanCheckPublishable(metaState);
+  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  assert(leanTag(prop) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(3));
+  assert(leanExprData(bvar).ushr(44) == 4)
 }

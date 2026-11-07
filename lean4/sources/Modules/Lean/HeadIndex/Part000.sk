@@ -2,6 +2,7 @@ module L4_Lean_HeadIndex;
 
 // "_private.Lean.HeadIndex.0.Lean.Expr.headNumArgs.go"
 fun f_Expr_headNumArgs_go_a4193d1998(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _a_2_1: LeanValue,
 ): LeanValue {
@@ -11,10 +12,11 @@ fun f_Expr_headNumArgs_go_a4193d1998(
     _fn_3_3: LeanValue = leanField(_a_1_0, 1);
     _arg_4_4: LeanValue = leanField(_a_1_0, 2);
     _x_6_15: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _a_2_1,
       LeanScalar("nat", "1"),
     );
-    f_Expr_headNumArgs_go_a4193d1998(_fn_3_3, _x_6_15)
+    f_Expr_headNumArgs_go_a4193d1998(_runtime, _fn_3_3, _x_6_15)
   | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
     _data_5: LeanValue = leanField(_a_1_0, 0);
     _declName_8_6: LeanValue = leanField(_a_1_0, 1);
@@ -22,17 +24,20 @@ fun f_Expr_headNumArgs_go_a4193d1998(
     _value_10_8: LeanValue = leanField(_a_1_0, 3);
     _body_11_9: LeanValue = leanField(_a_1_0, 4);
     _nondep_12_10: LeanValue = leanField(_a_1_0, 5);
-    f_Expr_headNumArgs_go_a4193d1998(_body_11_9, _a_2_1)
+    f_Expr_headNumArgs_go_a4193d1998(_runtime, _body_11_9, _a_2_1)
   | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
     _data_11: LeanValue = leanField(_a_1_0, 0);
     _data_14_12: LeanValue = leanField(_a_1_0, 1);
     _expr_15_13: LeanValue = leanField(_a_1_0, 2);
-    f_Expr_headNumArgs_go_a4193d1998(_expr_15_13, _a_2_1)
+    f_Expr_headNumArgs_go_a4193d1998(_runtime, _expr_15_13, _a_2_1)
   | _ -> _a_2_1
   }
 }
 // "_private.Lean.HeadIndex.0.Lean.Expr.toHeadIndexSlow"
-fun f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_x_1_0: LeanValue): LeanValue {
+fun f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_x_1_0, 0);
@@ -82,7 +87,7 @@ fun f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_x_1_0: LeanValue): LeanValue {
     _data_26: LeanValue = leanField(_x_1_0, 0);
     _fn_27_27: LeanValue = leanField(_x_1_0, 1);
     _arg_28_28: LeanValue = leanField(_x_1_0, 2);
-    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_fn_27_27)
+    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_runtime, _fn_27_27)
   | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
     _data_29: LeanValue = leanField(_x_1_0, 0);
     _declName_30_30: LeanValue = leanField(_x_1_0, 1);
@@ -91,36 +96,47 @@ fun f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_x_1_0: LeanValue): LeanValue {
     _body_33_33: LeanValue = leanField(_x_1_0, 4);
     _nondep_34_34: LeanValue = leanField(_x_1_0, 5);
     _x_35_47: LeanValue = L4_Lean_Expr.f_Lean_Expr_instantiate1_2af4e389c5(
+      _runtime,
       _body_33_33,
       _value_32_32,
     );
-    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_x_35_47)
+    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_runtime, _x_35_47)
   | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
     _data_35: LeanValue = leanField(_x_1_0, 0);
     _data_37_36: LeanValue = leanField(_x_1_0, 1);
     _expr_38_37: LeanValue = leanField(_x_1_0, 2);
-    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_expr_38_37)
+    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_runtime, _expr_38_37)
   | _ ->
     _x_45_55: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
       LeanText("Lean.HeadIndex"),
       LeanText("_private.Lean.HeadIndex.0.Lean.Expr.toHeadIndexSlow"),
       LeanScalar("nat", "104"),
       LeanScalar("nat", "31"),
       LeanText("unexpected expression kind"),
     );
-    f_Expr_toHeadIndexSlow_spec_0_4292c2cc6c(_x_45_55)
+    f_Expr_toHeadIndexSlow_spec_0_4292c2cc6c(_runtime, _x_45_55)
   }
 }
 // "panic._at_._private.Lean.HeadIndex.0.Lean.Expr.toHeadIndexSlow.spec_0"
-fun f_Expr_toHeadIndexSlow_spec_0_4292c2cc6c(_msg_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_Lean_instInhabitedHeadIndex_default_86306c5139();
-  L4_Init_Prelude.f_panicCore_3292f922f8(LeanErased(), _x_1_1, _msg_0)
+fun f_Expr_toHeadIndexSlow_spec_0_4292c2cc6c(
+  _runtime: mutable LeanExecution,
+  _msg_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_Lean_instInhabitedHeadIndex_default_86306c5139(
+    _runtime,
+  );
+  L4_Init_Prelude.f_panicCore_3292f922f8(_runtime, LeanErased(), _x_1_1, _msg_0)
 }
 // "Lean.Expr.toHeadIndex"
-fun f_Lean_Expr_toHeadIndex_fa1e19913c(_e_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = f_Lean_Expr_toHeadIndexQuick_2265662c1e(_e_0);
+fun f_Lean_Expr_toHeadIndex_fa1e19913c(
+  _runtime: mutable LeanExecution,
+  _e_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = f_Lean_Expr_toHeadIndexQuick_2265662c1e(_runtime, _e_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_e_0)
+  | "[\"Option\",\"none\"]" ->
+    f_Lean_Expr_toHeadIndexSlow_272d8f2cf5(_runtime, _e_0)
   | "[\"Option\",\"some\"]" ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _val_3_2
@@ -128,11 +144,17 @@ fun f_Lean_Expr_toHeadIndex_fa1e19913c(_e_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Expr.headNumArgs"
-fun f_Lean_Expr_headNumArgs_11290a2788(_e_0: LeanValue): LeanValue {
-  f_Expr_headNumArgs_go_a4193d1998(_e_0, LeanScalar("nat", "0"))
+fun f_Lean_Expr_headNumArgs_11290a2788(
+  _runtime: mutable LeanExecution,
+  _e_0: LeanValue,
+): LeanValue {
+  f_Expr_headNumArgs_go_a4193d1998(_runtime, _e_0, LeanScalar("nat", "0"))
 }
 // "_private.Lean.HeadIndex.0.Lean.Expr.toHeadIndexQuick?"
-fun f_Lean_Expr_toHeadIndexQuick_2265662c1e(_x_1_0: LeanValue): LeanValue {
+fun f_Lean_Expr_toHeadIndexQuick_2265662c1e(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
     _data_1: LeanValue = leanField(_x_1_0, 0);
@@ -210,7 +232,7 @@ fun f_Lean_Expr_toHeadIndexQuick_2265662c1e(_x_1_0: LeanValue): LeanValue {
     _data_26: LeanValue = leanField(_x_1_0, 0);
     _fn_35_27: LeanValue = leanField(_x_1_0, 1);
     _arg_36_28: LeanValue = leanField(_x_1_0, 2);
-    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_fn_35_27)
+    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_runtime, _fn_35_27)
   | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
     _data_29: LeanValue = leanField(_x_1_0, 0);
     _declName_38_30: LeanValue = leanField(_x_1_0, 1);
@@ -218,17 +240,19 @@ fun f_Lean_Expr_toHeadIndexQuick_2265662c1e(_x_1_0: LeanValue): LeanValue {
     _value_40_32: LeanValue = leanField(_x_1_0, 3);
     _body_41_33: LeanValue = leanField(_x_1_0, 4);
     _nondep_42_34: LeanValue = leanField(_x_1_0, 5);
-    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_body_41_33)
+    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_runtime, _body_41_33)
   | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
     _data_35: LeanValue = leanField(_x_1_0, 0);
     _data_44_36: LeanValue = leanField(_x_1_0, 1);
     _expr_45_37: LeanValue = leanField(_x_1_0, 2);
-    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_expr_45_37)
+    f_Lean_Expr_toHeadIndexQuick_2265662c1e(_runtime, _expr_45_37)
   | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
   }
 }
 // "Lean.instInhabitedHeadIndex.default"
-fun f_Lean_instInhabitedHeadIndex_default_86306c5139(): LeanValue {
+fun f_Lean_instInhabitedHeadIndex_default_86306c5139(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanCtor(
     "[\"Lean\",\"HeadIndex\",\"fvar\"]",
     Array[LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[])],
@@ -236,6 +260,7 @@ fun f_Lean_instInhabitedHeadIndex_default_86306c5139(): LeanValue {
 }
 // "Lean.instBEqHeadIndex.beq"
 fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -245,7 +270,11 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
     leanTag(_x_2_1) match {
     | "[\"Lean\",\"HeadIndex\",\"fvar\"]" ->
       _fvarId_4_8: LeanValue = leanField(_x_2_1, 0);
-      L4_Lean_Expr.f_Lean_instBEqFVarId_beq_4f51202b34(_fvarId_3_2, _fvarId_4_8)
+      L4_Lean_Expr.f_Lean_instBEqFVarId_beq_4f51202b34(
+        _runtime,
+        _fvarId_3_2,
+        _fvarId_4_8,
+      )
     | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
     }
   | "[\"Lean\",\"HeadIndex\",\"mvar\"]" ->
@@ -254,6 +283,7 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
     | "[\"Lean\",\"HeadIndex\",\"mvar\"]" ->
       _mvarId_8_11: LeanValue = leanField(_x_2_1, 0);
       L4_Lean_Expr.f_Lean_instBEqMVarId_beq_fc799f33a5(
+        _runtime,
         _mvarId_7_3,
         _mvarId_8_11,
       )
@@ -265,6 +295,7 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
     | "[\"Lean\",\"HeadIndex\",\"const\"]" ->
       _constName_12_14: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+        _runtime,
         _constName_11_4,
         _constName_12_14,
       )
@@ -278,13 +309,14 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
       _structName_17_17: LeanValue = leanField(_x_2_1, 0);
       _idx_18_18: LeanValue = leanField(_x_2_1, 1);
       _x_19_19: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+        _runtime,
         _structName_15_5,
         _structName_17_17,
       );
       leanTag(_x_19_19) match {
       | "[\"Bool\",\"false\"]" -> _x_19_19
       | "[\"Bool\",\"true\"]" ->
-        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_idx_16_6, _idx_18_18)
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _idx_16_6, _idx_18_18)
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
@@ -295,6 +327,7 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
     | "[\"Lean\",\"HeadIndex\",\"lit\"]" ->
       _litVal_23_22: LeanValue = leanField(_x_2_1, 0);
       L4_Lean_Expr.f_Lean_instBEqLiteral_beq_dea54cb2f4(
+        _runtime,
         _litVal_22_7,
         _litVal_23_22,
       )
@@ -322,12 +355,16 @@ fun f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
   }
 }
 fun apply_f_Lean_instBEqHeadIndex_beq_8d7a8ff028(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Lean_instBEqHeadIndex_beq_8d7a8ff028(_args[0], _args[1])
+  f_Lean_instBEqHeadIndex_beq_8d7a8ff028(_runtime, _args[0], _args[1])
 }
 // "Lean.HeadIndex.hash"
-fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
+fun f_Lean_HeadIndex_hash_cf38dc7d7d(
+  _runtime: mutable LeanExecution,
+  _x_1_0_input: LeanValue,
+): LeanValue {
   // Frame slots: 0=_x_1_0, 1=_fvarId_2_1, 2=_mvarId_6_2, 3=_constName_10_3, 4=_structName_15_4, 5=_idx_16_5, 6=_litVal_24_6, 7=_x_3_7, 8=_x_4_8, 9=_x_5_9, 10=_x_7_10, 11=_x_8_11, 12=_x_9_12, 13=_x_11_13, 14=_hash_14, 15=_hash_17, 16=_x_12_20, 17=_x_13_21, 18=_x_14_22, 19=_x_17_23, 20=_y_19_24, 21=_x_20_25, 22=_x_21_26, 23=_x_22_27, 24=_hash_28, 25=_hash_31, 26=_x_23_34, 27=_x_25_35, 28=_x_26_36, 29=_x_27_37, 30=_x_28_38, 31=_x_29_39, 32=_x_30_40
   _frame: mutable Array<LeanValue> = Array::mfill(
     33,
@@ -344,11 +381,14 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(7, LeanScalar("uint64", "11"));
         _frame.set(
           8,
-          L4_Lean_Expr.f_Lean_instHashableFVarId_hash_0a224ae9eb(_frame[1]),
+          L4_Lean_Expr.f_Lean_instHashableFVarId_hash_0a224ae9eb(
+            _runtime,
+            _frame[1],
+          ),
         );
         _frame.set(
           9,
-          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[7], _frame[8]),
+          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[7], _frame[8]),
         );
         return _frame[9]
       | "[\"Lean\",\"HeadIndex\",\"mvar\"]" ->
@@ -356,11 +396,18 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(10, LeanScalar("uint64", "13"));
         _frame.set(
           11,
-          L4_Lean_Expr.f_Lean_instHashableMVarId_hash_524addd803(_frame[2]),
+          L4_Lean_Expr.f_Lean_instHashableMVarId_hash_524addd803(
+            _runtime,
+            _frame[2],
+          ),
         );
         _frame.set(
           12,
-          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[10], _frame[11]),
+          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+            _runtime,
+            _frame[10],
+            _frame[11],
+          ),
         );
         return _frame[12]
       | "[\"Lean\",\"HeadIndex\",\"const\"]" ->
@@ -376,7 +423,11 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
           _ = leanField(_frame[3], 2);
           _frame.set(
             17,
-            L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[13], _frame[14]),
+            L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+              _runtime,
+              _frame[13],
+              _frame[14],
+            ),
           );
           return _frame[17]
         | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
@@ -385,7 +436,11 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
           _ = leanField(_frame[3], 2);
           _frame.set(
             18,
-            L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[13], _frame[15]),
+            L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+              _runtime,
+              _frame[13],
+              _frame[15],
+            ),
           );
           return _frame[18]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -422,10 +477,17 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
       | "[\"Lean\",\"HeadIndex\",\"lit\"]" ->
         _frame.set(6, leanField(_frame[0], 0));
         _frame.set(27, LeanScalar("uint64", "23"));
-        _frame.set(28, L4_Lean_Expr.f_Lean_Literal_hash_fe3484aa9e(_frame[6]));
+        _frame.set(
+          28,
+          L4_Lean_Expr.f_Lean_Literal_hash_fe3484aa9e(_runtime, _frame[6]),
+        );
         _frame.set(
           29,
-          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[27], _frame[28]),
+          L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+            _runtime,
+            _frame[27],
+            _frame[28],
+          ),
         );
         return _frame[29]
       | "[\"Lean\",\"HeadIndex\",\"sort\"]" ->
@@ -442,23 +504,29 @@ fun f_Lean_HeadIndex_hash_cf38dc7d7d(_x_1_0_input: LeanValue): LeanValue {
     | 1 ->
       _frame.set(
         21,
-        L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(_frame[5]),
+        L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(
+          _runtime,
+          _frame[5],
+        ),
       );
       _frame.set(
         22,
-        L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[20], _frame[21]),
+        L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[20], _frame[21]),
       );
       _frame.set(
         23,
-        L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_frame[19], _frame[22]),
+        L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[19], _frame[22]),
       );
       return _frame[23]
     | _ -> return leanFail("invalid join point")
     }
   }
 }
-fun apply_f_Lean_HeadIndex_hash_cf38dc7d7d(_args: Array<LeanValue>): LeanValue {
-  f_Lean_HeadIndex_hash_cf38dc7d7d(_args[0])
+fun apply_f_Lean_HeadIndex_hash_cf38dc7d7d(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Lean_HeadIndex_hash_cf38dc7d7d(_runtime, _args[0])
 }
 
 module end;

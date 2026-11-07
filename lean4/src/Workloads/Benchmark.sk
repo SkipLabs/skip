@@ -1,0 +1,171 @@
+class LeanTimedTheorem(result: LeanTheoremResult, nanoseconds: Int)
+
+fun leanMeasureLimitEdit(
+  context: mutable SKStore.Context,
+  constants: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+  request: LeanTheoremRequest,
+  results: ?SKStore.EHandle<SKStore.SID, LeanTheoremResult>,
+  edit: LeanLimitEdit,
+): LeanTimedTheorem {
+  start = Time.time_ns();
+  result = SKStore.withRegion(context, (_, current) ~> {
+    edit.apply(current, constants);
+    current.update();
+    results match {
+    | Some(handle) -> handle.get(current, SKStore.SID("result"))
+    | None() -> leanRunTheorem(current, request)
+    }
+  });
+  LeanTimedTheorem(result, Time.time_ns() - start)
+}
+
+// This is whole-process resident memory, including the shared import data and
+// allocator reserves, not a claim about live theorem-cache bytes. Linux supplies
+// VmRSS; other platforms explicitly report the measurement as unavailable.
+fun leanBenchmarkRss(): JSON.Value {
+  path = "/proc/self/status";
+  if (!FileSystem.exists(path)) return JSON.Null();
+  // procfs reports a zero stat size. Read until EOF rather than using the
+  // regular-file helper, which allocates from that reported size.
+  file = IO.File::open(path, IO.OpenOptions{read => true});
+  content = file.read_to_string();
+  file.close();
+  source = content match {
+  | Success(text) -> text
+  | Failure(_) -> return JSON.Null()
+  };
+  for (line in source.split("\n")) {
+    if (line.startsWith("VmRSS:")) return JSON.String(line)
+  };
+  JSON.Null()
+}
+
+fun leanBenchmarkLimit(
+  context: mutable SKStore.Context,
+  freshContext: mutable SKStore.Context,
+  constants: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+  request: LeanTheoremRequest,
+  results: SKStore.EHandle<SKStore.SID, LeanTheoremResult>,
+  outputRoot: String,
+): void {
+  warmup = 10;
+  samples = 100;
+  groups: mutable Vector<JSON.Value> = mutable Vector[];
+  for (mode in Array["no-op", "noise", "limit"]) {
+    beforeRss = leanBenchmarkRss();
+    incrementalTimes: mutable Vector<JSON.Value> = mutable Vector[];
+    freshTimes: mutable Vector<JSON.Value> = mutable Vector[];
+    executions = 0;
+    previousTick = results.get(context, SKStore.SID("result")).evaluatedAt;
+    for (i in Range(0, warmup + samples)) {
+      edit = mode match {
+      | "no-op" ->
+        LeanLimitEdit(mode, "before-result", None(), None(), true, false)
+      | "noise" ->
+        LeanLimitEdit(
+          mode,
+          "before-result",
+          Some("noise"),
+          Some(1000 + i),
+          true,
+          false,
+        )
+      | "limit" ->
+        LeanLimitEdit(
+          mode,
+          "before-result",
+          Some("limit"),
+          Some(if (i % 2 == 0) 4 else 3),
+          true,
+          true,
+        )
+      | _ -> leanFail("unknown benchmark edit")
+      };
+      // Alternate execution order to reduce systematic cache/scheduling bias.
+      (incremental, fresh) = if (i % 2 == 0) {
+        incremental = leanMeasureLimitEdit(
+          context,
+          constants,
+          request,
+          Some(results),
+          edit,
+        );
+        fresh = leanMeasureLimitEdit(
+          freshContext,
+          constants,
+          request,
+          None(),
+          edit,
+        );
+        (incremental, fresh)
+      } else {
+        fresh = leanMeasureLimitEdit(
+          freshContext,
+          constants,
+          request,
+          None(),
+          edit,
+        );
+        incremental = leanMeasureLimitEdit(
+          context,
+          constants,
+          request,
+          Some(results),
+          edit,
+        );
+        (incremental, fresh)
+      };
+      leanCompareTheorems(context, incremental.result, fresh.result, true);
+      recomputed = incremental.result.evaluatedAt != previousTick;
+      assert(recomputed == edit.recomputes);
+      !previousTick = incremental.result.evaluatedAt;
+      if (i >= warmup) {
+        if (recomputed) !executions = executions + 1;
+        incrementalTimes.push(JSON.IntNumber(incremental.nanoseconds));
+        freshTimes.push(JSON.IntNumber(fresh.nanoseconds))
+      }
+    };
+    groups.push(
+      JSON.Object[
+        "edit" => JSON.String(mode),
+        "warmup" => JSON.IntNumber(warmup),
+        "samples" => JSON.IntNumber(samples),
+        "incrementalExecutions" => JSON.IntNumber(executions),
+        "freshExecutions" => JSON.IntNumber(samples),
+        "incrementalNs" => JSON.Array(incrementalTimes.chill()),
+        "freshNs" => JSON.Array(freshTimes.chill()),
+        "rssBefore" => beforeRss,
+        "rssAfter" => leanBenchmarkRss(),
+      ],
+    );
+    print_string(
+      "Benchmarked " +
+        mode +
+        ": " +
+        executions.toString() +
+        " incremental executions / " +
+        samples.toString() +
+        " fresh executions",
+    )
+  };
+  FileSystem.writeTextFile(
+    outputRoot + "/limit-benchmark.json",
+    JSON.Object[
+      "schema" => JSON.IntNumber(1),
+      "leanCommit" => JSON.String("63fbf3d3588b404bbe707721df61ecd41885a6f6"),
+      "groups" => JSON.Array(groups.chill()),
+      "baseline" => JSON.String(
+        "Fresh execution of the same maintained Skip theorem function, with fresh initialization and Meta/Core state. No native Lean timing is used.",
+      ),
+      "included" => JSON.String(
+        "Applying edits, SKStore update, theorem execution when needed, returning/publishing results, and temporary-region reclamation.",
+      ),
+      "excluded" => JSON.String(
+        "One-time import loading and installation, compilation, proof comparison, JSON serialization, and independent kernel checking. Cold import/setup timings are in limit-edits.json.",
+      ),
+      "rssNote" => JSON.String(
+        "Whole-process VmRSS, including both contexts, imports and allocator reserves; not live cache size.",
+      ),
+    ].encode(),
+  )
+}

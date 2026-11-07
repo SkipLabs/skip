@@ -1,0 +1,127 @@
+fun levelSubstList(values: Array<LeanValue>): LeanValue {
+  result: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  index = values.size();
+  while (index > 0) {
+    !index = index - 1;
+    !result = LeanCtor("[\"List\",\"cons\"]", Array[values[index], result])
+  };
+  result
+}
+
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  uName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("u"));
+  vName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("v"));
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, vName);
+  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("f"));
+  expr = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    name,
+    levelSubstList(
+      Array[
+        u,
+        L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, v),
+        L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, u, v),
+        L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, u, v),
+      ],
+    ),
+  );
+  body = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x")),
+    LeanCtor("[\"Lean\",\"BinderInfo\",\"implicit\"]", Array[]),
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+      runtime,
+      expr,
+      L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, v),
+    ),
+  );
+  x = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  all = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    x,
+    LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
+    body,
+  );
+  binding = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    x,
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
+    expr,
+    body,
+    leanBool(true),
+  );
+  metadata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    levelSubstList(
+      Array[
+        LeanCtor(
+          "[\"Prod\",\"mk\"]",
+          Array[
+            L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+              runtime,
+              LeanText("marker"),
+            ),
+            LeanCtor(
+              "[\"Lean\",\"DataValue\",\"ofNat\"]",
+              Array[leanNatValue(7)],
+            ),
+          ],
+        ),
+      ],
+    ),
+    body,
+  );
+  projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("Pair")),
+    leanNatValue(0),
+    body,
+  );
+  absent = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("absent"),
+  );
+  results: mutable Vector<String> = mutable Vector[];
+  for ((input, names, levels) in Array[
+    (expr, Array[uName, vName], Array[zero, one]),
+    (body, Array[uName, vName], Array[zero, one]),
+    (expr, Array[uName], Array[v]),
+    (expr, Array[uName, vName], Array[zero]),
+    (expr, Array[uName], Array[zero, one]),
+    (expr, Array[uName, uName], Array[zero, one]),
+    (expr, Array[], Array[zero]),
+    (expr, Array[uName], Array[]),
+    (all, Array[uName, vName], Array[zero, one]),
+    (binding, Array[uName, vName], Array[zero, one]),
+    (metadata, Array[uName, vName], Array[zero, one]),
+    (projection, Array[uName, vName], Array[zero, one]),
+    (all, Array[uName], Array[u]),
+    (binding, Array[uName], Array[u]),
+    (metadata, Array[uName], Array[u]),
+    (projection, Array[uName], Array[u]),
+    (expr, Array[absent], Array[zero]),
+  ]) {
+    result = L4_Lean_Util_InstantiateLevelParams.f_Lean_Expr_instantiateLevelParamsImpl_0f94a4919a(
+      runtime,
+      input,
+      levelSubstList(names),
+      levelSubstList(levels),
+    );
+    if (
+      names.size() == 1 &&
+      levels.size() == 1 &&
+      leanLevelEqual(levels[0], u)
+    ) {
+      assert(leanExprEqual(runtime, result, input, true))
+    };
+    results.push(LeanNat::fromWord(leanExprData(result)).toString())
+  };
+  print_string("[" + results.toArray().join(",") + "]")
+}

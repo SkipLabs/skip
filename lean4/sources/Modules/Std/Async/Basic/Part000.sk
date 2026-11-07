@@ -2,6 +2,7 @@ module L4_Std_Async_Basic;
 
 // "Std.Async.EAsync.tryFinally'._redArg"
 fun f_Async_EAsync_tryFinally_7c9cd70c43(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _f_1: LeanValue,
   _prio_2: LeanValue,
@@ -13,12 +14,13 @@ fun f_Async_EAsync_tryFinally_7c9cd70c43(
     3,
     Array[_f_1],
   );
-  _x_3_6: LeanValue = leanApply(_x_0, Array[_a_1_4]);
+  _x_3_6: LeanValue = leanApply(_runtime, _x_0, Array[_a_1_4]);
   leanTag(_x_3_6) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_4_7: LeanValue = leanField(_x_3_6, 0);
     _state_5_8: LeanValue = leanField(_x_3_6, 1);
     f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
+      _runtime,
       _prio_2,
       _sync_3,
       _val_4_7,
@@ -30,10 +32,15 @@ fun f_Async_EAsync_tryFinally_7c9cd70c43(
 }
 // "Std.Async.AsyncTask.block._redArg"
 fun f_Async_AsyncTask_block_d41b5cf659(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = L4_Init_Core.f_Task_get_c7ebb314a7(LeanErased(), _x_0);
+  _x_2_2: LeanValue = L4_Init_Core.f_Task_get_c7ebb314a7(
+    _runtime,
+    LeanErased(),
+    _x_0,
+  );
   leanTag(_x_2_2) match {
   | "[\"Except\",\"error\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
@@ -46,6 +53,7 @@ fun f_Async_AsyncTask_block_d41b5cf659(
 }
 // "_private.Std.Async.Basic.0.Std.Async.BaseAsync.bind.bindAsyncTask._redArg"
 fun f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
+  _runtime: mutable LeanExecution,
   _prio_0: LeanValue,
   _sync_1: LeanValue,
   _t_2: LeanValue,
@@ -55,7 +63,7 @@ fun f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
   leanTag(_t_2) match {
   | "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]" ->
     _a_2_5: LeanValue = leanField(_t_2, 0);
-    leanApply(_f_3, Array[_a_2_5, _a_1_4])
+    leanApply(_runtime, _f_3, Array[_a_2_5, _a_1_4])
   | "[\"Std\",\"Async\",\"MaybeTask\",\"ofTask\"]" ->
     _a_4_6: LeanValue = leanField(_t_2, 0);
     _f_5_8: LeanValue = LeanClosure(
@@ -64,6 +72,7 @@ fun f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
       Array[_f_3],
     );
     _x_6_9: LeanValue = L4_Init_System_IO.f_BaseIO_bindTask_8b49975efb(
+      _runtime,
       LeanErased(),
       LeanErased(),
       _a_4_6,
@@ -93,6 +102,7 @@ fun f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
 }
 // "Std.Async.EAsync.tryFinally'._redArg._lam_1"
 fun f_EAsync_tryFinally_lam_1_1ffaa3d52a(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _do_lift_2_1: LeanValue,
   _y_3_2: LeanValue,
@@ -131,12 +141,14 @@ fun f_EAsync_tryFinally_lam_1_1ffaa3d52a(
   }
 }
 fun apply_f_EAsync_tryFinally_lam_1_1ffaa3d52a(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_EAsync_tryFinally_lam_1_1ffaa3d52a(_args[0], _args[1], _args[2])
+  f_EAsync_tryFinally_lam_1_1ffaa3d52a(_runtime, _args[0], _args[1], _args[2])
 }
 // "_private.Std.Async.Basic.0.Std.Async.BaseAsync.bind.bindAsyncTask"
 fun f_BaseAsync_bind_bindAsyncTask_14854bb26f(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _prio_2: LeanValue,
@@ -146,6 +158,7 @@ fun f_BaseAsync_bind_bindAsyncTask_14854bb26f(
   _a_1_6: LeanValue,
 ): LeanValue {
   f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
+    _runtime,
     _prio_2,
     _sync_3,
     _t_4,
@@ -155,6 +168,7 @@ fun f_BaseAsync_bind_bindAsyncTask_14854bb26f(
 }
 // "Std.Async.EAsync.tryFinally'._redArg._lam_2"
 fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _x_1_1: LeanValue,
   _y_2_2: LeanValue,
@@ -168,6 +182,7 @@ fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
       Array[_a_3_3],
     );
     _x_8_9: LeanValue = leanApply(
+      _runtime,
       _f_0,
       Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _y_2_2],
     );
@@ -176,6 +191,7 @@ fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
       _val_9_10: LeanValue = leanField(_x_8_9, 0);
       _state_10_11: LeanValue = leanField(_x_8_9, 1);
       f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
+        _runtime,
         LeanScalar("nat", "0"),
         LeanCtor("[\"Bool\",\"false\"]", Array[]),
         _val_9_10,
@@ -192,6 +208,7 @@ fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
       Array[_a_12_4],
     );
     _x_17_17: LeanValue = leanApply(
+      _runtime,
       _f_0,
       Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_12_4]), _y_2_2],
     );
@@ -200,6 +217,7 @@ fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
       _val_18_18: LeanValue = leanField(_x_17_17, 0);
       _state_19_19: LeanValue = leanField(_x_17_17, 1);
       f_BaseAsync_bind_bindAsyncTask_f20a10e0f4(
+        _runtime,
         LeanScalar("nat", "0"),
         LeanCtor("[\"Bool\",\"false\"]", Array[]),
         _val_18_18,
@@ -212,12 +230,14 @@ fun f_EAsync_tryFinally_lam_2_c8cd99c8db(
   }
 }
 fun apply_f_EAsync_tryFinally_lam_2_c8cd99c8db(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_EAsync_tryFinally_lam_2_c8cd99c8db(_args[0], _args[1], _args[2])
+  f_EAsync_tryFinally_lam_2_c8cd99c8db(_runtime, _args[0], _args[1], _args[2])
 }
 // "Std.Async.EAsync.tryFinally'._redArg._lam_0"
 fun f_EAsync_tryFinally_lam_0_8e5f47b80b(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _do_lift_2_1: LeanValue,
   _y_3_2: LeanValue,
@@ -251,17 +271,19 @@ fun f_EAsync_tryFinally_lam_0_8e5f47b80b(
   }
 }
 fun apply_f_EAsync_tryFinally_lam_0_8e5f47b80b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_EAsync_tryFinally_lam_0_8e5f47b80b(_args[0], _args[1], _args[2])
+  f_EAsync_tryFinally_lam_0_8e5f47b80b(_runtime, _args[0], _args[1], _args[2])
 }
 // "_private.Std.Async.Basic.0.Std.Async.BaseAsync.bind.bindAsyncTask._redArg._lam_0"
 fun f_bind_bindAsyncTask_lam_0_64b631e4b8(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _a_1: LeanValue,
   _y_1_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = leanApply(_f_0, Array[_a_1, _y_1_2]);
+  _x_2_3: LeanValue = leanApply(_runtime, _f_0, Array[_a_1, _y_1_2]);
   leanTag(_x_2_3) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_3_4: LeanValue = leanField(_x_2_3, 0);
@@ -270,6 +292,7 @@ fun f_bind_bindAsyncTask_lam_0_64b631e4b8(
     | "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]" ->
       _a_5_6: LeanValue = leanField(_val_3_4, 0);
       _x_6_8: LeanValue = L4_Init_Core.f_Task_pure_8e8af46293(
+        _runtime,
         LeanErased(),
         _a_5_6,
       );
@@ -283,9 +306,10 @@ fun f_bind_bindAsyncTask_lam_0_64b631e4b8(
   }
 }
 fun apply_f_bind_bindAsyncTask_lam_0_64b631e4b8(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_bind_bindAsyncTask_lam_0_64b631e4b8(_args[0], _args[1], _args[2])
+  f_bind_bindAsyncTask_lam_0_64b631e4b8(_runtime, _args[0], _args[1], _args[2])
 }
 
 module end;

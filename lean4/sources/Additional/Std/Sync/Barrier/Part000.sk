@@ -2,16 +2,18 @@ module L4_Std_Sync_Barrier;
 
 // "Std.Mutex.atomically._at_.Std.Barrier.wait.spec_1"
 fun f_Barrier_wait_spec_1_54bac6fb44(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _mutex_2: LeanValue,
   _k_3: LeanValue,
   _y_1_4: LeanValue,
 ): LeanValue {
-  f_Barrier_wait_spec_1_db229545b2(_mutex_2, _k_3, _y_1_4)
+  f_Barrier_wait_spec_1_db229545b2(_runtime, _mutex_2, _k_3, _y_1_4)
 }
 // "Std.Barrier.wait._lam_1"
 fun f_Barrier_wait_lam_1_e988867d54(
+  _runtime: mutable LeanExecution,
   _numThreads_0: LeanValue,
   _cvar_1: LeanValue,
   _lock_2: LeanValue,
@@ -19,6 +21,7 @@ fun f_Barrier_wait_lam_1_e988867d54(
   _y_2_4: LeanValue,
 ): LeanValue {
   _x_3_5: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_1_3,
@@ -33,6 +36,7 @@ fun f_Barrier_wait_lam_1_e988867d54(
       _count_8: LeanValue = leanField(_val_4_6, 0);
       _generationId_9: LeanValue = leanField(_val_4_6, 1);
       _x_6_10: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _y_1_3,
@@ -48,10 +52,12 @@ fun f_Barrier_wait_lam_1_e988867d54(
           _generationId_14: LeanValue = leanField(_val_7_11, 1);
           _x_9_15: LeanValue = LeanScalar("nat", "1");
           _x_10_16: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+            _runtime,
             _count_13,
             _x_9_15,
           );
           _x_12_18: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+            _runtime,
             LeanErased(),
             LeanErased(),
             _y_1_3,
@@ -66,6 +72,7 @@ fun f_Barrier_wait_lam_1_e988867d54(
             _val_13_19: LeanValue = leanField(_x_12_18, 0);
             _state_14_20: LeanValue = leanField(_x_12_18, 1);
             _x_15_21: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+              _runtime,
               LeanErased(),
               LeanErased(),
               _y_1_3,
@@ -80,12 +87,14 @@ fun f_Barrier_wait_lam_1_e988867d54(
                 _count_24: LeanValue = leanField(_val_16_22, 0);
                 _generationId_25: LeanValue = leanField(_val_16_22, 1);
                 _x_18_26: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                  _runtime,
                   _count_24,
                   _numThreads_0,
                 );
                 leanTag(_x_18_26) match {
                 | "[\"Bool\",\"false\"]" ->
                   _x_19_27: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+                    _runtime,
                     LeanErased(),
                     LeanErased(),
                     _y_1_3,
@@ -100,10 +109,12 @@ fun f_Barrier_wait_lam_1_e988867d54(
                       _count_30: LeanValue = leanField(_val_20_28, 0);
                       _generationId_31: LeanValue = leanField(_val_20_28, 1);
                       _x_23_33: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+                        _runtime,
                         _generationId_31,
                         _x_9_15,
                       );
                       _x_25_35: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+                        _runtime,
                         LeanErased(),
                         LeanErased(),
                         _y_1_3,
@@ -118,6 +129,7 @@ fun f_Barrier_wait_lam_1_e988867d54(
                         _val_26_36: LeanValue = leanField(_x_25_35, 0);
                         _state_27_37: LeanValue = leanField(_x_25_35, 1);
                         _x_28_38: LeanValue = L4_Std_Sync_Mutex.f_Std_Condvar_notifyAll_12dfe9eaa5(
+                          _runtime,
                           _cvar_1,
                           _state_27_37,
                         );
@@ -151,6 +163,7 @@ fun f_Barrier_wait_lam_1_e988867d54(
                       Array[_generationId_9, _x_18_26],
                     );
                     _x_34_46: LeanValue = f_Barrier_wait_spec_0_2171c4e49e(
+                      _runtime,
                       _cvar_1,
                       _mutex_44,
                       _f_33_45,
@@ -189,8 +202,12 @@ fun f_Barrier_wait_lam_1_e988867d54(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_Barrier_wait_lam_1_e988867d54(_args: Array<LeanValue>): LeanValue {
+fun apply_f_Barrier_wait_lam_1_e988867d54(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_Barrier_wait_lam_1_e988867d54(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -200,11 +217,13 @@ fun apply_f_Barrier_wait_lam_1_e988867d54(_args: Array<LeanValue>): LeanValue {
 }
 // "Std.Barrier.new"
 fun f_Std_Barrier_new_889e4b4029(
+  _runtime: mutable LeanExecution,
   _numThreads_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
   _x_2_2: LeanValue = LeanScalar("nat", "0");
   _x_4_4: LeanValue = L4_Std_Sync_Mutex.f_Std_Mutex_new_f7e8b64492(
+    _runtime,
     LeanCtor(
       "[\"_private\",\"Std\",\"Sync\",\"Barrier\",0,\"Std\",\"BarrierState\",\"mk\"]",
       Array[_x_2_2, _x_2_2],
@@ -216,6 +235,7 @@ fun f_Std_Barrier_new_889e4b4029(
     _val_5_5: LeanValue = leanField(_x_4_4, 0);
     _state_6_6: LeanValue = leanField(_x_4_4, 1);
     _x_7_7: LeanValue = L4_Std_Sync_Mutex.f_Std_Condvar_new_fcec465ccc(
+      _runtime,
       _state_6_6,
     );
     leanTag(_x_7_7) match {
@@ -239,6 +259,7 @@ fun f_Std_Barrier_new_889e4b4029(
 }
 // "Std.Barrier.wait"
 fun f_Std_Barrier_wait_a9b3eefed4(
+  _runtime: mutable LeanExecution,
   _barrier_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -252,12 +273,13 @@ fun f_Std_Barrier_wait_a9b3eefed4(
       5,
       Array[_numThreads_4, _cvar_3, _lock_2],
     );
-    f_Barrier_wait_spec_1_db229545b2(_lock_2, _f_2_5, _a_1_1)
+    f_Barrier_wait_spec_1_db229545b2(_runtime, _lock_2, _f_2_5, _a_1_1)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Std.Condvar.waitUntil._at_.Std.Barrier.wait.spec_0"
 fun f_Barrier_wait_spec_0_2171c4e49e(
+  _runtime: mutable LeanExecution,
   _condvar_0: LeanValue,
   _mutex_1: LeanValue,
   _pred_2: LeanValue,
@@ -265,6 +287,7 @@ fun f_Barrier_wait_spec_0_2171c4e49e(
   _y_2_4: LeanValue,
 ): LeanValue {
   _x_4_6: LeanValue = f_wait_spec_0_spec_0_7d80307b72(
+    _runtime,
     _pred_2,
     _condvar_0,
     _mutex_1,
@@ -283,7 +306,9 @@ fun f_Barrier_wait_spec_0_2171c4e49e(
   }
 }
 // "Std.Barrier.new._closed_0"
-fun f_Barrier_new_closed_0_a92586affb(): LeanValue {
+fun f_Barrier_new_closed_0_a92586affb(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_75_0: LeanValue = LeanScalar("nat", "0");
   _x_76_1: LeanValue = LeanScalar("nat", "0");
   LeanCtor(
@@ -293,12 +318,14 @@ fun f_Barrier_new_closed_0_a92586affb(): LeanValue {
 }
 // "Std.Barrier.wait._lam_0"
 fun f_Barrier_wait_lam_0_f68db51f2d(
+  _runtime: mutable LeanExecution,
   _generationId_0: LeanValue,
   _x_1_1: LeanValue,
   _y_2_2: LeanValue,
   _y_3_3: LeanValue,
 ): LeanValue {
   _x_4_4: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _y_2_2,
@@ -313,6 +340,7 @@ fun f_Barrier_wait_lam_0_f68db51f2d(
       _count_7: LeanValue = leanField(_val_5_5, 0);
       _generationId_8: LeanValue = leanField(_val_5_5, 1);
       _x_7_9: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _generationId_8,
         _generationId_0,
       );
@@ -331,11 +359,21 @@ fun f_Barrier_wait_lam_0_f68db51f2d(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_Barrier_wait_lam_0_f68db51f2d(_args: Array<LeanValue>): LeanValue {
-  f_Barrier_wait_lam_0_f68db51f2d(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_Barrier_wait_lam_0_f68db51f2d(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_Barrier_wait_lam_0_f68db51f2d(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "Std.Mutex.atomically._at_.Std.Barrier.wait.spec_1._redArg"
 fun f_Barrier_wait_spec_1_db229545b2(
+  _runtime: mutable LeanExecution,
   _mutex_0: LeanValue,
   _k_1: LeanValue,
   _y_1_2: LeanValue,
@@ -345,6 +383,7 @@ fun f_Barrier_wait_spec_1_db229545b2(
     _ref_3: LeanValue = leanField(_mutex_0, 0);
     _mutex_4: LeanValue = leanField(_mutex_0, 1);
     _x_2_5: LeanValue = L4_Std_Sync_Mutex.f_Std_BaseMutex_lock_ac2fb8a971(
+      _runtime,
       _mutex_4,
       _y_1_2,
     );
@@ -352,12 +391,13 @@ fun f_Barrier_wait_spec_1_db229545b2(
     | "[\"ST\",\"Out\",\"mk\"]" ->
       _val_3_6: LeanValue = leanField(_x_2_5, 0);
       _state_4_7: LeanValue = leanField(_x_2_5, 1);
-      _x_5_8: LeanValue = leanApply(_k_1, Array[_ref_3, _state_4_7]);
+      _x_5_8: LeanValue = leanApply(_runtime, _k_1, Array[_ref_3, _state_4_7]);
       leanTag(_x_5_8) match {
       | "[\"ST\",\"Out\",\"mk\"]" ->
         _val_6_9: LeanValue = leanField(_x_5_8, 0);
         _state_7_10: LeanValue = leanField(_x_5_8, 1);
         _x_8_11: LeanValue = L4_Std_Sync_Mutex.f_Std_BaseMutex_unlock_6ed47120e3(
+          _runtime,
           _mutex_4,
           _state_7_10,
         );
@@ -377,6 +417,7 @@ fun f_Barrier_wait_spec_1_db229545b2(
 }
 // "_private.Init.While.0.repeatM.erased._at_.Std.Condvar.waitUntil._at_.Std.Barrier.wait.spec_0.spec_0"
 fun f_wait_spec_0_spec_0_bdb1b4db23(
+  _runtime: mutable LeanExecution,
   _pred_0: LeanValue,
   _condvar_1: LeanValue,
   _mutex_2: LeanValue,
@@ -385,17 +426,25 @@ fun f_wait_spec_0_spec_0_bdb1b4db23(
   _y_2_5: LeanValue,
   _y_3_6: LeanValue,
 ): LeanValue {
-  f_wait_spec_0_spec_0_7d80307b72(_pred_0, _condvar_1, _mutex_2, _y_2_5, _y_3_6)
+  f_wait_spec_0_spec_0_7d80307b72(
+    _runtime,
+    _pred_0,
+    _condvar_1,
+    _mutex_2,
+    _y_2_5,
+    _y_3_6,
+  )
 }
 // "_private.Init.While.0.repeatM.erased._at_.Std.Condvar.waitUntil._at_.Std.Barrier.wait.spec_0.spec_0._redArg"
 fun f_wait_spec_0_spec_0_7d80307b72(
+  _runtime: mutable LeanExecution,
   _pred_0: LeanValue,
   _condvar_1: LeanValue,
   _mutex_2: LeanValue,
   _y_1_3: LeanValue,
   _y_2_4: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_pred_0, Array[_y_1_3, _y_2_4]);
+  _x_4_6: LeanValue = leanApply(_runtime, _pred_0, Array[_y_1_3, _y_2_4]);
   leanTag(_x_4_6) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_5_7: LeanValue = leanField(_x_4_6, 0);
@@ -403,6 +452,7 @@ fun f_wait_spec_0_spec_0_7d80307b72(
     leanTag(_val_5_7) match {
     | "[\"Bool\",\"false\"]" ->
       _x_7_9: LeanValue = L4_Std_Sync_Mutex.f_Std_Condvar_wait_61a9979587(
+        _runtime,
         _condvar_1,
         _mutex_2,
         _state_6_8,
@@ -412,6 +462,7 @@ fun f_wait_spec_0_spec_0_7d80307b72(
         _val_8_10: LeanValue = leanField(_x_7_9, 0);
         _state_9_11: LeanValue = leanField(_x_7_9, 1);
         f_wait_spec_0_spec_0_7d80307b72(
+          _runtime,
           _pred_0,
           _condvar_1,
           _mutex_2,

@@ -2,6 +2,7 @@ module L4_Init_Data_List_Control;
 
 // "List.forM._redArg"
 fun f_List_forM_1d30ff054c(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _as_1: LeanValue,
   _f_2: LeanValue,
@@ -20,6 +21,7 @@ fun f_List_forM_1d30ff054c(
       leanTag(_as_1) match {
       | "[\"List\",\"nil\"]" ->
         leanApply(
+          _runtime,
           _toPure_6,
           Array[LeanErased(), LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
         )
@@ -31,8 +33,9 @@ fun f_List_forM_1d30ff054c(
           4,
           Array[_inst_1_0, _tail_5_11, _f_2],
         );
-        _x_7_15: LeanValue = leanApply(_f_2, Array[_head_4_10]);
+        _x_7_15: LeanValue = leanApply(_runtime, _f_2, Array[_head_4_10]);
         leanApply(
+          _runtime,
           _toBind_4,
           Array[LeanErased(), LeanErased(), _x_7_15, _f_6_14],
         )
@@ -45,6 +48,7 @@ fun f_List_forM_1d30ff054c(
 }
 // "List.mapM.loop._redArg._lam_0"
 fun f_mapM_loop_lam_0_e241ed4570(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _f_2: LeanValue,
@@ -52,29 +56,45 @@ fun f_mapM_loop_lam_0_e241ed4570(
   _do_lift_4_4: LeanValue,
 ): LeanValue {
   f_List_mapM_loop_7cc22d5270(
+    _runtime,
     _inst_2_1,
     _f_2,
     _tail_3_3,
     LeanCtor("[\"List\",\"cons\"]", Array[_do_lift_4_4, _x_1_0]),
   )
 }
-fun apply_f_mapM_loop_lam_0_e241ed4570(_args: Array<LeanValue>): LeanValue {
-  f_mapM_loop_lam_0_e241ed4570(_args[0], _args[1], _args[2], _args[3], _args[4])
+fun apply_f_mapM_loop_lam_0_e241ed4570(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_mapM_loop_lam_0_e241ed4570(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+  )
 }
 // "List.forM._redArg._lam_0"
 fun f_List_forM_lam_0_a72a07a596(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _tail_2_1: LeanValue,
   _f_2: LeanValue,
   _r_3_3: LeanValue,
 ): LeanValue {
-  f_List_forM_1d30ff054c(_inst_1_0, _tail_2_1, _f_2)
+  f_List_forM_1d30ff054c(_runtime, _inst_1_0, _tail_2_1, _f_2)
 }
-fun apply_f_List_forM_lam_0_a72a07a596(_args: Array<LeanValue>): LeanValue {
-  f_List_forM_lam_0_a72a07a596(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_List_forM_lam_0_a72a07a596(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_List_forM_lam_0_a72a07a596(_runtime, _args[0], _args[1], _args[2], _args[3])
 }
 // "List.forIn'.loop._redArg._lam_0"
 fun f_forIn_loop_lam_0_c46f16c4b6(
+  _runtime: mutable LeanExecution,
   _toPure_0: LeanValue,
   _inst_1_1: LeanValue,
   _f_2: LeanValue,
@@ -84,15 +104,19 @@ fun f_forIn_loop_lam_0_c46f16c4b6(
   leanTag(_do_lift_3_4) match {
   | "[\"ForInStep\",\"done\"]" ->
     _a_4_5: LeanValue = leanField(_do_lift_3_4, 0);
-    leanApply(_toPure_0, Array[LeanErased(), _a_4_5])
+    leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_4_5])
   | "[\"ForInStep\",\"yield\"]" ->
     _a_6_6: LeanValue = leanField(_do_lift_3_4, 0);
-    f_List_forIn_loop_f9001ea68e(_inst_1_1, _f_2, _tail_2_3, _a_6_6)
+    f_List_forIn_loop_f9001ea68e(_runtime, _inst_1_1, _f_2, _tail_2_3, _a_6_6)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_forIn_loop_lam_0_c46f16c4b6(_args: Array<LeanValue>): LeanValue {
+fun apply_f_forIn_loop_lam_0_c46f16c4b6(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_forIn_loop_lam_0_c46f16c4b6(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -102,6 +126,7 @@ fun apply_f_forIn_loop_lam_0_c46f16c4b6(_args: Array<LeanValue>): LeanValue {
 }
 // "List.forIn'.loop._redArg"
 fun f_List_forIn_loop_f9001ea68e(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _f_1: LeanValue,
   _as_2: LeanValue,
@@ -119,7 +144,8 @@ fun f_List_forIn_loop_f9001ea68e(
       _toSeqLeft_9: LeanValue = leanField(_toApplicative_4, 3);
       _toSeqRight_10: LeanValue = leanField(_toApplicative_4, 4);
       leanTag(_as_2) match {
-      | "[\"List\",\"nil\"]" -> leanApply(_toPure_7, Array[LeanErased(), _b_3])
+      | "[\"List\",\"nil\"]" ->
+        leanApply(_runtime, _toPure_7, Array[LeanErased(), _b_3])
       | "[\"List\",\"cons\"]" ->
         _head_3_11: LeanValue = leanField(_as_2, 0);
         _tail_4_12: LeanValue = leanField(_as_2, 1);
@@ -129,10 +155,12 @@ fun f_List_forIn_loop_f9001ea68e(
           Array[_toPure_7, _inst_1_0, _f_1, _tail_4_12],
         );
         _x_6_15: LeanValue = leanApply(
+          _runtime,
           _f_1,
           Array[_head_3_11, LeanErased(), _b_3],
         );
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_6_15, _f_5_14],
         )
@@ -145,6 +173,7 @@ fun f_List_forIn_loop_f9001ea68e(
 }
 // "List.mapM.loop._redArg"
 fun f_List_mapM_loop_7cc22d5270(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _f_1: LeanValue,
   _x_2_2: LeanValue,
@@ -164,9 +193,10 @@ fun f_List_mapM_loop_7cc22d5270(
       leanTag(_x_2_2) match {
       | "[\"List\",\"nil\"]" ->
         _x_4_13: LeanValue = L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(
+          _runtime,
           _x_3_3,
         );
-        leanApply(_toPure_7, Array[LeanErased(), _x_4_13])
+        leanApply(_runtime, _toPure_7, Array[LeanErased(), _x_4_13])
       | "[\"List\",\"cons\"]" ->
         _head_6_11: LeanValue = leanField(_x_2_2, 0);
         _tail_7_12: LeanValue = leanField(_x_2_2, 1);
@@ -175,8 +205,9 @@ fun f_List_mapM_loop_7cc22d5270(
           5,
           Array[_x_3_3, _inst_1_0, _f_1, _tail_7_12],
         );
-        _x_9_16: LeanValue = leanApply(_f_1, Array[_head_6_11]);
+        _x_9_16: LeanValue = leanApply(_runtime, _f_1, Array[_head_6_11]);
         leanApply(
+          _runtime,
           _toBind_5,
           Array[LeanErased(), LeanErased(), _x_9_16, _f_8_15],
         )

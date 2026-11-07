@@ -1,0 +1,66 @@
+// One invocation owns all temporary references. Their integer handles must not
+// escape into cached results. SKStore inputs and outputs remain immutable.
+mutable class LeanExecution{
+  store: mutable SKStore.Context,
+  mutable initializing: Bool = false,
+  // Opt-in bring-up restriction. It does not implement heartbeat statistics.
+  unboundedHeartbeats: Bool = false,
+  // Lean's cross-execution realization cache requires its async IO machinery.
+  // FunInfo can use its original direct computation and per-execution cache.
+  sharedValueRealizations: Bool = false,
+  refs: mutable Vector<?LeanValue> = mutable Vector[],
+  initializers: mutable Map<String, LeanValue> = mutable Map[],
+} {
+  mutable fun newRef(value: LeanValue): LeanValue {
+    index = this.refs.size();
+    this.refs.push(Some(value));
+    LeanReference(index)
+  }
+
+  readonly fun readRef(ref: LeanValue): LeanValue {
+    ref match {
+    | LeanReference(index) ->
+      this.refs[index] match {
+      | Some(value) -> value
+      | None() -> leanFail("read of a taken Lean ST reference")
+      }
+    | _ -> leanFail("expected a Lean ST reference")
+    }
+  }
+
+  mutable fun writeRef(ref: LeanValue, value: ?LeanValue): void {
+    ref match {
+    | LeanReference(index) -> this.refs.set(index, value)
+    | _ -> leanFail("expected a Lean ST reference")
+    }
+  }
+}
+
+fun leanBool(value: Bool): LeanValue {
+  LeanCtor(
+    if (value) "[\"Bool\",\"true\"]" else "[\"Bool\",\"false\"]",
+    Array[],
+  )
+}
+
+fun leanIsTrue(value: LeanValue): Bool {
+  leanTag(value) match {
+  | "[\"Bool\",\"true\"]" -> true
+  | "[\"Bool\",\"false\"]" -> false
+  | _ -> leanFail("expected a Lean Bool")
+  }
+}
+
+fun leanSTResult(value: LeanValue, world: LeanValue): LeanValue {
+  LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[value, world])
+}
+
+fun leanReadInitializer(
+  runtime: mutable LeanExecution,
+  name: String,
+): LeanValue {
+  runtime.initializers.maybeGet(name) match {
+  | Some(value) -> value
+  | None() -> leanFail("module initialization not implemented: " + name)
+  }
+}

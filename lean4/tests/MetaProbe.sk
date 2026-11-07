@@ -1,0 +1,51 @@
+// Exercise actual Meta algorithms on closed sorts before importing an environment.
+// The environment is deliberately unavailable: these cases must not read it.
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  state = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  core = leanCoreContext("<meta-probe>", "");
+  unavailableCore = runtime.newRef(
+    leanCoreState(
+      runtime,
+      LeanCtor("probe: environment is unavailable", Array[]),
+    ),
+  );
+  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  assert(leanExprData(prop) == 3944470172);
+  bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(3));
+  assert(leanExprData(bvar) == 70369649708846);
+  reduced = L4_Lean_Meta_Basic.f_Lean_Meta_whnf_6493600863(
+    runtime,
+    prop,
+    context,
+    state,
+    core,
+    unavailableCore,
+    LeanErased(),
+  );
+  assert(leanTag(reduced) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(native_eq(leanField(reduced, 0), prop) == 0);
+  typeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    runtime,
+    prop,
+    context,
+    state,
+    core,
+    unavailableCore,
+    LeanErased(),
+  );
+  assert(leanTag(typeResult) == "[\"EST\",\"Out\",\"ok\"]");
+  type = leanField(typeResult, 0);
+  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(
+    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+  );
+  print_string("Meta whnf and inferType passed for Prop")
+}

@@ -1,0 +1,179 @@
+// Prepared imports, with no local declarations, theorem requests or cached proofs.
+// SKStore's mapped heap contains native pointers and is executable-specific.
+// Validate the ELF build ID in the ordinary process before re-executing with
+// the runtime's --data option. The public interface is --imports/--startup.
+class LeanImportSnapshot(
+  imports: LeanImportedEnvironment,
+  declarationCount: Int,
+  extraNameCount: Int,
+  extensionCount: Int,
+  revision: String,
+) extends SKStore.File
+
+fun leanSnapshotRevision(): String {
+  "63fbf3d3588b404bbe707721df61ecd41885a6f6"
+}
+
+fun leanReadExecutableBytes(
+  file: mutable IO.File,
+  offset: Int,
+  count: Int,
+): Array<UInt8> {
+  file.seek(IO.SeekFromStart(offset)) match {
+  | Success(_) -> void
+  | Failure(_) -> leanFail("cannot seek in executable identity")
+  };
+  bytes = Array::mfill(count, UInt8::truncate(0));
+  file.read_exact(bytes.mbytes()) match {
+  | Success(_) -> void
+  | Failure(_) -> leanFail("cannot read executable identity")
+  };
+  bytes.chill()
+}
+
+fun leanElfUnsigned(bytes: Array<UInt8>, offset: Int, count: Int): Int {
+  result = 0;
+  for (i in Range(0, count)) {
+    !result = result.or(bytes[offset + i].toInt().shl(i * 8))
+  };
+  result
+}
+
+fun leanExecutableIdentity(): String {
+  // Read the actual running inode, including when a concurrent build has
+  // replaced the pathname from which it was launched.
+  file = IO.File::open("/proc/self/exe", IO.OpenOptions{read => true});
+  header = leanReadExecutableBytes(file, 0, 64);
+  if (
+    leanElfUnsigned(header, 0, 4) != 0x464c457f ||
+    header[4].toInt() != 2 ||
+    header[5].toInt() != 1 ||
+    leanElfUnsigned(header, 16, 2) != 2
+  ) {
+    leanFail(
+      "mapped imports currently require a 64-bit little-endian ELF executable with fixed addresses",
+    )
+  };
+  phoff = leanElfUnsigned(header, 32, 8);
+  phsize = leanElfUnsigned(header, 54, 2);
+  phcount = leanElfUnsigned(header, 56, 2);
+  for (i in Range(0, phcount)) {
+    ph = leanReadExecutableBytes(file, phoff + i * phsize, phsize);
+    if (leanElfUnsigned(ph, 0, 4) != 4) continue; // PT_NOTE
+    offset = leanElfUnsigned(ph, 8, 8);
+    end = offset + leanElfUnsigned(ph, 32, 8);
+    while (offset + 12 <= end) {
+      note = leanReadExecutableBytes(file, offset, 12);
+      nameSize = leanElfUnsigned(note, 0, 4);
+      descSize = leanElfUnsigned(note, 4, 4);
+      kind = leanElfUnsigned(note, 8, 4);
+      descOffset = offset + 12 + ((nameSize + 3) / 4) * 4;
+      next = descOffset + ((descSize + 3) / 4) * 4;
+      if (next > end) leanFail("invalid executable note bounds");
+      if (kind == 3 && nameSize == 4 && descSize > 0 && descSize <= 64) {
+        owner = leanReadExecutableBytes(file, offset + 12, 4);
+        if (leanElfUnsigned(owner, 0, 4) == 0x00554e47) { // GNU
+          id = leanReadExecutableBytes(file, descOffset, descSize);
+          file.close();
+          return id.map(byte -> byte.toInt().toString()).join(".")
+        }
+      };
+      !offset = next
+    }
+  };
+  file.close();
+  leanFail("executable has no GNU build ID; cannot validate mapped imports")
+}
+
+fun leanDefaultImportSnapshot(): String {
+  "build/Init." + leanExecutableIdentity() + ".skstore"
+}
+
+fun leanPrepareImportSnapshot(path: String, dataRoot: String): void {
+  if (SKStore.gHasContext()) leanFail("import snapshot is already initialized");
+  start = Time.time_ns();
+  data = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-data.jsonl"),
+  );
+  extensions = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-extensions.jsonl"),
+  );
+  extras = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-extra-constants.jsonl"),
+  );
+  context = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store => context};
+  imports = leanInstallImports(runtime, data, extensions, extras, "/lean/Init");
+  context.initPre();
+  context.setPersistent(
+    "lean/imports",
+    LeanImportSnapshot(
+      imports,
+      data.constants.size(),
+      extras.extraConstants.fromSome().size(),
+      extensions.extensions.size(),
+      leanSnapshotRevision(),
+    ),
+  );
+  SKStore.gContextInit(context.clone());
+  // Write the completion marker last. An interrupted preparation cannot be
+  // mistaken for a ready snapshot by the public loader.
+  FileSystem.writeTextFile(
+    path + ".json",
+    JSON.Object[
+      "schema" => JSON.IntNumber(1),
+      "leanCommit" => JSON.String(leanSnapshotRevision()),
+      "executableBuildId" => JSON.String(leanExecutableIdentity()),
+      "declarations" => JSON.IntNumber(data.constants.size()),
+      "extraNames" => JSON.IntNumber(extras.extraConstants.fromSome().size()),
+      "extensions" => JSON.IntNumber(extensions.extensions.size()),
+      "preparationNs" => JSON.IntNumber(Time.time_ns() - start),
+    ].encode(),
+  );
+  print_string(
+    "Prepared mapped Init imports; no local theorem inputs or results were saved",
+  )
+}
+
+fun leanValidateImportSnapshot(path: String): void {
+  if (!FileSystem.exists(path) || !FileSystem.exists(path + ".json")) {
+    leanFail(
+      "prepared imports are missing or incomplete; run --prepare-imports " +
+        path,
+    )
+  };
+  header = JSON.decode(FileSystem.readTextFile(path + ".json")).expectObject();
+  if (
+    header.getInt("schema") != 1 ||
+    header.getString("leanCommit") != leanSnapshotRevision()
+  ) {
+    leanFail("incompatible import snapshot format or Lean revision")
+  };
+  if (header.getString("executableBuildId") != leanExecutableIdentity()) {
+    leanFail(
+      "import snapshot belongs to a different executable; prepare imports again after rebuilding",
+    )
+  }
+}
+
+fun leanSavedImports(context: SKStore.Context): LeanImportedEnvironment {
+  snapshot = context.getPersistent("lean/imports") match {
+  | Some(value) -> LeanImportSnapshot::type(value)
+  | None() -> leanFail("mapped store contains no prepared Lean imports")
+  };
+  if (snapshot.revision != leanSnapshotRevision()) {
+    leanFail("incorrect mapped Lean revision")
+  };
+  // This store has exactly the three imported input collections. No local
+  // command prefix, request collection, or theorem-result arrow is persisted.
+  for (dir in context.listDirs()) {
+    if (
+      dir.getDirName() != SKStore.DirName::create("/lean/Init/constants/") &&
+      dir.getDirName() != SKStore.DirName::create("/lean/Init/extensions/") &&
+      dir.getDirName() != SKStore.DirName::create("/lean/Init/extra-constants/")
+    ) {
+      leanFail("import snapshot contains a non-import collection")
+    }
+  };
+  snapshot.imports
+}

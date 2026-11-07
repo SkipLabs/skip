@@ -1,13 +1,23 @@
-// Representation support only. Lean foreign primitives remain aborting stubs.
+// Shared immutable values. Mutable references belong to one LeanExecution.
 
 base class LeanValue {
   children =
   | LeanErased()
+  // A bootstrap field whose implementation is still absent. It may be carried
+  // through an unused field, but inspecting it must fail with its identity.
+  | LeanUnavailable(description: String)
   | LeanCtor(name: String, fields: Array<LeanValue>)
   | LeanScalar(kind: String, decimal: String)
+  | LeanNatural(value: LeanNat)
+  | LeanWord(kind: String, bits: Int)
   | LeanText(value: String)
+  | LeanArray(values: Array<LeanValue>)
+  | LeanReference(index: Int)
+  | LeanTrackedConstants(view: LeanConstantsView)
+  | LeanTrackedExtensionArray(view: LeanExtensionArray)
+  | LeanCompletedTask(value: LeanValue)
   | LeanClosure(
-    invoke: Array<LeanValue> ~> LeanValue,
+    invoke: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
     arity: Int,
     captured: Array<LeanValue>,
   )
@@ -22,21 +32,73 @@ fun leanPrimitive(name: String): LeanValue {
   leanFail("unimplemented primitive: " + name)
 }
 
+// Invoke at the publication boundary, before a work item returns a cached value.
+// References are execution-local even though their representation is immutable.
+fun leanCheckPublishable(value: LeanValue): void {
+  value match {
+  | LeanUnavailable(description) ->
+    leanFail("cannot publish an unimplemented Lean value: " + description)
+  | LeanReference(_) ->
+    leanFail("cannot publish an execution-local Lean reference")
+  | LeanCtor(_, fields)
+  | LeanArray(fields) ->
+    for (field in fields) leanCheckPublishable(field)
+  | LeanClosure(_, _, captured) ->
+    for (field in captured) leanCheckPublishable(field)
+  | LeanCompletedTask(result) -> leanCheckPublishable(result)
+  | _ -> void
+  }
+}
+
 fun leanTag(v: LeanValue): String {
   v match {
   | LeanCtor(name, _) -> name
+  | LeanUnavailable(description) -> leanFail("not implemented: " + description)
   | _ -> invariant_violation("Lean-to-Skip: case on non-constructor")
   }
 }
 
 fun leanField(v: LeanValue, index: Int): LeanValue {
   v match {
-  | LeanCtor(_, fields) -> fields[index]
+  | LeanCtor(name, fields) ->
+    if (index < 0 || index >= fields.size()) {
+      leanFail(
+        "invalid constructor field " +
+          index.toString() +
+          " of " +
+          name +
+          " (" +
+          fields.size().toString() +
+          " fields)",
+      )
+    };
+    fields[index]
+  | LeanUnavailable(description) -> leanFail("not implemented: " + description)
   | _ -> invariant_violation("Lean-to-Skip: projection from non-constructor")
   }
 }
 
-fun leanApply(v: LeanValue, args: Array<LeanValue>): LeanValue {
+fun leanReplaceField(
+  value: LeanValue,
+  index: Int,
+  replacement: LeanValue,
+): LeanValue {
+  _ = leanField(value, index);
+  value match {
+  | LeanCtor(name, fields) ->
+    LeanCtor(
+      name,
+      fields.mapWithIndex((i, field) -> if (i == index) replacement else field),
+    )
+  | _ -> leanFail("replacement in a non-constructor Lean value")
+  }
+}
+
+fun leanApply(
+  runtime: mutable LeanExecution,
+  v: LeanValue,
+  args: Array<LeanValue>,
+): LeanValue {
   if (args.isEmpty()) return v;
   v match {
   | LeanClosure(invoke, arity, captured) ->
@@ -44,8 +106,10 @@ fun leanApply(v: LeanValue, args: Array<LeanValue>): LeanValue {
     if (all.size() < arity) {
       LeanClosure(invoke, arity, all)
     } else {
-      result = invoke(all.take(arity));
-      if (all.size() == arity) result else leanApply(result, all.drop(arity))
+      result = invoke(runtime, all.take(arity));
+      if (all.size() == arity) result else {
+        leanApply(runtime, result, all.drop(arity))
+      }
     }
   | _ -> leanFail("application of non-closure")
   }

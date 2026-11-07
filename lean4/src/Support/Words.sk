@@ -1,0 +1,96 @@
+// Fixed-width words use all 64 bits of Skip Int. Comparisons/division below are
+// unsigned; wrapping arithmetic matches Lean's UInt and USize operations.
+// Parse the exact unsigned decimal format used by immutable import data.
+// This avoids allocating arbitrary-precision limbs for each metadata digit.
+fun leanParseWord(text: String): Int {
+  if (text.isEmpty()) leanFail("empty Lean word literal");
+  bits = 0;
+  for (byte in text.bytes()) {
+    digit = byte.toInt() - 48;
+    if (digit < 0 || digit > 9) leanFail("invalid Lean word literal");
+    if (
+      bits.ugt(1844674407370955161) ||
+      (bits == 1844674407370955161 && digit > 5)
+    ) {
+      leanFail("Lean word literal exceeds UInt64")
+    };
+    !bits = bits * 10 + digit
+  };
+  bits
+}
+
+fun leanWordBits(value: LeanValue): Int {
+  value match {
+  | LeanWord(_, bits) -> bits
+  | LeanNatural(n) -> n.toWord()
+  | LeanScalar(_, digits) -> LeanNat::parse(digits).toWord()
+  | LeanCtor(name, fields) if (fields.isEmpty()) -> leanConstructorOrdinal(name)
+  | LeanUnavailable(description) -> leanFail("not implemented: " + description)
+  | _ -> leanFail("expected a Lean word")
+  }
+}
+
+fun leanWordWidth(kind: String): Int {
+  kind match {
+  | "uint8" -> 8
+  | "uint16" -> 16
+  | "uint32" -> 32
+  | "uint64" | "usize" -> 64
+  | _ -> leanFail("unknown Lean word kind: " + kind)
+  }
+}
+
+fun leanWordValue(kind: String, bits: Int): LeanValue {
+  width = leanWordWidth(kind);
+  LeanWord(kind, if (width == 64) bits else bits.and(1.shl(width) - 1))
+}
+
+fun leanUnsignedDiv(a: Int, b: Int): Int {
+  if (b == 0) return 0;
+  if (b < 0) return if (a.uge(b)) 1 else 0;
+  q = (a.ushr(1) / b).shl(1);
+  if ((a - q * b).uge(b)) q + 1 else q
+}
+
+fun leanMixHash(h: Int, k: Int): Int {
+  m = -4132994306676758123; // 0xc6a4a7935bd1e995
+  !k = k * m;
+  !k = k.xor(k.ushr(47));
+  !k = k.xor(m);
+  h.xor(k) * m
+}
+
+fun leanMixHash32(h: Int, k: Int): Int {
+  mask = 4294967295;
+  !k = (k * 3432918353).and(mask);
+  !k = k.xor(k.ushr(15));
+  !k = (k * 461845907).and(mask);
+  !h = h.xor(k).and(mask);
+  !h = h.shl(13).or(h.ushr(19)).and(mask);
+  (h * 5 + 3864292196).and(mask)
+}
+
+// Lean's String.hash is MurmurHash64A over UTF-8 bytes, with seed 11.
+fun leanStringHash(text: String): Int {
+  bytes = text.bytes();
+  m = -4132994306676758123;
+  h = 11.xor(bytes.size() * m);
+  offset = 0;
+  while (offset + 8 <= bytes.size()) {
+    k = 0;
+    for (i in Range(0, 8)) !k = k.or(bytes[offset + i].toInt().shl(i * 8));
+    !k = k * m;
+    !k = k.xor(k.ushr(47));
+    !k = k * m;
+    !h = h.xor(k) * m;
+    !offset = offset + 8
+  };
+  if (offset < bytes.size()) {
+    for (i in Range(offset, bytes.size())) {
+      !h = h.xor(bytes[i].toInt().shl((i - offset) * 8))
+    };
+    !h = h * m
+  };
+  !h = h.xor(h.ushr(47)) * m;
+  h.xor(h.ushr(47))
+}

@@ -1,0 +1,50 @@
+// Execute original Lean initializer bodies, then verify registry ownership and
+// idempotent bootstrap. No imported declarations are needed for this check.
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  leanInitializeExceptions(runtime);
+  count = runtime.refs.size();
+  ids: mutable Set<Int> = mutable Set[];
+  for ((name, value) in runtime.initializers.items()) {
+    if (name == "Lean.internalExceptionsRef") continue;
+    id = leanNat(value).toInt();
+    assert(!ids.contains(id));
+    ids.add(id)
+  };
+  registry = runtime.readRef(
+    leanReadInitializer(runtime, "Lean.internalExceptionsRef"),
+  );
+  assert(ids.size() == 13 && leanArray(registry).size() == 13);
+  stuck = leanReadInitializer(runtime, "Lean.Meta.isDefEqStuckExceptionId");
+  expected = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("isDefEqStuck"),
+  );
+  assert(leanNameEqual(leanArray(registry)[leanNat(stuck).toInt()], expected));
+  leanInitializeExceptions(runtime);
+  assert(runtime.refs.size() == count);
+  assert(
+    leanNat(
+      leanReadInitializer(runtime, "Lean.Meta.isDefEqStuckExceptionId"),
+    ) == leanNat(stuck),
+  );
+  print_string(
+    "Lean exception initialization passed: 13 unique IDs, one execution-owned registry, repeatable bootstrap",
+  );
+  leanInitializeOptions(runtime);
+  assert(!runtime.initializing);
+  assert(runtime.refs.size() == count + 1);
+  maxSize = leanReadInitializer(runtime, "Lean.Meta.synthInstance.maxSize");
+  assert(leanNat(leanField(maxSize, 1)).toInt() == 128);
+  optionCount = runtime.initializers.size();
+  assert(optionCount == 274);
+  leanInitializeOptions(runtime);
+  assert(
+    runtime.initializers.size() == optionCount &&
+      runtime.refs.size() == count + 1,
+  );
+  print_string(
+    "Lean option initialization passed: 259 registered options and repeatable bootstrap",
+  )
+}

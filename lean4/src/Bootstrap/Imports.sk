@@ -1,0 +1,101 @@
+class LeanImportedEnvironment(
+  constants: LeanConstantsView,
+  extraConstants: LeanValue,
+  extensions: LeanValue,
+  extensionGenerations: LeanValue,
+  trackedGeneration: LeanValue,
+) {
+  fun atPrefix(
+    runtime: mutable LeanExecution,
+    locals: LeanConstantsView,
+  ): LeanValue {
+    leanEnvironment(
+      runtime,
+      this.constants,
+      locals,
+      LeanUnavailable("imported environment header"),
+      this.extensions,
+      this.extensionGenerations,
+      true,
+      this.trackedGeneration,
+      this.extraConstants,
+    )
+  }
+}
+
+fun leanValidateImportModules(
+  first: LeanImportData,
+  second: LeanImportData,
+): void {
+  if (first.moduleNames.size() != second.moduleNames.size()) {
+    leanFail("mismatched imported module lists")
+  };
+  for (i in Range(0, first.moduleNames.size())) {
+    if (first.moduleNames[i] != second.moduleNames[i]) {
+      leanFail("mismatched imported module ordering")
+    }
+  }
+}
+
+// All three inputs come from checked imports of the pinned Lean revision. Extra
+// IR names have module identities but are not kernel declarations. They occupy
+// a separate directory so an absent constant cannot be confused with such a name.
+fun leanInstallImports(
+  runtime: mutable LeanExecution,
+  constantsData: LeanImportData,
+  extensionData: LeanImportData,
+  extraData: LeanImportData,
+  root: String,
+): LeanImportedEnvironment {
+  leanValidateImportModules(constantsData, extensionData);
+  leanValidateImportModules(constantsData, extraData);
+  extraNames = extraData.extraConstants match {
+  | Some(names) -> names
+  | None() -> leanFail("imported extra constant names were not exported")
+  };
+  leanInitializeMetaExtensions(runtime);
+  extensions = leanInstallImportedExtensions(
+    runtime,
+    "Init",
+    SKStore.DirName::create(root + "/extensions/"),
+    extensionData.extensions,
+  );
+  constants = runtime.store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create(root + "/constants/"),
+    constantsData.constants.map(entry ->
+      (
+        LeanConstantKey("Init", leanNameKey(entry.i0)),
+        LeanConstantFile(entry.i1, Some(entry.i2)),
+      )
+    ),
+  );
+  extras = runtime.store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create(root + "/extra-constants/"),
+    extraNames.map(entry ->
+      (
+        LeanConstantKey("Init", leanNameKey(entry.i0)),
+        LeanConstantFile(
+          LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+          Some(entry.i1),
+        ),
+      )
+    ),
+  );
+  LeanImportedEnvironment(
+    LeanConstantsView("Init", constants),
+    LeanCtor(
+      "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+      Array[
+        LeanCtor("[\"Option\",\"none\"]", Array[]),
+        LeanTrackedConstants(LeanConstantsView("Init", extras)),
+      ],
+    ),
+    extensions.i0,
+    extensions.i1,
+    extensionData.trackedGeneration,
+  )
+}

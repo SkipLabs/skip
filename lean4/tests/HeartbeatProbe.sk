@@ -1,0 +1,67 @@
+fun heartbeatProbe(): void {
+  mode = read_to_end().trim();
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  context = leanUnboundedCoreContext(runtime, "<heartbeat-probe>", "");
+  if (mode == "missing-options") {
+    !context = leanCoreContext("<heartbeat-probe>", "")
+  } else if (mode == "command-limit") {
+    !context = leanReplaceField(
+      context,
+      0,
+      leanReplaceField(leanField(context, 0), 7, leanNatValue(1)),
+    )
+  } else if (mode == "instance-limit") {
+    cold = leanField(context, 0);
+    name = leanHeartbeatOptionNames(runtime)[1];
+    dict = L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(runtime);
+    options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+      runtime,
+      dict,
+      leanField(cold, 2),
+      name,
+      leanNatValue(1),
+    );
+    !context = leanReplaceField(context, 0, leanReplaceField(cold, 2, options))
+  } else if (mode == "snapshot") {
+    _ = leanNat(leanField(leanField(context, 0), 6));
+    leanFail("unavailable heartbeat snapshot was accepted")
+  } else if (mode == "counter") {
+    _ = L4_Init_System_IO.f_IO_getNumHeartbeats_2b32cd415d(
+      runtime,
+      LeanErased(),
+    );
+    leanFail("unimplemented heartbeat counter was accepted")
+  };
+  count = runtime.newRef(leanNatValue(0));
+  action = LeanClosure(
+    (invocation, args) ~> {
+      assert(leanNat(invocation.readRef(args[0])).toInt() == 0);
+      invocation.writeRef(args[0], Some(leanNatValue(1)));
+      leanField(leanField(args[1], 0), 6) match {
+      | LeanUnavailable("heartbeat accounting") -> void
+      | _ -> leanFail("expected an unavailable heartbeat snapshot")
+      };
+      LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[leanNatValue(42), args[3]])
+    },
+    4,
+    Array[count],
+  );
+  result = L4_Lean_CoreM.f_Lean_Core_withCurrHeartbeatsImp_2c49de237f(
+    runtime,
+    action,
+    context,
+    LeanErased(),
+    LeanErased(),
+  );
+  assert(leanTag(result) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanNat(leanField(result, 0)).toInt() == 42);
+  assert(leanNat(runtime.readRef(count)).toInt() == 1);
+  print_string(
+    "Explicit unlimited heartbeat profile passed; action ran exactly once",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> heartbeatProbe())
+}

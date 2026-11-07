@@ -1,0 +1,44 @@
+// The direct path runs the original computation once and forwards its contexts.
+// It must not touch unavailable async realization services.
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  count = runtime.newRef(leanNatValue(0));
+  contexts = Array[
+    LeanUnavailable("test Meta context"),
+    LeanUnavailable("test Meta state"),
+    LeanUnavailable("test Core context"),
+    LeanUnavailable("test Core state"),
+    LeanErased(),
+  ];
+  // Captures are prepended by leanApply, so retain the expectation explicitly
+  // before the five runtime arguments rather than capturing mutable execution.
+  checked = LeanClosure(
+    (execution, args) ~> {
+      assert(leanNat(execution.readRef(args[0])).toInt() == 0);
+      execution.writeRef(args[0], Some(leanNatValue(1)));
+      for (i in Range(0, 5)) {
+        assert(native_eq(args[i + 2], leanArray(args[1])[i]) == 0)
+      };
+      LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[leanNatValue(42), args[6]])
+    },
+    7,
+    Array[count, LeanArray(contexts)],
+  );
+  result = L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_9_90036b5f28(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    LeanErased(),
+    LeanErased(),
+    checked,
+    contexts[0],
+    contexts[1],
+    contexts[2],
+    contexts[3],
+    contexts[4],
+  );
+  assert(leanNat(leanField(result, 0)).toInt() == 42);
+  assert(leanNat(runtime.readRef(count)).toInt() == 1);
+  print_string("Direct FunInfo computation ran once with the original contexts")
+}

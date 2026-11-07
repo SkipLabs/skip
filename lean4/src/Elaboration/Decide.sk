@@ -1,0 +1,31 @@
+// Invoke the maintained tactic's existing elaboration algorithm with fresh local
+// Meta/Core state. The caller owns initialization and the tracked environment.
+// This accepts an already constructed type; general parsing remains unsupported.
+fun leanElaborateDecide(
+  runtime: mutable LeanExecution,
+  env: LeanValue,
+  expected: LeanValue,
+): LeanValue {
+  metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreContext = leanUnboundedCoreContext(runtime, "<skip-decide>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, env));
+  tactic = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("decide"),
+  );
+  L4_Lean_Elab_Tactic_Decide.f_Tactic_evalDecideCore_doElab_a6b78daf66(
+    runtime,
+    tactic,
+    expected,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    LeanErased(),
+  )
+}

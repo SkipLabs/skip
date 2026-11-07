@@ -2,6 +2,7 @@ module L4_Init_Control_EState;
 
 // "EStateM.orElse'._redArg"
 fun f_EStateM_orElse_efcbf37f71(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _x_1: LeanValue,
   _x_2: LeanValue,
@@ -12,14 +13,18 @@ fun f_EStateM_orElse_efcbf37f71(
   | "[\"EStateM\",\"Backtrackable\",\"mk\"]" ->
     _save_5: LeanValue = leanField(_inst_1_0, 0);
     _restore_6: LeanValue = leanField(_inst_1_0, 1);
-    _d_7: LeanValue = leanApply(_save_5, Array[_s_4]);
-    _x_2_8: LeanValue = leanApply(_x_1, Array[_s_4]);
+    _d_7: LeanValue = leanApply(_runtime, _save_5, Array[_s_4]);
+    _x_2_8: LeanValue = leanApply(_runtime, _x_1, Array[_s_4]);
     leanTag(_x_2_8) match {
     | "[\"EStateM\",\"Result\",\"error\"]" ->
       _a_3_9: LeanValue = leanField(_x_2_8, 0);
       _a_4_10: LeanValue = leanField(_x_2_8, 1);
-      _x_5_11: LeanValue = leanApply(_restore_6, Array[_a_4_10, _d_7]);
-      _x_6_12: LeanValue = leanApply(_x_2, Array[_x_5_11]);
+      _x_5_11: LeanValue = leanApply(
+        _runtime,
+        _restore_6,
+        Array[_a_4_10, _d_7],
+      );
+      _x_6_12: LeanValue = leanApply(_runtime, _x_2, Array[_x_5_11]);
       leanTag(_x_6_12) match {
       | "[\"EStateM\",\"Result\",\"error\"]" ->
         _a_7_13: LeanValue = leanField(_x_6_12, 0);
@@ -39,6 +44,7 @@ fun f_EStateM_orElse_efcbf37f71(
 }
 // "EStateM.instToStringResult._redArg"
 fun f_EStateM_instToStringResult_d0ddfdb9e7(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
 ): LeanValue {
@@ -50,13 +56,14 @@ fun f_EStateM_instToStringResult_d0ddfdb9e7(
 }
 // "EStateM.fromStateM"
 fun f_EStateM_fromStateM_4542b09d23(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _value_2: LeanValue,
   _x_3: LeanValue,
   _s_4: LeanValue,
 ): LeanValue {
-  _x_1_5: LeanValue = leanApply(_x_3, Array[_s_4]);
+  _x_1_5: LeanValue = leanApply(_runtime, _x_3, Array[_s_4]);
   leanTag(_x_1_5) match {
   | "[\"Prod\",\"mk\"]" ->
     _fst_2_6: LeanValue = leanField(_x_1_5, 0);
@@ -66,15 +73,20 @@ fun f_EStateM_fromStateM_4542b09d23(
   }
 }
 // "EStateM.instToStringResult._redArg._lam_0._closed_1"
-fun f_instToStringResult_lam_0_closed_1_75dbed81f5(): LeanValue {
+fun f_instToStringResult_lam_0_closed_1_75dbed81f5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("error: ")
 }
 // "EStateM.instReprResult._redArg._lam_0._closed_0"
-fun f_instReprResult_lam_0_closed_0_cd2ff9bf7f(): LeanValue {
+fun f_instReprResult_lam_0_closed_0_cd2ff9bf7f(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("EStateM.Result.ok ")
 }
 // "EStateM.instReprResult"
 fun f_EStateM_instReprResult_1c7d76425e(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _value_2: LeanValue,
@@ -88,27 +100,33 @@ fun f_EStateM_instReprResult_1c7d76425e(
   )
 }
 // "EStateM.instReprResult._redArg._lam_0._closed_2"
-fun f_instReprResult_lam_0_closed_2_60aff9e43f(): LeanValue {
+fun f_instReprResult_lam_0_closed_2_60aff9e43f(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("EStateM.Result.error ")
 }
 // "EStateM.instToStringResult._redArg._lam_0._closed_0"
-fun f_instToStringResult_lam_0_closed_0_48e129862c(): LeanValue {
+fun f_instToStringResult_lam_0_closed_0_48e129862c(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("ok: ")
 }
 // "EStateM.instMonadFinally._redArg._lam_0"
 fun f_EStateM_instMonadFinally_lam_0_999467f6f3(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _x_2: LeanValue,
   _h_3: LeanValue,
   _s_4: LeanValue,
 ): LeanValue {
-  _r_5: LeanValue = leanApply(_x_2, Array[_s_4]);
+  _r_5: LeanValue = leanApply(_runtime, _x_2, Array[_s_4]);
   leanTag(_r_5) match {
   | "[\"EStateM\",\"Result\",\"ok\"]" ->
     _a_3_6: LeanValue = leanField(_r_5, 0);
     _a_4_7: LeanValue = leanField(_r_5, 1);
     _x_6_11: LeanValue = leanApply(
+      _runtime,
       _h_3,
       Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_3_6]), _a_4_7],
     );
@@ -130,6 +148,7 @@ fun f_EStateM_instMonadFinally_lam_0_999467f6f3(
     _a_14_8: LeanValue = leanField(_r_5, 0);
     _a_15_9: LeanValue = leanField(_r_5, 1);
     _x_17_20: LeanValue = leanApply(
+      _runtime,
       _h_3,
       Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_15_9],
     );
@@ -148,9 +167,11 @@ fun f_EStateM_instMonadFinally_lam_0_999467f6f3(
   }
 }
 fun apply_f_EStateM_instMonadFinally_lam_0_999467f6f3(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_EStateM_instMonadFinally_lam_0_999467f6f3(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -160,6 +181,7 @@ fun apply_f_EStateM_instMonadFinally_lam_0_999467f6f3(
 }
 // "EStateM.instToStringResult"
 fun f_EStateM_instToStringResult_7c59ca1a51(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _value_2: LeanValue,
@@ -174,6 +196,7 @@ fun f_EStateM_instToStringResult_7c59ca1a51(
 }
 // "EStateM.instToStringResult._redArg._lam_0"
 fun f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _x_3_2: LeanValue,
@@ -182,16 +205,18 @@ fun f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
   | "[\"EStateM\",\"Result\",\"ok\"]" ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _a_5_4: LeanValue = leanField(_x_3_2, 1);
-    _x_7_8: LeanValue = leanApply(_inst_1_0, Array[_a_4_3]);
+    _x_7_8: LeanValue = leanApply(_runtime, _inst_1_0, Array[_a_4_3]);
     L4_Init_Data_String_Bootstrap.f_String_Internal_append_aa316577ea(
+      _runtime,
       LeanText("ok: "),
       _x_7_8,
     )
   | "[\"EStateM\",\"Result\",\"error\"]" ->
     _a_9_5: LeanValue = leanField(_x_3_2, 0);
     _a_10_6: LeanValue = leanField(_x_3_2, 1);
-    _x_12_11: LeanValue = leanApply(_inst_2_1, Array[_a_9_5]);
+    _x_12_11: LeanValue = leanApply(_runtime, _inst_2_1, Array[_a_9_5]);
     L4_Init_Data_String_Bootstrap.f_String_Internal_append_aa316577ea(
+      _runtime,
       LeanText("error: "),
       _x_12_11,
     )
@@ -199,12 +224,19 @@ fun f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
   }
 }
 fun apply_f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_EStateM_instToStringResult_lam_0_4e3ff3b92b(_args[0], _args[1], _args[2])
+  f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+  )
 }
 // "EStateM.instReprResult._redArg._lam_0"
 fun f_EStateM_instReprResult_lam_0_0cb506bc55(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _x_3_2: LeanValue,
@@ -215,10 +247,12 @@ fun f_EStateM_instReprResult_lam_0_0cb506bc55(
     _a_5_4: LeanValue = leanField(_x_3_2, 0);
     _a_6_5: LeanValue = leanField(_x_3_2, 1);
     _x_10_11: LeanValue = leanApply(
+      _runtime,
       _inst_1_0,
       Array[_a_5_4, LeanScalar("nat", "1024")],
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
+      _runtime,
       LeanCtor(
         "[\"Std\",\"Format\",\"append\"]",
         Array[
@@ -235,10 +269,12 @@ fun f_EStateM_instReprResult_lam_0_0cb506bc55(
     _a_13_6: LeanValue = leanField(_x_3_2, 0);
     _a_14_7: LeanValue = leanField(_x_3_2, 1);
     _x_18_17: LeanValue = leanApply(
+      _runtime,
       _inst_2_1,
       Array[_a_13_6, LeanScalar("nat", "1024")],
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
+      _runtime,
       LeanCtor(
         "[\"Std\",\"Format\",\"append\"]",
         Array[
@@ -255,9 +291,11 @@ fun f_EStateM_instReprResult_lam_0_0cb506bc55(
   }
 }
 fun apply_f_EStateM_instReprResult_lam_0_0cb506bc55(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_EStateM_instReprResult_lam_0_0cb506bc55(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -266,6 +304,7 @@ fun apply_f_EStateM_instReprResult_lam_0_0cb506bc55(
 }
 // "EStateM.instMonadAttach"
 fun f_EStateM_instMonadAttach_6edcc8b67e(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
 ): LeanValue {
@@ -276,12 +315,16 @@ fun f_EStateM_instMonadAttach_6edcc8b67e(
   )
 }
 // "EStateM.instReprResult._redArg._lam_0._closed_3"
-fun f_instReprResult_lam_0_closed_3_5d5a9551c8(): LeanValue {
-  _x_108_0: LeanValue = f_instReprResult_lam_0_closed_2_60aff9e43f();
+fun f_instReprResult_lam_0_closed_3_5d5a9551c8(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_108_0: LeanValue = f_instReprResult_lam_0_closed_2_60aff9e43f(_runtime);
   LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_108_0])
 }
 // "EStateM.instMonadAttach._redArg._closed_0"
-fun f_EStateM_instMonadAttach_closed_0_1424a33778(): LeanValue {
+fun f_EStateM_instMonadAttach_closed_0_1424a33778(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_EState.apply_f_EStateM_instMonadAttach_lam_0_083c8b191b,
     3,
@@ -289,7 +332,10 @@ fun f_EStateM_instMonadAttach_closed_0_1424a33778(): LeanValue {
   )
 }
 // "EStateM.instMonadFinally._redArg"
-fun f_EStateM_instMonadFinally_25f683224e(_dummy_0: LeanValue): LeanValue {
+fun f_EStateM_instMonadFinally_25f683224e(
+  _runtime: mutable LeanExecution,
+  _dummy_0: LeanValue,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_EState.apply_f_EStateM_instMonadFinally_lam_0_999467f6f3,
     5,
@@ -298,6 +344,7 @@ fun f_EStateM_instMonadFinally_25f683224e(_dummy_0: LeanValue): LeanValue {
 }
 // "EStateM.instMonadFinally"
 fun f_EStateM_instMonadFinally_4b102d6520(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
 ): LeanValue {
@@ -309,6 +356,7 @@ fun f_EStateM_instMonadFinally_4b102d6520(
 }
 // "EStateM.orElse'"
 fun f_EStateM_orElse_1dd8fa9dbe(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _value_2: LeanValue,
@@ -323,14 +371,18 @@ fun f_EStateM_orElse_1dd8fa9dbe(
   | "[\"EStateM\",\"Backtrackable\",\"mk\"]" ->
     _save_9: LeanValue = leanField(_inst_1_4, 0);
     _restore_10: LeanValue = leanField(_inst_1_4, 1);
-    _d_11: LeanValue = leanApply(_save_9, Array[_s_8]);
-    _x_2_12: LeanValue = leanApply(_x_5, Array[_s_8]);
+    _d_11: LeanValue = leanApply(_runtime, _save_9, Array[_s_8]);
+    _x_2_12: LeanValue = leanApply(_runtime, _x_5, Array[_s_8]);
     leanTag(_x_2_12) match {
     | "[\"EStateM\",\"Result\",\"error\"]" ->
       _a_3_13: LeanValue = leanField(_x_2_12, 0);
       _a_4_14: LeanValue = leanField(_x_2_12, 1);
-      _x_5_15: LeanValue = leanApply(_restore_10, Array[_a_4_14, _d_11]);
-      _x_6_16: LeanValue = leanApply(_x_6, Array[_x_5_15]);
+      _x_5_15: LeanValue = leanApply(
+        _runtime,
+        _restore_10,
+        Array[_a_4_14, _d_11],
+      );
+      _x_6_16: LeanValue = leanApply(_runtime, _x_6, Array[_x_5_15]);
       leanTag(_x_6_16) match {
       | "[\"EStateM\",\"Result\",\"error\"]" ->
         _a_7_17: LeanValue = leanField(_x_6_16, 0);
@@ -352,7 +404,9 @@ fun f_EStateM_orElse_1dd8fa9dbe(
   }
 }
 // "EStateM.instMonadFinally._redArg._closed_0"
-fun f_EStateM_instMonadFinally_closed_0_0766f56a8e(): LeanValue {
+fun f_EStateM_instMonadFinally_closed_0_0766f56a8e(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_EState.apply_f_EStateM_instMonadFinally_lam_0_999467f6f3,
     5,
@@ -361,11 +415,12 @@ fun f_EStateM_instMonadFinally_closed_0_0766f56a8e(): LeanValue {
 }
 // "EStateM.instMonadAttach._redArg._lam_0"
 fun f_EStateM_instMonadAttach_lam_0_083c8b191b(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _x_1: LeanValue,
   _s_2: LeanValue,
 ): LeanValue {
-  _x_2_3: LeanValue = leanApply(_x_1, Array[_s_2]);
+  _x_2_3: LeanValue = leanApply(_runtime, _x_1, Array[_s_2]);
   leanTag(_x_2_3) match {
   | "[\"EStateM\",\"Result\",\"ok\"]" ->
     _a_3_4: LeanValue = leanField(_x_2_3, 0);
@@ -379,12 +434,19 @@ fun f_EStateM_instMonadAttach_lam_0_083c8b191b(
   }
 }
 fun apply_f_EStateM_instMonadAttach_lam_0_083c8b191b(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_EStateM_instMonadAttach_lam_0_083c8b191b(_args[0], _args[1], _args[2])
+  f_EStateM_instMonadAttach_lam_0_083c8b191b(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+  )
 }
 // "EStateM.instReprResult._redArg"
 fun f_EStateM_instReprResult_b7ab1cc609(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
 ): LeanValue {
@@ -395,12 +457,17 @@ fun f_EStateM_instReprResult_b7ab1cc609(
   )
 }
 // "EStateM.instReprResult._redArg._lam_0._closed_1"
-fun f_instReprResult_lam_0_closed_1_f264d0c3c4(): LeanValue {
-  _x_105_0: LeanValue = f_instReprResult_lam_0_closed_0_cd2ff9bf7f();
+fun f_instReprResult_lam_0_closed_1_f264d0c3c4(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_105_0: LeanValue = f_instReprResult_lam_0_closed_0_cd2ff9bf7f(_runtime);
   LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_105_0])
 }
 // "EStateM.instMonadAttach._redArg"
-fun f_EStateM_instMonadAttach_6e2f4cfbaf(_dummy_0: LeanValue): LeanValue {
+fun f_EStateM_instMonadAttach_6e2f4cfbaf(
+  _runtime: mutable LeanExecution,
+  _dummy_0: LeanValue,
+): LeanValue {
   LeanClosure(
     L4_Init_Control_EState.apply_f_EStateM_instMonadAttach_lam_0_083c8b191b,
     3,
@@ -409,10 +476,11 @@ fun f_EStateM_instMonadAttach_6e2f4cfbaf(_dummy_0: LeanValue): LeanValue {
 }
 // "EStateM.fromStateM._redArg"
 fun f_EStateM_fromStateM_463322de5d(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _s_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = leanApply(_x_0, Array[_s_1]);
+  _x_1_2: LeanValue = leanApply(_runtime, _x_0, Array[_s_1]);
   leanTag(_x_1_2) match {
   | "[\"Prod\",\"mk\"]" ->
     _fst_2_3: LeanValue = leanField(_x_1_2, 0);

@@ -1,13 +1,18 @@
 module L4_Init_Data_List_Basic;
 
 // "List.max?._redArg"
-fun f_List_max_acc401c982(_inst_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
+fun f_List_max_acc401c982(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
   leanTag(_x_2_1) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_x_2_1, 0);
     _tail_5_3: LeanValue = leanField(_x_2_1, 1);
     _x_6_5: LeanValue = L4_Init_Prelude.f_List_foldl_d2df05a48a(
+      _runtime,
       _inst_1_0,
       _head_4_2,
       _tail_5_3,
@@ -17,17 +22,22 @@ fun f_List_max_acc401c982(_inst_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
   }
 }
 // "List.zipIdx._redArg"
-fun f_List_zipIdx_11a4851f44(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
+fun f_List_zipIdx_11a4851f44(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_x_1_0, 0);
     _tail_5_3: LeanValue = leanField(_x_1_0, 1);
     _x_8_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _x_2_1,
       LeanScalar("nat", "1"),
     );
-    _x_9_8: LeanValue = f_List_zipIdx_11a4851f44(_tail_5_3, _x_8_7);
+    _x_9_8: LeanValue = f_List_zipIdx_11a4851f44(_runtime, _tail_5_3, _x_8_7);
     LeanCtor(
       "[\"List\",\"cons\"]",
       Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_head_4_2, _x_2_1]), _x_9_8],
@@ -36,26 +46,32 @@ fun f_List_zipIdx_11a4851f44(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
   }
 }
 // "List.unzipTR._redArg"
-fun f_List_unzipTR_a76a95684b(_l_0: LeanValue): LeanValue {
+fun f_List_unzipTR_a76a95684b(
+  _runtime: mutable LeanExecution,
+  _l_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
   f_List_unzipTR_spec_0_fe21136aa1(
+    _runtime,
     LeanCtor("[\"Prod\",\"mk\"]", Array[_x_1_1, _x_1_1]),
     _l_0,
   )
 }
 // "List.mapTR.loop._redArg"
 fun f_List_mapTR_loop_d4197faab1(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_a_2_2)
+  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_runtime, _a_2_2)
   | "[\"List\",\"cons\"]" ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
-    _x_6_6: LeanValue = leanApply(_f_0, Array[_head_4_3]);
+    _x_6_6: LeanValue = leanApply(_runtime, _f_0, Array[_head_4_3]);
     f_List_mapTR_loop_d4197faab1(
+      _runtime,
       _f_0,
       _tail_5_4,
       LeanCtor("[\"List\",\"cons\"]", Array[_x_6_6, _a_2_2]),
@@ -65,12 +81,14 @@ fun f_List_mapTR_loop_d4197faab1(
 }
 // "List.range'TR.go"
 fun f_List_range_TR_go_5e6451f4f7(
+  _runtime: mutable LeanExecution,
   _step_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
   _a_3_3: LeanValue,
 ): LeanValue {
   _isZero_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _a_1_1,
     LeanScalar("nat", "0"),
   );
@@ -78,11 +96,17 @@ fun f_List_range_TR_go_5e6451f4f7(
   | "[\"Bool\",\"true\"]" -> _a_3_3
   | "[\"Bool\",\"false\"]" ->
     _n_4_7: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _a_1_1,
       LeanScalar("nat", "1"),
     );
-    _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_a_2_2, _step_0);
+    _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
+      _a_2_2,
+      _step_0,
+    );
     f_List_range_TR_go_5e6451f4f7(
+      _runtime,
       _step_0,
       _n_4_7,
       _x_5_8,
@@ -92,7 +116,10 @@ fun f_List_range_TR_go_5e6451f4f7(
   }
 }
 // "List.getLast._redArg"
-fun f_List_getLast_4f0bc8360c(_x_1_0: LeanValue): LeanValue {
+fun f_List_getLast_4f0bc8360c(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> leanFail("unreachable: List.getLast._redArg")
   | "[\"List\",\"cons\"]" ->
@@ -103,14 +130,17 @@ fun f_List_getLast_4f0bc8360c(_x_1_0: LeanValue): LeanValue {
     | "[\"List\",\"cons\"]" ->
       _head_4_3: LeanValue = leanField(_tail_3_2, 0);
       _tail_5_4: LeanValue = leanField(_tail_3_2, 1);
-      f_List_getLast_4f0bc8360c(_tail_3_2)
+      f_List_getLast_4f0bc8360c(_runtime, _tail_3_2)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "List.isEmpty._redArg"
-fun f_List_isEmpty_31ee95efb7(_x_1_0: LeanValue): LeanValue {
+fun f_List_isEmpty_31ee95efb7(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
   | "[\"List\",\"cons\"]" ->
@@ -122,6 +152,7 @@ fun f_List_isEmpty_31ee95efb7(_x_1_0: LeanValue): LeanValue {
 }
 // "List.any._at_.List.eraseDupsBy.loop.spec_0._redArg"
 fun f_eraseDupsBy_loop_spec_0_e4eb9b30bf(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -130,10 +161,10 @@ fun f_eraseDupsBy_loop_spec_0_e4eb9b30bf(
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_x_2_1, 0);
     _tail_5_3: LeanValue = leanField(_x_2_1, 1);
-    _x_6_5: LeanValue = leanApply(_x_1_0, Array[_head_4_2]);
+    _x_6_5: LeanValue = leanApply(_runtime, _x_1_0, Array[_head_4_2]);
     leanTag(_x_6_5) match {
     | "[\"Bool\",\"false\"]" ->
-      f_eraseDupsBy_loop_spec_0_e4eb9b30bf(_x_1_0, _tail_5_3)
+      f_eraseDupsBy_loop_spec_0_e4eb9b30bf(_runtime, _x_1_0, _tail_5_3)
     | "[\"Bool\",\"true\"]" -> _x_6_5
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -142,21 +173,23 @@ fun f_eraseDupsBy_loop_spec_0_e4eb9b30bf(
 }
 // "List.filterTR.loop._redArg"
 fun f_List_filterTR_loop_901ce443dd(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_a_2_2)
+  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_runtime, _a_2_2)
   | "[\"List\",\"cons\"]" ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
-    _x_6_6: LeanValue = leanApply(_p_0, Array[_head_4_3]);
+    _x_6_6: LeanValue = leanApply(_runtime, _p_0, Array[_head_4_3]);
     leanTag(_x_6_6) match {
     | "[\"Bool\",\"false\"]" ->
-      f_List_filterTR_loop_901ce443dd(_p_0, _tail_5_4, _a_2_2)
+      f_List_filterTR_loop_901ce443dd(_runtime, _p_0, _tail_5_4, _a_2_2)
     | "[\"Bool\",\"true\"]" ->
       f_List_filterTR_loop_901ce443dd(
+        _runtime,
         _p_0,
         _tail_5_4,
         LeanCtor("[\"List\",\"cons\"]", Array[_head_4_3, _a_2_2]),
@@ -168,19 +201,22 @@ fun f_List_filterTR_loop_901ce443dd(
 }
 // "List.eraseDups._redArg._lam_0"
 fun f_List_eraseDups_lam_0_f1c3fb730d(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _x1_2_1: LeanValue,
   _x2_3_2: LeanValue,
 ): LeanValue {
-  leanApply(_inst_1_0, Array[_x1_2_1, _x2_3_2])
+  leanApply(_runtime, _inst_1_0, Array[_x1_2_1, _x2_3_2])
 }
 fun apply_f_List_eraseDups_lam_0_f1c3fb730d(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_List_eraseDups_lam_0_f1c3fb730d(_args[0], _args[1], _args[2])
+  f_List_eraseDups_lam_0_f1c3fb730d(_runtime, _args[0], _args[1], _args[2])
 }
 // "List.splitAt.go._redArg"
 fun f_List_splitAt_go_7eb2c20635(
+  _runtime: mutable LeanExecution,
   _l_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
@@ -192,19 +228,22 @@ fun f_List_splitAt_go_7eb2c20635(
     _head_5_4: LeanValue = leanField(_a_1_1, 0);
     _tail_6_5: LeanValue = leanField(_a_1_1, 1);
     _isZero_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _a_2_2,
       LeanScalar("nat", "0"),
     );
     leanTag(_isZero_8) match {
     | "[\"Bool\",\"true\"]" ->
-      _x_7_9: LeanValue = f_List_reverse_97a1249b31(_a_3_3);
+      _x_7_9: LeanValue = f_List_reverse_97a1249b31(_runtime, _a_3_3);
       LeanCtor("[\"Prod\",\"mk\"]", Array[_x_7_9, _a_1_1])
     | "[\"Bool\",\"false\"]" ->
       _n_9_12: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _runtime,
         _a_2_2,
         LeanScalar("nat", "1"),
       );
       f_List_splitAt_go_7eb2c20635(
+        _runtime,
         _l_0,
         _tail_6_5,
         _n_9_12,
@@ -217,33 +256,42 @@ fun f_List_splitAt_go_7eb2c20635(
 }
 // "List.eraseDupsBy.loop._redArg"
 fun f_List_eraseDupsBy_loop_cf4e36a81a(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_a_2_2)
+  | "[\"List\",\"nil\"]" -> f_List_reverse_97a1249b31(_runtime, _a_2_2)
   | "[\"List\",\"cons\"]" ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
-    _x_6_6: LeanValue = leanApply(_r_0, Array[_head_4_3]);
-    _x_7_7: LeanValue = f_eraseDupsBy_loop_spec_0_e4eb9b30bf(_x_6_6, _a_2_2);
+    _x_6_6: LeanValue = leanApply(_runtime, _r_0, Array[_head_4_3]);
+    _x_7_7: LeanValue = f_eraseDupsBy_loop_spec_0_e4eb9b30bf(
+      _runtime,
+      _x_6_6,
+      _a_2_2,
+    );
     leanTag(_x_7_7) match {
     | "[\"Bool\",\"false\"]" ->
       f_List_eraseDupsBy_loop_cf4e36a81a(
+        _runtime,
         _r_0,
         _tail_5_4,
         LeanCtor("[\"List\",\"cons\"]", Array[_head_4_3, _a_2_2]),
       )
     | "[\"Bool\",\"true\"]" ->
-      f_List_eraseDupsBy_loop_cf4e36a81a(_r_0, _tail_5_4, _a_2_2)
+      f_List_eraseDupsBy_loop_cf4e36a81a(_runtime, _r_0, _tail_5_4, _a_2_2)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "List.head?._redArg"
-fun f_List_head_555ed9a696(_x_1_0: LeanValue): LeanValue {
+fun f_List_head_555ed9a696(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"List\",\"cons\"]" ->
@@ -254,15 +302,20 @@ fun f_List_head_555ed9a696(_x_1_0: LeanValue): LeanValue {
   }
 }
 // "List.find?._redArg"
-fun f_List_find_d98e619bc2(_p_0: LeanValue, _x_1_1: LeanValue): LeanValue {
+fun f_List_find_d98e619bc2(
+  _runtime: mutable LeanExecution,
+  _p_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
   leanTag(_x_1_1) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"List\",\"cons\"]" ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
-    _x_5_5: LeanValue = leanApply(_p_0, Array[_head_3_2]);
+    _x_5_5: LeanValue = leanApply(_runtime, _p_0, Array[_head_3_2]);
     leanTag(_x_5_5) match {
-    | "[\"Bool\",\"false\"]" -> f_List_find_d98e619bc2(_p_0, _tail_4_3)
+    | "[\"Bool\",\"false\"]" ->
+      f_List_find_d98e619bc2(_runtime, _p_0, _tail_4_3)
     | "[\"Bool\",\"true\"]" ->
       LeanCtor("[\"Option\",\"some\"]", Array[_head_3_2])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -272,6 +325,7 @@ fun f_List_find_d98e619bc2(_p_0: LeanValue, _x_1_1: LeanValue): LeanValue {
 }
 // "List.reverseAux._redArg"
 fun f_List_reverseAux_4d9841a98b(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -281,6 +335,7 @@ fun f_List_reverseAux_4d9841a98b(
     _head_3_2: LeanValue = leanField(_x_1_0, 0);
     _tail_4_3: LeanValue = leanField(_x_1_0, 1);
     f_List_reverseAux_4d9841a98b(
+      _runtime,
       _tail_4_3,
       LeanCtor("[\"List\",\"cons\"]", Array[_head_3_2, _x_2_1]),
     )
@@ -288,29 +343,50 @@ fun f_List_reverseAux_4d9841a98b(
   }
 }
 // "List.range"
-fun f_List_range_a498a22294(_n_0: LeanValue): LeanValue {
-  f_List_range_loop_368ac529da(_n_0, LeanCtor("[\"List\",\"nil\"]", Array[]))
+fun f_List_range_a498a22294(
+  _runtime: mutable LeanExecution,
+  _n_0: LeanValue,
+): LeanValue {
+  f_List_range_loop_368ac529da(
+    _runtime,
+    _n_0,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
 }
 // "List.rotateLeft._redArg"
-fun f_List_rotateLeft_c1811192d1(_xs_0: LeanValue, _i_1: LeanValue): LeanValue {
-  _len_2: LeanValue = L4_Init_Prelude.f_List_length_a23e9d1869(_xs_0);
+fun f_List_rotateLeft_c1811192d1(
+  _runtime: mutable LeanExecution,
+  _xs_0: LeanValue,
+  _i_1: LeanValue,
+): LeanValue {
+  _len_2: LeanValue = L4_Init_Prelude.f_List_length_a23e9d1869(_runtime, _xs_0);
   _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
     _len_2,
     LeanScalar("nat", "1"),
   );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
-    _i_5: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_i_1, _len_2);
-    _ys_6: LeanValue = f_List_take_298597a2b0(_i_5, _xs_0);
-    _zs_7: LeanValue = f_List_drop_152ce24d64(_i_5, _xs_0);
-    f_List_appendTR_2b9956fe3a(_zs_7, _ys_6)
+    _i_5: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(
+      _runtime,
+      _i_1,
+      _len_2,
+    );
+    _ys_6: LeanValue = f_List_take_298597a2b0(_runtime, _i_5, _xs_0);
+    _zs_7: LeanValue = f_List_drop_152ce24d64(_runtime, _i_5, _xs_0);
+    f_List_appendTR_2b9956fe3a(_runtime, _zs_7, _ys_6)
   | "[\"Bool\",\"true\"]" -> _xs_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "List.take._redArg"
-fun f_List_take_298597a2b0(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
+fun f_List_take_298597a2b0(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _x_1_0,
     LeanScalar("nat", "0"),
   );
@@ -323,10 +399,11 @@ fun f_List_take_298597a2b0(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
       _head_4_5: LeanValue = leanField(_x_2_1, 0);
       _tail_5_6: LeanValue = leanField(_x_2_1, 1);
       _n_6_8: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _runtime,
         _x_1_0,
         LeanScalar("nat", "1"),
       );
-      _x_7_9: LeanValue = f_List_take_298597a2b0(_n_6_8, _tail_5_6);
+      _x_7_9: LeanValue = f_List_take_298597a2b0(_runtime, _n_6_8, _tail_5_6);
       LeanCtor("[\"List\",\"cons\"]", Array[_head_4_5, _x_7_9])
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -334,17 +411,22 @@ fun f_List_take_298597a2b0(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
   }
 }
 // "List.filter._redArg"
-fun f_List_filter_218e35f9a8(_p_0: LeanValue, _x_1_1: LeanValue): LeanValue {
+fun f_List_filter_218e35f9a8(
+  _runtime: mutable LeanExecution,
+  _p_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
   leanTag(_x_1_1) match {
   | "[\"List\",\"nil\"]" -> _x_1_1
   | "[\"List\",\"cons\"]" ->
     _head_2_2: LeanValue = leanField(_x_1_1, 0);
     _tail_3_3: LeanValue = leanField(_x_1_1, 1);
-    _x_4_4: LeanValue = leanApply(_p_0, Array[_head_2_2]);
+    _x_4_4: LeanValue = leanApply(_runtime, _p_0, Array[_head_2_2]);
     leanTag(_x_4_4) match {
-    | "[\"Bool\",\"false\"]" -> f_List_filter_218e35f9a8(_p_0, _tail_3_3)
+    | "[\"Bool\",\"false\"]" ->
+      f_List_filter_218e35f9a8(_runtime, _p_0, _tail_3_3)
     | "[\"Bool\",\"true\"]" ->
-      _x_6_6: LeanValue = f_List_filter_218e35f9a8(_p_0, _tail_3_3);
+      _x_6_6: LeanValue = f_List_filter_218e35f9a8(_runtime, _p_0, _tail_3_3);
       LeanCtor("[\"List\",\"cons\"]", Array[_head_2_2, _x_6_6])
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -353,28 +435,43 @@ fun f_List_filter_218e35f9a8(_p_0: LeanValue, _x_1_1: LeanValue): LeanValue {
 }
 // "List.rotateRight._redArg"
 fun f_List_rotateRight_922fe25a79(
+  _runtime: mutable LeanExecution,
   _xs_0: LeanValue,
   _i_1: LeanValue,
 ): LeanValue {
-  _len_2: LeanValue = L4_Init_Prelude.f_List_length_a23e9d1869(_xs_0);
+  _len_2: LeanValue = L4_Init_Prelude.f_List_length_a23e9d1869(_runtime, _xs_0);
   _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
     _len_2,
     LeanScalar("nat", "1"),
   );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
-    _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_i_1, _len_2);
-    _i_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(_len_2, _x_3_5);
-    _ys_7: LeanValue = f_List_take_298597a2b0(_i_6, _xs_0);
-    _zs_8: LeanValue = f_List_drop_152ce24d64(_i_6, _xs_0);
-    f_List_appendTR_2b9956fe3a(_zs_8, _ys_7)
+    _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(
+      _runtime,
+      _i_1,
+      _len_2,
+    );
+    _i_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
+      _len_2,
+      _x_3_5,
+    );
+    _ys_7: LeanValue = f_List_take_298597a2b0(_runtime, _i_6, _xs_0);
+    _zs_8: LeanValue = f_List_drop_152ce24d64(_runtime, _i_6, _xs_0);
+    f_List_appendTR_2b9956fe3a(_runtime, _zs_8, _ys_7)
   | "[\"Bool\",\"true\"]" -> _xs_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "List.replicateTR._redArg"
-fun f_List_replicateTR_e8c53acd26(_n_0: LeanValue, _a_1: LeanValue): LeanValue {
+fun f_List_replicateTR_e8c53acd26(
+  _runtime: mutable LeanExecution,
+  _n_0: LeanValue,
+  _a_1: LeanValue,
+): LeanValue {
   f_List_replicateTR_loop_31544bb5f5(
+    _runtime,
     _a_1,
     _n_0,
     LeanCtor("[\"List\",\"nil\"]", Array[]),
@@ -382,6 +479,7 @@ fun f_List_replicateTR_e8c53acd26(_n_0: LeanValue, _a_1: LeanValue): LeanValue {
 }
 // "List.instDecidableRelSubsetOfDecidableEq._redArg"
 fun f_List_instDecidableRelSubsetOfDecidableEq_3b487adca1(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _x_2_1: LeanValue,
   _x_3_2: LeanValue,
@@ -397,19 +495,21 @@ fun f_List_instDecidableRelSubsetOfDecidableEq_3b487adca1(
     3,
     Array[_f_4_3, _x_3_2],
   );
-  f_List_decidableBAll_8ecd106aaf(_f_5_4, _x_2_1)
+  f_List_decidableBAll_8ecd106aaf(_runtime, _f_5_4, _x_2_1)
 }
 // "List.zipWith._at_.List.zip.spec_0"
 fun f_List_zip_spec_0_71b57379f3(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _x_1_2: LeanValue,
   _x_2_3: LeanValue,
 ): LeanValue {
-  f_List_zip_spec_0_e28b4199c7(_x_1_2, _x_2_3)
+  f_List_zip_spec_0_e28b4199c7(_runtime, _x_1_2, _x_2_3)
 }
 // "List.decidableLex._redArg"
 fun f_List_decidableLex_bd6a9cda4d(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _h_1: LeanValue,
   _x_2_2: LeanValue,
@@ -433,10 +533,15 @@ fun f_List_decidableLex_bd6a9cda4d(
     | "[\"List\",\"cons\"]" ->
       _head_11_10: LeanValue = leanField(_x_3_3, 0);
       _tail_12_11: LeanValue = leanField(_x_3_3, 1);
-      _decide_13_13: LeanValue = leanApply(_h_1, Array[_head_8_4, _head_11_10]);
+      _decide_13_13: LeanValue = leanApply(
+        _runtime,
+        _h_1,
+        Array[_head_8_4, _head_11_10],
+      );
       leanTag(_decide_13_13) match {
       | "[\"Bool\",\"false\"]" ->
         _x_14_14: LeanValue = leanApply(
+          _runtime,
           _inst_1_0,
           Array[_head_8_4, _head_11_10],
         );
@@ -444,6 +549,7 @@ fun f_List_decidableLex_bd6a9cda4d(
         | "[\"Bool\",\"false\"]" -> _x_14_14
         | "[\"Bool\",\"true\"]" ->
           _decide_15_15: LeanValue = f_List_decidableLex_bd6a9cda4d(
+            _runtime,
             _inst_1_0,
             _h_1,
             _tail_9_5,
@@ -465,12 +571,17 @@ fun f_List_decidableLex_bd6a9cda4d(
   }
 }
 // "List.appendTR._redArg"
-fun f_List_appendTR_2b9956fe3a(_as_0: LeanValue, _bs_1: LeanValue): LeanValue {
-  _x_1_2: LeanValue = f_List_reverse_97a1249b31(_as_0);
-  f_List_reverseAux_4d9841a98b(_x_1_2, _bs_1)
+fun f_List_appendTR_2b9956fe3a(
+  _runtime: mutable LeanExecution,
+  _as_0: LeanValue,
+  _bs_1: LeanValue,
+): LeanValue {
+  _x_1_2: LeanValue = f_List_reverse_97a1249b31(_runtime, _as_0);
+  f_List_reverseAux_4d9841a98b(_runtime, _x_1_2, _bs_1)
 }
 // "List.eraseDups._redArg"
 fun f_List_eraseDups_09d0def917(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _as_1: LeanValue,
 ): LeanValue {
@@ -479,10 +590,11 @@ fun f_List_eraseDups_09d0def917(
     3,
     Array[_inst_1_0],
   );
-  f_List_eraseDupsBy_3afb81de3d(_f_2_2, _as_1)
+  f_List_eraseDupsBy_3afb81de3d(_runtime, _f_2_2, _as_1)
 }
 // "List.foldr._at_.List.intersperseTR.spec_0._redArg"
 fun f_List_intersperseTR_spec_0_f02ea85761(
+  _runtime: mutable LeanExecution,
   _sep_0: LeanValue,
   _init_1: LeanValue,
   _x_1_2: LeanValue,
@@ -493,6 +605,7 @@ fun f_List_intersperseTR_spec_0_f02ea85761(
     _head_2_3: LeanValue = leanField(_x_1_2, 0);
     _tail_3_4: LeanValue = leanField(_x_1_2, 1);
     _x_4_5: LeanValue = f_List_intersperseTR_spec_0_f02ea85761(
+      _runtime,
       _sep_0,
       _init_1,
       _tail_3_4,
@@ -505,19 +618,23 @@ fun f_List_intersperseTR_spec_0_f02ea85761(
   }
 }
 // "List.getLast?._redArg"
-fun f_List_getLast_7899e02e88(_x_1_0: LeanValue): LeanValue {
+fun f_List_getLast_7899e02e88(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"List\",\"cons\"]" ->
     _head_3_1: LeanValue = leanField(_x_1_0, 0);
     _tail_4_2: LeanValue = leanField(_x_1_0, 1);
-    _x_5_4: LeanValue = f_List_getLast_4f0bc8360c(_x_1_0);
+    _x_5_4: LeanValue = f_List_getLast_4f0bc8360c(_runtime, _x_1_0);
     LeanCtor("[\"Option\",\"some\"]", Array[_x_5_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "List.eraseRepsBy.loop._redArg"
 fun f_List_eraseRepsBy_loop_fa43a27b1d(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
@@ -526,22 +643,30 @@ fun f_List_eraseRepsBy_loop_fa43a27b1d(
   leanTag(_a_2_2) match {
   | "[\"List\",\"nil\"]" ->
     f_List_reverse_97a1249b31(
+      _runtime,
       LeanCtor("[\"List\",\"cons\"]", Array[_a_1_1, _a_3_3]),
     )
   | "[\"List\",\"cons\"]" ->
     _head_6_4: LeanValue = leanField(_a_2_2, 0);
     _tail_7_5: LeanValue = leanField(_a_2_2, 1);
-    _x_8_8: LeanValue = leanApply(_r_0, Array[_a_1_1, _head_6_4]);
+    _x_8_8: LeanValue = leanApply(_runtime, _r_0, Array[_a_1_1, _head_6_4]);
     leanTag(_x_8_8) match {
     | "[\"Bool\",\"false\"]" ->
       f_List_eraseRepsBy_loop_fa43a27b1d(
+        _runtime,
         _r_0,
         _head_6_4,
         _tail_7_5,
         LeanCtor("[\"List\",\"cons\"]", Array[_a_1_1, _a_3_3]),
       )
     | "[\"Bool\",\"true\"]" ->
-      f_List_eraseRepsBy_loop_fa43a27b1d(_r_0, _a_1_1, _tail_7_5, _a_3_3)
+      f_List_eraseRepsBy_loop_fa43a27b1d(
+        _runtime,
+        _r_0,
+        _a_1_1,
+        _tail_7_5,
+        _a_3_3,
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -549,6 +674,7 @@ fun f_List_eraseRepsBy_loop_fa43a27b1d(
 }
 // "List.eraseRepsBy._redArg"
 fun f_List_eraseRepsBy_d4cad8001e(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -558,6 +684,7 @@ fun f_List_eraseRepsBy_d4cad8001e(
     _head_2_2: LeanValue = leanField(_x_1_1, 0);
     _tail_3_3: LeanValue = leanField(_x_1_1, 1);
     f_List_eraseRepsBy_loop_fa43a27b1d(
+      _runtime,
       _r_0,
       _head_2_2,
       _tail_3_3,
@@ -568,11 +695,13 @@ fun f_List_eraseRepsBy_d4cad8001e(
 }
 // "List.replicateTR.loop._redArg"
 fun f_List_replicateTR_loop_31544bb5f5(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _a_1_1: LeanValue,
   _a_2_2: LeanValue,
 ): LeanValue {
   _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _a_1_1,
     LeanScalar("nat", "0"),
   );
@@ -580,10 +709,12 @@ fun f_List_replicateTR_loop_31544bb5f5(
   | "[\"Bool\",\"true\"]" -> _a_2_2
   | "[\"Bool\",\"false\"]" ->
     _n_3_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _a_1_1,
       LeanScalar("nat", "1"),
     );
     f_List_replicateTR_loop_31544bb5f5(
+      _runtime,
       _a_0,
       _n_3_6,
       LeanCtor("[\"List\",\"cons\"]", Array[_a_0, _a_2_2]),
@@ -592,11 +723,19 @@ fun f_List_replicateTR_loop_31544bb5f5(
   }
 }
 // "List.reverse._redArg"
-fun f_List_reverse_97a1249b31(_as_0: LeanValue): LeanValue {
-  f_List_reverseAux_4d9841a98b(_as_0, LeanCtor("[\"List\",\"nil\"]", Array[]))
+fun f_List_reverse_97a1249b31(
+  _runtime: mutable LeanExecution,
+  _as_0: LeanValue,
+): LeanValue {
+  f_List_reverseAux_4d9841a98b(
+    _runtime,
+    _as_0,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+  )
 }
 // "List.elem._redArg"
 fun f_List_elem_4fa78636d8(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _a_1: LeanValue,
   _x_2_2: LeanValue,
@@ -606,10 +745,10 @@ fun f_List_elem_4fa78636d8(
   | "[\"List\",\"cons\"]" ->
     _head_4_3: LeanValue = leanField(_x_2_2, 0);
     _tail_5_4: LeanValue = leanField(_x_2_2, 1);
-    _x_6_6: LeanValue = leanApply(_inst_1_0, Array[_a_1, _head_4_3]);
+    _x_6_6: LeanValue = leanApply(_runtime, _inst_1_0, Array[_a_1, _head_4_3]);
     leanTag(_x_6_6) match {
     | "[\"Bool\",\"false\"]" ->
-      f_List_elem_4fa78636d8(_inst_1_0, _a_1, _tail_5_4)
+      f_List_elem_4fa78636d8(_runtime, _inst_1_0, _a_1, _tail_5_4)
     | "[\"Bool\",\"true\"]" -> _x_6_6
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -618,16 +757,19 @@ fun f_List_elem_4fa78636d8(
 }
 // "List.instDecidableRelSubsetOfDecidableEq._redArg._lam_0"
 fun f_List_instDecidableRelSubsetOfDecidableEq_lam_0_757dcbde29(
+  _runtime: mutable LeanExecution,
   _f_1_0: LeanValue,
   _x_2_1: LeanValue,
   _a_2: LeanValue,
 ): LeanValue {
-  f_List_elem_4fa78636d8(_f_1_0, _a_2, _x_2_1)
+  f_List_elem_4fa78636d8(_runtime, _f_1_0, _a_2, _x_2_1)
 }
 fun apply_f_List_instDecidableRelSubsetOfDecidableEq_lam_0_757dcbde29(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_List_instDecidableRelSubsetOfDecidableEq_lam_0_757dcbde29(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -635,6 +777,7 @@ fun apply_f_List_instDecidableRelSubsetOfDecidableEq_lam_0_757dcbde29(
 }
 // "List.intersperseTR._redArg"
 fun f_List_intersperseTR_b852ac2130(
+  _runtime: mutable LeanExecution,
   _sep_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -649,6 +792,7 @@ fun f_List_intersperseTR_b852ac2130(
       _head_4_4: LeanValue = leanField(_tail_3_3, 0);
       _tail_5_5: LeanValue = leanField(_tail_3_3, 1);
       _x_7_7: LeanValue = f_List_intersperseTR_spec_0_f02ea85761(
+        _runtime,
         _sep_0,
         LeanCtor("[\"List\",\"nil\"]", Array[]),
         _tail_5_5,
@@ -673,6 +817,7 @@ fun f_List_intersperseTR_b852ac2130(
 }
 // "List.foldr._at_.List.unzipTR.spec_0._redArg"
 fun f_List_unzipTR_spec_0_fe21136aa1(
+  _runtime: mutable LeanExecution,
   _init_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -685,7 +830,11 @@ fun f_List_unzipTR_spec_0_fe21136aa1(
     | "[\"Prod\",\"mk\"]" ->
       _fst_4_4: LeanValue = leanField(_head_2_2, 0);
       _snd_5_5: LeanValue = leanField(_head_2_2, 1);
-      _x_6_6: LeanValue = f_List_unzipTR_spec_0_fe21136aa1(_init_0, _tail_3_3);
+      _x_6_6: LeanValue = f_List_unzipTR_spec_0_fe21136aa1(
+        _runtime,
+        _init_0,
+        _tail_3_3,
+      );
       leanTag(_x_6_6) match {
       | "[\"Prod\",\"mk\"]" ->
         _fst_7_7: LeanValue = leanField(_x_6_6, 0);
@@ -706,6 +855,7 @@ fun f_List_unzipTR_spec_0_fe21136aa1(
 }
 // "List.zipWith._at_.List.zip.spec_0._redArg"
 fun f_List_zip_spec_0_e28b4199c7(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -719,7 +869,11 @@ fun f_List_zip_spec_0_e28b4199c7(
     | "[\"List\",\"cons\"]" ->
       _head_7_5: LeanValue = leanField(_x_2_1, 0);
       _tail_8_6: LeanValue = leanField(_x_2_1, 1);
-      _x_10_9: LeanValue = f_List_zip_spec_0_e28b4199c7(_tail_5_3, _tail_8_6);
+      _x_10_9: LeanValue = f_List_zip_spec_0_e28b4199c7(
+        _runtime,
+        _tail_5_3,
+        _tail_8_6,
+      );
       LeanCtor(
         "[\"List\",\"cons\"]",
         Array[
@@ -734,25 +888,32 @@ fun f_List_zip_spec_0_e28b4199c7(
 }
 // "List.eraseDupsBy._redArg"
 fun f_List_eraseDupsBy_3afb81de3d(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _as_1: LeanValue,
 ): LeanValue {
   f_List_eraseDupsBy_loop_cf4e36a81a(
+    _runtime,
     _r_0,
     _as_1,
     LeanCtor("[\"List\",\"nil\"]", Array[]),
   )
 }
 // "List.any._redArg"
-fun f_List_any_dc9a93f644(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
+fun f_List_any_dc9a93f644(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_x_1_0, 0);
     _tail_5_3: LeanValue = leanField(_x_1_0, 1);
-    _x_6_5: LeanValue = leanApply(_x_2_1, Array[_head_4_2]);
+    _x_6_5: LeanValue = leanApply(_runtime, _x_2_1, Array[_head_4_2]);
     leanTag(_x_6_5) match {
-    | "[\"Bool\",\"false\"]" -> f_List_any_dc9a93f644(_tail_5_3, _x_2_1)
+    | "[\"Bool\",\"false\"]" ->
+      f_List_any_dc9a93f644(_runtime, _tail_5_3, _x_2_1)
     | "[\"Bool\",\"true\"]" -> _x_6_5
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -760,8 +921,13 @@ fun f_List_any_dc9a93f644(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
   }
 }
 // "List.splitAt._redArg"
-fun f_List_splitAt_2f373e108e(_n_0: LeanValue, _l_1: LeanValue): LeanValue {
+fun f_List_splitAt_2f373e108e(
+  _runtime: mutable LeanExecution,
+  _n_0: LeanValue,
+  _l_1: LeanValue,
+): LeanValue {
   f_List_splitAt_go_7eb2c20635(
+    _runtime,
     _l_1,
     _l_1,
     _n_0,
@@ -770,10 +936,12 @@ fun f_List_splitAt_2f373e108e(_n_0: LeanValue, _l_1: LeanValue): LeanValue {
 }
 // "List.range.loop"
 fun f_List_range_loop_368ac529da(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _a_2_1: LeanValue,
 ): LeanValue {
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _a_1_0,
     LeanScalar("nat", "0"),
   );
@@ -781,10 +949,12 @@ fun f_List_range_loop_368ac529da(
   | "[\"Bool\",\"true\"]" -> _a_2_1
   | "[\"Bool\",\"false\"]" ->
     _n_3_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _a_1_0,
       LeanScalar("nat", "1"),
     );
     f_List_range_loop_368ac529da(
+      _runtime,
       _n_3_5,
       LeanCtor("[\"List\",\"cons\"]", Array[_n_3_5, _a_2_1]),
     )
@@ -792,8 +962,13 @@ fun f_List_range_loop_368ac529da(
   }
 }
 // "List.drop._redArg"
-fun f_List_drop_152ce24d64(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
+fun f_List_drop_152ce24d64(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+  _x_2_1: LeanValue,
+): LeanValue {
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _x_1_0,
     LeanScalar("nat", "0"),
   );
@@ -806,10 +981,11 @@ fun f_List_drop_152ce24d64(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
       _head_3_4: LeanValue = leanField(_x_2_1, 0);
       _tail_4_5: LeanValue = leanField(_x_2_1, 1);
       _n_5_7: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _runtime,
         _x_1_0,
         LeanScalar("nat", "1"),
       );
-      f_List_drop_152ce24d64(_n_5_7, _tail_4_5)
+      f_List_drop_152ce24d64(_runtime, _n_5_7, _tail_4_5)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -817,6 +993,7 @@ fun f_List_drop_152ce24d64(_x_1_0: LeanValue, _x_2_1: LeanValue): LeanValue {
 }
 // "List.decidableBAll._redArg"
 fun f_List_decidableBAll_8ecd106aaf(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -825,11 +1002,12 @@ fun f_List_decidableBAll_8ecd106aaf(
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_x_2_1, 0);
     _tail_5_3: LeanValue = leanField(_x_2_1, 1);
-    _x_6_5: LeanValue = leanApply(_inst_1_0, Array[_head_4_2]);
+    _x_6_5: LeanValue = leanApply(_runtime, _inst_1_0, Array[_head_4_2]);
     leanTag(_x_6_5) match {
     | "[\"Bool\",\"false\"]" -> _x_6_5
     | "[\"Bool\",\"true\"]" ->
       _decide_7_6: LeanValue = f_List_decidableBAll_8ecd106aaf(
+        _runtime,
         _inst_1_0,
         _tail_5_3,
       );

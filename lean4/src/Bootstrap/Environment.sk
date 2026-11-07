@@ -1,0 +1,127 @@
+// A synchronous environment over two distinct constant views. The caller supplies
+// imported module metadata and initialized extension states. This constructor
+// neither validates declarations nor substitutes for module initialization.
+fun leanEnvironment(
+  runtime: mutable LeanExecution,
+  imports: LeanConstantsView,
+  locals: LeanConstantsView,
+  header: LeanValue,
+  extensions: LeanValue,
+  extensionGenerations: LeanValue,
+  quotInitialized: Bool,
+  trackedGeneration: LeanValue = LeanUnavailable("imported tracked generation"),
+  importedExtraConstants: LeanValue = LeanUnavailable(
+    "imported extra IR constants",
+  ),
+): LeanValue {
+  none: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  nil: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  leaf: LeanValue = LeanCtor(
+    "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+    Array[],
+  );
+  hashMap: LeanValue = LeanCtor(
+    "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+    Array[
+      LeanArray(
+        Array::fill(
+          32,
+          LeanCtor(
+            "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]",
+            Array[],
+          ),
+        ),
+      ),
+    ],
+  );
+  constants: LeanValue = LeanCtor(
+    "[\"Lean\",\"ConstMap\",\"mk\"]",
+    Array[
+      LeanCtor(
+        "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+        Array[none, LeanTrackedConstants(imports)],
+      ),
+      LeanTrackedConstants(locals),
+    ],
+  );
+  kernel: LeanValue = LeanCtor(
+    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"Kernel\",\"Environment\",\"mk\"]",
+    Array[
+      constants,
+      leanBool(quotInitialized),
+      LeanCtor(
+        "[\"Lean\",\"Kernel\",\"Diagnostics\",\"mk\"]",
+        Array[hashMap, leanBool(false)],
+      ),
+      importedExtraConstants,
+      extensions,
+      LeanUnavailable("IR environment extension state"),
+      extensionGenerations,
+      trackedGeneration,
+      header,
+    ],
+  );
+  asyncConsts = L4_Lean_Environment.f_Lean_instInhabitedAsyncConsts_default_13eda108e4(
+    runtime,
+  );
+  visibility = "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"VisibilityMap\",\"mk\"]";
+  LeanCtor(
+    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"Environment\",\"mk\"]",
+    Array[
+      LeanCtor(visibility, Array[kernel, kernel]),
+      LeanUnavailable("server environment extension state"),
+      LeanCompletedTask(kernel),
+      LeanCtor(visibility, Array[asyncConsts, asyncConsts]),
+      none,
+      none,
+      leaf,
+      LeanCompletedTask(leaf),
+      leanBool(false),
+      leanBool(false),
+      none,
+      LeanCtor(
+        "[\"Lean\",\"DeclChangeLog\",\"mk\"]",
+        Array[leanNatValue(0), nil],
+      ),
+      leanNatValue(0),
+      hashMap,
+      leanNatValue(0),
+    ],
+  )
+}
+
+// Valid header for tests without imports. Imported environments must instead use
+// the actual module header from their import data.
+fun leanEmptyEnvironmentHeader(): LeanValue {
+  empty: LeanValue = LeanArray(Array[]);
+  moduleIndices: LeanValue = LeanCtor(
+    "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+    Array[
+      leanNatValue(0),
+      LeanArray(
+        Array::fill(
+          8,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            Array[],
+          ),
+        ),
+      ),
+    ],
+  );
+  LeanCtor(
+    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]",
+    Array[
+      LeanWord("uint32", 0),
+      LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+      leanBool(false),
+      empty,
+      empty,
+      empty,
+      empty,
+      moduleIndices,
+      empty,
+      empty,
+    ],
+  )
+}

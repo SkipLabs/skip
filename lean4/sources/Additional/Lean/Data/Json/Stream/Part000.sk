@@ -2,6 +2,7 @@ module L4_Lean_Data_Json_Stream;
 
 // "Lean.IO.FS.Stream.writeJson"
 fun f_FS_Stream_writeJson_4366995cfb(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _j_1: LeanValue,
   _a_1_2: LeanValue,
@@ -15,14 +16,15 @@ fun f_FS_Stream_writeJson_4366995cfb(
     _putStr_7: LeanValue = leanField(_h_0, 4);
     _isTty_8: LeanValue = leanField(_h_0, 5);
     _x_2_9: LeanValue = L4_Lean_Data_Json_Printer.f_Lean_Json_compress_530c1aefe0(
+      _runtime,
       _j_1,
     );
-    _x_3_10: LeanValue = leanApply(_putStr_7, Array[_x_2_9, _a_1_2]);
+    _x_3_10: LeanValue = leanApply(_runtime, _putStr_7, Array[_x_2_9, _a_1_2]);
     leanTag(_x_3_10) match {
     | "[\"EST\",\"Out\",\"ok\"]" ->
       _a_4_11: LeanValue = leanField(_x_3_10, 0);
       _a_5_12: LeanValue = leanField(_x_3_10, 1);
-      leanApply(_flush_3, Array[_a_5_12])
+      leanApply(_runtime, _flush_3, Array[_a_5_12])
     | "[\"EST\",\"Out\",\"error\"]" ->
       _a_7_13: LeanValue = leanField(_x_3_10, 0);
       _a_8_14: LeanValue = leanField(_x_3_10, 1);
@@ -33,11 +35,14 @@ fun f_FS_Stream_writeJson_4366995cfb(
   }
 }
 // "Lean.IO.FS.Stream.readUTF8._closed_0"
-fun f_Stream_readUTF8_closed_0_e4cfa201af(): LeanValue {
+fun f_Stream_readUTF8_closed_0_e4cfa201af(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("invalid UTF-8")
 }
 // "Lean.IO.FS.Stream.readUTF8"
 fun f_FS_Stream_readUTF8_9741e5980a(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _nBytes_1: LeanValue,
   _a_1_2: LeanValue,
@@ -51,24 +56,28 @@ fun f_FS_Stream_readUTF8_9741e5980a(
     _putStr_7: LeanValue = leanField(_h_0, 4);
     _isTty_8: LeanValue = leanField(_h_0, 5);
     _x_2_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _nBytes_1,
     );
-    _x_3_10: LeanValue = leanApply(_read_4, Array[_x_2_9, _a_1_2]);
+    _x_3_10: LeanValue = leanApply(_runtime, _read_4, Array[_x_2_9, _a_1_2]);
     leanTag(_x_3_10) match {
     | "[\"EST\",\"Out\",\"ok\"]" ->
       _a_4_11: LeanValue = leanField(_x_3_10, 0);
       _a_5_12: LeanValue = leanField(_x_3_10, 1);
       _x_6_15: LeanValue = L4_Init_Data_String_Basic.f_ByteArray_validateUTF8_6952007cc6(
+        _runtime,
         _a_4_11,
       );
       leanTag(_x_6_15) match {
       | "[\"Bool\",\"false\"]" ->
         _x_8_17: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+          _runtime,
           LeanText("invalid UTF-8"),
         );
         LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_8_17, _a_5_12])
       | "[\"Bool\",\"true\"]" ->
         _x_10_19: LeanValue = L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+          _runtime,
           _a_4_11,
           LeanErased(),
         );
@@ -86,6 +95,7 @@ fun f_FS_Stream_readUTF8_9741e5980a(
 }
 // "Lean.IO.FS.Stream.readJson"
 fun f_FS_Stream_readJson_f32d502a2a(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _nBytes_1: LeanValue,
   _a_1_2: LeanValue,
@@ -99,31 +109,36 @@ fun f_FS_Stream_readJson_f32d502a2a(
     _putStr_7: LeanValue = leanField(_h_0, 4);
     _isTty_8: LeanValue = leanField(_h_0, 5);
     _x_2_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _nBytes_1,
     );
-    _x_3_10: LeanValue = leanApply(_read_4, Array[_x_2_9, _a_1_2]);
+    _x_3_10: LeanValue = leanApply(_runtime, _read_4, Array[_x_2_9, _a_1_2]);
     leanTag(_x_3_10) match {
     | "[\"EST\",\"Out\",\"ok\"]" ->
       _a_4_11: LeanValue = leanField(_x_3_10, 0);
       _a_5_12: LeanValue = leanField(_x_3_10, 1);
       _x_6_15: LeanValue = L4_Init_Data_String_Basic.f_ByteArray_validateUTF8_6952007cc6(
+        _runtime,
         _a_4_11,
       );
       leanTag(_x_6_15) match {
       | "[\"Bool\",\"false\"]" ->
         _x_8_17: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+          _runtime,
           LeanText("invalid UTF-8"),
         );
         LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_8_17, _a_5_12])
       | "[\"Bool\",\"true\"]" ->
         _x_10_19: LeanValue = L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+          _runtime,
           _a_4_11,
           LeanErased(),
         );
         _x_11_20: LeanValue = L4_Lean_Data_Json_Parser.f_Lean_Json_parse_7ec296389d(
+          _runtime,
           _x_10_19,
         );
-        f_Stream_readJson_spec_0_1c332b4768(_x_11_20, _a_5_12)
+        f_Stream_readJson_spec_0_1c332b4768(_runtime, _x_11_20, _a_5_12)
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | "[\"EST\",\"Out\",\"error\"]" ->
@@ -137,19 +152,23 @@ fun f_FS_Stream_readJson_f32d502a2a(
 }
 // "IO.ofExcept._at_.Lean.IO.FS.Stream.readJson.spec_0"
 fun f_Stream_readJson_spec_0_c09ed41bdd(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _e_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
-  f_Stream_readJson_spec_0_1c332b4768(_e_1, _a_1_2)
+  f_Stream_readJson_spec_0_1c332b4768(_runtime, _e_1, _a_1_2)
 }
 // "Lean.IO.FS.Stream.readUTF8._closed_1"
-fun f_Stream_readUTF8_closed_1_bc98aba9b5(): LeanValue {
-  _x_128_0: LeanValue = f_Stream_readUTF8_closed_0_e4cfa201af();
-  L4_Init_System_IOError.f_IO_userError_436e50ab44(_x_128_0)
+fun f_Stream_readUTF8_closed_1_bc98aba9b5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_128_0: LeanValue = f_Stream_readUTF8_closed_0_e4cfa201af(_runtime);
+  L4_Init_System_IOError.f_IO_userError_436e50ab44(_runtime, _x_128_0)
 }
 // "IO.ofExcept._at_.Lean.IO.FS.Stream.readJson.spec_0._redArg"
 fun f_Stream_readJson_spec_0_1c332b4768(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -157,6 +176,7 @@ fun f_Stream_readJson_spec_0_1c332b4768(
   | "[\"Except\",\"error\"]" ->
     _a_2_2: LeanValue = leanField(_e_0, 0);
     _x_3_4: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+      _runtime,
       _a_2_2,
     );
     LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_3_4, _a_1_1])

@@ -2,21 +2,27 @@ module L4_Init_System_IO;
 
 // "IO.Process.Child.tryWait"
 fun f_Process_Child_tryWait_f9bc74452c(
+  _runtime: mutable LeanExecution,
   _cfg_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
   _a_internal_hyg_2_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.Process.Child.tryWait [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_process_child_try_wait\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.Process.Child.tryWait",
+    "lean_io_process_child_try_wait",
+    Array[_cfg_0, _a_internal_hyg_1_1, _a_internal_hyg_2_2],
   )
 }
 // "_private.Init.System.IO.0.IO.FS.Handle.readBinToEndInto.loop"
 fun f_Handle_readBinToEndInto_loop_657c0bd6e0(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _acc_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
   _x_3_4: LeanValue = f_FS_Handle_read_f06af627d6(
+    _runtime,
     _h_0,
     LeanScalar("usize", "1024"),
     _a_1_2,
@@ -26,13 +32,21 @@ fun f_Handle_readBinToEndInto_loop_657c0bd6e0(
     _a_4_5: LeanValue = leanField(_x_3_4, 0);
     _a_5_6: LeanValue = leanField(_x_3_4, 1);
     _x_6_9: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_isEmpty_9ea0149c42(
+      _runtime,
       _a_4_5,
     );
     leanTag(_x_6_9) match {
     | "[\"Bool\",\"false\"]" ->
-      _x_8_11: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_acc_1);
-      _x_9_12: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_a_4_5);
+      _x_8_11: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+        _runtime,
+        _acc_1,
+      );
+      _x_9_12: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+        _runtime,
+        _a_4_5,
+      );
       _x_10_13: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_copySlice_70b6c056b1(
+        _runtime,
         _a_4_5,
         LeanScalar("nat", "0"),
         _acc_1,
@@ -40,7 +54,12 @@ fun f_Handle_readBinToEndInto_loop_657c0bd6e0(
         _x_9_12,
         _x_6_9,
       );
-      f_Handle_readBinToEndInto_loop_657c0bd6e0(_h_0, _x_10_13, _a_5_6)
+      f_Handle_readBinToEndInto_loop_657c0bd6e0(
+        _runtime,
+        _h_0,
+        _x_10_13,
+        _a_5_6,
+      )
     | "[\"Bool\",\"true\"]" ->
       LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_acc_1, _a_5_6])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -54,46 +73,57 @@ fun f_Handle_readBinToEndInto_loop_657c0bd6e0(
 }
 // "List.mapIdx.go._at_.IO.waitAny'.spec_0._redArg._lam_0"
 fun f_waitAny_spec_0_lam_0_0409336a16(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _a_1: LeanValue,
 ): LeanValue {
   LeanCtor("[\"Prod\",\"mk\"]", Array[_x_1_0, _a_1])
 }
 fun apply_f_waitAny_spec_0_lam_0_0409336a16(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_waitAny_spec_0_lam_0_0409336a16(_args[0], _args[1])
+  f_waitAny_spec_0_lam_0_0409336a16(_runtime, _args[0], _args[1])
 }
 // "IO.FS.Handle.readBinToEnd"
 fun f_FS_Handle_readBinToEnd_7c3bc676f2(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = L4_Init_Prelude.f_ByteArray_empty_97a63abe76();
-  f_Handle_readBinToEndInto_loop_657c0bd6e0(_h_0, _x_2_2, _a_1_1)
+  _x_2_2: LeanValue = L4_Init_Prelude.f_ByteArray_empty_97a63abe76(_runtime);
+  f_Handle_readBinToEndInto_loop_657c0bd6e0(_runtime, _h_0, _x_2_2, _a_1_1)
 }
 // "IO.FS.Handle.putStr"
 fun f_FS_Handle_putStr_d7c6a958cc(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _s_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.Handle.putStr [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_prim_handle_put_str\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.Handle.putStr",
+    "lean_io_prim_handle_put_str",
+    Array[_h_0, _s_1, _a_internal_hyg_1_2],
   )
 }
-fun apply_f_FS_Handle_putStr_d7c6a958cc(_args: Array<LeanValue>): LeanValue {
-  f_FS_Handle_putStr_d7c6a958cc(_args[0], _args[1], _args[2])
+fun apply_f_FS_Handle_putStr_d7c6a958cc(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_FS_Handle_putStr_d7c6a958cc(_runtime, _args[0], _args[1], _args[2])
 }
 // "IO.toEIO"
 fun f_IO_toEIO_6b84dfb0b6(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _f_2: LeanValue,
   _act_3: LeanValue,
   _a_1_4: LeanValue,
 ): LeanValue {
-  _x_2_5: LeanValue = leanApply(_act_3, Array[_a_1_4]);
+  _x_2_5: LeanValue = leanApply(_runtime, _act_3, Array[_a_1_4]);
   leanTag(_x_2_5) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_6: LeanValue = leanField(_x_2_5, 0);
@@ -102,21 +132,33 @@ fun f_IO_toEIO_6b84dfb0b6(
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_6_8: LeanValue = leanField(_x_2_5, 0);
     _a_7_9: LeanValue = leanField(_x_2_5, 1);
-    _x_8_11: LeanValue = leanApply(_f_2, Array[_a_6_8]);
+    _x_8_11: LeanValue = leanApply(_runtime, _f_2, Array[_a_6_8]);
     LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_8_11, _a_7_9])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_IO_toEIO_6b84dfb0b6(_args: Array<LeanValue>): LeanValue {
-  f_IO_toEIO_6b84dfb0b6(_args[0], _args[1], _args[2], _args[3], _args[4])
+fun apply_f_IO_toEIO_6b84dfb0b6(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_toEIO_6b84dfb0b6(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+  )
 }
 // "IO.FS.Stream.ofBuffer._lam_2"
 fun f_Stream_ofBuffer_lam_2_7644d0518e(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _s_1: LeanValue,
   _y_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _r_0,
@@ -131,10 +173,15 @@ fun f_Stream_ofBuffer_lam_2_7644d0518e(
       _data_6: LeanValue = leanField(_val_3_4, 0);
       _pos_7: LeanValue = leanField(_val_3_4, 1);
       _data_8: LeanValue = L4_Init_Prelude.f_String_toByteArray_f8944ff4b7(
+        _runtime,
         _s_1,
       );
-      _x_6_10: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_data_8);
+      _x_6_10: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+        _runtime,
+        _data_8,
+      );
       _x_8_12: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_copySlice_70b6c056b1(
+        _runtime,
         _data_8,
         LeanScalar("nat", "0"),
         _data_6,
@@ -143,10 +190,12 @@ fun f_Stream_ofBuffer_lam_2_7644d0518e(
         LeanCtor("[\"Bool\",\"false\"]", Array[]),
       );
       _x_9_13: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _pos_7,
         _x_6_10,
       );
       _x_11_15: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _r_0,
@@ -169,93 +218,137 @@ fun f_Stream_ofBuffer_lam_2_7644d0518e(
   }
 }
 fun apply_f_Stream_ofBuffer_lam_2_7644d0518e(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Stream_ofBuffer_lam_2_7644d0518e(_args[0], _args[1], _args[2])
+  f_Stream_ofBuffer_lam_2_7644d0518e(_runtime, _args[0], _args[1], _args[2])
 }
 // "IO.FS.removeFile"
 fun f_IO_FS_removeFile_9eb44531cd(
+  _runtime: mutable LeanExecution,
   _fname_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.removeFile [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_remove_file\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.removeFile",
+    "lean_io_remove_file",
+    Array[_fname_0, _a_internal_hyg_1_1],
   )
 }
-fun apply_f_IO_FS_removeFile_9eb44531cd(_args: Array<LeanValue>): LeanValue {
-  f_IO_FS_removeFile_9eb44531cd(_args[0], _args[1])
+fun apply_f_IO_FS_removeFile_9eb44531cd(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_FS_removeFile_9eb44531cd(_runtime, _args[0], _args[1])
 }
 // "IO.FS.Handle.read"
 fun f_FS_Handle_read_f06af627d6(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _bytes_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.Handle.read [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_prim_handle_read\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.Handle.read",
+    "lean_io_prim_handle_read",
+    Array[_h_0, _bytes_1, _a_internal_hyg_1_2],
   )
 }
-fun apply_f_FS_Handle_read_f06af627d6(_args: Array<LeanValue>): LeanValue {
-  f_FS_Handle_read_f06af627d6(_args[0], _args[1], _args[2])
+fun apply_f_FS_Handle_read_f06af627d6(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_FS_Handle_read_f06af627d6(_runtime, _args[0], _args[1], _args[2])
 }
 // "IO.getTID"
-fun f_IO_getTID_9ccbac017f(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.getTID [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_get_tid\"}]",
+fun f_IO_getTID_9ccbac017f(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getTID",
+    "lean_io_get_tid",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "IO.setStdout"
 fun f_IO_setStdout_7b488d05aa(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.setStdout [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_get_set_stdout\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.setStdout",
+    "lean_get_set_stdout",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
-fun apply_f_IO_setStdout_7b488d05aa(_args: Array<LeanValue>): LeanValue {
-  f_IO_setStdout_7b488d05aa(_args[0], _args[1])
+fun apply_f_IO_setStdout_7b488d05aa(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_setStdout_7b488d05aa(_runtime, _args[0], _args[1])
 }
 // "BaseIO.asTask"
 fun f_BaseIO_asTask_699ba47e39(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _act_1: LeanValue,
   _prio_2: LeanValue,
   _a_internal_hyg_1_3: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "BaseIO.asTask [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_as_task\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "BaseIO.asTask",
+    "lean_io_as_task",
+    Array[_value_0, _act_1, _prio_2, _a_internal_hyg_1_3],
   )
 }
-fun apply_f_BaseIO_asTask_699ba47e39(_args: Array<LeanValue>): LeanValue {
-  f_BaseIO_asTask_699ba47e39(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_BaseIO_asTask_699ba47e39(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_BaseIO_asTask_699ba47e39(_runtime, _args[0], _args[1], _args[2], _args[3])
 }
 // "IO.FS.Handle.flush"
 fun f_FS_Handle_flush_5b006d2a08(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.Handle.flush [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_prim_handle_flush\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.Handle.flush",
+    "lean_io_prim_handle_flush",
+    Array[_h_0, _a_internal_hyg_1_1],
   )
 }
-fun apply_f_FS_Handle_flush_5b006d2a08(_args: Array<LeanValue>): LeanValue {
-  f_FS_Handle_flush_5b006d2a08(_args[0], _args[1])
+fun apply_f_FS_Handle_flush_5b006d2a08(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_FS_Handle_flush_5b006d2a08(_runtime, _args[0], _args[1])
 }
 // "instMonadBaseIO._aux_9"
 fun f_instMonadBaseIO_aux_9_0aa082126f(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _x_2: LeanValue,
   _y_3: LeanValue,
   _a_3_4: LeanValue,
 ): LeanValue {
-  _x_4_5: LeanValue = leanApply(_x_2, Array[_a_3_4]);
+  _x_4_5: LeanValue = leanApply(_runtime, _x_2, Array[_a_3_4]);
   leanTag(_x_4_5) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_5_6: LeanValue = leanField(_x_4_5, 0);
     _state_6_7: LeanValue = leanField(_x_4_5, 1);
     _x_8_9: LeanValue = leanApply(
+      _runtime,
       _y_3,
       Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_6_7],
     );
@@ -270,9 +363,11 @@ fun f_instMonadBaseIO_aux_9_0aa082126f(
   }
 }
 fun apply_f_instMonadBaseIO_aux_9_0aa082126f(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadBaseIO_aux_9_0aa082126f(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -282,15 +377,20 @@ fun apply_f_instMonadBaseIO_aux_9_0aa082126f(
 }
 // "System.FilePath.metadata"
 fun f_System_FilePath_metadata_77e274945c(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "System.FilePath.metadata [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_metadata\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "System.FilePath.metadata",
+    "lean_io_metadata",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 // "instMonadFinallyEIO._aux_1"
 fun f_instMonadFinallyEIO_aux_1_115c681906(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -298,12 +398,13 @@ fun f_instMonadFinallyEIO_aux_1_115c681906(
   _f_4: LeanValue,
   _s_5: LeanValue,
 ): LeanValue {
-  _r_6: LeanValue = leanApply(_x_3, Array[_s_5]);
+  _r_6: LeanValue = leanApply(_runtime, _x_3, Array[_s_5]);
   leanTag(_r_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_7: LeanValue = leanField(_r_6, 0);
     _a_4_8: LeanValue = leanField(_r_6, 1);
     _x_6_12: LeanValue = leanApply(
+      _runtime,
       _f_4,
       Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_3_7]), _a_4_8],
     );
@@ -325,6 +426,7 @@ fun f_instMonadFinallyEIO_aux_1_115c681906(
     _a_14_9: LeanValue = leanField(_r_6, 0);
     _a_15_10: LeanValue = leanField(_r_6, 1);
     _x_17_21: LeanValue = leanApply(
+      _runtime,
       _f_4,
       Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_15_10],
     );
@@ -343,9 +445,11 @@ fun f_instMonadFinallyEIO_aux_1_115c681906(
   }
 }
 fun apply_f_instMonadFinallyEIO_aux_1_115c681906(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadFinallyEIO_aux_1_115c681906(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -356,26 +460,38 @@ fun apply_f_instMonadFinallyEIO_aux_1_115c681906(
 }
 // "IO.getEnv"
 fun f_IO_getEnv_fbb4e7ebf8(
+  _runtime: mutable LeanExecution,
   _var_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.getEnv [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_getenv\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getEnv",
+    "lean_io_getenv",
+    Array[_var_0, _a_internal_hyg_1_1],
   )
 }
 // "IO.getNumHeartbeats"
 fun f_IO_getNumHeartbeats_2b32cd415d(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.getNumHeartbeats [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_get_num_heartbeats\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getNumHeartbeats",
+    "lean_io_get_num_heartbeats",
+    Array[_a_internal_hyg_1_0],
   )
 }
-fun apply_f_IO_getNumHeartbeats_2b32cd415d(_args: Array<LeanValue>): LeanValue {
-  f_IO_getNumHeartbeats_2b32cd415d(_args[0])
+fun apply_f_IO_getNumHeartbeats_2b32cd415d(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_getNumHeartbeats_2b32cd415d(_runtime, _args[0])
 }
 // "instMonadEIO._aux_9"
 fun f_instMonadEIO_aux_9_b1bdd19d90(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -383,12 +499,13 @@ fun f_instMonadEIO_aux_9_b1bdd19d90(
   _y_4: LeanValue,
   _a_3_5: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_x_3, Array[_a_3_5]);
+  _x_4_6: LeanValue = leanApply(_runtime, _x_3, Array[_a_3_5]);
   leanTag(_x_4_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
     _x_8_12: LeanValue = leanApply(
+      _runtime,
       _y_4,
       Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _a_6_8],
     );
@@ -410,8 +527,12 @@ fun f_instMonadEIO_aux_9_b1bdd19d90(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_instMonadEIO_aux_9_b1bdd19d90(_args: Array<LeanValue>): LeanValue {
+fun apply_f_instMonadEIO_aux_9_b1bdd19d90(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_instMonadEIO_aux_9_b1bdd19d90(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -422,6 +543,7 @@ fun apply_f_instMonadEIO_aux_9_b1bdd19d90(_args: Array<LeanValue>): LeanValue {
 }
 // "instMonadEIO._aux_5"
 fun f_instMonadEIO_aux_5_9080cc62ed(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _a_2: LeanValue,
@@ -429,15 +551,29 @@ fun f_instMonadEIO_aux_5_9080cc62ed(
 ): LeanValue {
   LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_a_2, _a_2_3])
 }
-fun apply_f_instMonadEIO_aux_5_9080cc62ed(_args: Array<LeanValue>): LeanValue {
-  f_instMonadEIO_aux_5_9080cc62ed(_args[0], _args[1], _args[2], _args[3])
+fun apply_f_instMonadEIO_aux_5_9080cc62ed(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_instMonadEIO_aux_5_9080cc62ed(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "System.FilePath.pathExists"
 fun f_System_FilePath_pathExists_f339242c40(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_System_FilePath_metadata_77e274945c(_p_0, _a_1_1);
+  _x_2_2: LeanValue = f_System_FilePath_metadata_77e274945c(
+    _runtime,
+    _p_0,
+    _a_1_1,
+  );
   leanTag(_x_2_2) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
@@ -457,21 +593,33 @@ fun f_System_FilePath_pathExists_f339242c40(
   }
 }
 // "IO.lazyPure._redArg"
-fun f_IO_lazyPure_f29a779bb1(_fn_0: LeanValue, _a_1_1: LeanValue): LeanValue {
+fun f_IO_lazyPure_f29a779bb1(
+  _runtime: mutable LeanExecution,
+  _fn_0: LeanValue,
+  _a_1_1: LeanValue,
+): LeanValue {
   _x_3_3: LeanValue = leanApply(
+    _runtime,
     _fn_0,
     Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
   );
   LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_3_3, _a_1_1])
 }
 // "IO.getStdout"
-fun f_IO_getStdout_73410a8b64(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.getStdout [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_get_stdout\"}]",
+fun f_IO_getStdout_73410a8b64(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getStdout",
+    "lean_get_stdout",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "instMonadEIO._aux_7"
 fun f_instMonadEIO_aux_7_563997f273(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -479,12 +627,13 @@ fun f_instMonadEIO_aux_7_563997f273(
   _x_4: LeanValue,
   _a_3_5: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_f_3, Array[_a_3_5]);
+  _x_4_6: LeanValue = leanApply(_runtime, _f_3, Array[_a_3_5]);
   leanTag(_x_4_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
     _x_8_12: LeanValue = leanApply(
+      _runtime,
       _x_4,
       Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _a_6_8],
     );
@@ -492,7 +641,7 @@ fun f_instMonadEIO_aux_7_563997f273(
     | "[\"EST\",\"Out\",\"ok\"]" ->
       _a_9_13: LeanValue = leanField(_x_8_12, 0);
       _a_10_14: LeanValue = leanField(_x_8_12, 1);
-      _x_11_17: LeanValue = leanApply(_a_5_7, Array[_a_9_13]);
+      _x_11_17: LeanValue = leanApply(_runtime, _a_5_7, Array[_a_9_13]);
       LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_11_17, _a_10_14])
     | "[\"EST\",\"Out\",\"error\"]" ->
       _a_13_15: LeanValue = leanField(_x_8_12, 0);
@@ -507,8 +656,12 @@ fun f_instMonadEIO_aux_7_563997f273(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_instMonadEIO_aux_7_563997f273(_args: Array<LeanValue>): LeanValue {
+fun apply_f_instMonadEIO_aux_7_563997f273(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_instMonadEIO_aux_7_563997f273(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -519,11 +672,13 @@ fun apply_f_instMonadEIO_aux_7_563997f273(_args: Array<LeanValue>): LeanValue {
 }
 // "IO.FS.writeBinFile"
 fun f_IO_FS_writeBinFile_44f0999e27(
+  _runtime: mutable LeanExecution,
   _fname_0: LeanValue,
   _content_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
   _x_3_4: LeanValue = f_FS_Handle_mk_f74b60ec26(
+    _runtime,
     _fname_0,
     LeanCtor("[\"IO\",\"FS\",\"Mode\",\"write\"]", Array[]),
     _a_1_2,
@@ -532,7 +687,7 @@ fun f_IO_FS_writeBinFile_44f0999e27(
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_4_5: LeanValue = leanField(_x_3_4, 0);
     _a_5_6: LeanValue = leanField(_x_3_4, 1);
-    f_FS_Handle_write_9148c677c7(_a_4_5, _content_1, _a_5_6)
+    f_FS_Handle_write_9148c677c7(_runtime, _a_4_5, _content_1, _a_5_6)
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_7_7: LeanValue = leanField(_x_3_4, 0);
     _a_8_8: LeanValue = leanField(_x_3_4, 1);
@@ -542,16 +697,21 @@ fun f_IO_FS_writeBinFile_44f0999e27(
 }
 // "IO.Process.Child.wait"
 fun f_Process_Child_wait_78a6127106(
+  _runtime: mutable LeanExecution,
   _cfg_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
   _a_internal_hyg_2_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.Process.Child.wait [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_process_child_wait\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.Process.Child.wait",
+    "lean_io_process_child_wait",
+    Array[_cfg_0, _a_internal_hyg_1_1, _a_internal_hyg_2_2],
   )
 }
 // "IO.FS.Stream.ofBuffer._lam_3"
 fun f_Stream_ofBuffer_lam_3_24112fe498(
+  _runtime: mutable LeanExecution,
   _r_0_input: LeanValue,
   _y_1_1_input: LeanValue,
 ): LeanValue {
@@ -569,6 +729,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
       _frame.set(
         2,
         L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+          _runtime,
           LeanErased(),
           LeanErased(),
           _frame[0],
@@ -585,13 +746,13 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
           _frame.set(6, leanField(_frame[3], 1));
           _frame.set(
             18,
-            f_Stream_ofBuffer_spec_0_9125f8e286(_frame[5], _frame[6]),
+            f_Stream_ofBuffer_spec_0_9125f8e286(_runtime, _frame[5], _frame[6]),
           );
           leanTag(_frame[18]) match {
           | "[\"Option\",\"none\"]" ->
             _frame.set(
               20,
-              L4_Init_Prelude.f_ByteArray_size_7351955367(_frame[5]),
+              L4_Init_Prelude.f_ByteArray_size_7351955367(_runtime, _frame[5]),
             );
             _jump0 = _frame[20];
             _frame.set(7, _jump0);
@@ -602,6 +763,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
             _frame.set(
               21,
               L4_Init_Data_ByteArray_Basic.f_ByteArray_get_55eaeba688(
+                _runtime,
                 _frame[5],
                 _frame[19],
               ),
@@ -609,14 +771,22 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
             _frame.set(22, LeanScalar("uint8", "0"));
             _frame.set(
               23,
-              L4_Init_Prelude.f_UInt8_decEq_926bae36a1(_frame[21], _frame[22]),
+              L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+                _runtime,
+                _frame[21],
+                _frame[22],
+              ),
             );
             leanTag(_frame[23]) match {
             | "[\"Bool\",\"false\"]" ->
               _frame.set(24, LeanScalar("nat", "1"));
               _frame.set(
                 25,
-                L4_Init_Prelude.f_Nat_add_86990f4822(_frame[19], _frame[24]),
+                L4_Init_Prelude.f_Nat_add_86990f4822(
+                  _runtime,
+                  _frame[19],
+                  _frame[24],
+                ),
               );
               _jump0 = _frame[25];
               _frame.set(7, _jump0);
@@ -639,6 +809,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
       _frame.set(
         8,
         L4_Init_Data_ByteArray_Basic.f_ByteArray_extract_1aa209d344(
+          _runtime,
           _frame[5],
           _frame[6],
           _frame[7],
@@ -654,6 +825,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
       _frame.set(
         10,
         L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+          _runtime,
           LeanErased(),
           LeanErased(),
           _frame[0],
@@ -668,6 +840,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
         _frame.set(
           12,
           L4_Init_Data_String_Basic.f_ByteArray_validateUTF8_6952007cc6(
+            _runtime,
             _frame[8],
           ),
         );
@@ -690,6 +863,7 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
           _frame.set(
             16,
             L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+              _runtime,
               _frame[8],
               LeanErased(),
             ),
@@ -708,17 +882,20 @@ fun f_Stream_ofBuffer_lam_3_24112fe498(
   }
 }
 fun apply_f_Stream_ofBuffer_lam_3_24112fe498(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Stream_ofBuffer_lam_3_24112fe498(_args[0], _args[1])
+  f_Stream_ofBuffer_lam_3_24112fe498(_runtime, _args[0], _args[1])
 }
 // "IO.FS.Stream.ofBuffer._lam_0"
 fun f_Stream_ofBuffer_lam_0_7b05c2f0c0(
+  _runtime: mutable LeanExecution,
   _r_0: LeanValue,
   _n_1: LeanValue,
   _y_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _r_0,
@@ -733,22 +910,31 @@ fun f_Stream_ofBuffer_lam_0_7b05c2f0c0(
       _data_6: LeanValue = leanField(_val_3_4, 0);
       _pos_7: LeanValue = leanField(_val_3_4, 1);
       _x_5_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(
+        _runtime,
         _n_1,
       );
-      _x_6_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_pos_7, _x_5_8);
+      _x_6_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
+        _pos_7,
+        _x_5_8,
+      );
       _data_10: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_extract_1aa209d344(
+        _runtime,
         _data_6,
         _pos_7,
         _x_6_9,
       );
       _x_7_11: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+        _runtime,
         _data_10,
       );
       _x_8_12: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _pos_7,
         _x_7_11,
       );
       _x_10_14: LeanValue = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        _runtime,
         LeanErased(),
         LeanErased(),
         _r_0,
@@ -771,31 +957,47 @@ fun f_Stream_ofBuffer_lam_0_7b05c2f0c0(
   }
 }
 fun apply_f_Stream_ofBuffer_lam_0_7b05c2f0c0(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Stream_ofBuffer_lam_0_7b05c2f0c0(_args[0], _args[1], _args[2])
+  f_Stream_ofBuffer_lam_0_7b05c2f0c0(_runtime, _args[0], _args[1], _args[2])
 }
 // "IO.monoMsNow"
-fun f_IO_monoMsNow_a6b9fb4ccd(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.monoMsNow [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_mono_ms_now\"}]",
+fun f_IO_monoMsNow_a6b9fb4ccd(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.monoMsNow",
+    "lean_io_mono_ms_now",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "IO.setNumHeartbeats"
 fun f_IO_setNumHeartbeats_d12292a5a2(
+  _runtime: mutable LeanExecution,
   _count_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.setNumHeartbeats [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_set_heartbeats\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.setNumHeartbeats",
+    "lean_io_set_heartbeats",
+    Array[_count_0, _a_internal_hyg_1_1],
   )
 }
 // "System.FilePath.isDir"
 fun f_System_FilePath_isDir_aa104e31e1(
+  _runtime: mutable LeanExecution,
   _p_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_System_FilePath_metadata_77e274945c(_p_0, _a_1_1);
+  _x_2_2: LeanValue = f_System_FilePath_metadata_77e274945c(
+    _runtime,
+    _p_0,
+    _a_1_1,
+  );
   leanTag(_x_2_2) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
@@ -808,6 +1010,7 @@ fun f_System_FilePath_isDir_aa104e31e1(
       _type_10: LeanValue = leanField(_a_3_3, 3);
       _numLinks_11: LeanValue = leanField(_a_3_3, 4);
       _x_6_13: LeanValue = f_FS_instBEqFileType_beq_fe3d70a908(
+        _runtime,
         _type_10,
         LeanCtor("[\"IO\",\"FS\",\"FileType\",\"dir\"]", Array[]),
       );
@@ -826,6 +1029,7 @@ fun f_System_FilePath_isDir_aa104e31e1(
 }
 // "instInhabitedEIO._aux_1"
 fun f_instInhabitedEIO_aux_1_1ab470a363(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -834,75 +1038,102 @@ fun f_instInhabitedEIO_aux_1_1ab470a363(
   LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_inst_1_2, _s_3])
 }
 fun apply_f_instInhabitedEIO_aux_1_1ab470a363(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_instInhabitedEIO_aux_1_1ab470a363(_args[0], _args[1], _args[2], _args[3])
+  f_instInhabitedEIO_aux_1_1ab470a363(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+  )
 }
 // "IO.addHeartbeats"
 fun f_IO_addHeartbeats_5782b9c826(
+  _runtime: mutable LeanExecution,
   _count_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_IO_getNumHeartbeats_2b32cd415d(_a_1_1);
+  _x_2_2: LeanValue = f_IO_getNumHeartbeats_2b32cd415d(_runtime, _a_1_1);
   leanTag(_x_2_2) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_3_3: LeanValue = leanField(_x_2_2, 0);
     _state_4_4: LeanValue = leanField(_x_2_2, 1);
     _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _val_3_3,
       _count_0,
     );
-    f_IO_setNumHeartbeats_d12292a5a2(_x_5_5, _state_4_4)
+    f_IO_setNumHeartbeats_d12292a5a2(_runtime, _x_5_5, _state_4_4)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "IO.waitAny"
 fun f_IO_waitAny_ad69ada511(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _tasks_1: LeanValue,
   _h_2: LeanValue,
   _a_internal_hyg_1_3: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.waitAny [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_wait_any\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.waitAny",
+    "lean_io_wait_any",
+    Array[_value_0, _tasks_1, _h_2, _a_internal_hyg_1_3],
   )
 }
 // "IO.sleep"
-fun f_IO_sleep_19147e58dc(_ms_0: LeanValue, _s_1: LeanValue): LeanValue {
+fun f_IO_sleep_19147e58dc(
+  _runtime: mutable LeanExecution,
+  _ms_0: LeanValue,
+  _s_1: LeanValue,
+): LeanValue {
   _f_1_2: LeanValue = LeanClosure(
     L4_Init_System_IO.apply_f_IO_sleep_lam_0_fe32cbc1c2,
     2,
     Array[_s_1],
   );
-  L4_Init_Util.f_dbgSleep_181fda1099(LeanErased(), _ms_0, _f_1_2)
+  L4_Init_Util.f_dbgSleep_181fda1099(_runtime, LeanErased(), _ms_0, _f_1_2)
 }
-fun apply_f_IO_sleep_19147e58dc(_args: Array<LeanValue>): LeanValue {
-  f_IO_sleep_19147e58dc(_args[0], _args[1])
+fun apply_f_IO_sleep_19147e58dc(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_sleep_19147e58dc(_runtime, _args[0], _args[1])
 }
 // "IO.appDir"
-fun f_IO_appDir_8ce5306c5f(_a_1_0: LeanValue): LeanValue {
-  _x_2_1: LeanValue = f_IO_appPath_639a546218(_a_1_0);
+fun f_IO_appDir_8ce5306c5f(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
+  _x_2_1: LeanValue = f_IO_appPath_639a546218(_runtime, _a_1_0);
   leanTag(_x_2_1) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_5_6: LeanValue = L4_Init_System_FilePath.f_System_FilePath_parent_43a1ed8886(
+      _runtime,
       _a_3_2,
     );
     leanTag(_x_5_6) match {
     | "[\"Option\",\"some\"]" ->
       _val_6_7: LeanValue = leanField(_x_5_6, 0);
-      f_IO_FS_realPath_3b0d32020a(_val_6_7, _a_4_3)
+      f_IO_FS_realPath_3b0d32020a(_runtime, _val_6_7, _a_4_3)
     | _ ->
       _x_9_10: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         LeanText("IO.appDir: unexpected filename '"),
         _a_3_2,
       );
       _x_11_12: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         _x_9_10,
         LeanText("'"),
       );
       _x_12_13: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+        _runtime,
         _x_11_12,
       );
       LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_12_13, _a_4_3])
@@ -916,6 +1147,7 @@ fun f_IO_appDir_8ce5306c5f(_a_1_0: LeanValue): LeanValue {
 }
 // "EIO.chainTask._redArg"
 fun f_EIO_chainTask_ad114e49cf(
+  _runtime: mutable LeanExecution,
   _t_0: LeanValue,
   _f_1: LeanValue,
   _prio_2: LeanValue,
@@ -928,6 +1160,7 @@ fun f_EIO_chainTask_ad114e49cf(
     Array[_f_1],
   );
   _x_4_7: LeanValue = f_BaseIO_mapTask_8c22ae6ae5(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _f_2_5,
@@ -949,35 +1182,42 @@ fun f_EIO_chainTask_ad114e49cf(
 }
 // "IO.Process.spawn"
 fun f_IO_Process_spawn_26cb0bea8d(
+  _runtime: mutable LeanExecution,
   _args_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.Process.spawn [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_process_spawn\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.Process.spawn",
+    "lean_io_process_spawn",
+    Array[_args_0, _a_internal_hyg_1_1],
   )
 }
 // "instMonadBaseIO._aux_1"
 fun f_instMonadBaseIO_aux_1_fd6ae3acb6(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _f_2: LeanValue,
   _x_3: LeanValue,
   _a_3_4: LeanValue,
 ): LeanValue {
-  _x_4_5: LeanValue = leanApply(_x_3, Array[_a_3_4]);
+  _x_4_5: LeanValue = leanApply(_runtime, _x_3, Array[_a_3_4]);
   leanTag(_x_4_5) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_5_6: LeanValue = leanField(_x_4_5, 0);
     _state_6_7: LeanValue = leanField(_x_4_5, 1);
-    _x_7_8: LeanValue = leanApply(_f_2, Array[_val_5_6]);
+    _x_7_8: LeanValue = leanApply(_runtime, _f_2, Array[_val_5_6]);
     LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_7_8, _state_6_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_instMonadBaseIO_aux_1_fd6ae3acb6(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadBaseIO_aux_1_fd6ae3acb6(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -987,6 +1227,7 @@ fun apply_f_instMonadBaseIO_aux_1_fd6ae3acb6(
 }
 // "BaseIO.mapTask"
 fun f_BaseIO_mapTask_8c22ae6ae5(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _f_2: LeanValue,
@@ -995,27 +1236,57 @@ fun f_BaseIO_mapTask_8c22ae6ae5(
   _sync_5: LeanValue,
   _a_internal_hyg_1_6: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "BaseIO.mapTask [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_map_task\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "BaseIO.mapTask",
+    "lean_io_map_task",
+    Array[
+      _value_0,
+      _value_1,
+      _f_2,
+      _t_3,
+      _prio_4,
+      _sync_5,
+      _a_internal_hyg_1_6,
+    ],
   )
 }
 // "IO.monoNanosNow"
-fun f_IO_monoNanosNow_f8df510195(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.monoNanosNow [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_mono_nanos_now\"}]",
+fun f_IO_monoNanosNow_f8df510195(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.monoNanosNow",
+    "lean_io_mono_nanos_now",
+    Array[_a_internal_hyg_1_0],
   )
 }
-fun apply_f_IO_monoNanosNow_f8df510195(_args: Array<LeanValue>): LeanValue {
-  f_IO_monoNanosNow_f8df510195(_args[0])
+fun apply_f_IO_monoNanosNow_f8df510195(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_monoNanosNow_f8df510195(_runtime, _args[0])
 }
 // "IO.waitAny'._redArg"
-fun f_IO_waitAny_923c5cc86a(_tasks_0: LeanValue, _a_1_1: LeanValue): LeanValue {
+fun f_IO_waitAny_923c5cc86a(
+  _runtime: mutable LeanExecution,
+  _tasks_0: LeanValue,
+  _a_1_1: LeanValue,
+): LeanValue {
   _x_3_3: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   );
-  _x_4_4: LeanValue = f_IO_waitAny_spec_0_08a0c5e5d1(_tasks_0, _x_3_3);
+  _x_4_4: LeanValue = f_IO_waitAny_spec_0_08a0c5e5d1(
+    _runtime,
+    _tasks_0,
+    _x_3_3,
+  );
   _x_5_5: LeanValue = f_IO_waitAny_ad69ada511(
+    _runtime,
     LeanErased(),
     _x_4_4,
     LeanErased(),
@@ -1030,6 +1301,7 @@ fun f_IO_waitAny_923c5cc86a(_tasks_0: LeanValue, _a_1_1: LeanValue): LeanValue {
       _fst_8_8: LeanValue = leanField(_val_6_6, 0);
       _snd_9_9: LeanValue = leanField(_val_6_6, 1);
       _x_10_10: LeanValue = L4_Init_Data_List_Impl.f_List_eraseIdxTR_go_9b3f88ddfb(
+        _runtime,
         LeanErased(),
         _tasks_0,
         _tasks_0,
@@ -1049,13 +1321,22 @@ fun f_IO_waitAny_923c5cc86a(_tasks_0: LeanValue, _a_1_1: LeanValue): LeanValue {
   }
 }
 // "IO.getStderr"
-fun f_IO_getStderr_c60fecd6f6(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.getStderr [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_get_stderr\"}]",
+fun f_IO_getStderr_c60fecd6f6(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getStderr",
+    "lean_get_stderr",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "instMonadEIO._redArg"
-fun f_instMonadEIO_4431f17d75(_dummy_0: LeanValue): LeanValue {
+fun f_instMonadEIO_4431f17d75(
+  _runtime: mutable LeanExecution,
+  _dummy_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = LeanClosure(
     L4_Init_System_IO.apply_f_instMonadEIO_aux_1_4614387e95,
     6,
@@ -1109,7 +1390,10 @@ fun f_instMonadEIO_4431f17d75(_dummy_0: LeanValue): LeanValue {
   )
 }
 // "IO.FS.Stream.ofBuffer"
-fun f_FS_Stream_ofBuffer_4df184ae8c(_r_0: LeanValue): LeanValue {
+fun f_FS_Stream_ofBuffer_4df184ae8c(
+  _runtime: mutable LeanExecution,
+  _r_0: LeanValue,
+): LeanValue {
   _f_1_1: LeanValue = LeanClosure(
     L4_Init_System_IO.apply_f_Stream_ofBuffer_lam_0_7b05c2f0c0,
     3,
@@ -1147,26 +1431,34 @@ fun f_FS_Stream_ofBuffer_4df184ae8c(_r_0: LeanValue): LeanValue {
 }
 // "IO.FS.Handle.write"
 fun f_FS_Handle_write_9148c677c7(
+  _runtime: mutable LeanExecution,
   _h_0: LeanValue,
   _buffer_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.Handle.write [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_prim_handle_write\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.Handle.write",
+    "lean_io_prim_handle_write",
+    Array[_h_0, _buffer_1, _a_internal_hyg_1_2],
   )
 }
-fun apply_f_FS_Handle_write_9148c677c7(_args: Array<LeanValue>): LeanValue {
-  f_FS_Handle_write_9148c677c7(_args[0], _args[1], _args[2])
+fun apply_f_FS_Handle_write_9148c677c7(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_FS_Handle_write_9148c677c7(_runtime, _args[0], _args[1], _args[2])
 }
 // "instMonadBaseIO._aux_3"
 fun f_instMonadBaseIO_aux_3_8c1c085939(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _a_3_2: LeanValue,
   _a_4_3: LeanValue,
   _a_5_4: LeanValue,
 ): LeanValue {
-  _x_6_5: LeanValue = leanApply(_a_4_3, Array[_a_5_4]);
+  _x_6_5: LeanValue = leanApply(_runtime, _a_4_3, Array[_a_5_4]);
   leanTag(_x_6_5) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_7_6: LeanValue = leanField(_x_6_5, 0);
@@ -1176,9 +1468,11 @@ fun f_instMonadBaseIO_aux_3_8c1c085939(
   }
 }
 fun apply_f_instMonadBaseIO_aux_3_8c1c085939(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadBaseIO_aux_3_8c1c085939(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1187,7 +1481,7 @@ fun apply_f_instMonadBaseIO_aux_3_8c1c085939(
   )
 }
 // "instMonadBaseIO"
-fun f_instMonadBaseIO_1f1b5ad0d1(): LeanValue {
+fun f_instMonadBaseIO_1f1b5ad0d1(_runtime: mutable LeanExecution): LeanValue {
   _x_1_0: LeanValue = LeanClosure(
     L4_Init_System_IO.apply_f_instMonadBaseIO_aux_1_fd6ae3acb6,
     5,
@@ -1242,54 +1536,76 @@ fun f_instMonadBaseIO_1f1b5ad0d1(): LeanValue {
 }
 // "IO.FS.Handle.mk"
 fun f_FS_Handle_mk_f74b60ec26(
+  _runtime: mutable LeanExecution,
   _fn_0: LeanValue,
   _mode_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.Handle.mk [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_prim_handle_mk\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.Handle.mk",
+    "lean_io_prim_handle_mk",
+    Array[_fn_0, _mode_1, _a_internal_hyg_1_2],
   )
 }
 // "IO.FS.createTempFile"
 fun f_IO_FS_createTempFile_9a6a1fe1b3(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.createTempFile [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_create_tempfile\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.createTempFile",
+    "lean_io_create_tempfile",
+    Array[_a_internal_hyg_1_0],
   )
 }
 fun apply_f_IO_FS_createTempFile_9a6a1fe1b3(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_IO_FS_createTempFile_9a6a1fe1b3(_args[0])
+  f_IO_FS_createTempFile_9a6a1fe1b3(_runtime, _args[0])
 }
 // "IO.FS.instInhabitedStream.default._lam_5"
 fun f_instInhabitedStream_default_lam_5_932fb58070(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _y_2_1: LeanValue,
 ): LeanValue {
   LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_1_0, _y_2_1])
 }
 fun apply_f_instInhabitedStream_default_lam_5_932fb58070(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_instInhabitedStream_default_lam_5_932fb58070(_args[0], _args[1])
+  f_instInhabitedStream_default_lam_5_932fb58070(_runtime, _args[0], _args[1])
 }
 // "IO.setStderr"
 fun f_IO_setStderr_d259c4fa38(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.setStderr [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_get_set_stderr\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.setStderr",
+    "lean_get_set_stderr",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
-fun apply_f_IO_setStderr_d259c4fa38(_args: Array<LeanValue>): LeanValue {
-  f_IO_setStderr_d259c4fa38(_args[0], _args[1])
+fun apply_f_IO_setStderr_d259c4fa38(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_setStderr_d259c4fa38(_runtime, _args[0], _args[1])
 }
 // "unsafeBaseIO._redArg"
-fun f_unsafeBaseIO_5a5f070077(_fn_0: LeanValue): LeanValue {
+fun f_unsafeBaseIO_5a5f070077(
+  _runtime: mutable LeanExecution,
+  _fn_0: LeanValue,
+): LeanValue {
   _x_2_2: LeanValue = leanApply(
+    _runtime,
     _fn_0,
     Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
   );
@@ -1303,18 +1619,21 @@ fun f_unsafeBaseIO_5a5f070077(_fn_0: LeanValue): LeanValue {
 }
 // "IO.FS.Stream.ofBuffer._lam_4"
 fun f_Stream_ofBuffer_lam_4_b5a573c496(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _y_2_1: LeanValue,
 ): LeanValue {
   LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_1_0, _y_2_1])
 }
 fun apply_f_Stream_ofBuffer_lam_4_b5a573c496(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Stream_ofBuffer_lam_4_b5a573c496(_args[0], _args[1])
+  f_Stream_ofBuffer_lam_4_b5a573c496(_runtime, _args[0], _args[1])
 }
 // "instMonadEIO._aux_11"
 fun f_instMonadEIO_aux_11_7da901b438(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -1322,12 +1641,16 @@ fun f_instMonadEIO_aux_11_7da901b438(
   _y_4: LeanValue,
   _a_3_5: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_x_3, Array[_a_3_5]);
+  _x_4_6: LeanValue = leanApply(_runtime, _x_3, Array[_a_3_5]);
   leanTag(_x_4_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
-    leanApply(_y_4, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _a_6_8])
+    leanApply(
+      _runtime,
+      _y_4,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _a_6_8],
+    )
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_9_9: LeanValue = leanField(_x_4_6, 0);
     _a_10_10: LeanValue = leanField(_x_4_6, 1);
@@ -1335,8 +1658,12 @@ fun f_instMonadEIO_aux_11_7da901b438(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_instMonadEIO_aux_11_7da901b438(_args: Array<LeanValue>): LeanValue {
+fun apply_f_instMonadEIO_aux_11_7da901b438(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_instMonadEIO_aux_11_7da901b438(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1347,16 +1674,18 @@ fun apply_f_instMonadEIO_aux_11_7da901b438(_args: Array<LeanValue>): LeanValue {
 }
 // "List.mapIdx.go._at_.IO.waitAny'.spec_0._redArg"
 fun f_IO_waitAny_spec_0_08a0c5e5d1(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
   | "[\"List\",\"nil\"]" ->
-    L4_Init_Prelude.f_Array_toList_2f8b2ba454(LeanErased(), _a_2_1)
+    L4_Init_Prelude.f_Array_toList_2f8b2ba454(_runtime, LeanErased(), _a_2_1)
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_a_1_0, 0);
     _tail_5_3: LeanValue = leanField(_a_1_0, 1);
     _x_6_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _a_2_1,
     );
@@ -1366,6 +1695,7 @@ fun f_IO_waitAny_spec_0_08a0c5e5d1(
       Array[_x_6_5],
     );
     _x_10_9: LeanValue = L4_Init_Core.f_Task_map_58d98f7eb6(
+      _runtime,
       LeanErased(),
       LeanErased(),
       _f_7_6,
@@ -1374,34 +1704,43 @@ fun f_IO_waitAny_spec_0_08a0c5e5d1(
       LeanCtor("[\"Bool\",\"true\"]", Array[]),
     );
     _x_11_10: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+      _runtime,
       LeanErased(),
       _a_2_1,
       _x_10_9,
     );
-    f_IO_waitAny_spec_0_08a0c5e5d1(_tail_5_3, _x_11_10)
+    f_IO_waitAny_spec_0_08a0c5e5d1(_runtime, _tail_5_3, _x_11_10)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "IO.FS.readFile"
 fun f_IO_FS_readFile_bb3e0d146d(
+  _runtime: mutable LeanExecution,
   _fname_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
-  _x_2_2: LeanValue = f_IO_FS_readBinFile_8aeca414fa(_fname_0, _a_1_1);
+  _x_2_2: LeanValue = f_IO_FS_readBinFile_8aeca414fa(
+    _runtime,
+    _fname_0,
+    _a_1_1,
+  );
   leanTag(_x_2_2) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
     _a_4_4: LeanValue = leanField(_x_2_2, 1);
     _x_5_7: LeanValue = L4_Init_Data_String_Basic.f_ByteArray_validateUTF8_6952007cc6(
+      _runtime,
       _a_3_3,
     );
     leanTag(_x_5_7) match {
     | "[\"Bool\",\"false\"]" ->
       _x_7_9: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         LeanText("Tried to read file '"),
         _fname_0,
       );
       _x_9_11: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         _x_7_9,
         LeanText("' containing non UTF-8 data."),
       );
@@ -1414,6 +1753,7 @@ fun f_IO_FS_readFile_bb3e0d146d(
       )
     | "[\"Bool\",\"true\"]" ->
       _x_12_14: LeanValue = L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+        _runtime,
         _a_3_3,
         LeanErased(),
       );
@@ -1429,6 +1769,7 @@ fun f_IO_FS_readFile_bb3e0d146d(
 }
 // "instMonadEIO._aux_13"
 fun f_instMonadEIO_aux_13_8e46f2d7b7(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -1436,12 +1777,12 @@ fun f_instMonadEIO_aux_13_8e46f2d7b7(
   _f_4: LeanValue,
   _a_3_5: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_x_3, Array[_a_3_5]);
+  _x_4_6: LeanValue = leanApply(_runtime, _x_3, Array[_a_3_5]);
   leanTag(_x_4_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
-    leanApply(_f_4, Array[_a_5_7, _a_6_8])
+    leanApply(_runtime, _f_4, Array[_a_5_7, _a_6_8])
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_8_9: LeanValue = leanField(_x_4_6, 0);
     _a_9_10: LeanValue = leanField(_x_4_6, 1);
@@ -1449,8 +1790,12 @@ fun f_instMonadEIO_aux_13_8e46f2d7b7(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_instMonadEIO_aux_13_8e46f2d7b7(_args: Array<LeanValue>): LeanValue {
+fun apply_f_instMonadEIO_aux_13_8e46f2d7b7(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_instMonadEIO_aux_13_8e46f2d7b7(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1461,6 +1806,7 @@ fun apply_f_instMonadEIO_aux_13_8e46f2d7b7(_args: Array<LeanValue>): LeanValue {
 }
 // "instMonadEIO._aux_1"
 fun f_instMonadEIO_aux_1_4614387e95(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _n_1_1: LeanValue,
   _n_2_2: LeanValue,
@@ -1468,12 +1814,12 @@ fun f_instMonadEIO_aux_1_4614387e95(
   _x_4: LeanValue,
   _a_3_5: LeanValue,
 ): LeanValue {
-  _x_4_6: LeanValue = leanApply(_x_4, Array[_a_3_5]);
+  _x_4_6: LeanValue = leanApply(_runtime, _x_4, Array[_a_3_5]);
   leanTag(_x_4_6) match {
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_5_7: LeanValue = leanField(_x_4_6, 0);
     _a_6_8: LeanValue = leanField(_x_4_6, 1);
-    _x_7_11: LeanValue = leanApply(_f_3, Array[_a_5_7]);
+    _x_7_11: LeanValue = leanApply(_runtime, _f_3, Array[_a_5_7]);
     LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_7_11, _a_6_8])
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_9_9: LeanValue = leanField(_x_4_6, 0);
@@ -1482,8 +1828,12 @@ fun f_instMonadEIO_aux_1_4614387e95(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_instMonadEIO_aux_1_4614387e95(_args: Array<LeanValue>): LeanValue {
+fun apply_f_instMonadEIO_aux_1_4614387e95(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
   f_instMonadEIO_aux_1_4614387e95(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1494,46 +1844,62 @@ fun apply_f_instMonadEIO_aux_1_4614387e95(_args: Array<LeanValue>): LeanValue {
 }
 // "Runtime.forget"
 fun f_Runtime_forget_def24b5c38(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _a_1: LeanValue,
   _a_internal_hyg_1_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "Runtime.forget [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_runtime_forget\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "Runtime.forget",
+    "lean_runtime_forget",
+    Array[_value_0, _a_1, _a_internal_hyg_1_2],
   )
 }
 // "ByteArray.findIdx?.loop._at_.IO.FS.Stream.ofBuffer.spec_0"
 fun f_Stream_ofBuffer_spec_0_9125f8e286(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _i_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_a_0);
-  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_1, _x_1_2);
+  _x_1_2: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+    _runtime,
+    _a_0,
+  );
+  _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    _i_1,
+    _x_1_2,
+  );
   leanTag(_x_2_3) match {
   | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"Bool\",\"true\"]" ->
     _x_4_5: LeanValue = L4_Init_Data_ByteArray_Basic.f_ByteArray_get_fdae4c5c53(
+      _runtime,
       _a_0,
       _i_1,
       LeanErased(),
     );
     _x_6_7: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+      _runtime,
       _x_4_5,
       LeanScalar("uint8", "0"),
     );
     leanTag(_x_6_7) match {
     | "[\"Bool\",\"false\"]" ->
       _x_8_9: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+        _runtime,
         _x_4_5,
         LeanScalar("uint8", "10"),
       );
       leanTag(_x_8_9) match {
       | "[\"Bool\",\"false\"]" ->
         _x_10_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
           _i_1,
           LeanScalar("nat", "1"),
         );
-        f_Stream_ofBuffer_spec_0_9125f8e286(_a_0, _x_10_11)
+        f_Stream_ofBuffer_spec_0_9125f8e286(_runtime, _a_0, _x_10_11)
       | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_i_1])
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -1545,25 +1911,28 @@ fun f_Stream_ofBuffer_spec_0_9125f8e286(
 }
 // "instMonadBaseIO._aux_13"
 fun f_instMonadBaseIO_aux_13_b8d0280e0d(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _x_2: LeanValue,
   _f_3: LeanValue,
   _a_3_4: LeanValue,
 ): LeanValue {
-  _x_4_5: LeanValue = leanApply(_x_2, Array[_a_3_4]);
+  _x_4_5: LeanValue = leanApply(_runtime, _x_2, Array[_a_3_4]);
   leanTag(_x_4_5) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_5_6: LeanValue = leanField(_x_4_5, 0);
     _state_6_7: LeanValue = leanField(_x_4_5, 1);
-    leanApply(_f_3, Array[_val_5_6, _state_6_7])
+    leanApply(_runtime, _f_3, Array[_val_5_6, _state_6_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 fun apply_f_instMonadBaseIO_aux_13_b8d0280e0d(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadBaseIO_aux_13_b8d0280e0d(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1573,6 +1942,7 @@ fun apply_f_instMonadBaseIO_aux_13_b8d0280e0d(
 }
 // "instMonadBaseIO._aux_5"
 fun f_instMonadBaseIO_aux_5_591cfc7527(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _x_1: LeanValue,
   _a_2_2: LeanValue,
@@ -1580,59 +1950,80 @@ fun f_instMonadBaseIO_aux_5_591cfc7527(
   LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_1, _a_2_2])
 }
 fun apply_f_instMonadBaseIO_aux_5_591cfc7527(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_instMonadBaseIO_aux_5_591cfc7527(_args[0], _args[1], _args[2])
+  f_instMonadBaseIO_aux_5_591cfc7527(_runtime, _args[0], _args[1], _args[2])
 }
 // "IO.appPath"
-fun f_IO_appPath_639a546218(_a_internal_hyg_1_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "IO.appPath [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_app_path\"}]",
+fun f_IO_appPath_639a546218(
+  _runtime: mutable LeanExecution,
+  _a_internal_hyg_1_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "IO.appPath",
+    "lean_io_app_path",
+    Array[_a_internal_hyg_1_0],
   )
 }
 // "IO.FS.realPath"
 fun f_IO_FS_realPath_3b0d32020a(
+  _runtime: mutable LeanExecution,
   _fname_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.FS.realPath [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_realpath\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.FS.realPath",
+    "lean_io_realpath",
+    Array[_fname_0, _a_internal_hyg_1_1],
   )
 }
 // "IO.getTaskState"
 fun f_IO_getTaskState_dc7eb75921(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
   _a_internal_hyg_2_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.getTaskState [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_get_task_state\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.getTaskState",
+    "lean_io_get_task_state",
+    Array[_value_0, _a_internal_hyg_1_1, _a_internal_hyg_2_2],
   )
 }
 // "IO.Process.exit"
 fun f_IO_Process_exit_2eecd3e726(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _a_internal_hyg_1_1: LeanValue,
   _a_internal_hyg_2_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.Process.exit [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_exit\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.Process.exit",
+    "lean_io_exit",
+    Array[_value_0, _a_internal_hyg_1_1, _a_internal_hyg_2_2],
   )
 }
 // "instMonadBaseIO._aux_11"
 fun f_instMonadBaseIO_aux_11_fc9fd84f9e(
+  _runtime: mutable LeanExecution,
   _n_1_0: LeanValue,
   _n_2_1: LeanValue,
   _x_2: LeanValue,
   _y_3: LeanValue,
   _a_3_4: LeanValue,
 ): LeanValue {
-  _x_4_5: LeanValue = leanApply(_x_2, Array[_a_3_4]);
+  _x_4_5: LeanValue = leanApply(_runtime, _x_2, Array[_a_3_4]);
   leanTag(_x_4_5) match {
   | "[\"ST\",\"Out\",\"mk\"]" ->
     _val_5_6: LeanValue = leanField(_x_4_5, 0);
     _state_6_7: LeanValue = leanField(_x_4_5, 1);
     leanApply(
+      _runtime,
       _y_3,
       Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_6_7],
     )
@@ -1640,9 +2031,11 @@ fun f_instMonadBaseIO_aux_11_fc9fd84f9e(
   }
 }
 fun apply_f_instMonadBaseIO_aux_11_fc9fd84f9e(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
   f_instMonadBaseIO_aux_11_fc9fd84f9e(
+    _runtime,
     _args[0],
     _args[1],
     _args[2],
@@ -1652,6 +2045,7 @@ fun apply_f_instMonadBaseIO_aux_11_fc9fd84f9e(
 }
 // "BaseIO.bindTask"
 fun f_BaseIO_bindTask_8b49975efb(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _t_2: LeanValue,
@@ -1660,21 +2054,39 @@ fun f_BaseIO_bindTask_8b49975efb(
   _sync_5: LeanValue,
   _a_internal_hyg_1_6: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "BaseIO.bindTask [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_io_bind_task\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "BaseIO.bindTask",
+    "lean_io_bind_task",
+    Array[
+      _value_0,
+      _value_1,
+      _t_2,
+      _f_3,
+      _prio_4,
+      _sync_5,
+      _a_internal_hyg_1_6,
+    ],
   )
 }
 // "IO.setStdin"
 fun f_IO_setStdin_afce9b88de(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "IO.setStdin [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_get_set_stdin\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "IO.setStdin",
+    "lean_get_set_stdin",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
-fun apply_f_IO_setStdin_afce9b88de(_args: Array<LeanValue>): LeanValue {
-  f_IO_setStdin_afce9b88de(_args[0], _args[1])
+fun apply_f_IO_setStdin_afce9b88de(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_setStdin_afce9b88de(_runtime, _args[0], _args[1])
 }
 
 module end;

@@ -1,0 +1,127 @@
+// Exercise maintained Environment.find? over local declarations, including
+// negative reads. This is a lookup test, not theorem elaboration.
+class LocalLookupResult(value: LeanValue, tick: Int) extends SKStore.File
+class LocalLookupInput() extends SKStore.File
+
+fun localProbeName(runtime: mutable LeanExecution, name: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(name))
+}
+
+fun localProbeAxiom(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+): LeanValue {
+  LeanCtor(
+    "[\"Lean\",\"ConstantInfo\",\"axiomInfo\"]",
+    Array[
+      LeanCtor(
+        "[\"Lean\",\"AxiomVal\",\"mk\"]",
+        Array[
+          LeanCtor(
+            "[\"Lean\",\"ConstantVal\",\"mk\"]",
+            Array[
+              name,
+              LeanCtor("[\"List\",\"nil\"]", Array[]),
+              L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+                runtime,
+                LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+              ),
+            ],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun localEnvironmentProbe(): void {
+  mode = read_to_end().trim();
+  store = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store};
+  name = localProbeName(runtime, "localFact");
+  info = localProbeAxiom(runtime, name);
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/local-environment/constants/"),
+    Array[],
+  );
+  base = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", constants),
+    LeanConstantsView("prefix", constants),
+    leanEmptyEnvironmentHeader(),
+    LeanArray(Array[]),
+    LeanArray(Array[]),
+    false,
+    leanNatValue(0),
+  );
+  env = if (mode == "unsupported-realizations") {
+    leanReplaceField(base, 7, LeanUnavailable("pending realizations"))
+  } else {
+    base
+  };
+  inputs = store.mkdir(
+    SKStore.SID::keyType,
+    LocalLookupInput::type,
+    SKStore.DirName::create("/local-environment/input/"),
+    Array[(SKStore.SID("lookup"), LocalLookupInput())],
+  );
+  results = inputs.map(
+    SKStore.SID::keyType,
+    LocalLookupResult::type,
+    store,
+    SKStore.DirName::create("/local-environment/result/"),
+    (context, writer, key, _) ~> {
+      execution = mutable LeanExecution{store => context};
+      value = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+        execution,
+        env,
+        name,
+        leanBool(false),
+      );
+      leanCheckPublishable(value);
+      writer.set(key, LocalLookupResult(value, context.getTick().value))
+    },
+  );
+  store.initPre();
+  store.update();
+  key = SKStore.SID("lookup");
+  assert(leanTag(results.get(store, key).value) == "[\"Option\",\"none\"]");
+  missingTick = results.get(store, key).tick;
+  // A declaration in a later command prefix does not satisfy this read.
+  constants.writeArray(
+    store,
+    LeanConstantKey("later", leanNameKey(name)),
+    Array[LeanConstantFile(info, None())],
+  );
+  store.update();
+  assert(results.get(store, key).tick == missingTick);
+  constants.writeArray(
+    store,
+    LeanConstantKey("prefix", leanNameKey(name)),
+    Array[LeanConstantFile(info, None())],
+  );
+  store.update();
+  found = results.get(store, key);
+  assert(found.tick != missingTick);
+  assert(leanTag(found.value) == "[\"Option\",\"some\"]");
+  assert(native_eq(leanField(found.value, 0), info) == 0);
+  foundTick = found.tick;
+  constants.writeArray(
+    store,
+    LeanConstantKey("prefix", leanNameKey(name)),
+    Array[],
+  );
+  store.update();
+  assert(results.get(store, key).tick != foundTick);
+  assert(leanTag(results.get(store, key).value) == "[\"Option\",\"none\"]");
+  print_string(
+    "Local Environment.find? passed: insertion after miss, deletion, prefix isolation",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> localEnvironmentProbe())
+}

@@ -1,0 +1,137 @@
+// The original initializers allocate extension IDs and retain their callbacks.
+// Only the listed extensions are initialized. Missing globals still fail.
+fun leanInitializeMetaExtensions(runtime: mutable LeanExecution): void {
+  leanInitializeBinding(
+    runtime,
+    "_private.Lean.Environment.0.Lean.EnvExtension.envExtensionsRef",
+    L4_Lean_Environment.f_Environment_hygCtx_hyg_e76238c553,
+  );
+  leanInitializeBinding(
+    runtime,
+    "_private.Lean.Environment.0.Lean.EnvExtension.numTrackedExtsRef",
+    L4_Lean_Environment.f_Environment_hygCtx_hyg_e91be469c6,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.persistentEnvExtensionsRef",
+    L4_Lean_Environment.f_Environment_hygCtx_hyg_66c88d5d48,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.scopedEnvExtensionsRef",
+    L4_Lean_ScopedEnvExtension.f_ScopedEnvExtension_hygCtx_hyg_d8b333072b,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.classExtension",
+    L4_Lean_Class.f_Class_hygCtx_hyg_2928484159,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.projectionFnInfoExt",
+    L4_Lean_ProjFns.f_ProjFns_hygCtx_hyg_c87db54e38,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.Meta.instanceExtension",
+    L4_Lean_Meta_Instances.f_Instances_hygCtx_hyg_086a13d3e6,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.auxRecExt",
+    L4_Lean_AuxRecursor.f_AuxRecursor_hygCtx_hyg_534566eb68,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.reducibilityCoreExt",
+    L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_hygCtx_hyg_e36f9078d6,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.reducibilityExtraExt",
+    L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_hygCtx_hyg_a265903545,
+  );
+}
+
+// Call before Context.initPre. These are immutable import snapshots, not the
+// empty states returned by an extension's initializer. Registration callbacks
+// and IDs come from the maintained Lean code; data comes from checked imports.
+fun leanInstallImportedExtensions(
+  runtime: mutable LeanExecution,
+  scope: String,
+  path: SKStore.DirName,
+  imports: Array<LeanImportExtension>,
+): (LeanValue, LeanValue) {
+  byName: mutable Map<String, LeanImportExtension> = mutable Map[];
+  for (entry in imports) {
+    name = leanNameKey(entry.name);
+    if (!byName.maybeGet(name).isNone()) {
+      leanFail("duplicate imported extension: " + entry.binding)
+    };
+    leanCheckPublishable(entry.state);
+    byName.set(name, entry)
+  };
+  registry = leanArray(
+    runtime.readRef(
+      leanReadInitializer(
+        runtime,
+        "_private.Lean.Environment.0.Lean.EnvExtension.envExtensionsRef",
+      ),
+    ),
+  );
+  slots: mutable Vector<LeanExtensionKey> = mutable Vector[];
+  generations: mutable Vector<LeanExtensionKey> = mutable Vector[];
+  for (descriptor in registry) {
+    index = leanNat(leanField(descriptor, 0)).toInt();
+    if (index != slots.size()) {
+      leanFail("invalid Lean extension registry index")
+    };
+    name = leanNameKey(leanField(descriptor, 4));
+    entry = byName.maybeGet(name) match {
+    | Some(entry) -> entry
+    | None() -> leanFail("imported extension state is unavailable: " + name)
+    };
+    key = LeanExtensionKey(scope, name);
+    slots.push(key);
+    gen = leanField(descriptor, 5);
+    if (leanTag(gen) == "[\"Option\",\"some\"]") {
+      if (leanNat(leanField(gen, 0)).toInt() != generations.size()) {
+        leanFail("invalid Lean extension generation index")
+      };
+      if (entry.generation.isNone()) {
+        leanFail("missing imported generation: " + entry.binding)
+      };
+      generations.push(key)
+    } else if (!entry.generation.isNone()) {
+      leanFail("unexpected imported generation: " + entry.binding)
+    }
+  };
+  count = runtime.readRef(
+    leanReadInitializer(
+      runtime,
+      "_private.Lean.Environment.0.Lean.EnvExtension.numTrackedExtsRef",
+    ),
+  );
+  if (leanNat(count).toInt() != generations.size()) {
+    leanFail("invalid Lean tracked extension count")
+  };
+  entries = runtime.store.mkdir(
+    LeanExtensionKey::keyType,
+    LeanExtensionFile::type,
+    path,
+    imports.map(entry ->
+      (
+        LeanExtensionKey(scope, leanNameKey(entry.name)),
+        LeanExtensionFile(entry.state, entry.generation),
+      )
+    ),
+  );
+  (
+    LeanTrackedExtensionArray(
+      LeanExtensionArray(slots.toArray(), entries, false),
+    ),
+    LeanTrackedExtensionArray(
+      LeanExtensionArray(generations.toArray(), entries, true),
+    ),
+  )
+}

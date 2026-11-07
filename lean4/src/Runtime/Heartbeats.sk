@@ -1,0 +1,75 @@
+// No invented allocation counter: statistics and bounded runs still fail at
+// their original foreign entry points. The explicit unlimited-budget profile
+// may omit a snapshot, leaving a value that fails if anyone tries to use it.
+fun leanHeartbeatOptionNames(runtime: mutable LeanExecution): Array<LeanValue> {
+  Array[
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("maxHeartbeats"),
+    ),
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("synthInstance"),
+      LeanText("maxHeartbeats"),
+    ),
+  ]
+}
+
+fun leanWithoutHeartbeatSnapshot(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+): LeanValue {
+  cold = leanField(context, 0);
+  if (leanNat(leanField(cold, 7)) != LeanNat::fromInt(0)) {
+    leanFail("bounded command heartbeats are not implemented")
+  };
+  dict = L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(runtime);
+  for (name in leanHeartbeatOptionNames(runtime)) {
+    option = L4_Lean_Data_Options.f_Lean_Options_get_51e3bf3e60(
+      runtime,
+      dict,
+      leanField(cold, 2),
+      name,
+    );
+    if (
+      leanTag(option) != "[\"Option\",\"some\"]" ||
+      leanNat(leanField(option, 0)) != LeanNat::fromInt(0)
+    ) {
+      leanFail(
+        "unbounded execution requires explicit zero command and typeclass heartbeat limits",
+      )
+    }
+  };
+  leanReplaceField(
+    context,
+    0,
+    leanReplaceField(cold, 6, LeanUnavailable("heartbeat accounting")),
+  )
+}
+
+fun leanUnboundedCoreContext(
+  runtime: mutable LeanExecution,
+  fileName: String,
+  source: String,
+): LeanValue {
+  if (!runtime.unboundedHeartbeats) {
+    leanFail("unbounded heartbeat profile was not selected")
+  };
+  context = leanCoreContext(fileName, source);
+  cold = leanField(context, 0);
+  options = leanField(cold, 2);
+  dict = L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(runtime);
+  for (name in leanHeartbeatOptionNames(runtime)) {
+    !options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+      runtime,
+      dict,
+      options,
+      name,
+      leanNatValue(0),
+    )
+  };
+  leanWithoutHeartbeatSnapshot(
+    runtime,
+    leanReplaceField(context, 0, leanReplaceField(cold, 2, options)),
+  )
+}

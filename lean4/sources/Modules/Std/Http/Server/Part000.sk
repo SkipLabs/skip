@@ -2,6 +2,7 @@ module L4_Std_Http_Server;
 
 // "Std.Http.Server.new"
 fun f_Http_Server_new_3e15777e1a(
+  _runtime: mutable LeanExecution,
   _config_0_input: LeanValue,
   _localAddr_1_input: LeanValue,
   _a_1_2_input: LeanValue,
@@ -21,6 +22,7 @@ fun f_Http_Server_new_3e15777e1a(
       _frame.set(
         3,
         L4_Std_Sync_CancellationContext.f_Std_CancellationContext_new_3bdbf61e8f(
+          _runtime,
           _frame[2],
         ),
       );
@@ -31,7 +33,11 @@ fun f_Http_Server_new_3e15777e1a(
         _frame.set(6, LeanScalar("nat", "0"));
         _frame.set(
           7,
-          L4_Std_Sync_Mutex.f_Std_Mutex_new_f7e8b64492(_frame[6], _frame[5]),
+          L4_Std_Sync_Mutex.f_Std_Mutex_new_f7e8b64492(
+            _runtime,
+            _frame[6],
+            _frame[5],
+          ),
         );
         leanTag(_frame[7]) match {
         | "[\"ST\",\"Out\",\"mk\"]" ->
@@ -67,13 +73,18 @@ fun f_Http_Server_new_3e15777e1a(
             _ = leanField(_frame[0], 25);
             _frame.set(
               19,
-              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[18], _frame[6]),
+              L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+                _runtime,
+                _frame[18],
+                _frame[6],
+              ),
             );
             leanTag(_frame[19]) match {
             | "[\"Bool\",\"false\"]" ->
               _frame.set(
                 20,
                 L4_Std_Sync_Semaphore.f_Std_Semaphore_new_17af7deb1b(
+                  _runtime,
                   _frame[18],
                   _frame[9],
                 ),
@@ -115,6 +126,7 @@ fun f_Http_Server_new_3e15777e1a(
       _frame.set(
         13,
         L4_Std_Sync_Channel.f_Std_CloseableChannel_new_f66255dbdd(
+          _runtime,
           _frame[12],
           _frame[11],
         ),

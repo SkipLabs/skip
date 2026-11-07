@@ -1,0 +1,263 @@
+// Runtime operations over Lean expressions. Rebuilding uses the maintained Lean
+// constructors, so hashes, binder annotations and cached metadata stay consistent.
+// These traversals currently revisit shared subtrees; a traversal-local memo table
+// is a future performance improvement, not an environment dependency cache.
+
+// Child field index and number of additional binders in that child.
+fun leanExprChildren(expr: LeanValue): Array<(Int, Int)> {
+  leanTag(expr) match {
+  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" -> Array[(1, 0), (2, 0)]
+  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+    Array[(2, 0), (3, 1)]
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" -> Array[(2, 0), (3, 0), (4, 1)]
+  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" -> Array[(2, 0)]
+  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" -> Array[(3, 0)]
+  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+    Array[]
+  | _ -> leanFail("invalid expression in Lean runtime traversal")
+  }
+}
+
+fun leanExprRebuild(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  values: Array<LeanValue>,
+): LeanValue {
+  leanTag(expr) match {
+  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, values[0], values[1])
+  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      leanField(expr, 1),
+      leanField(expr, 4),
+      values[0],
+      values[1],
+    )
+  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      leanField(expr, 1),
+      leanField(expr, 4),
+      values[0],
+      values[1],
+    )
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      runtime,
+      leanField(expr, 1),
+      values[0],
+      values[1],
+      values[2],
+      leanField(expr, 5),
+    )
+  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+      runtime,
+      leanField(expr, 1),
+      values[0],
+    )
+  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+    L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+      runtime,
+      leanField(expr, 1),
+      leanField(expr, 2),
+      values[0],
+    )
+  | _ -> expr
+  }
+}
+
+// A negative delta lowers indices. Callers enforce the public s >= d condition.
+fun leanExprShift(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  cutoff: Int,
+  delta: Int,
+): LeanValue {
+  if (delta == 0 || leanExprData(expr).ushr(44) <= cutoff) return expr;
+  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+    index = leanNat(leanField(expr, 1)).toInt();
+    if (index < cutoff) return expr;
+    return L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(
+      runtime,
+      leanNatValue(index + delta),
+    )
+  };
+  leanExprRebuild(
+    runtime,
+    expr,
+    leanExprChildren(expr).map(child ->
+      leanExprShift(
+        runtime,
+        leanField(expr, child.i0),
+        cutoff + child.i1,
+        delta,
+      )
+    ),
+  )
+}
+
+// subst[0] replaces loose index zero. Passing under a binder
+// increases offset and lifts the substitution, preventing variable capture.
+fun leanExprInstantiate(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  subst: Array<LeanValue>,
+  offset: Int,
+): LeanValue {
+  if (subst.isEmpty() || leanExprData(expr).ushr(44) <= offset) return expr;
+  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+    index = leanNat(leanField(expr, 1)).toInt();
+    if (index < offset) return expr;
+    if (index - offset < subst.size()) {
+      return leanExprShift(runtime, subst[index - offset], 0, offset)
+    };
+    return L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(
+      runtime,
+      leanNatValue(index - subst.size()),
+    )
+  };
+  leanExprRebuild(
+    runtime,
+    expr,
+    leanExprChildren(expr).map(child ->
+      leanExprInstantiate(
+        runtime,
+        leanField(expr, child.i0),
+        subst,
+        offset + child.i1,
+      )
+    ),
+  )
+}
+
+fun leanExprInstantiateRange(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  begin: LeanValue,
+  end: LeanValue,
+  input: LeanValue,
+  reverse: Bool,
+): LeanValue {
+  subst = leanArray(input);
+  if (
+    leanNat(begin) > leanNat(end) ||
+    leanNat(end) > LeanNat::fromInt(subst.size())
+  ) {
+    leanFail("invalid Lean expression substitution range")
+  };
+  first = leanNat(begin).toInt();
+  last = leanNat(end).toInt();
+  selected = Array::fillBy(last - first, i ->
+    subst[if (reverse) last - 1 - i else first + i]
+  );
+  leanExprInstantiate(runtime, expr, selected, 0)
+}
+
+fun leanExprShiftRange(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  start: LeanValue,
+  amount: LeanValue,
+  lower: Bool,
+): LeanValue {
+  s = leanNat(start);
+  d = leanNat(amount);
+  if (
+    s >= LeanNat::fromInt(leanExprData(expr).ushr(44)) ||
+    (lower && s < d) ||
+    d == LeanNat::fromInt(0)
+  ) return expr;
+  if (!lower && d > LeanNat::fromInt(1048575)) {
+    leanFail("too many Lean bound variables")
+  };
+  leanExprShift(
+    runtime,
+    expr,
+    s.toInt(),
+    if (lower) 0 - d.toInt() else d.toInt(),
+  )
+}
+
+fun leanExprHasLooseBVarAt(expr: LeanValue, index: LeanValue): LeanValue {
+  n = leanNat(index);
+  if (n >= LeanNat::fromInt(leanExprData(expr).ushr(44))) {
+    return leanBool(false)
+  };
+  leanBool(leanExprHasLooseBVar(expr, n.toInt()))
+}
+
+fun leanExprHasLooseBVar(expr: LeanValue, index: Int): Bool {
+  if (leanExprData(expr).ushr(44) <= index) return false;
+  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+    return leanNat(leanField(expr, 1)).toInt() == index
+  };
+  leanExprChildren(expr).any(child ->
+    leanExprHasLooseBVar(leanField(expr, child.i0), index + child.i1)
+  )
+}
+
+// Abstract free variables and metavariables. The last matching array entry wins;
+// bound indices are counted from the end of the selected prefix, under binders.
+// Entries of other Expr kinds are ignored, matching lean_expr_abstract_core.
+fun leanExprAbstractAt(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  subst: Array<LeanValue>,
+  count: Int,
+  offset: Int,
+): LeanValue {
+  if (count == 0 || leanExprData(expr).and(7.shl(40)) == 0) return expr;
+  tag = leanTag(expr);
+  if (
+    tag == "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]" ||
+    tag == "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
+  ) {
+    i = count;
+    while (i > 0) {
+      !i = i - 1;
+      if (
+        leanTag(subst[i]) == tag &&
+        leanNameEqual(leanField(subst[i], 1), leanField(expr, 1))
+      ) {
+        return L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(
+          runtime,
+          leanNatValue(offset + count - i - 1),
+        )
+      }
+    };
+    return expr
+  };
+  leanExprRebuild(
+    runtime,
+    expr,
+    leanExprChildren(expr).map(child ->
+      leanExprAbstractAt(
+        runtime,
+        leanField(expr, child.i0),
+        subst,
+        count,
+        offset + child.i1,
+      )
+    ),
+  )
+}
+
+fun leanExprAbstractRange(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  count: LeanValue,
+  input: LeanValue,
+): LeanValue {
+  subst = leanArray(input);
+  n = leanNat(count);
+  size = if (n >= LeanNat::fromInt(subst.size())) subst.size() else n.toInt();
+  leanExprAbstractAt(runtime, expr, subst, size, 0)
+}

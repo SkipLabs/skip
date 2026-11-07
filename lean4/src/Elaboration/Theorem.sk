@@ -1,0 +1,110 @@
+// A request is a typed command at a fixed environment prefix. Parsing, options
+// changes and tactics other than `by decide` are not implemented by this driver.
+class LeanTheoremRequest(
+  name: LeanValue,
+  expectedType: LeanValue,
+  environment: LeanValue,
+) extends SKStore.File
+
+// Diagnostic rendering is deliberately separate from success/failure. Lean's
+// MessageData can contain lazy closures and execution-local state. Those must
+// never escape into a stored result. The initial driver preserves the error
+// category and reports its rendering limitation explicitly.
+class LeanElaborationDiagnostic(kind: String, message: String)
+
+class LeanTheoremResult(
+  declaration: ?LeanValue,
+  diagnostic: ?LeanElaborationDiagnostic,
+  evaluatedAt: Int,
+) extends SKStore.File
+
+fun leanTheoremConstant(
+  name: LeanValue,
+  type: LeanValue,
+  proof: LeanValue,
+): LeanValue {
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  result = LeanCtor(
+    "[\"Lean\",\"ConstantInfo\",\"thmInfo\"]",
+    Array[
+      LeanCtor(
+        "[\"Lean\",\"TheoremVal\",\"mk\"]",
+        Array[
+          LeanCtor("[\"Lean\",\"ConstantVal\",\"mk\"]", Array[name, nil, type]),
+          proof,
+          LeanCtor("[\"List\",\"cons\"]", Array[name, nil]),
+        ],
+      ),
+    ],
+  );
+  leanCheckPublishable(result);
+  result
+}
+
+// Both the cached work item and the fresh baseline call this exact function.
+// Imports are already installed. No native elaboration, cached environment or
+// mutable Meta/Core state is reused here.
+fun leanRunTheorem(
+  context: mutable SKStore.Context,
+  request: LeanTheoremRequest,
+): LeanTheoremResult {
+  runtime = mutable LeanExecution{
+    store => context,
+    unboundedHeartbeats => true,
+  };
+  leanInitializeExceptions(runtime);
+  leanInitializeOptions(runtime);
+  leanInitializeMetaExtensions(runtime);
+  out = leanElaborateDecide(runtime, request.environment, request.expectedType);
+  tick = context.getTick().value;
+  leanTag(out) match {
+  | "[\"EST\",\"Out\",\"ok\"]" ->
+    LeanTheoremResult(
+      Some(
+        leanTheoremConstant(
+          request.name,
+          request.expectedType,
+          leanField(out, 0),
+        ),
+      ),
+      None(),
+      tick,
+    )
+  | "[\"EST\",\"Out\",\"error\"]" ->
+    exception = leanField(out, 0);
+    if (leanTag(exception) != "[\"Lean\",\"Exception\",\"error\"]") {
+      leanFail("unhandled internal Lean exception in theorem elaboration")
+    };
+    LeanTheoremResult(
+      None(),
+      Some(
+        LeanElaborationDiagnostic(
+          "Lean.Exception.error",
+          "Lean rejected this elaboration. Rendering its MessageData is not implemented.",
+        ),
+      ),
+      tick,
+    )
+  | _ -> leanFail("invalid theorem elaboration result")
+  }
+}
+
+fun leanRegisterTheorems(
+  context: mutable SKStore.Context,
+  requests: SKStore.EHandle<SKStore.SID, LeanTheoremRequest>,
+  path: SKStore.DirName,
+): SKStore.EHandle<SKStore.SID, LeanTheoremResult> {
+  requests.map(
+    SKStore.SID::keyType,
+    LeanTheoremResult::type,
+    context,
+    path,
+    (context, writer, key, values) ~> {
+      request = values.getUnique() match {
+      | Some(request) -> request
+      | None() -> leanFail("expected one theorem request per key")
+      };
+      writer.set(key, leanRunTheorem(context, request))
+    },
+  )
+}

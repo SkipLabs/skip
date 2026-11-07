@@ -1,0 +1,359 @@
+// Independent runtime tests; this target does not compile the elaborator corpus.
+fun runtimeTestInvoke(
+  runtime: mutable LeanExecution,
+  foreign: String,
+  args: Array<LeanValue>,
+): LeanValue {
+  leanInvokePrimitive(runtime, "runtime test", foreign, args)
+}
+
+fun runtimeTestClosure(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  runtime.readRef(args[0])
+}
+
+fun runtimeChecks(runtime: mutable LeanExecution): void {
+  assert(
+    leanWordBits(
+      LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
+    ) == 3,
+  );
+  erased = runtimeTestInvoke(
+    runtime,
+    "lean_void_mk",
+    Array[LeanErased(), LeanCtor("[\"Unit\",\"unit\"]", Array[])],
+  );
+  erased match {
+  | LeanErased() -> void
+  | _ -> assert(false)
+  };
+  three = leanNatValue(3);
+  four = leanNatValue(4);
+  ref = leanField(
+    runtimeTestInvoke(
+      runtime,
+      "lean_st_mk_ref",
+      Array[erased, erased, three, erased],
+    ),
+    0,
+  );
+  closure = LeanClosure(runtimeTestClosure, 2, Array[ref]);
+  assert(leanNat(leanApply(runtime, closure, Array[erased])).toInt() == 3);
+  swapped = runtimeTestInvoke(
+    runtime,
+    "lean_st_ref_swap",
+    Array[erased, erased, ref, four, erased],
+  );
+  assert(leanNat(leanField(swapped, 0)).toInt() == 3);
+  assert(leanNat(leanApply(runtime, closure, Array[erased])).toInt() == 4);
+  alias = runtimeTestInvoke(
+    runtime,
+    "lean_st_ref_ptr_eq",
+    Array[erased, erased, ref, ref, erased],
+  );
+  assert(leanIsTrue(leanField(alias, 0)));
+  other = runtime.newRef(four);
+  distinct = runtimeTestInvoke(
+    runtime,
+    "lean_st_ref_ptr_eq",
+    Array[erased, erased, ref, other, erased],
+  );
+  assert(!leanIsTrue(leanField(distinct, 0)));
+  taken = runtimeTestInvoke(
+    runtime,
+    "lean_st_ref_take",
+    Array[erased, erased, ref, erased],
+  );
+  assert(leanNat(leanField(taken, 0)).toInt() == 4);
+  _ = runtimeTestInvoke(
+    runtime,
+    "lean_st_ref_put",
+    Array[erased, erased, ref, three, erased],
+  );
+  assert(leanNat(runtime.readRef(ref)).toInt() == 3);
+  original = LeanArray(Array[three, four]);
+  bytes = Array[
+    LeanText("λxy"),
+    LeanText("zλx"),
+    leanNatValue(0),
+    leanNatValue(1),
+    leanNatValue(3),
+    erased,
+    erased,
+  ];
+  assert(leanIsTrue(runtimeTestInvoke(runtime, "lean_string_memcmp", bytes)));
+  assert(
+    leanStringMemcmp(
+      Array[
+        LeanText("a\u0000b"),
+        LeanText("a\u0000c"),
+        leanNatValue(0),
+        leanNatValue(0),
+        leanNatValue(3),
+      ],
+    ) < 0,
+  );
+  assert(
+    leanWordBits(
+      runtimeTestInvoke(runtime, "lean_array_size", Array[erased, original]),
+    ) == 2,
+  );
+  assert(
+    leanNat(
+      runtimeTestInvoke(
+        runtime,
+        "lean_array_uget",
+        Array[erased, original, LeanWord("usize", 1), erased],
+      ),
+    ).toInt() == 4,
+  );
+  wordUpdated = runtimeTestInvoke(
+    runtime,
+    "lean_array_uset",
+    Array[erased, original, LeanWord("usize", 0), four, erased],
+  );
+  assert(leanNat(leanArray(wordUpdated)[0]).toInt() == 4);
+  updated = runtimeTestInvoke(
+    runtime,
+    "lean_array_fset",
+    Array[erased, original, leanNatValue(0), four, erased],
+  );
+  assert(leanNat(leanArray(original)[0]).toInt() == 3);
+  assert(leanNat(leanArray(updated)[0]).toInt() == 4);
+  list = runtimeTestInvoke(
+    runtime,
+    "lean_array_to_list",
+    Array[erased, updated],
+  );
+  rebuilt = runtimeTestInvoke(runtime, "lean_array_mk", Array[erased, list]);
+  assert(native_eq(updated, rebuilt) == 0);
+  leanCheckPublishable(rebuilt);
+  assert(
+    leanIsTrue(
+      leanInvokePrimitive(
+        runtime,
+        "Nat.decLt",
+        "lean_nat_dec_lt",
+        Array[three, four],
+      ),
+    ),
+  );
+  assert(
+    !leanIsTrue(
+      leanInvokePrimitive(
+        runtime,
+        "Nat.decEq",
+        "lean_nat_dec_eq",
+        Array[three, four],
+      ),
+    ),
+  );
+  assert(
+    leanIsTrue(
+      leanInvokePrimitive(
+        runtime,
+        "String.decEq",
+        "lean_string_dec_eq",
+        Array[LeanText("λ"), LeanText("λ")],
+      ),
+    ),
+  );
+  runtime.initializers.set("test", three);
+  assert(leanNat(leanReadInitializer(runtime, "test")).toInt() == 3)
+}
+
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  runtimeChecks(runtime);
+  for (line in read_to_end().split("\n")) {
+    if (line.isEmpty()) continue;
+    parts = line.split("\t");
+    parts[0] match {
+    | "string-compare" ->
+      result = runtimeTestInvoke(
+        runtime,
+        "lean_string_compare",
+        Array[LeanText(parts[1]), LeanText(parts[2])],
+      );
+      print_string(leanConstructorOrdinal(leanTag(result)).toString())
+    | "nat" ->
+      a = LeanNat::parse(parts[1]);
+      b = LeanNat::parse(parts[2]);
+      (q, r) = a.divMod(b);
+      print_string(
+        Array[
+          a.add(b).toString(),
+          a.sub(b).toString(),
+          a.mul(b).toString(),
+          q.toString(),
+          r.toString(),
+          if (a < b) "true" else "false",
+        ].join("\t"),
+      )
+    | "utf8-slice" ->
+      result = runtimeTestInvoke(
+        runtime,
+        "lean_string_utf8_extract_fast",
+        Array[
+          LeanText(parts[1]),
+          LeanNatural(LeanNat::parse(parts[2])),
+          LeanNatural(LeanNat::parse(parts[3])),
+        ],
+      );
+      print_string(
+        leanText(result).bytes().map(b -> b.toInt().toString()).join(","),
+      )
+    | "utf8-slice-range" ->
+      _ = leanStringExtract("abc", LeanNat::fromInt(0), LeanNat::fromInt(4))
+    | "utf8-slice-middle" ->
+      _ = leanStringExtract("λx", LeanNat::fromInt(0), LeanNat::fromInt(1))
+    | "utf8" ->
+      result = runtimeTestInvoke(
+        runtime,
+        "lean_string_utf8_get_fast",
+        Array[
+          LeanText(parts[1]),
+          LeanNatural(LeanNat::parse(parts[2])),
+          LeanErased(),
+        ],
+      );
+      next = runtimeTestInvoke(
+        runtime,
+        "lean_string_utf8_next_fast",
+        Array[
+          LeanText(parts[1]),
+          LeanNatural(LeanNat::parse(parts[2])),
+          LeanErased(),
+        ],
+      );
+      print_string(
+        leanWordBits(result).toString() + "\t" + leanNat(next).toString(),
+      )
+    | "utf8-bounds" ->
+      _ = leanStringDecodeChar(
+        "abc",
+        LeanNat::parse("10000000000000000000000000"),
+      )
+    | "utf8-middle" -> _ = leanStringDecodeChar("λ", LeanNat::fromInt(1))
+    | "nat-shiftr" ->
+      result = runtimeTestInvoke(
+        runtime,
+        "lean_nat_shiftr",
+        Array[
+          LeanNatural(LeanNat::parse(parts[1])),
+          LeanNatural(LeanNat::parse(parts[2])),
+        ],
+      );
+      print_string(leanNat(result).toString())
+    | "word" ->
+      a = LeanNat::parse(parts[1]).toWord();
+      b = LeanNat::parse(parts[2]).toWord();
+      assert(leanParseWord(parts[1]) == a && leanParseWord(parts[2]) == b);
+      q = leanUnsignedDiv(a, b);
+      print_string(
+        Array[
+          LeanNat::fromWord(a + b).toString(),
+          LeanNat::fromWord(a * b).toString(),
+          LeanNat::fromWord(q).toString(),
+          LeanNat::fromWord(a - q * b).toString(),
+        ].join("\t"),
+      )
+    | "hash" ->
+      print_string(LeanNat::fromWord(leanStringHash(parts[1])).toString())
+    | "mix" ->
+      a = LeanNat::parse(parts[1]).toWord();
+      b = LeanNat::parse(parts[2]).toWord();
+      print_string(LeanNat::fromWord(leanMixHash(a, b)).toString())
+    | "word-kind" ->
+      kind = parts[1];
+      a = leanWordValue(kind, LeanNat::parse(parts[2]).toWord());
+      b = leanWordValue(kind, LeanNat::parse(parts[3]).toWord());
+      results = Array[
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "mod",
+        "land",
+        "lor",
+        "xor",
+        "shift_left",
+        "shift_right",
+      ].map(op -> {
+        result = leanInvokePrimitive(
+          runtime,
+          "word test",
+          "lean_" + kind + "_" + op,
+          Array[a, b],
+        );
+        LeanNat::fromWord(leanWordBits(result)).toString()
+      });
+      print_string(results.join("\t"))
+    | "unknown" ->
+      _ = leanInvokePrimitive(
+        runtime,
+        "Lean.Kernel.check",
+        "lean_kernel_check",
+        Array[],
+      )
+    | "publish-ref" ->
+      leanCheckPublishable(LeanArray(Array[runtime.newRef(leanNatValue(0))]))
+    | "publish-unavailable" ->
+      leanCheckPublishable(
+        LeanArray(Array[LeanUnavailable("test import state")]),
+      )
+    | "unavailable-array" -> _ = leanArray(LeanUnavailable("test import state"))
+    | "word-overflow" -> _ = leanParseWord("18446744073709551616")
+    | "word-invalid" -> _ = leanParseWord("1-2")
+    | "string-range" ->
+      _ = leanStringMemcmp(
+        Array[
+          LeanText("abc"),
+          LeanText("abc"),
+          leanNatValue(2),
+          leanNatValue(0),
+          leanNatValue(2),
+        ],
+      )
+    | "array-word-bounds" ->
+      _ = runtimeTestInvoke(
+        runtime,
+        "lean_array_uget",
+        Array[
+          LeanErased(),
+          LeanArray(Array[]),
+          LeanWord("usize", -1),
+          LeanErased(),
+        ],
+      )
+    | "publish-closure-ref" ->
+      leanCheckPublishable(
+        LeanClosure(
+          runtimeTestClosure,
+          2,
+          Array[runtime.newRef(leanNatValue(0))],
+        ),
+      )
+    | "taken-ref" ->
+      ref = runtime.newRef(leanNatValue(0));
+      runtime.writeRef(ref, None());
+      _ = runtime.readRef(ref)
+    | "missing-init" -> _ = leanReadInitializer(runtime, "missing")
+    | "array-bounds" ->
+      _ = runtimeTestInvoke(
+        runtime,
+        "lean_array_get",
+        Array[
+          LeanErased(),
+          leanNatValue(0),
+          LeanArray(Array[]),
+          LeanScalar("nat", "18446744073709551616"),
+        ],
+      )
+    | _ -> leanFail("unknown runtime test command")
+    }
+  }
+}

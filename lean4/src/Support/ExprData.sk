@@ -1,0 +1,55 @@
+// Cached metadata layout from Lean's Expr and Level runtime representation.
+// The constructors and reduction algorithms remain in sources/Modules/Lean/.
+fun leanExprData(expr: LeanValue): Int {
+  leanTag(expr) match {
+  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+    leanWordBits(leanField(expr, 0))
+  | _ -> leanFail("expected a Lean Expr")
+  }
+}
+
+fun leanExprMakeData(args: Array<LeanValue>): LeanValue {
+  hash = leanWordBits(args[0]).and(4294967295);
+  range = leanNat(args[1]);
+  if (range > LeanNat::fromInt(1048575)) {
+    leanFail("too many Lean bound variables")
+  };
+  depth = min(255, leanWordBits(args[2]));
+  flags = 0;
+  for (i in Range(0, 4)) {
+    if (leanIsTrue(args[3 + i])) !flags = flags.or(1.shl(40 + i))
+  };
+  LeanWord("uint64", hash.or(depth.shl(32)).or(flags).or(range.toInt().shl(44)))
+}
+
+fun leanExprMakeAppData(f: Int, a: Int): LeanValue {
+  depth = min(255, max(f.ushr(32).and(255), a.ushr(32).and(255)) + 1);
+  range = max(f.ushr(44), a.ushr(44));
+  hash = leanMixHash32(f.and(4294967295), a.and(4294967295));
+  LeanWord(
+    "uint64",
+    f.or(a).and(15.shl(40)).or(hash).or(depth.shl(32)).or(range.shl(44)),
+  )
+}
+
+fun leanLevelMakeData(args: Array<LeanValue>): LeanValue {
+  depth = leanNat(args[1]);
+  if (depth > LeanNat::fromInt(16777215)) {
+    leanFail("Lean universe level depth is too big")
+  };
+  hash = leanWordBits(args[0]).and(4294967295);
+  mvar = if (leanIsTrue(args[2])) 1.shl(32) else 0;
+  param = if (leanIsTrue(args[3])) 1.shl(33) else 0;
+  LeanWord("uint64", hash.or(mvar).or(param).or(depth.toInt().shl(40)))
+}

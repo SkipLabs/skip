@@ -1,0 +1,455 @@
+// The first workload uses typed Nat definitions and an elaborated theorem type.
+// It exercises Lean's maintained `decide` algorithm. It is not a Lean parser or
+// a replacement definition elaborator; see INCREMENTAL.md for the restrictions.
+class LeanLimitEdit(
+  label: String,
+  scope: String,
+  name: ?String,
+  value: ?Int,
+  succeeds: Bool,
+  recomputes: Bool,
+) {
+  fun apply(
+    context: mutable SKStore.Context,
+    constants: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+  ): void {
+    this.name match {
+    | None() -> void
+    | Some(text) ->
+      runtime = mutable LeanExecution{store => context};
+      name = leanSimpleName(runtime, text);
+      values = this.value match {
+      | None() -> Array[]
+      | Some(n) ->
+        Array[
+          LeanConstantFile(
+            leanNatDefinition(runtime, name, leanNatValue(n)),
+            None(),
+          ),
+        ]
+      };
+      constants.writeArray(
+        context,
+        LeanConstantKey(this.scope, leanNameKey(name)),
+        values,
+      )
+    }
+  }
+}
+
+fun leanTheoremProof(result: LeanTheoremResult): LeanValue {
+  leanField(leanField(result.declaration.fromSome(), 0), 1)
+}
+
+fun leanCompareTheorems(
+  context: mutable SKStore.Context,
+  incremental: LeanTheoremResult,
+  fresh: LeanTheoremResult,
+  succeeds: Bool,
+): void {
+  assert(!incremental.declaration.isNone() == succeeds);
+  assert(!fresh.declaration.isNone() == succeeds);
+  if (succeeds) {
+    assert(incremental.diagnostic.isNone() && fresh.diagnostic.isNone());
+    runtime = mutable LeanExecution{store => context};
+    assert(
+      leanExprEqual(
+        runtime,
+        leanTheoremProof(incremental),
+        leanTheoremProof(fresh),
+        true,
+      ),
+    )
+  } else {
+    // This compares the actual failure category, not fully rendered messages:
+    // MessageData rendering is still explicitly unimplemented.
+    assert(
+      incremental.diagnostic.fromSome().kind ==
+        fresh.diagnostic.fromSome().kind,
+    )
+  }
+}
+
+fun leanExportLimitResult(
+  context: mutable SKStore.Context,
+  constants: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+  request: LeanTheoremRequest,
+  result: LeanTheoremResult,
+  path: String,
+): void {
+  if (result.declaration.isNone()) return void;
+  runtime = mutable LeanExecution{store => context};
+  definitions = Array["limit", "noise"].map(text -> {
+    name = leanSimpleName(runtime, text);
+    constants.get(context, LeanConstantKey("before-result", leanNameKey(name)))
+      .value
+  });
+  FileSystem.writeTextFile(
+    path,
+    leanProofDocument(
+      request.expectedType,
+      leanTheoremProof(result),
+      definitions,
+    ),
+  )
+}
+
+fun leanInstallLimitInput(
+  context: mutable SKStore.Context,
+  imports: LeanImportedEnvironment,
+): (SKStore.EHandle<LeanConstantKey, LeanConstantFile>, LeanTheoremRequest) {
+  runtime = mutable LeanExecution{store => context};
+  constants = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/local-constants/"),
+    Array[("limit", 3), ("noise", 99)].map(pair -> {
+      name = leanSimpleName(runtime, pair.i0);
+      (
+        LeanConstantKey("before-result", leanNameKey(name)),
+        LeanConstantFile(
+          leanNatDefinition(runtime, name, leanNatValue(pair.i1)),
+          None(),
+        ),
+      )
+    }),
+  );
+  request = LeanTheoremRequest(
+    leanSimpleName(runtime, "result"),
+    leanLimitTheoremType(runtime),
+    imports.atPrefix(runtime, LeanConstantsView("before-result", constants)),
+  );
+  (constants, request)
+}
+
+fun leanRunLimitExample(dataRoot: String, outputRoot: String): void {
+  loadStart = Time.time_ns();
+  print_string("Loading checked Init data");
+  data = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-data.jsonl"),
+  );
+  extensionData = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-extensions.jsonl"),
+  );
+  extraData = leanDecodeImportData(
+    FileSystem.readTextFile(dataRoot + "/init-extra-constants.jsonl"),
+  );
+  importNs = Time.time_ns() - loadStart;
+  setupStart = Time.time_ns();
+  context = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store => context};
+  imports = leanInstallImports(
+    runtime,
+    data,
+    extensionData,
+    extraData,
+    "/lean/Init",
+  );
+  leanRunLimitSession(context, imports, outputRoot, importNs, setupStart)
+}
+
+fun leanRunLimitSession(
+  context: mutable SKStore.Context,
+  imports: LeanImportedEnvironment,
+  outputRoot: String,
+  importNs: Int,
+  setupStart: Int,
+): void {
+  (constants, request) = leanInstallLimitInput(context, imports);
+  // Fork before registering the theorem arrow. Fresh execution has the same
+  // installed inputs and receives the same edits, but has no theorem cache.
+  freshContext = context.mclone();
+  key = SKStore.SID("result");
+  requests = context.mkdir(
+    SKStore.SID::keyType,
+    LeanTheoremRequest::type,
+    SKStore.DirName::create("/lean/theorems/"),
+    Array[(key, request)],
+  );
+  results = leanRegisterTheorems(
+    context,
+    requests,
+    SKStore.DirName::create("/lean/results/"),
+  );
+  context.initPre();
+  freshContext.initPre();
+  // Advance beyond the initial arrow tick before the first edit.
+  context.update();
+  freshContext.update();
+  coldNs = Time.time_ns() - setupStart;
+  print_string("Imported inputs installed; checking incremental theorem edits");
+  edits = Array[
+    LeanLimitEdit("initial", "before-result", None(), None(), true, true),
+    LeanLimitEdit("no-op", "before-result", None(), None(), true, false),
+    LeanLimitEdit(
+      "noise-100",
+      "before-result",
+      Some("noise"),
+      Some(100),
+      true,
+      false,
+    ),
+    LeanLimitEdit(
+      "limit-4",
+      "before-result",
+      Some("limit"),
+      Some(4),
+      true,
+      true,
+    ),
+    LeanLimitEdit(
+      "limit-30",
+      "before-result",
+      Some("limit"),
+      Some(30),
+      false,
+      true,
+    ),
+    LeanLimitEdit(
+      "delete-limit",
+      "before-result",
+      Some("limit"),
+      None(),
+      false,
+      true,
+    ),
+    LeanLimitEdit("later-limit", "later", Some("limit"), Some(3), false, false),
+    LeanLimitEdit(
+      "restore-limit",
+      "before-result",
+      Some("limit"),
+      Some(3),
+      true,
+      true,
+    ),
+    LeanLimitEdit(
+      "same-limit",
+      "before-result",
+      Some("limit"),
+      Some(3),
+      true,
+      false,
+    ),
+    LeanLimitEdit(
+      "noise-101",
+      "before-result",
+      Some("noise"),
+      Some(101),
+      true,
+      false,
+    ),
+  ];
+  previousTick = -1;
+  events: mutable Vector<JSON.Value> = mutable Vector[];
+  for (edit in edits) {
+    start = Time.time_ns();
+    incremental = SKStore.withRegion(context, (_, current) ~> {
+      edit.apply(current, constants);
+      current.update();
+      results.get(current, key)
+    });
+    incrementalNs = Time.time_ns() - start;
+    startFresh = Time.time_ns();
+    fresh = SKStore.withRegion(freshContext, (_, current) ~> {
+      edit.apply(current, constants);
+      current.update();
+      leanRunTheorem(current, request)
+    });
+    freshNs = Time.time_ns() - startFresh;
+    leanCompareTheorems(context, incremental, fresh, edit.succeeds);
+    recomputed = incremental.evaluatedAt != previousTick;
+    assert(recomputed == edit.recomputes);
+    !previousTick = incremental.evaluatedAt;
+    leanExportLimitResult(
+      context,
+      constants,
+      request,
+      incremental,
+      outputRoot + "/limit-" + edit.label + ".json",
+    );
+    event: JSON.Value = JSON.Object[
+      "edit" => JSON.String(edit.label),
+      "accepted" => JSON.Bool(edit.succeeds),
+      "recomputed" => JSON.Bool(recomputed),
+      "executionTick" => JSON.IntNumber(previousTick),
+      "incrementalNs" => JSON.IntNumber(incrementalNs),
+      "freshNs" => JSON.IntNumber(freshNs),
+    ];
+    events.push(event);
+    print_string(event.encode())
+  };
+  FileSystem.writeTextFile(
+    outputRoot + "/limit-edits.json",
+    JSON.Object[
+      "importLoadNs" => JSON.IntNumber(importNs),
+      "coldSetupNs" => JSON.IntNumber(coldNs),
+      "events" => JSON.Array(events.chill()),
+      "diagnosticLimitation" => JSON.String(
+        "Failure categories checked; MessageData rendering is not implemented.",
+      ),
+      "timingNote" => JSON.String(
+        "Correctness-run timings, not a warmed benchmark. Both paths include edit, update, and publication. Imports are installed once.",
+      ),
+    ].encode(),
+  );
+  print_string(
+    "Incremental theorem edits agree with fresh Skip execution; exported proofs await independent kernel checking",
+  );
+  leanBenchmarkLimit(
+    context,
+    freshContext,
+    constants,
+    request,
+    results,
+    outputRoot,
+  )
+}
+
+fun leanRunFirstTheorem(
+  context: mutable SKStore.Context,
+  imports: LeanImportedEnvironment,
+  outputRoot: String,
+  limit: Int,
+): Bool {
+  start = Time.time_ns();
+  (constants, request) = leanInstallLimitInput(context, imports);
+  context.initPre();
+  if (limit != 3) {
+    LeanLimitEdit(
+      "startup",
+      "before-result",
+      Some("limit"),
+      Some(limit),
+      limit < 10,
+      true,
+    ).apply(context, constants);
+    context.update()
+  };
+  result = leanRunTheorem(context, request);
+  elapsed = Time.time_ns() - start;
+  leanExportLimitResult(
+    context,
+    constants,
+    request,
+    result,
+    outputRoot + "/limit-startup.json",
+  );
+  print_string(
+    JSON.Object[
+      "accepted" => JSON.Bool(result.declaration.isSome()),
+      "theoremNs" => JSON.IntNumber(elapsed),
+      "limit" => JSON.IntNumber(limit),
+      "freshExecution" => JSON.Bool(true),
+    ].encode(),
+  );
+  if (result.diagnostic.isSome()) {
+    print_error(result.diagnostic.fromSome().message)
+  };
+  result.declaration.isSome()
+}
+
+fun leanLimitMain(): void {
+  rawArguments = Environ.args().collect(Array);
+  arguments = if (rawArguments.size() == 1) {
+    Array[rawArguments[0], "--startup", leanDefaultImportSnapshot()]
+  } else if (
+    rawArguments.size() == 2 &&
+    rawArguments[1] == "--prepare-imports"
+  ) {
+    Array[rawArguments[0], "--prepare-imports", leanDefaultImportSnapshot()]
+  } else if (rawArguments.size() == 2 && rawArguments[1] == "--benchmark") {
+    Array[rawArguments[0], "--imports", leanDefaultImportSnapshot()]
+  } else {
+    rawArguments
+  };
+  if (arguments.size() >= 3 && arguments[1] == "--prepare-imports") {
+    if (arguments.size() > 4) {
+      leanFail("usage: --prepare-imports snapshot [data-directory]")
+    };
+    path = arguments[2];
+    if (FileSystem.exists(path) || FileSystem.exists(path + ".json")) {
+      leanFail("snapshot destination already exists; choose a new path")
+    };
+    _ = leanExecutableIdentity();
+    dataRoot = if (arguments.size() == 4) arguments[3] else "build";
+    // Skargo's merged executable dispatches by argv[0] unless this is set.
+    Environ.set_var("SKARGO_BIN", "lean4-incremental");
+    Posix.execvp(
+      Array[
+        "/proc/self/exe",
+        "--init",
+        path,
+        "--capacity",
+        "8G",
+        "--prepare-mapped",
+        dataRoot,
+      ],
+    )
+  } else if (
+    arguments.size() == 7 &&
+    arguments[1] == "--init" &&
+    arguments[5] == "--prepare-mapped"
+  ) {
+    SKStore.withRegionVoid(() ~>
+      leanPrepareImportSnapshot(arguments[2], arguments[6])
+    )
+  } else if (
+    arguments.size() >= 3 &&
+    (arguments[1] == "--imports" || arguments[1] == "--startup")
+  ) {
+    if (arguments.size() > 5) {
+      leanFail("usage: --imports/--startup snapshot [output-directory [limit]]")
+    };
+    path = arguments[2];
+    leanValidateImportSnapshot(path);
+    output = if (arguments.size() >= 4) arguments[3] else "build";
+    limit = if (arguments.size() == 5) arguments[4] else "3";
+    mode = if (arguments[1] == "--startup") "--mapped-startup" else {
+      "--mapped-edits"
+    };
+    Environ.set_var("SKARGO_BIN", "lean4-incremental");
+    Posix.execvp(Array["/proc/self/exe", "--data", path, mode, output, limit])
+  } else if (
+    arguments.size() == 6 &&
+    arguments[1] == "--data" &&
+    (arguments[3] == "--mapped-startup" || arguments[3] == "--mapped-edits")
+  ) {
+    success = SKStore.withContext(base ->
+      SKStore.withRegionValue(() ~> {
+        imports = leanSavedImports(base);
+        context = base.mclone();
+        if (arguments[3] == "--mapped-startup") {
+          leanRunFirstTheorem(
+            context,
+            imports,
+            arguments[4],
+            arguments[5].toInt(),
+          )
+        } else {
+          leanRunLimitSession(
+            context,
+            imports,
+            arguments[4],
+            0,
+            Time.time_ns(),
+          );
+          true
+        }
+      })
+    );
+    if (!success) skipExit(1)
+  } else {
+    if (arguments.size() == 2 && arguments[1] == "--json") {
+      SKStore.withRegionVoid(() ~> leanRunLimitExample("build", "build"));
+      return void
+    };
+    if (arguments.size() != 3 || arguments[1].startsWith("--")) {
+      leanFail(
+        "usage: lean4-incremental | --prepare-imports [snapshot] | --benchmark | --imports snapshot | --startup snapshot | --json",
+      )
+    };
+    SKStore.withRegionVoid(() ~>
+      leanRunLimitExample(arguments[1], arguments[2])
+    )
+  }
+}

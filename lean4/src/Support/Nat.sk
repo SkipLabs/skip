@@ -1,0 +1,208 @@
+// Canonical arbitrary-precision naturals, little-endian base 10^9.
+// Products of two limbs plus carry fit in Skip's signed 64-bit Int.
+class LeanNat private (limbs: Array<Int>) uses Orderable, Show {
+  static fun create(limbs: Array<Int>): this {
+    size = limbs.size();
+    while (size > 0 && limbs[size - 1] == 0) !size = size - 1;
+    static(limbs.take(size))
+  }
+
+  static fun fromInt(value: Int): this {
+    invariant(value >= 0, "Negative Lean Nat");
+    result = mutable Vector[];
+    while (value > 0) {
+      result.push(value % 1000000000);
+      !value = value / 1000000000
+    };
+    static(result.toArray())
+  }
+
+  static fun parse(text: String): this {
+    invariant(!text.isEmpty(), "Empty Lean Nat");
+    result = static::fromInt(0);
+    for (c in text) {
+      digit = c.code() - '0'.code();
+      invariant(digit >= 0 && digit <= 9, "Invalid Lean Nat literal");
+      !result = result.mulSmall(10).add(static::fromInt(digit))
+    };
+    result
+  }
+
+  static fun fromWord(bits: Int): this {
+    static::fromInt(bits.ushr(32))
+      .mulSmall(4294967296)
+      .add(static::fromInt(bits.and(4294967295)))
+  }
+
+  fun toString(): String {
+    if (this.limbs.isEmpty()) return "0";
+    result = this.limbs.last().toString();
+    i = this.limbs.size() - 1;
+    while (i > 0) {
+      !i = i - 1;
+      digits = this.limbs[i].toString();
+      for (_ in Range(digits.length(), 9)) !result = result + "0";
+      !result = result + digits
+    };
+    result
+  }
+
+  fun compare(other: this): Order {
+    if (this.limbs.size() != other.limbs.size()) {
+      return this.limbs.size().compare(other.limbs.size())
+    };
+    i = this.limbs.size();
+    while (i > 0) {
+      !i = i - 1;
+      if (this.limbs[i] != other.limbs[i]) {
+        return this.limbs[i].compare(other.limbs[i])
+      }
+    };
+    EQ()
+  }
+
+  fun isZero(): Bool {
+    this.limbs.isEmpty()
+  }
+
+  fun toInt(): Int {
+    result = 0;
+    i = this.limbs.size();
+    while (i > 0) {
+      !i = i - 1;
+      invariant(
+        result <= (Int::max - this.limbs[i]) / 1000000000,
+        "Lean Nat exceeds the host indexing range",
+      );
+      !result = result * 1000000000 + this.limbs[i]
+    };
+    result
+  }
+
+  // Modular conversion is intentional for Lean's UInt64/USize conversions.
+  fun toWord(): Int {
+    result = 0;
+    i = this.limbs.size();
+    while (i > 0) {
+      !i = i - 1;
+      !result = result * 1000000000 + this.limbs[i]
+    };
+    result
+  }
+
+  fun add(other: this): this {
+    out = mutable Vector[];
+    carry = 0;
+    for (i in Range(0, max(this.limbs.size(), other.limbs.size()))) {
+      value =
+        carry +
+        this.limbs.maybeGet(i).default(0) +
+        other.limbs.maybeGet(i).default(0);
+      out.push(value % 1000000000);
+      !carry = value / 1000000000
+    };
+    if (carry != 0) out.push(carry);
+    static(out.toArray())
+  }
+
+  fun sub(other: this): this {
+    if (this < other) return static::fromInt(0);
+    out = mutable Vector[];
+    borrow = 0;
+    for (i in Range(0, this.limbs.size())) {
+      value = this.limbs[i] - other.limbs.maybeGet(i).default(0) - borrow;
+      !borrow = if (value < 0) 1 else 0;
+      out.push(if (value < 0) value + 1000000000 else value)
+    };
+    static::create(out.toArray())
+  }
+
+  fun mulSmall(factor: Int): this {
+    invariant(factor >= 0 && factor <= 4294967296, "Invalid limb multiplier");
+    out = mutable Vector[];
+    carry = 0;
+    for (limb in this.limbs) {
+      value = limb * factor + carry;
+      out.push(value % 1000000000);
+      !carry = value / 1000000000
+    };
+    while (carry != 0) {
+      out.push(carry % 1000000000);
+      !carry = carry / 1000000000
+    };
+    static::create(out.toArray())
+  }
+
+  fun mul(other: this): this {
+    out = Array::mfill(this.limbs.size() + other.limbs.size() + 1, 0);
+    for (i in Range(0, this.limbs.size())) {
+      carry = 0;
+      for (j in Range(0, other.limbs.size())) {
+        value = out[i + j] + this.limbs[i] * other.limbs[j] + carry;
+        out.set(i + j, value % 1000000000);
+        !carry = value / 1000000000
+      };
+      out.set(i + other.limbs.size(), carry)
+    };
+    static::create(out.chill())
+  }
+
+  fun divMod(other: this): (this, this) {
+    if (other.isZero()) return (static::fromInt(0), this);
+    quotient = Array::mfill(this.limbs.size(), 0);
+    remainder = static::fromInt(0);
+    i = this.limbs.size();
+    while (i > 0) {
+      !i = i - 1;
+      !remainder = static::create(Array[this.limbs[i]].concat(remainder.limbs));
+      lo = 0;
+      hi = 1000000000;
+      while (lo + 1 < hi) {
+        mid = (lo + hi) / 2;
+        if (other.mulSmall(mid) <= remainder) !lo = mid else !hi = mid
+      };
+      quotient.set(i, lo);
+      !remainder = remainder.sub(other.mulSmall(lo))
+    };
+    (static::create(quotient.chill()), remainder)
+  }
+
+  fun shiftRight(amount: this): this {
+    // Each decimal limb has fewer than 30 bits. Test before converting the
+    // shift to a host index, so even an arbitrarily large shift returns zero.
+    if (amount >= static::fromInt(this.limbs.size()).mulSmall(30)) {
+      return static::fromInt(0)
+    };
+    remaining = amount.toInt();
+    result = this;
+    while (remaining > 0) {
+      bits = min(remaining, 32);
+      divisor = 1.shl(bits);
+      quotient = Array::mfill(result.limbs.size(), 0);
+      carry = 0;
+      i = result.limbs.size();
+      while (i > 0) {
+        !i = i - 1;
+        value = carry * 1000000000 + result.limbs[i];
+        quotient.set(i, value / divisor);
+        !carry = value % divisor
+      };
+      !result = static::create(quotient.chill());
+      !remaining = remaining - bits
+    };
+    result
+  }
+}
+
+fun leanNat(value: LeanValue): LeanNat {
+  value match {
+  | LeanNatural(n) -> n
+  | LeanScalar("nat", digits) -> LeanNat::parse(digits)
+  | LeanUnavailable(description) -> leanFail("not implemented: " + description)
+  | _ -> leanFail("expected a Lean Nat")
+  }
+}
+
+fun leanNatValue(n: Int): LeanValue {
+  LeanNatural(LeanNat::fromInt(n))
+}

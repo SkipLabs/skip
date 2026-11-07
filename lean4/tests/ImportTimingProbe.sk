@@ -1,0 +1,58 @@
+// Diagnostic timing of the existing JSON import path on a valid DAG prefix.
+// Per-node timers add overhead; these identify costs, not production benchmarks.
+fun profileImport(): void {
+  start = Time.time_ns();
+  source = FileSystem.readTextFile("build/import-timing-prefix.jsonl");
+  readNs = Time.time_ns() - start;
+  splitStart = Time.time_ns();
+  lines = source.split("\n").filter(line -> !line.isEmpty());
+  splitNs = Time.time_ns() - splitStart;
+  nodes: mutable Vector<LeanValue> = mutable Vector[];
+  tags: mutable Map<String, String> = mutable Map[];
+  parseNs = 0;
+  constructNs = 0;
+  regionNs = 0;
+  appendNs = 0;
+  for (i in Range(1, lines.size() - 1)) {
+    outer = Time.time_ns();
+    measured = SKStore.withRegionLoop(() -> {
+      p0 = Time.time_ns();
+      json = JSON.decode(lines[i]);
+      p1 = Time.time_ns();
+      node = leanImportNode(nodes, tags, json);
+      p2 = Time.time_ns();
+      Some((node, p1 - p0, p2 - p1))
+    });
+    !regionNs = regionNs + Time.time_ns() - outer - measured.i1 - measured.i2;
+    !parseNs = parseNs + measured.i1;
+    !constructNs = constructNs + measured.i2;
+    appendStart = Time.time_ns();
+    node = measured.i0;
+    node match {
+    | LeanCtor(tag, _) ->
+      if (tags.maybeGet(tag).isNone()) {
+        _ = leanConstructorOrdinal(tag);
+        tags.set(tag, tag)
+      }
+    | _ -> void
+    };
+    nodes.push(node);
+    !appendNs = appendNs + Time.time_ns() - appendStart
+  };
+  print_string(
+    JSON.Object[
+      "nodes" => JSON.IntNumber(nodes.size()),
+      "readNs" => JSON.IntNumber(readNs),
+      "splitNs" => JSON.IntNumber(splitNs),
+      "jsonParseNs" => JSON.IntNumber(parseNs),
+      "constructNs" => JSON.IntNumber(constructNs),
+      "regionAndTimingNs" => JSON.IntNumber(regionNs),
+      "validateAndAppendNs" => JSON.IntNumber(appendNs),
+      "totalNs" => JSON.IntNumber(Time.time_ns() - start),
+    ].encode(),
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> profileImport())
+}

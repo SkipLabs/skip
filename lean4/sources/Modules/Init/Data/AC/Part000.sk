@@ -1,16 +1,28 @@
 module L4_Init_Data_AC;
 
 // "Lean.Data.AC.insert"
-fun f_Data_AC_insert_ccb54e6156(_x_0: LeanValue, _x_1_1: LeanValue): LeanValue {
+fun f_Data_AC_insert_ccb54e6156(
+  _runtime: mutable LeanExecution,
+  _x_0: LeanValue,
+  _x_1_1: LeanValue,
+): LeanValue {
   leanTag(_x_1_1) match {
   | "[\"List\",\"nil\"]" -> LeanCtor("[\"List\",\"cons\"]", Array[_x_0, _x_1_1])
   | "[\"List\",\"cons\"]" ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
-    _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_0, _head_3_2);
+    _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
+      _x_0,
+      _head_3_2,
+    );
     leanTag(_x_5_5) match {
     | "[\"Bool\",\"false\"]" ->
-      _x_6_6: LeanValue = f_Data_AC_insert_ccb54e6156(_x_0, _tail_4_3);
+      _x_6_6: LeanValue = f_Data_AC_insert_ccb54e6156(
+        _runtime,
+        _x_0,
+        _tail_4_3,
+      );
       LeanCtor("[\"List\",\"cons\"]", Array[_head_3_2, _x_6_6])
     | "[\"Bool\",\"true\"]" ->
       LeanCtor("[\"List\",\"cons\"]", Array[_x_0, _x_1_1])
@@ -20,7 +32,10 @@ fun f_Data_AC_insert_ccb54e6156(_x_0: LeanValue, _x_1_1: LeanValue): LeanValue {
   }
 }
 // "Lean.Data.AC.Expr.toList"
-fun f_AC_Expr_toList_0003cb4230(_x_1_0: LeanValue): LeanValue {
+fun f_AC_Expr_toList_0003cb4230(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"Data\",\"AC\",\"Expr\",\"var\"]" ->
     _x_2_1: LeanValue = leanField(_x_1_0, 0);
@@ -31,14 +46,15 @@ fun f_AC_Expr_toList_0003cb4230(_x_1_0: LeanValue): LeanValue {
   | "[\"Lean\",\"Data\",\"AC\",\"Expr\",\"op\"]" ->
     _lhs_5_2: LeanValue = leanField(_x_1_0, 0);
     _rhs_6_3: LeanValue = leanField(_x_1_0, 1);
-    _x_7_6: LeanValue = f_AC_Expr_toList_0003cb4230(_lhs_5_2);
-    _x_8_7: LeanValue = f_AC_Expr_toList_0003cb4230(_rhs_6_3);
-    L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(_x_7_6, _x_8_7)
+    _x_7_6: LeanValue = f_AC_Expr_toList_0003cb4230(_runtime, _lhs_5_2);
+    _x_8_7: LeanValue = f_AC_Expr_toList_0003cb4230(_runtime, _rhs_6_3);
+    L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(_runtime, _x_7_6, _x_8_7)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Data.AC.mergeIdem.loop"
 fun f_AC_mergeIdem_loop_454da432b7(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _a_2_1: LeanValue,
 ): LeanValue {
@@ -49,45 +65,69 @@ fun f_AC_mergeIdem_loop_454da432b7(
     _head_4_2: LeanValue = leanField(_a_2_1, 0);
     _tail_5_3: LeanValue = leanField(_a_2_1, 1);
     _x_6_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _a_1_0,
       _head_4_2,
     );
     leanTag(_x_6_5) match {
     | "[\"Bool\",\"false\"]" ->
-      _x_7_6: LeanValue = f_AC_mergeIdem_loop_454da432b7(_head_4_2, _tail_5_3);
+      _x_7_6: LeanValue = f_AC_mergeIdem_loop_454da432b7(
+        _runtime,
+        _head_4_2,
+        _tail_5_3,
+      );
       LeanCtor("[\"List\",\"cons\"]", Array[_a_1_0, _x_7_6])
-    | "[\"Bool\",\"true\"]" -> f_AC_mergeIdem_loop_454da432b7(_a_1_0, _tail_5_3)
+    | "[\"Bool\",\"true\"]" ->
+      f_AC_mergeIdem_loop_454da432b7(_runtime, _a_1_0, _tail_5_3)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Data.AC.mergeIdem"
-fun f_Data_AC_mergeIdem_d27deb5ca3(_xs_0: LeanValue): LeanValue {
+fun f_Data_AC_mergeIdem_d27deb5ca3(
+  _runtime: mutable LeanExecution,
+  _xs_0: LeanValue,
+): LeanValue {
   leanTag(_xs_0) match {
   | "[\"List\",\"nil\"]" -> _xs_0
   | "[\"List\",\"cons\"]" ->
     _head_1_1: LeanValue = leanField(_xs_0, 0);
     _tail_2_2: LeanValue = leanField(_xs_0, 1);
-    f_AC_mergeIdem_loop_454da432b7(_head_1_1, _tail_2_2)
+    f_AC_mergeIdem_loop_454da432b7(_runtime, _head_1_1, _tail_2_2)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Data.AC.sort.loop"
-fun f_AC_sort_loop_794a360817(_a_1_0: LeanValue, _a_2_1: LeanValue): LeanValue {
+fun f_AC_sort_loop_794a360817(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+  _a_2_1: LeanValue,
+): LeanValue {
   leanTag(_a_2_1) match {
   | "[\"List\",\"nil\"]" -> _a_1_0
   | "[\"List\",\"cons\"]" ->
     _head_3_2: LeanValue = leanField(_a_2_1, 0);
     _tail_4_3: LeanValue = leanField(_a_2_1, 1);
-    _x_5_4: LeanValue = f_Data_AC_insert_ccb54e6156(_head_3_2, _a_1_0);
-    f_AC_sort_loop_794a360817(_x_5_4, _tail_4_3)
+    _x_5_4: LeanValue = f_Data_AC_insert_ccb54e6156(
+      _runtime,
+      _head_3_2,
+      _a_1_0,
+    );
+    f_AC_sort_loop_794a360817(_runtime, _x_5_4, _tail_4_3)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Data.AC.sort"
-fun f_Data_AC_sort_0f288b1431(_xs_0: LeanValue): LeanValue {
-  f_AC_sort_loop_794a360817(LeanCtor("[\"List\",\"nil\"]", Array[]), _xs_0)
+fun f_Data_AC_sort_0f288b1431(
+  _runtime: mutable LeanExecution,
+  _xs_0: LeanValue,
+): LeanValue {
+  f_AC_sort_loop_794a360817(
+    _runtime,
+    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    _xs_0,
+  )
 }
 
 module end;

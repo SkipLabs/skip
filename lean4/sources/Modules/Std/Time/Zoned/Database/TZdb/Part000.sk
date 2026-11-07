@@ -2,10 +2,12 @@ module L4_Std_Time_Zoned_Database_TZdb;
 
 // "Std.Time.Database.TZdb.getLocalZoneRules"
 fun f_Database_TZdb_getLocalZoneRules_5c9db60f04(
+  _runtime: mutable LeanExecution,
   _db_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
   _x_2_2: LeanValue = f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
+    _runtime,
     _db_0,
     _a_1_1,
   );
@@ -14,6 +16,7 @@ fun f_Database_TZdb_getLocalZoneRules_5c9db60f04(
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
     _a_4_4: LeanValue = leanField(_x_2_2, 1);
     _x_5_7: LeanValue = f_Database_TZdb_resolveLocalPath_bf34f88797(
+      _runtime,
       _a_3_3,
       _a_4_4,
     );
@@ -21,7 +24,7 @@ fun f_Database_TZdb_getLocalZoneRules_5c9db60f04(
     | "[\"EST\",\"Out\",\"ok\"]" ->
       _a_6_8: LeanValue = leanField(_x_5_7, 0);
       _a_7_9: LeanValue = leanField(_x_5_7, 1);
-      f_Database_TZdb_localRules_b710b551bc(_a_6_8, _a_7_9)
+      f_Database_TZdb_localRules_b710b551bc(_runtime, _a_6_8, _a_7_9)
     | "[\"EST\",\"Out\",\"error\"]" ->
       _a_9_10: LeanValue = leanField(_x_5_7, 0);
       _a_10_11: LeanValue = leanField(_x_5_7, 1);
@@ -36,12 +39,14 @@ fun f_Database_TZdb_getLocalZoneRules_5c9db60f04(
   }
 }
 fun apply_f_Database_TZdb_getLocalZoneRules_5c9db60f04(
+  _runtime: mutable LeanExecution,
   _args: Array<LeanValue>,
 ): LeanValue {
-  f_Database_TZdb_getLocalZoneRules_5c9db60f04(_args[0], _args[1])
+  f_Database_TZdb_getLocalZoneRules_5c9db60f04(_runtime, _args[0], _args[1])
 }
 // "Std.Time.Database.TZdb.parseTZif"
 fun f_Database_TZdb_parseTZif_180115411a(
+  _runtime: mutable LeanExecution,
   _bin_0: LeanValue,
   _id_1: LeanValue,
 ): LeanValue {
@@ -51,6 +56,7 @@ fun f_Database_TZdb_parseTZif_180115411a(
     Array[],
   );
   _x_2_3: LeanValue = L4_Std_Internal_Parsec_ByteArray.f_ByteArray_Parser_run_5e27c8a52b(
+    _runtime,
     _x_1_2,
     _bin_0,
   );
@@ -61,6 +67,7 @@ fun f_Database_TZdb_parseTZif_180115411a(
   | "[\"Except\",\"ok\"]" ->
     _a_5_5: LeanValue = leanField(_x_2_3, 0);
     L4_Std_Time_Zoned_Database_Basic.f_Time_TimeZone_convertTZif_3c259447e3(
+      _runtime,
       _a_5_5,
       _id_1,
     )
@@ -69,10 +76,12 @@ fun f_Database_TZdb_parseTZif_180115411a(
 }
 // "Std.Time.Database.TZdb.localRules"
 fun f_Database_TZdb_localRules_b710b551bc(
+  _runtime: mutable LeanExecution,
   _path_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_System_IO.f_IO_FS_realPath_3b0d32020a(
+    _runtime,
     _path_0,
     _a_1_1,
   );
@@ -80,13 +89,19 @@ fun f_Database_TZdb_localRules_b710b551bc(
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
     _a_4_4: LeanValue = leanField(_x_2_2, 1);
-    _x_5_7: LeanValue = f_Database_TZdb_idFromPath_e6178ac5d1(_a_3_3);
+    _x_5_7: LeanValue = f_Database_TZdb_idFromPath_e6178ac5d1(_runtime, _a_3_3);
     leanTag(_x_5_7) match {
     | "[\"Option\",\"some\"]" ->
       _val_6_8: LeanValue = leanField(_x_5_7, 0);
-      f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(_path_0, _val_6_8, _a_4_4)
+      f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(
+        _runtime,
+        _path_0,
+        _val_6_8,
+        _a_4_4,
+      )
     | _ ->
       _x_9_11: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+        _runtime,
         LeanText("cannot read the id of the path."),
       );
       LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_9_11, _a_4_4])
@@ -99,7 +114,10 @@ fun f_Database_TZdb_localRules_b710b551bc(
   }
 }
 // "Std.Time.Database.TZdb.parseTZValue"
-fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
+fun f_Database_TZdb_parseTZValue_a32395e439(
+  _runtime: mutable LeanExecution,
+  _tz_0_input: LeanValue,
+): LeanValue {
   // Frame slots: 0=_tz_0, 1=_x_2_1, 2=_x_3_2, 3=_x_4_3, 4=_x_5_4, 5=_x_6_5, 6=_x_7_6, 7=_x_8_7, 8=_x_9_8, 9=_x_10_9, 10=_x_11_10, 11=_x_12_11, 12=_x_13_12, 13=_x_14_13, 14=_x_15_14, 15=_x_16_15, 16=_p_16, 17=_x_17_17, 18=_x_18_18, 19=_x_19_19, 20=_x_20_20, 21=_x_21_21
   _frame: mutable Array<LeanValue> = Array::mfill(
     22,
@@ -112,12 +130,12 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
     | 0 ->
       _frame.set(
         7,
-        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[0]),
+        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, _frame[0]),
       );
       _frame.set(8, LeanScalar("nat", "1"));
       _frame.set(
         9,
-        L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[8], _frame[7]),
+        L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_runtime, _frame[8], _frame[7]),
       );
       leanTag(_frame[9]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -129,6 +147,7 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
         _frame.set(
           12,
           L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+            _runtime,
             _frame[0],
             _frame[10],
             _frame[11],
@@ -153,6 +172,7 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
           _frame.set(
             14,
             L4_Init_Data_String_Basic.f_Slice_Pos_nextn_a3a6e0a2d4(
+              _runtime,
               _frame[13],
               _frame[11],
               _frame[8],
@@ -168,16 +188,24 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
           _frame.set(
             16,
             L4_Init_Data_String_Slice_Basic.f_String_Slice_toString_2634d7a086(
+              _runtime,
               _frame[15],
             ),
           );
           _frame.set(
             17,
-            L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[16]),
+            L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+              _runtime,
+              _frame[16],
+            ),
           );
           _frame.set(
             18,
-            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[17], _frame[11]),
+            L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+              _runtime,
+              _frame[17],
+              _frame[11],
+            ),
           );
           leanTag(_frame[18]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -205,12 +233,12 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
     | 1 ->
       _frame.set(
         1,
-        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[0]),
+        L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, _frame[0]),
       );
       _frame.set(2, LeanScalar("nat", "0"));
       _frame.set(
         3,
-        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_frame[1], _frame[2]),
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _frame[1], _frame[2]),
       );
       leanTag(_frame[3]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -234,16 +262,19 @@ fun f_Database_TZdb_parseTZValue_a32395e439(_tz_0_input: LeanValue): LeanValue {
 }
 // "Std.Time.Database.TZdb.findInPaths"
 fun f_Database_TZdb_findInPaths_591bf47c72(
+  _runtime: mutable LeanExecution,
   _searchPaths_0: LeanValue,
   _rel_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
   _sz_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+    _runtime,
     LeanErased(),
     _searchPaths_0,
   );
   _x_6_8: LeanValue = f_TZdb_findInPaths_spec_0_dfb7aef2fb(
+    _runtime,
     _rel_1,
     _searchPaths_0,
     _sz_6,
@@ -281,11 +312,13 @@ fun f_Database_TZdb_findInPaths_591bf47c72(
 }
 // "Std.Time.Database.TZdb.parseTZIfFromDisk"
 fun f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(
+  _runtime: mutable LeanExecution,
   _path_0: LeanValue,
   _id_1: LeanValue,
   _a_1_2: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_System_IO.f_IO_FS_readBinFile_8aeca414fa(
+    _runtime,
     _path_0,
     _a_1_2,
   );
@@ -293,28 +326,37 @@ fun f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(
   | "[\"EST\",\"Out\",\"ok\"]" ->
     _a_3_4: LeanValue = leanField(_x_2_3, 0);
     _a_4_5: LeanValue = leanField(_x_2_3, 1);
-    _x_5_8: LeanValue = f_Database_TZdb_parseTZif_180115411a(_a_3_4, _id_1);
-    f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(_x_5_8, _a_4_5)
+    _x_5_8: LeanValue = f_Database_TZdb_parseTZif_180115411a(
+      _runtime,
+      _a_3_4,
+      _id_1,
+    );
+    f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(_runtime, _x_5_8, _a_4_5)
   | "[\"EST\",\"Out\",\"error\"]" ->
     _a_7_6: LeanValue = leanField(_x_2_3, 0);
     _a_8_7: LeanValue = leanField(_x_2_3, 1);
     _x_10_11: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       LeanText("unable to locate "),
       _id_1,
     );
     _x_12_13: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_10_11,
       LeanText(" in the local timezone database at '"),
     );
     _x_13_14: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_12_13,
       _path_0,
     );
     _x_15_16: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_13_14,
       LeanText("'"),
     );
     _x_16_17: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+      _runtime,
       _x_15_16,
     );
     LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_16_17, _a_8_7])
@@ -322,27 +364,34 @@ fun f_Database_TZdb_parseTZIfFromDisk_b94bf8cf9e(
   }
 }
 // "Std.Time.Database.TZdb.default"
-fun f_Database_TZdb_default_75f1fdb040(): LeanValue {
+fun f_Database_TZdb_default_75f1fdb040(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_6_5: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "4"),
   );
   _x_7_6: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_6_5,
     LeanText("/usr/share/zoneinfo"),
   );
   _x_8_7: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_7_6,
     LeanText("/share/zoneinfo"),
   );
   _x_9_8: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_8_7,
     LeanText("/etc/zoneinfo"),
   );
   L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _x_9_8,
     LeanText("/usr/share/lib/zoneinfo"),
@@ -350,6 +399,7 @@ fun f_Database_TZdb_default_75f1fdb040(): LeanValue {
 }
 // "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Std.Time.Database.TZdb.findInPaths.spec_0"
 fun f_TZdb_findInPaths_spec_0_dfb7aef2fb(
+  _runtime: mutable LeanExecution,
   _rel_0: LeanValue,
   _as_1: LeanValue,
   _sz_2: LeanValue,
@@ -358,6 +408,7 @@ fun f_TZdb_findInPaths_spec_0_dfb7aef2fb(
   _y_1_5: LeanValue,
 ): LeanValue {
   _x_2_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+    _runtime,
     _i_3,
     _sz_2,
   );
@@ -367,16 +418,19 @@ fun f_TZdb_findInPaths_spec_0_dfb7aef2fb(
   | "[\"Bool\",\"true\"]" ->
     _x_5_9: LeanValue = LeanCtor("[\"PUnit\",\"unit\"]", Array[]);
     _a_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _as_1,
       _i_3,
       LeanErased(),
     );
     _x_7_12: LeanValue = L4_Init_System_FilePath.f_System_FilePath_join_56aa4f5bc1(
+      _runtime,
       _a_11,
       _rel_0,
     );
     _x_8_13: LeanValue = L4_Init_System_IO.f_System_FilePath_pathExists_f339242c40(
+      _runtime,
       _x_7_12,
       _y_1_5,
     );
@@ -387,10 +441,12 @@ fun f_TZdb_findInPaths_spec_0_dfb7aef2fb(
       leanTag(_val_9_14) match {
       | "[\"Bool\",\"false\"]" ->
         _x_12_17: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+          _runtime,
           _i_3,
           LeanScalar("usize", "1"),
         );
         f_TZdb_findInPaths_spec_0_dfb7aef2fb(
+          _runtime,
           _rel_0,
           _as_1,
           _sz_2,
@@ -427,6 +483,7 @@ fun f_TZdb_findInPaths_spec_0_dfb7aef2fb(
 }
 // "IO.ofExcept._at_.Std.Time.Database.TZdb.parseTZIfFromDisk.spec_0._redArg"
 fun f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
@@ -434,6 +491,7 @@ fun f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(
   | "[\"Except\",\"error\"]" ->
     _a_2_2: LeanValue = leanField(_e_0, 0);
     _x_3_4: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
+      _runtime,
       _a_2_2,
     );
     LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_3_4, _a_1_1])
@@ -444,47 +502,66 @@ fun f_TZdb_parseTZIfFromDisk_spec_0_e1212e7236(
   }
 }
 // "Std.Time.Database.TZdb.idFromPath"
-fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
+fun f_Database_TZdb_idFromPath_e6178ac5d1(
+  _runtime: mutable LeanExecution,
+  _path_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = L4_Init_System_FilePath.f_System_FilePath_components_c41240319d(
+    _runtime,
     _path_0,
   );
   _res_2: LeanValue = L4_Init_Prelude.f_Array_mk_15c9e2d6d9(
+    _runtime,
     LeanErased(),
     _x_1_1,
   );
   _x_2_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _res_2,
   );
   _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+    _runtime,
     _x_2_3,
     LeanScalar("nat", "1"),
   );
-  _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_4_5, _x_2_3);
+  _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    _x_4_5,
+    _x_2_3,
+  );
   leanTag(_x_5_6) match {
   | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
   | "[\"Bool\",\"true\"]" ->
     _x_8_9: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _x_2_3,
       LeanScalar("nat", "2"),
     );
-    _x_9_10: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_8_9, _x_2_3);
+    _x_9_10: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
+      _x_8_9,
+      _x_2_3,
+    );
     leanTag(_x_9_10) match {
     | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
     | "[\"Bool\",\"true\"]" ->
       _x_11_12: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        _runtime,
         LeanErased(),
         _res_2,
         _x_4_5,
         LeanErased(),
       );
       _x_12_13: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        _runtime,
         LeanErased(),
         _res_2,
         _x_8_9,
         LeanErased(),
       );
       _x_14_15: LeanValue = L4_Init_Prelude.f_String_decEq_88c69973f8(
+        _runtime,
         _x_12_13,
         LeanText("zoneinfo"),
       );
@@ -492,9 +569,11 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
       | "[\"Bool\",\"false\"]" ->
         _x_15_16: LeanValue = LeanScalar("nat", "0");
         _x_16_17: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+          _runtime,
           _x_12_13,
         );
         _x_18_19: LeanValue = L4_Init_Data_String_Slice_Pattern.f_String_Slice_trimAscii_a1e6d5b8ad(
+          _runtime,
           LeanCtor(
             "[\"String\",\"Slice\",\"mk\"]",
             Array[_x_12_13, _x_15_16, _x_16_17, LeanErased()],
@@ -507,9 +586,11 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
           _endExclusive_22: LeanValue = leanField(_x_18_19, 2);
           _startInclusive_le_endExc_23: LeanValue = leanField(_x_18_19, 3);
           _x_19_24: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+            _runtime,
             _x_11_12,
           );
           _x_21_26: LeanValue = L4_Init_Data_String_Slice_Pattern.f_String_Slice_trimAscii_a1e6d5b8ad(
+            _runtime,
             LeanCtor(
               "[\"String\",\"Slice\",\"mk\"]",
               Array[_x_11_12, _x_15_16, _x_19_24, LeanErased()],
@@ -522,20 +603,24 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
             _endExclusive_29: LeanValue = leanField(_x_21_26, 2);
             _startInclusive_le_endExc_30: LeanValue = leanField(_x_21_26, 3);
             _x_22_31: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+              _runtime,
               _str_20,
               _startInclusive_21,
               _endExclusive_22,
             );
             _x_24_33: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _x_22_31,
               LeanText("/"),
             );
             _x_25_34: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+              _runtime,
               _str_27,
               _startInclusive_28,
               _endExclusive_29,
             );
             _x_26_35: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _x_24_33,
               _x_25_34,
             );
@@ -546,9 +631,11 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
         }
       | "[\"Bool\",\"true\"]" ->
         _x_29_38: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+          _runtime,
           _x_11_12,
         );
         _x_31_40: LeanValue = L4_Init_Data_String_Slice_Pattern.f_String_Slice_trimAscii_a1e6d5b8ad(
+          _runtime,
           LeanCtor(
             "[\"String\",\"Slice\",\"mk\"]",
             Array[_x_11_12, LeanScalar("nat", "0"), _x_29_38, LeanErased()],
@@ -561,6 +648,7 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
           _endExclusive_43: LeanValue = leanField(_x_31_40, 2);
           _startInclusive_le_endExc_44: LeanValue = leanField(_x_31_40, 3);
           _x_32_45: LeanValue = L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
+            _runtime,
             _str_41,
             _startInclusive_42,
             _endExclusive_43,
@@ -577,10 +665,12 @@ fun f_Database_TZdb_idFromPath_e6178ac5d1(_path_0: LeanValue): LeanValue {
 }
 // "Std.Time.Database.TZdb.resolveZonesPaths"
 fun f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
+  _runtime: mutable LeanExecution,
   _db_0: LeanValue,
   _a_1_1: LeanValue,
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_System_IO.f_IO_getEnv_fbb4e7ebf8(
+    _runtime,
     LeanText("TZDIR"),
     _a_1_1,
   );
@@ -594,12 +684,14 @@ fun f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
     | "[\"Option\",\"some\"]" ->
       _val_7_6: LeanValue = leanField(_val_4_4, 0);
       _x_9_9: LeanValue = L4_Init_Prelude.f_String_decEq_88c69973f8(
+        _runtime,
         _val_7_6,
         LeanText(""),
       );
       leanTag(_x_9_9) match {
       | "[\"Bool\",\"false\"]" ->
         _x_10_10: LeanValue = L4_Init_System_IO.f_System_FilePath_pathExists_f339242c40(
+          _runtime,
           _val_7_6,
           _state_5_5,
         );
@@ -612,15 +704,18 @@ fun f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
             LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_db_0, _state_12_12])
           | "[\"Bool\",\"true\"]" ->
             _x_15_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+              _runtime,
               LeanErased(),
               LeanScalar("nat", "1"),
             );
             _x_16_16: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+              _runtime,
               LeanErased(),
               _x_15_15,
               _val_7_6,
             );
             _x_17_17: LeanValue = L4_Init_Data_Array_Basic.f_Array_append_156887c1ee(
+              _runtime,
               _x_16_16,
               _db_0,
             );
@@ -640,6 +735,7 @@ fun f_Database_TZdb_resolveZonesPaths_416fe0ff7c(
 }
 // "Std.Time.Database.TZdb.resolveLocalPath"
 fun f_Database_TZdb_resolveLocalPath_bf34f88797(
+  _runtime: mutable LeanExecution,
   _zonesPaths_0_input: LeanValue,
   _a_1_1_input: LeanValue,
 ): LeanValue {
@@ -657,7 +753,11 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
       _frame.set(2, LeanText("TZ"));
       _frame.set(
         3,
-        L4_Init_System_IO.f_IO_getEnv_fbb4e7ebf8(_frame[2], _frame[1]),
+        L4_Init_System_IO.f_IO_getEnv_fbb4e7ebf8(
+          _runtime,
+          _frame[2],
+          _frame[1],
+        ),
       );
       leanTag(_frame[3]) match {
       | "[\"ST\",\"Out\",\"mk\"]" ->
@@ -666,7 +766,10 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
         leanTag(_frame[4]) match {
         | "[\"Option\",\"some\"]" ->
           _frame.set(6, leanField(_frame[4], 0));
-          _frame.set(7, f_Database_TZdb_parseTZValue_a32395e439(_frame[6]));
+          _frame.set(
+            7,
+            f_Database_TZdb_parseTZValue_a32395e439(_runtime, _frame[6]),
+          );
           leanTag(_frame[7]) match {
           | "[\"Option\",\"some\"]" ->
             _frame.set(8, leanField(_frame[7], 0));
@@ -675,12 +778,19 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
               _frame.set(9, leanField(_frame[8], 0));
               _frame.set(
                 28,
-                L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_frame[9]),
+                L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+                  _runtime,
+                  _frame[9],
+                ),
               );
               _frame.set(29, LeanScalar("nat", "1"));
               _frame.set(
                 30,
-                L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[29], _frame[28]),
+                L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+                  _runtime,
+                  _frame[29],
+                  _frame[28],
+                ),
               );
               leanTag(_frame[30]) match {
               | "[\"Bool\",\"false\"]" ->
@@ -692,6 +802,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
                 _frame.set(
                   33,
                   L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+                    _runtime,
                     _frame[9],
                     _frame[31],
                     _frame[32],
@@ -723,6 +834,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
               _frame.set(
                 35,
                 f_Database_TZdb_findInPaths_591bf47c72(
+                  _runtime,
                   _frame[0],
                   _frame[10],
                   _frame[5],
@@ -748,6 +860,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
                   _frame.set(
                     43,
                     L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _runtime,
                       _frame[42],
                       _frame[6],
                     ),
@@ -759,6 +872,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
                   _frame.set(
                     45,
                     L4_Init_Data_String_Defs.f_String_append_61d243de93(
+                      _runtime,
                       _frame[43],
                       _frame[44],
                     ),
@@ -766,6 +880,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
                   _frame.set(
                     46,
                     L4_Init_System_IOError.f_IO_userError_436e50ab44(
+                      _runtime,
                       _frame[45],
                     ),
                   );
@@ -817,7 +932,12 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
     | 1 ->
       _frame.set(
         11,
-        f_Database_TZdb_findInPaths_591bf47c72(_frame[0], _frame[9], _frame[5]),
+        f_Database_TZdb_findInPaths_591bf47c72(
+          _runtime,
+          _frame[0],
+          _frame[9],
+          _frame[5],
+        ),
       );
       leanTag(_frame[11]) match {
       | "[\"EST\",\"Out\",\"ok\"]" ->
@@ -836,6 +956,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
           _frame.set(
             19,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[18],
               _frame[6],
             ),
@@ -844,6 +965,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
           _frame.set(
             21,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[19],
               _frame[20],
             ),
@@ -851,6 +973,7 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
           _frame.set(
             22,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[21],
               _frame[9],
             ),
@@ -859,13 +982,17 @@ fun f_Database_TZdb_resolveLocalPath_bf34f88797(
           _frame.set(
             24,
             L4_Init_Data_String_Defs.f_String_append_61d243de93(
+              _runtime,
               _frame[22],
               _frame[23],
             ),
           );
           _frame.set(
             25,
-            L4_Init_System_IOError.f_IO_userError_436e50ab44(_frame[24]),
+            L4_Init_System_IOError.f_IO_userError_436e50ab44(
+              _runtime,
+              _frame[24],
+            ),
           );
           _frame.set(
             26,

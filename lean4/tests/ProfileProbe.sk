@@ -1,0 +1,52 @@
+fun profileProbeAction(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  n = leanNat(runtime.readRef(args[0])).toInt();
+  runtime.writeRef(args[0], Some(leanNatValue(n + 1)));
+  leanNatValue(42)
+}
+
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  options = LeanCtor(
+    "[\"_private\",\"Lean\",\"Data\",\"Options\",0,\"Lean\",\"Options\",\"mk\"]",
+    Array[
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        Array[],
+      ),
+      leanBool(false),
+    ],
+  );
+  calls = runtime.newRef(leanNatValue(0));
+  action = LeanClosure(profileProbeAction, 2, Array[calls]);
+  if (read_to_end().trim() == "enabled") {
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("profiler"),
+    );
+    enabled = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(
+      runtime,
+      options,
+      name,
+      leanBool(true),
+    );
+    _ = leanProfile(runtime, enabled, action);
+    leanFail("enabled profiling unexpectedly succeeded")
+  };
+  value = L4_Lean_Util_Profile.f_Lean_profileit_37f35ff8d4(
+    runtime,
+    LeanErased(),
+    LeanText("test"),
+    options,
+    action,
+    LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+  );
+  assert(
+    leanNat(value).toInt() == 42 &&
+      leanNat(runtime.readRef(calls)).toInt() == 1,
+  );
+  print_string("Disabled profiling executes its action exactly once")
+}

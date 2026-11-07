@@ -2,13 +2,13 @@ module L4_Lean_Modifiers;
 
 // "Lean.addProtected"
 fun f_Lean_addProtected_01bea45b31(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _n_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = leanFail(
-    "module initialization required: Lean.protectedExt",
-  );
+  _x_1_2: LeanValue = leanReadInitializer(_runtime, "Lean.protectedExt");
   L4_Lean_EnvExtension.f_Lean_TagDeclarationExtension_tag_c6375041f3(
+    _runtime,
     _x_1_2,
     _env_0,
     _n_1,
@@ -16,25 +16,31 @@ fun f_Lean_addProtected_01bea45b31(
 }
 // "Lean.mkPrivateName"
 fun f_Lean_mkPrivateName_6b2700f8b5(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _n_1: LeanValue,
 ): LeanValue {
   _x_1_2: LeanValue = L4_Lean_Environment.f_Lean_Environment_mainModule_0db0ea8125(
+    _runtime,
     _env_0,
   );
   _x_2_3: LeanValue = L4_Lean_PrivateName.f_Lean_privateToUserName_5815acc3b1(
+    _runtime,
     _n_1,
   );
-  L4_Lean_PrivateName.f_Lean_mkPrivateNameCore_85264a6276(_x_1_2, _x_2_3)
+  L4_Lean_PrivateName.f_Lean_mkPrivateNameCore_85264a6276(
+    _runtime,
+    _x_1_2,
+    _x_2_3,
+  )
 }
 // "Lean.isProtected"
 fun f_Lean_isProtected_18b1f19197(
+  _runtime: mutable LeanExecution,
   _env_0: LeanValue,
   _n_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = leanFail(
-    "module initialization required: Lean.protectedExt",
-  );
+  _x_1_2: LeanValue = leanReadInitializer(_runtime, "Lean.protectedExt");
   leanTag(_x_1_2) match {
   | "[\"Lean\",\"PersistentEnvExtension\",\"mk\"]" ->
     _toEnvExtension_3: LeanValue = leanField(_x_1_2, 0);
@@ -53,6 +59,7 @@ fun f_Lean_isProtected_18b1f19197(
       _genIdx_14: LeanValue = leanField(_toEnvExtension_3, 5);
       _logWrites_15: LeanValue = leanField(_toEnvExtension_3, 6);
       L4_Lean_EnvExtension.f_Lean_TagDeclarationExtension_isTagged_a360ca0e6f(
+        _runtime,
         _x_1_2,
         _env_0,
         _n_1,
@@ -64,12 +71,17 @@ fun f_Lean_isProtected_18b1f19197(
   }
 }
 // "_private.Lean.Modifiers.0.Lean.initFn._@.Lean.Modifiers.2938752216._hygCtx._hyg.2"
-fun f_Modifiers_hygCtx_hyg_8d1744852f(_a_1_0: LeanValue): LeanValue {
+fun f_Modifiers_hygCtx_hyg_8d1744852f(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_4_3: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    _runtime,
     LeanText("Lean"),
     LeanText("protectedExt"),
   );
   L4_Lean_EnvExtension.f_Lean_mkTagDeclarationExtension_f4ca0dc04c(
+    _runtime,
     _x_4_3,
     LeanCtor("[\"Lean\",\"EnvExtension\",\"AsyncMode\",\"mainOnly\"]", Array[]),
     LeanCtor("[\"Bool\",\"false\"]", Array[]),
@@ -77,8 +89,8 @@ fun f_Modifiers_hygCtx_hyg_8d1744852f(_a_1_0: LeanValue): LeanValue {
   )
 }
 // "Lean.protectedExt"
-fun f_Lean_protectedExt_3efb1a30f6(): LeanValue {
-  leanPrimitive("Lean.protectedExt []")
+fun f_Lean_protectedExt_3efb1a30f6(_runtime: mutable LeanExecution): LeanValue {
+  leanReadInitializer(_runtime, "Lean.protectedExt")
 }
 
 module end;

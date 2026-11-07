@@ -2,6 +2,7 @@ module L4_Std_Http_Data_URI_Basic;
 
 // "Std.Http.URI.instBEqHost.beq"
 fun f_URI_instBEqHost_beq_df10fd005d(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -11,7 +12,7 @@ fun f_URI_instBEqHost_beq_df10fd005d(
     leanTag(_x_2_1) match {
     | "[\"Std\",\"Http\",\"URI\",\"Host\",\"name\"]" ->
       _name_4_5: LeanValue = leanField(_x_2_1, 0);
-      L4_Init_Prelude.f_String_decEq_88c69973f8(_name_3_2, _name_4_5)
+      L4_Init_Prelude.f_String_decEq_88c69973f8(_runtime, _name_3_2, _name_4_5)
     | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
     }
   | "[\"Std\",\"Http\",\"URI\",\"Host\",\"ipv4\"]" ->
@@ -20,6 +21,7 @@ fun f_URI_instBEqHost_beq_df10fd005d(
     | "[\"Std\",\"Http\",\"URI\",\"Host\",\"ipv4\"]" ->
       _ipv4_8_8: LeanValue = leanField(_x_2_1, 0);
       L4_Std_Net_Addr.f_Net_instDecidableEqIPv4Addr_decEq_3a5556603e(
+        _runtime,
         _ipv4_7_3,
         _ipv4_8_8,
       )
@@ -31,6 +33,7 @@ fun f_URI_instBEqHost_beq_df10fd005d(
     | "[\"Std\",\"Http\",\"URI\",\"Host\",\"ipv6\"]" ->
       _ipv6_12_11: LeanValue = leanField(_x_2_1, 0);
       L4_Std_Net_Addr.f_Net_instDecidableEqIPv6Addr_decEq_d4f570005b(
+        _runtime,
         _ipv6_11_4,
         _ipv6_12_11,
       )
@@ -39,23 +42,29 @@ fun f_URI_instBEqHost_beq_df10fd005d(
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
-fun apply_f_URI_instBEqHost_beq_df10fd005d(_args: Array<LeanValue>): LeanValue {
-  f_URI_instBEqHost_beq_df10fd005d(_args[0], _args[1])
+fun apply_f_URI_instBEqHost_beq_df10fd005d(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_URI_instBEqHost_beq_df10fd005d(_runtime, _args[0], _args[1])
 }
 // "Std.Http.URI.Query.empty"
-fun f_URI_Query_empty_1589fd83b1(): LeanValue {
+fun f_URI_Query_empty_1589fd83b1(_runtime: mutable LeanExecution): LeanValue {
   L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
   )
 }
 // "Std.Http.URI.Query.insertEncoded"
 fun f_URI_Query_insertEncoded_d0338d2e19(
+  _runtime: mutable LeanExecution,
   _query_0: LeanValue,
   _key_1: LeanValue,
   _value_2: LeanValue,
 ): LeanValue {
   L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
     LeanErased(),
     _query_0,
     LeanCtor("[\"Prod\",\"mk\"]", Array[_key_1, _value_2]),
@@ -63,59 +72,80 @@ fun f_URI_Query_insertEncoded_d0338d2e19(
 }
 // "Std.Http.URI.Query.formatQueryParam"
 fun f_URI_Query_formatQueryParam_983e18c5fa(
+  _runtime: mutable LeanExecution,
   _key_0: LeanValue,
   _value_1: LeanValue,
 ): LeanValue {
   leanTag(_value_1) match {
   | "[\"Option\",\"none\"]" ->
-    L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(_key_0, LeanErased())
+    L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+      _runtime,
+      _key_0,
+      LeanErased(),
+    )
   | "[\"Option\",\"some\"]" ->
     _val_2_2: LeanValue = leanField(_value_1, 0);
     _x_3_4: LeanValue = L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+      _runtime,
       _key_0,
       LeanErased(),
     );
     _x_5_6: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_3_4,
       LeanText("="),
     );
     _x_6_7: LeanValue = L4_Init_Prelude.f_String_ofByteArray_3a83ff86ee(
+      _runtime,
       _val_2_2,
       LeanErased(),
     );
-    L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_5_6, _x_6_7)
+    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      _x_5_6,
+      _x_6_7,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Std.Http.URI.Query.formatOption"
-fun f_URI_Query_formatOption_cbe2d9cfd5(_x_1_0: LeanValue): LeanValue {
+fun f_URI_Query_formatOption_cbe2d9cfd5(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Option\",\"none\"]" -> LeanText("")
   | "[\"Option\",\"some\"]" ->
     _val_3_1: LeanValue = leanField(_x_1_0, 0);
     _x_4_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _val_3_1,
     );
     _x_6_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _x_4_3,
       LeanScalar("nat", "0"),
     );
     leanTag(_x_6_5) match {
     | "[\"Bool\",\"false\"]" ->
       _x_7_6: LeanValue = L4_Init_Prelude.f_Array_toList_2f8b2ba454(
+        _runtime,
         LeanErased(),
         _val_3_1,
       );
       _encodedParams_8: LeanValue = f_Query_formatOption_spec_0_2dbee77153(
+        _runtime,
         _x_7_6,
         LeanCtor("[\"List\",\"nil\"]", Array[]),
       );
       _x_11_11: LeanValue = L4_Init_Data_String_Defs.f_String_intercalate_57e8ca8200(
+        _runtime,
         LeanText("&"),
         _encodedParams_8,
       );
       L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
         LeanText("?"),
         _x_11_11,
       )
@@ -127,12 +157,13 @@ fun f_URI_Query_formatOption_cbe2d9cfd5(_x_1_0: LeanValue): LeanValue {
 }
 // "List.mapTR.loop._at_.Std.Http.URI.Query.formatOption.spec_0"
 fun f_Query_formatOption_spec_0_2dbee77153(
+  _runtime: mutable LeanExecution,
   _a_1_0: LeanValue,
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
   | "[\"List\",\"nil\"]" ->
-    L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_a_2_1)
+    L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_2_1)
   | "[\"List\",\"cons\"]" ->
     _head_4_2: LeanValue = leanField(_a_1_0, 0);
     _tail_5_3: LeanValue = leanField(_a_1_0, 1);
@@ -141,10 +172,12 @@ fun f_Query_formatOption_spec_0_2dbee77153(
       _fst_6_5: LeanValue = leanField(_head_4_2, 0);
       _snd_7_6: LeanValue = leanField(_head_4_2, 1);
       _x_8_7: LeanValue = f_URI_Query_formatQueryParam_983e18c5fa(
+        _runtime,
         _fst_6_5,
         _snd_7_6,
       );
       f_Query_formatOption_spec_0_2dbee77153(
+        _runtime,
         _tail_5_3,
         LeanCtor("[\"List\",\"cons\"]", Array[_x_8_7, _a_2_1]),
       )
@@ -154,7 +187,10 @@ fun f_Query_formatOption_spec_0_2dbee77153(
   }
 }
 // "Std.Http.URI.isValidDomainLabel"
-fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
+fun f_Http_URI_isValidDomainLabel_463779fad7(
+  _runtime: mutable LeanExecution,
+  _s_0_input: LeanValue,
+): LeanValue {
   // Frame slots: 0=_s_0, 1=_y_2_1, 2=_x_3_2, 3=_x_4_3, 4=_x_5_4, 5=_x_6_5, 6=_y_8_6, 7=_x_9_7, 8=_x_10_8, 9=_x_11_9, 10=_x_12_10, 11=_chars_11, 12=_x_14_12, 13=_val_16_13, 14=_x_15_14, 15=_x_17_15, 16=_x_18_16, 17=_x_19_17, 18=_x_20_18, 19=_x_21_19, 20=_x_22_20, 21=_x_23_21, 22=_x_24_22, 23=_x_25_23, 24=_x_26_24, 25=_x_27_25, 26=_x_28_26, 27=_val_30_27, 28=_x_29_28, 29=_x_32_29, 30=_x_33_30, 31=_x_34_31, 32=_x_35_32, 33=_x_37_33, 34=_x_38_34, 35=_x_39_35, 36=_x_40_36, 37=_x_41_37, 38=_x_42_38, 39=_x_43_39, 40=_x_44_40, 41=_x_45_41, 42=_x_46_42, 43=_x_47_43
   _frame: mutable Array<LeanValue> = Array::mfill(
     44,
@@ -167,24 +203,40 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
     | 0 ->
       _frame.set(
         11,
-        L4_Init_Data_String_Csimp.f_String_toListImpl_7d55a7ae2c(_frame[0]),
+        L4_Init_Data_String_Csimp.f_String_toListImpl_7d55a7ae2c(
+          _runtime,
+          _frame[0],
+        ),
       );
-      _frame.set(22, L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(_frame[11]));
+      _frame.set(
+        22,
+        L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(_runtime, _frame[11]),
+      );
       _frame.set(23, LeanScalar("nat", "63"));
       _frame.set(
         24,
-        L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_frame[22], _frame[23]),
+        L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+          _runtime,
+          _frame[22],
+          _frame[23],
+        ),
       );
       leanTag(_frame[24]) match {
       | "[\"Bool\",\"false\"]" -> return _frame[24]
       | "[\"Bool\",\"true\"]" ->
-        _frame.set(25, f_URI_isValidDomainLabel_spec_0_a90bca758f(_frame[11]));
+        _frame.set(
+          25,
+          f_URI_isValidDomainLabel_spec_0_a90bca758f(_runtime, _frame[11]),
+        );
         leanTag(_frame[25]) match {
         | "[\"Bool\",\"false\"]" -> return _frame[25]
         | "[\"Bool\",\"true\"]" ->
           _frame.set(
             26,
-            L4_Init_Data_List_Basic.f_List_head_555ed9a696(_frame[11]),
+            L4_Init_Data_List_Basic.f_List_head_555ed9a696(
+              _runtime,
+              _frame[11],
+            ),
           );
           leanTag(_frame[26]) match {
           | "[\"Option\",\"none\"]" ->
@@ -194,12 +246,16 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
             _frame.set(27, leanField(_frame[26], 0));
             _frame.set(
               37,
-              L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_frame[27]),
+              L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _frame[27]),
             );
             _frame.set(38, LeanScalar("nat", "128"));
             _frame.set(
               39,
-              L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[37], _frame[38]),
+              L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+                _runtime,
+                _frame[37],
+                _frame[38],
+              ),
             );
             leanTag(_frame[39]) match {
             | "[\"Bool\",\"false\"]" -> return _frame[39]
@@ -208,6 +264,7 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
               _frame.set(
                 41,
                 L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                  _runtime,
                   _frame[40],
                   _frame[27],
                 ),
@@ -221,6 +278,7 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
                 _frame.set(
                   43,
                   L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                    _runtime,
                     _frame[27],
                     _frame[42],
                   ),
@@ -248,7 +306,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
       _frame.set(2, LeanScalar("uint32", "97"));
       _frame.set(
         3,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[2], _frame[1]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[2],
+          _frame[1],
+        ),
       );
       leanTag(_frame[3]) match {
       | "[\"Bool\",\"false\"]" -> return _frame[3]
@@ -256,7 +318,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
         _frame.set(4, LeanScalar("uint32", "122"));
         _frame.set(
           5,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[1], _frame[4]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[1],
+            _frame[4],
+          ),
         );
         return _frame[5]
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -265,7 +331,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
       _frame.set(7, LeanScalar("uint32", "65"));
       _frame.set(
         8,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[7], _frame[6]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[7],
+          _frame[6],
+        ),
       );
       leanTag(_frame[8]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -277,7 +347,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
         _frame.set(9, LeanScalar("uint32", "90"));
         _frame.set(
           10,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[6], _frame[9]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[6],
+            _frame[9],
+          ),
         );
         leanTag(_frame[10]) match {
         | "[\"Bool\",\"false\"]" ->
@@ -293,7 +367,7 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
     | 3 ->
       _frame.set(
         12,
-        L4_Init_Data_List_Basic.f_List_getLast_7899e02e88(_frame[11]),
+        L4_Init_Data_List_Basic.f_List_getLast_7899e02e88(_runtime, _frame[11]),
       );
       leanTag(_frame[12]) match {
       | "[\"Option\",\"none\"]" ->
@@ -301,11 +375,18 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
         return _frame[14]
       | "[\"Option\",\"some\"]" ->
         _frame.set(13, leanField(_frame[12], 0));
-        _frame.set(15, L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_frame[13]));
+        _frame.set(
+          15,
+          L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _frame[13]),
+        );
         _frame.set(16, LeanScalar("nat", "128"));
         _frame.set(
           17,
-          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[15], _frame[16]),
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _runtime,
+            _frame[15],
+            _frame[16],
+          ),
         );
         leanTag(_frame[17]) match {
         | "[\"Bool\",\"false\"]" -> return _frame[17]
@@ -313,7 +394,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
           _frame.set(18, LeanScalar("uint32", "48"));
           _frame.set(
             19,
-            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[18], _frame[13]),
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+              _runtime,
+              _frame[18],
+              _frame[13],
+            ),
           );
           leanTag(_frame[19]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -325,7 +410,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
             _frame.set(20, LeanScalar("uint32", "57"));
             _frame.set(
               21,
-              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[13], _frame[20]),
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                _runtime,
+                _frame[13],
+                _frame[20],
+              ),
             );
             leanTag(_frame[21]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -346,7 +435,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
       _frame.set(29, LeanScalar("uint32", "97"));
       _frame.set(
         30,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[29], _frame[27]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[29],
+          _frame[27],
+        ),
       );
       leanTag(_frame[30]) match {
       | "[\"Bool\",\"false\"]" -> return _frame[30]
@@ -354,7 +447,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
         _frame.set(31, LeanScalar("uint32", "122"));
         _frame.set(
           32,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[27], _frame[31]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[27],
+            _frame[31],
+          ),
         );
         leanTag(_frame[32]) match {
         | "[\"Bool\",\"false\"]" -> return _frame[32]
@@ -369,7 +466,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
       _frame.set(33, LeanScalar("uint32", "65"));
       _frame.set(
         34,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[33], _frame[27]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[33],
+          _frame[27],
+        ),
       );
       leanTag(_frame[34]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -379,7 +480,11 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
         _frame.set(35, LeanScalar("uint32", "90"));
         _frame.set(
           36,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[27], _frame[35]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[27],
+            _frame[35],
+          ),
         );
         leanTag(_frame[36]) match {
         | "[\"Bool\",\"false\"]" ->
@@ -398,6 +503,7 @@ fun f_Http_URI_isValidDomainLabel_463779fad7(_s_0_input: LeanValue): LeanValue {
 }
 // "List.all._at_.Std.Http.URI.isValidDomainLabel.spec_0"
 fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
+  _runtime: mutable LeanExecution,
   _x_1_0_input: LeanValue,
 ): LeanValue {
   // Frame slots: 0=_x_1_0, 1=_head_3_1, 2=_tail_4_2, 3=_x_2_3, 4=_x_6_4, 5=_x_7_5, 6=_x_8_6, 7=_x_10_7, 8=_x_11_8, 9=_x_12_9, 10=_x_13_10, 11=_x_14_11, 12=_x_16_12, 13=_x_17_13, 14=_x_18_14, 15=_x_19_15, 16=_x_20_16, 17=_x_21_17, 18=_x_22_18, 19=_x_23_19, 20=_x_24_20, 21=_x_25_21, 22=_x_26_22, 23=_x_27_23, 24=_x_28_24
@@ -417,11 +523,18 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
       | "[\"List\",\"cons\"]" ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
-        _frame.set(17, L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_frame[1]));
+        _frame.set(
+          17,
+          L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_runtime, _frame[1]),
+        );
         _frame.set(18, LeanScalar("nat", "128"));
         _frame.set(
           19,
-          L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[17], _frame[18]),
+          L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+            _runtime,
+            _frame[17],
+            _frame[18],
+          ),
         );
         leanTag(_frame[19]) match {
         | "[\"Bool\",\"false\"]" ->
@@ -431,7 +544,11 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
           _frame.set(20, LeanScalar("uint32", "48"));
           _frame.set(
             21,
-            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[20], _frame[1]),
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+              _runtime,
+              _frame[20],
+              _frame[1],
+            ),
           );
           leanTag(_frame[21]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -441,7 +558,11 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
             _frame.set(22, LeanScalar("uint32", "57"));
             _frame.set(
               23,
-              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[1], _frame[22]),
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                _runtime,
+                _frame[1],
+                _frame[22],
+              ),
             );
             leanTag(_frame[23]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -450,7 +571,7 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
             | "[\"Bool\",\"true\"]" ->
               _frame.set(
                 24,
-                f_URI_isValidDomainLabel_spec_0_a90bca758f(_frame[2]),
+                f_URI_isValidDomainLabel_spec_0_a90bca758f(_runtime, _frame[2]),
               );
               return _frame[24]
             | _ -> return leanFail("non-exhaustive Lean case")
@@ -465,12 +586,19 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
       _frame.set(4, LeanScalar("uint32", "45"));
       _frame.set(
         5,
-        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[1], _frame[4]),
+        L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+          _runtime,
+          _frame[1],
+          _frame[4],
+        ),
       );
       leanTag(_frame[5]) match {
       | "[\"Bool\",\"false\"]" -> return _frame[5]
       | "[\"Bool\",\"true\"]" ->
-        _frame.set(6, f_URI_isValidDomainLabel_spec_0_a90bca758f(_frame[2]));
+        _frame.set(
+          6,
+          f_URI_isValidDomainLabel_spec_0_a90bca758f(_runtime, _frame[2]),
+        );
         return _frame[6]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
@@ -478,7 +606,11 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
       _frame.set(7, LeanScalar("uint32", "97"));
       _frame.set(
         8,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[7], _frame[1]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[7],
+          _frame[1],
+        ),
       );
       leanTag(_frame[8]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -488,14 +620,21 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
         _frame.set(9, LeanScalar("uint32", "122"));
         _frame.set(
           10,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[1], _frame[9]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[1],
+            _frame[9],
+          ),
         );
         leanTag(_frame[10]) match {
         | "[\"Bool\",\"false\"]" ->
           !pc = 1;
           void
         | "[\"Bool\",\"true\"]" ->
-          _frame.set(11, f_URI_isValidDomainLabel_spec_0_a90bca758f(_frame[2]));
+          _frame.set(
+            11,
+            f_URI_isValidDomainLabel_spec_0_a90bca758f(_runtime, _frame[2]),
+          );
           return _frame[11]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
@@ -505,7 +644,11 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
       _frame.set(12, LeanScalar("uint32", "65"));
       _frame.set(
         13,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[12], _frame[1]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[12],
+          _frame[1],
+        ),
       );
       leanTag(_frame[13]) match {
       | "[\"Bool\",\"false\"]" ->
@@ -515,14 +658,21 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
         _frame.set(14, LeanScalar("uint32", "90"));
         _frame.set(
           15,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[1], _frame[14]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[1],
+            _frame[14],
+          ),
         );
         leanTag(_frame[15]) match {
         | "[\"Bool\",\"false\"]" ->
           !pc = 2;
           void
         | "[\"Bool\",\"true\"]" ->
-          _frame.set(16, f_URI_isValidDomainLabel_spec_0_a90bca758f(_frame[2]));
+          _frame.set(
+            16,
+            f_URI_isValidDomainLabel_spec_0_a90bca758f(_runtime, _frame[2]),
+          );
           return _frame[16]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
@@ -534,6 +684,7 @@ fun f_URI_isValidDomainLabel_spec_0_a90bca758f(
 }
 // "Std.Http.URI.instDecidableEqPort.decEq"
 fun f_URI_instDecidableEqPort_decEq_627bd3ca8a(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -560,7 +711,7 @@ fun f_URI_instDecidableEqPort_decEq_627bd3ca8a(
     leanTag(_x_2_1) match {
     | "[\"Std\",\"Http\",\"URI\",\"Port\",\"value\"]" ->
       _port_10_9: LeanValue = leanField(_x_2_1, 0);
-      L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(_port_9_2, _port_10_9)
+      L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(_runtime, _port_9_2, _port_10_9)
     | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")

@@ -1,7 +1,10 @@
 module L4_Std_Data_ByteSlice;
 
 // "ByteSlice.size"
-fun f_ByteSlice_size_8a3428a7e3(_s_0: LeanValue): LeanValue {
+fun f_ByteSlice_size_8a3428a7e3(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"_private\",\"Std\",\"Data\",\"ByteSlice\",0,\"Std\",\"Slice\",\"Internal\",\"ByteSliceData\",\"mk\"]" ->
     _byteArray_1: LeanValue = leanField(_s_0, 0);
@@ -9,25 +12,32 @@ fun f_ByteSlice_size_8a3428a7e3(_s_0: LeanValue): LeanValue {
     _stop_3: LeanValue = leanField(_s_0, 2);
     _start_le_stop_4: LeanValue = leanField(_s_0, 3);
     _stop_le_size_byteArray_5: LeanValue = leanField(_s_0, 4);
-    L4_Init_Prelude.f_Nat_sub_8647441ee5(_stop_3, _start_2)
+    L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _stop_3, _start_2)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "ByteSlice.empty"
-fun f_ByteSlice_empty_835cbff57e(): LeanValue {
+fun f_ByteSlice_empty_835cbff57e(_runtime: mutable LeanExecution): LeanValue {
   _x_1_0: LeanValue = LeanScalar("nat", "0");
   _x_2_1: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     _x_1_0,
   );
-  _x_3_2: LeanValue = L4_Init_Prelude.f_ByteArray_mk_19310ca5f8(_x_2_1);
+  _x_3_2: LeanValue = L4_Init_Prelude.f_ByteArray_mk_19310ca5f8(
+    _runtime,
+    _x_2_1,
+  );
   LeanCtor(
     "[\"_private\",\"Std\",\"Data\",\"ByteSlice\",0,\"Std\",\"Slice\",\"Internal\",\"ByteSliceData\",\"mk\"]",
     Array[_x_3_2, _x_1_0, _x_1_0, LeanErased(), LeanErased()],
   )
 }
 // "ByteSlice.toByteArray"
-fun f_ByteSlice_toByteArray_cb08d5bc5e(_s_0: LeanValue): LeanValue {
+fun f_ByteSlice_toByteArray_cb08d5bc5e(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"_private\",\"Std\",\"Data\",\"ByteSlice\",0,\"Std\",\"Slice\",\"Internal\",\"ByteSliceData\",\"mk\"]" ->
     _byteArray_1: LeanValue = leanField(_s_0, 0);
@@ -35,9 +45,14 @@ fun f_ByteSlice_toByteArray_cb08d5bc5e(_s_0: LeanValue): LeanValue {
     _stop_3: LeanValue = leanField(_s_0, 2);
     _start_le_stop_4: LeanValue = leanField(_s_0, 3);
     _stop_le_size_byteArray_5: LeanValue = leanField(_s_0, 4);
-    _x_1_6: LeanValue = f_ByteSlice_size_8a3428a7e3(_s_0);
-    _x_2_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_start_2, _x_1_6);
+    _x_1_6: LeanValue = f_ByteSlice_size_8a3428a7e3(_runtime, _s_0);
+    _x_2_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
+      _start_2,
+      _x_1_6,
+    );
     L4_Init_Data_ByteArray_Basic.f_ByteArray_extract_1aa209d344(
+      _runtime,
       _byteArray_1,
       _start_2,
       _x_2_7,
@@ -47,15 +62,24 @@ fun f_ByteSlice_toByteArray_cb08d5bc5e(_s_0: LeanValue): LeanValue {
 }
 // "ByteArray.toByteSlice"
 fun f_ByteArray_toByteSlice_f6425fd4f0(
+  _runtime: mutable LeanExecution,
   _as_0: LeanValue,
   _start_1: LeanValue,
   _stop_2: LeanValue,
 ): LeanValue {
-  _x_1_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(_as_0);
-  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_stop_2, _x_1_3);
+  _x_1_3: LeanValue = L4_Init_Prelude.f_ByteArray_size_7351955367(
+    _runtime,
+    _as_0,
+  );
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
+    _stop_2,
+    _x_1_3,
+  );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" ->
     _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _start_1,
       _x_1_3,
     );
@@ -74,6 +98,7 @@ fun f_ByteArray_toByteSlice_f6425fd4f0(
     }
   | "[\"Bool\",\"true\"]" ->
     _x_6_8: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
       _start_1,
       _stop_2,
     );

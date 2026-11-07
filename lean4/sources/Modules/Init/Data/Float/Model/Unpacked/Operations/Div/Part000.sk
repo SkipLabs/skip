@@ -2,23 +2,31 @@ module L4_Init_Data_Float_Model_Unpacked_Operations_Div;
 
 // "Float.Model.UnpackedFloat.accuracyOfFraction"
 fun f_Model_UnpackedFloat_accuracyOfFraction_5a8ba2c058(
+  _runtime: mutable LeanExecution,
   _num_0: LeanValue,
   _den_1: LeanValue,
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _num_0,
     LeanScalar("nat", "0"),
   );
   leanTag(_x_2_3) match {
   | "[\"Bool\",\"false\"]" ->
     _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+      _runtime,
       LeanScalar("nat", "2"),
       _num_0,
     );
-    _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_x_4_5, _den_1);
+    _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+      _runtime,
+      _x_4_5,
+      _den_1,
+    );
     leanTag(_x_5_6) match {
     | "[\"Bool\",\"false\"]" ->
       _x_6_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _x_4_5,
         _den_1,
       );
@@ -52,31 +60,41 @@ fun f_Model_UnpackedFloat_accuracyOfFraction_5a8ba2c058(
 }
 // "Float.Model.UnpackedFloat.divCore"
 fun f_Model_UnpackedFloat_divCore_40ca3a31fe(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _m_1: LeanValue,
   _e_2: LeanValue,
   _m_3: LeanValue,
   _e_4: LeanValue,
 ): LeanValue {
-  _x_1_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(_e_2, _e_4);
+  _x_1_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(
+    _runtime,
+    _e_2,
+    _e_4,
+  );
   _joined: Array<LeanValue> = {
     _x_10_15: LeanValue = L4_Init_Data_Float_Model_Format_Basic.f_Float_Model_totalExponent_940c0779ca(
+      _runtime,
       _m_1,
       _e_2,
     );
     _x_11_16: LeanValue = L4_Init_Data_Float_Model_Format_Basic.f_Float_Model_totalExponent_940c0779ca(
+      _runtime,
       _m_3,
       _e_4,
     );
     _x_12_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(
+      _runtime,
       _x_10_15,
       _x_11_16,
     );
     _x_13_18: LeanValue = L4_Init_Data_Float_Model_Format_Basic.f_Model_Format_targetExponent_199e2287ab(
+      _runtime,
       _spec_0,
       _x_12_17,
     );
     _x_14_19: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(
+      _runtime,
       _x_1_5,
       _x_13_18,
     );
@@ -88,19 +106,31 @@ fun f_Model_UnpackedFloat_divCore_40ca3a31fe(
   };
   _y_3_6: LeanValue = _joined[0];
   _x_4_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_sub_dc3937de03(
+    _runtime,
     _x_1_5,
     _y_3_6,
   );
   _shiftAmount_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_toNat_23da39749d(
+    _runtime,
     _x_4_7,
   );
   _m_9: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftLeft_d5b2caad1d(
+    _runtime,
     _m_1,
     _shiftAmount_8,
   );
-  _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(_m_9, _m_3);
-  _x_6_11: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(_m_9, _m_3);
+  _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(
+    _runtime,
+    _m_9,
+    _m_3,
+  );
+  _x_6_11: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(
+    _runtime,
+    _m_9,
+    _m_3,
+  );
   _x_7_12: LeanValue = f_Model_UnpackedFloat_accuracyOfFraction_5a8ba2c058(
+    _runtime,
     _x_6_11,
     _m_3,
   );
@@ -111,6 +141,7 @@ fun f_Model_UnpackedFloat_divCore_40ca3a31fe(
 }
 // "Float.Model.UnpackedFloat.div"
 fun f_Model_UnpackedFloat_div_de74a22194(
+  _runtime: mutable LeanExecution,
   _spec_0: LeanValue,
   _x_1_1: LeanValue,
   _x_2_2: LeanValue,
@@ -322,6 +353,7 @@ fun f_Model_UnpackedFloat_div_de74a22194(
       _exponent_47_39: LeanValue = leanField(_x_2_2, 2);
       _mantissa_pos_48_40: LeanValue = leanField(_x_2_2, 3);
       _x_49_49: LeanValue = f_Model_UnpackedFloat_divCore_40ca3a31fe(
+        _runtime,
         _spec_0,
         _mantissa_32_6,
         _exponent_33_7,
@@ -341,6 +373,7 @@ fun f_Model_UnpackedFloat_div_de74a22194(
             leanTag(_sign_45_37) match {
             | "[\"Float\",\"Model\",\"UnpackedFloat\",\"Sign\",\"negative\"]" ->
               L4_Init_Data_Float_Model_Unpacked_Round.f_Model_UnpackedFloat_roundWithAccuracy_3b839b9916(
+                _runtime,
                 _spec_0,
                 LeanCtor(
                   "[\"Float\",\"Model\",\"UnpackedFloat\",\"Sign\",\"positive\"]",
@@ -352,6 +385,7 @@ fun f_Model_UnpackedFloat_div_de74a22194(
               )
             | "[\"Float\",\"Model\",\"UnpackedFloat\",\"Sign\",\"positive\"]" ->
               L4_Init_Data_Float_Model_Unpacked_Round.f_Model_UnpackedFloat_roundWithAccuracy_3b839b9916(
+                _runtime,
                 _spec_0,
                 _sign_31_5,
                 _fst_50_50,
@@ -362,6 +396,7 @@ fun f_Model_UnpackedFloat_div_de74a22194(
             }
           | "[\"Float\",\"Model\",\"UnpackedFloat\",\"Sign\",\"positive\"]" ->
             L4_Init_Data_Float_Model_Unpacked_Round.f_Model_UnpackedFloat_roundWithAccuracy_3b839b9916(
+              _runtime,
               _spec_0,
               _sign_45_37,
               _fst_50_50,

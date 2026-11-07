@@ -1,9 +1,12 @@
 module L4_Lean_Util_CollectMVars;
 
 // "Lean.CollectMVars.State.empty"
-fun f_CollectMVars_State_empty_cb8844cb47(): LeanValue {
+fun f_CollectMVars_State_empty_cb8844cb47(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   _x_2_1: LeanValue = LeanScalar("nat", "0");
   _x_5_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "16"),
     LeanCtor(
@@ -12,6 +15,7 @@ fun f_CollectMVars_State_empty_cb8844cb47(): LeanValue {
     ),
   );
   _x_7_6: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    _runtime,
     LeanErased(),
     _x_2_1,
   );
@@ -29,6 +33,7 @@ fun f_CollectMVars_State_empty_cb8844cb47(): LeanValue {
 }
 // "Std.DHashMap.Internal.AssocList.foldlM._at_._private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.CollectMVars.visit.spec_1.spec_2.spec_4.spec_6._redArg"
 fun f_spec_2_spec_4_spec_6_8e8de23383(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -39,57 +44,71 @@ fun f_spec_2_spec_4_spec_6_8e8de23383(
     _value_4_3: LeanValue = leanField(_x_2_1, 1);
     _tail_5_4: LeanValue = leanField(_x_2_1, 2);
     _x_6_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _x_1_0,
     );
     _x_7_6: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      _runtime,
       LeanErased(),
       _key_3_2,
     );
     _x_9_8: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      _runtime,
       _x_7_6,
       LeanScalar("usize", "3"),
     );
     _x_10_9: LeanValue = L4_Init_Data_UInt_Basic.f_USize_toUInt64_158104741e(
+      _runtime,
       _x_9_8,
     );
     _x_12_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _x_10_9,
       LeanScalar("uint64", "32"),
     );
     _fold_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _x_10_9,
       _x_12_11,
     );
     _x_14_14: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _fold_12,
       LeanScalar("uint64", "16"),
     );
     _x_15_15: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _fold_12,
       _x_14_14,
     );
     _x_16_16: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _runtime,
       _x_15_15,
     );
     _x_17_17: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_6_5,
     );
     _x_19_19: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _runtime,
       _x_17_17,
       LeanScalar("usize", "1"),
     );
     _x_20_20: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _runtime,
       _x_16_16,
       _x_19_19,
     );
     _x_21_21: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _x_1_0,
       _x_20_20,
       LeanErased(),
     );
     _x_23_23: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+      _runtime,
       LeanErased(),
       _x_1_0,
       _x_20_20,
@@ -99,12 +118,13 @@ fun f_spec_2_spec_4_spec_6_8e8de23383(
       ),
       LeanErased(),
     );
-    f_spec_2_spec_4_spec_6_8e8de23383(_x_23_23, _tail_5_4)
+    f_spec_2_spec_4_spec_6_8e8de23383(_runtime, _x_23_23, _tail_5_4)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.CollectMVars.main"
 fun f_Lean_CollectMVars_main_856e6bffd6(
+  _runtime: mutable LeanExecution,
   _x_1_0_input: LeanValue,
   _a_2_1_input: LeanValue,
 ): LeanValue {
@@ -127,7 +147,7 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
         _frame.set(7, leanField(_frame[0], 3));
         _frame.set(
           19,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[7], _frame[1]),
+          f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[7], _frame[1]),
         );
         return _frame[19]
       | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
@@ -167,15 +187,23 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
         _ = leanField(_frame[0], 5);
         _frame.set(
           20,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[12], _frame[1]),
+          f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[12], _frame[1]),
         );
         _frame.set(
           21,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[13], _frame[20]),
+          f_Lean_CollectMVars_visit_0f932641da(
+            _runtime,
+            _frame[13],
+            _frame[20],
+          ),
         );
         _frame.set(
           22,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[14], _frame[21]),
+          f_Lean_CollectMVars_visit_0f932641da(
+            _runtime,
+            _frame[14],
+            _frame[21],
+          ),
         );
         return _frame[22]
       | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
@@ -184,11 +212,15 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
         _frame.set(16, leanField(_frame[0], 2));
         _frame.set(
           23,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[15], _frame[1]),
+          f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[15], _frame[1]),
         );
         _frame.set(
           24,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[16], _frame[23]),
+          f_Lean_CollectMVars_visit_0f932641da(
+            _runtime,
+            _frame[16],
+            _frame[23],
+          ),
         );
         return _frame[24]
       | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
@@ -197,7 +229,7 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
         _frame.set(17, leanField(_frame[0], 2));
         _frame.set(
           25,
-          f_Lean_CollectMVars_visit_0f932641da(_frame[17], _frame[1]),
+          f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[17], _frame[1]),
         );
         return _frame[25]
       | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
@@ -210,13 +242,18 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
           _frame.set(28, leanField(_frame[1], 2));
           _frame.set(
             29,
-            f_CollectMVars_main_spec_3_be2e801e22(_frame[18], _frame[27]),
+            f_CollectMVars_main_spec_3_be2e801e22(
+              _runtime,
+              _frame[18],
+              _frame[27],
+            ),
           );
           leanTag(_frame[29]) match {
           | "[\"Bool\",\"false\"]" ->
             _frame.set(
               30,
               L4_Lean_Expr.f_Lean_MVarIdSet_insert_1292a5ee47(
+                _runtime,
                 _frame[27],
                 _frame[18],
               ),
@@ -224,6 +261,7 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
             _frame.set(
               31,
               L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+                _runtime,
                 LeanErased(),
                 _frame[28],
                 _frame[18],
@@ -245,8 +283,14 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
       | _ -> return _frame[1]
       }
     | 1 ->
-      _frame.set(5, f_Lean_CollectMVars_visit_0f932641da(_frame[2], _frame[4]));
-      _frame.set(6, f_Lean_CollectMVars_visit_0f932641da(_frame[3], _frame[5]));
+      _frame.set(
+        5,
+        f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[2], _frame[4]),
+      );
+      _frame.set(
+        6,
+        f_Lean_CollectMVars_visit_0f932641da(_runtime, _frame[3], _frame[5]),
+      );
       return _frame[6]
     | _ -> return leanFail("invalid join point")
     }
@@ -254,6 +298,7 @@ fun f_Lean_CollectMVars_main_856e6bffd6(
 }
 // "Std.DTreeMap.Internal.Impl.contains._at_.Lean.CollectMVars.main.spec_3._redArg"
 fun f_CollectMVars_main_spec_3_be2e801e22(
+  _runtime: mutable LeanExecution,
   _k_0: LeanValue,
   _t_1: LeanValue,
 ): LeanValue {
@@ -265,15 +310,16 @@ fun f_CollectMVars_main_spec_3_be2e801e22(
     _l_4_5: LeanValue = leanField(_t_1, 3);
     _r_5_6: LeanValue = leanField(_t_1, 4);
     _x_6_7: LeanValue = L4_Lean_Data_Name.f_Lean_Name_quickCmpImpl_fa3996fc71(
+      _runtime,
       _k_0,
       _k_2_3,
     );
     leanTag(_x_6_7) match {
     | "[\"Ordering\",\"lt\"]" ->
-      f_CollectMVars_main_spec_3_be2e801e22(_k_0, _l_4_5)
+      f_CollectMVars_main_spec_3_be2e801e22(_runtime, _k_0, _l_4_5)
     | "[\"Ordering\",\"eq\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
     | "[\"Ordering\",\"gt\"]" ->
-      f_CollectMVars_main_spec_3_be2e801e22(_k_0, _r_5_6)
+      f_CollectMVars_main_spec_3_be2e801e22(_runtime, _k_0, _r_5_6)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
@@ -283,6 +329,7 @@ fun f_CollectMVars_main_spec_3_be2e801e22(
 }
 // "Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.CollectMVars.visit.spec_1._redArg"
 fun f_CollectMVars_visit_spec_1_6d752d9700(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _a_1: LeanValue,
   _b_2: LeanValue,
@@ -292,64 +339,83 @@ fun f_CollectMVars_visit_spec_1_6d752d9700(
     _size_1_3: LeanValue = leanField(_m_0, 0);
     _buckets_2_4: LeanValue = leanField(_m_0, 1);
     _x_3_5: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _buckets_2_4,
     );
     _x_4_6: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      _runtime,
       LeanErased(),
       _a_1,
     );
     _x_6_8: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      _runtime,
       _x_4_6,
       LeanScalar("usize", "3"),
     );
     _x_7_9: LeanValue = L4_Init_Data_UInt_Basic.f_USize_toUInt64_158104741e(
+      _runtime,
       _x_6_8,
     );
     _x_9_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _x_7_9,
       LeanScalar("uint64", "32"),
     );
     _fold_12: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _x_7_9,
       _x_9_11,
     );
     _x_11_14: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _fold_12,
       LeanScalar("uint64", "16"),
     );
     _x_12_15: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _fold_12,
       _x_11_14,
     );
     _x_13_16: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _runtime,
       _x_12_15,
     );
     _x_14_17: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_3_5,
     );
     _x_16_19: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _runtime,
       _x_14_17,
       LeanScalar("usize", "1"),
     );
     _x_17_20: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _runtime,
       _x_13_16,
       _x_16_19,
     );
     _bkt_21: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _buckets_2_4,
       _x_17_20,
       LeanErased(),
     );
-    _x_18_22: LeanValue = f_visit_spec_0_spec_0_e26194c730(_a_1, _bkt_21);
+    _x_18_22: LeanValue = f_visit_spec_0_spec_0_e26194c730(
+      _runtime,
+      _a_1,
+      _bkt_21,
+    );
     leanTag(_x_18_22) match {
     | "[\"Bool\",\"false\"]" ->
       _size_24: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _size_1_3,
         LeanScalar("nat", "1"),
       );
       _buckets_26: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        _runtime,
         LeanErased(),
         _buckets_2_4,
         _x_17_20,
@@ -360,24 +426,31 @@ fun f_CollectMVars_visit_spec_1_6d752d9700(
         LeanErased(),
       );
       _x_22_28: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+        _runtime,
         _size_24,
         LeanScalar("nat", "4"),
       );
       _x_24_30: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(
+        _runtime,
         _x_22_28,
         LeanScalar("nat", "3"),
       );
       _x_25_31: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+        _runtime,
         LeanErased(),
         _buckets_26,
       );
       _x_26_32: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+        _runtime,
         _x_24_30,
         _x_25_31,
       );
       leanTag(_x_26_32) match {
       | "[\"Bool\",\"false\"]" ->
-        _val_27_33: LeanValue = f_visit_spec_1_spec_2_5e2356e993(_buckets_26);
+        _val_27_33: LeanValue = f_visit_spec_1_spec_2_5e2356e993(
+          _runtime,
+          _buckets_26,
+        );
         LeanCtor(
           "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
           Array[_size_24, _val_27_33],
@@ -397,25 +470,33 @@ fun f_CollectMVars_visit_spec_1_6d752d9700(
 }
 // "_private.Std.Data.DHashMap.Internal.Defs.0.Std.DHashMap.Internal.Raw₀.expand.go._at_.Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.CollectMVars.visit.spec_1.spec_2.spec_4._redArg"
 fun f_spec_1_spec_2_spec_4_3581ebf5ab(
+  _runtime: mutable LeanExecution,
   _i_0: LeanValue,
   _source_1: LeanValue,
   _target_2: LeanValue,
 ): LeanValue {
   _x_1_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _source_1,
   );
-  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_i_0, _x_1_3);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    _i_0,
+    _x_1_3,
+  );
   leanTag(_x_2_4) match {
   | "[\"Bool\",\"false\"]" -> _target_2
   | "[\"Bool\",\"true\"]" ->
     _es_5: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
       LeanErased(),
       _source_1,
       _i_0,
       LeanErased(),
     );
     _source_7: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      _runtime,
       LeanErased(),
       _source_1,
       _i_0,
@@ -425,17 +506,23 @@ fun f_spec_1_spec_2_spec_4_3581ebf5ab(
       ),
       LeanErased(),
     );
-    _target_8: LeanValue = f_spec_2_spec_4_spec_6_8e8de23383(_target_2, _es_5);
+    _target_8: LeanValue = f_spec_2_spec_4_spec_6_8e8de23383(
+      _runtime,
+      _target_2,
+      _es_5,
+    );
     _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _i_0,
       LeanScalar("nat", "1"),
     );
-    f_spec_1_spec_2_spec_4_3581ebf5ab(_x_5_10, _source_7, _target_8)
+    f_spec_1_spec_2_spec_4_3581ebf5ab(_runtime, _x_5_10, _source_7, _target_8)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Std.DHashMap.Internal.Raw₀.contains._at_.Lean.CollectMVars.visit.spec_0._redArg"
 fun f_CollectMVars_visit_spec_0_26d0aff82b(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _a_1: LeanValue,
 ): LeanValue {
@@ -444,69 +531,84 @@ fun f_CollectMVars_visit_spec_0_26d0aff82b(
     _size_1_2: LeanValue = leanField(_m_0, 0);
     _buckets_2_3: LeanValue = leanField(_m_0, 1);
     _x_3_4: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+      _runtime,
       LeanErased(),
       _buckets_2_3,
     );
     _x_4_5: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      _runtime,
       LeanErased(),
       _a_1,
     );
     _x_6_7: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      _runtime,
       _x_4_5,
       LeanScalar("usize", "3"),
     );
     _x_7_8: LeanValue = L4_Init_Data_UInt_Basic.f_USize_toUInt64_158104741e(
+      _runtime,
       _x_6_7,
     );
     _x_9_10: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _x_7_8,
       LeanScalar("uint64", "32"),
     );
     _fold_11: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _x_7_8,
       _x_9_10,
     );
     _x_11_13: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+      _runtime,
       _fold_11,
       LeanScalar("uint64", "16"),
     );
     _x_12_14: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+      _runtime,
       _fold_11,
       _x_11_13,
     );
     _x_13_15: LeanValue = L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(
+      _runtime,
       _x_12_14,
     );
     _x_14_16: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
+      _runtime,
       _x_3_4,
     );
     _x_16_18: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+      _runtime,
       _x_14_16,
       LeanScalar("usize", "1"),
     );
     _x_17_19: LeanValue = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _runtime,
       _x_13_15,
       _x_16_18,
     );
     _x_18_20: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
       LeanErased(),
       _buckets_2_3,
       _x_17_19,
       LeanErased(),
     );
-    f_visit_spec_0_spec_0_e26194c730(_a_1, _x_18_20)
+    f_visit_spec_0_spec_0_e26194c730(_runtime, _a_1, _x_18_20)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Lean.Expr.collectMVars"
 fun f_Lean_Expr_collectMVars_5160706aa3(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _e_1: LeanValue,
 ): LeanValue {
-  f_Lean_CollectMVars_visit_0f932641da(_e_1, _s_0)
+  f_Lean_CollectMVars_visit_0f932641da(_runtime, _e_1, _s_0)
 }
 // "Std.DHashMap.Internal.AssocList.contains._at_.Std.DHashMap.Internal.Raw₀.contains._at_.Lean.CollectMVars.visit.spec_0.spec_0._redArg"
 fun f_visit_spec_0_spec_0_e26194c730(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -518,20 +620,23 @@ fun f_visit_spec_0_spec_0_e26194c730(
     _value_4_3: LeanValue = leanField(_x_1_1, 1);
     _tail_5_4: LeanValue = leanField(_x_1_1, 2);
     _x_6_6: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      _runtime,
       LeanErased(),
       _key_3_2,
     );
     _x_7_7: LeanValue = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      _runtime,
       LeanErased(),
       _a_0,
     );
     _x_8_8: LeanValue = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+      _runtime,
       _x_6_6,
       _x_7_7,
     );
     leanTag(_x_8_8) match {
     | "[\"Bool\",\"false\"]" ->
-      f_visit_spec_0_spec_0_e26194c730(_a_0, _tail_5_4)
+      f_visit_spec_0_spec_0_e26194c730(_runtime, _a_0, _tail_5_4)
     | "[\"Bool\",\"true\"]" -> _x_8_8
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -540,10 +645,14 @@ fun f_visit_spec_0_spec_0_e26194c730(
 }
 // "Lean.CollectMVars.visit"
 fun f_Lean_CollectMVars_visit_0f932641da(
+  _runtime: mutable LeanExecution,
   _e_0: LeanValue,
   _s_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_hasExprMVar_0a7c4cebda(_e_0);
+  _x_1_2: LeanValue = L4_Lean_Expr.f_Lean_Expr_hasExprMVar_0a7c4cebda(
+    _runtime,
+    _e_0,
+  );
   leanTag(_x_1_2) match {
   | "[\"Bool\",\"false\"]" -> _s_1
   | "[\"Bool\",\"true\"]" ->
@@ -553,17 +662,20 @@ fun f_Lean_CollectMVars_visit_0f932641da(
       _mvarSet_4: LeanValue = leanField(_s_1, 1);
       _result_5: LeanValue = leanField(_s_1, 2);
       _x_2_6: LeanValue = f_CollectMVars_visit_spec_0_26d0aff82b(
+        _runtime,
         _visited_3,
         _e_0,
       );
       leanTag(_x_2_6) match {
       | "[\"Bool\",\"false\"]" ->
         _x_4_8: LeanValue = f_CollectMVars_visit_spec_1_6d752d9700(
+          _runtime,
           _visited_3,
           _e_0,
           LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
         );
         f_Lean_CollectMVars_main_856e6bffd6(
+          _runtime,
           _e_0,
           LeanCtor(
             "[\"_private\",\"Lean\",\"Util\",\"CollectMVars\",0,\"Lean\",\"CollectMVars\",\"State\",\"mk\"]",
@@ -579,16 +691,22 @@ fun f_Lean_CollectMVars_visit_0f932641da(
   }
 }
 // "Std.DHashMap.Internal.Raw₀.expand._at_.Std.DHashMap.Internal.Raw₀.insertIfNew._at_.Lean.CollectMVars.visit.spec_1.spec_2._redArg"
-fun f_visit_spec_1_spec_2_5e2356e993(_data_0: LeanValue): LeanValue {
+fun f_visit_spec_1_spec_2_5e2356e993(
+  _runtime: mutable LeanExecution,
+  _data_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
     LeanErased(),
     _data_0,
   );
   _nbuckets_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
+    _runtime,
     _x_1_1,
     LeanScalar("nat", "2"),
   );
   _x_5_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    _runtime,
     LeanErased(),
     _nbuckets_3,
     LeanCtor(
@@ -597,12 +715,18 @@ fun f_visit_spec_1_spec_2_5e2356e993(_data_0: LeanValue): LeanValue {
     ),
   );
   _x_6_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_propagateMark_cb052002ff(
+    _runtime,
     LeanErased(),
     LeanErased(),
     _data_0,
     _x_5_6,
   );
-  f_spec_1_spec_2_spec_4_3581ebf5ab(LeanScalar("nat", "0"), _data_0, _x_6_7)
+  f_spec_1_spec_2_spec_4_3581ebf5ab(
+    _runtime,
+    LeanScalar("nat", "0"),
+    _data_0,
+    _x_6_7,
+  )
 }
 
 module end;

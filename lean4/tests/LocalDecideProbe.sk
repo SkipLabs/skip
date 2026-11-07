@@ -1,0 +1,104 @@
+// Bring-up probe for the existing decide elaborator on fixed input syntax.
+// Local definitions are typed inputs; parsing and the command pipeline are not implemented.
+// The exported proof is checked separately by tools/CheckProof.lean.
+fun describeDecideValue(value: LeanValue, depth: Int): String {
+  if (depth == 0) return "...";
+  value match {
+  | LeanCtor(name, fields) ->
+    if (
+      name.contains("\"Environment\"") ||
+      name.contains("\"Context\"") ||
+      name.contains("\"MessageDataContext\"")
+    ) {
+      return name + "(...)"
+    };
+    name +
+      "(" +
+      fields.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      ")"
+  | LeanArray(values) ->
+    "array[" +
+      values.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      "]"
+  | LeanText(text) -> JSON.String(text).encode()
+  | LeanNatural(n) -> n.toString()
+  | LeanScalar(_, text) -> text
+  | LeanWord(kind, bits) -> kind + ":" + LeanNat::fromWord(bits).toString()
+  | LeanClosure(_, arity, captured) ->
+    "closure/" +
+      arity.toString() +
+      "[" +
+      captured.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      "]"
+  | LeanReference(index) -> "ref:" + index.toString()
+  | LeanUnavailable(description) -> "unavailable:" + description
+  | _ -> "opaque"
+  }
+}
+
+fun decideProbe(): void {
+  data = leanDecodeImportData(FileSystem.readTextFile("build/init-data.jsonl"));
+  extensionData = leanDecodeImportData(
+    FileSystem.readTextFile("build/init-extensions.jsonl"),
+  );
+  store = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  leanInitializeExceptions(runtime);
+  leanInitializeOptions(runtime);
+  imports = leanInstallImports(
+    runtime,
+    data,
+    extensionData,
+    leanDecodeImportData(
+      FileSystem.readTextFile("build/init-extra-constants.jsonl"),
+    ),
+    "/lean/imported-meta",
+  );
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/local-constants/"),
+    Array[],
+  );
+  store.initPre();
+  env = imports.atPrefix(runtime, LeanConstantsView("local", constants));
+  limit = leanNatDefinition(
+    runtime,
+    leanSimpleName(runtime, "limit"),
+    leanNatValue(3),
+  );
+  noise = leanNatDefinition(
+    runtime,
+    leanSimpleName(runtime, "noise"),
+    leanNatValue(99),
+  );
+  constants.writeArray(
+    store,
+    LeanConstantKey("local", leanNameKey(leanSimpleName(runtime, "limit"))),
+    Array[LeanConstantFile(limit, None())],
+  );
+  constants.writeArray(
+    store,
+    LeanConstantKey("local", leanNameKey(leanSimpleName(runtime, "noise"))),
+    Array[LeanConstantFile(noise, None())],
+  );
+  store.update();
+  expected = leanLimitTheoremType(runtime);
+  result = leanElaborateDecide(runtime, env, expected);
+  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+    print_error(describeDecideValue(result, 14));
+    leanFail("decide elaboration failed; raw diagnostic printed above")
+  };
+  leanCheckPublishable(leanField(result, 0));
+  FileSystem.writeTextFile(
+    "build/local-decide-proof.json",
+    leanProofDocument(expected, leanField(result, 0), Array[limit, noise]),
+  );
+  print_string(
+    "decide produced a proof of limit < 10 (independent kernel validation pending)",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> decideProbe())
+}

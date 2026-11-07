@@ -1,0 +1,210 @@
+// Ordering from Lean's expr_lt.cpp and level.cpp. Quick ordering compares
+// constructor kinds and hashes before structure; it never uses pointer addresses.
+fun leanNameLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+): Bool {
+  leanIsTrue(L4_Lean_Data_Name.f_Lean_Name_lt_84dbf4700e(runtime, a, b))
+}
+
+fun leanLevelOrderData(value: LeanValue): Int {
+  if (leanTag(value) == "[\"Lean\",\"Level\",\"zero\",\"_impl\"]") 2221 else {
+    leanWordBits(leanField(value, 0))
+  }
+}
+
+fun leanLevelLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  quick: Bool,
+): Bool {
+  ad = leanLevelOrderData(a);
+  bd = leanLevelOrderData(b);
+  if (ad.ushr(40) != bd.ushr(40)) return ad.ushr(40) < bd.ushr(40);
+  ak = leanConstructorOrdinal(leanTag(a));
+  bk = leanConstructorOrdinal(leanTag(b));
+  if (ak != bk) return ak < bk;
+  if (quick && ad.and(4294967295) != bd.and(4294967295)) {
+    return ad.and(4294967295) < bd.and(4294967295)
+  };
+  if (leanLevelEqual(a, b)) return false;
+  leanTag(a) match {
+  | "[\"Lean\",\"Level\",\"param\",\"_impl\"]"
+  | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
+    leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
+  | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+    leanLevelLt(runtime, leanField(a, 1), leanField(b, 1), quick)
+  | "[\"Lean\",\"Level\",\"max\",\"_impl\"]"
+  | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+    index = if (leanLevelEqual(leanField(a, 1), leanField(b, 1))) 2 else 1;
+    leanLevelLt(runtime, leanField(a, index), leanField(b, index), quick)
+  | _ -> leanFail("invalid universe in expression ordering")
+  }
+}
+
+fun leanLevelListLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  quick: Bool,
+): Bool {
+  left = a;
+  right = b;
+  loop {
+    if (leanTag(left) == "[\"List\",\"nil\"]") {
+      return leanTag(right) != "[\"List\",\"nil\"]"
+    };
+    if (leanTag(right) == "[\"List\",\"nil\"]") return false;
+    if (!leanLevelEqual(leanField(left, 0), leanField(right, 0))) {
+      return leanLevelLt(
+        runtime,
+        leanField(left, 0),
+        leanField(right, 0),
+        quick,
+      )
+    };
+    !left = leanField(left, 1);
+    !right = leanField(right, 1)
+  }
+}
+
+fun leanMetadataValueLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+): Bool {
+  ak = leanConstructorOrdinal(leanTag(a));
+  bk = leanConstructorOrdinal(leanTag(b));
+  if (ak != bk) return ak < bk;
+  leanTag(a) match {
+  | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+    leanText(leanField(a, 0)) < leanText(leanField(b, 0))
+  | "[\"Lean\",\"DataValue\",\"ofBool\"]" ->
+    !leanIsTrue(leanField(a, 0)) && leanIsTrue(leanField(b, 0))
+  | "[\"Lean\",\"DataValue\",\"ofName\"]" ->
+    leanNameLt(runtime, leanField(a, 0), leanField(b, 0))
+  | "[\"Lean\",\"DataValue\",\"ofNat\"]" ->
+    leanNat(leanField(a, 0)) < leanNat(leanField(b, 0))
+  // This is the pinned native comparator's exact behavior (util/kvmap.cpp),
+  // whose Int and Syntax comparison is itself marked TODO.
+  | "[\"Lean\",\"DataValue\",\"ofInt\"]"
+  | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+    false
+  | _ -> leanFail("invalid metadata in expression ordering")
+  }
+}
+
+fun leanMetadataLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+): Bool {
+  left = a;
+  right = b;
+  loop {
+    if (leanTag(left) == "[\"List\",\"nil\"]") {
+      return leanTag(right) != "[\"List\",\"nil\"]"
+    };
+    if (leanTag(right) == "[\"List\",\"nil\"]") return false;
+    l = leanField(left, 0);
+    r = leanField(right, 0);
+    if (!leanNameEqual(leanField(l, 0), leanField(r, 0))) {
+      return leanNameLt(runtime, leanField(l, 0), leanField(r, 0))
+    };
+    if (leanMetadataValueLt(runtime, leanField(l, 1), leanField(r, 1))) {
+      return true
+    };
+    if (leanMetadataValueLt(runtime, leanField(r, 1), leanField(l, 1))) {
+      return false
+    };
+    !left = leanField(left, 1);
+    !right = leanField(right, 1)
+  }
+}
+
+fun leanExprLt(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  quick: Bool,
+): Bool {
+  ak = leanConstructorOrdinal(leanTag(a));
+  bk = leanConstructorOrdinal(leanTag(b));
+  if (ak != bk) return ak < bk;
+  ah = leanExprData(a).and(4294967295);
+  bh = leanExprData(b).and(4294967295);
+  if (quick && ah != bh) return ah < bh;
+  if (leanExprEqual(runtime, a, b, false)) return false;
+  leanTag(a) match {
+  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+    leanIsTrue(
+      L4_Lean_Expr.f_Lean_Literal_lt_f9e1f7bc0a(
+        runtime,
+        leanField(a, 1),
+        leanField(b, 1),
+      ),
+    )
+  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]" ->
+    leanNat(leanField(a, 1)) < leanNat(leanField(b, 1))
+  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
+    leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
+  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    leanLevelLt(runtime, leanField(a, 1), leanField(b, 1), quick)
+  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+    if (!leanNameEqual(leanField(a, 1), leanField(b, 1))) {
+      leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
+    } else {
+      leanLevelListLt(runtime, leanField(a, 2), leanField(b, 2), quick)
+    }
+  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+    index = if (
+      leanExprEqual(runtime, leanField(a, 1), leanField(b, 1), false)
+    ) 2 else {
+      1
+    };
+    leanExprLt(runtime, leanField(a, index), leanField(b, index), quick)
+  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
+  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+    index = if (
+      leanExprEqual(runtime, leanField(a, 2), leanField(b, 2), false)
+    ) 3 else {
+      2
+    };
+    leanExprLt(runtime, leanField(a, index), leanField(b, index), quick)
+  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    if (leanIsTrue(leanField(a, 5)) != leanIsTrue(leanField(b, 5))) {
+      return !leanIsTrue(leanField(a, 5))
+    };
+    for (index in Array[2, 3, 4]) {
+      if (
+        !leanExprEqual(runtime, leanField(a, index), leanField(b, index), false)
+      ) {
+        return leanExprLt(
+          runtime,
+          leanField(a, index),
+          leanField(b, index),
+          quick,
+        )
+      }
+    };
+    false
+  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+    if (!leanExprEqual(runtime, leanField(a, 2), leanField(b, 2), false)) {
+      leanExprLt(runtime, leanField(a, 2), leanField(b, 2), quick)
+    } else {
+      leanMetadataLt(runtime, leanField(a, 1), leanField(b, 1))
+    }
+  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+    if (!leanExprEqual(runtime, leanField(a, 3), leanField(b, 3), false)) {
+      leanExprLt(runtime, leanField(a, 3), leanField(b, 3), quick)
+    } else if (!leanNameEqual(leanField(a, 1), leanField(b, 1))) {
+      leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
+    } else {
+      leanNat(leanField(a, 2)) < leanNat(leanField(b, 2))
+    }
+  | _ -> leanFail("invalid expression in expression ordering")
+  }
+}

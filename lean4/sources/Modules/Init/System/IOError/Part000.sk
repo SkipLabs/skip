@@ -2,85 +2,138 @@ module L4_Init_System_IOError;
 
 // "IO.Error.otherErrorToString"
 fun f_IO_Error_otherErrorToString_504a9343ba(
+  _runtime: mutable LeanExecution,
   _gist_0: LeanValue,
   _code_1: LeanValue,
   _x_1_2: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
   | "[\"Option\",\"none\"]" ->
-    _x_2_4: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_gist_0);
+    _x_2_4: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_runtime, _gist_0);
     _x_4_6: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_2_4,
       LeanText(" (error code: "),
     );
-    _x_5_7: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_code_1);
-    _x_6_8: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_x_5_7);
+    _x_5_7: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+      _runtime,
+      _code_1,
+    );
+    _x_6_8: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+      _runtime,
+      _x_5_7,
+    );
     _x_7_9: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_4_6,
       _x_6_8,
     );
-    L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_7_9, LeanText(")"))
+    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      _x_7_9,
+      LeanText(")"),
+    )
   | "[\"Option\",\"some\"]" ->
     _val_10_3: LeanValue = leanField(_x_1_2, 0);
-    _x_11_12: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_gist_0);
+    _x_11_12: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
+      _runtime,
+      _gist_0,
+    );
     _x_13_14: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_11_12,
       LeanText(" (error code: "),
     );
-    _x_14_15: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_code_1);
-    _x_15_16: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_x_14_15);
+    _x_14_15: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+      _runtime,
+      _code_1,
+    );
+    _x_15_16: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+      _runtime,
+      _x_14_15,
+    );
     _x_16_17: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_13_14,
       _x_15_16,
     );
     _x_18_19: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_16_17,
       LeanText(", "),
     );
-    _x_19_20: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_val_10_3);
+    _x_19_20: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
+      _runtime,
+      _val_10_3,
+    );
     _x_20_21: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_18_19,
       _x_19_20,
     );
-    L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_20_21, LeanText(")"))
+    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      _x_20_21,
+      LeanText(")"),
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "instInhabitedError"
-fun f_instInhabitedError_3960fb474b(): LeanValue {
+fun f_instInhabitedError_3960fb474b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanCtor(
     "[\"IO\",\"Error\",\"userError\"]",
     Array[LeanText("(`Inhabited.default` for `IO.Error`)")],
   )
 }
 // "_private.Init.System.IOError.0.IO.Error.downCaseFirst"
-fun f_IO_Error_downCaseFirst_a0fdbd7d45(_s_0: LeanValue): LeanValue {
+fun f_IO_Error_downCaseFirst_a0fdbd7d45(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   _x_1_1: LeanValue = LeanScalar("nat", "0");
   _x_2_2: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
+    _runtime,
     _s_0,
     _x_1_1,
   );
   _x_4_4: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+    _runtime,
     LeanScalar("uint32", "65"),
     _x_2_2,
   );
   leanTag(_x_4_4) match {
   | "[\"Bool\",\"false\"]" ->
-    L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(_s_0, _x_1_1, _x_2_2)
+    L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
+      _runtime,
+      _s_0,
+      _x_1_1,
+      _x_2_2,
+    )
   | "[\"Bool\",\"true\"]" ->
     _x_7_7: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+      _runtime,
       _x_2_2,
       LeanScalar("uint32", "90"),
     );
     leanTag(_x_7_7) match {
     | "[\"Bool\",\"false\"]" ->
-      L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(_s_0, _x_1_1, _x_2_2)
+      L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
+        _runtime,
+        _s_0,
+        _x_1_1,
+        _x_2_2,
+      )
     | "[\"Bool\",\"true\"]" ->
       _x_10_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt32_add_89bff4a85f(
+        _runtime,
         _x_2_2,
         LeanScalar("uint32", "32"),
       );
       L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
+        _runtime,
         _s_0,
         _x_1_1,
         _x_10_10,
@@ -91,14 +144,21 @@ fun f_IO_Error_downCaseFirst_a0fdbd7d45(_s_0: LeanValue): LeanValue {
   }
 }
 // "IO.userError"
-fun f_IO_userError_436e50ab44(_s_0: LeanValue): LeanValue {
+fun f_IO_userError_436e50ab44(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+): LeanValue {
   LeanCtor("[\"IO\",\"Error\",\"userError\"]", Array[_s_0])
 }
-fun apply_f_IO_userError_436e50ab44(_args: Array<LeanValue>): LeanValue {
-  f_IO_userError_436e50ab44(_args[0])
+fun apply_f_IO_userError_436e50ab44(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_userError_436e50ab44(_runtime, _args[0])
 }
 // "IO.Error.fopenErrorToString"
 fun f_IO_Error_fopenErrorToString_432216b575(
+  _runtime: mutable LeanExecution,
   _gist_0: LeanValue,
   _fn_1: LeanValue,
   _code_2: LeanValue,
@@ -106,54 +166,91 @@ fun f_IO_Error_fopenErrorToString_432216b575(
 ): LeanValue {
   leanTag(_x_1_3) match {
   | "[\"Option\",\"none\"]" ->
-    _x_2_5: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_gist_0);
+    _x_2_5: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_runtime, _gist_0);
     _x_4_7: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_2_5,
       LeanText(" (error code: "),
     );
-    _x_5_8: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_code_2);
-    _x_6_9: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_x_5_8);
+    _x_5_8: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+      _runtime,
+      _code_2,
+    );
+    _x_6_9: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+      _runtime,
+      _x_5_8,
+    );
     _x_7_10: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_4_7,
       _x_6_9,
     );
     _x_9_12: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_7_10,
       LeanText(")\n  file: "),
     );
-    L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_9_12, _fn_1)
+    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      _x_9_12,
+      _fn_1,
+    )
   | "[\"Option\",\"some\"]" ->
     _val_11_4: LeanValue = leanField(_x_1_3, 0);
-    _x_12_14: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_gist_0);
+    _x_12_14: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
+      _runtime,
+      _gist_0,
+    );
     _x_14_16: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_12_14,
       LeanText(" (error code: "),
     );
-    _x_15_17: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(_code_2);
-    _x_16_18: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(_x_15_17);
+    _x_15_17: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+      _runtime,
+      _code_2,
+    );
+    _x_16_18: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+      _runtime,
+      _x_15_17,
+    );
     _x_17_19: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_14_16,
       _x_16_18,
     );
     _x_19_21: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_17_19,
       LeanText(", "),
     );
-    _x_20_22: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_val_11_4);
+    _x_20_22: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
+      _runtime,
+      _val_11_4,
+    );
     _x_21_23: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_19_21,
       _x_20_22,
     );
     _x_23_25: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
       _x_21_23,
       LeanText(")\n  file: "),
     );
-    L4_Init_Data_String_Defs.f_String_append_61d243de93(_x_23_25, _fn_1)
+    L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      _x_23_25,
+      _fn_1,
+    )
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "IO.Error.toString"
-fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
+fun f_IO_Error_toString_b58e96daa2(
+  _runtime: mutable LeanExecution,
+  _x_1_0_input: LeanValue,
+): LeanValue {
   // Frame slots: 0=_x_1_0, 1=_code_1, 2=_details_2, 3=_x_3_3, 4=_x_4_4, 5=_filename_5_5, 6=_osCode_6_6, 7=_details_7_7, 8=_osCode_15_8, 9=_details_16_9, 10=_osCode_17_10, 11=_details_18_11, 12=_osCode_22_12, 13=_details_23_13, 14=_osCode_27_14, 15=_details_28_15, 16=_osCode_32_16, 17=_osCode_37_18, 18=_osCode_42_20, 19=_details_43_21, 20=_osCode_47_22, 21=_details_48_23, 22=_osCode_52_24, 23=_details_53_25, 24=_filename_57_26, 25=_osCode_58_27, 26=_details_59_28, 27=_filename_63_29, 28=_osCode_64_30, 29=_filename_69_32, 30=_osCode_70_33, 31=_details_71_34, 32=_filename_79_35, 33=_osCode_80_36, 34=_details_81_37, 35=_filename_85_38, 36=_osCode_86_39, 37=_details_87_40, 38=_filename_95_41, 39=_osCode_96_42, 40=_details_97_43, 41=_filename_105_44, 42=_osCode_106_45, 43=_details_107_46, 44=_msg_116_47, 45=_val_11_48, 46=_x_8_49, 47=_x_9_50, 48=_x_10_51, 49=_x_12_52, 50=_x_13_53, 51=_x_14_54, 52=_x_19_55, 53=_x_20_56, 54=_x_21_57, 55=_x_24_58, 56=_x_25_59, 57=_x_26_60, 58=_x_29_61, 59=_x_30_62, 60=_x_31_63, 61=_x_34_64, 62=_x_35_65, 63=_x_36_66, 64=_x_39_67, 65=_x_40_68, 66=_x_41_69, 67=_x_44_70, 68=_x_45_71, 69=_x_46_72, 70=_x_49_73, 71=_x_50_74, 72=_x_51_75, 73=_x_54_76, 74=_x_55_77, 75=_x_56_78, 76=_x_60_79, 77=_x_61_80, 78=_x_62_81, 79=_x_66_82, 80=_x_67_83, 81=_x_68_84, 82=_val_75_85, 83=_x_72_86, 84=_x_73_87, 85=_x_74_88, 86=_x_76_89, 87=_x_77_90, 88=_x_78_91, 89=_val_82_92, 90=_x_83_93, 91=_x_84_94, 92=_val_91_95, 93=_x_88_96, 94=_x_89_97, 95=_x_90_98, 96=_x_92_99, 97=_x_93_100, 98=_x_94_101, 99=_val_101_102, 100=_x_98_103, 101=_x_99_104, 102=_x_100_105, 103=_x_102_106, 104=_x_103_107, 105=_x_104_108, 106=_val_111_109, 107=_x_108_110, 108=_x_109_111, 109=_x_110_112, 110=_x_112_113, 111=_x_113_114, 112=_x_114_115, 113=_x_115_116
   _frame: mutable Array<LeanValue> = Array::mfill(
     114,
@@ -176,6 +273,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             48,
             f_IO_Error_otherErrorToString_504a9343ba(
+              _runtime,
               _frame[46],
               _frame[6],
               _frame[47],
@@ -189,6 +287,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             51,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[49],
               _frame[45],
               _frame[6],
@@ -215,6 +314,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           54,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[52],
             _frame[10],
             _frame[53],
@@ -229,6 +329,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           57,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[55],
             _frame[12],
             _frame[56],
@@ -243,6 +344,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           60,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[58],
             _frame[14],
             _frame[59],
@@ -257,6 +359,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           63,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[61],
             _frame[16],
             _frame[62],
@@ -271,6 +374,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           66,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[64],
             _frame[17],
             _frame[65],
@@ -285,6 +389,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           69,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[67],
             _frame[18],
             _frame[68],
@@ -299,6 +404,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           72,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[70],
             _frame[20],
             _frame[71],
@@ -313,6 +419,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           75,
           f_IO_Error_otherErrorToString_504a9343ba(
+            _runtime,
             _frame[73],
             _frame[22],
             _frame[74],
@@ -328,6 +435,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           78,
           f_IO_Error_fopenErrorToString_432216b575(
+            _runtime,
             _frame[76],
             _frame[24],
             _frame[25],
@@ -344,6 +452,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
         _frame.set(
           81,
           f_IO_Error_fopenErrorToString_432216b575(
+            _runtime,
             _frame[79],
             _frame[27],
             _frame[28],
@@ -362,6 +471,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             85,
             f_IO_Error_otherErrorToString_504a9343ba(
+              _runtime,
               _frame[83],
               _frame[30],
               _frame[84],
@@ -375,6 +485,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             88,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[86],
               _frame[82],
               _frame[30],
@@ -402,6 +513,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             91,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[34],
               _frame[89],
               _frame[33],
@@ -422,6 +534,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             95,
             f_IO_Error_otherErrorToString_504a9343ba(
+              _runtime,
               _frame[93],
               _frame[36],
               _frame[94],
@@ -435,6 +548,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             98,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[96],
               _frame[92],
               _frame[36],
@@ -455,6 +569,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             102,
             f_IO_Error_otherErrorToString_504a9343ba(
+              _runtime,
               _frame[100],
               _frame[39],
               _frame[101],
@@ -468,6 +583,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             105,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[103],
               _frame[99],
               _frame[39],
@@ -488,6 +604,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             109,
             f_IO_Error_otherErrorToString_504a9343ba(
+              _runtime,
               _frame[107],
               _frame[42],
               _frame[108],
@@ -501,6 +618,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
           _frame.set(
             112,
             f_IO_Error_fopenErrorToString_432216b575(
+              _runtime,
               _frame[110],
               _frame[106],
               _frame[42],
@@ -523,6 +641,7 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
       _frame.set(
         4,
         f_IO_Error_otherErrorToString_504a9343ba(
+          _runtime,
           _frame[2],
           _frame[1],
           _frame[3],
@@ -533,8 +652,11 @@ fun f_IO_Error_toString_b58e96daa2(_x_1_0_input: LeanValue): LeanValue {
     }
   }
 }
-fun apply_f_IO_Error_toString_b58e96daa2(_args: Array<LeanValue>): LeanValue {
-  f_IO_Error_toString_b58e96daa2(_args[0])
+fun apply_f_IO_Error_toString_b58e96daa2(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_IO_Error_toString_b58e96daa2(_runtime, _args[0])
 }
 
 module end;

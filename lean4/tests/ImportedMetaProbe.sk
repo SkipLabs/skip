@@ -1,0 +1,73 @@
+// Bootstrap check: use all imported Init declarations, and execute the existing
+// Meta algorithms. Extension/header fields are explicitly unavailable until
+// their import and initialization protocols have been implemented.
+fun importedMetaProbe(): void {
+  data = leanDecodeImportData(FileSystem.readTextFile("build/init-data.jsonl"));
+  store = SKStore.Context::create{}.mclone();
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/imported-meta/constants/"),
+    data.constants.map(entry ->
+      (
+        LeanConstantKey("Init", leanNameKey(entry.i0)),
+        LeanConstantFile(entry.i1, Some(entry.i2)),
+      )
+    ),
+  );
+  store.initPre();
+  runtime = mutable LeanExecution{store};
+  env = leanEnvironment(
+    runtime,
+    LeanConstantsView("Init", constants),
+    LeanConstantsView("local", constants),
+    LeanUnavailable("imported environment header"),
+    LeanUnavailable("imported environment extensions"),
+    LeanUnavailable("imported extension generations"),
+    true,
+  );
+  metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreContext = leanCoreContext("<imported-meta-probe>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, env));
+  natName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Nat"),
+  );
+  info = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    runtime,
+    env,
+    natName,
+    leanBool(false),
+  );
+  assert(leanTag(info) == "[\"Option\",\"some\"]");
+  assert(
+    leanTag(leanField(info, 0)) == "[\"Lean\",\"ConstantInfo\",\"inductInfo\"]",
+  );
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
+  inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    runtime,
+    nat,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    LeanErased(),
+  );
+  assert(leanTag(inferred) == "[\"EST\",\"Out\",\"ok\"]");
+  type = leanField(inferred, 0);
+  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(
+    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+  );
+  print_string("Imported environment lookup and Meta.inferType Nat passed")
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> importedMetaProbe())
+}

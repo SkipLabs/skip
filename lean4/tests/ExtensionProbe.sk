@@ -1,0 +1,95 @@
+// Exercise original extension registration and class lookup with checked Init
+// data. Only extension data is loaded; no declaration is elaborated here.
+fun extensionProbe(): void {
+  data = leanDecodeImportData(
+    FileSystem.readTextFile("build/init-extensions.jsonl"),
+  );
+  assert(data.constants.isEmpty() && data.extensions.size() == 6);
+  store = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store};
+  leanInitializeMetaExtensions(runtime);
+  count = runtime.refs.size();
+  print_string("Extension registration references: " + count.toString());
+  leanInitializeMetaExtensions(runtime);
+  assert(runtime.refs.size() == count && !runtime.initializing);
+  extensions = leanInstallImportedExtensions(
+    runtime,
+    "Init",
+    SKStore.DirName::create("/lean/extension-probe/states/"),
+    data.extensions,
+  );
+  print_string(
+    "Imported state/generation slots: " +
+      leanValueArraySize(extensions.i0).toString() +
+      "/" +
+      leanValueArraySize(extensions.i1).toString(),
+  );
+  assert(leanValueArraySize(extensions.i0) == 6);
+  assert(leanValueArraySize(extensions.i1) == 1);
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/extension-probe/constants/"),
+    Array[],
+  );
+  store.initPre();
+  assert(
+    leanNat(
+      leanArrayRead(runtime, extensions.i1, leanNatValue(0), false),
+    ).toInt() == 1,
+  );
+  env = leanEnvironment(
+    runtime,
+    LeanConstantsView("Init", constants),
+    LeanConstantsView("local", constants),
+    LeanUnavailable("imported environment header"),
+    extensions.i0,
+    extensions.i1,
+    true,
+    data.trackedGeneration,
+  );
+  for ((text, expected) in Array[
+    ("Decidable", true),
+    ("Nat", false),
+    ("Inhabited", true),
+    ("MissingClass", false),
+  ]) {
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText(text),
+    );
+    result = L4_Lean_Class.f_Lean_isClass_8bc2d27716(runtime, env, name);
+    print_string("isClass " + text + ": " + leanIsTrue(result).toString());
+    assert(leanIsTrue(result) == expected)
+  };
+  nat = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("Nat"));
+  decLt = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Nat"),
+    LeanText("decLt"),
+  );
+  missing = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("MissingInstance"),
+  );
+  for ((name, text, expected) in Array[
+    (decLt, "Nat.decLt", true),
+    (nat, "Nat", false),
+    (missing, "MissingInstance", false),
+  ]) {
+    result = L4_Lean_Meta_Instances.f_Lean_Meta_isInstanceCore_1066af8573(
+      runtime,
+      env,
+      name,
+    );
+    print_string("isInstance " + text + ": " + leanIsTrue(result).toString());
+    assert(leanIsTrue(result) == expected)
+  };
+  print_string(
+    "Lean extension registration, imported class reads and generation lookup passed",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> extensionProbe())
+}

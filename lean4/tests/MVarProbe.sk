@@ -1,0 +1,310 @@
+fun mvarName(runtime: mutable LeanExecution, name: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(name))
+}
+fun mvarNat(runtime: mutable LeanExecution, n: Int): LeanValue {
+  L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(n))
+}
+fun mvarApp(
+  runtime: mutable LeanExecution,
+  f: LeanValue,
+  a: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, f, a)
+}
+fun mvarAssign(
+  runtime: mutable LeanExecution,
+  ctx: LeanValue,
+  name: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, ctx, name, value)
+}
+fun mvarOptionalData(value: LeanValue, level: Bool): JSON.Value {
+  if (leanTag(value) == "[\"Option\",\"none\"]") return JSON.Null();
+  expr = leanField(value, 0);
+  bits = if (!level) leanExprData(expr) else if (
+    leanTag(expr) == "[\"Lean\",\"Level\",\"zero\",\"_impl\"]"
+  ) 2221 else {
+    leanWordBits(leanField(expr, 0))
+  };
+  JSON.IntNumber(bits)
+}
+fun main(): void {
+  mode = read_to_end().trim();
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store};
+  aName = mvarName(runtime, "a");
+  bName = mvarName(runtime, "b");
+  uName = mvarName(runtime, "u");
+  vName = mvarName(runtime, "v");
+  x = mvarName(runtime, "x");
+  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  p = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  a = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, aName);
+  b = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, bName);
+  u = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, uName);
+  v = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, vName);
+  empty = L4_Lean_MetavarContext.f_Lean_instInhabitedMetavarContext_060bbe8809(
+    runtime,
+  );
+  if (mode == "expression-cycle") {
+    _ = leanInstantiateMVars(
+      runtime,
+      mvarAssign(runtime, empty, aName, a),
+      a,
+      false,
+    );
+    leanFail("cyclic expression assignment unexpectedly accepted")
+  };
+  if (mode == "universe-cycle") {
+    ctx = L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+      runtime,
+      empty,
+      uName,
+      u,
+    );
+    _ = leanInstantiateMVars(runtime, ctx, u, true);
+    leanFail("cyclic universe assignment unexpectedly accepted")
+  };
+  if (mode == "delayed") {
+    ctx = L4_Lean_MetavarContext.f_Lean_assignDelayedMVar_lam_0_21c1d3cc9b(
+      runtime,
+      LeanArray(Array[]),
+      bName,
+      LeanClosure(
+        L4_Lean_Expr.apply_f_Lean_instBEqMVarId_beq_fc799f33a5,
+        2,
+        Array[],
+      ),
+      LeanClosure(
+        L4_Lean_Expr.apply_f_Lean_instHashableMVarId_hash_524addd803,
+        1,
+        Array[],
+      ),
+      aName,
+      empty,
+    );
+    _ = leanInstantiateMVars(runtime, ctx, a, false);
+    leanFail("delayed assignment unexpectedly accepted")
+  };
+  direct = mvarAssign(runtime, empty, aName, mvarNat(runtime, 3));
+  chain = mvarAssign(
+    runtime,
+    mvarAssign(runtime, empty, bName, mvarNat(runtime, 4)),
+    aName,
+    b,
+  );
+  bvar0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+  bvar1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(1));
+  defaultBinder = LeanCtor("[\"Lean\",\"BinderInfo\",\"default\"]", Array[]);
+  identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    defaultBinder,
+    p,
+    bvar0,
+  );
+  identityCtx = mvarAssign(runtime, empty, aName, identity);
+  pair = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    LeanCtor("[\"Lean\",\"BinderInfo\",\"implicit\"]", Array[]),
+    p,
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      mvarName(runtime, "y"),
+      defaultBinder,
+      p,
+      bvar1,
+    ),
+  );
+  pairCtx = mvarAssign(runtime, empty, aName, pair);
+  letCtx = mvarAssign(
+    runtime,
+    empty,
+    aName,
+    L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      runtime,
+      x,
+      p,
+      identity,
+      bvar0,
+      leanBool(false),
+    ),
+  );
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  metadata = LeanCtor(
+    "[\"List\",\"cons\"]",
+    Array[
+      LeanCtor(
+        "[\"Prod\",\"mk\"]",
+        Array[
+          mvarName(runtime, "marker"),
+          LeanCtor(
+            "[\"Lean\",\"DataValue\",\"ofNat\"]",
+            Array[leanNatValue(7)],
+          ),
+        ],
+      ),
+      nil,
+    ],
+  );
+  metadataCtx = mvarAssign(
+    runtime,
+    empty,
+    aName,
+    L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, identity),
+  );
+  universe = L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+    runtime,
+    L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+      runtime,
+      empty,
+      vName,
+      zero,
+    ),
+    uName,
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, v),
+  );
+  both = mvarAssign(
+    runtime,
+    universe,
+    aName,
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
+  );
+  cases = Array[
+    (empty, p),
+    (empty, a),
+    (direct, a),
+    (chain, a),
+    (identityCtx, mvarApp(runtime, a, mvarNat(runtime, 10))),
+    (pairCtx, mvarApp(runtime, a, bvar0)),
+    (
+      pairCtx,
+      mvarApp(
+        runtime,
+        mvarApp(runtime, a, mvarNat(runtime, 3)),
+        mvarNat(runtime, 4),
+      ),
+    ),
+    (
+      identityCtx,
+      mvarApp(
+        runtime,
+        mvarApp(runtime, a, mvarNat(runtime, 3)),
+        mvarNat(runtime, 4),
+      ),
+    ),
+    (letCtx, mvarApp(runtime, a, mvarNat(runtime, 10))),
+    (metadataCtx, mvarApp(runtime, a, mvarNat(runtime, 10))),
+    (direct, mvarApp(runtime, identity, a)),
+    (
+      universe,
+      L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+        runtime,
+        L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, u, v),
+      ),
+    ),
+    (
+      universe,
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+        runtime,
+        mvarName(runtime, "f"),
+        LeanCtor(
+          "[\"List\",\"cons\"]",
+          Array[u, LeanCtor("[\"List\",\"cons\"]", Array[v, nil])],
+        ),
+      ),
+    ),
+    (both, a),
+    (
+      direct,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        x,
+        LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
+        a,
+        mvarApp(runtime, b, a),
+      ),
+    ),
+    (
+      direct,
+      L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+        runtime,
+        x,
+        p,
+        a,
+        mvarApp(runtime, b, a),
+        leanBool(true),
+      ),
+    ),
+    (
+      direct,
+      L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+        runtime,
+        mvarName(runtime, "Pair"),
+        leanNatValue(0),
+        a,
+      ),
+    ),
+  ];
+  results = cases.map(entry -> {
+    result = L4_Lean_MetavarContext.f_Lean_instantiateExprMVarsImp_d8cff85628(
+      runtime,
+      entry.i0,
+      entry.i1,
+    );
+    ctx = leanField(result, 0);
+    JSON.Array(
+      Vector::createFromItems(
+        Array[
+          JSON.IntNumber(leanExprData(leanField(result, 1))),
+          mvarOptionalData(
+            L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(
+              runtime,
+              ctx,
+              aName,
+            ),
+            false,
+          ),
+          mvarOptionalData(
+            L4_Lean_MetavarContext.f_Lean_getLevelMVarAssignmentExp_65f9d81d1e(
+              runtime,
+              ctx,
+              uName,
+            ),
+            true,
+          ),
+        ],
+      ),
+    )
+  });
+  print_string(JSON.Array(Vector::createFromItems(results)).encode());
+  levels = Array[
+    u,
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, u),
+    L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, u, v),
+    L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, u, v),
+    L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(
+      runtime,
+      mvarName(runtime, "missing"),
+    ),
+  ];
+  print_string(
+    JSON.Array(
+      Vector::createFromItems(
+        levels.map(level -> {
+          result = L4_Lean_MetavarContext.f_Lean_instantiateLevelMVarsImp_29f9cd6589(
+            runtime,
+            universe,
+            level,
+          );
+          mvarOptionalData(
+            LeanCtor("[\"Option\",\"some\"]", Array[leanField(result, 1)]),
+            true,
+          )
+        }),
+      ),
+    ).encode(),
+  )
+}

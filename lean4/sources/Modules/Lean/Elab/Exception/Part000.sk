@@ -2,22 +2,28 @@ module L4_Lean_Elab_Exception;
 
 // "Lean.Elab.throwAbortTactic"
 fun f_Lean_Elab_throwAbortTactic_e8179ab070(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwAbortTactic_708b4e62ef(_inst_1_2)
+  f_Lean_Elab_throwAbortTactic_708b4e62ef(_runtime, _inst_1_2)
 }
 // "Lean.Elab.throwAbortCommand._redArg"
-fun f_Lean_Elab_throwAbortCommand_a0aacdb7ae(_inst_1_0: LeanValue): LeanValue {
+fun f_Lean_Elab_throwAbortCommand_a0aacdb7ae(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"MonadExcept\",\"mk\"]" ->
     _throw_1: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_2: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.abortCommandExceptionId",
+    _x_2_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.abortCommandExceptionId",
     );
     leanApply(
+      _runtime,
       _throw_1,
       Array[
         LeanErased(),
@@ -31,29 +37,38 @@ fun f_Lean_Elab_throwAbortCommand_a0aacdb7ae(_inst_1_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Elab.isAbortExceptionId"
-fun f_Lean_Elab_isAbortExceptionId_dfd1712540(_id_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.abortCommandExceptionId",
+fun f_Lean_Elab_isAbortExceptionId_dfd1712540(
+  _runtime: mutable LeanExecution,
+  _id_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.abortCommandExceptionId",
   );
   _x_2_2: LeanValue = L4_Lean_InternalExceptionId.f_Lean_instBEqInternalExceptionId_beq_e523c80edd(
+    _runtime,
     _id_0,
     _x_1_1,
   );
   leanTag(_x_2_2) match {
   | "[\"Bool\",\"false\"]" ->
-    _x_3_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.abortTermExceptionId",
+    _x_3_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.abortTermExceptionId",
     );
     _x_4_4: LeanValue = L4_Lean_InternalExceptionId.f_Lean_instBEqInternalExceptionId_beq_e523c80edd(
+      _runtime,
       _id_0,
       _x_3_3,
     );
     leanTag(_x_4_4) match {
     | "[\"Bool\",\"false\"]" ->
-      _x_5_5: LeanValue = leanFail(
-        "module initialization required: Lean.Elab.abortTacticExceptionId",
+      _x_5_5: LeanValue = leanReadInitializer(
+        _runtime,
+        "Lean.Elab.abortTacticExceptionId",
       );
       L4_Lean_InternalExceptionId.f_Lean_instBEqInternalExceptionId_beq_e523c80edd(
+        _runtime,
         _id_0,
         _x_5_5,
       )
@@ -65,21 +80,31 @@ fun f_Lean_Elab_isAbortExceptionId_dfd1712540(_id_0: LeanValue): LeanValue {
   }
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.3789179955._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_1910efd3d3(): LeanValue {
+fun f_Exception_hygCtx_hyg_1910efd3d3(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("autoBoundImplicit")
 }
 // "Lean.Elab.throwIllFormedSyntax._redArg"
 fun f_Lean_Elab_throwIllFormedSyntax_c35334dead(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
 ): LeanValue {
   _x_4_3: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
     LeanText("ill-formed syntax"),
   );
-  L4_Lean_Exception.f_Lean_throwError_d120c73bae(_inst_1_0, _inst_2_1, _x_4_3)
+  L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+    _runtime,
+    _inst_1_0,
+    _inst_2_1,
+    _x_4_3,
+  )
 }
 // "Lean.Elab.mkMessageCore"
 fun f_Lean_Elab_mkMessageCore_e0a28432bc(
+  _runtime: mutable LeanExecution,
   _fileName_0: LeanValue,
   _fileMap_1: LeanValue,
   _data_2: LeanValue,
@@ -88,10 +113,12 @@ fun f_Lean_Elab_mkMessageCore_e0a28432bc(
   _endPos_5: LeanValue,
 ): LeanValue {
   _pos_6: LeanValue = L4_Lean_Data_Position.f_Lean_FileMap_toPosition_fcf03afe13(
+    _runtime,
     _fileMap_1,
     _pos_4,
   );
   _endPos_7: LeanValue = L4_Lean_Data_Position.f_Lean_FileMap_toPosition_fcf03afe13(
+    _runtime,
     _fileMap_1,
     _endPos_5,
   );
@@ -111,28 +138,40 @@ fun f_Lean_Elab_mkMessageCore_e0a28432bc(
   )
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.3863513224._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_59d1fa752a(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_2ff8d35c75();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_59d1fa752a(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_2ff8d35c75(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.2911972506._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_57b9a80f6d(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_57b9a80f6d(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("unsupportedSyntax"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "Lean.Elab.isAutoBoundImplicitLocalException?._closed_0"
-fun f_Elab_isAutoBoundImplicitLocalException_closed_0_ad869461fc(): LeanValue {
+fun f_Elab_isAutoBoundImplicitLocalException_closed_0_ad869461fc(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("x")
 }
 // "Lean.Elab.throwUnsupportedSyntax._redArg._closed_0"
-fun f_Elab_throwUnsupportedSyntax_closed_0_3a78e1d19b(): LeanValue {
-  _x_18_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.unsupportedSyntaxExceptionId",
+fun f_Elab_throwUnsupportedSyntax_closed_0_3a78e1d19b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_18_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.unsupportedSyntaxExceptionId",
   );
   LeanCtor(
     "[\"Lean\",\"Exception\",\"internal\"]",
@@ -140,19 +179,26 @@ fun f_Elab_throwUnsupportedSyntax_closed_0_3a78e1d19b(): LeanValue {
   )
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel._redArg._closed_0"
-fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_0_5ad6e537e6(): LeanValue {
+fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_0_5ad6e537e6(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("a universe level named `")
 }
 // "Lean.Elab.throwAbortTerm._redArg"
-fun f_Lean_Elab_throwAbortTerm_f7c18c9b87(_inst_1_0: LeanValue): LeanValue {
+fun f_Lean_Elab_throwAbortTerm_f7c18c9b87(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"MonadExcept\",\"mk\"]" ->
     _throw_1: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_2: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.abortTermExceptionId",
+    _x_2_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.abortTermExceptionId",
     );
     leanApply(
+      _runtime,
       _throw_1,
       Array[
         LeanErased(),
@@ -166,9 +212,12 @@ fun f_Lean_Elab_throwAbortTerm_f7c18c9b87(_inst_1_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Elab.throwPostpone._redArg._closed_0"
-fun f_Elab_throwPostpone_closed_0_6610b934c0(): LeanValue {
-  _x_18_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.postponeExceptionId",
+fun f_Elab_throwPostpone_closed_0_6610b934c0(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_18_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.postponeExceptionId",
   );
   LeanCtor(
     "[\"Lean\",\"Exception\",\"internal\"]",
@@ -176,53 +225,76 @@ fun f_Elab_throwPostpone_closed_0_6610b934c0(): LeanValue {
   )
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel._redArg._closed_1"
-fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_1_f3952352f5(): LeanValue {
-  _x_48_0: LeanValue = f_Elab_throwAlreadyDeclaredUniverseLevel_closed_0_5ad6e537e6();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_48_0)
+fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_1_f3952352f5(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_48_0: LeanValue = f_Elab_throwAlreadyDeclaredUniverseLevel_closed_0_5ad6e537e6(
+    _runtime,
+  );
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_48_0)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.3148402294._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_be1f0cf36c(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_be1f0cf36c(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("postpone"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.3789179955._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_ed6e74aa3c(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_ed6e74aa3c(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("autoBoundImplicit"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.3103249956._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_626a966519(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_626a966519(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("abortCommandElab"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "Lean.Elab.throwAutoBoundImplicitLocal"
 fun f_Lean_Elab_throwAutoBoundImplicitLocal_d29b1478b0(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
   _n_3: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwAutoBoundImplicitLocal_9d46c8a8f0(_inst_1_2, _n_3)
+  f_Lean_Elab_throwAutoBoundImplicitLocal_9d46c8a8f0(_runtime, _inst_1_2, _n_3)
 }
 // "Lean.Elab.throwAbortTactic._redArg._closed_0"
-fun f_Elab_throwAbortTactic_closed_0_463d1ac331(): LeanValue {
-  _x_12_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.abortTacticExceptionId",
+fun f_Elab_throwAbortTactic_closed_0_463d1ac331(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_12_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.abortTacticExceptionId",
   );
   LeanCtor(
     "[\"Lean\",\"Exception\",\"internal\"]",
@@ -230,11 +302,14 @@ fun f_Elab_throwAbortTactic_closed_0_463d1ac331(): LeanValue {
   )
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.3148402294._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_8c2d3ed86c(): LeanValue {
+fun f_Exception_hygCtx_hyg_8c2d3ed86c(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("postpone")
 }
 // "Lean.Elab.throwAutoBoundImplicitLocal._redArg"
 fun f_Lean_Elab_throwAutoBoundImplicitLocal_9d46c8a8f0(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _n_1: LeanValue,
 ): LeanValue {
@@ -242,19 +317,25 @@ fun f_Lean_Elab_throwAutoBoundImplicitLocal_9d46c8a8f0(
   | "[\"MonadExceptOf\",\"mk\"]" ->
     _throw_2: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_3: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_4: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.autoBoundImplicitExceptionId",
+    _x_2_4: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.autoBoundImplicitExceptionId",
     );
-    _x_3_5: LeanValue = L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9();
+    _x_3_5: LeanValue = L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(
+      _runtime,
+    );
     _x_5_7: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      _runtime,
       LeanText("localId"),
     );
     _x_7_9: LeanValue = L4_Lean_Data_KVMap.f_Lean_KVMap_insert_23a7cf2882(
+      _runtime,
       _x_3_5,
       _x_5_7,
       LeanCtor("[\"Lean\",\"DataValue\",\"ofName\"]", Array[_n_1]),
     );
     leanApply(
+      _runtime,
       _throw_2,
       Array[
         LeanErased(),
@@ -268,51 +349,72 @@ fun f_Lean_Elab_throwAutoBoundImplicitLocal_9d46c8a8f0(
   }
 }
 // "Lean.Elab.abortCommandExceptionId"
-fun f_Lean_Elab_abortCommandExceptionId_16644bc114(): LeanValue {
-  leanPrimitive("Lean.Elab.abortCommandExceptionId []")
+fun f_Lean_Elab_abortCommandExceptionId_16644bc114(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.abortCommandExceptionId")
 }
 // "Lean.Elab.throwIllFormedSyntax"
 fun f_Lean_Elab_throwIllFormedSyntax_7c30742577(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
   _inst_2_3: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwIllFormedSyntax_c35334dead(_inst_1_2, _inst_2_3)
+  f_Lean_Elab_throwIllFormedSyntax_c35334dead(_runtime, _inst_1_2, _inst_2_3)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.2911972506._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_2827939ae3(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_11e2723f19();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_2827939ae3(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_11e2723f19(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel._redArg._closed_3"
-fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_3_f038e84c75(): LeanValue {
-  _x_51_0: LeanValue = f_Elab_throwAlreadyDeclaredUniverseLevel_closed_2_89bc4ccd01();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_51_0)
+fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_3_f038e84c75(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_51_0: LeanValue = f_Elab_throwAlreadyDeclaredUniverseLevel_closed_2_89bc4ccd01(
+    _runtime,
+  );
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_51_0)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.3789179955._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_0202291a0d(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_1910efd3d3();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_0202291a0d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_1910efd3d3(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.3863513224._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_a80b0c5c9a(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_a80b0c5c9a(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("abortTactic"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "Lean.Elab.throwAutoBoundImplicitLocal._redArg._closed_0"
-fun f_Elab_throwAutoBoundImplicitLocal_closed_0_ce5db8ef79(): LeanValue {
+fun f_Elab_throwAutoBoundImplicitLocal_closed_0_ce5db8ef79(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("localId")
 }
 // "Lean.Elab.throwAbortCommand._redArg._closed_0"
-fun f_Elab_throwAbortCommand_closed_0_8457aaa8bb(): LeanValue {
-  _x_12_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.abortCommandExceptionId",
+fun f_Elab_throwAbortCommand_closed_0_8457aaa8bb(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_12_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.abortCommandExceptionId",
   );
   LeanCtor(
     "[\"Lean\",\"Exception\",\"internal\"]",
@@ -321,27 +423,37 @@ fun f_Elab_throwAbortCommand_closed_0_8457aaa8bb(): LeanValue {
 }
 // "Lean.Elab.throwAbortTerm"
 fun f_Lean_Elab_throwAbortTerm_2f2a96ad05(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwAbortTerm_f7c18c9b87(_inst_1_2)
+  f_Lean_Elab_throwAbortTerm_f7c18c9b87(_runtime, _inst_1_2)
 }
 // "Lean.Elab.throwIllFormedSyntax._redArg._closed_1"
-fun f_Elab_throwIllFormedSyntax_closed_1_156abeee2c(): LeanValue {
-  _x_16_0: LeanValue = f_Elab_throwIllFormedSyntax_closed_0_b9166a8272();
-  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_x_16_0)
+fun f_Elab_throwIllFormedSyntax_closed_1_156abeee2c(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_16_0: LeanValue = f_Elab_throwIllFormedSyntax_closed_0_b9166a8272(
+    _runtime,
+  );
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, _x_16_0)
 }
 // "Lean.Elab.throwPostpone._redArg"
-fun f_Lean_Elab_throwPostpone_16f1208e3e(_inst_1_0: LeanValue): LeanValue {
+fun f_Lean_Elab_throwPostpone_16f1208e3e(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"MonadExceptOf\",\"mk\"]" ->
     _throw_1: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_2: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.postponeExceptionId",
+    _x_2_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.postponeExceptionId",
     );
     leanApply(
+      _runtime,
       _throw_1,
       Array[
         LeanErased(),
@@ -355,21 +467,26 @@ fun f_Lean_Elab_throwPostpone_16f1208e3e(_inst_1_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Elab.throwIllFormedSyntax._redArg._closed_0"
-fun f_Elab_throwIllFormedSyntax_closed_0_b9166a8272(): LeanValue {
+fun f_Elab_throwIllFormedSyntax_closed_0_b9166a8272(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("ill-formed syntax")
 }
 // "Lean.Elab.isAutoBoundImplicitLocalException?"
 fun f_Lean_Elab_isAutoBoundImplicitLocalException_dddfd3f23e(
+  _runtime: mutable LeanExecution,
   _ex_0: LeanValue,
 ): LeanValue {
   leanTag(_ex_0) match {
   | "[\"Lean\",\"Exception\",\"internal\"]" ->
     _id_1_1: LeanValue = leanField(_ex_0, 0);
     _extra_2_2: LeanValue = leanField(_ex_0, 1);
-    _x_3_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.autoBoundImplicitExceptionId",
+    _x_3_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.autoBoundImplicitExceptionId",
     );
     _x_4_4: LeanValue = L4_Lean_InternalExceptionId.f_Lean_instBEqInternalExceptionId_beq_e523c80edd(
+      _runtime,
       _id_1_1,
       _x_3_3,
     );
@@ -377,12 +494,15 @@ fun f_Lean_Elab_isAutoBoundImplicitLocalException_dddfd3f23e(
     | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
     | "[\"Bool\",\"true\"]" ->
       _x_7_7: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        _runtime,
         LeanText("localId"),
       );
       _x_9_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        _runtime,
         LeanText("x"),
       );
       _x_10_10: LeanValue = L4_Lean_Data_KVMap.f_Lean_KVMap_getName_7db76fc55e(
+        _runtime,
         _extra_2_2,
         _x_7_7,
         _x_9_9,
@@ -394,26 +514,33 @@ fun f_Lean_Elab_isAutoBoundImplicitLocalException_dddfd3f23e(
   }
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.125629251._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_d57f789feb(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_a015f0fcfa();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_d57f789feb(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_a015f0fcfa(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "Lean.Elab.abortTermExceptionId"
-fun f_Lean_Elab_abortTermExceptionId_b8ff7e6d19(): LeanValue {
-  leanPrimitive("Lean.Elab.abortTermExceptionId []")
+fun f_Lean_Elab_abortTermExceptionId_b8ff7e6d19(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.abortTermExceptionId")
 }
 // "Lean.Elab.throwUnsupportedSyntax._redArg"
 fun f_Lean_Elab_throwUnsupportedSyntax_b4aee22286(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"MonadExceptOf\",\"mk\"]" ->
     _throw_1: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_2: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.unsupportedSyntaxExceptionId",
+    _x_2_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.unsupportedSyntaxExceptionId",
     );
     leanApply(
+      _runtime,
       _throw_1,
       Array[
         LeanErased(),
@@ -428,20 +555,25 @@ fun f_Lean_Elab_throwUnsupportedSyntax_b4aee22286(
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel._redArg"
 fun f_Lean_Elab_throwAlreadyDeclaredUniverseLevel_5642521ce2(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _inst_2_1: LeanValue,
   _u_2: LeanValue,
 ): LeanValue {
   _x_4_4: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
     LeanText("a universe level named `"),
   );
   _x_5_5: LeanValue = L4_Lean_Message.f_Lean_MessageData_ofName_d42ea5e93c(
+    _runtime,
     _u_2,
   );
   _x_8_8: LeanValue = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    _runtime,
     LeanText("` has already been declared"),
   );
   L4_Lean_Exception.f_Lean_throwError_d120c73bae(
+    _runtime,
     _inst_1_0,
     _inst_2_1,
     LeanCtor(
@@ -457,15 +589,20 @@ fun f_Lean_Elab_throwAlreadyDeclaredUniverseLevel_5642521ce2(
   )
 }
 // "Lean.Elab.isAbortTacticException"
-fun f_Lean_Elab_isAbortTacticException_17697937d9(_ex_0: LeanValue): LeanValue {
+fun f_Lean_Elab_isAbortTacticException_17697937d9(
+  _runtime: mutable LeanExecution,
+  _ex_0: LeanValue,
+): LeanValue {
   leanTag(_ex_0) match {
   | "[\"Lean\",\"Exception\",\"internal\"]" ->
     _id_1_1: LeanValue = leanField(_ex_0, 0);
     _extra_2_2: LeanValue = leanField(_ex_0, 1);
-    _x_3_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.abortTacticExceptionId",
+    _x_3_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.abortTacticExceptionId",
     );
     L4_Lean_InternalExceptionId.f_Lean_instBEqInternalExceptionId_beq_e523c80edd(
+      _runtime,
       _id_1_1,
       _x_3_3,
     )
@@ -473,30 +610,40 @@ fun f_Lean_Elab_isAbortTacticException_17697937d9(_ex_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Elab.isAbortException"
-fun f_Lean_Elab_isAbortException_7de289e76b(_ex_0: LeanValue): LeanValue {
+fun f_Lean_Elab_isAbortException_7de289e76b(
+  _runtime: mutable LeanExecution,
+  _ex_0: LeanValue,
+): LeanValue {
   leanTag(_ex_0) match {
   | "[\"Lean\",\"Exception\",\"internal\"]" ->
     _id_1_1: LeanValue = leanField(_ex_0, 0);
     _extra_2_2: LeanValue = leanField(_ex_0, 1);
-    f_Lean_Elab_isAbortExceptionId_dfd1712540(_id_1_1)
+    f_Lean_Elab_isAbortExceptionId_dfd1712540(_runtime, _id_1_1)
   | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
   }
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.3148402294._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_898ece7d7d(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_8c2d3ed86c();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_898ece7d7d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_8c2d3ed86c(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "Lean.Elab.throwAbortTactic._redArg"
-fun f_Lean_Elab_throwAbortTactic_708b4e62ef(_inst_1_0: LeanValue): LeanValue {
+fun f_Lean_Elab_throwAbortTactic_708b4e62ef(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"MonadExcept\",\"mk\"]" ->
     _throw_1: LeanValue = leanField(_inst_1_0, 0);
     _tryCatch_2: LeanValue = leanField(_inst_1_0, 1);
-    _x_2_3: LeanValue = leanFail(
-      "module initialization required: Lean.Elab.abortTacticExceptionId",
+    _x_2_3: LeanValue = leanReadInitializer(
+      _runtime,
+      "Lean.Elab.abortTacticExceptionId",
     );
     leanApply(
+      _runtime,
       _throw_1,
       Array[
         LeanErased(),
@@ -510,71 +657,97 @@ fun f_Lean_Elab_throwAbortTactic_708b4e62ef(_inst_1_0: LeanValue): LeanValue {
   }
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel._redArg._closed_2"
-fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_2_89bc4ccd01(): LeanValue {
+fun f_Elab_throwAlreadyDeclaredUniverseLevel_closed_2_89bc4ccd01(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("` has already been declared")
 }
 // "Lean.Elab.throwAbortCommand"
 fun f_Lean_Elab_throwAbortCommand_47b924a9e6(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwAbortCommand_a0aacdb7ae(_inst_1_2)
+  f_Lean_Elab_throwAbortCommand_a0aacdb7ae(_runtime, _inst_1_2)
 }
 // "Lean.Elab.throwPostpone"
 fun f_Lean_Elab_throwPostpone_6e48771d59(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwPostpone_16f1208e3e(_inst_1_2)
+  f_Lean_Elab_throwPostpone_16f1208e3e(_runtime, _inst_1_2)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.2911972506._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_11e2723f19(): LeanValue {
+fun f_Exception_hygCtx_hyg_11e2723f19(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("unsupportedSyntax")
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.3863513224._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_2ff8d35c75(): LeanValue {
+fun f_Exception_hygCtx_hyg_2ff8d35c75(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("abortTactic")
 }
 // "Lean.Elab.throwAutoBoundImplicitLocal._redArg._closed_1"
-fun f_Elab_throwAutoBoundImplicitLocal_closed_1_aa0fc77bd6(): LeanValue {
-  _x_21_0: LeanValue = f_Elab_throwAutoBoundImplicitLocal_closed_0_ce5db8ef79();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_21_0)
+fun f_Elab_throwAutoBoundImplicitLocal_closed_1_aa0fc77bd6(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_21_0: LeanValue = f_Elab_throwAutoBoundImplicitLocal_closed_0_ce5db8ef79(
+    _runtime,
+  );
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_21_0)
 }
 // "Lean.Elab.throwUnsupportedSyntax"
 fun f_Lean_Elab_throwUnsupportedSyntax_ab2322a10d(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
 ): LeanValue {
-  f_Lean_Elab_throwUnsupportedSyntax_b4aee22286(_inst_1_2)
+  f_Lean_Elab_throwUnsupportedSyntax_b4aee22286(_runtime, _inst_1_2)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.125629251._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_a015f0fcfa(): LeanValue {
+fun f_Exception_hygCtx_hyg_a015f0fcfa(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("abortTermElab")
 }
 // "Lean.Elab.postponeExceptionId"
-fun f_Lean_Elab_postponeExceptionId_c0a100c248(): LeanValue {
-  leanPrimitive("Lean.Elab.postponeExceptionId []")
+fun f_Lean_Elab_postponeExceptionId_c0a100c248(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.postponeExceptionId")
 }
 // "Lean.Elab.autoBoundImplicitExceptionId"
-fun f_Lean_Elab_autoBoundImplicitExceptionId_358e82508b(): LeanValue {
-  leanPrimitive("Lean.Elab.autoBoundImplicitExceptionId []")
+fun f_Lean_Elab_autoBoundImplicitExceptionId_358e82508b(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.autoBoundImplicitExceptionId")
 }
 // "Lean.Elab.mkMessageCore._closed_0"
-fun f_Elab_mkMessageCore_closed_0_a6a44a2cfd(): LeanValue {
+fun f_Elab_mkMessageCore_closed_0_a6a44a2cfd(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("")
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_1._@.Lean.Elab.Exception.3103249956._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_d3963dddad(): LeanValue {
-  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_d543aa1f17();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_7_0)
+fun f_Exception_hygCtx_hyg_d3963dddad(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_7_0: LeanValue = f_Exception_hygCtx_hyg_d543aa1f17(_runtime);
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_7_0)
 }
 // "Lean.Elab.throwAbortTerm._redArg._closed_0"
-fun f_Elab_throwAbortTerm_closed_0_00b747915d(): LeanValue {
-  _x_12_1: LeanValue = leanFail(
-    "module initialization required: Lean.Elab.abortTermExceptionId",
+fun f_Elab_throwAbortTerm_closed_0_00b747915d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_12_1: LeanValue = leanReadInitializer(
+    _runtime,
+    "Lean.Elab.abortTermExceptionId",
   );
   LeanCtor(
     "[\"Lean\",\"Exception\",\"internal\"]",
@@ -582,30 +755,44 @@ fun f_Elab_throwAbortTerm_closed_0_00b747915d(): LeanValue {
   )
 }
 // "Lean.Elab.unsupportedSyntaxExceptionId"
-fun f_Lean_Elab_unsupportedSyntaxExceptionId_839ced8d1a(): LeanValue {
-  leanPrimitive("Lean.Elab.unsupportedSyntaxExceptionId []")
+fun f_Lean_Elab_unsupportedSyntaxExceptionId_839ced8d1a(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.unsupportedSyntaxExceptionId")
 }
 // "Lean.Elab.isAutoBoundImplicitLocalException?._closed_1"
-fun f_Elab_isAutoBoundImplicitLocalException_closed_1_196b2ac328(): LeanValue {
-  _x_49_0: LeanValue = f_Elab_isAutoBoundImplicitLocalException_closed_0_ad869461fc();
-  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_x_49_0)
+fun f_Elab_isAutoBoundImplicitLocalException_closed_1_196b2ac328(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  _x_49_0: LeanValue = f_Elab_isAutoBoundImplicitLocalException_closed_0_ad869461fc(
+    _runtime,
+  );
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, _x_49_0)
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._closed_0._@.Lean.Elab.Exception.3103249956._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_d543aa1f17(): LeanValue {
+fun f_Exception_hygCtx_hyg_d543aa1f17(
+  _runtime: mutable LeanExecution,
+): LeanValue {
   LeanText("abortCommandElab")
 }
 // "_private.Lean.Elab.Exception.0.Lean.Elab.initFn._@.Lean.Elab.Exception.125629251._hygCtx._hyg.2"
-fun f_Exception_hygCtx_hyg_5118ee9d0a(_a_1_0: LeanValue): LeanValue {
+fun f_Exception_hygCtx_hyg_5118ee9d0a(
+  _runtime: mutable LeanExecution,
+  _a_1_0: LeanValue,
+): LeanValue {
   _x_3_2: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
     LeanText("abortTermElab"),
   );
   L4_Lean_InternalExceptionId.f_Lean_registerInternalExceptionId_044e5b2d16(
+    _runtime,
     _x_3_2,
     _a_1_0,
   )
 }
 // "Lean.Elab.throwAlreadyDeclaredUniverseLevel"
 fun f_Lean_Elab_throwAlreadyDeclaredUniverseLevel_fbdd844d2d(
+  _runtime: mutable LeanExecution,
   _m_0: LeanValue,
   _value_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -613,14 +800,17 @@ fun f_Lean_Elab_throwAlreadyDeclaredUniverseLevel_fbdd844d2d(
   _u_4: LeanValue,
 ): LeanValue {
   f_Lean_Elab_throwAlreadyDeclaredUniverseLevel_5642521ce2(
+    _runtime,
     _inst_1_2,
     _inst_2_3,
     _u_4,
   )
 }
 // "Lean.Elab.abortTacticExceptionId"
-fun f_Lean_Elab_abortTacticExceptionId_dc8d6df13d(): LeanValue {
-  leanPrimitive("Lean.Elab.abortTacticExceptionId []")
+fun f_Lean_Elab_abortTacticExceptionId_dc8d6df13d(
+  _runtime: mutable LeanExecution,
+): LeanValue {
+  leanReadInitializer(_runtime, "Lean.Elab.abortTacticExceptionId")
 }
 
 module end;

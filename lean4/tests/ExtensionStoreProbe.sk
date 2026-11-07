@@ -1,0 +1,208 @@
+// Dependency behavior through maintained Lean extension readers. This is a
+// store-boundary test, not the theorem workload or a performance benchmark.
+class ExtensionReadWork(
+  env: LeanValue,
+  name: LeanValue,
+  kind: Int,
+) extends SKStore.File
+class ExtensionReadResult(value: LeanValue, tick: Int) extends SKStore.File
+
+fun extensionStoreProbe(): void {
+  data = leanDecodeImportData(
+    FileSystem.readTextFile("build/init-extensions.jsonl"),
+  );
+  context = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store => context};
+  leanInitializeMetaExtensions(runtime);
+  arrays = leanInstallImportedExtensions(
+    runtime,
+    "Init",
+    SKStore.DirName::create("/extensions/states/"),
+    data.extensions,
+  );
+  entries = arrays.i0 match {
+  | LeanTrackedExtensionArray(view) -> view.entries
+  | _ -> leanFail("expected tracked extension states")
+  };
+  constants = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/extensions/constants/"),
+    Array[],
+  );
+  env = leanEnvironment(
+    runtime,
+    LeanConstantsView("Init", constants),
+    LeanConstantsView("local", constants),
+    LeanUnavailable("imported environment header"),
+    arrays.i0,
+    arrays.i1,
+    true,
+    data.trackedGeneration,
+  );
+  decidable = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Decidable"),
+  );
+  missing = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("NewClass"),
+  );
+  decLt = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Nat"),
+    LeanText("decLt"),
+  );
+  inputs = context.mkdir(
+    SKStore.SID::keyType,
+    ExtensionReadWork::type,
+    SKStore.DirName::create("/extensions/queries/"),
+    Array[
+      (SKStore.SID("class"), ExtensionReadWork(env, decidable, 0)),
+      (SKStore.SID("missing"), ExtensionReadWork(env, missing, 0)),
+      (SKStore.SID("instance"), ExtensionReadWork(env, decLt, 1)),
+      (SKStore.SID("generation"), ExtensionReadWork(env, leanNatValue(0), 2)),
+    ],
+  );
+  results = inputs.map(
+    SKStore.SID::keyType,
+    ExtensionReadResult::type,
+    context,
+    SKStore.DirName::create("/extensions/results/"),
+    (context, writer, key, values) ~> {
+      invocation = mutable LeanExecution{store => context};
+      leanInitializeMetaExtensions(invocation);
+      work = values.first;
+      value = work.kind match {
+      | 0 ->
+        L4_Lean_Class.f_Lean_isClass_8bc2d27716(invocation, work.env, work.name)
+      | 1 ->
+        L4_Lean_Meta_Instances.f_Lean_Meta_isInstanceCore_1066af8573(
+          invocation,
+          work.env,
+          work.name,
+        )
+      | 2 ->
+        L4_Lean_Environment.f_Lean_EnvExtension_getGenAt_ac1ff195d1(
+          invocation,
+          work.env,
+          work.name,
+        )
+      | _ -> leanFail("unknown extension probe query")
+      };
+      leanCheckPublishable(value);
+      writer.set(key, ExtensionReadResult(value, context.getTick().value))
+    },
+  );
+  context.initPre();
+  // Initial arrows run at tick 1; update advances the tick at the end of its
+  // pass. Advance once so a first edit cannot share the initial execution stamp.
+  context.update();
+  print_string("Extension store: initial queries");
+  assert(leanIsTrue(results.get(context, SKStore.SID("class")).value));
+  assert(!leanIsTrue(results.get(context, SKStore.SID("missing")).value));
+  assert(leanIsTrue(results.get(context, SKStore.SID("instance")).value));
+  assert(
+    leanNat(results.get(context, SKStore.SID("generation")).value).toInt() == 1,
+  );
+  classTick = results.get(context, SKStore.SID("class")).tick;
+  missingTick = results.get(context, SKStore.SID("missing")).tick;
+  instanceTick = results.get(context, SKStore.SID("instance")).tick;
+  generationTick = results.get(context, SKStore.SID("generation")).tick;
+  print_string("Extension store: update instance generation");
+  classImport = data.extensions.filter(entry ->
+    entry.binding == "Lean.classExtension"
+  )[0];
+  instanceImport = data.extensions.filter(entry ->
+    entry.binding == "Lean.Meta.instanceExtension"
+  )[0];
+  instanceKey = LeanExtensionKey("Init", leanNameKey(instanceImport.name));
+  entries.writeArray(
+    context,
+    instanceKey,
+    Array[LeanExtensionFile(instanceImport.state, Some(leanNatValue(2)))],
+  );
+  context.update();
+  print_string(
+    "ticks class " +
+      classTick.toString() +
+      " -> " +
+      results.get(context, SKStore.SID("class")).tick.toString() +
+      "; missing " +
+      missingTick.toString() +
+      " -> " +
+      results.get(context, SKStore.SID("missing")).tick.toString() +
+      "; instance " +
+      instanceTick.toString() +
+      " -> " +
+      results.get(context, SKStore.SID("instance")).tick.toString() +
+      "; generation " +
+      generationTick.toString() +
+      " -> " +
+      results.get(context, SKStore.SID("generation")).tick.toString(),
+  );
+  assert(results.get(context, SKStore.SID("class")).tick == classTick);
+  assert(results.get(context, SKStore.SID("missing")).tick == missingTick);
+  assert(results.get(context, SKStore.SID("instance")).tick != instanceTick);
+  assert(
+    results.get(context, SKStore.SID("generation")).tick != generationTick,
+  );
+  assert(
+    leanNat(results.get(context, SKStore.SID("generation")).value).toInt() == 2,
+  );
+  afterInstanceTick = results.get(context, SKStore.SID("instance")).tick;
+  print_string("Extension store: insert a previously missing class");
+  pair = leanField(classImport.state, 1);
+  newClass = LeanCtor(
+    "[\"Lean\",\"ClassEntry\",\"mk\"]",
+    Array[missing, LeanArray(Array[]), LeanArray(Array[])],
+  );
+  classState = L4_Lean_Class.f_Lean_ClassState_addEntry_3f7479c40a(
+    runtime,
+    leanField(pair, 1),
+    newClass,
+  );
+  addedState = leanReplaceField(
+    classImport.state,
+    1,
+    leanReplaceField(pair, 1, classState),
+  );
+  classKey = LeanExtensionKey("Init", leanNameKey(classImport.name));
+  entries.writeArray(
+    context,
+    classKey,
+    Array[LeanExtensionFile(addedState, classImport.generation)],
+  );
+  context.update();
+  assert(leanIsTrue(results.get(context, SKStore.SID("missing")).value));
+  assert(results.get(context, SKStore.SID("missing")).tick != missingTick);
+  assert(
+    results.get(context, SKStore.SID("instance")).tick == afterInstanceTick,
+  );
+  assert(leanIsTrue(results.get(context, SKStore.SID("class")).value));
+  // Restore the imported state: the newly added class becomes absent again.
+  print_string("Extension store: restore class snapshot");
+  entries.writeArray(
+    context,
+    classKey,
+    Array[LeanExtensionFile(classImport.state, classImport.generation)],
+  );
+  context.update();
+  assert(!leanIsTrue(results.get(context, SKStore.SID("missing")).value));
+  restoredTick = results.get(context, SKStore.SID("missing")).tick;
+  // A later scope cannot satisfy a miss in this command's extension snapshot.
+  entries.writeArray(
+    context,
+    LeanExtensionKey("later", classKey.name),
+    Array[LeanExtensionFile(addedState, classImport.generation)],
+  );
+  context.update();
+  assert(results.get(context, SKStore.SID("missing")).tick == restoredTick);
+  print_string(
+    "SKStore extension reads passed: unrelated reuse, generation invalidation, class insertion/removal and scope isolation",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> extensionStoreProbe())
+}

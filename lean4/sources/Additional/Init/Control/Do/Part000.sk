@@ -2,6 +2,7 @@ module L4_Init_Control_Do;
 
 // "Break.runK"
 fun f_Break_runK_bea30303c7(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _x_2: LeanValue,
@@ -10,15 +11,20 @@ fun f_Break_runK_bea30303c7(
 ): LeanValue {
   leanTag(_x_2) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_breakK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _breakK_3,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_3_5: LeanValue = leanField(_x_2, 0);
-    leanApply(_successK_4, Array[_val_3_5])
+    leanApply(_runtime, _successK_4, Array[_val_3_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "ContinueT.continue"
 fun f_ContinueT_continue_5c3ecccff9(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -35,6 +41,7 @@ fun f_ContinueT_continue_5c3ecccff9(
       _toSeqLeft_8: LeanValue = leanField(_toApplicative_3, 3);
       _toSeqRight_9: LeanValue = leanField(_toApplicative_3, 4);
       leanApply(
+        _runtime,
         _toPure_6,
         Array[LeanErased(), LeanCtor("[\"Option\",\"none\"]", Array[])],
       )
@@ -44,7 +51,10 @@ fun f_ContinueT_continue_5c3ecccff9(
   }
 }
 // "BreakT.break._redArg"
-fun f_BreakT_break_6202529688(_inst_1_0: LeanValue): LeanValue {
+fun f_BreakT_break_6202529688(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"Monad\",\"mk\"]" ->
     _toApplicative_1: LeanValue = leanField(_inst_1_0, 0);
@@ -57,6 +67,7 @@ fun f_BreakT_break_6202529688(_inst_1_0: LeanValue): LeanValue {
       _toSeqLeft_6: LeanValue = leanField(_toApplicative_1, 3);
       _toSeqRight_7: LeanValue = leanField(_toApplicative_1, 4);
       leanApply(
+        _runtime,
         _toPure_4,
         Array[LeanErased(), LeanCtor("[\"Option\",\"none\"]", Array[])],
       )
@@ -67,6 +78,7 @@ fun f_BreakT_break_6202529688(_inst_1_0: LeanValue): LeanValue {
 }
 // "BreakT.break"
 fun f_BreakT_break_318249f27f(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _inst_1_2: LeanValue,
@@ -83,6 +95,7 @@ fun f_BreakT_break_318249f27f(
       _toSeqLeft_8: LeanValue = leanField(_toApplicative_3, 3);
       _toSeqRight_9: LeanValue = leanField(_toApplicative_3, 4);
       leanApply(
+        _runtime,
         _toPure_6,
         Array[LeanErased(), LeanCtor("[\"Option\",\"none\"]", Array[])],
       )
@@ -93,21 +106,27 @@ fun f_BreakT_break_318249f27f(
 }
 // "Break.runK._redArg"
 fun f_Break_runK_6b199de3c4(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _breakK_1: LeanValue,
   _successK_2: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_breakK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _breakK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _val_3_3: LeanValue = leanField(_x_0, 0);
-    leanApply(_successK_2, Array[_val_3_3])
+    leanApply(_runtime, _successK_2, Array[_val_3_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "EarlyReturn.runK"
 fun f_EarlyReturn_runK_ae0e3c821c(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _value_2: LeanValue,
@@ -118,15 +137,16 @@ fun f_EarlyReturn_runK_ae0e3c821c(
   leanTag(_x_3) match {
   | "[\"Except\",\"error\"]" ->
     _a_1_6: LeanValue = leanField(_x_3, 0);
-    leanApply(_ret_4, Array[_a_1_6])
+    leanApply(_runtime, _ret_4, Array[_a_1_6])
   | "[\"Except\",\"ok\"]" ->
     _a_3_7: LeanValue = leanField(_x_3, 0);
-    leanApply(_pure_5, Array[_a_3_7])
+    leanApply(_runtime, _pure_5, Array[_a_3_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "Continue.runK"
 fun f_Continue_runK_76b259161a(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _value_1: LeanValue,
   _x_2: LeanValue,
@@ -135,15 +155,20 @@ fun f_Continue_runK_76b259161a(
 ): LeanValue {
   leanTag(_x_2) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_continueK_3, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _continueK_3,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _a_5: LeanValue = leanField(_x_2, 0);
-    leanApply(_successK_4, Array[_a_5])
+    leanApply(_runtime, _successK_4, Array[_a_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "EarlyReturn.runK._redArg"
 fun f_EarlyReturn_runK_2b93e32cb5(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _ret_1: LeanValue,
   _pure_2: LeanValue,
@@ -151,15 +176,16 @@ fun f_EarlyReturn_runK_2b93e32cb5(
   leanTag(_x_0) match {
   | "[\"Except\",\"error\"]" ->
     _a_1_3: LeanValue = leanField(_x_0, 0);
-    leanApply(_ret_1, Array[_a_1_3])
+    leanApply(_runtime, _ret_1, Array[_a_1_3])
   | "[\"Except\",\"ok\"]" ->
     _a_3_4: LeanValue = leanField(_x_0, 0);
-    leanApply(_pure_2, Array[_a_3_4])
+    leanApply(_runtime, _pure_2, Array[_a_3_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "EarlyReturnT.return._redArg"
 fun f_EarlyReturnT_return_e7081018c4(
+  _runtime: mutable LeanExecution,
   _inst_1_0: LeanValue,
   _r_1: LeanValue,
 ): LeanValue {
@@ -175,6 +201,7 @@ fun f_EarlyReturnT_return_e7081018c4(
       _toSeqLeft_7: LeanValue = leanField(_toApplicative_2, 3);
       _toSeqRight_8: LeanValue = leanField(_toApplicative_2, 4);
       leanApply(
+        _runtime,
         _toPure_5,
         Array[LeanErased(), LeanCtor("[\"Except\",\"error\"]", Array[_r_1])],
       )
@@ -185,6 +212,7 @@ fun f_EarlyReturnT_return_e7081018c4(
 }
 // "EarlyReturnT.return"
 fun f_EarlyReturnT_return_bd6a99ce79(
+  _runtime: mutable LeanExecution,
   _value_0: LeanValue,
   _m_1: LeanValue,
   _value_2: LeanValue,
@@ -203,6 +231,7 @@ fun f_EarlyReturnT_return_bd6a99ce79(
       _toSeqLeft_10: LeanValue = leanField(_toApplicative_5, 3);
       _toSeqRight_11: LeanValue = leanField(_toApplicative_5, 4);
       leanApply(
+        _runtime,
         _toPure_8,
         Array[LeanErased(), LeanCtor("[\"Except\",\"error\"]", Array[_r_4])],
       )
@@ -213,21 +242,29 @@ fun f_EarlyReturnT_return_bd6a99ce79(
 }
 // "Continue.runK._redArg"
 fun f_Continue_runK_e77ea56099(
+  _runtime: mutable LeanExecution,
   _x_0: LeanValue,
   _continueK_1: LeanValue,
   _successK_2: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
   | "[\"Option\",\"none\"]" ->
-    leanApply(_continueK_1, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+    leanApply(
+      _runtime,
+      _continueK_1,
+      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    )
   | "[\"Option\",\"some\"]" ->
     _a_3: LeanValue = leanField(_x_0, 0);
-    leanApply(_successK_2, Array[_a_3])
+    leanApply(_runtime, _successK_2, Array[_a_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "ContinueT.continue._redArg"
-fun f_ContinueT_continue_697815318a(_inst_1_0: LeanValue): LeanValue {
+fun f_ContinueT_continue_697815318a(
+  _runtime: mutable LeanExecution,
+  _inst_1_0: LeanValue,
+): LeanValue {
   leanTag(_inst_1_0) match {
   | "[\"Monad\",\"mk\"]" ->
     _toApplicative_1: LeanValue = leanField(_inst_1_0, 0);
@@ -240,6 +277,7 @@ fun f_ContinueT_continue_697815318a(_inst_1_0: LeanValue): LeanValue {
       _toSeqLeft_6: LeanValue = leanField(_toApplicative_1, 3);
       _toSeqRight_7: LeanValue = leanField(_toApplicative_1, 4);
       leanApply(
+        _runtime,
         _toPure_4,
         Array[LeanErased(), LeanCtor("[\"Option\",\"none\"]", Array[])],
       )

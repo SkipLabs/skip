@@ -2,17 +2,25 @@ module L4_Init_Data_String_Basic;
 
 // "String.extract"
 fun f_String_extract_f0bb3c1b49(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _b_1: LeanValue,
   _e_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.extract [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_extract_fast\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.extract",
+    "lean_string_utf8_extract_fast",
+    Array[_s_0, _b_1, _e_2],
   )
 }
 // "panic._at_.String.Slice.Pos.next!.spec_0._redArg"
-fun f_Pos_next_spec_0_986e77f51e(_msg_0: LeanValue): LeanValue {
+fun f_Pos_next_spec_0_986e77f51e(
+  _runtime: mutable LeanExecution,
+  _msg_0: LeanValue,
+): LeanValue {
   L4_Init_Prelude.f_panicCore_3292f922f8(
+    _runtime,
     LeanErased(),
     LeanScalar("nat", "0"),
     _msg_0,
@@ -20,16 +28,24 @@ fun f_Pos_next_spec_0_986e77f51e(_msg_0: LeanValue): LeanValue {
 }
 // "String.Pos.next"
 fun f_String_Pos_next_8ac80f5118(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _pos_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.next [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_next_fast\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.next",
+    "lean_string_utf8_next_fast",
+    Array[_s_0, _pos_1, _h_2],
   )
 }
 // "String.Slice.Pos.get!"
-fun f_Slice_Pos_get_734811b6ae(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
+fun f_Slice_Pos_get_734811b6ae(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _pos_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_2: LeanValue = leanField(_s_0, 0);
@@ -37,29 +53,33 @@ fun f_Slice_Pos_get_734811b6ae(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_4,
       _startInclusive_3,
     );
     _decide_2_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _pos_1,
       _x_1_6,
     );
     leanTag(_decide_2_7) match {
     | "[\"Bool\",\"false\"]" ->
       _x_3_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_3,
         _pos_1,
       );
-      f_String_decodeChar_368a7ef10a(_str_2, _x_3_8, LeanErased())
+      f_String_decodeChar_368a7ef10a(_runtime, _str_2, _x_3_8, LeanErased())
     | "[\"Bool\",\"true\"]" ->
       _x_10_15: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+        _runtime,
         LeanText("Init.Data.String.Basic"),
         LeanText("String.Slice.Pos.get!"),
         LeanScalar("nat", "1123"),
         LeanScalar("nat", "29"),
         LeanText("Cannot retrieve character at end position"),
       );
-      f_Pos_get_spec_0_fede9fabf5(_x_10_15)
+      f_Pos_get_spec_0_fede9fabf5(_runtime, _x_10_15)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -67,6 +87,7 @@ fun f_Slice_Pos_get_734811b6ae(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
 }
 // "_private.Init.Data.String.Basic.0.String.Pos.Raw.substrEq.loop"
 fun f_Raw_substrEq_loop_30dfed6ec9(
+  _runtime: mutable LeanExecution,
   _s1_0_input: LeanValue,
   _s2_1_input: LeanValue,
   _off1_2_input: LeanValue,
@@ -89,18 +110,28 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
     | 0 ->
       _frame.set(
         9,
-        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_frame[2], _frame[4]),
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, _frame[2], _frame[4]),
       );
       leanTag(_frame[9]) match {
       | "[\"Bool\",\"false\"]" ->
         _frame.set(10, LeanCtor("[\"Bool\",\"true\"]", Array[]));
         return _frame[10]
       | "[\"Bool\",\"true\"]" ->
-        _frame.set(11, f_Pos_Raw_get_09fbf9e241(_frame[0], _frame[2]));
-        _frame.set(12, f_Pos_Raw_get_09fbf9e241(_frame[1], _frame[3]));
+        _frame.set(
+          11,
+          f_Pos_Raw_get_09fbf9e241(_runtime, _frame[0], _frame[2]),
+        );
+        _frame.set(
+          12,
+          f_Pos_Raw_get_09fbf9e241(_runtime, _frame[1], _frame[3]),
+        );
         _frame.set(
           25,
-          L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_frame[11], _frame[12]),
+          L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+            _runtime,
+            _frame[11],
+            _frame[12],
+          ),
         );
         leanTag(_frame[25]) match {
         | "[\"Bool\",\"false\"]" -> return _frame[25]
@@ -108,14 +139,22 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
           _frame.set(26, LeanScalar("uint32", "127"));
           _frame.set(
             27,
-            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[11], _frame[26]),
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+              _runtime,
+              _frame[11],
+              _frame[26],
+            ),
           );
           leanTag(_frame[27]) match {
           | "[\"Bool\",\"false\"]" ->
             _frame.set(28, LeanScalar("uint32", "2047"));
             _frame.set(
               29,
-              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[11], _frame[28]),
+              L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                _runtime,
+                _frame[11],
+                _frame[28],
+              ),
             );
             leanTag(_frame[29]) match {
             | "[\"Bool\",\"false\"]" ->
@@ -123,6 +162,7 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
               _frame.set(
                 31,
                 L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+                  _runtime,
                   _frame[11],
                   _frame[30],
                 ),
@@ -163,10 +203,14 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(7, L4_Init_Prelude.f_Nat_add_86990f4822(_frame[3], _frame[6]));
+      _frame.set(
+        7,
+        L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[3], _frame[6]),
+      );
       _frame.set(
         8,
         f_Raw_substrEq_loop_30dfed6ec9(
+          _runtime,
           _frame[0],
           _frame[1],
           _frame[5],
@@ -178,26 +222,38 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
     | 2 ->
       _frame.set(
         14,
-        L4_Init_Prelude.f_Nat_add_86990f4822(_frame[2], _frame[13]),
+        L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[2], _frame[13]),
       );
       _frame.set(15, LeanScalar("uint32", "127"));
       _frame.set(
         16,
-        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[12], _frame[15]),
+        L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+          _runtime,
+          _frame[12],
+          _frame[15],
+        ),
       );
       leanTag(_frame[16]) match {
       | "[\"Bool\",\"false\"]" ->
         _frame.set(17, LeanScalar("uint32", "2047"));
         _frame.set(
           18,
-          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[12], _frame[17]),
+          L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+            _runtime,
+            _frame[12],
+            _frame[17],
+          ),
         );
         leanTag(_frame[18]) match {
         | "[\"Bool\",\"false\"]" ->
           _frame.set(19, LeanScalar("uint32", "65535"));
           _frame.set(
             20,
-            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(_frame[12], _frame[19]),
+            L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+              _runtime,
+              _frame[12],
+              _frame[19],
+            ),
           );
           leanTag(_frame[20]) match {
           | "[\"Bool\",\"false\"]" ->
@@ -244,16 +300,24 @@ fun f_Raw_substrEq_loop_30dfed6ec9(
 }
 // "String.decodeChar"
 fun f_String_decodeChar_368a7ef10a(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _byteIdx_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.decodeChar [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_get_fast\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.decodeChar",
+    "lean_string_utf8_get_fast",
+    Array[_s_0, _byteIdx_1, _h_2],
   )
 }
 // "String.Slice.Pos.next!"
-fun f_Slice_Pos_next_ac3599efdd(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
+fun f_Slice_Pos_next_ac3599efdd(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _pos_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_2: LeanValue = leanField(_s_0, 0);
@@ -261,39 +325,51 @@ fun f_Slice_Pos_next_ac3599efdd(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_4,
       _startInclusive_3,
     );
     _decide_2_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _pos_1,
       _x_1_6,
     );
     leanTag(_decide_2_7) match {
-    | "[\"Bool\",\"false\"]" -> f_Slice_Pos_next_3de0e87622(_s_0, _pos_1)
+    | "[\"Bool\",\"false\"]" ->
+      f_Slice_Pos_next_3de0e87622(_runtime, _s_0, _pos_1)
     | "[\"Bool\",\"true\"]" ->
       _x_9_14: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+        _runtime,
         LeanText("Init.Data.String.Basic"),
         LeanText("String.Slice.Pos.next!"),
         LeanScalar("nat", "1510"),
         LeanScalar("nat", "29"),
         LeanText("Cannot advance the end position"),
       );
-      f_Pos_next_spec_0_986e77f51e(_x_9_14)
+      f_Pos_next_spec_0_986e77f51e(_runtime, _x_9_14)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "panic._at_.String.Slice.Pos.get!.spec_0"
-fun f_Pos_get_spec_0_fede9fabf5(_msg_0: LeanValue): LeanValue {
+fun f_Pos_get_spec_0_fede9fabf5(
+  _runtime: mutable LeanExecution,
+  _msg_0: LeanValue,
+): LeanValue {
   L4_Init_Prelude.f_panicCore_3292f922f8(
+    _runtime,
     LeanErased(),
     LeanScalar("uint32", "65"),
     _msg_0,
   )
 }
 // "String.Slice.Pos.next?"
-fun f_Slice_Pos_next_25014d5062(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
+fun f_Slice_Pos_next_25014d5062(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _pos_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_2: LeanValue = leanField(_s_0, 0);
@@ -301,16 +377,18 @@ fun f_Slice_Pos_next_25014d5062(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_4,
       _startInclusive_3,
     );
     _decide_2_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _pos_1,
       _x_1_6,
     );
     leanTag(_decide_2_7) match {
     | "[\"Bool\",\"false\"]" ->
-      _x_3_8: LeanValue = f_Slice_Pos_next_3de0e87622(_s_0, _pos_1);
+      _x_3_8: LeanValue = f_Slice_Pos_next_3de0e87622(_runtime, _s_0, _pos_1);
       LeanCtor("[\"Option\",\"some\"]", Array[_x_3_8])
     | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -320,13 +398,24 @@ fun f_Slice_Pos_next_25014d5062(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
 }
 // "String.firstDiffPos"
 fun f_String_firstDiffPos_fbaa62323d(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
   _joined: Array<LeanValue> = {
-    _x_5_5: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_a_0);
-    _x_6_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_b_1);
-    _x_7_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_5_5, _x_6_6);
+    _x_5_5: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+      _runtime,
+      _a_0,
+    );
+    _x_6_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+      _runtime,
+      _b_1,
+    );
+    _x_7_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      _x_5_5,
+      _x_6_6,
+    );
     leanTag(_x_7_7) match {
     | "[\"Bool\",\"false\"]" -> Array[_x_6_6]
     | "[\"Bool\",\"true\"]" -> Array[_x_5_5]
@@ -335,6 +424,7 @@ fun f_String_firstDiffPos_fbaa62323d(
   };
   _y_2_2: LeanValue = _joined[0];
   f_String_firstDiffPos_loop_101dc13453(
+    _runtime,
     _a_0,
     _b_1,
     _y_2_2,
@@ -343,16 +433,21 @@ fun f_String_firstDiffPos_fbaa62323d(
 }
 // "String.Pos.Raw.extract"
 fun f_Pos_Raw_extract_3a4574e345(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
   _a_internal_hyg_3_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.extract [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_extract\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.extract",
+    "lean_string_utf8_extract",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1, _a_internal_hyg_3_2],
   )
 }
 // "String.Pos.Raw.isValidForSlice"
 fun f_Pos_Raw_isValidForSlice_7794db9816(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _p_1: LeanValue,
 ): LeanValue {
@@ -363,32 +458,42 @@ fun f_Pos_Raw_isValidForSlice_7794db9816(
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_4,
       _startInclusive_3,
     );
     _x_3_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _p_1,
       LeanScalar("nat", "1"),
     );
-    _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(_x_3_8, _x_1_6);
+    _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
+      _runtime,
+      _x_3_8,
+      _x_1_6,
+    );
     leanTag(_x_4_9) match {
     | "[\"Bool\",\"false\"]" ->
-      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_p_1, _x_1_6)
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _p_1, _x_1_6)
     | "[\"Bool\",\"true\"]" ->
       _x_6_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_3,
         _p_1,
       );
       _x_7_12: LeanValue = L4_Init_Data_String_PosRaw.f_String_getUTF8Byte_ad8da7ea50(
+        _runtime,
         _str_2,
         _x_6_11,
         LeanErased(),
       );
       _x_9_14: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+        _runtime,
         _x_7_12,
         LeanScalar("uint8", "128"),
       );
       _x_11_16: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+        _runtime,
         _x_9_14,
         LeanScalar("uint8", "0"),
       );
@@ -396,10 +501,12 @@ fun f_Pos_Raw_isValidForSlice_7794db9816(
       | "[\"Bool\",\"false\"]" ->
         _x_12_17: LeanValue = LeanScalar("uint8", "224");
         _x_13_18: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+          _runtime,
           _x_7_12,
           _x_12_17,
         );
         _x_15_20: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+          _runtime,
           _x_13_18,
           LeanScalar("uint8", "192"),
         );
@@ -407,20 +514,27 @@ fun f_Pos_Raw_isValidForSlice_7794db9816(
         | "[\"Bool\",\"false\"]" ->
           _x_16_21: LeanValue = LeanScalar("uint8", "240");
           _x_17_22: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+            _runtime,
             _x_7_12,
             _x_16_21,
           );
           _x_18_23: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+            _runtime,
             _x_17_22,
             _x_12_17,
           );
           leanTag(_x_18_23) match {
           | "[\"Bool\",\"false\"]" ->
             _x_20_25: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+              _runtime,
               _x_7_12,
               LeanScalar("uint8", "248"),
             );
-            L4_Init_Prelude.f_UInt8_decEq_926bae36a1(_x_20_25, _x_16_21)
+            L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+              _runtime,
+              _x_20_25,
+              _x_16_21,
+            )
           | "[\"Bool\",\"true\"]" -> _x_18_23
           | _ -> leanFail("non-exhaustive Lean case")
           }
@@ -437,37 +551,54 @@ fun f_Pos_Raw_isValidForSlice_7794db9816(
 }
 // "String.firstDiffPos.loop"
 fun f_String_firstDiffPos_loop_101dc13453(
+  _runtime: mutable LeanExecution,
   _a_0: LeanValue,
   _b_1: LeanValue,
   _stopPos_2: LeanValue,
   _i_3: LeanValue,
 ): LeanValue {
   _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _runtime,
     _i_3,
     LeanScalar("nat", "1"),
   );
-  _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(_x_2_5, _stopPos_2);
+  _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
+    _runtime,
+    _x_2_5,
+    _stopPos_2,
+  );
   leanTag(_x_3_6) match {
   | "[\"Bool\",\"false\"]" -> _i_3
   | "[\"Bool\",\"true\"]" ->
-    _x_4_7: LeanValue = f_Pos_Raw_get_09fbf9e241(_a_0, _i_3);
-    _x_5_8: LeanValue = f_Pos_Raw_get_09fbf9e241(_b_1, _i_3);
+    _x_4_7: LeanValue = f_Pos_Raw_get_09fbf9e241(_runtime, _a_0, _i_3);
+    _x_5_8: LeanValue = f_Pos_Raw_get_09fbf9e241(_runtime, _b_1, _i_3);
     _x_6_9: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
+      _runtime,
       _x_4_7,
       _x_5_8,
     );
     leanTag(_x_6_9) match {
     | "[\"Bool\",\"false\"]" -> _i_3
     | "[\"Bool\",\"true\"]" ->
-      _x_7_10: LeanValue = f_Pos_Raw_next_a53006f51f(_a_0, _i_3);
-      f_String_firstDiffPos_loop_101dc13453(_a_0, _b_1, _stopPos_2, _x_7_10)
+      _x_7_10: LeanValue = f_Pos_Raw_next_a53006f51f(_runtime, _a_0, _i_3);
+      f_String_firstDiffPos_loop_101dc13453(
+        _runtime,
+        _a_0,
+        _b_1,
+        _stopPos_2,
+        _x_7_10,
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "String.Slice.Pos.get?"
-fun f_Slice_Pos_get_5eec1d405e(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
+fun f_Slice_Pos_get_5eec1d405e(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _pos_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_2: LeanValue = leanField(_s_0, 0);
@@ -475,20 +606,24 @@ fun f_Slice_Pos_get_5eec1d405e(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_4,
       _startInclusive_3,
     );
     _decide_2_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
       _pos_1,
       _x_1_6,
     );
     leanTag(_decide_2_7) match {
     | "[\"Bool\",\"false\"]" ->
       _x_3_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_3,
         _pos_1,
       );
       _x_4_9: LeanValue = f_String_decodeChar_368a7ef10a(
+        _runtime,
         _str_2,
         _x_3_8,
         LeanErased(),
@@ -502,53 +637,66 @@ fun f_Slice_Pos_get_5eec1d405e(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
 }
 // "String.Slice.pos!"
 fun f_String_Slice_pos_a57f8a7a1f(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _off_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = f_Pos_Raw_isValidForSlice_7794db9816(_s_0, _off_1);
+  _x_1_2: LeanValue = f_Pos_Raw_isValidForSlice_7794db9816(
+    _runtime,
+    _s_0,
+    _off_1,
+  );
   leanTag(_x_1_2) match {
   | "[\"Bool\",\"false\"]" ->
     _x_7_8: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
       LeanText("Init.Data.String.Basic"),
       LeanText("String.Slice.pos!"),
       LeanScalar("nat", "1598"),
       LeanScalar("nat", "4"),
       LeanText("Offset is not at a valid UTF-8 character boundary"),
     );
-    f_Pos_next_spec_0_986e77f51e(_x_7_8)
+    f_Pos_next_spec_0_986e77f51e(_runtime, _x_7_8)
   | "[\"Bool\",\"true\"]" -> _off_1
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "String.Pos.Raw.atEnd"
 fun f_Pos_Raw_atEnd_fb658d32a3(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.atEnd [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_at_end\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.atEnd",
+    "lean_string_utf8_at_end",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 // "String.Slice.slice!"
 fun f_String_Slice_slice_0e3c7e55c1(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _newStart_1: LeanValue,
   _newEnd_2: LeanValue,
 ): LeanValue {
   _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
+    _runtime,
     _newStart_1,
     _newEnd_2,
   );
   leanTag(_x_1_3) match {
   | "[\"Bool\",\"false\"]" ->
     _x_7_9: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
       LeanText("Init.Data.String.Basic"),
       LeanText("String.Slice.slice!"),
       LeanScalar("nat", "1038"),
       LeanScalar("nat", "4"),
       LeanText("Starting position must be less than or equal to end position."),
     );
-    f_Slice_slice_spec_0_b57642cecb(_x_7_9)
+    f_Slice_slice_spec_0_b57642cecb(_runtime, _x_7_9)
   | "[\"Bool\",\"true\"]" ->
     leanTag(_s_0) match {
     | "[\"String\",\"Slice\",\"mk\"]" ->
@@ -557,10 +705,12 @@ fun f_String_Slice_slice_0e3c7e55c1(
       _endExclusive_13: LeanValue = leanField(_s_0, 2);
       _startInclusive_le_endExc_14: LeanValue = leanField(_s_0, 3);
       _x_9_15: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_12,
         _newStart_1,
       );
       _x_10_16: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
         _startInclusive_12,
         _newEnd_2,
       );
@@ -574,7 +724,11 @@ fun f_String_Slice_slice_0e3c7e55c1(
   }
 }
 // "String.Slice.Pos.next._redArg"
-fun f_Slice_Pos_next_3de0e87622(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
+fun f_Slice_Pos_next_3de0e87622(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _pos_1: LeanValue,
+): LeanValue {
   leanTag(_s_0) match {
   | "[\"String\",\"Slice\",\"mk\"]" ->
     _str_2: LeanValue = leanField(_s_0, 0);
@@ -582,19 +736,23 @@ fun f_Slice_Pos_next_3de0e87622(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     _endExclusive_4: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_5: LeanValue = leanField(_s_0, 3);
     _x_1_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
       _startInclusive_3,
       _pos_1,
     );
     _x_2_7: LeanValue = L4_Init_Data_String_PosRaw.f_String_getUTF8Byte_ad8da7ea50(
+      _runtime,
       _str_2,
       _x_1_6,
       LeanErased(),
     );
     _x_4_9: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+      _runtime,
       _x_2_7,
       LeanScalar("uint8", "128"),
     );
     _x_6_11: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+      _runtime,
       _x_4_9,
       LeanScalar("uint8", "0"),
     );
@@ -602,61 +760,100 @@ fun f_Slice_Pos_next_3de0e87622(_s_0: LeanValue, _pos_1: LeanValue): LeanValue {
     | "[\"Bool\",\"false\"]" ->
       _x_7_12: LeanValue = LeanScalar("uint8", "224");
       _x_8_13: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+        _runtime,
         _x_2_7,
         _x_7_12,
       );
       _x_10_15: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+        _runtime,
         _x_8_13,
         LeanScalar("uint8", "192"),
       );
       leanTag(_x_10_15) match {
       | "[\"Bool\",\"false\"]" ->
         _x_12_17: LeanValue = L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(
+          _runtime,
           _x_2_7,
           LeanScalar("uint8", "240"),
         );
         _x_13_18: LeanValue = L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
+          _runtime,
           _x_12_17,
           _x_7_12,
         );
         leanTag(_x_13_18) match {
         | "[\"Bool\",\"false\"]" ->
-          L4_Init_Prelude.f_Nat_add_86990f4822(_pos_1, LeanScalar("nat", "4"))
+          L4_Init_Prelude.f_Nat_add_86990f4822(
+            _runtime,
+            _pos_1,
+            LeanScalar("nat", "4"),
+          )
         | "[\"Bool\",\"true\"]" ->
-          L4_Init_Prelude.f_Nat_add_86990f4822(_pos_1, LeanScalar("nat", "3"))
+          L4_Init_Prelude.f_Nat_add_86990f4822(
+            _runtime,
+            _pos_1,
+            LeanScalar("nat", "3"),
+          )
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | "[\"Bool\",\"true\"]" ->
-        L4_Init_Prelude.f_Nat_add_86990f4822(_pos_1, LeanScalar("nat", "2"))
+        L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
+          _pos_1,
+          LeanScalar("nat", "2"),
+        )
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | "[\"Bool\",\"true\"]" ->
-      L4_Init_Prelude.f_Nat_add_86990f4822(_pos_1, LeanScalar("nat", "1"))
+      L4_Init_Prelude.f_Nat_add_86990f4822(
+        _runtime,
+        _pos_1,
+        LeanScalar("nat", "1"),
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
 // "String.Pos.Raw.isValid"
-fun f_Pos_Raw_isValid_a3c5e667f2(_s_0: LeanValue, _p_1: LeanValue): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.isValid [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_is_valid_pos\"}]",
+fun f_Pos_Raw_isValid_a3c5e667f2(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _p_1: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.isValid",
+    "lean_string_is_valid_pos",
+    Array[_s_0, _p_1],
   )
 }
 // "String.Pos.Raw.get"
-fun f_Pos_Raw_get_09fbf9e241(_s_0: LeanValue, _p_1: LeanValue): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.get [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_get\"}]",
+fun f_Pos_Raw_get_09fbf9e241(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _p_1: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.get",
+    "lean_string_utf8_get",
+    Array[_s_0, _p_1],
   )
 }
 // "String.slice!"
 fun f_String_slice_2f4f9110ef(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _p_1: LeanValue,
   _p_2: LeanValue,
 ): LeanValue {
-  _x_2_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_s_0);
+  _x_2_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+    _runtime,
+    _s_0,
+  );
   f_String_Slice_slice_0e3c7e55c1(
+    _runtime,
     LeanCtor(
       "[\"String\",\"Slice\",\"mk\"]",
       Array[_s_0, LeanScalar("nat", "0"), _x_2_4, LeanErased()],
@@ -666,43 +863,66 @@ fun f_String_slice_2f4f9110ef(
   )
 }
 // "ByteArray.validateUTF8"
-fun f_ByteArray_validateUTF8_6952007cc6(_b_0: LeanValue): LeanValue {
-  leanPrimitive(
-    "ByteArray.validateUTF8 [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_validate_utf8\"}]",
+fun f_ByteArray_validateUTF8_6952007cc6(
+  _runtime: mutable LeanExecution,
+  _b_0: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "ByteArray.validateUTF8",
+    "lean_string_validate_utf8",
+    Array[_b_0],
   )
 }
 // "String.Pos.Raw.get'"
 fun f_Pos_Raw_get_831aa10a7d(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _p_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.get' [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_get_fast\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.get'",
+    "lean_string_utf8_get_fast",
+    Array[_s_0, _p_1, _h_2],
   )
 }
 // "String.Pos.Raw.prev"
 fun f_Pos_Raw_prev_3fc1f1c32f(
+  _runtime: mutable LeanExecution,
   _a_internal_hyg_1_0: LeanValue,
   _a_internal_hyg_2_1: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.prev [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_prev\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.prev",
+    "lean_string_utf8_prev",
+    Array[_a_internal_hyg_1_0, _a_internal_hyg_2_1],
   )
 }
 // "String.Pos.Raw.next"
-fun f_Pos_Raw_next_a53006f51f(_s_0: LeanValue, _p_1: LeanValue): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.next [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_next\"}]",
+fun f_Pos_Raw_next_a53006f51f(
+  _runtime: mutable LeanExecution,
+  _s_0: LeanValue,
+  _p_1: LeanValue,
+): LeanValue {
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.next",
+    "lean_string_utf8_next",
+    Array[_s_0, _p_1],
   )
 }
 // "String.Slice.Pos.nextn"
 fun f_Slice_Pos_nextn_a3a6e0a2d4(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _p_1: LeanValue,
   _n_2: LeanValue,
 ): LeanValue {
   _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
     _n_2,
     LeanScalar("nat", "0"),
   );
@@ -716,33 +936,39 @@ fun f_Slice_Pos_nextn_a3a6e0a2d4(
       _endExclusive_7: LeanValue = leanField(_s_0, 2);
       _startInclusive_le_endExc_8: LeanValue = leanField(_s_0, 3);
       _x_1_9: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+        _runtime,
         _endExclusive_7,
         _startInclusive_6,
       );
       _decide_2_10: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        _runtime,
         _p_1,
         _x_1_9,
       );
       leanTag(_decide_2_10) match {
       | "[\"Bool\",\"false\"]" ->
         _n_3_12: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _n_2,
           LeanScalar("nat", "1"),
         );
         _x_4_13: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+          _runtime,
           _startInclusive_6,
           _p_1,
         );
         _x_5_14: LeanValue = f_String_Pos_next_8ac80f5118(
+          _runtime,
           _str_5,
           _x_4_13,
           LeanErased(),
         );
         _x_6_15: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+          _runtime,
           _x_5_14,
           _startInclusive_6,
         );
-        f_Slice_Pos_nextn_a3a6e0a2d4(_s_0, _x_6_15, _n_3_12)
+        f_Slice_Pos_nextn_a3a6e0a2d4(_runtime, _s_0, _x_6_15, _n_3_12)
       | "[\"Bool\",\"true\"]" -> _p_1
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -753,40 +979,79 @@ fun f_Slice_Pos_nextn_a3a6e0a2d4(
 }
 // "String.Pos.Raw.next'"
 fun f_Pos_Raw_next_d890af8af9(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _p_1: LeanValue,
   _h_2: LeanValue,
 ): LeanValue {
-  leanPrimitive(
-    "String.Pos.Raw.next' [{\"backend\": \"all\", \"kind\": \"standard\", \"symbol\": \"lean_string_utf8_next_fast\"}]",
+  leanInvokePrimitive(
+    _runtime,
+    "String.Pos.Raw.next'",
+    "lean_string_utf8_next_fast",
+    Array[_s_0, _p_1, _h_2],
   )
 }
 // "panic._at_.String.Slice.slice!.spec_0"
-fun f_Slice_slice_spec_0_b57642cecb(_msg_0: LeanValue): LeanValue {
-  _x_1_1: LeanValue = L4_Init_Data_String_Defs.f_String_instInhabitedSlice_cbc0cf417d();
-  L4_Init_Prelude.f_panicCore_3292f922f8(LeanErased(), _x_1_1, _msg_0)
+fun f_Slice_slice_spec_0_b57642cecb(
+  _runtime: mutable LeanExecution,
+  _msg_0: LeanValue,
+): LeanValue {
+  _x_1_1: LeanValue = L4_Init_Data_String_Defs.f_String_instInhabitedSlice_cbc0cf417d(
+    _runtime,
+  );
+  L4_Init_Prelude.f_panicCore_3292f922f8(_runtime, LeanErased(), _x_1_1, _msg_0)
 }
 // "String.Pos.Raw.substrEq"
 fun f_Pos_Raw_substrEq_d9afceee01(
+  _runtime: mutable LeanExecution,
   _s1_0: LeanValue,
   _pos1_1: LeanValue,
   _s2_2: LeanValue,
   _pos2_3: LeanValue,
   _sz_4: LeanValue,
 ): LeanValue {
-  _x_1_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_pos1_1, _sz_4);
-  _x_2_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_s1_0);
-  _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_1_5, _x_2_6);
+  _x_1_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+    _runtime,
+    _pos1_1,
+    _sz_4,
+  );
+  _x_2_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+    _runtime,
+    _s1_0,
+  );
+  _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
+    _x_1_5,
+    _x_2_6,
+  );
   leanTag(_x_3_7) match {
   | "[\"Bool\",\"false\"]" -> _x_3_7
   | "[\"Bool\",\"true\"]" ->
-    _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(_pos2_3, _sz_4);
-    _x_5_9: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_s2_2);
-    _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_x_4_8, _x_5_9);
+    _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
+      _pos2_3,
+      _sz_4,
+    );
+    _x_5_9: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
+      _runtime,
+      _s2_2,
+    );
+    _x_6_10: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      _x_4_8,
+      _x_5_9,
+    );
     leanTag(_x_6_10) match {
     | "[\"Bool\",\"false\"]" -> _x_6_10
     | "[\"Bool\",\"true\"]" ->
-      f_Raw_substrEq_loop_30dfed6ec9(_s1_0, _s2_2, _pos1_1, _pos2_3, _x_1_5)
+      f_Raw_substrEq_loop_30dfed6ec9(
+        _runtime,
+        _s1_0,
+        _s2_2,
+        _pos1_1,
+        _pos2_3,
+        _x_1_5,
+      )
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")

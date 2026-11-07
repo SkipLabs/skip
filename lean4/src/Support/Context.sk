@@ -1,0 +1,76 @@
+// Fixed empty-options Core context for the first synchronous execution path.
+// This does not initialize modules or create an imported environment. Heartbeat
+// limits are disabled explicitly; host cancellation is not implemented.
+fun leanCoreContext(fileName: String, source: String): LeanValue {
+  anonymous: LeanValue = LeanCtor(
+    "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+    Array[],
+  );
+  nil: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  none: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  options: LeanValue = LeanCtor(
+    "[\"_private\",\"Lean\",\"Data\",\"Options\",0,\"Lean\",\"Options\",\"mk\"]",
+    Array[
+      LeanCtor(
+        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        Array[],
+      ),
+      leanBool(false),
+    ],
+  );
+  positions = mutable Vector[leanNatValue(0)];
+  bytes = source.bytes();
+  for (i in Range(0, bytes.size())) {
+    if (bytes[i].toInt() == 10) positions.push(leanNatValue(i + 1))
+  };
+  positions.push(leanNatValue(source.bytes().size()));
+  fileMap: LeanValue = LeanCtor(
+    "[\"Lean\",\"FileMap\",\"mk\"]",
+    Array[LeanText(source), LeanArray(positions.toArray())],
+  );
+  inheritedTraceOptions: LeanValue = LeanCtor(
+    "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+    Array[
+      leanNatValue(0),
+      LeanArray(
+        Array::fill(
+          8,
+          LeanCtor(
+            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            Array[],
+          ),
+        ),
+      ),
+    ],
+  );
+  cold: LeanValue = LeanCtor(
+    "[\"Lean\",\"Core\",\"Context\",\"Cold\",\"mk\"]",
+    Array[
+      LeanText(fileName),
+      fileMap,
+      options,
+      leanNatValue(1000),
+      anonymous,
+      nil,
+      leanNatValue(0),
+      leanNatValue(0),
+      anonymous,
+      leanNatValue(1),
+      none,
+      inheritedTraceOptions,
+    ],
+  );
+  LeanCtor(
+    "[\"Lean\",\"Core\",\"Context\",\"mk\"]",
+    Array[
+      cold,
+      leanNatValue(0),
+      LeanCtor("[\"Lean\",\"Syntax\",\"missing\"]", Array[]),
+      LeanWord("uint16", 255),
+      LeanErased(),
+      leanBool(false),
+      LeanCtor("[\"Lean\",\"Core\",\"DeprecationCheck\",\"all\"]", Array[]),
+      leanBool(false),
+    ],
+  )
+}

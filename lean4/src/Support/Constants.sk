@@ -1,0 +1,97 @@
+// The scope identifies an immutable command-prefix view. Updates replace entries
+// inside that view; a later declaration must never be inserted into an earlier
+// command's scope. Imported and local maps use distinct scopes.
+class LeanConstantKey(scope: String, name: String) extends SKStore.Key
+
+class LeanConstantFile(
+  value: LeanValue,
+  moduleIndex: ?Int,
+) extends SKStore.File
+
+class LeanConstantsView(
+  scope: String,
+  entries: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+) {
+  fun lookup(
+    runtime: mutable LeanExecution,
+    name: LeanValue,
+  ): ?LeanConstantFile {
+    key = LeanConstantKey(this.scope, leanNameKey(name));
+    // Reading the empty array is intentional: a later insertion must invalidate
+    // computations that depended on this name being absent.
+    values = this.entries.getArray(runtime.store, key);
+    if (values.size() > 1) {
+      leanFail("multiple constants in one environment slot")
+    };
+    values.maybeGet(0)
+  }
+}
+
+// Length prefixes distinguish string components, numeric components and nesting.
+// Cached hashes are intentionally excluded from the semantic identity of names.
+fun leanNameKey(name: LeanValue): String {
+  leanTag(name) match {
+  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" -> "a"
+  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+    text = leanText(leanField(name, 2));
+    leanNameKey(leanField(name, 1)) +
+      "s" +
+      text.bytes().size().toString() +
+      ":" +
+      text
+  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+    leanNameKey(leanField(name, 1)) +
+      "n" +
+      leanNat(leanField(name, 2)).toString() +
+      ":"
+  | _ -> leanFail("invalid Lean Name for environment lookup")
+  }
+}
+
+fun leanLocalConstantLookup(
+  runtime: mutable LeanExecution,
+  view: LeanConstantsView,
+  name: LeanValue,
+): LeanValue {
+  view.lookup(runtime, name) match {
+  | Some(entry) -> LeanCtor("[\"Option\",\"some\"]", Array[entry.value])
+  | None() -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  }
+}
+
+fun leanImportedConstantLookup(
+  runtime: mutable LeanExecution,
+  imported: LeanValue,
+  name: LeanValue,
+  indexOnly: Bool,
+): LeanValue {
+  if (leanTag(imported) != "[\"Lean\",\"ImportedConsts\",\"mk\"]") {
+    return leanFail("invalid Lean imported constant map")
+  };
+  leanField(imported, 1) match {
+  | LeanTrackedConstants(view) ->
+    view.lookup(runtime, name) match {
+    | None() ->
+      if (indexOnly) leanNatValue(0) else {
+        LeanCtor("[\"Option\",\"none\"]", Array[])
+      }
+    | Some(entry) ->
+      index = entry.moduleIndex match {
+      | Some(index) -> index
+      | None() -> leanFail("local declaration stored in imported constants")
+      };
+      if (indexOnly) leanNatValue(index + 1) else {
+        LeanCtor(
+          "[\"Option\",\"some\"]",
+          Array[
+            LeanCtor(
+              "[\"Prod\",\"mk\"]",
+              Array[entry.value, leanNatValue(index)],
+            ),
+          ],
+        )
+      }
+    }
+  | _ -> leanFail("lookup of a native Lean imported tree is not implemented")
+  }
+}

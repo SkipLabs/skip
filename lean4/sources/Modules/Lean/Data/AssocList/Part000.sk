@@ -1,15 +1,22 @@
 module L4_Lean_Data_AssocList;
 
 // "Lean.AssocList.toList._redArg"
-fun f_Lean_AssocList_toList_032cdc137a(_as_0: LeanValue): LeanValue {
+fun f_Lean_AssocList_toList_032cdc137a(
+  _runtime: mutable LeanExecution,
+  _as_0: LeanValue,
+): LeanValue {
   _x_2_2: LeanValue = f_AssocList_toList_spec_0_26884422e9(
+    _runtime,
     LeanCtor("[\"List\",\"nil\"]", Array[]),
     _as_0,
   );
-  L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_x_2_2)
+  L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _x_2_2)
 }
 // "Lean.AssocList.isEmpty._redArg"
-fun f_Lean_AssocList_isEmpty_f36f1c193b(_x_1_0: LeanValue): LeanValue {
+fun f_Lean_AssocList_isEmpty_f36f1c193b(
+  _runtime: mutable LeanExecution,
+  _x_1_0: LeanValue,
+): LeanValue {
   leanTag(_x_1_0) match {
   | "[\"Lean\",\"AssocList\",\"nil\"]" ->
     LeanCtor("[\"Bool\",\"true\"]", Array[])
@@ -18,6 +25,7 @@ fun f_Lean_AssocList_isEmpty_f36f1c193b(_x_1_0: LeanValue): LeanValue {
 }
 // "Lean.AssocList.foldlM._at_.Lean.AssocList.toList.spec_0._redArg"
 fun f_AssocList_toList_spec_0_26884422e9(
+  _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
   _x_2_1: LeanValue,
 ): LeanValue {
@@ -28,6 +36,7 @@ fun f_AssocList_toList_spec_0_26884422e9(
     _value_4_3: LeanValue = leanField(_x_2_1, 1);
     _tail_5_4: LeanValue = leanField(_x_2_1, 2);
     f_AssocList_toList_spec_0_26884422e9(
+      _runtime,
       LeanCtor(
         "[\"List\",\"cons\"]",
         Array[
@@ -42,6 +51,7 @@ fun f_AssocList_toList_spec_0_26884422e9(
 }
 // "Lean.AssocList.mapVal._redArg"
 fun f_Lean_AssocList_mapVal_cfac015411(
+  _runtime: mutable LeanExecution,
   _f_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
@@ -52,8 +62,12 @@ fun f_Lean_AssocList_mapVal_cfac015411(
     _key_3_2: LeanValue = leanField(_x_1_1, 0);
     _value_4_3: LeanValue = leanField(_x_1_1, 1);
     _tail_5_4: LeanValue = leanField(_x_1_1, 2);
-    _x_6_6: LeanValue = leanApply(_f_0, Array[_value_4_3]);
-    _x_7_7: LeanValue = f_Lean_AssocList_mapVal_cfac015411(_f_0, _tail_5_4);
+    _x_6_6: LeanValue = leanApply(_runtime, _f_0, Array[_value_4_3]);
+    _x_7_7: LeanValue = f_Lean_AssocList_mapVal_cfac015411(
+      _runtime,
+      _f_0,
+      _tail_5_4,
+    );
     LeanCtor(
       "[\"Lean\",\"AssocList\",\"cons\"]",
       Array[_key_3_2, _x_6_6, _x_7_7],

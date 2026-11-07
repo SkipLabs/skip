@@ -1,0 +1,64 @@
+// Slots are allocated by Lean's original initializers. Store keys use stable
+// extension names instead, so native and Skip registration order may differ.
+class LeanExtensionKey(scope: String, name: String) extends SKStore.Key
+class LeanExtensionFile(
+  state: LeanValue,
+  generation: ?LeanValue,
+) extends SKStore.File
+
+class LeanExtensionArray(
+  slots: Array<LeanExtensionKey>,
+  entries: SKStore.EHandle<LeanExtensionKey, LeanExtensionFile>,
+  generations: Bool,
+) {
+  fun get(runtime: mutable LeanExecution, index: Int): LeanValue {
+    key = this.slots[index];
+    values = this.entries.getArray(runtime.store, key);
+    if (values.size() != 1) {
+      leanFail("imported extension state is unavailable: " + key.name)
+    };
+    value = values[0];
+    if (this.generations) {
+      value.generation match {
+      | Some(generation) -> generation
+      | None() ->
+        leanFail("generation requested for an untracked Lean extension")
+      }
+    } else {
+      value.state
+    }
+  }
+}
+
+fun leanValueArraySize(value: LeanValue): Int {
+  value match {
+  | LeanTrackedExtensionArray(view) -> view.slots.size()
+  | _ -> leanArray(value).size()
+  }
+}
+
+fun leanArrayRead(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+  at: LeanValue,
+  word: Bool,
+): LeanValue {
+  size = leanValueArraySize(value);
+  index = if (word) {
+    bits = leanWordBits(at);
+    if (!bits.ult(size)) leanFail("Lean Array USize index out of bounds");
+    bits
+  } else {
+    n = leanNat(at);
+    if (n >= LeanNat::fromInt(size)) {
+      leanFail(
+        "Lean Array index out of bounds (panic recovery is not implemented)",
+      )
+    };
+    n.toInt()
+  };
+  value match {
+  | LeanTrackedExtensionArray(view) -> view.get(runtime, index)
+  | _ -> leanArray(value)[index]
+  }
+}

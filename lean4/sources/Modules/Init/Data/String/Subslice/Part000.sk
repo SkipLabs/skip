@@ -2,6 +2,7 @@ module L4_Init_Data_String_Subslice;
 
 // "String.Slice.instInhabitedSubslice"
 fun f_String_Slice_instInhabitedSubslice_776f7b36ce(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
@@ -11,6 +12,7 @@ fun f_String_Slice_instInhabitedSubslice_776f7b36ce(
     _endExclusive_3: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_4: LeanValue = leanField(_s_0, 3);
     _x_1_5: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      _runtime,
       _endExclusive_3,
       _startInclusive_2,
     );
@@ -23,32 +25,39 @@ fun f_String_Slice_instInhabitedSubslice_776f7b36ce(
 }
 // "panic._at_.String.Slice.subslice!.spec_0"
 fun f_Slice_subslice_spec_0_53e36b0b4f(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _msg_1: LeanValue,
 ): LeanValue {
-  _x_1_2: LeanValue = f_String_Slice_instInhabitedSubslice_776f7b36ce(_s_0);
-  L4_Init_Prelude.f_panicCore_3292f922f8(LeanErased(), _x_1_2, _msg_1)
+  _x_1_2: LeanValue = f_String_Slice_instInhabitedSubslice_776f7b36ce(
+    _runtime,
+    _s_0,
+  );
+  L4_Init_Prelude.f_panicCore_3292f922f8(_runtime, LeanErased(), _x_1_2, _msg_1)
 }
 // "String.Slice.subslice!"
 fun f_String_Slice_subslice_cdd34a6812(
+  _runtime: mutable LeanExecution,
   _s_0: LeanValue,
   _newStart_1: LeanValue,
   _newEnd_2: LeanValue,
 ): LeanValue {
   _x_1_3: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
+    _runtime,
     _newStart_1,
     _newEnd_2,
   );
   leanTag(_x_1_3) match {
   | "[\"Bool\",\"false\"]" ->
     _x_7_9: LeanValue = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
       LeanText("Init.Data.String.Subslice"),
       LeanText("String.Slice.subslice!"),
       LeanScalar("nat", "128"),
       LeanScalar("nat", "4"),
       LeanText("Trying to construct a degenerate subslice"),
     );
-    f_Slice_subslice_spec_0_53e36b0b4f(_s_0, _x_7_9)
+    f_Slice_subslice_spec_0_53e36b0b4f(_runtime, _s_0, _x_7_9)
   | "[\"Bool\",\"true\"]" ->
     LeanCtor(
       "[\"String\",\"Slice\",\"Subslice\",\"mk\"]",

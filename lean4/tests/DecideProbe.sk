@@ -1,0 +1,176 @@
+// Bring-up probe for the existing decide elaborator on fixed input syntax.
+// This is not yet the command pipeline or the limit/noise edit benchmark.
+// The exported proof is checked separately by tools/CheckProof.lean.
+fun describeDecideValue(value: LeanValue, depth: Int): String {
+  if (depth == 0) return "...";
+  value match {
+  | LeanCtor(name, fields) ->
+    if (
+      name.contains("\"Environment\"") ||
+      name.contains("\"Context\"") ||
+      name.contains("\"MessageDataContext\"")
+    ) {
+      return name + "(...)"
+    };
+    name +
+      "(" +
+      fields.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      ")"
+  | LeanArray(values) ->
+    "array[" +
+      values.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      "]"
+  | LeanText(text) -> JSON.String(text).encode()
+  | LeanNatural(n) -> n.toString()
+  | LeanScalar(_, text) -> text
+  | LeanWord(kind, bits) -> kind + ":" + LeanNat::fromWord(bits).toString()
+  | LeanClosure(_, arity, captured) ->
+    "closure/" +
+      arity.toString() +
+      "[" +
+      captured.take(8).map(v -> describeDecideValue(v, depth - 1)).join(", ") +
+      "]"
+  | LeanReference(index) -> "ref:" + index.toString()
+  | LeanUnavailable(description) -> "unavailable:" + description
+  | _ -> "opaque"
+  }
+}
+
+fun decideProbe(): void {
+  data = leanDecodeImportData(FileSystem.readTextFile("build/init-data.jsonl"));
+  extensionData = leanDecodeImportData(
+    FileSystem.readTextFile("build/init-extensions.jsonl"),
+  );
+  store = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  leanInitializeExceptions(runtime);
+  leanInitializeOptions(runtime);
+  leanInitializeMetaExtensions(runtime);
+  extensions = leanInstallImportedExtensions(
+    runtime,
+    "Init",
+    SKStore.DirName::create("/lean/imported-meta/extensions/"),
+    extensionData.extensions,
+  );
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/lean/imported-meta/constants/"),
+    data.constants.map(entry ->
+      (
+        LeanConstantKey("Init", leanNameKey(entry.i0)),
+        LeanConstantFile(entry.i1, Some(entry.i2)),
+      )
+    ),
+  );
+  store.initPre();
+  env = leanEnvironment(
+    runtime,
+    LeanConstantsView("Init", constants),
+    LeanConstantsView("local", constants),
+    LeanUnavailable("imported environment header"),
+    extensions.i0,
+    extensions.i1,
+    true,
+    extensionData.trackedGeneration,
+  );
+  metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreContext = leanUnboundedCoreContext(runtime, "<imported-meta-probe>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, env));
+  natName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Nat"),
+  );
+  info = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    runtime,
+    env,
+    natName,
+    leanBool(false),
+  );
+  assert(leanTag(info) == "[\"Option\",\"some\"]");
+  assert(
+    leanTag(leanField(info, 0)) == "[\"Lean\",\"ConstantInfo\",\"inductInfo\"]",
+  );
+  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
+  inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    runtime,
+    nat,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    LeanErased(),
+  );
+  assert(leanTag(inferred) == "[\"EST\",\"Out\",\"ok\"]");
+  type = leanField(inferred, 0);
+  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(
+    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+  );
+  print_string("Imported environment lookup and Meta.inferType Nat passed");
+  ltName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("LT"),
+    LeanText("lt"),
+  );
+  levels = LeanCtor(
+    "[\"List\",\"cons\"]",
+    Array[LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]), nil],
+  );
+  lt = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, ltName, levels);
+  instName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("instLTNat"),
+  );
+  inst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, instName, nil);
+  // Match the elaborated `3 < 10` expression. Direct `Nat.lt 3 10` does not
+  // synthesize Decidable in the pinned Lean version; see DecideReference.lean.
+  relation = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, lt, nat),
+    inst,
+  );
+  three = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(3));
+  ten = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(10));
+  expected = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, relation, three),
+    ten,
+  );
+  tacticName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("decide"),
+  );
+  result = L4_Lean_Elab_Tactic_Decide.f_Tactic_evalDecideCore_doElab_a6b78daf66(
+    runtime,
+    tacticName,
+    expected,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    LeanErased(),
+  );
+  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+    print_error(describeDecideValue(result, 14));
+    leanFail("decide elaboration failed; raw diagnostic printed above")
+  };
+  leanCheckPublishable(leanField(result, 0));
+  FileSystem.writeTextFile(
+    "build/decide-proof.json",
+    leanProofDocument(expected, leanField(result, 0)),
+  );
+  print_string(
+    "decide produced a proof of 3 < 10 (independent kernel validation pending)",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> decideProbe())
+}
