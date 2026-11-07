@@ -18,6 +18,16 @@ If desired, a git pre-commit hook that automatically formats changed files when 
 
 Pull requests are gated by CircleCI (`.circleci/`): the required `ci/circleci: *`
 statuses run the compiler, prelude, skargo, skdb and runtime test suites.
+`.circleci/generate_config.sh` schedules only the jobs a PR's changes trigger,
+diffing the PR against its merge base with `main`.
+
+`main` runs tests again after every merge. There, the script diffs the merge
+commit against its first parent (the `main` the PR was merged into), so the
+jobs the PR triggered rerun on the merged tree, candidate toolchain included.
+That catches merge skew: a PR tested against an older `main` that breaks in
+combination with what merged since. A push to `main` that is not a merge
+commit, and the root commit, run every job. A failure on `main` doesn't block
+anything, so check the CircleCI status of your merge commit after merging.
 
 GitHub Actions (`.github/workflows/`) complements CircleCI but does not gate
 PRs. Only `actionlint`, `docs` and the docker `check-images` job run on pull

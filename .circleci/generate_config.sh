@@ -2,7 +2,23 @@
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
 
-BASE="$(git merge-base main HEAD)"
+# What to diff against. A branch or PR is compared with where it forked from
+# main. On main that would be HEAD itself and schedule nothing (#1603), so a
+# merge commit is compared with its first parent, the main it was merged into:
+# that runs the jobs the merged changes trigger, on their combination with
+# everything merged since the PR was tested. A push to main without a merge
+# commit (a direct push, a squash merge, or a rebase merge, whose several
+# commits get a single pipeline) cannot be told apart from the others, and the
+# root commit has no parent, so they are compared with the empty tree, which
+# schedules every job. The repository allows merge commits only, so that is
+# rare.
+if [ "${CIRCLE_BRANCH:-}" != main ]; then
+  BASE="$(git merge-base main HEAD)"
+elif git rev-parse --verify --quiet HEAD^2 > /dev/null; then
+  BASE="$(git rev-parse HEAD^1)"
+else
+  BASE="$(git hash-object -t tree /dev/null)"
+fi
 
 # Changes that cannot affect a build or test result must not trigger tests or
 # compilation, so every diff below excludes them: documentation (markdown
