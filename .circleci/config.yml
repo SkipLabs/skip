@@ -23,19 +23,30 @@ commands:
             github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
             github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
             ' > ~/.ssh/known_hosts
+            # CHECKOUT_KEY is unset in our jobs: unquoted, `cat` then reads (empty)
+            # stdin, whereas `cat ""` would fail.
+            # shellcheck disable=SC2086
             cat $CHECKOUT_KEY > ~/.ssh/id_rsa
-            if << parameters.with_main >> || [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
-              # PR branches need a base clone to fetch the PR ref into; with_main also pulls main for diffing.
-              git clone --single-branch --branch main "$CIRCLE_REPOSITORY_URL" .
-              if [[ "$CIRCLE_BRANCH" =~ ^pull\/* ]]; then
-                git fetch --force origin "$CIRCLE_BRANCH/head:remotes/origin/$CIRCLE_BRANCH"
-              else
-                git fetch --force origin "$CIRCLE_BRANCH:remotes/origin/$CIRCLE_BRANCH"
-              fi
-            else
-              git clone --single-branch --branch "$CIRCLE_BRANCH" "$CIRCLE_REPOSITORY_URL" .
+            # Fetch the pipeline's commit by SHA rather than through its branch,
+            # which may have moved, been force-pushed or been deleted (e.g. at
+            # merge) since the push that triggered the pipeline (#1614). GitHub
+            # serves any reachable commit by SHA, and unreachable ones until they
+            # are garbage-collected. The branch or PR ref is only a fallback.
+            if [[ "$CIRCLE_BRANCH" =~ ^pull/[0-9]+$ ]]; then ref="refs/$CIRCLE_BRANCH/head"; else ref="refs/heads/$CIRCLE_BRANCH"; fi
+            git init -q .
+            git remote add origin "$CIRCLE_REPOSITORY_URL"
+            if << parameters.with_main >>; then git fetch origin "+refs/heads/main:refs/remotes/origin/main"; fi
+            git fetch origin "$CIRCLE_SHA1" \
+              || { echo "Fetching $CIRCLE_SHA1 failed; trying $ref"; git fetch origin "+$ref:refs/remotes/origin/$CIRCLE_BRANCH"; } \
+              || true
+            if ! git cat-file -e "$CIRCLE_SHA1^{commit}" 2>/dev/null; then
+              echo "ERROR: could not fetch commit $CIRCLE_SHA1 of $CIRCLE_BRANCH, by SHA or via $ref (see the git errors above)." >&2
+              echo "If its branch was force-pushed or deleted and GitHub has since garbage-collected it, this pipeline is superseded: rerun CI on the branch's current commit instead." >&2
+              exit 1
             fi
             git checkout "$CIRCLE_SHA1" -B "$CIRCLE_BRANCH"
+            # generate_config.sh diffs against `git merge-base main HEAD`.
+            if << parameters.with_main >> && [ "$CIRCLE_BRANCH" != main ]; then git branch -f main origin/main; fi
 
 jobs:
   setup:
