@@ -172,6 +172,15 @@ class FixedDir<+K: Orderable, +T: frozen> extends
   }
 }
 
+// Whether a row's source key and output key are the same value, so that one
+// can be rebuilt from the other. Don't compare them through Key.compare: a
+// mapped collection's source and output keys can be different Key classes,
+// and a key's compare may reject other classes. A false negative only selects
+// a less compact representation.
+fun isIdentityKey(sourceKey: Key, key: Key): Bool {
+  native_eq(sourceKey, key) == 0
+}
+
 // Uniform identity-forwarding collections retain only keys and singleton files.
 class SingletonFixedDir protected {
   sourceDir: DirName,
@@ -183,14 +192,11 @@ class SingletonFixedDir protected {
     if (vec.size() == 0) return SharedSingletonFixedDir::create(vec);
     first = vec[0];
     for (row in vec) {
-      // `get` rebuilds each source from the output key, so they must be the
-      // same value. Don't compare them through Key.compare: a mapped
-      // collection's source and output keys can be different Key classes,
-      // and a key's compare may reject other classes.
+      // `get` rebuilds each source from the output key.
       if (
         row.value.size() != 1 ||
         row.source.dirName != first.source.dirName ||
-        native_eq(row.source.baseName, row.key) != 0 ||
+        !isIdentityKey(row.source.baseName, row.key) ||
         row.tag.current != first.tag.current
       ) {
         return SharedSingletonFixedDir::create(vec)
@@ -333,10 +339,10 @@ class CompactFixedDir protected {
     row: FixedRow<Key, Array<V>>,
   ): CompactRow {
     invariant(row.value.size() == 1);
-    sourceKey = if (row.source.baseName != row.key) {
-      Some(row.source.baseName)
-    } else {
+    sourceKey = if (isIdentityKey(row.source.baseName, row.key)) {
       None()
+    } else {
+      Some(row.source.baseName)
     };
 
     row.value[0] match {
@@ -710,7 +716,8 @@ private class IdentityFSMImpl(
     for ((path, info) in data) {
       if (path.dirName != dir) return FSMImpl::create(data, allowDuplicates);
       info match {
-      | MInfoSingle(key) if (key == path.baseName) -> void
+      // `get` rebuilds each forwarded key from the source key.
+      | MInfoSingle(key) if (isIdentityKey(path.baseName, key)) -> void
       | _ -> return FSMImpl::create(data, allowDuplicates)
       }
     };
