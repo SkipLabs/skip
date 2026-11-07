@@ -127,16 +127,15 @@ run() {
   expected_base=$(git -C "$ORIGIN" merge-base main "$sha" 2>/dev/null || true)
   mkdir "$WORK/project"
   local env=(CIRCLE_BRANCH="$branch" CIRCLE_SHA1="$sha" CIRCLE_TAG=
-    CIRCLE_REPOSITORY_URL="file://$ORIGIN" CHECKOUT_KEY="$WORK/key"
+    CIRCLE_REPOSITORY_URL="file://$ORIGIN" CHECKOUT_KEY=
     GIT_CONFIG_COUNT=$#)
   local i=0
   for kv in "$@"; do
     env+=("GIT_CONFIG_KEY_$i=${kv%%=*}" "GIT_CONFIG_VALUE_$i=${kv#*=}")
     i=$((i + 1))
   done
-  echo "dummy key" >"$WORK/key"
   local status=0
-  (cd "$WORK/project" && env "${env[@]}" bash -eo pipefail "$WORK/$script.sh") \
+  (cd "$WORK/project" && env "${env[@]}" bash -eo pipefail "$WORK/$script.sh" </dev/null) \
     >"$WORK/log" 2>&1 || status=$?
   local problem=""
   if [ "$expect" = gone ]; then
