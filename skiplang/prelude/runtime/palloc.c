@@ -502,6 +502,19 @@ struct file_mapping {
 };
 
 /*****************************************************************************/
+/* File locks on persistent mappings. */
+/*****************************************************************************/
+
+// A blocking flock can fail with EINTR when a signal handler installed without
+// SA_RESTART runs while waiting; retry instead of treating that as an error.
+static int sk_flock(int fd, int operation) {
+  int rv;
+  while ((rv = flock(fd, operation)) != 0 && errno == EINTR) {
+  }
+  return rv;
+}
+
+/*****************************************************************************/
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
@@ -521,7 +534,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
       perror("ERROR: could not create persistent mapping");
       exit(errno == EEXIST ? ERROR_MAPPING_EXISTS : ERROR_FILE_IO);
     }
-    if (flock(fd, LOCK_EX) != 0) {
+    if (sk_flock(fd, LOCK_EX) != 0) {
       perror("ERROR: could not lock persistent mapping");
       exit(ERROR_LOCKING);
     }
@@ -584,7 +597,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
     sk_global_lock_init();
     // Keep fd open with a shared lock until exit. A later process can acquire
     // an exclusive lock only after all users of this mapping have exited.
-    if (flock(fd, LOCK_SH) != 0) {
+    if (sk_flock(fd, LOCK_SH) != 0) {
       perror("ERROR: could not share persistent mapping lock");
       exit(ERROR_LOCKING);
     }
@@ -606,9 +619,9 @@ void sk_load_mapping(char* fileName) {
   // A mutex stored in the file can retain an owner from a previous process
   // namespace. The first user in this runtime epoch resets it under an
   // exclusive file lock. Other live users hold a shared lock until exit.
-  int first_user = flock(fd, LOCK_EX | LOCK_NB) == 0;
+  int first_user = sk_flock(fd, LOCK_EX | LOCK_NB) == 0;
   if (!first_user) {
-    if (errno != EWOULDBLOCK || flock(fd, LOCK_SH) != 0) {
+    if (errno != EWOULDBLOCK || sk_flock(fd, LOCK_SH) != 0) {
       perror("ERROR: could not lock persistent mapping");
       exit(ERROR_LOCKING);
     }
@@ -646,7 +659,7 @@ void sk_load_mapping(char* fileName) {
   pconsts = &mapping->pconsts;
   if (first_user) {
     sk_global_lock_init();
-    if (flock(fd, LOCK_SH) != 0) {
+    if (sk_flock(fd, LOCK_SH) != 0) {
       perror("ERROR: could not share persistent mapping lock");
       exit(ERROR_LOCKING);
     }
