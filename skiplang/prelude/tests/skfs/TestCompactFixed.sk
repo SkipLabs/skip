@@ -1,5 +1,78 @@
 module SKStoreTest;
 
+// Like downstream keys (e.g. skjs's FPath), compare rejects other Key classes.
+class StrictCompactKey(value: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | StrictCompactKey(value) -> this.value.compare(value)
+    | _ -> invariant_violation("StrictCompactKey compared to another Key class")
+    }
+  }
+}
+
+// A mapped collection's output keys can be of another class than its source
+// keys. Building its compact storage must not compare the two: Key's `!=`
+// dispatches to the source key's compare, which may reject other classes.
+@test
+fun testCompactFixedStrictSourceKeys(): void {
+  dir = SKStore.DirName::create("/compact-sources/");
+  rows = mutable Vector[];
+  for (i in Range(0, 10)) {
+    rows.push(
+      SKStore.FixedRow(
+        (SKStore.IID(i) : SKStore.Key),
+        Array[(SKStore.IntFile(i) : SKStore.File)],
+        SKStore.Path::create(dir, StrictCompactKey(i)),
+        SKStore.TickRange::create(SKStore.Tick(1)),
+      ),
+    );
+  };
+  compact = SKStore.CompactFixedDir::create(rows);
+  invariant(compact is SKStore.SharedSingletonFixedDir _);
+  for (i in Range(0, 10)) {
+    key = SKStore.IID(i);
+    invariant(compact.getArray(key).size() == 1);
+    invariant(
+      compact
+        .getArraySourceKey(SKStore.Path::create(dir, StrictCompactKey(i)), key)
+        .size() == 1,
+    );
+  }
+}
+
+// End to end: map StrictCompactKey-keyed input to IID-keyed outputs.
+@test
+fun testCompactFixedStrictSourceKeysMap(): void {
+  input = SKStore.DirName::create("/strict-input/");
+  output = SKStore.DirName::create("/strict-output/");
+  context = SKStore.run(context ~> {
+    source = context.mkdir(
+      StrictCompactKey::keyType,
+      SKStore.IntFile::type,
+      input,
+      Array[
+        (StrictCompactKey(0), SKStore.IntFile(10)),
+        (StrictCompactKey(1), SKStore.IntFile(11)),
+      ],
+    );
+    _ = source.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      output,
+      (_context, writer, key, values) ~> {
+        writer.set(SKStore.IID(key.value), values.first)
+      },
+    );
+  });
+  dir = context.unsafeGetEagerDir(output);
+  for (i in Range(0, 2)) {
+    files = dir.getArrayRaw(SKStore.IID(i));
+    invariant(files.size() == 1);
+    invariant(SKStore.IntFile::type(files[0]).value == 10 + i);
+  }
+}
+
 @test
 fun testCompactFixedCollections(): void {
   dir = SKStore.DirName::create("/compact/");
