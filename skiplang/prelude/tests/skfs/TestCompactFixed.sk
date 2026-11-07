@@ -73,6 +73,138 @@ fun testCompactFixedStrictSourceKeysMap(): void {
   }
 }
 
+// Two more strict key classes, so a map chain can use a distinct class at each
+// level, like skjs's FPath -> CGNode -> CGNode call graph.
+class StrictMidKey(value: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | StrictMidKey(value) -> this.value.compare(value)
+    | _ -> invariant_violation("StrictMidKey compared to another Key class")
+    }
+  }
+}
+
+class StrictOutKey(value: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | StrictOutKey(value) -> this.value.compare(value)
+    | _ -> invariant_violation("StrictOutKey compared to another Key class")
+    }
+  }
+}
+
+// Single-key forwarding stores MInfoSingle(outputKey) per source. Building the
+// source map must not compare the output key with the source key: here the
+// output key's compare is the one that rejects the source key's class.
+@test
+fun testCompactFixedStrictForwardedKeys(): void {
+  dir = SKStore.DirName::create("/strict-forwarded/");
+  deps = mutable Vector[];
+  for (i in Range(0, 10)) {
+    deps.push(
+      (
+        SKStore.Path::create(dir, StrictCompactKey(i)),
+        (SKStore.MInfoSingle(StrictMidKey(i)) : SKStore.MInfo),
+      ),
+    );
+  };
+  sourceMap = SKStore.FixedSourceMap::create(deps);
+  invariant(sourceMap.size() == 10);
+  for (i in Range(0, 10)) {
+    sourceMap.maybeGet(SKStore.Path::create(dir, StrictCompactKey(i))) match {
+    | Some(SKStore.MInfoSingle(StrictMidKey(value))) -> invariant(value == i)
+    | _ -> invariant_violation("Expected the forwarded StrictMidKey")
+    }
+  }
+}
+
+// Compact SKDB rows keep their source key only when it differs from the row
+// key. That check must not call a strict source key's compare on a RowKey.
+@test
+fun testCompactFixedStrictSourceKeysRows(): void {
+  dir = SKStore.DirName::create("/strict-rows/");
+  kinds = Array[(0, SQLParser.IASC(), SQLParser.INTEGER())];
+  rows = mutable Vector[];
+  for (i in Range(0, 10)) {
+    values = SKDB.RowValues(Array[Some(SKDB.CInt(i))], 1);
+    rows.push(
+      SKStore.FixedRow(
+        (SKDB.RowKey(values, kinds) : SKStore.Key),
+        Array[(values : SKStore.File)],
+        SKStore.Path::create(dir, StrictCompactKey(i)),
+        SKStore.TickRange::create(SKStore.Tick(1)),
+      ),
+    );
+  };
+  compact = SKStore.CompactFixedDir::create(rows);
+  invariant(compact is SKStore.CompactFixedDir _);
+  for (i in Range(0, 10)) {
+    row = compact.get(i);
+    invariant(row.value.size() == 1);
+    row.source.baseName match {
+    | StrictCompactKey(value) -> invariant(value == i)
+    | _ -> invariant_violation("Expected the StrictCompactKey source")
+    }
+  }
+}
+
+// End to end: a two-level map chain over three strict key classes, with
+// single-key forwarding at each level, then an update that rewrites both
+// levels and purges them.
+@test
+fun testCompactFixedStrictKeysMapChain(): void {
+  input = SKStore.DirName::create("/strict-chain-input/");
+  middle = SKStore.DirName::create("/strict-chain-middle/");
+  output = SKStore.DirName::create("/strict-chain-output/");
+  size = 4;
+  context = SKStore.run(context ~> {
+    source = context.mkdir(
+      StrictCompactKey::keyType,
+      SKStore.IntFile::type,
+      input,
+      Array::fillBy(size, i -> (StrictCompactKey(i), SKStore.IntFile(10 + i))),
+    );
+    mid = source.map(
+      StrictMidKey::keyType,
+      SKStore.IntFile::type,
+      context,
+      middle,
+      (_context, writer, key, values) ~> {
+        writer.set(StrictMidKey(key.value), values.first)
+      },
+    );
+    _ = mid.map(
+      StrictOutKey::keyType,
+      SKStore.IntFile::type,
+      context,
+      output,
+      (_context, writer, key, values) ~> {
+        writer.set(StrictOutKey(key.value), values.first)
+      },
+    );
+  });
+  check = (expected: Int ~> Int) -> {
+    for (i in Range(0, size)) {
+      files = getData(context, output, StrictOutKey(i));
+      invariant(files.size() == 1);
+      invariant(SKStore.IntFile::type(files[0]).value == expected(i));
+    }
+  };
+  check(i ~> 10 + i);
+  for (i in Range(0, size)) {
+    write(context, input, StrictCompactKey(i), Array[SKStore.IntFile(20 + i)]);
+    context.update();
+  };
+  check(i ~> 20 + i);
+  // Every row was rewritten, so both mapped directories are queued for
+  // purging, which rebuilds their fixed data and source maps.
+  context.purge();
+  check(i ~> 20 + i);
+  write(context, input, StrictCompactKey(0), Array[SKStore.IntFile(30)]);
+  context.update();
+  check(i ~> if (i == 0) 30 else 20 + i);
+}
+
 @test
 fun testCompactFixedCollections(): void {
   dir = SKStore.DirName::create("/compact/");
