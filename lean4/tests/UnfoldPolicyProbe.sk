@@ -1,0 +1,754 @@
+// Independent policy outcomes, lookup dispatch, and real diagnostic state updates.
+fun unfoldPolicyDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun unfoldPolicyContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun unfoldPolicyPreserved(
+  label: String,
+  before: LeanValue,
+  old: LeanValue,
+  current: LeanValue,
+): void {
+  if (
+    !rewriteProbeSameInput(before, old) ||
+    !rewriteProbeSameInput(before, current)
+  ) {
+    leanFail("unfold policy mutated input: " + label)
+  }
+}
+
+fun unfoldPolicyCheckDefault(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  config: LeanValue,
+  info: LeanValue,
+  core: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+  expected: Bool,
+): void {
+  oldConfig = rewriteProbeCopyInput(config);
+  newConfig = rewriteProbeCopyInput(config);
+  oldInfo = rewriteProbeCopyInput(info);
+  newInfo = rewriteProbeCopyInput(info);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_canUnfoldDefault_1475029161_fallback(
+        runtime,
+        oldConfig,
+        oldInfo,
+        oldCore,
+        coreStateRef,
+        world,
+      ),
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_canUnfoldDefault_1475029161(
+        runtime,
+        newConfig,
+        newInfo,
+        newCore,
+        coreStateRef,
+        world,
+      ),
+    Some(LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(expected), world])),
+  );
+  assert(leanTag(result) == LeanTag.EST_Out_ok);
+  assert(native_eq(saved.refs, after.refs) == 0);
+  unfoldPolicyPreserved(label, config, oldConfig, newConfig);
+  unfoldPolicyPreserved(label, info, oldInfo, newInfo);
+  unfoldPolicyPreserved(label, core, oldCore, newCore)
+}
+
+fun unfoldPolicyCheckLookup(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  name: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchangedRefs: Bool,
+): LeanExecutionCheckpoint {
+  oldName = rewriteProbeCopyInput(name);
+  newName = rewriteProbeCopyInput(name);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b_fallback(
+        runtime,
+        oldName,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      ),
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b(
+        runtime,
+        newName,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      )
+    ,
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("unfold policy unexpected lookup: " + label)
+  };
+  if (unchangedRefs) assert(native_eq(saved.refs, after.refs) == 0);
+  unfoldPolicyPreserved(label, name, oldName, newName);
+  unfoldPolicyPreserved(label, context, oldContext, newContext);
+  unfoldPolicyPreserved(label, core, oldCore, newCore);
+  after
+}
+
+// A supplied policy records its invocation and returns its configured decision or error.
+fun unfoldPolicyCallback(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  for (i in Range(0, 4)) {
+    assert(rewriteProbeSameInput(args[i + 1], args[i + 6]))
+  };
+  count = leanNat(runtime.readRef(args[0]));
+  runtime.writeRef(args[0], Some(leanBoxNat(count.add(LeanNat::fromInt(1)))));
+  assert(native_eq(leanField(args[5], 1), args[10]) == 0);
+  args[5]
+}
+
+fun unfoldPolicyAxiomCount(
+  runtime: mutable LeanExecution,
+  stateRef: LeanValue,
+  name: LeanValue,
+): LeanValue {
+  diagnostics = leanField(runtime.readRef(stateRef), 4);
+  L4_Lean_MetavarContext.f_MetavarContext_findUserName_spec_0_03d4ed3e50(
+    runtime,
+    leanField(diagnostics, 1),
+    name,
+  )
+}
+
+fun unfoldPolicyCheckRecording(
+  before: LeanExecutionCheckpoint,
+  after: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  name: LeanValue,
+  count: Int,
+): void {
+  oldRuntime = before.restoreRaw();
+  current = after.restoreRaw();
+  oldState = oldRuntime.readRef(state.metaStateRef);
+  newState = current.readRef(state.metaStateRef);
+  assert(
+    native_eq(
+      unfoldPolicyAxiomCount(current, state.metaStateRef, name),
+      LeanCtor(LeanTag.Option_some, Array[leanNatValue(count)]),
+    ) == 0,
+  );
+  oldDiagnostics = leanField(oldState, 4);
+  newDiagnostics = leanField(newState, 4);
+  assert(
+    rewriteProbeSameInput(
+      oldDiagnostics,
+      leanReplaceField(newDiagnostics, 1, leanField(oldDiagnostics, 1)),
+    ),
+  );
+  assert(
+    rewriteProbeSameInput(
+      oldState,
+      leanReplaceField(newState, 4, oldDiagnostics),
+    ),
+  );
+  current.writeRef(state.metaStateRef, Some(oldState));
+  assert(native_eq(before.refs, current.checkpoint().refs) == 0)
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+    none = (LeanCtor(LeanTag.Option_none, Array[]) : LeanValue);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero),
+    );
+    modes = Array[
+      ("none", LeanTag.Meta_TransparencyMode_none),
+      ("reducible", LeanTag.Meta_TransparencyMode_reducible),
+      ("instances", LeanTag.Meta_TransparencyMode_instances),
+      ("implicit", LeanTag.Meta_TransparencyMode_implicit),
+      ("default", LeanTag.Meta_TransparencyMode_default),
+      ("all", LeanTag.Meta_TransparencyMode_all),
+    ];
+    statuses = Array[
+      (
+        "reducible",
+        LeanTag.ReducibilityStatus_reducible,
+        Array[false, true, true, true, true, true],
+      ),
+      (
+        "instance",
+        LeanTag.ReducibilityStatus_instanceReducible,
+        Array[false, false, true, true, true, true],
+      ),
+      (
+        "implicit",
+        LeanTag.ReducibilityStatus_implicitReducible,
+        Array[false, false, false, true, true, true],
+      ),
+      (
+        "semireducible",
+        LeanTag.ReducibilityStatus_semireducible,
+        Array[false, false, false, false, true, true],
+      ),
+      (
+        "irreducible",
+        LeanTag.ReducibilityStatus_irreducible,
+        Array[false, false, false, false, false, true],
+      ),
+      (
+        "unset",
+        LeanTag.ReducibilityStatus_semireducible,
+        Array[false, false, false, false, true, true],
+      ),
+    ];
+    definitions = statuses.map(entry ->
+      unfoldPolicyDefinition(name("unfoldPolicy_" + entry.i0), type, prop)
+    );
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    p = name("p");
+    h = name("h");
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+    b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n1);
+    theoremName = name("unfoldPolicyTheorem");
+    theoremType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder,
+      p,
+      binder,
+      prop,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, h, binder, b0, b1),
+    );
+    theoremProof = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      p,
+      binder,
+      prop,
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(builder, h, binder, b0, b0),
+    );
+    theorem = LeanCtor(
+      LeanTag.ConstantInfo_thmInfo,
+      Array[
+        LeanCtor(
+          LeanTag.TheoremVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[theoremName, nil, theoremType],
+            ),
+            theoremProof,
+            LeanCtor(LeanTag.List_cons, Array[theoremName, nil]),
+          ],
+        ),
+      ],
+    );
+    opaqueName = name("unfoldPolicyOpaque");
+    opaque = LeanCtor(
+      LeanTag.ConstantInfo_opaqueInfo,
+      Array[
+        LeanCtor(
+          LeanTag.OpaqueVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[opaqueName, nil, type]),
+            prop,
+            leanBool(false),
+            LeanCtor(LeanTag.List_cons, Array[opaqueName, nil]),
+          ],
+        ),
+      ],
+    );
+    axiomName = name("unfoldPolicyAxiom");
+    axiom = LeanCtor(
+      LeanTag.ConstantInfo_axiomInfo,
+      Array[
+        LeanCtor(
+          LeanTag.AxiomVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[axiomName, nil, type]),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    otherAxiomName = name("unfoldPolicyOtherAxiom");
+    otherAxiom = LeanCtor(
+      LeanTag.ConstantInfo_axiomInfo,
+      Array[
+        LeanCtor(
+          LeanTag.AxiomVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[otherAxiomName, nil, type]),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    emptyName = name("UnfoldPolicyEmpty");
+    empty = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[emptyName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanCtor(LeanTag.List_cons, Array[emptyName, nil]),
+            nil,
+            LeanNatLiterals.n0,
+            leanBool(false),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    matcherName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("OfNat"),
+      LeanText("ofNat"),
+    );
+    matcher = unfoldPolicyDefinition(matcherName, type, prop);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in definitions.concat(
+      Array[theorem, opaque, axiom, otherAxiom, empty, matcher],
+    )) {
+      key = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(key), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    for (i in Range(0, 5)) {
+      definitionName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        definitions[i],
+      );
+      !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+        builder,
+        environment,
+        definitionName,
+        LeanCtor(statuses[i].i1, Array[]),
+        LeanCtor(LeanTag.AttributeKind_global, Array[]),
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      );
+      assert(
+        leanTag(
+          L4_Lean_ReducibilityAttrs.f_Lean_getReducibilityStatusCore_bb23a1ec3f(
+            builder,
+            environment,
+            definitionName,
+          ),
+        ) == statuses[i].i1,
+      )
+    };
+    state = rewriteProbeState(
+      builder,
+      environment,
+      L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder),
+      "<unfold-policy>",
+    );
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+      builder,
+      L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(builder),
+      leanField(leanField(state.coreContext, 0), 2),
+      name("diagnostics"),
+      leanBool(true),
+    );
+    diagnosticCore = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(
+      builder,
+      state.coreContext,
+      options,
+    );
+    callbackCount = builder.newRef(LeanNatLiterals.n0);
+    saved = builder.checkpoint();
+    failureRoute = Environ.varOpt("LEAN_SKIP_TEST_MATCH_PATTERN_FAILURE");
+    if (failureRoute.isSome()) {
+      assert(failureRoute == Some("old") || failureRoute == Some("new"));
+      config = leanReplaceField(
+        leanReplaceField(
+          baseConfig,
+          9,
+          LeanCtor(LeanTag.Meta_TransparencyMode_none, Array[]),
+        ),
+        19,
+        leanBool(true),
+      );
+      context = unfoldPolicyContext(builder, state.metaContext, config);
+      if (failureRoute == Some("old")) {
+        _ = L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b_fallback(
+          builder,
+          matcherName,
+          context,
+          state.metaStateRef,
+          state.coreContext,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      } else {
+        _ = L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b(
+          builder,
+          matcherName,
+          context,
+          state.metaStateRef,
+          state.coreContext,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      };
+      leanFail("expected unsupported matchPatternAttr initialization")
+    };
+    for (world in Array[LeanErased(), leanNatValue(37)]) {
+      successNone = LeanCtor(LeanTag.EST_Out_ok, Array[none, world]);
+      for (i in Range(0, statuses.size())) {
+        info = definitions[i];
+        definitionName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+          builder,
+          info,
+        );
+        for (j in Range(0, modes.size())) {
+          config = leanReplaceField(
+            baseConfig,
+            9,
+            LeanCtor(modes[j].i1, Array[]),
+          );
+          context = unfoldPolicyContext(builder, state.metaContext, config);
+          allowed = statuses[i].i2[j];
+          label = statuses[i].i0 + "/" + modes[j].i0;
+          unfoldPolicyCheckDefault(
+            label,
+            saved,
+            config,
+            info,
+            state.coreContext,
+            state.coreStateRef,
+            world,
+            allowed,
+          );
+          _after = unfoldPolicyCheckLookup(
+            label,
+            saved,
+            state,
+            definitionName,
+            context,
+            state.coreContext,
+            world,
+            LeanCtor(
+              LeanTag.EST_Out_ok,
+              Array[
+                if (allowed) LeanCtor(LeanTag.Option_some, Array[info]) else {
+                  none
+                },
+                world,
+              ],
+            ),
+            true,
+          );
+          !checks = checks + 2
+        }
+      };
+      for ((mode, expected) in Array[
+        (LeanTag.Meta_TransparencyMode_none, false),
+        (LeanTag.Meta_TransparencyMode_all, true),
+      ]) {
+        unfoldPolicyCheckDefault(
+          "unconditional transparency skips info and Core",
+          saved,
+          leanReplaceField(baseConfig, 9, LeanCtor(mode, Array[])),
+          LeanUnavailable("unused constant info"),
+          LeanUnavailable("unused Core context"),
+          LeanUnavailable("unused Core state"),
+          world,
+          expected,
+        );
+        !checks = checks + 1
+      };
+      for ((label, declName) in Array[
+        ("missing", name("unfoldPolicyMissing")),
+        ("theorem", theoremName),
+        ("opaque", opaqueName),
+        ("inductive", emptyName),
+      ]) {
+        _after = unfoldPolicyCheckLookup(
+          label + " skips policy",
+          saved,
+          state,
+          declName,
+          LeanUnavailable("unused Meta context"),
+          LeanUnavailable("unused Core context"),
+          world,
+          successNone,
+          true,
+        );
+        !checks = checks + 1
+      };
+      _off = unfoldPolicyCheckLookup(
+        "axiom diagnostics disabled",
+        saved,
+        state,
+        axiomName,
+        LeanUnavailable("unused axiom Meta context"),
+        state.coreContext,
+        world,
+        successNone,
+        true,
+      );
+      once = unfoldPolicyCheckLookup(
+        "axiom first recording",
+        saved,
+        state,
+        axiomName,
+        LeanUnavailable("unused axiom Meta context"),
+        diagnosticCore,
+        world,
+        successNone,
+        false,
+      );
+      unfoldPolicyCheckRecording(saved, once, state, axiomName, 1);
+      twice = unfoldPolicyCheckLookup(
+        "axiom repeated recording",
+        once,
+        state,
+        axiomName,
+        state.metaContext,
+        diagnosticCore,
+        world,
+        successNone,
+        false,
+      );
+      unfoldPolicyCheckRecording(once, twice, state, axiomName, 2);
+      other = unfoldPolicyCheckLookup(
+        "different axiom preserves previous count",
+        twice,
+        state,
+        otherAxiomName,
+        state.metaContext,
+        diagnosticCore,
+        world,
+        successNone,
+        false,
+      );
+      unfoldPolicyCheckRecording(twice, other, state, otherAxiomName, 1);
+      afterOther = other.restoreRaw();
+      assert(
+        native_eq(
+          unfoldPolicyAxiomCount(afterOther, state.metaStateRef, axiomName),
+          LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n2]),
+        ) == 0,
+      );
+      _disabledAfter = unfoldPolicyCheckLookup(
+        "disabled diagnostics preserves recorded counts",
+        other,
+        state,
+        axiomName,
+        state.metaContext,
+        state.coreContext,
+        world,
+        successNone,
+        true,
+      );
+      !checks = checks + 5;
+      for (atMatcher in Array[false, true]) {
+        matcherConfig = leanReplaceField(
+          leanReplaceField(
+            baseConfig,
+            9,
+            LeanCtor(
+              if (atMatcher) LeanTag.Meta_TransparencyMode_all else {
+                LeanTag.Meta_TransparencyMode_none
+              },
+              Array[],
+            ),
+          ),
+          19,
+          leanBool(atMatcher),
+        );
+        matcherContext = unfoldPolicyContext(
+          builder,
+          state.metaContext,
+          matcherConfig,
+        );
+        _matcherResult = unfoldPolicyCheckLookup(
+          "matcher mode with allowed default skips unsupported attribute",
+          saved,
+          state,
+          matcherName,
+          matcherContext,
+          state.coreContext,
+          world,
+          LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[
+              if (atMatcher) {
+                LeanCtor(LeanTag.Option_some, Array[matcher])
+              } else {
+                none
+              },
+              world,
+            ],
+          ),
+          true,
+        );
+        !checks = checks + 1;
+        for (response in Range(0, 3)) {
+          allow = response == 0;
+          config = leanReplaceField(
+            leanReplaceField(
+              baseConfig,
+              9,
+              LeanCtor(
+                if (allow) LeanTag.Meta_TransparencyMode_none else {
+                  LeanTag.Meta_TransparencyMode_all
+                },
+                Array[],
+              ),
+            ),
+            19,
+            leanBool(atMatcher),
+          );
+          info = definitions[4];
+          callbackResult = if (response == 2) {
+            LeanCtor(
+              LeanTag.EST_Out_error,
+              Array[
+                LeanCtor(
+                  LeanTag.Exception_error,
+                  Array[
+                    leanField(state.coreContext, 2),
+                    L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      builder,
+                      LeanText("unfold policy rejected"),
+                    ),
+                  ],
+                ),
+                world,
+              ],
+            )
+          } else {
+            LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(allow), world])
+          };
+          policy = LeanClosure(
+            unfoldPolicyCallback,
+            11,
+            Array[
+              callbackCount,
+              config,
+              info,
+              state.coreContext,
+              state.coreStateRef,
+              callbackResult,
+            ],
+          );
+          context = leanReplaceField(
+            unfoldPolicyContext(builder, state.metaContext, config),
+            7,
+            LeanCtor(LeanTag.Option_some, Array[policy]),
+          );
+          expected = if (response == 2) callbackResult else {
+            LeanCtor(
+              LeanTag.EST_Out_ok,
+              Array[
+                if (allow) LeanCtor(LeanTag.Option_some, Array[info]) else none,
+                world,
+              ],
+            )
+          };
+          after = unfoldPolicyCheckLookup(
+            "custom predicate priority/result " + response.toString(),
+            saved,
+            state,
+            L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+              builder,
+              info,
+            ),
+            context,
+            state.coreContext,
+            world,
+            expected,
+            false,
+          );
+          expectedRuntime = saved.restoreRaw();
+          expectedRuntime.writeRef(callbackCount, Some(LeanNatLiterals.n1));
+          assert(native_eq(expectedRuntime.checkpoint().refs, after.refs) == 0);
+          !checks = checks + 1
+        }
+      }
+    }
+  };
+  assert(checks == 364);
+  print_string("Unfolding policy passed " + checks.toString() + " cases")
+}

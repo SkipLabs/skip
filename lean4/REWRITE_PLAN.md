@@ -64,7 +64,7 @@ frozen cases. All 28 successful proofs pass the native kernel against the
 imported `Goal`; all eight broken cases produce the expected simplification
 failure and no proof. [Execution coverage](provenance/rewrite-execution-coverage.json)
 records body hashes, per-case entries, build/snapshot identities and 212 unmarked
-declarations. Reconciliation finds 185 remaining frame routines: 73 from the seed
+declarations. The initial reconciliation found 185 remaining frame routines: 73 from the seed
 and 112 newly observed, totaling 85,566 old body lines. The other observed entries
 need dispositions, not automatic rewrites. Only the wave-four cache and forward
 dependency bodies changed after the snapshot. Their focused checks do not turn
@@ -251,6 +251,27 @@ regressions pass. The [fourth audit](provenance/rewrite-batches/2026-11-09-wave-
 records hashes, preserved originals and coverage limits. The diagnostic coverage
 executable was frozen at the preceding `4e6d15791` checkpoint; its observations
 must be reconciled with these two newer routes, not attributed to these bodies.
+
+### Fifth checkpoint: two implementation owners (2026-11-09)
+
+Both peers now write code while the primary reviews, integrates and validates it.
+`DiscrTree/Basic/KeyOrder.sk` replaces boxed comparison dispatch with a host Bool
+helper; 1,808 comparisons pass, including fixed hash-order vectors and genuine
+Name collisions. `GetUnfoldableConst/Policy.sk` and `Lookup.sk` expose unfolding
+decisions and axiom diagnostic updates directly; 364 state/result/input checks
+pass. Matcher attribute initialization remains explicitly unsupported: separate
+old/new subprocess checks both exit 86 with the same missing-initializer failure.
+Allowed default policy and custom callbacks still work with matcher mode enabled.
+
+`FunInfo/DependencySort.sk` uses a private vector and explicit range stack while
+preserving the original partition order, duplicate-wrapper permutation and
+immutable publication. Its 2,478 comparisons and 70 unfolding/function-info
+regressions pass. Other array representations retain the original sorter.
+All four routines pass incremental release checking; all retained source files
+restore exactly to `b5f97b7dc`. The [fifth audit](provenance/rewrite-batches/2026-11-09-wave-05.json)
+records hashes and remaining boxed interfaces/fixture gaps. The inventory now has
+181 remaining observed frame routines (73 seed, 108 newly observed), with 16
+validated rewrites in these five waves. No new performance result is claimed.
 
 ### 1. Freeze task inputs and calibrate
 

@@ -1,0 +1,384 @@
+// Exact wrapper permutations, inclusive bounds and immutable array publication.
+fun dependencySortArray(values: Array<LeanValue>, form: Int): LeanValue {
+  if (form == 1) {
+    return LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(values).chill(),
+    )
+  };
+  if (form == 2 && !values.isEmpty()) {
+    return LeanArrayOverride(LeanArray(values), 0, values[0])
+  };
+  LeanArray(values)
+}
+
+fun dependencySortForm(value: LeanValue): Int {
+  value match {
+  | LeanArray(_) -> 0
+  | LeanPersistentArray(_) -> 1
+  | LeanArrayOverride(_, _, _) -> 2
+  | _ -> leanFail("unexpected dependency-sort array representation")
+  }
+}
+
+fun dependencySortContents(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+): LeanValue {
+  LeanArray(
+    Array::fillBy(leanValueArraySize(value), index ->
+      leanArrayRead(runtime, value, LeanWord("usize", index), true)
+    ),
+  )
+}
+
+fun checkDependencySort(
+  saved: LeanExecutionCheckpoint,
+  label: String,
+  values: Array<LeanValue>,
+  lower: LeanValue,
+  upper: LeanValue,
+  expected: Array<LeanValue>,
+  form: Int,
+): void {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldInput = dependencySortArray(values.map(rewriteProbeCopyInput), form);
+  newInput = dependencySortArray(values.map(rewriteProbeCopyInput), form);
+  erasedSize = LeanUnavailable("unused dependency-sort vector size witness");
+  oldResult = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_spec_0_7edefeebb8_fallback(
+    oldRuntime,
+    erasedSize,
+    oldInput,
+    lower,
+    upper,
+  );
+  assert(
+    rewriteProbeSameInput(
+      dependencySortContents(oldRuntime, oldInput),
+      LeanArray(values),
+    ),
+  );
+  newResult = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_spec_0_7edefeebb8(
+    newRuntime,
+    erasedSize,
+    newInput,
+    lower,
+    upper,
+  );
+  assert(
+    rewriteProbeSameInput(
+      dependencySortContents(newRuntime, newInput),
+      LeanArray(values),
+    ),
+  );
+  if (
+    !rewriteProbeSameInput(
+      dependencySortContents(oldRuntime, oldResult),
+      LeanArray(expected),
+    ) ||
+    !rewriteProbeSameInput(
+      dependencySortContents(newRuntime, newResult),
+      LeanArray(expected),
+    )
+  ) leanFail("dependency-sort values or wrapper permutation: " + label);
+  expectedForm = dependencySortForm(oldInput);
+  if (
+    expectedForm == 0 &&
+    values.size() > 128 &&
+    leanNat(lower) < leanNat(upper)
+  ) !expectedForm = 1;
+  assert(dependencySortForm(oldResult) == expectedForm);
+  assert(dependencySortForm(newResult) == expectedForm);
+  assert(native_eq(saved.refs, oldRuntime.checkpoint().refs) == 0);
+  assert(native_eq(saved.refs, newRuntime.checkpoint().refs) == 0)
+}
+
+fun checkDependencySortNoArray(
+  saved: LeanExecutionCheckpoint,
+  lower: LeanValue,
+  upper: LeanValue,
+): void {
+  unavailable = LeanUnavailable(
+    "no-op dependency sort must not inspect its array",
+  );
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_spec_0_7edefeebb8_fallback(
+    oldRuntime,
+    unavailable,
+    unavailable,
+    lower,
+    upper,
+  );
+  newResult = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_spec_0_7edefeebb8(
+    newRuntime,
+    unavailable,
+    unavailable,
+    lower,
+    upper,
+  );
+  assert(native_eq(oldResult, unavailable) == 0);
+  assert(native_eq(newResult, unavailable) == 0);
+  assert(native_eq(saved.refs, oldRuntime.checkpoint().refs) == 0);
+  assert(native_eq(saved.refs, newRuntime.checkpoint().refs) == 0)
+}
+
+fun main(): void {
+  zero = leanNatValue(0);
+  one = leanNatValue(1);
+  huge = LeanScalar("nat", "340282366920938463463374607431768211456");
+  belowHuge = leanBoxNat(
+    LeanNat::parse("340282366920938463463374607431768211455"),
+  );
+  zeroScalar = LeanScalar("nat", "0");
+  zeroPadded = LeanScalar("nat", "00");
+  zeroMorePadded = LeanScalar("nat", "000");
+  oneScalar = LeanScalar("nat", "1");
+  unused = LeanUnavailable("outside the sorted dependency range");
+  fixed: Array<(String, Array<LeanValue>, Int, Int, Array<LeanValue>)> = Array[
+    (
+      "equal wrappers rotate",
+      Array[zeroScalar, zero, zeroPadded, zeroMorePadded],
+      0,
+      3,
+      Array[zeroMorePadded, zeroScalar, zero, zeroPadded],
+    ),
+    (
+      "partition duplicate wrappers",
+      Array[oneScalar, zero, one, zeroScalar],
+      0,
+      3,
+      Array[zeroScalar, zero, oneScalar, one],
+    ),
+    (
+      "huge Nat order",
+      Array[huge, one, belowHuge, zero],
+      0,
+      3,
+      Array[zero, one, belowHuge, huge],
+    ),
+    (
+      "equal huge representations",
+      Array[huge, leanBoxNat(leanNat(huge))],
+      0,
+      1,
+      Array[leanBoxNat(leanNat(huge)), huge],
+    ),
+    (
+      "partial range does not inspect outside",
+      Array[unused, leanNatValue(2), zero, one, unused],
+      1,
+      3,
+      Array[unused, zero, one, leanNatValue(2), unused],
+    ),
+    (
+      "equal subrange rotates only inside",
+      Array[one, zeroScalar, zero, zeroPadded, one],
+      1,
+      3,
+      Array[one, zeroPadded, zeroScalar, zero, one],
+    ),
+  ];
+  count = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37)]));
+    saved = runtime.checkpoint();
+    // Exhaust all arrays of length 0..5 over three canonical Nat values.
+    for (size in Range(0, 6)) {
+      patterns = 1;
+      for (_ in Range(0, size)) !patterns = patterns * 3;
+      for (pattern in Range(0, patterns)) {
+        digits = pattern;
+        zeroCount = 0;
+        oneCount = 0;
+        input: mutable Vector<LeanValue> = mutable Vector[];
+        for (_ in Range(0, size)) {
+          digit = digits % 3;
+          input.push(leanNatValue(digit));
+          if (digit == 0) !zeroCount = zeroCount + 1;
+          if (digit == 1) !oneCount = oneCount + 1;
+          !digits = digits / 3
+        };
+        expected = Array::fillBy(size, index ->
+          leanNatValue(
+            if (index < zeroCount) 0 else if (index < zeroCount + oneCount) {
+              1
+            } else {
+              2
+            },
+          )
+        );
+        for (form in Array[0, 1, 2]) {
+          checkDependencySort(
+            saved,
+            "exhaustive small values",
+            input.toArray(),
+            zero,
+            leanNatValue(max(0, size - 1)),
+            expected,
+            form,
+          );
+          !count = count + 1
+        }
+      }
+    };
+    for ((label, input, lower, upper, expected) in fixed) {
+      for (form in Array[0, 1, 2]) {
+        checkDependencySort(
+          saved,
+          label,
+          input,
+          LeanScalar("nat", lower.toString()),
+          leanNatValue(upper),
+          expected,
+          form,
+        );
+        !count = count + 1
+      }
+    };
+    descending = Array[
+      leanNatValue(4),
+      leanNatValue(3),
+      leanNatValue(2),
+      one,
+      zero,
+    ];
+    for (lower in Range(0, 5)) {
+      for (upper in Range(0, 5)) {
+        expected = Array::fillBy(5, index ->
+          descending[
+            if (lower < upper && index >= lower && index <= upper) {
+              lower + upper - index
+            } else {
+              index
+            },
+          ]
+        );
+        for (form in Array[0, 1, 2]) {
+          checkDependencySort(
+            saved,
+            "inclusive subrange or reversed bounds",
+            descending,
+            leanNatValue(lower),
+            LeanScalar("nat", upper.toString()),
+            expected,
+            form,
+          );
+          !count = count + 1
+        }
+      }
+    };
+    for (size in Array[127, 128, 129, 160]) {
+      largeDescending = Array::fillBy(size, index -> leanNatValue(size - index - 1));
+      ascending = Array::fillBy(size, leanNatValue);
+      equal = Array::fillBy(size, index ->
+        if (index % 2 == 0) zeroScalar else zero
+      );
+      rotated = Array::fillBy(size, index ->
+        equal[if (index == 0) size - 1 else index - 1]
+      );
+      last = leanNatValue(size - 1);
+      for (form in Array[0, 1]) {
+        checkDependencySort(
+          saved,
+          "publication after largeDescending sort",
+          largeDescending,
+          zero,
+          last,
+          ascending,
+          form,
+        );
+        checkDependencySort(
+          saved,
+          "publication after already sorted range",
+          ascending,
+          zero,
+          last,
+          ascending,
+          form,
+        );
+        checkDependencySort(
+          saved,
+          "publication after equal-wrapper sort",
+          equal,
+          zero,
+          last,
+          rotated,
+          form,
+        );
+        checkDependencySort(
+          saved,
+          "no-op preserves large input representation",
+          equal,
+          last,
+          last,
+          equal,
+          form,
+        );
+        !count = count + 4
+      };
+      payloads: Array<LeanValue> = Array[oneScalar, zero, one, zeroScalar];
+      orderedPayloads: Array<LeanValue> = Array[
+        zeroScalar,
+        zero,
+        oneScalar,
+        one,
+      ];
+      sentinels = Array::fillBy(size, index ->
+        if (index >= 64 && index <= 67) payloads[index - 64] else {
+          LeanScalar("nat", (index + 1000).toString())
+        }
+      );
+      expectedSentinels = Array::fillBy(size, index ->
+        if (index >= 64 && index <= 67) orderedPayloads[index - 64] else {
+          sentinels[index]
+        }
+      );
+      for (form in Array[0, 1, 2]) {
+        checkDependencySort(
+          saved,
+          "bounded permutation preserves surrounding wrappers",
+          sentinels,
+          leanNatValue(64),
+          leanNatValue(67),
+          expectedSentinels,
+          form,
+        );
+        !count = count + 1
+      }
+    };
+    for ((lower, upper) in Array[
+      (zero, zero),
+      (one, zero),
+      (huge, huge),
+      (huge, belowHuge),
+    ]) {
+      checkDependencySortNoArray(saved, lower, upper);
+      !count = count + 1
+    };
+    for (form in Array[0, 1, 2]) {
+      checkDependencySort(
+        saved,
+        "huge no-op bounds preserve array",
+        descending,
+        huge,
+        belowHuge,
+        descending,
+        form,
+      );
+      checkDependencySort(
+        saved,
+        "past-end equal bounds do not read",
+        descending,
+        leanNatValue(5),
+        leanNatValue(5),
+        descending,
+        form,
+      );
+      !count = count + 2
+    }
+  };
+  assert(count == 2478);
+  print_string(count.toString() + " dependency sort comparisons passed")
+}

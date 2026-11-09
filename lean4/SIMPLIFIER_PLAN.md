@@ -13,13 +13,13 @@ Current provider limits take precedence: all parallel Vibe runs and a subsequent
 single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
 Codex/local work continues. Any later Vibe run is limited to one worker with
 automatic API retries disabled and a coordinator-managed cooldown.
-The first four rewrite batches are integrated and pass focused checks.
+The first five rewrite batches are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
 [rewrite-inventory.json](provenance/rewrite-inventory.json) preserves the sampled
-seed and the full observed-entry inventory. There are 185 remaining frame routines
-(73 seed and 112 newly observed); other entries need explicit dispositions, not
+seed and the full observed-entry inventory. There are 181 remaining frame routines
+(73 seed and 108 newly observed); other entries need explicit dispositions, not
 automatic conversion. The previous 5–8 working-day estimate predates this scope
 reconciliation and provider limits. Re-estimate from accepted batches under the
 two-writer allocation; the earlier 24–48 active-hour estimate was optimistic.
@@ -140,6 +140,14 @@ also pass. [Wave four](provenance/rewrite-batches/2026-11-09-wave-04.json) recor
 the retained-body audit and remaining interface/fixture limits. The separate
 coverage executable predates this batch; its observed entries identify the
 earlier body hashes, while these replacements have focused validation only.
+
+The fifth batch adds discrimination-key ordering, unfolding policy/lookup and
+private-vector dependency sorting. All 1,808 ordering, 364 policy and 2,478 sorter
+checks pass, plus 70 unfolding/function-info regressions and incremental release
+checking. The unchanged matcher-attribute initializer failure is verified in both
+old/new subprocess routes; no runtime stub was added. [Wave five](provenance/rewrite-batches/2026-11-09-wave-05.json)
+records exact retained-source restoration, hashes and remaining boxed interfaces.
+Both peer agents now implement; the primary independently reviews and integrates.
 
 The diagnostic coverage run completes the 36-case frozen matrix at depths
 0, 1, 2 and 6. It observes 1,225 function entries; 28 proofs pass the native

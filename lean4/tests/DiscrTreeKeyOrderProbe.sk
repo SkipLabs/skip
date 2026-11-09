@@ -1,0 +1,281 @@
+// Independent ordering vectors plus the retained original comparator.
+fun keyOrderNamed(
+  kind: LeanTag.Value,
+  name: LeanValue,
+  position: LeanValue,
+  arity: LeanValue,
+): LeanValue {
+  LeanCtor(
+    kind,
+    if (kind == LeanTag.Meta_DiscrTree_Key_proj) {
+      Array[name, position, arity]
+    } else {
+      Array[name, arity]
+    },
+  )
+}
+
+fun keyOrderLiteral(value: LeanValue, natural: Bool): LeanValue {
+  LeanCtor(
+    LeanTag.Meta_DiscrTree_Key_lit,
+    Array[
+      LeanCtor(
+        if (natural) LeanTag.Literal_natVal else LeanTag.Literal_strVal,
+        Array[value],
+      ),
+    ],
+  )
+}
+
+fun checkKeyOrder(
+  saved: LeanExecutionCheckpoint,
+  label: String,
+  left: LeanValue,
+  right: LeanValue,
+  expected: Bool,
+): void {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldLeft = rewriteProbeCopyInput(left);
+  oldRight = rewriteProbeCopyInput(right);
+  newLeft = rewriteProbeCopyInput(left);
+  newRight = rewriteProbeCopyInput(right);
+  oldResult = L4_Lean_Meta_DiscrTree_Basic.f_DiscrTree_Key_lt_f15791e26d_fallback(
+    oldRuntime,
+    oldLeft,
+    oldRight,
+  );
+  assert(rewriteProbeSameInput(oldLeft, left));
+  assert(rewriteProbeSameInput(oldRight, right));
+  newResult = L4_Lean_Meta_DiscrTree_Basic.f_DiscrTree_Key_lt_f15791e26d(
+    newRuntime,
+    newLeft,
+    newRight,
+  );
+  assert(rewriteProbeSameInput(newLeft, left));
+  assert(rewriteProbeSameInput(newRight, right));
+  if (
+    native_eq(oldResult, leanBool(expected)) != 0 ||
+    native_eq(newResult, leanBool(expected)) != 0
+  ) {
+    leanFail("discrimination key order: " + label)
+  };
+  assert(native_eq(saved.refs, oldRuntime.checkpoint().refs) == 0);
+  assert(native_eq(saved.refs, newRuntime.checkpoint().refs) == 0)
+}
+
+fun main(): void {
+  builder = mutable LeanExecution{};
+  anonymous = (LeanCtor(LeanTag.Name_anonymous__impl, Array[]) : LeanValue);
+  name = (prefix: LeanValue, suffix: String) ->
+    L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+      builder,
+      prefix,
+      LeanText(suffix),
+    );
+  number = (suffix: LeanValue) ->
+    L4_Init_Prelude.f_Name_num_override_ca591eddf2(builder, anonymous, suffix);
+  a = name(anonymous, "a");
+  // The three numeric names have a genuine equal hash; quickCmp breaks it by Nat.
+  names: Array<(LeanValue, Int, String)> = Array[
+    (anonymous, 0, "1723"),
+    (a, 1, "7839396180116328695"),
+    (name(anonymous, "b"), 2, "10300200614825825839"),
+    (number(leanNatValue(17)), 3, "14196505973637522745"),
+    (
+      number(LeanScalar("nat", "18446744073709551616")),
+      4,
+      "14196505973637522745",
+    ),
+    (
+      number(LeanScalar("nat", "340282366920938463463374607431768211456")),
+      5,
+      "14196505973637522745",
+    ),
+    (name(a, "b"), 6, "14634427553699225707"),
+    (name(anonymous, "世界🙂"), 7, "15144356023376512105"),
+    (number(LeanScalar("nat", "17")), 3, "14196505973637522745"),
+  ];
+  for ((value, _, hash) in names) {
+    assert(leanNameHashBits(value) == leanParseWord(hash))
+  };
+  naturals: mutable Vector<LeanValue> = mutable Vector[];
+  for (digits in Array[
+    "0",
+    "1",
+    "18446744073709551615",
+    "18446744073709551616",
+    "340282366920938463463374607431768211456",
+  ]) {
+    naturals.push(LeanScalar("nat", digits));
+    naturals.push(leanBoxNat(LeanNat::parse(digits)))
+  };
+  nats = naturals.toArray();
+  texts = Array["", "a", "aa", "世界🙂"];
+  namedKinds = Array[
+    LeanTag.Meta_DiscrTree_Key_fvar,
+    LeanTag.Meta_DiscrTree_Key_const,
+    LeanTag.Meta_DiscrTree_Key_proj,
+  ];
+  zero = leanNatValue(0);
+  one = leanNatValue(1);
+  keys: Array<LeanValue> = Array[
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]),
+    keyOrderLiteral(zero, true),
+    keyOrderNamed(namedKinds[0], a, zero, zero),
+    keyOrderNamed(namedKinds[1], a, zero, zero),
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+    keyOrderNamed(namedKinds[2], a, zero, zero),
+  ];
+  count = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37)]));
+    saved = runtime.checkpoint();
+    for (i in Range(0, keys.size())) {
+      for (j in Range(0, keys.size())) {
+        checkKeyOrder(saved, "constructor rank", keys[i], keys[j], i < j);
+        !count = count + 1
+      }
+    };
+    for ((leftName, leftRank, _) in names) {
+      for ((rightName, rightRank, _) in names) {
+        for (kind in namedKinds) {
+          checkKeyOrder(
+            saved,
+            "name quick order and collision",
+            keyOrderNamed(kind, leftName, zero, zero),
+            keyOrderNamed(kind, rightName, zero, zero),
+            leftRank < rightRank,
+          );
+          !count = count + 1
+        }
+      }
+    };
+    for (i in Range(0, nats.size())) {
+      for (j in Range(0, nats.size())) {
+        expected = i / 2 < j / 2;
+        for (kind in namedKinds) {
+          checkKeyOrder(
+            saved,
+            "arity tie",
+            keyOrderNamed(kind, a, zero, nats[i]),
+            keyOrderNamed(kind, a, zero, nats[j]),
+            expected,
+          );
+          !count = count + 1
+        };
+        checkKeyOrder(
+          saved,
+          "projection index before arity",
+          keyOrderNamed(namedKinds[2], a, nats[i], one),
+          keyOrderNamed(namedKinds[2], a, nats[j], zero),
+          expected,
+        );
+        checkKeyOrder(
+          saved,
+          "natural literal",
+          keyOrderLiteral(nats[i], true),
+          keyOrderLiteral(nats[j], true),
+          expected,
+        );
+        !count = count + 2
+      };
+      for (text in texts) {
+        checkKeyOrder(
+          saved,
+          "natural before string",
+          keyOrderLiteral(nats[i], true),
+          keyOrderLiteral(LeanText(text), false),
+          true,
+        );
+        checkKeyOrder(
+          saved,
+          "string after natural",
+          keyOrderLiteral(LeanText(text), false),
+          keyOrderLiteral(nats[i], true),
+          false,
+        );
+        !count = count + 2
+      }
+    };
+    for (i in Range(0, texts.size())) {
+      for (j in Range(0, texts.size())) {
+        checkKeyOrder(
+          saved,
+          "string literal",
+          keyOrderLiteral(LeanText(texts[i]), false),
+          keyOrderLiteral(LeanText(texts[j]), false),
+          i < j,
+        );
+        !count = count + 1
+      }
+    };
+    unused = LeanUnavailable("key-order short-circuit field");
+    for (kind in namedKinds) {
+      leftAlias = keyOrderNamed(kind, names[3].i0, zero, zero);
+      rightAlias = keyOrderNamed(kind, names[8].i0, zero, one);
+      checkKeyOrder(
+        saved,
+        "equal numeric name with alternate representation",
+        leftAlias,
+        rightAlias,
+        true,
+      );
+      checkKeyOrder(
+        saved,
+        "equal numeric name arity reverse",
+        rightAlias,
+        leftAlias,
+        false,
+      );
+      lower = keyOrderNamed(kind, anonymous, unused, unused);
+      upper = keyOrderNamed(kind, a, unused, unused);
+      checkKeyOrder(saved, "name precedes unavailable Nat", lower, upper, true);
+      checkKeyOrder(
+        saved,
+        "different name rejects before unavailable Nat",
+        upper,
+        lower,
+        false,
+      );
+      !count = count + 4
+    };
+    lowerProjection = keyOrderNamed(namedKinds[2], a, zero, unused);
+    upperProjection = keyOrderNamed(namedKinds[2], a, one, unused);
+    checkKeyOrder(
+      saved,
+      "projection index skips arity",
+      lowerProjection,
+      upperProjection,
+      true,
+    );
+    checkKeyOrder(
+      saved,
+      "greater projection index skips arity",
+      upperProjection,
+      lowerProjection,
+      false,
+    );
+    checkKeyOrder(
+      saved,
+      "constructor skips payload",
+      keys[0],
+      keyOrderNamed(namedKinds[1], unused, unused, unused),
+      true,
+    );
+    checkKeyOrder(
+      saved,
+      "constructor skips payload reverse",
+      keyOrderNamed(namedKinds[1], unused, unused, unused),
+      keys[0],
+      false,
+    );
+    !count = count + 4
+  };
+  assert(count == 1808);
+  print_string(
+    count.toString() + " discrimination key ordering comparisons passed",
+  )
+}

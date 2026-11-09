@@ -1,0 +1,78 @@
+// Look up an unfoldable definition and record attempts to unfold axioms.
+module L4_Lean_Meta_GetUnfoldableConst;
+
+fun f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  read = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreStateRef,
+    world,
+  );
+  if (leanTag(read) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  coreState = leanField(read, 0);
+  if (leanTag(coreState) != LeanTag.Core_State_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  lookupWorld = leanField(read, 1);
+  found = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    runtime,
+    leanField(coreState, 0),
+    name,
+    leanBool(false),
+  );
+  none = LeanCtor(LeanTag.Option_none, Array[]);
+  if (leanTag(found) != LeanTag.Option_some) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[none, lookupWorld])
+  };
+  info = leanField(found, 0);
+  leanTag(info) match {
+  | LeanTag.ConstantInfo_defnInfo ->
+    decision = f_Lean_Meta_canUnfold_e22f7a4ebf(
+      runtime,
+      info,
+      metaContext,
+      coreContext,
+      coreStateRef,
+      lookupWorld,
+    );
+    leanTag(decision) match {
+    | LeanTag.EST_Out_error -> decision
+    | LeanTag.EST_Out_ok ->
+      result = leanTag(leanField(decision, 0)) match {
+      | LeanTag.Bool_false -> none
+      | LeanTag.Bool_true -> found
+      | _ -> leanFail("non-exhaustive Lean case")
+      };
+      LeanCtor(LeanTag.EST_Out_ok, Array[result, leanField(decision, 1)])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | LeanTag.ConstantInfo_axiomInfo ->
+    recorded = L4_Lean_Meta_Basic.f_Lean_Meta_recordUnfoldAxiom_7a49360c1b(
+      runtime,
+      name,
+      metaStateRef,
+      coreContext,
+      lookupWorld,
+    );
+    leanTag(recorded) match {
+    | LeanTag.EST_Out_error -> recorded
+    | LeanTag.EST_Out_ok ->
+      LeanCtor(LeanTag.EST_Out_ok, Array[none, leanField(recorded, 1)])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> LeanCtor(LeanTag.EST_Out_ok, Array[none, lookupWorld])
+  }
+}
+
+module end;

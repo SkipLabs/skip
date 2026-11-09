@@ -1,0 +1,62 @@
+// Discrimination keys compare by constructor, then by their semantic payload.
+module L4_Lean_Meta_DiscrTree_Basic;
+
+fun f_keyLess(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+): Bool {
+  kind = leanTag(left);
+  if (kind != leanTag(right)) {
+    return leanConstructorOrdinal(kind) < leanConstructorOrdinal(leanTag(right))
+  };
+  kind match {
+  | LeanTag.Meta_DiscrTree_Key_star
+  | LeanTag.Meta_DiscrTree_Key_other
+  | LeanTag.Meta_DiscrTree_Key_arrow ->
+    false
+  | LeanTag.Meta_DiscrTree_Key_lit ->
+    leanIsTrue(
+      L4_Lean_Expr.f_Lean_Literal_lt_f9e1f7bc0a(
+        runtime,
+        leanField(left, 0),
+        leanField(right, 0),
+      ),
+    )
+  | LeanTag.Meta_DiscrTree_Key_fvar
+  | LeanTag.Meta_DiscrTree_Key_const
+  | LeanTag.Meta_DiscrTree_Key_proj ->
+    leftName = leanField(left, 0);
+    rightName = leanField(right, 0);
+    if (
+      leanIsTrue(
+        L4_Lean_Data_Name.f_Lean_Name_quickLt_a4269e4c5e(
+          runtime,
+          leftName,
+          rightName,
+        ),
+      )
+    ) return true;
+    if (!leanNameEqual(leftName, rightName)) return false;
+    leftIndexOrArity = leanNat(leanField(left, 1));
+    rightIndexOrArity = leanNat(leanField(right, 1));
+    if (leftIndexOrArity < rightIndexOrArity) return true;
+    if (
+      kind != LeanTag.Meta_DiscrTree_Key_proj ||
+      leftIndexOrArity != rightIndexOrArity
+    ) return false;
+    leanNat(leanField(left, 2)) < leanNat(leanField(right, 2))
+  | _ -> leanFail("invalid discrimination-tree key")
+  }
+}
+
+// "Lean.Meta.DiscrTree.Key.lt"
+fun f_DiscrTree_Key_lt_f15791e26d(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+): LeanValue {
+  leanBool(f_keyLess(runtime, left, right))
+}
+
+module end;

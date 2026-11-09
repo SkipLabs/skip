@@ -1,0 +1,98 @@
+// Preserve Lean's quicksort partition order in a private dependency workspace.
+module L4_Lean_Meta_FunInfo;
+
+fun f_swapDependencySlots(
+  values: mutable Vector<LeanValue>,
+  left: Int,
+  right: Int,
+): void {
+  saved = values[left];
+  values.set(left, values[right]);
+  values.set(right, saved)
+}
+
+fun f_partitionDependencies(
+  values: mutable Vector<LeanValue>,
+  lower: Int,
+  upper: Int,
+): Int {
+  middle = lower + (upper - lower) / 2;
+  if (leanNat(values[middle]) < leanNat(values[lower])) {
+    f_swapDependencySlots(values, lower, middle)
+  };
+  if (leanNat(values[upper]) < leanNat(values[lower])) {
+    f_swapDependencySlots(values, lower, upper)
+  };
+  if (leanNat(values[middle]) < leanNat(values[upper])) {
+    f_swapDependencySlots(values, middle, upper)
+  };
+  pivot = leanNat(values[upper]);
+  boundary = lower;
+  for (cursor in Range(lower, upper)) {
+    if (leanNat(values[cursor]) < pivot) {
+      f_swapDependencySlots(values, boundary, cursor);
+      !boundary = boundary + 1
+    }
+  };
+  f_swapDependencySlots(values, boundary, upper);
+  boundary
+}
+
+fun f_sortDependencies(
+  values: Array<LeanValue>,
+  lower: Int,
+  upper: Int,
+): Array<LeanValue> {
+  sorted = Vector::mcreateFromItems(values);
+  pending = mutable Vector[(lower, upper)];
+  while (!pending.isEmpty()) {
+    (first, last) = pending.pop();
+    if (first >= last) continue;
+    pivot = f_partitionDependencies(sorted, first, last);
+    if (pivot < last) {
+      // The original visits the left range first and includes its pivot slot.
+      pending.push((pivot + 1, last));
+      pending.push((first, pivot))
+    }
+  };
+  sorted.toArray()
+}
+
+fun f_Meta_collectDeps_spec_0_7edefeebb8(
+  runtime: mutable LeanExecution,
+  lengthWitness: LeanValue,
+  dependencies: LeanValue,
+  lower: LeanValue,
+  upper: LeanValue,
+): LeanValue {
+  lowerBound = leanNat(lower);
+  upperBound = leanNat(upper);
+  if (lowerBound >= upperBound) return dependencies;
+  dependencies match {
+  | LeanArray(values) ->
+    if (upperBound < LeanNat::fromInt(values.size())) {
+      result = f_sortDependencies(
+        values,
+        lowerBound.toInt(),
+        upperBound.toInt(),
+      );
+      // Every active partition swaps, even when all values compare equal.
+      if (result.size() > 128) {
+        return LeanPersistentArray(
+          Persistent.RadixTreeVector::mcreateFromItems(result).chill(),
+        )
+      };
+      return LeanArray(result)
+    }
+  | _ -> void
+  };
+  f_Meta_collectDeps_spec_0_7edefeebb8_fallback(
+    runtime,
+    lengthWitness,
+    dependencies,
+    lower,
+    upper,
+  )
+}
+
+module end;

@@ -23,18 +23,18 @@
   "reconciled_source_revision": "5a033d6f43914d8d8b055955cba494a68a04adfb",
   "observed_functions": 1225,
   "initial_frame_candidates": 197,
-  "validated_frame_rewrites_in_waves": 12,
-  "remaining_observed_frames": 185,
-  "remaining_observed_frame_lines": 85566,
+  "validated_frame_rewrites_in_waves": 16,
+  "remaining_observed_frames": 181,
+  "remaining_observed_frame_lines": 84514,
   "remaining_frames_by_lane": {
-    "discrimination_trees": 6,
+    "discrimination_trees": 5,
     "environment": 9,
     "equality": 42,
     "expressions_and_state": 15,
-    "inference": 31,
+    "inference": 30,
     "reduction": 5,
     "rewrite_selection": 16,
-    "shared_helpers_triage": 10,
+    "shared_helpers_triage": 8,
     "simplifier_construction": 51
   },
   "static_frontier": "provenance/rewrite-static-frontier.md",
@@ -12603,20 +12603,32 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "discrimination_trees",
-      "status": "candidate",
-      "control_flow": "frame",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Meta/DiscrTree/Basic/Part000.sk",
-      "lines": 270,
-      "frame": 36,
-      "source_body_sha256": "db1b02fbdbae38aa22987e9d0dedec60293b0c38e3614c758f934d841a347102",
+      "status": "control_flow_validated",
+      "control_flow": "structured",
+      "representation": "host_Bool_ordering; boxed_Key_Name_Literal_interfaces_pending",
+      "path": "sources/Modules/Lean/Meta/DiscrTree/Basic/KeyOrder.sk",
+      "lines": 8,
+      "frame": 0,
+      "source_body_sha256": "e1bd5f999c211afcc8ca204b81fac91287b06a6c153f4fc89a58f2685486802b",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "db1b02fbdbae38aa22987e9d0dedec60293b0c38e3614c758f934d841a347102",
         "case_count": 36,
-        "current_body_matches_snapshot": true
-      }
+        "current_body_matches_snapshot": false
+      },
+      "planning_source_body_sha256": "db1b02fbdbae38aa22987e9d0dedec60293b0c38e3614c758f934d841a347102",
+      "validation": [
+        "1808 differential and independent expected-order comparisons across profile off/on",
+        "All seven key kinds; fixed name hashes and genuine collisions; arbitrary Nat arities, projection indices and literals; alternate representations and short circuits",
+        "Copied inputs and populated reference state preserved"
+      ],
+      "coverage_limits": [
+        "Internal ordering returns Bool; keys, names and literals remain boxed.",
+        "Name.quickLt, literal comparison, Nat and constructor metadata helpers remain shared. Fixed expected vectors cover selected collisions independently.",
+        "Malformed keys and malformed payload errors are not covered; input contract is the seven valid key constructors."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-09-wave-05.json"
     },
     {
       "name": "L4_Lean_Meta_DiscrTree_Basic.f_Meta_DiscrTree_createNodes_6a82c52983",
@@ -14983,20 +14995,32 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "candidate",
-      "control_flow": "frame",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
-      "lines": 279,
-      "frame": 32,
-      "source_body_sha256": "eb2a9beff3fc8198859845d4995c60468724a007cfe17c578a3e4f1ad3017555",
+      "status": "control_flow_validated",
+      "control_flow": "structured",
+      "representation": "typed_Array_private_Vector_bounded_Int_ranges; boxed_Nat_payloads_and_nonordinary_fallbacks_remain",
+      "path": "sources/Modules/Lean/Meta/FunInfo/DependencySort.sk",
+      "lines": 36,
+      "frame": 0,
+      "source_body_sha256": "b8d5bb387dd74ed37559b8049ded32db5d986f17f2c467af3d48e404e3ccff68",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "eb2a9beff3fc8198859845d4995c60468724a007cfe17c578a3e4f1ad3017555",
         "case_count": 36,
-        "current_body_matches_snapshot": true
-      }
+        "current_body_matches_snapshot": false
+      },
+      "planning_source_body_sha256": "eb2a9beff3fc8198859845d4995c60468724a007cfe17c578a3e4f1ad3017555",
+      "validation": [
+        "2478 comparisons across profile off/on: exhaustive arrays of length 0..5 over 0/1/2, all five-element subranges, exact duplicate-wrapper permutations and arbitrary Nat values",
+        "Ordinary/persistent/override inputs; 127/128/129/160 sizes; full/no-op/partial sorts; unchanged outside wrappers and preserved original arrays/references",
+        "36 function-info parameter/class regressions passed"
+      ],
+      "coverage_limits": [
+        "Typed ordinary-array/private-vector/Int-range path publishes immutably; Nat payloads retain their exact wrappers.",
+        "Persistent/override/invalid active ranges retain the original recursively redirected implementation; tracked arrays, active out-of-bounds and malformed-value failures are not exercised.",
+        "Inclusive left-pivot recursion and median-of-three/partition swaps preserve the original permutation; large active ordinary arrays publish persistent even when values compare equal."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-09-wave-05.json"
     },
     {
       "name": "L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_lam_0_d8ffe98521",
@@ -15403,40 +15427,65 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "candidate",
-      "control_flow": "frame",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Meta/GetUnfoldableConst/Part000.sk",
-      "lines": 310,
-      "frame": 41,
-      "source_body_sha256": "0c54150386d6d457e3bdb191ce03f35f2883afd95f73ceb637177bb0a1536ade",
+      "status": "control_flow_validated",
+      "control_flow": "structured",
+      "representation": "host_Bool_typed_tags; boxed_config_declaration_state_effect_interfaces_pending",
+      "path": "sources/Modules/Lean/Meta/GetUnfoldableConst/Policy.sk",
+      "lines": 67,
+      "frame": 0,
+      "source_body_sha256": "00412ab0751f349f70359ea0baa27ae3823747439227d537449fc7fed810cbc7",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "0c54150386d6d457e3bdb191ce03f35f2883afd95f73ceb637177bb0a1536ade",
         "case_count": 36,
-        "current_body_matches_snapshot": true
-      }
+        "current_body_matches_snapshot": false
+      },
+      "planning_source_body_sha256": "0c54150386d6d457e3bdb191ce03f35f2883afd95f73ceb637177bb0a1536ade",
+      "validation": [
+        "364 combined default/lookup scenarios across two worlds and profile off/on, including direct 6-transparency by 5-status plus unset-status expectations",
+        "None/all do not inspect info/Core placeholders; custom policy allow/deny/error and all forwarded argument roles checked",
+        "34 definition-unfolding regression cases passed"
+      ],
+      "coverage_limits": [
+        "Transparency/status decisions use typed tags and Bool; configurations, declarations, state and effects remain boxed.",
+        "Reducibility and environment helpers are shared. Impossible status-reader errors, malformed values and imported/scoped attribute updates are not injected.",
+        "Ordinary matcher attribute lookup remains explicitly unsupported; old/new subprocesses both exit 86 with the exact missing Lean.matchPatternAttr initializer failure. Matcher mode with a successful default and custom predicates is exercised."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-09-wave-05.json"
     },
     {
       "name": "L4_Lean_Meta_GetUnfoldableConst.f_Lean_Meta_getUnfoldableConstNoEx_1bfb8a676b",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "candidate",
-      "control_flow": "frame",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Meta/GetUnfoldableConst/Part000.sk",
-      "lines": 193,
-      "frame": 34,
-      "source_body_sha256": "0229da565d1ff9853a29af3bcce9cc550288c1f7d053cfc4c5d5dfc8b246ad18",
+      "status": "control_flow_validated",
+      "control_flow": "structured",
+      "representation": "structured_dispatch; boxed_context_state_declaration_result_interfaces_pending",
+      "path": "sources/Modules/Lean/Meta/GetUnfoldableConst/Lookup.sk",
+      "lines": 73,
+      "frame": 0,
+      "source_body_sha256": "2e4a53ca3784751184ecb31c5b37758d127dafcc9631bcb9400b146f1fc0a37b",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "0229da565d1ff9853a29af3bcce9cc550288c1f7d053cfc4c5d5dfc8b246ad18",
         "case_count": 36,
-        "current_body_matches_snapshot": true
-      }
+        "current_body_matches_snapshot": false
+      },
+      "planning_source_body_sha256": "0229da565d1ff9853a29af3bcce9cc550288c1f7d053cfc4c5d5dfc8b246ad18",
+      "validation": [
+        "364 combined default/lookup scenarios compare full results/worlds/references and input preservation",
+        "Missing/theorem/opaque/inductive outcomes; allowed/refused definitions; custom callback error propagation and callback-only effects",
+        "Axiom diagnostics disabled/enabled/repeated/unrelated counts preserve all other state; Unit success is wrapped as Option.none",
+        "34 definition-unfolding regressions and exact old/new unsupported matcher-initializer failures passed"
+      ],
+      "coverage_limits": [
+        "Contexts, references, declaration and Option/EST results remain boxed.",
+        "Both lookup routes share canUnfold, which calls the new default; default has its own independent retained-body matrix. Other lookup/diagnostic helpers are shared.",
+        "Matcher attribute lookup is explicitly unsupported; actual enabled attributes, individual quotient/constructor/recursor variants and malformed inputs remain outside these fixtures."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-09-wave-05.json"
     },
     {
       "name": "L4_Lean_Meta_GetUnfoldableConst.f_Meta_canUnfoldDefault_spec_0_fa1f87a129",
@@ -24858,5 +24907,6 @@
         "current_body_matches_snapshot": true
       }
     }
-  ]
+  ],
+  "latest_batch": "provenance/rewrite-batches/2026-11-09-wave-05.json"
 }

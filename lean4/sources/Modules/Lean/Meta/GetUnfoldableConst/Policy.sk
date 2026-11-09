@@ -1,0 +1,72 @@
+// Decide whether the current transparency mode permits unfolding a declaration.
+module L4_Lean_Meta_GetUnfoldableConst;
+
+fun f_Lean_Meta_canUnfoldDefault_1475029161(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+  info: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanTag(config) != LeanTag.Meta_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  transparency = leanTag(leanField(config, 9));
+  if (transparency == LeanTag.Meta_TransparencyMode_none) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(false), world])
+  };
+  if (transparency == LeanTag.Meta_TransparencyMode_all) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(true), world])
+  };
+  name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(runtime, info);
+  if (transparency == LeanTag.Meta_TransparencyMode_default) {
+    irreducible = f_Meta_canUnfoldDefault_spec_0_fa1f87a129(
+      runtime,
+      name,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    leanTag(irreducible) match {
+    | LeanTag.EST_Out_error -> return irreducible
+    | LeanTag.EST_Out_ok ->
+      allowed = leanTag(leanField(irreducible, 0)) match {
+      | LeanTag.Bool_false -> true
+      | LeanTag.Bool_true -> false
+      | _ -> leanFail("non-exhaustive Lean case")
+      };
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanBool(allowed), leanField(irreducible, 1)],
+      )
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  };
+  statusResult = f_Meta_canUnfoldDefault_spec_1_09e1da2ecf(
+    runtime,
+    name,
+    coreStateRef,
+    world,
+  );
+  leanTag(statusResult) match {
+  | LeanTag.EST_Out_ok ->
+    allowed = leanTag(leanField(statusResult, 0)) match {
+    | LeanTag.ReducibilityStatus_reducible -> true
+    | LeanTag.ReducibilityStatus_instanceReducible ->
+      transparency == LeanTag.Meta_TransparencyMode_instances ||
+        transparency == LeanTag.Meta_TransparencyMode_implicit
+    | LeanTag.ReducibilityStatus_implicitReducible ->
+      transparency == LeanTag.Meta_TransparencyMode_implicit
+    | _ -> false
+    };
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[leanBool(allowed), leanField(statusResult, 1)],
+    )
+  | LeanTag.EST_Out_error -> leanFail("unreachable: Lean.Meta.canUnfoldDefault")
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;
