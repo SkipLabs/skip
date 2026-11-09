@@ -102,3 +102,25 @@ fun rewriteProbeCopyInput(value: LeanValue): LeanValue {
   | _ -> value
   }
 }
+
+// Copying an array can change its element specialization without changing its values.
+fun rewriteProbeSameInput(left: LeanValue, right: LeanValue): Bool {
+  if (native_eq(left, right) == 0) return true;
+  (left, right) match {
+  | (LeanCtor(leftTag, leftFields), LeanCtor(rightTag, rightFields)) ->
+    if (leftTag != rightTag || leftFields.size() != rightFields.size()) {
+      return false
+    };
+    for (i in Range(0, leftFields.size())) {
+      if (!rewriteProbeSameInput(leftFields[i], rightFields[i])) return false
+    };
+    true
+  | (LeanArray(leftValues), LeanArray(rightValues)) ->
+    if (leftValues.size() != rightValues.size()) return false;
+    for (i in Range(0, leftValues.size())) {
+      if (!rewriteProbeSameInput(leftValues[i], rightValues[i])) return false
+    };
+    true
+  | _ -> false
+  }
+}

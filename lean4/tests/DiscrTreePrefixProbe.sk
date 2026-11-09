@@ -1,0 +1,448 @@
+fun prefixTestKey(
+  kind: LeanTag.Value,
+  name: LeanValue,
+  arity: LeanValue,
+): LeanValue {
+  if (kind == LeanTag.Meta_DiscrTree_Key_proj) {
+    LeanCtor(kind, Array[name, leanNatValue(7), arity])
+  } else {
+    LeanCtor(kind, Array[name, arity])
+  }
+}
+
+fun prefixBucketRoot(hash: LeanValue, entry: LeanValue): LeanValue {
+  bucket = leanWordBits(hash).and(31);
+  entries: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, 32)) {
+    entries.push(
+      if (index == bucket) entry else {
+        LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[])
+      },
+    )
+  };
+  LeanCtor(
+    LeanTag.PersistentHashMap_Node_entries,
+    Array[LeanArray(entries.toArray())],
+  )
+}
+
+fun prefixSingleRoot(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+  trie: LeanValue,
+): LeanValue {
+  hash = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+    runtime,
+    key,
+  );
+  prefixBucketRoot(
+    hash,
+    LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, trie]),
+  )
+}
+
+fun prefixCollisionRoot(
+  runtime: mutable LeanExecution,
+  keys: Array<LeanValue>,
+  trie: LeanValue,
+): LeanValue {
+  assert(keys.size() >= 2);
+  hash = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+    runtime,
+    keys[0],
+  );
+  for (i in Range(0, keys.size())) {
+    actual = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+      runtime,
+      keys[i],
+    );
+    assert(native_eq(hash, actual) == 0);
+    for (j in Range(0, i)) {
+      sameKey = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_instBEqKey_beq_5d3d2e2dd7(
+        runtime,
+        keys[i],
+        keys[j],
+      );
+      assert(!leanIsTrue(sameKey))
+    }
+  };
+  collision = LeanCtor(
+    LeanTag.PersistentHashMap_Node_collision,
+    Array[
+      LeanArray(keys),
+      LeanArray(Array::fill(keys.size(), trie)),
+      LeanErased(),
+    ],
+  );
+  prefixBucketRoot(
+    hash,
+    LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[collision]),
+  )
+}
+
+fun checkPrefixCase(
+  runtime: mutable LeanExecution,
+  label: String,
+  rootNode: LeanValue,
+  key: LeanValue,
+  expected: Bool,
+  metaStateRef: LeanValue,
+  coreStateRef: LeanValue,
+): Int {
+  // Sentinels detect accidental inspection of the unused contexts.
+  metaContext = LeanUnavailable("prefix search inspected Meta context");
+  coreContext = LeanUnavailable("prefix search inspected Core context");
+  for (world in Array[LeanNatLiterals.n0, leanNatValue(53)]) {
+    saved = runtime.checkpoint();
+    original = saved.restoreRaw();
+    rewritten = saved.restoreRaw();
+    expectedResult = LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[leanBool(expected), world],
+    );
+    actual = L4_Lean_Meta_DiscrTree_Main.f_DiscrTree_getMatchWithExtra_mayMatchPrefix_ef47d0e14e(
+      rewritten,
+      rootNode,
+      key,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    retained = L4_Lean_Meta_DiscrTree_Main.f_DiscrTree_getMatchWithExtra_mayMatchPrefix_ef47d0e14e_fallback(
+      original,
+      rootNode,
+      key,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    if (
+      native_eq(actual, expectedResult) != 0 ||
+      native_eq(retained, expectedResult) != 0
+    ) {
+      leanFail("prefix search outcome: " + label)
+    };
+    assert(native_eq(rewritten.checkpoint().refs, saved.refs) == 0);
+    assert(native_eq(original.checkpoint().refs, saved.refs) == 0)
+  };
+  2
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  metaStateRef = runtime.newRef(LeanUnavailable("unused Meta state"));
+  coreStateRef = runtime.newRef(LeanUnavailable("unused Core state"));
+  anonymous = (LeanCtor(LeanTag.Name_anonymous__impl, Array[]) : LeanValue);
+  name = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("f"),
+  );
+  qualified = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    name,
+    LeanText("g"),
+  );
+  numeric = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    runtime,
+    name,
+    leanBoxNat(LeanNat::parse("18446744073709551616")),
+  );
+  otherName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("different"),
+  );
+  trie = LeanCtor(
+    LeanTag.Meta_DiscrTree_Trie_node,
+    Array[LeanArray(Array[]), LeanArray(Array[])],
+  );
+  emptyRoot = LeanCtor(
+    LeanTag.PersistentHashMap_Node_entries,
+    Array[
+      LeanArray(
+        Array::fill(
+          32,
+          (LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[]) : LeanValue),
+        ),
+      ),
+    ],
+  );
+  kinds = Array[
+    LeanTag.Meta_DiscrTree_Key_const,
+    LeanTag.Meta_DiscrTree_Key_fvar,
+    LeanTag.Meta_DiscrTree_Key_proj,
+  ];
+  checks = 0;
+  for (kind in kinds) {
+    for (head in Array[anonymous, name, qualified, numeric]) {
+      key0 = prefixTestKey(kind, head, leanNatValue(0));
+      key1 = prefixTestKey(kind, head, leanNatValue(1));
+      key2 = prefixTestKey(kind, head, leanNatValue(2));
+      key3 = prefixTestKey(kind, head, leanNatValue(3));
+      root0 = prefixSingleRoot(runtime, key0, trie);
+      root1 = prefixSingleRoot(runtime, key1, trie);
+      root2 = prefixSingleRoot(runtime, key2, trie);
+      wrongHead = prefixSingleRoot(
+        runtime,
+        prefixTestKey(kind, otherName, leanNatValue(1)),
+        trie,
+      );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "empty zero arity",
+          emptyRoot,
+          key0,
+          false,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "zero arity is not queried",
+          root0,
+          key0,
+          false,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "prefix at zero arity",
+          root0,
+          key1,
+          true,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "original key alone",
+          root1,
+          key1,
+          false,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "first shorter key",
+          root2,
+          key3,
+          true,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "later shorter key",
+          root0,
+          key3,
+          true,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "all prefixes absent",
+          emptyRoot,
+          key3,
+          false,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "larger arity is not a prefix",
+          root2,
+          key1,
+          false,
+          metaStateRef,
+          coreStateRef,
+        );
+      !checks =
+        checks +
+        checkPrefixCase(
+          runtime,
+          "different head",
+          wrongHead,
+          key2,
+          false,
+          metaStateRef,
+          coreStateRef,
+        )
+    }
+  };
+  otherKeys = Array[
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]),
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_lit,
+      Array[LeanCtor(LeanTag.Literal_natVal, Array[leanNatValue(3)])],
+    ),
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_lit,
+      Array[LeanCtor(LeanTag.Literal_strVal, Array[LeanText("a")])],
+    ),
+  ];
+  for (key in otherKeys) {
+    present = prefixSingleRoot(runtime, key, trie);
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "non-application key absent",
+        emptyRoot,
+        key,
+        false,
+        metaStateRef,
+        coreStateRef,
+      );
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "non-application key present",
+        present,
+        key,
+        false,
+        metaStateRef,
+        coreStateRef,
+      )
+  };
+  wrongProjection = LeanCtor(
+    LeanTag.Meta_DiscrTree_Key_proj,
+    Array[name, leanNatValue(8), leanNatValue(1)],
+  );
+  !checks =
+    checks +
+    checkPrefixCase(
+      runtime,
+      "projection index is preserved",
+      prefixSingleRoot(runtime, wrongProjection, trie),
+      prefixTestKey(LeanTag.Meta_DiscrTree_Key_proj, name, leanNatValue(2)),
+      false,
+      metaStateRef,
+      coreStateRef,
+    );
+  predecessors = Array[
+    ("9223372036854775808", "9223372036854775807"),
+    ("18446744073709551616", "18446744073709551615"),
+    ("18446744073709551617", "18446744073709551616"),
+    (
+      "340282366920938463463374607431768211473",
+      "340282366920938463463374607431768211472",
+    ),
+  ];
+  for (kind in kinds) {
+    for (digits in predecessors) {
+      for (arity in Array[
+        LeanScalar("nat", digits.i0),
+        leanBoxNat(LeanNat::parse(digits.i0)),
+      ]) {
+        predecessor = prefixTestKey(
+          kind,
+          name,
+          leanBoxNat(LeanNat::parse(digits.i1)),
+        );
+        !checks =
+          checks +
+          checkPrefixCase(
+            runtime,
+            "large Nat first prefix",
+            prefixSingleRoot(runtime, predecessor, trie),
+            prefixTestKey(kind, name, arity),
+            true,
+            metaStateRef,
+            coreStateRef,
+          )
+      }
+    };
+    small = prefixTestKey(kind, name, leanNatValue(1));
+    large = prefixTestKey(
+      kind,
+      name,
+      leanBoxNat(LeanNat::parse("18446744073709551617")),
+    );
+    larger = prefixTestKey(
+      kind,
+      name,
+      leanBoxNat(LeanNat::parse("36893488147419103233")),
+    );
+    withSmall = prefixCollisionRoot(runtime, Array[large, small], trie);
+    withoutSmall = prefixCollisionRoot(runtime, Array[large, larger], trie);
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "collision second key matches",
+        withSmall,
+        prefixTestKey(kind, name, leanNatValue(2)),
+        true,
+        metaStateRef,
+        coreStateRef,
+      );
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "equal hash is not an equal key",
+        withoutSmall,
+        prefixTestKey(kind, name, leanNatValue(2)),
+        false,
+        metaStateRef,
+        coreStateRef,
+      );
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "original collision key is not a prefix",
+        withSmall,
+        small,
+        false,
+        metaStateRef,
+        coreStateRef,
+      );
+    !checks =
+      checks +
+      checkPrefixCase(
+        runtime,
+        "large collision first key matches",
+        withSmall,
+        prefixTestKey(
+          kind,
+          name,
+          leanBoxNat(LeanNat::parse("18446744073709551618")),
+        ),
+        true,
+        metaStateRef,
+        coreStateRef,
+      )
+  };
+  assert(checks == 310);
+  print_string(
+    checks.toString() + " prefix result/world/reference comparisons passed",
+  )
+}

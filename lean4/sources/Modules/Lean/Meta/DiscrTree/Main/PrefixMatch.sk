@@ -1,0 +1,62 @@
+// Look for an application prefix with strictly fewer arguments.
+module L4_Lean_Meta_DiscrTree_Main;
+
+fun f_DiscrTree_getMatchWithExtra_mayMatchPrefix_ef47d0e14e(
+  runtime: mutable LeanExecution,
+  rootNode: LeanValue,
+  key: LeanValue,
+  _metaContext: LeanValue,
+  _metaStateRef: LeanValue,
+  _coreContext: LeanValue,
+  _coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  kind = leanTag(key);
+  if (
+    kind != LeanTag.Meta_DiscrTree_Key_const &&
+    kind != LeanTag.Meta_DiscrTree_Key_fvar &&
+    kind != LeanTag.Meta_DiscrTree_Key_proj
+  ) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(false), world])
+  };
+  isProjection = kind == LeanTag.Meta_DiscrTree_Key_proj;
+  head = leanField(key, 0);
+  arity: LeanValue = leanField(key, if (isProjection) 2 else 1);
+  loop {
+    if (
+      leanIsTrue(
+        L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+          runtime,
+          arity,
+          LeanNatLiterals.n0,
+        ),
+      )
+    ) {
+      return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(false), world])
+    };
+    !arity = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      runtime,
+      arity,
+      LeanNatLiterals.n1,
+    );
+    shorterKey = if (isProjection) {
+      LeanCtor(kind, Array[head, leanField(key, 1), arity])
+    } else {
+      LeanCtor(kind, Array[head, arity])
+    };
+    found = f_DiscrTree_getStarResult_spec_0_38be478a44(
+      runtime,
+      rootNode,
+      shorterKey,
+    );
+    leanTag(found) match {
+    | LeanTag.Option_none -> void
+    | LeanTag.Option_some ->
+      _ = leanField(found, 0);
+      return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(true), world])
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  }
+}
+
+module end;

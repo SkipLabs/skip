@@ -1,0 +1,280 @@
+// Depth boundaries, recursive unfolding and the cache across repeated calls.
+fun whnfEntryContext(
+  base: LeanValue,
+  maximum: LeanValue,
+  current: LeanValue,
+  source: LeanValue,
+): LeanValue {
+  cold = leanReplaceField(leanField(base, 0), 3, maximum);
+  withCold = leanReplaceField(base, 0, cold);
+  withDepth = leanReplaceField(withCold, 1, current);
+  leanReplaceField(withDepth, 2, source)
+}
+
+fun whnfEntryError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun whnfEntryCall(
+  runtime: mutable LeanExecution,
+  original: Bool,
+  state: RewriteProbeState,
+  expr: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  method = if (original) {
+    L4_Lean_Meta_WHNF.f_Lean_Meta_whnfImp_1c79221716_fallback
+  } else {
+    L4_Lean_Meta_WHNF.f_Lean_Meta_whnfImp_1c79221716
+  };
+  method(
+    runtime,
+    expr,
+    state.metaContext,
+    state.metaStateRef,
+    core,
+    state.coreStateRef,
+    world,
+  )
+}
+
+fun checkWhnfEntry(
+  label: String,
+  state: RewriteProbeState,
+  saved: LeanExecutionCheckpoint,
+  expr: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchangedRefs: Bool,
+): LeanExecutionCheckpoint {
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  assert(rewriteProbeSameInput(oldCore, core));
+  assert(rewriteProbeSameInput(newCore, core));
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      whnfEntryCall(runtime, true, state, expr, oldCore, world),
+    (runtime: mutable LeanExecution) ~>
+      whnfEntryCall(runtime, false, state, expr, newCore, world)
+    ,
+  );
+  // Error source syntax comes from the copied context, including copied arrays.
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("WHNF entry unexpected outcome: " + label)
+  };
+  if (
+    !rewriteProbeSameInput(oldCore, core) ||
+    !rewriteProbeSameInput(newCore, core)
+  ) {
+    leanFail("WHNF entry changed input context: " + label)
+  };
+  if (unchangedRefs && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("WHNF entry unexpectedly changed references: " + label)
+  };
+  after
+}
+
+fun whnfEntryCacheValue(
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  expr: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  runtime = saved.restoreRaw();
+  key = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+    runtime,
+    expr,
+    state.metaContext,
+    world,
+  );
+  assert(leanTag(key) == LeanTag.EST_Out_ok);
+  cache = leanField(runtime.readRef(state.metaStateRef), 1);
+  L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_4_fba3a797db(
+    runtime,
+    leanField(cache, 3),
+    leanField(key, 0),
+  )
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero),
+  );
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("whnfEntryFixture"),
+  );
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  definition = LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          prop,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  );
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(leanNameKey(name), LeanConstantFile(definition, None()));
+  environment = rewriteProbeEnvironment(runtime, constants.chill());
+  state = rewriteProbeState(
+    runtime,
+    environment,
+    L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime),
+    "<whnf-entry-probe>",
+  );
+  expr = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name, nil);
+  source = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+    runtime,
+    LeanText("whnf-entry-source"),
+  );
+  world = leanNatValue(37);
+  ok = LeanCtor(LeanTag.EST_Out_ok, Array[prop, world]);
+  error = whnfEntryError(runtime, source, world);
+  huge = LeanScalar("nat", "18446744073709551616");
+  hugeNext = LeanScalar("nat", "18446744073709551617");
+  hugeNextNext = LeanScalar("nat", "18446744073709551618");
+  blocked = RewriteProbeState(
+    state.saved,
+    LeanUnavailable("guard must precede Meta.Context access"),
+    LeanUnavailable("guard must precede Meta.State access"),
+    state.coreContext,
+    LeanUnavailable("guard must precede Core.State access"),
+  );
+  limits: Array<(String, LeanValue, LeanValue, Bool)> = Array[
+    ("unlimited at zero", LeanNatLiterals.n0, LeanNatLiterals.n0, false),
+    ("unlimited at huge depth", LeanNatLiterals.n0, huge, false),
+    ("below limit", leanNatValue(7), leanNatValue(6), false),
+    ("equal limit", leanNatValue(7), leanNatValue(7), true),
+    ("above limit", leanNatValue(7), leanNatValue(8), false),
+    ("huge below limit", hugeNext, huge, false),
+    ("huge equal limit", huge, huge, true),
+    ("huge above limit", huge, hugeNext, false),
+  ];
+  for ((label, maximum, current, atLimit) in limits) {
+    _ = checkWhnfEntry(
+      label,
+      if (atLimit) blocked else state,
+      state.saved,
+      if (atLimit) {
+        LeanUnavailable("guard must precede expression access")
+      } else {
+        prop
+      },
+      whnfEntryContext(state.coreContext, maximum, current, source),
+      world,
+      if (atLimit) error else ok,
+      true,
+    )
+  };
+
+  // Unfolding this constant re-enters whnfImp with the incremented depth.
+  nested: Array<(String, LeanValue, LeanValue, Bool)> = Array[
+    ("nested reaches limit", leanNatValue(1), LeanNatLiterals.n0, true),
+    ("nested has room", leanNatValue(2), LeanNatLiterals.n0, false),
+    ("huge nested reaches limit", hugeNext, huge, true),
+    ("huge nested has room", hugeNextNext, huge, false),
+    ("huge nested unlimited", LeanNatLiterals.n0, huge, false),
+  ];
+  assert(
+    leanTag(whnfEntryCacheValue(state.saved, state, expr, world)) ==
+      LeanTag.Option_none,
+  );
+  for ((label, maximum, current, fails) in nested) {
+    after = checkWhnfEntry(
+      label,
+      state,
+      state.saved,
+      expr,
+      whnfEntryContext(state.coreContext, maximum, current, source),
+      world,
+      if (fails) error else ok,
+      false,
+    );
+    cached = whnfEntryCacheValue(after, state, expr, world);
+    expectedCache = if (fails) LeanCtor(LeanTag.Option_none, Array[]) else {
+      LeanCtor(LeanTag.Option_some, Array[prop])
+    };
+    assert(native_eq(cached, expectedCache) == 0);
+    if (!fails) {
+      _ = checkWhnfEntry(
+        label + " cached below limit",
+        state,
+        after,
+        expr,
+        whnfEntryContext(
+          state.coreContext,
+          leanNatValue(1),
+          LeanNatLiterals.n0,
+          source,
+        ),
+        world,
+        ok,
+        true,
+      );
+      _ = checkWhnfEntry(
+        label + " cached at limit",
+        state,
+        after,
+        expr,
+        whnfEntryContext(
+          state.coreContext,
+          leanNatValue(1),
+          leanNatValue(1),
+          source,
+        ),
+        world,
+        error,
+        true,
+      )
+    }
+  };
+  print_string("WHNF entry: 19 checks passed\n")
+}

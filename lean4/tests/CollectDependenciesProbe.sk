@@ -1,0 +1,144 @@
+// Expected dependency indices, immutable inputs and the retained entry's result.
+fun collectDepsCopy(value: LeanValue): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.map(collectDepsCopy))
+  | LeanArray(values) -> LeanArray(values.map(collectDepsCopy))
+  | _ -> value
+  }
+}
+
+fun checkCollectDeps(
+  saved: LeanExecutionCheckpoint,
+  label: String,
+  fvars: LeanValue,
+  expr: LeanValue,
+  indices: Array<Int>,
+): void {
+  original = saved.restoreRaw();
+  replacement = saved.restoreRaw();
+  oldFvars = collectDepsCopy(fvars);
+  newFvars = collectDepsCopy(fvars);
+  frozenExpr = collectDepsCopy(expr);
+  expected = LeanArray(indices.map((index) -> leanNatValue(index)));
+  oldResult = L4_Lean_Meta_FunInfo.f_Lean_Meta_collectDeps_56366e190e_fallback(
+    original,
+    oldFvars,
+    expr,
+  );
+  if (native_eq(oldFvars, fvars) != 0 || native_eq(expr, frozenExpr) != 0) {
+    leanFail("collectDeps original changed input: " + label)
+  };
+  // Keep shared expression nodes shared; check the first call before reuse.
+  newResult = L4_Lean_Meta_FunInfo.f_Lean_Meta_collectDeps_56366e190e(
+    replacement,
+    newFvars,
+    expr,
+  );
+  if (native_eq(newFvars, fvars) != 0 || native_eq(expr, frozenExpr) != 0) {
+    leanFail("collectDeps replacement changed input: " + label)
+  };
+  if (
+    native_eq(oldResult, expected) != 0 ||
+    native_eq(newResult, expected) != 0
+  ) {
+    leanFail("collectDeps unexpected indices: " + label)
+  };
+  if (
+    native_eq(original.checkpoint().refs, saved.refs) != 0 ||
+    native_eq(replacement.checkpoint().refs, saved.refs) != 0
+  ) {
+    leanFail("collectDeps changed references: " + label)
+  };
+}
+
+fun main(): void {
+  builder = mutable LeanExecution{};
+  name = (text: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+  fvar = (text: String) ->
+    L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, name(text));
+  app = (fn: LeanValue, arg: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, fn, arg);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  binderName = name("bound");
+  lam = (domain: LeanValue, body: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      binderName,
+      binder,
+      domain,
+      body,
+    );
+  forallExpr = (domain: LeanValue, body: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder,
+      binderName,
+      binder,
+      domain,
+      body,
+    );
+  letExpr = (type: LeanValue, value: LeanValue, body: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      builder,
+      binderName,
+      type,
+      value,
+      body,
+      leanBool(false),
+    );
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    builder,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+  x = fvar("x");
+  y = fvar("y");
+  z = fvar("z");
+  missing = fvar("missing");
+  fvars = LeanArray(Array[x, y, z]);
+  shared = app(z, x);
+  projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    builder,
+    name("Pair"),
+    LeanNatLiterals.n0,
+    y,
+  );
+  metadata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    LeanCtor(LeanTag.List_nil, Array[]),
+    shared,
+  );
+  cases: Array<(String, LeanValue, LeanValue, Array<Int>)> = Array[
+    ("empty fvars", LeanArray(Array[]), x, Array[]),
+    ("no free variables", fvars, prop, Array[]),
+    ("missing fvar", fvars, missing, Array[]),
+    ("singleton", fvars, y, Array[1]),
+    ("repeated occurrence", fvars, app(y, y), Array[1]),
+    ("reverse discovery", fvars, app(z, app(y, x)), Array[0, 1, 2]),
+    ("first repeated input", LeanArray(Array[y, x, y]), y, Array[0]),
+    ("reordered input", LeanArray(Array[z, x, y]), app(y, z), Array[0, 2]),
+    ("app without fvars", fvars, app(bound, bound), Array[]),
+    ("lambda domain", fvars, lam(z, bound), Array[2]),
+    ("lambda body", fvars, lam(prop, x), Array[0]),
+    ("closed lambda", fvars, lam(prop, bound), Array[]),
+    ("forall domain", fvars, forallExpr(y, bound), Array[1]),
+    ("forall body", fvars, forallExpr(prop, z), Array[2]),
+    ("closed forall", fvars, forallExpr(prop, bound), Array[]),
+    ("let type", fvars, letExpr(z, prop, bound), Array[2]),
+    ("let value", fvars, letExpr(prop, y, bound), Array[1]),
+    ("let body", fvars, letExpr(prop, prop, x), Array[0]),
+    ("closed let", fvars, letExpr(prop, prop, bound), Array[]),
+    ("projection", fvars, projection, Array[1]),
+    ("metadata", fvars, metadata, Array[0, 2]),
+    ("shared expression", fvars, app(shared, shared), Array[0, 2]),
+  ];
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37)]));
+    saved = runtime.checkpoint();
+    for ((label, variables, expr, indices) in cases) {
+      checkCollectDeps(saved, label, variables, expr, indices)
+    }
+  };
+  print_string("collectDeps: 44 checks passed\n")
+}

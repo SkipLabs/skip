@@ -177,6 +177,29 @@ the earlier ten-worker authorization.
 cases and generated input hashes. This records scope, not completed execution
 coverage. A matching executable snapshot and observed-entry run are still needed.
 
+### Second checkpoint (2026-11-09)
+
+The floating-literal candidate predicate, prefix search, dependency-collection
+entry and WHNF recursion-depth entry are integrated and validated. The
+[second batch audit](provenance/rewrite-batches/2026-11-09-wave-02.json) records
+34 floating-literal cases, 310 prefix comparisons, 44 dependency checks and 19
+WHNF comparisons, plus 36 existing function-info regression checks. Incremental
+release type-checking passes; all four retained source files restore exactly to
+`796037fe7` by reversing their recorded fallback renames/self-call changes.
+
+The packet and integration tools were used for all four functions. Vibe supplied
+the floating-literal draft; Codex completed the other rewrites and stateful
+fixtures after provider quota failures stopped the workers. A test comparison
+needed correction: copying a constructor tree can change an array's element
+specialization, making `native_eq` reject equal contents. Input-preservation and
+copied-error-source expectations now compare contents, with seven positive and
+negative checks. Old/new result and reference comparisons remain exact.
+
+These are structured control-flow conversions with boxed interfaces. The
+dependency visitor/sorter and deeper WHNF helpers remain shared. Complete path
+coverage, coherent typed interfaces, whole-proof validation and timing remain
+open; this checkpoint does not establish a speedup.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree

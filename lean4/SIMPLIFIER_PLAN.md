@@ -21,7 +21,7 @@ seed inventory. Its 85 initial frame candidates are not complete execution
 coverage. The revised estimate is about 5–8 working days for the example-scoped
 rewrite, review and final benchmark. The original 24–48 active-hour estimate was
 optimistic: stateful fixture coverage and review cost more than draft production.
-The next batch will trial compact task packets, guarded integration and shared
+The second batch used compact task packets, guarded integration and shared
 probe fixtures to reduce repeated mechanical work. This does not invoke the
 historical transpiler or change Skip's compiler/runtime.
 
@@ -104,6 +104,19 @@ stable valid map. Decidable=true and downstream runtime/interrupt/helper errors
 still need additional coverage. Trace-enabled entry behavior retains the old
 body. These are control-flow rewrites with boxed interfaces; typed conversion,
 whole-example validation and performance assessment remain pending.
+
+The second batch adds `ExprDefEq/FloatCandidate.sk`,
+`DiscrTree/Main/PrefixMatch.sk`, `FunInfo/Dependencies.sk` and `WHNF/Entry.sk`.
+Incremental release checking passes, along with 34 floating-literal cases, 310
+prefix comparisons (including real hash collisions and arbitrary Nat arities),
+44 dependency checks and 19 WHNF depth/cache checks. The existing 22 parameter
+and 14 class/output-parameter cases still pass. Seven test-harness checks cover
+copied-array comparison across element specializations and rejection of changed
+contents. The [second audit](provenance/rewrite-batches/2026-11-09-wave-02.json)
+records exact hashes and limitations. All four retained source files restore
+byte-for-byte to `796037fe7` by reversing only recorded fallback identity changes.
+These entries retain boxed interfaces; the deeper visitor/sorter and WHNF helpers
+remain shared. Vibe quota failures stopped launches; Codex/local work continues.
 
 Use `skargo check` while editing and a measurement release build after the example
 path rewrite type-checks and focused checks pass. `skargo check --release` checks the release

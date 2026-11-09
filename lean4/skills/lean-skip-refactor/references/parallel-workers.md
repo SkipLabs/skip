@@ -212,6 +212,12 @@ using its environment builder. It does not generate semantic cases: expected
 outcomes, branch coverage, repeated-call state and unsupported-path assertions
 remain the task owner's responsibility. Its copying helper rebuilds constructors
 and ordinary arrays; other immutable value representations remain shared.
+`rewriteProbeSameInput` compares those copied trees by contents: copying can
+change an array's element specialization, which makes `native_eq` report unequal
+arrays even when every element matches. Use this comparison for copied-input
+preservation and expected results that embed a copy. Keep exact old/new result
+and reference comparisons where both routes use the same representations. This
+helper is a test comparison, not expression equality or a cache-key policy.
 
 ```sh
 python3 tools/probe.py --release --rewrite-harness \

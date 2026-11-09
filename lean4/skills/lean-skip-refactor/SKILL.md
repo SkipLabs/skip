@@ -27,7 +27,8 @@ adapters. `src/Elaboration/` connects typed inputs to the maintained Meta code;
 Read [REWRITE_PLAN.md](../../REWRITE_PLAN.md) for the current example-scoped
 rewrite and completion criteria. For delegation, also read
 [parallel-workers.md](references/parallel-workers.md). The user permits at most
-ten Vibe instances; two peer Codex agents can review and coordinate alongside
+ten Vibe instances, subject to provider quotas; current quota failures have
+stopped Vibe launches. Two peer Codex agents can review and coordinate alongside
 the primary. Task ownership and the single compiler queue remain explicit.
 Use the packet/integration tools and shared probe fixtures documented in that
 reference to avoid repeating extraction, fallback preservation and test setup.

@@ -1,0 +1,70 @@
+// Enter weak-head normalization under Lean's recursion-depth guard.
+module L4_Lean_Meta_WHNF;
+
+fun f_Lean_Meta_whnfImp_1c79221716(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanTag(coreContext) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(coreContext, 0);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  currentDepth = leanField(coreContext, 1);
+  maximumDepth = leanField(cold, 3);
+  unlimited = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    runtime,
+    maximumDepth,
+    LeanNatLiterals.n0,
+  );
+  if (!leanIsTrue(unlimited)) {
+    atLimit = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      runtime,
+      currentDepth,
+      maximumDepth,
+    );
+    if (leanIsTrue(atLimit)) {
+      return f_Meta_whnfImp_spec_7_29fc25698b(
+        runtime,
+        leanField(coreContext, 2),
+        world,
+      )
+    }
+  };
+  nextDepth = L4_Init_Prelude.f_Nat_add_86990f4822(
+    runtime,
+    currentDepth,
+    LeanNatLiterals.n1,
+  );
+  deeperContext = LeanCtor(
+    LeanTag.Core_Context_mk,
+    Array[
+      cold,
+      nextDepth,
+      leanField(coreContext, 2),
+      leanField(coreContext, 3),
+      LeanErased(),
+      leanField(coreContext, 5),
+      leanField(coreContext, 6),
+      leanField(coreContext, 7),
+    ],
+  );
+  f_Meta_whnfImp_spec_6_f07976f502(
+    runtime,
+    expression,
+    metaContext,
+    metaStateRef,
+    deeperContext,
+    coreStateRef,
+    world,
+  )
+}
+
+module end;

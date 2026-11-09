@@ -1,0 +1,104 @@
+{
+  "scope": "Four control-flow rewrites; typed interfaces, complete execution coverage and whole-example performance remain pending.",
+  "skargo_check": "incremental release passed",
+  "retained_body_audit": "All four original source files restore byte-for-byte to 796037fe7 by reversing only fallback identity/self-recursion changes.",
+  "integration_regressions": [
+    "22 FunInfo parameter traversal checks",
+    "14 FunInfo class/output-parameter cases",
+    "7 input-snapshot comparator checks"
+  ],
+  "harness": {
+    "source": "tests/Support/RewriteProbe.sk",
+    "source_sha256": "377db8f9a59a66d9728fec4a2928eb63ea5b3dcf5f55c51ac50026a361b15647",
+    "probe": "tests/RewriteProbeInputProbe.sk",
+    "probe_sha256": "d5988d0867acdcfbc44479611eefd0c754f13491b0a7c7c612d8402725e5f957",
+    "note": "Copied constructor/array trees compare by contents because array element specialization can change on copy. Differential old/new result and reference comparisons remain exact."
+  },
+  "records": [
+    {
+      "function": "L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isFloatLitCandidate_2c7d66a6cd",
+      "original_source": "sources/Modules/Lean/Meta/ExprDefEq/Runtime001.sk",
+      "current_source": "sources/Modules/Lean/Meta/ExprDefEq/FloatCandidate.sk",
+      "baseline_commit": "796037fe7",
+      "original_body_sha256": "67bc7c7652248029a61f341f39951796fb7ca3d868f84a22211bf9f36d946dc7",
+      "fallback_body_sha256": "e0732d4cfb31037fd64e73f09dfbbb0984d2a5d3fe739a7c5d8c8ce921d99ead",
+      "current_catalog_body_sha256": "0a1ea7c910e0fe81af97fd411ef57b5cb2f27c9e5be076ed53df4573e6c24a97",
+      "checks": [
+        "34 explicit syntax cases with unchanged references"
+      ],
+      "probes": [
+        "tests/FloatCandidateProbe.sk"
+      ],
+      "probe_sha256": "8d8df5d8d3d62aef345f34cc3f226cf6b18c58364d1e7ead211946965bb3154d",
+      "limits": [
+        "Syntactic candidate filter only; does not infer types or validate the floating literal.",
+        "Expression and Name helpers are shared with the retained route."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_FunInfo.f_Lean_Meta_collectDeps_56366e190e",
+      "original_source": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/FunInfo/Dependencies.sk",
+      "baseline_commit": "796037fe7",
+      "original_body_sha256": "886bdfdde9e48f4931d29f39fb49b07cba72fffac773d641d38263935c6bc3ed",
+      "fallback_body_sha256": "970bdcad17beb65b619a4abe827fdf5849d461c8467233baa8ffb6b213cb296f",
+      "current_catalog_body_sha256": "61bb38f6a2f10bdd7155467387e9514d1be871c5582d0583778e5aa18e08d05c",
+      "checks": [
+        "44 checks: 22 explicit expression/dependency cases with primitive profiling off and on",
+        "Sorted unique indices, first repeated fvar index, copied inputs and populated references preserved"
+      ],
+      "probes": [
+        "tests/CollectDependenciesProbe.sk"
+      ],
+      "probe_sha256": "fccff28b84bb7bc204d5a9eb4d0350ceb129bb20e01d37dba2ff72a9f7e2459a",
+      "limits": [
+        "Visitor and sorter remain shared; this batch converts the collection/sort entry only.",
+        "Primitive diagnostic call counts intentionally differ after removing tautological Nat clamps."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_WHNF.f_Lean_Meta_whnfImp_1c79221716",
+      "original_source": "sources/Modules/Lean/Meta/WHNF/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/WHNF/Entry.sk",
+      "baseline_commit": "796037fe7",
+      "original_body_sha256": "cc505e0ce534ec971dc754726edc9c4932f07b083f38548f7d58d650920ee9cf",
+      "fallback_body_sha256": "088a56078b24d3d4582b60a1eac8ca5f2031441a8f36c66d02f8a26b3373f024",
+      "current_catalog_body_sha256": "e65dab37960ea3790843178537d63f91cfc2e1bd1ed869eb943240a1097887de",
+      "checks": [
+        "19 result/world/reference comparisons with independent success/error expectations",
+        "Unlimited, equal, above and below depth bounds, including values beyond UInt64",
+        "Nested unfolding observes incremented depth; repeated calls verify cache publication and guard precedence"
+      ],
+      "probes": [
+        "tests/WhnfEntryProbe.sk"
+      ],
+      "probe_sha256": "a068b2a90133ded7fe23820d73a063ea9d55d52a306da76eaa7092c8c443e419",
+      "limits": [
+        "The deeper WHNF dispatcher and recursive helpers are shared; this independently compares the outer depth guard only.",
+        "Input preservation checks cover the copied Core context constructor/array tree; other immutable representations remain shared."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_DiscrTree_Main.f_DiscrTree_getMatchWithExtra_mayMatchPrefix_ef47d0e14e",
+      "original_source": "sources/Modules/Lean/Meta/DiscrTree/Main/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/DiscrTree/Main/PrefixMatch.sk",
+      "baseline_commit": "796037fe7",
+      "original_body_sha256": "520b4bed8ed5f5dfb9d74c1f4b11b9bde4a781ea6c5b4c5cd6954797cf7869f8",
+      "fallback_body_sha256": "8254b16de3874e90854b3aabb2b4c07049ef35bb30bc614db100a6534de5ccaa",
+      "current_catalog_body_sha256": "e83749c22d761281bf2196e35c53c4ce2f0d61a73ee2948ea4e0edb625430629",
+      "checks": [
+        "310 result/world/reference comparisons: 155 expected cases across two world values",
+        "All key constructors, decreasing arities, original-key exclusion, wrong heads/projection indices and real full-hash collisions",
+        "Scalar and canonical arbitrary Nat arities across 2^63, 2^64 and above 2^128"
+      ],
+      "probes": [
+        "tests/DiscrTreePrefixProbe.sk"
+      ],
+      "probe_sha256": "394805313bbb76ea5b61bf1516aba458cb7f14e86ddf56f3cad63ba1e83d2d8f",
+      "limits": [
+        "Hash-map lookup, hashing and Nat helpers are shared.",
+        "The retained prefix routine redirects its direct self-call, preserving an independent prefix traversal oracle."
+      ]
+    }
+  ]
+}

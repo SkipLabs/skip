@@ -1,0 +1,239 @@
+// Probe for the rewritten float-literal candidate filter. Calls both the
+// rewritten identity and the coordinator-retained fallback on every fixture.
+
+fun exprApp(
+  runtime: mutable LeanExecution,
+  f: LeanValue,
+  a: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, f, a)
+}
+
+fun constExpr(runtime: mutable LeanExecution, n: LeanValue): LeanValue {
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    n,
+    LeanCtor(LeanTag.List_nil, Array[]),
+  )
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  sort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  x = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  implicit = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+  bvar0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+  fvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, x);
+  mvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, x);
+  natLit = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(3));
+  strLit = L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("a"));
+  lam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    implicit,
+    sort,
+    bvar0,
+  );
+  all = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    x,
+    implicit,
+    sort,
+    bvar0,
+  );
+  binding = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    x,
+    sort,
+    bvar0,
+    bvar0,
+    leanBool(true),
+  );
+  pair = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Pair"),
+  );
+  proj = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    runtime,
+    pair,
+    leanNatValue(0),
+    lam,
+  );
+  marker = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("marker"),
+  );
+  metadata = LeanCtor(
+    LeanTag.List_cons,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[
+          marker,
+          LeanCtor(LeanTag.DataValue_ofNat, Array[leanNatValue(7)]),
+        ],
+      ),
+      nil,
+    ],
+  );
+  ofNatName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("OfNat"),
+    LeanText("ofNat"),
+  );
+  ofScientificName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("OfScientific"),
+    LeanText("ofScientific"),
+  );
+  negName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Neg"),
+    LeanText("neg"),
+  );
+  floatName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Float"),
+  );
+  float32Name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Float32"),
+  );
+  natName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Nat"),
+  );
+  ofNatHead = constExpr(runtime, ofNatName);
+  ofScientificHead = constExpr(runtime, ofScientificName);
+  negHead = constExpr(runtime, negName);
+  floatConst = constExpr(runtime, floatName);
+  float32Const = constExpr(runtime, float32Name);
+  natConst = constExpr(runtime, natName);
+  // Universe levels on the head constant do not affect name recognition.
+  levelledOfNatHead = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    ofNatName,
+    LeanCtor(LeanTag.List_cons, Array[zero, nil]),
+  );
+  // Quoted/qualified lookalike names must not match.
+  quotedOfNatHead = constExpr(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("OfNat.ofNat"),
+    ),
+  );
+  wrongPrefixHead = constExpr(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("Foo"),
+      LeanText("ofNat"),
+    ),
+  );
+  offSuffixHead = constExpr(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("OfNat"),
+      LeanText("ofNatExtra"),
+    ),
+  );
+  quotedNegHead = constExpr(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("Neg.neg")),
+  );
+  mdataFloat = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    floatConst,
+  );
+  mdataApp = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    exprApp(runtime, ofNatHead, floatConst),
+  );
+  partialFloat = exprApp(runtime, ofNatHead, floatConst);
+  twoArguments = exprApp(runtime, partialFloat, natLit);
+  ordinaryArity = exprApp(runtime, twoArguments, strLit);
+  oversaturated = exprApp(runtime, ordinaryArity, bvar0);
+  wrongFirstArg = exprApp(
+    runtime,
+    exprApp(runtime, ofNatHead, natConst),
+    floatConst,
+  );
+  appHeaded = exprApp(
+    runtime,
+    exprApp(runtime, floatConst, natConst),
+    floatConst,
+  );
+  fixtures = Array[
+    (floatConst, false),
+    (sort, false),
+    (bvar0, false),
+    (fvar, false),
+    (mvar, false),
+    (natLit, false),
+    (strLit, false),
+    (lam, false),
+    (all, false),
+    (binding, false),
+    (proj, false),
+    (mdataApp, false),
+    (ofNatHead, false),
+    (partialFloat, true),
+    (exprApp(runtime, ofNatHead, float32Const), true),
+    (exprApp(runtime, ofNatHead, natConst), false),
+    (exprApp(runtime, ofScientificHead, floatConst), true),
+    (exprApp(runtime, ofScientificHead, float32Const), true),
+    (exprApp(runtime, ofScientificHead, natConst), false),
+    (exprApp(runtime, negHead, floatConst), true),
+    (exprApp(runtime, negHead, float32Const), true),
+    (exprApp(runtime, negHead, natConst), false),
+    (twoArguments, true),
+    (ordinaryArity, true),
+    (oversaturated, true),
+    (wrongFirstArg, false),
+    (exprApp(runtime, levelledOfNatHead, floatConst), true),
+    (exprApp(runtime, quotedOfNatHead, floatConst), false),
+    (exprApp(runtime, wrongPrefixHead, floatConst), false),
+    (exprApp(runtime, offSuffixHead, floatConst), false),
+    (exprApp(runtime, quotedNegHead, floatConst), false),
+    (mdataFloat, false),
+    (exprApp(runtime, ofNatHead, mdataFloat), false),
+    (appHeaded, false),
+  ];
+  for (fixture in fixtures) {
+    e = fixture.i0;
+    expected = fixture.i1;
+    before = runtime.checkpoint().refs;
+    result = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isFloatLitCandidate_2c7d66a6cd(
+      runtime,
+      e,
+    );
+    fallback = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isFloatLitCandidate_2c7d66a6cd_fallback(
+      runtime,
+      e,
+    );
+    // Retained-body equivalence and exact Bool wrapper for the expected outcome.
+    assert(native_eq(result, fallback) == 0);
+    assert(native_eq(result, leanBool(expected)) == 0);
+    assert(leanIsTrue(result) == expected);
+    assert(native_eq(before, runtime.checkpoint().refs) == 0)
+  };
+  // Expressions are immutable values; rebuilding fixtures after the calls shows
+  // the predicate left its inputs structurally unchanged.
+  rebuiltTwoArguments = exprApp(
+    runtime,
+    exprApp(runtime, ofNatHead, floatConst),
+    natLit,
+  );
+  rebuiltOrdinary = exprApp(runtime, rebuiltTwoArguments, strLit);
+  assert(native_eq(ordinaryArity, rebuiltOrdinary) == 0);
+  rebuiltOversaturated = exprApp(runtime, rebuiltOrdinary, bvar0);
+  assert(native_eq(oversaturated, rebuiltOversaturated) == 0);
+  assert(fixtures.size() == 34);
+  print_string("34 floating-literal candidate cases passed")
+}

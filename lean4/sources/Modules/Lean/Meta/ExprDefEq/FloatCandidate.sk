@@ -1,0 +1,79 @@
+// Recognize floating literal syntax from its head and first type argument.
+module L4_Lean_Meta_ExprDefEq;
+
+fun f_Lean_Meta_isFloatLitCandidate_2c7d66a6cd(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+): LeanValue {
+  isApplication = L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(
+    runtime,
+    expression,
+  );
+  if (!leanIsTrue(isApplication)) {
+    return isApplication;
+  };
+  ofNatName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("OfNat"),
+    LeanText("ofNat"),
+  );
+  hasLiteralHead = leanIsTrue(
+    L4_Lean_Expr.f_Lean_Expr_isAppOf_9d840508c5(runtime, expression, ofNatName),
+  );
+  if (!hasLiteralHead) {
+    ofScientificName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("OfScientific"),
+      LeanText("ofScientific"),
+    );
+    !hasLiteralHead = leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isAppOf_9d840508c5(
+        runtime,
+        expression,
+        ofScientificName,
+      ),
+    )
+  };
+  if (!hasLiteralHead) {
+    negName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("Neg"),
+      LeanText("neg"),
+    );
+    !hasLiteralHead = leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isAppOf_9d840508c5(runtime, expression, negName),
+    )
+  };
+  if (!hasLiteralHead) {
+    return leanBool(false);
+  };
+  // First argument of the application: getRevArg e (numArgs - 1) counts from the end.
+  numArgs = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+    runtime,
+    expression,
+  );
+  firstArg = L4_Lean_Expr.f_Lean_Expr_getRevArg_587d3ee448(
+    runtime,
+    expression,
+    L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, numArgs, LeanNatLiterals.n1),
+  );
+  floatName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Float"),
+  );
+  isFloatConst = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+    runtime,
+    firstArg,
+    floatName,
+  );
+  if (leanIsTrue(isFloatConst)) {
+    return isFloatConst;
+  };
+  float32Name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Float32"),
+  );
+  L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(runtime, firstArg, float32Name)
+}
+
+module end;

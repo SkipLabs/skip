@@ -1,0 +1,51 @@
+// Collect free-variable indices, then sort the unique dependencies.
+module L4_Lean_Meta_FunInfo;
+
+fun f_Lean_Meta_collectDeps_56366e190e(
+  runtime: mutable LeanExecution,
+  fvars: LeanValue,
+  expr: LeanValue,
+): LeanValue {
+  empty = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    runtime,
+    LeanErased(),
+    LeanNatLiterals.n0,
+  );
+  dependencies = f_Meta_collectDeps_visit_c7a0fd662b(
+    runtime,
+    fvars,
+    expr,
+    empty,
+  );
+  count = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    dependencies,
+  );
+  if (
+    leanIsTrue(
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        runtime,
+        count,
+        LeanNatLiterals.n0,
+      ),
+    )
+  ) {
+    return dependencies
+  };
+
+  last = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+    runtime,
+    count,
+    LeanNatLiterals.n1,
+  );
+  f_Meta_collectDeps_spec_0_7edefeebb8(
+    runtime,
+    count,
+    dependencies,
+    LeanNatLiterals.n0,
+    last,
+  )
+}
+
+module end;

@@ -1,0 +1,25 @@
+// Input snapshots compare contents even when array specialization changes.
+fun main(): void {
+  one = LeanCtor(LeanTag.Option_none, Array[]);
+  original = LeanArray(Array[one]);
+  copied = rewriteProbeCopyInput(original);
+  assert(rewriteProbeSameInput(original, copied));
+  assert(rewriteProbeSameInput(copied, original));
+  assert(!rewriteProbeSameInput(original, LeanArray(Array[])));
+  differentTag = LeanCtor(LeanTag.List_nil, Array[]);
+  assert(!rewriteProbeSameInput(original, LeanArray(Array[differentTag])));
+  nested = LeanCtor(
+    LeanTag.Option_some,
+    Array[LeanArray(Array[leanNatValue(1)])],
+  );
+  changed = LeanCtor(
+    LeanTag.Option_some,
+    Array[LeanArray(Array[leanNatValue(2)])],
+  );
+  assert(rewriteProbeSameInput(nested, rewriteProbeCopyInput(nested)));
+  assert(!rewriteProbeSameInput(nested, changed));
+  assert(
+    !rewriteProbeSameInput(nested, LeanCtor(LeanTag.Option_some, Array[])),
+  );
+  print_string("7 input-snapshot comparison checks passed\n")
+}
