@@ -14,20 +14,20 @@ fun leanEnvironment(
     "imported extra IR constants",
   ),
 ): LeanValue {
-  none: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  nil: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   leaf: LeanValue = LeanCtor(
-    "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+    LeanTag.Std_DTreeMap_Internal_Impl_leaf,
     Array[],
   );
   hashMap: LeanValue = LeanCtor(
-    "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+    LeanTag.PersistentHashMap_Node_entries,
     Array[
       LeanArray(
         Array::fill(
           32,
           LeanCtor(
-            "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]",
+            LeanTag.PersistentHashMap_Entry_null,
             Array[],
           ),
         ),
@@ -35,22 +35,22 @@ fun leanEnvironment(
     ],
   );
   constants: LeanValue = LeanCtor(
-    "[\"Lean\",\"ConstMap\",\"mk\"]",
+    LeanTag.ConstMap_mk,
     Array[
       LeanCtor(
-        "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+        LeanTag.ImportedConsts_mk,
         Array[none, LeanTrackedConstants(imports)],
       ),
       LeanTrackedConstants(locals),
     ],
   );
   kernel: LeanValue = LeanCtor(
-    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"Kernel\",\"Environment\",\"mk\"]",
+    LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk,
     Array[
       constants,
       leanBool(quotInitialized),
       LeanCtor(
-        "[\"Lean\",\"Kernel\",\"Diagnostics\",\"mk\"]",
+        LeanTag.Kernel_Diagnostics_mk,
         Array[hashMap, leanBool(false)],
       ),
       importedExtraConstants,
@@ -64,9 +64,9 @@ fun leanEnvironment(
   asyncConsts = L4_Lean_Environment.f_Lean_instInhabitedAsyncConsts_default_13eda108e4(
     runtime,
   );
-  visibility = "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"VisibilityMap\",\"mk\"]";
+  visibility = LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk;
   LeanCtor(
-    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"Environment\",\"mk\"]",
+    LeanTag.Private_Lean_Environment_0_Lean_Environment_mk,
     Array[
       LeanCtor(visibility, Array[kernel, kernel]),
       LeanUnavailable("server environment extension state"),
@@ -80,7 +80,7 @@ fun leanEnvironment(
       leanBool(false),
       none,
       LeanCtor(
-        "[\"Lean\",\"DeclChangeLog\",\"mk\"]",
+        LeanTag.DeclChangeLog_mk,
         Array[leanNatValue(0), nil],
       ),
       leanNatValue(0),
@@ -95,14 +95,14 @@ fun leanEnvironment(
 fun leanEmptyEnvironmentHeader(): LeanValue {
   empty: LeanValue = LeanArray(Array[]);
   moduleIndices: LeanValue = LeanCtor(
-    "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+    LeanTag.Std_DHashMap_Raw_mk,
     Array[
       leanNatValue(0),
       LeanArray(
         Array::fill(
           8,
           LeanCtor(
-            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            LeanTag.Std_DHashMap_Internal_AssocList_nil,
             Array[],
           ),
         ),
@@ -110,10 +110,10 @@ fun leanEmptyEnvironmentHeader(): LeanValue {
     ],
   );
   LeanCtor(
-    "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]",
+    LeanTag.Private_Lean_Environment_0_Lean_EnvironmentHeader_mk,
     Array[
       LeanWord("uint32", 0),
-      LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
       leanBool(false),
       empty,
       empty,

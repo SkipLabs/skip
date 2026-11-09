@@ -9,7 +9,7 @@ fun leanNameLt(
 }
 
 fun leanLevelOrderData(value: LeanValue): Int {
-  if (leanTag(value) == "[\"Lean\",\"Level\",\"zero\",\"_impl\"]") 2221 else {
+  if (leanTag(value) == LeanTag.Level_zero__impl) 2221 else {
     leanWordBits(leanField(value, 0))
   }
 }
@@ -31,13 +31,13 @@ fun leanLevelLt(
   };
   if (leanLevelEqual(a, b)) return false;
   leanTag(a) match {
-  | "[\"Lean\",\"Level\",\"param\",\"_impl\"]"
-  | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
+  | LeanTag.Level_param__impl
+  | LeanTag.Level_mvar__impl ->
     leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
-  | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+  | LeanTag.Level_succ__impl ->
     leanLevelLt(runtime, leanField(a, 1), leanField(b, 1), quick)
-  | "[\"Lean\",\"Level\",\"max\",\"_impl\"]"
-  | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+  | LeanTag.Level_max__impl
+  | LeanTag.Level_imax__impl ->
     index = if (leanLevelEqual(leanField(a, 1), leanField(b, 1))) 2 else 1;
     leanLevelLt(runtime, leanField(a, index), leanField(b, index), quick)
   | _ -> leanFail("invalid universe in expression ordering")
@@ -53,10 +53,10 @@ fun leanLevelListLt(
   left = a;
   right = b;
   loop {
-    if (leanTag(left) == "[\"List\",\"nil\"]") {
-      return leanTag(right) != "[\"List\",\"nil\"]"
+    if (leanTag(left) == LeanTag.List_nil) {
+      return leanTag(right) != LeanTag.List_nil
     };
-    if (leanTag(right) == "[\"List\",\"nil\"]") return false;
+    if (leanTag(right) == LeanTag.List_nil) return false;
     if (!leanLevelEqual(leanField(left, 0), leanField(right, 0))) {
       return leanLevelLt(
         runtime,
@@ -79,18 +79,18 @@ fun leanMetadataValueLt(
   bk = leanConstructorOrdinal(leanTag(b));
   if (ak != bk) return ak < bk;
   leanTag(a) match {
-  | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+  | LeanTag.DataValue_ofString ->
     leanText(leanField(a, 0)) < leanText(leanField(b, 0))
-  | "[\"Lean\",\"DataValue\",\"ofBool\"]" ->
+  | LeanTag.DataValue_ofBool ->
     !leanIsTrue(leanField(a, 0)) && leanIsTrue(leanField(b, 0))
-  | "[\"Lean\",\"DataValue\",\"ofName\"]" ->
+  | LeanTag.DataValue_ofName ->
     leanNameLt(runtime, leanField(a, 0), leanField(b, 0))
-  | "[\"Lean\",\"DataValue\",\"ofNat\"]" ->
+  | LeanTag.DataValue_ofNat ->
     leanNat(leanField(a, 0)) < leanNat(leanField(b, 0))
   // This is the pinned native comparator's exact behavior (util/kvmap.cpp),
   // whose Int and Syntax comparison is itself marked TODO.
-  | "[\"Lean\",\"DataValue\",\"ofInt\"]"
-  | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+  | LeanTag.DataValue_ofInt
+  | LeanTag.DataValue_ofSyntax ->
     false
   | _ -> leanFail("invalid metadata in expression ordering")
   }
@@ -104,10 +104,10 @@ fun leanMetadataLt(
   left = a;
   right = b;
   loop {
-    if (leanTag(left) == "[\"List\",\"nil\"]") {
-      return leanTag(right) != "[\"List\",\"nil\"]"
+    if (leanTag(left) == LeanTag.List_nil) {
+      return leanTag(right) != LeanTag.List_nil
     };
-    if (leanTag(right) == "[\"List\",\"nil\"]") return false;
+    if (leanTag(right) == LeanTag.List_nil) return false;
     l = leanField(left, 0);
     r = leanField(right, 0);
     if (!leanNameEqual(leanField(l, 0), leanField(r, 0))) {
@@ -138,7 +138,7 @@ fun leanExprLt(
   if (quick && ah != bh) return ah < bh;
   if (leanExprEqual(runtime, a, b, false)) return false;
   leanTag(a) match {
-  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+  | LeanTag.Expr_lit__impl ->
     leanIsTrue(
       L4_Lean_Expr.f_Lean_Literal_lt_f9e1f7bc0a(
         runtime,
@@ -146,35 +146,35 @@ fun leanExprLt(
         leanField(b, 1),
       ),
     )
-  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]" ->
+  | LeanTag.Expr_bvar__impl ->
     leanNat(leanField(a, 1)) < leanNat(leanField(b, 1))
-  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
+  | LeanTag.Expr_fvar__impl
+  | LeanTag.Expr_mvar__impl ->
     leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
-  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+  | LeanTag.Expr_sort__impl ->
     leanLevelLt(runtime, leanField(a, 1), leanField(b, 1), quick)
-  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+  | LeanTag.Expr_const__impl ->
     if (!leanNameEqual(leanField(a, 1), leanField(b, 1))) {
       leanNameLt(runtime, leanField(a, 1), leanField(b, 1))
     } else {
       leanLevelListLt(runtime, leanField(a, 2), leanField(b, 2), quick)
     }
-  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+  | LeanTag.Expr_app__impl ->
     index = if (
       leanExprEqual(runtime, leanField(a, 1), leanField(b, 1), false)
     ) 2 else {
       1
     };
     leanExprLt(runtime, leanField(a, index), leanField(b, index), quick)
-  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+  | LeanTag.Expr_lam__impl
+  | LeanTag.Expr_forallE__impl ->
     index = if (
       leanExprEqual(runtime, leanField(a, 2), leanField(b, 2), false)
     ) 3 else {
       2
     };
     leanExprLt(runtime, leanField(a, index), leanField(b, index), quick)
-  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+  | LeanTag.Expr_letE__impl ->
     if (leanIsTrue(leanField(a, 5)) != leanIsTrue(leanField(b, 5))) {
       return !leanIsTrue(leanField(a, 5))
     };
@@ -191,13 +191,13 @@ fun leanExprLt(
       }
     };
     false
-  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+  | LeanTag.Expr_mdata__impl ->
     if (!leanExprEqual(runtime, leanField(a, 2), leanField(b, 2), false)) {
       leanExprLt(runtime, leanField(a, 2), leanField(b, 2), quick)
     } else {
       leanMetadataLt(runtime, leanField(a, 1), leanField(b, 1))
     }
-  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+  | LeanTag.Expr_proj__impl ->
     if (!leanExprEqual(runtime, leanField(a, 3), leanField(b, 3), false)) {
       leanExprLt(runtime, leanField(a, 3), leanField(b, 3), quick)
     } else if (!leanNameEqual(leanField(a, 1), leanField(b, 1))) {

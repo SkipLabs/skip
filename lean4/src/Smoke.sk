@@ -1,29 +1,29 @@
 // Exercise maintained functions and the runtime needed to construct Meta state.
 fun leanSmoke(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   anonymous: LeanValue = LeanCtor(
-    "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+    LeanTag.Name_anonymous__impl,
     Array[],
   );
   named: LeanValue = LeanCtor(
-    "[\"Lean\",\"Name\",\"str\",\"_impl\"]",
+    LeanTag.Name_str__impl,
     Array[LeanScalar("uint64", "0"), anonymous, LeanText("smoke")],
   );
   assert(
     leanTag(
       L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(runtime, anonymous),
-    ) == "[\"Bool\",\"true\"]",
+    ) == LeanTag.Bool_true,
   );
   assert(
     leanTag(
       L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(runtime, named),
-    ) == "[\"Bool\",\"false\"]",
+    ) == LeanTag.Bool_false,
   );
   assert(
     leanTag(
       L4_Lean_Data_Name.f_Lean_Name_getPrefix_0e6a878b3f(runtime, named),
-    ) == "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+    ) == LeanTag.Name_anonymous__impl,
   );
   metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
     runtime,
@@ -31,13 +31,13 @@ fun leanSmoke(): void {
   metaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
     runtime,
   );
-  assert(leanTag(metaContext) == "[\"Lean\",\"Meta\",\"Context\",\"mk\"]");
-  assert(leanTag(metaState) == "[\"Lean\",\"Meta\",\"State\",\"mk\"]");
+  assert(leanTag(metaContext) == LeanTag.Meta_Context_mk);
+  assert(leanTag(metaState) == LeanTag.Meta_State_mk);
   leanCheckPublishable(metaContext);
   leanCheckPublishable(metaState);
-  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
   prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
-  assert(leanTag(prop) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(leanTag(prop) == LeanTag.Expr_sort__impl);
   bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(3));
   assert(leanExprData(bvar).ushr(44) == 4)
 }

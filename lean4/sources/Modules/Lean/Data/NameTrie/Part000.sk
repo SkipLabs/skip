@@ -7,12 +7,12 @@ fun f_NameTrie_find_spec_0_17ed074d1d(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"PrefixTreeNode\",\"Node\"]" ->
+  | LeanTag.PrefixTreeNode_Node ->
     _a_3_2: LeanValue = leanField(_x_1_0, 0);
     _a_4_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_x_2_1) match {
-    | "[\"List\",\"nil\"]" -> _a_3_2
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_nil -> _a_3_2
+    | LeanTag.List_cons ->
       _head_5_4: LeanValue = leanField(_x_2_1, 0);
       _tail_6_5: LeanValue = leanField(_x_2_1, 1);
       _x_7_6: LeanValue = f_insert_spec_0_spec_1_efc3cca8f0(
@@ -21,8 +21,8 @@ fun f_NameTrie_find_spec_0_17ed074d1d(
         _head_5_4,
       );
       leanTag(_x_7_6) match {
-      | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+      | LeanTag.Option_some ->
         _val_9_7: LeanValue = leanField(_x_7_6, 0);
         f_NameTrie_find_spec_0_17ed074d1d(_runtime, _val_9_7, _tail_6_5)
       | _ -> leanFail("non-exhaustive Lean case")
@@ -40,7 +40,7 @@ fun f_NameTrie_Lean_toKey_2ff47994d0(
   f_Lean_toKey_loop_b12a226d87(
     _runtime,
     _n_0,
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
   )
 }
 // "panic._at_.Std.DTreeMap.Internal.Impl.insert!._at_._private.Lean.Data.PrefixTree.0.Lean.PrefixTreeNode.insert.loop._at_.Lean.NameTrie.insert.spec_0.spec_0.spec_1._redArg"
@@ -51,7 +51,7 @@ fun f_spec_0_spec_0_spec_1_7c35ab98f0(
   L4_Init_Prelude.f_panicCore_3292f922f8(
     _runtime,
     LeanErased(),
-    LeanCtor("[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]", Array[]),
+    LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]),
     _msg_0,
   )
 }
@@ -75,21 +75,21 @@ fun f_NameTrie_insert_spec_0_b0d0618b34(
     pc match {
     | 0 ->
       leanTag(_frame[1]) match {
-      | "[\"Lean\",\"PrefixTreeNode\",\"Node\"]" ->
+      | LeanTag.PrefixTreeNode_Node ->
         _frame.set(3, leanField(_frame[1], 0));
         _frame.set(4, leanField(_frame[1], 1));
         leanTag(_frame[2]) match {
-        | "[\"List\",\"nil\"]" ->
-          _frame.set(7, LeanCtor("[\"Option\",\"some\"]", Array[_frame[0]]));
+        | LeanTag.List_nil ->
+          _frame.set(7, LeanCtor(LeanTag.Option_some, Array[_frame[0]]));
           _frame.set(
             8,
             LeanCtor(
-              "[\"Lean\",\"PrefixTreeNode\",\"Node\"]",
+              LeanTag.PrefixTreeNode_Node,
               Array[_frame[7], _frame[4]],
             ),
           );
           return _frame[8]
-        | "[\"List\",\"cons\"]" ->
+        | LeanTag.List_cons ->
           _frame.set(5, leanField(_frame[2], 0));
           _frame.set(6, leanField(_frame[2], 1));
           _frame.set(
@@ -97,7 +97,7 @@ fun f_NameTrie_insert_spec_0_b0d0618b34(
             f_insert_spec_0_spec_1_efc3cca8f0(_runtime, _frame[4], _frame[5]),
           );
           leanTag(_frame[12]) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             _frame.set(
               14,
               f_insert_spec_0_spec_2_8f356a4dd2(_runtime, _frame[0], _frame[6]),
@@ -106,7 +106,7 @@ fun f_NameTrie_insert_spec_0_b0d0618b34(
             _frame.set(9, _jump0);
             !pc = 1;
             void
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(13, leanField(_frame[12], 0));
             _frame.set(
               15,
@@ -140,7 +140,7 @@ fun f_NameTrie_insert_spec_0_b0d0618b34(
       _frame.set(
         11,
         LeanCtor(
-          "[\"Lean\",\"PrefixTreeNode\",\"Node\"]",
+          LeanTag.PrefixTreeNode_Node,
           Array[_frame[3], _frame[10]],
         ),
       );
@@ -156,18 +156,18 @@ fun f_insert_spec_0_spec_2_8f356a4dd2(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_k_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     LeanCtor(
-      "[\"Lean\",\"PrefixTreeNode\",\"Node\"]",
+      LeanTag.PrefixTreeNode_Node,
       Array[
-        LeanCtor("[\"Option\",\"some\"]", Array[_val_0]),
+        LeanCtor(LeanTag.Option_some, Array[_val_0]),
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_leaf,
           Array[],
         ),
       ],
     )
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_2: LeanValue = leanField(_k_1, 0);
     _tail_5_3: LeanValue = leanField(_k_1, 1);
     _t_7: LeanValue = f_insert_spec_0_spec_2_8f356a4dd2(
@@ -180,13 +180,13 @@ fun f_insert_spec_0_spec_2_8f356a4dd2(
       _head_4_2,
       _t_7,
       LeanCtor(
-        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        LeanTag.Std_DTreeMap_Internal_Impl_leaf,
         Array[],
       ),
     );
     LeanCtor(
-      "[\"Lean\",\"PrefixTreeNode\",\"Node\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _x_8_10],
+      LeanTag.PrefixTreeNode_Node,
+      Array[LeanCtor(LeanTag.Option_none, Array[]), _x_8_10],
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -211,7 +211,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
     pc match {
     | 0 ->
       leanTag(_frame[2]) match {
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
         _frame.set(3, leanField(_frame[2], 0));
         _frame.set(4, leanField(_frame[2], 1));
         _frame.set(5, leanField(_frame[2], 2));
@@ -222,7 +222,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
           f_Lean_NamePart_cmp_543f34a785(_runtime, _frame[0], _frame[4]),
         );
         leanTag(_frame[8]) match {
-        | "[\"Ordering\",\"lt\"]" ->
+        | LeanTag.Ordering_lt ->
           _frame.set(
             9,
             f_insert_spec_0_spec_0_7c26fdc6ce(
@@ -233,20 +233,20 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
             ),
           );
           leanTag(_frame[7]) match {
-          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+          | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
             _frame.set(10, leanField(_frame[7], 0));
             _ = leanField(_frame[7], 1);
             _ = leanField(_frame[7], 2);
             _ = leanField(_frame[7], 3);
             _ = leanField(_frame[7], 4);
             leanTag(_frame[9]) match {
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+            | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
               _frame.set(11, leanField(_frame[9], 0));
               _frame.set(12, leanField(_frame[9], 1));
               _frame.set(13, leanField(_frame[9], 2));
               _frame.set(14, leanField(_frame[9], 3));
               _frame.set(15, leanField(_frame[9], 4));
-              _frame.set(16, LeanScalar("nat", "3"));
+              _frame.set(16, LeanNatLiterals.n3);
               _frame.set(
                 17,
                 L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -264,8 +264,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 ),
               );
               leanTag(_frame[18]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(19, LeanScalar("nat", "1"));
+              | LeanTag.Bool_false ->
+                _frame.set(19, LeanNatLiterals.n1);
                 _frame.set(
                   20,
                   L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -285,7 +285,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 _frame.set(
                   22,
                   LeanCtor(
-                    "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                    LeanTag.Std_DTreeMap_Internal_Impl_inner,
                     Array[
                       _frame[21],
                       _frame[4],
@@ -296,22 +296,22 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   ),
                 );
                 return _frame[22]
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 leanTag(_frame[14]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _frame.set(23, leanField(_frame[14], 0));
                   _ = leanField(_frame[14], 1);
                   _ = leanField(_frame[14], 2);
                   _ = leanField(_frame[14], 3);
                   _ = leanField(_frame[14], 4);
                   leanTag(_frame[15]) match {
-                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                     _frame.set(24, leanField(_frame[15], 0));
                     _frame.set(25, leanField(_frame[15], 1));
                     _frame.set(26, leanField(_frame[15], 2));
                     _frame.set(27, leanField(_frame[15], 3));
                     _frame.set(28, leanField(_frame[15], 4));
-                    _frame.set(29, LeanScalar("nat", "2"));
+                    _frame.set(29, LeanNatLiterals.n2);
                     _frame.set(
                       30,
                       L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -329,8 +329,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       ),
                     );
                     leanTag(_frame[31]) match {
-                    | "[\"Bool\",\"false\"]" ->
-                      _frame.set(32, LeanScalar("nat", "1"));
+                    | LeanTag.Bool_false ->
+                      _frame.set(32, LeanNatLiterals.n1);
                       _frame.set(
                         33,
                         L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -356,7 +356,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                         ),
                       );
                       leanTag(_frame[27]) match {
-                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                         _frame.set(48, leanField(_frame[27], 0));
                         _ = leanField(_frame[27], 1);
                         _ = leanField(_frame[27], 2);
@@ -366,16 +366,16 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                         _frame.set(42, _jump0);
                         !pc = 2;
                         void
-                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                        _frame.set(49, LeanScalar("nat", "0"));
+                      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                        _frame.set(49, LeanNatLiterals.n0);
                         _jump0 = _frame[49];
                         _frame.set(42, _jump0);
                         !pc = 2;
                         void
                       | _ -> return leanFail("non-exhaustive Lean case")
                       }
-                    | "[\"Bool\",\"true\"]" ->
-                      _frame.set(50, LeanScalar("nat", "1"));
+                    | LeanTag.Bool_true ->
+                      _frame.set(50, LeanNatLiterals.n1);
                       _frame.set(
                         51,
                         L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -411,7 +411,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       _frame.set(
                         55,
                         LeanCtor(
-                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          LeanTag.Std_DTreeMap_Internal_Impl_inner,
                           Array[
                             _frame[54],
                             _frame[4],
@@ -424,7 +424,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       _frame.set(
                         56,
                         LeanCtor(
-                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          LeanTag.Std_DTreeMap_Internal_Impl_inner,
                           Array[
                             _frame[52],
                             _frame[12],
@@ -437,7 +437,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       return _frame[56]
                     | _ -> return leanFail("non-exhaustive Lean case")
                     }
-                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                     _frame.set(
                       57,
                       LeanText("Std.Data.DTreeMap.Internal.Balancing"),
@@ -446,8 +446,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       58,
                       LeanText("Std.DTreeMap.Internal.Impl.balanceL!"),
                     );
-                    _frame.set(59, LeanScalar("nat", "182"));
-                    _frame.set(60, LeanScalar("nat", "35"));
+                    _frame.set(59, LeanNatLiterals.n182);
+                    _frame.set(60, LeanNatLiterals.n35);
                     _frame.set(
                       61,
                       LeanText("balanceL! input was not balanced"),
@@ -470,7 +470,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     return _frame[63]
                   | _ -> return leanFail("non-exhaustive Lean case")
                   }
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                   _frame.set(
                     64,
                     LeanText("Std.Data.DTreeMap.Internal.Balancing"),
@@ -479,8 +479,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     65,
                     LeanText("Std.DTreeMap.Internal.Impl.balanceL!"),
                   );
-                  _frame.set(66, LeanScalar("nat", "183"));
-                  _frame.set(67, LeanScalar("nat", "21"));
+                  _frame.set(66, LeanNatLiterals.n183);
+                  _frame.set(67, LeanNatLiterals.n21);
                   _frame.set(68, LeanText("balanceL! input was not balanced"));
                   _frame.set(
                     69,
@@ -502,8 +502,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-              _frame.set(71, LeanScalar("nat", "1"));
+            | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+              _frame.set(71, LeanNatLiterals.n1);
               _frame.set(
                 72,
                 L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -515,36 +515,36 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
               _frame.set(
                 73,
                 LeanCtor(
-                  "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                  LeanTag.Std_DTreeMap_Internal_Impl_inner,
                   Array[_frame[72], _frame[4], _frame[5], _frame[9], _frame[7]],
                 ),
               );
               return _frame[73]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+          | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
             leanTag(_frame[9]) match {
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+            | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
               _frame.set(74, leanField(_frame[9], 0));
               _frame.set(75, leanField(_frame[9], 1));
               _frame.set(76, leanField(_frame[9], 2));
               _frame.set(77, leanField(_frame[9], 3));
               _frame.set(78, leanField(_frame[9], 4));
               leanTag(_frame[77]) match {
-              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+              | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                 _ = leanField(_frame[77], 0);
                 _ = leanField(_frame[77], 1);
                 _ = leanField(_frame[77], 2);
                 _ = leanField(_frame[77], 3);
                 _ = leanField(_frame[77], 4);
                 leanTag(_frame[78]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _frame.set(79, leanField(_frame[78], 0));
                   _ = leanField(_frame[78], 1);
                   _ = leanField(_frame[78], 2);
                   _ = leanField(_frame[78], 3);
                   _ = leanField(_frame[78], 4);
-                  _frame.set(80, LeanScalar("nat", "1"));
+                  _frame.set(80, LeanNatLiterals.n1);
                   _frame.set(
                     81,
                     L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -564,7 +564,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     83,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[82],
                         _frame[4],
@@ -577,7 +577,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     84,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[81],
                         _frame[75],
@@ -588,13 +588,13 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     ),
                   );
                   return _frame[84]
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                  _frame.set(85, LeanScalar("nat", "3"));
-                  _frame.set(86, LeanScalar("nat", "1"));
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                  _frame.set(85, LeanNatLiterals.n3);
+                  _frame.set(86, LeanNatLiterals.n1);
                   _frame.set(
                     87,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[86],
                         _frame[4],
@@ -607,7 +607,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     88,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[85],
                         _frame[75],
@@ -620,20 +620,20 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   return _frame[88]
                 | _ -> return leanFail("non-exhaustive Lean case")
                 }
-              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+              | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                 leanTag(_frame[78]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _ = leanField(_frame[78], 0);
                   _frame.set(89, leanField(_frame[78], 1));
                   _frame.set(90, leanField(_frame[78], 2));
                   _ = leanField(_frame[78], 3);
                   _ = leanField(_frame[78], 4);
-                  _frame.set(91, LeanScalar("nat", "3"));
-                  _frame.set(92, LeanScalar("nat", "1"));
+                  _frame.set(91, LeanNatLiterals.n3);
+                  _frame.set(92, LeanNatLiterals.n1);
                   _frame.set(
                     93,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[92],
                         _frame[75],
@@ -646,7 +646,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     94,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[92],
                         _frame[4],
@@ -659,7 +659,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     95,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[91],
                         _frame[89],
@@ -670,12 +670,12 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     ),
                   );
                   return _frame[95]
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                  _frame.set(96, LeanScalar("nat", "2"));
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                  _frame.set(96, LeanNatLiterals.n2);
                   _frame.set(
                     97,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[96],
                         _frame[4],
@@ -690,12 +690,12 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-              _frame.set(98, LeanScalar("nat", "1"));
+            | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+              _frame.set(98, LeanNatLiterals.n1);
               _frame.set(
                 99,
                 LeanCtor(
-                  "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                  LeanTag.Std_DTreeMap_Internal_Impl_inner,
                   Array[_frame[98], _frame[4], _frame[5], _frame[9], _frame[9]],
                 ),
               );
@@ -704,16 +704,16 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Ordering\",\"eq\"]" ->
+        | LeanTag.Ordering_eq ->
           _frame.set(
             100,
             LeanCtor(
-              "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+              LeanTag.Std_DTreeMap_Internal_Impl_inner,
               Array[_frame[3], _frame[0], _frame[1], _frame[6], _frame[7]],
             ),
           );
           return _frame[100]
-        | "[\"Ordering\",\"gt\"]" ->
+        | LeanTag.Ordering_gt ->
           _frame.set(
             101,
             f_insert_spec_0_spec_0_7c26fdc6ce(
@@ -724,20 +724,20 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
             ),
           );
           leanTag(_frame[6]) match {
-          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+          | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
             _frame.set(102, leanField(_frame[6], 0));
             _ = leanField(_frame[6], 1);
             _ = leanField(_frame[6], 2);
             _ = leanField(_frame[6], 3);
             _ = leanField(_frame[6], 4);
             leanTag(_frame[101]) match {
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+            | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
               _frame.set(103, leanField(_frame[101], 0));
               _frame.set(104, leanField(_frame[101], 1));
               _frame.set(105, leanField(_frame[101], 2));
               _frame.set(106, leanField(_frame[101], 3));
               _frame.set(107, leanField(_frame[101], 4));
-              _frame.set(108, LeanScalar("nat", "3"));
+              _frame.set(108, LeanNatLiterals.n3);
               _frame.set(
                 109,
                 L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -755,8 +755,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 ),
               );
               leanTag(_frame[110]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(111, LeanScalar("nat", "1"));
+              | LeanTag.Bool_false ->
+                _frame.set(111, LeanNatLiterals.n1);
                 _frame.set(
                   112,
                   L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -776,7 +776,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 _frame.set(
                   114,
                   LeanCtor(
-                    "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                    LeanTag.Std_DTreeMap_Internal_Impl_inner,
                     Array[
                       _frame[113],
                       _frame[4],
@@ -787,22 +787,22 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   ),
                 );
                 return _frame[114]
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 leanTag(_frame[106]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _frame.set(115, leanField(_frame[106], 0));
                   _frame.set(116, leanField(_frame[106], 1));
                   _frame.set(117, leanField(_frame[106], 2));
                   _frame.set(118, leanField(_frame[106], 3));
                   _frame.set(119, leanField(_frame[106], 4));
                   leanTag(_frame[107]) match {
-                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                     _frame.set(120, leanField(_frame[107], 0));
                     _ = leanField(_frame[107], 1);
                     _ = leanField(_frame[107], 2);
                     _ = leanField(_frame[107], 3);
                     _ = leanField(_frame[107], 4);
-                    _frame.set(121, LeanScalar("nat", "2"));
+                    _frame.set(121, LeanNatLiterals.n2);
                     _frame.set(
                       122,
                       L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -820,8 +820,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       ),
                     );
                     leanTag(_frame[123]) match {
-                    | "[\"Bool\",\"false\"]" ->
-                      _frame.set(124, LeanScalar("nat", "1"));
+                    | LeanTag.Bool_false ->
+                      _frame.set(124, LeanNatLiterals.n1);
                       _frame.set(
                         125,
                         L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -839,7 +839,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                         ),
                       );
                       leanTag(_frame[118]) match {
-                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                         _frame.set(139, leanField(_frame[118], 0));
                         _ = leanField(_frame[118], 1);
                         _ = leanField(_frame[118], 2);
@@ -849,16 +849,16 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                         _frame.set(133, _jump0);
                         !pc = 4;
                         void
-                      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                        _frame.set(140, LeanScalar("nat", "0"));
+                      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                        _frame.set(140, LeanNatLiterals.n0);
                         _jump0 = _frame[140];
                         _frame.set(133, _jump0);
                         !pc = 4;
                         void
                       | _ -> return leanFail("non-exhaustive Lean case")
                       }
-                    | "[\"Bool\",\"true\"]" ->
-                      _frame.set(141, LeanScalar("nat", "1"));
+                    | LeanTag.Bool_true ->
+                      _frame.set(141, LeanNatLiterals.n1);
                       _frame.set(
                         142,
                         L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -886,7 +886,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       _frame.set(
                         145,
                         LeanCtor(
-                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          LeanTag.Std_DTreeMap_Internal_Impl_inner,
                           Array[
                             _frame[144],
                             _frame[4],
@@ -899,7 +899,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       _frame.set(
                         146,
                         LeanCtor(
-                          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                          LeanTag.Std_DTreeMap_Internal_Impl_inner,
                           Array[
                             _frame[143],
                             _frame[104],
@@ -912,7 +912,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       return _frame[146]
                     | _ -> return leanFail("non-exhaustive Lean case")
                     }
-                  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                  | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                     _frame.set(
                       147,
                       LeanText("Std.Data.DTreeMap.Internal.Balancing"),
@@ -921,8 +921,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                       148,
                       LeanText("Std.DTreeMap.Internal.Impl.balanceR!"),
                     );
-                    _frame.set(149, LeanScalar("nat", "276"));
-                    _frame.set(150, LeanScalar("nat", "35"));
+                    _frame.set(149, LeanNatLiterals.n276);
+                    _frame.set(150, LeanNatLiterals.n35);
                     _frame.set(
                       151,
                       LeanText("balanceR! input was not balanced"),
@@ -945,7 +945,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     return _frame[153]
                   | _ -> return leanFail("non-exhaustive Lean case")
                   }
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                   _frame.set(
                     154,
                     LeanText("Std.Data.DTreeMap.Internal.Balancing"),
@@ -954,8 +954,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     155,
                     LeanText("Std.DTreeMap.Internal.Impl.balanceR!"),
                   );
-                  _frame.set(156, LeanScalar("nat", "277"));
-                  _frame.set(157, LeanScalar("nat", "21"));
+                  _frame.set(156, LeanNatLiterals.n277);
+                  _frame.set(157, LeanNatLiterals.n21);
                   _frame.set(158, LeanText("balanceR! input was not balanced"));
                   _frame.set(
                     159,
@@ -977,8 +977,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-              _frame.set(161, LeanScalar("nat", "1"));
+            | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+              _frame.set(161, LeanNatLiterals.n1);
               _frame.set(
                 162,
                 L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -990,7 +990,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
               _frame.set(
                 163,
                 LeanCtor(
-                  "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                  LeanTag.Std_DTreeMap_Internal_Impl_inner,
                   Array[
                     _frame[162],
                     _frame[4],
@@ -1003,29 +1003,29 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
               return _frame[163]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+          | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
             leanTag(_frame[101]) match {
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+            | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
               _frame.set(164, leanField(_frame[101], 0));
               _frame.set(165, leanField(_frame[101], 1));
               _frame.set(166, leanField(_frame[101], 2));
               _frame.set(167, leanField(_frame[101], 3));
               _frame.set(168, leanField(_frame[101], 4));
               leanTag(_frame[167]) match {
-              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+              | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                 _frame.set(169, leanField(_frame[167], 0));
                 _frame.set(170, leanField(_frame[167], 1));
                 _frame.set(171, leanField(_frame[167], 2));
                 _ = leanField(_frame[167], 3);
                 _ = leanField(_frame[167], 4);
                 leanTag(_frame[168]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _ = leanField(_frame[168], 0);
                   _ = leanField(_frame[168], 1);
                   _ = leanField(_frame[168], 2);
                   _ = leanField(_frame[168], 3);
                   _ = leanField(_frame[168], 4);
-                  _frame.set(172, LeanScalar("nat", "1"));
+                  _frame.set(172, LeanNatLiterals.n1);
                   _frame.set(
                     173,
                     L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1045,7 +1045,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     175,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[174],
                         _frame[4],
@@ -1058,7 +1058,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     176,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[173],
                         _frame[165],
@@ -1069,13 +1069,13 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     ),
                   );
                   return _frame[176]
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                  _frame.set(177, LeanScalar("nat", "3"));
-                  _frame.set(178, LeanScalar("nat", "1"));
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                  _frame.set(177, LeanNatLiterals.n3);
+                  _frame.set(178, LeanNatLiterals.n1);
                   _frame.set(
                     179,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[178],
                         _frame[4],
@@ -1088,7 +1088,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     180,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[178],
                         _frame[165],
@@ -1101,7 +1101,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     181,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[177],
                         _frame[170],
@@ -1114,20 +1114,20 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   return _frame[181]
                 | _ -> return leanFail("non-exhaustive Lean case")
                 }
-              | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
+              | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
                 leanTag(_frame[168]) match {
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+                | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
                   _ = leanField(_frame[168], 0);
                   _ = leanField(_frame[168], 1);
                   _ = leanField(_frame[168], 2);
                   _ = leanField(_frame[168], 3);
                   _ = leanField(_frame[168], 4);
-                  _frame.set(182, LeanScalar("nat", "3"));
-                  _frame.set(183, LeanScalar("nat", "1"));
+                  _frame.set(182, LeanNatLiterals.n3);
+                  _frame.set(183, LeanNatLiterals.n1);
                   _frame.set(
                     184,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[183],
                         _frame[4],
@@ -1140,7 +1140,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                   _frame.set(
                     185,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[182],
                         _frame[165],
@@ -1151,12 +1151,12 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                     ),
                   );
                   return _frame[185]
-                | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-                  _frame.set(186, LeanScalar("nat", "2"));
+                | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+                  _frame.set(186, LeanNatLiterals.n2);
                   _frame.set(
                     187,
                     LeanCtor(
-                      "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                      LeanTag.Std_DTreeMap_Internal_Impl_inner,
                       Array[
                         _frame[186],
                         _frame[4],
@@ -1171,12 +1171,12 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-              _frame.set(188, LeanScalar("nat", "1"));
+            | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+              _frame.set(188, LeanNatLiterals.n1);
               _frame.set(
                 189,
                 LeanCtor(
-                  "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+                  LeanTag.Std_DTreeMap_Internal_Impl_inner,
                   Array[
                     _frame[188],
                     _frame[4],
@@ -1193,12 +1193,12 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-        _frame.set(190, LeanScalar("nat", "1"));
+      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+        _frame.set(190, LeanNatLiterals.n1);
         _frame.set(
           191,
           LeanCtor(
-            "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+            LeanTag.Std_DTreeMap_Internal_Impl_inner,
             Array[_frame[190], _frame[0], _frame[1], _frame[2], _frame[2]],
           ),
         );
@@ -1213,14 +1213,14 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
       _frame.set(
         39,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[_frame[38], _frame[4], _frame[5], _frame[28], _frame[7]],
         ),
       );
       _frame.set(
         40,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[_frame[34], _frame[25], _frame[26], _frame[36], _frame[39]],
         ),
       );
@@ -1233,7 +1233,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
       _frame.set(
         44,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[_frame[43], _frame[12], _frame[13], _frame[14], _frame[27]],
         ),
       );
@@ -1242,7 +1242,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
         L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[32], _frame[10]),
       );
       leanTag(_frame[28]) match {
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
         _frame.set(46, leanField(_frame[28], 0));
         _ = leanField(_frame[28], 1);
         _ = leanField(_frame[28], 2);
@@ -1256,8 +1256,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
         _frame.set(37, _jump2);
         !pc = 1;
         void
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-        _frame.set(47, LeanScalar("nat", "0"));
+      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+        _frame.set(47, LeanNatLiterals.n0);
         _jump0 = _frame[45];
         _jump1 = _frame[44];
         _jump2 = _frame[47];
@@ -1280,7 +1280,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
       _frame.set(
         131,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[
             _frame[130],
             _frame[104],
@@ -1293,7 +1293,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
       _frame.set(
         132,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[
             _frame[126],
             _frame[116],
@@ -1316,7 +1316,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
       _frame.set(
         135,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_inner,
           Array[_frame[134], _frame[4], _frame[5], _frame[6], _frame[118]],
         ),
       );
@@ -1329,7 +1329,7 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
         ),
       );
       leanTag(_frame[119]) match {
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
         _frame.set(137, leanField(_frame[119], 0));
         _ = leanField(_frame[119], 1);
         _ = leanField(_frame[119], 2);
@@ -1343,8 +1343,8 @@ fun f_insert_spec_0_spec_0_7c26fdc6ce(
         _frame.set(129, _jump2);
         !pc = 3;
         void
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-        _frame.set(138, LeanScalar("nat", "0"));
+      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+        _frame.set(138, LeanNatLiterals.n0);
         _jump0 = _frame[136];
         _jump1 = _frame[135];
         _jump2 = _frame[138];
@@ -1385,7 +1385,7 @@ fun f_insert_spec_0_spec_1_efc3cca8f0(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
     _size_1_2: LeanValue = leanField(_t_0, 0);
     _k_2_3: LeanValue = leanField(_t_0, 1);
     _v_3_4: LeanValue = leanField(_t_0, 2);
@@ -1393,16 +1393,16 @@ fun f_insert_spec_0_spec_1_efc3cca8f0(
     _r_5_6: LeanValue = leanField(_t_0, 4);
     _x_6_7: LeanValue = f_Lean_NamePart_cmp_543f34a785(_runtime, _k_1, _k_2_3);
     leanTag(_x_6_7) match {
-    | "[\"Ordering\",\"lt\"]" ->
+    | LeanTag.Ordering_lt ->
       f_insert_spec_0_spec_1_efc3cca8f0(_runtime, _l_4_5, _k_1)
-    | "[\"Ordering\",\"eq\"]" ->
-      LeanCtor("[\"Option\",\"some\"]", Array[_v_3_4])
-    | "[\"Ordering\",\"gt\"]" ->
+    | LeanTag.Ordering_eq ->
+      LeanCtor(LeanTag.Option_some, Array[_v_3_4])
+    | LeanTag.Ordering_gt ->
       f_insert_spec_0_spec_1_efc3cca8f0(_runtime, _r_5_6, _k_1)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-    LeanCtor("[\"Option\",\"none\"]", Array[])
+  | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+    LeanCtor(LeanTag.Option_none, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1413,25 +1413,25 @@ fun f_Lean_NamePart_cmp_543f34a785(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"NamePart\",\"str\"]" ->
+  | LeanTag.NamePart_str ->
     _s_3_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"NamePart\",\"str\"]" ->
+    | LeanTag.NamePart_str ->
       _s_4_4: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Data_String_Compare.f_String_compare_b761aa53dc(
         _runtime,
         _s_3_2,
         _s_4_4,
       )
-    | _ -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Ordering_gt, Array[])
     }
-  | "[\"Lean\",\"NamePart\",\"num\"]" ->
+  | LeanTag.NamePart_num ->
     _n_7_3: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"NamePart\",\"str\"]" ->
+    | LeanTag.NamePart_str ->
       _s_8_7: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Ordering\",\"lt\"]", Array[])
-    | "[\"Lean\",\"NamePart\",\"num\"]" ->
+      LeanCtor(LeanTag.Ordering_lt, Array[])
+    | LeanTag.NamePart_num ->
       _n_10_8: LeanValue = leanField(_x_2_1, 0);
       _x_11_10: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
         _runtime,
@@ -1439,18 +1439,18 @@ fun f_Lean_NamePart_cmp_543f34a785(
         _n_10_8,
       );
       leanTag(_x_11_10) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_12_11: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
           _runtime,
           _n_7_3,
           _n_10_8,
         );
         leanTag(_x_12_11) match {
-        | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
-        | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+        | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_gt, Array[])
+        | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_eq, Array[])
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1471,8 +1471,8 @@ fun f_Lean_toKey_loop_b12a226d87(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" -> _x_2_1
-  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+  | LeanTag.Name_anonymous__impl -> _x_2_1
+  | LeanTag.Name_str__impl ->
     _hash_2: LeanValue = leanField(_x_1_0, 0);
     _pre_3_3: LeanValue = leanField(_x_1_0, 1);
     _str_4_4: LeanValue = leanField(_x_1_0, 2);
@@ -1480,14 +1480,14 @@ fun f_Lean_toKey_loop_b12a226d87(
       _runtime,
       _pre_3_3,
       LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
-          LeanCtor("[\"Lean\",\"NamePart\",\"str\"]", Array[_str_4_4]),
+          LeanCtor(LeanTag.NamePart_str, Array[_str_4_4]),
           _x_2_1,
         ],
       ),
     )
-  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+  | LeanTag.Name_num__impl ->
     _hash_5: LeanValue = leanField(_x_1_0, 0);
     _pre_8_6: LeanValue = leanField(_x_1_0, 1);
     _i_9_7: LeanValue = leanField(_x_1_0, 2);
@@ -1495,9 +1495,9 @@ fun f_Lean_toKey_loop_b12a226d87(
       _runtime,
       _pre_8_6,
       LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
-          LeanCtor("[\"Lean\",\"NamePart\",\"num\"]", Array[_i_9_7]),
+          LeanCtor(LeanTag.NamePart_num, Array[_i_9_7]),
           _x_2_1,
         ],
       ),

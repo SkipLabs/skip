@@ -12,7 +12,7 @@ fun extensionStoreProbe(): void {
     FileSystem.readTextFile("build/init-extensions.jsonl"),
   );
   context = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store => context};
+  runtime = mutable LeanExecution{store => Some(context)};
   leanInitializeMetaExtensions(runtime);
   arrays = leanInstallImportedExtensions(
     runtime,
@@ -32,8 +32,8 @@ fun extensionStoreProbe(): void {
   );
   env = leanEnvironment(
     runtime,
-    LeanConstantsView("Init", constants),
-    LeanConstantsView("local", constants),
+    LeanConstantsView("Init", LeanConstantDirectory(constants)),
+    LeanConstantsView("local", LeanConstantDirectory(constants)),
     LeanUnavailable("imported environment header"),
     arrays.i0,
     arrays.i1,
@@ -70,7 +70,7 @@ fun extensionStoreProbe(): void {
     context,
     SKStore.DirName::create("/extensions/results/"),
     (context, writer, key, values) ~> {
-      invocation = mutable LeanExecution{store => context};
+      invocation = mutable LeanExecution{store => Some(context)};
       leanInitializeMetaExtensions(invocation);
       work = values.first;
       value = work.kind match {
@@ -154,7 +154,7 @@ fun extensionStoreProbe(): void {
   print_string("Extension store: insert a previously missing class");
   pair = leanField(classImport.state, 1);
   newClass = LeanCtor(
-    "[\"Lean\",\"ClassEntry\",\"mk\"]",
+    LeanTag.ClassEntry_mk,
     Array[missing, LeanArray(Array[]), LeanArray(Array[])],
   );
   classState = L4_Lean_Class.f_Lean_ClassState_addEntry_3f7479c40a(

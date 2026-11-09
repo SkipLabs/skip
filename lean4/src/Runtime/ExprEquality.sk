@@ -7,65 +7,100 @@ fun leanExprEqual(
   b: LeanValue,
   binders: Bool,
 ): Bool {
+  start = if (runtime.profileRuntime) Time.time_ns() else 0;
+  result = leanExprEqualCore(runtime, a, b, binders);
+  if (runtime.profileRuntime) {
+    runtime.!expressionEqualityCount = runtime.expressionEqualityCount + 1;
+    runtime.!expressionEqualityNs =
+      runtime.expressionEqualityNs +
+      Time.time_ns() -
+      start
+  };
+  result
+}
+
+fun leanExprEqualCore(
+  runtime: mutable LeanExecution,
+  a: LeanValue,
+  b: LeanValue,
+  binders: Bool,
+): Bool {
+  // The common identity and unequal-hash answers need no traversal workspace.
+  // Keep binder-sensitive comparison and collision handling in the walk below.
+  if (leanSameObject(a, b) != 0) return true;
+  if (leanExprData(a).and(4294967295) != leanExprData(b).and(4294967295)) {
+    return false
+  };
   pending = mutable Vector[(a, b)];
   while (!pending.isEmpty()) {
     (left, right) = pending.pop();
+    // Sharing needs no traversal. Check the cached hash before asking generic
+    // structural equality to walk two potentially large, unequal proof terms.
+    if (leanSameObject(left, right) != 0) continue;
+    if (
+      leanExprData(left).and(4294967295) != leanExprData(right).and(4294967295)
+    ) {
+      return false
+    };
+    // A negative structural answer is inconclusive for binder-insensitive
+    // equality, so retain the Lean comparison below in that case.
+    if (native_eq(left, right) == 0) continue;
     tag = leanTag(left);
     if (tag != leanTag(right)) return false;
     tag match {
-    | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]" ->
+    | LeanTag.Expr_bvar__impl ->
       if (leanNat(leanField(left, 1)) != leanNat(leanField(right, 1))) {
         return false
       }
-    | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
-    | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
+    | LeanTag.Expr_fvar__impl
+    | LeanTag.Expr_mvar__impl ->
       if (!leanNameEqual(leanField(left, 1), leanField(right, 1))) return false
-    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    | LeanTag.Expr_sort__impl ->
       if (!leanLevelEqual(leanField(left, 1), leanField(right, 1))) return false
-    | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+    | LeanTag.Expr_const__impl ->
       if (!leanNameEqual(leanField(left, 1), leanField(right, 1))) return false;
       levelsLeft = leanField(left, 2);
       levelsRight = leanField(right, 2);
       loop {
         if (leanTag(levelsLeft) != leanTag(levelsRight)) return false;
-        if (leanTag(levelsLeft) == "[\"List\",\"nil\"]") break void;
+        if (leanTag(levelsLeft) == LeanTag.List_nil) break void;
         if (
           !leanLevelEqual(leanField(levelsLeft, 0), leanField(levelsRight, 0))
         ) return false;
         !levelsLeft = leanField(levelsLeft, 1);
         !levelsRight = leanField(levelsRight, 1)
       }
-    | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
-    | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+    | LeanTag.Expr_lam__impl
+    | LeanTag.Expr_forallE__impl ->
       if (
         binders &&
         (!leanNameEqual(leanField(left, 1), leanField(right, 1)) ||
           leanTag(leanField(left, 4)) != leanTag(leanField(right, 4)))
       ) return false
-    | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    | LeanTag.Expr_letE__impl ->
       if (leanIsTrue(leanField(left, 5)) != leanIsTrue(leanField(right, 5))) {
         return false
       };
       if (binders && !leanNameEqual(leanField(left, 1), leanField(right, 1))) {
         return false
       }
-    | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+    | LeanTag.Expr_lit__impl ->
       l = leanField(left, 1);
       r = leanField(right, 1);
       if (leanTag(l) != leanTag(r)) return false;
       leanTag(l) match {
-      | "[\"Lean\",\"Literal\",\"natVal\"]" ->
+      | LeanTag.Literal_natVal ->
         if (leanNat(leanField(l, 0)) != leanNat(leanField(r, 0))) return false
-      | "[\"Lean\",\"Literal\",\"strVal\"]" ->
+      | LeanTag.Literal_strVal ->
         if (leanText(leanField(l, 0)) != leanText(leanField(r, 0))) return false
       | _ -> leanFail("invalid Lean literal in expression equality")
       }
-    | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+    | LeanTag.Expr_mdata__impl ->
       entriesLeft = leanField(left, 1);
       entriesRight = leanField(right, 1);
       loop {
         if (leanTag(entriesLeft) != leanTag(entriesRight)) return false;
-        if (leanTag(entriesLeft) == "[\"List\",\"nil\"]") break void;
+        if (leanTag(entriesLeft) == LeanTag.List_nil) break void;
         l = leanField(entriesLeft, 0);
         r = leanField(entriesRight, 0);
         if (!leanNameEqual(leanField(l, 0), leanField(r, 0))) return false;
@@ -81,12 +116,12 @@ fun leanExprEqual(
         !entriesLeft = leanField(entriesLeft, 1);
         !entriesRight = leanField(entriesRight, 1)
       }
-    | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+    | LeanTag.Expr_proj__impl ->
       if (
         !leanNameEqual(leanField(left, 1), leanField(right, 1)) ||
         leanNat(leanField(left, 2)) != leanNat(leanField(right, 2))
       ) return false
-    | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" -> void
+    | LeanTag.Expr_app__impl -> void
     | _ -> leanFail("invalid Lean expression in equality")
     };
     for ((field, _) in leanExprChildren(left)) {

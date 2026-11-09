@@ -9,23 +9,23 @@ fun f_List_takeTR_go_3320b4400e(
   _a_3_3: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" -> _l_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _l_0
+  | LeanTag.List_cons ->
     _head_4_4: LeanValue = leanField(_a_1_1, 0);
     _tail_5_5: LeanValue = leanField(_a_1_1, 1);
     _isZero_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _a_2_2,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     leanTag(_isZero_7) match {
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       L4_Init_Prelude.f_Array_toList_2f8b2ba454(_runtime, LeanErased(), _a_3_3)
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _n_7_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _a_2_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_8_11: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
         _runtime,
@@ -55,15 +55,15 @@ fun f_List_zipIdxTR_01406433f1(
     LeanErased(),
     _as_2,
   );
-  _x_2_4: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_2_4: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_1_3,
   );
   leanTag(_x_4_6) match {
-  | "[\"Bool\",\"false\"]" -> _x_2_4
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _x_2_4
+  | LeanTag.Bool_true ->
     _x_5_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _n_1,
@@ -77,11 +77,11 @@ fun f_List_zipIdxTR_01406433f1(
       _runtime,
       _as_2,
       _x_7_9,
-      LeanScalar("usize", "0"),
-      LeanCtor("[\"Prod\",\"mk\"]", Array[_x_5_7, _x_2_4]),
+      LeanWord("usize", 0),
+      LeanCtor(LeanTag.Prod_mk, Array[_x_5_7, _x_2_4]),
     );
     leanTag(_x_9_11) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_12: LeanValue = leanField(_x_9_11, 0);
       _snd_13: LeanValue = leanField(_x_9_11, 1);
       _snd_13
@@ -98,9 +98,9 @@ fun f_List_flatMapTR_go_f464fef66b(
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Prelude.f_Array_toList_2f8b2ba454(_runtime, LeanErased(), _a_2_2)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
     _x_6_6: LeanValue = leanApply(_runtime, _f_0, Array[_head_4_3]);
@@ -121,16 +121,16 @@ fun f_List_filterMapTR_go_4d9e139f0d(
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Prelude.f_Array_toList_2f8b2ba454(_runtime, LeanErased(), _a_2_2)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
     _x_6_6: LeanValue = leanApply(_runtime, _f_0, Array[_head_4_3]);
     leanTag(_x_6_6) match {
-    | "[\"Option\",\"none\"]" ->
+    | LeanTag.Option_none ->
       f_List_filterMapTR_go_4d9e139f0d(_runtime, _f_0, _tail_5_4, _a_2_2)
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_8_7: LeanValue = leanField(_x_6_6, 0);
       _x_9_9: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
         _runtime,
@@ -158,15 +158,15 @@ fun f_List_zipIdxTR_spec_0_e1a25411d5(
     _stop_2,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_b_3) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_2_5: LeanValue = leanField(_b_3, 0);
       _snd_3_6: LeanValue = leanField(_b_3, 1);
       _x_5_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
         _runtime,
         _i_1,
-        LeanScalar("usize", "1"),
+        LeanWord("usize", 1),
       );
       _x_6_9: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
         _runtime,
@@ -178,7 +178,7 @@ fun f_List_zipIdxTR_spec_0_e1a25411d5(
       _x_8_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _fst_2_5,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_List_zipIdxTR_spec_0_e1a25411d5(
         _runtime,
@@ -186,13 +186,13 @@ fun f_List_zipIdxTR_spec_0_e1a25411d5(
         _x_5_8,
         _stop_2,
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             _x_8_11,
             LeanCtor(
-              "[\"List\",\"cons\"]",
+              LeanTag.List_cons,
               Array[
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_x_6_9, _x_8_11]),
+                LeanCtor(LeanTag.Prod_mk, Array[_x_6_9, _x_8_11]),
                 _snd_3_6,
               ],
             ),
@@ -201,7 +201,7 @@ fun f_List_zipIdxTR_spec_0_e1a25411d5(
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _b_3
+  | LeanTag.Bool_true -> _b_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -236,18 +236,18 @@ fun f_List_eraseIdxTR_go_f84fcffd65(
   _a_3_3: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" -> _l_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _l_0
+  | LeanTag.List_cons ->
     _head_4_4: LeanValue = leanField(_a_1_1, 0);
     _tail_5_5: LeanValue = leanField(_a_1_1, 1);
-    _zero_6: LeanValue = LeanScalar("nat", "0");
+    _zero_6: LeanValue = LeanNatLiterals.n0;
     _isZero_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _a_2_2,
       _zero_6,
     );
     leanTag(_isZero_7) match {
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_6_8: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
         _runtime,
         LeanErased(),
@@ -259,8 +259,8 @@ fun f_List_eraseIdxTR_go_f84fcffd65(
         _x_6_8,
       );
       leanTag(_x_7_9) match {
-      | "[\"Bool\",\"false\"]" -> _tail_5_5
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _tail_5_5
+      | LeanTag.Bool_true ->
         _x_8_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
           _runtime,
           _x_6_8,
@@ -269,16 +269,16 @@ fun f_List_eraseIdxTR_go_f84fcffd65(
           _runtime,
           _a_3_3,
           _x_8_10,
-          LeanScalar("usize", "0"),
+          LeanWord("usize", 0),
           _tail_5_5,
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _n_11_14: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _a_2_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_12_15: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
         _runtime,
@@ -323,11 +323,11 @@ fun f_setTR_go_spec_0_bfa723e63a(
     _stop_2,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_3_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
       _runtime,
       _i_1,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_4_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
@@ -341,9 +341,9 @@ fun f_setTR_go_spec_0_bfa723e63a(
       _as_0,
       _x_3_6,
       _stop_2,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_4_7, _b_3]),
+      LeanCtor(LeanTag.List_cons, Array[_x_4_7, _b_3]),
     )
-  | "[\"Bool\",\"true\"]" -> _b_3
+  | LeanTag.Bool_true -> _b_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -356,11 +356,11 @@ fun f_List_zipWithTR_go_bbec702a3a(
   _a_3_3: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_4: LeanValue = leanField(_a_1_1, 0);
     _tail_5_5: LeanValue = leanField(_a_1_1, 1);
     leanTag(_a_2_2) match {
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_cons ->
       _head_6_6: LeanValue = leanField(_a_2_2, 0);
       _tail_7_7: LeanValue = leanField(_a_2_2, 1);
       _x_8_8: LeanValue = leanApply(

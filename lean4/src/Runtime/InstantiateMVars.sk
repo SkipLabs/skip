@@ -7,7 +7,7 @@ fun leanExprHasMVars(expr: LeanValue): Bool {
 }
 
 fun leanLevelHasMVars(level: LeanValue): Bool {
-  if (leanTag(level) == "[\"Lean\",\"Level\",\"zero\",\"_impl\"]") return false;
+  if (leanTag(level) == LeanTag.Level_zero__impl) return false;
   leanWordBits(leanField(level, 0)).and(1.shl(32)) != 0
 }
 
@@ -22,7 +22,7 @@ fun leanMVarApplyBeta(
   index = 0;
   while (index < args.size()) {
     leanTag(result) match {
-    | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]" ->
+    | LeanTag.Expr_lam__impl ->
       !result = leanExprInstantiate(
         runtime,
         leanField(result, 3),
@@ -30,14 +30,14 @@ fun leanMVarApplyBeta(
         0,
       );
       !index = index + 1
-    | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+    | LeanTag.Expr_letE__impl ->
       !result = leanExprInstantiate(
         runtime,
         leanField(result, 4),
         Array[leanField(result, 3)],
         0,
       )
-    | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+    | LeanTag.Expr_mdata__impl ->
       !result = leanField(result, 2)
     | _ ->
       while (index < args.size()) {
@@ -65,13 +65,13 @@ mutable class LeanMVarInstantiation{
       this.context,
       id,
     );
-    if (leanTag(original) == "[\"Option\",\"none\"]") {
+    if (leanTag(original) == LeanTag.Option_none) {
       delayed = L4_Lean_MetavarContext.f_Lean_MetavarContext_getDelayedMVarAssignmentCore_7f0b380b23(
         this.runtime,
         this.context,
         id,
       );
-      if (leanTag(delayed) != "[\"Option\",\"none\"]") {
+      if (leanTag(delayed) != LeanTag.Option_none) {
         leanFail(
           "not implemented: delayed metavariable assignment [lean_instantiate_expr_mvars]",
         )
@@ -101,14 +101,14 @@ mutable class LeanMVarInstantiation{
   mutable fun level(value: LeanValue): LeanValue {
     if (!leanLevelHasMVars(value)) return value;
     leanTag(value) match {
-    | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
+    | LeanTag.Level_mvar__impl ->
       id = leanField(value, 1);
       assignment = L4_Lean_MetavarContext.f_Lean_getLevelMVarAssignmentExp_65f9d81d1e(
         this.runtime,
         this.context,
         id,
       );
-      if (leanTag(assignment) == "[\"Option\",\"none\"]") return value;
+      if (leanTag(assignment) == LeanTag.Option_none) return value;
       original = leanField(assignment, 0);
       if (!leanLevelHasMVars(original)) return original;
       key = leanNameKey(id);
@@ -127,16 +127,16 @@ mutable class LeanMVarInstantiation{
         )
       };
       normalized
-    | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+    | LeanTag.Level_succ__impl ->
       L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
         this.runtime,
         this.level(leanField(value, 1)),
       )
-    | "[\"Lean\",\"Level\",\"max\",\"_impl\"]" ->
+    | LeanTag.Level_max__impl ->
       left = this.level(leanField(value, 1));
       right = this.level(leanField(value, 2));
       L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(this.runtime, left, right)
-    | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+    | LeanTag.Level_imax__impl ->
       left = this.level(leanField(value, 1));
       right = this.level(leanField(value, 2));
       L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(this.runtime, left, right)
@@ -146,11 +146,11 @@ mutable class LeanMVarInstantiation{
 
   mutable fun levels(values: LeanValue): LeanValue {
     leanTag(values) match {
-    | "[\"List\",\"nil\"]" -> values
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_nil -> values
+    | LeanTag.List_cons ->
       value = this.level(leanField(values, 0));
       tail = this.levels(leanField(values, 1));
-      LeanCtor("[\"List\",\"cons\"]", Array[value, tail])
+      LeanCtor(LeanTag.List_cons, Array[value, tail])
     | _ -> leanFail("invalid universe list in metavariable substitution")
     }
   }
@@ -158,31 +158,31 @@ mutable class LeanMVarInstantiation{
   mutable fun expr(value: LeanValue): LeanValue {
     if (!leanExprHasMVars(value)) return value;
     leanTag(value) match {
-    | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]" ->
+    | LeanTag.Expr_mvar__impl ->
       this.assignment(leanField(value, 1)).default(value)
-    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    | LeanTag.Expr_sort__impl ->
       L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
         this.runtime,
         this.level(leanField(value, 1)),
       )
-    | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+    | LeanTag.Expr_const__impl ->
       levels = this.levels(leanField(value, 2));
       L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
         this.runtime,
         leanField(value, 1),
         levels,
       )
-    | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+    | LeanTag.Expr_app__impl ->
       head = value;
-      while (leanTag(head) == "[\"Lean\",\"Expr\",\"app\",\"_impl\"]") {
+      while (leanTag(head) == LeanTag.Expr_app__impl) {
         !head = leanField(head, 1)
       };
-      if (leanTag(head) == "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]") {
+      if (leanTag(head) == LeanTag.Expr_mvar__impl) {
         this.assignment(leanField(head, 1)) match {
         | Some(fn) ->
           reversed: mutable Vector<LeanValue> = mutable Vector[];
           current = value;
-          while (leanTag(current) == "[\"Lean\",\"Expr\",\"app\",\"_impl\"]") {
+          while (leanTag(current) == LeanTag.Expr_app__impl) {
             reversed.push(this.expr(leanField(current, 2)));
             !current = leanField(current, 1)
           };
@@ -213,5 +213,5 @@ fun leanInstantiateMVars(
 ): LeanValue {
   traversal = mutable LeanMVarInstantiation{runtime, context};
   result = if (isLevel) traversal.level(value) else traversal.expr(value);
-  LeanCtor("[\"Prod\",\"mk\"]", Array[traversal.context, result])
+  LeanCtor(LeanTag.Prod_mk, Array[traversal.context, result])
 }

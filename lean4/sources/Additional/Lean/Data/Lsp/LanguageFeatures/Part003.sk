@@ -7,19 +7,19 @@ fun f_instBEqCompletionItem_beq_spec_0_d28f834935(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_String_decEq_88c69973f8(_runtime, _val_6_2, _val_8_6)
     | _ -> leanFail("non-exhaustive Lean case")
@@ -34,15 +34,15 @@ fun f_go_spec_0_spec_0_fdc4a24fdc(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _x_4_4: LeanValue = f_spec_0_spec_0_spec_1_2d9b57663d(_runtime, _val_3_2);
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _x_4_4]),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.Prod_mk, Array[_k_0, _x_4_4]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -53,8 +53,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_43_5205887684(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"method\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_method, Array[])],
   )
 }
 // "Lean.Option.fromJson?._at_.Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonSignatureInformation.fromJson.spec_0.spec_0"
@@ -63,22 +63,22 @@ fun f_fromJson_spec_0_spec_0_4fdc2e3272(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = f_spec_0_spec_0_spec_1_1b5fa8254d(_runtime, _x_1_0);
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -131,7 +131,7 @@ fun f_instFromJsonSymbolInformation_fromJson_closed_20_71e2042f60(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_3826_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.Array.toJson._at_.Lean.Json.opt._at_.Lean.Lsp.instToJsonDocumentSymbolAux.toJson._at_.Lean.Lsp.instToJsonDocumentSymbol.go.spec_0.spec_0.spec_1.spec_2"
@@ -147,8 +147,8 @@ fun f_spec_0_spec_1_spec_2_a77a9380ca(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _v_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -161,7 +161,7 @@ fun f_spec_0_spec_1_spec_2_a77a9380ca(
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_3_7: LeanValue = f_Lsp_instToJsonDocumentSymbol_go_135cfdf879(
@@ -190,9 +190,9 @@ fun f_instFromJsonSymbolKind_lam_0_closed_37_b7dbd4eb93(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
-      LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"constructor\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_SymbolKind_constructor, Array[]),
     ],
   )
 }
@@ -242,7 +242,7 @@ fun f_SemanticTokenType_parameter_elim_070d7767cf(
 fun f_instInhabitedCallHierarchyItem_default_closed_0_c8115850bb(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_18_0: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  _x_18_0: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
   _x_19_1: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instInhabitedRange_default_c5e80fa5e7(
     _runtime,
   );
@@ -252,16 +252,16 @@ fun f_instInhabitedCallHierarchyItem_default_closed_0_c8115850bb(
   _x_21_3: LeanValue = f_instInhabitedCompletionItem_default_closed_0_537b1ad514(
     _runtime,
   );
-  _x_22_4: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_23_5: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  _x_22_4: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_23_5: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
   _x_25_7: LeanValue = f_instInhabitedCompletionItem_default_closed_0_537b1ad514(
     _runtime,
   );
   LeanCtor(
-    "[\"Lean\",\"Lsp\",\"CallHierarchyItem\",\"mk\"]",
+    LeanTag.Lsp_CallHierarchyItem_mk,
     Array[
       _x_25_7,
-      LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"file\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_SymbolKind_file, Array[]),
       _x_23_5,
       _x_23_5,
       _x_25_7,
@@ -288,7 +288,7 @@ fun f_Lsp_SemanticTokenModifier_names_cb6c2412af(
   _x_15_14: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "13"),
+    LeanNatLiterals.n13,
   );
   _x_16_15: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
@@ -376,15 +376,15 @@ fun f_instToJsonSignatureInformation_toJson_spec_0_b67450f9ee(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _x_4_4: LeanValue = f_toJson_spec_0_spec_0_bc41fdf7b9(_runtime, _val_3_2);
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _x_4_4]),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.Prod_mk, Array[_k_0, _x_4_4]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -443,7 +443,7 @@ fun f_instReprCompletionItemKind_repr_closed_39_4c7469e0e9(
   _x_1163_0: LeanValue = f_instReprCompletionItemKind_repr_closed_38_f5bee2a515(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1163_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1163_0])
 }
 // "Lean.Lsp.instFromJsonSemanticTokensParams._closed_0"
 fun f_Lsp_instFromJsonSemanticTokensParams_closed_0_e8609720c3(
@@ -494,7 +494,7 @@ fun f_instFromJsonSymbolKind_lam_0_closed_6_916a94d980(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "24"),
+    LeanNatLiterals.n24,
   )
 }
 // "Lean.Lsp.instFromJsonDocumentSymbolAux.fromJson._redArg._closed_14"
@@ -507,7 +507,7 @@ fun f_instFromJsonDocumentSymbolAux_fromJson_closed_14_d77c609d42(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_2027_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instToJsonCompletionIdentifier._lam_0._closed_0"
@@ -522,162 +522,162 @@ fun f_Lsp_instToJsonSymbolKind_lam_0_3ddea1143f(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"file\"]" ->
+  | LeanTag.Lsp_SymbolKind_file ->
     _x_3_2: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_3_2])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"module\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_3_2])
+  | LeanTag.Lsp_SymbolKind_module ->
     _x_6_5: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "2"),
+      LeanNatLiterals.n2,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_6_5])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"namespace\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_6_5])
+  | LeanTag.Lsp_SymbolKind_namespace ->
     _x_9_8: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "3"),
+      LeanNatLiterals.n3,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_9_8])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"package\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_9_8])
+  | LeanTag.Lsp_SymbolKind_package ->
     _x_12_11: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "4"),
+      LeanNatLiterals.n4,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_12_11])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"class\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_12_11])
+  | LeanTag.Lsp_SymbolKind_class ->
     _x_15_14: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "5"),
+      LeanNatLiterals.n5,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_15_14])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"method\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_15_14])
+  | LeanTag.Lsp_SymbolKind_method ->
     _x_18_17: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "6"),
+      LeanNatLiterals.n6,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_18_17])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"property\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_18_17])
+  | LeanTag.Lsp_SymbolKind_property ->
     _x_21_20: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "7"),
+      LeanNatLiterals.n7,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_21_20])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"field\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_21_20])
+  | LeanTag.Lsp_SymbolKind_field ->
     _x_24_23: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "8"),
+      LeanNatLiterals.n8,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_24_23])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"constructor\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_24_23])
+  | LeanTag.Lsp_SymbolKind_constructor ->
     _x_27_26: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "9"),
+      LeanNatLiterals.n9,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_27_26])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"enum\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_27_26])
+  | LeanTag.Lsp_SymbolKind_enum ->
     _x_30_29: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "10"),
+      LeanNatLiterals.n10,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_30_29])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"interface\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_30_29])
+  | LeanTag.Lsp_SymbolKind_interface ->
     _x_33_32: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "11"),
+      LeanNatLiterals.n11,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_33_32])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"function\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_33_32])
+  | LeanTag.Lsp_SymbolKind_function ->
     _x_36_35: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "12"),
+      LeanNatLiterals.n12,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_36_35])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"variable\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_36_35])
+  | LeanTag.Lsp_SymbolKind_variable ->
     _x_39_38: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "13"),
+      LeanNatLiterals.n13,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_39_38])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"constant\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_39_38])
+  | LeanTag.Lsp_SymbolKind_constant ->
     _x_42_41: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "14"),
+      LeanNatLiterals.n14,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_42_41])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"string\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_42_41])
+  | LeanTag.Lsp_SymbolKind_string ->
     _x_45_44: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "15"),
+      LeanNatLiterals.n15,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_45_44])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"number\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_45_44])
+  | LeanTag.Lsp_SymbolKind_number ->
     _x_48_47: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "16"),
+      LeanNatLiterals.n16,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_48_47])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"boolean\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_48_47])
+  | LeanTag.Lsp_SymbolKind_boolean ->
     _x_51_50: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "17"),
+      LeanNatLiterals.n17,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_51_50])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"array\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_51_50])
+  | LeanTag.Lsp_SymbolKind_array ->
     _x_54_53: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "18"),
+      LeanNatLiterals.n18,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_54_53])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"object\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_54_53])
+  | LeanTag.Lsp_SymbolKind_object ->
     _x_57_56: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "19"),
+      LeanNatLiterals.n19,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_57_56])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"key\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_57_56])
+  | LeanTag.Lsp_SymbolKind_key ->
     _x_60_59: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "20"),
+      LeanNatLiterals.n20,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_60_59])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"null\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_60_59])
+  | LeanTag.Lsp_SymbolKind_null ->
     _x_63_62: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "21"),
+      LeanNatLiterals.n21,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_63_62])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"enumMember\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_63_62])
+  | LeanTag.Lsp_SymbolKind_enumMember ->
     _x_66_65: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "22"),
+      LeanNatLiterals.n22,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_66_65])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"struct\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_66_65])
+  | LeanTag.Lsp_SymbolKind_struct ->
     _x_69_68: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "23"),
+      LeanNatLiterals.n23,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_69_68])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"event\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_69_68])
+  | LeanTag.Lsp_SymbolKind_event ->
     _x_72_71: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "24"),
+      LeanNatLiterals.n24,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_72_71])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"operator\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_72_71])
+  | LeanTag.Lsp_SymbolKind_operator ->
     _x_75_74: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "25"),
+      LeanNatLiterals.n25,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_75_74])
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"typeParameter\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_75_74])
+  | LeanTag.Lsp_SymbolKind_typeParameter ->
     _x_78_77: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "26"),
+      LeanNatLiterals.n26,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_78_77])
+    LeanCtor(LeanTag.Json_num, Array[_x_78_77])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -780,7 +780,7 @@ fun f_instInhabitedCallHierarchyIncomingCall_default_closed_1_4ab8f88cb6(
     _runtime,
   );
   LeanCtor(
-    "[\"Lean\",\"Lsp\",\"CallHierarchyIncomingCall\",\"mk\"]",
+    LeanTag.Lsp_CallHierarchyIncomingCall_mk,
     Array[_x_14_1, _x_13_0],
   )
 }
@@ -796,7 +796,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -804,7 +804,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
       LeanText("Lsp"),
       LeanText("SignatureHelpOptions"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -839,8 +839,8 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_22_21: LeanValue = f_instFromJsonCompletionOptions_fromJson_spec_0_ee4f11ab8b(
       _runtime,
@@ -848,7 +848,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
       LeanText("triggerCharacters"),
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -856,7 +856,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
         LeanText("Lsp"),
         LeanText("SignatureHelpOptions"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -891,8 +891,8 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
         _x_37_37,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_38_38])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_38_38])
+    | LeanTag.Except_ok ->
       _a_40_23: LeanValue = leanField(_x_22_21, 0);
       _x_42_41: LeanValue = f_instFromJsonCompletionOptions_fromJson_spec_0_ee4f11ab8b(
         _runtime,
@@ -900,7 +900,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
         LeanText("retriggerCharacters"),
       );
       leanTag(_x_42_41) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_43_42: LeanValue = leanField(_x_42_41, 0);
         _x_47_47: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -908,7 +908,7 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
           LeanText("Lsp"),
           LeanText("SignatureHelpOptions"),
         );
-        _x_48_48: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_48_48: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_49_49: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_47_47,
@@ -943,14 +943,14 @@ fun f_Lsp_instFromJsonSignatureHelpOptions_fromJson_2889b90319(
           _x_57_57,
           _a_43_42,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_58_58])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_58_58])
+      | LeanTag.Except_ok ->
         _a_60_43: LeanValue = leanField(_x_42_41, 0);
         LeanCtor(
-          "[\"Except\",\"ok\"]",
+          LeanTag.Except_ok,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"SignatureHelpOptions\",\"mk\"]",
+              LeanTag.Lsp_SignatureHelpOptions_mk,
               Array[_a_20_4, _a_40_23, _a_60_43],
             ),
           ],
@@ -1100,7 +1100,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_19_1ef4a01b26(
   _x_498_0: LeanValue = f_instToJsonSymbolKind_lam_0_closed_18_f8b369c62b(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_498_0])
+  LeanCtor(LeanTag.Json_num, Array[_x_498_0])
 }
 // "Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonCompletionItem.fromJson.spec_0"
 fun f_instFromJsonCompletionItem_fromJson_spec_0_ffd33d35bc(
@@ -1125,7 +1125,7 @@ fun f_instFromJsonRenameParams_fromJson_closed_10_c408dd2d21(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_748_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonHover.fromJson._closed_12"
@@ -1183,10 +1183,10 @@ fun f_Lsp_InlayHintTooltip_ctorElim_a8af82578f(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"Lsp\",\"InlayHintTooltip\",\"plaintext\"]" ->
+  | LeanTag.Lsp_InlayHintTooltip_plaintext ->
     _text_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_text_2])
-  | "[\"Lean\",\"Lsp\",\"InlayHintTooltip\",\"markdown\"]" ->
+  | LeanTag.Lsp_InlayHintTooltip_markdown ->
     _markup_3: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_markup_3])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1233,7 +1233,7 @@ fun f_Lsp_instToJsonCompletionOptions_toJson_7014b83d12(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"CompletionOptions\",\"mk\"]" ->
+  | LeanTag.Lsp_CompletionOptions_mk ->
     _triggerCharacters_1: LeanValue = leanField(_x_1_0, 0);
     _allCommitCharacters_2: LeanValue = leanField(_x_1_0, 1);
     _resolveProvider_3: LeanValue = leanField(_x_1_0, 2);
@@ -1247,15 +1247,15 @@ fun f_Lsp_instToJsonCompletionOptions_toJson_7014b83d12(
       LeanText("allCommitCharacters"),
       _allCommitCharacters_2,
     );
-    _x_9_11: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_9_11: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_10_12: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             LeanText("resolveProvider"),
-            LeanCtor("[\"Lean\",\"Json\",\"bool\"]", Array[_resolveProvider_3]),
+            LeanCtor(LeanTag.Json_bool, Array[_resolveProvider_3]),
           ],
         ),
         _x_9_11,
@@ -1264,19 +1264,19 @@ fun f_Lsp_instToJsonCompletionOptions_toJson_7014b83d12(
     _x_15_17: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_16_18: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
       LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           _x_3_5,
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               _x_5_7,
-              LeanCtor("[\"List\",\"cons\"]", Array[_x_10_12, _x_9_11]),
+              LeanCtor(LeanTag.List_cons, Array[_x_10_12, _x_9_11]),
             ],
           ),
         ],
@@ -1303,7 +1303,7 @@ fun f_instFromJsonSemanticTokens_fromJson_closed_7_9d54ca38f8(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_673_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonDocumentSymbolAux.fromJson._redArg._closed_20"
@@ -1327,10 +1327,10 @@ fun f_instFromJsonSemanticTokenModifier_fromJson_closed_13_f90f27cf20(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"declaration\"]",
+        LeanTag.Lsp_SemanticTokenModifier_declaration,
         Array[],
       ),
     ],
@@ -1389,9 +1389,9 @@ fun f_instFromJsonSymbolKind_lam_0_closed_11_51fdea42e4(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
-      LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"enumMember\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_SymbolKind_enumMember, Array[]),
     ],
   )
 }
@@ -1402,7 +1402,7 @@ fun f_instFromJsonCompletionIdentifier_lam_0_closed_1_f36e19ea00(
   _x_185_0: LeanValue = f_instFromJsonCompletionIdentifier_lam_0_closed_0_a2beeb37e8(
     _runtime,
   );
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_185_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_185_0])
 }
 // "Lean.Lsp.instToJsonSemanticTokenModifier.toJson"
 fun f_Lsp_instToJsonSemanticTokenModifier_toJson_dbd8a8d56e(
@@ -1410,32 +1410,32 @@ fun f_Lsp_instToJsonSemanticTokenModifier_toJson_dbd8a8d56e(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"declaration\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("declaration")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"definition\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("definition")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"readonly\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("readonly")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"static\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("static")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"deprecated\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("deprecated")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"abstract\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("abstract")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"async\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("async")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"modification\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("modification")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"documentation\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("documentation")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"defaultLibrary\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("defaultLibrary")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupBold\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("markupBold")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupItalic\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("markupItalic")])
-  | "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupSyntax\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("markupSyntax")])
+  | LeanTag.Lsp_SemanticTokenModifier_declaration ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("declaration")])
+  | LeanTag.Lsp_SemanticTokenModifier_definition ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("definition")])
+  | LeanTag.Lsp_SemanticTokenModifier_readonly ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("readonly")])
+  | LeanTag.Lsp_SemanticTokenModifier_static ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("static")])
+  | LeanTag.Lsp_SemanticTokenModifier_deprecated ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("deprecated")])
+  | LeanTag.Lsp_SemanticTokenModifier_abstract ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("abstract")])
+  | LeanTag.Lsp_SemanticTokenModifier_async ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("async")])
+  | LeanTag.Lsp_SemanticTokenModifier_modification ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("modification")])
+  | LeanTag.Lsp_SemanticTokenModifier_documentation ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("documentation")])
+  | LeanTag.Lsp_SemanticTokenModifier_defaultLibrary ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("defaultLibrary")])
+  | LeanTag.Lsp_SemanticTokenModifier_markupBold ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("markupBold")])
+  | LeanTag.Lsp_SemanticTokenModifier_markupItalic ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("markupItalic")])
+  | LeanTag.Lsp_SemanticTokenModifier_markupSyntax ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("markupSyntax")])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1484,7 +1484,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_26_6c96e8ebe4(
 ): LeanValue {
   L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
     _runtime,
-    LeanScalar("nat", "17"),
+    LeanNatLiterals.n17,
   )
 }
 // "Lean.Lsp.CompletionItemKind.ctorElim"
@@ -1558,10 +1558,10 @@ fun f_Lsp_ParameterInformationLabel_ctorElim_3e962255dc(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"Lsp\",\"ParameterInformationLabel\",\"name\"]" ->
+  | LeanTag.Lsp_ParameterInformationLabel_name ->
     _name_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_name_2])
-  | "[\"Lean\",\"Lsp\",\"ParameterInformationLabel\",\"range\"]" ->
+  | LeanTag.Lsp_ParameterInformationLabel_range ->
     _startUtf16Offset_3: LeanValue = leanField(_t_0, 0);
     _endUtf16Offset_4: LeanValue = leanField(_t_0, 1);
     leanApply(_runtime, _k_1, Array[_startUtf16Offset_3, _endUtf16Offset_4])
@@ -1600,7 +1600,7 @@ fun f_spec_2_spec_4_spec_6_b4fec6abc7(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_2_1: LeanValue = leanField(_x_1_0, 0);
     _sz_2: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
       _runtime,
@@ -1617,7 +1617,7 @@ fun f_spec_2_spec_4_spec_6_b4fec6abc7(
     _x_7_7: LeanValue = L4_Lean_Data_Json_Printer.f_Lean_Json_pretty_b82232e7b1(
       _runtime,
       _x_1_0,
-      LeanScalar("nat", "80"),
+      LeanNatLiterals.n80,
     );
     _x_8_8: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -1629,7 +1629,7 @@ fun f_spec_2_spec_4_spec_6_b4fec6abc7(
       _x_8_8,
       LeanText("'"),
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_10_10])
+    LeanCtor(LeanTag.Except_error, Array[_x_10_10])
   }
 }
 // "Lean.Lsp.CompletionItemKind.module.elim._redArg"
@@ -1644,10 +1644,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_19_74bc359a54(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"modifier\"]",
+        LeanTag.Lsp_SemanticTokenType_modifier,
         Array[],
       ),
     ],
@@ -1665,7 +1665,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -1673,7 +1673,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
       LeanText("Lsp"),
       LeanText("Color"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -1708,8 +1708,8 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("green");
     _x_22_21: LeanValue = f_instFromJsonColor_fromJson_spec_0_abd6ae5ff6(
@@ -1718,7 +1718,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -1726,7 +1726,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
         LeanText("Lsp"),
         LeanText("Color"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -1761,8 +1761,8 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       _x_40_39: LeanValue = LeanText("blue");
       _x_41_40: LeanValue = f_instFromJsonColor_fromJson_spec_0_abd6ae5ff6(
@@ -1771,7 +1771,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
         _x_40_39,
       );
       leanTag(_x_41_40) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_42_41: LeanValue = leanField(_x_41_40, 0);
         _x_46_46: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -1779,7 +1779,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
           LeanText("Lsp"),
           LeanText("Color"),
         );
-        _x_47_47: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_47_47: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_48_48: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_46_46,
@@ -1814,8 +1814,8 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
           _x_55_55,
           _a_42_41,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_56_56])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_56_56])
+      | LeanTag.Except_ok ->
         _a_58_42: LeanValue = leanField(_x_41_40, 0);
         _x_59_58: LeanValue = LeanText("alpha");
         _x_60_59: LeanValue = f_instFromJsonColor_fromJson_spec_0_abd6ae5ff6(
@@ -1824,7 +1824,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
           _x_59_58,
         );
         leanTag(_x_60_59) match {
-        | "[\"Except\",\"error\"]" ->
+        | LeanTag.Except_error ->
           _a_61_60: LeanValue = leanField(_x_60_59, 0);
           _x_65_65: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
             _runtime,
@@ -1832,7 +1832,7 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
             LeanText("Lsp"),
             LeanText("Color"),
           );
-          _x_66_66: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+          _x_66_66: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
           _x_67_67: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
             _runtime,
             _x_65_65,
@@ -1867,14 +1867,14 @@ fun f_Lsp_instFromJsonColor_fromJson_e5af2bf95b(
             _x_74_74,
             _a_61_60,
           );
-          LeanCtor("[\"Except\",\"error\"]", Array[_x_75_75])
-        | "[\"Except\",\"ok\"]" ->
+          LeanCtor(LeanTag.Except_error, Array[_x_75_75])
+        | LeanTag.Except_ok ->
           _a_77_61: LeanValue = leanField(_x_60_59, 0);
           LeanCtor(
-            "[\"Except\",\"ok\"]",
+            LeanTag.Except_ok,
             Array[
               LeanCtor(
-                "[\"Lean\",\"Lsp\",\"Color\",\"mk\"]",
+                LeanTag.Lsp_Color_mk,
                 Array[_a_20_4, _a_39_23, _a_58_42, _a_77_61],
               ),
             ],
@@ -1899,8 +1899,8 @@ fun f_spec_0_spec_0_closed_0_a96bf0a96a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instHashableSymbolKind"
@@ -1928,10 +1928,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_8_0ef1a320c4(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupQuote\"]",
+        LeanTag.Lsp_SemanticTokenType_markupQuote,
         Array[],
       ),
     ],
@@ -1942,8 +1942,8 @@ fun f_spec_3_spec_6_closed_0_d1d51c3819(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonRenameParams.fromJson._closed_2"
@@ -1956,7 +1956,7 @@ fun f_instFromJsonRenameParams_fromJson_closed_2_a68d77d3f2(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_685_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.InlayHintTooltip.plaintext.elim._redArg"
@@ -1977,7 +1977,7 @@ fun f_instFromJsonSignatureHelp_fromJson_closed_3_b510f339e0(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_926_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instInhabitedCallHierarchyIncomingCall.default"
@@ -1990,10 +1990,10 @@ fun f_Lsp_instInhabitedCallHierarchyIncomingCall_default_c597f8657b(
   _x_3_2: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   LeanCtor(
-    "[\"Lean\",\"Lsp\",\"CallHierarchyIncomingCall\",\"mk\"]",
+    LeanTag.Lsp_CallHierarchyIncomingCall_mk,
     Array[_x_1_0, _x_3_2],
   )
 }
@@ -2038,8 +2038,8 @@ fun f_instFromJsonSymbolTag_lam_0_closed_1_2c7664cb65(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolTag\",\"deprecated\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolTag_deprecated, Array[])],
   )
 }
 // "Lean.Lsp.instToJsonSymbolKind._lam_0._closed_25"
@@ -2049,7 +2049,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_25_9456f20b93(
   _x_510_0: LeanValue = f_instToJsonSymbolKind_lam_0_closed_24_795b13e65b(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_510_0])
+  LeanCtor(LeanTag.Json_num, Array[_x_510_0])
 }
 // "Lean.Lsp.instReprCompletionItemKind.repr._closed_29"
 fun f_instReprCompletionItemKind_repr_closed_29_05470c8903(
@@ -2058,7 +2058,7 @@ fun f_instReprCompletionItemKind_repr_closed_29_05470c8903(
   _x_1148_0: LeanValue = f_instReprCompletionItemKind_repr_closed_28_69beb7f728(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1148_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1148_0])
 }
 // "Lean.Lsp.instHashableCompletionIdentifier.hash"
 fun f_Lsp_instHashableCompletionIdentifier_hash_9782405351(
@@ -2066,25 +2066,25 @@ fun f_Lsp_instHashableCompletionIdentifier_hash_9782405351(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"CompletionIdentifier\",\"const\"]" ->
+  | LeanTag.Lsp_CompletionIdentifier_const ->
     _declName_2_1: LeanValue = leanField(_x_1_0, 0);
     _x_3_3: LeanValue = LeanScalar("uint64", "0");
     leanTag(_declName_2_1) match {
-    | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+    | LeanTag.Name_anonymous__impl ->
       LeanScalar("uint64", "8934034000889494153")
-    | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+    | LeanTag.Name_str__impl ->
       _hash_4: LeanValue = leanField(_declName_2_1, 0);
       _pre_5: LeanValue = leanField(_declName_2_1, 1);
       _str_6: LeanValue = leanField(_declName_2_1, 2);
       L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _x_3_3, _hash_4)
-    | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+    | LeanTag.Name_num__impl ->
       _hash_7: LeanValue = leanField(_declName_2_1, 0);
       _pre_8: LeanValue = leanField(_declName_2_1, 1);
       _i_9: LeanValue = leanField(_declName_2_1, 2);
       L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _x_3_3, _hash_7)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"Lsp\",\"CompletionIdentifier\",\"fvar\"]" ->
+  | LeanTag.Lsp_CompletionIdentifier_fvar ->
     _id_7_2: LeanValue = leanField(_x_1_0, 0);
     _x_9_14: LeanValue = L4_Lean_Expr.f_Lean_instHashableFVarId_hash_0a224ae9eb(
       _runtime,
@@ -2185,7 +2185,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_13_ecf65dec33(
   _x_518_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_12_96a6bc7a51(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_518_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_518_0])
 }
 // "Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonSemanticTokensLegend.fromJson.spec_0"
 fun f_instFromJsonSemanticTokensLegend_fromJson_spec_0_4497dd537c(
@@ -2210,7 +2210,7 @@ fun f_instFromJsonColorInformation_fromJson_closed_8_86e0e58f60(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_461_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonSymbolKind._lam_0._closed_26"
@@ -2219,7 +2219,7 @@ fun f_instFromJsonSymbolKind_lam_0_closed_26_085f3e4167(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "14"),
+    LeanNatLiterals.n14,
   )
 }
 // "Lean.Lsp.instFromJsonInlayHintKind._lam_0._closed_1"
@@ -2227,9 +2227,9 @@ fun f_instFromJsonInlayHintKind_lam_0_closed_1_2aa0a918da(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
-      LeanCtor("[\"Lean\",\"Lsp\",\"InlayHintKind\",\"parameter\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_InlayHintKind_parameter, Array[]),
     ],
   )
 }
@@ -2239,7 +2239,7 @@ fun f_Lsp_instHashableInsertReplaceEdit_hash_421bee78c2(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"InsertReplaceEdit\",\"mk\"]" ->
+  | LeanTag.Lsp_InsertReplaceEdit_mk ->
     _newText_2_1: LeanValue = leanField(_x_1_0, 0);
     _insert_3_2: LeanValue = leanField(_x_1_0, 1);
     _replace_4_3: LeanValue = leanField(_x_1_0, 2);
@@ -2291,7 +2291,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Lsp\",\"CompletionItem\",\"mk\"]" ->
+      | LeanTag.Lsp_CompletionItem_mk ->
         _frame.set(6, leanField(_frame[0], 0));
         _frame.set(7, leanField(_frame[0], 1));
         _frame.set(8, leanField(_frame[0], 2));
@@ -2314,13 +2314,13 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
           ),
         );
         leanTag(_frame[7]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(70, LeanScalar("uint64", "11"));
           _jump0 = _frame[70];
           _frame.set(62, _jump0);
           !pc = 7;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(69, leanField(_frame[7], 0));
           _frame.set(
             71,
@@ -2360,7 +2360,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[14], _frame[15]),
       );
       leanTag(_frame[13]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(18, LeanScalar("uint64", "11"));
         _frame.set(
           19,
@@ -2371,10 +2371,10 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
           ),
         );
         return _frame[19]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(17, leanField(_frame[13], 0));
         _frame.set(20, LeanScalar("uint64", "7"));
-        _frame.set(21, LeanScalar("nat", "0"));
+        _frame.set(21, LeanNatLiterals.n0);
         _frame.set(
           22,
           L4_Init_Prelude.f_Array_size_3866d4555a(
@@ -2392,14 +2392,14 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
           ),
         );
         leanTag(_frame[23]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[16];
           _jump1 = _frame[20];
           _frame.set(1, _jump0);
           _frame.set(2, _jump1);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(24, LeanScalar("usize", "0"));
           _frame.set(
             25,
@@ -2433,7 +2433,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[27], _frame[28]),
       );
       leanTag(_frame[12]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(31, LeanScalar("uint64", "11"));
         _jump0 = _frame[29];
         _jump1 = _frame[31];
@@ -2441,7 +2441,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         _frame.set(15, _jump1);
         !pc = 2;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(30, leanField(_frame[12], 0));
         _frame.set(
           32,
@@ -2473,7 +2473,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[35], _frame[36]),
       );
       leanTag(_frame[11]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(39, LeanScalar("uint64", "11"));
         _jump0 = _frame[37];
         _jump1 = _frame[39];
@@ -2481,7 +2481,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         _frame.set(28, _jump1);
         !pc = 3;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(38, leanField(_frame[11], 0));
         _frame.set(
           40,
@@ -2510,7 +2510,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[43], _frame[44]),
       );
       leanTag(_frame[10]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(47, LeanScalar("uint64", "11"));
         _jump0 = _frame[45];
         _jump1 = _frame[47];
@@ -2518,7 +2518,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         _frame.set(36, _jump1);
         !pc = 4;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(46, leanField(_frame[10], 0));
         _frame.set(
           48,
@@ -2550,7 +2550,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[51], _frame[52]),
       );
       leanTag(_frame[9]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(55, LeanScalar("uint64", "11"));
         _jump0 = _frame[53];
         _jump1 = _frame[55];
@@ -2558,7 +2558,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         _frame.set(44, _jump1);
         !pc = 5;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(54, leanField(_frame[9], 0));
         _frame.set(
           56,
@@ -2590,7 +2590,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         L4_Init_Prelude.f_mixHash_f2b5fd4ac9(_runtime, _frame[61], _frame[62]),
       );
       leanTag(_frame[8]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(65, LeanScalar("uint64", "11"));
         _jump0 = _frame[63];
         _jump1 = _frame[65];
@@ -2598,7 +2598,7 @@ fun f_Lsp_instHashableCompletionItem_hash_77433d80dd(
         _frame.set(52, _jump1);
         !pc = 6;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(64, leanField(_frame[8], 0));
         _frame.set(
           66,
@@ -2651,7 +2651,7 @@ fun f_instFromJsonSymbolInformation_fromJson_closed_14_fb0707e0ce(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_3798_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonCallHierarchyItem.fromJson._closed_6"
@@ -2686,13 +2686,13 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Json\",\"num\"]" ->
+      | LeanTag.Json_num ->
         _frame.set(7, leanField(_frame[0], 0));
         leanTag(_frame[7]) match {
-        | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+        | LeanTag.JsonNumber_mk ->
           _frame.set(8, leanField(_frame[7], 0));
           _frame.set(9, leanField(_frame[7], 1));
-          _frame.set(10, LeanScalar("nat", "0"));
+          _frame.set(10, LeanNatLiterals.n0);
           _frame.set(
             11,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[10]),
@@ -2706,7 +2706,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
             ),
           );
           leanTag(_frame[12]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               13,
               L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
@@ -2714,7 +2714,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                 _frame[8],
               ),
             );
-            _frame.set(14, LeanScalar("nat", "1"));
+            _frame.set(14, LeanNatLiterals.n1);
             _frame.set(
               15,
               L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2724,8 +2724,8 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
               ),
             );
             leanTag(_frame[15]) match {
-            | "[\"Bool\",\"false\"]" ->
-              _frame.set(16, LeanScalar("nat", "2"));
+            | LeanTag.Bool_false ->
+              _frame.set(16, LeanNatLiterals.n2);
               _frame.set(
                 17,
                 L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2735,12 +2735,12 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                 ),
               );
               leanTag(_frame[17]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 _jump0 = _frame[0];
                 _frame.set(1, _jump0);
                 !pc = 1;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   18,
                   L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2750,7 +2750,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                   ),
                 );
                 leanTag(_frame[18]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _frame.set(
                     19,
                     L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -2761,36 +2761,36 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                   _frame.set(
                     20,
                     LeanCtor(
-                      "[\"Lean\",\"JsonNumber\",\"mk\"]",
+                      LeanTag.JsonNumber_mk,
                       Array[_frame[19], _frame[9]],
                     ),
                   );
                   _frame.set(
                     21,
-                    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[20]]),
+                    LeanCtor(LeanTag.Json_num, Array[_frame[20]]),
                   );
                   _jump0 = _frame[21];
                   _frame.set(1, _jump0);
                   !pc = 1;
                   void
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _frame.set(
                     22,
                     LeanCtor(
-                      "[\"Lean\",\"Lsp\",\"InlayHintKind\",\"parameter\"]",
+                      LeanTag.Lsp_InlayHintKind_parameter,
                       Array[],
                     ),
                   );
                   _frame.set(
                     23,
-                    LeanCtor("[\"Except\",\"ok\"]", Array[_frame[22]]),
+                    LeanCtor(LeanTag.Except_ok, Array[_frame[22]]),
                   );
                   return _frame[23]
                 | _ -> return leanFail("non-exhaustive Lean case")
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 24,
                 L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2800,7 +2800,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                 ),
               );
               leanTag(_frame[24]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 _frame.set(
                   25,
                   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -2811,29 +2811,29 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
                 _frame.set(
                   26,
                   LeanCtor(
-                    "[\"Lean\",\"JsonNumber\",\"mk\"]",
+                    LeanTag.JsonNumber_mk,
                     Array[_frame[25], _frame[9]],
                   ),
                 );
                 _frame.set(
                   27,
-                  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[26]]),
+                  LeanCtor(LeanTag.Json_num, Array[_frame[26]]),
                 );
                 _jump0 = _frame[27];
                 _frame.set(1, _jump0);
                 !pc = 1;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   28,
                   LeanCtor(
-                    "[\"Lean\",\"Lsp\",\"InlayHintKind\",\"type\"]",
+                    LeanTag.Lsp_InlayHintKind_type,
                     Array[],
                   ),
                 );
                 _frame.set(
                   29,
-                  LeanCtor("[\"Except\",\"ok\"]", Array[_frame[28]]),
+                  LeanCtor(LeanTag.Except_ok, Array[_frame[28]]),
                 );
                 return _frame[29]
               | _ -> return leanFail("non-exhaustive Lean case")
@@ -2856,7 +2856,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
       }
     | 1 ->
       _frame.set(2, LeanText("unknown inlay hint kind "));
-      _frame.set(3, LeanScalar("nat", "80"));
+      _frame.set(3, LeanNatLiterals.n80);
       _frame.set(
         4,
         L4_Lean_Data_Json_Printer.f_Lean_Json_pretty_b82232e7b1(
@@ -2873,7 +2873,7 @@ fun f_Lsp_instFromJsonInlayHintKind_lam_0_ddfa1474e5(
           _frame[4],
         ),
       );
-      _frame.set(6, LeanCtor("[\"Except\",\"error\"]", Array[_frame[5]]));
+      _frame.set(6, LeanCtor(LeanTag.Except_error, Array[_frame[5]]));
       return _frame[6]
     | _ -> return leanFail("invalid join point")
     }
@@ -2890,10 +2890,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_10_9472d04a6c(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupPlainText\"]",
+        LeanTag.Lsp_SemanticTokenType_markupPlainText,
         Array[],
       ),
     ],
@@ -2904,8 +2904,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_13_dd37cdc3be(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"null\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_null, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonSignatureHelpParams"
@@ -2937,19 +2937,19 @@ fun f_instBEqCompletionItem_beq_spec_1_dec200898e(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       L4_Lean_Data_Lsp_Basic.f_Lsp_instDecidableEqMarkupContent_decEq_88bcbbb44f(
         _runtime,
@@ -2989,7 +2989,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_2_6955cc84bf(
 ): LeanValue {
   L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
     _runtime,
-    LeanScalar("nat", "5"),
+    LeanNatLiterals.n5,
   )
 }
 // "Lean.Lsp.instFromJsonInlayHint.fromJson._closed_21"
@@ -3002,7 +3002,7 @@ fun f_instFromJsonInlayHint_fromJson_closed_21_ecbc5d1b9a(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_4314_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonInlayHintParams.fromJson._closed_3"
@@ -3015,7 +3015,7 @@ fun f_instFromJsonInlayHintParams_fromJson_closed_3_3c6cf281cf(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_686_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonDefinitionParams.fromJson._closed_6"
@@ -3091,9 +3091,9 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_22_0e015c22a1(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
-      LeanCtor("[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"event\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_SemanticTokenType_event, Array[]),
     ],
   )
 }
@@ -3180,7 +3180,7 @@ fun f_instReprCompletionItemKind_repr_closed_50_ff38ef6099(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "2"),
+    LeanNatLiterals.n2,
   )
 }
 // "Lean.Lsp.instReprSemanticTokenModifier.repr._closed_13"
@@ -3190,7 +3190,7 @@ fun f_instReprSemanticTokenModifier_repr_closed_13_7cbf4dac18(
   _x_596_0: LeanValue = f_instReprSemanticTokenModifier_repr_closed_12_dec0cb1615(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_596_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_596_0])
 }
 // "Lean.Lsp.instFromJsonInlayHintClientCapabilities.fromJson._closed_11"
 fun f_instFromJsonInlayHintClientCapabilities_fromJson_closed__dcd4557ad9(
@@ -3242,7 +3242,7 @@ fun f_instToJsonSemanticTokenModifier_toJson_closed_11_7583cbb171(
   _x_215_0: LeanValue = f_instToJsonSemanticTokenModifier_toJson_closed_10_797db550e9(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_215_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_215_0])
 }
 // "Lean.Lsp.SemanticTokenModifiers.ofBits"
 fun f_Lsp_SemanticTokenModifiers_ofBits_68ea2d98ab(
@@ -3285,7 +3285,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_43_beb4c56197(
   _x_563_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_42_53d3c3dc55(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_563_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_563_0])
 }
 // "Lean.Lsp.instHashableSymbolTag"
 fun f_Lean_Lsp_instHashableSymbolTag_7846404d06(
@@ -3355,7 +3355,7 @@ fun f_instReprSemanticTokenModifier_repr_closed_5_bcaabb0876(
   _x_584_0: LeanValue = f_instReprSemanticTokenModifier_repr_closed_4_7565aeaed4(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_584_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_584_0])
 }
 // "Lean.Lsp.instFromJsonSemanticTokensOptions"
 fun f_Lean_Lsp_instFromJsonSemanticTokensOptions_b66afd3007(
@@ -3375,17 +3375,17 @@ fun f_instToJsonSymbolKind_lam_0_closed_29_7818e468d4(
   _x_518_0: LeanValue = f_instToJsonSymbolKind_lam_0_closed_28_5fd725d1de(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_518_0])
+  LeanCtor(LeanTag.Json_num, Array[_x_518_0])
 }
 // "Lean.Lsp.instFromJsonSemanticTokenType.fromJson._closed_36"
 fun f_instFromJsonSemanticTokenType_fromJson_closed_36_d829953b37(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupCrossReference\"]",
+        LeanTag.Lsp_SemanticTokenType_markupCrossReference,
         Array[],
       ),
     ],
@@ -3404,7 +3404,7 @@ fun f_instFromJsonParameterInformationLabel_lam_0_closed_1_05beb4d680(
   _x_233_0: LeanValue = f_instFromJsonParameterInformationLabel_lam_0_closed_0_26e9f30058(
     _runtime,
   );
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_233_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_233_0])
 }
 // "Lean.Lsp.instFromJsonColor.fromJson._closed_9"
 fun f_instFromJsonColor_fromJson_closed_9_4f0282b317(
@@ -3426,7 +3426,7 @@ fun f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"CompletionItem\",\"mk\"]" ->
+  | LeanTag.Lsp_CompletionItem_mk ->
     _label_1: LeanValue = leanField(_x_1_0, 0);
     _detail_2: LeanValue = leanField(_x_1_0, 1);
     _documentation_3: LeanValue = leanField(_x_1_0, 2);
@@ -3435,15 +3435,15 @@ fun f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
     _sortText_6: LeanValue = leanField(_x_1_0, 5);
     _data_7: LeanValue = leanField(_x_1_0, 6);
     _tags_8: LeanValue = leanField(_x_1_0, 7);
-    _x_5_12: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_12: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_6_13: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             LeanText("label"),
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_label_1]),
+            LeanCtor(LeanTag.Json_str, Array[_label_1]),
           ],
         ),
         _x_5_12,
@@ -3485,18 +3485,18 @@ fun f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
       _tags_8,
     );
     _x_24_31: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         _x_14_21,
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             _x_16_23,
             LeanCtor(
-              "[\"List\",\"cons\"]",
+              LeanTag.List_cons,
               Array[
                 _x_18_25,
-                LeanCtor("[\"List\",\"cons\"]", Array[_x_20_27, _x_5_12]),
+                LeanCtor(LeanTag.List_cons, Array[_x_20_27, _x_5_12]),
               ],
             ),
           ],
@@ -3504,18 +3504,18 @@ fun f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
       ],
     );
     _x_28_35: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         _x_6_13,
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             _x_8_15,
             LeanCtor(
-              "[\"List\",\"cons\"]",
+              LeanTag.List_cons,
               Array[
                 _x_10_17,
-                LeanCtor("[\"List\",\"cons\"]", Array[_x_12_19, _x_24_31]),
+                LeanCtor(LeanTag.List_cons, Array[_x_12_19, _x_24_31]),
               ],
             ),
           ],
@@ -3525,7 +3525,7 @@ fun f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
     _x_30_37: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_31_38: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -3633,17 +3633,17 @@ fun f_instToJsonCompletionItem_toJson_spec_0_ca028ccc77(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
-          Array[_k_0, LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_val_3_2])],
+          LeanTag.Prod_mk,
+          Array[_k_0, LeanCtor(LeanTag.Json_str, Array[_val_3_2])],
         ),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3656,7 +3656,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_41_cae544d628(
   _x_560_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_40_0da62f7380(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_560_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_560_0])
 }
 // "Lean.Json.opt._at_.Lean.Lsp.instToJsonFoldingRange.toJson.spec_0"
 fun f_instToJsonFoldingRange_toJson_spec_0_3009ad02a6(
@@ -3676,47 +3676,47 @@ fun f_instToJsonFoldingRange_toJson_spec_0_3009ad02a6(
     pc match {
     | 0 ->
       leanTag(_frame[1]) match {
-      | "[\"Option\",\"none\"]" ->
-        _frame.set(7, LeanCtor("[\"List\",\"nil\"]", Array[]));
+      | LeanTag.Option_none ->
+        _frame.set(7, LeanCtor(LeanTag.List_nil, Array[]));
         return _frame[7]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(6, leanField(_frame[1], 0));
         leanTag(_frame[6]) match {
-        | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"comment\"]" ->
+        | LeanTag.Lsp_FoldingRangeKind_comment ->
           _frame.set(8, LeanText("comment"));
           _frame.set(
             9,
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_frame[8]]),
+            LeanCtor(LeanTag.Json_str, Array[_frame[8]]),
           );
           _jump0 = _frame[9];
           _frame.set(2, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"imports\"]" ->
+        | LeanTag.Lsp_FoldingRangeKind_imports ->
           _frame.set(10, LeanText("imports"));
           _frame.set(
             11,
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_frame[10]]),
+            LeanCtor(LeanTag.Json_str, Array[_frame[10]]),
           );
           _jump0 = _frame[11];
           _frame.set(2, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"region\"]" ->
+        | LeanTag.Lsp_FoldingRangeKind_region ->
           _frame.set(12, LeanText("region"));
           _frame.set(
             13,
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_frame[12]]),
+            LeanCtor(LeanTag.Json_str, Array[_frame[12]]),
           );
           _jump0 = _frame[13];
           _frame.set(2, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"proof\"]" ->
+        | LeanTag.Lsp_FoldingRangeKind_proof ->
           _frame.set(14, LeanText("proof"));
           _frame.set(
             15,
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_frame[14]]),
+            LeanCtor(LeanTag.Json_str, Array[_frame[14]]),
           );
           _jump0 = _frame[15];
           _frame.set(2, _jump0);
@@ -3727,11 +3727,11 @@ fun f_instToJsonFoldingRange_toJson_spec_0_3009ad02a6(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(3, LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[0], _frame[2]]));
-      _frame.set(4, LeanCtor("[\"List\",\"nil\"]", Array[]));
+      _frame.set(3, LeanCtor(LeanTag.Prod_mk, Array[_frame[0], _frame[2]]));
+      _frame.set(4, LeanCtor(LeanTag.List_nil, Array[]));
       _frame.set(
         5,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[3], _frame[4]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[3], _frame[4]]),
       );
       return _frame[5]
     | _ -> return leanFail("invalid join point")
@@ -3768,18 +3768,18 @@ fun f_instFromJsonWorkspaceSymbolParams_fromJson_closed_7_4cae1cbbdb(
 fun f_instInhabitedResolvableCompletionItem_default_closed_0_9853913ce1(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_13_0: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_14_1: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_15_2: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_16_3: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_17_4: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_18_5: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  _x_19_6: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  _x_13_0: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_14_1: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_15_2: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_16_3: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_17_4: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_18_5: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  _x_19_6: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
   _x_20_7: LeanValue = f_instInhabitedCompletionItem_default_closed_0_537b1ad514(
     _runtime,
   );
   LeanCtor(
-    "[\"Lean\",\"Lsp\",\"ResolvableCompletionItem\",\"mk\"]",
+    LeanTag.Lsp_ResolvableCompletionItem_mk,
     Array[
       _x_20_7,
       _x_19_6,
@@ -3802,7 +3802,7 @@ fun f_instFromJsonCompletionOptions_fromJson_closed_10_d8da233c2c(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_1026_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonSignatureHelpTriggerKind._lam_0._closed_2"
@@ -3810,10 +3810,10 @@ fun f_instFromJsonSignatureHelpTriggerKind_lam_0_closed_2_3ace6d7578(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SignatureHelpTriggerKind\",\"contentChange\"]",
+        LeanTag.Lsp_SignatureHelpTriggerKind_contentChange,
         Array[],
       ),
     ],
@@ -3834,18 +3834,18 @@ fun f_Lsp_instToJsonReferenceParams_toJson_02a1ac88cf(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"ReferenceParams\",\"mk\"]" ->
+  | LeanTag.Lsp_ReferenceParams_mk ->
     _toTextDocumentPositionPa_1: LeanValue = leanField(_x_1_0, 0);
     _context_2: LeanValue = leanField(_x_1_0, 1);
     leanTag(_toTextDocumentPositionPa_1) match {
-    | "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]" ->
+    | LeanTag.Lsp_TextDocumentPositionParams_mk ->
       _textDocument_3: LeanValue = leanField(_toTextDocumentPositionPa_1, 0);
       _position_4: LeanValue = leanField(_toTextDocumentPositionPa_1, 1);
       _x_3_6: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instToJsonTextDocumentIdentifier_toJson_4b24e1d9e7(
         _runtime,
         _textDocument_3,
       );
-      _x_5_8: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+      _x_5_8: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
       _x_8_11: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instToJsonPosition_toJson_4ecb22c787(
         _runtime,
         _position_4,
@@ -3855,13 +3855,13 @@ fun f_Lsp_instToJsonReferenceParams_toJson_02a1ac88cf(
         _context_2,
       );
       _x_15_18: LeanValue = LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               LeanCtor(
-                "[\"Prod\",\"mk\"]",
+                LeanTag.Prod_mk,
                 Array[LeanText("context"), _x_12_15],
               ),
               _x_5_8,
@@ -3871,13 +3871,13 @@ fun f_Lsp_instToJsonReferenceParams_toJson_02a1ac88cf(
         ],
       );
       _x_16_19: LeanValue = LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               LeanCtor(
-                "[\"Prod\",\"mk\"]",
+                LeanTag.Prod_mk,
                 Array[LeanText("position"), _x_8_11],
               ),
               _x_5_8,
@@ -3887,13 +3887,13 @@ fun f_Lsp_instToJsonReferenceParams_toJson_02a1ac88cf(
         ],
       );
       _x_17_20: LeanValue = LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               LeanCtor(
-                "[\"Prod\",\"mk\"]",
+                LeanTag.Prod_mk,
                 Array[LeanText("textDocument"), _x_3_6],
               ),
               _x_5_8,
@@ -3905,7 +3905,7 @@ fun f_Lsp_instToJsonReferenceParams_toJson_02a1ac88cf(
       _x_19_22: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
         _runtime,
         LeanErased(),
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_20_23: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
         _runtime,
@@ -3946,21 +3946,21 @@ fun f_Lsp_instToJsonCallHierarchyOutgoingCallsParams_toJson_bbc3d8e63c(
     _runtime,
     _x_1_0,
   );
-  _x_5_4: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_5_4: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_9_8: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_10_9: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
     _runtime,
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("item"), _x_3_2]),
+            LeanCtor(LeanTag.Prod_mk, Array[LeanText("item"), _x_3_2]),
             _x_5_4,
           ],
         ),
@@ -3992,36 +3992,36 @@ fun f_Lsp_instToJsonDocumentHighlight_toJson_523acfe6a5(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"DocumentHighlight\",\"mk\"]" ->
+  | LeanTag.Lsp_DocumentHighlight_mk ->
     _range_1: LeanValue = leanField(_x_1_0, 0);
     _kind_2: LeanValue = leanField(_x_1_0, 1);
     _x_3_4: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instToJsonRange_toJson_3863a218ca(
       _runtime,
       _range_1,
     );
-    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_6: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_8_9: LeanValue = f_instToJsonDocumentHighlight_toJson_spec_0_87a7602578(
       _runtime,
       LeanText("kind"),
       _kind_2,
     );
     _x_10_11: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("range"), _x_3_4]),
+            LeanCtor(LeanTag.Prod_mk, Array[LeanText("range"), _x_3_4]),
             _x_5_6,
           ],
         ),
-        LeanCtor("[\"List\",\"cons\"]", Array[_x_8_9, _x_5_6]),
+        LeanCtor(LeanTag.List_cons, Array[_x_8_9, _x_5_6]),
       ],
     );
     _x_12_13: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_13_14: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -4048,7 +4048,7 @@ fun f_instFromJsonFoldingRangeParams_fromJson_closed_2_3987548d33(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_226_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonCallHierarchyPrepareParams.fromJson._closed_2"
@@ -4061,7 +4061,7 @@ fun f_instFromJsonCallHierarchyPrepareParams_fromJson_closed_2_6ad5539c0b(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_418_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonDocumentSymbolAux.fromJson._redArg._closed_10"
@@ -4090,7 +4090,7 @@ fun f_instFromJsonCompletionItem_fromJson_closed_18_6b47521b12(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_4041_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.SymbolKind.file.elim._redArg"
@@ -4126,21 +4126,21 @@ fun f_Lsp_instFromJsonCompletionItemKind_lam_0_63891d38e8(
     _v_0,
   );
   leanTag(_x_1_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_2_2: LeanValue = leanField(_x_1_1, 0);
-    LeanCtor("[\"Except\",\"error\"]", Array[_a_2_2])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_a_2_2])
+  | LeanTag.Except_ok ->
     _a_4_3: LeanValue = leanField(_x_1_1, 0);
     _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _a_4_3,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_7_7: LeanValue = f_Lsp_CompletionItemKind_ofNat_00f1d72ea0(
       _runtime,
       _x_6_6,
     );
-    LeanCtor("[\"Except\",\"ok\"]", Array[_x_7_7])
+    LeanCtor(LeanTag.Except_ok, Array[_x_7_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -4160,7 +4160,7 @@ fun f_instFromJsonCompletionItem_fromJson_closed_6_01e95a2379(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_3985_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Option.fromJson?._at_.Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonSignatureHelpParams.fromJson.spec_0.spec_0"
@@ -4169,10 +4169,10 @@ fun f_fromJson_spec_0_spec_0_a87562207d(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = f_Lsp_instFromJsonSignatureHelpContext_fromJson_b2028b4aaf(
@@ -4180,14 +4180,14 @@ fun f_fromJson_spec_0_spec_0_a87562207d(
       _x_1_0,
     );
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -4210,10 +4210,10 @@ fun f_fromJson_spec_1_spec_2_c04679ad51(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instFromJsonMarkupContent_fromJson_fc7cd5e266(
@@ -4221,14 +4221,14 @@ fun f_fromJson_spec_1_spec_2_c04679ad51(
       _x_1_0,
     );
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -4247,7 +4247,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_1_e15fc0d7de(
   _x_500_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_0_572e6a3d84(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_500_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_500_0])
 }
 // "instBEqOption.beq._at_.Lean.Lsp.instBEqResolvableCompletionItemData.beq.spec_0"
 fun f_instBEqResolvableCompletionItemData_beq_spec_0_aadb325244(
@@ -4256,19 +4256,19 @@ fun f_instBEqResolvableCompletionItemData_beq_spec_0_aadb325244(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _val_6_2, _val_8_6)
     | _ -> leanFail("non-exhaustive Lean case")
@@ -4281,10 +4281,10 @@ fun f_instFromJsonSemanticTokenModifier_fromJson_closed_7_76891fd62b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"async\"]",
+        LeanTag.Lsp_SemanticTokenModifier_async,
         Array[],
       ),
     ],
@@ -4324,7 +4324,7 @@ fun f_instReprSemanticTokenModifier_repr_closed_11_eafab10ba9(
   _x_593_0: LeanValue = f_instReprSemanticTokenModifier_repr_closed_10_81286923bd(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_593_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_593_0])
 }
 // "Lean.Lsp.instToJsonInlayHintLabelPart"
 fun f_Lean_Lsp_instToJsonInlayHintLabelPart_1d7944ed1d(
@@ -4365,8 +4365,8 @@ fun f_spec_5_spec_10_closed_0_2f6ae5fcc9(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonInlayHintLabelPart._closed_0"
@@ -4390,7 +4390,7 @@ fun f_instFromJsonSignatureHelpParams_fromJson_closed_2_ab83b974c2(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_1131_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instToJsonRenameOptions._closed_0"
@@ -4411,7 +4411,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_27_f2313d0f81(
   _x_539_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_26_deaf5ff7ed(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_539_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_539_0])
 }
 // "Lean.Lsp.SemanticTokenType.markupQuote.elim._redArg"
 fun f_SemanticTokenType_markupQuote_elim_b4c2b00926(
@@ -4458,26 +4458,26 @@ fun f_Lsp_instToJsonCallHierarchyOutgoingCall_toJson_96ddb091c3(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"CallHierarchyOutgoingCall\",\"mk\"]" ->
+  | LeanTag.Lsp_CallHierarchyOutgoingCall_mk ->
     _to_1: LeanValue = leanField(_x_1_0, 0);
     _fromRanges_2: LeanValue = leanField(_x_1_0, 1);
     _x_3_4: LeanValue = f_Lsp_instToJsonCallHierarchyItem_toJson_1f7a48c6f1(
       _runtime,
       _to_1,
     );
-    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_6: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_8_9: LeanValue = f_instToJsonCallHierarchyIncomingCall_toJson_spec_0_72cefdab7b(
       _runtime,
       _fromRanges_2,
     );
     _x_11_12: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[LeanText("fromRanges"), _x_8_9],
             ),
             _x_5_6,
@@ -4489,17 +4489,17 @@ fun f_Lsp_instToJsonCallHierarchyOutgoingCall_toJson_96ddb091c3(
     _x_14_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_15_16: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
       LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
-              LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("to"), _x_3_4]),
+              LeanCtor(LeanTag.Prod_mk, Array[LeanText("to"), _x_3_4]),
               _x_5_6,
             ],
           ),
@@ -4526,10 +4526,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_7_92d15d6567(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupList\"]",
+        LeanTag.Lsp_SemanticTokenType_markupList,
         Array[],
       ),
     ],
@@ -4541,19 +4541,19 @@ fun f_Lsp_instToJsonSignatureHelpParams_toJson_dffeca9946(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"SignatureHelpParams\",\"mk\"]" ->
+  | LeanTag.Lsp_SignatureHelpParams_mk ->
     _toTextDocumentPositionPa_1: LeanValue = leanField(_x_1_0, 0);
     _toWorkDoneProgressParams_2: LeanValue = leanField(_x_1_0, 1);
     _context_3: LeanValue = leanField(_x_1_0, 2);
     leanTag(_toTextDocumentPositionPa_1) match {
-    | "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]" ->
+    | LeanTag.Lsp_TextDocumentPositionParams_mk ->
       _textDocument_4: LeanValue = leanField(_toTextDocumentPositionPa_1, 0);
       _position_5: LeanValue = leanField(_toTextDocumentPositionPa_1, 1);
       _x_3_7: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instToJsonTextDocumentIdentifier_toJson_4b24e1d9e7(
         _runtime,
         _textDocument_4,
       );
-      _x_5_9: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+      _x_5_9: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
       _x_8_12: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instToJsonPosition_toJson_4ecb22c787(
         _runtime,
         _position_5,
@@ -4569,35 +4569,35 @@ fun f_Lsp_instToJsonSignatureHelpParams_toJson_dffeca9946(
         _context_3,
       );
       _x_17_21: LeanValue = LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               LeanCtor(
-                "[\"Prod\",\"mk\"]",
+                LeanTag.Prod_mk,
                 Array[LeanText("position"), _x_8_12],
               ),
               _x_5_9,
             ],
           ),
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               _x_12_16,
-              LeanCtor("[\"List\",\"cons\"]", Array[_x_14_18, _x_5_9]),
+              LeanCtor(LeanTag.List_cons, Array[_x_14_18, _x_5_9]),
             ],
           ),
         ],
       );
       _x_18_22: LeanValue = LeanCtor(
-        "[\"List\",\"cons\"]",
+        LeanTag.List_cons,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
+            LeanTag.List_cons,
             Array[
               LeanCtor(
-                "[\"Prod\",\"mk\"]",
+                LeanTag.Prod_mk,
                 Array[LeanText("textDocument"), _x_3_7],
               ),
               _x_5_9,
@@ -4609,7 +4609,7 @@ fun f_Lsp_instToJsonSignatureHelpParams_toJson_dffeca9946(
       _x_20_24: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
         _runtime,
         LeanErased(),
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_21_25: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
         _runtime,
@@ -4721,7 +4721,7 @@ fun f_instReprSemanticTokenModifier_repr_closed_9_afeaa3f216(
   _x_590_0: LeanValue = f_instReprSemanticTokenModifier_repr_closed_8_45336ff3b2(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_590_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_590_0])
 }
 // "Lean.Lsp.instHashableResolvableCompletionItem._closed_0"
 fun f_Lsp_instHashableResolvableCompletionItem_closed_0_2eca69c7ea(
@@ -4740,14 +4740,14 @@ fun f_Lsp_instToJsonFoldingRangeKind_lam_0_8af07aaf51(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"comment\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("comment")])
-  | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"imports\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("imports")])
-  | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"region\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("region")])
-  | "[\"Lean\",\"Lsp\",\"FoldingRangeKind\",\"proof\"]" ->
-    LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[LeanText("proof")])
+  | LeanTag.Lsp_FoldingRangeKind_comment ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("comment")])
+  | LeanTag.Lsp_FoldingRangeKind_imports ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("imports")])
+  | LeanTag.Lsp_FoldingRangeKind_region ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("region")])
+  | LeanTag.Lsp_FoldingRangeKind_proof ->
+    LeanCtor(LeanTag.Json_str, Array[LeanText("proof")])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -4761,7 +4761,7 @@ fun apply_f_Lsp_instToJsonFoldingRangeKind_lam_0_8af07aaf51(
 fun f_Lean_Lsp_instInhabitedCompletionItemKind_e3b23d2fd5(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Lsp\",\"CompletionItemKind\",\"text\"]", Array[])
+  LeanCtor(LeanTag.Lsp_CompletionItemKind_text, Array[])
 }
 // "Lean.Lsp.instHashableSymbolKind.hash"
 fun f_Lsp_instHashableSymbolKind_hash_1d13c06db6(
@@ -4769,42 +4769,42 @@ fun f_Lsp_instHashableSymbolKind_hash_1d13c06db6(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"file\"]" -> LeanScalar("uint64", "0")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"module\"]" -> LeanScalar("uint64", "1")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"namespace\"]" ->
+  | LeanTag.Lsp_SymbolKind_file -> LeanScalar("uint64", "0")
+  | LeanTag.Lsp_SymbolKind_module -> LeanScalar("uint64", "1")
+  | LeanTag.Lsp_SymbolKind_namespace ->
     LeanScalar("uint64", "2")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"package\"]" -> LeanScalar("uint64", "3")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"class\"]" -> LeanScalar("uint64", "4")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"method\"]" -> LeanScalar("uint64", "5")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"property\"]" ->
+  | LeanTag.Lsp_SymbolKind_package -> LeanScalar("uint64", "3")
+  | LeanTag.Lsp_SymbolKind_class -> LeanScalar("uint64", "4")
+  | LeanTag.Lsp_SymbolKind_method -> LeanScalar("uint64", "5")
+  | LeanTag.Lsp_SymbolKind_property ->
     LeanScalar("uint64", "6")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"field\"]" -> LeanScalar("uint64", "7")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"constructor\"]" ->
+  | LeanTag.Lsp_SymbolKind_field -> LeanScalar("uint64", "7")
+  | LeanTag.Lsp_SymbolKind_constructor ->
     LeanScalar("uint64", "8")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"enum\"]" -> LeanScalar("uint64", "9")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"interface\"]" ->
+  | LeanTag.Lsp_SymbolKind_enum -> LeanScalar("uint64", "9")
+  | LeanTag.Lsp_SymbolKind_interface ->
     LeanScalar("uint64", "10")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"function\"]" ->
+  | LeanTag.Lsp_SymbolKind_function ->
     LeanScalar("uint64", "11")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"variable\"]" ->
+  | LeanTag.Lsp_SymbolKind_variable ->
     LeanScalar("uint64", "12")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"constant\"]" ->
+  | LeanTag.Lsp_SymbolKind_constant ->
     LeanScalar("uint64", "13")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"string\"]" -> LeanScalar("uint64", "14")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"number\"]" -> LeanScalar("uint64", "15")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"boolean\"]" ->
+  | LeanTag.Lsp_SymbolKind_string -> LeanScalar("uint64", "14")
+  | LeanTag.Lsp_SymbolKind_number -> LeanScalar("uint64", "15")
+  | LeanTag.Lsp_SymbolKind_boolean ->
     LeanScalar("uint64", "16")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"array\"]" -> LeanScalar("uint64", "17")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"object\"]" -> LeanScalar("uint64", "18")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"key\"]" -> LeanScalar("uint64", "19")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"null\"]" -> LeanScalar("uint64", "20")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"enumMember\"]" ->
+  | LeanTag.Lsp_SymbolKind_array -> LeanScalar("uint64", "17")
+  | LeanTag.Lsp_SymbolKind_object -> LeanScalar("uint64", "18")
+  | LeanTag.Lsp_SymbolKind_key -> LeanScalar("uint64", "19")
+  | LeanTag.Lsp_SymbolKind_null -> LeanScalar("uint64", "20")
+  | LeanTag.Lsp_SymbolKind_enumMember ->
     LeanScalar("uint64", "21")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"struct\"]" -> LeanScalar("uint64", "22")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"event\"]" -> LeanScalar("uint64", "23")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"operator\"]" ->
+  | LeanTag.Lsp_SymbolKind_struct -> LeanScalar("uint64", "22")
+  | LeanTag.Lsp_SymbolKind_event -> LeanScalar("uint64", "23")
+  | LeanTag.Lsp_SymbolKind_operator ->
     LeanScalar("uint64", "24")
-  | "[\"Lean\",\"Lsp\",\"SymbolKind\",\"typeParameter\"]" ->
+  | LeanTag.Lsp_SymbolKind_typeParameter ->
     LeanScalar("uint64", "25")
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -4822,14 +4822,14 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
   _x_58_14: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "13"),
+    LeanNatLiterals.n13,
   );
   _x_59_15: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
     LeanErased(),
     _x_58_14,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"declaration\"]",
+      LeanTag.Lsp_SemanticTokenModifier_declaration,
       Array[],
     ),
   );
@@ -4838,7 +4838,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_59_15,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"definition\"]",
+      LeanTag.Lsp_SemanticTokenModifier_definition,
       Array[],
     ),
   );
@@ -4847,7 +4847,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_60_16,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"readonly\"]",
+      LeanTag.Lsp_SemanticTokenModifier_readonly,
       Array[],
     ),
   );
@@ -4856,7 +4856,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_61_17,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"static\"]",
+      LeanTag.Lsp_SemanticTokenModifier_static,
       Array[],
     ),
   );
@@ -4865,7 +4865,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_62_18,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"deprecated\"]",
+      LeanTag.Lsp_SemanticTokenModifier_deprecated,
       Array[],
     ),
   );
@@ -4874,7 +4874,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_63_19,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"abstract\"]",
+      LeanTag.Lsp_SemanticTokenModifier_abstract,
       Array[],
     ),
   );
@@ -4882,14 +4882,14 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     _runtime,
     LeanErased(),
     _x_64_20,
-    LeanCtor("[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"async\"]", Array[]),
+    LeanCtor(LeanTag.Lsp_SemanticTokenModifier_async, Array[]),
   );
   _x_66_22: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
     LeanErased(),
     _x_65_21,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"modification\"]",
+      LeanTag.Lsp_SemanticTokenModifier_modification,
       Array[],
     ),
   );
@@ -4898,7 +4898,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_66_22,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"documentation\"]",
+      LeanTag.Lsp_SemanticTokenModifier_documentation,
       Array[],
     ),
   );
@@ -4907,7 +4907,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_67_23,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"defaultLibrary\"]",
+      LeanTag.Lsp_SemanticTokenModifier_defaultLibrary,
       Array[],
     ),
   );
@@ -4916,7 +4916,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_68_24,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupBold\"]",
+      LeanTag.Lsp_SemanticTokenModifier_markupBold,
       Array[],
     ),
   );
@@ -4925,7 +4925,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_69_25,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupItalic\"]",
+      LeanTag.Lsp_SemanticTokenModifier_markupItalic,
       Array[],
     ),
   );
@@ -4934,7 +4934,7 @@ fun f_SemanticTokenModifier_all_closed_0_4799df61e2(
     LeanErased(),
     _x_70_26,
     LeanCtor(
-      "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"markupSyntax\"]",
+      LeanTag.Lsp_SemanticTokenModifier_markupSyntax,
       Array[],
     ),
   )
@@ -4951,7 +4951,7 @@ fun f_instRepr_lam_0_closed_7_5f095da319(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_89_0: LeanValue = f_instRepr_lam_0_closed_0_45abdf8485(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_89_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_89_0])
 }
 // "Lean.Lsp.SemanticTokenType.regexp.elim"
 fun f_SemanticTokenType_regexp_elim_d7f45fb7a3(
@@ -5056,22 +5056,22 @@ fun f_fromJson_spec_2_spec_4_a9ad2a7751(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = f_spec_2_spec_4_spec_6_b4fec6abc7(_runtime, _x_1_0);
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -5123,7 +5123,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_7_396ae8c8df(
   _x_509_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_6_7655edf354(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_509_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_509_0])
 }
 // "Lean.Lsp.DocumentHighlightKind.write.elim._redArg"
 fun f_DocumentHighlightKind_write_elim_bf8cb46493(
@@ -5142,7 +5142,7 @@ fun f_instFromJsonSignatureInformation_fromJson_closed_11_b37ea94436(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_1494_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonSignatureHelpOptions.fromJson._closed_0"
@@ -5216,7 +5216,7 @@ fun f_instToJsonSignatureHelp_toJson_spec_0_d31299ff8d(
     LeanScalar("usize", "0"),
     _a_0,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"arr\"]", Array[_x_2_3])
+  LeanCtor(LeanTag.Json_arr, Array[_x_2_3])
 }
 // "Lean.Lsp.instFromJsonRenameParams.fromJson"
 fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
@@ -5230,7 +5230,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -5238,7 +5238,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
       LeanText("Lsp"),
       LeanText("RenameParams"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -5273,8 +5273,8 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("position");
     _x_22_21: LeanValue = f_instFromJsonCompletionParams_fromJson_spec_1_e402e6b1d5(
@@ -5283,7 +5283,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -5291,7 +5291,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
         LeanText("Lsp"),
         LeanText("RenameParams"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -5326,8 +5326,8 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       _x_40_39: LeanValue = LeanText("newName");
       _x_41_40: LeanValue = f_instFromJsonInsertReplaceEdit_fromJson_spec_0_e25b3b2285(
@@ -5336,7 +5336,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
         _x_40_39,
       );
       leanTag(_x_41_40) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_42_41: LeanValue = leanField(_x_41_40, 0);
         _x_46_46: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -5344,7 +5344,7 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
           LeanText("Lsp"),
           LeanText("RenameParams"),
         );
-        _x_47_47: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_47_47: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_48_48: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_46_46,
@@ -5379,20 +5379,20 @@ fun f_Lsp_instFromJsonRenameParams_fromJson_6e0c812473(
           _x_55_55,
           _a_42_41,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_56_56])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_56_56])
+      | LeanTag.Except_ok ->
         _a_58_42: LeanValue = leanField(_x_41_40, 0);
         _x_60_59: LeanValue = LeanCtor(
-          "[\"Lean\",\"Lsp\",\"RenameParams\",\"mk\"]",
+          LeanTag.Lsp_RenameParams_mk,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]",
+              LeanTag.Lsp_TextDocumentPositionParams_mk,
               Array[_a_20_4, _a_39_23],
             ),
             _a_58_42,
           ],
         );
-        LeanCtor("[\"Except\",\"ok\"]", Array[_x_60_59])
+        LeanCtor(LeanTag.Except_ok, Array[_x_60_59])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -5418,7 +5418,7 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -5426,7 +5426,7 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
       LeanText("Lsp"),
       LeanText("DeclarationParams"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -5461,8 +5461,8 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("position");
     _x_22_21: LeanValue = f_instFromJsonCompletionParams_fromJson_spec_1_e402e6b1d5(
@@ -5471,7 +5471,7 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -5479,7 +5479,7 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
         LeanText("Lsp"),
         LeanText("DeclarationParams"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -5514,14 +5514,14 @@ fun f_Lsp_instFromJsonDeclarationParams_fromJson_56e40ce9e2(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
+        LeanTag.Except_ok,
         Array[
           LeanCtor(
-            "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]",
+            LeanTag.Lsp_TextDocumentPositionParams_mk,
             Array[_a_20_4, _a_39_23],
           ),
         ],
@@ -5558,7 +5558,7 @@ fun f_instFromJsonSemanticTokens_fromJson_closed_11_0da8d11604(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_700_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Json.opt._at_.Lean.Lsp.instToJsonCompletionItem.toJson.spec_2"
@@ -5568,8 +5568,8 @@ fun f_instToJsonCompletionItem_toJson_spec_2_bcee804234(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _x_4_4: LeanValue = L4_Init_Prelude.f_getObjTagNat_fc9363532b(
       _runtime,
@@ -5579,20 +5579,20 @@ fun f_instToJsonCompletionItem_toJson_spec_2_bcee804234(
     _x_6_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _x_4_4,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_7_7: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
       _x_6_6,
     );
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
-          Array[_k_0, LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_7_7])],
+          LeanTag.Prod_mk,
+          Array[_k_0, LeanCtor(LeanTag.Json_num, Array[_x_7_7])],
         ),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -5612,7 +5612,7 @@ fun f_instReprCompletionItemKind_repr_closed_35_c963469a5e(
   _x_1157_0: LeanValue = f_instReprCompletionItemKind_repr_closed_34_e8c50dd191(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1157_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1157_0])
 }
 // "Lean.Lsp.SemanticTokenType.markupPlainText.elim"
 fun f_SemanticTokenType_markupPlainText_elim_de58e4e86d(
@@ -5669,17 +5669,17 @@ fun f_toJson_spec_0_spec_0_bc41fdf7b9(
     LeanScalar("usize", "0"),
     _a_0,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"arr\"]", Array[_x_2_3])
+  LeanCtor(LeanTag.Json_arr, Array[_x_2_3])
 }
 // "Lean.Lsp.instFromJsonSemanticTokenType.fromJson._closed_32"
 fun f_instFromJsonSemanticTokenType_fromJson_closed_32_2d1587aeec(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"function\"]",
+        LeanTag.Lsp_SemanticTokenType_function,
         Array[],
       ),
     ],
@@ -5740,7 +5740,7 @@ fun f_Lsp_instFromJsonSemanticTokensParams_fromJson_85bdff54a5(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -5748,7 +5748,7 @@ fun f_Lsp_instFromJsonSemanticTokensParams_fromJson_85bdff54a5(
       LeanText("Lsp"),
       LeanText("SemanticTokensParams"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -5783,10 +5783,10 @@ fun f_Lsp_instFromJsonSemanticTokensParams_fromJson_85bdff54a5(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
-    LeanCtor("[\"Except\",\"ok\"]", Array[_a_20_4])
+    LeanCtor(LeanTag.Except_ok, Array[_a_20_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -5801,8 +5801,8 @@ fun f_spec_1_spec_2_closed_0_32d7354326(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonCompletionList.fromJson._closed_1"
@@ -5817,7 +5817,7 @@ fun f_instFromJsonSymbolKind_lam_0_closed_38_09fdec0574(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "8"),
+    LeanNatLiterals.n8,
   )
 }
 // "Lean.Lsp.instFromJsonCallHierarchyPrepareParams._closed_0"
@@ -5837,7 +5837,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_42_1cc76f98b9(
 ): LeanValue {
   L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
     _runtime,
-    LeanScalar("nat", "25"),
+    LeanNatLiterals.n25,
   )
 }
 // "Lean.Lsp.instFromJsonSemanticTokensOptions.fromJson._closed_13"
@@ -5850,7 +5850,7 @@ fun f_instFromJsonSemanticTokensOptions_fromJson_closed_13_752e4837d8(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_751_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.FoldingRangeKind.ctorElim._redArg"
@@ -5873,7 +5873,7 @@ fun f_instHashableCallHierarchyItem_hash_spec_0_2b0401b24f(
     _stop_1,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_3_5: LeanValue = L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
       _runtime,
       _b_2,
@@ -5890,7 +5890,7 @@ fun f_instHashableCallHierarchyItem_hash_spec_0_2b0401b24f(
       _stop_1,
       _x_3_5,
     )
-  | "[\"Bool\",\"true\"]" -> _b_2
+  | LeanTag.Bool_true -> _b_2
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -5918,8 +5918,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_23_8ffb8af5db(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"number\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_number, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonSymbolInformation"
@@ -5976,10 +5976,10 @@ fun f_fromJson_spec_1_spec_2_477ae03ec5(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_Json_getNat_f1859a16f6(
@@ -5987,14 +5987,14 @@ fun f_fromJson_spec_1_spec_2_477ae03ec5(
       _x_1_0,
     );
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -6014,7 +6014,7 @@ fun f_instToJsonFoldingRangeKind_lam_0_closed_5_fd12b2d2be(
   _x_60_0: LeanValue = f_instToJsonFoldingRangeKind_lam_0_closed_4_e76b775aa1(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_60_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_60_0])
 }
 // "Lean.Option.fromJson?._at_.Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonCompletionOptions.fromJson.spec_0.spec_0"
 fun f_fromJson_spec_0_spec_0_eea4b7fff1(
@@ -6022,22 +6022,22 @@ fun f_fromJson_spec_0_spec_0_eea4b7fff1(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = f_spec_0_spec_0_spec_2_8bcbcb0ee6(_runtime, _x_1_0);
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -6060,7 +6060,7 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_1_782f9e6213(
   _x_2805_0: LeanValue = f_instFromJsonSemanticTokenType_fromJson_closed_0_2a4562691a(
     _runtime,
   );
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_2805_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_2805_0])
 }
 // "Lean.Lsp.instToJsonDocumentHighlightKind._lam_0"
 fun f_Lsp_instToJsonDocumentHighlightKind_lam_0_33cf80f3e5(
@@ -6068,24 +6068,24 @@ fun f_Lsp_instToJsonDocumentHighlightKind_lam_0_33cf80f3e5(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"DocumentHighlightKind\",\"text\"]" ->
+  | LeanTag.Lsp_DocumentHighlightKind_text ->
     _x_3_2: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_3_2])
-  | "[\"Lean\",\"Lsp\",\"DocumentHighlightKind\",\"read\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_3_2])
+  | LeanTag.Lsp_DocumentHighlightKind_read ->
     _x_6_5: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "2"),
+      LeanNatLiterals.n2,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_6_5])
-  | "[\"Lean\",\"Lsp\",\"DocumentHighlightKind\",\"write\"]" ->
+    LeanCtor(LeanTag.Json_num, Array[_x_6_5])
+  | LeanTag.Lsp_DocumentHighlightKind_write ->
     _x_9_8: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "3"),
+      LeanNatLiterals.n3,
     );
-    LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_9_8])
+    LeanCtor(LeanTag.Json_num, Array[_x_9_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -6119,8 +6119,8 @@ fun f_spec_0_spec_0_closed_0_c05bf2d204(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonCallHierarchyItem._closed_0"
@@ -6141,7 +6141,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_33_a5d27df74b(
   _x_548_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_32_6415329a8a(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_548_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_548_0])
 }
 // "Lean.Lsp.instFromJsonColorInformation.fromJson._closed_0"
 fun f_instFromJsonColorInformation_fromJson_closed_0_2107c94507(
@@ -6159,7 +6159,7 @@ fun f_instFromJsonCompletionItem_fromJson_closed_24_0b09b79afb(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_4069_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instToJsonSignatureHelp._closed_0"
@@ -6244,7 +6244,7 @@ fun f_Lsp_instToJsonSignatureHelp_toJson_cc8cb7bdaf(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"SignatureHelp\",\"mk\"]" ->
+  | LeanTag.Lsp_SignatureHelp_mk ->
     _signatures_1: LeanValue = leanField(_x_1_0, 0);
     _activeSignature_2: LeanValue = leanField(_x_1_0, 1);
     _activeParameter_3: LeanValue = leanField(_x_1_0, 2);
@@ -6252,7 +6252,7 @@ fun f_Lsp_instToJsonSignatureHelp_toJson_cc8cb7bdaf(
       _runtime,
       _signatures_1,
     );
-    _x_5_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_8_10: LeanValue = f_instToJsonSignatureInformation_toJson_spec_1_9c6e1e5c49(
       _runtime,
       LeanText("activeSignature"),
@@ -6264,23 +6264,23 @@ fun f_Lsp_instToJsonSignatureHelp_toJson_cc8cb7bdaf(
       _activeParameter_3,
     );
     _x_13_15: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[LeanText("signatures"), _x_3_5],
             ),
             _x_5_7,
           ],
         ),
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             _x_8_10,
-            LeanCtor("[\"List\",\"cons\"]", Array[_x_10_12, _x_5_7]),
+            LeanCtor(LeanTag.List_cons, Array[_x_10_12, _x_5_7]),
           ],
         ),
       ],
@@ -6288,7 +6288,7 @@ fun f_Lsp_instToJsonSignatureHelp_toJson_cc8cb7bdaf(
     _x_15_17: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_16_18: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -6326,9 +6326,9 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_17_665537a68d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
-      LeanCtor("[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"string\"]", Array[]),
+      LeanCtor(LeanTag.Lsp_SemanticTokenType_string, Array[]),
     ],
   )
 }
@@ -6357,10 +6357,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_4_86334a8cae(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupUrl\"]",
+        LeanTag.Lsp_SemanticTokenType_markupUrl,
         Array[],
       ),
     ],
@@ -6433,7 +6433,7 @@ fun f_Lsp_instBEqCompletionItem_beq_d8760aa6c7(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"CompletionItem\",\"mk\"]" ->
+  | LeanTag.Lsp_CompletionItem_mk ->
     _label_3_2: LeanValue = leanField(_x_1_0, 0);
     _detail_4_3: LeanValue = leanField(_x_1_0, 1);
     _documentation_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -6443,7 +6443,7 @@ fun f_Lsp_instBEqCompletionItem_beq_d8760aa6c7(
     _data_9_8: LeanValue = leanField(_x_1_0, 6);
     _tags_10_9: LeanValue = leanField(_x_1_0, 7);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"Lsp\",\"CompletionItem\",\"mk\"]" ->
+    | LeanTag.Lsp_CompletionItem_mk ->
       _label_11_10: LeanValue = leanField(_x_2_1, 0);
       _detail_12_11: LeanValue = leanField(_x_2_1, 1);
       _documentation_13_12: LeanValue = leanField(_x_2_1, 2);
@@ -6458,56 +6458,56 @@ fun f_Lsp_instBEqCompletionItem_beq_d8760aa6c7(
         _label_11_10,
       );
       leanTag(_x_19_18) match {
-      | "[\"Bool\",\"false\"]" -> _x_19_18
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_19_18
+      | LeanTag.Bool_true ->
         _x_20_19: LeanValue = f_instBEqCompletionItem_beq_spec_0_d28f834935(
           _runtime,
           _detail_4_3,
           _detail_12_11,
         );
         leanTag(_x_20_19) match {
-        | "[\"Bool\",\"false\"]" -> _x_20_19
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _x_20_19
+        | LeanTag.Bool_true ->
           _x_21_20: LeanValue = f_instBEqCompletionItem_beq_spec_1_dec200898e(
             _runtime,
             _documentation_5_4,
             _documentation_13_12,
           );
           leanTag(_x_21_20) match {
-          | "[\"Bool\",\"false\"]" -> _x_21_20
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_false -> _x_21_20
+          | LeanTag.Bool_true ->
             _x_22_21: LeanValue = f_instBEqCompletionItem_beq_spec_2_f91b4b0bf1(
               _runtime,
               _kind_6_5,
               _kind_14_13,
             );
             leanTag(_x_22_21) match {
-            | "[\"Bool\",\"false\"]" -> _x_22_21
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_false -> _x_22_21
+            | LeanTag.Bool_true ->
               _x_23_22: LeanValue = f_instBEqCompletionItem_beq_spec_3_b1af083d90(
                 _runtime,
                 _textEdit_7_6,
                 _textEdit_15_14,
               );
               leanTag(_x_23_22) match {
-              | "[\"Bool\",\"false\"]" -> _x_23_22
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_false -> _x_23_22
+              | LeanTag.Bool_true ->
                 _x_24_23: LeanValue = f_instBEqCompletionItem_beq_spec_0_d28f834935(
                   _runtime,
                   _sortText_8_7,
                   _sortText_16_15,
                 );
                 leanTag(_x_24_23) match {
-                | "[\"Bool\",\"false\"]" -> _x_24_23
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_false -> _x_24_23
+                | LeanTag.Bool_true ->
                   _x_25_24: LeanValue = f_instBEqCompletionItem_beq_spec_4_f5f0442cf8(
                     _runtime,
                     _data_9_8,
                     _data_17_16,
                   );
                   leanTag(_x_25_24) match {
-                  | "[\"Bool\",\"false\"]" -> _x_25_24
-                  | "[\"Bool\",\"true\"]" ->
+                  | LeanTag.Bool_false -> _x_25_24
+                  | LeanTag.Bool_true ->
                     f_instBEqCompletionItem_beq_spec_5_308e82627d(
                       _runtime,
                       _tags_10_9,
@@ -6594,7 +6594,7 @@ fun f_instReprCompletionItemKind_repr_closed_17_1f259b8cd9(
   _x_1130_0: LeanValue = f_instReprCompletionItemKind_repr_closed_16_d6d5706cd3(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1130_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1130_0])
 }
 // "Lean.Lsp.instReprCompletionItemKind.repr._closed_41"
 fun f_instReprCompletionItemKind_repr_closed_41_ad1aaa4941(
@@ -6603,7 +6603,7 @@ fun f_instReprCompletionItemKind_repr_closed_41_ad1aaa4941(
   _x_1166_0: LeanValue = f_instReprCompletionItemKind_repr_closed_40_f07e602f51(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1166_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1166_0])
 }
 // "Lean.Array.toJson._at_.Lean.Lsp.instToJsonInlayHint.toJson.spec_3"
 fun f_instToJsonInlayHint_toJson_spec_3_049ba0aa59(
@@ -6621,7 +6621,7 @@ fun f_instToJsonInlayHint_toJson_spec_3_049ba0aa59(
     LeanScalar("usize", "0"),
     _a_0,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"arr\"]", Array[_x_2_3])
+  LeanCtor(LeanTag.Json_arr, Array[_x_2_3])
 }
 // "Lean.Lsp.CompletionItemKind.unit.elim"
 fun f_CompletionItemKind_unit_elim_7dd19c2e42(
@@ -6649,7 +6649,7 @@ fun f_instFromJsonInlayHintOptions_fromJson_closed_6_f9b5158627(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_427_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.SemanticTokenType.string.elim"
@@ -6683,7 +6683,7 @@ fun f_instFromJsonCompletionParams_fromJson_closed_6_7dad936401(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_455_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonInlayHintOptions.fromJson._closed_0"
@@ -6705,7 +6705,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_5_924284c6e3(
   _x_470_0: LeanValue = f_instToJsonSymbolKind_lam_0_closed_4_de05030eee(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_470_0])
+  LeanCtor(LeanTag.Json_num, Array[_x_470_0])
 }
 // "Lean.Lsp.instFromJsonSemanticTokensOptions.fromJson._closed_15"
 fun f_instFromJsonSemanticTokensOptions_fromJson_closed_15_90f69519fa(
@@ -6736,7 +6736,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_55_8264577f3f(
   _x_581_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_54_6eb31fdf87(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_581_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_581_0])
 }
 // "Lean.Json.opt._at_.Lean.Lsp.instToJsonCompletionItem.toJson.spec_4"
 fun f_instToJsonCompletionItem_toJson_spec_4_e1ba0a1740(
@@ -6745,14 +6745,14 @@ fun f_instToJsonCompletionItem_toJson_spec_4_e1ba0a1740(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _val_3_2]),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.Prod_mk, Array[_k_0, _val_3_2]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -6782,19 +6782,19 @@ fun f_spec_5_spec_5_spec_6_8821553717(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _bs_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_4_7: LeanValue = L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
       _runtime,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_7_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
@@ -6806,7 +6806,7 @@ fun f_spec_5_spec_5_spec_6_8821553717(
       LeanErased(),
       _bs_5,
       _i_1,
-      LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_4_7]),
+      LeanCtor(LeanTag.Json_num, Array[_x_4_7]),
       LeanErased(),
     );
     f_spec_5_spec_5_spec_6_8821553717(_runtime, _sz_0, _x_7_10, _x_8_11)
@@ -7035,8 +7035,8 @@ fun f_spec_1_spec_1_closed_0_c6209060aa(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonRenameOptions"
@@ -7095,7 +7095,7 @@ fun f_instReprCompletionItemKind_repr_closed_51_526affda0a(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Lean.Lsp.instFromJsonResolvableCompletionList.fromJson._closed_2"
@@ -7108,7 +7108,7 @@ fun f_instFromJsonResolvableCompletionList_fromJson_closed_2_6d18e11637(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_662_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonInsertReplaceEdit.fromJson"
@@ -7123,7 +7123,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -7131,7 +7131,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
       LeanText("Lsp"),
       LeanText("InsertReplaceEdit"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -7166,8 +7166,8 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("insert");
     _x_22_21: LeanValue = f_instFromJsonInsertReplaceEdit_fromJson_spec_1_389b6f2f40(
@@ -7176,7 +7176,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -7184,7 +7184,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
         LeanText("Lsp"),
         LeanText("InsertReplaceEdit"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -7219,8 +7219,8 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       _x_40_39: LeanValue = LeanText("replace");
       _x_41_40: LeanValue = f_instFromJsonInsertReplaceEdit_fromJson_spec_1_389b6f2f40(
@@ -7229,7 +7229,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
         _x_40_39,
       );
       leanTag(_x_41_40) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_42_41: LeanValue = leanField(_x_41_40, 0);
         _x_46_46: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -7237,7 +7237,7 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
           LeanText("Lsp"),
           LeanText("InsertReplaceEdit"),
         );
-        _x_47_47: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_47_47: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_48_48: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_46_46,
@@ -7272,14 +7272,14 @@ fun f_Lsp_instFromJsonInsertReplaceEdit_fromJson_926e822ee8(
           _x_55_55,
           _a_42_41,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_56_56])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_56_56])
+      | LeanTag.Except_ok ->
         _a_58_42: LeanValue = leanField(_x_41_40, 0);
         LeanCtor(
-          "[\"Except\",\"ok\"]",
+          LeanTag.Except_ok,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"InsertReplaceEdit\",\"mk\"]",
+              LeanTag.Lsp_InsertReplaceEdit_mk,
               Array[_a_20_4, _a_39_23, _a_58_42],
             ),
           ],
@@ -7303,7 +7303,7 @@ fun f_instFromJsonSymbolKind_lam_0_closed_46_8bdbf1450d(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n4,
   )
 }
 // "Lean.Lsp.instFromJsonParameterInformation.fromJson._closed_4"
@@ -7339,8 +7339,8 @@ fun f_spec_2_spec_4_closed_0_4cda56b714(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonInsertReplaceEdit.fromJson._closed_16"
@@ -7353,7 +7353,7 @@ fun f_instFromJsonInsertReplaceEdit_fromJson_closed_16_0f7e2311d3(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_765_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonDocumentColorOptions.fromJson._closed_5"
@@ -7379,19 +7379,19 @@ fun f_instBEqCompletionItem_beq_spec_3_b1af083d90(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       f_Lsp_instBEqInsertReplaceEdit_beq_ff7b0f5b9e(
         _runtime,
@@ -7419,9 +7419,9 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Json\",\"str\"]" ->
+      | LeanTag.Json_str ->
         _frame.set(1, leanField(_frame[0], 0));
-        _frame.set(21, LeanScalar("nat", "0"));
+        _frame.set(21, LeanNatLiterals.n0);
         _frame.set(
           22,
           L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, _frame[1]),
@@ -7429,7 +7429,7 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
         _frame.set(
           23,
           LeanCtor(
-            "[\"String\",\"Slice\",\"mk\"]",
+            LeanTag.String_Slice_mk,
             Array[_frame[1], _frame[21], _frame[22], LeanErased()],
           ),
         );
@@ -7442,13 +7442,13 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
           ),
         );
         leanTag(_frame[24]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(26, LeanScalar("uint32", "65"));
           _jump0 = _frame[26];
           _frame.set(2, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(25, leanField(_frame[24], 0));
           _jump0 = _frame[25];
           _frame.set(2, _jump0);
@@ -7463,7 +7463,7 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
             "Expected string in `FromJson` instance of `CompletionIdentifier`.",
           ),
         );
-        _frame.set(28, LeanCtor("[\"Except\",\"error\"]", Array[_frame[27]]));
+        _frame.set(28, LeanCtor(LeanTag.Except_error, Array[_frame[27]]));
         return _frame[28]
       }
     | 1 ->
@@ -7477,7 +7477,7 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
         ),
       );
       leanTag(_frame[4]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(5, LeanScalar("uint32", "102"));
         _frame.set(
           6,
@@ -7488,17 +7488,17 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
           ),
         );
         leanTag(_frame[6]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             7,
             LeanText(
               "Expected string with prefix `c` or `f` in `FromJson` instance of `CompletionIdentifier`.",
             ),
           );
-          _frame.set(8, LeanCtor("[\"Except\",\"error\"]", Array[_frame[7]]));
+          _frame.set(8, LeanCtor(LeanTag.Except_error, Array[_frame[7]]));
           return _frame[8]
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(9, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(9, LeanNatLiterals.n1);
           _frame.set(
             10,
             L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
@@ -7522,16 +7522,16 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
           _frame.set(
             13,
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"CompletionIdentifier\",\"fvar\"]",
+              LeanTag.Lsp_CompletionIdentifier_fvar,
               Array[_frame[12]],
             ),
           );
-          _frame.set(14, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[13]]));
+          _frame.set(14, LeanCtor(LeanTag.Except_ok, Array[_frame[13]]));
           return _frame[14]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(15, LeanScalar("nat", "1"));
+      | LeanTag.Bool_true ->
+        _frame.set(15, LeanNatLiterals.n1);
         _frame.set(
           16,
           L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, _frame[1]),
@@ -7552,11 +7552,11 @@ fun f_Lsp_instFromJsonCompletionIdentifier_lam_0_e264ee0bd0(
         _frame.set(
           19,
           LeanCtor(
-            "[\"Lean\",\"Lsp\",\"CompletionIdentifier\",\"const\"]",
+            LeanTag.Lsp_CompletionIdentifier_const,
             Array[_frame[18]],
           ),
         );
-        _frame.set(20, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[19]]));
+        _frame.set(20, LeanCtor(LeanTag.Except_ok, Array[_frame[19]]));
         return _frame[20]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
@@ -7585,7 +7585,7 @@ fun f_Lean_Lsp_instToJsonDocumentHighlight_7219078489(
 fun f_Lsp_SemanticTokenModifiers_instMembershipSemanticTokenMo_277062433f(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Membership\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.Membership_mk, Array[LeanErased()])
 }
 // "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.Array.toJson._at_.Lean.Lsp.instToJsonCompletionList.toJson.spec_0.spec_0"
 fun f_toJson_spec_0_spec_0_e274f1b5a2(
@@ -7600,8 +7600,8 @@ fun f_toJson_spec_0_spec_0_e274f1b5a2(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _v_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -7614,7 +7614,7 @@ fun f_toJson_spec_0_spec_0_e274f1b5a2(
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_3_7: LeanValue = f_Lsp_instToJsonCompletionItem_toJson_aabc798782(
@@ -7665,10 +7665,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_24_1848260839(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"parameter\"]",
+        LeanTag.Lsp_SemanticTokenType_parameter,
         Array[],
       ),
     ],
@@ -7679,8 +7679,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_50_21d23ed456(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"module\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_module, Array[])],
   )
 }
 // "_private.Init.Data.Array.Basic.0.Array.mapMUnsafe.map._at_.Lean.Array.fromJson?._at_.Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonResolvableCompletionList.fromJson.spec_0.spec_0.spec_1"
@@ -7696,8 +7696,8 @@ fun f_spec_0_spec_0_spec_1_a67a19c0ba(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Except\",\"ok\"]", Array[_bs_2])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Except_ok, Array[_bs_2])
+  | LeanTag.Bool_true ->
     _v_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -7710,17 +7710,17 @@ fun f_spec_0_spec_0_spec_1_a67a19c0ba(
       _v_5,
     );
     leanTag(_x_3_6) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_4_7: LeanValue = leanField(_x_3_6, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_4_7])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_4_7])
+    | LeanTag.Except_ok ->
       _a_6_8: LeanValue = leanField(_x_3_6, 0);
       _bs_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
         _runtime,
         LeanErased(),
         _bs_2,
         _i_1,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
         LeanErased(),
       );
       _x_9_13: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -7769,18 +7769,18 @@ fun f_instToJsonSignatureHelpParams_toJson_spec_0_e1e4d92f2f(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"List\",\"nil\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.List_nil, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _x_4_4: LeanValue = f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
       _runtime,
       _val_3_2,
     );
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_k_0, _x_4_4]),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.Prod_mk, Array[_k_0, _x_4_4]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       ],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -7792,7 +7792,7 @@ fun f_instFromJsonSymbolKind_lam_0_closed_28_5dceb4a331(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "13"),
+    LeanNatLiterals.n13,
   )
 }
 // "Lean.Lsp.instFromJsonCompletionList.fromJson._closed_7"
@@ -7868,7 +7868,7 @@ fun f_instFromJsonSymbolInformation_fromJson_closed_2_7295da73c3(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_3708_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonParameterInformation.fromJson._closed_1"
@@ -7896,10 +7896,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_6_f490735351(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"markupInlineCode\"]",
+        LeanTag.Lsp_SemanticTokenType_markupInlineCode,
         Array[],
       ),
     ],
@@ -7930,10 +7930,10 @@ fun f_fromJson_spec_2_spec_4_fa2e873234(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instFromJsonCommand_fromJson_0179310f45(
@@ -7941,14 +7941,14 @@ fun f_fromJson_spec_2_spec_4_fa2e873234(
       _x_1_0,
     );
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -8002,8 +8002,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_27_766d04e904(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"constant\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_constant, Array[])],
   )
 }
 // "Lean.Option.fromJson?._at_.Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonSignatureHelpContext.fromJson.spec_1.spec_1"
@@ -8012,10 +8012,10 @@ fun f_fromJson_spec_1_spec_1_a7843802da(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" ->
+  | LeanTag.Json_null ->
     LeanCtor(
-      "[\"Except\",\"ok\"]",
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Except_ok,
+      Array[LeanCtor(LeanTag.Option_none, Array[])],
     )
   | _ ->
     _x_4_3: LeanValue = f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
@@ -8023,14 +8023,14 @@ fun f_fromJson_spec_1_spec_1_a7843802da(
       _x_1_0,
     );
     leanTag(_x_4_3) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_5_4: LeanValue = leanField(_x_4_3, 0);
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_5_4])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_a_5_4])
+    | LeanTag.Except_ok ->
       _a_7_5: LeanValue = leanField(_x_4_3, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_5])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_some, Array[_a_7_5])],
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -8044,15 +8044,15 @@ fun f_beq_spec_0_spec_0_f0e66baf47(
   _isZero_2: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _x_1_0,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_2) match {
-  | "[\"Bool\",\"true\"]" -> _isZero_2
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> _isZero_2
+  | LeanTag.Bool_false ->
     _n_2_4: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _x_1_0,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_beq_spec_0_spec_0_f0e66baf47(_runtime, _n_2_4)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -8082,7 +8082,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_29_9087680d0c(
   _x_542_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_28_cb6e2e67b8(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_542_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_542_0])
 }
 // "Lean.Lsp.instBEqSemanticTokenModifier._closed_0"
 fun f_Lsp_instBEqSemanticTokenModifier_closed_0_1c63d0e65c(
@@ -8118,7 +8118,7 @@ fun f_instFromJsonSignatureHelpOptions_fromJson_closed_2_6f9f3544e1(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_686_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonHoverParams.fromJson._closed_0"
@@ -8164,7 +8164,7 @@ fun f_instFromJsonCompletionList_fromJson_closed_11_687c2943a0(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_698_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonCompletionIdentifier._lam_0._closed_0"
@@ -8207,22 +8207,22 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Lsp\",\"ParameterInformation\",\"mk\"]" ->
+      | LeanTag.Lsp_ParameterInformation_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, LeanText("label"));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Lsp\",\"ParameterInformationLabel\",\"name\"]" ->
+        | LeanTag.Lsp_ParameterInformationLabel_name ->
           _frame.set(16, leanField(_frame[1], 0));
           _frame.set(
             19,
-            LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_frame[16]]),
+            LeanCtor(LeanTag.Json_str, Array[_frame[16]]),
           );
           _jump0 = _frame[19];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"ParameterInformationLabel\",\"range\"]" ->
+        | LeanTag.Lsp_ParameterInformationLabel_range ->
           _frame.set(17, leanField(_frame[1], 0));
           _frame.set(18, leanField(_frame[1], 1));
           _frame.set(
@@ -8234,7 +8234,7 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
           );
           _frame.set(
             21,
-            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[20]]),
+            LeanCtor(LeanTag.Json_num, Array[_frame[20]]),
           );
           _frame.set(
             22,
@@ -8245,9 +8245,9 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
           );
           _frame.set(
             23,
-            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[22]]),
+            LeanCtor(LeanTag.Json_num, Array[_frame[22]]),
           );
-          _frame.set(24, LeanScalar("nat", "2"));
+          _frame.set(24, LeanNatLiterals.n2);
           _frame.set(
             25,
             L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -8276,7 +8276,7 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
           );
           _frame.set(
             28,
-            LeanCtor("[\"Lean\",\"Json\",\"arr\"]", Array[_frame[27]]),
+            LeanCtor(LeanTag.Json_arr, Array[_frame[27]]),
           );
           _jump0 = _frame[28];
           _frame.set(4, _jump0);
@@ -8287,11 +8287,11 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[3], _frame[4]]));
-      _frame.set(6, LeanCtor("[\"List\",\"nil\"]", Array[]));
+      _frame.set(5, LeanCtor(LeanTag.Prod_mk, Array[_frame[3], _frame[4]]));
+      _frame.set(6, LeanCtor(LeanTag.List_nil, Array[]));
       _frame.set(
         7,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[5], _frame[6]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[5], _frame[6]]),
       );
       _frame.set(8, LeanText("documentation"));
       _frame.set(
@@ -8304,13 +8304,13 @@ fun f_Lsp_instToJsonParameterInformation_toJson_9cfa4c5f71(
       );
       _frame.set(
         10,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[9], _frame[6]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[9], _frame[6]]),
       );
       _frame.set(
         11,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[7], _frame[10]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[7], _frame[10]]),
       );
-      _frame.set(12, LeanScalar("nat", "0"));
+      _frame.set(12, LeanNatLiterals.n0);
       _frame.set(
         13,
         L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -8361,15 +8361,15 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Lsp\",\"SignatureHelpContext\",\"mk\"]" ->
+      | LeanTag.Lsp_SignatureHelpContext_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, leanField(_frame[0], 2));
         _frame.set(4, leanField(_frame[0], 3));
         _frame.set(5, LeanText("triggerKind"));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Lsp\",\"SignatureHelpTriggerKind\",\"invoked\"]" ->
-          _frame.set(26, LeanScalar("nat", "1"));
+        | LeanTag.Lsp_SignatureHelpTriggerKind_invoked ->
+          _frame.set(26, LeanNatLiterals.n1);
           _frame.set(
             27,
             L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
@@ -8379,14 +8379,14 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
           );
           _frame.set(
             28,
-            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[27]]),
+            LeanCtor(LeanTag.Json_num, Array[_frame[27]]),
           );
           _jump0 = _frame[28];
           _frame.set(6, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"SignatureHelpTriggerKind\",\"triggerCharacter\"]" ->
-          _frame.set(29, LeanScalar("nat", "2"));
+        | LeanTag.Lsp_SignatureHelpTriggerKind_triggerCharacter ->
+          _frame.set(29, LeanNatLiterals.n2);
           _frame.set(
             30,
             L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
@@ -8396,14 +8396,14 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
           );
           _frame.set(
             31,
-            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[30]]),
+            LeanCtor(LeanTag.Json_num, Array[_frame[30]]),
           );
           _jump0 = _frame[31];
           _frame.set(6, _jump0);
           !pc = 1;
           void
-        | "[\"Lean\",\"Lsp\",\"SignatureHelpTriggerKind\",\"contentChange\"]" ->
-          _frame.set(32, LeanScalar("nat", "3"));
+        | LeanTag.Lsp_SignatureHelpTriggerKind_contentChange ->
+          _frame.set(32, LeanNatLiterals.n3);
           _frame.set(
             33,
             L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
@@ -8413,7 +8413,7 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
           );
           _frame.set(
             34,
-            LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_frame[33]]),
+            LeanCtor(LeanTag.Json_num, Array[_frame[33]]),
           );
           _jump0 = _frame[34];
           _frame.set(6, _jump0);
@@ -8424,11 +8424,11 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(7, LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[5], _frame[6]]));
-      _frame.set(8, LeanCtor("[\"List\",\"nil\"]", Array[]));
+      _frame.set(7, LeanCtor(LeanTag.Prod_mk, Array[_frame[5], _frame[6]]));
+      _frame.set(8, LeanCtor(LeanTag.List_nil, Array[]));
       _frame.set(
         9,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[7], _frame[8]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[7], _frame[8]]),
       );
       _frame.set(10, LeanText("triggerCharacter"));
       _frame.set(
@@ -8442,15 +8442,15 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
       _frame.set(12, LeanText("isRetrigger"));
       _frame.set(
         13,
-        LeanCtor("[\"Lean\",\"Json\",\"bool\"]", Array[_frame[3]]),
+        LeanCtor(LeanTag.Json_bool, Array[_frame[3]]),
       );
       _frame.set(
         14,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[12], _frame[13]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[12], _frame[13]]),
       );
       _frame.set(
         15,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[14], _frame[8]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[14], _frame[8]]),
       );
       _frame.set(16, LeanText("activeSignatureHelp"));
       _frame.set(
@@ -8463,21 +8463,21 @@ fun f_Lsp_instToJsonSignatureHelpContext_toJson_23ac1712fe(
       );
       _frame.set(
         18,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[17], _frame[8]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[17], _frame[8]]),
       );
       _frame.set(
         19,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[15], _frame[18]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[15], _frame[18]]),
       );
       _frame.set(
         20,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[11], _frame[19]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[11], _frame[19]]),
       );
       _frame.set(
         21,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[9], _frame[20]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[9], _frame[20]]),
       );
-      _frame.set(22, LeanScalar("nat", "0"));
+      _frame.set(22, LeanNatLiterals.n0);
       _frame.set(
         23,
         L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -8521,21 +8521,21 @@ fun f_Lsp_instToJsonCallHierarchyIncomingCallsParams_toJson_37a6c2030c(
     _runtime,
     _x_1_0,
   );
-  _x_5_4: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_5_4: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_9_8: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_10_9: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
     _runtime,
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("item"), _x_3_2]),
+            LeanCtor(LeanTag.Prod_mk, Array[LeanText("item"), _x_3_2]),
             _x_5_4,
           ],
         ),
@@ -8575,7 +8575,7 @@ fun f_SemanticTokenModifiers_toArray_closed_1_d80528feba(
   L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Lean.Json.getObjValAs?._at_.Lean.Lsp.instFromJsonHover.fromJson.spec_1"
@@ -8609,7 +8609,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_31_cefe21055c(
   _x_522_0: LeanValue = f_instToJsonSymbolKind_lam_0_closed_30_6c6c0396b5(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_522_0])
+  LeanCtor(LeanTag.Json_num, Array[_x_522_0])
 }
 // "Lean.Lsp.instFromJsonCallHierarchyItem.fromJson._closed_15"
 fun f_instFromJsonCallHierarchyItem_fromJson_closed_15_f9d3cf19d0(
@@ -8633,7 +8633,7 @@ fun f_fromJson_spec_1_spec_1_6c1b358274(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_2_1: LeanValue = leanField(_x_1_0, 0);
     _sz_2: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
       _runtime,
@@ -8650,7 +8650,7 @@ fun f_fromJson_spec_1_spec_1_6c1b358274(
     _x_7_7: LeanValue = L4_Lean_Data_Json_Printer.f_Lean_Json_pretty_b82232e7b1(
       _runtime,
       _x_1_0,
-      LeanScalar("nat", "80"),
+      LeanNatLiterals.n80,
     );
     _x_8_8: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -8662,7 +8662,7 @@ fun f_fromJson_spec_1_spec_1_6c1b358274(
       _x_8_8,
       LeanText("'"),
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_10_10])
+    LeanCtor(LeanTag.Except_error, Array[_x_10_10])
   }
 }
 // "Lean.Lsp.instFromJsonFoldingRangeParams.fromJson._closed_4"
@@ -8730,7 +8730,7 @@ fun f_Lean_Lsp_instToJsonCompletionItemTag_2afcf81620(
 fun f_Lsp_SemanticTokenModifiers_empty_707c39e019(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanScalar("nat", "0")
+  LeanNatLiterals.n0
 }
 // "Lean.Lsp.SemanticTokenType.comment.elim._redArg"
 fun f_SemanticTokenType_comment_elim_5bcb95c0cf(
@@ -8744,8 +8744,8 @@ fun f_spec_0_spec_0_closed_0_53d296b6aa(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.Lsp.instToJsonInlayHintParams"
@@ -8764,10 +8764,10 @@ fun f_instFromJsonSemanticTokenModifier_fromJson_closed_10_5eb54ffd08(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenModifier\",\"static\"]",
+        LeanTag.Lsp_SemanticTokenModifier_static,
         Array[],
       ),
     ],
@@ -8790,25 +8790,25 @@ fun f_Lsp_instToJsonDocumentHighlightParams_toJson_6cc9af7743(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]" ->
+  | LeanTag.Lsp_TextDocumentPositionParams_mk ->
     _textDocument_1: LeanValue = leanField(_x_1_0, 0);
     _position_2: LeanValue = leanField(_x_1_0, 1);
     _x_3_4: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instToJsonTextDocumentIdentifier_toJson_4b24e1d9e7(
       _runtime,
       _textDocument_1,
     );
-    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_6: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_8_9: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instToJsonPosition_toJson_4ecb22c787(
       _runtime,
       _position_2,
     );
     _x_11_12: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("position"), _x_8_9]),
+            LeanCtor(LeanTag.Prod_mk, Array[LeanText("position"), _x_8_9]),
             _x_5_6,
           ],
         ),
@@ -8816,13 +8816,13 @@ fun f_Lsp_instToJsonDocumentHighlightParams_toJson_6cc9af7743(
       ],
     );
     _x_12_13: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[LeanText("textDocument"), _x_3_4],
             ),
             _x_5_6,
@@ -8834,7 +8834,7 @@ fun f_Lsp_instToJsonDocumentHighlightParams_toJson_6cc9af7743(
     _x_14_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_15_16: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -8883,15 +8883,15 @@ fun f_Lsp_instToJsonRenameOptions_toJson_e0ee20ed9a(
   _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
 ): LeanValue {
-  _x_5_4: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_5_4: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_6_5: LeanValue = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           LeanText("prepareProvider"),
-          LeanCtor("[\"Lean\",\"Json\",\"bool\"]", Array[_x_1_0]),
+          LeanCtor(LeanTag.Json_bool, Array[_x_1_0]),
         ],
       ),
       _x_5_4,
@@ -8900,11 +8900,11 @@ fun f_Lsp_instToJsonRenameOptions_toJson_e0ee20ed9a(
   _x_9_8: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_10_9: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
     _runtime,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_6_5, _x_5_4]),
+    LeanCtor(LeanTag.List_cons, Array[_x_6_5, _x_5_4]),
     _x_9_8,
   );
   L4_Lean_Data_Json_Basic.f_Lean_Json_mkObj_45a0766b3b(_runtime, _x_10_9)
@@ -8921,7 +8921,7 @@ fun f_instToJsonSymbolKind_lam_0_closed_22_f5404cfb37(
 ): LeanValue {
   L4_Lean_Data_Json_Basic.f_Lean_JsonNumber_fromNat_aaf0572ed5(
     _runtime,
-    LeanScalar("nat", "15"),
+    LeanNatLiterals.n15,
   )
 }
 // "Lean.Lsp.instFromJsonDocumentSymbolAux.fromJson._redArg._closed_11"
@@ -8946,18 +8946,18 @@ fun f_Lsp_instToJsonResolvableCompletionList_toJson_26f95c6000(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"ResolvableCompletionList\",\"mk\"]" ->
+  | LeanTag.Lsp_ResolvableCompletionList_mk ->
     _isIncomplete_1: LeanValue = leanField(_x_1_0, 0);
     _items_2: LeanValue = leanField(_x_1_0, 1);
-    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_6: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_6_7: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             LeanText("isIncomplete"),
-            LeanCtor("[\"Lean\",\"Json\",\"bool\"]", Array[_isIncomplete_1]),
+            LeanCtor(LeanTag.Json_bool, Array[_isIncomplete_1]),
           ],
         ),
         _x_5_6,
@@ -8968,16 +8968,16 @@ fun f_Lsp_instToJsonResolvableCompletionList_toJson_26f95c6000(
       _items_2,
     );
     _x_12_13: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         _x_6_7,
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             LeanCtor(
-              "[\"List\",\"cons\"]",
+              LeanTag.List_cons,
               Array[
-                LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("items"), _x_8_9]),
+                LeanCtor(LeanTag.Prod_mk, Array[LeanText("items"), _x_8_9]),
                 _x_5_6,
               ],
             ),
@@ -8989,7 +8989,7 @@ fun f_Lsp_instToJsonResolvableCompletionList_toJson_26f95c6000(
     _x_14_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_15_16: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -9011,10 +9011,10 @@ fun f_instFromJsonSemanticTokenType_fromJson_closed_12_bfe1ab3791(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SemanticTokenType\",\"leanSorryLike\"]",
+        LeanTag.Lsp_SemanticTokenType_leanSorryLike,
         Array[],
       ),
     ],
@@ -9027,7 +9027,7 @@ fun f_instToJsonSemanticTokenType_toJson_closed_9_5205e39e3c(
   _x_512_0: LeanValue = f_instToJsonSemanticTokenType_toJson_closed_8_b6218ecb67(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_x_512_0])
+  LeanCtor(LeanTag.Json_str, Array[_x_512_0])
 }
 // "Lean.Lsp.instBEqInsertReplaceEdit"
 fun f_Lean_Lsp_instBEqInsertReplaceEdit_870dcffe48(
@@ -9083,7 +9083,7 @@ fun f_instFromJsonCallHierarchyOutgoingCall_fromJson_closed_6_bd59f98718(
   L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
     _runtime,
     _x_421_1,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
   )
 }
 // "Lean.Lsp.instFromJsonSignatureHelpParams.fromJson._closed_11"
@@ -9159,25 +9159,25 @@ fun f_Lsp_instToJsonCallHierarchyPrepareParams_toJson_84bb0e8bbc(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Lsp\",\"TextDocumentPositionParams\",\"mk\"]" ->
+  | LeanTag.Lsp_TextDocumentPositionParams_mk ->
     _textDocument_1: LeanValue = leanField(_x_1_0, 0);
     _position_2: LeanValue = leanField(_x_1_0, 1);
     _x_3_4: LeanValue = L4_Lean_Data_Lsp_Basic.f_Lsp_instToJsonTextDocumentIdentifier_toJson_4b24e1d9e7(
       _runtime,
       _textDocument_1,
     );
-    _x_5_6: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_5_6: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_8_9: LeanValue = L4_Lean_Data_Lsp_BasicAux.f_Lsp_instToJsonPosition_toJson_4ecb22c787(
       _runtime,
       _position_2,
     );
     _x_11_12: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanCtor("[\"Prod\",\"mk\"]", Array[LeanText("position"), _x_8_9]),
+            LeanCtor(LeanTag.Prod_mk, Array[LeanText("position"), _x_8_9]),
             _x_5_6,
           ],
         ),
@@ -9185,13 +9185,13 @@ fun f_Lsp_instToJsonCallHierarchyPrepareParams_toJson_84bb0e8bbc(
       ],
     );
     _x_12_13: LeanValue = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[LeanText("textDocument"), _x_3_4],
             ),
             _x_5_6,
@@ -9203,7 +9203,7 @@ fun f_Lsp_instToJsonCallHierarchyPrepareParams_toJson_84bb0e8bbc(
     _x_14_15: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_15_16: LeanValue = f_instToJsonCompletionOptions_toJson_spec_1_bba4f7885e(
       _runtime,
@@ -9235,7 +9235,7 @@ fun f_Lsp_SemanticTokenModifiers_singleton_9fecc15f68(
   );
   L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftLeft_d5b2caad1d(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
     _x_2_2,
   )
 }
@@ -9277,7 +9277,7 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -9285,7 +9285,7 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
       LeanText("Lsp"),
       LeanText("SemanticTokensLegend"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -9320,8 +9320,8 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("tokenModifiers");
     _x_22_21: LeanValue = f_instFromJsonSemanticTokensLegend_fromJson_spec_0_4497dd537c(
@@ -9330,7 +9330,7 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -9338,7 +9338,7 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
         LeanText("Lsp"),
         LeanText("SemanticTokensLegend"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -9373,14 +9373,14 @@ fun f_Lsp_instFromJsonSemanticTokensLegend_fromJson_49e00fca65(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       LeanCtor(
-        "[\"Except\",\"ok\"]",
+        LeanTag.Except_ok,
         Array[
           LeanCtor(
-            "[\"Lean\",\"Lsp\",\"SemanticTokensLegend\",\"mk\"]",
+            LeanTag.Lsp_SemanticTokensLegend_mk,
             Array[_a_20_4, _a_39_23],
           ),
         ],
@@ -9411,7 +9411,7 @@ fun f_spec_0_spec_0_closed_2_f84bd24b9e(
   _x_3547_0: LeanValue = f_instFromJsonResolvableCompletionItemData_lam_0_closed_2_6507823bb2(
     _runtime,
   );
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_3547_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_3547_0])
 }
 // "Lean.Lsp.instFromJsonCallHierarchyPrepareParams.fromJson._closed_6"
 fun f_instFromJsonCallHierarchyPrepareParams_fromJson_closed_6_59c26ba679(
@@ -9435,7 +9435,7 @@ fun f_spec_0_spec_0_spec_1_1b5fa8254d(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_2_1: LeanValue = leanField(_x_1_0, 0);
     _sz_2: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
       _runtime,
@@ -9452,7 +9452,7 @@ fun f_spec_0_spec_0_spec_1_1b5fa8254d(
     _x_7_7: LeanValue = L4_Lean_Data_Json_Printer.f_Lean_Json_pretty_b82232e7b1(
       _runtime,
       _x_1_0,
-      LeanScalar("nat", "80"),
+      LeanNatLiterals.n80,
     );
     _x_8_8: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -9464,7 +9464,7 @@ fun f_spec_0_spec_0_spec_1_1b5fa8254d(
       _x_8_8,
       LeanText("'"),
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_10_10])
+    LeanCtor(LeanTag.Except_error, Array[_x_10_10])
   }
 }
 // "Lean.Lsp.instFromJsonCallHierarchyItem.fromJson._closed_7"
@@ -9503,9 +9503,9 @@ fun f_instFromJsonPrepareRenameParams_fromJson_closed_3_e692a28163(
 fun f_Lsp_instInhabitedResolvableCompletionItem_default_e47f62e248(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_2_1: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  _x_2_1: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
   LeanCtor(
-    "[\"Lean\",\"Lsp\",\"ResolvableCompletionItem\",\"mk\"]",
+    LeanTag.Lsp_ResolvableCompletionItem_mk,
     Array[LeanText(""), _x_2_1, _x_2_1, _x_2_1, _x_2_1, _x_2_1, _x_2_1, _x_2_1],
   )
 }
@@ -9521,7 +9521,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -9529,7 +9529,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
       LeanText("Lsp"),
       LeanText("SignatureHelp"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -9564,8 +9564,8 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_22_21: LeanValue = f_instFromJsonSignatureInformation_fromJson_spec_1_7673203bd6(
       _runtime,
@@ -9573,7 +9573,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
       LeanText("activeSignature"),
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -9581,7 +9581,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
         LeanText("Lsp"),
         LeanText("SignatureHelp"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -9616,8 +9616,8 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
         _x_37_37,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_38_38])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_38_38])
+    | LeanTag.Except_ok ->
       _a_40_23: LeanValue = leanField(_x_22_21, 0);
       _x_42_41: LeanValue = f_instFromJsonSignatureInformation_fromJson_spec_1_7673203bd6(
         _runtime,
@@ -9625,7 +9625,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
         LeanText("activeParameter"),
       );
       leanTag(_x_42_41) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_43_42: LeanValue = leanField(_x_42_41, 0);
         _x_47_47: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -9633,7 +9633,7 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
           LeanText("Lsp"),
           LeanText("SignatureHelp"),
         );
-        _x_48_48: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_48_48: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_49_49: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_47_47,
@@ -9668,14 +9668,14 @@ fun f_Lsp_instFromJsonSignatureHelp_fromJson_057d70fe3f(
           _x_57_57,
           _a_43_42,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_58_58])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_58_58])
+      | LeanTag.Except_ok ->
         _a_60_43: LeanValue = leanField(_x_42_41, 0);
         LeanCtor(
-          "[\"Except\",\"ok\"]",
+          LeanTag.Except_ok,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"SignatureHelp\",\"mk\"]",
+              LeanTag.Lsp_SignatureHelp_mk,
               Array[_a_20_4, _a_40_23, _a_60_43],
             ),
           ],
@@ -9700,7 +9700,7 @@ fun f_instReprCompletionItemKind_repr_closed_11_325eb01bbf(
   _x_1121_0: LeanValue = f_instReprCompletionItemKind_repr_closed_10_966af3fa54(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_1121_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_1121_0])
 }
 // "Lean.Lsp.instToJsonSignatureHelpParams._closed_0"
 fun f_Lsp_instToJsonSignatureHelpParams_closed_0_bacdd0f5a7(
@@ -9743,10 +9743,10 @@ fun f_instFromJsonSignatureHelpTriggerKind_lam_0_closed_4_10cad38765(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
+    LeanTag.Except_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Lsp\",\"SignatureHelpTriggerKind\",\"invoked\"]",
+        LeanTag.Lsp_SignatureHelpTriggerKind_invoked,
         Array[],
       ),
     ],
@@ -9764,7 +9764,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
     _x_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _x_8_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
@@ -9772,7 +9772,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
       LeanText("Lsp"),
       LeanText("SemanticTokensOptions"),
     );
-    _x_9_9: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+    _x_9_9: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
     _x_10_10: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
       _runtime,
       _x_8_8,
@@ -9807,8 +9807,8 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
       _x_17_17,
       _a_4_3,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_18_18])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_18_18])
+  | LeanTag.Except_ok ->
     _a_20_4: LeanValue = leanField(_x_3_2, 0);
     _x_21_20: LeanValue = LeanText("range");
     _x_22_21: LeanValue = f_instFromJsonCompletionOptions_fromJson_spec_1_efe6b2f68d(
@@ -9817,7 +9817,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
       _x_21_20,
     );
     leanTag(_x_22_21) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_23_22: LeanValue = leanField(_x_22_21, 0);
       _x_27_27: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
         _runtime,
@@ -9825,7 +9825,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
         LeanText("Lsp"),
         LeanText("SemanticTokensOptions"),
       );
-      _x_28_28: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_28_28: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       _x_29_29: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
         _runtime,
         _x_27_27,
@@ -9860,8 +9860,8 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
         _x_36_36,
         _a_23_22,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_37_37])
-    | "[\"Except\",\"ok\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_37_37])
+    | LeanTag.Except_ok ->
       _a_39_23: LeanValue = leanField(_x_22_21, 0);
       _x_40_39: LeanValue = LeanText("full");
       _x_41_40: LeanValue = f_instFromJsonCompletionOptions_fromJson_spec_1_efe6b2f68d(
@@ -9870,7 +9870,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
         _x_40_39,
       );
       leanTag(_x_41_40) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _a_42_41: LeanValue = leanField(_x_41_40, 0);
         _x_46_46: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
           _runtime,
@@ -9878,7 +9878,7 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
           LeanText("Lsp"),
           LeanText("SemanticTokensOptions"),
         );
-        _x_47_47: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+        _x_47_47: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
         _x_48_48: LeanValue = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
           _runtime,
           _x_46_46,
@@ -9913,14 +9913,14 @@ fun f_Lsp_instFromJsonSemanticTokensOptions_fromJson_05ad1f8e04(
           _x_55_55,
           _a_42_41,
         );
-        LeanCtor("[\"Except\",\"error\"]", Array[_x_56_56])
-      | "[\"Except\",\"ok\"]" ->
+        LeanCtor(LeanTag.Except_error, Array[_x_56_56])
+      | LeanTag.Except_ok ->
         _a_58_42: LeanValue = leanField(_x_41_40, 0);
         LeanCtor(
-          "[\"Except\",\"ok\"]",
+          LeanTag.Except_ok,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Lsp\",\"SemanticTokensOptions\",\"mk\"]",
+              LeanTag.Lsp_SemanticTokensOptions_mk,
               Array[_a_20_4, _a_39_23, _a_58_42],
             ),
           ],
@@ -9969,7 +9969,7 @@ fun f_instToJsonCompletionOptions_toJson_closed_0_8f7fa05457(
   L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Lean.Lsp.instFromJsonSymbolKind._lam_0._closed_29"
@@ -9977,8 +9977,8 @@ fun f_instFromJsonSymbolKind_lam_0_closed_29_b60bbcdc30(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Lean\",\"Lsp\",\"SymbolKind\",\"variable\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Lsp_SymbolKind_variable, Array[])],
   )
 }
 // "Lean.Lsp.instFromJsonSignatureHelpTriggerKind"
@@ -10039,7 +10039,7 @@ fun f_SemanticTokenModifiers_toArray_closed_2_bd8ee3e78f(
   );
   L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_197_0,
   )
 }

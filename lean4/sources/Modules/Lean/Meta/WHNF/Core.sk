@@ -1,0 +1,462 @@
+// Structured weak-head reduction. The boxed interface remains for existing callers.
+module L4_Lean_Meta_WHNF;
+
+// Argument collection is private to this call. Freeze before passing it to Lean.
+fun f_whnfCoreArguments(expr: LeanValue, reverse: Bool): LeanValue {
+  arguments: mutable Vector<LeanValue> = mutable Vector[];
+  while (leanTag(expr) == LeanTag.Expr_app__impl) {
+    arguments.push(leanField(expr, 2));
+    !expr = leanField(expr, 1)
+  };
+  if (reverse) LeanArray(arguments.toArray()) else {
+    size = arguments.size();
+    LeanArray(Array::fillBy(size, i -> arguments[size - i - 1]))
+  }
+}
+
+// "Lean.Meta.whnfEasyCases._at_._private.Lean.Meta.WHNF.0.Lean.Meta.whnfCore.go.spec_3"
+fun f_whnfCore_go_spec_3_85c62e30bd(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  loop {
+    leanTag(expr) match {
+    | LeanTag.Expr_sort__impl
+    | LeanTag.Expr_lam__impl
+    | LeanTag.Expr_forallE__impl
+    | LeanTag.Expr_lit__impl ->
+      return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+    | LeanTag.Expr_mdata__impl ->
+      !expr = leanField(expr, 2);
+      continue
+    | LeanTag.Expr_fvar__impl ->
+      id = leanField(expr, 1);
+      found = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+        runtime,
+        id,
+        context,
+        core,
+        coreState,
+        world,
+      );
+      if (leanTag(found) == LeanTag.EST_Out_error) return found;
+      decl = leanField(found, 0);
+      !world = leanField(found, 1);
+      if (
+        leanTag(decl) != LeanTag.LocalDecl_ldecl ||
+        leanIsTrue(leanField(decl, 5))
+      ) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+      };
+      implementationDetail = L4_Lean_LocalContext.f_Lean_LocalDecl_isImplementationDetail_a1009b26d6(
+        runtime,
+        decl,
+      );
+      if (!leanIsTrue(implementationDetail)) {
+        config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+          runtime,
+          context,
+        );
+        if (
+          !leanIsTrue(leanField(config, 16)) &&
+          !leanIsTrue(
+            f_go_spec_3_spec_3_3058eb84df(runtime, id, leanField(context, 2)),
+          )
+        ) {
+          return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+        }
+      };
+      if (leanIsTrue(leanField(context, 1))) {
+        recorded = L4_Lean_Meta_Basic.f_Lean_Meta_addZetaDeltaFVarId_162af9724c(
+          runtime,
+          id,
+          state,
+          world,
+        );
+        if (leanTag(recorded) == LeanTag.EST_Out_error) return recorded;
+        !world = leanField(recorded, 1)
+      };
+      !expr = leanField(decl, 4);
+      continue
+    | LeanTag.Expr_mvar__impl ->
+      assigned = f_go_spec_3_spec_4_4c1323d7b7(
+        runtime,
+        leanField(expr, 1),
+        state,
+        world,
+      );
+      if (leanTag(assigned) == LeanTag.EST_Out_error) return assigned;
+      !world = leanField(assigned, 1);
+      value = leanField(assigned, 0);
+      if (leanTag(value) == LeanTag.Option_none) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+      };
+      !expr = leanField(value, 0);
+      continue
+    | _ -> void
+    };
+
+    // Keep the existing trace/profiler implementation when trace options exist.
+    // Easy cases above precede tracing in Lean as well.
+    if (leanIsTrue(leanField(leanField(leanField(core, 0), 2), 1))) {
+      return f_whnfCore_go_spec_3_85c62e30bd_fallback(
+        runtime,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    leanTag(expr) match {
+    | LeanTag.Expr_const__impl ->
+      return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+    | LeanTag.Expr_letE__impl ->
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        runtime,
+        context,
+      );
+      body = leanField(expr, 4);
+      zetaHave = leanField(config, 18);
+      if (
+        leanIsTrue(leanField(config, 15)) &&
+        (!leanIsTrue(leanField(expr, 5)) || leanIsTrue(zetaHave))
+      ) {
+        !expr = f_Lean_Meta_expandLet_8cc6fa255d(
+          runtime,
+          body,
+          LeanArray(Array[leanField(expr, 3)]),
+          zetaHave,
+        );
+        continue
+      };
+      if (
+        leanIsTrue(leanField(config, 17)) &&
+        !leanIsTrue(
+          L4_Lean_Expr.f_Lean_Expr_hasLooseBVars_25b8fd0e1a(runtime, body),
+        )
+      ) {
+        !expr = f_Lean_Meta_consumeUnusedLet_d1bfc80f26(
+          runtime,
+          body,
+          leanBool(false),
+        );
+        continue
+      };
+      return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+    | LeanTag.Expr_app__impl ->
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        runtime,
+        context,
+      );
+      head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+        runtime,
+        leanField(expr, 1),
+      );
+      reduced = f_whnfCore_go_spec_3_85c62e30bd(
+        runtime,
+        head,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      );
+      if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+      reducedHead = leanField(reduced, 0);
+      !world = leanField(reduced, 1);
+      // A newly exposed lambda is part of head reduction even with beta disabled.
+      if (
+        leanTag(reducedHead) == LeanTag.Expr_lam__impl &&
+        (leanIsTrue(leanField(config, 13)) ||
+          leanTag(head) != LeanTag.Expr_lam__impl)
+      ) {
+        !expr = L4_Lean_Expr.f_Lean_Expr_betaRev_7cc33c698c(
+          runtime,
+          reducedHead,
+          f_whnfCoreArguments(expr, true),
+          leanBool(false),
+          leanBool(false),
+        );
+        continue
+      };
+      delayed = f_Lean_Meta_whnfDelayedAssigned_becfa75be1(
+        runtime,
+        reducedHead,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      );
+      if (leanTag(delayed) == LeanTag.EST_Out_error) return delayed;
+      !world = leanField(delayed, 1);
+      expansion = leanField(delayed, 0);
+      if (leanTag(expansion) == LeanTag.Option_some) {
+        !expr = leanField(expansion, 0);
+        continue
+      };
+      if (
+        !leanIsTrue(
+          L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(runtime, head, reducedHead),
+        )
+      ) {
+        !expr = L4_Lean_Expr.f_Lean_Expr_updateFn_3a6deb974f(
+          runtime,
+          expr,
+          reducedHead,
+        )
+      };
+      if (!leanIsTrue(leanField(config, 12))) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+      };
+      return f_whnfCoreIota(
+        runtime,
+        expr,
+        reducedHead,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    | LeanTag.Expr_proj__impl ->
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        runtime,
+        context,
+      );
+      structure = leanField(expr, 3);
+      reduced = leanTag(leanField(config, 14)) match {
+      | LeanTag.Meta_ProjReductionKind_no ->
+        return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+      | LeanTag.Meta_ProjReductionKind_yes ->
+        f_whnfCore_go_spec_3_85c62e30bd(
+          runtime,
+          structure,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        )
+      | LeanTag.Meta_ProjReductionKind_yesWithDelta ->
+        L4_Lean_Meta_Basic.f_Lean_Meta_whnf_6493600863(
+          runtime,
+          structure,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        )
+      | LeanTag.Meta_ProjReductionKind_yesWithDeltaI ->
+        L4_Lean_Meta_Basic.f_Lean_Meta_whnfAtMostI_a0d60bfc4b(
+          runtime,
+          structure,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        )
+      | _ -> leanFail("invalid projection reduction mode")
+      };
+      if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+      projected = f_Lean_Meta_projectCore_493855558d(
+        runtime,
+        leanField(reduced, 0),
+        leanField(expr, 2),
+        context,
+        state,
+        core,
+        coreState,
+        leanField(reduced, 1),
+      );
+      if (leanTag(projected) == LeanTag.EST_Out_error) return projected;
+      !world = leanField(projected, 1);
+      value = leanField(projected, 0);
+      if (leanTag(value) == LeanTag.Option_none) {
+        // Preserve the original projection, even if its structure reduced.
+        return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+      };
+      !expr = leanField(value, 0);
+      continue
+    | _ ->
+      // Retain the exact panic behavior for loose bound variables/malformed inputs.
+      return f_whnfCore_go_spec_3_85c62e30bd_fallback(
+        runtime,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    }
+  }
+}
+
+fun f_whnfCoreIota(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  reducedHead: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  matcher = f_Lean_Meta_reduceMatcher_6453efd516(
+    runtime,
+    expr,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  if (leanTag(matcher) == LeanTag.EST_Out_error) return matcher;
+  !world = leanField(matcher, 1);
+  result = leanField(matcher, 0);
+  leanTag(result) match {
+  | LeanTag.Meta_ReduceMatcherResult_reduced ->
+    return f_whnfCore_go_spec_3_85c62e30bd(
+      runtime,
+      leanField(result, 0),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Meta_ReduceMatcherResult_notMatcher -> void
+  | _ -> return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+  };
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, reducedHead);
+  if (leanTag(head) != LeanTag.Expr_const__impl) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+  };
+  read = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreState,
+    world,
+  );
+  !world = leanField(read, 1);
+  found = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+    runtime,
+    leanField(leanField(read, 0), 0),
+    leanField(head, 1),
+    leanBool(false),
+  );
+  if (leanTag(found) != LeanTag.Option_some) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+  };
+  info = leanField(found, 0);
+  levels = leanField(head, 2);
+  leanTag(info) match {
+  | LeanTag.ConstantInfo_recInfo
+  | LeanTag.ConstantInfo_quotInfo ->
+    failed = LeanClosure(
+      L4_Lean_Meta_WHNF.apply_f_go_spec_3_lam_0_bee6184748,
+      7,
+      Array[expr],
+    );
+    succeeded = LeanClosure(
+      L4_Lean_Meta_WHNF.apply_f_go_spec_3_lam_2_2884939903,
+      7,
+      Array[info],
+    );
+    arguments = f_whnfCoreArguments(expr, false);
+    if (leanTag(info) == LeanTag.ConstantInfo_recInfo) {
+      f_Lean_Meta_reduceRec_bb27b5d389(
+        runtime,
+        leanField(info, 0),
+        levels,
+        arguments,
+        failed,
+        succeeded,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    } else {
+      f_Lean_Meta_reduceQuotRec_fccd4ba83a(
+        runtime,
+        leanField(info, 0),
+        arguments,
+        failed,
+        succeeded,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    }
+  | LeanTag.ConstantInfo_defnInfo ->
+    name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+      runtime,
+      info,
+    );
+    auxiliary = f_Lean_Meta_isAuxDef_382f075074(
+      runtime,
+      name,
+      coreState,
+      world,
+    );
+    if (leanTag(auxiliary) == LeanTag.EST_Out_error) return auxiliary;
+    !world = leanField(auxiliary, 1);
+    if (!leanIsTrue(leanField(auxiliary, 0))) {
+      return LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+    };
+    recorded = L4_Lean_Meta_Basic.f_Lean_Meta_recordUnfold_139663effb(
+      runtime,
+      name,
+      state,
+      core,
+      world,
+    );
+    if (leanTag(recorded) == LeanTag.EST_Out_error) return recorded;
+    f_whnfCore_go_spec_0_9f207115da(
+      runtime,
+      expr,
+      info,
+      levels,
+      f_whnfCoreArguments(expr, true),
+      leanBool(false),
+      context,
+      state,
+      core,
+      coreState,
+      leanField(recorded, 1),
+    )
+  | LeanTag.ConstantInfo_axiomInfo ->
+    name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+      runtime,
+      info,
+    );
+    recorded = L4_Lean_Meta_Basic.f_Lean_Meta_recordUnfoldAxiom_7a49360c1b(
+      runtime,
+      name,
+      state,
+      core,
+      world,
+    );
+    if (leanTag(recorded) == LeanTag.EST_Out_error) return recorded;
+    LeanCtor(LeanTag.EST_Out_ok, Array[expr, leanField(recorded, 1)])
+  | _ -> LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+  }
+}
+
+module end;

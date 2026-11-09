@@ -5,10 +5,10 @@ fun f_AsyncList_getFinishedPrefix_closed_0_c81eb13170(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
+    LeanTag.Prod_mk,
     Array[
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
-      LeanCtor("[\"Bool\",\"true\"]", Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanCtor(LeanTag.Bool_true, Array[]),
     ],
   )
 }
@@ -19,14 +19,14 @@ fun f_Lean_AsyncList_ctorElim_9f11618401(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"AsyncList\",\"cons\"]" ->
+  | LeanTag.AsyncList_cons ->
     _hd_2: LeanValue = leanField(_t_0, 0);
     _tl_3: LeanValue = leanField(_t_0, 1);
     leanApply(_runtime, _k_1, Array[_hd_2, _tl_3])
-  | "[\"Lean\",\"AsyncList\",\"delayed\"]" ->
+  | LeanTag.AsyncList_delayed ->
     _tl_4: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_tl_4])
-  | "[\"Lean\",\"AsyncList\",\"nil\"]" -> _k_1
+  | LeanTag.AsyncList_nil -> _k_1
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -39,7 +39,7 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
   _a_1_3: LeanValue,
 ): LeanValue {
   leanTag(_xs_2) match {
-  | "[\"Lean\",\"AsyncList\",\"cons\"]" ->
+  | LeanTag.AsyncList_cons ->
     _hd_2_4: LeanValue = leanField(_xs_2, 0);
     _tl_3_5: LeanValue = leanField(_xs_2, 1);
     _x_4_7: LeanValue = f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
@@ -50,20 +50,20 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
       _a_1_3,
     );
     leanTag(_x_4_7) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_5_8: LeanValue = leanField(_x_4_7, 0);
       _state_6_9: LeanValue = leanField(_x_4_7, 1);
       leanTag(_val_5_8) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _fst_7_10: LeanValue = leanField(_val_5_8, 0);
         _snd_8_11: LeanValue = leanField(_val_5_8, 1);
         LeanCtor(
-          "[\"ST\",\"Out\",\"mk\"]",
+          LeanTag.ST_Out_mk,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[
-                LeanCtor("[\"List\",\"cons\"]", Array[_hd_2_4, _fst_7_10]),
+                LeanCtor(LeanTag.List_cons, Array[_hd_2_4, _fst_7_10]),
                 _snd_8_11,
               ],
             ),
@@ -74,7 +74,7 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"delayed\"]" ->
+  | LeanTag.AsyncList_delayed ->
     _tl_12_6: LeanValue = leanField(_xs_2, 0);
     _f_13_15: LeanValue = LeanClosure(
       L4_Lean_Server_AsyncList
@@ -88,18 +88,18 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
       _a_1_3,
     );
     leanTag(_x_14_16) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_15_17: LeanValue = leanField(_x_14_16, 0);
       _state_16_18: LeanValue = leanField(_x_14_16, 1);
-      _x_17_19: LeanValue = LeanCtor("[\"Bool\",\"true\"]", Array[]);
+      _x_17_19: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
       leanTag(_val_15_17) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_18_20: LeanValue = L4_Lean_Server_ServerTask.f_Server_ServerTask_mapCheap_990766fe81(
           _runtime,
           _f_13_15,
           _tl_12_6,
         );
-        _x_19_21: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+        _x_19_21: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
         _x_20_22: LeanValue = f_getFinishedPrefixWithTimeout_go_spec_0_b5fd8b1817(
           _runtime,
           _cancelTks_0,
@@ -107,8 +107,8 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
         );
         _x_23_25: LeanValue = L4_Init_Data_List_Basic.f_List_appendTR_2b9956fe3a(
           _runtime,
-          LeanCtor("[\"List\",\"cons\"]", Array[_x_18_20, _x_20_22]),
-          LeanCtor("[\"List\",\"cons\"]", Array[_timeoutTask_1, _x_19_21]),
+          LeanCtor(LeanTag.List_cons, Array[_x_18_20, _x_20_22]),
+          LeanCtor(LeanTag.List_cons, Array[_timeoutTask_1, _x_19_21]),
         );
         _x_24_26: LeanValue = L4_Lean_Server_ServerTask.f_Server_ServerTask_waitAny_8718fbbe64(
           _runtime,
@@ -116,23 +116,23 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
           _state_16_18,
         );
         leanTag(_x_24_26) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_25_27: LeanValue = leanField(_x_24_26, 0);
           _state_26_28: LeanValue = leanField(_x_24_26, 1);
           leanTag(_val_25_27) match {
-          | "[\"Sum\",\"inl\"]" ->
+          | LeanTag.Sum_inl ->
             _val_27_29: LeanValue = leanField(_val_25_27, 0);
             LeanCtor(
-              "[\"ST\",\"Out\",\"mk\"]",
+              LeanTag.ST_Out_mk,
               Array[
                 LeanCtor(
-                  "[\"Prod\",\"mk\"]",
+                  LeanTag.Prod_mk,
                   Array[
                     _x_19_21,
                     LeanCtor(
-                      "[\"Prod\",\"mk\"]",
+                      LeanTag.Prod_mk,
                       Array[
-                        LeanCtor("[\"Option\",\"none\"]", Array[]),
+                        LeanCtor(LeanTag.Option_none, Array[]),
                         _val_15_17,
                       ],
                     ),
@@ -141,22 +141,22 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
                 _state_26_28,
               ],
             )
-          | "[\"Sum\",\"inr\"]" ->
+          | LeanTag.Sum_inr ->
             _val_32_30: LeanValue = leanField(_val_25_27, 0);
             leanTag(_val_32_30) match {
-            | "[\"Except\",\"error\"]" ->
+            | LeanTag.Except_error ->
               _a_33_35: LeanValue = leanField(_val_32_30, 0);
               LeanCtor(
-                "[\"ST\",\"Out\",\"mk\"]",
+                LeanTag.ST_Out_mk,
                 Array[
                   LeanCtor(
-                    "[\"Prod\",\"mk\"]",
+                    LeanTag.Prod_mk,
                     Array[
                       _x_19_21,
                       LeanCtor(
-                        "[\"Prod\",\"mk\"]",
+                        LeanTag.Prod_mk,
                         Array[
-                          LeanCtor("[\"Option\",\"some\"]", Array[_a_33_35]),
+                          LeanCtor(LeanTag.Option_some, Array[_a_33_35]),
                           _x_17_19,
                         ],
                       ),
@@ -165,7 +165,7 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
                   _state_26_28,
                 ],
               )
-            | "[\"Except\",\"ok\"]" ->
+            | LeanTag.Except_ok ->
               _a_38_36: LeanValue = leanField(_val_32_30, 0);
               f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
                 _runtime,
@@ -180,7 +180,7 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
           }
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_40_42: LeanValue = L4_Init_System_IO.f_IO_wait_67db917e2b(
           _runtime,
           LeanErased(),
@@ -188,27 +188,27 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
           _state_16_18,
         );
         leanTag(_x_40_42) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_41_43: LeanValue = leanField(_x_40_42, 0);
           _state_42_44: LeanValue = leanField(_x_40_42, 1);
           leanTag(_val_41_43) match {
-          | "[\"Except\",\"error\"]" ->
+          | LeanTag.Except_error ->
             _a_43_45: LeanValue = leanField(_val_41_43, 0);
             _x_47_50: LeanValue = LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[
-                LeanCtor("[\"List\",\"nil\"]", Array[]),
+                LeanCtor(LeanTag.List_nil, Array[]),
                 LeanCtor(
-                  "[\"Prod\",\"mk\"]",
+                  LeanTag.Prod_mk,
                   Array[
-                    LeanCtor("[\"Option\",\"some\"]", Array[_a_43_45]),
+                    LeanCtor(LeanTag.Option_some, Array[_a_43_45]),
                     _x_17_19,
                   ],
                 ),
               ],
             );
-            LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_47_50, _state_42_44])
-          | "[\"Except\",\"ok\"]" ->
+            LeanCtor(LeanTag.ST_Out_mk, Array[_x_47_50, _state_42_44])
+          | LeanTag.Except_ok ->
             _a_49_46: LeanValue = leanField(_val_41_43, 0);
             f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
               _runtime,
@@ -225,21 +225,21 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"nil\"]" ->
+  | LeanTag.AsyncList_nil ->
     _x_55_57: LeanValue = LeanCtor(
-      "[\"Prod\",\"mk\"]",
+      LeanTag.Prod_mk,
       Array[
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
-            LeanCtor("[\"Option\",\"none\"]", Array[]),
-            LeanCtor("[\"Bool\",\"true\"]", Array[]),
+            LeanCtor(LeanTag.Option_none, Array[]),
+            LeanCtor(LeanTag.Bool_true, Array[]),
           ],
         ),
       ],
     );
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_55_57, _a_1_3])
+    LeanCtor(LeanTag.ST_Out_mk, Array[_x_55_57, _a_1_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -323,20 +323,20 @@ fun f_AsyncList_waitUntil_lam_1_9feceda137(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_2_2: LeanValue = leanField(_x_1_1, 0);
     L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
-          LeanCtor("[\"List\",\"nil\"]", Array[]),
-          LeanCtor("[\"Option\",\"some\"]", Array[_a_2_2]),
+          LeanCtor(LeanTag.List_nil, Array[]),
+          LeanCtor(LeanTag.Option_some, Array[_a_2_2]),
         ],
       ),
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_7_3: LeanValue = leanField(_x_1_1, 0);
     f_Lean_AsyncList_waitUntil_e609925837(_runtime, _p_0, _a_7_3)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -414,8 +414,8 @@ fun f_AsyncList_waitFind_closed_0_0377620fff(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Lean.AsyncList.ctorIdx._impl._redArg"
@@ -432,9 +432,9 @@ fun f_getFinishedPrefixWithTimeout_go_spec_0_b5fd8b1817(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_2_1)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_2: LeanValue = leanField(_a_1_0, 0);
     _tail_5_3: LeanValue = leanField(_a_1_0, 1);
     _f_6_5: LeanValue = LeanClosure(
@@ -450,7 +450,7 @@ fun f_getFinishedPrefixWithTimeout_go_spec_0_b5fd8b1817(
     f_getFinishedPrefixWithTimeout_go_spec_0_b5fd8b1817(
       _runtime,
       _tail_5_3,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_7_6, _a_2_1]),
+      LeanCtor(LeanTag.List_cons, Array[_x_7_6, _a_2_1]),
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -462,7 +462,7 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"AsyncList\",\"cons\"]" ->
+  | LeanTag.AsyncList_cons ->
     _hd_3_2: LeanValue = leanField(_x_1_0, 0);
     _tl_4_3: LeanValue = leanField(_x_1_0, 1);
     _x_5_5: LeanValue = f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
@@ -471,20 +471,20 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
       _a_2_1,
     );
     leanTag(_x_5_5) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_6_6: LeanValue = leanField(_x_5_5, 0);
       _state_7_7: LeanValue = leanField(_x_5_5, 1);
       leanTag(_val_6_6) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _fst_8_8: LeanValue = leanField(_val_6_6, 0);
         _snd_9_9: LeanValue = leanField(_val_6_6, 1);
         LeanCtor(
-          "[\"ST\",\"Out\",\"mk\"]",
+          LeanTag.ST_Out_mk,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[
-                LeanCtor("[\"List\",\"cons\"]", Array[_hd_3_2, _fst_8_8]),
+                LeanCtor(LeanTag.List_cons, Array[_hd_3_2, _fst_8_8]),
                 _snd_9_9,
               ],
             ),
@@ -495,7 +495,7 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"delayed\"]" ->
+  | LeanTag.AsyncList_delayed ->
     _tl_13_4: LeanValue = leanField(_x_1_0, 0);
     _x_14_13: LeanValue = L4_Lean_Server_ServerTask.f_Server_ServerTask_hasFinished_6d3560573d(
       _runtime,
@@ -503,23 +503,23 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
       _a_2_1,
     );
     leanTag(_x_14_13) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_15_14: LeanValue = leanField(_x_14_13, 0);
       _state_16_15: LeanValue = leanField(_x_14_13, 1);
       leanTag(_val_15_14) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_20_19: LeanValue = LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
-            LeanCtor("[\"List\",\"nil\"]", Array[]),
+            LeanCtor(LeanTag.List_nil, Array[]),
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
-              Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _val_15_14],
+              LeanTag.Prod_mk,
+              Array[LeanCtor(LeanTag.Option_none, Array[]), _val_15_14],
             ),
           ],
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_20_19, _state_16_15])
-      | "[\"Bool\",\"true\"]" ->
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_20_19, _state_16_15])
+      | LeanTag.Bool_true ->
         _x_22_21: LeanValue = L4_Init_System_IO.f_IO_wait_67db917e2b(
           _runtime,
           LeanErased(),
@@ -527,27 +527,27 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
           _state_16_15,
         );
         leanTag(_x_22_21) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_23_22: LeanValue = leanField(_x_22_21, 0);
           _state_24_23: LeanValue = leanField(_x_22_21, 1);
           leanTag(_val_23_22) match {
-          | "[\"Except\",\"error\"]" ->
+          | LeanTag.Except_error ->
             _a_25_24: LeanValue = leanField(_val_23_22, 0);
             _x_29_29: LeanValue = LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[
-                LeanCtor("[\"List\",\"nil\"]", Array[]),
+                LeanCtor(LeanTag.List_nil, Array[]),
                 LeanCtor(
-                  "[\"Prod\",\"mk\"]",
+                  LeanTag.Prod_mk,
                   Array[
-                    LeanCtor("[\"Option\",\"some\"]", Array[_a_25_24]),
+                    LeanCtor(LeanTag.Option_some, Array[_a_25_24]),
                     _val_15_14,
                   ],
                 ),
               ],
             );
-            LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_29_29, _state_24_23])
-          | "[\"Except\",\"ok\"]" ->
+            LeanCtor(LeanTag.ST_Out_mk, Array[_x_29_29, _state_24_23])
+          | LeanTag.Except_ok ->
             _a_31_25: LeanValue = leanField(_val_23_22, 0);
             f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
               _runtime,
@@ -562,21 +562,21 @@ fun f_Lean_AsyncList_getFinishedPrefix_84184ea6c7(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"nil\"]" ->
+  | LeanTag.AsyncList_nil ->
     _x_37_36: LeanValue = LeanCtor(
-      "[\"Prod\",\"mk\"]",
+      LeanTag.Prod_mk,
       Array[
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
-            LeanCtor("[\"Option\",\"none\"]", Array[]),
-            LeanCtor("[\"Bool\",\"true\"]", Array[]),
+            LeanCtor(LeanTag.Option_none, Array[]),
+            LeanCtor(LeanTag.Bool_true, Array[]),
           ],
         ),
       ],
     );
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_37_36, _a_2_1])
+    LeanCtor(LeanTag.ST_Out_mk, Array[_x_37_36, _a_2_1])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -606,7 +606,7 @@ fun f_Lean_AsyncList_ofList_28d48a912e(
 ): LeanValue {
   f_AsyncList_ofList_spec_0_55b2806526(
     _runtime,
-    LeanCtor("[\"Lean\",\"AsyncList\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.AsyncList_nil, Array[]),
     _l_0,
   )
 }
@@ -649,15 +649,15 @@ fun f_AsyncList_getFinishedPrefixWithTimeout_lam_0_d495768d34(
     _y_1_1,
   );
   leanTag(_x_2_2) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_3_3: LeanValue = leanField(_x_2_2, 0);
     _state_4_4: LeanValue = leanField(_x_2_2, 1);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Sum\",\"inl\"]",
-          Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+          LeanTag.Sum_inl,
+          Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
         ),
         _state_4_4,
       ],
@@ -682,8 +682,8 @@ fun f_AsyncList_ofList_spec_0_55b2806526(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"List\",\"nil\"]" -> _init_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _init_0
+  | LeanTag.List_cons ->
     _head_2_2: LeanValue = leanField(_x_1_1, 0);
     _tail_3_3: LeanValue = leanField(_x_1_1, 1);
     _x_4_4: LeanValue = f_AsyncList_ofList_spec_0_55b2806526(
@@ -691,7 +691,7 @@ fun f_AsyncList_ofList_spec_0_55b2806526(
       _init_0,
       _tail_3_3,
     );
-    LeanCtor("[\"Lean\",\"AsyncList\",\"cons\"]", Array[_head_2_2, _x_4_4])
+    LeanCtor(LeanTag.AsyncList_cons, Array[_head_2_2, _x_4_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -710,7 +710,7 @@ fun f_go_spec_0_lam_0_c0d0f20f7f(
   _runtime: mutable LeanExecution,
   _val_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Sum\",\"inl\"]", Array[_val_0])
+  LeanCtor(LeanTag.Sum_inl, Array[_val_0])
 }
 fun apply_f_go_spec_0_lam_0_c0d0f20f7f(
   _runtime: mutable LeanExecution,
@@ -743,24 +743,24 @@ fun f_AsyncList_getFinishedPrefixWithConsistentLatency_sleepWi_43879fe969(
     LeanScalar("uint32", "0"),
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_5: LeanValue = L4_Init_Data_List_Basic.f_List_isEmpty_31ee95efb7(
       _runtime,
       _cancelTks_0,
     );
     leanTag(_x_4_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_5_6: LeanValue = f_getFinishedPrefixWithConsistentLatency_sleepWithCancella_013f6dc87e(
         _runtime,
         _cancelTks_0,
         _a_1_2,
       );
       leanTag(_x_5_6) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_6_7: LeanValue = leanField(_x_5_6, 0);
         _state_7_8: LeanValue = leanField(_x_5_6, 1);
         leanTag(_val_6_7) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _x_8_9: LeanValue = LeanClosure(
             L4_Init_System_IO.apply_f_IO_sleep_19147e58dc,
             2,
@@ -772,47 +772,47 @@ fun f_AsyncList_getFinishedPrefixWithConsistentLatency_sleepWi_43879fe969(
             _state_7_8,
           );
           leanTag(_x_9_10) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _val_10_11: LeanValue = leanField(_x_9_10, 0);
             _state_11_12: LeanValue = leanField(_x_9_10, 1);
             L4_Lean_Server_ServerTask.f_Server_ServerTask_waitAny_8718fbbe64(
               _runtime,
-              LeanCtor("[\"List\",\"cons\"]", Array[_val_10_11, _cancelTks_0]),
+              LeanCtor(LeanTag.List_cons, Array[_val_10_11, _cancelTks_0]),
               _state_11_12,
             )
           | _ -> leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           LeanCtor(
-            "[\"ST\",\"Out\",\"mk\"]",
-            Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_7_8],
+            LeanTag.ST_Out_mk,
+            Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _state_7_8],
           )
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_16_17: LeanValue = L4_Init_System_IO.f_IO_sleep_19147e58dc(
         _runtime,
         _sleepDurationMs_1,
         _a_1_2,
       );
       leanTag(_x_16_17) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_17_18: LeanValue = leanField(_x_16_17, 0);
         _state_18_19: LeanValue = leanField(_x_16_17, 1);
         LeanCtor(
-          "[\"ST\",\"Out\",\"mk\"]",
-          Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_18_19],
+          LeanTag.ST_Out_mk,
+          Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _state_18_19],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
-      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _a_1_2],
+      LeanTag.ST_Out_mk,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _a_1_2],
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -822,7 +822,7 @@ fun f_Lean_AsyncList_instInhabited_9c6cf1925c(
   _runtime: mutable LeanExecution,
   _dummy_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"AsyncList\",\"nil\"]", Array[])
+  LeanCtor(LeanTag.AsyncList_nil, Array[])
 }
 // "Lean.AsyncList.instCoeList"
 fun f_Lean_AsyncList_instCoeList_f994327947(
@@ -861,7 +861,7 @@ fun f_Lean_AsyncList_getFinishedPrefixWithConsistentLatency_d4232063fe(
     _a_1_3,
   );
   leanTag(_x_2_4) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_3_5: LeanValue = leanField(_x_2_4, 0);
     _state_4_6: LeanValue = leanField(_x_2_4, 1);
     _x_5_7: LeanValue = f_Lean_AsyncList_getFinishedPrefixWithTimeout_b6bc74bb07(
@@ -872,7 +872,7 @@ fun f_Lean_AsyncList_getFinishedPrefixWithConsistentLatency_d4232063fe(
       _state_4_6,
     );
     leanTag(_x_5_7) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_6_8: LeanValue = leanField(_x_5_7, 0);
       _state_7_9: LeanValue = leanField(_x_5_7, 1);
       _x_8_10: LeanValue = L4_Init_System_IO.f_IO_monoMsNow_a6b9fb4ccd(
@@ -880,7 +880,7 @@ fun f_Lean_AsyncList_getFinishedPrefixWithConsistentLatency_d4232063fe(
         _state_7_9,
       );
       leanTag(_x_8_10) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_9_11: LeanValue = leanField(_x_8_10, 0);
         _state_10_12: LeanValue = leanField(_x_8_10, 1);
         _x_11_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -908,10 +908,10 @@ fun f_Lean_AsyncList_getFinishedPrefixWithConsistentLatency_d4232063fe(
           _state_10_12,
         );
         leanTag(_x_15_17) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_16_18: LeanValue = leanField(_x_15_17, 0);
           _state_17_19: LeanValue = leanField(_x_15_17, 1);
-          LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_6_8, _state_17_19])
+          LeanCtor(LeanTag.ST_Out_mk, Array[_val_6_8, _state_17_19])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
@@ -935,7 +935,7 @@ fun f_Lean_AsyncList_getFinishedPrefixWithTimeout_b6bc74bb07(
     LeanScalar("uint32", "0"),
   );
   leanTag(_x_3_5) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _f_4_6: LeanValue = LeanClosure(
       L4_Lean_Server_AsyncList
         .apply_f_AsyncList_getFinishedPrefixWithTimeout_lam_0_d495768d34,
@@ -948,7 +948,7 @@ fun f_Lean_AsyncList_getFinishedPrefixWithTimeout_b6bc74bb07(
       _a_1_3,
     );
     leanTag(_x_5_7) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_6_8: LeanValue = leanField(_x_5_7, 0);
       _state_7_9: LeanValue = leanField(_x_5_7, 1);
       f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
@@ -960,13 +960,13 @@ fun f_Lean_AsyncList_getFinishedPrefixWithTimeout_b6bc74bb07(
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_11_13: LeanValue = L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
       LeanCtor(
-        "[\"Sum\",\"inl\"]",
-        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+        LeanTag.Sum_inl,
+        Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
       ),
     );
     f_AsyncList_getFinishedPrefixWithTimeout_go_102ab307fa(
@@ -985,7 +985,7 @@ fun f_Lean_AsyncList_instInhabited_3772023ae6(
   _value_0: LeanValue,
   _value_1: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"AsyncList\",\"nil\"]", Array[])
+  LeanCtor(LeanTag.AsyncList_nil, Array[])
 }
 // "Lean.AsyncList.getFinishedPrefix._redArg._closed_1"
 fun f_AsyncList_getFinishedPrefix_closed_1_b8cbb08294(
@@ -995,8 +995,8 @@ fun f_AsyncList_getFinishedPrefix_closed_1_b8cbb08294(
     _runtime,
   );
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
-    Array[LeanCtor("[\"List\",\"nil\"]", Array[]), _x_334_0],
+    LeanTag.Prod_mk,
+    Array[LeanCtor(LeanTag.List_nil, Array[]), _x_334_0],
   )
 }
 // "List.anyM._at_._private.Lean.Server.AsyncList.0.Lean.AsyncList.getFinishedPrefixWithConsistentLatency.sleepWithCancellation.spec_0"
@@ -1006,12 +1006,12 @@ fun f_getFinishedPrefixWithConsistentLatency_sleepWithCancella_013f6dc87e(
   _y_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
-      Array[LeanCtor("[\"Bool\",\"false\"]", Array[]), _y_2_1],
+      LeanTag.ST_Out_mk,
+      Array[LeanCtor(LeanTag.Bool_false, Array[]), _y_2_1],
     )
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_5_2: LeanValue = leanField(_x_1_0, 0);
     _tail_6_3: LeanValue = leanField(_x_1_0, 1);
     _x_7_6: LeanValue = L4_Lean_Server_ServerTask.f_Server_ServerTask_hasFinished_6d3560573d(
@@ -1020,17 +1020,17 @@ fun f_getFinishedPrefixWithConsistentLatency_sleepWithCancella_013f6dc87e(
       _y_2_1,
     );
     leanTag(_x_7_6) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_8_7: LeanValue = leanField(_x_7_6, 0);
       _state_9_8: LeanValue = leanField(_x_7_6, 1);
       leanTag(_val_8_7) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         f_getFinishedPrefixWithConsistentLatency_sleepWithCancella_013f6dc87e(
           _runtime,
           _tail_6_3,
           _state_9_8,
         )
-      | "[\"Bool\",\"true\"]" -> _x_7_6
+      | LeanTag.Bool_true -> _x_7_6
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1045,13 +1045,13 @@ fun f_AsyncList_waitUntil_lam_0_c0999790bc(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_3_2: LeanValue = leanField(_x_2_1, 0);
     _snd_4_3: LeanValue = leanField(_x_2_1, 1);
     LeanCtor(
-      "[\"Prod\",\"mk\"]",
+      LeanTag.Prod_mk,
       Array[
-        LeanCtor("[\"List\",\"cons\"]", Array[_hd_1_0, _fst_3_2]),
+        LeanCtor(LeanTag.List_cons, Array[_hd_1_0, _fst_3_2]),
         _snd_4_3,
       ],
     )
@@ -1077,8 +1077,8 @@ fun f_getFinishedPrefixWithTimeout_lam_0_closed_0_cc79def0eb(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Sum\",\"inl\"]",
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    LeanTag.Sum_inl,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Lean.AsyncList.waitAll._redArg._lam_0"
@@ -1086,7 +1086,7 @@ fun f_AsyncList_waitAll_lam_0_a04f127338(
   _runtime: mutable LeanExecution,
   _x_1_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Bool\",\"false\"]", Array[])
+  LeanCtor(LeanTag.Bool_false, Array[])
 }
 fun apply_f_AsyncList_waitAll_lam_0_a04f127338(
   _runtime: mutable LeanExecution,
@@ -1161,7 +1161,7 @@ fun f_getFinishedPrefixWithTimeout_go_lam_0_d6bed0ec66(
   _runtime: mutable LeanExecution,
   _val_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Sum\",\"inr\"]", Array[_val_0])
+  LeanCtor(LeanTag.Sum_inr, Array[_val_0])
 }
 fun apply_f_getFinishedPrefixWithTimeout_go_lam_0_d6bed0ec66(
   _runtime: mutable LeanExecution,
@@ -1174,10 +1174,10 @@ fun f_AsyncList_waitUntil_closed_0_c0f4fa4c3a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
+    LeanTag.Prod_mk,
     Array[
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
     ],
   )
 }
@@ -1188,12 +1188,12 @@ fun f_Lean_AsyncList_waitUntil_e609925837(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Lean\",\"AsyncList\",\"cons\"]" ->
+  | LeanTag.AsyncList_cons ->
     _hd_2_2: LeanValue = leanField(_x_1_1, 0);
     _tl_3_3: LeanValue = leanField(_x_1_1, 1);
     _x_4_5: LeanValue = leanApply(_runtime, _p_0, Array[_hd_2_2]);
     leanTag(_x_4_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _f_5_6: LeanValue = LeanClosure(
         L4_Lean_Server_AsyncList.apply_f_AsyncList_waitUntil_lam_0_c0999790bc,
         2,
@@ -1209,21 +1209,21 @@ fun f_Lean_AsyncList_waitUntil_e609925837(
         _f_5_6,
         _x_6_7,
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_11_12: LeanValue = LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           LeanCtor(
-            "[\"List\",\"cons\"]",
-            Array[_hd_2_2, LeanCtor("[\"List\",\"nil\"]", Array[])],
+            LeanTag.List_cons,
+            Array[_hd_2_2, LeanCtor(LeanTag.List_nil, Array[])],
           ),
-          LeanCtor("[\"Option\",\"none\"]", Array[]),
+          LeanCtor(LeanTag.Option_none, Array[]),
         ],
       );
       L4_Init_Core.f_Task_pure_8e8af46293(_runtime, LeanErased(), _x_11_12)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"delayed\"]" ->
+  | LeanTag.AsyncList_delayed ->
     _tl_13_4: LeanValue = leanField(_x_1_1, 0);
     _f_14_14: LeanValue = LeanClosure(
       L4_Lean_Server_AsyncList.apply_f_AsyncList_waitUntil_lam_1_9feceda137,
@@ -1235,15 +1235,15 @@ fun f_Lean_AsyncList_waitUntil_e609925837(
       _tl_13_4,
       _f_14_14,
     )
-  | "[\"Lean\",\"AsyncList\",\"nil\"]" ->
+  | LeanTag.AsyncList_nil ->
     L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
-          LeanCtor("[\"List\",\"nil\"]", Array[]),
-          LeanCtor("[\"Option\",\"none\"]", Array[]),
+          LeanCtor(LeanTag.List_nil, Array[]),
+          LeanCtor(LeanTag.Option_none, Array[]),
         ],
       ),
     )

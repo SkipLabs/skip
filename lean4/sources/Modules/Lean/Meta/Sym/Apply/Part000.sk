@@ -30,14 +30,14 @@ fun f_BackwardRule_apply_spec_2_17e45c46ff(
     _y_7_8,
   );
   leanTag(_x_9_10) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_10_11: LeanValue = leanField(_x_9_10, 0);
     _a_11_12: LeanValue = leanField(_x_9_10, 1);
     _x_9_10
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_12_13: LeanValue = leanField(_x_9_10, 0);
     _a_13_14: LeanValue = leanField(_x_9_10, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_12_13, _a_13_14])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_12_13, _a_13_14])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -57,18 +57,18 @@ fun f_BackwardRule_apply_spec_0_de20888bd8(
     _y_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_4_5: LeanValue = leanField(_x_3_4, 0);
     _state_5_6: LeanValue = leanField(_x_3_4, 1);
     leanTag(_val_4_5) match {
-    | "[\"Lean\",\"Meta\",\"State\",\"mk\"]" ->
+    | LeanTag.Meta_State_mk ->
       _mctx_7: LeanValue = leanField(_val_4_5, 0);
       _cache_8: LeanValue = leanField(_val_4_5, 1);
       _zetaDeltaFVarIds_9: LeanValue = leanField(_val_4_5, 2);
       _postponed_10: LeanValue = leanField(_val_4_5, 3);
       _diag_11: LeanValue = leanField(_val_4_5, 4);
       leanTag(_mctx_7) match {
-      | "[\"Lean\",\"MetavarContext\",\"mk\"]" ->
+      | LeanTag.MetavarContext_mk ->
         _depth_12: LeanValue = leanField(_mctx_7, 0);
         _levelAssignDepth_13: LeanValue = leanField(_mctx_7, 1);
         _lmvarCounter_14: LeanValue = leanField(_mctx_7, 2);
@@ -88,7 +88,7 @@ fun f_BackwardRule_apply_spec_0_de20888bd8(
           _val_1,
         );
         _x_8_26: LeanValue = LeanCtor(
-          "[\"Lean\",\"MetavarContext\",\"mk\"]",
+          LeanTag.MetavarContext_mk,
           Array[
             _depth_12,
             _levelAssignDepth_13,
@@ -110,7 +110,7 @@ fun f_BackwardRule_apply_spec_0_de20888bd8(
           LeanErased(),
           _y_1_2,
           LeanCtor(
-            "[\"Lean\",\"Meta\",\"State\",\"mk\"]",
+            LeanTag.Meta_State_mk,
             Array[
               _x_8_26,
               _cache_8,
@@ -122,12 +122,12 @@ fun f_BackwardRule_apply_spec_0_de20888bd8(
           _state_5_6,
         );
         leanTag(_x_10_28) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_11_29: LeanValue = leanField(_x_10_28, 0);
           _state_12_30: LeanValue = leanField(_x_10_28, 1);
           LeanCtor(
-            "[\"EST\",\"Out\",\"ok\"]",
-            Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_12_30],
+            LeanTag.EST_Out_ok,
+            Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _state_12_30],
           )
         | _ -> leanFail("non-exhaustive Lean case")
         }
@@ -151,8 +151,8 @@ fun f_Sym_mkResultPos_spec_5_f139485b5f(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _v_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -161,7 +161,7 @@ fun f_Sym_mkResultPos_spec_5_f139485b5f(
       LeanErased(),
     );
     leanTag(_v_4) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"ProofInstArgInfo\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_ProofInstArgInfo_mk ->
       _isProof_5: LeanValue = leanField(_v_4, 0);
       _isInstance_6: LeanValue = leanField(_v_4, 1);
       _bs_8: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
@@ -169,13 +169,13 @@ fun f_Sym_mkResultPos_spec_5_f139485b5f(
         LeanErased(),
         _bs_2,
         _i_1,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
         LeanErased(),
       );
       _x_4_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
         _runtime,
         _i_1,
-        LeanScalar("usize", "1"),
+        LeanWord("usize", 1),
       );
       _x_5_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
         _runtime,
@@ -211,14 +211,14 @@ fun f_Meta_Sym_mkValue_c468150681(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+      | LeanTag.Expr_const__impl ->
         _ = leanField(_frame[0], 0);
         _frame.set(8, leanField(_frame[0], 1));
         _frame.set(9, leanField(_frame[0], 2));
         leanTag(_frame[9]) match {
-        | "[\"List\",\"nil\"]" ->
+        | LeanTag.List_nil ->
           leanTag(_frame[2]) match {
-          | "[\"Lean\",\"Meta\",\"Sym\",\"MatchUnifyResult\",\"mk\"]" ->
+          | LeanTag.Meta_Sym_MatchUnifyResult_mk ->
             _frame.set(10, leanField(_frame[2], 0));
             _frame.set(11, leanField(_frame[2], 1));
             _ = leanField(_frame[2], 2);
@@ -251,7 +251,7 @@ fun f_Meta_Sym_mkValue_c468150681(
       }
     | 1 ->
       leanTag(_frame[1]) match {
-      | "[\"Lean\",\"Meta\",\"Sym\",\"Pattern\",\"mk\"]" ->
+      | LeanTag.Meta_Sym_Pattern_mk ->
         _frame.set(3, leanField(_frame[1], 0));
         _ = leanField(_frame[1], 1);
         _ = leanField(_frame[1], 2);
@@ -259,7 +259,7 @@ fun f_Meta_Sym_mkValue_c468150681(
         _ = leanField(_frame[1], 4);
         _ = leanField(_frame[1], 5);
         leanTag(_frame[2]) match {
-        | "[\"Lean\",\"Meta\",\"Sym\",\"MatchUnifyResult\",\"mk\"]" ->
+        | LeanTag.Meta_Sym_MatchUnifyResult_mk ->
           _frame.set(4, leanField(_frame[2], 0));
           _frame.set(5, leanField(_frame[2], 1));
           _ = leanField(_frame[2], 2);
@@ -297,13 +297,13 @@ fun f_BackwardRule_apply_spec_1_404cc01710(
   _a_3_2: LeanValue,
 ): LeanValue {
   leanTag(_a_2_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_3_2)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_5_3: LeanValue = leanField(_a_2_1, 0);
     _tail_6_4: LeanValue = leanField(_a_2_1, 1);
     leanTag(_val_1_0) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"MatchUnifyResult\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_MatchUnifyResult_mk ->
       _us_6: LeanValue = leanField(_val_1_0, 0);
       _args_7: LeanValue = leanField(_val_1_0, 1);
       _unresolvedInsts_8: LeanValue = leanField(_val_1_0, 2);
@@ -325,7 +325,7 @@ fun f_BackwardRule_apply_spec_1_404cc01710(
         _runtime,
         _val_1_0,
         _tail_6_4,
-        LeanCtor("[\"List\",\"cons\"]", Array[_x_9_11, _a_3_2]),
+        LeanCtor(LeanTag.List_cons, Array[_x_9_11, _a_3_2]),
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -341,12 +341,12 @@ fun f_spec_2_spec_4_spec_5_af7f7dc419(
   _x_4_3: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+  | LeanTag.PersistentHashMap_Node_entries ->
     _es_5_4: LeanValue = leanField(_x_1_0, 0);
     leanFail(
       "unreachable: Lean.PersistentHashMap.insertAtCollisionNodeAux._at_.Lean.PersistentHashMap.insertAtCollisionNode._at_.Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MVarId.assign._at_.Lean.Meta.Sym.BackwardRule.apply.spec_0.spec_0.spec_2.spec_4.spec_5._redArg",
     )
-  | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+  | LeanTag.PersistentHashMap_Node_collision ->
     _ks_6_5: LeanValue = leanField(_x_1_0, 0);
     _vs_7_6: LeanValue = leanField(_x_1_0, 1);
     _h_8_7: LeanValue = leanField(_x_1_0, 2);
@@ -361,7 +361,7 @@ fun f_spec_2_spec_4_spec_5_af7f7dc419(
       _x_9_8,
     );
     leanTag(_x_10_9) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_11_10: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
         _runtime,
         LeanErased(),
@@ -375,10 +375,10 @@ fun f_spec_2_spec_4_spec_5_af7f7dc419(
         _x_4_3,
       );
       LeanCtor(
-        "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+        LeanTag.PersistentHashMap_Node_collision,
         Array[_x_11_10, _x_12_11, LeanErased()],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _k_13: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
         LeanErased(),
@@ -392,23 +392,23 @@ fun f_spec_2_spec_4_spec_5_af7f7dc419(
         _k_13,
       );
       leanTag(_x_14_14) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_17_17: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
           _x_2_1,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         f_spec_2_spec_4_spec_5_af7f7dc419(
           _runtime,
           LeanCtor(
-            "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+            LeanTag.PersistentHashMap_Node_collision,
             Array[_ks_6_5, _vs_7_6, LeanErased()],
           ),
           _x_17_17,
           _x_3_2,
           _x_4_3,
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_19_19: LeanValue = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
           _runtime,
           LeanErased(),
@@ -426,7 +426,7 @@ fun f_spec_2_spec_4_spec_5_af7f7dc419(
           LeanErased(),
         );
         LeanCtor(
-          "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+          LeanTag.PersistentHashMap_Node_collision,
           Array[_x_19_19, _x_20_20, LeanErased()],
         )
       | _ -> leanFail("non-exhaustive Lean case")
@@ -455,7 +455,7 @@ fun f_apply_spec_0_spec_0_1375197499(
     _runtime,
     _x_1_0,
     _x_5_4,
-    LeanScalar("usize", "1"),
+    LeanWord("usize", 1),
     _x_2_1,
     _x_3_2,
   )
@@ -516,29 +516,29 @@ fun f_Meta_Sym_mkBackwardRuleFromDecl_5fd97ac527(
     _a_1_6,
   );
   leanTag(_x_2_7) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_8: LeanValue = leanField(_x_2_7, 0);
     _a_4_9: LeanValue = leanField(_x_2_7, 1);
     _x_5_12: LeanValue = f_Meta_Sym_mkResultPos_42eeea9e1b(_runtime, _a_3_8);
     _x_7_14: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
       _runtime,
       _declName_0,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     );
     LeanCtor(
-      "[\"EST\",\"Out\",\"ok\"]",
+      LeanTag.EST_Out_ok,
       Array[
         LeanCtor(
-          "[\"Lean\",\"Meta\",\"Sym\",\"BackwardRule\",\"mk\"]",
+          LeanTag.Meta_Sym_BackwardRule_mk,
           Array[_x_7_14, _a_3_8, _x_5_12],
         ),
         _a_4_9,
       ],
     )
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_10_10: LeanValue = leanField(_x_2_7, 0);
     _a_11_11: LeanValue = leanField(_x_2_7, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_10_10, _a_11_11])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_10_10, _a_11_11])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -574,13 +574,13 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
         L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, _frame[5], _frame[0]),
       );
       leanTag(_frame[11]) match {
-      | "[\"Bool\",\"false\"]" -> return _frame[6]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> return _frame[6]
+      | LeanTag.Bool_true ->
         leanTag(_frame[6]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(12, leanField(_frame[6], 0));
           _frame.set(13, leanField(_frame[6], 1));
-          _frame.set(14, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(14, LeanCtor(LeanTag.Bool_false, Array[]));
           _frame.set(
             15,
             L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
@@ -592,12 +592,12 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
             ),
           );
           leanTag(_frame[15]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               16,
               L4_Lean_Expr.f_Lean_instInhabitedExpr_ed9f456de4(_runtime),
             );
-            _frame.set(17, LeanScalar("nat", "1"));
+            _frame.set(17, LeanNatLiterals.n1);
             _frame.set(
               18,
               L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -631,7 +631,7 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 21,
                 L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
@@ -643,13 +643,13 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
               );
               _frame.set(
                 22,
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[12], _frame[21]]),
+                LeanCtor(LeanTag.Prod_mk, Array[_frame[12], _frame[21]]),
               );
               _jump0 = _frame[22];
               _frame.set(7, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 23,
                 L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
@@ -661,7 +661,7 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
               );
               _frame.set(
                 24,
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[23], _frame[13]]),
+                LeanCtor(LeanTag.Prod_mk, Array[_frame[23], _frame[13]]),
               );
               _jump0 = _frame[24];
               _frame.set(7, _jump0);
@@ -669,10 +669,10 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
               void
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               25,
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[12], _frame[13]]),
+              LeanCtor(LeanTag.Prod_mk, Array[_frame[12], _frame[13]]),
             );
             _jump0 = _frame[25];
             _frame.set(7, _jump0);
@@ -685,7 +685,7 @@ fun f_Sym_mkResultPos_spec_4_6dfbb2d0bd(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(8, LeanScalar("nat", "1"));
+      _frame.set(8, LeanNatLiterals.n1);
       _frame.set(
         9,
         L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[5], _frame[8]),
@@ -724,7 +724,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Meta\",\"Sym\",\"Pattern\",\"mk\"]" ->
+      | LeanTag.Meta_Sym_Pattern_mk ->
         _ = leanField(_frame[0], 0);
         _frame.set(1, leanField(_frame[0], 1));
         _frame.set(2, leanField(_frame[0], 2));
@@ -740,7 +740,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
           ),
         );
         leanTag(_frame[2]) match {
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(25, leanField(_frame[2], 0));
           _frame.set(
             26,
@@ -750,7 +750,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
               _frame[25],
             ),
           );
-          _frame.set(27, LeanScalar("usize", "0"));
+          _frame.set(27, LeanWord("usize", 0));
           _frame.set(
             28,
             f_Sym_mkResultPos_spec_5_f139485b5f(
@@ -765,7 +765,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
           !pc = 1;
           void
         | _ ->
-          _frame.set(29, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(29, LeanCtor(LeanTag.Bool_false, Array[]));
           _frame.set(
             30,
             L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
@@ -791,7 +791,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
           _frame[1],
         ),
       );
-      _frame.set(7, LeanScalar("usize", "0"));
+      _frame.set(7, LeanWord("usize", 0));
       _frame.set(
         8,
         f_Sym_mkResultPos_spec_0_3de76752d9(
@@ -804,11 +804,11 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
       _frame.set(
         9,
         LeanCtor(
-          "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+          LeanTag.Std_DTreeMap_Internal_Impl_leaf,
           Array[],
         ),
       );
-      _frame.set(10, LeanScalar("nat", "0"));
+      _frame.set(10, LeanNatLiterals.n0);
       _frame.set(
         11,
         L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -842,7 +842,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
         ),
       );
       leanTag(_frame[14]) match {
-      | "[\"_private\",\"Lean\",\"Util\",\"CollectFVars\",0,\"Lean\",\"CollectFVars\",\"State\",\"mk\"]" ->
+      | LeanTag.Private_Lean_Util_CollectFVars_0_Lean_CollectFVars_State_mk ->
         _ = leanField(_frame[14], 0);
         _ = leanField(_frame[14], 1);
         _frame.set(15, leanField(_frame[14], 2));
@@ -856,7 +856,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
         );
         _frame.set(
           17,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[11], _frame[11]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[11], _frame[11]]),
         );
         _frame.set(
           18,
@@ -892,7 +892,7 @@ fun f_Meta_Sym_mkResultPos_42eeea9e1b(
           ),
         );
         leanTag(_frame[20]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(21, leanField(_frame[20], 0));
           _frame.set(22, leanField(_frame[20], 1));
           _frame.set(
@@ -933,8 +933,8 @@ fun f_Sym_mkResultPos_spec_0_3de76752d9(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _auxPrefix_5: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
       _runtime,
       LeanText("_sym_pre"),
@@ -944,7 +944,7 @@ fun f_Sym_mkResultPos_spec_0_3de76752d9(
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_4_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(
@@ -963,7 +963,7 @@ fun f_Sym_mkResultPos_spec_0_3de76752d9(
     _x_8_12: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
       _i_1,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_9_13: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,
@@ -1011,9 +1011,9 @@ fun f_Sym_mkResultPos_spec_3_a3ab9509e3(
         L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, _frame[6], _frame[0]),
       );
       leanTag(_frame[12]) match {
-      | "[\"Bool\",\"false\"]" -> return _frame[7]
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(13, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+      | LeanTag.Bool_false -> return _frame[7]
+      | LeanTag.Bool_true ->
+        _frame.set(13, LeanCtor(LeanTag.Bool_false, Array[]));
         _frame.set(
           14,
           L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
@@ -1025,7 +1025,7 @@ fun f_Sym_mkResultPos_spec_3_a3ab9509e3(
           ),
         );
         leanTag(_frame[14]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             15,
             L4_Lean_Expr.f_Lean_instInhabitedExpr_ed9f456de4(_runtime),
@@ -1053,12 +1053,12 @@ fun f_Sym_mkResultPos_spec_3_a3ab9509e3(
             ),
           );
           leanTag(_frame[18]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[7];
             _frame.set(8, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               19,
               L4_Init_Prelude.f_Nat_decLt_b34d01d051(
@@ -1070,7 +1070,7 @@ fun f_Sym_mkResultPos_spec_3_a3ab9509e3(
             return _frame[19]
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[7];
           _frame.set(8, _jump0);
           !pc = 1;
@@ -1080,7 +1080,7 @@ fun f_Sym_mkResultPos_spec_3_a3ab9509e3(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(9, LeanScalar("nat", "1"));
+      _frame.set(9, LeanNatLiterals.n1);
       _frame.set(
         10,
         L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[6], _frame[9]),
@@ -1127,16 +1127,16 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
     _y_7_8,
   );
   leanTag(_x_8_9) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_9_10: LeanValue = leanField(_x_8_9, 0);
     _a_10_11: LeanValue = leanField(_x_8_9, 1);
     leanTag(_rule_1) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"BackwardRule\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_BackwardRule_mk ->
       _expr_14: LeanValue = leanField(_rule_1, 0);
       _pattern_15: LeanValue = leanField(_rule_1, 1);
       _resultPos_16: LeanValue = leanField(_rule_1, 2);
       leanTag(_a_9_10) match {
-      | "[\"Lean\",\"MetavarDecl\",\"mk\"]" ->
+      | LeanTag.MetavarDecl_mk ->
         _userName_17: LeanValue = leanField(_a_9_10, 0);
         _lctx_18: LeanValue = leanField(_a_9_10, 1);
         _type_19: LeanValue = leanField(_a_9_10, 2);
@@ -1149,7 +1149,7 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
           _runtime,
           _pattern_15,
           _type_19,
-          LeanCtor("[\"Bool\",\"true\"]", Array[]),
+          LeanCtor(LeanTag.Bool_true, Array[]),
           _y_1_2,
           _y_2_3,
           _y_3_4,
@@ -1159,14 +1159,14 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
           _a_10_11,
         );
         leanTag(_x_12_26) match {
-        | "[\"EST\",\"Out\",\"ok\"]" ->
+        | LeanTag.EST_Out_ok ->
           _a_13_27: LeanValue = leanField(_x_12_26, 0);
           _a_14_28: LeanValue = leanField(_x_12_26, 1);
           leanTag(_a_13_27) match {
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _val_15_31: LeanValue = leanField(_a_13_27, 0);
             leanTag(_val_15_31) match {
-            | "[\"Lean\",\"Meta\",\"Sym\",\"MatchUnifyResult\",\"mk\"]" ->
+            | LeanTag.Meta_Sym_MatchUnifyResult_mk ->
               _us_32: LeanValue = leanField(_val_15_31, 0);
               _args_33: LeanValue = leanField(_val_15_31, 1);
               _unresolvedInsts_34: LeanValue = leanField(_val_15_31, 2);
@@ -1178,21 +1178,21 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
               _x_18_37: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
                 _runtime,
                 _x_16_35,
-                LeanScalar("nat", "0"),
+                LeanNatLiterals.n0,
               );
               leanTag(_x_18_37) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 LeanCtor(
-                  "[\"EST\",\"Out\",\"ok\"]",
+                  LeanTag.EST_Out_ok,
                   Array[
                     LeanCtor(
-                      "[\"Lean\",\"Meta\",\"Sym\",\"ApplyResult\",\"failed\"]",
+                      LeanTag.Meta_Sym_ApplyResult_failed,
                       Array[],
                     ),
                     _a_14_28,
                   ],
                 )
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _x_21_40: LeanValue = f_Meta_Sym_mkValue_c468150681(
                   _runtime,
                   _expr_14,
@@ -1207,26 +1207,26 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
                   _a_14_28,
                 );
                 leanTag(_x_22_41) match {
-                | "[\"EST\",\"Out\",\"ok\"]" ->
+                | LeanTag.EST_Out_ok ->
                   _a_23_42: LeanValue = leanField(_x_22_41, 0);
                   _a_24_43: LeanValue = leanField(_x_22_41, 1);
                   _x_26_47: LeanValue = f_BackwardRule_apply_spec_1_404cc01710(
                     _runtime,
                     _val_15_31,
                     _resultPos_16,
-                    LeanCtor("[\"List\",\"nil\"]", Array[]),
+                    LeanCtor(LeanTag.List_nil, Array[]),
                   );
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"ok\"]",
+                    LeanTag.EST_Out_ok,
                     Array[
                       LeanCtor(
-                        "[\"Lean\",\"Meta\",\"Sym\",\"ApplyResult\",\"goals\"]",
+                        LeanTag.Meta_Sym_ApplyResult_goals,
                         Array[_x_26_47],
                       ),
                       _a_24_43,
                     ],
                   )
-                | "[\"EST\",\"Out\",\"error\"]" ->
+                | LeanTag.EST_Out_error ->
                   _a_29_44: LeanValue = leanField(_x_22_41, 0);
                   _a_30_45: LeanValue = leanField(_x_22_41, 1);
                   leanFail(
@@ -1240,30 +1240,30 @@ fun f_BackwardRule_apply_lam_0_c9e4db42be(
             }
           | _ ->
             LeanCtor(
-              "[\"EST\",\"Out\",\"ok\"]",
+              LeanTag.EST_Out_ok,
               Array[
                 LeanCtor(
-                  "[\"Lean\",\"Meta\",\"Sym\",\"ApplyResult\",\"failed\"]",
+                  LeanTag.Meta_Sym_ApplyResult_failed,
                   Array[],
                 ),
                 _a_14_28,
               ],
             )
           }
-        | "[\"EST\",\"Out\",\"error\"]" ->
+        | LeanTag.EST_Out_error ->
           _a_33_29: LeanValue = leanField(_x_12_26, 0);
           _a_34_30: LeanValue = leanField(_x_12_26, 1);
-          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_33_29, _a_34_30])
+          LeanCtor(LeanTag.EST_Out_error, Array[_a_33_29, _a_34_30])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_36_12: LeanValue = leanField(_x_8_9, 0);
     _a_37_13: LeanValue = leanField(_x_8_9, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_36_12, _a_37_13])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_36_12, _a_37_13])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1291,9 +1291,9 @@ fun f_Sym_mkBackwardRuleFromExpr_spec_0_8c214fd0ad(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_2_1)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_2: LeanValue = leanField(_a_1_0, 0);
     _tail_5_3: LeanValue = leanField(_a_1_0, 1);
     _x_6_5: LeanValue = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(
@@ -1303,7 +1303,7 @@ fun f_Sym_mkBackwardRuleFromExpr_spec_0_8c214fd0ad(
     f_Sym_mkBackwardRuleFromExpr_spec_0_8c214fd0ad(
       _runtime,
       _tail_5_3,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_6_5, _a_2_1]),
+      LeanCtor(LeanTag.List_cons, Array[_x_6_5, _a_2_1]),
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1359,8 +1359,8 @@ fun f_spec_0_spec_2_spec_5_996f9ab357(
     _x_1_5,
   );
   leanTag(_x_2_6) match {
-  | "[\"Bool\",\"false\"]" -> _entries_4
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _entries_4
+  | LeanTag.Bool_true ->
     _k_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
       _runtime,
       LeanErased(),
@@ -1386,11 +1386,11 @@ fun f_spec_0_spec_2_spec_5_996f9ab357(
     _x_7_14: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
       _runtime,
       _depth_0,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_8_15: LeanValue = L4_Init_Data_UInt_Basic.f_USize_mul_409e03f718(
       _runtime,
-      LeanScalar("usize", "5"),
+      LeanWord("usize", 5),
       _x_7_14,
     );
     _h_16: LeanValue = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
@@ -1401,7 +1401,7 @@ fun f_spec_0_spec_2_spec_5_996f9ab357(
     _x_9_17: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _i_3,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_10_18: LeanValue = f_spec_0_spec_0_spec_2_7440e2b703(
       _runtime,
@@ -1446,11 +1446,11 @@ fun f_Meta_Sym_mkBackwardRuleFromExpr_f075a9e38f(
     _a_1_7,
   );
   leanTag(_x_2_8) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_9: LeanValue = leanField(_x_2_8, 0);
     _a_4_10: LeanValue = leanField(_x_2_8, 1);
     leanTag(_a_3_9) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"Pattern\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_Pattern_mk ->
       _levelParams_13: LeanValue = leanField(_a_3_9, 0);
       _varTypes_14: LeanValue = leanField(_a_3_9, 1);
       _varInfos_15: LeanValue = leanField(_a_3_9, 2);
@@ -1461,7 +1461,7 @@ fun f_Meta_Sym_mkBackwardRuleFromExpr_f075a9e38f(
       _x_7_21: LeanValue = f_Sym_mkBackwardRuleFromExpr_spec_0_8c214fd0ad(
         _runtime,
         _levelParams_13,
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       );
       _x_8_22: LeanValue = L4_Lean_Util_InstantiateLevelParams.f_Lean_Expr_instantiateLevelParams_3f94b13444(
         _runtime,
@@ -1470,10 +1470,10 @@ fun f_Meta_Sym_mkBackwardRuleFromExpr_f075a9e38f(
         _x_7_21,
       );
       LeanCtor(
-        "[\"EST\",\"Out\",\"ok\"]",
+        LeanTag.EST_Out_ok,
         Array[
           LeanCtor(
-            "[\"Lean\",\"Meta\",\"Sym\",\"BackwardRule\",\"mk\"]",
+            LeanTag.Meta_Sym_BackwardRule_mk,
             Array[_x_8_22, _a_3_9, _x_5_19],
           ),
           _a_4_10,
@@ -1481,10 +1481,10 @@ fun f_Meta_Sym_mkBackwardRuleFromExpr_f075a9e38f(
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_11_11: LeanValue = leanField(_x_2_8, 0);
     _a_12_12: LeanValue = leanField(_x_2_8, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_11_11, _a_12_12])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_11_11, _a_12_12])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1518,8 +1518,8 @@ fun f_Sym_mkResultPos_spec_1_684a063da6(
         ),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" -> return _frame[3]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> return _frame[3]
+      | LeanTag.Bool_true ->
         _frame.set(
           9,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -1531,7 +1531,7 @@ fun f_Sym_mkResultPos_spec_1_684a063da6(
           ),
         );
         leanTag(_frame[9]) match {
-        | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+        | LeanTag.Name_num__impl ->
           _ = leanField(_frame[9], 0);
           _frame.set(10, leanField(_frame[9], 1));
           _frame.set(11, leanField(_frame[9], 2));
@@ -1549,12 +1549,12 @@ fun f_Sym_mkResultPos_spec_1_684a063da6(
             ),
           );
           leanTag(_frame[14]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[3];
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               15,
               L4_Init_Data_Array_Set.f_Array_set_de08bfc69e(
@@ -1580,7 +1580,7 @@ fun f_Sym_mkResultPos_spec_1_684a063da6(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(5, LeanWord("usize", 1));
       _frame.set(
         6,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -1618,8 +1618,8 @@ fun f_Sym_mkResultPos_spec_2_4cf520a36c(
     _sz_1,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" -> _bs_3
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_3
+  | LeanTag.Bool_true ->
     _v_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -1627,7 +1627,7 @@ fun f_Sym_mkResultPos_spec_2_4cf520a36c(
       _i_2,
       LeanErased(),
     );
-    _x_2_6: LeanValue = LeanScalar("nat", "0");
+    _x_2_6: LeanValue = LeanNatLiterals.n0;
     _bs_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,
       LeanErased(),
@@ -1650,7 +1650,7 @@ fun f_Sym_mkResultPos_spec_2_4cf520a36c(
     _x_6_11: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
       _i_2,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_7_12: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,
@@ -1680,7 +1680,7 @@ fun f_spec_0_spec_2_spec_4_3cf130e389(
   f_spec_2_spec_4_spec_5_af7f7dc419(
     _runtime,
     _n_0,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _k_1,
     _v_2,
   )
@@ -1709,9 +1709,9 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+      | LeanTag.PersistentHashMap_Node_entries ->
         _frame.set(5, leanField(_frame[0], 0));
-        _frame.set(8, LeanScalar("usize", "31"));
+        _frame.set(8, LeanWord("usize", 31));
         _frame.set(
           9,
           L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
@@ -1744,8 +1744,8 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
           ),
         );
         leanTag(_frame[12]) match {
-        | "[\"Bool\",\"false\"]" -> return _frame[0]
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> return _frame[0]
+        | LeanTag.Bool_true ->
           _frame.set(
             13,
             L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
@@ -1756,7 +1756,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               LeanErased(),
             ),
           );
-          _frame.set(14, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+          _frame.set(14, LeanCtor(LeanTag.PUnit_unit, Array[]));
           _frame.set(
             15,
             L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
@@ -1769,7 +1769,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
             ),
           );
           leanTag(_frame[13]) match {
-          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]" ->
+          | LeanTag.PersistentHashMap_Entry_entry ->
             _frame.set(19, leanField(_frame[13], 0));
             _frame.set(20, leanField(_frame[13], 1));
             _frame.set(
@@ -1781,7 +1781,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               ),
             );
             leanTag(_frame[22]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 23,
                 L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkCollisionNode_6a9ae0c1b1(
@@ -1795,7 +1795,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               _frame.set(
                 24,
                 LeanCtor(
-                  "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]",
+                  LeanTag.PersistentHashMap_Entry_ref,
                   Array[_frame[23]],
                 ),
               );
@@ -1803,11 +1803,11 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               _frame.set(16, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 25,
                 LeanCtor(
-                  "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]",
+                  LeanTag.PersistentHashMap_Entry_entry,
                   Array[_frame[3], _frame[4]],
                 ),
               );
@@ -1817,9 +1817,9 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               void
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]" ->
+          | LeanTag.PersistentHashMap_Entry_ref ->
             _frame.set(21, leanField(_frame[13], 0));
-            _frame.set(26, LeanScalar("usize", "5"));
+            _frame.set(26, LeanWord("usize", 5));
             _frame.set(
               27,
               L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
@@ -1828,7 +1828,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
                 _frame[26],
               ),
             );
-            _frame.set(28, LeanScalar("usize", "1"));
+            _frame.set(28, LeanWord("usize", 1));
             _frame.set(
               29,
               L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -1851,7 +1851,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
             _frame.set(
               31,
               LeanCtor(
-                "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"ref\"]",
+                LeanTag.PersistentHashMap_Entry_ref,
                 Array[_frame[30]],
               ),
             );
@@ -1859,11 +1859,11 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
             _frame.set(16, _jump0);
             !pc = 1;
             void
-          | "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"null\"]" ->
+          | LeanTag.PersistentHashMap_Entry_null ->
             _frame.set(
               32,
               LeanCtor(
-                "[\"Lean\",\"PersistentHashMap\",\"Entry\",\"entry\"]",
+                LeanTag.PersistentHashMap_Entry_entry,
                 Array[_frame[3], _frame[4]],
               ),
             );
@@ -1875,14 +1875,14 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+      | LeanTag.PersistentHashMap_Node_collision ->
         _frame.set(6, leanField(_frame[0], 0));
         _frame.set(7, leanField(_frame[0], 1));
         _ = leanField(_frame[0], 2);
         _frame.set(
           33,
           LeanCtor(
-            "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]",
+            LeanTag.PersistentHashMap_Node_collision,
             Array[_frame[6], _frame[7], LeanErased()],
           ),
         );
@@ -1895,7 +1895,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
             _frame[4],
           ),
         );
-        _frame.set(35, LeanScalar("usize", "7"));
+        _frame.set(35, LeanWord("usize", 7));
         _frame.set(
           36,
           L4_Init_Data_UInt_BasicAux.f_USize_decLe_6ddbd478b6(
@@ -1905,7 +1905,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
           ),
         );
         leanTag(_frame[36]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             37,
             L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_getCollisionNodeSize_4ef93619b3(
@@ -1913,7 +1913,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               _frame[34],
             ),
           );
-          _frame.set(38, LeanScalar("nat", "4"));
+          _frame.set(38, LeanNatLiterals.n4);
           _frame.set(
             39,
             L4_Init_Prelude.f_Nat_decLt_b34d01d051(
@@ -1923,18 +1923,18 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
             ),
           );
           leanTag(_frame[39]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             leanTag(_frame[34]) match {
-            | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]" ->
+            | LeanTag.PersistentHashMap_Node_entries ->
               _ = leanField(_frame[34], 0);
               return leanFail(
                 "unreachable: Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MVarId.assign._at_.Lean.Meta.Sym.BackwardRule.apply.spec_0.spec_0.spec_2._redArg",
               )
-            | "[\"Lean\",\"PersistentHashMap\",\"Node\",\"collision\"]" ->
+            | LeanTag.PersistentHashMap_Node_collision ->
               _frame.set(40, leanField(_frame[34], 0));
               _frame.set(41, leanField(_frame[34], 1));
               _ = leanField(_frame[34], 2);
-              _frame.set(42, LeanScalar("nat", "0"));
+              _frame.set(42, LeanNatLiterals.n0);
               _frame.set(
                 43,
                 L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntries_8e6ec2b40b(
@@ -1956,10 +1956,10 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
               return _frame[44]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" -> return _frame[34]
+          | LeanTag.Bool_true -> return _frame[34]
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" -> return _frame[34]
+        | LeanTag.Bool_true -> return _frame[34]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -1979,7 +1979,7 @@ fun f_spec_0_spec_0_spec_2_7440e2b703(
       _frame.set(
         18,
         LeanCtor(
-          "[\"Lean\",\"PersistentHashMap\",\"Node\",\"entries\"]",
+          LeanTag.PersistentHashMap_Node_entries,
           Array[_frame[17]],
         ),
       );

@@ -1,0 +1,513 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// The original simpLoop policy, expressed with scoped locals instead of its
+// 96-slot temporary frame. The retained fallback is a differential oracle.
+// Recursion limits precede cache lookup; cached results do not consume steps.
+fun f_Meta_Simp_simpLoop_c21384c049(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  methods: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  meta: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  limit = leanNat(leanField(leanField(core, 0), 3));
+  depth = leanNat(leanField(core, 1));
+  if (!limit.isZero() && depth == limit) {
+    return f_Simp_reduce_spec_0_f30ff62012(runtime, leanField(core, 2), world)
+  };
+  !core = leanReplaceField(
+    leanReplaceField(core, 1, leanBoxNat(depth.add(LeanNat::fromInt(1)))),
+    4,
+    LeanErased(),
+  );
+  config = leanField(context, 0);
+  current = runtime.readRef(state);
+  if (leanIsTrue(leanField(config, 3))) {
+    cached = f_Simp_simpLoop_spec_4_cc6ea5540b(
+      runtime,
+      leanField(current, 0),
+      expr,
+    );
+    if (leanTag(cached) == LeanTag.Option_some) {
+      return LeanCtor(LeanTag.EST_Out_ok, Array[leanField(cached, 0), world])
+    }
+  };
+  if (leanNat(leanField(config, 0)) < leanNat(leanField(current, 4))) {
+    message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText("`simp` failed: maximum number of steps exceeded"),
+    );
+    return f_Simp_simpLoop_spec_3_1f9b890f90(
+      runtime,
+      message,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  };
+  checked = L4_Lean_CoreM.f_Lean_Core_checkSystem_ccc29ea7a7(
+    runtime,
+    LeanText("simp"),
+    core,
+    coreState,
+    world,
+  );
+  if (leanTag(checked) == LeanTag.EST_Out_error) return checked;
+  !world = leanField(checked, 1);
+  // Read again after checkSystem, matching the original take/update/put order.
+  !current = runtime.readRef(state);
+  steps = leanNat(leanField(current, 4)).add(LeanNat::fromInt(1));
+  runtime.writeRef(
+    state,
+    Some(leanReplaceField(current, 4, leanBoxNat(steps))),
+  );
+  before = leanApply(
+    runtime,
+    leanField(methods, 0),
+    Array[
+      expr,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    ],
+  );
+  if (leanTag(before) == LeanTag.EST_Out_error) return before;
+  step = leanField(before, 0);
+  !world = leanField(before, 1);
+  leanTag(step) match {
+  | LeanTag.Meta_Simp_Step_done ->
+    f_Meta_Simp_cacheResult_075347cddb(
+      runtime,
+      expr,
+      config,
+      leanField(step, 0),
+      state,
+      world,
+    )
+  | LeanTag.Meta_Simp_Step_visit ->
+    result = leanField(step, 0);
+    visited = f_Meta_Simp_simpLoop_c21384c049(
+      runtime,
+      leanField(result, 0),
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(visited) == LeanTag.EST_Out_error) return visited;
+    composed = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Result_mkEqTrans_aee50f8e97(
+      runtime,
+      result,
+      leanField(visited, 0),
+      meta,
+      metaState,
+      core,
+      coreState,
+      leanField(visited, 1),
+    );
+    if (leanTag(composed) == LeanTag.EST_Out_error) return composed;
+    f_Meta_Simp_cacheResult_075347cddb(
+      runtime,
+      expr,
+      config,
+      leanField(composed, 0),
+      state,
+      leanField(composed, 1),
+    )
+  | LeanTag.Meta_Simp_Step_continue ->
+    optional = leanField(step, 0);
+    result = leanTag(optional) match {
+    | LeanTag.Option_none ->
+      LeanCtor(
+        LeanTag.Meta_Simp_Result_mk,
+        Array[expr, LeanCtor(LeanTag.Option_none, Array[]), leanBool(true)],
+      )
+    | LeanTag.Option_some -> leanField(optional, 0)
+    | _ -> leanFail("invalid simplifier continuation")
+    };
+    f_Simp_simpLoop_visitPreContinue_385c1aaa86(
+      runtime,
+      expr,
+      config,
+      result,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  | _ -> leanFail("invalid simplifier step")
+  }
+}
+
+// Simplifier continuations preserve callback, proof-composition and state order.
+// Trace-enabled execution delegates to the retained original implementation.
+fun f_Meta_Simp_cacheResult_075347cddb(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  config: LeanValue,
+  result: LeanValue,
+  state: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanIsTrue(leanField(config, 3)) && leanIsTrue(leanField(result, 2))) {
+    current = runtime.readRef(state);
+    cache = f_Simp_cacheResult_spec_0_8ef765dbbe(
+      runtime,
+      leanField(current, 0),
+      expr,
+      result,
+    );
+    runtime.writeRef(state, Some(leanReplaceField(current, 0, cache)))
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+}
+
+fun f_Simp_simpLoop_visitPostContinue_617d44ad14(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  config: LeanValue,
+  result: LeanValue,
+  methods: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  meta: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (
+    !leanIsTrue(leanField(config, 4)) &&
+    !leanExprEqual(runtime, expr, leanField(result, 0), false)
+  ) {
+    visited = f_Meta_Simp_simpLoop_c21384c049(
+      runtime,
+      leanField(result, 0),
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(visited) == LeanTag.EST_Out_error) return visited;
+    composed = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Result_mkEqTrans_aee50f8e97(
+      runtime,
+      result,
+      leanField(visited, 0),
+      meta,
+      metaState,
+      core,
+      coreState,
+      leanField(visited, 1),
+    );
+    if (leanTag(composed) == LeanTag.EST_Out_error) return composed;
+    !result = leanField(composed, 0);
+    !world = leanField(composed, 1)
+  };
+  f_Meta_Simp_cacheResult_075347cddb(
+    runtime,
+    expr,
+    config,
+    result,
+    state,
+    world,
+  )
+}
+
+fun f_Simp_simpLoop_visitPost_82ef1b6958(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  config: LeanValue,
+  result: LeanValue,
+  methods: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  meta: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  after = leanApply(
+    runtime,
+    leanField(methods, 1),
+    Array[
+      leanField(result, 0),
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    ],
+  );
+  if (leanTag(after) == LeanTag.EST_Out_error) return after;
+  step = leanField(after, 0);
+  !world = leanField(after, 1);
+  // A missing post-result keeps the incoming proof. Both visit and a supplied
+  // continuation compose the proofs before testing whether another pass is due.
+  next = leanTag(step) match {
+  | LeanTag.Meta_Simp_Step_done -> Some(leanField(step, 0))
+  | LeanTag.Meta_Simp_Step_visit -> Some(leanField(step, 0))
+  | LeanTag.Meta_Simp_Step_continue ->
+    optional = leanField(step, 0);
+    leanTag(optional) match {
+    | LeanTag.Option_none -> None()
+    | LeanTag.Option_some -> Some(leanField(optional, 0))
+    | _ -> leanFail("invalid simplifier continuation")
+    }
+  | _ -> leanFail("invalid simplifier step")
+  };
+  next match {
+  | Some(nextResult) ->
+    composed = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Result_mkEqTrans_aee50f8e97(
+      runtime,
+      result,
+      nextResult,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(composed) == LeanTag.EST_Out_error) return composed;
+    !result = leanField(composed, 0);
+    !world = leanField(composed, 1)
+  | None() -> void
+  };
+  if (leanTag(step) == LeanTag.Meta_Simp_Step_done) {
+    f_Meta_Simp_cacheResult_075347cddb(
+      runtime,
+      expr,
+      config,
+      result,
+      state,
+      world,
+    )
+  } else {
+    f_Simp_simpLoop_visitPostContinue_617d44ad14(
+      runtime,
+      expr,
+      config,
+      result,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  }
+}
+
+fun f_Simp_simpLoop_visitPreContinue_385c1aaa86(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  config: LeanValue,
+  result: LeanValue,
+  methods: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  meta: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  // The original path retains trace formatting and its state effects.
+  if (leanIsTrue(leanField(leanField(leanField(core, 0), 2), 1))) {
+    return f_Simp_simpLoop_visitPreContinue_385c1aaa86_fallback(
+      runtime,
+      expr,
+      config,
+      result,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  };
+  reduced = f_Meta_Simp_reduceStep_e0a2562bfe(
+    runtime,
+    leanField(result, 0),
+    methods,
+    context,
+    state,
+    meta,
+    metaState,
+    core,
+    coreState,
+    world,
+  );
+  if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+  !world = leanField(reduced, 1);
+  next = leanField(reduced, 0);
+  changed = !leanExprEqual(runtime, next, leanField(result, 0), false);
+  simplified = if (changed) {
+    !result = leanReplaceField(result, 0, next);
+    f_Meta_Simp_simpLoop_c21384c049(
+      runtime,
+      next,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  } else {
+    f_Meta_Simp_simpStep_72598f99b1(
+      runtime,
+      leanField(result, 0),
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  };
+  if (leanTag(simplified) == LeanTag.EST_Out_error) return simplified;
+  composed = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Result_mkEqTrans_aee50f8e97(
+    runtime,
+    result,
+    leanField(simplified, 0),
+    meta,
+    metaState,
+    core,
+    coreState,
+    leanField(simplified, 1),
+  );
+  if (leanTag(composed) == LeanTag.EST_Out_error) return composed;
+  if (changed) {
+    f_Meta_Simp_cacheResult_075347cddb(
+      runtime,
+      expr,
+      config,
+      leanField(composed, 0),
+      state,
+      leanField(composed, 1),
+    )
+  } else {
+    f_Simp_simpLoop_visitPost_82ef1b6958(
+      runtime,
+      expr,
+      config,
+      leanField(composed, 0),
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      leanField(composed, 1),
+    )
+  }
+}
+
+fun f_Meta_Simp_simpImpl_2408473d27(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  methods: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  meta: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanIsTrue(leanField(leanField(leanField(core, 0), 2), 1))) {
+    return f_Meta_Simp_simpImpl_2408473d27_fallback(
+      runtime,
+      expr,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  };
+  limit = leanNat(leanField(leanField(core, 0), 3));
+  depth = leanNat(leanField(core, 1));
+  if (!limit.isZero() && depth == limit) {
+    return f_Simp_reduce_spec_0_f30ff62012(runtime, leanField(core, 2), world)
+  };
+  !core = leanReplaceField(
+    leanReplaceField(core, 1, leanBoxNat(depth.add(LeanNat::fromInt(1)))),
+    4,
+    LeanErased(),
+  );
+  proof = L4_Lean_Meta_InferType.f_Lean_Meta_isProof_16699223c4(
+    runtime,
+    expr,
+    meta,
+    metaState,
+    core,
+    coreState,
+    world,
+  );
+  if (leanTag(proof) == LeanTag.EST_Out_error) return proof;
+  !world = leanField(proof, 1);
+  if (leanIsTrue(leanField(proof, 0))) {
+    result = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[expr, LeanCtor(LeanTag.Option_none, Array[]), leanBool(true)],
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+  } else {
+    f_Meta_Simp_simpLoop_c21384c049(
+      runtime,
+      expr,
+      methods,
+      context,
+      state,
+      meta,
+      metaState,
+      core,
+      coreState,
+      world,
+    )
+  }
+}
+
+module end;

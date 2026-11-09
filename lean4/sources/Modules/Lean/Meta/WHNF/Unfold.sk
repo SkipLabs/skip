@@ -1,0 +1,244 @@
+// Definition unfolding, preserving transparency and smart-unfolding decisions.
+module L4_Lean_Meta_WHNF;
+
+fun f_unfoldNone(world: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  )
+}
+
+// "Lean.Meta.unfoldDefinition?"
+fun f_Lean_Meta_unfoldDefinition_1936145013(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  ignoreTransparency: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  leanTag(expr) match {
+  | LeanTag.Expr_app__impl ->
+    head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+      runtime,
+      leanField(expr, 1),
+    );
+    if (leanTag(head) != LeanTag.Expr_const__impl) {
+      return f_Lean_Meta_unfoldProjInstWhenInstances_a97264ffdb(
+        runtime,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    levels = leanField(head, 2);
+    lookup = f_Lean_Meta_getConstInfo_d7ee2c9021(
+      runtime,
+      leanField(head, 1),
+      ignoreTransparency,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(lookup) == LeanTag.EST_Out_error) return lookup;
+    !world = leanField(lookup, 1);
+    found = leanField(lookup, 0);
+    if (leanTag(found) != LeanTag.Option_some) {
+      return f_Lean_Meta_unfoldProjInstWhenInstances_a97264ffdb(
+        runtime,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    info = leanField(found, 0);
+    parameters = L4_Lean_Declaration.f_Lean_ConstantInfo_levelParams_3f5c87f376(
+      runtime,
+      info,
+    );
+    if (
+      leanNat(
+        L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(runtime, parameters),
+      ) != leanNat(L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(runtime, levels))
+    ) {
+      return f_unfoldNone(world)
+    };
+    if (leanWordBits(leanField(core, 3)).and(128) == 0) {
+      return f_Lean_Meta_unfoldDefault_82fe3a512a(
+        runtime,
+        info,
+        levels,
+        expr,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    read = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      coreState,
+      world,
+    );
+    !world = leanField(read, 1);
+    name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+      runtime,
+      info,
+    );
+    smartName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+      runtime,
+      name,
+      LeanText("_sunfold"),
+    );
+    smart = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
+      runtime,
+      leanField(leanField(read, 0), 0),
+      smartName,
+      leanBool(true),
+    );
+    if (
+      leanTag(smart) == LeanTag.Option_some &&
+      leanTag(leanField(smart, 0)) == LeanTag.ConstantInfo_defnInfo
+    ) {
+      return f_Meta_unfoldDefinition_spec_0_c13a5dbe36(
+        runtime,
+        info,
+        expr,
+        leanField(smart, 0),
+        levels,
+        f_whnfCoreArguments(expr, true),
+        leanBool(true),
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    // Both absent and non-definition smart helpers must pass this matcher test.
+    // A known matcher is reduced by whnfCore, not ordinary delta unfolding.
+    matcher = f_Meta_reduceMatcher_spec_0_4ac858d2ec(
+      runtime,
+      name,
+      coreState,
+      world,
+    );
+    if (leanTag(matcher) == LeanTag.EST_Out_error) {
+      return leanFail("unreachable: Lean.Meta.unfoldDefinition?")
+    };
+    !world = leanField(matcher, 1);
+    if (leanTag(leanField(matcher, 0)) == LeanTag.Option_some) {
+      return f_unfoldNone(world)
+    };
+    f_Lean_Meta_unfoldDefault_82fe3a512a(
+      runtime,
+      info,
+      levels,
+      expr,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Expr_const__impl ->
+    name = leanField(expr, 1);
+    levels = leanField(expr, 2);
+    lookup = f_Lean_Meta_getConstInfoNoEx_b2c8d5d393(
+      runtime,
+      name,
+      ignoreTransparency,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(lookup) == LeanTag.EST_Out_error) return lookup;
+    !world = leanField(lookup, 1);
+    found = leanField(lookup, 0);
+    if (leanTag(found) != LeanTag.Option_some) return f_unfoldNone(world);
+    info = leanField(found, 0);
+    // The original reads state before testing the smart-unfolding option here.
+    read = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      coreState,
+      world,
+    );
+    !world = leanField(read, 1);
+    if (leanWordBits(leanField(core, 3)).and(128) != 0) {
+      smartName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+        runtime,
+        name,
+        LeanText("_sunfold"),
+      );
+      if (
+        leanIsTrue(
+          L4_Lean_Environment.f_Lean_Environment_contains_0afe6850fd(
+            runtime,
+            leanField(leanField(read, 0), 0),
+            smartName,
+            leanBool(true),
+          ),
+        )
+      ) return f_unfoldNone(world)
+    };
+    if (
+      leanIsTrue(
+        L4_Lean_Declaration.f_Lean_ConstantInfo_hasValue_1c71df3b04(
+          runtime,
+          info,
+          leanBool(false),
+        ),
+      )
+    ) {
+      return f_Meta_unfoldDefinition_spec_1_f87c4eb106(
+        runtime,
+        name,
+        info,
+        levels,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    };
+    if (
+      leanIsTrue(
+        L4_Lean_Declaration.f_Lean_ConstantInfo_isAxiom_d18d07479a(
+          runtime,
+          info,
+        ),
+      )
+    ) {
+      recorded = L4_Lean_Meta_Basic.f_Lean_Meta_recordUnfoldAxiom_7a49360c1b(
+        runtime,
+        L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(runtime, info),
+        state,
+        core,
+        world,
+      );
+      if (leanTag(recorded) == LeanTag.EST_Out_error) return recorded;
+      !world = leanField(recorded, 1)
+    };
+    f_unfoldNone(world)
+  | _ -> f_unfoldNone(world)
+  }
+}
+
+module end;

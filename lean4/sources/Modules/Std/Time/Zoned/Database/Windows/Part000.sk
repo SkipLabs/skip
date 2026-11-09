@@ -40,10 +40,10 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
     pc match {
     | 0 ->
       leanTag(_frame[1]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _frame.set(3, leanField(_frame[1], 0));
         _frame.set(4, leanField(_frame[1], 1));
-        _frame.set(5, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+        _frame.set(5, LeanCtor(LeanTag.Bool_false, Array[]));
         _frame.set(
           6,
           f_Database_Windows_getNextTransition_8a011dd26c(
@@ -55,14 +55,14 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
           ),
         );
         leanTag(_frame[6]) match {
-        | "[\"EST\",\"Out\",\"ok\"]" ->
+        | LeanTag.EST_Out_ok ->
           _frame.set(7, leanField(_frame[6], 0));
           _frame.set(8, leanField(_frame[6], 1));
           leanTag(_frame[7]) match {
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(11, leanField(_frame[7], 0));
             leanTag(_frame[11]) match {
-            | "[\"Prod\",\"mk\"]" ->
+            | LeanTag.Prod_mk ->
               _frame.set(12, leanField(_frame[11], 0));
               _frame.set(13, leanField(_frame[11], 1));
               _frame.set(
@@ -82,7 +82,7 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
               _frame.set(
                 16,
                 LeanCtor(
-                  "[\"Std\",\"Time\",\"TimeZone\",\"Transition\",\"mk\"]",
+                  LeanTag.Std_Time_TimeZone_Transition_mk,
                   Array[_frame[14], _frame[15]],
                 ),
               );
@@ -104,8 +104,8 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
                 ),
               );
               leanTag(_frame[20]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(21, LeanScalar("nat", "32503690800"));
+              | LeanTag.Bool_false ->
+                _frame.set(21, LeanNatLiterals.n32503690800);
                 _frame.set(
                   22,
                   L4_Init_Data_SInt_Basic.f_Int64_ofNat_cfcb59fbc9(
@@ -122,11 +122,11 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
                   ),
                 );
                 leanTag(_frame[23]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _frame.set(
                     24,
                     LeanCtor(
-                      "[\"Prod\",\"mk\"]",
+                      LeanTag.Prod_mk,
                       Array[_frame[12], _frame[17]],
                     ),
                   );
@@ -140,12 +140,12 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
                     ),
                   );
                   return _frame[25]
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   !pc = 1;
                   void
                 | _ -> return leanFail("non-exhaustive Lean case")
                 }
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 !pc = 1;
                 void
               | _ -> return leanFail("non-exhaustive Lean case")
@@ -155,24 +155,24 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
           | _ ->
             _frame.set(
               26,
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[3], _frame[4]]),
+              LeanCtor(LeanTag.Prod_mk, Array[_frame[3], _frame[4]]),
             );
             _frame.set(
               27,
               LeanCtor(
-                "[\"EST\",\"Out\",\"ok\"]",
+                LeanTag.EST_Out_ok,
                 Array[_frame[26], _frame[8]],
               ),
             );
             return _frame[27]
           }
-        | "[\"EST\",\"Out\",\"error\"]" ->
+        | LeanTag.EST_Out_error ->
           _frame.set(9, leanField(_frame[6], 0));
           _frame.set(10, leanField(_frame[6], 1));
           _frame.set(
             28,
             LeanCtor(
-              "[\"EST\",\"Out\",\"error\"]",
+              LeanTag.EST_Out_error,
               Array[_frame[9], _frame[10]],
             ),
           );
@@ -184,11 +184,11 @@ fun f_Windows_getZoneRules_spec_1_ee59d0c6a1(
     | 1 ->
       _frame.set(
         18,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[3], _frame[17]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[3], _frame[17]]),
       );
       _frame.set(
         19,
-        LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[18], _frame[8]]),
+        LeanCtor(LeanTag.EST_Out_ok, Array[_frame[18], _frame[8]]),
       );
       return _frame[19]
     | _ -> return leanFail("invalid join point")
@@ -214,23 +214,23 @@ fun f_Windows_getZoneRules_toLocalTime_e819883de2(
   _res_0: LeanValue,
 ): LeanValue {
   leanTag(_res_0) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_1: LeanValue = leanField(_res_0, 0);
     _name_2: LeanValue = leanField(_res_0, 1);
     _abbreviation_3: LeanValue = leanField(_res_0, 2);
     _isDST_4: LeanValue = leanField(_res_0, 3);
     LeanCtor(
-      "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+      LeanTag.Std_Time_TimeZone_LocalTimeType_mk,
       Array[
         _offset_1,
         _isDST_4,
         _abbreviation_3,
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"wall\"]",
+          LeanTag.Std_Time_TimeZone_StdWall_wall,
           Array[],
         ),
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"local\"]",
+          LeanTag.Std_Time_TimeZone_UTLocal_local,
           Array[],
         ),
         _name_2,
@@ -247,7 +247,7 @@ fun f_Database_Windows_getZoneRules_93b836d711(
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_Data_SInt_Basic.f_Int64_ofNat_cfcb59fbc9(
     _runtime,
-    LeanScalar("nat", "2147483648"),
+    LeanNatLiterals.n2147483648,
   );
   _start_4: LeanValue = L4_Init_Data_SInt_Basic.f_Int64_neg_d34f086d86(
     _runtime,
@@ -256,24 +256,24 @@ fun f_Database_Windows_getZoneRules_93b836d711(
   _transitions_6: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_6_8: LeanValue = f_Database_Windows_getNextTransition_8a011dd26c(
     _runtime,
     _id_0,
     _start_4,
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
+    LeanCtor(LeanTag.Bool_true, Array[]),
     _a_1_1,
   );
   leanTag(_x_6_8) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_7_9: LeanValue = leanField(_x_6_8, 0);
     _a_8_10: LeanValue = leanField(_x_6_8, 1);
     leanTag(_a_7_9) match {
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_9_13: LeanValue = leanField(_a_7_9, 0);
       leanTag(_val_9_13) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _fst_14: LeanValue = leanField(_val_9_13, 0);
         _snd_15: LeanValue = leanField(_val_9_13, 1);
         _x_10_16: LeanValue = f_Windows_getZoneRules_toLocalTime_e819883de2(
@@ -283,26 +283,26 @@ fun f_Database_Windows_getZoneRules_93b836d711(
         _x_12_18: LeanValue = f_Windows_getZoneRules_spec_1_ee59d0c6a1(
           _runtime,
           _id_0,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_start_4, _transitions_6]),
+          LeanCtor(LeanTag.Prod_mk, Array[_start_4, _transitions_6]),
           _a_8_10,
         );
         leanTag(_x_12_18) match {
-        | "[\"EST\",\"Out\",\"ok\"]" ->
+        | LeanTag.EST_Out_ok ->
           _a_13_19: LeanValue = leanField(_x_12_18, 0);
           _a_14_20: LeanValue = leanField(_x_12_18, 1);
           leanTag(_a_13_19) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _fst_23: LeanValue = leanField(_a_13_19, 0);
             _snd_24: LeanValue = leanField(_a_13_19, 1);
             LeanCtor(
-              "[\"EST\",\"Out\",\"ok\"]",
+              LeanTag.EST_Out_ok,
               Array[
                 LeanCtor(
-                  "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]",
+                  LeanTag.Std_Time_TimeZone_ZoneRules_mk,
                   Array[
                     _x_10_16,
                     _snd_24,
-                    LeanCtor("[\"Option\",\"none\"]", Array[]),
+                    LeanCtor(LeanTag.Option_none, Array[]),
                   ],
                 ),
                 _a_14_20,
@@ -310,10 +310,10 @@ fun f_Database_Windows_getZoneRules_93b836d711(
             )
           | _ -> leanFail("non-exhaustive Lean case")
           }
-        | "[\"EST\",\"Out\",\"error\"]" ->
+        | LeanTag.EST_Out_error ->
           _a_18_21: LeanValue = leanField(_x_12_18, 0);
           _a_19_22: LeanValue = leanField(_x_12_18, 1);
-          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_18_21, _a_19_22])
+          LeanCtor(LeanTag.EST_Out_error, Array[_a_18_21, _a_19_22])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
@@ -323,12 +323,12 @@ fun f_Database_Windows_getZoneRules_93b836d711(
         _runtime,
         LeanText("cannot find first transition in zone rules"),
       );
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_22_30, _a_8_10])
+      LeanCtor(LeanTag.EST_Out_error, Array[_x_22_30, _a_8_10])
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_24_11: LeanValue = leanField(_x_6_8, 0);
     _a_25_12: LeanValue = leanField(_x_6_8, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_24_11, _a_25_12])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_24_11, _a_25_12])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

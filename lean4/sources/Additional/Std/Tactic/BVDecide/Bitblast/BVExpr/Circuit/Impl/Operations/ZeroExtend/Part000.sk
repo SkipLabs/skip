@@ -8,7 +8,7 @@ fun f_BVExpr_bitblast_blastZeroExtend_fa54c3805a(
   _target_2: LeanValue,
 ): LeanValue {
   leanTag(_target_2) match {
-  | "[\"Std\",\"Sat\",\"AIG\",\"ExtendTarget\",\"mk\"]" ->
+  | LeanTag.Std_Sat_AIG_ExtendTarget_mk ->
     _w_1_3: LeanValue = leanField(_target_2, 0);
     _vec_2_4: LeanValue = leanField(_target_2, 1);
     _x_4_6: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
@@ -22,7 +22,7 @@ fun f_BVExpr_bitblast_blastZeroExtend_fa54c3805a(
       _w_1_3,
       _vec_2_4,
       _newWidth_0,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       _x_4_6,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -99,16 +99,16 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
         L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, _frame[4], _frame[3]),
       );
       leanTag(_frame[16]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           17,
           LeanCtor(
-            "[\"Std\",\"Sat\",\"AIG\",\"RefVecEntry\",\"mk\"]",
+            LeanTag.Std_Sat_AIG_RefVecEntry_mk,
             Array[_frame[0], _frame[5]],
           ),
         );
         return _frame[17]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           18,
           L4_Init_Prelude.f_Nat_decLt_b34d01d051(
@@ -118,8 +118,8 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(19, LeanScalar("nat", "1"));
+        | LeanTag.Bool_false ->
+          _frame.set(19, LeanNatLiterals.n1);
           _frame.set(
             20,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -154,7 +154,7 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
             ),
           );
           return _frame[23]
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             24,
             L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
@@ -165,7 +165,7 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
               LeanErased(),
             ),
           );
-          _frame.set(25, LeanScalar("nat", "1"));
+          _frame.set(25, LeanNatLiterals.n1);
           _frame.set(
             26,
             L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
@@ -182,7 +182,7 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
               _frame[24],
             ),
           );
-          _frame.set(28, LeanScalar("nat", "0"));
+          _frame.set(28, LeanNatLiterals.n0);
           _frame.set(
             29,
             L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -192,15 +192,15 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
             ),
           );
           leanTag(_frame[29]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[26];
             _jump1 = _frame[18];
             _frame.set(6, _jump0);
             _frame.set(7, _jump1);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(30, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          | LeanTag.Bool_true ->
+            _frame.set(30, LeanCtor(LeanTag.Bool_false, Array[]));
             _jump0 = _frame[26];
             _jump1 = _frame[30];
             _frame.set(6, _jump0);
@@ -214,12 +214,12 @@ fun f_bitblast_blastZeroExtend_go_19715fbabb(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(8, LeanScalar("nat", "1"));
+      _frame.set(8, LeanNatLiterals.n1);
       _frame.set(
         9,
         L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[4], _frame[8]),
       );
-      _frame.set(10, LeanScalar("nat", "2"));
+      _frame.set(10, LeanNatLiterals.n2);
       _frame.set(
         11,
         L4_Init_Prelude.f_Nat_mul_8d6effc865(_runtime, _frame[6], _frame[10]),

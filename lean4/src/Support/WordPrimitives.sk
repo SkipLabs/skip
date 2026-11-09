@@ -1,0 +1,168 @@
+// Static dispatch for fixed-width primitives. The old dispatcher split and
+// reassembled the foreign symbol on every call, including arithmetic and array
+// loop indices. Keep the same operations without runtime name parsing.
+fun leanWordBinary(
+  kind: String,
+  op: String,
+  left: LeanValue,
+  right: LeanValue,
+): LeanValue {
+  a = leanWordBits(left);
+  b = leanWordBits(right);
+  op match {
+  | "add" -> leanWordValue(kind, a + b)
+  | "sub" -> leanWordValue(kind, a - b)
+  | "mul" -> leanWordValue(kind, a * b)
+  | "div" -> leanWordValue(kind, leanUnsignedDiv(a, b))
+  | "mod" -> leanWordValue(kind, a - leanUnsignedDiv(a, b) * b)
+  | "land" -> leanWordValue(kind, a.and(b))
+  | "lor" -> leanWordValue(kind, a.or(b))
+  | "xor" -> leanWordValue(kind, a.xor(b))
+  | "shift_left" -> leanWordValue(kind, a.shl(b.and(leanWordWidth(kind) - 1)))
+  | "shift_right" -> leanWordValue(kind, a.ushr(b.and(leanWordWidth(kind) - 1)))
+  | "dec_eq" -> leanBool(a == b)
+  | "dec_lt" -> leanBool(a.ult(b))
+  | "dec_le" -> leanBool(a.ule(b))
+  | _ -> leanFail("invalid internal word operation")
+  }
+}
+
+fun leanInvokeWordPrimitive(
+  name: String,
+  foreign: String,
+  args: Array<LeanValue>,
+): LeanValue {
+  foreign match {
+  | "lean_uint8_add" -> leanWordBinary("uint8", "add", args[0], args[1])
+  | "lean_uint8_sub" -> leanWordBinary("uint8", "sub", args[0], args[1])
+  | "lean_uint8_mul" -> leanWordBinary("uint8", "mul", args[0], args[1])
+  | "lean_uint8_div" -> leanWordBinary("uint8", "div", args[0], args[1])
+  | "lean_uint8_mod" -> leanWordBinary("uint8", "mod", args[0], args[1])
+  | "lean_uint8_land" -> leanWordBinary("uint8", "land", args[0], args[1])
+  | "lean_uint8_lor" -> leanWordBinary("uint8", "lor", args[0], args[1])
+  | "lean_uint8_xor" -> leanWordBinary("uint8", "xor", args[0], args[1])
+  | "lean_uint8_shift_left" ->
+    leanWordBinary("uint8", "shift_left", args[0], args[1])
+  | "lean_uint8_shift_right" ->
+    leanWordBinary("uint8", "shift_right", args[0], args[1])
+  | "lean_uint8_dec_eq" -> leanWordBinary("uint8", "dec_eq", args[0], args[1])
+  | "lean_uint8_dec_lt" -> leanWordBinary("uint8", "dec_lt", args[0], args[1])
+  | "lean_uint8_dec_le" -> leanWordBinary("uint8", "dec_le", args[0], args[1])
+  | "lean_uint8_of_nat" | "lean_uint8_of_nat_mk" ->
+    leanWordValue("uint8", leanNat(args[0]).toWord())
+  | "lean_uint8_to_nat" -> leanBoxNat(LeanNat::fromWord(leanWordBits(args[0])))
+  | "lean_uint8_neg" -> leanWordValue("uint8", 0 - leanWordBits(args[0]))
+  | "lean_uint8_complement" ->
+    leanWordValue("uint8", leanWordBits(args[0]).xor(-1))
+  | "lean_uint8_to_uint8" -> leanWordValue("uint8", leanWordBits(args[0]))
+  | "lean_uint8_to_uint16" -> leanWordValue("uint16", leanWordBits(args[0]))
+  | "lean_uint8_to_uint32" -> leanWordValue("uint32", leanWordBits(args[0]))
+  | "lean_uint8_to_uint64" -> leanWordValue("uint64", leanWordBits(args[0]))
+  | "lean_uint8_to_usize" -> leanWordValue("usize", leanWordBits(args[0]))
+  | "lean_uint16_add" -> leanWordBinary("uint16", "add", args[0], args[1])
+  | "lean_uint16_sub" -> leanWordBinary("uint16", "sub", args[0], args[1])
+  | "lean_uint16_mul" -> leanWordBinary("uint16", "mul", args[0], args[1])
+  | "lean_uint16_div" -> leanWordBinary("uint16", "div", args[0], args[1])
+  | "lean_uint16_mod" -> leanWordBinary("uint16", "mod", args[0], args[1])
+  | "lean_uint16_land" -> leanWordBinary("uint16", "land", args[0], args[1])
+  | "lean_uint16_lor" -> leanWordBinary("uint16", "lor", args[0], args[1])
+  | "lean_uint16_xor" -> leanWordBinary("uint16", "xor", args[0], args[1])
+  | "lean_uint16_shift_left" ->
+    leanWordBinary("uint16", "shift_left", args[0], args[1])
+  | "lean_uint16_shift_right" ->
+    leanWordBinary("uint16", "shift_right", args[0], args[1])
+  | "lean_uint16_dec_eq" -> leanWordBinary("uint16", "dec_eq", args[0], args[1])
+  | "lean_uint16_dec_lt" -> leanWordBinary("uint16", "dec_lt", args[0], args[1])
+  | "lean_uint16_dec_le" -> leanWordBinary("uint16", "dec_le", args[0], args[1])
+  | "lean_uint16_of_nat" | "lean_uint16_of_nat_mk" ->
+    leanWordValue("uint16", leanNat(args[0]).toWord())
+  | "lean_uint16_to_nat" -> leanBoxNat(LeanNat::fromWord(leanWordBits(args[0])))
+  | "lean_uint16_neg" -> leanWordValue("uint16", 0 - leanWordBits(args[0]))
+  | "lean_uint16_complement" ->
+    leanWordValue("uint16", leanWordBits(args[0]).xor(-1))
+  | "lean_uint16_to_uint8" -> leanWordValue("uint8", leanWordBits(args[0]))
+  | "lean_uint16_to_uint16" -> leanWordValue("uint16", leanWordBits(args[0]))
+  | "lean_uint16_to_uint32" -> leanWordValue("uint32", leanWordBits(args[0]))
+  | "lean_uint16_to_uint64" -> leanWordValue("uint64", leanWordBits(args[0]))
+  | "lean_uint16_to_usize" -> leanWordValue("usize", leanWordBits(args[0]))
+  | "lean_uint32_add" -> leanWordBinary("uint32", "add", args[0], args[1])
+  | "lean_uint32_sub" -> leanWordBinary("uint32", "sub", args[0], args[1])
+  | "lean_uint32_mul" -> leanWordBinary("uint32", "mul", args[0], args[1])
+  | "lean_uint32_div" -> leanWordBinary("uint32", "div", args[0], args[1])
+  | "lean_uint32_mod" -> leanWordBinary("uint32", "mod", args[0], args[1])
+  | "lean_uint32_land" -> leanWordBinary("uint32", "land", args[0], args[1])
+  | "lean_uint32_lor" -> leanWordBinary("uint32", "lor", args[0], args[1])
+  | "lean_uint32_xor" -> leanWordBinary("uint32", "xor", args[0], args[1])
+  | "lean_uint32_shift_left" ->
+    leanWordBinary("uint32", "shift_left", args[0], args[1])
+  | "lean_uint32_shift_right" ->
+    leanWordBinary("uint32", "shift_right", args[0], args[1])
+  | "lean_uint32_dec_eq" -> leanWordBinary("uint32", "dec_eq", args[0], args[1])
+  | "lean_uint32_dec_lt" -> leanWordBinary("uint32", "dec_lt", args[0], args[1])
+  | "lean_uint32_dec_le" -> leanWordBinary("uint32", "dec_le", args[0], args[1])
+  | "lean_uint32_of_nat" | "lean_uint32_of_nat_mk" ->
+    leanWordValue("uint32", leanNat(args[0]).toWord())
+  | "lean_uint32_to_nat" -> leanBoxNat(LeanNat::fromWord(leanWordBits(args[0])))
+  | "lean_uint32_neg" -> leanWordValue("uint32", 0 - leanWordBits(args[0]))
+  | "lean_uint32_complement" ->
+    leanWordValue("uint32", leanWordBits(args[0]).xor(-1))
+  | "lean_uint32_to_uint8" -> leanWordValue("uint8", leanWordBits(args[0]))
+  | "lean_uint32_to_uint16" -> leanWordValue("uint16", leanWordBits(args[0]))
+  | "lean_uint32_to_uint32" -> leanWordValue("uint32", leanWordBits(args[0]))
+  | "lean_uint32_to_uint64" -> leanWordValue("uint64", leanWordBits(args[0]))
+  | "lean_uint32_to_usize" -> leanWordValue("usize", leanWordBits(args[0]))
+  | "lean_uint64_add" -> leanWordBinary("uint64", "add", args[0], args[1])
+  | "lean_uint64_sub" -> leanWordBinary("uint64", "sub", args[0], args[1])
+  | "lean_uint64_mul" -> leanWordBinary("uint64", "mul", args[0], args[1])
+  | "lean_uint64_div" -> leanWordBinary("uint64", "div", args[0], args[1])
+  | "lean_uint64_mod" -> leanWordBinary("uint64", "mod", args[0], args[1])
+  | "lean_uint64_land" -> leanWordBinary("uint64", "land", args[0], args[1])
+  | "lean_uint64_lor" -> leanWordBinary("uint64", "lor", args[0], args[1])
+  | "lean_uint64_xor" -> leanWordBinary("uint64", "xor", args[0], args[1])
+  | "lean_uint64_shift_left" ->
+    leanWordBinary("uint64", "shift_left", args[0], args[1])
+  | "lean_uint64_shift_right" ->
+    leanWordBinary("uint64", "shift_right", args[0], args[1])
+  | "lean_uint64_dec_eq" -> leanWordBinary("uint64", "dec_eq", args[0], args[1])
+  | "lean_uint64_dec_lt" -> leanWordBinary("uint64", "dec_lt", args[0], args[1])
+  | "lean_uint64_dec_le" -> leanWordBinary("uint64", "dec_le", args[0], args[1])
+  | "lean_uint64_of_nat" | "lean_uint64_of_nat_mk" ->
+    leanWordValue("uint64", leanNat(args[0]).toWord())
+  | "lean_uint64_to_nat" -> leanBoxNat(LeanNat::fromWord(leanWordBits(args[0])))
+  | "lean_uint64_neg" -> leanWordValue("uint64", 0 - leanWordBits(args[0]))
+  | "lean_uint64_complement" ->
+    leanWordValue("uint64", leanWordBits(args[0]).xor(-1))
+  | "lean_uint64_to_uint8" -> leanWordValue("uint8", leanWordBits(args[0]))
+  | "lean_uint64_to_uint16" -> leanWordValue("uint16", leanWordBits(args[0]))
+  | "lean_uint64_to_uint32" -> leanWordValue("uint32", leanWordBits(args[0]))
+  | "lean_uint64_to_uint64" -> leanWordValue("uint64", leanWordBits(args[0]))
+  | "lean_uint64_to_usize" -> leanWordValue("usize", leanWordBits(args[0]))
+  | "lean_usize_add" -> leanWordBinary("usize", "add", args[0], args[1])
+  | "lean_usize_sub" -> leanWordBinary("usize", "sub", args[0], args[1])
+  | "lean_usize_mul" -> leanWordBinary("usize", "mul", args[0], args[1])
+  | "lean_usize_div" -> leanWordBinary("usize", "div", args[0], args[1])
+  | "lean_usize_mod" -> leanWordBinary("usize", "mod", args[0], args[1])
+  | "lean_usize_land" -> leanWordBinary("usize", "land", args[0], args[1])
+  | "lean_usize_lor" -> leanWordBinary("usize", "lor", args[0], args[1])
+  | "lean_usize_xor" -> leanWordBinary("usize", "xor", args[0], args[1])
+  | "lean_usize_shift_left" ->
+    leanWordBinary("usize", "shift_left", args[0], args[1])
+  | "lean_usize_shift_right" ->
+    leanWordBinary("usize", "shift_right", args[0], args[1])
+  | "lean_usize_dec_eq" -> leanWordBinary("usize", "dec_eq", args[0], args[1])
+  | "lean_usize_dec_lt" -> leanWordBinary("usize", "dec_lt", args[0], args[1])
+  | "lean_usize_dec_le" -> leanWordBinary("usize", "dec_le", args[0], args[1])
+  | "lean_usize_of_nat" | "lean_usize_of_nat_mk" ->
+    leanWordValue("usize", leanNat(args[0]).toWord())
+  | "lean_usize_to_nat" -> leanBoxNat(LeanNat::fromWord(leanWordBits(args[0])))
+  | "lean_usize_neg" -> leanWordValue("usize", 0 - leanWordBits(args[0]))
+  | "lean_usize_complement" ->
+    leanWordValue("usize", leanWordBits(args[0]).xor(-1))
+  | "lean_usize_to_uint8" -> leanWordValue("uint8", leanWordBits(args[0]))
+  | "lean_usize_to_uint16" -> leanWordValue("uint16", leanWordBits(args[0]))
+  | "lean_usize_to_uint32" -> leanWordValue("uint32", leanWordBits(args[0]))
+  | "lean_usize_to_uint64" -> leanWordValue("uint64", leanWordBits(args[0]))
+  | "lean_usize_to_usize" -> leanWordValue("usize", leanWordBits(args[0]))
+  | _ -> leanPrimitive(name + " [" + foreign + "]")
+  }
+}

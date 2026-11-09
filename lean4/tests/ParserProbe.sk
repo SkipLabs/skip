@@ -1,0 +1,45 @@
+fun main(): void {
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store => Some(store)};
+  cases = Array[
+    ("num", "42"),
+    ("num", "0x2a"),
+    ("num", "1_024"),
+    ("num", "-- before\n 42 /- after -/"),
+    ("num", "\r\n42\r\n"),
+    ("num", ""),
+    ("num", "42 x"),
+    ("num", "xyz"),
+    ("ident", "alpha"),
+    ("ident", "αβ"),
+    ("ident", "Foo.bar"),
+    ("ident", "«a b»"),
+    ("ident", "42"),
+    ("str", "\"hello\""),
+    ("str", "\"α\\nβ\""),
+    ("str", "\"unfinished"),
+    ("num", "/- unterminated"),
+  ];
+  for ((kind, source) in cases) {
+    parser = kind match {
+    | "num" -> L4_Lean_Parser_Extra.f_Lean_Parser_numLit_5092ead640(runtime)
+    | "ident" -> L4_Lean_Parser_Extra.f_Lean_Parser_ident_0a28e7a8b1(runtime)
+    | "str" -> L4_Lean_Parser_Extra.f_Lean_Parser_strLit_4302d84c4b(runtime)
+    | _ -> leanFail("invalid lexical parser probe")
+    };
+    result = leanRunParser(
+      runtime,
+      parser,
+      LeanUnavailable("lexical probe environment"),
+      L4_Lean_Data_Trie.f_Data_Trie_empty_324ebbcc70(runtime, LeanErased()),
+      source,
+      "fixture.lean",
+    );
+    output = if (leanTag(result) == LeanTag.Except_ok) {
+      JSON.Object["ok" => parserSyntax(runtime, leanField(result, 0))]
+    } else {
+      JSON.Object["error" => JSON.String(leanText(leanField(result, 0)))]
+    };
+    print_string(output.encode())
+  }
+}

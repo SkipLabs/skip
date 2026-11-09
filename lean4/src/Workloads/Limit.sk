@@ -16,7 +16,7 @@ class LeanLimitEdit(
     this.name match {
     | None() -> void
     | Some(text) ->
-      runtime = mutable LeanExecution{store => context};
+      runtime = mutable LeanExecution{store => Some(context)};
       name = leanSimpleName(runtime, text);
       values = this.value match {
       | None() -> Array[]
@@ -51,7 +51,7 @@ fun leanCompareTheorems(
   assert(!fresh.declaration.isNone() == succeeds);
   if (succeeds) {
     assert(incremental.diagnostic.isNone() && fresh.diagnostic.isNone());
-    runtime = mutable LeanExecution{store => context};
+    runtime = mutable LeanExecution{store => Some(context)};
     assert(
       leanExprEqual(
         runtime,
@@ -78,7 +78,7 @@ fun leanExportLimitResult(
   path: String,
 ): void {
   if (result.declaration.isNone()) return void;
-  runtime = mutable LeanExecution{store => context};
+  runtime = mutable LeanExecution{store => Some(context)};
   definitions = Array["limit", "noise"].map(text -> {
     name = leanSimpleName(runtime, text);
     constants.get(context, LeanConstantKey("before-result", leanNameKey(name)))
@@ -98,7 +98,7 @@ fun leanInstallLimitInput(
   context: mutable SKStore.Context,
   imports: LeanImportedEnvironment,
 ): (SKStore.EHandle<LeanConstantKey, LeanConstantFile>, LeanTheoremRequest) {
-  runtime = mutable LeanExecution{store => context};
+  runtime = mutable LeanExecution{store => Some(context)};
   constants = context.mkdir(
     LeanConstantKey::keyType,
     LeanConstantFile::type,
@@ -117,7 +117,10 @@ fun leanInstallLimitInput(
   request = LeanTheoremRequest(
     leanSimpleName(runtime, "result"),
     leanLimitTheoremType(runtime),
-    imports.atPrefix(runtime, LeanConstantsView("before-result", constants)),
+    imports.atPrefix(
+      runtime,
+      LeanConstantsView("before-result", LeanConstantDirectory(constants)),
+    ),
   );
   (constants, request)
 }
@@ -137,7 +140,7 @@ fun leanRunLimitExample(dataRoot: String, outputRoot: String): void {
   importNs = Time.time_ns() - loadStart;
   setupStart = Time.time_ns();
   context = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store => context};
+  runtime = mutable LeanExecution{store => Some(context)};
   imports = leanInstallImports(
     runtime,
     data,

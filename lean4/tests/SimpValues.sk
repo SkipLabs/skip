@@ -1,0 +1,111 @@
+fun runtimeSimpValueChecks(): void {
+  values: Array<LeanValue> = Array[
+    LeanErased(),
+    LeanUnavailable("a"),
+    LeanUnavailable("b"),
+    LeanText("a"),
+    LeanText("b"),
+    leanNatValue(0),
+    leanNatValue(3),
+    LeanWord("uint8", 0),
+    LeanWord("uint8", 1),
+    LeanWord("uint16", 1),
+    LeanWord("uint32", 1),
+    LeanWord("uint64", 0),
+    LeanWord("uint64", -1),
+    LeanWord("usize", 0),
+    LeanCtor(LeanTag.Unknown("A"), Array[]),
+    LeanCtor(LeanTag.Unknown("A"), Array[leanNatValue(0)]),
+    LeanCtor(LeanTag.Unknown("B"), Array[]),
+    LeanArray(Array[]),
+    LeanArray(Array[leanNatValue(0)]),
+  ];
+  for (i in Range(0, values.size())) {
+    for (j in Range(0, values.size())) {
+      assert(leanSimpValueCompare(values[i], values[j]) == i.compare(j))
+    }
+  };
+  assert(
+    leanSimpValueCompare(leanNatValue(3), LeanNatLiterals.n3) == EQ(),
+  );
+  assert(
+    leanSimpValueCompare(
+      LeanWord("uint64", -1),
+      LeanScalar("uint64", "18446744073709551615"),
+    ) == EQ(),
+  );
+  vector: mutable Persistent.RadixTreeVector<
+    LeanValue,
+  > = Persistent.RadixTreeVector::mcreate();
+  vector.push(leanNatValue(0));
+  assert(
+    leanSimpValueCompare(values.last(), LeanPersistentArray(vector.chill())) ==
+      EQ(),
+  );
+  validator = mutable LeanSimpValueValidator{};
+  assert(!validator.check(LeanReference(0)));
+  assert(!validator.check(LeanUnavailable("not implemented")));
+  assert(
+    (mutable LeanSimpValueValidator{allowUnavailable => true}).check(
+      LeanUnavailable("not implemented"),
+    ),
+  );
+  assert(!validator.check(LeanClosure(runtimeTestClosure, 1, Array[])));
+  assert(
+    !validator.check(
+      LeanCtor(
+        LeanTag.Name_str__impl,
+        Array[
+          LeanWord("uint64", 0),
+          LeanErased(),
+          LeanText("_skip_simp_query"),
+        ],
+      ),
+    ),
+  );
+  assert(
+    !validator.check(
+      LeanCtor(LeanTag.Expr_mvar__impl, Array[]),
+    ),
+  );
+  assert(
+    !validator.check(
+      LeanCtor(LeanTag.Level_mvar__impl, Array[]),
+    ),
+  );
+  // A tree walker would visit more than a trillion nodes; the DAG has only 41.
+  expression: LeanValue = LeanCtor(
+    LeanTag.Expr_lit__impl,
+    Array[
+      LeanWord("uint64", 7),
+      LeanCtor(LeanTag.Literal_natVal, Array[leanNatValue(0)]),
+    ],
+  );
+  for (_ in Range(0, 40)) {
+    data = leanExprData(expression);
+    !expression = LeanCtor(
+      LeanTag.Expr_app__impl,
+      Array[leanExprMakeAppData(data, data), expression, expression],
+    )
+  };
+  assert(validator.check(expression));
+  assert(validator.visited.size() == 41);
+  // Even deliberately equal cached hashes do not alias different expressions.
+  left = LeanCtor(
+    LeanTag.Expr_lit__impl,
+    Array[
+      LeanWord("uint64", 7),
+      LeanCtor(LeanTag.Literal_natVal, Array[leanNatValue(0)]),
+    ],
+  );
+  right = LeanCtor(
+    LeanTag.Expr_lit__impl,
+    Array[
+      LeanWord("uint64", 7),
+      LeanCtor(LeanTag.Literal_natVal, Array[leanNatValue(1)]),
+    ],
+  );
+  assert(leanSimpValueCompare(left, right) == LT());
+  assert(validator.check(right));
+  assert(validator.visited.size() == 42)
+}

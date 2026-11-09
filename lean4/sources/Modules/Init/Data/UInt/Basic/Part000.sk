@@ -6,12 +6,16 @@ fun f_UInt8_sub_d0ab5af62e(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.sub",
-    "lean_uint8_sub",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.sub",
+      "lean_uint8_sub",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0) - leanWordBits(_b_1)).and(255))
 }
 fun apply_f_UInt8_sub_d0ab5af62e(
   _runtime: mutable LeanExecution,
@@ -24,12 +28,16 @@ fun f_Bool_toUInt32_8bf31fec40(
   _runtime: mutable LeanExecution,
   _b_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "Bool.toUInt32",
-    "lean_bool_to_uint32",
-    Array[_b_0],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "Bool.toUInt32",
+      "lean_bool_to_uint32",
+      Array[_b_0],
+    )
+  };
+  LeanWord("uint32", if (leanIsTrue(_b_0)) 1 else 0)
 }
 // "USize.shiftRight"
 fun f_USize_shiftRight_dbd7e8f695(
@@ -37,12 +45,16 @@ fun f_USize_shiftRight_dbd7e8f695(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.shiftRight",
-    "lean_usize_shift_right",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.shiftRight",
+      "lean_usize_shift_right",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("usize", leanWordBits(_a_0).ushr(leanWordBits(_b_1).and(63)))
 }
 fun apply_f_USize_shiftRight_dbd7e8f695(
   _runtime: mutable LeanExecution,
@@ -56,12 +68,16 @@ fun f_UInt8_lor_32846b4b03(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.lor",
-    "lean_uint8_lor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.lor",
+      "lean_uint8_lor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0).or(leanWordBits(_b_1))).and(255))
 }
 fun apply_f_UInt8_lor_32846b4b03(
   _runtime: mutable LeanExecution,
@@ -75,12 +91,18 @@ fun f_UInt32_mod_62846e624b(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.mod",
-    "lean_uint32_mod",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.mod",
+      "lean_uint32_mod",
+      Array[_a_0, _b_1],
+    )
+  };
+  a = leanWordBits(_a_0);
+  b = leanWordBits(_b_1);
+  LeanWord("uint32", (a - leanUnsignedDiv(a, b) * b).and(4294967295))
 }
 fun apply_f_UInt32_mod_62846e624b(
   _runtime: mutable LeanExecution,
@@ -94,12 +116,18 @@ fun f_UInt64_mod_e07128cc7c(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.mod",
-    "lean_uint64_mod",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.mod",
+      "lean_uint64_mod",
+      Array[_a_0, _b_1],
+    )
+  };
+  a = leanWordBits(_a_0);
+  b = leanWordBits(_b_1);
+  LeanWord("uint64", a - leanUnsignedDiv(a, b) * b)
 }
 fun apply_f_UInt64_mod_e07128cc7c(
   _runtime: mutable LeanExecution,
@@ -116,15 +144,15 @@ fun f_UInt16_pow_c3c56c2045(
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _n_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_3) match {
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint16", "1")
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> LeanWord("uint16", 1)
+  | LeanTag.Bool_false ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _n_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_3_7: LeanValue = f_UInt16_pow_c3c56c2045(_runtime, _x_0, _n_2_6);
     f_UInt16_mul_4aacc4c20d(_runtime, _x_3_7, _x_0)
@@ -143,12 +171,18 @@ fun f_UInt16_mod_8a2663e113(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.mod",
-    "lean_uint16_mod",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.mod",
+      "lean_uint16_mod",
+      Array[_a_0, _b_1],
+    )
+  };
+  a = leanWordBits(_a_0);
+  b = leanWordBits(_b_1);
+  LeanWord("uint16", (a - leanUnsignedDiv(a, b) * b).and(65535))
 }
 fun apply_f_UInt16_mod_8a2663e113(
   _runtime: mutable LeanExecution,
@@ -162,12 +196,16 @@ fun f_UInt16_decLt_8ae88d04db(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.decLt",
-    "lean_uint16_dec_lt",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.decLt",
+      "lean_uint16_dec_lt",
+      Array[_a_0, _b_1],
+    )
+  };
+  leanBool(leanWordBits(_a_0).ult(leanWordBits(_b_1)))
 }
 fun apply_f_UInt16_decLt_8ae88d04db(
   _runtime: mutable LeanExecution,
@@ -180,12 +218,16 @@ fun f_UInt64_toUSize_59eca95223(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.toUSize",
-    "lean_uint64_to_usize",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.toUSize",
+      "lean_uint64_to_usize",
+      Array[_a_0],
+    )
+  };
+  LeanWord("usize", leanWordBits(_a_0))
 }
 // "UInt64.lor"
 fun f_UInt64_lor_ecf41afb83(
@@ -193,12 +235,16 @@ fun f_UInt64_lor_ecf41afb83(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.lor",
-    "lean_uint64_lor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.lor",
+      "lean_uint64_lor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).or(leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_lor_ecf41afb83(
   _runtime: mutable LeanExecution,
@@ -211,12 +257,16 @@ fun f_UInt32_complement_484b03fd39(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.complement",
-    "lean_uint32_complement",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.complement",
+      "lean_uint32_complement",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint32", (leanWordBits(_a_0).xor(-1)).and(4294967295))
 }
 fun apply_f_UInt32_complement_484b03fd39(
   _runtime: mutable LeanExecution,
@@ -230,12 +280,16 @@ fun f_USize_mul_409e03f718(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.mul",
-    "lean_usize_mul",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.mul",
+      "lean_usize_mul",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("usize", leanWordBits(_a_0) * leanWordBits(_b_1))
 }
 fun apply_f_USize_mul_409e03f718(
   _runtime: mutable LeanExecution,
@@ -249,11 +303,18 @@ fun f_UInt32_shiftRight_33090f8b80(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.shiftRight",
-    "lean_uint32_shift_right",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.shiftRight",
+      "lean_uint32_shift_right",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanWordBits(_a_0).ushr(leanWordBits(_b_1).and(31))).and(4294967295),
   )
 }
 fun apply_f_UInt32_shiftRight_33090f8b80(
@@ -268,12 +329,16 @@ fun f_UInt64_decLt_2a0f258398(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.decLt",
-    "lean_uint64_dec_lt",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.decLt",
+      "lean_uint64_dec_lt",
+      Array[_a_0, _b_1],
+    )
+  };
+  leanBool(leanWordBits(_a_0).ult(leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_decLt_2a0f258398(
   _runtime: mutable LeanExecution,
@@ -286,12 +351,16 @@ fun f_UInt16_complement_087af106fa(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.complement",
-    "lean_uint16_complement",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.complement",
+      "lean_uint16_complement",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0).xor(-1)).and(65535))
 }
 fun apply_f_UInt16_complement_087af106fa(
   _runtime: mutable LeanExecution,
@@ -305,12 +374,16 @@ fun f_UInt8_land_d31c5d72bc(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.land",
-    "lean_uint8_land",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.land",
+      "lean_uint8_land",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0).and(leanWordBits(_b_1))).and(255))
 }
 fun apply_f_UInt8_land_d31c5d72bc(
   _runtime: mutable LeanExecution,
@@ -324,12 +397,16 @@ fun f_UInt8_add_1552353faf(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.add",
-    "lean_uint8_add",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.add",
+      "lean_uint8_add",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0) + leanWordBits(_b_1)).and(255))
 }
 fun apply_f_UInt8_add_1552353faf(
   _runtime: mutable LeanExecution,
@@ -343,12 +420,16 @@ fun f_UInt64_land_41c79517e7(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.land",
-    "lean_uint64_land",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.land",
+      "lean_uint64_land",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).and(leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_land_41c79517e7(
   _runtime: mutable LeanExecution,
@@ -362,11 +443,18 @@ fun f_UInt8_shiftLeft_7caa138176(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.shiftLeft",
-    "lean_uint8_shift_left",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.shiftLeft",
+      "lean_uint8_shift_left",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint8",
+    (leanWordBits(_a_0).shl(leanWordBits(_b_1).and(7))).and(255),
   )
 }
 fun apply_f_UInt8_shiftLeft_7caa138176(
@@ -381,12 +469,16 @@ fun f_UInt32_mul_f37e3656b2(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.mul",
-    "lean_uint32_mul",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.mul",
+      "lean_uint32_mul",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint32", (leanWordBits(_a_0) * leanWordBits(_b_1)).and(4294967295))
 }
 fun apply_f_UInt32_mul_f37e3656b2(
   _runtime: mutable LeanExecution,
@@ -400,12 +492,16 @@ fun f_UInt64_shiftRight_3838e8e5a8(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.shiftRight",
-    "lean_uint64_shift_right",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.shiftRight",
+      "lean_uint64_shift_right",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).ushr(leanWordBits(_b_1).and(63)))
 }
 fun apply_f_UInt64_shiftRight_3838e8e5a8(
   _runtime: mutable LeanExecution,
@@ -418,12 +514,16 @@ fun f_USize_toUInt64_158104741e(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.toUInt64",
-    "lean_usize_to_uint64",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.toUInt64",
+      "lean_usize_to_uint64",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0))
 }
 fun apply_f_USize_toUInt64_158104741e(
   _runtime: mutable LeanExecution,
@@ -436,12 +536,16 @@ fun f_UInt64_complement_10079b9da3(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.complement",
-    "lean_uint64_complement",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.complement",
+      "lean_uint64_complement",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).xor(-1))
 }
 fun apply_f_UInt64_complement_10079b9da3(
   _runtime: mutable LeanExecution,
@@ -455,12 +559,16 @@ fun f_UInt16_xor_b061e3877b(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.xor",
-    "lean_uint16_xor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.xor",
+      "lean_uint16_xor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0).xor(leanWordBits(_b_1))).and(65535))
 }
 fun apply_f_UInt16_xor_b061e3877b(
   _runtime: mutable LeanExecution,
@@ -474,12 +582,18 @@ fun f_UInt8_mod_3abd690e56(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.mod",
-    "lean_uint8_mod",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.mod",
+      "lean_uint8_mod",
+      Array[_a_0, _b_1],
+    )
+  };
+  a = leanWordBits(_a_0);
+  b = leanWordBits(_b_1);
+  LeanWord("uint8", (a - leanUnsignedDiv(a, b) * b).and(255))
 }
 fun apply_f_UInt8_mod_3abd690e56(
   _runtime: mutable LeanExecution,
@@ -493,11 +607,18 @@ fun f_UInt32_div_7bf8c9cda8(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.div",
-    "lean_uint32_div",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.div",
+      "lean_uint32_div",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanUnsignedDiv(leanWordBits(_a_0), leanWordBits(_b_1))).and(4294967295),
   )
 }
 fun apply_f_UInt32_div_7bf8c9cda8(
@@ -512,11 +633,18 @@ fun f_UInt16_div_81532173dd(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.div",
-    "lean_uint16_div",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.div",
+      "lean_uint16_div",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint16",
+    (leanUnsignedDiv(leanWordBits(_a_0), leanWordBits(_b_1))).and(65535),
   )
 }
 fun apply_f_UInt16_div_81532173dd(
@@ -531,11 +659,18 @@ fun f_UInt16_shiftRight_76be19490e(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.shiftRight",
-    "lean_uint16_shift_right",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.shiftRight",
+      "lean_uint16_shift_right",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint16",
+    (leanWordBits(_a_0).ushr(leanWordBits(_b_1).and(15))).and(65535),
   )
 }
 fun apply_f_UInt16_shiftRight_76be19490e(
@@ -550,12 +685,16 @@ fun f_UInt64_add_0bab798e0f(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.add",
-    "lean_uint64_add",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.add",
+      "lean_uint64_add",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0) + leanWordBits(_b_1))
 }
 fun apply_f_UInt64_add_0bab798e0f(
   _runtime: mutable LeanExecution,
@@ -569,12 +708,16 @@ fun f_UInt64_div_3a6c21eb5d(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.div",
-    "lean_uint64_div",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.div",
+      "lean_uint64_div",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanUnsignedDiv(leanWordBits(_a_0), leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_div_3a6c21eb5d(
   _runtime: mutable LeanExecution,
@@ -588,12 +731,16 @@ fun f_UInt8_mul_1f0e4af9bd(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.mul",
-    "lean_uint8_mul",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.mul",
+      "lean_uint8_mul",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0) * leanWordBits(_b_1)).and(255))
 }
 fun apply_f_UInt8_mul_1f0e4af9bd(
   _runtime: mutable LeanExecution,
@@ -607,12 +754,16 @@ fun f_UInt64_mul_aa0247ad16(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.mul",
-    "lean_uint64_mul",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.mul",
+      "lean_uint64_mul",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0) * leanWordBits(_b_1))
 }
 fun apply_f_UInt64_mul_aa0247ad16(
   _runtime: mutable LeanExecution,
@@ -626,11 +777,18 @@ fun f_UInt32_xor_305b6d7bac(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.xor",
-    "lean_uint32_xor",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.xor",
+      "lean_uint32_xor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanWordBits(_a_0).xor(leanWordBits(_b_1))).and(4294967295),
   )
 }
 fun apply_f_UInt32_xor_305b6d7bac(
@@ -645,11 +803,18 @@ fun f_UInt8_div_a378c96586(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.div",
-    "lean_uint8_div",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.div",
+      "lean_uint8_div",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint8",
+    (leanUnsignedDiv(leanWordBits(_a_0), leanWordBits(_b_1))).and(255),
   )
 }
 fun apply_f_UInt8_div_a378c96586(
@@ -664,12 +829,16 @@ fun f_UInt16_sub_b62438b4ac(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.sub",
-    "lean_uint16_sub",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.sub",
+      "lean_uint16_sub",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0) - leanWordBits(_b_1)).and(65535))
 }
 fun apply_f_UInt16_sub_b62438b4ac(
   _runtime: mutable LeanExecution,
@@ -683,12 +852,18 @@ fun f_USize_mod_bf195caf1e(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.mod",
-    "lean_usize_mod",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.mod",
+      "lean_usize_mod",
+      Array[_a_0, _b_1],
+    )
+  };
+  a = leanWordBits(_a_0);
+  b = leanWordBits(_b_1);
+  LeanWord("usize", a - leanUnsignedDiv(a, b) * b)
 }
 fun apply_f_USize_mod_bf195caf1e(
   _runtime: mutable LeanExecution,
@@ -702,12 +877,16 @@ fun f_UInt16_land_01cb154555(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.land",
-    "lean_uint16_land",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.land",
+      "lean_uint16_land",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0).and(leanWordBits(_b_1))).and(65535))
 }
 fun apply_f_UInt16_land_01cb154555(
   _runtime: mutable LeanExecution,
@@ -724,15 +903,15 @@ fun f_UInt64_pow_dafd8f1814(
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _n_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_3) match {
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint64", "1")
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> LeanWord("uint64", 1)
+  | LeanTag.Bool_false ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _n_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_3_7: LeanValue = f_UInt64_pow_dafd8f1814(_runtime, _x_0, _n_2_6);
     f_UInt64_mul_aa0247ad16(_runtime, _x_3_7, _x_0)
@@ -751,12 +930,16 @@ fun f_UInt64_sub_e9f146f97f(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.sub",
-    "lean_uint64_sub",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.sub",
+      "lean_uint64_sub",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0) - leanWordBits(_b_1))
 }
 fun apply_f_UInt64_sub_e9f146f97f(
   _runtime: mutable LeanExecution,
@@ -769,12 +952,16 @@ fun f_UInt8_complement_b05623d7d9(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.complement",
-    "lean_uint8_complement",
-    Array[_a_0],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.complement",
+      "lean_uint8_complement",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0).xor(-1)).and(255))
 }
 fun apply_f_UInt8_complement_b05623d7d9(
   _runtime: mutable LeanExecution,
@@ -788,12 +975,16 @@ fun f_USize_ofNat32_87c6ea69f5(
   _n_0: LeanValue,
   _h_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.ofNat32",
-    "lean_usize_of_nat",
-    Array[_n_0, _h_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.ofNat32",
+      "lean_usize_of_nat",
+      Array[_n_0, _h_1],
+    )
+  };
+  LeanWord("usize", leanNat(_n_0).toWord())
 }
 // "UInt16.lor"
 fun f_UInt16_lor_48ca73237a(
@@ -801,12 +992,16 @@ fun f_UInt16_lor_48ca73237a(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.lor",
-    "lean_uint16_lor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.lor",
+      "lean_uint16_lor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0).or(leanWordBits(_b_1))).and(65535))
 }
 fun apply_f_UInt16_lor_48ca73237a(
   _runtime: mutable LeanExecution,
@@ -820,12 +1015,16 @@ fun f_UInt16_add_01b6b1febf(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.add",
-    "lean_uint16_add",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.add",
+      "lean_uint16_add",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0) + leanWordBits(_b_1)).and(65535))
 }
 fun apply_f_UInt16_add_01b6b1febf(
   _runtime: mutable LeanExecution,
@@ -838,7 +1037,16 @@ fun f_UInt8_neg_64c557b33f(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(_runtime, "UInt8.neg", "lean_uint8_neg", Array[_a_0])
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.neg",
+      "lean_uint8_neg",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint8", (0 - leanWordBits(_a_0)).and(255))
 }
 fun apply_f_UInt8_neg_64c557b33f(
   _runtime: mutable LeanExecution,
@@ -855,15 +1063,15 @@ fun f_UInt8_pow_3fe19b37f3(
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _n_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_3) match {
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint8", "1")
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> LeanWord("uint8", 1)
+  | LeanTag.Bool_false ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _n_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_3_7: LeanValue = f_UInt8_pow_3fe19b37f3(_runtime, _x_0, _n_2_6);
     f_UInt8_mul_1f0e4af9bd(_runtime, _x_3_7, _x_0)
@@ -882,12 +1090,16 @@ fun f_UInt8_xor_dfa6919525(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.xor",
-    "lean_uint8_xor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.xor",
+      "lean_uint8_xor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint8", (leanWordBits(_a_0).xor(leanWordBits(_b_1))).and(255))
 }
 fun apply_f_UInt8_xor_dfa6919525(
   _runtime: mutable LeanExecution,
@@ -901,12 +1113,16 @@ fun f_UInt16_decLe_d43db69ae1(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.decLe",
-    "lean_uint16_dec_le",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.decLe",
+      "lean_uint16_dec_le",
+      Array[_a_0, _b_1],
+    )
+  };
+  leanBool(leanWordBits(_a_0).ule(leanWordBits(_b_1)))
 }
 fun apply_f_UInt16_decLe_d43db69ae1(
   _runtime: mutable LeanExecution,
@@ -920,12 +1136,16 @@ fun f_UInt64_xor_5cc42b1d96(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.xor",
-    "lean_uint64_xor",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.xor",
+      "lean_uint64_xor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).xor(leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_xor_5cc42b1d96(
   _runtime: mutable LeanExecution,
@@ -939,11 +1159,18 @@ fun f_UInt32_lor_477ee673d4(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.lor",
-    "lean_uint32_lor",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.lor",
+      "lean_uint32_lor",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanWordBits(_a_0).or(leanWordBits(_b_1))).and(4294967295),
   )
 }
 fun apply_f_UInt32_lor_477ee673d4(
@@ -957,7 +1184,16 @@ fun f_UInt64_neg_f540b999f1(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(_runtime, "UInt64.neg", "lean_uint64_neg", Array[_a_0])
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.neg",
+      "lean_uint64_neg",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint64", 0 - leanWordBits(_a_0))
 }
 fun apply_f_UInt64_neg_f540b999f1(
   _runtime: mutable LeanExecution,
@@ -971,11 +1207,18 @@ fun f_UInt32_shiftLeft_2be8f00e4b(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.shiftLeft",
-    "lean_uint32_shift_left",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.shiftLeft",
+      "lean_uint32_shift_left",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanWordBits(_a_0).shl(leanWordBits(_b_1).and(31))).and(4294967295),
   )
 }
 fun apply_f_UInt32_shiftLeft_2be8f00e4b(
@@ -990,12 +1233,16 @@ fun f_UInt64_decLe_6fc6cc2f1b(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.decLe",
-    "lean_uint64_dec_le",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.decLe",
+      "lean_uint64_dec_le",
+      Array[_a_0, _b_1],
+    )
+  };
+  leanBool(leanWordBits(_a_0).ule(leanWordBits(_b_1)))
 }
 fun apply_f_UInt64_decLe_6fc6cc2f1b(
   _runtime: mutable LeanExecution,
@@ -1009,12 +1256,16 @@ fun f_UInt64_shiftLeft_22a3dd919b(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt64.shiftLeft",
-    "lean_uint64_shift_left",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt64.shiftLeft",
+      "lean_uint64_shift_left",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint64", leanWordBits(_a_0).shl(leanWordBits(_b_1).and(63)))
 }
 fun apply_f_UInt64_shiftLeft_22a3dd919b(
   _runtime: mutable LeanExecution,
@@ -1028,11 +1279,18 @@ fun f_UInt8_shiftRight_42784549f2(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt8.shiftRight",
-    "lean_uint8_shift_right",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt8.shiftRight",
+      "lean_uint8_shift_right",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint8",
+    (leanWordBits(_a_0).ushr(leanWordBits(_b_1).and(7))).and(255),
   )
 }
 fun apply_f_UInt8_shiftRight_42784549f2(
@@ -1046,12 +1304,16 @@ fun f_Bool_toUInt64_1b3903ff27(
   _runtime: mutable LeanExecution,
   _b_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "Bool.toUInt64",
-    "lean_bool_to_uint64",
-    Array[_b_0],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "Bool.toUInt64",
+      "lean_bool_to_uint64",
+      Array[_b_0],
+    )
+  };
+  LeanWord("uint64", if (leanIsTrue(_b_0)) 1 else 0)
 }
 // "UInt32.land"
 fun f_UInt32_land_597b5a0d65(
@@ -1059,11 +1321,18 @@ fun f_UInt32_land_597b5a0d65(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt32.land",
-    "lean_uint32_land",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.land",
+      "lean_uint32_land",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint32",
+    (leanWordBits(_a_0).and(leanWordBits(_b_1))).and(4294967295),
   )
 }
 fun apply_f_UInt32_land_597b5a0d65(
@@ -1077,7 +1346,16 @@ fun f_UInt16_neg_ddc7716518(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(_runtime, "UInt16.neg", "lean_uint16_neg", Array[_a_0])
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.neg",
+      "lean_uint16_neg",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint16", (0 - leanWordBits(_a_0)).and(65535))
 }
 fun apply_f_UInt16_neg_ddc7716518(
   _runtime: mutable LeanExecution,
@@ -1091,12 +1369,16 @@ fun f_USize_shiftLeft_afa761e806(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.shiftLeft",
-    "lean_usize_shift_left",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.shiftLeft",
+      "lean_usize_shift_left",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("usize", leanWordBits(_a_0).shl(leanWordBits(_b_1).and(63)))
 }
 fun apply_f_USize_shiftLeft_afa761e806(
   _runtime: mutable LeanExecution,
@@ -1113,15 +1395,15 @@ fun f_UInt32_pow_1eeffd8f9f(
   _isZero_3: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _n_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_3) match {
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint32", "1")
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> LeanWord("uint32", 1)
+  | LeanTag.Bool_false ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _n_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_3_7: LeanValue = f_UInt32_pow_1eeffd8f9f(_runtime, _x_0, _n_2_6);
     f_UInt32_mul_f37e3656b2(_runtime, _x_3_7, _x_0)
@@ -1140,12 +1422,16 @@ fun f_UInt16_mul_4aacc4c20d(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.mul",
-    "lean_uint16_mul",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.mul",
+      "lean_uint16_mul",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("uint16", (leanWordBits(_a_0) * leanWordBits(_b_1)).and(65535))
 }
 fun apply_f_UInt16_mul_4aacc4c20d(
   _runtime: mutable LeanExecution,
@@ -1159,11 +1445,18 @@ fun f_UInt16_shiftLeft_af287aae1f(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "UInt16.shiftLeft",
-    "lean_uint16_shift_left",
-    Array[_a_0, _b_1],
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt16.shiftLeft",
+      "lean_uint16_shift_left",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord(
+    "uint16",
+    (leanWordBits(_a_0).shl(leanWordBits(_b_1).and(15))).and(65535),
   )
 }
 fun apply_f_UInt16_shiftLeft_af287aae1f(
@@ -1177,7 +1470,16 @@ fun f_UInt32_neg_96268cd86c(
   _runtime: mutable LeanExecution,
   _a_0: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(_runtime, "UInt32.neg", "lean_uint32_neg", Array[_a_0])
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "UInt32.neg",
+      "lean_uint32_neg",
+      Array[_a_0],
+    )
+  };
+  LeanWord("uint32", (0 - leanWordBits(_a_0)).and(4294967295))
 }
 fun apply_f_UInt32_neg_96268cd86c(
   _runtime: mutable LeanExecution,
@@ -1191,12 +1493,16 @@ fun f_USize_land_9e95e03ccb(
   _a_0: LeanValue,
   _b_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "USize.land",
-    "lean_usize_land",
-    Array[_a_0, _b_1],
-  )
+  // Avoid argument arrays and string dispatch for this statically known operation.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "USize.land",
+      "lean_usize_land",
+      Array[_a_0, _b_1],
+    )
+  };
+  LeanWord("usize", leanWordBits(_a_0).and(leanWordBits(_b_1)))
 }
 fun apply_f_USize_land_9e95e03ccb(
   _runtime: mutable LeanExecution,

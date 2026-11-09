@@ -1,0 +1,393 @@
+// Universe equality callback; trace-enabled calls retain the original body.
+module L4_Lean_Meta_LevelDefEq;
+
+fun f_postponeLevelDefEqStructured(
+  runtime: mutable LeanExecution,
+  lhs: LeanValue,
+  rhs: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  successValue: LeanValue,
+  state: LeanValue,
+): LeanValue {
+  postponed = f_Lean_Meta_postponeIsLevelDefEq_08df54432e(
+    runtime,
+    lhs,
+    rhs,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreState,
+    state,
+  );
+  leanTag(postponed) match {
+  | LeanTag.EST_Out_ok ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[successValue, leanField(postponed, 1)])
+  | LeanTag.EST_Out_error -> postponed
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26_structured(
+  runtime: mutable LeanExecution,
+  offsetsEqual: LeanValue,
+  lhs: LeanValue,
+  rhs: LeanValue,
+  _successValue: LeanValue,
+  _traceNamespace: LeanValue,
+  _traceName: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  initialState: LeanValue,
+): LeanValue {
+  leanTag(offsetsEqual) match {
+  | LeanTag.Bool_true ->
+    lhsOffset = L4_Lean_Level.f_Lean_Level_getOffset_0f4bfe445c(runtime, lhs);
+    rhsOffset = L4_Lean_Level.f_Lean_Level_getOffset_0f4bfe445c(runtime, rhs);
+    sameOffset = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      runtime,
+      lhsOffset,
+      rhsOffset,
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[sameOffset, initialState])
+  | LeanTag.Bool_false ->
+    instantiatedLhs = f_Meta_isLevelDefEqAuxImpl_spec_0_1ff12cf8d2(
+      runtime,
+      lhs,
+      metaStateRef,
+      initialState,
+    );
+    leanTag(instantiatedLhs) match {
+    | LeanTag.EST_Out_ok ->
+      lhsWithMVars = leanField(instantiatedLhs, 0);
+      stateAfterLhs = leanField(instantiatedLhs, 1);
+      normalizedLhs = L4_Lean_Level.f_Lean_Level_normalize_dbab3d38d1(
+        runtime,
+        lhsWithMVars,
+      );
+      instantiatedRhs = f_Meta_isLevelDefEqAuxImpl_spec_0_1ff12cf8d2(
+        runtime,
+        rhs,
+        metaStateRef,
+        stateAfterLhs,
+      );
+      leanTag(instantiatedRhs) match {
+      | LeanTag.EST_Out_ok ->
+        rhsWithMVars = leanField(instantiatedRhs, 0);
+        stateAfterRhs = leanField(instantiatedRhs, 1);
+        normalizedRhs = L4_Lean_Level.f_Lean_Level_normalize_dbab3d38d1(
+          runtime,
+          rhsWithMVars,
+        );
+        lhsUnchanged = L4_Lean_Level.f_Lean_Level_beq_a85e9a2f15(
+          runtime,
+          lhs,
+          normalizedLhs,
+        );
+        leanTag(lhsUnchanged) match {
+        | LeanTag.Bool_false ->
+          L4_Lean_Meta_Basic.f_Lean_Meta_isLevelDefEqAux_da8f7dc47b(
+            runtime,
+            normalizedLhs,
+            normalizedRhs,
+            metaContext,
+            metaStateRef,
+            coreContext,
+            coreState,
+            stateAfterRhs,
+          )
+        | LeanTag.Bool_true ->
+          rhsUnchanged = L4_Lean_Level.f_Lean_Level_beq_a85e9a2f15(
+            runtime,
+            rhs,
+            normalizedRhs,
+          );
+          leanTag(rhsUnchanged) match {
+          | LeanTag.Bool_false ->
+            L4_Lean_Meta_Basic.f_Lean_Meta_isLevelDefEqAux_da8f7dc47b(
+              runtime,
+              normalizedLhs,
+              normalizedRhs,
+              metaContext,
+              metaStateRef,
+              coreContext,
+              coreState,
+              stateAfterRhs,
+            )
+          | LeanTag.Bool_true ->
+            lhsToRhs = f_Lean_Meta_solve_cb97badf52(
+              runtime,
+              lhs,
+              rhs,
+              metaContext,
+              metaStateRef,
+              coreContext,
+              coreState,
+              stateAfterRhs,
+            );
+            leanTag(lhsToRhs) match {
+            | LeanTag.EST_Out_ok ->
+              lhsToRhsResult = leanField(lhsToRhs, 0);
+              stateAfterLhsToRhs = leanField(lhsToRhs, 1);
+              leanTag(lhsToRhsResult) match {
+              | LeanTag.LBool_undef ->
+                rhsToLhs = f_Lean_Meta_solve_cb97badf52(
+                  runtime,
+                  rhs,
+                  lhs,
+                  metaContext,
+                  metaStateRef,
+                  coreContext,
+                  coreState,
+                  stateAfterLhsToRhs,
+                );
+                leanTag(rhsToLhs) match {
+                | LeanTag.EST_Out_ok ->
+                  rhsToLhsResult = leanField(rhsToLhs, 0);
+                  stateAfterRhsToLhs = leanField(rhsToLhs, 1);
+                  leanTag(rhsToLhsResult) match {
+                  | LeanTag.LBool_undef ->
+                    lhsAssignable = L4_Lean_Meta_HasAssignableMVar.f_Lean_Meta_hasAssignableLevelMVar_ebe77499e3(
+                      runtime,
+                      lhs,
+                      metaContext,
+                      metaStateRef,
+                      coreContext,
+                      coreState,
+                      stateAfterRhsToLhs,
+                    );
+                    leanTag(lhsAssignable) match {
+                    | LeanTag.EST_Out_ok ->
+                      lhsCanAssign = leanField(lhsAssignable, 0);
+                      stateAfterLhsAssignable = leanField(lhsAssignable, 1);
+                      leanTag(lhsCanAssign) match {
+                      | LeanTag.Bool_true ->
+                        f_postponeLevelDefEqStructured(
+                          runtime,
+                          lhs,
+                          rhs,
+                          metaContext,
+                          metaStateRef,
+                          coreContext,
+                          coreState,
+                          _successValue,
+                          stateAfterLhsAssignable,
+                        )
+                      | LeanTag.Bool_false ->
+                        rhsAssignable = L4_Lean_Meta_HasAssignableMVar.f_Lean_Meta_hasAssignableLevelMVar_ebe77499e3(
+                          runtime,
+                          rhs,
+                          metaContext,
+                          metaStateRef,
+                          coreContext,
+                          coreState,
+                          stateAfterLhsAssignable,
+                        );
+                        leanTag(rhsAssignable) match {
+                        | LeanTag.EST_Out_ok ->
+                          rhsCanAssign = leanField(rhsAssignable, 0);
+                          stateAfterRhsAssignable = leanField(rhsAssignable, 1);
+                          leanTag(rhsCanAssign) match {
+                          | LeanTag.Bool_true ->
+                            f_postponeLevelDefEqStructured(
+                              runtime,
+                              lhs,
+                              rhs,
+                              metaContext,
+                              metaStateRef,
+                              coreContext,
+                              coreState,
+                              _successValue,
+                              stateAfterRhsAssignable,
+                            )
+                          | LeanTag.Bool_false ->
+                            metaConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+                              runtime,
+                              metaContext,
+                            );
+                            leanTag(metaConfig) match {
+                            | LeanTag.Meta_Config_mk ->
+                              stuckExceptionEnabled = leanField(metaConfig, 4);
+                              leanTag(stuckExceptionEnabled) match {
+                              | LeanTag.Bool_false ->
+                                LeanCtor(
+                                  LeanTag.EST_Out_ok,
+                                  Array[
+                                    LeanCtor(LeanTag.Bool_false, Array[]),
+                                    stateAfterRhsAssignable,
+                                  ],
+                                )
+                              | LeanTag.Bool_true ->
+                                lhsIsMVar = L4_Lean_Level.f_Lean_Level_isMVar_9a4163cb78(
+                                  runtime,
+                                  lhs,
+                                );
+                                leanTag(lhsIsMVar) match {
+                                | LeanTag.Bool_true ->
+                                  L4_Lean_Meta_Basic.f_Lean_Meta_throwIsDefEqStuck_0918dc8a78(
+                                    runtime,
+                                    stateAfterRhsAssignable,
+                                  )
+                                | LeanTag.Bool_false ->
+                                  rhsIsMVar = L4_Lean_Level.f_Lean_Level_isMVar_9a4163cb78(
+                                    runtime,
+                                    rhs,
+                                  );
+                                  leanTag(rhsIsMVar) match {
+                                  | LeanTag.Bool_true ->
+                                    L4_Lean_Meta_Basic.f_Lean_Meta_throwIsDefEqStuck_0918dc8a78(
+                                      runtime,
+                                      stateAfterRhsAssignable,
+                                    )
+                                  | LeanTag.Bool_false ->
+                                    LeanCtor(
+                                      LeanTag.EST_Out_ok,
+                                      Array[
+                                        LeanCtor(LeanTag.Bool_false, Array[]),
+                                        stateAfterRhsAssignable,
+                                      ],
+                                    )
+                                  | _ -> leanFail("non-exhaustive Lean case")
+                                  }
+                                | _ -> leanFail("non-exhaustive Lean case")
+                                }
+                              | _ -> leanFail("non-exhaustive Lean case")
+                              }
+                            | _ -> leanFail("non-exhaustive Lean case")
+                            }
+                          | _ -> leanFail("non-exhaustive Lean case")
+                          }
+                        | LeanTag.EST_Out_error -> rhsAssignable
+                        | _ -> leanFail("non-exhaustive Lean case")
+                        }
+                      | _ -> leanFail("non-exhaustive Lean case")
+                      }
+                    | LeanTag.EST_Out_error -> lhsAssignable
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | LeanTag.LBool_true ->
+                    LeanCtor(
+                      LeanTag.EST_Out_ok,
+                      Array[
+                        LeanCtor(LeanTag.Bool_true, Array[]),
+                        stateAfterRhsToLhs,
+                      ],
+                    )
+                  | LeanTag.LBool_false ->
+                    LeanCtor(
+                      LeanTag.EST_Out_ok,
+                      Array[
+                        LeanCtor(LeanTag.Bool_false, Array[]),
+                        stateAfterRhsToLhs,
+                      ],
+                    )
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | LeanTag.EST_Out_error -> rhsToLhs
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | LeanTag.LBool_true ->
+                LeanCtor(
+                  LeanTag.EST_Out_ok,
+                  Array[
+                    LeanCtor(LeanTag.Bool_true, Array[]),
+                    stateAfterLhsToRhs,
+                  ],
+                )
+              | LeanTag.LBool_false ->
+                LeanCtor(
+                  LeanTag.EST_Out_ok,
+                  Array[
+                    LeanCtor(LeanTag.Bool_false, Array[]),
+                    stateAfterLhsToRhs,
+                  ],
+                )
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | LeanTag.EST_Out_error -> lhsToRhs
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | LeanTag.EST_Out_error ->
+        leanFail("unreachable: Lean.Meta.isLevelDefEqAuxImpl._lam_0")
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Conservatively retain all original tracing whenever trace options are present.
+fun f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26(
+  runtime: mutable LeanExecution,
+  offsetsEqual: LeanValue,
+  lhs: LeanValue,
+  rhs: LeanValue,
+  successValue: LeanValue,
+  traceNamespace: LeanValue,
+  traceName: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  initialState: LeanValue,
+): LeanValue {
+  leanTag(coreContext) match {
+  | LeanTag.Core_Context_mk ->
+    coreCold = leanField(coreContext, 0);
+    leanTag(coreCold) match {
+    | LeanTag.Core_Context_Cold_mk ->
+      options = leanField(coreCold, 2);
+      leanTag(options) match {
+      | LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk ->
+        hasTrace = leanField(options, 1);
+        leanTag(hasTrace) match {
+        | LeanTag.Bool_false ->
+          f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26_structured(
+            runtime,
+            offsetsEqual,
+            lhs,
+            rhs,
+            successValue,
+            traceNamespace,
+            traceName,
+            metaContext,
+            metaStateRef,
+            coreContext,
+            coreState,
+            initialState,
+          )
+        | LeanTag.Bool_true ->
+          f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26_fallback(
+            runtime,
+            offsetsEqual,
+            lhs,
+            rhs,
+            successValue,
+            traceNamespace,
+            traceName,
+            metaContext,
+            metaStateRef,
+            coreContext,
+            coreState,
+            initialState,
+          )
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

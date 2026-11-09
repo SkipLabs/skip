@@ -17,8 +17,8 @@ fun f_Option_pfilter_6b94910f48(
   _p_2: LeanValue,
 ): LeanValue {
   leanTag(_o_1) match {
-  | "[\"Option\",\"none\"]" -> _o_1
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _o_1
+  | LeanTag.Option_some ->
     _val_1_3: LeanValue = leanField(_o_1, 0);
     _x_2_4: LeanValue = leanApply(
       _runtime,
@@ -26,8 +26,8 @@ fun f_Option_pfilter_6b94910f48(
       Array[_val_1_3, LeanErased()],
     );
     leanTag(_x_2_4) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> _o_1
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Bool_true -> _o_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -43,13 +43,13 @@ fun f_Option_forM_e0701faf9e(
   _x_3_4: LeanValue,
 ): LeanValue {
   leanTag(_x_2_3) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanApply(
       _runtime,
       _inst_1_2,
-      Array[LeanErased(), LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      Array[LeanErased(), LeanCtor(LeanTag.PUnit_unit, Array[])],
     )
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_5: LeanValue = leanField(_x_2_3, 0);
     leanApply(_runtime, _x_3_4, Array[_val_6_5])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -73,7 +73,7 @@ fun f_Option_instMembership_88f4bc4fba(
   _runtime: mutable LeanExecution,
   _value_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Membership\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.Membership_mk, Array[LeanErased()])
 }
 // "Option.instForIn'InferInstanceMembershipOfMonad._redArg._lam_1"
 fun f_Option_instForIn_InferInstanceMembershipOfMonad_lam_1_7a541d1211(
@@ -87,9 +87,9 @@ fun f_Option_instForIn_InferInstanceMembershipOfMonad_lam_1_7a541d1211(
   _f_6: LeanValue,
 ): LeanValue {
   leanTag(_x_4) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _init_5])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_4_7: LeanValue = leanField(_x_4, 0);
     _x_5_9: LeanValue = leanApply(
       _runtime,
@@ -126,8 +126,8 @@ fun f_Option_pfilter_cbf97ddc3f(
   _p_1: LeanValue,
 ): LeanValue {
   leanTag(_o_0) match {
-  | "[\"Option\",\"none\"]" -> _o_0
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _o_0
+  | LeanTag.Option_some ->
     _val_1_2: LeanValue = leanField(_o_0, 0);
     _x_2_3: LeanValue = leanApply(
       _runtime,
@@ -135,8 +135,8 @@ fun f_Option_pfilter_cbf97ddc3f(
       Array[_val_1_2, LeanErased()],
     );
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> _o_0
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Bool_true -> _o_0
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -153,7 +153,7 @@ fun f_Option_instDecidableMemOfDecidableEq_bb3ad31b30(
     _runtime,
     _inst_1_0,
     _o_2,
-    LeanCtor("[\"Option\",\"some\"]", Array[_j_1]),
+    LeanCtor(LeanTag.Option_some, Array[_j_1]),
   )
 }
 // "Option.forM._redArg"
@@ -164,13 +164,13 @@ fun f_Option_forM_37300105ea(
   _x_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanApply(
       _runtime,
       _inst_1_0,
-      Array[LeanErased(), LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      Array[LeanErased(), LeanCtor(LeanTag.PUnit_unit, Array[])],
     )
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_3: LeanValue = leanField(_x_2_1, 0);
     leanApply(_runtime, _x_3_2, Array[_val_6_3])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -183,15 +183,15 @@ fun f_Option_pmap_ef5d0e7ae3(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
     _val_3_2: LeanValue = leanField(_x_1_1, 0);
     _x_4_4: LeanValue = leanApply(
       _runtime,
       _f_0,
       Array[_val_3_2, LeanErased()],
     );
-    LeanCtor("[\"Option\",\"some\"]", Array[_x_4_4])
+    LeanCtor(LeanTag.Option_some, Array[_x_4_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -205,8 +205,8 @@ fun f_Option_pelim_2c70446509(
   _f_4: LeanValue,
 ): LeanValue {
   leanTag(_o_2) match {
-  | "[\"Option\",\"none\"]" -> _b_3
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _b_3
+  | LeanTag.Option_some ->
     _val_1_5: LeanValue = leanField(_o_2, 0);
     leanApply(_runtime, _f_4, Array[_val_1_5, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -227,7 +227,7 @@ fun f_Option_instMembership_dd00ef55d4(
   _runtime: mutable LeanExecution,
   _dummy_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Membership\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.Membership_mk, Array[LeanErased()])
 }
 // "Option.pbind._redArg"
 fun f_Option_pbind_00be31d8f1(
@@ -236,8 +236,8 @@ fun f_Option_pbind_00be31d8f1(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
     _val_4_2: LeanValue = leanField(_x_1_0, 0);
     leanApply(_runtime, _x_2_1, Array[_val_4_2, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -251,8 +251,8 @@ fun f_Option_pelim_e10d20c55b(
   _f_2: LeanValue,
 ): LeanValue {
   leanTag(_o_0) match {
-  | "[\"Option\",\"none\"]" -> _b_1
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _b_1
+  | LeanTag.Option_some ->
     _val_1_3: LeanValue = leanField(_o_0, 0);
     leanApply(_runtime, _f_2, Array[_val_1_3, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -265,8 +265,8 @@ fun f_Option_decidableForallMem_0c29868545(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+  | LeanTag.Option_some ->
     _val_4_2: LeanValue = leanField(_x_2_1, 0);
     leanApply(_runtime, _inst_1_0, Array[_val_4_2])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -291,8 +291,8 @@ fun f_Option_pbind_889fbd8a08(
   _x_2_3: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
     _val_4_4: LeanValue = leanField(_x_1_2, 0);
     leanApply(_runtime, _x_2_3, Array[_val_4_4, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -320,8 +320,8 @@ fun f_Option_decidableExistsMem_ebe782a775(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+  | LeanTag.Option_some ->
     _val_4_2: LeanValue = leanField(_x_2_1, 0);
     leanApply(_runtime, _inst_1_0, Array[_val_4_2])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -338,15 +338,15 @@ fun f_Option_pmap_b45b79df5f(
   _x_2_5: LeanValue,
 ): LeanValue {
   leanTag(_x_1_4) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
     _val_4_6: LeanValue = leanField(_x_1_4, 0);
     _x_5_8: LeanValue = leanApply(
       _runtime,
       _f_3,
       Array[_val_4_6, LeanErased()],
     );
-    LeanCtor("[\"Option\",\"some\"]", Array[_x_5_8])
+    LeanCtor(LeanTag.Option_some, Array[_x_5_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -356,11 +356,11 @@ fun f_Option_instForIn_InferInstanceMembershipOfMonad_4c2d0159ae(
   _inst_1_0: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_1: LeanValue = leanField(_inst_1_0, 0);
     _toBind_2: LeanValue = leanField(_inst_1_0, 1);
     leanTag(_toApplicative_1) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_3: LeanValue = leanField(_toApplicative_1, 0);
       _toPure_4: LeanValue = leanField(_toApplicative_1, 1);
       _toSeq_5: LeanValue = leanField(_toApplicative_1, 2);
@@ -389,11 +389,11 @@ fun f_Option_instForMOfMonad_97f8ca40e3(
   _inst_1_0: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_1: LeanValue = leanField(_inst_1_0, 0);
     _toBind_2: LeanValue = leanField(_inst_1_0, 1);
     leanTag(_toApplicative_1) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_3: LeanValue = leanField(_toApplicative_1, 0);
       _toPure_4: LeanValue = leanField(_toApplicative_1, 1);
       _toSeq_5: LeanValue = leanField(_toApplicative_1, 2);
@@ -416,10 +416,10 @@ fun f_Option_instForIn_InferInstanceMembershipOfMonad_lam_0_0a71a82a16(
   _do_lift_1_1: LeanValue,
 ): LeanValue {
   leanTag(_do_lift_1_1) match {
-  | "[\"ForInStep\",\"done\"]" ->
+  | LeanTag.ForInStep_done ->
     _a_2_2: LeanValue = leanField(_do_lift_1_1, 0);
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_2_2])
-  | "[\"ForInStep\",\"yield\"]" ->
+  | LeanTag.ForInStep_yield ->
     _a_4_3: LeanValue = leanField(_do_lift_1_1, 0);
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_4_3])
   | _ -> leanFail("non-exhaustive Lean case")

@@ -7,14 +7,14 @@ fun f_AsyncList_waitFind_lam_0_62082c76fc(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_2_2: LeanValue = leanField(_x_1_1, 0);
     L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
-      LeanCtor("[\"Except\",\"error\"]", Array[_a_2_2]),
+      LeanCtor(LeanTag.Except_error, Array[_a_2_2]),
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_5_3: LeanValue = leanField(_x_1_1, 0);
     f_Lean_AsyncList_waitFind_fdb7796399(_runtime, _p_0, _a_5_3)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -33,25 +33,25 @@ fun f_Lean_AsyncList_waitFind_fdb7796399(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Lean\",\"AsyncList\",\"cons\"]" ->
+  | LeanTag.AsyncList_cons ->
     _hd_2_2: LeanValue = leanField(_x_1_1, 0);
     _tl_3_3: LeanValue = leanField(_x_1_1, 1);
     _x_4_5: LeanValue = leanApply(_runtime, _p_0, Array[_hd_2_2]);
     leanTag(_x_4_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       f_Lean_AsyncList_waitFind_fdb7796399(_runtime, _p_0, _tl_3_3)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       L4_Init_Core.f_Task_pure_8e8af46293(
         _runtime,
         LeanErased(),
         LeanCtor(
-          "[\"Except\",\"ok\"]",
-          Array[LeanCtor("[\"Option\",\"some\"]", Array[_hd_2_2])],
+          LeanTag.Except_ok,
+          Array[LeanCtor(LeanTag.Option_some, Array[_hd_2_2])],
         ),
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"AsyncList\",\"delayed\"]" ->
+  | LeanTag.AsyncList_delayed ->
     _tl_9_4: LeanValue = leanField(_x_1_1, 0);
     _f_10_10: LeanValue = LeanClosure(
       L4_Lean_Server_AsyncList.apply_f_AsyncList_waitFind_lam_0_62082c76fc,
@@ -63,13 +63,13 @@ fun f_Lean_AsyncList_waitFind_fdb7796399(
       _tl_9_4,
       _f_10_10,
     )
-  | "[\"Lean\",\"AsyncList\",\"nil\"]" ->
+  | LeanTag.AsyncList_nil ->
     L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.Option_none, Array[])],
       ),
     )
   | _ -> leanFail("non-exhaustive Lean case")

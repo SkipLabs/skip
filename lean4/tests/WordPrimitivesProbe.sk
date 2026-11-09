@@ -1,0 +1,669 @@
+// Compare statically selected wrappers with the generic dispatcher, whose
+// arithmetic is checked independently by tests/runtime.py against Python integers.
+class LeanWordProbe(
+  name: String,
+  kind: String,
+  operation: String,
+  invoke: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+) {}
+
+fun main(): void {
+  cases = Array[
+    LeanWordProbe("lean_uint8_sub", "uint8", "sub", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_sub_d0ab5af62e(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_usize_shift_right",
+      "usize",
+      "shift_right",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint8_lor", "uint8", "lor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_lor_32846b4b03(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_mod", "uint32", "mod", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_mod_62846e624b(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint64_mod", "uint64", "mod", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_mod_e07128cc7c(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_mod", "uint16", "mod", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_mod_8a2663e113(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_dec_lt", "uint16", "dec_lt", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_decLt_8ae88d04db(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint64_to_usize",
+      "uint64",
+      "to_usize",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint64_lor", "uint64", "lor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_lor_ecf41afb83(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint32_complement",
+      "uint32",
+      "complement",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt32_complement_484b03fd39(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_usize_mul", "usize", "mul", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_USize_mul_409e03f718(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint32_shift_right",
+      "uint32",
+      "shift_right",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt32_shiftRight_33090f8b80(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint64_dec_lt", "uint64", "dec_lt", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_decLt_2a0f258398(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint16_complement",
+      "uint16",
+      "complement",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt16_complement_087af106fa(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint8_land", "uint8", "land", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_land_d31c5d72bc(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_add", "uint8", "add", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_add_1552353faf(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint64_land", "uint64", "land", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_land_41c79517e7(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint8_shift_left",
+      "uint8",
+      "shift_left",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt8_shiftLeft_7caa138176(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint32_mul", "uint32", "mul", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_mul_f37e3656b2(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint64_shift_right",
+      "uint64",
+      "shift_right",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe(
+      "lean_usize_to_uint64",
+      "usize",
+      "to_uint64",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_USize_toUInt64_158104741e(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint64_complement",
+      "uint64",
+      "complement",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt64_complement_10079b9da3(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint16_xor", "uint16", "xor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_xor_b061e3877b(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_mod", "uint8", "mod", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_mod_3abd690e56(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_div", "uint32", "div", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_div_7bf8c9cda8(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_div", "uint16", "div", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_div_81532173dd(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint16_shift_right",
+      "uint16",
+      "shift_right",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt16_shiftRight_76be19490e(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint64_add", "uint64", "add", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_add_0bab798e0f(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint64_div", "uint64", "div", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_div_3a6c21eb5d(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_mul", "uint8", "mul", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_mul_1f0e4af9bd(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint64_mul", "uint64", "mul", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_mul_aa0247ad16(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_xor", "uint32", "xor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_xor_305b6d7bac(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_div", "uint8", "div", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_div_a378c96586(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_sub", "uint16", "sub", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_sub_b62438b4ac(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_usize_mod", "usize", "mod", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_USize_mod_bf195caf1e(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_land", "uint16", "land", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_land_01cb154555(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint64_sub", "uint64", "sub", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_sub_e9f146f97f(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint8_complement",
+      "uint8",
+      "complement",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt8_complement_b05623d7d9(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_usize_of_nat", "usize", "of_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_USize_ofNat32_87c6ea69f5(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint16_lor", "uint16", "lor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_lor_48ca73237a(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_add", "uint16", "add", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_add_01b6b1febf(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_neg", "uint8", "neg", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_neg_64c557b33f(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint8_xor", "uint8", "xor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt8_xor_dfa6919525(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint16_dec_le", "uint16", "dec_le", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_decLe_d43db69ae1(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint64_xor", "uint64", "xor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_lor", "uint32", "lor", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_lor_477ee673d4(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint64_neg", "uint64", "neg", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_neg_f540b999f1(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint32_shift_left",
+      "uint32",
+      "shift_left",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt32_shiftLeft_2be8f00e4b(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint64_dec_le", "uint64", "dec_le", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt64_decLe_6fc6cc2f1b(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint64_shift_left",
+      "uint64",
+      "shift_left",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt64_shiftLeft_22a3dd919b(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint8_shift_right",
+      "uint8",
+      "shift_right",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt8_shiftRight_42784549f2(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint32_land", "uint32", "land", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_land_597b5a0d65(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint16_neg", "uint16", "neg", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_neg_ddc7716518(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_usize_shift_left",
+      "usize",
+      "shift_left",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_USize_shiftLeft_afa761e806(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint16_mul", "uint16", "mul", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt16_mul_4aacc4c20d(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint16_shift_left",
+      "uint16",
+      "shift_left",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_Basic.f_UInt16_shiftLeft_af287aae1f(
+          runtime,
+          args[0],
+          args[1],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint32_neg", "uint32", "neg", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_UInt32_neg_96268cd86c(runtime, args[0])
+    ),
+    LeanWordProbe("lean_usize_land", "usize", "land", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint32_to_uint8",
+      "uint32",
+      "to_uint8",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt32_toUInt8_e61b5e14f2(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint64_to_uint16",
+      "uint64",
+      "to_uint16",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt64_toUInt16_e898b9f7ad(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_usize_dec_le", "usize", "dec_le", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_decLe_6ddbd478b6(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint64_of_nat", "uint64", "of_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt64_ofNat_fcf242b6af(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint8_to_uint32",
+      "uint8",
+      "to_uint32",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_usize_of_nat", "usize", "of_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint32_of_nat", "uint32", "of_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt32_ofNat_3133526b43(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint8_to_uint64",
+      "uint8",
+      "to_uint64",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt64_aa24868275(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint64_to_nat", "uint64", "to_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt64_toNat_07186ec958(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint32_to_uint16",
+      "uint32",
+      "to_uint16",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt32_toUInt16_d572624911(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint64_to_uint8",
+      "uint64",
+      "to_uint8",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt64_toUInt8_cd94ce1101(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint16_of_nat", "uint16", "of_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt16_ofNat_5fafc41fa9(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint64_to_uint32",
+      "uint64",
+      "to_uint32",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt64_toUInt32_cb6253b322(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint32_to_uint64",
+      "uint32",
+      "to_uint64",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt32_toUInt64_6676f2a52b(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_usize_to_nat", "usize", "to_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint32_sub", "uint32", "sub", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt32_sub_6a5ac5caf2(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint16_to_uint64",
+      "uint16",
+      "to_uint64",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt16_toUInt64_96ee59d123(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint16_to_nat", "uint16", "to_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt16_toNat_6096a4420b(runtime, args[0])
+    ),
+    LeanWordProbe("lean_usize_sub", "usize", "sub", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint8_to_nat", "uint8", "to_nat", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt8_toNat_fc0446beb8(runtime, args[0])
+    ),
+    LeanWordProbe("lean_usize_add", "usize", "add", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_uint32_add", "uint32", "add", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_UInt32_add_89bff4a85f(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe("lean_usize_dec_lt", "usize", "dec_lt", (runtime, args) ~>
+      L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanWordProbe(
+      "lean_uint16_to_uint32",
+      "uint16",
+      "to_uint32",
+      (runtime, args) ~>
+        L4_Init_Data_UInt_BasicAux.f_UInt16_toUInt32_1ed7ec9ff7(
+          runtime,
+          args[0],
+        )
+      ,
+    ),
+    LeanWordProbe("lean_uint16_to_nat", "uint16", "to_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt16_toBitVec_a619e1e726(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint8_dec_lt", "uint8", "dec_lt", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt8_decLt_2d8965d9e4(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_to_nat", "uint32", "to_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt32_toBitVec_4fbfac515c(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint32_to_nat", "uint32", "to_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(runtime, args[0])
+    ),
+    LeanWordProbe(
+      "lean_uint64_mix_hash",
+      "uint64",
+      "mix_hash",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_mixHash_f2b5fd4ac9(runtime, args[0], args[1])
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint16_of_nat_mk",
+      "uint16",
+      "of_nat_mk",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_UInt16_ofBitVec_08bd0638eb(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_usize_dec_eq", "usize", "dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_USize_decEq_0a1f5bb887(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint64_of_nat_mk",
+      "uint64",
+      "of_nat_mk",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_UInt64_ofBitVec_c56c62a8d6(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint32_dec_le", "uint32", "dec_le", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_to_nat", "uint8", "to_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt8_toBitVec_b5f42886fc(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint64_of_nat", "uint64", "of_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt64_ofNatLT_8ce88eb130(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint32_of_nat_mk",
+      "uint32",
+      "of_nat_mk",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_UInt32_ofBitVec_f7dadd201b(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe(
+      "lean_uint32_mix_hash",
+      "uint32",
+      "mix_hash",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_mixHash32_b14966a097(runtime, args[0], args[1])
+      ,
+    ),
+    LeanWordProbe("lean_uint16_dec_eq", "uint16", "dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_usize_of_nat", "usize", "of_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_USize_ofNatLT_84e9726cb8(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_dec_eq", "uint32", "dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt32_decEq_8e017905ad(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_of_nat", "uint32", "of_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_Char_ofNatAux_c52218ec65(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_dec_le", "uint8", "dec_le", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt8_decLe_e76284d58b(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint8_of_nat", "uint8", "of_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt8_ofNat_56001605a5(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint64_dec_eq", "uint64", "dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt64_decEq_97f4edb260(runtime, args[0], args[1])
+    ),
+    LeanWordProbe("lean_uint32_dec_lt", "uint32", "dec_lt", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt32_decLt_d96374b7f5(runtime, args[0], args[1])
+    ),
+    LeanWordProbe(
+      "lean_uint8_of_nat_mk",
+      "uint8",
+      "of_nat_mk",
+      (runtime, args) ~>
+        L4_Init_Prelude.f_UInt8_ofBitVec_70f8f0d83e(runtime, args[0])
+      ,
+    ),
+    LeanWordProbe("lean_uint64_to_nat", "uint64", "to_nat", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt64_toBitVec_8414fc4c05(runtime, args[0])
+    ),
+    LeanWordProbe("lean_uint8_dec_eq", "uint8", "dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_UInt8_decEq_926bae36a1(runtime, args[0], args[1])
+    ),
+  ];
+  runtime = mutable LeanExecution{};
+  profiled = mutable LeanExecution{profileRuntime => true};
+  checks = 0;
+  for (case in cases) {
+    numbers = Array[
+      0,
+      1,
+      2,
+      7,
+      31,
+      32,
+      63,
+      64,
+      65,
+      255,
+      256,
+      65535,
+      4294967295,
+      9223372036854775807,
+      Int::min,
+      -2,
+      -1,
+    ];
+    for (a in numbers) {
+      for (b in numbers) {
+        left: LeanValue = if (
+          case.operation == "of_nat" ||
+          case.operation == "of_nat_mk"
+        ) {
+          LeanNatural(LeanNat::fromWord(a))
+        } else {
+          leanWordValue(case.kind, a)
+        };
+        args = Array[left, leanWordValue(case.kind, b)];
+        expected = leanInvokePrimitive(runtime, case.name, case.name, args);
+        actual = case.invoke(runtime, args);
+        counted = case.invoke(profiled, args);
+        assert(native_eq(expected, actual) == 0);
+        assert(native_eq(expected, counted) == 0);
+        !checks = checks + 1
+      }
+    };
+    if (case.operation == "of_nat" || case.operation == "of_nat_mk") {
+      for (digits in Array[
+        "18446744073709551616",
+        "9999999999999999999999999999999999999999999999999999999999999999",
+      ]) {
+        // Some ofNat wrappers retain an erased bound proof argument.
+        args: Array<LeanValue> = Array[LeanScalar("nat", digits), LeanErased()];
+        assert(
+          native_eq(
+            leanInvokePrimitive(runtime, case.name, case.name, args),
+            case.invoke(runtime, args),
+          ) == 0,
+        )
+      }
+    }
+  };
+  assert(profiled.primitiveCount == checks);
+  assert(runtime.primitiveCount == 0);
+  print_string(
+    checks.toString() +
+      " direct word operations match generic dispatch, including profiled execution",
+  )
+}

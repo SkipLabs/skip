@@ -1,0 +1,140 @@
+// Cached metadata accessors, using the pinned Lean bit layout.
+module L4_Lean_Expr;
+
+// "Lean.Expr.data"
+fun f_Lean_Expr_data_8b4646e8ed(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  if (_runtime.profileRuntime) {
+    return f_Lean_Expr_data_8b4646e8ed_fallback(_runtime, expr)
+  };
+  // The primitive returns UInt64 even when boundary data used a scalar literal.
+  data = leanExprDataValue(expr);
+  data match {
+  | LeanWord("uint64", _) -> data
+  | _ -> LeanWord("uint64", leanWordBits(data))
+  }
+}
+
+// "Lean.Expr.hash"
+fun f_Lean_Expr_hash_9ccb6f80a4(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  LeanWord("uint64", leanExprData(expr).and(4294967295))
+}
+
+// "Lean.Expr.approxDepth"
+fun f_Lean_Expr_approxDepth_fc90d8477b(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  LeanWord("uint32", leanExprData(expr).ushr(32).and(255))
+}
+
+// "Lean.Expr.looseBVarRange"
+fun f_Lean_Expr_looseBVarRange_2e2851dc5d(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanNatValue(leanExprData(expr).ushr(44))
+}
+
+// "Lean.Expr.hasFVar"
+fun f_Lean_Expr_hasFVar_ec2474cd19(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).and(1.shl(40)) != 0)
+}
+
+// "Lean.Expr.hasExprMVar"
+fun f_Lean_Expr_hasExprMVar_0a7c4cebda(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).and(1.shl(41)) != 0)
+}
+
+// "Lean.Expr.hasLevelMVar"
+fun f_Lean_Expr_hasLevelMVar_f0ac0ca94d(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).and(1.shl(42)) != 0)
+}
+
+// "Lean.Expr.hasLevelParam"
+fun f_Lean_Expr_hasLevelParam_17262a6851(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).and(1.shl(43)) != 0)
+}
+
+// "Lean.Expr.hasMVar"
+fun f_Lean_Expr_hasMVar_6b07f9e1fb(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).and(3.shl(41)) != 0)
+}
+
+// "Lean.Expr.hasLooseBVars"
+fun f_Lean_Expr_hasLooseBVars_25b8fd0e1a(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  leanBool(leanExprData(expr).ushr(44) != 0)
+}
+
+// "Lean.Expr.Data.approxDepth"
+fun f_Expr_Data_approxDepth_8b0943e63e(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  LeanWord("uint8", leanWordBits(data).ushr(32).and(255))
+}
+
+// "Lean.Expr.Data.looseBVarRange"
+fun f_Expr_Data_looseBVarRange_8e964b131d(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  LeanWord("uint32", leanWordBits(data).ushr(44))
+}
+
+// "Lean.Expr.Data.hasFVar"
+fun f_Expr_Data_hasFVar_58a5cf3330(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(40)) != 0)
+}
+
+// "Lean.Expr.Data.hasExprMVar"
+fun f_Expr_Data_hasExprMVar_eccaaffcb0(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(41)) != 0)
+}
+
+// "Lean.Expr.Data.hasLevelMVar"
+fun f_Expr_Data_hasLevelMVar_4409fbfa06(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(42)) != 0)
+}
+
+// "Lean.Expr.Data.hasLevelParam"
+fun f_Expr_Data_hasLevelParam_48aa3fc148(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(43)) != 0)
+}
+
+module end;

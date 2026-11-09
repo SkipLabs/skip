@@ -26,14 +26,14 @@ fun f_Simp_Result_isRfl_f764f6452c(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"rfl\"]" ->
+  | LeanTag.Meta_Sym_Simp_Result_rfl ->
     _done_2_1: LeanValue = leanField(_x_1_0, 0);
     _contextDependent_3_2: LeanValue = leanField(_x_1_0, 1);
     leanTag(_done_2_1) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | _ -> LeanCtor(LeanTag.Bool_false, Array[])
   }
 }
 // "Lean.Meta.Sym.Simp.mkEqTransResult"
@@ -74,23 +74,23 @@ fun f_Sym_Simp_mkEqTransResult_495e03e9f4(
     pc match {
     | 0 ->
       leanTag(_frame[3]) match {
-      | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"rfl\"]" ->
+      | LeanTag.Meta_Sym_Simp_Result_rfl ->
         _frame.set(12, leanField(_frame[3], 0));
         _frame.set(13, leanField(_frame[3], 1));
         leanTag(_frame[4]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[13];
           _frame.set(18, _jump0);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[4];
           _frame.set(18, _jump0);
           !pc = 1;
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"step\"]" ->
+      | LeanTag.Meta_Sym_Simp_Result_step ->
         _frame.set(14, leanField(_frame[3], 0));
         _frame.set(15, leanField(_frame[3], 1));
         _frame.set(16, leanField(_frame[3], 2));
@@ -114,29 +114,29 @@ fun f_Sym_Simp_mkEqTransResult_495e03e9f4(
           ),
         );
         leanTag(_frame[21]) match {
-        | "[\"EST\",\"Out\",\"ok\"]" ->
+        | LeanTag.EST_Out_ok ->
           _frame.set(22, leanField(_frame[21], 0));
           _frame.set(23, leanField(_frame[21], 1));
           leanTag(_frame[4]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[17];
             _frame.set(26, _jump0);
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[4];
             _frame.set(26, _jump0);
             !pc = 2;
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"EST\",\"Out\",\"error\"]" ->
+        | LeanTag.EST_Out_error ->
           _frame.set(24, leanField(_frame[21], 0));
           _frame.set(25, leanField(_frame[21], 1));
           _frame.set(
             29,
             LeanCtor(
-              "[\"EST\",\"Out\",\"error\"]",
+              LeanTag.EST_Out_error,
               Array[_frame[24], _frame[25]],
             ),
           );
@@ -149,26 +149,26 @@ fun f_Sym_Simp_mkEqTransResult_495e03e9f4(
       _frame.set(
         19,
         LeanCtor(
-          "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"step\"]",
+          LeanTag.Meta_Sym_Simp_Result_step,
           Array[_frame[1], _frame[2], _frame[12], _frame[18]],
         ),
       );
       _frame.set(
         20,
-        LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[19], _frame[11]]),
+        LeanCtor(LeanTag.EST_Out_ok, Array[_frame[19], _frame[11]]),
       );
       return _frame[20]
     | 2 ->
       _frame.set(
         27,
         LeanCtor(
-          "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"step\"]",
+          LeanTag.Meta_Sym_Simp_Result_step,
           Array[_frame[14], _frame[22], _frame[16], _frame[26]],
         ),
       );
       _frame.set(
         28,
-        LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[27], _frame[23]]),
+        LeanCtor(LeanTag.EST_Out_ok, Array[_frame[27], _frame[23]]),
       );
       return _frame[28]
     | _ -> return leanFail("invalid join point")

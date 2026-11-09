@@ -8,7 +8,7 @@ fun f_IO_Error_otherErrorToString_504a9343ba(
   _x_1_2: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_2_4: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_runtime, _gist_0);
     _x_4_6: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -33,7 +33,7 @@ fun f_IO_Error_otherErrorToString_504a9343ba(
       _x_7_9,
       LeanText(")"),
     )
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_10_3: LeanValue = leanField(_x_1_2, 0);
     _x_11_12: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
       _runtime,
@@ -84,7 +84,7 @@ fun f_instInhabitedError_3960fb474b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"IO\",\"Error\",\"userError\"]",
+    LeanTag.IO_Error_userError,
     Array[LeanText("(`Inhabited.default` for `IO.Error`)")],
   )
 }
@@ -93,7 +93,7 @@ fun f_IO_Error_downCaseFirst_a0fdbd7d45(
   _runtime: mutable LeanExecution,
   _s_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
     _runtime,
     _s_0,
@@ -101,36 +101,36 @@ fun f_IO_Error_downCaseFirst_a0fdbd7d45(
   );
   _x_4_4: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
     _runtime,
-    LeanScalar("uint32", "65"),
+    LeanWord("uint32", 65),
     _x_2_2,
   );
   leanTag(_x_4_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
       _runtime,
       _s_0,
       _x_1_1,
       _x_2_2,
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_7_7: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
       _runtime,
       _x_2_2,
-      LeanScalar("uint32", "90"),
+      LeanWord("uint32", 90),
     );
     leanTag(_x_7_7) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
         _runtime,
         _s_0,
         _x_1_1,
         _x_2_2,
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_10_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt32_add_89bff4a85f(
         _runtime,
         _x_2_2,
-        LeanScalar("uint32", "32"),
+        LeanWord("uint32", 32),
       );
       L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
         _runtime,
@@ -148,7 +148,7 @@ fun f_IO_userError_436e50ab44(
   _runtime: mutable LeanExecution,
   _s_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"IO\",\"Error\",\"userError\"]", Array[_s_0])
+  LeanCtor(LeanTag.IO_Error_userError, Array[_s_0])
 }
 fun apply_f_IO_userError_436e50ab44(
   _runtime: mutable LeanExecution,
@@ -165,7 +165,7 @@ fun f_IO_Error_fopenErrorToString_432216b575(
   _x_1_3: LeanValue,
 ): LeanValue {
   leanTag(_x_1_3) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_2_5: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(_runtime, _gist_0);
     _x_4_7: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -195,7 +195,7 @@ fun f_IO_Error_fopenErrorToString_432216b575(
       _x_9_12,
       _fn_1,
     )
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_11_4: LeanValue = leanField(_x_1_3, 0);
     _x_12_14: LeanValue = f_IO_Error_downCaseFirst_a0fdbd7d45(
       _runtime,
@@ -262,14 +262,14 @@ fun f_IO_Error_toString_b58e96daa2(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"IO\",\"Error\",\"alreadyExists\"]" ->
+      | LeanTag.IO_Error_alreadyExists ->
         _frame.set(5, leanField(_frame[0], 0));
         _frame.set(6, leanField(_frame[0], 1));
         _frame.set(7, leanField(_frame[0], 2));
         leanTag(_frame[5]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(46, LeanText("already exists"));
-          _frame.set(47, LeanCtor("[\"Option\",\"some\"]", Array[_frame[7]]));
+          _frame.set(47, LeanCtor(LeanTag.Option_some, Array[_frame[7]]));
           _frame.set(
             48,
             f_IO_Error_otherErrorToString_504a9343ba(
@@ -280,10 +280,10 @@ fun f_IO_Error_toString_b58e96daa2(
             ),
           );
           return _frame[48]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(45, leanField(_frame[5], 0));
           _frame.set(49, LeanText("already exists"));
-          _frame.set(50, LeanCtor("[\"Option\",\"some\"]", Array[_frame[7]]));
+          _frame.set(50, LeanCtor(LeanTag.Option_some, Array[_frame[7]]));
           _frame.set(
             51,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -297,7 +297,7 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[51]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"otherError\"]" ->
+      | LeanTag.IO_Error_otherError ->
         _frame.set(8, leanField(_frame[0], 0));
         _frame.set(9, leanField(_frame[0], 1));
         _jump0 = _frame[8];
@@ -306,11 +306,11 @@ fun f_IO_Error_toString_b58e96daa2(
         _frame.set(2, _jump1);
         !pc = 1;
         void
-      | "[\"IO\",\"Error\",\"resourceBusy\"]" ->
+      | LeanTag.IO_Error_resourceBusy ->
         _frame.set(10, leanField(_frame[0], 0));
         _frame.set(11, leanField(_frame[0], 1));
         _frame.set(52, LeanText("resource busy"));
-        _frame.set(53, LeanCtor("[\"Option\",\"some\"]", Array[_frame[11]]));
+        _frame.set(53, LeanCtor(LeanTag.Option_some, Array[_frame[11]]));
         _frame.set(
           54,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -321,11 +321,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[54]
-      | "[\"IO\",\"Error\",\"resourceVanished\"]" ->
+      | LeanTag.IO_Error_resourceVanished ->
         _frame.set(12, leanField(_frame[0], 0));
         _frame.set(13, leanField(_frame[0], 1));
         _frame.set(55, LeanText("resource vanished"));
-        _frame.set(56, LeanCtor("[\"Option\",\"some\"]", Array[_frame[13]]));
+        _frame.set(56, LeanCtor(LeanTag.Option_some, Array[_frame[13]]));
         _frame.set(
           57,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -336,11 +336,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[57]
-      | "[\"IO\",\"Error\",\"unsupportedOperation\"]" ->
+      | LeanTag.IO_Error_unsupportedOperation ->
         _frame.set(14, leanField(_frame[0], 0));
         _frame.set(15, leanField(_frame[0], 1));
         _frame.set(58, LeanText("unsupported operation"));
-        _frame.set(59, LeanCtor("[\"Option\",\"some\"]", Array[_frame[15]]));
+        _frame.set(59, LeanCtor(LeanTag.Option_some, Array[_frame[15]]));
         _frame.set(
           60,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -351,11 +351,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[60]
-      | "[\"IO\",\"Error\",\"hardwareFault\"]" ->
+      | LeanTag.IO_Error_hardwareFault ->
         _frame.set(16, leanField(_frame[0], 0));
         _ = leanField(_frame[0], 1);
         _frame.set(61, LeanText("hardware fault"));
-        _frame.set(62, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        _frame.set(62, LeanCtor(LeanTag.Option_none, Array[]));
         _frame.set(
           63,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -366,11 +366,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[63]
-      | "[\"IO\",\"Error\",\"unsatisfiedConstraints\"]" ->
+      | LeanTag.IO_Error_unsatisfiedConstraints ->
         _frame.set(17, leanField(_frame[0], 0));
         _ = leanField(_frame[0], 1);
         _frame.set(64, LeanText("directory not empty"));
-        _frame.set(65, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        _frame.set(65, LeanCtor(LeanTag.Option_none, Array[]));
         _frame.set(
           66,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -381,11 +381,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[66]
-      | "[\"IO\",\"Error\",\"illegalOperation\"]" ->
+      | LeanTag.IO_Error_illegalOperation ->
         _frame.set(18, leanField(_frame[0], 0));
         _frame.set(19, leanField(_frame[0], 1));
         _frame.set(67, LeanText("illegal operation"));
-        _frame.set(68, LeanCtor("[\"Option\",\"some\"]", Array[_frame[19]]));
+        _frame.set(68, LeanCtor(LeanTag.Option_some, Array[_frame[19]]));
         _frame.set(
           69,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -396,11 +396,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[69]
-      | "[\"IO\",\"Error\",\"protocolError\"]" ->
+      | LeanTag.IO_Error_protocolError ->
         _frame.set(20, leanField(_frame[0], 0));
         _frame.set(21, leanField(_frame[0], 1));
         _frame.set(70, LeanText("protocol error"));
-        _frame.set(71, LeanCtor("[\"Option\",\"some\"]", Array[_frame[21]]));
+        _frame.set(71, LeanCtor(LeanTag.Option_some, Array[_frame[21]]));
         _frame.set(
           72,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -411,11 +411,11 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[72]
-      | "[\"IO\",\"Error\",\"timeExpired\"]" ->
+      | LeanTag.IO_Error_timeExpired ->
         _frame.set(22, leanField(_frame[0], 0));
         _frame.set(23, leanField(_frame[0], 1));
         _frame.set(73, LeanText("time expired"));
-        _frame.set(74, LeanCtor("[\"Option\",\"some\"]", Array[_frame[23]]));
+        _frame.set(74, LeanCtor(LeanTag.Option_some, Array[_frame[23]]));
         _frame.set(
           75,
           f_IO_Error_otherErrorToString_504a9343ba(
@@ -426,12 +426,12 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[75]
-      | "[\"IO\",\"Error\",\"interrupted\"]" ->
+      | LeanTag.IO_Error_interrupted ->
         _frame.set(24, leanField(_frame[0], 0));
         _frame.set(25, leanField(_frame[0], 1));
         _frame.set(26, leanField(_frame[0], 2));
         _frame.set(76, LeanText("interrupted system call"));
-        _frame.set(77, LeanCtor("[\"Option\",\"some\"]", Array[_frame[26]]));
+        _frame.set(77, LeanCtor(LeanTag.Option_some, Array[_frame[26]]));
         _frame.set(
           78,
           f_IO_Error_fopenErrorToString_432216b575(
@@ -443,12 +443,12 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[78]
-      | "[\"IO\",\"Error\",\"noFileOrDirectory\"]" ->
+      | LeanTag.IO_Error_noFileOrDirectory ->
         _frame.set(27, leanField(_frame[0], 0));
         _frame.set(28, leanField(_frame[0], 1));
         _ = leanField(_frame[0], 2);
         _frame.set(79, LeanText("no such file or directory"));
-        _frame.set(80, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        _frame.set(80, LeanCtor(LeanTag.Option_none, Array[]));
         _frame.set(
           81,
           f_IO_Error_fopenErrorToString_432216b575(
@@ -460,14 +460,14 @@ fun f_IO_Error_toString_b58e96daa2(
           ),
         );
         return _frame[81]
-      | "[\"IO\",\"Error\",\"invalidArgument\"]" ->
+      | LeanTag.IO_Error_invalidArgument ->
         _frame.set(29, leanField(_frame[0], 0));
         _frame.set(30, leanField(_frame[0], 1));
         _frame.set(31, leanField(_frame[0], 2));
         leanTag(_frame[29]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(83, LeanText("invalid argument"));
-          _frame.set(84, LeanCtor("[\"Option\",\"some\"]", Array[_frame[31]]));
+          _frame.set(84, LeanCtor(LeanTag.Option_some, Array[_frame[31]]));
           _frame.set(
             85,
             f_IO_Error_otherErrorToString_504a9343ba(
@@ -478,10 +478,10 @@ fun f_IO_Error_toString_b58e96daa2(
             ),
           );
           return _frame[85]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(82, leanField(_frame[29], 0));
           _frame.set(86, LeanText("invalid argument"));
-          _frame.set(87, LeanCtor("[\"Option\",\"some\"]", Array[_frame[31]]));
+          _frame.set(87, LeanCtor(LeanTag.Option_some, Array[_frame[31]]));
           _frame.set(
             88,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -495,21 +495,21 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[88]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"permissionDenied\"]" ->
+      | LeanTag.IO_Error_permissionDenied ->
         _frame.set(32, leanField(_frame[0], 0));
         _frame.set(33, leanField(_frame[0], 1));
         _frame.set(34, leanField(_frame[0], 2));
         leanTag(_frame[32]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _jump0 = _frame[33];
           _jump1 = _frame[34];
           _frame.set(1, _jump0);
           _frame.set(2, _jump1);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(89, leanField(_frame[32], 0));
-          _frame.set(90, LeanCtor("[\"Option\",\"none\"]", Array[]));
+          _frame.set(90, LeanCtor(LeanTag.Option_none, Array[]));
           _frame.set(
             91,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -523,14 +523,14 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[91]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"resourceExhausted\"]" ->
+      | LeanTag.IO_Error_resourceExhausted ->
         _frame.set(35, leanField(_frame[0], 0));
         _frame.set(36, leanField(_frame[0], 1));
         _frame.set(37, leanField(_frame[0], 2));
         leanTag(_frame[35]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(93, LeanText("resource exhausted"));
-          _frame.set(94, LeanCtor("[\"Option\",\"some\"]", Array[_frame[37]]));
+          _frame.set(94, LeanCtor(LeanTag.Option_some, Array[_frame[37]]));
           _frame.set(
             95,
             f_IO_Error_otherErrorToString_504a9343ba(
@@ -541,10 +541,10 @@ fun f_IO_Error_toString_b58e96daa2(
             ),
           );
           return _frame[95]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(92, leanField(_frame[35], 0));
           _frame.set(96, LeanText("resource exhausted"));
-          _frame.set(97, LeanCtor("[\"Option\",\"some\"]", Array[_frame[37]]));
+          _frame.set(97, LeanCtor(LeanTag.Option_some, Array[_frame[37]]));
           _frame.set(
             98,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -558,14 +558,14 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[98]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"inappropriateType\"]" ->
+      | LeanTag.IO_Error_inappropriateType ->
         _frame.set(38, leanField(_frame[0], 0));
         _frame.set(39, leanField(_frame[0], 1));
         _frame.set(40, leanField(_frame[0], 2));
         leanTag(_frame[38]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(100, LeanText("inappropriate type"));
-          _frame.set(101, LeanCtor("[\"Option\",\"some\"]", Array[_frame[40]]));
+          _frame.set(101, LeanCtor(LeanTag.Option_some, Array[_frame[40]]));
           _frame.set(
             102,
             f_IO_Error_otherErrorToString_504a9343ba(
@@ -576,10 +576,10 @@ fun f_IO_Error_toString_b58e96daa2(
             ),
           );
           return _frame[102]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(99, leanField(_frame[38], 0));
           _frame.set(103, LeanText("inappropriate type"));
-          _frame.set(104, LeanCtor("[\"Option\",\"some\"]", Array[_frame[40]]));
+          _frame.set(104, LeanCtor(LeanTag.Option_some, Array[_frame[40]]));
           _frame.set(
             105,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -593,14 +593,14 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[105]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"noSuchThing\"]" ->
+      | LeanTag.IO_Error_noSuchThing ->
         _frame.set(41, leanField(_frame[0], 0));
         _frame.set(42, leanField(_frame[0], 1));
         _frame.set(43, leanField(_frame[0], 2));
         leanTag(_frame[41]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _frame.set(107, LeanText("no such thing"));
-          _frame.set(108, LeanCtor("[\"Option\",\"some\"]", Array[_frame[43]]));
+          _frame.set(108, LeanCtor(LeanTag.Option_some, Array[_frame[43]]));
           _frame.set(
             109,
             f_IO_Error_otherErrorToString_504a9343ba(
@@ -611,10 +611,10 @@ fun f_IO_Error_toString_b58e96daa2(
             ),
           );
           return _frame[109]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(106, leanField(_frame[41], 0));
           _frame.set(110, LeanText("no such thing"));
-          _frame.set(111, LeanCtor("[\"Option\",\"some\"]", Array[_frame[43]]));
+          _frame.set(111, LeanCtor(LeanTag.Option_some, Array[_frame[43]]));
           _frame.set(
             112,
             f_IO_Error_fopenErrorToString_432216b575(
@@ -628,16 +628,16 @@ fun f_IO_Error_toString_b58e96daa2(
           return _frame[112]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"IO\",\"Error\",\"unexpectedEof\"]" ->
+      | LeanTag.IO_Error_unexpectedEof ->
         _frame.set(113, LeanText("end of file"));
         return _frame[113]
-      | "[\"IO\",\"Error\",\"userError\"]" ->
+      | LeanTag.IO_Error_userError ->
         _frame.set(44, leanField(_frame[0], 0));
         return _frame[44]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(3, LeanCtor("[\"Option\",\"none\"]", Array[]));
+      _frame.set(3, LeanCtor(LeanTag.Option_none, Array[]));
       _frame.set(
         4,
         f_IO_Error_otherErrorToString_504a9343ba(

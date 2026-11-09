@@ -40,11 +40,11 @@ fun f_instBEqProd_lam_0_bb81419f27(
   _x_4_3: LeanValue,
 ): LeanValue {
   leanTag(_x_3_2) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_5_4: LeanValue = leanField(_x_3_2, 0);
     _snd_6_5: LeanValue = leanField(_x_3_2, 1);
     leanTag(_x_4_3) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_7_6: LeanValue = leanField(_x_4_3, 0);
       _snd_8_7: LeanValue = leanField(_x_4_3, 1);
       _x_9_8: LeanValue = leanApply(
@@ -53,8 +53,8 @@ fun f_instBEqProd_lam_0_bb81419f27(
         Array[_fst_5_4, _fst_7_6],
       );
       leanTag(_x_9_8) match {
-      | "[\"Bool\",\"false\"]" -> _x_9_8
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_9_8
+      | LeanTag.Bool_true ->
         leanApply(_runtime, _inst_2_1, Array[_snd_6_5, _snd_8_7])
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -83,12 +83,12 @@ fun f_Prod_map_388028ac64(
   _x_1_2: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_2_3: LeanValue = leanField(_x_1_2, 0);
     _snd_3_4: LeanValue = leanField(_x_1_2, 1);
     _x_4_5: LeanValue = leanApply(_runtime, _f_0, Array[_fst_2_3]);
     _x_5_6: LeanValue = leanApply(_runtime, _g_1, Array[_snd_3_4]);
-    LeanCtor("[\"Prod\",\"mk\"]", Array[_x_4_5, _x_5_6])
+    LeanCtor(LeanTag.Prod_mk, Array[_x_4_5, _x_5_6])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -162,28 +162,28 @@ fun f_Prod_lexLtDec_9e9408a176(
   _x_5_4: LeanValue,
 ): LeanValue {
   leanTag(_x_4_3) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_5: LeanValue = leanField(_x_4_3, 0);
     _snd_6: LeanValue = leanField(_x_4_3, 1);
     leanTag(_x_5_4) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_7: LeanValue = leanField(_x_5_4, 0);
       _snd_8: LeanValue = leanField(_x_5_4, 1);
       _x_6_9: LeanValue = leanApply(_runtime, _inst_2_1, Array[_fst_5, _fst_7]);
       leanTag(_x_6_9) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_7_10: LeanValue = leanApply(
           _runtime,
           _inst_1_0,
           Array[_fst_5, _fst_7],
         );
         leanTag(_x_7_10) match {
-        | "[\"Bool\",\"false\"]" -> _x_7_10
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _x_7_10
+        | LeanTag.Bool_true ->
           leanApply(_runtime, _inst_3_2, Array[_snd_6, _snd_8])
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> _x_6_9
+      | LeanTag.Bool_true -> _x_6_9
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -199,19 +199,19 @@ fun f_instBEqOption_beq_b18dedf270(
   _x_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_3_2) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_5_4: LeanValue = leanField(_x_3_2, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_7_3: LeanValue = leanField(_x_2_1, 0);
     leanTag(_x_3_2) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_9_7: LeanValue = leanField(_x_3_2, 0);
       leanApply(_runtime, _inst_1_0, Array[_val_7_3, _val_9_7])
     | _ -> leanFail("non-exhaustive Lean case")

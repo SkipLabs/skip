@@ -4,7 +4,8 @@
 fun describeDecideValue(value: LeanValue, depth: Int): String {
   if (depth == 0) return "...";
   value match {
-  | LeanCtor(name, fields) ->
+  | LeanCtor(tag, fields) ->
+    name = tag.toString();
     if (
       name.contains("\"Environment\"") ||
       name.contains("\"Context\"") ||
@@ -42,7 +43,7 @@ fun decideProbe(): void {
     FileSystem.readTextFile("build/init-extensions.jsonl"),
   );
   store = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  runtime = mutable LeanExecution{store => Some(store), unboundedHeartbeats => true};
   leanInitializeExceptions(runtime);
   leanInitializeOptions(runtime);
   leanInitializeMetaExtensions(runtime);
@@ -66,8 +67,8 @@ fun decideProbe(): void {
   store.initPre();
   env = leanEnvironment(
     runtime,
-    LeanConstantsView("Init", constants),
-    LeanConstantsView("local", constants),
+    LeanConstantsView("Init", LeanConstantDirectory(constants)),
+    LeanConstantsView("local", LeanConstantDirectory(constants)),
     LeanUnavailable("imported environment header"),
     extensions.i0,
     extensions.i1,
@@ -92,11 +93,11 @@ fun decideProbe(): void {
     natName,
     leanBool(false),
   );
-  assert(leanTag(info) == "[\"Option\",\"some\"]");
+  assert(leanTag(info) == LeanTag.Option_some);
   assert(
-    leanTag(leanField(info, 0)) == "[\"Lean\",\"ConstantInfo\",\"inductInfo\"]",
+    leanTag(leanField(info, 0)) == LeanTag.ConstantInfo_inductInfo,
   );
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
   inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
     runtime,
@@ -107,11 +108,11 @@ fun decideProbe(): void {
     coreState,
     LeanErased(),
   );
-  assert(leanTag(inferred) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanTag(inferred) == LeanTag.EST_Out_ok);
   type = leanField(inferred, 0);
-  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(leanTag(type) == LeanTag.Expr_sort__impl);
   assert(
-    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+    leanTag(leanField(type, 1)) == LeanTag.Level_succ__impl,
   );
   print_string("Imported environment lookup and Meta.inferType Nat passed");
   ltName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
@@ -120,8 +121,8 @@ fun decideProbe(): void {
     LeanText("lt"),
   );
   levels = LeanCtor(
-    "[\"List\",\"cons\"]",
-    Array[LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]), nil],
+    LeanTag.List_cons,
+    Array[LeanCtor(LeanTag.Level_zero__impl, Array[]), nil],
   );
   lt = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, ltName, levels);
   instName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -157,7 +158,7 @@ fun decideProbe(): void {
     coreState,
     LeanErased(),
   );
-  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+  if (leanTag(result) != LeanTag.EST_Out_ok) {
     print_error(describeDecideValue(result, 14));
     leanFail("decide elaboration failed; raw diagnostic printed above")
   };

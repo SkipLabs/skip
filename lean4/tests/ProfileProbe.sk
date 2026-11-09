@@ -9,12 +9,12 @@ fun profileProbeAction(
 
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   options = LeanCtor(
-    "[\"_private\",\"Lean\",\"Data\",\"Options\",0,\"Lean\",\"Options\",\"mk\"]",
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
     Array[
       LeanCtor(
-        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        LeanTag.Std_DTreeMap_Internal_Impl_leaf,
         Array[],
       ),
       leanBool(false),
@@ -42,7 +42,7 @@ fun main(): void {
     LeanText("test"),
     options,
     action,
-    LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+    LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
   );
   assert(
     leanNat(value).toInt() == 42 &&

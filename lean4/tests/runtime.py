@@ -6,6 +6,7 @@ the pinned native Lean build; no exporter or transpiler participates in this tes
 """
 from pathlib import Path
 import json
+import math
 import os
 import random
 import subprocess
@@ -22,6 +23,8 @@ def main():
     with (BUILD / 'compile.log').open('w') as log:
         subprocess.run([compiler, '--capacity', '3G', '-o', str(binary),
                         *map(str, sorted((ROOT / 'src/Support').glob('*.sk'))),
+                        str(ROOT / 'src/Elaboration/SimpValues.sk'),
+                        str(ROOT / 'tests/SimpValues.sk'),
                         str(ROOT / 'tests/Runtime.sk')], check=True, stdout=log, stderr=log)
     rng = random.Random(89241)
     cases = []
@@ -29,20 +32,79 @@ def main():
     def case(command, expected):
         cases.append((command, '\t'.join(map(str, expected))))
 
+    # The pinned identity/ordinal inventory is the protocol oracle. Typed tags
+    # must preserve all identities, including different types with ordinal zero.
+    constructors = json.loads((ROOT/'provenance/constructors.json').read_text())
+    for name, info in sorted(constructors.items()):
+        case(f'constructor-tag\t{name}', [name, info['tag']])
+
     strings = ['', 'a', 'a\0', 'a\0b', 'a\0c', 'λ', '🙂', '中', 'z', 'aa']
     for a in strings:
         for b in strings:
             case(f'string-compare\t{a}\t{b}', [0 if a < b else 2 if a > b else 1])
 
-    naturals = [0, 1, 2, 999999999, 1000000000, 1000000001,
-                2**63 - 1, 2**63, 2**64 - 1, 2**64, 10**36 - 1]
+    naturals = [0, 1, 2, 255, 256, 257, 999999999, 1000000000, 1000000001,
+                3037000499, 3037000500, 2**63 - 2, 2**63 - 1, 2**63,
+                2**63 + 1, 2**64 - 1, 2**64, 10**36 - 1]
+    for value in naturals:
+        case(f'int-construction\t{value}', [value, -value-1])
+        if value < 2**64:
+            case(f'word-repr\t{value}', [value])
+    for text in strings:
+        for code in [0, 65, 97, 955, 0x1F642, 0x10FFFF]:
+            char = chr(code)
+            case(f'string-character\t{text}\t{code}',
+                 [','.join(map(str, char.encode('utf-8'))),
+                  ','.join(map(str, (text + char).encode('utf-8'))), int(char in text)])
     nat_pairs = [(a, b) for a in naturals for b in naturals]
+    for text in ['0', '00', '00000000000000000000000', '00000000000000000000007',
+                 '999999999999999999', '1000000000000000000']:
+        n = int(text)
+        case(f'nat\t{text}\t0', [n, n, 0, 0, n, 'false'])
     nat_pairs += [(rng.getrandbits(rng.randrange(1, 1025)),
                    rng.getrandbits(rng.randrange(1, 1025))) for _ in range(200)]
+    for value in naturals + [a for a, _ in nat_pairs]:
+        case(f'nat-canonical\t{value}', ['true'])
+        case(f'word-literal\t{value}', [value % MODULUS])
+    for digits in ['0', '0000000000000000000000000007', '18446744073709551616']:
+        case(f'word-literal\t{digits}', [int(digits) % MODULUS])
     for a, b in nat_pairs:
         case(f'nat\t{a}\t{b}', [a+b, max(0, a-b), a*b,
                                   a//b if b else 0, a % b if b else a,
                                   str(a < b).lower()])
+        case(f'nat-gcd\t{a}\t{b}', [math.gcd(a, b)])
+    for base in [0, 1, 2, 3, 10, 1000000000, 2**64 - 1, 10**100]:
+        for exponent in [0, 1, 2, 3, 7, 20]:
+            case(f'nat-pow\t{base}\t{exponent}', [base**exponent])
+    for base in [0, 1]:
+        for exponent in [2**32 - 1, 2**32, 2**80]:
+            case(f'nat-pow\t{base}\t{exponent}', [base])
+    signed = [0, 1, -1, 2, -2, 2**63, -(2**63), 10**100, -(10**100)]
+    int_pairs = [(a, b) for a in signed for b in signed]
+    int_pairs += [(rng.getrandbits(512) * rng.choice([-1, 1]),
+                   rng.getrandbits(512) * rng.choice([-1, 1])) for _ in range(100)]
+    for a, b in int_pairs:
+        case(f'int\t{a}\t{b}', [a+b, a-b, a*b, int(a == b), int(a < b),
+                                int(a <= b), -a, abs(a)])
+    for text in ['abc', 'aλ中🙂\0z']:
+        for offset, byte in enumerate(text.encode('utf-8')):
+            case(f'utf8-byte\t{text}\t{offset}', [byte])
+    for text in ['', 'abc', 'aλ中🙂\0z']:
+        encoded = text.encode('utf-8')
+        starts = {len(text[:i].encode('utf-8')): c for i, c in enumerate(text)}
+        valid = set(starts) | {len(encoded)}
+        positions = list(range(len(encoded) + 3)) + [2**80]
+        for offset in positions:
+            char = starts.get(offset, 'A')
+            previous = (max(0, offset - 1) if offset > len(encoded) or offset == 0
+                        else max(p for p in starts if p < offset))
+            case(f'utf8-total\t{text}\t{offset}', [ord(char), offset + len(char.encode('utf-8')),
+                  previous, int(offset in valid), int(offset >= len(encoded))])
+        for begin in positions:
+            for end in positions:
+                stop = end if end in valid else len(encoded)
+                result = encoded[begin:stop] if begin < end and begin in starts else b''
+                case(f'utf8-total-slice\t{text}\t{begin}\t{end}', [','.join(map(str, result))])
     shifts = [0, 1, 29, 30, 31, 32, 33, 63, 64, 65, 1023, 1024, 1025, 10**100]
     shift_pairs = [(a, b) for a in naturals for b in shifts]
     shift_pairs += [(rng.getrandbits(rng.randrange(1, 1025)), rng.randrange(2048))
@@ -99,6 +161,9 @@ def main():
     for observed, (command, expected) in zip(actual, cases):
         assert observed == expected, (command, observed, expected)
     failures = {
+        'unknown-constructor-tag': 'unknown Lean constructor ordinal: unknown constructor',
+        'nat-pow-overflow': 'Nat.pow exponent is too big',
+        'utf8-byte-bounds': 'Lean UTF-8 byte position out of bounds',
         'unknown': 'unimplemented primitive: Lean.Kernel.check [lean_kernel_check]',
         'publish-ref': 'cannot publish an execution-local Lean reference',
         'publish-unavailable': 'cannot publish an unimplemented Lean value: test import state',

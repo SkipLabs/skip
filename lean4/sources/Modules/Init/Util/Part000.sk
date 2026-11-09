@@ -7,16 +7,16 @@ fun f_ptrEqList_9b717c366c(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     leanTag(_x_2_1) match {
-    | "[\"List\",\"nil\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.List_nil -> LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_5_2: LeanValue = leanField(_x_1_0, 0);
     _tail_6_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_x_2_1) match {
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_cons ->
       _head_7_6: LeanValue = leanField(_x_2_1, 0);
       _tail_8_7: LeanValue = leanField(_x_2_1, 1);
       _x_9_8: LeanValue = f_ptrAddrUnsafe_e81d71e7bd(
@@ -35,12 +35,12 @@ fun f_ptrEqList_9b717c366c(
         _x_10_9,
       );
       leanTag(_x_11_10) match {
-      | "[\"Bool\",\"false\"]" -> _x_11_10
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_11_10
+      | LeanTag.Bool_true ->
         f_ptrEqList_9b717c366c(_runtime, _tail_6_3, _tail_8_7)
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }

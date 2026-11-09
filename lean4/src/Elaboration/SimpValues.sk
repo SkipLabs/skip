@@ -1,0 +1,121 @@
+// Exact ordering for immutable query inputs. Hashes are only search hints;
+// equality always compares complete values. Runtime numeric/array representations
+// of the same value have the same order, regardless of sharing or allocation.
+fun leanSimpScalarKind(kind: String): Int {
+  kind match {
+  | "nat" -> 3
+  | "uint8" -> 4
+  | "uint16" -> 5
+  | "uint32" -> 6
+  | "uint64" -> 7
+  | "usize" -> 8
+  | _ -> -1
+  }
+}
+
+fun leanSimpValueKind(value: LeanValue): Int {
+  value match {
+  | LeanErased() -> 0
+  | LeanUnavailable _ -> 1
+  | LeanText _ -> 2
+  | LeanNatural _ -> 3
+  | LeanScalar(kind, _)
+  | LeanWord(kind, _) ->
+    leanSimpScalarKind(kind)
+  | LeanCtor _ -> 9
+  | LeanArray _
+  | LeanPersistentArray _ ->
+    10
+  | _ -> -1
+  }
+}
+
+fun leanSimpValuesCompare(
+  left: Array<LeanValue>,
+  right: Array<LeanValue>,
+): Order {
+  for (i in Range(0, min(left.size(), right.size()))) {
+    result = leanSimpValueCompare(left[i], right[i]);
+    if (result != EQ()) return result
+  };
+  left.size().compare(right.size())
+}
+
+fun leanSimpValueCompare(left: LeanValue, right: LeanValue): Order {
+  if (native_eq(left, right) == 0) return EQ();
+  kind = leanSimpValueKind(left);
+  otherKind = leanSimpValueKind(right);
+  if (kind < 0 || otherKind < 0) leanFail("non-immutable simplifier query key");
+  if (kind != otherKind) return kind.compare(otherKind);
+  if (kind == 3) return leanNat(left).compare(leanNat(right));
+  if (kind >= 4 && kind <= 8) {
+    l = leanWordBits(left);
+    r = leanWordBits(right);
+    return if (l == r) EQ() else if (l.ult(r)) LT() else GT()
+  };
+  if (kind == 10) {
+    return leanSimpValuesCompare(leanArray(left), leanArray(right))
+  };
+  (left, right) match {
+  | (LeanErased(), LeanErased()) -> EQ()
+  | (LeanUnavailable(l), LeanUnavailable(r)) -> l.compare(r)
+  | (LeanText(l), LeanText(r)) -> l.compare(r)
+  | (LeanCtor(l, ls), LeanCtor(r, rs)) ->
+    tagOrder = l.toString().compare(r.toString());
+    if (tagOrder == EQ()) leanSimpValuesCompare(ls, rs) else tagOrder
+  | _ -> leanFail("invalid simplifier query key ordering")
+  }
+}
+
+// Validation follows the expression DAG, not its potentially exponential tree
+// expansion. A fresh validator is local to one boundary and never stored in a
+// query result. Hash collisions are resolved by LeanImmutableKey's full equality.
+mutable class LeanSimpValueValidator{
+  allowUnavailable: Bool = false,
+  visited: mutable Map<LeanImmutableKey, Bool> = mutable Map[],
+} {
+  mutable fun fields(values: Array<LeanValue>): Bool {
+    for (value in values) {
+      if (!this.check(value)) return false
+    };
+    true
+  }
+
+  mutable fun check(value: LeanValue): Bool {
+    value match {
+    | LeanUnavailable _ -> this.allowUnavailable
+    | LeanErased()
+    | LeanText _
+    | LeanNatural _ ->
+      true
+    | LeanScalar(kind, _)
+    | LeanWord(kind, _) ->
+      leanSimpScalarKind(kind) >= 0
+    | LeanArray _
+    | LeanPersistentArray _ ->
+      this.fields(leanArray(value))
+    | LeanCtor(tag, fields) ->
+      family = leanImmutableTagKind(tag);
+      if (
+        tag == LeanTag.Expr_mvar__impl ||
+        tag == LeanTag.Level_mvar__impl
+      ) return false;
+      if (family == 1 && leanExprData(value).and(3.shl(41)) != 0) return false;
+      if (
+        tag == LeanTag.Name_str__impl &&
+        leanText(fields[2]) == "_skip_simp_query"
+      ) return false;
+      memo = family != 0;
+      if (memo) {
+        this.visited.maybeGet(LeanImmutableKey(value)) match {
+        | Some(valid) -> return valid
+        | None() -> void
+        }
+      };
+      valid = this.fields(fields);
+      if (memo) this.visited.set(LeanImmutableKey(value), valid);
+      valid
+    | _ -> false
+    }
+  }
+}

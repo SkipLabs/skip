@@ -61,6 +61,7 @@ fun leanInstallImportedExtensions(
   scope: String,
   path: SKStore.DirName,
   imports: Array<LeanImportExtension>,
+  direct: Bool = false,
 ): (LeanValue, LeanValue) {
   byName: mutable Map<String, LeanImportExtension> = mutable Map[];
   for (entry in imports) {
@@ -94,7 +95,7 @@ fun leanInstallImportedExtensions(
     key = LeanExtensionKey(scope, name);
     slots.push(key);
     gen = leanField(descriptor, 5);
-    if (leanTag(gen) == "[\"Option\",\"some\"]") {
+    if (leanTag(gen) == LeanTag.Option_some) {
       if (leanNat(leanField(gen, 0)).toInt() != generations.size()) {
         leanFail("invalid Lean extension generation index")
       };
@@ -115,17 +116,29 @@ fun leanInstallImportedExtensions(
   if (leanNat(count).toInt() != generations.size()) {
     leanFail("invalid Lean tracked extension count")
   };
-  entries = runtime.store.mkdir(
-    LeanExtensionKey::keyType,
-    LeanExtensionFile::type,
-    path,
-    imports.map(entry ->
-      (
-        LeanExtensionKey(scope, leanNameKey(entry.name)),
-        LeanExtensionFile(entry.state, entry.generation),
-      )
-    ),
-  );
+  if (direct) {
+    return (
+      LeanArray(slots.toArray().map(key -> byName.get(key.name).state)),
+      LeanArray(
+        generations.toArray().map(key ->
+          byName.get(key.name).generation.fromSome()
+        ),
+      ),
+    )
+  };
+  entries = runtime
+    .context()
+    .mkdir(
+      LeanExtensionKey::keyType,
+      LeanExtensionFile::type,
+      path,
+      imports.map(entry ->
+        (
+          LeanExtensionKey(scope, leanNameKey(entry.name)),
+          LeanExtensionFile(entry.state, entry.generation),
+        )
+      ),
+    );
   (
     LeanTrackedExtensionArray(
       LeanExtensionArray(slots.toArray(), entries, false),

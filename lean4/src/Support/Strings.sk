@@ -1,5 +1,13 @@
 // Byte-oriented comparison used by Lean's string slices and pattern matching.
 // Positions may be inside a UTF-8 character; this operation does not decode them.
+fun leanUnicodeCharacter(value: LeanValue): Char {
+  code = leanWordBits(value);
+  if (!Char::isValidCharCodePoint(code)) {
+    leanFail("invalid Lean Unicode scalar")
+  };
+  Char::fromCode(code)
+}
+
 fun leanStringMemcmp(args: Array<LeanValue>): Int {
   left = leanText(args[0]).bytes();
   right = leanText(args[1]).bytes();
@@ -75,4 +83,53 @@ fun leanStringExtract(text: String, begin: LeanNat, end: LeanNat): String {
     leanFail("invalid Lean UTF-8 slice boundary")
   };
   String.unsafeSlice(text, b, e)
+}
+
+// Lean's total raw-position operations accept end/out-of-range positions and
+// interior UTF-8 bytes. These cases are specified values, not panic recovery.
+fun leanStringGet(text: String, position: LeanNat): Int {
+  bytes = text.bytes();
+  if (position >= LeanNat::fromInt(bytes.size())) return 'A'.code();
+  if (bytes[position.toInt()].toInt().and(192) == 128) return 'A'.code();
+  leanStringDecodeChar(text, position)
+}
+
+fun leanStringNext(text: String, position: LeanNat): LeanNat {
+  bytes = text.bytes();
+  if (position >= LeanNat::fromInt(bytes.size())) {
+    return position.add(LeanNat::fromInt(1))
+  };
+  first = bytes[position.toInt()].toInt();
+  width = if (first.and(224) == 192) 2 else if (first.and(240) == 224) {
+    3
+  } else if (first.and(248) == 240) 4 else {
+    1
+  };
+  position.add(LeanNat::fromInt(width))
+}
+
+fun leanStringPrevious(text: String, position: LeanNat): LeanNat {
+  bytes = text.bytes();
+  if (position.isZero() || position > LeanNat::fromInt(bytes.size())) {
+    return position.sub(LeanNat::fromInt(1))
+  };
+  index = position.toInt() - 1;
+  while (index > 0 && bytes[index].toInt().and(192) == 128) !index = index - 1;
+  LeanNat::fromInt(index)
+}
+
+fun leanStringValidPosition(text: String, position: LeanNat): Bool {
+  bytes = text.bytes();
+  if (position > LeanNat::fromInt(bytes.size())) return false;
+  position == LeanNat::fromInt(bytes.size()) ||
+    bytes[position.toInt()].toInt().and(192) != 128
+}
+
+fun leanStringExtractTotal(text: String, begin: LeanNat, end: LeanNat): String {
+  size = LeanNat::fromInt(text.bytes().size());
+  if (begin >= end || begin >= size || !leanStringValidPosition(text, begin)) {
+    return ""
+  };
+  stop = if (end > size || !leanStringValidPosition(text, end)) size else end;
+  leanStringExtract(text, begin, stop)
 }

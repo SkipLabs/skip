@@ -1,0 +1,46 @@
+// Plain, already-formatted diagnostics only. Expression/goal pretty printing
+// and lazy MessageData evaluation remain explicitly unsupported by this bridge.
+fun leanPlainFormat(format: LeanValue): ?String {
+  leanTag(format) match {
+  | LeanTag.Std_Format_nil -> Some("")
+  | LeanTag.Std_Format_line -> Some("\n")
+  | LeanTag.Std_Format_text -> Some(leanText(leanField(format, 0)))
+  | LeanTag.Std_Format_group -> leanPlainFormat(leanField(format, 0))
+  | LeanTag.Std_Format_nest | LeanTag.Std_Format_tag ->
+    leanPlainFormat(leanField(format, 1))
+  | LeanTag.Std_Format_append ->
+    (
+      leanPlainFormat(leanField(format, 0)),
+      leanPlainFormat(leanField(format, 1)),
+    ) match {
+    | (Some(left), Some(right)) -> Some(left + right)
+    | _ -> None()
+    }
+  | _ -> None()
+  }
+}
+
+fun leanPlainMessage(message: LeanValue): ?String {
+  leanTag(message) match {
+  | LeanTag.MessageData_ofFormatWithInfos ->
+    leanPlainFormat(leanField(leanField(message, 0), 0))
+  | LeanTag.MessageData_group ->
+    leanPlainMessage(leanField(message, 0))
+  | LeanTag.MessageData_withContext
+  | LeanTag.MessageData_withNamingContext
+  | LeanTag.MessageData_ofOriginatingSyntax
+  | LeanTag.MessageData_ofWidget
+  | LeanTag.MessageData_nest
+  | LeanTag.MessageData_tagged ->
+    leanPlainMessage(leanField(message, 1))
+  | LeanTag.MessageData_compose ->
+    (
+      leanPlainMessage(leanField(message, 0)),
+      leanPlainMessage(leanField(message, 1)),
+    ) match {
+    | (Some(left), Some(right)) -> Some(left + right)
+    | _ -> None()
+    }
+  | _ -> None()
+  }
+}

@@ -1,0 +1,462 @@
+// Differential checks against retained implementations. This probe needs no
+// imported environment: reaching one in a leaf case is a failure.
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  defaults = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  config = leanField(leanField(defaults, 0), 0);
+  flags = Array[0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 15, 16, 17, 18, 19];
+  checks = 0;
+  for (transparency in Array[
+    "all",
+    "default",
+    "reducible",
+    "instances",
+    "none",
+    "implicit",
+  ]) {
+    for (eta in Array["all", "notClasses", "none"]) {
+      for (proj in Array["no", "yes", "yesWithDelta", "yesWithDeltaI"]) {
+        for (fill in Array[false, true]) {
+          for (toggle in Range(-1, flags.size())) {
+            fields = Array::fillBy(20, i -> leanField(config, i)).clone();
+            for (i in Range(0, flags.size())) {
+              fields.set(flags[i], leanBool(if (i == toggle) !fill else fill))
+            };
+            fields.set(
+              9,
+              LeanCtor(
+                leanConstructorTag(
+                  "[\"Lean\",\"Meta\",\"TransparencyMode\",\"" +
+                    transparency +
+                    "\"]",
+                ),
+                Array[],
+              ),
+            );
+            fields.set(
+              10,
+              LeanCtor(
+                leanConstructorTag(
+                  "[\"Lean\",\"Meta\",\"EtaStructMode\",\"" + eta + "\"]",
+                ),
+                Array[],
+              ),
+            );
+            fields.set(
+              14,
+              LeanCtor(
+                leanConstructorTag(
+                  "[\"Lean\",\"Meta\",\"ProjReductionKind\",\"" + proj + "\"]",
+                ),
+                Array[],
+              ),
+            );
+            c = LeanCtor(leanTag(config), fields.chill());
+            expected = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a_fallback(
+              runtime,
+              c,
+            );
+            actual = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+              runtime,
+              c,
+            );
+            assert(leanWordBits(expected) == leanWordBits(actual));
+            !checks = checks + 1
+          }
+        }
+      }
+    }
+  };
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  kind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  empty = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  cdecl = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    empty,
+    name,
+    name,
+    prop,
+    binder,
+    kind,
+  );
+  dependent = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+    runtime,
+    empty,
+    name,
+    name,
+    prop,
+    prop,
+    leanBool(false),
+    kind,
+  );
+  nondependent = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+    runtime,
+    empty,
+    name,
+    name,
+    prop,
+    prop,
+    leanBool(true),
+    kind,
+  );
+  core = leanCoreContext("<meta-fast-path-probe>", "");
+  state = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreState = runtime.newRef(
+    leanCoreState(runtime, LeanUnavailable("probe environment")),
+  );
+  lit = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(37));
+  lam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name, binder, prop, x);
+  all = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name, binder, prop, x);
+  for (locals in Array[cdecl, dependent, nondependent]) {
+    context = leanReplaceField(defaults, 3, locals);
+    for (base in Array[prop, x, lit, lam, all]) {
+      annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+        runtime,
+        LeanCtor(LeanTag.List_nil, Array[]),
+        base,
+      );
+      for (e in Array[base, annotated]) {
+        saved = runtime.checkpoint();
+        original = saved.restoreRaw();
+        fast = saved.restoreRaw();
+        expected = L4_Lean_Meta_WHNF.f_whnfCore_go_spec_3_85c62e30bd_fallback(
+          original,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        actual = L4_Lean_Meta_WHNF.f_whnfCore_go_spec_3_85c62e30bd(
+          fast,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        assert(native_eq(expected, actual) == 0);
+        assert(
+          native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+        );
+        if (leanSameObject(base, lam) == 0 && leanSameObject(base, all) == 0) {
+          expectedType = L4_Lean_Meta_InferType.f_Meta_inferTypeImp_infer_d48462d789_fallback(
+            original,
+            e,
+            context,
+            state,
+            core,
+            coreState,
+            LeanErased(),
+          );
+          actualType = L4_Lean_Meta_InferType.f_Meta_inferTypeImp_infer_d48462d789(
+            fast,
+            e,
+            context,
+            state,
+            core,
+            coreState,
+            LeanErased(),
+          );
+          assert(native_eq(expectedType, actualType) == 0);
+          assert(
+            native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+          )
+        }
+      }
+    }
+  };
+
+  // Cache miss, hit and disabled-cache paths, including argument collection.
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+  identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    name,
+    binder,
+    prop,
+    bound,
+  );
+  app = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, x);
+  binding = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    name,
+    prop,
+    x,
+    bound,
+    leanBool(false),
+  );
+  for (enabled in Array[false, true]) {
+    context = leanReplaceField(
+      leanReplaceField(defaults, 3, cdecl),
+      10,
+      leanBool(enabled),
+    );
+    for (e in Array[identity, app, binding, all]) {
+      saved = runtime.checkpoint();
+      original = saved.restoreRaw();
+      fast = saved.restoreRaw();
+      for (_ in Range(0, 2)) {
+        expected = L4_Lean_Meta_InferType.f_Meta_inferTypeImp_infer_d48462d789_fallback(
+          original,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        actual = L4_Lean_Meta_InferType.f_Meta_inferTypeImp_infer_d48462d789(
+          fast,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        assert(native_eq(expected, actual) == 0);
+        assert(
+          native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+        )
+      }
+    }
+  };
+
+  // Composite WHNF with beta/zeta/iota policy variations. No environment lookup
+  // is valid for these local heads or for a constant at whnfCore (no delta).
+  constant = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    name,
+    LeanCtor(LeanTag.List_nil, Array[]),
+  );
+  localApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, x, prop);
+  have = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    name,
+    prop,
+    x,
+    bound,
+    leanBool(true),
+  );
+  unused = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    name,
+    prop,
+    x,
+    prop,
+    leanBool(false),
+  );
+  compositeChecks = 0;
+  for (mask in Range(0, 32)) {
+    changed = config;
+    for ((field, bit) in Array[(13, 0), (15, 1), (18, 2), (17, 3), (12, 4)]) {
+      !changed = leanReplaceField(
+        changed,
+        field,
+        leanBool(mask.and(1.shl(bit)) != 0),
+      )
+    };
+    keyed = LeanCtor(
+      leanTag(leanField(defaults, 0)),
+      Array[
+        changed,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, changed),
+      ],
+    );
+    for (locals in Array[cdecl, dependent, nondependent]) {
+      context = leanReplaceField(
+        leanReplaceField(defaults, 0, keyed),
+        3,
+        locals,
+      );
+      for (e in Array[constant, localApp, app, binding, have, unused]) {
+        saved = runtime.checkpoint();
+        original = saved.restoreRaw();
+        fast = saved.restoreRaw();
+        expected = L4_Lean_Meta_WHNF.f_whnfCore_go_spec_3_85c62e30bd_fallback(
+          original,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        actual = L4_Lean_Meta_WHNF.f_whnfCore_go_spec_3_85c62e30bd(
+          fast,
+          e,
+          context,
+          state,
+          core,
+          coreState,
+          LeanErased(),
+        );
+        assert(native_eq(expected, actual) == 0);
+        assert(
+          native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+        );
+        !compositeChecks = compositeChecks + 1
+      }
+    }
+  };
+  print_string(
+    compositeChecks.toString() +
+      " composite WHNF results and state snapshots match",
+  );
+  print_string(
+    checks.toString() +
+      " configuration keys and WHNF/inference leaf cases match retained implementations",
+  );
+  // Exercise configuration strengthening and recursion limits at the public
+  // inference entry, including cache state and successful/error world results.
+  entryChecks = 0;
+  for (transparency in Array[
+    LeanTag.Meta_TransparencyMode_all,
+    LeanTag.Meta_TransparencyMode_default,
+    LeanTag.Meta_TransparencyMode_reducible,
+    LeanTag.Meta_TransparencyMode_instances,
+    LeanTag.Meta_TransparencyMode_none,
+    LeanTag.Meta_TransparencyMode_implicit,
+  ]) {
+    for (setting in Range(0, 8)) {
+      cfg = leanReplaceField(config, 9, LeanCtor(transparency, Array[]));
+      if (setting >= 1 && setting <= 5) {
+        !cfg = leanReplaceField(
+          cfg,
+          Array[12, 13, 15, 16, 18][setting - 1],
+          leanBool(false),
+        )
+      };
+      if (setting == 6) {
+        !cfg = leanReplaceField(
+          cfg,
+          10,
+          LeanCtor(LeanTag.Meta_EtaStructMode_none, Array[]),
+        )
+      };
+      if (setting == 7) {
+        !cfg = leanReplaceField(
+          cfg,
+          14,
+          LeanCtor(LeanTag.Meta_ProjReductionKind_no, Array[]),
+        )
+      };
+      for (unusedEnabled in Array[false, true]) {
+        changed = leanReplaceField(cfg, 17, leanBool(unusedEnabled));
+        keyed = LeanCtor(
+          LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+          Array[
+            changed,
+            L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, changed),
+          ],
+        );
+        context = leanReplaceField(
+          leanReplaceField(defaults, 3, cdecl),
+          0,
+          keyed,
+        );
+        limited = leanReplaceField(
+          core,
+          0,
+          leanReplaceField(leanField(core, 0), 3, LeanNatLiterals.n1),
+        );
+        unlimited = leanReplaceField(
+          core,
+          0,
+          leanReplaceField(leanField(core, 0), 3, LeanNatLiterals.n0),
+        );
+        for (entryCore in Array[
+          core,
+          limited,
+          leanReplaceField(limited, 1, LeanNatLiterals.n1),
+          unlimited,
+        ]) {
+          for (expr in Array[prop, x, identity, app, binding, all]) {
+            saved = runtime.checkpoint();
+            original = saved.restoreRaw();
+            fast = saved.restoreRaw();
+            expected = L4_Lean_Meta_InferType.f_Lean_Meta_inferTypeImp_31f204953c_fallback(
+              original,
+              expr,
+              context,
+              state,
+              entryCore,
+              coreState,
+              leanNatValue(37),
+            );
+            actual = L4_Lean_Meta_InferType.f_Lean_Meta_inferTypeImp_31f204953c(
+              fast,
+              expr,
+              context,
+              state,
+              entryCore,
+              coreState,
+              leanNatValue(37),
+            );
+            assert(native_eq(expected, actual) == 0);
+            assert(
+              native_eq(original.checkpoint().refs, fast.checkpoint().refs) ==
+                0,
+            );
+            !entryChecks = entryChecks + 1
+          }
+        }
+      }
+    }
+  };
+  print_string(
+    entryChecks.toString() +
+      " inference-entry results and state snapshots match",
+  );
+  unusedChecks = 0;
+  for (mask in Range(0, 8)) {
+    cfg = config;
+    for ((field, bit) in Array[(15, 0), (17, 1), (18, 2)]) {
+      !cfg = leanReplaceField(cfg, field, leanBool(mask.and(1.shl(bit)) != 0))
+    };
+    keyed = LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        cfg,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, cfg),
+      ],
+    );
+    context = leanReplaceField(defaults, 0, keyed);
+    for (base in Array[prop, binding, have, unused, app]) {
+      annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+        runtime,
+        LeanCtor(LeanTag.List_nil, Array[]),
+        base,
+      );
+      for (expr in Array[base, annotated]) {
+        expected = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_consumeLetIfZeta_c3f72853e8_fallback(
+          runtime,
+          expr,
+          context,
+          leanNatValue(37),
+        );
+        actual = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_consumeLetIfZeta_c3f72853e8(
+          runtime,
+          expr,
+          context,
+          leanNatValue(37),
+        );
+        assert(native_eq(expected, actual) == 0);
+        !unusedChecks = unusedChecks + 1
+      }
+    }
+  };
+  print_string(unusedChecks.toString() + " unused-let policy cases match");
+}

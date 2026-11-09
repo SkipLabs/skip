@@ -10,24 +10,33 @@ never rewrites source files.
 ```sh
 cd /home/julienv/skip/lean4
 export SKC="$PWD/../skiplang/compiler/stage1/bin/skc"
-skargo build
-skargo run --bin lean4-smoke
+skargo check
+skargo build --release
+skargo run --release --bin lean4-smoke
 ```
 
 Use the repository compiler, which includes the memory fixes required by this
 large program. The installed `/usr/local/bin/skc` predates those fixes. Keep
-`target/` between runs: the latest incremental build passed in 25.72 seconds
-(19.01 GiB peak). Earlier builds took 35.68–205.53 seconds, depending on the
-changes. These are build measurements, not incremental elaboration benchmarks.
+`target/` between runs. Build time and peak memory depend strongly on the changed
+types and functions; the current measurements and cache-recovery notes are in
+[SIMPLIFIER_PLAN.md](SIMPLIFIER_PLAN.md). These are build measurements, not
+incremental elaboration benchmarks.
 
 ## Maintained source
+
+Future refactoring work should use the repository skill
+[lean-skip-refactor](skills/lean-skip-refactor/SKILL.md). It covers idiomatic Skip
+representations, semantic invariants, incremental builds and measurement.
+The example-scoped [rewrite plan](REWRITE_PLAN.md) describes worker ownership,
+human review, validation, and the timing assessment after the rewrite.
 
 - `sources/Modules/`: every elaborator-owned function and its dependency closure,
   Edit these files directly; use `skfmt` for formatting.
 - `sources/Additional/`: other declarations from the import closure. They remain implemented or explicitly stubbed, with no duplicates of
   declarations in `Modules/`. They are outside the normal build selection.
 - `sources/build.txt`: the normal build's source manifest. `build.sk` only reads
-  this file and supplies its paths to Skargo.
+  this file and supplies its paths to Skargo, registering each path as an input
+  so edits outside `src/` trigger an incremental rebuild.
 - `src/Support/`: shared Skip runtime representations and explicit unsupported
   runtime operations.
 - `src/Runtime/`: runtime operations that use maintained Lean constructors.
@@ -51,6 +60,27 @@ There is one application package. This layout preserves the existing build
 selection; it does not use libraries to isolate compilation.
 
 ## Incremental elaboration
+
+[SIMPLIFIER_PLAN.md](SIMPLIFIER_PLAN.md) tracks the current target: conditional
+rewriting with roughly ten seconds of elaboration, faster first proof execution
+and rechecking, and a script comparing native Lean with Skip. The kernel stays
+unchanged. The [GCD experiment](GCD_PLAN.md) and broader
+[research plan](RESEARCH_PLAN.md) are deferred.
+
+The current priority is raw execution near native Lean's performance, before
+further SKStore work. Run the small baseline with:
+
+```sh
+./run-raw.sh --depth 6 --runs 1
+```
+
+This retains `target/`, prepares immutable inputs, executes the proof in native
+Lean and Skip, and independently kernel-checks Skip's proof. Raw elaboration
+uses direct maps/arrays and has no dependency-tracking context. Prepared inputs
+still load through the existing mapped snapshot infrastructure. The supported
+input is the fixed typed simplifier workload, not a general Lean source frontend.
+See the plan for remaining limitations and separate timing phases. Skip itself
+must remain unchanged; compiler/runtime changes require a separate discussion.
 
 [INCREMENTAL.md](INCREMENTAL.md) records the implementation plan, restrictions,
 correctness requirements, and measurement policy for the `limit < 10 := by decide`
@@ -138,7 +168,20 @@ python3 tools/probe.py
 python3 tools/probe.py --name meta --driver tests/MetaProbe.sk --include src/Bootstrap/Core.sk
 python3 tools/probe.py --name store --driver tests/StoreProbe.sk
 python3 tools/probe.py --name expr --driver tests/ExprProbe.sk
+python3 tools/probe.py --name metadata --release --driver tests/MetadataProbe.sk
+python3 tools/probe.py --name names --release --driver tests/NameProbe.sk
 python3 tools/probe.py --name heartbeats --driver tests/HeartbeatProbe.sk
+python3 tools/probe.py --name simp-loop --release --driver tests/SimpLoopProbe.sk \
+  --include src/Bootstrap/Initialize.sk --include src/Bootstrap/Options.sk \
+  --include src/Bootstrap/Core.sk --include src/Bootstrap/Environment.sk
+python3 tools/probe.py --name propositions --release --driver tests/PropositionProbe.sk \
+  --include src/Bootstrap/Initialize.sk --include src/Bootstrap/Options.sk \
+  --include src/Bootstrap/Core.sk --include src/Bootstrap/Environment.sk
+python3 tools/probe.py --name defeq-quick --release --driver tests/DefEqQuickProbe.sk \
+  --include src/Bootstrap/Initialize.sk --include src/Bootstrap/Options.sk \
+  --include src/Bootstrap/Core.sk --include src/Bootstrap/Environment.sk \
+  --include src/Bootstrap/Exceptions.sk --include src/Bootstrap/Extensions.sk \
+  --include src/Bootstrap/SimpInitialization.sk --include src/Bootstrap/ImportData.sk
 ```
 
 The runtime tests compare arithmetic with independent Python integers and hashes
@@ -147,6 +190,29 @@ function bodies and all their dependencies to shorten runtime iteration; their
 source hashes are recorded under `build/probes/`. They never replace missing
 functions with stubs or invoke the transpiler. The full build remains
 `skargo build`.
+
+The simplifier-loop probe compares its structured implementation with the
+retained original, including state snapshots, cache reuse, callback outcomes,
+step limits and recursion limits. Whole-theorem runs additionally submit the
+constructed proof to the native Lean kernel.
+
+The metadata probe compares direct bit-field accessors with the retained original
+implementations across every expression/level constructor, boundary bits, mixed
+bit patterns, boxed words and scalar literals. It also checks universe zero's
+special metadata value.
+The name probe checks construction, unsigned hash ordering and collision
+tie-breaking, including natural suffixes beyond UInt64 and Unicode strings.
+The proposition probe checks structured classification against the original
+implementations, comparing results and reference snapshots across universe
+substitution, metavariable assignments, dependent binders and lookup errors.
+
+For diagnostics, `lean4-simp --raw-session SNAPSHOT MANIFEST` accepts the same
+step manifest as `--session` (`label`, `inputs`, `proof`), but creates fresh raw
+proof state for every step and uses no SKStore queries. Only immutable imports
+survive between steps. Its warm timings do not establish first-run parity.
+The corresponding native diagnostic is `lean --run tools/SimpReference.lean
+--repeat COUNT`, with `LEAN_PATH` pointing to the prepared input module. It
+creates fresh Meta/Core state and checks each proof with the native kernel.
 
 To prepare checked, immutable `Init` declarations and exercise imported lookup:
 
@@ -228,9 +294,21 @@ the probe's standard input.
 
 `tests/ExprReference.lean` supplies independent native-runtime metadata for the
 11 substitution/lifting cases, 338 Expr comparisons and 64 Level comparisons in
-`tests/ExprProbe.sk`. `tests/ExtensionReference.lean` checks native class/instance
-lookups against `tests/ExtensionProbe.sk`. Focused probes compile at
-`-O0` to shorten iteration and are not performance measurements.
+`tests/ExprProbe.sk`, plus expression ordering, abstraction and budgeted equality.
+To check those results automatically:
+
+```sh
+python3 tools/probe.py --name expr --release --driver tests/ExprProbe.sk > build/expr.log
+source /home/julienv/lean4/build/release/env.sh
+lean --run tests/ExprReference.lean > build/expr-reference.log
+python3 tests/check_expr.py build/expr.log build/expr-reference.log
+```
+
+Budget exhaustion can differ with object sharing; every definite answer must
+agree, and the largest test budget must resolve all comparisons.
+`tests/ExtensionReference.lean` checks native class/instance lookups against
+`tests/ExtensionProbe.sk`. Focused probes default to `-O0`; `--release` enables
+optimization. Neither is a substitute for the full theorem measurements.
 
 A one-time supplemental import added three modules implementing native Lean
 runtime bridges absent from the original `Lean.Elab` closure. Its provenance is

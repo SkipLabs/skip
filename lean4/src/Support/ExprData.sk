@@ -1,22 +1,43 @@
 // Cached metadata layout from Lean's Expr and Level runtime representation.
 // The constructors and reduction algorithms remain in sources/Modules/Lean/.
-fun leanExprData(expr: LeanValue): Int {
+fun leanExprDataValue(expr: LeanValue): LeanValue {
   leanTag(expr) match {
-  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
-    leanWordBits(leanField(expr, 0))
+  | LeanTag.Expr_bvar__impl
+  | LeanTag.Expr_fvar__impl
+  | LeanTag.Expr_mvar__impl
+  | LeanTag.Expr_sort__impl
+  | LeanTag.Expr_const__impl
+  | LeanTag.Expr_app__impl
+  | LeanTag.Expr_lam__impl
+  | LeanTag.Expr_forallE__impl
+  | LeanTag.Expr_letE__impl
+  | LeanTag.Expr_lit__impl
+  | LeanTag.Expr_mdata__impl
+  | LeanTag.Expr_proj__impl ->
+    leanField(expr, 0)
   | _ -> leanFail("expected a Lean Expr")
   }
+}
+
+fun leanExprData(expr: LeanValue): Int {
+  leanWordBits(leanExprDataValue(expr))
+}
+
+fun leanLevelDataValue(level: LeanValue): LeanValue {
+  leanTag(level) match {
+  | LeanTag.Level_zero__impl -> LeanWord("uint64", 2221)
+  | LeanTag.Level_succ__impl
+  | LeanTag.Level_max__impl
+  | LeanTag.Level_imax__impl
+  | LeanTag.Level_param__impl
+  | LeanTag.Level_mvar__impl ->
+    leanField(level, 0)
+  | _ -> leanFail("expected a Lean Level")
+  }
+}
+
+fun leanLevelData(level: LeanValue): Int {
+  leanWordBits(leanLevelDataValue(level))
 }
 
 fun leanExprMakeData(args: Array<LeanValue>): LeanValue {

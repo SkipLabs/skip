@@ -1,0 +1,311 @@
+// Differential proposition checks include declarations, universe substitution,
+// metavariable assignments, binder scopes and error/state propagation.
+fun propProbeList(values: Array<LeanValue>): LeanValue {
+  result: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  index = values.size();
+  while (index > 0) {
+    !index = index - 1;
+    !result = LeanCtor(LeanTag.List_cons, Array[values[index], result])
+  };
+  result
+}
+
+fun propProbeCall(
+  runtime: mutable LeanExecution,
+  original: Bool,
+  which: Int,
+  subst: LeanValue,
+  expr: LeanValue,
+  arity: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (which == 0) {
+    method = if (original) {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isPropQuickCore_35cdb9cd39_fallback
+    } else {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isPropQuickCore_35cdb9cd39
+    };
+    return method(runtime, subst, expr, context, state, core, coreState, world)
+  };
+  method = if (which == 1) {
+    if (original) {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isArrowProp_446653b016_fallback
+    } else {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isArrowProp_446653b016
+    }
+  } else {
+    if (original) {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isArrowProposition_d1b375b0b4_fallback
+    } else {
+      L4_Lean_Meta_InferType.f_Lean_Meta_isArrowProposition_d1b375b0b4
+    }
+  };
+  method(runtime, subst, expr, arity, context, state, core, coreState, world)
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeOptions(runtime);
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  xName = name("x");
+  mName = name("m");
+  uName = name("u");
+  unknown = name("unknown");
+  cName = name("C");
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  mu = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, mName);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+  sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u);
+  sortM = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, mu);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  localKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  emptyLocals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+    runtime,
+  );
+  locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    emptyLocals,
+    xName,
+    xName,
+    prop,
+    binder,
+    localKind,
+  );
+  defaults = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  context = leanReplaceField(defaults, 3, locals);
+  initialState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+    runtime,
+    leanField(initialState, 0),
+    mName,
+    mName,
+    locals,
+    LeanArray(Array[]),
+    sortM,
+    LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+    LeanNatLiterals.n0,
+  );
+  !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(
+    runtime,
+    mctx,
+    mName,
+  );
+  state = runtime.newRef(leanReplaceField(initialState, 0, mctx));
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constant = LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[cName, propProbeList(Array[uName]), sortU],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  );
+  constants.set(leanNameKey(cName), LeanConstantFile(constant, None()));
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView(
+      "imports",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    LeanConstantsView("locals", LeanConstantMap(constants.chill())),
+    leanEmptyEnvironmentHeader(),
+    LeanArray(Array[]),
+    LeanArray(Array[]),
+    false,
+    LeanNatLiterals.n0,
+  );
+  core = leanUnboundedCoreContext(runtime, "<proposition-probe>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, environment));
+  b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+  m = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mName);
+  values: mutable Vector<LeanValue> = mutable Vector[];
+  for (e in Array[
+    prop,
+    type,
+    sortU,
+    sortM,
+    b0,
+    b1,
+    x,
+    m,
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(3)),
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      cName,
+      propProbeList(Array[u]),
+    ),
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      cName,
+      propProbeList(Array[zero]),
+    ),
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, cName, nil),
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, unknown, nil),
+    L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, unknown),
+    L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, unknown),
+  ]) values.push(e);
+  for (e in values.toArray()) {
+    values.push(L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, nil, e));
+    values.push(
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, xName, binder, prop, e),
+    );
+    values.push(
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, xName, binder, prop, e),
+    );
+    values.push(
+      L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+        runtime,
+        xName,
+        prop,
+        x,
+        e,
+        leanBool(false),
+      ),
+    );
+    values.push(L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, e, x))
+  };
+  // Applied bound variables and dependent binders exercise numArgs/idx replay.
+  applied = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, b0, b1);
+  arrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    xName,
+    binder,
+    prop,
+    prop,
+  );
+  values.push(applied);
+  values.push(
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      xName,
+      binder,
+      arrow,
+      applied,
+    ),
+  );
+  values.push(
+    L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+      runtime,
+      cName,
+      LeanNatLiterals.n0,
+      x,
+    ),
+  );
+  count = 0;
+  errors = 0;
+  inputs = values.toArray();
+  for (assignment in Array[None(), Some(zero), Some(one)]) {
+    assigned = assignment match {
+    | None() -> mctx
+    | Some(level) ->
+      L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+        runtime,
+        mctx,
+        mName,
+        level,
+      )
+    };
+    runtime.writeRef(state, Some(leanReplaceField(initialState, 0, assigned)));
+    for (levels in Array[
+      nil,
+      propProbeList(Array[zero]),
+      propProbeList(Array[one]),
+      propProbeList(Array[mu]),
+    ]) {
+      params = if (leanTag(levels) == LeanTag.List_nil) nil else {
+        propProbeList(Array[uName])
+      };
+      subst = LeanCtor(
+        LeanTag.Private_Lean_Meta_InferType_0_Lean_Meta_LevelSubst_mk,
+        Array[params, levels],
+      );
+      for (index in Range(0, inputs.size())) {
+        expr = inputs[index];
+        for (which in Range(0, 3)) {
+          arities = if (which == 0) Array[LeanNatLiterals.n0] else {
+            Array[
+              LeanNatLiterals.n0,
+              LeanNatLiterals.n1,
+              leanNatValue(2),
+              leanNatValue(4),
+              LeanNatLiterals.n18446744073709551616,
+            ]
+          };
+          for (arity in arities) {
+            saved = runtime.checkpoint();
+            original = saved.restoreRaw();
+            fast = saved.restoreRaw();
+            expected = propProbeCall(
+              original,
+              true,
+              which,
+              subst,
+              expr,
+              arity,
+              context,
+              state,
+              core,
+              coreState,
+              leanNatValue(37),
+            );
+            actual = propProbeCall(
+              fast,
+              false,
+              which,
+              subst,
+              expr,
+              arity,
+              context,
+              state,
+              core,
+              coreState,
+              leanNatValue(37),
+            );
+            if (
+              native_eq(expected, actual) != 0 ||
+              native_eq(original.checkpoint().refs, fast.checkpoint().refs) != 0
+            ) {
+              leanFail(
+                "proposition mismatch: method " +
+                  which.toString() +
+                  " expression " +
+                  index.toString(),
+              )
+            };
+            if (leanTag(actual) == LeanTag.EST_Out_error) !errors = errors + 1;
+            !count = count + 1
+          }
+        }
+      }
+    }
+  };
+  assert(errors > 0);
+  print_string(
+    count.toString() +
+      " proposition comparisons passed (" +
+      errors.toString() +
+      " errors)",
+  )
+}

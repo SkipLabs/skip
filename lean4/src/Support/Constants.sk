@@ -8,18 +8,28 @@ class LeanConstantFile(
   moduleIndex: ?Int,
 ) extends SKStore.File
 
-class LeanConstantsView(
-  scope: String,
-  entries: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
-) {
+base class LeanConstantStorage {
+  children =
+  | LeanConstantDirectory(
+    entries: SKStore.EHandle<LeanConstantKey, LeanConstantFile>,
+  )
+  | LeanConstantMap(entries: Map<String, LeanConstantFile>)
+}
+
+class LeanConstantsView(scope: String, storage: LeanConstantStorage) {
   fun lookup(
     runtime: mutable LeanExecution,
     name: LeanValue,
   ): ?LeanConstantFile {
-    key = LeanConstantKey(this.scope, leanNameKey(name));
+    nameKey = leanNameKey(name);
+    entries = this.storage match {
+    | LeanConstantMap(values) -> return values.maybeGet(nameKey)
+    | LeanConstantDirectory(entries) -> entries
+    };
+    key = LeanConstantKey(this.scope, nameKey);
     // Reading the empty array is intentional: a later insertion must invalidate
     // computations that depended on this name being absent.
-    values = this.entries.getArray(runtime.store, key);
+    values = entries.getArray(runtime.context(), key);
     if (values.size() > 1) {
       leanFail("multiple constants in one environment slot")
     };
@@ -31,15 +41,15 @@ class LeanConstantsView(
 // Cached hashes are intentionally excluded from the semantic identity of names.
 fun leanNameKey(name: LeanValue): String {
   leanTag(name) match {
-  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" -> "a"
-  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+  | LeanTag.Name_anonymous__impl -> "a"
+  | LeanTag.Name_str__impl ->
     text = leanText(leanField(name, 2));
     leanNameKey(leanField(name, 1)) +
       "s" +
       text.bytes().size().toString() +
       ":" +
       text
-  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+  | LeanTag.Name_num__impl ->
     leanNameKey(leanField(name, 1)) +
       "n" +
       leanNat(leanField(name, 2)).toString() +
@@ -54,8 +64,8 @@ fun leanLocalConstantLookup(
   name: LeanValue,
 ): LeanValue {
   view.lookup(runtime, name) match {
-  | Some(entry) -> LeanCtor("[\"Option\",\"some\"]", Array[entry.value])
-  | None() -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | Some(entry) -> LeanCtor(LeanTag.Option_some, Array[entry.value])
+  | None() -> LeanCtor(LeanTag.Option_none, Array[])
   }
 }
 
@@ -65,7 +75,7 @@ fun leanImportedConstantLookup(
   name: LeanValue,
   indexOnly: Bool,
 ): LeanValue {
-  if (leanTag(imported) != "[\"Lean\",\"ImportedConsts\",\"mk\"]") {
+  if (leanTag(imported) != LeanTag.ImportedConsts_mk) {
     return leanFail("invalid Lean imported constant map")
   };
   leanField(imported, 1) match {
@@ -73,7 +83,7 @@ fun leanImportedConstantLookup(
     view.lookup(runtime, name) match {
     | None() ->
       if (indexOnly) leanNatValue(0) else {
-        LeanCtor("[\"Option\",\"none\"]", Array[])
+        LeanCtor(LeanTag.Option_none, Array[])
       }
     | Some(entry) ->
       index = entry.moduleIndex match {
@@ -82,10 +92,10 @@ fun leanImportedConstantLookup(
       };
       if (indexOnly) leanNatValue(index + 1) else {
         LeanCtor(
-          "[\"Option\",\"some\"]",
+          LeanTag.Option_some,
           Array[
             LeanCtor(
-              "[\"Prod\",\"mk\"]",
+              LeanTag.Prod_mk,
               Array[entry.value, leanNatValue(index)],
             ),
           ],

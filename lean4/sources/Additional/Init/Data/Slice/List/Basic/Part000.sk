@@ -88,13 +88,13 @@ fun f_instSliceableListSliceNat_2_lam_0_71924a4f59(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_xs_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
     _list_2: LeanValue = leanField(_xs_0, 0);
     _stop_3: LeanValue = leanField(_xs_0, 1);
     leanTag(_stop_3) match {
-    | "[\"Option\",\"none\"]" ->
+    | LeanTag.Option_none ->
       f_List_toUnboundedSlice_db531d028c(_runtime, _list_2, _range_1)
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_2_4: LeanValue = leanField(_stop_3, 0);
       f_List_toSlice_8730c3cffe(_runtime, _list_2, _range_1, _val_2_4)
     | _ -> leanFail("non-exhaustive Lean case")
@@ -144,8 +144,8 @@ fun f_List_toUnboundedSlice_db531d028c(
     _as_0,
   );
   LeanCtor(
-    "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]",
-    Array[_x_1_2, LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Std_Slice_Internal_ListSliceData_mk,
+    Array[_x_1_2, LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 fun apply_f_List_toUnboundedSlice_db531d028c(
@@ -235,15 +235,15 @@ fun f_List_toSlice_8730c3cffe(
     _stop_2,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     LeanCtor(
-      "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]",
+      LeanTag.Std_Slice_Internal_ListSliceData_mk,
       Array[
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
-        LeanCtor("[\"Option\",\"some\"]", Array[LeanScalar("nat", "0")]),
+        LeanCtor(LeanTag.List_nil, Array[]),
+        LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n0]),
       ],
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_6_8: LeanValue = L4_Init_Data_List_Basic.f_List_drop_152ce24d64(
       _runtime,
       _start_1,
@@ -255,8 +255,8 @@ fun f_List_toSlice_8730c3cffe(
       _start_1,
     );
     LeanCtor(
-      "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]",
-      Array[_x_6_8, LeanCtor("[\"Option\",\"some\"]", Array[_x_7_9])],
+      LeanTag.Std_Slice_Internal_ListSliceData_mk,
+      Array[_x_6_8, LeanCtor(LeanTag.Option_some, Array[_x_7_9])],
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -268,7 +268,7 @@ fun f_instSliceableListNatListSlice_1_lam_0_c16c00e924(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_range_1) match {
-  | "[\"Std\",\"Rco\",\"mk\"]" ->
+  | LeanTag.Std_Rco_mk ->
     _lower_2: LeanValue = leanField(_range_1, 0);
     _upper_3: LeanValue = leanField(_range_1, 1);
     f_List_toSlice_8730c3cffe(_runtime, _xs_0, _lower_2, _upper_3)
@@ -303,12 +303,12 @@ fun f_instSliceableListSliceNat_6_lam_0_48c90638e4(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
-          _frame.set(8, LeanScalar("nat", "1"));
+        | LeanTag.Option_none ->
+          _frame.set(8, LeanNatLiterals.n1);
           _frame.set(
             9,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -321,9 +321,9 @@ fun f_instSliceableListSliceNat_6_lam_0_48c90638e4(
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(7, leanField(_frame[3], 0));
-          _frame.set(10, LeanScalar("nat", "1"));
+          _frame.set(10, LeanNatLiterals.n1);
           _frame.set(
             11,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -341,12 +341,12 @@ fun f_instSliceableListSliceNat_6_lam_0_48c90638e4(
             ),
           );
           leanTag(_frame[12]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[11];
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[7];
             _frame.set(4, _jump0);
             !pc = 1;
@@ -358,7 +358,7 @@ fun f_instSliceableListSliceNat_6_lam_0_48c90638e4(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("nat", "0"));
+      _frame.set(5, LeanNatLiterals.n0);
       _frame.set(
         6,
         f_List_toSlice_8730c3cffe(_runtime, _frame[2], _frame[5], _frame[4]),
@@ -404,7 +404,7 @@ fun f_instSliceableListNatListSlice_7_lam_0_9642901c1f(
   _xs_0: LeanValue,
   _range_1: LeanValue,
 ): LeanValue {
-  f_List_toSlice_8730c3cffe(_runtime, _xs_0, LeanScalar("nat", "0"), _range_1)
+  f_List_toSlice_8730c3cffe(_runtime, _xs_0, LeanNatLiterals.n0, _range_1)
 }
 fun apply_f_instSliceableListNatListSlice_7_lam_0_9642901c1f(
   _runtime: mutable LeanExecution,
@@ -422,7 +422,7 @@ fun f_instSliceableListNatListSlice_8_lam_0_2bd83a3514(
   _xs_0: LeanValue,
   _x_1_1: LeanValue,
 ): LeanValue {
-  f_List_toUnboundedSlice_db531d028c(_runtime, _xs_0, LeanScalar("nat", "0"))
+  f_List_toUnboundedSlice_db531d028c(_runtime, _xs_0, LeanNatLiterals.n0)
 }
 fun apply_f_instSliceableListNatListSlice_8_lam_0_2bd83a3514(
   _runtime: mutable LeanExecution,
@@ -452,13 +452,13 @@ fun f_instSliceableListSliceNat_1_lam_0_45ed88569a(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Rco\",\"mk\"]" ->
+          | LeanTag.Std_Rco_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(8, leanField(_frame[1], 1));
             _jump0 = _frame[8];
@@ -467,10 +467,10 @@ fun f_instSliceableListSliceNat_1_lam_0_45ed88569a(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(7, leanField(_frame[3], 0));
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Rco\",\"mk\"]" ->
+          | LeanTag.Std_Rco_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(9, leanField(_frame[1], 1));
             _frame.set(
@@ -482,12 +482,12 @@ fun f_instSliceableListSliceNat_1_lam_0_45ed88569a(
               ),
             );
             leanTag(_frame[10]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[9];
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[7];
               _frame.set(4, _jump0);
               !pc = 1;
@@ -502,7 +502,7 @@ fun f_instSliceableListSliceNat_1_lam_0_45ed88569a(
       }
     | 1 ->
       leanTag(_frame[1]) match {
-      | "[\"Std\",\"Rco\",\"mk\"]" ->
+      | LeanTag.Std_Rco_mk ->
         _frame.set(5, leanField(_frame[1], 0));
         _ = leanField(_frame[1], 1);
         _frame.set(
@@ -596,13 +596,13 @@ fun f_instSliceableListNatListSlice_4_lam_0_2ee332045f(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_range_1) match {
-  | "[\"Std\",\"Roo\",\"mk\"]" ->
+  | LeanTag.Std_Roo_mk ->
     _lower_2: LeanValue = leanField(_range_1, 0);
     _upper_3: LeanValue = leanField(_range_1, 1);
     _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _lower_2,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_List_toSlice_8730c3cffe(_runtime, _xs_0, _x_2_5, _upper_3)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -627,7 +627,7 @@ fun f_instSliceableListNatListSlice_5_lam_0_c0fb7cd0ef(
   _x_2_3: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
     _runtime,
     _range_1,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   f_List_toUnboundedSlice_db531d028c(_runtime, _xs_0, _x_2_3)
 }
@@ -648,10 +648,10 @@ fun f_instSliceableListNatListSlice_3_lam_0_da0e05c056(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_range_1) match {
-  | "[\"Std\",\"Roc\",\"mk\"]" ->
+  | LeanTag.Std_Roc_mk ->
     _lower_2: LeanValue = leanField(_range_1, 0);
     _upper_3: LeanValue = leanField(_range_1, 1);
-    _x_1_4: LeanValue = LeanScalar("nat", "1");
+    _x_1_4: LeanValue = LeanNatLiterals.n1;
     _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _lower_2,
@@ -740,23 +740,23 @@ fun f_instSliceableListSliceNat_5_lam_0_658032bf32(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_xs_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
     _list_2: LeanValue = leanField(_xs_0, 0);
     _stop_3: LeanValue = leanField(_xs_0, 1);
     leanTag(_stop_3) match {
-    | "[\"Option\",\"none\"]" ->
+    | LeanTag.Option_none ->
       _x_2_6: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _range_1,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_List_toUnboundedSlice_db531d028c(_runtime, _list_2, _x_2_6)
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_4_4: LeanValue = leanField(_stop_3, 0);
       _x_6_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _range_1,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_List_toSlice_8730c3cffe(_runtime, _list_2, _x_6_9, _val_4_4)
     | _ -> leanFail("non-exhaustive Lean case")
@@ -811,8 +811,8 @@ fun f_List_toSlice_closed_1_fd3f34835e(
 ): LeanValue {
   _x_33_0: LeanValue = f_List_toSlice_closed_0_98903d594b(_runtime);
   LeanCtor(
-    "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]",
-    Array[LeanCtor("[\"List\",\"nil\"]", Array[]), _x_33_0],
+    LeanTag.Std_Slice_Internal_ListSliceData_mk,
+    Array[LeanCtor(LeanTag.List_nil, Array[]), _x_33_0],
   )
 }
 // "instSliceableListNatListSlice_6._redArg"
@@ -892,16 +892,16 @@ fun f_instSliceableListSliceNat_7_lam_0_1dafdc17ad(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _jump0 = _frame[1];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(7, leanField(_frame[3], 0));
           _frame.set(
             8,
@@ -912,12 +912,12 @@ fun f_instSliceableListSliceNat_7_lam_0_1dafdc17ad(
             ),
           );
           leanTag(_frame[8]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[1];
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[7];
             _frame.set(4, _jump0);
             !pc = 1;
@@ -929,7 +929,7 @@ fun f_instSliceableListSliceNat_7_lam_0_1dafdc17ad(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("nat", "0"));
+      _frame.set(5, LeanNatLiterals.n0);
       _frame.set(
         6,
         f_List_toSlice_8730c3cffe(_runtime, _frame[2], _frame[5], _frame[4]),
@@ -949,7 +949,7 @@ fun apply_f_instSliceableListSliceNat_7_lam_0_1dafdc17ad(
 fun f_List_toSlice_closed_0_98903d594b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Option\",\"some\"]", Array[LeanScalar("nat", "0")])
+  LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n0])
 }
 // "instSliceableListSliceNat_8._redArg._lam_0"
 fun f_instSliceableListSliceNat_8_lam_0_a547ada9f6(
@@ -986,9 +986,9 @@ fun f_instSliceableListNatListSlice_6_lam_0_06bf2b6d24(
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
     _runtime,
     _range_1,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
-  f_List_toSlice_8730c3cffe(_runtime, _xs_0, LeanScalar("nat", "0"), _x_3_4)
+  f_List_toSlice_8730c3cffe(_runtime, _xs_0, LeanNatLiterals.n0, _x_3_4)
 }
 fun apply_f_instSliceableListNatListSlice_6_lam_0_06bf2b6d24(
   _runtime: mutable LeanExecution,
@@ -1042,13 +1042,13 @@ fun f_instSliceableListSliceNat_4_lam_0_532e8aacba(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Roo\",\"mk\"]" ->
+          | LeanTag.Std_Roo_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(10, leanField(_frame[1], 1));
             _jump0 = _frame[10];
@@ -1057,10 +1057,10 @@ fun f_instSliceableListSliceNat_4_lam_0_532e8aacba(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(9, leanField(_frame[3], 0));
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Roo\",\"mk\"]" ->
+          | LeanTag.Std_Roo_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(11, leanField(_frame[1], 1));
             _frame.set(
@@ -1072,12 +1072,12 @@ fun f_instSliceableListSliceNat_4_lam_0_532e8aacba(
               ),
             );
             leanTag(_frame[12]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[11];
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[9];
               _frame.set(4, _jump0);
               !pc = 1;
@@ -1092,10 +1092,10 @@ fun f_instSliceableListSliceNat_4_lam_0_532e8aacba(
       }
     | 1 ->
       leanTag(_frame[1]) match {
-      | "[\"Std\",\"Roo\",\"mk\"]" ->
+      | LeanTag.Std_Roo_mk ->
         _frame.set(5, leanField(_frame[1], 0));
         _ = leanField(_frame[1], 1);
-        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(6, LeanNatLiterals.n1);
         _frame.set(
           7,
           L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[5], _frame[6]),
@@ -1182,16 +1182,16 @@ fun f_instSliceableListSliceNat_lam_0_8e869ee7eb(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Rcc\",\"mk\"]" ->
+          | LeanTag.Std_Rcc_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(8, leanField(_frame[1], 1));
-            _frame.set(9, LeanScalar("nat", "1"));
+            _frame.set(9, LeanNatLiterals.n1);
             _frame.set(
               10,
               L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1206,13 +1206,13 @@ fun f_instSliceableListSliceNat_lam_0_8e869ee7eb(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(7, leanField(_frame[3], 0));
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Rcc\",\"mk\"]" ->
+          | LeanTag.Std_Rcc_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(11, leanField(_frame[1], 1));
-            _frame.set(12, LeanScalar("nat", "1"));
+            _frame.set(12, LeanNatLiterals.n1);
             _frame.set(
               13,
               L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1230,12 +1230,12 @@ fun f_instSliceableListSliceNat_lam_0_8e869ee7eb(
               ),
             );
             leanTag(_frame[14]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[13];
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[7];
               _frame.set(4, _jump0);
               !pc = 1;
@@ -1250,7 +1250,7 @@ fun f_instSliceableListSliceNat_lam_0_8e869ee7eb(
       }
     | 1 ->
       leanTag(_frame[1]) match {
-      | "[\"Std\",\"Rcc\",\"mk\"]" ->
+      | LeanTag.Std_Rcc_mk ->
         _frame.set(5, leanField(_frame[1], 0));
         _ = leanField(_frame[1], 1);
         _frame.set(
@@ -1312,16 +1312,16 @@ fun f_instSliceableListSliceNat_3_lam_0_326eddb9e4(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Slice\",\"Internal\",\"ListSliceData\",\"mk\"]" ->
+      | LeanTag.Std_Slice_Internal_ListSliceData_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[3]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Roc\",\"mk\"]" ->
+          | LeanTag.Std_Roc_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(10, leanField(_frame[1], 1));
-            _frame.set(11, LeanScalar("nat", "1"));
+            _frame.set(11, LeanNatLiterals.n1);
             _frame.set(
               12,
               L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1336,13 +1336,13 @@ fun f_instSliceableListSliceNat_3_lam_0_326eddb9e4(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(9, leanField(_frame[3], 0));
           leanTag(_frame[1]) match {
-          | "[\"Std\",\"Roc\",\"mk\"]" ->
+          | LeanTag.Std_Roc_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(13, leanField(_frame[1], 1));
-            _frame.set(14, LeanScalar("nat", "1"));
+            _frame.set(14, LeanNatLiterals.n1);
             _frame.set(
               15,
               L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1360,12 +1360,12 @@ fun f_instSliceableListSliceNat_3_lam_0_326eddb9e4(
               ),
             );
             leanTag(_frame[16]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[15];
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[9];
               _frame.set(4, _jump0);
               !pc = 1;
@@ -1380,10 +1380,10 @@ fun f_instSliceableListSliceNat_3_lam_0_326eddb9e4(
       }
     | 1 ->
       leanTag(_frame[1]) match {
-      | "[\"Std\",\"Roc\",\"mk\"]" ->
+      | LeanTag.Std_Roc_mk ->
         _frame.set(5, leanField(_frame[1], 0));
         _ = leanField(_frame[1], 1);
-        _frame.set(6, LeanScalar("nat", "1"));
+        _frame.set(6, LeanNatLiterals.n1);
         _frame.set(
           7,
           L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[5], _frame[6]),
@@ -1448,13 +1448,13 @@ fun f_instSliceableListNatListSlice_lam_0_8d7f2c13b5(
   _range_1: LeanValue,
 ): LeanValue {
   leanTag(_range_1) match {
-  | "[\"Std\",\"Rcc\",\"mk\"]" ->
+  | LeanTag.Std_Rcc_mk ->
     _lower_2: LeanValue = leanField(_range_1, 0);
     _upper_3: LeanValue = leanField(_range_1, 1);
     _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _upper_3,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_List_toSlice_8730c3cffe(_runtime, _xs_0, _lower_2, _x_2_5)
   | _ -> leanFail("non-exhaustive Lean case")

@@ -1,0 +1,10 @@
+// Names cache their full UInt64 hash. Anonymous has no stored fields.
+fun leanNameHashBits(name: LeanValue): Int {
+  leanTag(name) match {
+  | LeanTag.Name_anonymous__impl -> 1723
+  | LeanTag.Name_str__impl
+  | LeanTag.Name_num__impl ->
+    leanWordBits(leanField(name, 0))
+  | _ -> leanFail("invalid Lean Name")
+  }
+}

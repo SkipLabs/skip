@@ -5,18 +5,18 @@ fun f_Nat_instDecidableIsPowerOfTwo_30f373aaed(
   _runtime: mutable LeanExecution,
   _n_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _n_0,
     _x_1_1,
   );
   leanTag(_x_2_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_4: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _n_0,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_5_5: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_land_6499bfda82(
       _runtime,
@@ -24,7 +24,7 @@ fun f_Nat_instDecidableIsPowerOfTwo_30f373aaed(
       _x_4_4,
     );
     L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _x_5_5, _x_1_1)
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Bool_false, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

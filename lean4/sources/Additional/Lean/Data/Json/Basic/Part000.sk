@@ -31,7 +31,7 @@ fun f_JsonNumber_normalize_closed_3_0f6ade46fc(
   _x_757_1: LeanValue = f_instHashableJsonNumber_hash_closed_0_3daa3b6bc5(
     _runtime,
   );
-  LeanCtor("[\"Prod\",\"mk\"]", Array[_x_757_1, _x_756_0])
+  LeanCtor(LeanTag.Prod_mk, Array[_x_757_1, _x_756_0])
 }
 // "Lean.Json.getArrVal?"
 fun f_Lean_Json_getArrVal_40a4077824(
@@ -40,7 +40,7 @@ fun f_Lean_Json_getArrVal_40a4077824(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_3_2: LeanValue = leanField(_x_1_0, 0);
     _x_4_3: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
       _runtime,
@@ -53,7 +53,7 @@ fun f_Lean_Json_getArrVal_40a4077824(
       _x_4_3,
     );
     leanTag(_x_5_4) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_6: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
         _runtime,
         _x_2_1,
@@ -63,8 +63,8 @@ fun f_Lean_Json_getArrVal_40a4077824(
         LeanText("index out of bounds: "),
         _x_7_6,
       );
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_8_7])
-    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(LeanTag.Except_error, Array[_x_8_7])
+    | LeanTag.Bool_true ->
       _x_10_9: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
         LeanErased(),
@@ -72,10 +72,10 @@ fun f_Lean_Json_getArrVal_40a4077824(
         _x_2_1,
         LeanErased(),
       );
-      LeanCtor("[\"Except\",\"ok\"]", Array[_x_10_9])
+      LeanCtor(LeanTag.Except_ok, Array[_x_10_9])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | _ -> LeanCtor("[\"Except\",\"error\"]", Array[LeanText("array expected")])
+  | _ -> LeanCtor(LeanTag.Except_error, Array[LeanText("array expected")])
   }
 }
 // "Lean.JsonNumber.instDecidableLt"
@@ -92,7 +92,7 @@ fun f_JsonNumber_fromFloat_closed_2_8bc77103a1(
 ): LeanValue {
   L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Lean.Json.instBEq._private_1"
@@ -115,8 +115,8 @@ fun f_beq_spec_3_closed_2_6361404cf2(
 ): LeanValue {
   _x_980_1: LeanValue = f_beq_spec_3_closed_1_b73bb59ca2(_runtime);
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
-    Array[_x_980_1, LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    LeanTag.Prod_mk,
+    Array[_x_980_1, LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "WellFounded.opaqueFix₃._at_.Lean.JsonNumber.normalize.spec_0"
@@ -162,10 +162,10 @@ fun f_Lean_JsonNumber_toFloat_da9ed2f9ed(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+      | LeanTag.JsonNumber_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
-        _frame.set(8, LeanScalar("nat", "0"));
+        _frame.set(8, LeanNatLiterals.n0);
         _frame.set(
           9,
           L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[8]),
@@ -179,10 +179,10 @@ fun f_Lean_JsonNumber_toFloat_da9ed2f9ed(
           ),
         );
         leanTag(_frame[10]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(11, LeanScalar("nat", "10"));
-          _frame.set(12, LeanCtor("[\"Bool\",\"true\"]", Array[]));
-          _frame.set(13, LeanScalar("nat", "1"));
+        | LeanTag.Bool_false ->
+          _frame.set(11, LeanNatLiterals.n10);
+          _frame.set(12, LeanCtor(LeanTag.Bool_true, Array[]));
+          _frame.set(13, LeanNatLiterals.n1);
           _frame.set(
             14,
             L4_Init_Data_OfScientific.f_Float_ofScientific_16366b6072(
@@ -203,9 +203,9 @@ fun f_Lean_JsonNumber_toFloat_da9ed2f9ed(
           _frame.set(3, _jump0);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(16, LeanScalar("nat", "10"));
-          _frame.set(17, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(16, LeanNatLiterals.n10);
+          _frame.set(17, LeanNatLiterals.n1);
           _frame.set(
             18,
             L4_Init_Data_OfScientific.f_Float_ofScientific_16366b6072(
@@ -228,7 +228,7 @@ fun f_Lean_JsonNumber_toFloat_da9ed2f9ed(
         4,
         L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(_runtime, _frame[1]),
       );
-      _frame.set(5, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+      _frame.set(5, LeanCtor(LeanTag.Bool_true, Array[]));
       _frame.set(
         6,
         L4_Init_Data_OfScientific.f_Float_ofScientific_16366b6072(
@@ -279,7 +279,7 @@ fun f_JsonNumber_toString_closed_3_7af61b7820(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "9"),
+    LeanNatLiterals.n9,
   )
 }
 // "Lean.Json.instCoeArrayStructured._lam_0"
@@ -287,7 +287,7 @@ fun f_Json_instCoeArrayStructured_lam_0_dca33a836d(
   _runtime: mutable LeanExecution,
   _elems_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"Structured\",\"arr\"]", Array[_elems_0])
+  LeanCtor(LeanTag.Json_Structured_arr, Array[_elems_0])
 }
 fun apply_f_Json_instCoeArrayStructured_lam_0_dca33a836d(
   _runtime: mutable LeanExecution,
@@ -338,7 +338,7 @@ fun f_instRepr_lam_0_closed_6_b463eb577d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_163_0: LeanValue = f_instRepr_lam_0_closed_0_bda6c5f51b(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_163_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_163_0])
 }
 // "Lean.JsonNumber.normalize._closed_0"
 fun f_JsonNumber_normalize_closed_0_bb38786e93(
@@ -346,7 +346,7 @@ fun f_JsonNumber_normalize_closed_0_bb38786e93(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Lean.instDecidableEqJsonNumber.decEq"
@@ -356,11 +356,11 @@ fun f_Lean_instDecidableEqJsonNumber_decEq_b6cbfb38bd(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+  | LeanTag.JsonNumber_mk ->
     _mantissa_3_2: LeanValue = leanField(_x_1_0, 0);
     _exponent_4_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+    | LeanTag.JsonNumber_mk ->
       _mantissa_5_4: LeanValue = leanField(_x_2_1, 0);
       _exponent_6_5: LeanValue = leanField(_x_2_1, 1);
       _x_7_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
@@ -369,8 +369,8 @@ fun f_Lean_instDecidableEqJsonNumber_decEq_b6cbfb38bd(
         _mantissa_5_4,
       );
       leanTag(_x_7_6) match {
-      | "[\"Bool\",\"false\"]" -> _x_7_6
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_7_6
+      | LeanTag.Bool_true ->
         L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
           _runtime,
           _exponent_4_3,
@@ -412,7 +412,7 @@ fun f_Json_getArr_closed_1_d54b36cc5c(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_Json_getArr_closed_0_a2d9ec3dab(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_90_0])
 }
 // "Lean.Json.setObjVal!._closed_2"
 fun f_Json_setObjVal_closed_2_be17a5bdb4(
@@ -427,8 +427,8 @@ fun f_Json_setObjVal_closed_2_be17a5bdb4(
     _runtime,
     _x_1458_4,
     _x_1457_3,
-    LeanScalar("nat", "292"),
-    LeanScalar("nat", "21"),
+    LeanNatLiterals.n292,
+    LeanNatLiterals.n21,
     _x_1454_0,
   )
 }
@@ -447,10 +447,10 @@ fun f_beq_spec_3_closed_0_a54ea5c88d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
+    LeanTag.Prod_mk,
     Array[
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
-      LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanCtor(LeanTag.PUnit_unit, Array[]),
     ],
   )
 }
@@ -465,8 +465,8 @@ fun f_setObjVal_spec_0_closed_7_757c93e617(
     _runtime,
     _x_619_4,
     _x_618_3,
-    LeanScalar("nat", "276"),
-    LeanScalar("nat", "35"),
+    LeanNatLiterals.n276,
+    LeanNatLiterals.n35,
     _x_615_0,
   )
 }
@@ -486,7 +486,7 @@ fun f_Json_getArr_closed_0_a2d9ec3dab(
 fun f_Lean_instInhabitedJson_b869e9ddd7(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"null\"]", Array[])
+  LeanCtor(LeanTag.Json_null, Array[])
 }
 // "Lean.Json.getObjVal?._closed_0"
 fun f_Json_getObjVal_closed_0_221aaa178c(
@@ -515,7 +515,7 @@ fun f_Json_getNat_closed_1_56278b22fb(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_114_0: LeanValue = f_Json_getNat_closed_0_9babe7f699(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_114_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_114_0])
 }
 // "Lean.Json.num.elim"
 fun f_Json_num_elim_ead72e81ca(
@@ -538,7 +538,7 @@ fun f_JsonNumber_fromFloat_closed_8_c24b037c7c(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_101_0: LeanValue = f_JsonNumber_fromFloat_closed_7_42ed83e34e(_runtime);
-  LeanCtor("[\"Sum\",\"inl\"]", Array[_x_101_0])
+  LeanCtor(LeanTag.Sum_inl, Array[_x_101_0])
 }
 // "_private.Lean.Data.Json.Basic.0.Lean.Json.beq'"
 fun f_Lean_Json_beq_07be9e42ee(
@@ -558,40 +558,40 @@ fun f_Lean_Json_beq_07be9e42ee(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Json\",\"null\"]" ->
+      | LeanTag.Json_null ->
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"null\"]" ->
-          _frame.set(7, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+        | LeanTag.Json_null ->
+          _frame.set(7, LeanCtor(LeanTag.Bool_true, Array[]));
           return _frame[7]
         | _ ->
-          _frame.set(8, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(8, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[8]
         }
-      | "[\"Lean\",\"Json\",\"bool\"]" ->
+      | LeanTag.Json_bool ->
         _frame.set(2, leanField(_frame[0], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"bool\"]" ->
+        | LeanTag.Json_bool ->
           _frame.set(9, leanField(_frame[1], 0));
           leanTag(_frame[9]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             leanTag(_frame[2]) match {
-            | "[\"Bool\",\"false\"]" ->
-              _frame.set(10, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+            | LeanTag.Bool_false ->
+              _frame.set(10, LeanCtor(LeanTag.Bool_true, Array[]));
               return _frame[10]
-            | "[\"Bool\",\"true\"]" -> return _frame[9]
+            | LeanTag.Bool_true -> return _frame[9]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" -> return _frame[2]
+          | LeanTag.Bool_true -> return _frame[2]
           | _ -> return leanFail("non-exhaustive Lean case")
           }
         | _ ->
-          _frame.set(11, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(11, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[11]
         }
-      | "[\"Lean\",\"Json\",\"num\"]" ->
+      | LeanTag.Json_num ->
         _frame.set(3, leanField(_frame[0], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"num\"]" ->
+        | LeanTag.Json_num ->
           _frame.set(12, leanField(_frame[1], 0));
           _frame.set(
             13,
@@ -603,13 +603,13 @@ fun f_Lean_Json_beq_07be9e42ee(
           );
           return _frame[13]
         | _ ->
-          _frame.set(14, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(14, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[14]
         }
-      | "[\"Lean\",\"Json\",\"str\"]" ->
+      | LeanTag.Json_str ->
         _frame.set(4, leanField(_frame[0], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"str\"]" ->
+        | LeanTag.Json_str ->
           _frame.set(15, leanField(_frame[1], 0));
           _frame.set(
             16,
@@ -621,13 +621,13 @@ fun f_Lean_Json_beq_07be9e42ee(
           );
           return _frame[16]
         | _ ->
-          _frame.set(17, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(17, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[17]
         }
-      | "[\"Lean\",\"Json\",\"arr\"]" ->
+      | LeanTag.Json_arr ->
         _frame.set(5, leanField(_frame[0], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"arr\"]" ->
+        | LeanTag.Json_arr ->
           _frame.set(18, leanField(_frame[1], 0));
           _frame.set(
             19,
@@ -654,8 +654,8 @@ fun f_Lean_Json_beq_07be9e42ee(
             ),
           );
           leanTag(_frame[21]) match {
-          | "[\"Bool\",\"false\"]" -> return _frame[21]
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_false -> return _frame[21]
+          | LeanTag.Bool_true ->
             _frame.set(
               22,
               f_Json_beq_spec_0_68b64f02ef(
@@ -669,15 +669,15 @@ fun f_Lean_Json_beq_07be9e42ee(
           | _ -> return leanFail("non-exhaustive Lean case")
           }
         | _ ->
-          _frame.set(23, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(23, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[23]
         }
-      | "[\"Lean\",\"Json\",\"obj\"]" ->
+      | LeanTag.Json_obj ->
         _frame.set(6, leanField(_frame[0], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Json\",\"obj\"]" ->
+        | LeanTag.Json_obj ->
           _frame.set(24, leanField(_frame[1], 0));
-          _frame.set(25, LeanScalar("nat", "0"));
+          _frame.set(25, LeanNatLiterals.n0);
           _frame.set(
             26,
             f_beq_spec_1_spec_1_bd8dd0f7ec(_runtime, _frame[25], _frame[6]),
@@ -695,13 +695,13 @@ fun f_Lean_Json_beq_07be9e42ee(
             ),
           );
           leanTag(_frame[28]) match {
-          | "[\"Bool\",\"false\"]" -> return _frame[28]
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(32, LeanCtor("[\"Option\",\"none\"]", Array[]));
-            _frame.set(33, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+          | LeanTag.Bool_false -> return _frame[28]
+          | LeanTag.Bool_true ->
+            _frame.set(32, LeanCtor(LeanTag.Option_none, Array[]));
+            _frame.set(33, LeanCtor(LeanTag.PUnit_unit, Array[]));
             _frame.set(
               34,
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[32], _frame[33]]),
+              LeanCtor(LeanTag.Prod_mk, Array[_frame[32], _frame[33]]),
             );
             _frame.set(
               35,
@@ -715,13 +715,13 @@ fun f_Lean_Json_beq_07be9e42ee(
               ),
             );
             leanTag(_frame[35]) match {
-            | "[\"ForInStep\",\"done\"]" ->
+            | LeanTag.ForInStep_done ->
               _frame.set(36, leanField(_frame[35], 0));
               _jump0 = _frame[36];
               _frame.set(29, _jump0);
               !pc = 1;
               void
-            | "[\"ForInStep\",\"yield\"]" ->
+            | LeanTag.ForInStep_yield ->
               _frame.set(37, leanField(_frame[35], 0));
               _jump0 = _frame[37];
               _frame.set(29, _jump0);
@@ -732,19 +732,19 @@ fun f_Lean_Json_beq_07be9e42ee(
           | _ -> return leanFail("non-exhaustive Lean case")
           }
         | _ ->
-          _frame.set(38, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          _frame.set(38, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[38]
         }
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       leanTag(_frame[29]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _frame.set(30, leanField(_frame[29], 0));
         _ = leanField(_frame[29], 1);
         leanTag(_frame[30]) match {
-        | "[\"Option\",\"none\"]" -> return _frame[28]
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_none -> return _frame[28]
+        | LeanTag.Option_some ->
           _frame.set(31, leanField(_frame[30], 0));
           return _frame[31]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -760,7 +760,7 @@ fun f_JsonNumber_fromFloat_closed_6_42949aaa63(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_98_0: LeanValue = f_JsonNumber_fromFloat_closed_5_2d4d679880(_runtime);
-  LeanCtor("[\"Sum\",\"inl\"]", Array[_x_98_0])
+  LeanCtor(LeanTag.Sum_inl, Array[_x_98_0])
 }
 // "Lean.JsonNumber.instOrd._lam_0"
 fun f_JsonNumber_instOrd_lam_0_49476d03b0(
@@ -770,14 +770,14 @@ fun f_JsonNumber_instOrd_lam_0_49476d03b0(
 ): LeanValue {
   _x_1_2: LeanValue = f_Lean_JsonNumber_lt_69bd201013(_runtime, _x_0, _y_1);
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = f_Lean_JsonNumber_lt_69bd201013(_runtime, _y_1, _x_0);
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_eq, Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_gt, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -791,7 +791,7 @@ fun apply_f_JsonNumber_instOrd_lam_0_49476d03b0(
 fun f_Lean_instInhabitedJson_default_de0a13e2d5(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"null\"]", Array[])
+  LeanCtor(LeanTag.Json_null, Array[])
 }
 // "Lean.JsonNumber.instRepr._lam_0._closed_3"
 fun f_instRepr_lam_0_closed_3_739b5bf07c(
@@ -827,15 +827,15 @@ fun f_Lean_Json_hash_579a099ce5(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" -> LeanScalar("uint64", "11")
-  | "[\"Lean\",\"Json\",\"bool\"]" ->
+  | LeanTag.Json_null -> LeanScalar("uint64", "11")
+  | LeanTag.Json_bool ->
     _b_3_1: LeanValue = leanField(_x_1_0, 0);
     leanTag(_b_3_1) match {
-    | "[\"Bool\",\"false\"]" -> LeanScalar("uint64", "889925284873970544")
-    | "[\"Bool\",\"true\"]" -> LeanScalar("uint64", "7849220421742680397")
+    | LeanTag.Bool_false -> LeanScalar("uint64", "889925284873970544")
+    | LeanTag.Bool_true -> LeanScalar("uint64", "7849220421742680397")
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"Json\",\"num\"]" ->
+  | LeanTag.Json_num ->
     _n_6_2: LeanValue = leanField(_x_1_0, 0);
     _x_8_10: LeanValue = f_Lean_instHashableJsonNumber_hash_6907839b48(
       _runtime,
@@ -846,7 +846,7 @@ fun f_Lean_Json_hash_579a099ce5(
       LeanScalar("uint64", "17"),
       _x_8_10,
     )
-  | "[\"Lean\",\"Json\",\"str\"]" ->
+  | LeanTag.Json_str ->
     _s_10_3: LeanValue = leanField(_x_1_0, 0);
     _x_12_13: LeanValue = L4_Init_Prelude.f_String_hash_dbd8502213(
       _runtime,
@@ -857,7 +857,7 @@ fun f_Lean_Json_hash_579a099ce5(
       LeanScalar("uint64", "19"),
       _x_12_13,
     )
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_14_4: LeanValue = leanField(_x_1_0, 0);
     _x_16_16: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
       _runtime,
@@ -866,12 +866,12 @@ fun f_Lean_Json_hash_579a099ce5(
     );
     _x_17_17: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       _x_16_16,
     );
     leanTag(_x_17_17) match {
-    | "[\"Bool\",\"false\"]" -> LeanScalar("uint64", "179905158410471120")
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> LeanScalar("uint64", "179905158410471120")
+    | LeanTag.Bool_true ->
       _x_22_22: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
         _runtime,
         _x_16_16,
@@ -890,7 +890,7 @@ fun f_Lean_Json_hash_579a099ce5(
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"Json\",\"obj\"]" ->
+  | LeanTag.Json_obj ->
     _kvPairs_25_5: LeanValue = leanField(_x_1_0, 0);
     _x_28_27: LeanValue = f_hash_spec_1_spec_1_92edb3f845(
       _runtime,
@@ -934,21 +934,21 @@ fun f_instRepr_lam_0_closed_7_90476d0b3f(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_165_0: LeanValue = f_instRepr_lam_0_closed_3_739b5bf07c(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_165_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_165_0])
 }
 // "Lean.JsonNumber.instRepr._lam_0._closed_2"
 fun f_instRepr_lam_0_closed_2_260ab4f4d7(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_156_0: LeanValue = f_instRepr_lam_0_closed_1_f9c0eb0f7a(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_156_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_156_0])
 }
 // "Lean.Json.instCoeRawStringStructured._lam_0"
 fun f_Json_instCoeRawStringStructured_lam_0_8651457aa0(
   _runtime: mutable LeanExecution,
   _kvPairs_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"Structured\",\"obj\"]", Array[_kvPairs_0])
+  LeanCtor(LeanTag.Json_Structured_obj, Array[_kvPairs_0])
 }
 fun apply_f_Json_instCoeRawStringStructured_lam_0_8651457aa0(
   _runtime: mutable LeanExecution,
@@ -984,11 +984,11 @@ fun f_JsonNumber_instRepr_lam_0_9537578d67(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+      | LeanTag.JsonNumber_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, LeanText("⟨"));
-        _frame.set(21, LeanScalar("nat", "0"));
+        _frame.set(21, LeanNatLiterals.n0);
         _frame.set(
           22,
           L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[21]),
@@ -1002,27 +1002,27 @@ fun f_JsonNumber_instRepr_lam_0_9537578d67(
           ),
         );
         leanTag(_frame[23]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             24,
             L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(_runtime, _frame[1]),
           );
           _frame.set(
             25,
-            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[24]]),
+            LeanCtor(LeanTag.Std_Format_text, Array[_frame[24]]),
           );
           _jump0 = _frame[25];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             26,
             L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(_runtime, _frame[1]),
           );
           _frame.set(
             27,
-            LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[26]]),
+            LeanCtor(LeanTag.Std_Format_text, Array[_frame[26]]),
           );
           _frame.set(
             28,
@@ -1044,12 +1044,12 @@ fun f_JsonNumber_instRepr_lam_0_9537578d67(
       _frame.set(5, LeanText(","));
       _frame.set(
         6,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[5]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[5]]),
       );
       _frame.set(
         7,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[4], _frame[6]],
         ),
       );
@@ -1059,12 +1059,12 @@ fun f_JsonNumber_instRepr_lam_0_9537578d67(
       );
       _frame.set(
         9,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[8]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[8]]),
       );
       _frame.set(
         10,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[7], _frame[9]],
         ),
       );
@@ -1082,44 +1082,44 @@ fun f_JsonNumber_instRepr_lam_0_9537578d67(
       );
       _frame.set(
         14,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[3]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[3]]),
       );
       _frame.set(
         15,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[14], _frame[10]],
         ),
       );
       _frame.set(
         16,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[11]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[11]]),
       );
       _frame.set(
         17,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[15], _frame[16]],
         ),
       );
       _frame.set(
         18,
         LeanCtor(
-          "[\"Std\",\"Format\",\"nest\"]",
+          LeanTag.Std_Format_nest,
           Array[_frame[13], _frame[17]],
         ),
       );
       _frame.set(
         19,
         LeanCtor(
-          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          LeanTag.Std_Format_FlattenBehavior_allOrNone,
           Array[],
         ),
       );
       _frame.set(
         20,
         LeanCtor(
-          "[\"Std\",\"Format\",\"group\"]",
+          LeanTag.Std_Format_group,
           Array[_frame[18], _frame[19]],
         ),
       );
@@ -1164,7 +1164,7 @@ fun f_Lean_Json_instOfNat_537274562b(
   _n_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = f_Lean_JsonNumber_fromNat_aaf0572ed5(_runtime, _n_0);
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_1_1])
+  LeanCtor(LeanTag.Json_num, Array[_x_1_1])
 }
 // "Lean.Json.getObj?._closed_0"
 fun f_Json_getObj_closed_0_ddd2b7aace(
@@ -1192,7 +1192,7 @@ fun f_Json_instCoeInt_lam_0_6ca9459ff6(
   _n_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = f_Lean_JsonNumber_fromInt_710c15f8bc(_runtime, _n_0);
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_1_1])
+  LeanCtor(LeanTag.Json_num, Array[_x_1_1])
 }
 fun apply_f_Json_instCoeInt_lam_0_6ca9459ff6(
   _runtime: mutable LeanExecution,
@@ -1268,10 +1268,10 @@ fun f_Lean_Json_getArr_038404d19b(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_2_1: LeanValue = leanField(_x_1_0, 0);
-    LeanCtor("[\"Except\",\"ok\"]", Array[_elems_2_1])
-  | _ -> LeanCtor("[\"Except\",\"error\"]", Array[LeanText("array expected")])
+    LeanCtor(LeanTag.Except_ok, Array[_elems_2_1])
+  | _ -> LeanCtor(LeanTag.Except_error, Array[LeanText("array expected")])
   }
 }
 // "Std.DTreeMap.Internal.Impl.foldlM._at_.Std.DTreeMap.Internal.Impl.foldl._at_._private.Lean.Data.Json.Basic.0.Lean.Json.beq'.spec_1.spec_1"
@@ -1281,7 +1281,7 @@ fun f_beq_spec_1_spec_1_bd8dd0f7ec(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
     _size_2_2: LeanValue = leanField(_x_1_1, 0);
     _k_3_3: LeanValue = leanField(_x_1_1, 1);
     _v_4_4: LeanValue = leanField(_x_1_1, 2);
@@ -1295,10 +1295,10 @@ fun f_beq_spec_1_spec_1_bd8dd0f7ec(
     _x_9_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _x_7_7,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_beq_spec_1_spec_1_bd8dd0f7ec(_runtime, _x_9_9, _r_6_6)
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _init_0
+  | LeanTag.Std_DTreeMap_Internal_Impl_leaf -> _init_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1324,10 +1324,10 @@ fun f_Lean_Json_getNum_0301b52ba4(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"num\"]" ->
+  | LeanTag.Json_num ->
     _n_2_1: LeanValue = leanField(_x_1_0, 0);
-    LeanCtor("[\"Except\",\"ok\"]", Array[_n_2_1])
-  | _ -> LeanCtor("[\"Except\",\"error\"]", Array[LeanText("number expected")])
+    LeanCtor(LeanTag.Except_ok, Array[_n_2_1])
+  | _ -> LeanCtor(LeanTag.Except_error, Array[LeanText("number expected")])
   }
 }
 fun apply_f_Lean_Json_getNum_0301b52ba4(
@@ -1352,10 +1352,10 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+      | LeanTag.JsonNumber_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
-        _frame.set(3, LeanScalar("nat", "0"));
+        _frame.set(3, LeanNatLiterals.n0);
         _frame.set(
           14,
           L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[3]),
@@ -1369,7 +1369,7 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
           ),
         );
         leanTag(_frame[15]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             16,
             L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
@@ -1379,8 +1379,8 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
             ),
           );
           leanTag(_frame[16]) match {
-          | "[\"Bool\",\"false\"]" ->
-            _frame.set(17, LeanScalar("nat", "1"));
+          | LeanTag.Bool_false ->
+            _frame.set(17, LeanNatLiterals.n1);
             _frame.set(
               18,
               L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -1396,8 +1396,8 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(20, LeanScalar("nat", "1"));
+          | LeanTag.Bool_true ->
+            _frame.set(20, LeanNatLiterals.n1);
             _frame.set(
               21,
               L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -1411,14 +1411,14 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             22,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[3], _frame[14]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[3], _frame[14]]),
           );
           _frame.set(
             23,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[14], _frame[22]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[14], _frame[22]]),
           );
           return _frame[23]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -1465,11 +1465,11 @@ fun f_Lean_JsonNumber_normalize_eb6bde3141(
       );
       _frame.set(
         12,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[7], _frame[11]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[7], _frame[11]]),
       );
       _frame.set(
         13,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[4], _frame[12]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[4], _frame[12]]),
       );
       return _frame[13]
     | _ -> return leanFail("invalid join point")
@@ -1500,10 +1500,10 @@ fun f_JsonNumber_instOfScientific_lam_0_aa0ff3f220(
   _decimalExponent_2: LeanValue,
 ): LeanValue {
   leanTag(_exponentSign_1) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_4: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
       _runtime,
-      LeanScalar("nat", "10"),
+      LeanNatLiterals.n10,
       _decimalExponent_2,
     );
     _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -1516,16 +1516,16 @@ fun f_JsonNumber_instOfScientific_lam_0_aa0ff3f220(
       _x_3_5,
     );
     LeanCtor(
-      "[\"Lean\",\"JsonNumber\",\"mk\"]",
-      Array[_x_4_6, LeanScalar("nat", "0")],
+      LeanTag.JsonNumber_mk,
+      Array[_x_4_6, LeanNatLiterals.n0],
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_7_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
       _mantissa_0,
     );
     LeanCtor(
-      "[\"Lean\",\"JsonNumber\",\"mk\"]",
+      LeanTag.JsonNumber_mk,
       Array[_x_7_9, _decimalExponent_2],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1557,7 +1557,7 @@ fun f_Json_getStr_closed_1_de81d16f0d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_Json_getStr_closed_0_ede90e5eed(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_90_0])
 }
 // "Std.DTreeMap.Internal.Impl.insert!._at_.Lean.Json.setObjVal!.spec_0._redArg._closed_5"
 fun f_setObjVal_spec_0_closed_5_f99cbe547b(
@@ -1576,8 +1576,8 @@ fun f_setObjVal_spec_0_closed_4_4ca97e961e(
     _runtime,
     _x_610_4,
     _x_609_3,
-    LeanScalar("nat", "183"),
-    LeanScalar("nat", "21"),
+    LeanNatLiterals.n183,
+    LeanNatLiterals.n21,
     _x_606_0,
   )
 }
@@ -1606,7 +1606,7 @@ fun f_Json_hash_spec_0_ca0820e4db(
     _stop_2,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -1626,7 +1626,7 @@ fun f_Json_hash_spec_0_ca0820e4db(
       LeanScalar("usize", "1"),
     );
     f_Json_hash_spec_0_ca0820e4db(_runtime, _as_0, _x_6_9, _stop_2, _x_4_7)
-  | "[\"Bool\",\"true\"]" -> _b_3
+  | LeanTag.Bool_true -> _b_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1662,7 +1662,7 @@ fun f_Structured_obj_elim_b8292ba8ab(
 fun f_JsonNumber_instInhabited_closed_0_9bb553865a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  f_Lean_JsonNumber_fromNat_aaf0572ed5(_runtime, LeanScalar("nat", "0"))
+  f_Lean_JsonNumber_fromNat_aaf0572ed5(_runtime, LeanNatLiterals.n0)
 }
 // "Lean.Json.instCoeString._closed_0"
 fun f_Json_instCoeString_closed_0_9253dafff9(
@@ -1681,7 +1681,7 @@ fun f_hash_spec_1_spec_1_92edb3f845(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
     _size_2_2: LeanValue = leanField(_x_1_1, 0);
     _k_3_3: LeanValue = leanField(_x_1_1, 1);
     _v_4_4: LeanValue = leanField(_x_1_1, 2);
@@ -1708,7 +1708,7 @@ fun f_hash_spec_1_spec_1_92edb3f845(
       _x_10_10,
     );
     f_hash_spec_1_spec_1_92edb3f845(_runtime, _x_11_11, _r_6_6)
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _init_0
+  | LeanTag.Std_DTreeMap_Internal_Impl_leaf -> _init_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1728,11 +1728,11 @@ fun f_Lean_instHashableJsonNumber_hash_6907839b48(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+      | LeanTag.JsonNumber_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, LeanScalar("uint64", "0"));
-        _frame.set(8, LeanScalar("nat", "0"));
+        _frame.set(8, LeanNatLiterals.n0);
         _frame.set(
           9,
           L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[8]),
@@ -1746,12 +1746,12 @@ fun f_Lean_instHashableJsonNumber_hash_6907839b48(
           ),
         );
         leanTag(_frame[10]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             11,
             L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(_runtime, _frame[1]),
           );
-          _frame.set(12, LeanScalar("nat", "2"));
+          _frame.set(12, LeanNatLiterals.n2);
           _frame.set(
             13,
             L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -1771,12 +1771,12 @@ fun f_Lean_instHashableJsonNumber_hash_6907839b48(
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             15,
             L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(_runtime, _frame[1]),
           );
-          _frame.set(16, LeanScalar("nat", "1"));
+          _frame.set(16, LeanNatLiterals.n1);
           _frame.set(
             17,
             L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -1785,7 +1785,7 @@ fun f_Lean_instHashableJsonNumber_hash_6907839b48(
               _frame[16],
             ),
           );
-          _frame.set(18, LeanScalar("nat", "2"));
+          _frame.set(18, LeanNatLiterals.n2);
           _frame.set(
             19,
             L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -1860,15 +1860,15 @@ fun f_Json_beq_spec_0_68b64f02ef(
   _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _x_1_2,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_4) match {
-  | "[\"Bool\",\"true\"]" -> _isZero_4
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> _isZero_4
+  | LeanTag.Bool_false ->
     _n_2_6: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _x_1_2,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_3_7: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
       _runtime,
@@ -1886,8 +1886,8 @@ fun f_Json_beq_spec_0_68b64f02ef(
     );
     _x_5_9: LeanValue = f_Lean_Json_beq_07be9e42ee(_runtime, _x_3_7, _x_4_8);
     leanTag(_x_5_9) match {
-    | "[\"Bool\",\"false\"]" -> _x_5_9
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _x_5_9
+    | LeanTag.Bool_true ->
       f_Json_beq_spec_0_68b64f02ef(_runtime, _xs_0, _ys_1, _n_2_6)
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -1906,14 +1906,14 @@ fun f_beq_spec_3_closed_3_876bba931a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_982_0: LeanValue = f_beq_spec_3_closed_2_6361404cf2(_runtime);
-  LeanCtor("[\"ForInStep\",\"done\"]", Array[_x_982_0])
+  LeanCtor(LeanTag.ForInStep_done, Array[_x_982_0])
 }
 // "Lean.Json.instCoeString._lam_0"
 fun f_Json_instCoeString_lam_0_caa8480442(
   _runtime: mutable LeanExecution,
   _s_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"str\"]", Array[_s_0])
+  LeanCtor(LeanTag.Json_str, Array[_s_0])
 }
 fun apply_f_Json_instCoeString_lam_0_caa8480442(
   _runtime: mutable LeanExecution,
@@ -1926,14 +1926,14 @@ fun f_Json_getBool_closed_1_87b42644e8(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_Json_getBool_closed_0_f56bd26e5b(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_90_0])
 }
 // "Lean.Json.getObj?._closed_1"
 fun f_Json_getObj_closed_1_5ce99da03d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_Json_getObj_closed_0_ddd2b7aace(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_90_0])
 }
 // "Lean.JsonNumber.fromFloat?._closed_0"
 fun f_JsonNumber_fromFloat_closed_0_ca9b8c7136(
@@ -1941,9 +1941,9 @@ fun f_JsonNumber_fromFloat_closed_0_ca9b8c7136(
 ): LeanValue {
   L4_Init_Data_OfScientific.f_Float_ofScientific_16366b6072(
     _runtime,
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_true, Array[]),
+    LeanNatLiterals.n1,
   )
 }
 // "Lean.JsonNumber.fromFloat?._closed_7"
@@ -2023,7 +2023,7 @@ fun f_Json_getArrVal_closed_1_6db2cf8e7a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_205_0: LeanValue = f_Json_getArr_closed_0_a2d9ec3dab(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_205_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_205_0])
 }
 // "Lean.instHashableJsonNumber"
 fun f_Lean_instHashableJsonNumber_2679cda973(
@@ -2042,7 +2042,7 @@ fun f_mergeObj_spec_0_spec_0_bcf73e35a4(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
     _size_2_2: LeanValue = leanField(_x_1_1, 0);
     _k_3_3: LeanValue = leanField(_x_1_1, 1);
     _v_4_4: LeanValue = leanField(_x_1_1, 2);
@@ -2060,7 +2060,7 @@ fun f_mergeObj_spec_0_spec_0_bcf73e35a4(
       _x_7_7,
     );
     f_mergeObj_spec_0_spec_0_bcf73e35a4(_runtime, _x_8_8, _r_6_6)
-  | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" -> _init_0
+  | LeanTag.Std_DTreeMap_Internal_Impl_leaf -> _init_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -2087,9 +2087,9 @@ fun f_JsonNumber_normalize_spec_0_feca79a58d(
     _upperBound_1_0,
   );
   leanTag(_x_2_3) match {
-  | "[\"Bool\",\"false\"]" -> _b_2
-  | "[\"Bool\",\"true\"]" ->
-    _x_4_5: LeanValue = LeanScalar("nat", "10");
+  | LeanTag.Bool_false -> _b_2
+  | LeanTag.Bool_true ->
+    _x_4_5: LeanValue = LeanNatLiterals.n10;
     _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_mod_0b9c5755ae(
       _runtime,
       _b_2,
@@ -2098,11 +2098,11 @@ fun f_JsonNumber_normalize_spec_0_feca79a58d(
     _x_6_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_5_6,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     leanTag(_x_6_7) match {
-    | "[\"Bool\",\"false\"]" -> _b_2
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _b_2
+    | LeanTag.Bool_true ->
       _x_7_8: LeanValue = L4_Init_Prelude.f_Nat_div_d9df18e4c4(
         _runtime,
         _b_2,
@@ -2111,7 +2111,7 @@ fun f_JsonNumber_normalize_spec_0_feca79a58d(
       _x_9_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _a_1,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_JsonNumber_normalize_spec_0_feca79a58d(
         _runtime,
@@ -2172,7 +2172,7 @@ fun f_Json_getNum_closed_1_41577324aa(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_Json_getNum_closed_0_00cac16ba3(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_90_0])
 }
 // "Lean.Json.null.elim._redArg"
 fun f_Json_null_elim_e68f9213cc(
@@ -2189,10 +2189,10 @@ fun f_Json_Structured_ctorElim_947ff8def1(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"Json\",\"Structured\",\"arr\"]" ->
+  | LeanTag.Json_Structured_arr ->
     _elems_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_elems_2])
-  | "[\"Lean\",\"Json\",\"Structured\",\"obj\"]" ->
+  | LeanTag.Json_Structured_obj ->
     _kvPairs_3: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_kvPairs_3])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2228,20 +2228,20 @@ fun f_Lean_Json_ctorElim_7fa2d26a9c(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"Json\",\"null\"]" -> _k_1
-  | "[\"Lean\",\"Json\",\"bool\"]" ->
+  | LeanTag.Json_null -> _k_1
+  | LeanTag.Json_bool ->
     _b_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_b_2])
-  | "[\"Lean\",\"Json\",\"num\"]" ->
+  | LeanTag.Json_num ->
     _n_3: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_n_3])
-  | "[\"Lean\",\"Json\",\"str\"]" ->
+  | LeanTag.Json_str ->
     _s_4: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_s_4])
-  | "[\"Lean\",\"Json\",\"arr\"]" ->
+  | LeanTag.Json_arr ->
     _elems_5: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_elems_5])
-  | "[\"Lean\",\"Json\",\"obj\"]" ->
+  | LeanTag.Json_obj ->
     _kvPairs_6: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_kvPairs_6])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2261,7 +2261,7 @@ fun f_Lean_JsonNumber_instOrd_c50e07aa97(
 fun f_Lean_JsonNumber_ltProp_7a91fb5292(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"LT\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LT_mk, Array[LeanErased()])
 }
 // "Lean.strLt"
 fun f_Lean_strLt_5f9f84337d(
@@ -2299,7 +2299,7 @@ fun f_Json_beq_spec_3_e9faddee7c(
     pc match {
     | 0 ->
       leanTag(_frame[4]) match {
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"inner\"]" ->
+      | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
         _ = leanField(_frame[4], 0);
         _frame.set(5, leanField(_frame[4], 1));
         _frame.set(6, leanField(_frame[4], 2));
@@ -2325,36 +2325,36 @@ fun f_Json_beq_spec_3_e9faddee7c(
           ),
         );
         leanTag(_frame[10]) match {
-        | "[\"ForInStep\",\"done\"]" ->
+        | LeanTag.ForInStep_done ->
           _ = leanField(_frame[10], 0);
           return _frame[10]
-        | "[\"ForInStep\",\"yield\"]" ->
+        | LeanTag.ForInStep_yield ->
           _ = leanField(_frame[10], 0);
-          _frame.set(11, LeanCtor("[\"Option\",\"none\"]", Array[]));
-          _frame.set(12, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+          _frame.set(11, LeanCtor(LeanTag.Option_none, Array[]));
+          _frame.set(12, LeanCtor(LeanTag.PUnit_unit, Array[]));
           _frame.set(
             13,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[11], _frame[12]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[11], _frame[12]]),
           );
           _frame.set(
             19,
             f_Json_beq_spec_2_8fd10c2578(_runtime, _frame[2], _frame[5]),
           );
           leanTag(_frame[19]) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             !pc = 1;
             void
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(20, leanField(_frame[19], 0));
             _frame.set(
               21,
               f_Lean_Json_beq_07be9e42ee(_runtime, _frame[6], _frame[20]),
             );
             leanTag(_frame[21]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 22,
                 f_Json_beq_spec_3_e9faddee7c(
@@ -2373,14 +2373,14 @@ fun f_Json_beq_spec_3_e9faddee7c(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]" ->
-        _frame.set(23, LeanCtor("[\"ForInStep\",\"yield\"]", Array[_frame[3]]));
+      | LeanTag.Std_DTreeMap_Internal_Impl_leaf ->
+        _frame.set(23, LeanCtor(LeanTag.ForInStep_yield, Array[_frame[3]]));
         return _frame[23]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       leanTag(_frame[9]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           14,
           f_Json_beq_spec_3_e9faddee7c(
@@ -2393,14 +2393,14 @@ fun f_Json_beq_spec_3_e9faddee7c(
           ),
         );
         return _frame[14]
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(15, LeanCtor("[\"Bool\",\"false\"]", Array[]));
-        _frame.set(16, LeanCtor("[\"Option\",\"some\"]", Array[_frame[15]]));
+      | LeanTag.Bool_true ->
+        _frame.set(15, LeanCtor(LeanTag.Bool_false, Array[]));
+        _frame.set(16, LeanCtor(LeanTag.Option_some, Array[_frame[15]]));
         _frame.set(
           17,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[16], _frame[12]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[16], _frame[12]]),
         );
-        _frame.set(18, LeanCtor("[\"ForInStep\",\"done\"]", Array[_frame[17]]));
+        _frame.set(18, LeanCtor(LeanTag.ForInStep_done, Array[_frame[17]]));
         return _frame[18]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
@@ -2427,14 +2427,14 @@ fun f_JsonNumber_instNeg_lam_0_f5d1b2b8d8(
   _jn_0: LeanValue,
 ): LeanValue {
   leanTag(_jn_0) match {
-  | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+  | LeanTag.JsonNumber_mk ->
     _mantissa_1: LeanValue = leanField(_jn_0, 0);
     _exponent_2: LeanValue = leanField(_jn_0, 1);
     _x_1_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
       _runtime,
       _mantissa_1,
     );
-    LeanCtor("[\"Lean\",\"JsonNumber\",\"mk\"]", Array[_x_1_3, _exponent_2])
+    LeanCtor(LeanTag.JsonNumber_mk, Array[_x_1_3, _exponent_2])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -2451,14 +2451,14 @@ fun f_JsonNumber_normalize_closed_2_48b7ee1bff(
   _x_753_0: LeanValue = f_instHashableJsonNumber_hash_closed_0_3daa3b6bc5(
     _runtime,
   );
-  LeanCtor("[\"Prod\",\"mk\"]", Array[LeanScalar("nat", "0"), _x_753_0])
+  LeanCtor(LeanTag.Prod_mk, Array[LeanNatLiterals.n0, _x_753_0])
 }
 // "Lean.JsonNumber.fromFloat?._closed_4"
 fun f_JsonNumber_fromFloat_closed_4_c586fcfd30(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_95_0: LeanValue = f_JsonNumber_fromFloat_closed_3_3e8952dd10(_runtime);
-  LeanCtor("[\"Sum\",\"inl\"]", Array[_x_95_0])
+  LeanCtor(LeanTag.Sum_inl, Array[_x_95_0])
 }
 // "Lean.Json.instCoeNat"
 fun f_Lean_Json_instCoeNat_480cbb0c07(
@@ -2475,7 +2475,7 @@ fun f_Json_getObjVal_closed_1_acabfd1d17(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_166_0: LeanValue = f_Json_getObj_closed_0_ddd2b7aace(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_166_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_166_0])
 }
 // "Lean.Json.instCoeBool"
 fun f_Lean_Json_instCoeBool_fa52473bd1(
@@ -2493,7 +2493,7 @@ fun f_instHashableJsonNumber_hash_closed_0_3daa3b6bc5(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Lean.JsonNumber.fromFloat?._closed_3"
@@ -2516,17 +2516,17 @@ fun f_Lean_Json_mergeObj_1770593bdc(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Json\",\"obj\"]" ->
+  | LeanTag.Json_obj ->
     _kvPairs_3_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"Json\",\"obj\"]" ->
+    | LeanTag.Json_obj ->
       _kvPairs_4_3: LeanValue = leanField(_x_2_1, 0);
       _x_5_4: LeanValue = f_mergeObj_spec_0_spec_0_bcf73e35a4(
         _runtime,
         _kvPairs_3_2,
         _kvPairs_4_3,
       );
-      LeanCtor("[\"Lean\",\"Json\",\"obj\"]", Array[_x_5_4])
+      LeanCtor(LeanTag.Json_obj, Array[_x_5_4])
     | _ -> _x_2_1
     }
   | _ -> _x_2_1
@@ -2560,8 +2560,8 @@ fun f_setObjVal_spec_0_closed_3_0a1f5f9d4c(
     _runtime,
     _x_601_4,
     _x_600_3,
-    LeanScalar("nat", "182"),
-    LeanScalar("nat", "35"),
+    LeanNatLiterals.n182,
+    LeanNatLiterals.n35,
     _x_597_0,
   )
 }
@@ -2587,7 +2587,7 @@ fun f_Lean_JsonNumber_lt_69bd201013(
         f_Lean_JsonNumber_normalize_eb6bde3141(_runtime, _frame[0]),
       );
       leanTag(_frame[23]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _frame.set(24, leanField(_frame[23], 0));
         _frame.set(25, leanField(_frame[23], 1));
         _frame.set(
@@ -2595,7 +2595,7 @@ fun f_Lean_JsonNumber_lt_69bd201013(
           f_Lean_JsonNumber_normalize_eb6bde3141(_runtime, _frame[1]),
         );
         leanTag(_frame[26]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(27, leanField(_frame[26], 0));
           _frame.set(28, leanField(_frame[26], 1));
           _frame.set(
@@ -2607,7 +2607,7 @@ fun f_Lean_JsonNumber_lt_69bd201013(
             ),
           );
           leanTag(_frame[29]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               30,
               L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
@@ -2617,8 +2617,8 @@ fun f_Lean_JsonNumber_lt_69bd201013(
               ),
             );
             return _frame[30]
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(31, LeanScalar("nat", "0"));
+          | LeanTag.Bool_true ->
+            _frame.set(31, LeanNatLiterals.n0);
             _frame.set(
               32,
               L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -2635,8 +2635,8 @@ fun f_Lean_JsonNumber_lt_69bd201013(
               ),
             );
             leanTag(_frame[33]) match {
-            | "[\"Bool\",\"false\"]" ->
-              _frame.set(34, LeanScalar("nat", "1"));
+            | LeanTag.Bool_false ->
+              _frame.set(34, LeanNatLiterals.n1);
               _frame.set(
                 35,
                 L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -2660,14 +2660,14 @@ fun f_Lean_JsonNumber_lt_69bd201013(
                 ),
               );
               leanTag(_frame[37]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 _jump0 = _frame[25];
                 _jump1 = _frame[28];
                 _frame.set(2, _jump0);
                 _frame.set(3, _jump1);
                 !pc = 1;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _jump0 = _frame[28];
                 _jump1 = _frame[25];
                 _frame.set(2, _jump0);
@@ -2676,8 +2676,8 @@ fun f_Lean_JsonNumber_lt_69bd201013(
                 void
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
-              _frame.set(38, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+            | LeanTag.Bool_true ->
+              _frame.set(38, LeanCtor(LeanTag.Bool_false, Array[]));
               return _frame[38]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
@@ -2689,11 +2689,11 @@ fun f_Lean_JsonNumber_lt_69bd201013(
       }
     | 1 ->
       leanTag(_frame[2]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _frame.set(4, leanField(_frame[2], 0));
         _frame.set(5, leanField(_frame[2], 1));
         leanTag(_frame[3]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(6, leanField(_frame[3], 0));
           _frame.set(7, leanField(_frame[3], 1));
           _frame.set(
@@ -2705,7 +2705,7 @@ fun f_Lean_JsonNumber_lt_69bd201013(
             ),
           );
           leanTag(_frame[8]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               9,
               L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
@@ -2715,7 +2715,7 @@ fun f_Lean_JsonNumber_lt_69bd201013(
               ),
             );
             leanTag(_frame[9]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 10,
                 f_Lean_JsonNumber_countDigits_987729c696(_runtime, _frame[4]),
@@ -2733,8 +2733,8 @@ fun f_Lean_JsonNumber_lt_69bd201013(
                 ),
               );
               leanTag(_frame[12]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(13, LeanScalar("nat", "10"));
+              | LeanTag.Bool_false ->
+                _frame.set(13, LeanNatLiterals.n10);
                 _frame.set(
                   14,
                   L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -2768,8 +2768,8 @@ fun f_Lean_JsonNumber_lt_69bd201013(
                   ),
                 );
                 return _frame[17]
-              | "[\"Bool\",\"true\"]" ->
-                _frame.set(18, LeanScalar("nat", "10"));
+              | LeanTag.Bool_true ->
+                _frame.set(18, LeanNatLiterals.n10);
                 _frame.set(
                   19,
                   L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -2805,10 +2805,10 @@ fun f_Lean_JsonNumber_lt_69bd201013(
                 return _frame[22]
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" -> return _frame[8]
+            | LeanTag.Bool_true -> return _frame[8]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" -> return _frame[8]
+          | LeanTag.Bool_true -> return _frame[8]
           | _ -> return leanFail("non-exhaustive Lean case")
           }
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -2830,7 +2830,7 @@ fun f_JsonNumber_fromFloat_closed_1_217a147ce6(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_90_0: LeanValue = f_JsonNumber_instInhabited_closed_0_9bb553865a(_runtime);
-  LeanCtor("[\"Sum\",\"inr\"]", Array[_x_90_0])
+  LeanCtor(LeanTag.Sum_inr, Array[_x_90_0])
 }
 // "Lean.JsonNumber.instToString"
 fun f_Lean_JsonNumber_instToString_80e3bf48c6(
@@ -2847,8 +2847,8 @@ fun f_beq_spec_3_closed_1_b73bb59ca2(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Option\",\"some\"]",
-    Array[LeanCtor("[\"Bool\",\"false\"]", Array[])],
+    LeanTag.Option_some,
+    Array[LeanCtor(LeanTag.Bool_false, Array[])],
   )
 }
 // "Lean.JsonNumber.instRepr"
@@ -2874,7 +2874,7 @@ fun f_Json_instCoeBool_lam_0_9488020697(
   _runtime: mutable LeanExecution,
   _b_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"Json\",\"bool\"]", Array[_b_0])
+  LeanCtor(LeanTag.Json_bool, Array[_b_0])
 }
 fun apply_f_Json_instCoeBool_lam_0_9488020697(
   _runtime: mutable LeanExecution,
@@ -2888,9 +2888,9 @@ fun f_JsonNumber_toFloat_closed_0_2454b91de9(
 ): LeanValue {
   L4_Init_Data_OfScientific.f_Float_ofScientific_16366b6072(
     _runtime,
-    LeanScalar("nat", "10"),
-    LeanCtor("[\"Bool\",\"true\"]", Array[]),
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n10,
+    LeanCtor(LeanTag.Bool_true, Array[]),
+    LeanNatLiterals.n1,
   )
 }
 // "Lean.JsonNumber.fromFloat?._closed_5"
@@ -2913,7 +2913,7 @@ fun f_Json_instCoeNat_lam_0_6d004df6cd(
   _n_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = f_Lean_JsonNumber_fromNat_aaf0572ed5(_runtime, _n_0);
-  LeanCtor("[\"Lean\",\"Json\",\"num\"]", Array[_x_1_1])
+  LeanCtor(LeanTag.Json_num, Array[_x_1_1])
 }
 fun apply_f_Json_instCoeNat_lam_0_6d004df6cd(
   _runtime: mutable LeanExecution,
@@ -2942,8 +2942,8 @@ fun f_setObjVal_spec_0_closed_8_b4aa769ffe(
     _runtime,
     _x_628_4,
     _x_627_3,
-    LeanScalar("nat", "277"),
-    LeanScalar("nat", "21"),
+    LeanNatLiterals.n277,
+    LeanNatLiterals.n21,
     _x_624_0,
   )
 }
@@ -2962,7 +2962,7 @@ fun f_Json_getInt_closed_1_7c61f64045(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_108_0: LeanValue = f_Json_getInt_closed_0_8946e20533(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_108_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_108_0])
 }
 // "Lean.Json.arr.elim"
 fun f_Json_arr_elim_beccdde14d(
@@ -3040,13 +3040,13 @@ fun f_Lean_Json_getInt_e4e981d1a2(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Json\",\"num\"]" ->
+      | LeanTag.Json_num ->
         _frame.set(3, leanField(_frame[0], 0));
         leanTag(_frame[3]) match {
-        | "[\"Lean\",\"JsonNumber\",\"mk\"]" ->
+        | LeanTag.JsonNumber_mk ->
           _frame.set(4, leanField(_frame[3], 0));
           _frame.set(5, leanField(_frame[3], 1));
-          _frame.set(6, LeanScalar("nat", "0"));
+          _frame.set(6, LeanNatLiterals.n0);
           _frame.set(
             7,
             L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -3056,11 +3056,11 @@ fun f_Lean_Json_getInt_e4e981d1a2(
             ),
           );
           leanTag(_frame[7]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(8, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[4]]));
+          | LeanTag.Bool_true ->
+            _frame.set(8, LeanCtor(LeanTag.Except_ok, Array[_frame[4]]));
             return _frame[8]
           | _ -> return leanFail("non-exhaustive Lean case")
           }
@@ -3072,7 +3072,7 @@ fun f_Lean_Json_getInt_e4e981d1a2(
       }
     | 1 ->
       _frame.set(1, LeanText("Integer expected"));
-      _frame.set(2, LeanCtor("[\"Except\",\"error\"]", Array[_frame[1]]));
+      _frame.set(2, LeanCtor(LeanTag.Except_error, Array[_frame[1]]));
       return _frame[2]
     | _ -> return leanFail("invalid join point")
     }

@@ -1,0 +1,226 @@
+// Compare the callback's result, world and full reference state with its
+// retained body. Recursive equality/solve helpers are shared by both routes.
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  mName = name("m");
+  nName = name("n");
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  succ = (u: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, u);
+  max = (u: LeanValue, v: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, u, v);
+  imax = (u: LeanValue, v: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, u, v);
+  one = succ(zero);
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, name("u"));
+  v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, name("v"));
+  m = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, mName);
+  n = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, nName);
+  levels = Array[
+    zero,
+    one,
+    succ(one),
+    u,
+    v,
+    m,
+    n,
+    succ(u),
+    succ(m),
+    max(u, v),
+    max(m, n),
+    max(u, m),
+    imax(u, m),
+    imax(m, n),
+  ];
+  context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  initialState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  mctx = leanField(initialState, 0);
+  for (id in Array[mName, nName]) {
+    !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(
+      runtime,
+      mctx,
+      id,
+    )
+  };
+  metaState = runtime.newRef(initialState);
+  constants = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", constants),
+    LeanConstantsView("locals", constants),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    // No modules are imported by this fixture, including extra IR constants.
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+  core = leanUnboundedCoreContext(runtime, "<level-defeq-callback-probe>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, environment));
+  cold = leanField(core, 0);
+  traceCore = leanReplaceField(
+    core,
+    0,
+    leanReplaceField(
+      cold,
+      2,
+      leanReplaceField(leanField(cold, 2), 1, leanBool(true)),
+    ),
+  );
+  checks = 0;
+  errors = 0;
+  effects = 0;
+  for (assignment in Array[None(), Some(zero), Some(one)]) {
+    assigned = assignment match {
+    | None() -> mctx
+    | Some(level) ->
+      L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+        runtime,
+        mctx,
+        mName,
+        level,
+      )
+    };
+    for (nested in Array[false, true]) {
+      activeMctx = if (nested) {
+        L4_Lean_MetavarContext.f_Lean_MetavarContext_incDepth_2d774c5ab2(
+          runtime,
+          assigned,
+          leanBool(false),
+        )
+      } else {
+        assigned
+      };
+      runtime.writeRef(
+        metaState,
+        Some(leanReplaceField(initialState, 0, activeMctx)),
+      );
+      for (stuck in Array[false, true]) {
+        config = leanReplaceField(
+          L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context),
+          4,
+          leanBool(stuck),
+        );
+        key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+          runtime,
+          config,
+        );
+        configured = leanReplaceField(
+          context,
+          0,
+          LeanCtor(
+            LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+            Array[config, key],
+          ),
+        );
+        for (coreContext in Array[core, traceCore]) {
+          for (lhs in levels) {
+            for (rhs in levels) {
+              lhsBase = L4_Lean_Level.f_Lean_Level_getLevelOffset_ff2e04d99e(
+                runtime,
+                lhs,
+              );
+              rhsBase = L4_Lean_Level.f_Lean_Level_getLevelOffset_ff2e04d99e(
+                runtime,
+                rhs,
+              );
+              equalBases = L4_Lean_Level.f_Lean_Level_beq_a85e9a2f15(
+                runtime,
+                lhsBase,
+                rhsBase,
+              );
+              saved = runtime.checkpoint();
+              original = saved.restoreRaw();
+              structured = saved.restoreRaw();
+              for (_ in Range(0, 2)) {
+                expected = L4_Lean_Meta_LevelDefEq.f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26_fallback(
+                  original,
+                  equalBases,
+                  lhs,
+                  rhs,
+                  leanBool(true),
+                  LeanText("Meta"),
+                  LeanText("isLevelDefEq"),
+                  configured,
+                  metaState,
+                  coreContext,
+                  coreState,
+                  leanNatValue(53),
+                );
+                actual = L4_Lean_Meta_LevelDefEq.f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26(
+                  structured,
+                  equalBases,
+                  lhs,
+                  rhs,
+                  leanBool(true),
+                  LeanText("Meta"),
+                  LeanText("isLevelDefEq"),
+                  configured,
+                  metaState,
+                  coreContext,
+                  coreState,
+                  leanNatValue(53),
+                );
+                refs = structured.checkpoint().refs;
+                if (
+                  native_eq(expected, actual) != 0 ||
+                  native_eq(original.checkpoint().refs, refs) != 0
+                ) {
+                  leanFail(
+                    "universe equality callback mismatch: " + checks.toString(),
+                  )
+                };
+                if (native_eq(saved.refs, refs) != 0) !effects = effects + 1;
+                if (leanTag(actual) == LeanTag.EST_Out_error) {
+                  !errors = errors + 1
+                };
+                !checks = checks + 1
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+  assert(checks == 9408);
+  assert(errors > 0);
+  assert(effects > 0);
+  print_string(
+    checks.toString() +
+      " universe equality callback result/state comparisons passed, " +
+      errors.toString() +
+      " errors, " +
+      effects.toString() +
+      " state changes",
+  )
+}

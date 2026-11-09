@@ -7,9 +7,9 @@ fun f_evalEfficientM_spec_1_spec_1_e2fcdad575(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
-    LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+  | LeanTag.Std_DHashMap_Internal_AssocList_nil ->
+    LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Std_DHashMap_Internal_AssocList_cons ->
     _key_3_2: LeanValue = leanField(_x_1_1, 0);
     _value_4_3: LeanValue = leanField(_x_1_1, 1);
     _tail_5_4: LeanValue = leanField(_x_1_1, 2);
@@ -19,10 +19,10 @@ fun f_evalEfficientM_spec_1_spec_1_e2fcdad575(
       _a_0,
     );
     leanTag(_x_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       f_evalEfficientM_spec_1_spec_1_e2fcdad575(_runtime, _a_0, _tail_5_4)
-    | "[\"Bool\",\"true\"]" ->
-      LeanCtor("[\"Option\",\"some\"]", Array[_value_4_3])
+    | LeanTag.Bool_true ->
+      LeanCtor(LeanTag.Option_some, Array[_value_4_3])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -38,13 +38,13 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
   _a_2_4: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"var\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_var__impl ->
     _hashCode_5: LeanValue = leanField(_a_1_1, 0);
     _w_3_6: LeanValue = leanField(_a_1_1, 1);
     _idx_4_7: LeanValue = leanField(_a_1_1, 2);
     _x_5_53: LeanValue = leanApply(_runtime, _a_2, Array[_idx_4_7]);
     leanTag(_x_5_53) match {
-    | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"PackedBitVec\",\"mk\"]" ->
+    | LeanTag.Std_Tactic_BVDecide_BVExpr_PackedBitVec_mk ->
       _w_54: LeanValue = leanField(_x_5_53, 0);
       _bv_55: LeanValue = leanField(_x_5_53, 1);
       _x_6_56: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -53,26 +53,26 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _w_0,
       );
       leanTag(_x_6_56) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_7_57: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_setWidth_c7469634b4(
           _runtime,
           _w_54,
           _w_0,
           _bv_55,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_7_57, _a_2_4])
-      | "[\"Bool\",\"true\"]" ->
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_bv_55, _a_2_4])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_7_57, _a_2_4])
+      | LeanTag.Bool_true ->
+        LeanCtor(LeanTag.ST_Out_mk, Array[_bv_55, _a_2_4])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"const\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_const__impl ->
     _hashCode_8: LeanValue = leanField(_a_1_1, 0);
     _w_10_9: LeanValue = leanField(_a_1_1, 1);
     _val_11_10: LeanValue = leanField(_a_1_1, 2);
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_11_10, _a_2_4])
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"extract\",\"_impl\"]" ->
+    LeanCtor(LeanTag.ST_Out_mk, Array[_val_11_10, _a_2_4])
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_extract__impl ->
     _hashCode_11: LeanValue = leanField(_a_1_1, 0);
     _w_13_12: LeanValue = leanField(_a_1_1, 1);
     _start_14_13: LeanValue = leanField(_a_1_1, 2);
@@ -87,7 +87,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_17_61) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_18_62: LeanValue = leanField(_x_17_61, 0);
       _state_19_63: LeanValue = leanField(_x_17_61, 1);
       _x_20_64: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_extractLsb_671811e706(
@@ -96,10 +96,10 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _w_0,
         _val_18_62,
       );
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_20_64, _state_19_63])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_x_20_64, _state_19_63])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"bin\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_bin__impl ->
     _hashCode_16: LeanValue = leanField(_a_1_1, 0);
     _w_22_17: LeanValue = leanField(_a_1_1, 1);
     _lhs_23_18: LeanValue = leanField(_a_1_1, 2);
@@ -114,7 +114,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_26_66) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_27_67: LeanValue = leanField(_x_26_66, 0);
       _state_28_68: LeanValue = leanField(_x_26_66, 1);
       _x_29_69: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -126,7 +126,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _state_28_68,
       );
       leanTag(_x_29_69) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_30_70: LeanValue = leanField(_x_29_69, 0);
         _state_31_71: LeanValue = leanField(_x_29_69, 1);
         _x_32_72: LeanValue = L4_Std_Tactic_BVDecide_Bitblast_BVExpr_Basic.f_BVDecide_BVBinOp_eval_f5d04596fc(
@@ -136,12 +136,12 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
           _val_27_67,
           _val_30_70,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_32_72, _state_31_71])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_32_72, _state_31_71])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"un\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_un__impl ->
     _hashCode_21: LeanValue = leanField(_a_1_1, 0);
     _w_34_22: LeanValue = leanField(_a_1_1, 1);
     _op_35_23: LeanValue = leanField(_a_1_1, 2);
@@ -155,7 +155,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_37_74) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_38_75: LeanValue = leanField(_x_37_74, 0);
       _state_39_76: LeanValue = leanField(_x_37_74, 1);
       _x_40_77: LeanValue = L4_Std_Tactic_BVDecide_Bitblast_BVExpr_Basic.f_BVDecide_BVUnOp_eval_c79e6cce1c(
@@ -164,10 +164,10 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _op_35_23,
         _val_38_75,
       );
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_40_77, _state_39_76])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_x_40_77, _state_39_76])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"append\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_append__impl ->
     _hashCode_25: LeanValue = leanField(_a_1_1, 0);
     _l_42_26: LeanValue = leanField(_a_1_1, 1);
     _r_43_27: LeanValue = leanField(_a_1_1, 2);
@@ -184,7 +184,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_48_79) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_49_80: LeanValue = leanField(_x_48_79, 0);
       _state_50_81: LeanValue = leanField(_x_48_79, 1);
       _x_51_82: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -196,7 +196,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _state_50_81,
       );
       leanTag(_x_51_82) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_52_83: LeanValue = leanField(_x_51_82, 0);
         _state_53_84: LeanValue = leanField(_x_51_82, 1);
         _x_54_85: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_append_9f02258dc6(
@@ -205,12 +205,12 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
           _val_49_80,
           _val_52_83,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_54_85, _state_53_84])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_54_85, _state_53_84])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"replicate\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_replicate__impl ->
     _hashCode_32: LeanValue = leanField(_a_1_1, 0);
     _w_56_33: LeanValue = leanField(_a_1_1, 1);
     _w_57_34: LeanValue = leanField(_a_1_1, 2);
@@ -226,7 +226,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_61_87) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_62_88: LeanValue = leanField(_x_61_87, 0);
       _state_63_89: LeanValue = leanField(_x_61_87, 1);
       _x_64_90: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_replicate_93db8aed0b(
@@ -235,10 +235,10 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _n_58_35,
         _val_62_88,
       );
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_64_90, _state_63_89])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_x_64_90, _state_63_89])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftLeft\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftLeft__impl ->
     _hashCode_38: LeanValue = leanField(_a_1_1, 0);
     _m_66_39: LeanValue = leanField(_a_1_1, 1);
     _n_67_40: LeanValue = leanField(_a_1_1, 2);
@@ -253,7 +253,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_70_92) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_71_93: LeanValue = leanField(_x_70_92, 0);
       _state_72_94: LeanValue = leanField(_x_70_92, 1);
       _x_73_95: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -265,7 +265,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _state_72_94,
       );
       leanTag(_x_73_95) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_74_96: LeanValue = leanField(_x_73_95, 0);
         _state_75_97: LeanValue = leanField(_x_73_95, 1);
         _x_76_98: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_shiftLeft_4a4b020dbb(
@@ -274,12 +274,12 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
           _val_71_93,
           _val_74_96,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_76_98, _state_75_97])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_76_98, _state_75_97])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftRight\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftRight__impl ->
     _hashCode_43: LeanValue = leanField(_a_1_1, 0);
     _m_78_44: LeanValue = leanField(_a_1_1, 1);
     _n_79_45: LeanValue = leanField(_a_1_1, 2);
@@ -294,7 +294,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_82_100) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_83_101: LeanValue = leanField(_x_82_100, 0);
       _state_84_102: LeanValue = leanField(_x_82_100, 1);
       _x_85_103: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -306,7 +306,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _state_84_102,
       );
       leanTag(_x_85_103) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_86_104: LeanValue = leanField(_x_85_103, 0);
         _state_87_105: LeanValue = leanField(_x_85_103, 1);
         _x_88_106: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_shiftRight_587ba76ba3(
@@ -314,12 +314,12 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
           _val_83_101,
           _val_86_104,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_88_106, _state_87_105])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_88_106, _state_87_105])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"arithShiftRight\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVExpr_arithShiftRight__impl ->
     _hashCode_48: LeanValue = leanField(_a_1_1, 0);
     _m_90_49: LeanValue = leanField(_a_1_1, 1);
     _n_91_50: LeanValue = leanField(_a_1_1, 2);
@@ -334,7 +334,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
       _a_2_4,
     );
     leanTag(_x_94_108) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_95_109: LeanValue = leanField(_x_94_108, 0);
       _state_96_110: LeanValue = leanField(_x_94_108, 1);
       _x_97_111: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -346,7 +346,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _state_96_110,
       );
       leanTag(_x_97_111) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_98_112: LeanValue = leanField(_x_97_111, 0);
         _state_99_113: LeanValue = leanField(_x_97_111, 1);
         _x_100_114: LeanValue = L4_Init_Data_BitVec_Basic.f_BitVec_sshiftRight_99eddf642e(
@@ -355,7 +355,7 @@ fun f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
           _val_95_109,
           _val_98_112,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_100_114, _state_99_113])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_100_114, _state_99_113])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -371,8 +371,8 @@ fun f_evalEfficientM_spec_2_spec_5_630b591934(
   _x_1_2: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" -> _x_1_2
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+  | LeanTag.Std_DHashMap_Internal_AssocList_nil -> _x_1_2
+  | LeanTag.Std_DHashMap_Internal_AssocList_cons ->
     _key_2_3: LeanValue = leanField(_x_1_2, 0);
     _value_3_4: LeanValue = leanField(_x_1_2, 1);
     _tail_4_5: LeanValue = leanField(_x_1_2, 2);
@@ -382,7 +382,7 @@ fun f_evalEfficientM_spec_2_spec_5_630b591934(
       _a_0,
     );
     leanTag(_x_5_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_6_7: LeanValue = f_evalEfficientM_spec_2_spec_5_630b591934(
         _runtime,
         _a_0,
@@ -390,12 +390,12 @@ fun f_evalEfficientM_spec_2_spec_5_630b591934(
         _tail_4_5,
       );
       LeanCtor(
-        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        LeanTag.Std_DHashMap_Internal_AssocList_cons,
         Array[_key_2_3, _value_3_4, _x_6_7],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       LeanCtor(
-        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+        LeanTag.Std_DHashMap_Internal_AssocList_cons,
         Array[_a_0, _b_1, _tail_4_5],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -415,9 +415,9 @@ fun f_BVExpr_evalEfficient_lam_0_657744b286(
   _x_5_8: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "16"),
+    LeanNatLiterals.n16,
     LeanCtor(
-      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      LeanTag.Std_DHashMap_Internal_AssocList_nil,
       Array[],
     ),
   );
@@ -426,13 +426,13 @@ fun f_BVExpr_evalEfficient_lam_0_657744b286(
     LeanErased(),
     LeanErased(),
     LeanCtor(
-      "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
-      Array[LeanScalar("nat", "0"), _x_5_8],
+      LeanTag.Std_DHashMap_Raw_mk,
+      Array[LeanNatLiterals.n0, _x_5_8],
     ),
     _y_1_4,
   );
   leanTag(_x_7_10) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_8_11: LeanValue = leanField(_x_7_10, 0);
     _state_9_12: LeanValue = leanField(_x_7_10, 1);
     _x_10_13: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -444,7 +444,7 @@ fun f_BVExpr_evalEfficient_lam_0_657744b286(
       _state_9_12,
     );
     leanTag(_x_10_13) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_11_14: LeanValue = leanField(_x_10_13, 0);
       _state_12_15: LeanValue = leanField(_x_10_13, 1);
       _x_13_16: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
@@ -455,10 +455,10 @@ fun f_BVExpr_evalEfficient_lam_0_657744b286(
         _state_12_15,
       );
       leanTag(_x_13_16) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_14_17: LeanValue = leanField(_x_13_16, 0);
         _state_15_18: LeanValue = leanField(_x_13_16, 1);
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_11_14, _state_15_18])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_val_11_14, _state_15_18])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -507,14 +507,14 @@ fun f_evalEfficientM_spec_2_spec_4_7786a4f79d(
   _nbuckets_3: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
     _runtime,
     _x_1_1,
-    LeanScalar("nat", "2"),
+    LeanNatLiterals.n2,
   );
   _x_5_6: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
     _runtime,
     LeanErased(),
     _nbuckets_3,
     LeanCtor(
-      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      LeanTag.Std_DHashMap_Internal_AssocList_nil,
       Array[],
     ),
   );
@@ -527,7 +527,7 @@ fun f_evalEfficientM_spec_2_spec_4_7786a4f79d(
   );
   f_spec_2_spec_4_spec_5_2e290f8864(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _data_0,
     _x_6_7,
   )
@@ -556,7 +556,7 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
   _a_1_4: LeanValue,
 ): LeanValue {
   _key_5: LeanValue = LeanCtor(
-    "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"Cache\",\"Key\",\"mk\"]",
+    LeanTag.Std_Tactic_BVDecide_BVExpr_Cache_Key_mk,
     Array[_w_0, _expr_1],
   );
   _x_2_6: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
@@ -567,7 +567,7 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
     _a_1_4,
   );
   leanTag(_x_2_6) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_3_7: LeanValue = leanField(_x_2_6, 0);
     _state_4_8: LeanValue = leanField(_x_2_6, 1);
     _x_5_9: LeanValue = f_BVExpr_evalEfficientM_spec_1_b0e571c128(
@@ -576,9 +576,9 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
       _key_5,
     );
     leanTag(_x_5_9) match {
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_6_10: LeanValue = leanField(_x_5_9, 0);
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_6_10, _state_4_8])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_val_6_10, _state_4_8])
     | _ ->
       _x_8_12: LeanValue = f_BVExpr_evalEfficientM_go_3cc8dd0dd3(
         _runtime,
@@ -589,7 +589,7 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
         _state_4_8,
       );
       leanTag(_x_8_12) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_9_13: LeanValue = leanField(_x_8_12, 0);
         _state_10_14: LeanValue = leanField(_x_8_12, 1);
         _x_11_15: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
@@ -600,7 +600,7 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
           _state_10_14,
         );
         leanTag(_x_11_15) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_12_16: LeanValue = leanField(_x_11_15, 0);
           _state_13_17: LeanValue = leanField(_x_11_15, 1);
           _x_14_18: LeanValue = f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
@@ -618,10 +618,10 @@ fun f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
             _state_13_17,
           );
           leanTag(_x_15_19) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _val_16_20: LeanValue = leanField(_x_15_19, 0);
             _state_17_21: LeanValue = leanField(_x_15_19, 1);
-            LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_9_13, _state_17_21])
+            LeanCtor(LeanTag.ST_Out_mk, Array[_val_9_13, _state_17_21])
           | _ -> leanFail("non-exhaustive Lean case")
           }
         | _ -> leanFail("non-exhaustive Lean case")
@@ -639,9 +639,9 @@ fun f_evalEfficientM_spec_2_spec_3_ffd9a65e99(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
-    LeanCtor("[\"Bool\",\"false\"]", Array[])
-  | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+  | LeanTag.Std_DHashMap_Internal_AssocList_nil ->
+    LeanCtor(LeanTag.Bool_false, Array[])
+  | LeanTag.Std_DHashMap_Internal_AssocList_cons ->
     _key_3_2: LeanValue = leanField(_x_1_1, 0);
     _value_4_3: LeanValue = leanField(_x_1_1, 1);
     _tail_5_4: LeanValue = leanField(_x_1_1, 2);
@@ -651,9 +651,9 @@ fun f_evalEfficientM_spec_2_spec_3_ffd9a65e99(
       _a_0,
     );
     leanTag(_x_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       f_evalEfficientM_spec_2_spec_3_ffd9a65e99(_runtime, _a_0, _tail_5_4)
-    | "[\"Bool\",\"true\"]" -> _x_6_6
+    | LeanTag.Bool_true -> _x_6_6
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -677,8 +677,8 @@ fun f_spec_2_spec_4_spec_5_2e290f8864(
     _x_1_3,
   );
   leanTag(_x_2_4) match {
-  | "[\"Bool\",\"false\"]" -> _target_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _target_2
+  | LeanTag.Bool_true ->
     _es_5: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
       _runtime,
       LeanErased(),
@@ -692,7 +692,7 @@ fun f_spec_2_spec_4_spec_5_2e290f8864(
       _source_1,
       _i_0,
       LeanCtor(
-        "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+        LeanTag.Std_DHashMap_Internal_AssocList_nil,
         Array[],
       ),
       LeanErased(),
@@ -705,7 +705,7 @@ fun f_spec_2_spec_4_spec_5_2e290f8864(
     _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _i_0,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_spec_2_spec_4_spec_5_2e290f8864(_runtime, _x_5_10, _source_7, _target_8)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -731,11 +731,11 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Std_DHashMap_Raw_mk ->
         _frame.set(3, leanField(_frame[0], 0));
         _frame.set(4, leanField(_frame[0], 1));
         leanTag(_frame[1]) match {
-        | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"Cache\",\"Key\",\"mk\"]" ->
+        | LeanTag.Std_Tactic_BVDecide_BVExpr_Cache_Key_mk ->
           _ = leanField(_frame[1], 0);
           _frame.set(5, leanField(_frame[1], 1));
           _frame.set(
@@ -747,7 +747,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             ),
           );
           leanTag(_frame[5]) match {
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"var\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_var__impl ->
             _frame.set(39, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -755,7 +755,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"const\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_const__impl ->
             _frame.set(40, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -763,7 +763,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"extract\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_extract__impl ->
             _frame.set(41, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -773,7 +773,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"bin\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_bin__impl ->
             _frame.set(42, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -783,7 +783,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"un\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_un__impl ->
             _frame.set(43, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -792,7 +792,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"append\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_append__impl ->
             _frame.set(44, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -804,7 +804,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"replicate\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_replicate__impl ->
             _frame.set(45, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -815,7 +815,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftLeft\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftLeft__impl ->
             _frame.set(46, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -825,7 +825,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftRight__impl ->
             _frame.set(47, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -835,7 +835,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"arithShiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_arithShiftRight__impl ->
             _frame.set(48, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -852,7 +852,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(8, LeanScalar("uint64", "32"));
+      _frame.set(8, LeanWord("uint64", 32));
       _frame.set(
         9,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -869,7 +869,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
           _frame[9],
         ),
       );
-      _frame.set(11, LeanScalar("uint64", "16"));
+      _frame.set(11, LeanWord("uint64", 16));
       _frame.set(
         12,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -900,7 +900,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
           _frame[6],
         ),
       );
-      _frame.set(16, LeanScalar("usize", "1"));
+      _frame.set(16, LeanWord("usize", 1));
       _frame.set(
         17,
         L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
@@ -936,8 +936,8 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
         ),
       );
       leanTag(_frame[20]) match {
-      | "[\"Bool\",\"false\"]" ->
-        _frame.set(21, LeanScalar("nat", "1"));
+      | LeanTag.Bool_false ->
+        _frame.set(21, LeanNatLiterals.n1);
         _frame.set(
           22,
           L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, _frame[3], _frame[21]),
@@ -945,7 +945,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
         _frame.set(
           23,
           LeanCtor(
-            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+            LeanTag.Std_DHashMap_Internal_AssocList_cons,
             Array[_frame[1], _frame[2], _frame[19]],
           ),
         );
@@ -960,7 +960,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             LeanErased(),
           ),
         );
-        _frame.set(25, LeanScalar("nat", "4"));
+        _frame.set(25, LeanNatLiterals.n4);
         _frame.set(
           26,
           L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -969,7 +969,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
             _frame[25],
           ),
         );
-        _frame.set(27, LeanScalar("nat", "3"));
+        _frame.set(27, LeanNatLiterals.n3);
         _frame.set(
           28,
           L4_Init_Prelude.f_Nat_div_d9df18e4c4(
@@ -995,7 +995,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
           ),
         );
         leanTag(_frame[30]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             31,
             f_evalEfficientM_spec_2_spec_4_7786a4f79d(_runtime, _frame[24]),
@@ -1003,27 +1003,27 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
           _frame.set(
             32,
             LeanCtor(
-              "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+              LeanTag.Std_DHashMap_Raw_mk,
               Array[_frame[22], _frame[31]],
             ),
           );
           return _frame[32]
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             33,
             LeanCtor(
-              "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+              LeanTag.Std_DHashMap_Raw_mk,
               Array[_frame[22], _frame[24]],
             ),
           );
           return _frame[33]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           34,
           LeanCtor(
-            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            LeanTag.Std_DHashMap_Internal_AssocList_nil,
             Array[],
           ),
         );
@@ -1061,7 +1061,7 @@ fun f_BVExpr_evalEfficientM_spec_2_08cb87eb3e(
         _frame.set(
           38,
           LeanCtor(
-            "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+            LeanTag.Std_DHashMap_Raw_mk,
             Array[_frame[3], _frame[37]],
           ),
         );
@@ -1090,14 +1090,14 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
     pc match {
     | 0 ->
       leanTag(_frame[1]) match {
-      | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]" ->
+      | LeanTag.Std_DHashMap_Internal_AssocList_nil ->
         return _frame[0]
-      | "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]" ->
+      | LeanTag.Std_DHashMap_Internal_AssocList_cons ->
         _frame.set(2, leanField(_frame[1], 0));
         _frame.set(3, leanField(_frame[1], 1));
         _frame.set(4, leanField(_frame[1], 2));
         leanTag(_frame[2]) match {
-        | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"Cache\",\"Key\",\"mk\"]" ->
+        | LeanTag.Std_Tactic_BVDecide_BVExpr_Cache_Key_mk ->
           _ = leanField(_frame[2], 0);
           _frame.set(5, leanField(_frame[2], 1));
           _frame.set(
@@ -1109,7 +1109,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             ),
           );
           leanTag(_frame[5]) match {
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"var\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_var__impl ->
             _frame.set(23, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1117,7 +1117,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"const\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_const__impl ->
             _frame.set(24, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1125,7 +1125,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"extract\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_extract__impl ->
             _frame.set(25, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1135,7 +1135,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"bin\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_bin__impl ->
             _frame.set(26, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1145,7 +1145,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"un\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_un__impl ->
             _frame.set(27, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1154,7 +1154,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"append\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_append__impl ->
             _frame.set(28, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1166,7 +1166,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"replicate\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_replicate__impl ->
             _frame.set(29, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1177,7 +1177,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftLeft\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftLeft__impl ->
             _frame.set(30, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1187,7 +1187,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftRight__impl ->
             _frame.set(31, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1197,7 +1197,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
             _frame.set(7, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"arithShiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_arithShiftRight__impl ->
             _frame.set(32, leanField(_frame[5], 0));
             _ = leanField(_frame[5], 1);
             _ = leanField(_frame[5], 2);
@@ -1214,7 +1214,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(8, LeanScalar("uint64", "32"));
+      _frame.set(8, LeanWord("uint64", 32));
       _frame.set(
         9,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -1231,7 +1231,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
           _frame[9],
         ),
       );
-      _frame.set(11, LeanScalar("uint64", "16"));
+      _frame.set(11, LeanWord("uint64", 16));
       _frame.set(
         12,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -1262,7 +1262,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
           _frame[6],
         ),
       );
-      _frame.set(16, LeanScalar("usize", "1"));
+      _frame.set(16, LeanWord("usize", 1));
       _frame.set(
         17,
         L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
@@ -1292,7 +1292,7 @@ fun f_spec_4_spec_5_spec_6_4f916ccd1c(
       _frame.set(
         20,
         LeanCtor(
-          "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"cons\"]",
+          LeanTag.Std_DHashMap_Internal_AssocList_cons,
           Array[_frame[2], _frame[3], _frame[19]],
         ),
       );
@@ -1334,11 +1334,11 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Std_DHashMap_Raw_mk ->
         _ = leanField(_frame[0], 0);
         _frame.set(2, leanField(_frame[0], 1));
         leanTag(_frame[1]) match {
-        | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"Cache\",\"Key\",\"mk\"]" ->
+        | LeanTag.Std_Tactic_BVDecide_BVExpr_Cache_Key_mk ->
           _ = leanField(_frame[1], 0);
           _frame.set(3, leanField(_frame[1], 1));
           _frame.set(
@@ -1350,7 +1350,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             ),
           );
           leanTag(_frame[3]) match {
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"var\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_var__impl ->
             _frame.set(19, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1358,7 +1358,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"const\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_const__impl ->
             _frame.set(20, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1366,7 +1366,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"extract\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_extract__impl ->
             _frame.set(21, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1376,7 +1376,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"bin\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_bin__impl ->
             _frame.set(22, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1386,7 +1386,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"un\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_un__impl ->
             _frame.set(23, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1395,7 +1395,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"append\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_append__impl ->
             _frame.set(24, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1407,7 +1407,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"replicate\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_replicate__impl ->
             _frame.set(25, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1418,7 +1418,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftLeft\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftLeft__impl ->
             _frame.set(26, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1428,7 +1428,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"shiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_shiftRight__impl ->
             _frame.set(27, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1438,7 +1438,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
             _frame.set(5, _jump0);
             !pc = 1;
             void
-          | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVExpr\",\"arithShiftRight\",\"_impl\"]" ->
+          | LeanTag.Std_Tactic_BVDecide_BVExpr_arithShiftRight__impl ->
             _frame.set(28, leanField(_frame[3], 0));
             _ = leanField(_frame[3], 1);
             _ = leanField(_frame[3], 2);
@@ -1455,7 +1455,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(6, LeanScalar("uint64", "32"));
+      _frame.set(6, LeanWord("uint64", 32));
       _frame.set(
         7,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -1472,7 +1472,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
           _frame[7],
         ),
       );
-      _frame.set(9, LeanScalar("uint64", "16"));
+      _frame.set(9, LeanWord("uint64", 16));
       _frame.set(
         10,
         L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
@@ -1503,7 +1503,7 @@ fun f_BVExpr_evalEfficientM_spec_1_b0e571c128(
           _frame[4],
         ),
       );
-      _frame.set(14, LeanScalar("usize", "1"));
+      _frame.set(14, LeanWord("usize", 1));
       _frame.set(
         15,
         L4_Init_Data_UInt_BasicAux.f_USize_sub_9d0bfbce3c(
@@ -1554,9 +1554,9 @@ fun f_BVLogicalExpr_evalEfficient_lam_0_f69f314303(
   _x_5_7: LeanValue = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "16"),
+    LeanNatLiterals.n16,
     LeanCtor(
-      "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+      LeanTag.Std_DHashMap_Internal_AssocList_nil,
       Array[],
     ),
   );
@@ -1565,13 +1565,13 @@ fun f_BVLogicalExpr_evalEfficient_lam_0_f69f314303(
     LeanErased(),
     LeanErased(),
     LeanCtor(
-      "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
-      Array[LeanScalar("nat", "0"), _x_5_7],
+      LeanTag.Std_DHashMap_Raw_mk,
+      Array[LeanNatLiterals.n0, _x_5_7],
     ),
     _y_1_3,
   );
   leanTag(_x_7_9) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_8_10: LeanValue = leanField(_x_7_9, 0);
     _state_9_11: LeanValue = leanField(_x_7_9, 1);
     _x_10_12: LeanValue = f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
@@ -1582,7 +1582,7 @@ fun f_BVLogicalExpr_evalEfficient_lam_0_f69f314303(
       _state_9_11,
     );
     leanTag(_x_10_12) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_11_13: LeanValue = leanField(_x_10_12, 0);
       _state_12_14: LeanValue = leanField(_x_10_12, 1);
       _x_13_15: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
@@ -1593,10 +1593,10 @@ fun f_BVLogicalExpr_evalEfficient_lam_0_f69f314303(
         _state_12_14,
       );
       leanTag(_x_13_15) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_14_16: LeanValue = leanField(_x_13_15, 0);
         _state_15_17: LeanValue = leanField(_x_13_15, 1);
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_val_11_13, _state_15_17])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_val_11_13, _state_15_17])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1625,7 +1625,7 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
   _a_1_3: LeanValue,
 ): LeanValue {
   leanTag(_expr_0) match {
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVLogicalExpr\",\"literal\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVLogicalExpr_literal__impl ->
     _hashCode_4: LeanValue = leanField(_expr_0, 0);
     _a_2_5: LeanValue = leanField(_expr_0, 1);
     f_EfficientEval_BVPred_evalEfficientM_29b5109921(
@@ -1635,11 +1635,11 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
       _a_2,
       _a_1_3,
     )
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVLogicalExpr\",\"const\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVLogicalExpr_const__impl ->
     _hashCode_6: LeanValue = leanField(_expr_0, 0);
     _a_4_7: LeanValue = leanField(_expr_0, 1);
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_a_4_7, _a_1_3])
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVLogicalExpr\",\"not\",\"_impl\"]" ->
+    LeanCtor(LeanTag.ST_Out_mk, Array[_a_4_7, _a_1_3])
+  | LeanTag.Std_Tactic_BVDecide_BVLogicalExpr_not__impl ->
     _hashCode_8: LeanValue = leanField(_expr_0, 0);
     _a_6_9: LeanValue = leanField(_expr_0, 1);
     _x_7_20: LeanValue = f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
@@ -1650,25 +1650,25 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
       _a_1_3,
     );
     leanTag(_x_7_20) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_8_21: LeanValue = leanField(_x_7_20, 0);
       _state_9_22: LeanValue = leanField(_x_7_20, 1);
       leanTag(_val_8_21) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         LeanCtor(
-          "[\"ST\",\"Out\",\"mk\"]",
-          Array[LeanCtor("[\"Bool\",\"true\"]", Array[]), _state_9_22],
+          LeanTag.ST_Out_mk,
+          Array[LeanCtor(LeanTag.Bool_true, Array[]), _state_9_22],
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         LeanCtor(
-          "[\"ST\",\"Out\",\"mk\"]",
-          Array[LeanCtor("[\"Bool\",\"false\"]", Array[]), _state_9_22],
+          LeanTag.ST_Out_mk,
+          Array[LeanCtor(LeanTag.Bool_false, Array[]), _state_9_22],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVLogicalExpr\",\"gate\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVLogicalExpr_gate__impl ->
     _hashCode_10: LeanValue = leanField(_expr_0, 0);
     _a_14_11: LeanValue = leanField(_expr_0, 1);
     _a_15_12: LeanValue = leanField(_expr_0, 2);
@@ -1681,7 +1681,7 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
       _a_1_3,
     );
     leanTag(_x_17_27) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_18_28: LeanValue = leanField(_x_17_27, 0);
       _state_19_29: LeanValue = leanField(_x_17_27, 1);
       _x_20_30: LeanValue = f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
@@ -1692,7 +1692,7 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
         _state_19_29,
       );
       leanTag(_x_20_30) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_21_31: LeanValue = leanField(_x_20_30, 0);
         _state_22_32: LeanValue = leanField(_x_20_30, 1);
         _x_23_33: LeanValue = L4_Std_Tactic_BVDecide_Bitblast_BVExpr_Basic.f_BVDecide_Gate_eval_de974994ee(
@@ -1701,12 +1701,12 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
           _val_18_28,
           _val_21_31,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_23_33, _state_22_32])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_23_33, _state_22_32])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVLogicalExpr\",\"ite\",\"_impl\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVLogicalExpr_ite__impl ->
     _hashCode_14: LeanValue = leanField(_expr_0, 0);
     _a_25_15: LeanValue = leanField(_expr_0, 1);
     _a_26_16: LeanValue = leanField(_expr_0, 2);
@@ -1719,11 +1719,11 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
       _a_1_3,
     );
     leanTag(_x_28_35) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_29_36: LeanValue = leanField(_x_28_35, 0);
       _state_30_37: LeanValue = leanField(_x_28_35, 1);
       leanTag(_val_29_36) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
           _runtime,
           _a_27_17,
@@ -1731,7 +1731,7 @@ fun f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
           _a_2,
           _state_30_37,
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         f_EfficientEval_BVLogicalExpr_evalEfficientM_15cce64a1c(
           _runtime,
           _a_26_16,
@@ -1755,7 +1755,7 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
   _a_1_3: LeanValue,
 ): LeanValue {
   leanTag(_expr_0) match {
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVPred\",\"bin\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVPred_bin ->
     _w_2_4: LeanValue = leanField(_expr_0, 0);
     _lhs_3_5: LeanValue = leanField(_expr_0, 1);
     _op_4_6: LeanValue = leanField(_expr_0, 2);
@@ -1769,7 +1769,7 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
       _a_1_3,
     );
     leanTag(_x_6_11) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_7_12: LeanValue = leanField(_x_6_11, 0);
       _state_8_13: LeanValue = leanField(_x_6_11, 1);
       _x_9_14: LeanValue = f_EfficientEval_BVExpr_evalEfficientM_26772d1166(
@@ -1781,7 +1781,7 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
         _state_8_13,
       );
       leanTag(_x_9_14) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_10_15: LeanValue = leanField(_x_9_14, 0);
         _state_11_16: LeanValue = leanField(_x_9_14, 1);
         _x_12_17: LeanValue = L4_Std_Tactic_BVDecide_Bitblast_BVExpr_Basic.f_BVDecide_BVBinPred_eval_f7d91d0fc8(
@@ -1790,12 +1790,12 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
           _val_7_12,
           _val_10_15,
         );
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_12_17, _state_11_16])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_12_17, _state_11_16])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Std\",\"Tactic\",\"BVDecide\",\"BVPred\",\"getLsbD\"]" ->
+  | LeanTag.Std_Tactic_BVDecide_BVPred_getLsbD ->
     _w_14_8: LeanValue = leanField(_expr_0, 0);
     _expr_15_9: LeanValue = leanField(_expr_0, 1);
     _idx_16_10: LeanValue = leanField(_expr_0, 2);
@@ -1808,7 +1808,7 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
       _a_1_3,
     );
     leanTag(_x_17_19) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_18_20: LeanValue = leanField(_x_17_19, 0);
       _state_19_21: LeanValue = leanField(_x_17_19, 1);
       _x_20_22: LeanValue = L4_Init_Data_Nat_Bitwise_Basic.f_Nat_testBit_3c19af1a0f(
@@ -1816,7 +1816,7 @@ fun f_EfficientEval_BVPred_evalEfficientM_29b5109921(
         _val_18_20,
         _idx_16_10,
       );
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_20_22, _state_19_21])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_x_20_22, _state_19_21])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")

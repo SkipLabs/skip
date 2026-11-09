@@ -1,0 +1,115 @@
+// Resource bounds and the minimum reduction configuration required for inference.
+module L4_Lean_Meta_InferType;
+
+// "Lean.Meta.inferTypeImp"
+fun f_Lean_Meta_inferTypeImp_31f204953c(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  cold = leanField(core, 0);
+  depth = leanNat(leanField(core, 1));
+  limit = leanNat(leanField(cold, 3));
+  if (!limit.isZero() && depth == limit) {
+    return f_Meta_inferTypeImp_spec_0_8c4183f87b(
+      runtime,
+      leanField(core, 2),
+      world,
+    )
+  };
+  nested = leanReplaceField(
+    leanReplaceField(core, 1, leanBoxNat(depth.add(LeanNat::fromInt(1)))),
+    4,
+    LeanErased(),
+  );
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    context,
+  );
+  transparency = LeanCtor(LeanTag.Meta_TransparencyMode_default, Array[]);
+  if (
+    leanIsTrue(
+      L4_Lean_Meta_TransparencyMode.f_Meta_TransparencyMode_lt_41b30b8fe8(
+        runtime,
+        leanField(config, 9),
+        transparency,
+      ),
+    )
+  ) {
+    keyed = L4_Lean_Meta_Basic.f_Meta_ConfigWithKey_setTransparency_d2874c92d7(
+      runtime,
+      transparency,
+      leanField(context, 0),
+    );
+    !context = leanReplaceField(context, 0, keyed)
+  };
+  f_Meta_inferTypeImp_lam_0_5eca222887(
+    runtime,
+    expr,
+    context,
+    state,
+    nested,
+    coreState,
+    world,
+  )
+}
+
+// "Lean.Meta.inferTypeImp._lam_0"
+fun f_Meta_inferTypeImp_lam_0_5eca222887(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    context,
+  );
+  suitable =
+    leanIsTrue(leanField(config, 13)) &&
+    leanIsTrue(leanField(config, 12)) &&
+    leanIsTrue(leanField(config, 15)) &&
+    leanIsTrue(leanField(config, 18)) &&
+    leanIsTrue(leanField(config, 16)) &&
+    leanTag(leanField(config, 14)) ==
+      LeanTag.Meta_ProjReductionKind_yesWithDelta &&
+    leanTag(leanField(config, 10)) == LeanTag.Meta_EtaStructMode_all;
+  if (!suitable) {
+    // Update a private copy once, retaining all unrelated configuration fields.
+    fields = config match {
+    | LeanCtor(LeanTag.Meta_Config_mk, values) -> values.clone()
+    | _ -> leanFail("invalid inference configuration")
+    };
+    fields.set(10, LeanCtor(LeanTag.Meta_EtaStructMode_all, Array[]));
+    fields.set(
+      14,
+      LeanCtor(LeanTag.Meta_ProjReductionKind_yesWithDelta, Array[]),
+    );
+    for (i in Array[12, 13, 15, 16, 18]) fields.set(i, leanBool(true));
+    updated = LeanCtor(LeanTag.Meta_Config_mk, fields.chill());
+    key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, updated);
+    keyed = LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[updated, key],
+    );
+    !context = leanReplaceField(context, 0, keyed)
+  };
+  f_Meta_inferTypeImp_infer_d48462d789(
+    runtime,
+    expr,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  )
+}
+
+module end;

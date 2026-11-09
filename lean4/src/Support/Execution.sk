@@ -1,16 +1,173 @@
 // One invocation owns all temporary references. Their integer handles must not
 // escape into cached results. SKStore inputs and outputs remain immutable.
 mutable class LeanExecution{
-  store: mutable SKStore.Context,
+  // Raw executions have no dependency-tracking context. Reaching a tracked
+  // environment operation on that path fails rather than silently using it.
+  store: ?(mutable SKStore.Context) = None(),
   mutable initializing: Bool = false,
   // Opt-in bring-up restriction. It does not implement heartbeat statistics.
   unboundedHeartbeats: Bool = false,
   // Lean's cross-execution realization cache requires its async IO machinery.
   // FunInfo can use its original direct computation and per-execution cache.
   sharedValueRealizations: Bool = false,
-  refs: mutable Vector<?LeanValue> = mutable Vector[],
-  initializers: mutable Map<String, LeanValue> = mutable Map[],
+  profileRuntime: Bool = false,
+  profileSimpPhases: Bool = false,
+  mutable simpPhaseNs: SortedMap<String, Int> = SortedMap::create(),
+  collectSimpRegions: Bool = false,
+  denseSimpRegions: Bool = false,
+  memoizeSimp: Bool = false,
+  simpQueryMask: Int = 31,
+  mutable simpHook: ?((
+    mutable LeanExecution,
+    Array<LeanValue>,
+  ) ~> ?LeanValue) = None(),
+  mutable simpQueryFetches: Int = 0,
+  mutable simpQueryDeclines: Int = 0,
+  mutable simpOlderQueriesFetched: Int = 0,
+  mutable simpOlderQueryKeys: SortedSet<SKStore.Key> = SortedSet[],
+  mutable regionCount: Int = 0,
+  mutable arrayWriteCount: Int = 0,
+  mutable arrayWriteElements: Int = 0,
+  mutable largestArrayWrite: Int = 0,
+  mutable expressionEqualityCount: Int = 0,
+  mutable expressionEqualityNs: Int = 0,
+  mutable primitiveCount: Int = 0,
+  mutable primitiveInclusiveNs: Int = 0,
+  mutable refs: mutable LeanReferenceTable = mutable LeanReferenceTable{},
+  mutable initializers: SortedMap<String, LeanValue> = SortedMap::create(),
+  mutable immutableIdentities: LeanIdentityTable = LeanIdentityTable(
+    SortedMap::create(),
+    0,
+  ),
 } {
+  mutable fun context(): mutable SKStore.Context {
+    this.store match {
+    | Some(context) -> context
+    | None() -> leanFail("tracked environment access during raw execution")
+    }
+  }
+
+  mutable fun runRegionAction(
+    action: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+    args: Array<LeanValue>,
+  ): (Result<LeanValue, Exception>, LeanExecutionCheckpoint) {
+    this.!regionCount = this.regionCount + 1;
+    result: Result<LeanValue, Exception> = try {
+      Success(action(this, args))
+    } catch {
+    | error -> Failure(error)
+    };
+    (result, this.checkpoint())
+  }
+  // A region owns a complete execution copy. Its result, references and store
+  // dependencies are copied out together before temporary allocations are freed.
+  // No reference is dropped or renumbered at this boundary.
+  mutable fun inRegion(
+    action: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+    args: Array<LeanValue>,
+  ): LeanValue {
+    saved = this.checkpoint();
+    (result, restored) = if (this.store.isNone()) {
+      // This helper uses only Skip allocation regions, despite its namespace;
+      // it neither clones a Context nor records dependencies or cached results.
+      SKStore.withRegionValue(() ~>
+        saved.restoreRaw().runRegionAction(action, args)
+      )
+    } else {
+      SKStore.withRegion(this.context(), (_, context) ~>
+        saved.restore(context).runRegionAction(action, args)
+      )
+    };
+    this.!initializing = restored.initializing;
+    this.!refs = restored.refs.restore();
+    this.!initializers = restored.initializers;
+    this.!immutableIdentities = restored.immutableIdentities;
+    this.!simpPhaseNs = restored.simpPhaseNs;
+    this.!simpHook = restored.simpHook;
+    this.!simpOlderQueryKeys = restored.simpOlderQueryKeys;
+    this.restoreMetrics(restored.metrics);
+    result match {
+    | Success(value) -> value
+    | Failure(error) -> throw error
+    }
+  }
+
+  mutable fun checkpoint(): LeanExecutionCheckpoint {
+    LeanExecutionCheckpoint(
+      this.initializing,
+      this.unboundedHeartbeats,
+      this.sharedValueRealizations,
+      this.profileRuntime,
+      this.collectSimpRegions,
+      this.denseSimpRegions,
+      this.memoizeSimp,
+      this.simpQueryMask,
+      this.simpHook,
+      this.simpOlderQueryKeys,
+      this.refs.snapshot(),
+      this.initializers,
+      this.immutableIdentities,
+      Array[
+        this.arrayWriteCount,
+        this.arrayWriteElements,
+        this.largestArrayWrite,
+        this.expressionEqualityCount,
+        this.expressionEqualityNs,
+        this.regionCount,
+        this.primitiveCount,
+        this.primitiveInclusiveNs,
+        this.simpQueryFetches,
+        this.simpQueryDeclines,
+        this.simpOlderQueriesFetched,
+      ],
+      this.profileSimpPhases,
+      this.simpPhaseNs,
+    )
+  }
+
+  readonly fun simpPhaseNow(): Int {
+    if (this.profileSimpPhases) Time.time_ns() else 0
+  }
+
+  mutable fun recordSimpPhase(name: String, elapsed: Int): void {
+    if (this.profileSimpPhases) {
+      this.!simpPhaseNs = this.simpPhaseNs.set(name, elapsed)
+    }
+  }
+
+  mutable fun restoreMetrics(metrics: Array<Int>): void {
+    this.!arrayWriteCount = metrics[0];
+    this.!arrayWriteElements = metrics[1];
+    this.!largestArrayWrite = metrics[2];
+    this.!expressionEqualityCount = metrics[3];
+    this.!expressionEqualityNs = metrics[4];
+    this.!regionCount = metrics[5];
+    this.!primitiveCount = metrics[6];
+    this.!primitiveInclusiveNs = metrics[7];
+    this.!simpQueryFetches = metrics[8];
+    this.!simpQueryDeclines = metrics[9];
+    this.!simpOlderQueriesFetched = metrics[10]
+  }
+
+  mutable fun recordArrayWrite(value: LeanValue): void {
+    if (!this.profileRuntime) return void;
+    size = leanValueArraySize(value);
+    this.!arrayWriteCount = this.arrayWriteCount + 1;
+    this.!arrayWriteElements = this.arrayWriteElements + size;
+    this.!largestArrayWrite = max(this.largestArrayWrite, size)
+  }
+
+  mutable fun immutableIdentity(value: LeanValue): Int {
+    key = LeanImmutableKey(value);
+    this.immutableIdentities.maybeGet(key) match {
+    | Some(id) -> id
+    | None() ->
+      id = this.immutableIdentities.size() + 1;
+      this.!immutableIdentities = this.immutableIdentities.insert(key, id);
+      id
+    }
+  }
+
   mutable fun newRef(value: LeanValue): LeanValue {
     index = this.refs.size();
     this.refs.push(Some(value));
@@ -36,23 +193,75 @@ mutable class LeanExecution{
   }
 }
 
+class LeanExecutionCheckpoint(
+  initializing: Bool,
+  unboundedHeartbeats: Bool,
+  sharedValueRealizations: Bool,
+  profileRuntime: Bool,
+  collectSimpRegions: Bool,
+  denseSimpRegions: Bool,
+  memoizeSimp: Bool,
+  simpQueryMask: Int,
+  simpHook: ?((mutable LeanExecution, Array<LeanValue>) ~> ?LeanValue),
+  simpOlderQueryKeys: SortedSet<SKStore.Key>,
+  refs: LeanReferenceSnapshot,
+  initializers: SortedMap<String, LeanValue>,
+  immutableIdentities: LeanIdentityTable,
+  metrics: Array<Int>,
+  profileSimpPhases: Bool,
+  simpPhaseNs: SortedMap<String, Int>,
+) {
+  fun restore(context: mutable SKStore.Context): mutable LeanExecution {
+    this.restoreWithStore(Some(context))
+  }
+
+  fun restoreRaw(): mutable LeanExecution {
+    this.restoreWithStore(None())
+  }
+
+  fun restoreWithStore(
+    store: ?(mutable SKStore.Context),
+  ): mutable LeanExecution {
+    result = mutable LeanExecution{
+      store,
+      initializing => this.initializing,
+      unboundedHeartbeats => this.unboundedHeartbeats,
+      sharedValueRealizations => this.sharedValueRealizations,
+      profileRuntime => this.profileRuntime,
+      profileSimpPhases => this.profileSimpPhases,
+      simpPhaseNs => this.simpPhaseNs,
+      collectSimpRegions => this.collectSimpRegions,
+      denseSimpRegions => this.denseSimpRegions,
+      memoizeSimp => this.memoizeSimp,
+      simpQueryMask => this.simpQueryMask,
+      simpHook => this.simpHook,
+      simpOlderQueryKeys => this.simpOlderQueryKeys,
+      refs => this.refs.restore(),
+      initializers => this.initializers,
+      immutableIdentities => this.immutableIdentities,
+    };
+    result.restoreMetrics(this.metrics);
+    result
+  }
+}
+
+const leanTrueValue: LeanValue = LeanCtor(LeanTag.Bool_true, Array[]);
+const leanFalseValue: LeanValue = LeanCtor(LeanTag.Bool_false, Array[]);
+
 fun leanBool(value: Bool): LeanValue {
-  LeanCtor(
-    if (value) "[\"Bool\",\"true\"]" else "[\"Bool\",\"false\"]",
-    Array[],
-  )
+  if (value) leanTrueValue else leanFalseValue
 }
 
 fun leanIsTrue(value: LeanValue): Bool {
   leanTag(value) match {
-  | "[\"Bool\",\"true\"]" -> true
-  | "[\"Bool\",\"false\"]" -> false
+  | LeanTag.Bool_true -> true
+  | LeanTag.Bool_false -> false
   | _ -> leanFail("expected a Lean Bool")
   }
 }
 
 fun leanSTResult(value: LeanValue, world: LeanValue): LeanValue {
-  LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[value, world])
+  LeanCtor(LeanTag.ST_Out_mk, Array[value, world])
 }
 
 fun leanReadInitializer(

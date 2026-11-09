@@ -22,12 +22,41 @@ fun leanParseWord(text: String): Int {
 fun leanWordBits(value: LeanValue): Int {
   value match {
   | LeanWord(_, bits) -> bits
+  | _ -> leanWordBitsOther(value)
+  }
+}
+
+// Literal parsing and erased enum conversion are cold for computed words.
+// Keeping them separate lets the normal optimizer inline the common load.
+fun leanWordBitsOther(value: LeanValue): Int {
+  value match {
   | LeanNatural(n) -> n.toWord()
-  | LeanScalar(_, digits) -> LeanNat::parse(digits).toWord()
-  | LeanCtor(name, fields) if (fields.isEmpty()) -> leanConstructorOrdinal(name)
+  | LeanScalar(_, digits) -> leanParseWordModulo(digits)
+  | LeanCtor(name, fields) if (fields.isEmpty()) ->
+    // Booleans are frequent word inputs (configuration keys in particular).
+    // Avoid the complete erased-constructor inventory for these two cases.
+    name match {
+    | LeanTag.Bool_false -> 0
+    | LeanTag.Bool_true -> 1
+    | _ -> leanConstructorOrdinal(name)
+    }
   | LeanUnavailable(description) -> leanFail("not implemented: " + description)
   | _ -> leanFail("expected a Lean word")
   }
+}
+
+// Literal conversion has the same modulo-2^64 semantics as Nat.toWord, even for
+// arbitrarily large naturals. Avoid allocating big-number limbs for word literals
+// at every arithmetic operation. Import validation still uses leanParseWord.
+fun leanParseWordModulo(text: String): Int {
+  if (text.isEmpty()) leanFail("empty Lean word literal");
+  bits = 0;
+  for (byte in text.bytes()) {
+    digit = byte.toInt() - 48;
+    if (digit < 0 || digit > 9) leanFail("invalid Lean word literal");
+    !bits = bits * 10 + digit
+  };
+  bits
 }
 
 fun leanWordWidth(kind: String): Int {

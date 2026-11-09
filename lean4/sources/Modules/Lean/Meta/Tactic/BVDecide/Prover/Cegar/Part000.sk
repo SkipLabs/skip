@@ -10,7 +10,7 @@ fun f_cegarBlaster_cegarLoop_spec_1_c51ad9f000(
   _x_2_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
@@ -18,8 +18,8 @@ fun f_cegarBlaster_cegarLoop_spec_1_c51ad9f000(
     _stop_2,
   );
   leanTag(_x_3_5) match {
-  | "[\"Bool\",\"false\"]" -> _x_2_4
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _x_2_4
+  | LeanTag.Bool_true ->
     _x_4_6: LeanValue = L4_Init_Prelude.f_Array_size_3866d4555a(
       _runtime,
       LeanErased(),
@@ -31,15 +31,15 @@ fun f_cegarBlaster_cegarLoop_spec_1_c51ad9f000(
       _x_4_6,
     );
     leanTag(_x_5_7) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_6_8: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
         _runtime,
         _start_1,
         _x_4_6,
       );
       leanTag(_x_6_8) match {
-      | "[\"Bool\",\"false\"]" -> _x_2_4
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_2_4
+      | LeanTag.Bool_true ->
         _x_7_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
           _runtime,
           _start_1,
@@ -57,7 +57,7 @@ fun f_cegarBlaster_cegarLoop_spec_1_c51ad9f000(
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_10_12: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
         _runtime,
         _start_1,
@@ -96,11 +96,11 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
     _y_5_5,
   );
   leanTag(_x_6_6) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_7_7: LeanValue = leanField(_x_6_6, 0);
     _state_8_8: LeanValue = leanField(_x_6_6, 1);
     leanTag(_val_7_7) match {
-    | "[\"Lean\",\"Core\",\"State\",\"mk\"]" ->
+    | LeanTag.Core_State_mk ->
       _env_9: LeanValue = leanField(_val_7_7, 0);
       _nextMacroScope_10: LeanValue = leanField(_val_7_7, 1);
       _ngen_11: LeanValue = leanField(_val_7_7, 2);
@@ -114,7 +114,7 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
       _env_20: LeanValue = L4_Lean_Environment.f_Lean_Environment_setRecordingDeps_123c45e5c9(
         _runtime,
         _env_9,
-        LeanCtor("[\"Bool\",\"false\"]", Array[]),
+        LeanCtor(LeanTag.Bool_false, Array[]),
       );
       _x_10_21: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
         _runtime,
@@ -124,18 +124,18 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
         _state_8_8,
       );
       leanTag(_x_10_21) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_11_22: LeanValue = leanField(_x_10_21, 0);
         _state_12_23: LeanValue = leanField(_x_10_21, 1);
         leanTag(_val_11_22) match {
-        | "[\"Lean\",\"Meta\",\"State\",\"mk\"]" ->
+        | LeanTag.Meta_State_mk ->
           _mctx_24: LeanValue = leanField(_val_11_22, 0);
           _cache_25: LeanValue = leanField(_val_11_22, 1);
           _zetaDeltaFVarIds_26: LeanValue = leanField(_val_11_22, 2);
           _postponed_27: LeanValue = leanField(_val_11_22, 3);
           _diag_28: LeanValue = leanField(_val_11_22, 4);
           leanTag(_y_1_1) match {
-          | "[\"Lean\",\"Meta\",\"Context\",\"mk\"]" ->
+          | LeanTag.Meta_Context_mk ->
             _keyedConfig_29: LeanValue = leanField(_y_1_1, 0);
             _trackZetaDelta_30: LeanValue = leanField(_y_1_1, 1);
             _zetaDeltaSet_31: LeanValue = leanField(_y_1_1, 2);
@@ -148,7 +148,7 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
             _inTypeClassResolution_38: LeanValue = leanField(_y_1_1, 9);
             _cacheInferType_39: LeanValue = leanField(_y_1_1, 10);
             leanTag(_y_3_3) match {
-            | "[\"Lean\",\"Core\",\"Context\",\"mk\"]" ->
+            | LeanTag.Core_Context_mk ->
               _toCold_40: LeanValue = leanField(_y_3_3, 0);
               _currRecDepth_41: LeanValue = leanField(_y_3_3, 1);
               _ref_42: LeanValue = leanField(_y_3_3, 2);
@@ -158,7 +158,7 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
               _checkDeprecated_46: LeanValue = leanField(_y_3_3, 6);
               _isRecordingDeps_47: LeanValue = leanField(_y_3_3, 7);
               leanTag(_toCold_40) match {
-              | "[\"Lean\",\"Core\",\"Context\",\"Cold\",\"mk\"]" ->
+              | LeanTag.Core_Context_Cold_mk ->
                 _fileName_48: LeanValue = leanField(_toCold_40, 0);
                 _fileMap_49: LeanValue = leanField(_toCold_40, 1);
                 _options_50: LeanValue = leanField(_toCold_40, 2);
@@ -175,17 +175,17 @@ fun f_checkTermination_spec_0_spec_0_f8a22e38a0(
                   11,
                 );
                 _x_14_61: LeanValue = LeanCtor(
-                  "[\"Lean\",\"MessageData\",\"withContext\"]",
+                  LeanTag.MessageData_withContext,
                   Array[
                     LeanCtor(
-                      "[\"Lean\",\"MessageDataContext\",\"mk\"]",
+                      LeanTag.MessageDataContext_mk,
                       Array[_env_20, _mctx_24, _lctx_32, _options_50],
                     ),
                     _msgData_0,
                   ],
                 );
                 LeanCtor(
-                  "[\"EST\",\"Out\",\"ok\"]",
+                  LeanTag.EST_Out_ok,
                   Array[_x_14_61, _state_12_23],
                 )
               | _ -> leanFail("non-exhaustive Lean case")
@@ -248,7 +248,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
   loop {
     pc match {
     | 0 ->
-      _frame.set(16, LeanScalar("nat", "0"));
+      _frame.set(16, LeanNatLiterals.n0);
       _frame.set(
         17,
         L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -257,7 +257,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
           _frame[16],
         ),
       );
-      _frame.set(18, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+      _frame.set(18, LeanCtor(LeanTag.Bool_true, Array[]));
       _frame.set(
         19,
         L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Basic.f_CegarM_TheoryState_new_03dbcbb949(
@@ -266,15 +266,15 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
         ),
       );
       leanTag(_frame[19]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _frame.set(20, leanField(_frame[19], 0));
         _frame.set(21, leanField(_frame[19], 1));
         leanTag(_frame[2]) match {
-        | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"ReflectionResult\",\"mk\"]" ->
+        | LeanTag.Meta_Tactic_BVDecide_ReflectionResult_mk ->
           _frame.set(22, leanField(_frame[2], 0));
           _frame.set(23, leanField(_frame[2], 1));
           leanTag(_frame[0]) match {
-          | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"TacticContext\",\"mk\"]" ->
+          | LeanTag.Meta_Tactic_BVDecide_TacticContext_mk ->
             _ = leanField(_frame[0], 0);
             _ = leanField(_frame[0], 1);
             _ = leanField(_frame[0], 2);
@@ -283,7 +283,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
             _frame.set(24, leanField(_frame[0], 5));
             _ = leanField(_frame[0], 6);
             leanTag(_frame[24]) match {
-            | "[\"Lean\",\"Elab\",\"Tactic\",\"BVDecide\",\"BVDecideConfig\",\"mk\"]" ->
+            | LeanTag.Elab_Tactic_BVDecide_BVDecideConfig_mk ->
               _frame.set(25, leanField(_frame[24], 0));
               _ = leanField(_frame[24], 1);
               _ = leanField(_frame[24], 2);
@@ -299,7 +299,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
               _ = leanField(_frame[24], 12);
               _ = leanField(_frame[24], 13);
               _frame.set(26, leanField(_frame[24], 14));
-              _frame.set(27, LeanScalar("nat", "1000"));
+              _frame.set(27, LeanNatLiterals.n1000);
               _frame.set(
                 28,
                 L4_Init_Prelude.f_Nat_mul_8d6effc865(
@@ -311,7 +311,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
               _frame.set(
                 29,
                 LeanCtor(
-                  "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]",
+                  LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk,
                   Array[
                     _frame[22],
                     _frame[17],
@@ -326,7 +326,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
               _frame.set(
                 30,
                 LeanCtor(
-                  "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"Context\",\"mk\"]",
+                  LeanTag.Meta_Tactic_BVDecide_CegarM_Context_mk,
                   Array[_frame[1], _frame[23], _frame[0]],
                 ),
               );
@@ -341,7 +341,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                 ),
               );
               leanTag(_frame[31]) match {
-              | "[\"ST\",\"Out\",\"mk\"]" ->
+              | LeanTag.ST_Out_mk ->
                 _frame.set(32, leanField(_frame[31], 0));
                 _frame.set(33, leanField(_frame[31], 1));
                 _frame.set(
@@ -355,11 +355,11 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                   ),
                 );
                 leanTag(_frame[39]) match {
-                | "[\"ST\",\"Out\",\"mk\"]" ->
+                | LeanTag.ST_Out_mk ->
                   _frame.set(40, leanField(_frame[39], 0));
                   _frame.set(41, leanField(_frame[39], 1));
                   leanTag(_frame[40]) match {
-                  | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+                  | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
                     _frame.set(42, leanField(_frame[40], 0));
                     _frame.set(43, leanField(_frame[40], 1));
                     _frame.set(44, leanField(_frame[40], 2));
@@ -370,7 +370,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                     _frame.set(
                       48,
                       LeanCtor(
-                        "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]",
+                        LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk,
                         Array[
                           _frame[42],
                           _frame[43],
@@ -394,7 +394,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                       ),
                     );
                     leanTag(_frame[49]) match {
-                    | "[\"ST\",\"Out\",\"mk\"]" ->
+                    | LeanTag.ST_Out_mk ->
                       _ = leanField(_frame[49], 0);
                       _frame.set(50, leanField(_frame[49], 1));
                       _frame.set(
@@ -407,17 +407,17 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                         ),
                       );
                       leanTag(_frame[51]) match {
-                      | "[\"EST\",\"Out\",\"ok\"]" ->
+                      | LeanTag.EST_Out_ok ->
                         _ = leanField(_frame[51], 0);
                         _frame.set(52, leanField(_frame[51], 1));
                         _frame.set(
                           55,
-                          LeanCtor("[\"Option\",\"none\"]", Array[]),
+                          LeanCtor(LeanTag.Option_none, Array[]),
                         );
                         _frame.set(
                           56,
                           LeanCtor(
-                            "[\"Prod\",\"mk\"]",
+                            LeanTag.Prod_mk,
                             Array[_frame[55], _frame[17]],
                           ),
                         );
@@ -444,15 +444,15 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                           ),
                         );
                         leanTag(_frame[57]) match {
-                        | "[\"EST\",\"Out\",\"ok\"]" ->
+                        | LeanTag.EST_Out_ok ->
                           _frame.set(58, leanField(_frame[57], 0));
                           _frame.set(59, leanField(_frame[57], 1));
                           leanTag(_frame[58]) match {
-                          | "[\"Prod\",\"mk\"]" ->
+                          | LeanTag.Prod_mk ->
                             _frame.set(62, leanField(_frame[58], 0));
                             _frame.set(63, leanField(_frame[58], 1));
                             leanTag(_frame[62]) match {
-                            | "[\"Option\",\"none\"]" ->
+                            | LeanTag.Option_none ->
                               _frame.set(
                                 65,
                                 L4_Init_Prelude.f_Array_size_3866d4555a(
@@ -481,18 +481,18 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                                 ),
                               );
                               leanTag(_frame[67]) match {
-                              | "[\"ST\",\"Out\",\"mk\"]" ->
+                              | LeanTag.ST_Out_mk ->
                                 _frame.set(68, leanField(_frame[67], 0));
                                 _frame.set(69, leanField(_frame[67], 1));
                                 leanTag(_frame[68]) match {
-                                | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"State\",\"mk\"]" ->
+                                | LeanTag.Meta_Tactic_BVDecide_State_mk ->
                                   _ = leanField(_frame[68], 0);
                                   _ = leanField(_frame[68], 1);
                                   _ = leanField(_frame[68], 2);
                                   _ = leanField(_frame[68], 3);
                                   _frame.set(70, leanField(_frame[68], 4));
                                   leanTag(_frame[70]) match {
-                                  | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"FunState\",\"mk\"]" ->
+                                  | LeanTag.Meta_Tactic_BVDecide_FunState_mk ->
                                     _frame.set(71, leanField(_frame[70], 0));
                                     _ = leanField(_frame[70], 1);
                                     _ = leanField(_frame[70], 2);
@@ -504,7 +504,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                                         _frame[71],
                                       ),
                                     );
-                                    _frame.set(73, LeanScalar("usize", "0"));
+                                    _frame.set(73, LeanWord("usize", 0));
                                     _frame.set(
                                       74,
                                       f_cegarBlaster_cegarLoop_spec_2_083c39317b(
@@ -517,7 +517,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                                     _frame.set(
                                       75,
                                       LeanCtor(
-                                        "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CounterExample\",\"mk\"]",
+                                        LeanTag.Meta_Tactic_BVDecide_CounterExample_mk,
                                         Array[
                                           _frame[1],
                                           _frame[23],
@@ -529,7 +529,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                                     _frame.set(
                                       76,
                                       LeanCtor(
-                                        "[\"Except\",\"error\"]",
+                                        LeanTag.Except_error,
                                         Array[_frame[75]],
                                       ),
                                     );
@@ -547,7 +547,7 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                                 }
                               | _ -> return leanFail("non-exhaustive Lean case")
                               }
-                            | "[\"Option\",\"some\"]" ->
+                            | LeanTag.Option_some ->
                               _frame.set(64, leanField(_frame[62], 0));
                               _jump0 = _frame[64];
                               _jump1 = _frame[59];
@@ -559,26 +559,26 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
                             }
                           | _ -> return leanFail("non-exhaustive Lean case")
                           }
-                        | "[\"EST\",\"Out\",\"error\"]" ->
+                        | LeanTag.EST_Out_error ->
                           _frame.set(60, leanField(_frame[57], 0));
                           _frame.set(61, leanField(_frame[57], 1));
                           _frame.set(
                             77,
                             LeanCtor(
-                              "[\"EST\",\"Out\",\"error\"]",
+                              LeanTag.EST_Out_error,
                               Array[_frame[60], _frame[61]],
                             ),
                           );
                           return _frame[77]
                         | _ -> return leanFail("non-exhaustive Lean case")
                         }
-                      | "[\"EST\",\"Out\",\"error\"]" ->
+                      | LeanTag.EST_Out_error ->
                         _frame.set(53, leanField(_frame[51], 0));
                         _frame.set(54, leanField(_frame[51], 1));
                         _frame.set(
                           78,
                           LeanCtor(
-                            "[\"EST\",\"Out\",\"error\"]",
+                            LeanTag.EST_Out_error,
                             Array[_frame[53], _frame[54]],
                           ),
                         );
@@ -613,12 +613,12 @@ fun f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
         ),
       );
       leanTag(_frame[36]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _ = leanField(_frame[36], 0);
         _frame.set(37, leanField(_frame[36], 1));
         _frame.set(
           38,
-          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[34], _frame[37]]),
+          LeanCtor(LeanTag.EST_Out_ok, Array[_frame[34], _frame[37]]),
         );
         return _frame[38]
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -648,10 +648,10 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
   _y_15_15: LeanValue,
 ): LeanValue {
   leanTag(_a_0) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_16: LeanValue = leanField(_a_0, 0);
     _snd_17: LeanValue = leanField(_a_0, 1);
-    _x_16_18: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+    _x_16_18: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
     _x_18_20: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
       _runtime,
       LeanErased(),
@@ -660,11 +660,11 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
       _y_15_15,
     );
     leanTag(_x_18_20) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_19_21: LeanValue = leanField(_x_18_20, 0);
       _state_20_22: LeanValue = leanField(_x_18_20, 1);
       leanTag(_val_19_21) match {
-      | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+      | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
         _satExpr_23: LeanValue = leanField(_val_19_21, 0);
         _hypQueue_24: LeanValue = leanField(_val_19_21, 1);
         _usedHyps_25: LeanValue = leanField(_val_19_21, 2);
@@ -673,15 +673,15 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
         _solverTimeBudgetMs_28: LeanValue = leanField(_val_19_21, 5);
         _roundBudget_29: LeanValue = leanField(_val_19_21, 6);
         leanTag(_didChange_26) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           LeanCtor(
-            "[\"EST\",\"Out\",\"ok\"]",
+            LeanTag.EST_Out_ok,
             Array[
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_x_16_18, _snd_17]),
+              LeanCtor(LeanTag.Prod_mk, Array[_x_16_18, _snd_17]),
               _state_20_22,
             ],
           )
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _x_23_32: LeanValue = f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
             _runtime,
             _y_1_1,
@@ -701,7 +701,7 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
             _state_20_22,
           );
           leanTag(_x_23_32) match {
-          | "[\"EST\",\"Out\",\"ok\"]" ->
+          | LeanTag.EST_Out_ok ->
             _a_24_33: LeanValue = leanField(_x_23_32, 0);
             _a_25_34: LeanValue = leanField(_x_23_32, 1);
             _x_26_37: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_BitVec.f_BVDecide_Cegar_checkBitVec_6e60de208f(
@@ -723,11 +723,11 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
               _a_25_34,
             );
             leanTag(_x_26_37) match {
-            | "[\"EST\",\"Out\",\"ok\"]" ->
+            | LeanTag.EST_Out_ok ->
               _a_27_38: LeanValue = leanField(_x_26_37, 0);
               _a_28_39: LeanValue = leanField(_x_26_37, 1);
               leanTag(_a_27_38) match {
-              | "[\"Except\",\"error\"]" ->
+              | LeanTag.Except_error ->
                 _a_29_42: LeanValue = leanField(_a_27_38, 0);
                 _x_30_44: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Basic.f_CegarM_CounterExample_ofArray_1cf0fd8c72(
                   _runtime,
@@ -746,7 +746,7 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                   _a_28_39,
                 );
                 leanTag(_x_30_44) match {
-                | "[\"EST\",\"Out\",\"ok\"]" ->
+                | LeanTag.EST_Out_ok ->
                   _a_31_45: LeanValue = leanField(_x_30_44, 0);
                   _a_32_46: LeanValue = leanField(_x_30_44, 1);
                   _x_33_49: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Function.f_BVDecide_Cegar_checkUf_b63fba1fc4(
@@ -769,7 +769,7 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                     _a_32_46,
                   );
                   leanTag(_x_33_49) match {
-                  | "[\"EST\",\"Out\",\"ok\"]" ->
+                  | LeanTag.EST_Out_ok ->
                     _a_34_50: LeanValue = leanField(_x_33_49, 0);
                     _a_35_51: LeanValue = leanField(_x_33_49, 1);
                     _x_36_54: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Lemmas.f_BVDecide_Cegar_processNewHyps_630a576cbb(
@@ -791,11 +791,11 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                       _a_35_51,
                     );
                     leanTag(_x_36_54) match {
-                    | "[\"EST\",\"Out\",\"ok\"]" ->
+                    | LeanTag.EST_Out_ok ->
                       _a_37_55: LeanValue = leanField(_x_36_54, 0);
                       _a_38_56: LeanValue = leanField(_x_36_54, 1);
                       leanTag(_a_37_55) match {
-                      | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"ProcessHypResult\",\"solved\"]" ->
+                      | LeanTag.Meta_Tactic_BVDecide_ProcessHypResult_solved ->
                         _x_39_59: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Basic.f_BVDecide_CegarM_createCert_2ed1d6663c(
                           _runtime,
                           _x_16_18,
@@ -803,20 +803,20 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                           _a_38_56,
                         );
                         leanTag(_x_39_59) match {
-                        | "[\"EST\",\"Out\",\"ok\"]" ->
+                        | LeanTag.EST_Out_ok ->
                           _a_40_60: LeanValue = leanField(_x_39_59, 0);
                           _a_41_61: LeanValue = leanField(_x_39_59, 1);
                           LeanCtor(
-                            "[\"EST\",\"Out\",\"ok\"]",
+                            LeanTag.EST_Out_ok,
                             Array[
                               LeanCtor(
-                                "[\"Prod\",\"mk\"]",
+                                LeanTag.Prod_mk,
                                 Array[
                                   LeanCtor(
-                                    "[\"Option\",\"some\"]",
+                                    LeanTag.Option_some,
                                     Array[
                                       LeanCtor(
-                                        "[\"Except\",\"ok\"]",
+                                        LeanTag.Except_ok,
                                         Array[_a_40_60],
                                       ),
                                     ],
@@ -827,16 +827,16 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                               _a_41_61,
                             ],
                           )
-                        | "[\"EST\",\"Out\",\"error\"]" ->
+                        | LeanTag.EST_Out_error ->
                           _a_46_62: LeanValue = leanField(_x_39_59, 0);
                           _a_47_63: LeanValue = leanField(_x_39_59, 1);
                           LeanCtor(
-                            "[\"EST\",\"Out\",\"error\"]",
+                            LeanTag.EST_Out_error,
                             Array[_a_46_62, _a_47_63],
                           )
                         | _ -> leanFail("non-exhaustive Lean case")
                         }
-                      | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"ProcessHypResult\",\"newHyps\"]" ->
+                      | LeanTag.Meta_Tactic_BVDecide_ProcessHypResult_newHyps ->
                         _x_49_69: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
                           _runtime,
                           LeanErased(),
@@ -845,11 +845,11 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                           _a_38_56,
                         );
                         leanTag(_x_49_69) match {
-                        | "[\"ST\",\"Out\",\"mk\"]" ->
+                        | LeanTag.ST_Out_mk ->
                           _val_50_70: LeanValue = leanField(_x_49_69, 0);
                           _state_51_71: LeanValue = leanField(_x_49_69, 1);
                           leanTag(_val_50_70) match {
-                          | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+                          | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
                             _satExpr_72: LeanValue = leanField(_val_50_70, 0);
                             _hypQueue_73: LeanValue = leanField(_val_50_70, 1);
                             _usedHyps_74: LeanValue = leanField(_val_50_70, 2);
@@ -867,12 +867,12 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                               6,
                             );
                             _x_52_79: LeanValue = LeanCtor(
-                              "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]",
+                              LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk,
                               Array[
                                 _satExpr_72,
                                 _hypQueue_73,
                                 _usedHyps_74,
-                                LeanCtor("[\"Bool\",\"true\"]", Array[]),
+                                LeanCtor(LeanTag.Bool_true, Array[]),
                                 _theoryState_76,
                                 _solverTimeBudgetMs_77,
                                 _roundBudget_78,
@@ -887,13 +887,13 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                               _state_51_71,
                             );
                             leanTag(_x_53_80) match {
-                            | "[\"ST\",\"Out\",\"mk\"]" ->
+                            | LeanTag.ST_Out_mk ->
                               _val_54_81: LeanValue = leanField(_x_53_80, 0);
                               _state_55_82: LeanValue = leanField(_x_53_80, 1);
                               f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                                 _runtime,
                                 LeanCtor(
-                                  "[\"Prod\",\"mk\"]",
+                                  LeanTag.Prod_mk,
                                   Array[_x_16_18, _a_29_42],
                                 ),
                                 _y_1_1,
@@ -918,7 +918,7 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                           }
                         | _ -> leanFail("non-exhaustive Lean case")
                         }
-                      | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"ProcessHypResult\",\"none\"]" ->
+                      | LeanTag.Meta_Tactic_BVDecide_ProcessHypResult_none ->
                         _x_59_86: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
                           _runtime,
                           LeanErased(),
@@ -927,11 +927,11 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                           _a_38_56,
                         );
                         leanTag(_x_59_86) match {
-                        | "[\"ST\",\"Out\",\"mk\"]" ->
+                        | LeanTag.ST_Out_mk ->
                           _val_60_87: LeanValue = leanField(_x_59_86, 0);
                           _state_61_88: LeanValue = leanField(_x_59_86, 1);
                           leanTag(_val_60_87) match {
-                          | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+                          | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
                             _satExpr_89: LeanValue = leanField(_val_60_87, 0);
                             _hypQueue_90: LeanValue = leanField(_val_60_87, 1);
                             _usedHyps_91: LeanValue = leanField(_val_60_87, 2);
@@ -949,12 +949,12 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                               6,
                             );
                             _x_62_96: LeanValue = LeanCtor(
-                              "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]",
+                              LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk,
                               Array[
                                 _satExpr_89,
                                 _hypQueue_90,
                                 _usedHyps_91,
-                                LeanCtor("[\"Bool\",\"false\"]", Array[]),
+                                LeanCtor(LeanTag.Bool_false, Array[]),
                                 _theoryState_93,
                                 _solverTimeBudgetMs_94,
                                 _roundBudget_95,
@@ -969,13 +969,13 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                               _state_61_88,
                             );
                             leanTag(_x_63_97) match {
-                            | "[\"ST\",\"Out\",\"mk\"]" ->
+                            | LeanTag.ST_Out_mk ->
                               _val_64_98: LeanValue = leanField(_x_63_97, 0);
                               _state_65_99: LeanValue = leanField(_x_63_97, 1);
                               f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                                 _runtime,
                                 LeanCtor(
-                                  "[\"Prod\",\"mk\"]",
+                                  LeanTag.Prod_mk,
                                   Array[_x_16_18, _a_29_42],
                                 ),
                                 _y_1_1,
@@ -1002,55 +1002,55 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                         }
                       | _ -> leanFail("non-exhaustive Lean case")
                       }
-                    | "[\"EST\",\"Out\",\"error\"]" ->
+                    | LeanTag.EST_Out_error ->
                       _a_68_57: LeanValue = leanField(_x_36_54, 0);
                       _a_69_58: LeanValue = leanField(_x_36_54, 1);
                       LeanCtor(
-                        "[\"EST\",\"Out\",\"error\"]",
+                        LeanTag.EST_Out_error,
                         Array[_a_68_57, _a_69_58],
                       )
                     | _ -> leanFail("non-exhaustive Lean case")
                     }
-                  | "[\"EST\",\"Out\",\"error\"]" ->
+                  | LeanTag.EST_Out_error ->
                     _a_71_52: LeanValue = leanField(_x_33_49, 0);
                     _a_72_53: LeanValue = leanField(_x_33_49, 1);
                     LeanCtor(
-                      "[\"EST\",\"Out\",\"error\"]",
+                      LeanTag.EST_Out_error,
                       Array[_a_71_52, _a_72_53],
                     )
                   | _ -> leanFail("non-exhaustive Lean case")
                   }
-                | "[\"EST\",\"Out\",\"error\"]" ->
+                | LeanTag.EST_Out_error ->
                   _a_74_47: LeanValue = leanField(_x_30_44, 0);
                   _a_75_48: LeanValue = leanField(_x_30_44, 1);
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"error\"]",
+                    LeanTag.EST_Out_error,
                     Array[_a_74_47, _a_75_48],
                   )
                 | _ -> leanFail("non-exhaustive Lean case")
                 }
-              | "[\"Except\",\"ok\"]" ->
+              | LeanTag.Except_ok ->
                 _a_77_43: LeanValue = leanField(_a_27_38, 0);
                 _x_79_106: LeanValue = L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Basic.f_BVDecide_CegarM_createCert_2ed1d6663c(
                   _runtime,
-                  LeanCtor("[\"Option\",\"some\"]", Array[_a_77_43]),
+                  LeanCtor(LeanTag.Option_some, Array[_a_77_43]),
                   _y_2_2,
                   _a_28_39,
                 );
                 leanTag(_x_79_106) match {
-                | "[\"EST\",\"Out\",\"ok\"]" ->
+                | LeanTag.EST_Out_ok ->
                   _a_80_107: LeanValue = leanField(_x_79_106, 0);
                   _a_81_108: LeanValue = leanField(_x_79_106, 1);
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"ok\"]",
+                    LeanTag.EST_Out_ok,
                     Array[
                       LeanCtor(
-                        "[\"Prod\",\"mk\"]",
+                        LeanTag.Prod_mk,
                         Array[
                           LeanCtor(
-                            "[\"Option\",\"some\"]",
+                            LeanTag.Option_some,
                             Array[
-                              LeanCtor("[\"Except\",\"ok\"]", Array[_a_80_107]),
+                              LeanCtor(LeanTag.Except_ok, Array[_a_80_107]),
                             ],
                           ),
                           _snd_17,
@@ -1059,27 +1059,27 @@ fun f_cegarBlaster_cegarLoop_spec_0_5402e54c48(
                       _a_81_108,
                     ],
                   )
-                | "[\"EST\",\"Out\",\"error\"]" ->
+                | LeanTag.EST_Out_error ->
                   _a_86_109: LeanValue = leanField(_x_79_106, 0);
                   _a_87_110: LeanValue = leanField(_x_79_106, 1);
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"error\"]",
+                    LeanTag.EST_Out_error,
                     Array[_a_86_109, _a_87_110],
                   )
                 | _ -> leanFail("non-exhaustive Lean case")
                 }
               | _ -> leanFail("non-exhaustive Lean case")
               }
-            | "[\"EST\",\"Out\",\"error\"]" ->
+            | LeanTag.EST_Out_error ->
               _a_89_40: LeanValue = leanField(_x_26_37, 0);
               _a_90_41: LeanValue = leanField(_x_26_37, 1);
-              LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_89_40, _a_90_41])
+              LeanCtor(LeanTag.EST_Out_error, Array[_a_89_40, _a_90_41])
             | _ -> leanFail("non-exhaustive Lean case")
             }
-          | "[\"EST\",\"Out\",\"error\"]" ->
+          | LeanTag.EST_Out_error ->
             _a_92_35: LeanValue = leanField(_x_23_32, 0);
             _a_93_36: LeanValue = leanField(_x_23_32, 1);
-            LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_92_35, _a_93_36])
+            LeanCtor(LeanTag.EST_Out_error, Array[_a_92_35, _a_93_36])
           | _ -> leanFail("non-exhaustive Lean case")
           }
         | _ -> leanFail("non-exhaustive Lean case")
@@ -1112,7 +1112,7 @@ fun f_Tactic_BVDecide_cegarBlaster_4a1c53d324(
   _a_3_15: LeanValue,
 ): LeanValue {
   leanTag(_ctx_0) match {
-  | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"TacticContext\",\"mk\"]" ->
+  | LeanTag.Meta_Tactic_BVDecide_TacticContext_mk ->
     _exprDef_16: LeanValue = leanField(_ctx_0, 0);
     _certDef_17: LeanValue = leanField(_ctx_0, 1);
     _reflectionDef_18: LeanValue = leanField(_ctx_0, 2);
@@ -1121,7 +1121,7 @@ fun f_Tactic_BVDecide_cegarBlaster_4a1c53d324(
     _config_21: LeanValue = leanField(_ctx_0, 5);
     _restrictedTypes_22: LeanValue = leanField(_ctx_0, 6);
     leanTag(_config_21) match {
-    | "[\"Lean\",\"Elab\",\"Tactic\",\"BVDecide\",\"BVDecideConfig\",\"mk\"]" ->
+    | LeanTag.Elab_Tactic_BVDecide_BVDecideConfig_mk ->
       _timeout_23: LeanValue = leanField(_config_21, 0);
       _trimProofs_24: LeanValue = leanField(_config_21, 1);
       _binaryProofs_25: LeanValue = leanField(_config_21, 2);
@@ -1138,7 +1138,7 @@ fun f_Tactic_BVDecide_cegarBlaster_4a1c53d324(
       _uf_36: LeanValue = leanField(_config_21, 13);
       _cegarRounds_37: LeanValue = leanField(_config_21, 14);
       leanTag(_uf_36) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_4_38: LeanValue = LeanClosure(
           L4_Lean_Meta_Tactic_BVDecide_Prover_Cegar_Basic
             .apply_f_BVDecide_CegarCert_ofLratCert_93effc4318,
@@ -1171,7 +1171,7 @@ fun f_Tactic_BVDecide_cegarBlaster_4a1c53d324(
           _a_14,
           _a_3_15,
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         f_BVDecide_cegarBlaster_cegarLoop_d136b3ceeb(
           _runtime,
           _ctx_0,
@@ -1268,7 +1268,7 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
         ),
       );
       leanTag(_frame[26]) match {
-      | "[\"EST\",\"Out\",\"ok\"]" ->
+      | LeanTag.EST_Out_ok ->
         _ = leanField(_frame[26], 0);
         _frame.set(27, leanField(_frame[26], 1));
         _frame.set(
@@ -1282,11 +1282,11 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
           ),
         );
         leanTag(_frame[28]) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _frame.set(29, leanField(_frame[28], 0));
           _frame.set(30, leanField(_frame[28], 1));
           leanTag(_frame[29]) match {
-          | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+          | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
             _ = leanField(_frame[29], 0);
             _ = leanField(_frame[29], 1);
             _ = leanField(_frame[29], 2);
@@ -1294,7 +1294,7 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
             _ = leanField(_frame[29], 4);
             _ = leanField(_frame[29], 5);
             _frame.set(31, leanField(_frame[29], 6));
-            _frame.set(32, LeanScalar("nat", "0"));
+            _frame.set(32, LeanNatLiterals.n0);
             _frame.set(
               33,
               L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -1304,14 +1304,14 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
               ),
             );
             leanTag(_frame[33]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[0];
               _jump1 = _frame[30];
               _frame.set(6, _jump0);
               _frame.set(7, _jump1);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 34,
                 LeanText(
@@ -1338,13 +1338,13 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
                 ),
               );
               leanTag(_frame[36]) match {
-              | "[\"EST\",\"Out\",\"ok\"]" ->
+              | LeanTag.EST_Out_ok ->
                 _ = leanField(_frame[36], 0);
                 _ = leanField(_frame[36], 1);
                 return leanFail(
                   "unreachable: _private.Lean.Meta.Tactic.BVDecide.Prover.Cegar.0.Lean.Meta.Tactic.BVDecide.cegarBlaster.checkTermination",
                 )
-              | "[\"EST\",\"Out\",\"error\"]" ->
+              | LeanTag.EST_Out_error ->
                 _ = leanField(_frame[36], 0);
                 _ = leanField(_frame[36], 1);
                 return _frame[36]
@@ -1356,7 +1356,7 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"EST\",\"Out\",\"error\"]" ->
+      | LeanTag.EST_Out_error ->
         _ = leanField(_frame[26], 0);
         _ = leanField(_frame[26], 1);
         return _frame[26]
@@ -1374,11 +1374,11 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
         ),
       );
       leanTag(_frame[8]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _frame.set(9, leanField(_frame[8], 0));
         _frame.set(10, leanField(_frame[8], 1));
         leanTag(_frame[9]) match {
-        | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]" ->
+        | LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk ->
           _frame.set(11, leanField(_frame[9], 0));
           _frame.set(12, leanField(_frame[9], 1));
           _frame.set(13, leanField(_frame[9], 2));
@@ -1386,8 +1386,8 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
           _frame.set(15, leanField(_frame[9], 4));
           _frame.set(16, leanField(_frame[9], 5));
           _frame.set(17, leanField(_frame[9], 6));
-          _frame.set(18, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
-          _frame.set(19, LeanScalar("nat", "1"));
+          _frame.set(18, LeanCtor(LeanTag.PUnit_unit, Array[]));
+          _frame.set(19, LeanNatLiterals.n1);
           _frame.set(
             20,
             L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -1399,7 +1399,7 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
           _frame.set(
             21,
             LeanCtor(
-              "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"State\",\"mk\"]",
+              LeanTag.Meta_Tactic_BVDecide_CegarM_State_mk,
               Array[
                 _frame[11],
                 _frame[12],
@@ -1423,13 +1423,13 @@ fun f_BVDecide_cegarBlaster_checkTermination_3bde5360f5(
             ),
           );
           leanTag(_frame[22]) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _ = leanField(_frame[22], 0);
             _frame.set(23, leanField(_frame[22], 1));
             _frame.set(
               24,
               LeanCtor(
-                "[\"EST\",\"Out\",\"ok\"]",
+                LeanTag.EST_Out_ok,
                 Array[_frame[18], _frame[23]],
               ),
             );
@@ -1457,8 +1457,8 @@ fun f_cegarBlaster_cegarLoop_spec_2_083c39317b(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _v_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -1467,7 +1467,7 @@ fun f_cegarBlaster_cegarLoop_spec_2_083c39317b(
       LeanErased(),
     );
     leanTag(_v_4) match {
-    | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"FunAtom\",\"mk\"]" ->
+    | LeanTag.Meta_Tactic_BVDecide_FunAtom_mk ->
       _funExpr_5: LeanValue = leanField(_v_4, 0);
       _isBoolAtom_6: LeanValue = leanField(_v_4, 1);
       _bs_8: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
@@ -1475,13 +1475,13 @@ fun f_cegarBlaster_cegarLoop_spec_2_083c39317b(
         LeanErased(),
         _bs_2,
         _i_1,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
         LeanErased(),
       );
       _x_4_10: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
         _runtime,
         _i_1,
-        LeanScalar("usize", "1"),
+        LeanWord("usize", 1),
       );
       _x_5_11: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
         _runtime,
@@ -1515,16 +1515,16 @@ fun f_BVDecide_cegarBlaster_configureSolver_d707566e36(
     _a_1_2,
   );
   leanTag(_x_2_3) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_4: LeanValue = leanField(_x_2_3, 0);
     _a_4_5: LeanValue = leanField(_x_2_3, 1);
     leanTag(_a_0) match {
-    | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"CegarM\",\"Context\",\"mk\"]" ->
+    | LeanTag.Meta_Tactic_BVDecide_CegarM_Context_mk ->
       _goal_8: LeanValue = leanField(_a_0, 0);
       _unusedHypotheses_9: LeanValue = leanField(_a_0, 1);
       _tacticContext_10: LeanValue = leanField(_a_0, 2);
       leanTag(_tacticContext_10) match {
-      | "[\"Lean\",\"Meta\",\"Tactic\",\"BVDecide\",\"TacticContext\",\"mk\"]" ->
+      | LeanTag.Meta_Tactic_BVDecide_TacticContext_mk ->
         _exprDef_11: LeanValue = leanField(_tacticContext_10, 0);
         _certDef_12: LeanValue = leanField(_tacticContext_10, 1);
         _reflectionDef_13: LeanValue = leanField(_tacticContext_10, 2);
@@ -1533,7 +1533,7 @@ fun f_BVDecide_cegarBlaster_configureSolver_d707566e36(
         _config_16: LeanValue = leanField(_tacticContext_10, 5);
         _restrictedTypes_17: LeanValue = leanField(_tacticContext_10, 6);
         leanTag(_config_16) match {
-        | "[\"Lean\",\"Elab\",\"Tactic\",\"BVDecide\",\"BVDecideConfig\",\"mk\"]" ->
+        | LeanTag.Elab_Tactic_BVDecide_BVDecideConfig_mk ->
           _timeout_18: LeanValue = leanField(_config_16, 0);
           _trimProofs_19: LeanValue = leanField(_config_16, 1);
           _binaryProofs_20: LeanValue = leanField(_config_16, 2);
@@ -1564,10 +1564,10 @@ fun f_BVDecide_cegarBlaster_configureSolver_d707566e36(
             _a_4_5,
           );
           leanTag(_x_7_35) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _val_8_36: LeanValue = leanField(_x_7_35, 0);
             _state_9_37: LeanValue = leanField(_x_7_35, 1);
-            LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_val_8_36, _state_9_37])
+            LeanCtor(LeanTag.EST_Out_ok, Array[_val_8_36, _state_9_37])
           | _ -> leanFail("non-exhaustive Lean case")
           }
         | _ -> leanFail("non-exhaustive Lean case")
@@ -1576,10 +1576,10 @@ fun f_BVDecide_cegarBlaster_configureSolver_d707566e36(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_11_6: LeanValue = leanField(_x_2_3, 0);
     _a_12_7: LeanValue = leanField(_x_2_3, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_11_6, _a_12_7])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_11_6, _a_12_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1613,7 +1613,7 @@ fun f_cegarLoop_spec_1_spec_1_d8b2630db1(
         ),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           9,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -1625,18 +1625,18 @@ fun f_cegarLoop_spec_1_spec_1_d8b2630db1(
           ),
         );
         leanTag(_frame[9]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(10, leanField(_frame[9], 0));
           _frame.set(11, leanField(_frame[9], 1));
           leanTag(_frame[11]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(12, leanField(_frame[11], 0));
             _frame.set(13, leanField(_frame[11], 1));
             leanTag(_frame[12]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 14,
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[10], _frame[13]]),
+                LeanCtor(LeanTag.Prod_mk, Array[_frame[10], _frame[13]]),
               );
               _frame.set(
                 15,
@@ -1651,7 +1651,7 @@ fun f_cegarLoop_spec_1_spec_1_d8b2630db1(
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[3];
               _frame.set(4, _jump0);
               !pc = 1;
@@ -1662,11 +1662,11 @@ fun f_cegarLoop_spec_1_spec_1_d8b2630db1(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[3]
+      | LeanTag.Bool_true -> return _frame[3]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(5, LeanWord("usize", 1));
       _frame.set(
         6,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -1701,7 +1701,7 @@ fun f_cegarBlaster_checkTermination_spec_0_2ba0c1b423(
   _y_5_5: LeanValue,
 ): LeanValue {
   leanTag(_y_3_3) match {
-  | "[\"Lean\",\"Core\",\"Context\",\"mk\"]" ->
+  | LeanTag.Core_Context_mk ->
     _toCold_6: LeanValue = leanField(_y_3_3, 0);
     _currRecDepth_7: LeanValue = leanField(_y_3_3, 1);
     _ref_8: LeanValue = leanField(_y_3_3, 2);
@@ -1720,20 +1720,20 @@ fun f_cegarBlaster_checkTermination_spec_0_2ba0c1b423(
       _y_5_5,
     );
     leanTag(_x_6_14) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_7_15: LeanValue = leanField(_x_6_14, 0);
       _a_8_16: LeanValue = leanField(_x_6_14, 1);
       LeanCtor(
-        "[\"EST\",\"Out\",\"error\"]",
+        LeanTag.EST_Out_error,
         Array[
           LeanCtor(
-            "[\"Lean\",\"Exception\",\"error\"]",
+            LeanTag.Exception_error,
             Array[_ref_8, _a_7_15],
           ),
           _a_8_16,
         ],
       )
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_11_17: LeanValue = leanField(_x_6_14, 0);
       _a_12_18: LeanValue = leanField(_x_6_14, 1);
       leanFail(

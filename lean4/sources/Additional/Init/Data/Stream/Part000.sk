@@ -11,10 +11,10 @@ fun f_forIn_visit_lam_0_3fc3244e69(
   _do_lift_4_5: LeanValue,
 ): LeanValue {
   leanTag(_do_lift_4_5) match {
-  | "[\"ForInStep\",\"done\"]" ->
+  | LeanTag.ForInStep_done ->
     _a_5_6: LeanValue = leanField(_do_lift_4_5, 0);
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_5_6])
-  | "[\"ForInStep\",\"yield\"]" ->
+  | LeanTag.ForInStep_yield ->
     _a_7_7: LeanValue = leanField(_do_lift_4_5, 0);
     f_Stream_forIn_visit_7af2b49e85(
       _runtime,
@@ -62,8 +62,8 @@ fun f_Std_instToStreamStringRaw_lam_0_2f5c7d4579(
     _s_0,
   );
   LeanCtor(
-    "[\"Substring\",\"Raw\",\"mk\"]",
-    Array[_s_0, LeanScalar("nat", "0"), _x_2_2],
+    LeanTag.Substring_Raw_mk,
+    Array[_s_0, LeanNatLiterals.n0, _x_2_2],
   )
 }
 fun apply_f_Std_instToStreamStringRaw_lam_0_2f5c7d4579(
@@ -110,7 +110,7 @@ fun f_Std_instStreamSubarray_lam_0_d2e8284699(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_1: LeanValue = leanField(_s_0, 0);
     _start_2: LeanValue = leanField(_s_0, 1);
     _stop_3: LeanValue = leanField(_s_0, 2);
@@ -122,8 +122,8 @@ fun f_Std_instStreamSubarray_lam_0_d2e8284699(
       _stop_3,
     );
     leanTag(_x_1_6) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Bool_true ->
       _x_3_8: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
         LeanErased(),
@@ -134,19 +134,19 @@ fun f_Std_instStreamSubarray_lam_0_d2e8284699(
       _x_5_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_7_12: LeanValue = LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           _x_3_8,
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_1, _x_5_10, _stop_3, LeanErased(), LeanErased()],
           ),
         ],
       );
-      LeanCtor("[\"Option\",\"some\"]", Array[_x_7_12])
+      LeanCtor(LeanTag.Option_some, Array[_x_7_12])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -370,7 +370,7 @@ fun f_Std_instToStreamArraySubarray_lam_0_50ccb2773a(
   L4_Init_Data_Array_Subarray.f_Array_toSubarray_0ba25fcf44(
     _runtime,
     _a_0,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_2_2,
   )
 }
@@ -390,11 +390,11 @@ fun f_Stream_forIn_visit_7af2b49e85(
   _b_4: LeanValue,
 ): LeanValue {
   leanTag(_inst_2_1) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_5: LeanValue = leanField(_inst_2_1, 0);
     _toBind_6: LeanValue = leanField(_inst_2_1, 1);
     leanTag(_toApplicative_5) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_7: LeanValue = leanField(_toApplicative_5, 0);
       _toPure_8: LeanValue = leanField(_toApplicative_5, 1);
       _toSeq_9: LeanValue = leanField(_toApplicative_5, 2);
@@ -402,12 +402,12 @@ fun f_Stream_forIn_visit_7af2b49e85(
       _toSeqRight_11: LeanValue = leanField(_toApplicative_5, 4);
       _x_3_12: LeanValue = leanApply(_runtime, _inst_1_0, Array[_s_3]);
       leanTag(_x_3_12) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         leanApply(_runtime, _toPure_8, Array[LeanErased(), _b_4])
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _val_5_13: LeanValue = leanField(_x_3_12, 0);
         leanTag(_val_5_13) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _fst_6_15: LeanValue = leanField(_val_5_13, 0);
           _snd_7_16: LeanValue = leanField(_val_5_13, 1);
           _f_8_17: LeanValue = LeanClosure(
@@ -512,35 +512,35 @@ fun f_Std_instStreamProd_lam_0_0b81ae2d29(
   _x_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_3_2) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_4_3: LeanValue = leanField(_x_3_2, 0);
     _snd_5_4: LeanValue = leanField(_x_3_2, 1);
     _x_6_5: LeanValue = leanApply(_runtime, _inst_1_0, Array[_fst_4_3]);
     leanTag(_x_6_5) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_6_5, 0);
       leanTag(_val_8_6) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _fst_9_8: LeanValue = leanField(_val_8_6, 0);
         _snd_10_9: LeanValue = leanField(_val_8_6, 1);
         _x_11_10: LeanValue = leanApply(_runtime, _inst_2_1, Array[_snd_5_4]);
         leanTag(_x_11_10) match {
-        | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+        | LeanTag.Option_some ->
           _val_13_11: LeanValue = leanField(_x_11_10, 0);
           leanTag(_val_13_11) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _fst_14_13: LeanValue = leanField(_val_13_11, 0);
             _snd_15_14: LeanValue = leanField(_val_13_11, 1);
             LeanCtor(
-              "[\"Option\",\"some\"]",
+              LeanTag.Option_some,
               Array[
                 LeanCtor(
-                  "[\"Prod\",\"mk\"]",
+                  LeanTag.Prod_mk,
                   Array[
-                    LeanCtor("[\"Prod\",\"mk\"]", Array[_fst_9_8, _fst_14_13]),
-                    LeanCtor("[\"Prod\",\"mk\"]", Array[_snd_10_9, _snd_15_14]),
+                    LeanCtor(LeanTag.Prod_mk, Array[_fst_9_8, _fst_14_13]),
+                    LeanCtor(LeanTag.Prod_mk, Array[_snd_10_9, _snd_15_14]),
                   ],
                 ),
               ],
@@ -613,7 +613,7 @@ fun f_Std_instStreamRangeNat_lam_0_85806ba648(
   _r_0: LeanValue,
 ): LeanValue {
   leanTag(_r_0) match {
-  | "[\"Std\",\"Legacy\",\"Range\",\"mk\"]" ->
+  | LeanTag.Std_Legacy_Range_mk ->
     _start_1: LeanValue = leanField(_r_0, 0);
     _stop_2: LeanValue = leanField(_r_0, 1);
     _step_3: LeanValue = leanField(_r_0, 2);
@@ -624,22 +624,22 @@ fun f_Std_instStreamRangeNat_lam_0_85806ba648(
       _stop_2,
     );
     leanTag(_x_1_5) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Bool_true ->
       _x_3_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_1,
         _step_3,
       );
       LeanCtor(
-        "[\"Option\",\"some\"]",
+        LeanTag.Option_some,
         Array[
           LeanCtor(
-            "[\"Prod\",\"mk\"]",
+            LeanTag.Prod_mk,
             Array[
               _start_1,
               LeanCtor(
-                "[\"Std\",\"Legacy\",\"Range\",\"mk\"]",
+                LeanTag.Std_Legacy_Range_mk,
                 Array[_x_3_7, _stop_2, _step_3, LeanErased()],
               ),
             ],
@@ -698,13 +698,13 @@ fun f_Std_instStreamList_lam_0_4f98ff3f04(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"List\",\"nil\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.List_cons ->
     _head_3_1: LeanValue = leanField(_x_1_0, 0);
     _tail_4_2: LeanValue = leanField(_x_1_0, 1);
     LeanCtor(
-      "[\"Option\",\"some\"]",
-      Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_head_3_1, _tail_4_2])],
+      LeanTag.Option_some,
+      Array[LeanCtor(LeanTag.Prod_mk, Array[_head_3_1, _tail_4_2])],
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }

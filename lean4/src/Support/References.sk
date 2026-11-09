@@ -1,0 +1,95 @@
+// Execution-local reference slots have mutable semantics. A page is copied only
+// when taking a checkpoint or first writing after restoring one. Immutable Lean
+// arrays are a separate abstraction and keep their value semantics.
+const leanReferencePageSize: Int = 256;
+
+mutable class LeanReferencePage{
+  mutable saved: Array<?LeanValue>,
+  mutable working: ?(mutable Array<?LeanValue>) = None(),
+} {
+  readonly fun get(index: Int): ?LeanValue {
+    this.working match {
+    | Some(values) -> values[index]
+    | None() -> this.saved[index]
+    }
+  }
+
+  mutable fun set(index: Int, value: ?LeanValue): void {
+    values = this.working match {
+    | Some(values) -> values
+    | None() ->
+      copy = this.saved.clone();
+      this.!working = Some(copy);
+      copy
+    };
+    values.set(index, value)
+  }
+
+  mutable fun snapshot(): Array<?LeanValue> {
+    this.working match {
+    | Some(values) ->
+      this.!saved = values.chill();
+      this.!working = None()
+    | None() -> void
+    };
+    this.saved
+  }
+}
+
+mutable class LeanReferenceTable{
+  mutable pages: mutable Vector<mutable LeanReferencePage> = mutable Vector[],
+  mutable count: Int = 0,
+} {
+  readonly fun size(): Int {
+    this.count
+  }
+
+  readonly fun get(index: Int): ?LeanValue {
+    invariant(
+      index >= 0 && index < this.count,
+      "Lean reference index out of bounds",
+    );
+    this.pages[index / leanReferencePageSize].get(index % leanReferencePageSize)
+  }
+
+  mutable fun set(index: Int, value: ?LeanValue): void {
+    invariant(
+      index >= 0 && index < this.count,
+      "Lean reference index out of bounds",
+    );
+    this.pages[index / leanReferencePageSize].set(
+      index % leanReferencePageSize,
+      value,
+    )
+  }
+
+  mutable fun push(value: ?LeanValue): void {
+    offset = this.count % leanReferencePageSize;
+    if (offset == 0) {
+      this.pages.push(
+        mutable LeanReferencePage{
+          saved => Array::fill(leanReferencePageSize, None()),
+        },
+      )
+    };
+    this.pages.last().set(offset, value);
+    this.!count = this.count + 1
+  }
+
+  mutable fun snapshot(): LeanReferenceSnapshot {
+    LeanReferenceSnapshot(
+      Array::fillBy(this.pages.size(), i -> this.pages[i].snapshot()),
+      this.count,
+    )
+  }
+}
+
+class LeanReferenceSnapshot(pages: Array<Array<?LeanValue>>, count: Int) {
+  fun restore(): mutable LeanReferenceTable {
+    table = mutable LeanReferenceTable{count => this.count};
+    for (page in this.pages) {
+      table.pages.push(mutable LeanReferencePage{saved => page})
+    };
+    table
+  }
+}

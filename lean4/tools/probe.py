@@ -20,6 +20,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--name', default='smoke')
     parser.add_argument('--driver', type=Path)
+    parser.add_argument('--release', action='store_true', help='Compile the probe with release optimization')
     parser.add_argument('--include', type=Path, action='append', default=[],
                         help='Additional handwritten Skip source used by this probe')
     args = parser.parse_args()
@@ -58,7 +59,8 @@ def main():
     compiler = os.environ.get('SKC', str(ROOT.parent / 'skiplang/compiler/stage1/bin/skc'))
     print(f'Compiling {len(selected)} verbatim maintained functions', flush=True)
     with (build / 'compile.log').open('w') as log:
-        subprocess.run([compiler, '--capacity', '8G', '-O0', '--no-inline', '--no-ipa', '-o', str(binary),
+        options = ['--release', '-O2'] if args.release else ['-O0', '--no-inline', '--no-ipa']
+        subprocess.run([compiler, '--capacity', '8G', *options, '-o', str(binary),
                         *map(str, sorted((ROOT / 'src/Support').glob('*.sk'))),
                         *map(str, includes), str(unit), str(entry)], check=True, stdout=log, stderr=log)
     result = subprocess.run([binary])

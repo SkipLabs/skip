@@ -9,12 +9,16 @@ fun f_Array_set_465d35ad3a(
   _v_3: LeanValue,
   _h_4: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "Array.set",
-    "lean_array_fset",
-    Array[_value_0, _xs_1, _i_2, _v_3, _h_4],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "Array.set",
+      "lean_array_fset",
+      Array[_value_0, _xs_1, _i_2, _v_3, _h_4],
+    )
+  };
+  leanArrayWrite(_xs_1, _i_2, _v_3, false)
 }
 // "Array.set!"
 fun f_Array_set_de08bfc69e(
@@ -24,12 +28,16 @@ fun f_Array_set_de08bfc69e(
   _i_2: LeanValue,
   _v_3: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "Array.set!",
-    "lean_array_set",
-    Array[_value_0, _xs_1, _i_2, _v_3],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "Array.set!",
+      "lean_array_set",
+      Array[_value_0, _xs_1, _i_2, _v_3],
+    )
+  };
+  leanArrayWrite(_xs_1, _i_2, _v_3, false)
 }
 
 module end;

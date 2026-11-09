@@ -5,7 +5,7 @@ fun f_Lean_instToExprRat_mkInt_4c5f23e486(
   _runtime: mutable LeanExecution,
   _i_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
     _x_1_1,
@@ -16,7 +16,7 @@ fun f_Lean_instToExprRat_mkInt_4c5f23e486(
     _i_0,
   );
   leanTag(_x_3_3) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_6_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
       _runtime,
       LeanText("Neg"),
@@ -26,11 +26,11 @@ fun f_Lean_instToExprRat_mkInt_4c5f23e486(
       _runtime,
       _x_1_1,
     );
-    _x_8_8: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_8_8: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_10_10: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
       _runtime,
       _x_6_6,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_7_7, _x_8_8]),
+      LeanCtor(LeanTag.List_cons, Array[_x_7_7, _x_8_8]),
     );
     _x_11_11: LeanValue = LeanText("Rat");
     _x_12_12: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -71,7 +71,7 @@ fun f_Lean_instToExprRat_mkInt_4c5f23e486(
       _x_16_16,
       _x_19_19,
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_21_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_toNat_23da39749d(
       _runtime,
       _i_0,
@@ -103,13 +103,13 @@ fun f_Lean_instToExprRat_mkNat_6e75ebd711(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("Rat");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -151,33 +151,33 @@ fun f_Name_toExprAux_isSimple_0a4b517b74(
   _sz_1: LeanValue,
 ): LeanValue {
   leanTag(_n_0) match {
-  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+  | LeanTag.Name_anonymous__impl ->
     _x_2_6: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       _sz_1,
     );
     leanTag(_x_2_6) match {
-    | "[\"Bool\",\"false\"]" -> _x_2_6
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _x_2_6
+    | LeanTag.Bool_true ->
       L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
         _runtime,
         _sz_1,
-        LeanScalar("nat", "8"),
+        LeanNatLiterals.n8,
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+  | LeanTag.Name_str__impl ->
     _hash_2: LeanValue = leanField(_n_0, 0);
     _pre_5_3: LeanValue = leanField(_n_0, 1);
     _str_6_4: LeanValue = leanField(_n_0, 2);
     _x_8_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _sz_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     f_Name_toExprAux_isSimple_0a4b517b74(_runtime, _pre_5_3, _x_8_10)
-  | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | _ -> LeanCtor(LeanTag.Bool_false, Array[])
   }
 }
 // "_private.Lean.ToExpr.0.Lean.List.toExprAux._redArg"
@@ -189,12 +189,12 @@ fun f_Lean_List_toExprAux_b556ee1a10(
   _x_2_3: LeanValue,
 ): LeanValue {
   leanTag(_x_2_3) match {
-  | "[\"List\",\"nil\"]" -> _nilFn_1
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _nilFn_1
+  | LeanTag.List_cons ->
     _head_3_4: LeanValue = leanField(_x_2_3, 0);
     _tail_4_5: LeanValue = leanField(_x_2_3, 1);
     leanTag(_inst_1_0) match {
-    | "[\"Lean\",\"ToExpr\",\"mk\"]" ->
+    | LeanTag.ToExpr_mk ->
       _toExpr_6: LeanValue = leanField(_inst_1_0, 0);
       _toTypeExpr_7: LeanValue = leanField(_inst_1_0, 1);
       _x_5_8: LeanValue = leanApply(_runtime, _toExpr_6, Array[_head_3_4]);
@@ -224,13 +224,13 @@ fun f_Lean_instToExprInt32_mkNat_f434733688(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("Int32");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -281,9 +281,9 @@ fun f_Lean_instToExprInt_c7e022ddec(
   _x_5_4: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_2,
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
   );
-  LeanCtor("[\"Lean\",\"ToExpr\",\"mk\"]", Array[_f_1_0, _x_5_4])
+  LeanCtor(LeanTag.ToExpr_mk, Array[_f_1_0, _x_5_4])
 }
 // "_private.Lean.ToExpr.0.Lean.List.toExprAux"
 fun f_Lean_List_toExprAux_2704fe94dc(
@@ -315,13 +315,13 @@ fun f_Lean_instToExprInt64_mkNat_4ac489993a(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("Int64");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -364,7 +364,7 @@ fun f_Name_toExprAux_mkStr_5da2159cd0(
   _args_2: LeanValue,
 ): LeanValue {
   leanTag(_n_0) match {
-  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+  | LeanTag.Name_anonymous__impl ->
     _x_3_8: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
       _runtime,
       LeanText("Lean"),
@@ -387,21 +387,21 @@ fun f_Name_toExprAux_mkStr_5da2159cd0(
     _x_9_14: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
       _runtime,
       _x_7_12,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     );
     _x_10_15: LeanValue = L4_Init_Data_Array_Basic.f_Array_reverse_93c36f0624(
       _runtime,
       _args_2,
     );
     L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(_runtime, _x_9_14, _x_10_15)
-  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+  | LeanTag.Name_str__impl ->
     _hash_3: LeanValue = leanField(_n_0, 0);
     _pre_12_4: LeanValue = leanField(_n_0, 1);
     _str_13_5: LeanValue = leanField(_n_0, 2);
     _x_15_18: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _sz_1,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     _x_16_19: LeanValue = L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(
       _runtime,
@@ -419,8 +419,8 @@ fun f_Name_toExprAux_mkStr_5da2159cd0(
       _runtime,
       LeanText("Lean.ToExpr"),
       LeanText("_private.Lean.ToExpr.0.Lean.Name.toExprAux.mkStr"),
-      LeanScalar("nat", "221"),
-      LeanScalar("nat", "11"),
+      LeanNatLiterals.n221,
+      LeanNatLiterals.n11,
       LeanText("unreachable code has been reached"),
     );
     f_toExprAux_mkStr_spec_0_2c50ca9a16(_runtime, _x_24_27)
@@ -439,13 +439,13 @@ fun f_Lean_instToExprISize_mkNat_36013d214e(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("ISize");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -486,7 +486,7 @@ fun f_Name_toExprAux_go_e2027965c4(
   _a_1_0: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]" ->
+  | LeanTag.Name_anonymous__impl ->
     _x_5_10: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
       _runtime,
       LeanText("Lean"),
@@ -496,9 +496,9 @@ fun f_Name_toExprAux_go_e2027965c4(
     L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
       _runtime,
       _x_5_10,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     )
-  | "[\"Lean\",\"Name\",\"str\",\"_impl\"]" ->
+  | LeanTag.Name_str__impl ->
     _hash_1: LeanValue = leanField(_a_1_0, 0);
     _pre_8_2: LeanValue = leanField(_a_1_0, 1);
     _str_9_3: LeanValue = leanField(_a_1_0, 2);
@@ -511,7 +511,7 @@ fun f_Name_toExprAux_go_e2027965c4(
     _x_15_18: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
       _runtime,
       _x_13_16,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     );
     _x_16_19: LeanValue = f_Name_toExprAux_go_e2027965c4(_runtime, _pre_8_2);
     _x_17_20: LeanValue = L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(
@@ -524,7 +524,7 @@ fun f_Name_toExprAux_go_e2027965c4(
       _x_16_19,
       _x_17_20,
     )
-  | "[\"Lean\",\"Name\",\"num\",\"_impl\"]" ->
+  | LeanTag.Name_num__impl ->
     _hash_4: LeanValue = leanField(_a_1_0, 0);
     _pre_19_5: LeanValue = leanField(_a_1_0, 1);
     _i_20_6: LeanValue = leanField(_a_1_0, 2);
@@ -537,7 +537,7 @@ fun f_Name_toExprAux_go_e2027965c4(
     _x_26_27: LeanValue = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
       _runtime,
       _x_24_25,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     );
     _x_27_28: LeanValue = f_Name_toExprAux_go_e2027965c4(_runtime, _pre_19_5);
     _x_28_29: LeanValue = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(
@@ -558,7 +558,7 @@ fun f_Lean_instToExprInt_lam_0_ad459b067b(
   _runtime: mutable LeanExecution,
   _i_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
     _x_1_1,
@@ -569,7 +569,7 @@ fun f_Lean_instToExprInt_lam_0_ad459b067b(
     _i_0,
   );
   leanTag(_x_3_3) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_6_6: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
       _runtime,
       LeanText("Neg"),
@@ -579,11 +579,11 @@ fun f_Lean_instToExprInt_lam_0_ad459b067b(
       _runtime,
       _x_1_1,
     );
-    _x_8_8: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+    _x_8_8: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
     _x_10_10: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
       _runtime,
       _x_6_6,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_7_7, _x_8_8]),
+      LeanCtor(LeanTag.List_cons, Array[_x_7_7, _x_8_8]),
     );
     _x_11_11: LeanValue = LeanText("Int");
     _x_12_12: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -624,7 +624,7 @@ fun f_Lean_instToExprInt_lam_0_ad459b067b(
       _x_16_16,
       _x_19_19,
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_21_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_toNat_23da39749d(
       _runtime,
       _i_0,
@@ -644,15 +644,15 @@ fun f_Lean_Name_toExprAux_ebe9e9134e(
   _runtime: mutable LeanExecution,
   _n_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = f_Name_toExprAux_isSimple_0a4b517b74(
     _runtime,
     _n_0,
     _x_1_1,
   );
   leanTag(_x_2_2) match {
-  | "[\"Bool\",\"false\"]" -> f_Name_toExprAux_go_e2027965c4(_runtime, _n_0)
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> f_Name_toExprAux_go_e2027965c4(_runtime, _n_0)
+  | LeanTag.Bool_true ->
     _x_4_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
@@ -675,13 +675,13 @@ fun f_Lean_instToExprInt_mkNat_2874220c0f(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
     _runtime,
@@ -727,13 +727,13 @@ fun f_Lean_instToExprInt8_mkNat_12d5ee5cc0(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("Int8");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
@@ -781,13 +781,13 @@ fun f_Lean_instToExprInt16_mkNat_5645638176(
   );
   _x_5_6: LeanValue = L4_Lean_Level.f_Lean_Level_ofNat_5596cc4a79(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
-  _x_6_7: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  _x_6_7: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   _x_8_9: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
     _runtime,
     _x_3_4,
-    LeanCtor("[\"List\",\"cons\"]", Array[_x_5_6, _x_6_7]),
+    LeanCtor(LeanTag.List_cons, Array[_x_5_6, _x_6_7]),
   );
   _x_9_10: LeanValue = LeanText("Int16");
   _x_10_11: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(

@@ -1,0 +1,77 @@
+// Register the original attribute implementations required by simp's default
+// definitional-equality classification. Imported tag state is supplied separately.
+fun leanInitializeSimp(runtime: mutable LeanExecution): void {
+  leanInitializeExceptions(runtime);
+  leanInitializeOptions(runtime);
+  leanInitializeMetaExtensions(runtime);
+  leanInitializeBinding(
+    runtime,
+    "Lean.attributeMapRef",
+    L4_Lean_Attributes.f_Attributes_hygCtx_hyg_8d74352ad1,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.backwardDefeqAttr",
+    L4_Lean_DefEqAttrib.f_DefEqAttrib_hygCtx_hyg_d6dc7b09c1,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.defeqAttr",
+    L4_Lean_DefEqAttrib.f_DefEqAttrib_hygCtx_hyg_9df2939911,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.Meta.eqnsExt",
+    L4_Lean_Meta_Eqns.f_Eqns_hygCtx_hyg_bb87608d26,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.auxParentProjInfoExt",
+    L4_Lean_ProjFns.f_ProjFns_hygCtx_hyg_c188468628,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.Meta.unificationHintExtension",
+    L4_Lean_Meta_UnificationHint.f_UnificationHint_hygCtx_hyg_14959af229,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.Meta.Simp.builtinSimprocDeclsRef",
+    L4_Lean_Meta_Tactic_Simp_Simproc.f_Simproc_hygCtx_hyg_0387e2ef08,
+  );
+  // The declaration metadata comes from checked imports below. Executable
+  // builtin simprocs have not been installed; accessing that registry must fail.
+  builtinRef = leanReadInitializer(
+    runtime,
+    "Lean.Meta.Simp.builtinSimprocDeclsRef",
+  );
+  runtime.writeRef(
+    builtinRef,
+    Some(
+      LeanCtor(
+        LeanTag.Meta_Simp_BuiltinSimprocs_mk,
+        Array[
+          LeanUnavailable(
+            "builtin simproc registration keys outside imported metadata",
+          ),
+          LeanUnavailable("native builtin simplification procedures"),
+        ],
+      ),
+    ),
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.Meta.Simp.simprocDeclExt",
+    L4_Lean_Meta_Tactic_Simp_Simproc.f_Simproc_hygCtx_hyg_6bd2d809c5,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.indirectModUseExt",
+    L4_Lean_ExtraModUses.f_ExtraModUses_hygCtx_hyg_eaa6f18fb0,
+  );
+  leanInitializeBinding(
+    runtime,
+    "_private.Lean.ExtraModUses.0.Lean.extraModUses",
+    L4_Lean_ExtraModUses.f_ExtraModUses_hygCtx_hyg_b3982dc2be,
+  );
+}

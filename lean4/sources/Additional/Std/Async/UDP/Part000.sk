@@ -27,14 +27,14 @@ fun f_UDP_Socket_sendAll_216950b14f(
       _a_1_3,
     );
     leanTag(_x_13_14) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_14_15: LeanValue = leanField(_x_13_14, 0);
       _a_15_16: LeanValue = leanField(_x_13_14, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_14_15]), _a_15_16]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_14_15]), _a_15_16]
+    | LeanTag.EST_Out_error ->
       _a_17_17: LeanValue = leanField(_x_13_14, 0);
       _a_18_18: LeanValue = leanField(_x_13_14, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_17_17]), _a_18_18]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_17_17]), _a_18_18]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
@@ -44,11 +44,11 @@ fun f_UDP_Socket_sendAll_216950b14f(
     _runtime,
     LeanErased(),
     LeanErased(),
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_false, Array[]),
     LeanCtor(
-      "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_val_8_9])],
+      LeanTag.Std_Async_MaybeTask_pure,
+      Array[LeanCtor(LeanTag.Except_ok, Array[_val_8_9])],
     ),
     _f_4_6,
     _state_9_10,
@@ -106,17 +106,17 @@ fun f_Socket_recvSelector_lam_4_edc1b043e0(
     pc match {
     | 0 ->
       leanTag(_frame[3]) match {
-      | "[\"Option\",\"none\"]" ->
-        _frame.set(10, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+      | LeanTag.Option_none ->
+        _frame.set(10, LeanCtor(LeanTag.PUnit_unit, Array[]));
         _jump0 = _frame[10];
         _jump1 = _frame[4];
         _frame.set(5, _jump0);
         _frame.set(6, _jump1);
         !pc = 1;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(9, leanField(_frame[3], 0));
-        _frame.set(11, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+        _frame.set(11, LeanCtor(LeanTag.PUnit_unit, Array[]));
         _frame.set(
           12,
           LeanClosure(
@@ -138,7 +138,7 @@ fun f_Socket_recvSelector_lam_4_edc1b043e0(
           ),
         );
         leanTag(_frame[13]) match {
-        | "[\"EST\",\"Out\",\"ok\"]" ->
+        | LeanTag.EST_Out_ok ->
           _frame.set(14, leanField(_frame[13], 0));
           _frame.set(15, leanField(_frame[13], 1));
           _jump0 = _frame[14];
@@ -147,13 +147,13 @@ fun f_Socket_recvSelector_lam_4_edc1b043e0(
           _frame.set(6, _jump1);
           !pc = 1;
           void
-        | "[\"EST\",\"Out\",\"error\"]" ->
+        | LeanTag.EST_Out_error ->
           _frame.set(16, leanField(_frame[13], 0));
           _frame.set(17, leanField(_frame[13], 1));
-          _frame.set(18, LeanCtor("[\"Except\",\"error\"]", Array[_frame[16]]));
+          _frame.set(18, LeanCtor(LeanTag.Except_error, Array[_frame[16]]));
           _frame.set(
             19,
-            LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_frame[18], _frame[17]]),
+            LeanCtor(LeanTag.ST_Out_mk, Array[_frame[18], _frame[17]]),
           );
           return _frame[19]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -161,10 +161,10 @@ fun f_Socket_recvSelector_lam_4_edc1b043e0(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(7, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[5]]));
+      _frame.set(7, LeanCtor(LeanTag.Except_ok, Array[_frame[5]]));
       _frame.set(
         8,
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_frame[7], _frame[6]]),
+        LeanCtor(LeanTag.ST_Out_mk, Array[_frame[7], _frame[6]]),
       );
       return _frame[8]
     | _ -> return leanFail("invalid join point")
@@ -189,8 +189,8 @@ fun f_recvSelector_lam_5_closed_0_0b57a66834(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Std.Async.Waiter.race._at_.Std.Async.UDP.Socket.recvSelector.spec_1._closed_0"
@@ -207,19 +207,19 @@ fun f_Socket_recvSelector_lam_5_5b41ff6f3d(
   _y_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_2_1, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_4_3])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_4_3])],
         ),
         _y_3_2,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_8_4: LeanValue = leanField(_x_2_1, 0);
     _x_9_8: LeanValue = L4_Init_System_Promise.f_IO_Promise_result_5fc6840910(
       _runtime,
@@ -232,23 +232,23 @@ fun f_Socket_recvSelector_lam_5_5b41ff6f3d(
       LeanErased(),
       _f_1_0,
       _x_9_8,
-      LeanScalar("nat", "0"),
-      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      LeanNatLiterals.n0,
+      LeanCtor(LeanTag.Bool_false, Array[]),
       _y_3_2,
     );
     leanTag(_x_13_12) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_14_13: LeanValue = leanField(_x_13_12, 0);
       _state_15_14: LeanValue = leanField(_x_13_12, 1);
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+            LeanTag.Std_Async_MaybeTask_pure,
             Array[
               LeanCtor(
-                "[\"Except\",\"ok\"]",
-                Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+                LeanTag.Except_ok,
+                Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
               ),
             ],
           ),
@@ -292,26 +292,26 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
     pc match {
     | 0 ->
       leanTag(_frame[4]) match {
-      | "[\"Except\",\"error\"]" ->
+      | LeanTag.Except_error ->
         _frame.set(6, leanField(_frame[4], 0));
-        _frame.set(8, LeanCtor("[\"Except\",\"error\"]", Array[_frame[6]]));
+        _frame.set(8, LeanCtor(LeanTag.Except_error, Array[_frame[6]]));
         _frame.set(
           9,
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+            LeanTag.Std_Async_MaybeTask_pure,
             Array[_frame[8]],
           ),
         );
         _frame.set(
           10,
-          LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_frame[9], _frame[5]]),
+          LeanCtor(LeanTag.ST_Out_mk, Array[_frame[9], _frame[5]]),
         );
         return _frame[10]
-      | "[\"Except\",\"ok\"]" ->
+      | LeanTag.Except_ok ->
         _frame.set(7, leanField(_frame[4], 0));
         leanTag(_frame[7]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(11, LeanScalar("nat", "0"));
+        | LeanTag.Bool_false ->
+          _frame.set(11, LeanNatLiterals.n0);
           _frame.set(
             16,
             L4_Std_Internal_UV_UDP.f_UDP_Socket_cancelRecv_a2f2d1581b(
@@ -321,22 +321,22 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
             ),
           );
           leanTag(_frame[16]) match {
-          | "[\"EST\",\"Out\",\"ok\"]" ->
+          | LeanTag.EST_Out_ok ->
             _frame.set(17, leanField(_frame[16], 0));
             _frame.set(18, leanField(_frame[16], 1));
-            _frame.set(21, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[17]]));
+            _frame.set(21, LeanCtor(LeanTag.Except_ok, Array[_frame[17]]));
             _jump0 = _frame[21];
             _jump1 = _frame[18];
             _frame.set(12, _jump0);
             _frame.set(13, _jump1);
             !pc = 1;
             void
-          | "[\"EST\",\"Out\",\"error\"]" ->
+          | LeanTag.EST_Out_error ->
             _frame.set(19, leanField(_frame[16], 0));
             _frame.set(20, leanField(_frame[16], 1));
             _frame.set(
               22,
-              LeanCtor("[\"Except\",\"error\"]", Array[_frame[19]]),
+              LeanCtor(LeanTag.Except_error, Array[_frame[19]]),
             );
             _jump0 = _frame[22];
             _jump1 = _frame[20];
@@ -346,9 +346,9 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(23, LeanScalar("nat", "0"));
-          _frame.set(24, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+        | LeanTag.Bool_true ->
+          _frame.set(23, LeanNatLiterals.n0);
+          _frame.set(24, LeanCtor(LeanTag.Bool_false, Array[]));
           _frame.set(
             25,
             LeanText("the promise linked to the Async was dropped"),
@@ -379,22 +379,22 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
             ),
           );
           leanTag(_frame[36]) match {
-          | "[\"EST\",\"Out\",\"ok\"]" ->
+          | LeanTag.EST_Out_ok ->
             _frame.set(37, leanField(_frame[36], 0));
             _frame.set(38, leanField(_frame[36], 1));
-            _frame.set(41, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[37]]));
+            _frame.set(41, LeanCtor(LeanTag.Except_ok, Array[_frame[37]]));
             _jump0 = _frame[41];
             _jump1 = _frame[38];
             _frame.set(28, _jump0);
             _frame.set(29, _jump1);
             !pc = 2;
             void
-          | "[\"EST\",\"Out\",\"error\"]" ->
+          | LeanTag.EST_Out_error ->
             _frame.set(39, leanField(_frame[36], 0));
             _frame.set(40, leanField(_frame[36], 1));
             _frame.set(
               42,
-              LeanCtor("[\"Except\",\"error\"]", Array[_frame[39]]),
+              LeanCtor(LeanTag.Except_error, Array[_frame[39]]),
             );
             _jump0 = _frame[42];
             _jump1 = _frame[40];
@@ -412,7 +412,7 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
       _frame.set(
         14,
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+          LeanTag.Std_Async_MaybeTask_pure,
           Array[_frame[12]],
         ),
       );
@@ -431,11 +431,11 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
       );
       return _frame[15]
     | 2 ->
-      _frame.set(30, LeanCtor("[\"Except\",\"ok\"]", Array[_frame[28]]));
+      _frame.set(30, LeanCtor(LeanTag.Except_ok, Array[_frame[28]]));
       _frame.set(
         31,
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+          LeanTag.Std_Async_MaybeTask_pure,
           Array[_frame[30]],
         ),
       );
@@ -453,7 +453,7 @@ fun f_Socket_recvSelector_lam_7_ff50744667(
         ),
       );
       leanTag(_frame[32]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _frame.set(33, leanField(_frame[32], 0));
         _frame.set(34, leanField(_frame[32], 1));
         _frame.set(
@@ -506,8 +506,8 @@ fun f_recvSelector_lam_1_closed_0_c8db503f3b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Std.Async.UDP.Socket.sendAll._closed_1"
@@ -528,13 +528,13 @@ fun f_Socket_sendAll_lam_0_bb4ba9d866(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_3_3: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
       _runtime,
       _x_1_0,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_3_3])
-  | "[\"Option\",\"some\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_3_3])
+  | LeanTag.Option_some ->
     _val_5_2: LeanValue = leanField(_x_2_1, 0);
     _val_5_2
   | _ -> leanFail("non-exhaustive Lean case")
@@ -585,7 +585,7 @@ fun f_recvSelector_lam_5_closed_1_c224e67152(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_2858_0: LeanValue = f_recvSelector_lam_5_closed_0_0b57a66834(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_2858_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_2858_0])
 }
 // "IO.ofExcept._at_.Std.Async.UDP.Socket.recvSelector.spec_0._redArg"
 fun f_Socket_recvSelector_spec_0_94d169c01a(
@@ -594,7 +594,7 @@ fun f_Socket_recvSelector_spec_0_94d169c01a(
   _a_1_1: LeanValue,
 ): LeanValue {
   leanTag(_e_0) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_2_2: LeanValue = leanField(_e_0, 0);
     _x_3_4: LeanValue = L4_Init_System_IOError.f_IO_Error_toString_b58e96daa2(
       _runtime,
@@ -604,10 +604,10 @@ fun f_Socket_recvSelector_spec_0_94d169c01a(
       _runtime,
       _x_3_4,
     );
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_x_4_5, _a_1_1])
-  | "[\"Except\",\"ok\"]" ->
+    LeanCtor(LeanTag.EST_Out_error, Array[_x_4_5, _a_1_1])
+  | LeanTag.Except_ok ->
     _a_6_3: LeanValue = leanField(_e_0, 0);
-    LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_a_6_3, _a_1_1])
+    LeanCtor(LeanTag.EST_Out_ok, Array[_a_6_3, _a_1_1])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -616,7 +616,7 @@ fun f_recvSelector_lam_1_closed_1_cfc7f309c2(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_2727_0: LeanValue = f_recvSelector_lam_1_closed_0_c8db503f3b(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_2727_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_2727_0])
 }
 // "Std.Async.UDP.Socket.recv._lam_1"
 fun f_Socket_recv_lam_1_9bf9fed511(
@@ -626,34 +626,34 @@ fun f_Socket_recv_lam_1_9bf9fed511(
   _y_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_2_1, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_4_3])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_4_3])],
         ),
         _y_3_2,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_8_4: LeanValue = leanField(_x_2_1, 0);
     leanTag(_a_8_4) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_9_8: LeanValue = leanField(_a_8_4, 0);
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-            Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_9_8])],
+            LeanTag.Std_Async_MaybeTask_pure,
+            Array[LeanCtor(LeanTag.Except_error, Array[_a_9_8])],
           ),
           _y_3_2,
         ],
       )
-    | "[\"Except\",\"ok\"]" ->
+    | LeanTag.Except_ok ->
       _a_13_9: LeanValue = leanField(_a_8_4, 0);
       _x_14_13: LeanValue = L4_Init_System_Promise.f_IO_Promise_result_5fc6840910(
         _runtime,
@@ -666,14 +666,14 @@ fun f_Socket_recv_lam_1_9bf9fed511(
         LeanErased(),
         _f_1_0,
         _x_14_13,
-        LeanScalar("nat", "0"),
-        LeanCtor("[\"Bool\",\"false\"]", Array[]),
+        LeanNatLiterals.n0,
+        LeanCtor(LeanTag.Bool_false, Array[]),
       );
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"ofTask\"]",
+            LeanTag.Std_Async_MaybeTask_ofTask,
             Array[_x_17_16],
           ),
           _y_3_2,
@@ -701,7 +701,7 @@ fun f_UDP_Socket_send_727d7f96e1(
   _x_3_5: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_6: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
@@ -728,14 +728,14 @@ fun f_UDP_Socket_send_727d7f96e1(
       _a_1_3,
     );
     leanTag(_x_16_17) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_17_18: LeanValue = leanField(_x_16_17, 0);
       _a_18_19: LeanValue = leanField(_x_16_17, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_17_18]), _a_18_19]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_17_18]), _a_18_19]
+    | LeanTag.EST_Out_error ->
       _a_20_20: LeanValue = leanField(_x_16_17, 0);
       _a_21_21: LeanValue = leanField(_x_16_17, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_20_20]), _a_21_21]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_20_20]), _a_21_21]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
@@ -745,11 +745,11 @@ fun f_UDP_Socket_send_727d7f96e1(
     _runtime,
     LeanErased(),
     LeanErased(),
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_false, Array[]),
     LeanCtor(
-      "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_val_11_12])],
+      LeanTag.Std_Async_MaybeTask_pure,
+      Array[LeanCtor(LeanTag.Except_ok, Array[_val_11_12])],
     ),
     _f_7_9,
     _state_12_13,
@@ -765,8 +765,8 @@ fun f_recvSelector_lam_7_closed_0_8a23829203(
     5,
     Array[
       _f_3028_2,
-      LeanScalar("nat", "0"),
-      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      LeanNatLiterals.n0,
+      LeanCtor(LeanTag.Bool_false, Array[]),
     ],
   )
 }
@@ -826,7 +826,7 @@ fun f_UDP_Socket_recvSelector_69c76ee561(
     Array[_f_6_7, _s_0],
   );
   LeanCtor(
-    "[\"Std\",\"Async\",\"Selector\",\"mk\"]",
+    LeanTag.Std_Async_Selector_mk,
     Array[_f_7_8, _f_4_5, _f_3_4],
   )
 }
@@ -890,7 +890,7 @@ fun f_UDP_Socket_setMembership_680fcfe9d6(
   _a_1_4: LeanValue,
 ): LeanValue {
   leanTag(_membership_3) match {
-  | "[\"Std\",\"Async\",\"UDP\",\"Membership\",\"leaveGroup\"]" ->
+  | LeanTag.Std_Async_UDP_Membership_leaveGroup ->
     L4_Std_Internal_UV_UDP.f_UDP_Socket_setMembership_3c1ef924e4(
       _runtime,
       _s_0,
@@ -899,7 +899,7 @@ fun f_UDP_Socket_setMembership_680fcfe9d6(
       LeanScalar("uint8", "0"),
       _a_1_4,
     )
-  | "[\"Std\",\"Async\",\"UDP\",\"Membership\",\"enterGroup\"]" ->
+  | LeanTag.Std_Async_UDP_Membership_enterGroup ->
     L4_Std_Internal_UV_UDP.f_UDP_Socket_setMembership_3c1ef924e4(
       _runtime,
       _s_0,
@@ -930,7 +930,7 @@ fun f_recvSelector_lam_4_closed_0_9ad56d0bc3(
   LeanClosure(
     L4_Std_Async_UDP.apply_f_Socket_recvSelector_lam_3_4726106271,
     2,
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Std.Async.Waiter.race._at_.Std.Async.UDP.Socket.recvSelector.spec_1._closed_1"
@@ -957,23 +957,23 @@ fun f_Socket_recvSelector_lam_2_124356dfe0(
       _y_1_1,
     );
     leanTag(_x_7_6) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_8_7: LeanValue = leanField(_x_7_6, 0);
       _a_9_8: LeanValue = leanField(_x_7_6, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_8_7]), _a_9_8]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_8_7]), _a_9_8]
+    | LeanTag.EST_Out_error ->
       _a_11_9: LeanValue = leanField(_x_7_6, 0);
       _a_12_10: LeanValue = leanField(_x_7_6, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_11_9]), _a_12_10]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_11_9]), _a_12_10]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
   _val_3_2: LeanValue = _joined[0];
   _state_4_3: LeanValue = _joined[1];
   LeanCtor(
-    "[\"ST\",\"Out\",\"mk\"]",
+    LeanTag.ST_Out_mk,
     Array[
-      LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_val_3_2]),
+      LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_val_3_2]),
       _state_4_3,
     ],
   )
@@ -1010,7 +1010,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
     pc match {
     | 0 ->
       leanTag(_frame[3]) match {
-      | "[\"_private\",\"Std\",\"Async\",\"Select\",0,\"Std\",\"Async\",\"Waiter\",\"mk\"]" ->
+      | LeanTag.Private_Std_Async_Select_0_Std_Async_Waiter_mk ->
         _frame.set(6, leanField(_frame[3], 0));
         _frame.set(7, leanField(_frame[3], 1));
         _frame.set(
@@ -1032,18 +1032,18 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
           ),
         );
         leanTag(_frame[16]) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _frame.set(17, leanField(_frame[16], 0));
           _frame.set(18, leanField(_frame[16], 1));
           leanTag(_frame[17]) match {
-          | "[\"Bool\",\"false\"]" ->
-            _frame.set(43, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+          | LeanTag.Bool_false ->
+            _frame.set(43, LeanCtor(LeanTag.Bool_true, Array[]));
             _jump0 = _frame[43];
             _frame.set(19, _jump0);
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(44, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+          | LeanTag.Bool_true ->
+            _frame.set(44, LeanCtor(LeanTag.Bool_false, Array[]));
             _jump0 = _frame[44];
             _frame.set(19, _jump0);
             !pc = 2;
@@ -1055,7 +1055,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(10, LeanCtor("[\"Except\",\"error\"]", Array[_frame[8]]));
+      _frame.set(10, LeanCtor(LeanTag.Except_error, Array[_frame[8]]));
       _frame.set(
         11,
         L4_Init_System_Promise.f_IO_Promise_resolve_a7b06877a0(
@@ -1067,18 +1067,18 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
         ),
       );
       leanTag(_frame[11]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _frame.set(12, leanField(_frame[11], 0));
         _frame.set(13, leanField(_frame[11], 1));
         _frame.set(
           14,
-          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_frame[12], _frame[13]]),
+          LeanCtor(LeanTag.EST_Out_ok, Array[_frame[12], _frame[13]]),
         );
         return _frame[14]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 2 ->
-      _frame.set(20, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+      _frame.set(20, LeanCtor(LeanTag.Bool_true, Array[]));
       _frame.set(
         21,
         L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
@@ -1091,14 +1091,14 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
         ),
       );
       leanTag(_frame[21]) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _ = leanField(_frame[21], 0);
         _frame.set(22, leanField(_frame[21], 1));
         leanTag(_frame[19]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(23, leanApply(_runtime, _frame[4], Array[_frame[22]]));
           return _frame[23]
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             24,
             f_Socket_recvSelector_spec_0_94d169c01a(
@@ -1108,7 +1108,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
             ),
           );
           leanTag(_frame[24]) match {
-          | "[\"EST\",\"Out\",\"ok\"]" ->
+          | LeanTag.EST_Out_ok ->
             _ = leanField(_frame[24], 0);
             _frame.set(25, leanField(_frame[24], 1));
             _frame.set(
@@ -1121,7 +1121,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
               ),
             );
             leanTag(_frame[28]) match {
-            | "[\"EST\",\"Out\",\"ok\"]" ->
+            | LeanTag.EST_Out_ok ->
               _frame.set(29, leanField(_frame[28], 0));
               _frame.set(30, leanField(_frame[28], 1));
               _frame.set(
@@ -1144,8 +1144,8 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
                   _frame[29],
                 ),
               );
-              _frame.set(36, LeanScalar("nat", "0"));
-              _frame.set(37, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+              _frame.set(36, LeanNatLiterals.n0);
+              _frame.set(37, LeanCtor(LeanTag.Bool_false, Array[]));
               _frame.set(
                 38,
                 L4_Init_Core.f_Task_map_58d98f7eb6(
@@ -1158,7 +1158,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
                   _frame[37],
                 ),
               );
-              _frame.set(39, LeanCtor("[\"PUnit\",\"unit\"]", Array[]));
+              _frame.set(39, LeanCtor(LeanTag.PUnit_unit, Array[]));
               _frame.set(
                 40,
                 L4_Init_System_IO.f_BaseIO_mapTask_8c22ae6ae5(
@@ -1173,20 +1173,20 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
                 ),
               );
               leanTag(_frame[40]) match {
-              | "[\"ST\",\"Out\",\"mk\"]" ->
+              | LeanTag.ST_Out_mk ->
                 _ = leanField(_frame[40], 0);
                 _frame.set(41, leanField(_frame[40], 1));
                 _frame.set(
                   42,
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"ok\"]",
+                    LeanTag.EST_Out_ok,
                     Array[_frame[39], _frame[41]],
                   ),
                 );
                 return _frame[42]
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"EST\",\"Out\",\"error\"]" ->
+            | LeanTag.EST_Out_error ->
               _frame.set(31, leanField(_frame[28], 0));
               _frame.set(32, leanField(_frame[28], 1));
               _jump0 = _frame[31];
@@ -1197,7 +1197,7 @@ fun f_Socket_recvSelector_spec_1_464226f7cd(
               void
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"EST\",\"Out\",\"error\"]" ->
+          | LeanTag.EST_Out_error ->
             _frame.set(26, leanField(_frame[24], 0));
             _frame.set(27, leanField(_frame[24], 1));
             _jump0 = _frame[26];
@@ -1236,14 +1236,14 @@ fun f_UDP_Socket_mk_e3b5e5b787(
     _a_1_0,
   );
   leanTag(_x_2_1) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_a_3_2, _a_4_3])
-  | "[\"EST\",\"Out\",\"error\"]" ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[_a_3_2, _a_4_3])
+  | LeanTag.EST_Out_error ->
     _a_6_4: LeanValue = leanField(_x_2_1, 0);
     _a_7_5: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_6_4, _a_7_5])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_6_4, _a_7_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1269,34 +1269,34 @@ fun f_Socket_sendAll_lam_1_08f04724f8(
   _y_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_2_1, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_4_3])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_4_3])],
         ),
         _y_3_2,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_8_4: LeanValue = leanField(_x_2_1, 0);
     leanTag(_a_8_4) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_9_8: LeanValue = leanField(_a_8_4, 0);
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-            Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_9_8])],
+            LeanTag.Std_Async_MaybeTask_pure,
+            Array[LeanCtor(LeanTag.Except_error, Array[_a_9_8])],
           ),
           _y_3_2,
         ],
       )
-    | "[\"Except\",\"ok\"]" ->
+    | LeanTag.Except_ok ->
       _a_13_9: LeanValue = leanField(_a_8_4, 0);
       _x_14_13: LeanValue = L4_Init_System_Promise.f_IO_Promise_result_5fc6840910(
         _runtime,
@@ -1309,14 +1309,14 @@ fun f_Socket_sendAll_lam_1_08f04724f8(
         LeanErased(),
         _f_1_0,
         _x_14_13,
-        LeanScalar("nat", "0"),
-        LeanCtor("[\"Bool\",\"false\"]", Array[]),
+        LeanNatLiterals.n0,
+        LeanCtor(LeanTag.Bool_false, Array[]),
       );
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"ofTask\"]",
+            LeanTag.Std_Async_MaybeTask_ofTask,
             Array[_x_17_16],
           ),
           _y_3_2,
@@ -1379,14 +1379,14 @@ fun f_UDP_Socket_recv_8a35a6c80d(
       _a_1_2,
     );
     leanTag(_x_13_13) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_14_14: LeanValue = leanField(_x_13_13, 0);
       _a_15_15: LeanValue = leanField(_x_13_13, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_14_14]), _a_15_15]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_14_14]), _a_15_15]
+    | LeanTag.EST_Out_error ->
       _a_17_16: LeanValue = leanField(_x_13_13, 0);
       _a_18_17: LeanValue = leanField(_x_13_13, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_17_16]), _a_18_17]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_17_16]), _a_18_17]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
@@ -1396,11 +1396,11 @@ fun f_UDP_Socket_recv_8a35a6c80d(
     _runtime,
     LeanErased(),
     LeanErased(),
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_false, Array[]),
     LeanCtor(
-      "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_val_8_8])],
+      LeanTag.Std_Async_MaybeTask_pure,
+      Array[LeanCtor(LeanTag.Except_ok, Array[_val_8_8])],
     ),
     _f_4_5,
     _state_9_9,
@@ -1425,29 +1425,29 @@ fun f_Socket_recvSelector_lam_1_c8c235c430(
   _y_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_3_2: LeanValue = leanField(_x_1_0, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_3_2])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_3_2])],
         ),
         _y_2_1,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_7_3: LeanValue = leanField(_x_1_0, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+          LeanTag.Std_Async_MaybeTask_pure,
           Array[
             LeanCtor(
-              "[\"Except\",\"ok\"]",
-              Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+              LeanTag.Except_ok,
+              Array[LeanCtor(LeanTag.Option_none, Array[])],
             ),
           ],
         ),
@@ -1477,14 +1477,14 @@ fun f_Socket_recvSelector_lam_10_5bc66d2599(
       _y_2_2,
     );
     leanTag(_x_10_9) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_11_10: LeanValue = leanField(_x_10_9, 0);
       _a_12_11: LeanValue = leanField(_x_10_9, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_11_10]), _a_12_11]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_11_10]), _a_12_11]
+    | LeanTag.EST_Out_error ->
       _a_14_12: LeanValue = leanField(_x_10_9, 0);
       _a_15_13: LeanValue = leanField(_x_10_9, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_14_12]), _a_15_13]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_14_12]), _a_15_13]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
@@ -1494,9 +1494,9 @@ fun f_Socket_recvSelector_lam_10_5bc66d2599(
     _runtime,
     LeanErased(),
     LeanErased(),
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
-    LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_val_6_5]),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_false, Array[]),
+    LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_val_6_5]),
     _f_1_0,
     _state_7_6,
   )
@@ -1529,34 +1529,34 @@ fun f_Socket_recvSelector_lam_8_e8e9a1e56b(
   _y_5_4: LeanValue,
 ): LeanValue {
   leanTag(_x_4_3) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_6_5: LeanValue = leanField(_x_4_3, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_6_5])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_6_5])],
         ),
         _y_5_4,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_10_6: LeanValue = leanField(_x_4_3, 0);
     leanTag(_a_10_6) match {
-    | "[\"Except\",\"error\"]" ->
+    | LeanTag.Except_error ->
       _a_11_10: LeanValue = leanField(_a_10_6, 0);
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-            Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_11_10])],
+            LeanTag.Std_Async_MaybeTask_pure,
+            Array[LeanCtor(LeanTag.Except_error, Array[_a_11_10])],
           ),
           _y_5_4,
         ],
       )
-    | "[\"Except\",\"ok\"]" ->
+    | LeanTag.Except_ok ->
       _a_15_11: LeanValue = leanField(_a_10_6, 0);
       _x_16_15: LeanValue = L4_Init_System_Promise.f_IO_Promise_result_5fc6840910(
         _runtime,
@@ -1573,10 +1573,10 @@ fun f_Socket_recvSelector_lam_8_e8e9a1e56b(
         _x_3_2,
       );
       LeanCtor(
-        "[\"ST\",\"Out\",\"mk\"]",
+        LeanTag.ST_Out_mk,
         Array[
           LeanCtor(
-            "[\"Std\",\"Async\",\"MaybeTask\",\"ofTask\"]",
+            LeanTag.Std_Async_MaybeTask_ofTask,
             Array[_x_17_16],
           ),
           _y_5_4,
@@ -1607,13 +1607,13 @@ fun f_Socket_recv_lam_0_2e31991bd9(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_3_3: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
       _runtime,
       _x_1_0,
     );
-    LeanCtor("[\"Except\",\"error\"]", Array[_x_3_3])
-  | "[\"Option\",\"some\"]" ->
+    LeanCtor(LeanTag.Except_error, Array[_x_3_3])
+  | LeanTag.Option_some ->
     _val_5_2: LeanValue = leanField(_x_2_1, 0);
     _val_5_2
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1638,7 +1638,7 @@ fun f_Socket_recvSelector_lam_3_4726106271(
   _x_1_0: LeanValue,
   _y_2_1: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_1_0, _y_2_1])
+  LeanCtor(LeanTag.EST_Out_ok, Array[_x_1_0, _y_2_1])
 }
 fun apply_f_Socket_recvSelector_lam_3_4726106271(
   _runtime: mutable LeanExecution,
@@ -1692,29 +1692,29 @@ fun f_Socket_recvSelector_lam_0_2b14082ba2(
   _y_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_3_2: LeanValue = leanField(_x_1_0, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_3_2])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_3_2])],
         ),
         _y_2_1,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_7_3: LeanValue = leanField(_x_1_0, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
+          LeanTag.Std_Async_MaybeTask_pure,
           Array[
             LeanCtor(
-              "[\"Except\",\"ok\"]",
-              Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_7_3])],
+              LeanTag.Except_ok,
+              Array[LeanCtor(LeanTag.Option_some, Array[_a_7_3])],
             ),
           ],
         ),
@@ -1755,14 +1755,14 @@ fun f_Socket_recvSelector_lam_6_5e4cc1fcdc(
       _y_1_3,
     );
     leanTag(_x_11_12) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_12_13: LeanValue = leanField(_x_11_12, 0);
       _a_13_14: LeanValue = leanField(_x_11_12, 1);
-      Array[LeanCtor("[\"Except\",\"ok\"]", Array[_a_12_13]), _a_13_14]
-    | "[\"EST\",\"Out\",\"error\"]" ->
+      Array[LeanCtor(LeanTag.Except_ok, Array[_a_12_13]), _a_13_14]
+    | LeanTag.EST_Out_error ->
       _a_15_15: LeanValue = leanField(_x_11_12, 0);
       _a_16_16: LeanValue = leanField(_x_11_12, 1);
-      Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_15_15]), _a_16_16]
+      Array[LeanCtor(LeanTag.Except_error, Array[_a_15_15]), _a_16_16]
     | _ -> leanFail("non-exhaustive Lean case")
     }
   };
@@ -1772,9 +1772,9 @@ fun f_Socket_recvSelector_lam_6_5e4cc1fcdc(
     _runtime,
     LeanErased(),
     LeanErased(),
-    LeanScalar("nat", "0"),
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
-    LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_val_7_8]),
+    LeanNatLiterals.n0,
+    LeanCtor(LeanTag.Bool_false, Array[]),
+    LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_val_7_8]),
     _f_3_5,
     _state_8_9,
   )
@@ -1810,19 +1810,19 @@ fun f_Socket_recvSelector_lam_9_5039bc63b8(
   _y_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"Except\",\"error\"]" ->
+  | LeanTag.Except_error ->
     _a_4_3: LeanValue = leanField(_x_2_1, 0);
     LeanCtor(
-      "[\"ST\",\"Out\",\"mk\"]",
+      LeanTag.ST_Out_mk,
       Array[
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"error\"]", Array[_a_4_3])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_error, Array[_a_4_3])],
         ),
         _y_3_2,
       ],
     )
-  | "[\"Except\",\"ok\"]" ->
+  | LeanTag.Except_ok ->
     _a_8_4: LeanValue = leanField(_x_2_1, 0);
     _x_11_10: LeanValue = L4_Init_System_Promise.f_IO_Promise_isResolved_ad29fb0a0b(
       _runtime,
@@ -1830,18 +1830,18 @@ fun f_Socket_recvSelector_lam_9_5039bc63b8(
       _y_3_2,
     );
     leanTag(_x_11_10) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_12_11: LeanValue = leanField(_x_11_10, 0);
       _state_13_12: LeanValue = leanField(_x_11_10, 1);
       L4_Std_Async_Basic.f_BaseAsync_bind_bindAsyncTask_14854bb26f(
         _runtime,
         LeanErased(),
         LeanErased(),
-        LeanScalar("nat", "0"),
-        LeanCtor("[\"Bool\",\"false\"]", Array[]),
+        LeanNatLiterals.n0,
+        LeanCtor(LeanTag.Bool_false, Array[]),
         LeanCtor(
-          "[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]",
-          Array[LeanCtor("[\"Except\",\"ok\"]", Array[_val_12_11])],
+          LeanTag.Std_Async_MaybeTask_pure,
+          Array[LeanCtor(LeanTag.Except_ok, Array[_val_12_11])],
         ),
         _f_1_0,
         _state_13_12,

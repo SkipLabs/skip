@@ -16,8 +16,8 @@ fun leanInitializeBinding(
     throw error
   };
   runtime.!initializing = wasInitializing;
-  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+  if (leanTag(result) != LeanTag.EST_Out_ok) {
     leanFail("Lean module initializer failed: " + name)
   };
-  runtime.initializers.set(name, leanField(result, 0))
+  runtime.!initializers = runtime.initializers.set(name, leanField(result, 0))
 }

@@ -1,0 +1,71 @@
+// Diagnostic bring-up only. The normal build/script will own prepared imports
+// and the edit session; this focused probe uses the same maintained functions.
+fun simpProbe(): void {
+  context = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{
+    store => Some(context),
+    unboundedHeartbeats => true,
+  };
+  leanInitializeSimp(runtime);
+  imports = leanInstallImports(
+    runtime,
+    leanDecodeImportData(FileSystem.readTextFile("build/init-data.jsonl")),
+    leanDecodeImportData(
+      FileSystem.readTextFile("build/simp-reference/extensions-small.jsonl"),
+    ),
+    leanDecodeImportData(
+      FileSystem.readTextFile("build/init-extra-constants.jsonl"),
+    ),
+    "/lean/Init",
+    Some(
+      leanDecodeImportData(FileSystem.readTextFile("build/init-header.jsonl")),
+    ),
+  );
+  inputs = leanDecodeImportData(
+    FileSystem.readTextFile("build/simp-reference/inputs-small.jsonl"),
+  );
+  constants = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/simp/inputs/"),
+    inputs.constants.map(entry ->
+      (
+        LeanConstantKey("before-proof", leanNameKey(entry.i0)),
+        LeanConstantFile(entry.i1, None()),
+      )
+    ),
+  );
+  context.initPre();
+  expected = leanNamedConstant(runtime, "Goal");
+  print_string("Simp inputs loaded; executing original Meta.simp");
+  result = leanElaborateSimp(
+    runtime,
+    imports.atPrefix(
+      runtime,
+      LeanConstantsView("before-proof", LeanConstantDirectory(constants)),
+    ),
+    expected,
+    Array[
+      leanSimpleName(runtime, "iter_zero"),
+      leanSimpleName(runtime, "iter_succ"),
+    ],
+    Array[leanNatValue(4), leanNatValue(5)],
+  );
+  if (!leanMetaSucceeded(result)) {
+    leanFail(
+      "simp returned a Lean exception (diagnostic rendering not implemented)",
+    )
+  };
+  leanCheckPublishable(leanField(result, 0));
+  FileSystem.writeTextFile(
+    "build/simp-reference/proof-small.json",
+    leanProofDocument(expected, leanField(result, 0)),
+  );
+  print_string(
+    "Skip produced the small conditional-rewriting proof; kernel checking pending",
+  )
+}
+
+fun main(): void {
+  SKStore.withRegionVoid(() ~> simpProbe())
+}

@@ -1,0 +1,318 @@
+// Named primitive adapters must preserve results, immutable arrays and local
+// reference state relative to the independently tested generic dispatcher.
+class LeanAdapterProbe(
+  name: String,
+  invoke: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+) {}
+fun main(): void {
+  cases = Array[
+    LeanAdapterProbe("lean_mk_array", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+      )
+    ),
+    LeanAdapterProbe("lean_array_propagate_mark", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_propagateMark_cb052002ff(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_array_pop", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_pop_8b755694a8(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_array_uget", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_array_size", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanAdapterProbe("lean_array_uset", (runtime, args) ~>
+      L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+      )
+    ),
+    LeanAdapterProbe("lean_array_fset", (runtime, args) ~>
+      L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+      )
+    ),
+    LeanAdapterProbe("lean_array_set", (runtime, args) ~>
+      L4_Init_Data_Array_Set.f_Array_set_de08bfc69e(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_nat_gcd", (runtime, args) ~>
+      L4_Init_Data_Nat_Gcd.f_Nat_gcd_ee21c096be(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_bool_to_uint32", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_Bool_toUInt32_8bf31fec40(runtime, args[0])
+    ),
+    LeanAdapterProbe("lean_bool_to_uint64", (runtime, args) ~>
+      L4_Init_Data_UInt_Basic.f_Bool_toUInt64_1b3903ff27(runtime, args[0])
+    ),
+    LeanAdapterProbe("lean_mk_empty_array_with_capacity", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_dec_le", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_ble_40aa3bdf39(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_array_push", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+      )
+    ),
+    LeanAdapterProbe("lean_string_hash", (runtime, args) ~>
+      L4_Init_Prelude.f_String_hash_dbd8502213(runtime, args[0])
+    ),
+    LeanAdapterProbe("lean_string_dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_String_decEq_88c69973f8(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_beq_ebfe7df9fa(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_name_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_array_fget", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_nat_pow", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_pow_c3fca086ae(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_dec_eq", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_dec_lt", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_decLt_b34d01d051(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_sub", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_mul", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_mul_8d6effc865(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_array_get_size", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_size_3866d4555a(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_array_get", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_nat_dec_le", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_nat_add", (runtime, args) ~>
+      L4_Init_Prelude.f_Nat_add_86990f4822(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_mk_empty_array_with_capacity", (runtime, args) ~>
+      L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
+        runtime,
+        args[0],
+        args[1],
+      )
+    ),
+    LeanAdapterProbe("lean_st_ref_swap", (runtime, args) ~>
+      L4_Init_System_ST.f_Prim_Ref_swap_b4291ad63a(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+      )
+    ),
+    LeanAdapterProbe("lean_st_ref_take", (runtime, args) ~>
+      L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_st_ref_put", (runtime, args) ~>
+      L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+      )
+    ),
+    LeanAdapterProbe("lean_st_ref_get", (runtime, args) ~>
+      L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_st_mk_ref", (runtime, args) ~>
+      L4_Init_System_ST.f_ST_Prim_mkRef_23b2310680(
+        runtime,
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+      )
+    ),
+    LeanAdapterProbe("lean_void_mk", (runtime, args) ~>
+      L4_Init_System_ST.f_Internal_Void_mk_e3317dd99f(runtime, args[0], args[1])
+    ),
+    LeanAdapterProbe("lean_expr_data", (runtime, args) ~>
+      L4_Lean_Expr.f_Lean_Expr_data_8b4646e8ed(runtime, args[0])
+    ),
+    LeanAdapterProbe("lean_expr_mk_app_data", (runtime, args) ~>
+      L4_Lean_Expr.f_Lean_Expr_mkAppData_03dac2cc5c(runtime, args[0], args[1])
+    ),
+  ];
+
+  runtime = mutable LeanExecution{};
+  ref = runtime.newRef(leanNatValue(7));
+  secondRef = runtime.newRef(leanNatValue(9));
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  count = 0;
+  for (case in cases) {
+    for (size in Array[1, 2, 128, 129, 300]) {
+      array = LeanArray(Array::fillBy(size, i -> leanNatValue(i)));
+      args: mutable Array<LeanValue> = Array::mfill(
+        7,
+        (LeanErased() : LeanValue),
+      );
+      args.set(0, leanNatValue(size));
+      args.set(1, leanNatValue(2));
+      if (case.name.startsWith("lean_bool_to_")) {
+        args.set(0, leanBool(size % 2 == 0))
+      };
+      case.name match {
+      | "lean_expr_data" -> args.set(0, prop)
+      | "lean_expr_mk_app_data" ->
+        args.set(0, leanField(prop, 0));
+        args.set(1, leanField(prop, 0))
+      | "lean_mk_array" ->
+        args.set(1, leanNatValue(size));
+        args.set(2, prop)
+      | "lean_mk_empty_array_with_capacity" -> args.set(1, leanNatValue(size))
+      | "lean_array_get_size" | "lean_array_size" | "lean_array_pop" ->
+        args.set(1, array)
+      | "lean_array_push" ->
+        args.set(1, array);
+        args.set(2, prop)
+      | "lean_array_propagate_mark" ->
+        args.set(1, prop);
+        args.set(3, array)
+      | "lean_array_fget" | "lean_array_fget_borrowed" | "lean_array_fset"
+      | "lean_array_set" ->
+        args.set(1, array);
+        args.set(2, leanNatValue(size - 1));
+        args.set(3, prop)
+      | "lean_array_uget" | "lean_array_uget_borrowed" | "lean_array_uset" ->
+        args.set(1, array);
+        args.set(2, LeanWord("usize", size - 1));
+        args.set(3, prop)
+      | "lean_array_get" | "lean_array_get_borrowed" ->
+        args.set(2, array);
+        args.set(3, leanNatValue(size - 1))
+      | "lean_st_mk_ref" ->
+        args.set(2, prop);
+        args.set(3, LeanText("world"))
+      | "lean_st_ref_get" | "lean_st_ref_take" ->
+        args.set(2, ref);
+        args.set(3, LeanText("world"))
+      | "lean_st_ref_put" | "lean_st_ref_swap" ->
+        args.set(2, ref);
+        args.set(3, prop);
+        args.set(4, LeanText("world"))
+      | "lean_st_ref_ptr_eq" ->
+        args.set(2, ref);
+        args.set(3, if (size % 2 == 0) ref else secondRef);
+        args.set(4, LeanText("world"))
+      | "lean_string_dec_eq" | "lean_string_hash" ->
+        args.set(0, LeanText("aλ"));
+        args.set(1, LeanText("aλ"))
+      | "lean_name_eq" ->
+        name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+          runtime,
+          LeanText("x"),
+        );
+        args.set(0, name);
+        args.set(1, name)
+      | _ -> void
+      };
+      arguments = args.chill();
+      for (profiling in Array[false, true]) {
+        saved = runtime.checkpoint();
+        original = saved.restoreRaw();
+        fast = mutable LeanExecution{
+          profileRuntime => profiling,
+          refs => saved.refs.restore(),
+        };
+        expected = leanInvokePrimitive(
+          original,
+          case.name,
+          case.name,
+          arguments,
+        );
+        actual = case.invoke(fast, arguments);
+        assert(native_eq(expected, actual) == 0);
+        assert(
+          native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+        );
+        assert(fast.primitiveCount == if (profiling) 1 else 0);
+        !count = count + 1
+      }
+    }
+  };
+  print_string(
+    count.toString() + " primitive adapter results and state snapshots match",
+  )
+}

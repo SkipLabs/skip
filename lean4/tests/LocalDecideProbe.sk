@@ -4,7 +4,8 @@
 fun describeDecideValue(value: LeanValue, depth: Int): String {
   if (depth == 0) return "...";
   value match {
-  | LeanCtor(name, fields) ->
+  | LeanCtor(tag, fields) ->
+    name = tag.toString();
     if (
       name.contains("\"Environment\"") ||
       name.contains("\"Context\"") ||
@@ -42,7 +43,7 @@ fun decideProbe(): void {
     FileSystem.readTextFile("build/init-extensions.jsonl"),
   );
   store = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  runtime = mutable LeanExecution{store => Some(store), unboundedHeartbeats => true};
   leanInitializeExceptions(runtime);
   leanInitializeOptions(runtime);
   imports = leanInstallImports(
@@ -61,7 +62,7 @@ fun decideProbe(): void {
     Array[],
   );
   store.initPre();
-  env = imports.atPrefix(runtime, LeanConstantsView("local", constants));
+  env = imports.atPrefix(runtime, LeanConstantsView("local", LeanConstantDirectory(constants)));
   limit = leanNatDefinition(
     runtime,
     leanSimpleName(runtime, "limit"),
@@ -85,7 +86,7 @@ fun decideProbe(): void {
   store.update();
   expected = leanLimitTheoremType(runtime);
   result = leanElaborateDecide(runtime, env, expected);
-  if (leanTag(result) != "[\"EST\",\"Out\",\"ok\"]") {
+  if (leanTag(result) != LeanTag.EST_Out_ok) {
     print_error(describeDecideValue(result, 14));
     leanFail("decide elaboration failed; raw diagnostic printed above")
   };

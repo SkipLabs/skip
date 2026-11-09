@@ -1,0 +1,342 @@
+// Typed-input simplifier runner. Source preparation is explicit; the target
+// proof is produced entirely by the maintained Skip Meta implementation.
+// Diagnostic only: count the contents still retained by execution references.
+// This runs after elaboration/export timing and only under LEAN_SKIP_PROFILE.
+fun leanSimpReferenceProfile(runtime: mutable LeanExecution): JSON.Value {
+  counts: mutable Map<String, Int> = mutable Map[];
+  for (i in Range(0, runtime.refs.size())) {
+    kind = runtime.refs[i] match {
+    | None() -> "taken"
+    | Some(value) ->
+      value match {
+      | LeanCtor(name, _) -> name.toString()
+      | LeanArray(_) -> "array"
+      | LeanPersistentArray(_) -> "persistent array"
+      | LeanReference(_) -> "reference"
+      | LeanClosure(_, _, _) -> "closure"
+      | _ -> "other"
+      }
+    };
+    counts.set(kind, counts.maybeGet(kind).default(0) + 1)
+  };
+  result: mutable Map<String, JSON.Value> = mutable Map[];
+  for ((kind, count) in counts.items()) result.set(kind, JSON.IntNumber(count));
+  JSON.Object(result.chill())
+}
+
+fun leanRunSimpProblem(
+  context: ?(mutable SKStore.Context),
+  snapshot: LeanImportSnapshot,
+  output: String,
+  inputPath: String = "",
+  raw: Bool = false,
+): JSON.Value {
+  start = Time.time_ns();
+  prepared = snapshot.problem match {
+  | Some(inputs) -> inputs
+  | None() -> leanFail("snapshot contains no typed simplifier inputs")
+  };
+  inputs = if (inputPath.isEmpty()) prepared else {
+    leanDecodeImportData(FileSystem.readTextFile(inputPath))
+  };
+  // The prepared attribute metadata belongs to the fixed input library. Only
+  // these three definitions may vary without preparing that metadata again.
+  if (inputs.constants.size() != prepared.constants.size()) {
+    leanFail("a changed input library requires a new snapshot")
+  };
+  preparedNames: mutable Map<String, LeanValue> = mutable Map[];
+  for (entry in prepared.constants) {
+    preparedNames.set(leanNameKey(entry.i0), entry.i1)
+  };
+  runtime = mutable LeanExecution{
+    store => if (raw) None() else context,
+    unboundedHeartbeats => true,
+    profileRuntime => Environ.varOpt("LEAN_SKIP_PROFILE") == Some("1"),
+    profileSimpPhases => Environ.varOpt("LEAN_SKIP_PHASES") == Some("1"),
+    collectSimpRegions => Environ.varOpt("LEAN_SKIP_REGIONS") != Some("0"),
+    denseSimpRegions => Environ.varOpt("LEAN_SKIP_REGIONS") == Some("all"),
+    memoizeSimp => !raw && Environ.varOpt("LEAN_SKIP_SIMP_CACHE") == Some("1"),
+    simpQueryMask => Environ.varOpt("LEAN_SKIP_SIMP_MASK") match {
+    | Some(value) -> value.toInt()
+    | None() -> 31
+    },
+  };
+  leanInitializeSimp(runtime);
+  editable = Array["Goal", "depth", "noise"].map(name ->
+    leanNameKey(leanSimpleName(runtime, name))
+  );
+  for (entry in inputs.constants) {
+    key = leanNameKey(entry.i0);
+    original = preparedNames.maybeGet(key) match {
+    | Some(value) -> value
+    | None() -> leanFail("an added declaration requires a new snapshot")
+    };
+    if (!editable.contains(key) && native_eq(original, entry.i1) != 0) {
+      leanFail("changed rewrite-library declarations require a new snapshot")
+    }
+  };
+  localView = if (raw) {
+    values: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (entry in inputs.constants) {
+      values.set(leanNameKey(entry.i0), LeanConstantFile(entry.i1, None()))
+    };
+    LeanConstantsView("before-proof", LeanConstantMap(values.chill()))
+  } else {
+    tracked = context match {
+    | Some(value) -> value
+    | None() -> leanFail("incremental simplification requires a query context")
+    };
+    path = SKStore.DirName::create("/simp/inputs/");
+    if (tracked.maybeGetDir(path).isNone()) {
+      _ = tracked.mkdir(LeanConstantKey::keyType, LeanConstantFile::type, path)
+    };
+    // Keep one converter construction site across the initial and later edits.
+    constants = SKStore.EHandle(
+      LeanConstantKey::keyType,
+      LeanConstantFile::type,
+      path,
+    );
+    for (entry in inputs.constants) {
+      constants.writeArray(
+        tracked,
+        LeanConstantKey("before-proof", leanNameKey(entry.i0)),
+        Array[LeanConstantFile(entry.i1, None())],
+      )
+    };
+    tracked.initPre();
+    tracked.update();
+    LeanConstantsView("before-proof", LeanConstantDirectory(constants))
+  };
+  imports = if (raw) {
+    snapshot.rawImports match {
+    | Some(imports) -> imports
+    | None() ->
+      leanFail("snapshot has no direct immutable inputs; prepare it again")
+    }
+  } else {
+    snapshot.imports
+  };
+  env = imports.atPrefix(runtime, localView);
+  setupNs = Time.time_ns() - start;
+  expected = leanNamedConstant(runtime, "Goal");
+  beginElab = Time.time_ns();
+  result = leanElaborateSimp(
+    runtime,
+    env,
+    expected,
+    Array[
+      leanSimpleName(runtime, "iter_zero"),
+      leanSimpleName(runtime, "iter_succ"),
+    ],
+    Array[leanNatValue(4), leanNatValue(5)],
+  );
+  elabNs = Time.time_ns() - beginElab;
+  succeeded = leanMetaSucceeded(result);
+  diagnostic = if (succeeded) JSON.Null() else {
+    exception = leanField(result, 0);
+    if (leanTag(exception) != LeanTag.Exception_error) {
+      leanFail("unhandled internal Lean exception in simplification")
+    };
+    JSON.String(
+      leanPlainMessage(leanField(exception, 1)).default(
+        "Lean.Exception.error (MessageData rendering not implemented)",
+      ),
+    )
+  };
+  beginExport = Time.time_ns();
+  if (succeeded) {
+    FileSystem.writeTextFile(
+      output,
+      leanProofDagDocument(expected, leanField(result, 0)),
+    )
+  };
+  JSON.Object[
+    "implementation" => JSON.String(if (raw) "skip-raw" else "skip"),
+    "setupNs" => JSON.IntNumber(setupNs),
+    "elaborationNs" => JSON.IntNumber(elabNs),
+    "elaborationStartNs" => if (
+      Environ.varOpt("LEAN_SKIP_SAMPLE_TIMESTAMPS").isSome()
+    ) {
+      JSON.IntNumber(beginElab)
+    } else {
+      JSON.Null()
+    },
+    "exportNs" => JSON.IntNumber(Time.time_ns() - beginExport),
+    "kernelChecked" => JSON.Bool(false),
+    "elaborated" => JSON.Bool(succeeded),
+    "diagnostic" => diagnostic,
+    "phaseNs" => if (runtime.profileSimpPhases) {
+      phases: mutable Map<String, JSON.Value> = mutable Map[];
+      for ((name, elapsed) in runtime.simpPhaseNs.items()) {
+        phases.set(name, JSON.IntNumber(elapsed))
+      };
+      JSON.Object(phases.chill())
+    } else {
+      JSON.Null()
+    },
+    "simpQueries" => JSON.Object[
+      "fetches" => JSON.IntNumber(runtime.simpQueryFetches),
+      "declines" => JSON.IntNumber(runtime.simpQueryDeclines),
+      "olderResultsFetched" => JSON.IntNumber(
+        runtime.simpOlderQueryKeys.size(),
+      ),
+      "directOlderFetches" => JSON.IntNumber(runtime.simpOlderQueriesFetched),
+    ],
+    "runtimeProfile" => if (runtime.profileRuntime) {
+      JSON.Object[
+        "scope" => JSON.String(
+          if (runtime.memoizeSimp) {
+            "outer execution only; excludes query executions"
+          } else {
+            "complete execution"
+          },
+        ),
+        "arrayWrites" => JSON.IntNumber(runtime.arrayWriteCount),
+        "logicalArraySlotsAtWrites" => JSON.IntNumber(
+          runtime.arrayWriteElements,
+        ),
+        "largestArrayWritten" => JSON.IntNumber(runtime.largestArrayWrite),
+        "expressionEqualities" => JSON.IntNumber(
+          runtime.expressionEqualityCount,
+        ),
+        "expressionEqualityNs" => JSON.IntNumber(runtime.expressionEqualityNs),
+        "allocatedReferences" => JSON.IntNumber(runtime.refs.size()),
+        "retainedReferenceKinds" => leanSimpReferenceProfile(runtime),
+        "collectionRegions" => JSON.IntNumber(runtime.regionCount),
+        "immutableIdentities" => JSON.IntNumber(
+          runtime.immutableIdentities.size(),
+        ),
+        "primitiveCalls" => JSON.IntNumber(runtime.primitiveCount),
+        "primitiveInclusiveNs" => JSON.IntNumber(runtime.primitiveInclusiveNs),
+      ]
+    } else {
+      JSON.Null()
+    },
+  ]
+}
+
+// Each edit runs the theorem again. Only intermediate lazy queries survive;
+// there is deliberately no whole-theorem result cache in this driver.
+fun leanRunSimpSession(
+  context: mutable SKStore.Context,
+  snapshot: LeanImportSnapshot,
+  manifestPath: String,
+  raw: Bool = false,
+): void {
+  context.!debugMode = Environ.varOpt("LEAN_SKIP_STORE_DEBUG") == Some("1");
+  manifest = JSON.decode(FileSystem.readTextFile(manifestPath)).expectVector();
+  for (step in manifest) {
+    item = step.expectObject();
+    label = item.getString("label");
+    output = item.getString("proof");
+    inputs = item.getString("inputs");
+    result = if (raw) {
+      // Diagnostic repeated raw executions share immutable imports only. Each
+      // call creates fresh references/initializers and has no query Context.
+      SKStore.withRegionValue(() ~>
+        leanRunSimpProblem(None(), snapshot, output, inputs, true)
+      )
+    } else {
+      SKStore.withRegion(context, (_, current) ~>
+        leanRunSimpProblem(Some(current), snapshot, output, inputs)
+      )
+    };
+    print_string(
+      JSON.Object["label" => JSON.String(label), "result" => result].encode(),
+    )
+  }
+}
+
+fun leanSimpMain(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 5 && args[1] == "--prepare") {
+    path = args[2];
+    if (FileSystem.exists(path) || FileSystem.exists(path + ".json")) {
+      leanFail("snapshot destination already exists; choose a new path")
+    };
+    Environ.set_var("SKARGO_BIN", "lean4-simp");
+    Posix.execvp(
+      Array[
+        "/proc/self/exe",
+        "--init",
+        path,
+        "--capacity",
+        "8G",
+        "--prepare-mapped",
+        args[3],
+        args[4],
+      ],
+    )
+  } else if (
+    args.size() == 8 &&
+    args[1] == "--init" &&
+    args[5] == "--prepare-mapped"
+  ) {
+    SKStore.withRegionVoid(() ~>
+      leanPrepareImportSnapshot(args[2], args[6], args[7])
+    )
+  } else if (
+    ((args.size() == 4 || args.size() == 5) &&
+      (args[1] == "--run" || args[1] == "--raw")) ||
+    (args.size() == 4 && (args[1] == "--session" || args[1] == "--raw-session"))
+  ) {
+    leanValidateImportSnapshot(args[2]);
+    Environ.set_var("SKARGO_BIN", "lean4-simp");
+    Posix.execvp(
+      Array[
+        "/proc/self/exe",
+        "--data",
+        args[2],
+        if (args[1] == "--raw-session") "--mapped-raw-session" else if (
+          args[1] == "--session"
+        ) "--mapped-session" else if (args[1] == "--raw") "--mapped-raw" else {
+          "--mapped-run"
+        },
+        args[3],
+        if (args.size() == 5) args[4] else "",
+      ],
+    )
+  } else if (
+    args.size() == 6 &&
+    args[1] == "--data" &&
+    (args[3] == "--mapped-run" ||
+      args[3] == "--mapped-session" ||
+      args[3] == "--mapped-raw-session" ||
+      args[3] == "--mapped-raw")
+  ) {
+    SKStore.withContext(base ->
+      SKStore.withRegionVoid(() ~> {
+        _ = leanSavedImports(base);
+        snapshot = LeanImportSnapshot::type(
+          base.getPersistent("lean/imports").fromSome(),
+        );
+        context = base.mclone();
+        if (
+          args[3] == "--mapped-session" ||
+          args[3] == "--mapped-raw-session"
+        ) {
+          leanRunSimpSession(
+            context,
+            snapshot,
+            args[4],
+            args[3] == "--mapped-raw-session",
+          )
+        } else {
+          print_string(
+            leanRunSimpProblem(
+              if (args[3] == "--mapped-raw") None() else Some(context),
+              snapshot,
+              args[4],
+              args[5],
+              args[3] == "--mapped-raw",
+            ).encode(),
+          )
+        }
+      })
+    )
+  } else {
+    leanFail(
+      "usage: lean4-simp --prepare SNAPSHOT IMPORT-DATA TYPED-INPUTS | --run SNAPSHOT PROOF-OUTPUT [TYPED-INPUTS] | --raw SNAPSHOT PROOF-OUTPUT [TYPED-INPUTS] | --session SNAPSHOT MANIFEST | --raw-session SNAPSHOT MANIFEST",
+    )
+  }
+}

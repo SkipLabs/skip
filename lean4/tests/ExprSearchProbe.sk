@@ -1,0 +1,55 @@
+fun exprSearchPredicate(
+  _runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  expr = args[0];
+  leanBool(leanTag(expr) == LeanTag.Expr_lit__impl)
+}
+
+fun main(): void {
+  context = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store => Some(context)};
+  one = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(1));
+  two = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(2));
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  sort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  app = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, one, two);
+  lam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    name,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    two,
+    one,
+  );
+  letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    name,
+    sort,
+    two,
+    one,
+    leanBool(false),
+  );
+  for ((expr, expected) in Array[(app, 1), (lam, 2), (letExpr, 2)]) {
+    result = L4_Lean_Util_FindExpr.f_Lean_Expr_findImpl_6534067b74(
+      runtime,
+      LeanClosure(exprSearchPredicate, 1, Array[]),
+      expr,
+    );
+    assert(
+      leanNat(leanField(leanField(leanField(result, 0), 1), 0)).toInt() ==
+        expected,
+    )
+  };
+  absent = leanExprFind(
+    runtime,
+    LeanClosure(exprSearchPredicate, 1, Array[]),
+    sort,
+  );
+  assert(leanTag(absent) == LeanTag.Option_none);
+  print_string(
+    "expression search: preorder, binder/let traversal and absent result passed",
+  )
+}

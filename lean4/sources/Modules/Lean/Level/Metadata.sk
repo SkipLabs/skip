@@ -1,0 +1,68 @@
+// Cached metadata accessors, using the pinned Lean bit layout.
+module L4_Lean_Level;
+
+// "Lean.Level.data._override"
+fun f_Level_data_override_dbd511c826(
+  _runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  leanLevelDataValue(level)
+}
+
+// "Lean.Level.hash"
+fun f_Lean_Level_hash_73088a010f(
+  _runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  LeanWord("uint64", leanLevelData(level).and(4294967295))
+}
+
+// "Lean.Level.hasMVar"
+fun f_Lean_Level_hasMVar_1e5dea1793(
+  _runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  leanBool(leanLevelData(level).and(1.shl(32)) != 0)
+}
+
+// "Lean.Level.hasParam"
+fun f_Lean_Level_hasParam_c489c472e0(
+  _runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  leanBool(leanLevelData(level).and(1.shl(33)) != 0)
+}
+
+// "Lean.Level.Data.hash"
+fun f_Level_Data_hash_e7a8397800(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  LeanWord("uint64", leanWordBits(data).and(4294967295))
+}
+
+// "Lean.Level.Data.depth"
+fun f_Level_Data_depth_fcd32b75c8(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  LeanWord("uint32", leanWordBits(data).ushr(40))
+}
+
+// "Lean.Level.Data.hasMVar"
+fun f_Level_Data_hasMVar_a8d498d5a2(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(32)) != 0)
+}
+
+// "Lean.Level.Data.hasParam"
+fun f_Level_Data_hasParam_1083112b5b(
+  _runtime: mutable LeanExecution,
+  data: LeanValue,
+): LeanValue {
+  leanBool(leanWordBits(data).and(1.shl(33)) != 0)
+}
+
+module end;

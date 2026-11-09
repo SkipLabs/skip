@@ -1,0 +1,28 @@
+// Preserve Lean's distinction between unused lets, dependent lets and haves.
+module L4_Lean_Meta_ExprDefEq;
+
+// "_private.Lean.Meta.ExprDefEq.0.Lean.Meta.consumeLetIfZeta._redArg"
+fun f_Lean_Meta_consumeLetIfZeta_c3f72853e8(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  context: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    context,
+  );
+  zeta = leanIsTrue(leanField(config, 15));
+  unused = leanIsTrue(leanField(config, 17));
+  if (zeta || unused) {
+    nondependent = unused || leanIsTrue(leanField(config, 18));
+    !expr = L4_Lean_Meta_WHNF.f_Lean_Meta_consumeUnusedLet_d1bfc80f26(
+      runtime,
+      expr,
+      leanBool(nondependent),
+    )
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[expr, world])
+}
+
+module end;

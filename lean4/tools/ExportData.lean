@@ -1,4 +1,7 @@
-import Lean
+module
+public import Lean
+import all Lean.ExtraModUses
+public section
 
 /- Immutable import data, not compiler IR or executable code. The Skip program
    will run the elaborator. Native Lean only supplies checked declarations. -/
@@ -25,11 +28,15 @@ def add (j : Json) : EncodeM Node := do
 
 def ctor (tag : String) (fields : Array Node := #[]) : EncodeM Node :=
   add <| toJson #[Json.str "ctor", Json.str ((toJson (tag.splitOn ".")).compress), toJson fields]
+def ctorTag (tag : String) (fields : Array Node) : EncodeM Node :=
+  add <| toJson #[Json.str "ctor", Json.str tag, toJson fields]
 def nat (n : Nat) : EncodeM Node := add <| toJson #[Json.str "nat", Json.str (toString n)]
 def word (kind : String) (n : Nat) : EncodeM Node := add <| toJson #[Json.str kind, Json.str (toString n)]
 def text (s : String) : EncodeM Node := add <| toJson #[Json.str "text", Json.str s]
 def array (xs : Array Node) : EncodeM Node := add <| toJson #[Json.str "array", toJson xs]
 def erased : EncodeM Node := add <| toJson #[Json.str "erased"]
+def unavailable (description : String) : EncodeM Node :=
+  add <| toJson #[Json.str "unavailable", Json.str description]
 def bool (b : Bool) : EncodeM Node := ctor (if b then "Bool.true" else "Bool.false")
 def list (xs : List Node) : EncodeM Node := do
   let mut result ← ctor "List.nil"
@@ -224,6 +231,25 @@ partial def instanceTrie : Meta.DiscrTree.Trie Meta.InstanceEntry → EncodeM No
     ctor "Lean.Meta.DiscrTree.Trie.node" #[← array (← values.mapM instanceEntry),
       ← array (← children.mapM (pair discrKey instanceTrie))]
 
+partial def nameTrie : Meta.DiscrTree.Trie Name → EncodeM Node
+  | .chain key child => do ctor "Lean.Meta.DiscrTree.Trie.chain" #[← discrKey key, ← nameTrie child]
+  | .node values children => do
+    ctor "Lean.Meta.DiscrTree.Trie.node" #[← array (← values.mapM name),
+      ← array (← children.mapM (pair discrKey nameTrie))]
+
+def unificationHintEntry (e : Meta.UnificationHintEntry) : EncodeM Node := do
+  ctor "Lean.Meta.UnificationHintEntry.mk" #[← array (← e.keys.mapM discrKey), ← name e.val]
+
+def simpKeys (keys : Array Meta.SimpTheoremKey) : EncodeM Node := do
+  array (← keys.mapM discrKey)
+
+def simprocDecl (d : Meta.Simp.SimprocDecl) : EncodeM Node := do
+  ctor "Lean.Meta.Simp.SimprocDecl.mk" #[← name d.declName, ← simpKeys d.keys]
+
+def simprocDeclState (s : Meta.Simp.SimprocDeclExtState) : EncodeM Node := do
+  ctor "Lean.Meta.Simp.SimprocDeclExtState.mk" #[← hashMap name simpKeys s.builtin,
+    ← hashNode name simpKeys s.newEntries.root]
+
 def instances (s : Meta.Instances) : EncodeM Node := do
   -- DiscrTree, PHashMap and PHashSet single-field wrappers disappear in mono.
   ctor "Lean.Meta.Instances.mk" #[← hashNode discrKey instanceTrie s.discrTree.root.root,
@@ -259,6 +285,36 @@ def classState (s : ClassState) : EncodeM Node := do
 def projectionInfo (p : ProjectionFunctionInfo) : EncodeM Node := do
   ctor "Lean.ProjectionFunctionInfo.mk" #[← name p.ctorName, ← nat p.numParams, ← nat p.i, ← bool p.fromClass]
 
+def auxParentProjectionInfo (p : AuxParentProjectionInfo) : EncodeM Node := do
+  ctor "Lean.AuxParentProjectionInfo.mk" #[← nat p.numParams, ← bool p.fromClass]
+
+def indirectModUse (e : IndirectModUse) : EncodeM Node := do
+  ctor "Lean.IndirectModUse.mk" #[← text e.kind, ← name e.declName]
+
+def extraModUse (e : ExtraModUse) : EncodeM Node := do
+  ctor "Lean.ExtraModUse.mk" #[← name e.module, ← bool e.isExported, ← bool e.isMeta]
+
+def importData (i : Import) : EncodeM Node := do
+  ctor "Lean.Import.mk" #[← name i.module, ← bool i.importAll, ← bool i.isExported, ← bool i.isMeta]
+
+def effectiveImport (i : EffectiveImport) : EncodeM Node := do
+  let phase ← ctor <| "Lean.IRPhases." ++ match i.irPhases with
+    | .runtime => "runtime" | .comptime => "comptime" | .all => "all"
+  ctor "Lean.EffectiveImport.mk" #[← importData i.toImport, phase, ← bool i.hasData]
+
+def environmentHeader (h : EnvironmentHeader) : EncodeM Node := do
+  let mut indices : Std.HashMap Name Nat := {}
+  for index in [:h.moduleNames.size] do
+    indices := indices.insert h.moduleNames[index]! index
+  -- Native mapped regions cannot be transferred to Skip. Unsupported accesses
+  -- fail explicitly, while names and effective import modifiers are preserved.
+  ctorTag "[\"_private\",\"Lean\",\"Environment\",0,\"Lean\",\"EnvironmentHeader\",\"mk\"]" #[
+    ← word "uint32" h.trustLevel.toNat, ← name h.mainModule, ← bool h.isModule,
+    ← array (← h.imports.mapM importData), ← unavailable "native compacted import regions",
+    ← array (← h.modules.mapM effectiveImport), ← array (← h.moduleNames.mapM name),
+    ← hashMap name nat indices, ← array (← h.importAllModules.mapM effectiveImport),
+    ← unavailable "native module data"]
+
 def persistentState (entry : α → EncodeM Node) (value : σ → EncodeM Node)
     (s : PersistentEnvExtensionState α σ) : EncodeM Node := do
   ctor "Lean.PersistentEnvExtensionState.mk" #[← array (← s.importedEntries.mapM fun entries => do
@@ -289,20 +345,106 @@ def extensions (env : Environment) : EncodeM (Array Json) := do
       (persistentState (scopedEntry (pair name reducibility))
         (scopedStack (pair name reducibility) (pair name reducibility) (smap name reducibility)))]
 
+def simpTagExtension (base input : Environment) (inputModule : Name)
+    (binding : String) (attr : TagAttribute) : EncodeM Json := do
+  let some idx := input.header.moduleNames.idxOf? inputModule
+    | throw s!"input module not present: {inputModule}"
+  let state := attr.ext.toEnvExtension.getState base (asyncMode := .local)
+  let localNames := attr.ext.getModuleEntries input idx
+  let state := { state with state := localNames.foldl (fun names n => names.insert n) state.state }
+  extension base binding attr.ext.toEnvExtension (fun _ =>
+    persistentState name (fun s => tree name unit s.inner.inner.inner) state)
+
 end ImportData
 
 unsafe def main (args : List String) : IO Unit := do
-  let (path, mode) ← match args with
-    | [path] => pure (path, "constants")
-    | [path, "--extensions"] => pure (path, "extensions")
-    | [path, "--extra-constants"] => pure (path, "extra-constants")
-    | _ => throw <| IO.userError "usage: ExportData.lean output.jsonl [--extensions | --extra-constants]"
-  let extensionsOnly := mode == "extensions"
+  let (path, mode, moduleName, roots) ← match args with
+    | [path] => pure (path, "constants", `Init, [])
+    | [path, "--extensions"] => pure (path, "extensions", `Init, [])
+    | [path, "--extra-constants"] => pure (path, "extra-constants", `Init, [])
+    | [path, "--header"] => pure (path, "header", `Init, [])
+    | [path, "--simp-extensions", mod] => pure (path, "simp-extensions", mod.toName, [])
+    | path :: "--definition-module" :: mod :: root :: rest =>
+      pure (path, "definitions", mod.toName, (root :: rest).map String.toName)
+    | path :: "--declaration-module" :: mod :: root :: rest =>
+      pure (path, "declarations", mod.toName,
+        if root == "*" && rest.isEmpty then [Name.mkSimple "*"] else (root :: rest).map String.toName)
+    | _ => throw <| IO.userError "usage: ExportData.lean output.jsonl [--extensions | --extra-constants | --definition-module MODULE ROOT... | --declaration-module MODULE ROOT...]"
+  let extensionsOnly := mode == "extensions" || mode == "simp-extensions"
   initSearchPath (← findSysroot)
   if extensionsOnly then enableInitializersExecution
-  let env ← importModules #[{ module := `Init }] {} (leakEnv := true) (loadExts := extensionsOnly)
+  let baseModule := if mode == "simp-extensions" then `Init else moduleName
+  let env ← importModules #[{ module := baseModule }] {} (leakEnv := true) (loadExts := extensionsOnly)
+  let inputEnv ← if mode == "simp-extensions" then do
+    enableInitializersExecution
+    importModules #[{ module := moduleName }] {} (leakEnv := true) (loadExts := true)
+    else pure env
+  let roots := if roots == [Name.mkSimple "*"] then
+    env.constants.toList.filterMap fun (n, c) => do
+      -- Compiler-only unsafe implementations are not kernel inputs.
+      match c with
+      | .defnInfo v => guard (v.safety == .safe)
+      | .thmInfo _ => pure ()
+      | _ => failure
+      let idx ← env.getModuleIdxFor? n
+      if env.header.moduleNames[idx.toNat]! == moduleName then some n else none
+    else roots
   let encode : ImportData.EncodeM (Array Json × Array Json × Array Json) := do
-    if extensionsOnly then return (#[], ← ImportData.extensions env, #[])
+    if mode == "header" then return (#[], #[], #[])
+    if extensionsOnly then
+      let mut entries ← ImportData.extensions env
+      if mode == "simp-extensions" then
+        entries := entries.push (← ImportData.simpTagExtension env inputEnv moduleName
+          "Lean.backwardDefeqAttr" backwardDefeqAttr)
+        entries := entries.push (← ImportData.simpTagExtension env inputEnv moduleName
+          "Lean.defeqAttr" defeqAttr)
+        entries := entries.push (← ImportData.extension env "Lean.Meta.eqnsExt" Meta.eqnsExt
+          (fun s => ImportData.hashNode ImportData.name ImportData.name s.mapInv.root))
+        entries := entries.push (← ImportData.extension env "Lean.auxParentProjInfoExt" auxParentProjInfoExt.toEnvExtension
+          (ImportData.persistentState (ImportData.pair ImportData.name ImportData.auxParentProjectionInfo)
+            (fun m => ImportData.tree ImportData.name ImportData.auxParentProjectionInfo m.inner.inner)))
+        entries := entries.push (← ImportData.extension env "Lean.Meta.unificationHintExtension" Meta.unificationHintExtension.ext.toEnvExtension
+          (ImportData.persistentState (ImportData.scopedEntry ImportData.unificationHintEntry)
+            (ImportData.scopedStack ImportData.unificationHintEntry ImportData.unificationHintEntry
+              (fun s => ImportData.hashNode ImportData.discrKey ImportData.nameTrie s.discrTree.root.root))))
+        entries := entries.push (← ImportData.extension env "Lean.Meta.Simp.simprocDeclExt" Meta.Simp.simprocDeclExt.toEnvExtension
+          (ImportData.persistentState ImportData.simprocDecl ImportData.simprocDeclState))
+        entries := entries.push (← ImportData.extension env "Lean.indirectModUseExt" indirectModUseExt.toEnvExtension
+          (ImportData.persistentState ImportData.indirectModUse
+            (ImportData.pair (fun xs => do ImportData.list (← xs.mapM ImportData.indirectModUse))
+              (ImportData.hashMap ImportData.name (fun xs => do ImportData.array (← xs.mapM (fun n => ImportData.nat n.toNat)))))))
+        entries := entries.push (← ImportData.extension env "_private.Lean.ExtraModUses.0.Lean.extraModUses" extraModUses.toEnvExtension
+          (ImportData.persistentState ImportData.extraModUse
+            (ImportData.pair (fun xs => do ImportData.list (← xs.mapM ImportData.extraModUse))
+              (fun s => ImportData.hashNode ImportData.extraModUse ImportData.unit s.set.root))))
+      return (#[], entries, #[])
+    if mode == "definitions" || mode == "declarations" then
+      -- Typed-input bring-up only. The caller selects a module containing input
+      -- declarations, never the benchmark's target proof or simplified result.
+      let mut pending := roots
+      let mut seen : NameSet := {}
+      let mut entries := #[]
+      while let n :: rest := pending do
+        pending := rest
+        if seen.contains n then continue
+        seen := seen.insert n
+        let some c := env.find? n | throw s!"missing definition {n}"
+        let some idx := env.getModuleIdxFor? n | throw s!"missing module for {n}"
+        if env.header.moduleNames[idx.toNat]! != moduleName then
+          if roots.contains n then throw s!"root {n} is not defined in {moduleName}"
+          continue
+        let value ← match c with
+          | .defnInfo v =>
+            unless v.safety == .safe do throw s!"input data cannot contain unsafe definition {n}"
+            pure v.value
+          | .thmInfo v =>
+            if mode != "declarations" then throw s!"definition data cannot contain theorem {n}"
+            pure v.value
+          | _ => throw s!"input data cannot contain {n}: not a safe definition or theorem"
+        if c.type.hasSorry || value.hasSorry then throw s!"input {n} contains sorry"
+        pending := c.type.getUsedConstants.toList ++ value.getUsedConstants.toList ++ pending
+        entries := entries.push <| toJson #[toJson (← ImportData.name n), toJson (← ImportData.info c), toJson idx.toNat]
+      return (entries, #[], #[])
     if mode == "extra-constants" then
       let entries ← env.toKernelEnv.importedExtraConsts.foldlEntriesM (fun entries n (_, idx) => do
         return entries.push <| toJson #[toJson (← ImportData.name n), toJson idx]) (#[] : Array Json)
@@ -312,12 +454,16 @@ unsafe def main (args : List String) : IO Unit := do
       let some idx := env.getModuleIdxFor? n | throw s!"missing imported module for {n}"
       entries := entries.push <| toJson #[toJson (← ImportData.name n), toJson (← ImportData.info c), toJson idx.toNat]
     return (entries, #[], #[])
-  let ((entries, extensions, extraConstants), state) ← match encode.run {} with
+  let withHeader := do
+    let data ← encode
+    let header ← if mode == "header" then some <$> ImportData.environmentHeader env.header else pure none
+    return (data, header)
+  let (((entries, extensions, extraConstants), headerRef), state) ← match withHeader.run {} with
     | .ok result => pure result
     | .error message => throw <| IO.userError message
   let out ← IO.FS.Handle.mk path .write
   out.putStrLn <| (Json.mkObj [("schema", toJson (1 : Nat)), ("leanCommit", toJson Lean.githash),
-    ("imports", toJson #["Init"]), ("moduleNames", toJson (env.header.moduleNames.map toString)),
+    ("imports", toJson #[baseModule.toString]), ("moduleNames", toJson (env.header.moduleNames.map toString)),
     ("trackedGeneration", toJson (toString env.trackedGen))]).compress
   for node in state.nodes do out.putStrLn node.compress
   let footer := [("constants", toJson entries), ("extensions", toJson extensions),
@@ -326,5 +472,8 @@ unsafe def main (args : List String) : IO Unit := do
   let footer := if mode == "extra-constants" then
       footer ++ [("extraConstants", toJson extraConstants)]
     else footer
+  let footer := match headerRef with
+    | some ref => footer ++ [("environmentHeader", toJson ref)]
+    | none => footer
   out.putStrLn <| (Json.mkObj footer).compress
   IO.eprintln s!"Exported {entries.size} checked declarations, {extensions.size} extension states and {extraConstants.size} extra names as {state.nodes.size} data nodes"

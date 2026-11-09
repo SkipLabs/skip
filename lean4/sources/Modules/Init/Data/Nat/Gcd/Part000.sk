@@ -6,7 +6,16 @@ fun f_Nat_gcd_ee21c096be(
   _m_0: LeanValue,
   _n_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(_runtime, "Nat.gcd", "lean_nat_gcd", Array[_m_0, _n_1])
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "Nat.gcd",
+      "lean_nat_gcd",
+      Array[_m_0, _n_1],
+    )
+  };
+  leanBoxNat(leanNat(_m_0).gcd(leanNat(_n_1)))
 }
 fun apply_f_Nat_gcd_ee21c096be(
   _runtime: mutable LeanExecution,

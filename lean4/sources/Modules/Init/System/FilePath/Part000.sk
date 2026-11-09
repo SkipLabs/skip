@@ -8,24 +8,21 @@ fun f_System_FilePath_pathSeparators_82d1e386f1(
     _runtime,
   );
   leanTag(_x_1_0) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     LeanCtor(
-      "[\"List\",\"cons\"]",
-      Array[
-        LeanScalar("uint32", "47"),
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
-      ],
+      LeanTag.List_cons,
+      Array[LeanWord("uint32", 47), LeanCtor(LeanTag.List_nil, Array[])],
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
-        LeanScalar("uint32", "92"),
+        LeanWord("uint32", 92),
         LeanCtor(
-          "[\"List\",\"cons\"]",
+          LeanTag.List_cons,
           Array[
-            LeanScalar("uint32", "47"),
-            LeanCtor("[\"List\",\"nil\"]", Array[]),
+            LeanWord("uint32", 47),
+            LeanCtor(LeanTag.List_nil, Array[]),
           ],
         ),
       ],
@@ -41,7 +38,7 @@ fun f_System_FilePath_join_56aa4f5bc1(
 ): LeanValue {
   _x_1_2: LeanValue = f_System_FilePath_isAbsolute_975fd4e775(_runtime, _sub_1);
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = f_System_FilePath_pathSeparator_b714f93f0e(_runtime);
     _x_4_5: LeanValue = L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
       _runtime,
@@ -58,7 +55,7 @@ fun f_System_FilePath_join_56aa4f5bc1(
       _x_5_6,
       _sub_1,
     )
-  | "[\"Bool\",\"true\"]" -> _sub_1
+  | LeanTag.Bool_true -> _sub_1
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -85,16 +82,16 @@ fun f_System_FilePath_normalize_49659a948b(
   _x_4_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _x_2_3,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   leanTag(_x_4_5) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     f_FilePath_normalize_spec_1_6e404bec8c(
       _runtime,
       _p_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     )
-  | "[\"Bool\",\"true\"]" -> _p_1
+  | LeanTag.Bool_true -> _p_1
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -107,7 +104,7 @@ fun f_isAbsolute_spec_0_spec_0_bb7450e020(
   _b_3: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_4: LeanValue = leanField(_x_2_1, 0);
     _startInclusive_5: LeanValue = leanField(_x_2_1, 1);
     _endExclusive_6: LeanValue = leanField(_x_2_1, 2);
@@ -123,22 +120,22 @@ fun f_isAbsolute_spec_0_spec_0_bb7450e020(
       _x_3_8,
     );
     leanTag(_decide_4_9) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _isZero_11: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
         _runtime,
         _b_3,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       leanTag(_isZero_11) match {
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_5_12: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
           _runtime,
           _x_1_0,
           _a_2,
           LeanErased(),
         );
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_5_12])
-      | "[\"Bool\",\"false\"]" ->
+        LeanCtor(LeanTag.Option_some, Array[_x_5_12])
+      | LeanTag.Bool_false ->
         _x_7_14: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
           _startInclusive_5,
@@ -158,7 +155,7 @@ fun f_isAbsolute_spec_0_spec_0_bb7450e020(
         _n_10_18: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _b_3,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         f_isAbsolute_spec_0_spec_0_bb7450e020(
           _runtime,
@@ -169,7 +166,7 @@ fun f_isAbsolute_spec_0_spec_0_bb7450e020(
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -182,7 +179,7 @@ fun f_System_FilePath_isAbsolute_975fd4e775(
 ): LeanValue {
   _x_1_1: LeanValue = f_System_FilePath_pathSeparators_82d1e386f1(_runtime);
   _joined: Array<LeanValue> = {
-    _x_14_13: LeanValue = LeanScalar("nat", "0");
+    _x_14_13: LeanValue = LeanNatLiterals.n0;
     _x_15_14: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _p_0,
@@ -190,14 +187,14 @@ fun f_System_FilePath_isAbsolute_975fd4e775(
     _x_17_16: LeanValue = L4_Init_Data_String_Basic.f_Slice_Pos_get_5eec1d405e(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_p_0, _x_14_13, _x_15_14, LeanErased()],
       ),
       _x_14_13,
     );
     leanTag(_x_17_16) match {
-    | "[\"Option\",\"none\"]" -> Array[LeanScalar("uint32", "65")]
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> Array[LeanWord("uint32", 65)]
+    | LeanTag.Option_some ->
       _val_19_17: LeanValue = leanField(_x_17_16, 0);
       Array[_val_19_17]
     | _ -> leanFail("non-exhaustive Lean case")
@@ -210,14 +207,14 @@ fun f_System_FilePath_isAbsolute_975fd4e775(
     _x_1_1,
   );
   leanTag(_x_4_3) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_5_4: LeanValue = L4_Init_System_Platform.f_System_Platform_isWindows_98b761276c(
       _runtime,
     );
     leanTag(_x_5_4) match {
-    | "[\"Bool\",\"false\"]" -> _x_5_4
-    | "[\"Bool\",\"true\"]" ->
-      _x_6_5: LeanValue = LeanScalar("nat", "0");
+    | LeanTag.Bool_false -> _x_5_4
+    | LeanTag.Bool_true ->
+      _x_6_5: LeanValue = LeanNatLiterals.n0;
       _x_7_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
         _runtime,
         _p_0,
@@ -226,20 +223,20 @@ fun f_System_FilePath_isAbsolute_975fd4e775(
         _runtime,
         _p_0,
         LeanCtor(
-          "[\"String\",\"Slice\",\"mk\"]",
+          LeanTag.String_Slice_mk,
           Array[_p_0, _x_6_5, _x_7_6, LeanErased()],
         ),
         _x_6_5,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_FilePath_isAbsolute_spec_1_d633187c3d(
         _runtime,
         _x_10_9,
-        LeanCtor("[\"Option\",\"some\"]", Array[LeanScalar("uint32", "58")]),
+        LeanCtor(LeanTag.Option_some, Array[LeanWord("uint32", 58)]),
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _x_4_3
+  | LeanTag.Bool_true -> _x_4_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -252,25 +249,25 @@ fun f_normalize_normalizeDriveLetter_spec_0_5c132732ac(
   _b_3: LeanValue,
 ): LeanValue {
   leanTag(_a_2) match {
-  | "[\"Std\",\"Iterators\",\"Types\",\"Take\",\"mk\"]" ->
+  | LeanTag.Std_Iterators_Types_Take_mk ->
     _countdown_4: LeanValue = leanField(_a_2, 0);
     _inner_5: LeanValue = leanField(_a_2, 1);
     _finite_6: LeanValue = leanField(_a_2, 2);
-    _x_3_7: LeanValue = LeanScalar("nat", "1");
+    _x_3_7: LeanValue = LeanNatLiterals.n1;
     _x_4_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _countdown_4,
       _x_3_7,
     );
     leanTag(_x_4_8) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _decide_5_9: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
         _runtime,
         _inner_5,
         _x_2_1,
       );
       leanTag(_decide_5_9) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_6_10: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
           _runtime,
           _x_1_0,
@@ -299,15 +296,15 @@ fun f_normalize_normalizeDriveLetter_spec_0_5c132732ac(
           _x_1_0,
           _x_2_1,
           LeanCtor(
-            "[\"Std\",\"Iterators\",\"Types\",\"Take\",\"mk\"]",
+            LeanTag.Std_Iterators_Types_Take_mk,
             Array[_x_8_12, _x_6_10, LeanErased()],
           ),
           _x_10_14,
         )
-      | "[\"Bool\",\"true\"]" -> _b_3
+      | LeanTag.Bool_true -> _b_3
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> _b_3
+    | LeanTag.Bool_true -> _b_3
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -320,19 +317,19 @@ fun f_FilePath_isAbsolute_spec_1_d633187c3d(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_UInt32_decEq_8e017905ad(_runtime, _val_6_2, _val_8_6)
     | _ -> leanFail("non-exhaustive Lean case")
@@ -345,7 +342,7 @@ fun f_System_SearchPath_parse_93ea3f2c2f(
   _runtime: mutable LeanExecution,
   _s_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_2_2: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
     _runtime,
     _s_0,
@@ -363,7 +360,7 @@ fun f_System_SearchPath_parse_93ea3f2c2f(
     _runtime,
     _s_0,
     LeanCtor(
-      "[\"String\",\"Slice\",\"mk\"]",
+      LeanTag.String_Slice_mk,
       Array[_s_0, _x_1_1, _x_2_2, LeanErased()],
     ),
     _x_2_2,
@@ -379,10 +376,10 @@ fun f_System_FilePath_extension_3d997e9cf9(
 ): LeanValue {
   _x_1_1: LeanValue = f_System_FilePath_fileName_7103d157ff(_runtime, _p_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> _x_1_1
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _x_1_1
+  | LeanTag.Option_some ->
     _val_2_2: LeanValue = leanField(_x_1_1, 0);
-    _x_3_3: LeanValue = LeanScalar("nat", "0");
+    _x_3_3: LeanValue = LeanNatLiterals.n0;
     _x_4_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _val_2_2,
@@ -390,13 +387,13 @@ fun f_System_FilePath_extension_3d997e9cf9(
     _x_6_6: LeanValue = f_FilePath_fileStem_spec_0_75dcabb101(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_val_2_2, _x_3_3, _x_4_4, LeanErased()],
       ),
     );
     leanTag(_x_6_6) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Option_some ->
       _val_8_7: LeanValue = leanField(_x_6_6, 0);
       _x_9_9: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
         _runtime,
@@ -404,11 +401,11 @@ fun f_System_FilePath_extension_3d997e9cf9(
         _x_3_3,
       );
       leanTag(_x_9_9) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_11_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
           _val_8_7,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         _x_12_12: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_extract_3a4574e345(
           _runtime,
@@ -416,8 +413,8 @@ fun f_System_FilePath_extension_3d997e9cf9(
           _x_11_11,
           _x_4_4,
         );
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_12_12])
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+        LeanCtor(LeanTag.Option_some, Array[_x_12_12])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -433,8 +430,8 @@ fun f_System_FilePath_exeExtension_d24b8f3b01(
     _runtime,
   );
   leanTag(_x_1_0) match {
-  | "[\"Bool\",\"false\"]" -> LeanText("")
-  | "[\"Bool\",\"true\"]" -> LeanText("exe")
+  | LeanTag.Bool_false -> LeanText("")
+  | LeanTag.Bool_true -> LeanText("exe")
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -443,9 +440,9 @@ fun f_SearchPath_parse_spec_0_9549c9a2e9(
   _runtime: mutable LeanExecution,
   _dummy_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   LeanCtor(
-    "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+    LeanTag.String_Slice_SplitIterator_operating,
     Array[_x_1_1, _x_1_1],
   )
 }
@@ -457,8 +454,8 @@ fun f_System_FilePath_withExtension_a5e2de1704(
 ): LeanValue {
   _x_1_2: LeanValue = f_System_FilePath_fileStem_c55dc59e72(_runtime, _p_0);
   leanTag(_x_1_2) match {
-  | "[\"Option\",\"none\"]" -> _p_0
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _p_0
+  | LeanTag.Option_some ->
     _val_2_3: LeanValue = leanField(_x_1_2, 0);
     _x_3_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
@@ -467,10 +464,10 @@ fun f_System_FilePath_withExtension_a5e2de1704(
     _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_3_4,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     leanTag(_x_5_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_8: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
         _runtime,
         _val_2_3,
@@ -482,7 +479,7 @@ fun f_System_FilePath_withExtension_a5e2de1704(
         _ext_1,
       );
       f_System_FilePath_withFileName_7255f8b348(_runtime, _p_0, _x_8_9)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       f_System_FilePath_withFileName_7255f8b348(_runtime, _p_0, _val_2_3)
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -513,7 +510,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
     pc match {
     | 0 ->
       leanTag(_frame[3]) match {
-      | "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]" ->
+      | LeanTag.String_Slice_SplitIterator_operating ->
         _frame.set(11, leanField(_frame[3], 0));
         _frame.set(12, leanField(_frame[3], 1));
         _frame.set(
@@ -525,7 +522,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
           ),
         );
         leanTag(_frame[13]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(14, f_System_SearchPath_separator_aef2befa1a(_runtime));
           _frame.set(
             15,
@@ -545,7 +542,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
             ),
           );
           leanTag(_frame[16]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               17,
               L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
@@ -558,7 +555,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
             _frame.set(
               18,
               LeanCtor(
-                "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+                LeanTag.String_Slice_SplitIterator_operating,
                 Array[_frame[11], _frame[17]],
               ),
             );
@@ -574,7 +571,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
               ),
             );
             return _frame[19]
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
@@ -612,12 +609,12 @@ fun f_SearchPath_parse_spec_1_476127b562(
             _frame.set(
               24,
               LeanCtor(
-                "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+                LeanTag.String_Slice_SplitIterator_operating,
                 Array[_frame[22], _frame[22]],
               ),
             );
             leanTag(_frame[23]) match {
-            | "[\"String\",\"Slice\",\"Subslice\",\"mk\"]" ->
+            | LeanTag.String_Slice_Subslice_mk ->
               _frame.set(25, leanField(_frame[23], 0));
               _frame.set(26, leanField(_frame[23], 1));
               _ = leanField(_frame[23], 2);
@@ -633,11 +630,11 @@ fun f_SearchPath_parse_spec_1_476127b562(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             27,
             LeanCtor(
-              "[\"String\",\"Slice\",\"SplitIterator\",\"atEnd\"]",
+              LeanTag.String_Slice_SplitIterator_atEnd,
               Array[],
             ),
           );
@@ -651,7 +648,7 @@ fun f_SearchPath_parse_spec_1_476127b562(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"String\",\"Slice\",\"SplitIterator\",\"atEnd\"]" -> return _frame[4]
+      | LeanTag.String_Slice_SplitIterator_atEnd -> return _frame[4]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
@@ -699,12 +696,12 @@ fun f_posOfLastSep_spec_0_spec_0_61632502f3(
   _decide_2_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _a_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_decide_2_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_s_0) match {
-    | "[\"String\",\"Slice\",\"mk\"]" ->
+    | LeanTag.String_Slice_mk ->
       _str_5: LeanValue = leanField(_s_0, 0);
       _startInclusive_6: LeanValue = leanField(_s_0, 1);
       _endExclusive_7: LeanValue = leanField(_s_0, 2);
@@ -720,7 +717,7 @@ fun f_posOfLastSep_spec_0_spec_0_61632502f3(
         _x_4_10,
         _startInclusive_6,
       );
-      _x_7_13: LeanValue = LeanScalar("nat", "1");
+      _x_7_13: LeanValue = LeanNatLiterals.n1;
       _x_8_14: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _x_6_12,
@@ -729,7 +726,7 @@ fun f_posOfLastSep_spec_0_spec_0_61632502f3(
       _x_9_15: LeanValue = L4_Init_Data_String_FindPos.f_String_Slice_posLE_e4fbd445e7(
         _runtime,
         LeanCtor(
-          "[\"String\",\"Slice\",\"mk\"]",
+          LeanTag.String_Slice_mk,
           Array[_str_5, _startInclusive_6, _x_4_10, LeanErased()],
         ),
         _x_8_14,
@@ -751,7 +748,7 @@ fun f_posOfLastSep_spec_0_spec_0_61632502f3(
         _x_3_9,
       );
       leanTag(_x_12_18) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_14_20: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _a_1,
@@ -766,15 +763,15 @@ fun f_posOfLastSep_spec_0_spec_0_61632502f3(
           _runtime,
           _s_0,
           _x_15_21,
-          LeanCtor("[\"Option\",\"none\"]", Array[]),
+          LeanCtor(LeanTag.Option_none, Array[]),
         )
-      | "[\"Bool\",\"true\"]" ->
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_9_15])
+      | LeanTag.Bool_true ->
+        LeanCtor(LeanTag.Option_some, Array[_x_9_15])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _b_2
+  | LeanTag.Bool_true -> _b_2
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -804,7 +801,7 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
         L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _frame[1], _frame[18]),
       );
       leanTag(_frame[19]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(20, f_System_FilePath_pathSeparators_82d1e386f1(_runtime));
         _frame.set(
           21,
@@ -824,12 +821,12 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
           ),
         );
         leanTag(_frame[22]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[21];
           _frame.set(6, _jump0);
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(23, f_System_FilePath_pathSeparator_b714f93f0e(_runtime));
           _jump0 = _frame[23];
           _frame.set(6, _jump0);
@@ -837,7 +834,7 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[0]
+      | LeanTag.Bool_true -> return _frame[0]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
@@ -861,7 +858,7 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
           LeanErased(),
         ),
       );
-      _frame.set(8, LeanScalar("uint32", "127"));
+      _frame.set(8, LeanWord("uint32", 127));
       _frame.set(
         9,
         L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
@@ -871,8 +868,8 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
         ),
       );
       leanTag(_frame[9]) match {
-      | "[\"Bool\",\"false\"]" ->
-        _frame.set(10, LeanScalar("uint32", "2047"));
+      | LeanTag.Bool_false ->
+        _frame.set(10, LeanWord("uint32", 2047));
         _frame.set(
           11,
           L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
@@ -882,8 +879,8 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
           ),
         );
         leanTag(_frame[11]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(12, LeanScalar("uint32", "65535"));
+        | LeanTag.Bool_false ->
+          _frame.set(12, LeanWord("uint32", 65535));
           _frame.set(
             13,
             L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
@@ -893,16 +890,16 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
             ),
           );
           leanTag(_frame[13]) match {
-          | "[\"Bool\",\"false\"]" ->
-            _frame.set(14, LeanScalar("nat", "4"));
+          | LeanTag.Bool_false ->
+            _frame.set(14, LeanNatLiterals.n4);
             _jump0 = _frame[7];
             _jump1 = _frame[14];
             _frame.set(2, _jump0);
             _frame.set(3, _jump1);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(15, LeanScalar("nat", "3"));
+          | LeanTag.Bool_true ->
+            _frame.set(15, LeanNatLiterals.n3);
             _jump0 = _frame[7];
             _jump1 = _frame[15];
             _frame.set(2, _jump0);
@@ -911,8 +908,8 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(16, LeanScalar("nat", "2"));
+        | LeanTag.Bool_true ->
+          _frame.set(16, LeanNatLiterals.n2);
           _jump0 = _frame[7];
           _jump1 = _frame[16];
           _frame.set(2, _jump0);
@@ -921,8 +918,8 @@ fun f_FilePath_normalize_spec_1_6e404bec8c(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(17, LeanScalar("nat", "1"));
+      | LeanTag.Bool_true ->
+        _frame.set(17, LeanNatLiterals.n1);
         _jump0 = _frame[7];
         _jump1 = _frame[17];
         _frame.set(2, _jump0);
@@ -947,15 +944,15 @@ fun f_System_FilePath_posOfLastSep_822cbfc544(
   _x_4_4: LeanValue = f_FilePath_posOfLastSep_spec_0_77ca57e12e(
     _runtime,
     LeanCtor(
-      "[\"String\",\"Slice\",\"mk\"]",
-      Array[_p_0, LeanScalar("nat", "0"), _x_2_2, LeanErased()],
+      LeanTag.String_Slice_mk,
+      Array[_p_0, LeanNatLiterals.n0, _x_2_2, LeanErased()],
     ),
   );
   leanTag(_x_4_4) match {
-  | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
     _val_6_5: LeanValue = leanField(_x_4_4, 0);
-    LeanCtor("[\"Option\",\"some\"]", Array[_val_6_5])
+    LeanCtor(LeanTag.Option_some, Array[_val_6_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -969,12 +966,12 @@ fun f_fileStem_spec_0_spec_0_39c3b2676d(
   _decide_2_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _a_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_decide_2_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_s_0) match {
-    | "[\"String\",\"Slice\",\"mk\"]" ->
+    | LeanTag.String_Slice_mk ->
       _str_5: LeanValue = leanField(_s_0, 0);
       _startInclusive_6: LeanValue = leanField(_s_0, 1);
       _endExclusive_7: LeanValue = leanField(_s_0, 2);
@@ -989,7 +986,7 @@ fun f_fileStem_spec_0_spec_0_39c3b2676d(
         _x_3_9,
         _startInclusive_6,
       );
-      _x_6_12: LeanValue = LeanScalar("nat", "1");
+      _x_6_12: LeanValue = LeanNatLiterals.n1;
       _x_7_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _x_5_11,
@@ -998,7 +995,7 @@ fun f_fileStem_spec_0_spec_0_39c3b2676d(
       _x_8_14: LeanValue = L4_Init_Data_String_FindPos.f_String_Slice_posLE_e4fbd445e7(
         _runtime,
         LeanCtor(
-          "[\"String\",\"Slice\",\"mk\"]",
+          LeanTag.String_Slice_mk,
           Array[_str_5, _startInclusive_6, _x_3_9, LeanErased()],
         ),
         _x_7_13,
@@ -1017,10 +1014,10 @@ fun f_fileStem_spec_0_spec_0_39c3b2676d(
       _x_12_18: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
         _runtime,
         _x_10_16,
-        LeanScalar("uint32", "46"),
+        LeanWord("uint32", 46),
       );
       leanTag(_x_12_18) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_14_20: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _a_1,
@@ -1035,15 +1032,15 @@ fun f_fileStem_spec_0_spec_0_39c3b2676d(
           _runtime,
           _s_0,
           _x_15_21,
-          LeanCtor("[\"Option\",\"none\"]", Array[]),
+          LeanCtor(LeanTag.Option_none, Array[]),
         )
-      | "[\"Bool\",\"true\"]" ->
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_8_14])
+      | LeanTag.Bool_true ->
+        LeanCtor(LeanTag.Option_some, Array[_x_8_14])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _b_2
+  | LeanTag.Bool_true -> _b_2
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1053,7 +1050,7 @@ fun f_FilePath_posOfLastSep_spec_0_77ca57e12e(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_1: LeanValue = leanField(_s_0, 0);
     _startInclusive_2: LeanValue = leanField(_s_0, 1);
     _endExclusive_3: LeanValue = leanField(_s_0, 2);
@@ -1067,7 +1064,7 @@ fun f_FilePath_posOfLastSep_spec_0_77ca57e12e(
       _runtime,
       _s_0,
       _searcher_5,
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1081,9 +1078,9 @@ fun f_FilePath_normalize_normalizeDriveLetter_f6f64e195b(
     _runtime,
   );
   leanTag(_x_1_1) match {
-  | "[\"Bool\",\"false\"]" -> _p_0
-  | "[\"Bool\",\"true\"]" ->
-    _x_2_2: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Bool_false -> _p_0
+  | LeanTag.Bool_true ->
+    _x_2_2: LeanValue = LeanNatLiterals.n0;
     _x_3_3: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _p_0,
@@ -1098,8 +1095,8 @@ fun f_FilePath_normalize_normalizeDriveLetter_f6f64e195b(
       _p_0,
       _x_3_3,
       LeanCtor(
-        "[\"Std\",\"Iterators\",\"Types\",\"Take\",\"mk\"]",
-        Array[LeanScalar("nat", "3"), _x_2_2, LeanErased()],
+        LeanTag.Std_Iterators_Types_Take_mk,
+        Array[LeanNatLiterals.n3, _x_2_2, LeanErased()],
       ),
       _x_6_6,
     );
@@ -1109,41 +1106,41 @@ fun f_FilePath_normalize_normalizeDriveLetter_f6f64e195b(
       _x_7_7,
     );
     leanTag(_x_8_8) match {
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_cons ->
       _head_9_9: LeanValue = leanField(_x_8_8, 0);
       _tail_10_10: LeanValue = leanField(_x_8_8, 1);
       leanTag(_tail_10_10) match {
-      | "[\"List\",\"cons\"]" ->
+      | LeanTag.List_cons ->
         _head_11_11: LeanValue = leanField(_tail_10_10, 0);
         _tail_12_12: LeanValue = leanField(_tail_10_10, 1);
         _x_14_14: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
           _runtime,
           _head_11_11,
-          LeanScalar("uint32", "58"),
+          LeanWord("uint32", 58),
         );
         leanTag(_x_14_14) match {
-        | "[\"Bool\",\"false\"]" -> _p_0
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _p_0
+        | LeanTag.Bool_true ->
           leanTag(_tail_12_12) match {
-          | "[\"List\",\"nil\"]" ->
-            _x_15_15: LeanValue = LeanScalar("uint32", "97");
+          | LeanTag.List_nil ->
+            _x_15_15: LeanValue = LeanWord("uint32", 97);
             _x_16_16: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
               _runtime,
               _x_15_15,
               _head_9_9,
             );
             leanTag(_x_16_16) match {
-            | "[\"Bool\",\"false\"]" -> _p_0
-            | "[\"Bool\",\"true\"]" ->
-              _x_17_17: LeanValue = LeanScalar("uint32", "122");
+            | LeanTag.Bool_false -> _p_0
+            | LeanTag.Bool_true ->
+              _x_17_17: LeanValue = LeanWord("uint32", 122);
               _x_18_18: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
                 _runtime,
                 _head_9_9,
                 _x_17_17,
               );
               leanTag(_x_18_18) match {
-              | "[\"Bool\",\"false\"]" -> _p_0
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_false -> _p_0
+              | LeanTag.Bool_true ->
                 _x_19_19: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
                   _runtime,
                   _p_0,
@@ -1155,32 +1152,32 @@ fun f_FilePath_normalize_normalizeDriveLetter_f6f64e195b(
                   _x_19_19,
                 );
                 leanTag(_x_20_20) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
                     _runtime,
                     _p_0,
                     _x_2_2,
                     _x_19_19,
                   )
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _x_22_22: LeanValue = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
                     _runtime,
                     _x_19_19,
                     _x_17_17,
                   );
                   leanTag(_x_22_22) match {
-                  | "[\"Bool\",\"false\"]" ->
+                  | LeanTag.Bool_false ->
                     L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
                       _runtime,
                       _p_0,
                       _x_2_2,
                       _x_19_19,
                     )
-                  | "[\"Bool\",\"true\"]" ->
+                  | LeanTag.Bool_true ->
                     _x_25_25: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt32_add_89bff4a85f(
                       _runtime,
                       _x_19_19,
-                      LeanScalar("uint32", "4294967264"),
+                      LeanWord("uint32", 4294967264),
                     );
                     L4_Init_Data_String_Modify.f_Pos_Raw_set_ebf072026c(
                       _runtime,
@@ -1218,8 +1215,8 @@ fun f_System_FilePath_fileName_7103d157ff(
       _p_0,
     );
     leanTag(_x_14_13) match {
-    | "[\"Option\",\"none\"]" -> Array[_p_0]
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> Array[_p_0]
+    | LeanTag.Option_some ->
       _val_15_14: LeanValue = leanField(_x_14_13, 0);
       _x_17_16: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
         _runtime,
@@ -1228,8 +1225,8 @@ fun f_System_FilePath_fileName_7103d157ff(
       _x_19_18: LeanValue = L4_Init_Data_String_Basic.f_Slice_Pos_next_ac3599efdd(
         _runtime,
         LeanCtor(
-          "[\"String\",\"Slice\",\"mk\"]",
-          Array[_p_0, LeanScalar("nat", "0"), _x_17_16, LeanErased()],
+          LeanTag.String_Slice_mk,
+          Array[_p_0, LeanNatLiterals.n0, _x_17_16, LeanErased()],
         ),
         _val_15_14,
       );
@@ -1251,32 +1248,32 @@ fun f_System_FilePath_fileName_7103d157ff(
   _x_5_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _x_3_2,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_x_5_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_7_6: LeanValue = L4_Init_Prelude.f_String_decEq_88c69973f8(
       _runtime,
       _y_2_1,
       LeanText("."),
     );
     leanTag(_x_7_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_9_8: LeanValue = L4_Init_Prelude.f_String_decEq_88c69973f8(
         _runtime,
         _y_2_1,
         LeanText(".."),
       );
       leanTag(_x_9_8) match {
-      | "[\"Bool\",\"false\"]" ->
-        LeanCtor("[\"Option\",\"some\"]", Array[_y_2_1])
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | LeanTag.Bool_false ->
+        LeanCtor(LeanTag.Option_some, Array[_y_2_1])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1286,7 +1283,7 @@ fun f_System_FilePath_components_c41240319d(
   _p_0: LeanValue,
 ): LeanValue {
   _x_1_1: LeanValue = f_System_FilePath_normalize_49659a948b(_runtime, _p_0);
-  _x_2_2: LeanValue = LeanScalar("nat", "0");
+  _x_2_2: LeanValue = LeanNatLiterals.n0;
   _x_3_3: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
     _runtime,
     _x_1_1,
@@ -1304,7 +1301,7 @@ fun f_System_FilePath_components_c41240319d(
     _runtime,
     _x_1_1,
     LeanCtor(
-      "[\"String\",\"Slice\",\"mk\"]",
+      LeanTag.String_Slice_mk,
       Array[_x_1_1, _x_2_2, _x_3_3, LeanErased()],
     ),
     _x_3_3,
@@ -1333,15 +1330,15 @@ fun f_System_FilePath_parent_43a1ed8886(
         f_System_FilePath_posOfLastSep_822cbfc544(_runtime, _frame[0]),
       );
       leanTag(_frame[10]) match {
-      | "[\"Option\",\"none\"]" ->
-        _frame.set(26, LeanCtor("[\"Option\",\"none\"]", Array[]));
+      | LeanTag.Option_none ->
+        _frame.set(26, LeanCtor(LeanTag.Option_none, Array[]));
         _jump0 = _frame[26];
         _frame.set(11, _jump0);
         !pc = 2;
         void
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(25, leanField(_frame[10], 0));
-        _frame.set(27, LeanScalar("nat", "0"));
+        _frame.set(27, LeanNatLiterals.n0);
         _frame.set(
           28,
           L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
@@ -1351,7 +1348,7 @@ fun f_System_FilePath_parent_43a1ed8886(
             _frame[25],
           ),
         );
-        _frame.set(29, LeanCtor("[\"Option\",\"some\"]", Array[_frame[28]]));
+        _frame.set(29, LeanCtor(LeanTag.Option_some, Array[_frame[28]]));
         _jump0 = _frame[29];
         _frame.set(11, _jump0);
         !pc = 2;
@@ -1359,7 +1356,7 @@ fun f_System_FilePath_parent_43a1ed8886(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanCtor("[\"Option\",\"some\"]", Array[_frame[2]]));
+      _frame.set(5, LeanCtor(LeanTag.Option_some, Array[_frame[2]]));
       _frame.set(
         6,
         L4_Init_Data_Option_Basic.f_Option_instDecidableEq_39b7b19c41(
@@ -1370,9 +1367,9 @@ fun f_System_FilePath_parent_43a1ed8886(
         ),
       );
       leanTag(_frame[6]) match {
-      | "[\"Bool\",\"false\"]" -> return _frame[1]
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(7, LeanScalar("nat", "0"));
+      | LeanTag.Bool_false -> return _frame[1]
+      | LeanTag.Bool_true ->
+        _frame.set(7, LeanNatLiterals.n0);
         _frame.set(
           8,
           L4_Init_Data_String_Basic.f_String_extract_f0bb3c1b49(
@@ -1382,7 +1379,7 @@ fun f_System_FilePath_parent_43a1ed8886(
             _frame[2],
           ),
         );
-        _frame.set(9, LeanCtor("[\"Option\",\"some\"]", Array[_frame[8]]));
+        _frame.set(9, LeanCtor(LeanTag.Option_some, Array[_frame[8]]));
         return _frame[9]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
@@ -1392,8 +1389,8 @@ fun f_System_FilePath_parent_43a1ed8886(
         f_System_FilePath_isAbsolute_975fd4e775(_runtime, _frame[0]),
       );
       leanTag(_frame[12]) match {
-      | "[\"Bool\",\"false\"]" -> return _frame[11]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> return _frame[11]
+      | LeanTag.Bool_true ->
         _frame.set(
           13,
           f_System_FilePath_afterRootDirectory_22d222219a(_runtime, _frame[0]),
@@ -1411,7 +1408,7 @@ fun f_System_FilePath_parent_43a1ed8886(
           ),
         );
         leanTag(_frame[15]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             16,
             LeanClosure(
@@ -1422,7 +1419,7 @@ fun f_System_FilePath_parent_43a1ed8886(
             ),
           );
           leanTag(_frame[10]) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             _jump0 = _frame[11];
             _jump1 = _frame[13];
             _jump2 = _frame[16];
@@ -1433,13 +1430,13 @@ fun f_System_FilePath_parent_43a1ed8886(
             _frame.set(4, _jump3);
             !pc = 1;
             void
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(17, leanField(_frame[10], 0));
-            _frame.set(18, LeanScalar("nat", "0"));
+            _frame.set(18, LeanNatLiterals.n0);
             _frame.set(
               19,
               LeanCtor(
-                "[\"String\",\"Slice\",\"mk\"]",
+                LeanTag.String_Slice_mk,
                 Array[_frame[0], _frame[18], _frame[14], LeanErased()],
               ),
             );
@@ -1452,8 +1449,8 @@ fun f_System_FilePath_parent_43a1ed8886(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Option\",\"none\"]" ->
-              _frame.set(22, LeanCtor("[\"Option\",\"none\"]", Array[]));
+            | LeanTag.Option_none ->
+              _frame.set(22, LeanCtor(LeanTag.Option_none, Array[]));
               _jump0 = _frame[11];
               _jump1 = _frame[13];
               _jump2 = _frame[16];
@@ -1464,11 +1461,11 @@ fun f_System_FilePath_parent_43a1ed8886(
               _frame.set(4, _jump3);
               !pc = 1;
               void
-            | "[\"Option\",\"some\"]" ->
+            | LeanTag.Option_some ->
               _frame.set(21, leanField(_frame[20], 0));
               _frame.set(
                 23,
-                LeanCtor("[\"Option\",\"some\"]", Array[_frame[21]]),
+                LeanCtor(LeanTag.Option_some, Array[_frame[21]]),
               );
               _jump0 = _frame[11];
               _jump1 = _frame[13];
@@ -1484,8 +1481,8 @@ fun f_System_FilePath_parent_43a1ed8886(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(24, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        | LeanTag.Bool_true ->
+          _frame.set(24, LeanCtor(LeanTag.Option_none, Array[]));
           return _frame[24]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
@@ -1503,8 +1500,8 @@ fun f_System_FilePath_addExtension_3504e14db5(
 ): LeanValue {
   _x_1_2: LeanValue = f_System_FilePath_fileName_7103d157ff(_runtime, _p_0);
   leanTag(_x_1_2) match {
-  | "[\"Option\",\"none\"]" -> _p_0
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _p_0
+  | LeanTag.Option_some ->
     _val_2_3: LeanValue = leanField(_x_1_2, 0);
     _x_3_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
@@ -1513,10 +1510,10 @@ fun f_System_FilePath_addExtension_3504e14db5(
     _x_5_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_3_4,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     leanTag(_x_5_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_8: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
         _runtime,
         _val_2_3,
@@ -1528,7 +1525,7 @@ fun f_System_FilePath_addExtension_3504e14db5(
         _ext_1,
       );
       f_System_FilePath_withFileName_7255f8b348(_runtime, _p_0, _x_8_9)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       f_System_FilePath_withFileName_7255f8b348(_runtime, _p_0, _val_2_3)
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -1546,7 +1543,7 @@ fun f_FilePath_components_spec_0_94c7ae2cae(
     LeanText(""),
     _x_2_2,
   );
-  _x_4_4: LeanValue = LeanScalar("nat", "0");
+  _x_4_4: LeanValue = LeanNatLiterals.n0;
   _x_5_5: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
     _runtime,
     _x_3_3,
@@ -1557,9 +1554,9 @@ fun f_FilePath_components_spec_0_94c7ae2cae(
     _x_4_4,
   );
   leanTag(_x_6_6) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_7_7: LeanValue = LeanCtor(
-      "[\"String\",\"Slice\",\"mk\"]",
+      LeanTag.String_Slice_mk,
       Array[_x_3_3, _x_4_4, _x_5_5, LeanErased()],
     );
     _x_8_8: LeanValue = L4_Init_Data_String_Pattern_String.f_Pattern_ForwardSliceSearcher_buildTable_cc99e092ed(
@@ -1567,22 +1564,22 @@ fun f_FilePath_components_spec_0_94c7ae2cae(
       _x_7_7,
     );
     LeanCtor(
-      "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+      LeanTag.String_Slice_SplitIterator_operating,
       Array[
         _x_4_4,
         LeanCtor(
-          "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+          LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
           Array[_x_7_7, _x_8_8, LeanErased(), _x_4_4, _x_4_4, LeanErased()],
         ),
       ],
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     LeanCtor(
-      "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+      LeanTag.String_Slice_SplitIterator_operating,
       Array[
         _x_4_4,
         LeanCtor(
-          "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"emptyBefore\"]",
+          LeanTag.String_Slice_Pattern_ForwardSliceSearcher_emptyBefore,
           Array[_x_4_4],
         ),
       ],
@@ -1597,10 +1594,10 @@ fun f_System_FilePath_fileStem_c55dc59e72(
 ): LeanValue {
   _x_1_1: LeanValue = f_System_FilePath_fileName_7103d157ff(_runtime, _p_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> _x_1_1
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _x_1_1
+  | LeanTag.Option_some ->
     _val_2_2: LeanValue = leanField(_x_1_1, 0);
-    _x_3_3: LeanValue = LeanScalar("nat", "0");
+    _x_3_3: LeanValue = LeanNatLiterals.n0;
     _x_4_4: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _val_2_2,
@@ -1608,13 +1605,13 @@ fun f_System_FilePath_fileStem_c55dc59e72(
     _x_6_6: LeanValue = f_FilePath_fileStem_spec_0_75dcabb101(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_val_2_2, _x_3_3, _x_4_4, LeanErased()],
       ),
     );
     leanTag(_x_6_6) match {
-    | "[\"Option\",\"none\"]" -> _x_1_1
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> _x_1_1
+    | LeanTag.Option_some ->
       _val_7_7: LeanValue = leanField(_x_6_6, 0);
       _x_8_8: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
         _runtime,
@@ -1622,15 +1619,15 @@ fun f_System_FilePath_fileStem_c55dc59e72(
         _x_3_3,
       );
       leanTag(_x_8_8) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_9_9: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_extract_3a4574e345(
           _runtime,
           _val_2_2,
           _x_3_3,
           _val_7_7,
         );
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_9_9])
-      | "[\"Bool\",\"true\"]" -> _x_1_1
+        LeanCtor(LeanTag.Option_some, Array[_x_9_9])
+      | LeanTag.Bool_true -> _x_1_1
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1646,8 +1643,8 @@ fun f_System_FilePath_withFileName_7255f8b348(
 ): LeanValue {
   _x_1_2: LeanValue = f_System_FilePath_parent_43a1ed8886(_runtime, _p_0);
   leanTag(_x_1_2) match {
-  | "[\"Option\",\"none\"]" -> _fname_1
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _fname_1
+  | LeanTag.Option_some ->
     _val_2_3: LeanValue = leanField(_x_1_2, 0);
     f_System_FilePath_join_56aa4f5bc1(_runtime, _val_2_3, _fname_1)
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1661,8 +1658,8 @@ fun f_System_FilePath_pathSeparator_b714f93f0e(
     _runtime,
   );
   leanTag(_x_1_0) match {
-  | "[\"Bool\",\"false\"]" -> LeanScalar("uint32", "47")
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint32", "92")
+  | LeanTag.Bool_false -> LeanWord("uint32", 47)
+  | LeanTag.Bool_true -> LeanWord("uint32", 92)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1673,7 +1670,7 @@ fun f_System_FilePath_afterRootDirectory_22d222219a(
 ): LeanValue {
   _x_1_1: LeanValue = f_System_FilePath_pathSeparators_82d1e386f1(_runtime);
   _joined: Array<LeanValue> = {
-    _x_15_14: LeanValue = LeanScalar("nat", "0");
+    _x_15_14: LeanValue = LeanNatLiterals.n0;
     _x_16_15: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _p_0,
@@ -1681,14 +1678,14 @@ fun f_System_FilePath_afterRootDirectory_22d222219a(
     _x_18_17: LeanValue = L4_Init_Data_String_Basic.f_Slice_Pos_get_5eec1d405e(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_p_0, _x_15_14, _x_16_15, LeanErased()],
       ),
       _x_15_14,
     );
     leanTag(_x_18_17) match {
-    | "[\"Option\",\"none\"]" -> Array[LeanScalar("uint32", "65")]
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> Array[LeanWord("uint32", 65)]
+    | LeanTag.Option_some ->
       _val_20_18: LeanValue = leanField(_x_18_17, 0);
       Array[_val_20_18]
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1701,8 +1698,8 @@ fun f_System_FilePath_afterRootDirectory_22d222219a(
     _x_1_1,
   );
   leanTag(_x_4_3) match {
-  | "[\"Bool\",\"false\"]" ->
-    _x_5_4: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Bool_false ->
+    _x_5_4: LeanValue = LeanNatLiterals.n0;
     _x_7_6: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _p_0,
@@ -1710,14 +1707,14 @@ fun f_System_FilePath_afterRootDirectory_22d222219a(
     L4_Init_Data_String_Basic.f_Slice_Pos_nextn_a3a6e0a2d4(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_p_0, _x_5_4, _x_7_6, LeanErased()],
       ),
       _x_5_4,
-      LeanScalar("nat", "3"),
+      LeanNatLiterals.n3,
     )
-  | "[\"Bool\",\"true\"]" ->
-    _x_10_9: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Bool_true ->
+    _x_10_9: LeanValue = LeanNatLiterals.n0;
     _x_12_11: LeanValue = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(
       _runtime,
       _p_0,
@@ -1725,11 +1722,11 @@ fun f_System_FilePath_afterRootDirectory_22d222219a(
     L4_Init_Data_String_Basic.f_Slice_Pos_nextn_a3a6e0a2d4(
       _runtime,
       LeanCtor(
-        "[\"String\",\"Slice\",\"mk\"]",
+        LeanTag.String_Slice_mk,
         Array[_p_0, _x_10_9, _x_12_11, LeanErased()],
       ),
       _x_10_9,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1742,8 +1739,8 @@ fun f_System_SearchPath_separator_aef2befa1a(
     _runtime,
   );
   leanTag(_x_1_0) match {
-  | "[\"Bool\",\"false\"]" -> LeanScalar("uint32", "58")
-  | "[\"Bool\",\"true\"]" -> LeanScalar("uint32", "59")
+  | LeanTag.Bool_false -> LeanWord("uint32", 58)
+  | LeanTag.Bool_true -> LeanWord("uint32", 59)
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1754,8 +1751,8 @@ fun f_FilePath_normalize_spec_0_e6715ddb88(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"List\",\"nil\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanCtor(LeanTag.Bool_false, Array[])
+  | LeanTag.List_cons ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
     _x_5_5: LeanValue = L4_Init_Prelude.f_UInt32_decEq_8e017905ad(
@@ -1764,9 +1761,9 @@ fun f_FilePath_normalize_spec_0_e6715ddb88(
       _head_3_2,
     );
     leanTag(_x_5_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       f_FilePath_normalize_spec_0_e6715ddb88(_runtime, _a_0, _tail_4_3)
-    | "[\"Bool\",\"true\"]" -> _x_5_5
+    | LeanTag.Bool_true -> _x_5_5
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1778,7 +1775,7 @@ fun f_FilePath_fileStem_spec_0_75dcabb101(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_1: LeanValue = leanField(_s_0, 0);
     _startInclusive_2: LeanValue = leanField(_s_0, 1);
     _endExclusive_3: LeanValue = leanField(_s_0, 2);
@@ -1792,7 +1789,7 @@ fun f_FilePath_fileStem_spec_0_75dcabb101(
       _runtime,
       _s_0,
       _searcher_5,
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1821,14 +1818,14 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
     pc match {
     | 0 ->
       leanTag(_frame[3]) match {
-      | "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]" ->
+      | LeanTag.String_Slice_SplitIterator_operating ->
         _frame.set(12, leanField(_frame[3], 0));
         _frame.set(13, leanField(_frame[3], 1));
         leanTag(_frame[13]) match {
-        | "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"emptyBefore\"]" ->
+        | LeanTag.String_Slice_Pattern_ForwardSliceSearcher_emptyBefore ->
           _frame.set(25, leanField(_frame[13], 0));
           leanTag(_frame[1]) match {
-          | "[\"String\",\"Slice\",\"mk\"]" ->
+          | LeanTag.String_Slice_mk ->
             _ = leanField(_frame[1], 0);
             _frame.set(31, leanField(_frame[1], 1));
             _frame.set(32, leanField(_frame[1], 2));
@@ -1850,11 +1847,11 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
               ),
             );
             leanTag(_frame[34]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 35,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"emptyAt\"]",
+                  LeanTag.String_Slice_Pattern_ForwardSliceSearcher_emptyAt,
                   Array[_frame[25], LeanErased()],
                 ),
               );
@@ -1866,11 +1863,11 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
               _frame.set(19, _jump2);
               !pc = 3;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 36,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"atEnd\"]",
+                  LeanTag.String_Slice_Pattern_ForwardSliceSearcher_atEnd,
                   Array[],
                 ),
               );
@@ -1886,7 +1883,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"emptyAt\"]" ->
+        | LeanTag.String_Slice_Pattern_ForwardSliceSearcher_emptyAt ->
           _frame.set(26, leanField(_frame[13], 0));
           _ = leanField(_frame[13], 1);
           _frame.set(
@@ -1901,7 +1898,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
           _frame.set(
             38,
             LeanCtor(
-              "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"emptyBefore\"]",
+              LeanTag.String_Slice_Pattern_ForwardSliceSearcher_emptyBefore,
               Array[_frame[37]],
             ),
           );
@@ -1909,7 +1906,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
           _frame.set(14, _jump0);
           !pc = 2;
           void
-        | "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]" ->
+        | LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper ->
           _frame.set(27, leanField(_frame[13], 0));
           _frame.set(28, leanField(_frame[13], 1));
           _ = leanField(_frame[13], 2);
@@ -1917,7 +1914,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
           _frame.set(30, leanField(_frame[13], 4));
           _ = leanField(_frame[13], 5);
           leanTag(_frame[27]) match {
-          | "[\"String\",\"Slice\",\"mk\"]" ->
+          | LeanTag.String_Slice_mk ->
             _frame.set(39, leanField(_frame[27], 0));
             _frame.set(40, leanField(_frame[27], 1));
             _frame.set(41, leanField(_frame[27], 2));
@@ -1955,8 +1952,8 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
               ),
             );
             leanTag(_frame[45]) match {
-            | "[\"Bool\",\"false\"]" ->
-              _frame.set(46, LeanScalar("nat", "1"));
+            | LeanTag.Bool_false ->
+              _frame.set(46, LeanNatLiterals.n1);
               _frame.set(
                 47,
                 L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1974,14 +1971,14 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                 ),
               );
               leanTag(_frame[48]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 !pc = 4;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   49,
                   LeanCtor(
-                    "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"atEnd\"]",
+                    LeanTag.String_Slice_Pattern_ForwardSliceSearcher_atEnd,
                     Array[],
                   ),
                 );
@@ -1991,7 +1988,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                 void
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 50,
                 L4_Init_Data_String_PosRaw.f_String_getUTF8Byte_ad8da7ea50(
@@ -2027,8 +2024,8 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                 ),
               );
               leanTag(_frame[53]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(54, LeanScalar("nat", "0"));
+              | LeanTag.Bool_false ->
+                _frame.set(54, LeanNatLiterals.n0);
                 _frame.set(
                   55,
                   L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2038,8 +2035,8 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                   ),
                 );
                 leanTag(_frame[55]) match {
-                | "[\"Bool\",\"false\"]" ->
-                  _frame.set(56, LeanScalar("nat", "1"));
+                | LeanTag.Bool_false ->
+                  _frame.set(56, LeanNatLiterals.n1);
                   _frame.set(
                     57,
                     L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -2067,11 +2064,11 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                     ),
                   );
                   leanTag(_frame[59]) match {
-                  | "[\"Bool\",\"false\"]" ->
+                  | LeanTag.Bool_false ->
                     _frame.set(
                       60,
                       LeanCtor(
-                        "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+                        LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
                         Array[
                           _frame[27],
                           _frame[28],
@@ -2086,7 +2083,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                     _frame.set(14, _jump0);
                     !pc = 2;
                     void
-                  | "[\"Bool\",\"true\"]" ->
+                  | LeanTag.Bool_true ->
                     _frame.set(
                       61,
                       L4_Init_Data_String_FindPos.f_String_Slice_posGE_61401d4577(
@@ -2098,7 +2095,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                     _frame.set(
                       62,
                       LeanCtor(
-                        "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+                        LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
                         Array[
                           _frame[27],
                           _frame[28],
@@ -2115,8 +2112,8 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                     void
                   | _ -> return leanFail("non-exhaustive Lean case")
                   }
-                | "[\"Bool\",\"true\"]" ->
-                  _frame.set(63, LeanScalar("nat", "1"));
+                | LeanTag.Bool_true ->
+                  _frame.set(63, LeanNatLiterals.n1);
                   _frame.set(
                     64,
                     L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -2136,7 +2133,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                   _frame.set(
                     66,
                     LeanCtor(
-                      "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+                      LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
                       Array[
                         _frame[27],
                         _frame[28],
@@ -2153,8 +2150,8 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                   void
                 | _ -> return leanFail("non-exhaustive Lean case")
                 }
-              | "[\"Bool\",\"true\"]" ->
-                _frame.set(67, LeanScalar("nat", "1"));
+              | LeanTag.Bool_true ->
+                _frame.set(67, LeanNatLiterals.n1);
                 _frame.set(
                   68,
                   L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -2180,11 +2177,11 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                   ),
                 );
                 leanTag(_frame[70]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _frame.set(
                     71,
                     LeanCtor(
-                      "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+                      LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
                       Array[
                         _frame[27],
                         _frame[28],
@@ -2198,7 +2195,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                   _frame.set(
                     72,
                     LeanCtor(
-                      "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+                      LeanTag.String_Slice_SplitIterator_operating,
                       Array[_frame[12], _frame[71]],
                     ),
                   );
@@ -2214,7 +2211,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                     ),
                   );
                   return _frame[73]
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _frame.set(
                     74,
                     L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -2239,11 +2236,11 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
                       _frame[68],
                     ),
                   );
-                  _frame.set(77, LeanScalar("nat", "0"));
+                  _frame.set(77, LeanNatLiterals.n0);
                   _frame.set(
                     78,
                     LeanCtor(
-                      "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"proper\"]",
+                      LeanTag.String_Slice_Pattern_ForwardSliceSearcher_proper,
                       Array[
                         _frame[27],
                         _frame[28],
@@ -2270,19 +2267,19 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"String\",\"Slice\",\"Pattern\",\"ForwardSliceSearcher\",\"atEnd\"]" ->
+        | LeanTag.String_Slice_Pattern_ForwardSliceSearcher_atEnd ->
           !pc = 4;
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"String\",\"Slice\",\"SplitIterator\",\"atEnd\"]" -> return _frame[4]
+      | LeanTag.String_Slice_SplitIterator_atEnd -> return _frame[4]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       _frame.set(
         8,
         LeanCtor(
-          "[\"String\",\"Slice\",\"mk\"]",
+          LeanTag.String_Slice_mk,
           Array[_frame[0], _frame[6], _frame[7], LeanErased()],
         ),
       );
@@ -2318,7 +2315,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
       _frame.set(
         15,
         LeanCtor(
-          "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+          LeanTag.String_Slice_SplitIterator_operating,
           Array[_frame[12], _frame[14]],
         ),
       );
@@ -2345,14 +2342,14 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
         ),
       );
       leanTag(_frame[20]) match {
-      | "[\"String\",\"Slice\",\"Subslice\",\"mk\"]" ->
+      | LeanTag.String_Slice_Subslice_mk ->
         _frame.set(21, leanField(_frame[20], 0));
         _frame.set(22, leanField(_frame[20], 1));
         _ = leanField(_frame[20], 2);
         _frame.set(
           23,
           LeanCtor(
-            "[\"String\",\"Slice\",\"SplitIterator\",\"operating\"]",
+            LeanTag.String_Slice_SplitIterator_operating,
             Array[_frame[19], _frame[17]],
           ),
         );
@@ -2369,7 +2366,7 @@ fun f_FilePath_components_spec_1_5b4b75ff02(
     | 4 ->
       _frame.set(
         24,
-        LeanCtor("[\"String\",\"Slice\",\"SplitIterator\",\"atEnd\"]", Array[]),
+        LeanCtor(LeanTag.String_Slice_SplitIterator_atEnd, Array[]),
       );
       _jump0 = _frame[24];
       _jump1 = _frame[12];

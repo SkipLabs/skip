@@ -23,16 +23,16 @@ fun leanTheoremConstant(
   type: LeanValue,
   proof: LeanValue,
 ): LeanValue {
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   result = LeanCtor(
-    "[\"Lean\",\"ConstantInfo\",\"thmInfo\"]",
+    LeanTag.ConstantInfo_thmInfo,
     Array[
       LeanCtor(
-        "[\"Lean\",\"TheoremVal\",\"mk\"]",
+        LeanTag.TheoremVal_mk,
         Array[
-          LeanCtor("[\"Lean\",\"ConstantVal\",\"mk\"]", Array[name, nil, type]),
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
           proof,
-          LeanCtor("[\"List\",\"cons\"]", Array[name, nil]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
         ],
       ),
     ],
@@ -49,7 +49,7 @@ fun leanRunTheorem(
   request: LeanTheoremRequest,
 ): LeanTheoremResult {
   runtime = mutable LeanExecution{
-    store => context,
+    store => Some(context),
     unboundedHeartbeats => true,
   };
   leanInitializeExceptions(runtime);
@@ -58,7 +58,7 @@ fun leanRunTheorem(
   out = leanElaborateDecide(runtime, request.environment, request.expectedType);
   tick = context.getTick().value;
   leanTag(out) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     LeanTheoremResult(
       Some(
         leanTheoremConstant(
@@ -70,9 +70,9 @@ fun leanRunTheorem(
       None(),
       tick,
     )
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     exception = leanField(out, 0);
-    if (leanTag(exception) != "[\"Lean\",\"Exception\",\"error\"]") {
+    if (leanTag(exception) != LeanTag.Exception_error) {
       leanFail("unhandled internal Lean exception in theorem elaboration")
     };
     LeanTheoremResult(

@@ -7,6 +7,7 @@ class LeanImportData(
   extensions: Array<LeanImportExtension>,
   trackedGeneration: LeanValue,
   extraConstants: ?Array<(LeanValue, Int)>,
+  environmentHeader: LeanValue,
 )
 
 class LeanImportExtension(
@@ -29,16 +30,20 @@ fun leanImportReference(
 
 fun leanImportNode(
   nodes: readonly Vector<LeanValue>,
-  checkedTags: readonly Map<String, String>,
+  checkedTags: readonly Map<String, LeanTag.Value>,
   input: JSON.Value,
 ): LeanValue {
   fields = input.expectVector();
   kind = fields[0].expectString();
   kind match {
   | "erased" -> LeanErased()
+  | "unavailable" -> LeanUnavailable(fields[1].expectString())
   | "ctor" ->
     decodedTag = fields[1].expectString();
-    tag = checkedTags.maybeGet(decodedTag).default(decodedTag);
+    tag = checkedTags.maybeGet(decodedTag) match {
+    | Some(tag) -> tag
+    | None() -> leanConstructorTag(decodedTag)
+    };
     LeanCtor(
       tag,
       fields[2]
@@ -78,7 +83,7 @@ fun leanDecodeImportData(source: String): LeanImportData {
     leanFail("Lean import data was exported from a different Lean revision")
   };
   nodes: mutable Vector<LeanValue> = mutable Vector[];
-  checkedTags: mutable Map<String, String> = mutable Map[];
+  checkedTags: mutable Map<String, LeanTag.Value> = mutable Map[];
   for (i in Range(1, lines.size() - 1)) {
     // Parsing allocates temporary JSON trees. Reclaim them after each node;
     // only the immutable decoded value escapes into the outer node table.
@@ -86,13 +91,13 @@ fun leanDecodeImportData(source: String): LeanImportData {
     node = SKStore.withRegionLoop(() ->
       Some(leanImportNode(nodes, checkedTags, JSON.decode(lines[i])))
     );
-    // Validate each constructor identity once, and share its string across
-    // nodes. Insert only after copying the node out of the temporary region.
+    // Validate and decode each constructor identity once. Insert only after
+    // copying the typed tag out of the temporary region.
     node match {
     | LeanCtor(tag, _) ->
-      if (checkedTags.maybeGet(tag).isNone()) {
+      if (checkedTags.maybeGet(tag.toString()).isNone()) {
         _ = leanConstructorOrdinal(tag);
-        checkedTags.set(tag, tag)
+        checkedTags.set(tag.toString(), tag)
       }
     | _ -> void
     };
@@ -165,5 +170,9 @@ fun leanDecodeImportData(source: String): LeanImportData {
     | None() -> LeanUnavailable("imported tracked generation")
     },
     extraConstants,
+    footer.maybeGetInt("environmentHeader") match {
+    | Some(index) -> leanImportReference(nodes, JSON.IntNumber(index))
+    | None() -> LeanUnavailable("imported environment header")
+    },
   )
 }

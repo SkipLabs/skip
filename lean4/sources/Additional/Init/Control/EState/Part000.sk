@@ -10,13 +10,13 @@ fun f_EStateM_orElse_efcbf37f71(
   _s_4: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"EStateM\",\"Backtrackable\",\"mk\"]" ->
+  | LeanTag.EStateM_Backtrackable_mk ->
     _save_5: LeanValue = leanField(_inst_1_0, 0);
     _restore_6: LeanValue = leanField(_inst_1_0, 1);
     _d_7: LeanValue = leanApply(_runtime, _save_5, Array[_s_4]);
     _x_2_8: LeanValue = leanApply(_runtime, _x_1, Array[_s_4]);
     leanTag(_x_2_8) match {
-    | "[\"EStateM\",\"Result\",\"error\"]" ->
+    | LeanTag.EStateM_Result_error ->
       _a_3_9: LeanValue = leanField(_x_2_8, 0);
       _a_4_10: LeanValue = leanField(_x_2_8, 1);
       _x_5_11: LeanValue = leanApply(
@@ -26,13 +26,13 @@ fun f_EStateM_orElse_efcbf37f71(
       );
       _x_6_12: LeanValue = leanApply(_runtime, _x_2, Array[_x_5_11]);
       leanTag(_x_6_12) match {
-      | "[\"EStateM\",\"Result\",\"error\"]" ->
+      | LeanTag.EStateM_Result_error ->
         _a_7_13: LeanValue = leanField(_x_6_12, 0);
         _a_8_14: LeanValue = leanField(_x_6_12, 1);
         leanTag(_useFirstEx_3) match {
-        | "[\"Bool\",\"false\"]" -> _x_6_12
-        | "[\"Bool\",\"true\"]" ->
-          LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_3_9, _a_8_14])
+        | LeanTag.Bool_false -> _x_6_12
+        | LeanTag.Bool_true ->
+          LeanCtor(LeanTag.EStateM_Result_error, Array[_a_3_9, _a_8_14])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> _x_6_12
@@ -65,10 +65,10 @@ fun f_EStateM_fromStateM_4542b09d23(
 ): LeanValue {
   _x_1_5: LeanValue = leanApply(_runtime, _x_3, Array[_s_4]);
   leanTag(_x_1_5) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_2_6: LeanValue = leanField(_x_1_5, 0);
     _snd_3_7: LeanValue = leanField(_x_1_5, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"ok\"]", Array[_fst_2_6, _snd_3_7])
+    LeanCtor(LeanTag.EStateM_Result_ok, Array[_fst_2_6, _snd_3_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -122,45 +122,45 @@ fun f_EStateM_instMonadFinally_lam_0_999467f6f3(
 ): LeanValue {
   _r_5: LeanValue = leanApply(_runtime, _x_2, Array[_s_4]);
   leanTag(_r_5) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_3_6: LeanValue = leanField(_r_5, 0);
     _a_4_7: LeanValue = leanField(_r_5, 1);
     _x_6_11: LeanValue = leanApply(
       _runtime,
       _h_3,
-      Array[LeanCtor("[\"Option\",\"some\"]", Array[_a_3_6]), _a_4_7],
+      Array[LeanCtor(LeanTag.Option_some, Array[_a_3_6]), _a_4_7],
     );
     leanTag(_x_6_11) match {
-    | "[\"EStateM\",\"Result\",\"ok\"]" ->
+    | LeanTag.EStateM_Result_ok ->
       _a_7_12: LeanValue = leanField(_x_6_11, 0);
       _a_8_13: LeanValue = leanField(_x_6_11, 1);
       LeanCtor(
-        "[\"EStateM\",\"Result\",\"ok\"]",
-        Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_a_3_6, _a_7_12]), _a_8_13],
+        LeanTag.EStateM_Result_ok,
+        Array[LeanCtor(LeanTag.Prod_mk, Array[_a_3_6, _a_7_12]), _a_8_13],
       )
-    | "[\"EStateM\",\"Result\",\"error\"]" ->
+    | LeanTag.EStateM_Result_error ->
       _a_11_14: LeanValue = leanField(_x_6_11, 0);
       _a_12_15: LeanValue = leanField(_x_6_11, 1);
-      LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_11_14, _a_12_15])
+      LeanCtor(LeanTag.EStateM_Result_error, Array[_a_11_14, _a_12_15])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+  | LeanTag.EStateM_Result_error ->
     _a_14_8: LeanValue = leanField(_r_5, 0);
     _a_15_9: LeanValue = leanField(_r_5, 1);
     _x_17_20: LeanValue = leanApply(
       _runtime,
       _h_3,
-      Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _a_15_9],
+      Array[LeanCtor(LeanTag.Option_none, Array[]), _a_15_9],
     );
     leanTag(_x_17_20) match {
-    | "[\"EStateM\",\"Result\",\"ok\"]" ->
+    | LeanTag.EStateM_Result_ok ->
       _a_18_21: LeanValue = leanField(_x_17_20, 0);
       _a_19_22: LeanValue = leanField(_x_17_20, 1);
-      LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_14_8, _a_19_22])
-    | "[\"EStateM\",\"Result\",\"error\"]" ->
+      LeanCtor(LeanTag.EStateM_Result_error, Array[_a_14_8, _a_19_22])
+    | LeanTag.EStateM_Result_error ->
       _a_21_23: LeanValue = leanField(_x_17_20, 0);
       _a_22_24: LeanValue = leanField(_x_17_20, 1);
-      LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_21_23, _a_22_24])
+      LeanCtor(LeanTag.EStateM_Result_error, Array[_a_21_23, _a_22_24])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -202,7 +202,7 @@ fun f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
   _x_3_2: LeanValue,
 ): LeanValue {
   leanTag(_x_3_2) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_4_3: LeanValue = leanField(_x_3_2, 0);
     _a_5_4: LeanValue = leanField(_x_3_2, 1);
     _x_7_8: LeanValue = leanApply(_runtime, _inst_1_0, Array[_a_4_3]);
@@ -211,7 +211,7 @@ fun f_EStateM_instToStringResult_lam_0_4e3ff3b92b(
       LeanText("ok: "),
       _x_7_8,
     )
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+  | LeanTag.EStateM_Result_error ->
     _a_9_5: LeanValue = leanField(_x_3_2, 0);
     _a_10_6: LeanValue = leanField(_x_3_2, 1);
     _x_12_11: LeanValue = leanApply(_runtime, _inst_2_1, Array[_a_9_5]);
@@ -243,21 +243,21 @@ fun f_EStateM_instReprResult_lam_0_0cb506bc55(
   _x_4_3: LeanValue,
 ): LeanValue {
   leanTag(_x_3_2) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_5_4: LeanValue = leanField(_x_3_2, 0);
     _a_6_5: LeanValue = leanField(_x_3_2, 1);
     _x_10_11: LeanValue = leanApply(
       _runtime,
       _inst_1_0,
-      Array[_a_5_4, LeanScalar("nat", "1024")],
+      Array[_a_5_4, LeanNatLiterals.n1024],
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
       LeanCtor(
-        "[\"Std\",\"Format\",\"append\"]",
+        LeanTag.Std_Format_append,
         Array[
           LeanCtor(
-            "[\"Std\",\"Format\",\"text\"]",
+            LeanTag.Std_Format_text,
             Array[LeanText("EStateM.Result.ok ")],
           ),
           _x_10_11,
@@ -265,21 +265,21 @@ fun f_EStateM_instReprResult_lam_0_0cb506bc55(
       ),
       _x_4_3,
     )
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+  | LeanTag.EStateM_Result_error ->
     _a_13_6: LeanValue = leanField(_x_3_2, 0);
     _a_14_7: LeanValue = leanField(_x_3_2, 1);
     _x_18_17: LeanValue = leanApply(
       _runtime,
       _inst_2_1,
-      Array[_a_13_6, LeanScalar("nat", "1024")],
+      Array[_a_13_6, LeanNatLiterals.n1024],
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
       LeanCtor(
-        "[\"Std\",\"Format\",\"append\"]",
+        LeanTag.Std_Format_append,
         Array[
           LeanCtor(
-            "[\"Std\",\"Format\",\"text\"]",
+            LeanTag.Std_Format_text,
             Array[LeanText("EStateM.Result.error ")],
           ),
           _x_18_17,
@@ -319,7 +319,7 @@ fun f_instReprResult_lam_0_closed_3_5d5a9551c8(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_108_0: LeanValue = f_instReprResult_lam_0_closed_2_60aff9e43f(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_108_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_108_0])
 }
 // "EStateM.instMonadAttach._redArg._closed_0"
 fun f_EStateM_instMonadAttach_closed_0_1424a33778(
@@ -368,13 +368,13 @@ fun f_EStateM_orElse_1dd8fa9dbe(
   _s_8: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_4) match {
-  | "[\"EStateM\",\"Backtrackable\",\"mk\"]" ->
+  | LeanTag.EStateM_Backtrackable_mk ->
     _save_9: LeanValue = leanField(_inst_1_4, 0);
     _restore_10: LeanValue = leanField(_inst_1_4, 1);
     _d_11: LeanValue = leanApply(_runtime, _save_9, Array[_s_8]);
     _x_2_12: LeanValue = leanApply(_runtime, _x_5, Array[_s_8]);
     leanTag(_x_2_12) match {
-    | "[\"EStateM\",\"Result\",\"error\"]" ->
+    | LeanTag.EStateM_Result_error ->
       _a_3_13: LeanValue = leanField(_x_2_12, 0);
       _a_4_14: LeanValue = leanField(_x_2_12, 1);
       _x_5_15: LeanValue = leanApply(
@@ -384,14 +384,14 @@ fun f_EStateM_orElse_1dd8fa9dbe(
       );
       _x_6_16: LeanValue = leanApply(_runtime, _x_6, Array[_x_5_15]);
       leanTag(_x_6_16) match {
-      | "[\"EStateM\",\"Result\",\"error\"]" ->
+      | LeanTag.EStateM_Result_error ->
         _a_7_17: LeanValue = leanField(_x_6_16, 0);
         _a_8_18: LeanValue = leanField(_x_6_16, 1);
         leanTag(_useFirstEx_7) match {
-        | "[\"Bool\",\"false\"]" -> _x_6_16
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _x_6_16
+        | LeanTag.Bool_true ->
           LeanCtor(
-            "[\"EStateM\",\"Result\",\"error\"]",
+            LeanTag.EStateM_Result_error,
             Array[_a_3_13, _a_8_18],
           )
         | _ -> leanFail("non-exhaustive Lean case")
@@ -422,14 +422,14 @@ fun f_EStateM_instMonadAttach_lam_0_083c8b191b(
 ): LeanValue {
   _x_2_3: LeanValue = leanApply(_runtime, _x_1, Array[_s_2]);
   leanTag(_x_2_3) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_3_4: LeanValue = leanField(_x_2_3, 0);
     _a_4_5: LeanValue = leanField(_x_2_3, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"ok\"]", Array[_a_3_4, _a_4_5])
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+    LeanCtor(LeanTag.EStateM_Result_ok, Array[_a_3_4, _a_4_5])
+  | LeanTag.EStateM_Result_error ->
     _a_6_6: LeanValue = leanField(_x_2_3, 0);
     _a_7_7: LeanValue = leanField(_x_2_3, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_6_6, _a_7_7])
+    LeanCtor(LeanTag.EStateM_Result_error, Array[_a_6_6, _a_7_7])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -461,7 +461,7 @@ fun f_instReprResult_lam_0_closed_1_f264d0c3c4(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_105_0: LeanValue = f_instReprResult_lam_0_closed_0_cd2ff9bf7f(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_105_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_105_0])
 }
 // "EStateM.instMonadAttach._redArg"
 fun f_EStateM_instMonadAttach_6e2f4cfbaf(
@@ -482,10 +482,10 @@ fun f_EStateM_fromStateM_463322de5d(
 ): LeanValue {
   _x_1_2: LeanValue = leanApply(_runtime, _x_0, Array[_s_1]);
   leanTag(_x_1_2) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_2_3: LeanValue = leanField(_x_1_2, 0);
     _snd_3_4: LeanValue = leanField(_x_1_2, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"ok\"]", Array[_fst_2_3, _snd_3_4])
+    LeanCtor(LeanTag.EStateM_Result_ok, Array[_fst_2_3, _snd_3_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

@@ -12,18 +12,18 @@ fun f_OfYear_instOrdOrdinal_aux_1_cb7cebe45f(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
       _runtime,
       _x_0,
       _y_1,
     );
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_gt, Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_eq, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -128,16 +128,16 @@ fun f_OfYear_Ordinal_ofFin_a850d6d9d2(
   _runtime: mutable LeanExecution,
   _data_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "1");
+  _x_1_1: LeanValue = LeanNatLiterals.n1;
   _x_2_2: LeanValue = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
     _runtime,
     _x_1_1,
     _data_0,
   );
   leanTag(_x_2_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _x_1_1)
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _data_0)
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -160,7 +160,7 @@ fun f_OfYear_instReprOrdinal_aux_1_d58fd1b9ad(
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -168,20 +168,20 @@ fun f_OfYear_instReprOrdinal_aux_1_d58fd1b9ad(
     _x_3_3,
   );
   leanTag(_x_4_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_5_5: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
-    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_5_5])
-  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(LeanTag.Std_Format_text, Array[_x_5_5])
+  | LeanTag.Bool_true ->
     _x_7_7: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_7_7]),
+      LeanCtor(LeanTag.Std_Format_text, Array[_x_7_7]),
       _a_1_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -231,7 +231,7 @@ fun f_Week_Offset_ofDays_a0bcf30f60(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "7"),
+    LeanNatLiterals.n7,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(_runtime, _days_0, _x_2_2)
 }
@@ -242,7 +242,7 @@ fun f_Week_Offset_ofSeconds_dd9d9e30ad(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800"),
+    LeanNatLiterals.n604800,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(_runtime, _secs_0, _x_2_2)
 }
@@ -252,7 +252,7 @@ fun f_Ordinal_ofFin_closed_0_d070a14f7a(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Std.Time.Week.instHMulIntOffset._closed_0"
@@ -304,7 +304,7 @@ fun f_Week_Offset_toMilliseconds_d48f4f0e7a(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000"),
+    LeanNatLiterals.n604800000,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -319,7 +319,7 @@ fun f_aux_1_spec_0_spec_0_0e20653d58(
 fun f_Ordinal_ofNat_auto_1_18016b8d47(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_1_0: LeanValue = LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]);
+  _x_1_0: LeanValue = LeanCtor(LeanTag.SourceInfo_none, Array[]);
   _x_2_1: LeanValue = LeanText("Lean");
   _x_3_2: LeanValue = LeanText("Parser");
   _x_4_3: LeanValue = LeanText("Tactic");
@@ -333,7 +333,7 @@ fun f_Ordinal_ofNat_auto_1_18016b8d47(
   _x_8_7: LeanValue = L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
     _runtime,
@@ -375,14 +375,14 @@ fun f_Ordinal_ofNat_auto_1_18016b8d47(
     _runtime,
     LeanErased(),
     _x_8_7,
-    LeanCtor("[\"Lean\",\"Syntax\",\"node\"]", Array[_x_1_0, _x_12_11, _x_8_7]),
+    LeanCtor(LeanTag.Syntax_node, Array[_x_1_0, _x_12_11, _x_8_7]),
   );
   _x_22_21: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
     LeanErased(),
     _x_16_15,
     LeanCtor(
-      "[\"Lean\",\"Syntax\",\"node\"]",
+      LeanTag.Syntax_node,
       Array[_x_1_0, _x_18_17, _x_20_19],
     ),
   );
@@ -391,7 +391,7 @@ fun f_Ordinal_ofNat_auto_1_18016b8d47(
     LeanErased(),
     _x_8_7,
     LeanCtor(
-      "[\"Lean\",\"Syntax\",\"node\"]",
+      LeanTag.Syntax_node,
       Array[_x_1_0, _x_14_13, _x_22_21],
     ),
   );
@@ -400,7 +400,7 @@ fun f_Ordinal_ofNat_auto_1_18016b8d47(
     LeanErased(),
     _x_8_7,
     LeanCtor(
-      "[\"Lean\",\"Syntax\",\"node\"]",
+      LeanTag.Syntax_node,
       Array[_x_1_0, _x_12_11, _x_24_23],
     ),
   );
@@ -409,11 +409,11 @@ fun f_Ordinal_ofNat_auto_1_18016b8d47(
     LeanErased(),
     _x_8_7,
     LeanCtor(
-      "[\"Lean\",\"Syntax\",\"node\"]",
+      LeanTag.Syntax_node,
       Array[_x_1_0, _x_10_9, _x_26_25],
     ),
   );
-  LeanCtor("[\"Lean\",\"Syntax\",\"node\"]", Array[_x_1_0, _x_6_5, _x_28_27])
+  LeanCtor(LeanTag.Syntax_node, Array[_x_1_0, _x_6_5, _x_28_27])
 }
 // "Std.Time.Week.instHMulNatOffset"
 fun f_Time_Week_instHMulNatOffset_860f4a848b(
@@ -432,11 +432,11 @@ fun f_Week_OfYear_instOfNatOrdinal_234572dcb8(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "52"),
+    LeanNatLiterals.n52,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -508,7 +508,7 @@ fun f_Week_Offset_ofMinutes_472bcd6d3f(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "10080"),
+    LeanNatLiterals.n10080,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
     _runtime,
@@ -523,11 +523,11 @@ fun f_Week_Aligned_instOfNatOrdinal_375f7fe780(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n4,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -584,7 +584,7 @@ fun f_Week_Offset_ofHours_5386748e96(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "168"),
+    LeanNatLiterals.n168,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
     _runtime,
@@ -608,7 +608,7 @@ fun f_Offset_toHours_closed_0_d56bec8849(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "168"),
+    LeanNatLiterals.n168,
   )
 }
 // "Std.Time.Week.instOrdOffset._aux_1"
@@ -623,18 +623,18 @@ fun f_Week_instOrdOffset_aux_1_8f1ab3b9dd(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
       _runtime,
       _x_0,
       _y_1,
     );
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_gt, Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_eq, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -662,7 +662,7 @@ fun f_Week_instReprOffset_lam_0_7c63a9b739(
 ): LeanValue {
   _x_4_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -670,20 +670,20 @@ fun f_Week_instReprOffset_lam_0_7c63a9b739(
     _x_4_3,
   );
   leanTag(_x_5_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_6_5: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _y_1_0,
     );
-    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_6_5])
-  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(LeanTag.Std_Format_text, Array[_x_6_5])
+  | LeanTag.Bool_true ->
     _x_8_7: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _y_1_0,
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_8_7]),
+      LeanCtor(LeanTag.Std_Format_text, Array[_x_8_7]),
       _y_2_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -734,11 +734,11 @@ fun f_Time_Week_instInhabitedOrdinal_2982ad1a23(
 ): LeanValue {
   _x_2_1: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "5"),
+    LeanNatLiterals.n5,
   );
   _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -793,7 +793,7 @@ fun f_instOfNatOrdinal_aux_1_closed_0_6d1c392104(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Std.Time.Week.instDecidableLtOffset"
@@ -830,7 +830,7 @@ fun f_Offset_toNanoseconds_closed_0_aed4b92ce1(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000000000"),
+    LeanNatLiterals.n604800000000000,
   )
 }
 // "Std.Time.Week.OfYear.Ordinal.ofNat._auto_1._closed_6"
@@ -859,7 +859,7 @@ fun f_Offset_toSeconds_closed_0_0b169fcf1f(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800"),
+    LeanNatLiterals.n604800,
   )
 }
 // "Std.Time.Week.OfYear.Ordinal.toOffset"
@@ -876,11 +876,11 @@ fun f_Aligned_instOfNatOrdinal_aux_1_24768cfb0b(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n4,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -936,7 +936,7 @@ fun f_ofNat_auto_1_closed_5_b5db12ad16(
   L4_Init_Prelude.f_Array_emptyWithCapacity_a10c7ca6b9(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Std.Time.Week.instOfNatOrdinal._aux_1"
@@ -946,11 +946,11 @@ fun f_Week_instOfNatOrdinal_aux_1_6ba89651c7(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "5"),
+    LeanNatLiterals.n5,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -997,7 +997,7 @@ fun f_Week_instOfNatOrdinal_aux_1_6ba89651c7(
 fun f_Time_Week_instLTOffset_bf124be509(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"LT\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LT_mk, Array[LeanErased()])
 }
 // "Std.Time.Week.Aligned.instOfNatOrdinal._aux_1._closed_3"
 fun f_instOfNatOrdinal_aux_1_closed_3_5f9feede48(
@@ -1014,7 +1014,7 @@ fun f_Week_Offset_ofMilliseconds_f6b6a9383c(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000"),
+    LeanNatLiterals.n604800000,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
     _runtime,
@@ -1034,18 +1034,18 @@ fun f_Week_instOrdOrdinal_aux_1_9f334098ad(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
       _runtime,
       _x_0,
       _y_1,
     );
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_gt, Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_eq, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1062,9 +1062,9 @@ fun f_ofNat_auto_1_closed_24_cd287241b6(
   _x_96_0: LeanValue = f_ofNat_auto_1_closed_23_bf33314810(_runtime);
   _x_97_1: LeanValue = f_ofNat_auto_1_closed_7_ae6726dc92(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_97_1,
       _x_96_0,
     ],
@@ -1093,11 +1093,11 @@ fun f_OfYear_instOfNatOrdinal_aux_1_1d9728d2d6(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "52"),
+    LeanNatLiterals.n52,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -1163,7 +1163,7 @@ fun f_Week_Offset_toDays_a87582c0d3(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "7"),
+    LeanNatLiterals.n7,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -1225,7 +1225,7 @@ fun f_Week_Offset_ofNanoseconds_3e36c4141a(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000000000"),
+    LeanNatLiterals.n604800000000000,
   );
   L4_Init_Data_Int_DivMod_Basic.f_Int_ediv_8bc87f2c18(
     _runtime,
@@ -1278,7 +1278,7 @@ fun f_instOfNatOrdinal_aux_1_closed_1_9cc456594f(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "52"),
+    LeanNatLiterals.n52,
   )
 }
 // "Std.Time.Week.OfYear.instOrdOrdinal"
@@ -1297,7 +1297,7 @@ fun f_Offset_toMinutes_closed_0_a91a871467(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "10080"),
+    LeanNatLiterals.n10080,
   )
 }
 // "Std.Time.Week.OfYear.Ordinal.ofNat._auto_1._closed_21"
@@ -1320,7 +1320,7 @@ fun f_Week_Offset_toNanoseconds_2fa4035ec0(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000000000"),
+    LeanNatLiterals.n604800000000000,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -1348,7 +1348,7 @@ fun f_Week_instHDivOffsetInt_closed_0_c415a1ef63(
 fun f_Time_Week_instLEOffset_16442324a7(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"LE\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LE_mk, Array[LeanErased()])
 }
 // "Std.Time.Week.OfYear.Ordinal.ofNat._auto_1._closed_3"
 fun f_ofNat_auto_1_closed_3_1a7251d81c(
@@ -1428,9 +1428,9 @@ fun f_ofNat_auto_1_closed_22_b1d4e7c277(
   _x_89_0: LeanValue = f_ofNat_auto_1_closed_21_ca587ed71e(_runtime);
   _x_90_1: LeanValue = f_ofNat_auto_1_closed_9_0bb5fb6d2e(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_90_1,
       _x_89_0,
     ],
@@ -1468,11 +1468,11 @@ fun f_Week_Aligned_instInhabitedOrdinal_323b1ee0a5(
 ): LeanValue {
   _x_2_1: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n4,
   );
   _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -1517,7 +1517,7 @@ fun f_instReprOffset_aux_1_closed_0_b854abb3b4(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Std.Time.Week.instHDivOffsetNat._aux_1"
@@ -1558,7 +1558,7 @@ fun f_Week_instAddOffset_aux_1_5c2e185d51(
 fun f_Week_OfYear_instLEOrdinal_3bd4d010ce(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"LE\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LE_mk, Array[LeanErased()])
 }
 // "Std.Time.Week.instOrdOrdinal._closed_0"
 fun f_Week_instOrdOrdinal_closed_0_225ed90fb1(
@@ -1605,9 +1605,9 @@ fun f_ofNat_auto_1_closed_26_cb60852115(
   _x_103_0: LeanValue = f_ofNat_auto_1_closed_25_9b32465c9b(_runtime);
   _x_104_1: LeanValue = f_ofNat_auto_1_closed_4_a77897abc8(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_104_1,
       _x_103_0,
     ],
@@ -1633,11 +1633,11 @@ fun f_Week_OfYear_instInhabitedOrdinal_5fdbcca35b(
 ): LeanValue {
   _x_2_1: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "52"),
+    LeanNatLiterals.n52,
   );
   _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -1726,7 +1726,7 @@ fun f_Aligned_instReprOrdinal_aux_1_d49c43ee25(
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -1734,20 +1734,20 @@ fun f_Aligned_instReprOrdinal_aux_1_d49c43ee25(
     _x_3_3,
   );
   leanTag(_x_4_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_5_5: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
-    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_5_5])
-  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(LeanTag.Std_Format_text, Array[_x_5_5])
+  | LeanTag.Bool_true ->
     _x_7_7: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_7_7]),
+      LeanCtor(LeanTag.Std_Format_text, Array[_x_7_7]),
       _a_1_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1783,7 +1783,7 @@ fun f_instOfNatOrdinal_aux_1_closed_0_8e6faa69bf(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "5"),
+    LeanNatLiterals.n5,
   )
 }
 // "Std.Time.Week.Offset.toMinutes"
@@ -1793,7 +1793,7 @@ fun f_Week_Offset_toMinutes_6da6352f21(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "10080"),
+    LeanNatLiterals.n10080,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -1820,7 +1820,7 @@ fun f_Week_Offset_toHours_ada7acc6ba(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "168"),
+    LeanNatLiterals.n168,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -1841,11 +1841,11 @@ fun f_Time_Week_instOfNatOrdinal_8b88e9c2de(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "5"),
+    LeanNatLiterals.n5,
   );
   _x_5_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
     _runtime,
@@ -1896,7 +1896,7 @@ fun f_Week_instReprOrdinal_aux_1_0c59a1235d(
 ): LeanValue {
   _x_3_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_4_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -1904,20 +1904,20 @@ fun f_Week_instReprOrdinal_aux_1_0c59a1235d(
     _x_3_3,
   );
   leanTag(_x_4_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_5_5: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
-    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_5_5])
-  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(LeanTag.Std_Format_text, Array[_x_5_5])
+  | LeanTag.Bool_true ->
     _x_7_7: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _n_0,
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_7_7]),
+      LeanCtor(LeanTag.Std_Format_text, Array[_x_7_7]),
       _a_1_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1933,7 +1933,7 @@ fun f_ofNat_auto_1_closed_10_1f525cb485(
 fun f_Week_OfYear_instLTOrdinal_0f4a2e2905(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"LT\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LT_mk, Array[LeanErased()])
 }
 // "Std.Time.Week.OfYear.Ordinal.ofNat._auto_1._closed_23"
 fun f_ofNat_auto_1_closed_23_bf33314810(
@@ -1956,7 +1956,7 @@ fun f_Week_instReprOffset_aux_1_2086e448f5(
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -1964,20 +1964,20 @@ fun f_Week_instReprOffset_aux_1_2086e448f5(
     _x_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_5: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _x_0,
     );
-    LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_4_5])
-  | "[\"Bool\",\"true\"]" ->
+    LeanCtor(LeanTag.Std_Format_text, Array[_x_4_5])
+  | LeanTag.Bool_true ->
     _x_6_7: LeanValue = L4_Init_Data_Int_Repr.f_Int_repr_590e594cc9(
       _runtime,
       _x_0,
     );
     L4_Init_Data_Repr.f_Repr_addAppParen_ca7ef04961(
       _runtime,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_6_7]),
+      LeanCtor(LeanTag.Std_Format_text, Array[_x_6_7]),
       _p_1,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2031,18 +2031,18 @@ fun f_Aligned_instOrdOrdinal_aux_1_addfddb9c9(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
       _runtime,
       _x_0,
       _y_1,
     );
     leanTag(_x_2_3) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Ordering\",\"gt\"]", Array[])
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"eq\"]", Array[])
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Ordering_gt, Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_eq, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Ordering\",\"lt\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Ordering_lt, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -2084,7 +2084,7 @@ fun f_Offset_toDays_closed_0_70b608829e(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "7"),
+    LeanNatLiterals.n7,
   )
 }
 // "Std.Time.Week.Offset.toSeconds"
@@ -2094,7 +2094,7 @@ fun f_Week_Offset_toSeconds_f4c060d2d0(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800"),
+    LeanNatLiterals.n604800,
   );
   L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(_runtime, _weeks_0, _x_2_2)
 }
@@ -2104,7 +2104,7 @@ fun f_instOfNatOrdinal_aux_1_closed_0_a91827852f(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n4,
   )
 }
 // "Std.Time.Week.Offset.toMilliseconds._closed_0"
@@ -2113,7 +2113,7 @@ fun f_Offset_toMilliseconds_closed_0_bd5a81ac8a(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "604800000"),
+    LeanNatLiterals.n604800000,
   )
 }
 // "Std.Time.Week.instHDivOffsetNat._closed_0"
@@ -2133,9 +2133,9 @@ fun f_ofNat_auto_1_closed_20_6dec73cd68(
   _x_82_0: LeanValue = f_ofNat_auto_1_closed_19_fa373d1e87(_runtime);
   _x_83_1: LeanValue = f_ofNat_auto_1_closed_11_98bd0ef5c5(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_83_1,
       _x_82_0,
     ],
@@ -2263,9 +2263,9 @@ fun f_ofNat_auto_1_closed_16_07ee629f6d(
   _x_68_0: LeanValue = f_ofNat_auto_1_closed_5_b5db12ad16(_runtime);
   _x_69_1: LeanValue = f_ofNat_auto_1_closed_9_0bb5fb6d2e(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_69_1,
       _x_68_0,
     ],
@@ -2343,9 +2343,9 @@ fun f_ofNat_auto_1_closed_18_9962cb8d4d(
   _x_75_0: LeanValue = f_ofNat_auto_1_closed_17_57894e1022(_runtime);
   _x_76_1: LeanValue = f_ofNat_auto_1_closed_15_b7dff8a91e(_runtime);
   LeanCtor(
-    "[\"Lean\",\"Syntax\",\"node\"]",
+    LeanTag.Syntax_node,
     Array[
-      LeanCtor("[\"Lean\",\"SourceInfo\",\"none\"]", Array[]),
+      LeanCtor(LeanTag.SourceInfo_none, Array[]),
       _x_76_1,
       _x_75_0,
     ],

@@ -3,16 +3,16 @@
 // limits are disabled explicitly; host cancellation is not implemented.
 fun leanCoreContext(fileName: String, source: String): LeanValue {
   anonymous: LeanValue = LeanCtor(
-    "[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]",
+    LeanTag.Name_anonymous__impl,
     Array[],
   );
-  nil: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
-  none: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
   options: LeanValue = LeanCtor(
-    "[\"_private\",\"Lean\",\"Data\",\"Options\",0,\"Lean\",\"Options\",\"mk\"]",
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
     Array[
       LeanCtor(
-        "[\"Std\",\"DTreeMap\",\"Internal\",\"Impl\",\"leaf\"]",
+        LeanTag.Std_DTreeMap_Internal_Impl_leaf,
         Array[],
       ),
       leanBool(false),
@@ -25,18 +25,18 @@ fun leanCoreContext(fileName: String, source: String): LeanValue {
   };
   positions.push(leanNatValue(source.bytes().size()));
   fileMap: LeanValue = LeanCtor(
-    "[\"Lean\",\"FileMap\",\"mk\"]",
+    LeanTag.FileMap_mk,
     Array[LeanText(source), LeanArray(positions.toArray())],
   );
   inheritedTraceOptions: LeanValue = LeanCtor(
-    "[\"Std\",\"DHashMap\",\"Raw\",\"mk\"]",
+    LeanTag.Std_DHashMap_Raw_mk,
     Array[
       leanNatValue(0),
       LeanArray(
         Array::fill(
           8,
           LeanCtor(
-            "[\"Std\",\"DHashMap\",\"Internal\",\"AssocList\",\"nil\"]",
+            LeanTag.Std_DHashMap_Internal_AssocList_nil,
             Array[],
           ),
         ),
@@ -44,7 +44,7 @@ fun leanCoreContext(fileName: String, source: String): LeanValue {
     ],
   );
   cold: LeanValue = LeanCtor(
-    "[\"Lean\",\"Core\",\"Context\",\"Cold\",\"mk\"]",
+    LeanTag.Core_Context_Cold_mk,
     Array[
       LeanText(fileName),
       fileMap,
@@ -61,15 +61,15 @@ fun leanCoreContext(fileName: String, source: String): LeanValue {
     ],
   );
   LeanCtor(
-    "[\"Lean\",\"Core\",\"Context\",\"mk\"]",
+    LeanTag.Core_Context_mk,
     Array[
       cold,
       leanNatValue(0),
-      LeanCtor("[\"Lean\",\"Syntax\",\"missing\"]", Array[]),
+      LeanCtor(LeanTag.Syntax_missing, Array[]),
       LeanWord("uint16", 255),
       LeanErased(),
       leanBool(false),
-      LeanCtor("[\"Lean\",\"Core\",\"DeprecationCheck\",\"all\"]", Array[]),
+      LeanCtor(LeanTag.Core_DeprecationCheck_all, Array[]),
       leanBool(false),
     ],
   )

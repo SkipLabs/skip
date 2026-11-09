@@ -2,7 +2,7 @@
 // The environment is deliberately unavailable: these cases must not read it.
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
     runtime,
   );
@@ -13,10 +13,10 @@ fun main(): void {
   unavailableCore = runtime.newRef(
     leanCoreState(
       runtime,
-      LeanCtor("probe: environment is unavailable", Array[]),
+      LeanCtor(LeanTag.Unknown("probe: environment is unavailable"), Array[]),
     ),
   );
-  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
   prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
   assert(leanExprData(prop) == 3944470172);
   bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(3));
@@ -30,7 +30,7 @@ fun main(): void {
     unavailableCore,
     LeanErased(),
   );
-  assert(leanTag(reduced) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanTag(reduced) == LeanTag.EST_Out_ok);
   assert(native_eq(leanField(reduced, 0), prop) == 0);
   typeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
     runtime,
@@ -41,11 +41,11 @@ fun main(): void {
     unavailableCore,
     LeanErased(),
   );
-  assert(leanTag(typeResult) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanTag(typeResult) == LeanTag.EST_Out_ok);
   type = leanField(typeResult, 0);
-  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(leanTag(type) == LeanTag.Expr_sort__impl);
   assert(
-    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+    leanTag(leanField(type, 1)) == LeanTag.Level_succ__impl,
   );
   print_string("Meta whnf and inferType passed for Prop")
 }

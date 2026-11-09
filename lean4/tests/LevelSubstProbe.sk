@@ -1,21 +1,21 @@
 fun levelSubstList(values: Array<LeanValue>): LeanValue {
-  result: LeanValue = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  result: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
   index = values.size();
   while (index > 0) {
     !index = index - 1;
-    !result = LeanCtor("[\"List\",\"cons\"]", Array[values[index], result])
+    !result = LeanCtor(LeanTag.List_cons, Array[values[index], result])
   };
   result
 }
 
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   uName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("u"));
   vName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("v"));
   u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
   v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, vName);
-  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
   one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
   name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("f"));
   expr = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
@@ -33,7 +33,7 @@ fun main(): void {
   body = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
     runtime,
     L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x")),
-    LeanCtor("[\"Lean\",\"BinderInfo\",\"implicit\"]", Array[]),
+    LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
     L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
     L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
       runtime,
@@ -45,7 +45,7 @@ fun main(): void {
   all = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
     runtime,
     x,
-    LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
+    LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]),
     L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u),
     body,
   );
@@ -62,14 +62,14 @@ fun main(): void {
     levelSubstList(
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
               runtime,
               LeanText("marker"),
             ),
             LeanCtor(
-              "[\"Lean\",\"DataValue\",\"ofNat\"]",
+              LeanTag.DataValue_ofNat,
               Array[leanNatValue(7)],
             ),
           ],

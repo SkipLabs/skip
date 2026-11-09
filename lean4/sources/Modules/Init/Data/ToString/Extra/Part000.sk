@@ -7,12 +7,12 @@ fun f_List_toString_5f0cf5e07e(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_2_1) match {
-  | "[\"List\",\"nil\"]" -> LeanText("[]")
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanText("[]")
+  | LeanTag.List_cons ->
     _head_4_2: LeanValue = leanField(_x_2_1, 0);
     _tail_5_3: LeanValue = leanField(_x_2_1, 1);
     leanTag(_tail_5_3) match {
-    | "[\"List\",\"nil\"]" ->
+    | LeanTag.List_nil ->
       _x_7_6: LeanValue = leanApply(_runtime, _inst_1_0, Array[_head_4_2]);
       _x_8_7: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
         _runtime,
@@ -45,7 +45,7 @@ fun f_List_toString_5f0cf5e07e(
       L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
         _runtime,
         _x_15_14,
-        LeanScalar("uint32", "93"),
+        LeanWord("uint32", 93),
       )
     }
   | _ -> leanFail("non-exhaustive Lean case")

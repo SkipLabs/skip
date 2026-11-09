@@ -1,0 +1,61 @@
+fun main(): void {
+  store = SKStore.Context::create{}.mclone();
+  runtime = mutable LeanExecution{store => Some(store)};
+  leanInitializeParsers(runtime);
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  if (leanTag(extensions) != LeanTag.EST_Out_ok) {
+    leanFail("parser extension initialization failed")
+  };
+  generationCount = leanNat(
+    runtime.readRef(
+      leanReadInitializer(
+        runtime,
+        "_private.Lean.Environment.0.Lean.EnvExtension.numTrackedExtsRef",
+      ),
+    ),
+  ).toInt();
+  constants = store.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/parser/constants/"),
+    Array[],
+  );
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", LeanConstantDirectory(constants)),
+    LeanConstantsView("locals", LeanConstantDirectory(constants)),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    LeanArray(Array::fill(generationCount, leanNatValue(0))),
+    false,
+    leanNatValue(0),
+  );
+  cases = Array[
+    ("term", "3"),
+    ("term", "Nat"),
+    ("term", "fun (x : Nat) => x"),
+    ("term", "Nat → Nat"),
+    ("command", "def limit : Nat := 3"),
+    ("command", "theorem result : True := True.intro"),
+    ("command", "def id (x : Nat) : Nat := x"),
+    ("command", "def bad : := 3"),
+  ];
+  for ((kind, source) in cases) {
+    result = L4_Lean_Parser_Extension.f_Lean_Parser_runParserCategory_991080a8ca(
+      runtime,
+      environment,
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(kind)),
+      LeanText(source),
+      LeanText("fixture.lean"),
+    );
+    output = if (leanTag(result) == LeanTag.Except_ok) {
+      JSON.Object["ok" => parserSyntax(runtime, leanField(result, 0))]
+    } else {
+      JSON.Object["error" => JSON.String(leanText(leanField(result, 0)))]
+    };
+    print_string(output.encode())
+  }
+}

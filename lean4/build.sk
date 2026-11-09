@@ -7,6 +7,9 @@ fun main(): void {
       "Invalid source manifest entry",
     );
     invariant(FileSystem.exists(path), "Missing maintained source: " + path);
+    // These files live outside src/. Make changes to every listed input rerun
+    // this hook so Skargo invalidates the library and its executable consumers.
+    print_string("skargo:rerun-if-changed=" + path);
     print_string("skargo:skc-extra-source=" + path)
   };
   print_string("skargo:rerun-if-changed=sources/build.txt")

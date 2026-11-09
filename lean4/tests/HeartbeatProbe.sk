@@ -1,7 +1,7 @@
 fun heartbeatProbe(): void {
   mode = read_to_end().trim();
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store, unboundedHeartbeats => true};
+  runtime = mutable LeanExecution{store => Some(store), unboundedHeartbeats => true};
   context = leanUnboundedCoreContext(runtime, "<heartbeat-probe>", "");
   if (mode == "missing-options") {
     !context = leanCoreContext("<heartbeat-probe>", "")
@@ -42,7 +42,7 @@ fun heartbeatProbe(): void {
       | LeanUnavailable("heartbeat accounting") -> void
       | _ -> leanFail("expected an unavailable heartbeat snapshot")
       };
-      LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[leanNatValue(42), args[3]])
+      LeanCtor(LeanTag.EST_Out_ok, Array[leanNatValue(42), args[3]])
     },
     4,
     Array[count],
@@ -54,7 +54,7 @@ fun heartbeatProbe(): void {
     LeanErased(),
     LeanErased(),
   );
-  assert(leanTag(result) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanTag(result) == LeanTag.EST_Out_ok);
   assert(leanNat(leanField(result, 0)).toInt() == 42);
   assert(leanNat(runtime.readRef(count)).toInt() == 1);
   print_string(

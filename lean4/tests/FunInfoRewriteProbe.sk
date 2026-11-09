@@ -1,0 +1,317 @@
+// Differential driver for the structured getFunInfoAux entry.
+// Integration contract: keep the current source body as
+// f_Lean_Meta_getFunInfoAux_f44d4b39aa_fallback, and wire Entry.sk's body under
+// f_Lean_Meta_getFunInfoAux_f44d4b39aa before compiling this probe.
+// Every comparison starts from two raw restores of one initialized snapshot.
+// Repeating a case within each restored runtime checks its local Meta cache hit.
+
+fun funInfoProbeList(values: Array<LeanValue>): LeanValue {
+  result: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  index = values.size();
+  while (index > 0) {
+    !index = index - 1;
+    !result = LeanCtor(LeanTag.List_cons, Array[values[index], result])
+  };
+  result
+}
+
+fun funInfoProbeCall(
+  runtime: mutable LeanExecution,
+  fallback: Bool,
+  fn: LeanValue,
+  maxArgs: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  method = if (fallback) {
+    L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfoAux_f44d4b39aa_fallback
+  } else {
+    L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfoAux_f44d4b39aa
+  };
+  method(
+    runtime,
+    fn,
+    maxArgs,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  )
+}
+
+fun checkFunInfoCase(
+  saved: LeanExecutionCheckpoint,
+  fn: LeanValue,
+  maxArgs: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  label: String,
+): Int {
+  original = saved.restoreRaw();
+  structured = saved.restoreRaw();
+  for (_ in Range(0, 2)) {
+    expected = funInfoProbeCall(
+      original,
+      true,
+      fn,
+      maxArgs,
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      LeanNatLiterals.n0,
+    );
+    actual = funInfoProbeCall(
+      structured,
+      false,
+      fn,
+      maxArgs,
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      LeanNatLiterals.n0,
+    );
+    if (
+      native_eq(expected, actual) != 0 ||
+      native_eq(original.checkpoint().refs, structured.checkpoint().refs) != 0
+    ) {
+      leanFail("FunInfo result/reference mismatch: " + label)
+    }
+  };
+  2
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  xName = name("x");
+  uName = name("u");
+  mName = name("m");
+  identityName = name("FunInfo.identity");
+  polymorphicName = name("FunInfo.polymorphic");
+  absentName = name("FunInfo.absent");
+
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  levelParam = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  levelMVar = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, mName);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  sortParam = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelParam);
+  bvar0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  functionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    xName,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    prop,
+    prop,
+  );
+  identityValue = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    xName,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    prop,
+    bvar0,
+  );
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  identityConstantValue = LeanCtor(
+    LeanTag.ConstantVal_mk,
+    Array[identityName, nil, functionType],
+  );
+  identityDefinition = LeanCtor(
+    LeanTag.DefinitionVal_mk,
+    Array[
+      identityConstantValue,
+      identityValue,
+      LeanCtor(LeanTag.ReducibilityHints_regular, Array[LeanWord("uint32", 1)]),
+      LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+      nil,
+    ],
+  );
+  identityInfo = LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[identityDefinition],
+  );
+
+  // A polymorphic declaration with a universe parameter exercises both a
+  // closed level argument and an open level metavariable at the constant site.
+  // Both its domain and codomain are Sort u, with the identity as its value.
+  polymorphicConstantValue = LeanCtor(
+    LeanTag.ConstantVal_mk,
+    Array[
+      polymorphicName,
+      funInfoProbeList(Array[uName]),
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        xName,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        sortParam,
+        sortParam,
+      ),
+    ],
+  );
+  polymorphicDefinition = LeanCtor(
+    LeanTag.DefinitionVal_mk,
+    Array[
+      polymorphicConstantValue,
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        runtime,
+        xName,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        sortParam,
+        bvar0,
+      ),
+      LeanCtor(LeanTag.ReducibilityHints_regular, Array[LeanWord("uint32", 1)]),
+      LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+      nil,
+    ],
+  );
+  polymorphicInfo = LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[polymorphicDefinition],
+  );
+
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(
+    leanNameKey(identityName),
+    LeanConstantFile(identityInfo, None()),
+  );
+  constants.set(
+    leanNameKey(polymorphicName),
+    LeanConstantFile(polymorphicInfo, None()),
+  );
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView(
+      "imports",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    LeanConstantsView("locals", LeanConstantMap(constants.chill())),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    // No modules are imported by this fixture, including extra IR constants.
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+  coreContext = leanUnboundedCoreContext(runtime, "<fun-info-probe>", "");
+
+  // Declare level m in the actual Meta state used for the open-level case.
+  defaultContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  defaultState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  !defaultState = leanReplaceField(
+    defaultState,
+    0,
+    L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(
+      runtime,
+      leanField(defaultState, 0),
+      mName,
+    ),
+  );
+
+  localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+    runtime,
+  );
+  !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localContext,
+    xName,
+    xName,
+    functionType,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+  );
+  metaContext = leanReplaceField(defaultContext, 3, localContext);
+  stateRef = runtime.newRef(defaultState);
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+
+  identity = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, identityName, nil);
+  polymorphicClosed = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    polymorphicName,
+    funInfoProbeList(Array[levelParam]),
+  );
+  polymorphicOpen = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    polymorphicName,
+    funInfoProbeList(Array[levelMVar]),
+  );
+  absent = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, absentName, nil);
+  localFunction = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+
+  inputs: mutable Vector<(String, LeanValue, LeanValue)> = mutable Vector[];
+  for (maxArgs in Array[
+    LeanCtor(LeanTag.Option_none, Array[]),
+    LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n0]),
+    LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n1]),
+    LeanCtor(LeanTag.Option_some, Array[leanNatValue(2)]),
+  ]) {
+    for ((label, fn) in Array[
+      ("lambda", identityValue),
+      ("free-variable function", localFunction),
+      ("ordinary definition", identity),
+      ("closed universe level", polymorphicClosed),
+      ("open universe level", polymorphicOpen),
+      ("missing constant", absent),
+    ]) {
+      inputs.push((label, fn, maxArgs))
+    }
+  };
+
+  saved = runtime.checkpoint();
+  count = 0;
+  for ((label, fn, maxArgs) in inputs.toArray()) {
+    !count =
+      count +
+      checkFunInfoCase(
+        saved,
+        fn,
+        maxArgs,
+        metaContext,
+        stateRef,
+        coreContext,
+        coreStateRef,
+        label + " case=" + count.toString(),
+      )
+  };
+  assert(count == 48);
+  print_string(
+    count.toString() +
+      " FunInfo result/reference comparisons passed across cache misses and hits",
+  )
+}

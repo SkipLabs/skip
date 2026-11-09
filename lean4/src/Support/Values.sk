@@ -6,12 +6,18 @@ base class LeanValue {
   // A bootstrap field whose implementation is still absent. It may be carried
   // through an unused field, but inspecting it must fail with its identity.
   | LeanUnavailable(description: String)
-  | LeanCtor(name: String, fields: Array<LeanValue>)
+  | LeanCtor(name: LeanTag.Value, fields: Array<LeanValue>)
   | LeanScalar(kind: String, decimal: String)
   | LeanNatural(value: LeanNat)
   | LeanWord(kind: String, bits: Int)
   | LeanText(value: String)
   | LeanArray(values: Array<LeanValue>)
+  // Large mutable-by-value Lean arrays use a persistent vector, so updating a
+  // hash-table bucket does not copy every bucket. Both representations are pure.
+  | LeanPersistentArray(values: Persistent.RadixTreeVector<LeanValue>)
+  // A persistent write over a tracked extension array. Old environments keep
+  // their previous view; no SKStore input is mutated while elaborating.
+  | LeanArrayOverride(base: LeanValue, index: Int, value: LeanValue)
   | LeanReference(index: Int)
   | LeanTrackedConstants(view: LeanConstantsView)
   | LeanTrackedExtensionArray(view: LeanExtensionArray)
@@ -21,6 +27,94 @@ base class LeanValue {
     arity: Int,
     captured: Array<LeanValue>,
   )
+}
+
+// Sharing is used only as a sufficient equality check. A negative answer never
+// establishes inequality. Lean's budgeted equality explicitly permits sharing
+// to affect whether the result is conclusive.
+@cpp_extern("SKIP_physEq")
+native fun leanSameObject(a: LeanValue, b: LeanValue): UInt32;
+
+// Constructor families used by traversal caches. Named constant patterns test
+// compact integer identities; protocol text stays at the import/export boundary.
+// 0 = other, 1 = Expr, 2 = Level.zero, 3 = another Level constructor.
+fun leanImmutableTagKind(tag: LeanTag.Value): Int {
+  tag match {
+  | LeanTag.Expr_bvar__impl
+  | LeanTag.Expr_fvar__impl
+  | LeanTag.Expr_mvar__impl
+  | LeanTag.Expr_sort__impl
+  | LeanTag.Expr_const__impl
+  | LeanTag.Expr_app__impl
+  | LeanTag.Expr_lam__impl
+  | LeanTag.Expr_forallE__impl
+  | LeanTag.Expr_letE__impl
+  | LeanTag.Expr_lit__impl
+  | LeanTag.Expr_mdata__impl
+  | LeanTag.Expr_proj__impl ->
+    1
+  | LeanTag.Level_zero__impl -> 2
+  | LeanTag.Level_succ__impl
+  | LeanTag.Level_max__impl
+  | LeanTag.Level_imax__impl
+  | LeanTag.Level_param__impl
+  | LeanTag.Level_mvar__impl ->
+    3
+  | _ -> 0
+  }
+}
+
+// Content identities for immutable expression/level traversal caches. Hashes
+// select a bucket; structural equality resolves collisions. These are not native
+// addresses and must not be used for memory access or mutable object identity.
+class LeanImmutableKey(value: LeanValue) uses Hashable, Equality {
+  fun hash(): Int {
+    value = this.value;
+    kind = leanImmutableTagKind(leanTag(value));
+    if (kind == 2) return 0;
+    if (kind != 0) {
+      leanWordBits(leanField(value, 0)).and(4294967295)
+    } else {
+      leanFail(
+        "pointer identity is implemented only for immutable Expr and Level values",
+      )
+    }
+  }
+
+  fun ==(other: LeanImmutableKey): Bool {
+    leanSameObject(this.value, other.value) != 0 ||
+      native_eq(this.value, other.value) == 0
+  }
+}
+
+// Checkpoints share this index. Buckets retain full values and compare them
+// structurally, so neither a hash collision nor collection can alias identities.
+class LeanIdentityTable(
+  buckets: SortedMap<Int, Array<(LeanValue, Int)>>,
+  count: Int,
+) {
+  fun size(): Int {
+    this.count
+  }
+
+  fun maybeGet(key: LeanImmutableKey): ?Int {
+    for ((value, id) in this.buckets.maybeGet(key.hash()).default(Array[])) {
+      if (
+        leanSameObject(value, key.value) != 0 ||
+        native_eq(value, key.value) == 0
+      ) return Some(id)
+    };
+    None()
+  }
+
+  fun insert(key: LeanImmutableKey, id: Int): this {
+    hash = key.hash();
+    bucket = this.buckets.maybeGet(hash).default(Array[]);
+    LeanIdentityTable(
+      this.buckets.set(hash, bucket.concat(Array[(key.value, id)])),
+      this.count + 1,
+    )
+  }
 }
 
 fun leanFail<T>(message: String): T {
@@ -43,6 +137,11 @@ fun leanCheckPublishable(value: LeanValue): void {
   | LeanCtor(_, fields)
   | LeanArray(fields) ->
     for (field in fields) leanCheckPublishable(field)
+  | LeanArrayOverride(base, _, replacement) ->
+    leanCheckPublishable(base);
+    leanCheckPublishable(replacement)
+  | LeanPersistentArray(values) ->
+    for (field in values) leanCheckPublishable(field)
   | LeanClosure(_, _, captured) ->
     for (field in captured) leanCheckPublishable(field)
   | LeanCompletedTask(result) -> leanCheckPublishable(result)
@@ -50,7 +149,7 @@ fun leanCheckPublishable(value: LeanValue): void {
   }
 }
 
-fun leanTag(v: LeanValue): String {
+fun leanTag(v: LeanValue): LeanTag.Value {
   v match {
   | LeanCtor(name, _) -> name
   | LeanUnavailable(description) -> leanFail("not implemented: " + description)
@@ -60,21 +159,30 @@ fun leanTag(v: LeanValue): String {
 
 fun leanField(v: LeanValue, index: Int): LeanValue {
   v match {
-  | LeanCtor(name, fields) ->
+  | LeanCtor(_, fields) ->
     if (index < 0 || index >= fields.size()) {
-      leanFail(
-        "invalid constructor field " +
-          index.toString() +
-          " of " +
-          name +
-          " (" +
-          fields.size().toString() +
-          " fields)",
-      )
+      return leanInvalidField(v, index)
     };
     fields[index]
   | LeanUnavailable(description) -> leanFail("not implemented: " + description)
   | _ -> invariant_violation("Lean-to-Skip: projection from non-constructor")
+  }
+}
+
+// Keep diagnostic construction out of this frequently inlined projection.
+fun leanInvalidField(v: LeanValue, index: Int): LeanValue {
+  v match {
+  | LeanCtor(name, fields) ->
+    leanFail(
+      "invalid constructor field " +
+        index.toString() +
+        " of " +
+        name.toString() +
+        " (" +
+        fields.size().toString() +
+        " fields)",
+    )
+  | _ -> leanFail("invalid constructor projection")
   }
 }
 

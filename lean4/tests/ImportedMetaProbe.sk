@@ -16,11 +16,11 @@ fun importedMetaProbe(): void {
     ),
   );
   store.initPre();
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   env = leanEnvironment(
     runtime,
-    LeanConstantsView("Init", constants),
-    LeanConstantsView("local", constants),
+    LeanConstantsView("Init", LeanConstantDirectory(constants)),
+    LeanConstantsView("local", LeanConstantDirectory(constants)),
     LeanUnavailable("imported environment header"),
     LeanUnavailable("imported environment extensions"),
     LeanUnavailable("imported extension generations"),
@@ -44,11 +44,11 @@ fun importedMetaProbe(): void {
     natName,
     leanBool(false),
   );
-  assert(leanTag(info) == "[\"Option\",\"some\"]");
+  assert(leanTag(info) == LeanTag.Option_some);
   assert(
-    leanTag(leanField(info, 0)) == "[\"Lean\",\"ConstantInfo\",\"inductInfo\"]",
+    leanTag(leanField(info, 0)) == LeanTag.ConstantInfo_inductInfo,
   );
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
   inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
     runtime,
@@ -59,11 +59,11 @@ fun importedMetaProbe(): void {
     coreState,
     LeanErased(),
   );
-  assert(leanTag(inferred) == "[\"EST\",\"Out\",\"ok\"]");
+  assert(leanTag(inferred) == LeanTag.EST_Out_ok);
   type = leanField(inferred, 0);
-  assert(leanTag(type) == "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]");
+  assert(leanTag(type) == LeanTag.Expr_sort__impl);
   assert(
-    leanTag(leanField(type, 1)) == "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+    leanTag(leanField(type, 1)) == LeanTag.Level_succ__impl,
   );
   print_string("Imported environment lookup and Meta.inferType Nat passed")
 }

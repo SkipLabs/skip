@@ -18,11 +18,11 @@ fun f_Simp_dischargeSimpSelf_lam_0_03a03b8445(
     _y_1_5,
   );
   leanTag(_x_2_6) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_3_7: LeanValue = leanField(_x_2_6, 0);
     _state_4_8: LeanValue = leanField(_x_2_6, 1);
     leanTag(_val_3_7) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"State\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_Simp_State_mk ->
       _numSteps_9: LeanValue = leanField(_val_3_7, 0);
       _persistentCache_10: LeanValue = leanField(_val_3_7, 1);
       _transientCache_11: LeanValue = leanField(_val_3_7, 2);
@@ -33,18 +33,18 @@ fun f_Simp_dischargeSimpSelf_lam_0_03a03b8445(
         LeanErased(),
         _a_0,
         LeanCtor(
-          "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"State\",\"mk\"]",
+          LeanTag.Meta_Sym_Simp_State_mk,
           Array[_numSteps_9, _persistentCache_1, _transientCache_2, _funext_3],
         ),
         _state_4_8,
       );
       leanTag(_x_7_15) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_8_16: LeanValue = leanField(_x_7_15, 0);
         _state_9_17: LeanValue = leanField(_x_7_15, 1);
         LeanCtor(
-          "[\"EST\",\"Out\",\"ok\"]",
-          Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[]), _state_9_17],
+          LeanTag.EST_Out_ok,
+          Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _state_9_17],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -75,7 +75,7 @@ fun f_Sym_Simp_mkDischargerFromSimproc_f39ba10861(
     Array[_e_1, _a_2, _a_3, _a_4, _a_5, _a_6, _a_7, _a_8, _a_9, _a_10, _a_1_11],
   );
   leanTag(_x_2_12) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_13: LeanValue = leanField(_x_2_12, 0);
     _a_4_14: LeanValue = leanField(_x_2_12, 1);
     _x_5_17: LeanValue = f_Sym_Simp_resultToDischargeResult_dd96654631(
@@ -83,11 +83,11 @@ fun f_Sym_Simp_mkDischargerFromSimproc_f39ba10861(
       _e_1,
       _a_3_13,
     );
-    LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_5_17, _a_4_14])
-  | "[\"EST\",\"Out\",\"error\"]" ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[_x_5_17, _a_4_14])
+  | LeanTag.EST_Out_error ->
     _a_7_15: LeanValue = leanField(_x_2_12, 0);
     _a_8_16: LeanValue = leanField(_x_2_12, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_7_15, _a_8_16])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_7_15, _a_8_16])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -118,14 +118,14 @@ fun f_Sym_Simp_resultToDischargeResult_dd96654631(
   _result_1: LeanValue,
 ): LeanValue {
   leanTag(_result_1) match {
-  | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"rfl\"]" ->
+  | LeanTag.Meta_Sym_Simp_Result_rfl ->
     _done_1_2: LeanValue = leanField(_result_1, 0);
     _contextDependent_2_3: LeanValue = leanField(_result_1, 1);
     LeanCtor(
-      "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"DischargeResult\",\"failed\"]",
+      LeanTag.Meta_Sym_Simp_DischargeResult_failed,
       Array[_contextDependent_2_3],
     )
-  | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Result\",\"step\"]" ->
+  | LeanTag.Meta_Sym_Simp_Result_step ->
     _e_4_4: LeanValue = leanField(_result_1, 0);
     _proof_5_5: LeanValue = leanField(_result_1, 1);
     _done_6_6: LeanValue = leanField(_result_1, 2);
@@ -135,19 +135,19 @@ fun f_Sym_Simp_resultToDischargeResult_dd96654631(
       _e_4_4,
     );
     leanTag(_x_8_9) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       LeanCtor(
-        "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"DischargeResult\",\"failed\"]",
+        LeanTag.Meta_Sym_Simp_DischargeResult_failed,
         Array[_contextDependent_7_7],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_10_11: LeanValue = L4_Lean_Meta_AppBuilder.f_Lean_Meta_mkOfEqTrueCore_fc9c4a2fcc(
         _runtime,
         _e_0,
         _proof_5_5,
       );
       LeanCtor(
-        "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"DischargeResult\",\"solved\"]",
+        LeanTag.Meta_Sym_Simp_DischargeResult_solved,
         Array[_x_10_11, _contextDependent_7_7],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -176,15 +176,15 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
     _a_1_10,
   );
   leanTag(_x_2_11) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_12: LeanValue = leanField(_x_2_11, 0);
     _a_4_13: LeanValue = leanField(_x_2_11, 1);
     leanTag(_a_3_12) match {
-    | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Config\",\"mk\"]" ->
+    | LeanTag.Meta_Sym_Simp_Config_mk ->
       _maxSteps_16: LeanValue = leanField(_a_3_12, 0);
       _maxDischargeDepth_17: LeanValue = leanField(_a_3_12, 1);
       leanTag(_a_2) match {
-      | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Context\",\"mk\"]" ->
+      | LeanTag.Meta_Sym_Simp_Context_mk ->
         _config_18: LeanValue = leanField(_a_2, 0);
         _initialLCtxSize_19: LeanValue = leanField(_a_2, 1);
         _dischargeDepth_20: LeanValue = leanField(_a_2, 2);
@@ -194,7 +194,7 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
           _dischargeDepth_20,
         );
         leanTag(_x_5_21) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _x_6_22: LeanValue = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
             _runtime,
             LeanErased(),
@@ -203,11 +203,11 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
             _a_4_13,
           );
           leanTag(_x_6_22) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _val_7_23: LeanValue = leanField(_x_6_22, 0);
             _state_8_24: LeanValue = leanField(_x_6_22, 1);
             leanTag(_val_7_23) match {
-            | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"State\",\"mk\"]" ->
+            | LeanTag.Meta_Sym_Simp_State_mk ->
               _numSteps_25: LeanValue = leanField(_val_7_23, 0);
               _persistentCache_26: LeanValue = leanField(_val_7_23, 1);
               _transientCache_27: LeanValue = leanField(_val_7_23, 2);
@@ -220,11 +220,11 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                 _state_8_24,
               );
               leanTag(_x_9_29) match {
-              | "[\"ST\",\"Out\",\"mk\"]" ->
+              | LeanTag.ST_Out_mk ->
                 _val_10_30: LeanValue = leanField(_x_9_29, 0);
                 _state_11_31: LeanValue = leanField(_x_9_29, 1);
                 leanTag(_val_10_30) match {
-                | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"State\",\"mk\"]" ->
+                | LeanTag.Meta_Sym_Simp_State_mk ->
                   _numSteps_32: LeanValue = leanField(_val_10_30, 0);
                   _persistentCache_33: LeanValue = leanField(_val_10_30, 1);
                   _transientCache_34: LeanValue = leanField(_val_10_30, 2);
@@ -237,11 +237,11 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                     _state_11_31,
                   );
                   leanTag(_x_12_36) match {
-                  | "[\"ST\",\"Out\",\"mk\"]" ->
+                  | LeanTag.ST_Out_mk ->
                     _val_13_37: LeanValue = leanField(_x_12_36, 0);
                     _state_14_38: LeanValue = leanField(_x_12_36, 1);
                     leanTag(_val_13_37) match {
-                    | "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"State\",\"mk\"]" ->
+                    | LeanTag.Meta_Sym_Simp_State_mk ->
                       _numSteps_39: LeanValue = leanField(_val_13_37, 0);
                       _persistentCache_40: LeanValue = leanField(_val_13_37, 1);
                       _transientCache_41: LeanValue = leanField(_val_13_37, 2);
@@ -249,14 +249,14 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                       _x_16_44: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
                         _runtime,
                         _dischargeDepth_20,
-                        LeanScalar("nat", "1"),
+                        LeanNatLiterals.n1,
                       );
                       _x_18_46: LeanValue = L4_Lean_Meta_Sym_Simp_SimpM.f_Sym_Simp_simp_a294627c1b(
                         _runtime,
                         _e_0,
                         _a_1,
                         LeanCtor(
-                          "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"Context\",\"mk\"]",
+                          LeanTag.Meta_Sym_Simp_Context_mk,
                           Array[_config_18, _initialLCtxSize_19, _x_16_44],
                         ),
                         _a_3,
@@ -269,7 +269,7 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                         _state_14_38,
                       );
                       leanTag(_x_18_46) match {
-                      | "[\"EST\",\"Out\",\"ok\"]" ->
+                      | LeanTag.EST_Out_ok ->
                         _a_19_47: LeanValue = leanField(_x_18_46, 0);
                         _a_20_48: LeanValue = leanField(_x_18_46, 1);
                         _x_21_51: LeanValue = f_Sym_Simp_resultToDischargeResult_dd96654631(
@@ -283,18 +283,18 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                           _persistentCache_26,
                           _transientCache_34,
                           _funext_42,
-                          LeanCtor("[\"Option\",\"some\"]", Array[_x_21_51]),
+                          LeanCtor(LeanTag.Option_some, Array[_x_21_51]),
                           _a_20_48,
                         );
                         leanTag(_x_23_53) match {
-                        | "[\"EST\",\"Out\",\"ok\"]" ->
+                        | LeanTag.EST_Out_ok ->
                           _a_24_54: LeanValue = leanField(_x_23_53, 0);
                           _a_25_55: LeanValue = leanField(_x_23_53, 1);
                           LeanCtor(
-                            "[\"EST\",\"Out\",\"ok\"]",
+                            LeanTag.EST_Out_ok,
                             Array[_x_21_51, _a_25_55],
                           )
-                        | "[\"EST\",\"Out\",\"error\"]" ->
+                        | LeanTag.EST_Out_error ->
                           _a_27_56: LeanValue = leanField(_x_23_53, 0);
                           _a_28_57: LeanValue = leanField(_x_23_53, 1);
                           leanFail(
@@ -302,7 +302,7 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                           )
                         | _ -> leanFail("non-exhaustive Lean case")
                         }
-                      | "[\"EST\",\"Out\",\"error\"]" ->
+                      | LeanTag.EST_Out_error ->
                         _a_29_49: LeanValue = leanField(_x_18_46, 0);
                         _a_30_50: LeanValue = leanField(_x_18_46, 1);
                         _x_32_60: LeanValue = f_Simp_dischargeSimpSelf_lam_0_03a03b8445(
@@ -311,18 +311,18 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
                           _persistentCache_26,
                           _transientCache_34,
                           _funext_42,
-                          LeanCtor("[\"Option\",\"none\"]", Array[]),
+                          LeanCtor(LeanTag.Option_none, Array[]),
                           _a_30_50,
                         );
                         leanTag(_x_32_60) match {
-                        | "[\"EST\",\"Out\",\"ok\"]" ->
+                        | LeanTag.EST_Out_ok ->
                           _a_33_61: LeanValue = leanField(_x_32_60, 0);
                           _a_34_62: LeanValue = leanField(_x_32_60, 1);
                           LeanCtor(
-                            "[\"EST\",\"Out\",\"error\"]",
+                            LeanTag.EST_Out_error,
                             Array[_a_29_49, _a_34_62],
                           )
-                        | "[\"EST\",\"Out\",\"error\"]" ->
+                        | LeanTag.EST_Out_error ->
                           _a_36_63: LeanValue = leanField(_x_32_60, 0);
                           _a_37_64: LeanValue = leanField(_x_32_60, 1);
                           leanFail(
@@ -344,13 +344,13 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
             }
           | _ -> leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           LeanCtor(
-            "[\"EST\",\"Out\",\"ok\"]",
+            LeanTag.EST_Out_ok,
             Array[
               LeanCtor(
-                "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"DischargeResult\",\"failed\"]",
-                Array[LeanCtor("[\"Bool\",\"false\"]", Array[])],
+                LeanTag.Meta_Sym_Simp_DischargeResult_failed,
+                Array[LeanCtor(LeanTag.Bool_false, Array[])],
               ),
               _a_4_13,
             ],
@@ -361,10 +361,10 @@ fun f_Sym_Simp_dischargeSimpSelf_dbb1d43fe2(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_41_14: LeanValue = leanField(_x_2_11, 0);
     _a_42_15: LeanValue = leanField(_x_2_11, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_41_14, _a_42_15])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_41_14, _a_42_15])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -429,11 +429,11 @@ fun f_Sym_Simp_dischargeNone_d1d881b3b7(
   _a_1_0: LeanValue,
 ): LeanValue {
   LeanCtor(
-    "[\"EST\",\"Out\",\"ok\"]",
+    LeanTag.EST_Out_ok,
     Array[
       LeanCtor(
-        "[\"Lean\",\"Meta\",\"Sym\",\"Simp\",\"DischargeResult\",\"failed\"]",
-        Array[LeanCtor("[\"Bool\",\"false\"]", Array[])],
+        LeanTag.Meta_Sym_Simp_DischargeResult_failed,
+        Array[LeanCtor(LeanTag.Bool_false, Array[])],
       ),
       _a_1_0,
     ],

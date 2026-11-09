@@ -1,0 +1,20 @@
+// The cached hash orders names first; collisions retain Lean's structural order.
+module L4_Lean_Data_Name;
+
+// "_private.Lean.Data.Name.0.Lean.Name.quickCmpImpl"
+fun f_Lean_Name_quickCmpImpl_fa3996fc71(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+): LeanValue {
+  if (leanSameObject(left, right) != 0) {
+    return LeanCtor(LeanTag.Ordering_eq, Array[])
+  };
+  leftHash = leanNameHashBits(left);
+  rightHash = leanNameHashBits(right);
+  if (leftHash.ult(rightHash)) return LeanCtor(LeanTag.Ordering_lt, Array[]);
+  if (leftHash != rightHash) return LeanCtor(LeanTag.Ordering_gt, Array[]);
+  f_Lean_Name_quickCmpAux_b7c9cf0df0(runtime, left, right)
+}
+
+module end;

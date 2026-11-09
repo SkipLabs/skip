@@ -18,9 +18,9 @@ fun f_MCasesPat_parse_goAlts_25e8468fba(
     _x_6_5,
   );
   leanTag(_x_7_6) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Bool\",\"true\"]" ->
-    _x_9_8: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Bool_true ->
+    _x_9_8: LeanValue = LeanNatLiterals.n0;
     _x_10_9: LeanValue = L4_Init_Prelude.f_Lean_Syntax_getArg_f802eebdd1(
       _runtime,
       _a_1_0,
@@ -42,10 +42,10 @@ fun f_MCasesPat_parse_goAlts_25e8468fba(
     _x_14_14: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_12_12,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     leanTag(_x_14_14) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _sz_15: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
         _runtime,
         LeanErased(),
@@ -54,12 +54,12 @@ fun f_MCasesPat_parse_goAlts_25e8468fba(
       _x_16_17: LeanValue = f_parse_goAlts_spec_4_1356d46581(
         _runtime,
         _sz_15,
-        LeanScalar("usize", "0"),
+        LeanWord("usize", 0),
         _x_11_11,
       );
       leanTag(_x_16_17) match {
-      | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+      | LeanTag.Option_some ->
         _val_18_18: LeanValue = leanField(_x_16_17, 0);
         _x_19_20: LeanValue = L4_Init_Prelude.f_Array_toList_2f8b2ba454(
           _runtime,
@@ -67,17 +67,17 @@ fun f_MCasesPat_parse_goAlts_25e8468fba(
           _val_18_18,
         );
         LeanCtor(
-          "[\"Option\",\"some\"]",
+          LeanTag.Option_some,
           Array[
             LeanCtor(
-              "[\"Lean\",\"Parser\",\"Tactic\",\"MCasesPat\",\"alts\"]",
+              LeanTag.Parser_Tactic_MCasesPat_alts,
               Array[_x_19_20],
             ),
           ],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_22_23: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
         LeanErased(),
@@ -111,22 +111,22 @@ fun f_Tactic_MCasesPat_parse_80739cd306(
     _a_1_2,
   );
   leanTag(_x_3_4) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_4_5: LeanValue = leanField(_x_3_4, 0);
     _a_5_6: LeanValue = leanField(_x_3_4, 1);
     _x_6_9: LeanValue = f_MCasesPat_parse_go_61724ec5eb(_runtime, _a_4_5);
     leanTag(_x_6_9) match {
-    | "[\"Option\",\"none\"]" ->
+    | LeanTag.Option_none ->
       L4_Init_Prelude.f_Lean_Macro_throwUnsupported_3c5c0282ee(_runtime, _a_5_6)
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_8_10: LeanValue = leanField(_x_6_9, 0);
-      LeanCtor("[\"EStateM\",\"Result\",\"ok\"]", Array[_val_8_10, _a_5_6])
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[_val_8_10, _a_5_6])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+  | LeanTag.EStateM_Result_error ->
     _a_10_7: LeanValue = leanField(_x_3_4, 0);
     _a_11_8: LeanValue = leanField(_x_3_4, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_10_7, _a_11_8])
+    LeanCtor(LeanTag.EStateM_Result_error, Array[_a_10_7, _a_11_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -149,8 +149,8 @@ fun f_parse_go_spec_1_204a07b165(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_bs_2])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_some, Array[_bs_2])
+  | LeanTag.Bool_true ->
     _v_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -160,21 +160,21 @@ fun f_parse_go_spec_1_204a07b165(
     );
     _x_3_6: LeanValue = f_MRefinePat_parse_go_02bbb4ff9e(_runtime, _v_5);
     leanTag(_x_3_6) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Option_some ->
       _val_5_7: LeanValue = leanField(_x_3_6, 0);
       _bs_10: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
         _runtime,
         LeanErased(),
         _bs_2,
         _i_1,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
         LeanErased(),
       );
       _x_8_12: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
         _runtime,
         _i_1,
-        LeanScalar("usize", "1"),
+        LeanWord("usize", 1),
       );
       _x_9_13: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
         _runtime,
@@ -210,22 +210,22 @@ fun f_Tactic_MRefinePat_parse_e64907a915(
     _a_1_2,
   );
   leanTag(_x_3_4) match {
-  | "[\"EStateM\",\"Result\",\"ok\"]" ->
+  | LeanTag.EStateM_Result_ok ->
     _a_4_5: LeanValue = leanField(_x_3_4, 0);
     _a_5_6: LeanValue = leanField(_x_3_4, 1);
     _x_6_9: LeanValue = f_MRefinePat_parse_go_02bbb4ff9e(_runtime, _a_4_5);
     leanTag(_x_6_9) match {
-    | "[\"Option\",\"none\"]" ->
+    | LeanTag.Option_none ->
       L4_Init_Prelude.f_Lean_Macro_throwUnsupported_3c5c0282ee(_runtime, _a_5_6)
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_8_10: LeanValue = leanField(_x_6_9, 0);
-      LeanCtor("[\"EStateM\",\"Result\",\"ok\"]", Array[_val_8_10, _a_5_6])
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[_val_8_10, _a_5_6])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EStateM\",\"Result\",\"error\"]" ->
+  | LeanTag.EStateM_Result_error ->
     _a_10_7: LeanValue = leanField(_x_3_4, 0);
     _a_11_8: LeanValue = leanField(_x_3_4, 1);
-    LeanCtor("[\"EStateM\",\"Result\",\"error\"]", Array[_a_10_7, _a_11_8])
+    LeanCtor(LeanTag.EStateM_Result_error, Array[_a_10_7, _a_11_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -248,8 +248,8 @@ fun f_parse_go_spec_0_22e21813af(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_bs_2])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_some, Array[_bs_2])
+  | LeanTag.Bool_true ->
     _v_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -262,13 +262,13 @@ fun f_parse_go_spec_0_22e21813af(
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_5_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
       _i_1,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_6_10: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,

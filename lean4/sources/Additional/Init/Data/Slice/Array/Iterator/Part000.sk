@@ -18,10 +18,10 @@ fun f_Subarray_forIn_lam_1_b6317f6236(
   _do_lift_2_3: LeanValue,
 ): LeanValue {
   leanTag(_do_lift_2_3) match {
-  | "[\"ForInStep\",\"done\"]" ->
+  | LeanTag.ForInStep_done ->
     _a_3_4: LeanValue = leanField(_do_lift_2_3, 0);
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_3_4])
-  | "[\"ForInStep\",\"yield\"]" ->
+  | LeanTag.ForInStep_yield ->
     _a_5_5: LeanValue = leanField(_do_lift_2_3, 0);
     leanApply(
       _runtime,
@@ -58,7 +58,7 @@ fun f_Array_Subarray_repr_1c10c525fc(
   _x_4_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_5_5: LeanValue = L4_Init_WFExtrinsicFix.f_WFExtrinsicFix_WellFounded_opaqueFix_f16a801aaa(
     _runtime,
@@ -72,10 +72,10 @@ fun f_Array_Subarray_repr_1c10c525fc(
     _x_5_5,
   );
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
+    LeanTag.Std_Format_append,
     Array[
       _x_6_6,
-      LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[LeanText(".toSubarray")]),
+      LeanCtor(LeanTag.Std_Format_text, Array[LeanText(".toSubarray")]),
     ],
   )
 }
@@ -91,11 +91,11 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_3_5474c01f64(
   _y_2_6: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_7: LeanValue = leanField(_inst_1_0, 0);
     _toBind_8: LeanValue = leanField(_inst_1_0, 1);
     leanTag(_toApplicative_7) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_9: LeanValue = leanField(_toApplicative_7, 0);
       _toPure_10: LeanValue = leanField(_toApplicative_7, 1);
       _toSeq_11: LeanValue = leanField(_toApplicative_7, 2);
@@ -140,7 +140,7 @@ fun f_instIteratorSubarrayIteratorId_lam_0_899d71b154(
   _it_0: LeanValue,
 ): LeanValue {
   leanTag(_it_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_1: LeanValue = leanField(_it_0, 0);
     _start_2: LeanValue = leanField(_it_0, 1);
     _stop_3: LeanValue = leanField(_it_0, 2);
@@ -152,13 +152,13 @@ fun f_instIteratorSubarrayIteratorId_lam_0_899d71b154(
       _stop_3,
     );
     leanTag(_x_1_6) match {
-    | "[\"Bool\",\"false\"]" ->
-      LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false ->
+      LeanCtor(LeanTag.Std_IterStep_done, Array[])
+    | LeanTag.Bool_true ->
       _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_6_11: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
@@ -168,10 +168,10 @@ fun f_instIteratorSubarrayIteratorId_lam_0_899d71b154(
         LeanErased(),
       );
       LeanCtor(
-        "[\"Std\",\"IterStep\",\"yield\"]",
+        LeanTag.Std_IterStep_yield,
         Array[
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_1, _x_4_9, _stop_3, LeanErased(), LeanErased()],
           ),
           _x_6_11,
@@ -199,7 +199,7 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_1_ae14e3ba06(
   _s_5: LeanValue,
 ): LeanValue {
   leanTag(_s_5) match {
-  | "[\"Std\",\"IterStep\",\"yield\"]" ->
+  | LeanTag.Std_IterStep_yield ->
     _it_2_6: LeanValue = leanField(_s_5, 0);
     _out_3_7: LeanValue = leanField(_s_5, 1);
     _f_4_9: LeanValue = LeanClosure(
@@ -218,14 +218,14 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_1_ae14e3ba06(
       _toBind_4,
       Array[LeanErased(), LeanErased(), _x_5_10, _f_4_9],
     )
-  | "[\"Std\",\"IterStep\",\"skip\"]" ->
+  | LeanTag.Std_IterStep_skip ->
     _it_7_8: LeanValue = leanField(_s_5, 0);
     leanApply(
       _runtime,
       _recur_1,
       Array[_it_7_8, _acc_3, LeanErased(), LeanErased()],
     )
-  | "[\"Std\",\"IterStep\",\"done\"]" ->
+  | LeanTag.Std_IterStep_done ->
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _acc_3])
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -252,7 +252,7 @@ fun f_Array_instAppendSubarray_lam_2_a51b893641(
   _x_2: LeanValue,
   _y_3: LeanValue,
 ): LeanValue {
-  _x_3_4: LeanValue = LeanScalar("nat", "0");
+  _x_3_4: LeanValue = LeanNatLiterals.n0;
   _x_4_5: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
@@ -318,7 +318,7 @@ fun f_SubarrayIterator_step_0d4c0e734d(
   _x_1_2: LeanValue,
 ): LeanValue {
   leanTag(_x_1_2) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_3: LeanValue = leanField(_x_1_2, 0);
     _start_4: LeanValue = leanField(_x_1_2, 1);
     _stop_5: LeanValue = leanField(_x_1_2, 2);
@@ -330,13 +330,13 @@ fun f_SubarrayIterator_step_0d4c0e734d(
       _stop_5,
     );
     leanTag(_x_2_8) match {
-    | "[\"Bool\",\"false\"]" ->
-      LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false ->
+      LeanCtor(LeanTag.Std_IterStep_done, Array[])
+    | LeanTag.Bool_true ->
       _x_5_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_4,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_7_13: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
@@ -346,10 +346,10 @@ fun f_SubarrayIterator_step_0d4c0e734d(
         LeanErased(),
       );
       LeanCtor(
-        "[\"Std\",\"IterStep\",\"yield\"]",
+        LeanTag.Std_IterStep_yield,
         Array[
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_3, _x_5_11, _stop_5, LeanErased(), LeanErased()],
           ),
           _x_7_13,
@@ -380,10 +380,10 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_0_17a1d4ff02(
   _do_lift_2_3: LeanValue,
 ): LeanValue {
   leanTag(_do_lift_2_3) match {
-  | "[\"ForInStep\",\"done\"]" ->
+  | LeanTag.ForInStep_done ->
     _a_3_4: LeanValue = leanField(_do_lift_2_3, 0);
     leanApply(_runtime, _toPure_0, Array[LeanErased(), _a_3_4])
-  | "[\"ForInStep\",\"yield\"]" ->
+  | LeanTag.ForInStep_yield ->
     _a_5_5: LeanValue = leanField(_do_lift_2_3, 0);
     leanApply(
       _runtime,
@@ -428,11 +428,11 @@ fun f_Subarray_forIn_4a43b38a13(
   _f_6: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_3) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_7: LeanValue = leanField(_inst_1_3, 0);
     _toBind_8: LeanValue = leanField(_inst_1_3, 1);
     leanTag(_toApplicative_7) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_9: LeanValue = leanField(_toApplicative_7, 0);
       _toPure_10: LeanValue = leanField(_toApplicative_7, 1);
       _toSeq_11: LeanValue = leanField(_toApplicative_7, 2);
@@ -494,11 +494,11 @@ fun f_Subarray_forIn_8cd96e54a1(
   _f_3: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Monad\",\"mk\"]" ->
+  | LeanTag.Monad_mk ->
     _toApplicative_4: LeanValue = leanField(_inst_1_0, 0);
     _toBind_5: LeanValue = leanField(_inst_1_0, 1);
     leanTag(_toApplicative_4) match {
-    | "[\"Applicative\",\"mk\"]" ->
+    | LeanTag.Applicative_mk ->
       _toFunctor_6: LeanValue = leanField(_toApplicative_4, 0);
       _toPure_7: LeanValue = leanField(_toApplicative_4, 1);
       _toSeq_8: LeanValue = leanField(_toApplicative_4, 2);
@@ -535,7 +535,7 @@ fun f_Subarray_copy_closed_0_a7b5b1bea5(
   L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Array.instAppendSubarray._closed_0"
@@ -558,7 +558,7 @@ fun f_Iterator_SubarrayIterator_instFinitelessRelation_7f7f53307c(
   _value_0: LeanValue,
 ): LeanValue {
   LeanCtor(
-    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    LeanTag.Std_Iterators_FinitenessRelation_mk,
     Array[LeanErased(), LeanErased(), LeanErased()],
   )
 }
@@ -598,7 +598,7 @@ fun f_Array_instAppendSubarray_lam_0_7798e1a5ee(
   _recur_2: LeanValue,
 ): LeanValue {
   leanTag(_it_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_3: LeanValue = leanField(_it_0, 0);
     _start_4: LeanValue = leanField(_it_0, 1);
     _stop_5: LeanValue = leanField(_it_0, 2);
@@ -610,12 +610,12 @@ fun f_Array_instAppendSubarray_lam_0_7798e1a5ee(
       _stop_5,
     );
     leanTag(_x_1_8) match {
-    | "[\"Bool\",\"false\"]" -> _acc_1
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _acc_1
+    | LeanTag.Bool_true ->
       _x_3_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_4,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_5_12: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
@@ -635,7 +635,7 @@ fun f_Array_instAppendSubarray_lam_0_7798e1a5ee(
         _recur_2,
         Array[
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_3, _x_3_10, _stop_5, LeanErased(), LeanErased()],
           ),
           _x_6_13,
@@ -701,7 +701,7 @@ fun f_Iterator_SubarrayIterator_instFinitelessRelation_c8c3c6ec85(
   _dummy_0: LeanValue,
 ): LeanValue {
   LeanCtor(
-    "[\"Std\",\"Iterators\",\"FinitenessRelation\",\"mk\"]",
+    LeanTag.Std_Iterators_FinitenessRelation_mk,
     Array[LeanErased(), LeanErased(), LeanErased()],
   )
 }
@@ -846,7 +846,7 @@ fun f_Subarray_repr_closed_1_8031c104cc(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_134_0: LeanValue = f_Subarray_repr_closed_0_8d2ccff4b0(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_134_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_134_0])
 }
 // "instIteratorLoopSubarrayIteratorIdOfMonad._redArg"
 fun f_instIteratorLoopSubarrayIteratorIdOfMonad_e4f09e2a61(
@@ -870,7 +870,7 @@ fun f_Array_instToStringSubarray_lam_1_bbf136b354(
   _x_4_4: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_5_5: LeanValue = L4_Init_WFExtrinsicFix.f_WFExtrinsicFix_WellFounded_opaqueFix_f16a801aaa(
     _runtime,
@@ -955,7 +955,7 @@ fun f_Subarray_forIn_lam_2_770bae6927(
   _recur_7: LeanValue,
 ): LeanValue {
   leanTag(_it_4) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_8: LeanValue = leanField(_it_4, 0);
     _start_9: LeanValue = leanField(_it_4, 1);
     _stop_10: LeanValue = leanField(_it_4, 2);
@@ -967,13 +967,13 @@ fun f_Subarray_forIn_lam_2_770bae6927(
       _stop_10,
     );
     leanTag(_x_2_13) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       leanApply(_runtime, _toPure_0, Array[LeanErased(), _acc_5])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_5_16: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_9,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _f_7_18: LeanValue = LeanClosure(
         L4_Init_Data_Slice_Array_Iterator
@@ -983,7 +983,7 @@ fun f_Subarray_forIn_lam_2_770bae6927(
           _toPure_0,
           _recur_7,
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_8, _x_5_16, _stop_10, LeanErased(), LeanErased()],
           ),
         ],
@@ -1040,7 +1040,7 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_2_be5d20ea65(
   _recur_7: LeanValue,
 ): LeanValue {
   leanTag(_it_4) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_8: LeanValue = leanField(_it_4, 0);
     _start_9: LeanValue = leanField(_it_4, 1);
     _stop_10: LeanValue = leanField(_it_4, 2);
@@ -1058,7 +1058,7 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_2_be5d20ea65(
       _stop_10,
     );
     leanTag(_x_3_14) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       leanApply(
         _runtime,
         _lift_3,
@@ -1066,14 +1066,14 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_2_be5d20ea65(
           LeanErased(),
           LeanErased(),
           _f_2_13,
-          LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[]),
+          LeanCtor(LeanTag.Std_IterStep_done, Array[]),
         ],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_7_18: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_9,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_9_20: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
@@ -1083,10 +1083,10 @@ fun f_instIteratorLoopSubarrayIteratorIdOfMonad_lam_2_be5d20ea65(
         LeanErased(),
       );
       _x_10_21: LeanValue = LeanCtor(
-        "[\"Std\",\"IterStep\",\"yield\"]",
+        LeanTag.Std_IterStep_yield,
         Array[
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_8, _x_7_18, _stop_10, LeanErased(), LeanErased()],
           ),
           _x_9_20,
@@ -1155,7 +1155,7 @@ fun f_SubarrayIterator_step_5d0941355a(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]" ->
+  | LeanTag.Std_Slice_Internal_SubarrayData_mk ->
     _array_1: LeanValue = leanField(_x_1_0, 0);
     _start_2: LeanValue = leanField(_x_1_0, 1);
     _stop_3: LeanValue = leanField(_x_1_0, 2);
@@ -1167,13 +1167,13 @@ fun f_SubarrayIterator_step_5d0941355a(
       _stop_3,
     );
     leanTag(_x_2_6) match {
-    | "[\"Bool\",\"false\"]" ->
-      LeanCtor("[\"Std\",\"IterStep\",\"done\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false ->
+      LeanCtor(LeanTag.Std_IterStep_done, Array[])
+    | LeanTag.Bool_true ->
       _x_5_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _start_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_7_11: LeanValue = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
         _runtime,
@@ -1183,10 +1183,10 @@ fun f_SubarrayIterator_step_5d0941355a(
         LeanErased(),
       );
       LeanCtor(
-        "[\"Std\",\"IterStep\",\"yield\"]",
+        LeanTag.Std_IterStep_yield,
         Array[
           LeanCtor(
-            "[\"Std\",\"Slice\",\"Internal\",\"SubarrayData\",\"mk\"]",
+            LeanTag.Std_Slice_Internal_SubarrayData_mk,
             Array[_array_1, _x_5_9, _stop_3, LeanErased(), LeanErased()],
           ),
           _x_7_11,

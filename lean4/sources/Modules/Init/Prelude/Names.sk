@@ -1,0 +1,40 @@
+// Name construction preserves Lean's cached hash and original payload values.
+module L4_Init_Prelude;
+
+// "Lean.Name.str._override"
+fun f_Name_str_override_fde29b60d1(
+  _runtime: mutable LeanExecution,
+  prefix: LeanValue,
+  suffix: LeanValue,
+): LeanValue {
+  hash = leanMixHash(
+    leanNameHashBits(prefix),
+    leanStringHash(leanText(suffix)),
+  );
+  LeanCtor(
+    LeanTag.Name_str__impl,
+    Array[LeanWord("uint64", hash), prefix, suffix],
+  )
+}
+
+// "Lean.Name.num._override"
+fun f_Name_num_override_ca591eddf2(
+  _runtime: mutable LeanExecution,
+  prefix: LeanValue,
+  suffix: LeanValue,
+): LeanValue {
+  index = leanNat(suffix);
+  // Lean deliberately hashes every natural beyond UInt64 with the value 17.
+  suffixHash = if (index < leanNat(LeanNatLiterals.n18446744073709551616)) {
+    index.toWord()
+  } else {
+    17
+  };
+  hash = leanMixHash(leanNameHashBits(prefix), suffixHash);
+  LeanCtor(
+    LeanTag.Name_num__impl,
+    Array[LeanWord("uint64", hash), prefix, suffix],
+  )
+}
+
+module end;

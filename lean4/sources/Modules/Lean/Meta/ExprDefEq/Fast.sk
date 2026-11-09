@@ -1,0 +1,223 @@
+module L4_Lean_Meta_ExprDefEq;
+
+// Structured no-tracing path of Lean.Meta.isExprDefEqAuxImpl. The tracing path
+// retains the original implementation. All unification/reduction algorithms,
+// resource checks and cache policies below are the original maintained calls.
+fun f_Lean_Meta_isExprDefEqAuxImpl_4b1d8193a6(
+  runtime: mutable LeanExecution,
+  t: LeanValue,
+  s: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  cold = leanField(core, 0);
+  if (leanIsTrue(leanField(leanField(cold, 2), 1))) {
+    return f_Lean_Meta_isExprDefEqAuxImpl_4b1d8193a6_fallback(
+      runtime,
+      t,
+      s,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  depth = leanNat(leanField(core, 1));
+  limit = leanNat(leanField(cold, 3));
+  if (limit != LeanNat::fromInt(0) && depth == limit) {
+    return f_Meta_isExprDefEqAuxImpl_spec_0_36bf0f2948(
+      runtime,
+      leanField(core, 2),
+      world,
+    )
+  };
+  nested = leanReplaceField(
+    leanReplaceField(core, 1, leanBoxNat(depth.add(LeanNat::fromInt(1)))),
+    4,
+    LeanErased(),
+  );
+  checked = L4_Lean_CoreM.f_Lean_Core_checkSystem_ccc29ea7a7(
+    runtime,
+    LeanText("isDefEq"),
+    nested,
+    coreState,
+    world,
+  );
+  if (leanTag(checked) == LeanTag.EST_Out_error) return checked;
+  !world = leanField(checked, 1);
+  quick = f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+    runtime,
+    t,
+    s,
+    context,
+    state,
+    nested,
+    coreState,
+    world,
+  );
+  f_defEqConclusive(quick) match {
+  | Some(result) -> return result
+  | None() -> void
+  };
+  !world = leanField(quick, 1);
+  irrel = f_Lean_Meta_isDefEqProofIrrel_d59b1dcb06(
+    runtime,
+    t,
+    s,
+    context,
+    state,
+    nested,
+    coreState,
+    world,
+  );
+  f_defEqConclusive(irrel) match {
+  | Some(result) -> return result
+  | None() -> void
+  };
+  !world = leanField(irrel, 1);
+  reducedT = f_Lean_Meta_whnfCoreAtDefEq_689c617b89(
+    runtime,
+    t,
+    context,
+    state,
+    nested,
+    coreState,
+    world,
+  );
+  if (leanTag(reducedT) == LeanTag.EST_Out_error) return reducedT;
+  reducedS = f_Lean_Meta_whnfCoreAtDefEq_689c617b89(
+    runtime,
+    s,
+    context,
+    state,
+    nested,
+    coreState,
+    leanField(reducedT, 1),
+  );
+  if (leanTag(reducedS) == LeanTag.EST_Out_error) return reducedS;
+  !world = leanField(reducedS, 1);
+  if (
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(
+        runtime,
+        t,
+        leanField(reducedT, 0),
+      ),
+    ) ||
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(
+        runtime,
+        s,
+        leanField(reducedS, 0),
+      ),
+    )
+  ) {
+    return f_Lean_Meta_isExprDefEqAuxImpl_4b1d8193a6(
+      runtime,
+      leanField(reducedT, 0),
+      leanField(reducedS, 0),
+      context,
+      state,
+      nested,
+      coreState,
+      world,
+    )
+  };
+  assignedT = f_Meta_synthInstanceTypedMVarAndUnify_spec_0_ba8275ee71(
+    runtime,
+    t,
+    state,
+    world,
+  );
+  if (leanTag(assignedT) == LeanTag.EST_Out_error) return assignedT;
+  assignedS = f_Meta_synthInstanceTypedMVarAndUnify_spec_0_ba8275ee71(
+    runtime,
+    s,
+    state,
+    leanField(assignedT, 1),
+  );
+  if (leanTag(assignedS) == LeanTag.EST_Out_error) return assignedS;
+  before = L4_Lean_Meta_Basic.f_Lean_Meta_getNumPostponed_debc6b5010(
+    runtime,
+    state,
+    leanField(assignedS, 1),
+  );
+  if (leanTag(before) == LeanTag.EST_Out_error) return before;
+  keyed = f_Lean_Meta_mkCacheKey_7c4732fc06(
+    runtime,
+    leanField(assignedT, 0),
+    leanField(assignedS, 0),
+    context,
+    leanField(before, 1),
+  );
+  if (leanTag(keyed) == LeanTag.EST_Out_error) return keyed;
+  key = leanField(keyed, 0);
+  cached = f_Lean_Meta_getCachedResult_19e92f3d25(
+    runtime,
+    key,
+    state,
+    leanField(keyed, 1),
+  );
+  f_defEqConclusive(cached) match {
+  | Some(result) -> return result
+  | None() -> void
+  };
+  result = f_Lean_Meta_isExprDefEqExpensive_88995bc3cb(
+    runtime,
+    leanField(assignedT, 0),
+    leanField(assignedS, 0),
+    context,
+    state,
+    nested,
+    coreState,
+    leanField(cached, 1),
+  );
+  if (leanTag(result) == LeanTag.EST_Out_error) return result;
+  after = L4_Lean_Meta_Basic.f_Lean_Meta_getNumPostponed_debc6b5010(
+    runtime,
+    state,
+    leanField(result, 1),
+  );
+  if (leanTag(after) == LeanTag.EST_Out_error) return after;
+  !world = leanField(after, 1);
+  if (leanNat(leanField(before, 0)) == leanNat(leanField(after, 0))) {
+    stored = f_Lean_Meta_cacheResult_0f61072da4(
+      runtime,
+      key,
+      leanField(result, 0),
+      context,
+      state,
+      world,
+    );
+    if (leanTag(stored) == LeanTag.EST_Out_error) return stored;
+    !world = leanField(stored, 1)
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[leanField(result, 0), world])
+}
+
+// Errors and conclusive LBool results terminate the chain; undef continues.
+fun f_defEqConclusive(result: LeanValue): ?LeanValue {
+  if (leanTag(result) == LeanTag.EST_Out_error) return Some(result);
+  value = leanField(result, 0);
+  leanTag(value) match {
+  | LeanTag.LBool_undef -> None()
+  | LeanTag.LBool_true ->
+    Some(
+      LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(true), leanField(result, 1)]),
+    )
+  | LeanTag.LBool_false ->
+    Some(
+      LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanBool(false), leanField(result, 1)],
+      ),
+    )
+  | _ -> leanFail("invalid definitional-equality result")
+  }
+}
+
+module end;

@@ -1,0 +1,165 @@
+// Differential check against the retained original Lean traversal. Expressions
+// need not be well typed: this function checks scope, not typing.
+fun main(): void {
+  context = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store => Some(context)};
+  empty = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  otherName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("y"),
+  );
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name);
+  y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, otherName);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  kind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  cdecl = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    empty,
+    name,
+    name,
+    type,
+    binder,
+    kind,
+  );
+  dependent = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+    runtime,
+    empty,
+    name,
+    name,
+    type,
+    y,
+    leanBool(false),
+    kind,
+  );
+  nondependent = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+    runtime,
+    empty,
+    name,
+    name,
+    type,
+    y,
+    leanBool(true),
+    kind,
+  );
+  scopes = Array[empty, cdecl, dependent, nondependent];
+  expressions = mutable Vector[type, x, y];
+  lit = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(4));
+  expressions.push(lit);
+  expressions.push(
+    L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0)),
+  );
+  for (a in Array[type, x, y]) {
+    for (b in Array[type, x, y]) {
+      expressions.push(L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, a, b));
+      expressions.push(
+        L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name, binder, a, b),
+      );
+      expressions.push(
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name, binder, a, b),
+      );
+      expressions.push(
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          name,
+          a,
+          b,
+          x,
+          leanBool(false),
+        ),
+      );
+      expressions.push(
+        L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+          runtime,
+          name,
+          leanNatValue(0),
+          a,
+        ),
+      );
+      expressions.push(
+        L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+          runtime,
+          LeanCtor(LeanTag.List_nil, Array[]),
+          a,
+        ),
+      )
+    }
+  };
+  shared = x;
+  for (_ in Range(0, 30)) {
+    !shared = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, shared, shared)
+  };
+  expressions.push(shared);
+  // Two different expressions deliberately share a hash. Neither visited set
+  // may treat the hash as identity and skip the disallowed variable y.
+  collision = leanReplaceField(y, 0, leanField(x, 0));
+  expressions.push(L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, x, collision));
+  mctx = L4_Lean_MetavarContext.f_Lean_instInhabitedMetavarContext_060bbe8809(
+    runtime,
+  );
+  for (id in Array[name, otherName]) {
+    mvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, id);
+    expressions.push(mvar);
+    expressions.push(L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, x, mvar))
+  };
+  count = 0;
+  for (scope in scopes) {
+    // No other MetavarDecl fields are read by this branch.
+    decl = LeanCtor(
+      LeanTag.MetavarDecl_mk,
+      Array[
+        LeanErased(),
+        scope,
+        LeanErased(),
+        LeanErased(),
+        LeanErased(),
+        LeanErased(),
+        LeanErased(),
+        LeanErased(),
+      ],
+    );
+    for (locals in scopes) {
+      for (arguments in Array[Array[], Array[x], Array[y], Array[x, y]]) {
+        for (expr in expressions) {
+          for (hasContextLocals in Array[false, true]) {
+            original = L4_Lean_Meta_ExprDefEq.f_CheckAssignmentQuick_checkImpl_visit_02c6e27811(
+              runtime,
+              leanBool(hasContextLocals),
+              mctx,
+              locals,
+              decl,
+              name,
+              LeanArray(arguments),
+              expr,
+              L4_Lean_Util_PtrSet.f_Lean_mkPtrSet_65e1e9627e(
+                runtime,
+                leanNatValue(64),
+              ),
+            );
+            actual = L4_Lean_Meta_ExprDefEq.f_Meta_CheckAssignmentQuick_checkImpl_f03bef3c21(
+              runtime,
+              leanBool(hasContextLocals),
+              mctx,
+              locals,
+              decl,
+              name,
+              LeanArray(arguments),
+              expr,
+            );
+            assert(leanIsTrue(actual) == leanIsTrue(leanField(original, 0)));
+            !count = count + 1
+          }
+        }
+      }
+    }
+  };
+  print_string(
+    "assignment traversal: " +
+      count.toString() +
+      " scope/DAG/collision comparisons passed",
+  )
+}

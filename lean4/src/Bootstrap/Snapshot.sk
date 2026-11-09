@@ -8,6 +8,9 @@ class LeanImportSnapshot(
   extraNameCount: Int,
   extensionCount: Int,
   revision: String,
+  // Optional typed problem declarations, never a target proof or result cache.
+  problem: ?LeanImportData = None(),
+  rawImports: ?LeanImportedEnvironment = None(),
 ) extends SKStore.File
 
 fun leanSnapshotRevision(): String {
@@ -89,7 +92,11 @@ fun leanDefaultImportSnapshot(): String {
   "build/Init." + leanExecutableIdentity() + ".skstore"
 }
 
-fun leanPrepareImportSnapshot(path: String, dataRoot: String): void {
+fun leanPrepareImportSnapshot(
+  path: String,
+  dataRoot: String,
+  problemPath: String = "",
+): void {
   if (SKStore.gHasContext()) leanFail("import snapshot is already initialized");
   start = Time.time_ns();
   data = leanDecodeImportData(
@@ -102,8 +109,37 @@ fun leanPrepareImportSnapshot(path: String, dataRoot: String): void {
     FileSystem.readTextFile(dataRoot + "/init-extra-constants.jsonl"),
   );
   context = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store => context};
-  imports = leanInstallImports(runtime, data, extensions, extras, "/lean/Init");
+  runtime = mutable LeanExecution{store => Some(context)};
+  problem = if (problemPath.isEmpty()) None() else {
+    leanInitializeSimp(runtime);
+    Some(leanDecodeImportData(FileSystem.readTextFile(problemPath)))
+  };
+  header = if (FileSystem.exists(dataRoot + "/init-header.jsonl")) {
+    Some(
+      leanDecodeImportData(
+        FileSystem.readTextFile(dataRoot + "/init-header.jsonl"),
+      ),
+    )
+  } else {
+    None()
+  };
+  imports = leanInstallImports(
+    runtime,
+    data,
+    extensions,
+    extras,
+    "/lean/Init",
+    header,
+  );
+  rawImports = leanInstallImports(
+    runtime,
+    data,
+    extensions,
+    extras,
+    "/lean/raw-unused",
+    header,
+    true,
+  );
   context.initPre();
   context.setPersistent(
     "lean/imports",
@@ -113,6 +149,8 @@ fun leanPrepareImportSnapshot(path: String, dataRoot: String): void {
       extras.extraConstants.fromSome().size(),
       extensions.extensions.size(),
       leanSnapshotRevision(),
+      problem,
+      Some(rawImports),
     ),
   );
   SKStore.gContextInit(context.clone());
@@ -127,11 +165,14 @@ fun leanPrepareImportSnapshot(path: String, dataRoot: String): void {
       "declarations" => JSON.IntNumber(data.constants.size()),
       "extraNames" => JSON.IntNumber(extras.extraConstants.fromSome().size()),
       "extensions" => JSON.IntNumber(extensions.extensions.size()),
+      "typedProblemDeclarations" => JSON.IntNumber(
+        problem.maybe(0, data -> data.constants.size()),
+      ),
       "preparationNs" => JSON.IntNumber(Time.time_ns() - start),
     ].encode(),
   );
   print_string(
-    "Prepared mapped Init imports; no local theorem inputs or results were saved",
+    "Prepared immutable declarations; no target proof or result cache was saved",
   )
 }
 

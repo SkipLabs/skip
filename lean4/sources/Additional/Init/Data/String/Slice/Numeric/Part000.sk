@@ -28,12 +28,12 @@ fun f_String_Slice_toInt_c10a3effec(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"String\",\"Slice\",\"mk\"]" ->
+      | LeanTag.String_Slice_mk ->
         _frame.set(6, leanField(_frame[0], 0));
         _frame.set(7, leanField(_frame[0], 1));
         _frame.set(8, leanField(_frame[0], 2));
         _ = leanField(_frame[0], 3);
-        _frame.set(9, LeanScalar("nat", "0"));
+        _frame.set(9, LeanNatLiterals.n0);
         _frame.set(
           10,
           L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _frame[8], _frame[7]),
@@ -47,7 +47,7 @@ fun f_String_Slice_toInt_c10a3effec(
           ),
         );
         leanTag(_frame[11]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(12, LeanScalar("uint32", "45"));
           _frame.set(
             13,
@@ -67,10 +67,10 @@ fun f_String_Slice_toInt_c10a3effec(
             ),
           );
           leanTag(_frame[14]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               15,
               L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
@@ -99,7 +99,7 @@ fun f_String_Slice_toInt_c10a3effec(
             _frame.set(
               18,
               LeanCtor(
-                "[\"String\",\"Slice\",\"mk\"]",
+                LeanTag.String_Slice_mk,
                 Array[_frame[6], _frame[17], _frame[8], LeanErased()],
               ),
             );
@@ -108,10 +108,10 @@ fun f_String_Slice_toInt_c10a3effec(
               f_String_Slice_toNat_d8abc78398(_runtime, _frame[18]),
             );
             leanTag(_frame[19]) match {
-            | "[\"Option\",\"none\"]" ->
-              _frame.set(21, LeanCtor("[\"Option\",\"none\"]", Array[]));
+            | LeanTag.Option_none ->
+              _frame.set(21, LeanCtor(LeanTag.Option_none, Array[]));
               return _frame[21]
-            | "[\"Option\",\"some\"]" ->
+            | LeanTag.Option_some ->
               _frame.set(20, leanField(_frame[19], 0));
               _frame.set(
                 22,
@@ -122,14 +122,14 @@ fun f_String_Slice_toInt_c10a3effec(
               );
               _frame.set(
                 23,
-                LeanCtor("[\"Option\",\"some\"]", Array[_frame[22]]),
+                LeanCtor(LeanTag.Option_some, Array[_frame[22]]),
               );
               return _frame[23]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           !pc = 1;
           void
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -139,16 +139,16 @@ fun f_String_Slice_toInt_c10a3effec(
     | 1 ->
       _frame.set(1, f_String_Slice_toNat_d8abc78398(_runtime, _frame[0]));
       leanTag(_frame[1]) match {
-      | "[\"Option\",\"none\"]" ->
-        _frame.set(3, LeanCtor("[\"Option\",\"none\"]", Array[]));
+      | LeanTag.Option_none ->
+        _frame.set(3, LeanCtor(LeanTag.Option_none, Array[]));
         return _frame[3]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(2, leanField(_frame[1], 0));
         _frame.set(
           4,
           L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[2]),
         );
-        _frame.set(5, LeanCtor("[\"Option\",\"some\"]", Array[_frame[4]]));
+        _frame.set(5, LeanCtor(LeanTag.Option_some, Array[_frame[4]]));
         return _frame[5]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
@@ -173,8 +173,8 @@ fun f_Slice_toNat_closed_3_e58c277936(
     _runtime,
     _x_236_4,
     _x_235_3,
-    LeanScalar("nat", "109"),
-    LeanScalar("nat", "4"),
+    LeanNatLiterals.n109,
+    LeanNatLiterals.n4,
     _x_232_0,
   )
 }
@@ -183,10 +183,10 @@ fun f_Slice_isNat_closed_0_c50f3dda7b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Prod\",\"mk\"]",
+    LeanTag.Prod_mk,
     Array[
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
-      LeanCtor("[\"Bool\",\"false\"]", Array[]),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanCtor(LeanTag.Bool_false, Array[]),
     ],
   )
 }
@@ -226,7 +226,7 @@ fun f_String_Slice_isInt_ada9acfa98(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_1: LeanValue = leanField(_s_0, 0);
     _startInclusive_2: LeanValue = leanField(_s_0, 1);
     _endExclusive_3: LeanValue = leanField(_s_0, 2);
@@ -238,11 +238,11 @@ fun f_String_Slice_isInt_ada9acfa98(
     );
     _decide_3_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       _x_2_6,
     );
     leanTag(_decide_3_7) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_5_9: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
         _runtime,
         _str_1,
@@ -255,9 +255,9 @@ fun f_String_Slice_isInt_ada9acfa98(
         LeanScalar("uint32", "45"),
       );
       leanTag(_x_6_10) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         f_String_Slice_isNat_c864db0a33(_runtime, _s_0)
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_8_12: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
           _runtime,
           _str_1,
@@ -277,13 +277,13 @@ fun f_String_Slice_isInt_ada9acfa98(
         f_String_Slice_isNat_c864db0a33(
           _runtime,
           LeanCtor(
-            "[\"String\",\"Slice\",\"mk\"]",
+            LeanTag.String_Slice_mk,
             Array[_str_1, _x_10_14, _endExclusive_3, LeanErased()],
           ),
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> f_String_Slice_isNat_c864db0a33(_runtime, _s_0)
+    | LeanTag.Bool_true -> f_String_Slice_isNat_c864db0a33(_runtime, _s_0)
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -296,7 +296,7 @@ fun f_String_Slice_toInt_1378d4401b(
 ): LeanValue {
   _x_1_1: LeanValue = f_String_Slice_toInt_c10a3effec(_runtime, _s_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_instInhabited_7aca87de12(
       _runtime,
     );
@@ -305,7 +305,7 @@ fun f_String_Slice_toInt_1378d4401b(
       _x_2_3,
       LeanText("Int expected"),
     )
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_5_2: LeanValue = leanField(_x_1_1, 0);
     _val_5_2
   | _ -> leanFail("non-exhaustive Lean case")

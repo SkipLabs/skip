@@ -14,13 +14,13 @@ fun f_CNF_dimacs_go_00c28a837f(
   );
   _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_4_4,
   );
   leanTag(_x_5_5) match {
-  | "[\"Bool\",\"false\"]" ->
-    LeanCtor("[\"Prod\",\"mk\"]", Array[_x_2_2, _a_1_1])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false ->
+    LeanCtor(LeanTag.Prod_mk, Array[_x_2_2, _a_1_1])
+  | LeanTag.Bool_true ->
     _x_8_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
       _runtime,
       _x_4_4,
@@ -28,7 +28,7 @@ fun f_CNF_dimacs_go_00c28a837f(
     f_dimacs_go_spec_1_784f52bd8c(
       _runtime,
       _cnf_0,
-      LeanScalar("usize", "0"),
+      LeanWord("usize", 0),
       _x_8_8,
       _x_2_2,
       _a_1_1,
@@ -51,9 +51,9 @@ fun f_dimacs_go_spec_1_784f52bd8c(
     _stop_2,
   );
   leanTag(_x_2_5) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_y_1_4) match {
-    | "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]" ->
+    | LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk ->
       _numClauses_6: LeanValue = leanField(_y_1_4, 0);
       _maxLit_7: LeanValue = leanField(_y_1_4, 1);
       _x_3_8: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -64,7 +64,7 @@ fun f_dimacs_go_spec_1_784f52bd8c(
         LeanErased(),
       );
       leanTag(_x_3_8) match {
-      | "[\"Std\",\"Sat\",\"CNF\",\"Clause\",\"mk\"]" ->
+      | LeanTag.Std_Sat_CNF_Clause_mk ->
         _atoms_9: LeanValue = leanField(_x_3_8, 0);
         _polarities_10: LeanValue = leanField(_x_3_8, 1);
         _size_polarities_11: LeanValue = leanField(_x_3_8, 2);
@@ -72,7 +72,7 @@ fun f_dimacs_go_spec_1_784f52bd8c(
         _x_5_14: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
           _numClauses_6,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         _sz_16: LeanValue = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
           _runtime,
@@ -83,31 +83,31 @@ fun f_dimacs_go_spec_1_784f52bd8c(
           _runtime,
           _x_3_8,
           _sz_16,
-          LeanScalar("usize", "0"),
+          LeanWord("usize", 0),
           _b_3,
           LeanCtor(
-            "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]",
+            LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk,
             Array[_x_5_14, _maxLit_7],
           ),
         );
         leanTag(_x_8_18) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _fst_9_19: LeanValue = leanField(_x_8_18, 0);
           _snd_10_20: LeanValue = leanField(_x_8_18, 1);
           _x_12_22: LeanValue = L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
             _runtime,
             _fst_9_19,
-            LeanScalar("uint32", "48"),
+            LeanWord("uint32", 48),
           );
           _x_14_24: LeanValue = L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
             _runtime,
             _x_12_22,
-            LeanScalar("uint32", "10"),
+            LeanWord("uint32", 10),
           );
           _x_16_26: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
             _runtime,
             _i_1,
-            LeanScalar("usize", "1"),
+            LeanWord("usize", 1),
           );
           f_dimacs_go_spec_1_784f52bd8c(
             _runtime,
@@ -123,7 +123,7 @@ fun f_dimacs_go_spec_1_784f52bd8c(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Prod\",\"mk\"]", Array[_b_3, _y_1_4])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Prod_mk, Array[_b_3, _y_1_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -132,27 +132,27 @@ fun f_Sat_CNF_dimacs_abd068a060(
   _runtime: mutable LeanExecution,
   _cnf_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanScalar("nat", "0");
+  _x_1_1: LeanValue = LeanNatLiterals.n0;
   _x_3_3: LeanValue = f_CNF_dimacs_go_00c28a837f(
     _runtime,
     _cnf_0,
     LeanCtor(
-      "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]",
+      LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk,
       Array[_x_1_1, _x_1_1],
     ),
   );
   leanTag(_x_3_3) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_4_4: LeanValue = leanField(_x_3_3, 0);
     _snd_5_5: LeanValue = leanField(_x_3_3, 1);
     leanTag(_snd_5_5) match {
-    | "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]" ->
+    | LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk ->
       _numClauses_6: LeanValue = leanField(_snd_5_5, 0);
       _maxLit_7: LeanValue = leanField(_snd_5_5, 1);
       _x_8_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _maxLit_7,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_9_11: LeanValue = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
         _runtime,
@@ -224,21 +224,21 @@ fun f_dimacs_go_spec_0_6a86eca416(
         ),
       );
       leanTag(_frame[13]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           14,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[3], _frame[4]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[3], _frame[4]]),
         );
         return _frame[14]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         leanTag(_frame[0]) match {
-        | "[\"Std\",\"Sat\",\"CNF\",\"Clause\",\"mk\"]" ->
+        | LeanTag.Std_Sat_CNF_Clause_mk ->
           _frame.set(15, leanField(_frame[0], 0));
           _frame.set(16, leanField(_frame[0], 1));
           _ = leanField(_frame[0], 2);
           _ = leanField(_frame[0], 3);
           leanTag(_frame[4]) match {
-          | "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]" ->
+          | LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk ->
             _frame.set(17, leanField(_frame[4], 0));
             _frame.set(18, leanField(_frame[4], 1));
             _frame.set(
@@ -260,7 +260,7 @@ fun f_dimacs_go_spec_0_6a86eca416(
                 LeanErased(),
               ),
             );
-            _frame.set(21, LeanScalar("uint8", "1"));
+            _frame.set(21, LeanWord("uint8", 1));
             _frame.set(
               22,
               L4_Init_Prelude.f_UInt8_decEq_926bae36a1(
@@ -278,16 +278,16 @@ fun f_dimacs_go_spec_0_6a86eca416(
               ),
             );
             leanTag(_frame[32]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _jump0 = _frame[4];
               _frame.set(23, _jump0);
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 33,
                 LeanCtor(
-                  "[\"_private\",\"Std\",\"Sat\",\"CNF\",\"Dimacs\",0,\"Std\",\"Sat\",\"CNF\",\"DimacsState\",\"mk\"]",
+                  LeanTag.Private_Std_Sat_CNF_Dimacs_0_Std_Sat_CNF_DimacsState_mk,
                   Array[_frame[17], _frame[19]],
                 ),
               );
@@ -312,7 +312,7 @@ fun f_dimacs_go_spec_0_6a86eca416(
           _frame[6],
         ),
       );
-      _frame.set(8, LeanScalar("uint32", "32"));
+      _frame.set(8, LeanWord("uint32", 32));
       _frame.set(
         9,
         L4_Init_Data_String_Bootstrap.f_String_push_e2cbb929c6(
@@ -321,7 +321,7 @@ fun f_dimacs_go_spec_0_6a86eca416(
           _frame[8],
         ),
       );
-      _frame.set(10, LeanScalar("usize", "1"));
+      _frame.set(10, LeanWord("usize", 1));
       _frame.set(
         11,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -344,9 +344,9 @@ fun f_dimacs_go_spec_0_6a86eca416(
       return _frame[12]
     | 2 ->
       leanTag(_frame[22]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(24, LeanText("-"));
-        _frame.set(25, LeanScalar("nat", "1"));
+        _frame.set(25, LeanNatLiterals.n1);
         _frame.set(
           26,
           L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -373,8 +373,8 @@ fun f_dimacs_go_spec_0_6a86eca416(
         _frame.set(6, _jump1);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(29, LeanScalar("nat", "1"));
+      | LeanTag.Bool_true ->
+        _frame.set(29, LeanNatLiterals.n1);
         _frame.set(
           30,
           L4_Init_Prelude.f_Nat_add_86990f4822(

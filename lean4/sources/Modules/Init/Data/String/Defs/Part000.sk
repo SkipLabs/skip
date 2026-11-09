@@ -4,9 +4,9 @@ module L4_Init_Data_String_Defs;
 fun f_String_instInhabitedSlice_cbc0cf417d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_2_1: LeanValue = LeanScalar("nat", "0");
+  _x_2_1: LeanValue = LeanNatLiterals.n0;
   LeanCtor(
-    "[\"String\",\"Slice\",\"mk\"]",
+    LeanTag.String_Slice_mk,
     Array[LeanText(""), _x_2_1, _x_2_1, LeanErased()],
   )
 }
@@ -17,8 +17,8 @@ fun f_String_intercalate_57e8ca8200(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"List\",\"nil\"]" -> LeanText("")
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanText("")
+  | LeanTag.List_cons ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
     f_String_intercalate_go_1751246b4d(_runtime, _head_3_2, _s_0, _tail_4_3)
@@ -67,8 +67,8 @@ fun f_String_intercalate_go_1751246b4d(
   _a_1_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_2) match {
-  | "[\"List\",\"nil\"]" -> _acc_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _acc_0
+  | LeanTag.List_cons ->
     _head_2_3: LeanValue = leanField(_a_1_2, 0);
     _tail_3_4: LeanValue = leanField(_a_1_2, 1);
     _x_4_5: LeanValue = f_String_append_61d243de93(_runtime, _acc_0, _s_1);

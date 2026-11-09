@@ -14,16 +14,195 @@ fun runtimeTestClosure(
   runtime.readRef(args[0])
 }
 
-fun runtimeChecks(runtime: mutable LeanExecution): void {
-  assert(
-    leanWordBits(
-      LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
-    ) == 3,
+fun runtimeRegionAction(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  runtime.writeRef(args[0], Some(leanNatValue(71)));
+  newRef = runtime.newRef(leanNatValue(72));
+  runtime.!initializers = runtime.initializers.set("region-test", newRef);
+  if (leanIsTrue(args[1])) throw RuntimeError("region-test exception");
+  LeanClosure(runtimeTestClosure, 2, Array[newRef])
+}
+
+class RuntimeRegionRead(value: LeanValue, tick: Int) extends SKStore.File
+
+fun runtimeRegionQueryAction(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  assert(runtime.memoizeSimp && runtime.simpQueryMask == 7);
+  hook = runtime.simpHook.fromSome();
+  hook(runtime, args).fromSome()
+}
+
+fun runtimePersistentArrays(runtime: mutable LeanExecution): void {
+  for (size in Array[
+    0,
+    1,
+    31,
+    32,
+    33,
+    127,
+    128,
+    129,
+    255,
+    256,
+    1023,
+    1024,
+    1025,
+    4096,
+  ]) {
+    original: LeanValue = LeanArray(Array::fillBy(size, i -> leanNatValue(i)));
+    changed = original;
+    oracle = Vector::mcreateFromItems(Range(0, size).collect(Array));
+    for (step in Range(0, 80)) {
+      before = changed;
+      !changed = leanArrayPush(changed, leanNatValue(10000 + step));
+      oracle.push(10000 + step);
+      assert(leanValueArraySize(before) + 1 == leanValueArraySize(changed));
+      index = (step * 97) % oracle.size();
+      savedIndex = min(index, leanValueArraySize(before) - 1);
+      previous = if (savedIndex >= 0) {
+        leanArrayRead(runtime, before, leanNatValue(savedIndex), false)
+      } else {
+        LeanErased()
+      };
+      !changed = leanArrayWrite(
+        changed,
+        leanNatValue(index),
+        leanNatValue(step + 700),
+        false,
+      );
+      oracle.set(index, step + 700);
+      if (leanValueArraySize(before) > 0) {
+        assert(
+          native_eq(
+            previous,
+            leanArrayRead(runtime, before, leanNatValue(savedIndex), false),
+          ) == 0,
+        )
+      };
+      last = oracle.size() - 1;
+      !changed = runtimeTestInvoke(
+        runtime,
+        "lean_array_uswap",
+        Array[
+          LeanErased(),
+          changed,
+          LeanWord("usize", 0),
+          LeanWord("usize", last),
+          LeanErased(),
+          LeanErased(),
+        ],
+      );
+      temp = oracle[0];
+      oracle.set(0, oracle[last]);
+      oracle.set(last, temp);
+      if (step % 2 == 0) {
+        !changed = leanArrayPop(changed);
+        _ = oracle.pop()
+      };
+      assert(leanValueArraySize(changed) == oracle.size());
+      for (i in Range(0, oracle.size())) {
+        assert(
+          leanNat(
+            leanArrayRead(runtime, changed, LeanWord("usize", i), true),
+          ).toInt() == oracle[i],
+        )
+      }
+    };
+    assert(
+      leanArray(changed).map(value -> leanNat(value).toInt()) ==
+        oracle.toArray(),
+    );
+    for (i in Range(0, size)) {
+      assert(
+        leanNat(
+          leanArrayRead(runtime, original, leanNatValue(i), false),
+        ).toInt() == i,
+      )
+    };
+    // Empty persistent arrays must support Lean's total pop operation.
+    while (leanValueArraySize(changed) > 0) !changed = leanArrayPop(changed);
+    assert(leanValueArraySize(leanArrayPop(changed)) == 0)
+  }
+}
+
+fun runtimeRegionStoreChecks(): void {
+  context = SKStore.Context::create{}.mclone();
+  inputs = context.mkdir(
+    LeanConstantKey::keyType,
+    LeanConstantFile::type,
+    SKStore.DirName::create("/region/inputs/"),
+    Array[],
   );
+  view = LeanConstantsView("test", LeanConstantDirectory(inputs));
+  name = LeanCtor(
+    LeanTag.Name_str__impl,
+    Array[
+      LeanWord("uint64", 0),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      LeanText("x"),
+    ],
+  );
+  requests = context.mkdir(
+    SKStore.SID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/region/requests/"),
+    Array[(SKStore.SID("read"), SKStore.IntFile(0))],
+  );
+  outputs = requests.map(
+    SKStore.SID::keyType,
+    RuntimeRegionRead::type,
+    context,
+    SKStore.DirName::create("/region/results/"),
+    (context, writer, key, _) ~> {
+      runtime = mutable LeanExecution{store => Some(context)};
+      value = runtime.inRegion(
+        (inner, _) ~> leanLocalConstantLookup(inner, view, name),
+        Array[],
+      );
+      writer.set(key, RuntimeRegionRead(value, context.getTick().value))
+    },
+  );
+  context.initPre();
+  context.update();
+  key = SKStore.SID("read");
+  assert(leanTag(outputs.get(context, key).value) == LeanTag.Option_none);
+  before = outputs.get(context, key).tick;
+  inputKey = LeanConstantKey("test", leanNameKey(name));
+  inputs.writeArray(
+    context,
+    inputKey,
+    Array[LeanConstantFile(leanNatValue(17), None())],
+  );
+  context.update();
+  found = outputs.get(context, key);
+  assert(
+    found.tick != before && leanNat(leanField(found.value, 0)).toInt() == 17,
+  );
+  inputs.writeArray(
+    context,
+    LeanConstantKey("unrelated", inputKey.name),
+    Array[LeanConstantFile(leanNatValue(18), None())],
+  );
+  context.update();
+  assert(outputs.get(context, key).tick == found.tick);
+  inputs.writeArray(context, inputKey, Array[]);
+  context.update();
+  assert(leanTag(outputs.get(context, key).value) == LeanTag.Option_none)
+}
+
+fun runtimeChecks(runtime: mutable LeanExecution): void {
+  assert(leanWordBits(LeanCtor(LeanTag.BinderInfo_instImplicit, Array[])) == 3);
   erased = runtimeTestInvoke(
     runtime,
     "lean_void_mk",
-    Array[LeanErased(), LeanCtor("[\"Unit\",\"unit\"]", Array[])],
+    Array[
+      LeanErased(),
+      LeanCtor(LeanTag.Unknown("[\"Unit\",\"unit\"]"), Array[]),
+    ],
   );
   erased match {
   | LeanErased() -> void
@@ -73,7 +252,182 @@ fun runtimeChecks(runtime: mutable LeanExecution): void {
     Array[erased, erased, ref, three, erased],
   );
   assert(leanNat(runtime.readRef(ref)).toInt() == 3);
+  // Old aliases, newly allocated references, initializer changes and exceptions
+  // must all survive a collecting execution boundary.
+  regionClosure = runtime.inRegion(
+    runtimeRegionAction,
+    Array[ref, leanBool(false)],
+  );
+  assert(leanNat(runtime.readRef(ref)).toInt() == 71);
+  assert(
+    leanNat(leanApply(runtime, regionClosure, Array[erased])).toInt() == 72,
+  );
+  assert(
+    leanNat(
+      runtime.readRef(leanReadInitializer(runtime, "region-test")),
+    ).toInt() == 72,
+  );
+  caught = try {
+    _ = runtime.inRegion(runtimeRegionAction, Array[ref, leanBool(true)]);
+    false
+  } catch {
+  | RuntimeError(message) -> message == "region-test exception"
+  | error -> throw error
+  };
+  assert(caught && leanNat(runtime.readRef(ref)).toInt() == 71);
+  queryRuntime = mutable LeanExecution{
+    store => runtime.store,
+    memoizeSimp => true,
+    simpQueryMask => 7,
+  };
+  queryRef = queryRuntime.newRef(three);
+  queryRuntime.!simpHook = Some((current, args) ~> {
+    current.!simpQueryFetches = current.simpQueryFetches + 1;
+    current.writeRef(args[0], Some(four));
+    Some(current.readRef(args[0]))
+  });
+  assert(
+    leanNat(
+      queryRuntime.inRegion(runtimeRegionQueryAction, Array[queryRef]),
+    ).toInt() == 4,
+  );
+  assert(queryRuntime.simpQueryFetches == 1);
+  assert(leanNat(queryRuntime.readRef(queryRef)).toInt() == 4);
+  _ = runtimeRegionQueryAction(queryRuntime, Array[queryRef]);
+  assert(queryRuntime.simpQueryFetches == 2);
+  // Bootstrap templates may be shared; their mutable reference tables may not.
+  template = queryRuntime.checkpoint();
+  privateFirst = template.restore(runtime.context());
+  privateSecond = template.restore(runtime.context());
+  privateFirst.writeRef(queryRef, Some(leanNatValue(99)));
+  assert(leanNat(privateSecond.readRef(queryRef)).toInt() == 4);
+  assert(leanNat(queryRuntime.readRef(queryRef)).toInt() == 4);
+  assert(leanNat(privateFirst.readRef(queryRef)).toInt() == 99);
+  // Cross-page writes and appended slots must remain isolated across snapshots.
+  paged = mutable LeanReferenceTable{};
+  for (i in Range(0, 700)) paged.push(Some(leanNatValue(i)));
+  firstSnapshot = paged.snapshot();
+  forkA = firstSnapshot.restore();
+  forkB = firstSnapshot.restore();
+  for (i in Array[0, 255, 256, 511, 512, 699]) {
+    forkA.set(i, Some(leanNatValue(i + 1000)))
+  };
+  forkA.push(Some(leanNatValue(700)));
+  secondSnapshot = forkA.snapshot();
+  forkA.set(256, None());
+  forkB.set(0, Some(leanNatValue(9000)));
+  forkC = secondSnapshot.restore();
+  assert(forkA.size() == 701 && forkB.size() == 700);
+  assert(forkA[256].isNone());
+  assert(leanNat(forkC[256].fromSome()).toInt() == 1256);
+  assert(leanNat(forkB[256].fromSome()).toInt() == 256);
+  assert(leanNat(forkC[0].fromSome()).toInt() == 1000);
+  assert(leanNat(paged[0].fromSome()).toInt() == 0);
+  assert(leanNat(forkC[700].fromSome()).toInt() == 700);
+  // The raw path must work with no dependency-tracking Context, including its
+  // collecting regions and immutable constant lookup.
+  rawRuntime = mutable LeanExecution{};
+  rawRef = rawRuntime.newRef(three);
+  rawClosure = rawRuntime.inRegion(
+    runtimeRegionAction,
+    Array[rawRef, leanBool(false)],
+  );
+  assert(rawRuntime.store.isNone());
+  assert(leanNat(rawRuntime.readRef(rawRef)).toInt() == 71);
+  assert(
+    leanNat(leanApply(rawRuntime, rawClosure, Array[erased])).toInt() == 72,
+  );
+  rawEntries: mutable Map<String, LeanConstantFile> = mutable Map[];
+  rawEntries.set("a", LeanConstantFile(three, None()));
+  rawView = LeanConstantsView("raw", LeanConstantMap(rawEntries.chill()));
+  rawName = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  assert(
+    leanNat(rawView.lookup(rawRuntime, rawName).fromSome().value).toInt() == 3,
+  );
+  assert(
+    rawView
+      .lookup(
+        rawRuntime,
+        LeanCtor(
+          LeanTag.Name_str__impl,
+          Array[LeanWord("uint64", 0), rawName, LeanText("missing")],
+        ),
+      )
+      .isNone(),
+  );
+  runtime.writeRef(ref, Some(three));
+  task = runtimeTestInvoke(runtime, "lean_task_pure", Array[erased, four]);
+  mapped = runtimeTestInvoke(
+    runtime,
+    "lean_task_map",
+    Array[erased, erased, closure, task, leanNatValue(0), leanBool(true)],
+  );
+  assert(
+    leanNat(
+      runtimeTestInvoke(runtime, "lean_task_get_own", Array[erased, mapped]),
+    ).toInt() == 3,
+  );
   original = LeanArray(Array[three, four]);
+  assert(
+    native_eq(
+      original,
+      runtimeTestInvoke(
+        runtime,
+        "lean_array_propagate_mark",
+        Array[erased, erased, LeanArray(Array[]), original],
+      ),
+    ) == 0,
+  );
+  for (i in Range(0, 2)) {
+    for (j in Range(0, 2)) {
+      arraySwapped = runtimeTestInvoke(
+        runtime,
+        "lean_array_fswap",
+        Array[
+          erased,
+          original,
+          leanNatValue(i),
+          leanNatValue(j),
+          erased,
+          erased,
+        ],
+      );
+      arraySwappedWord = runtimeTestInvoke(
+        runtime,
+        "lean_array_uswap",
+        Array[
+          erased,
+          original,
+          LeanWord("usize", i),
+          LeanWord("usize", j),
+          erased,
+          erased,
+        ],
+      );
+      assert(native_eq(arraySwapped, arraySwappedWord) == 0);
+      assert(leanNat(leanArray(arraySwapped)[i]).toInt() == 3 + j);
+      assert(leanNat(leanArray(arraySwapped)[j]).toInt() == 3 + i);
+      assert(leanNat(leanArray(original)[0]).toInt() == 3)
+    }
+  };
+  // Force a hash collision: identities must still distinguish the expressions.
+  first = LeanCtor(
+    LeanTag.Expr_bvar__impl,
+    Array[LeanWord("uint64", 42), three],
+  );
+  second = LeanCtor(
+    LeanTag.Expr_bvar__impl,
+    Array[LeanWord("uint64", 42), four],
+  );
+  firstId = runtimeTestInvoke(runtime, "lean_ptr_addr", Array[erased, first]);
+  secondId = runtimeTestInvoke(runtime, "lean_ptr_addr", Array[erased, second]);
+  assert(leanWordBits(firstId) != leanWordBits(secondId));
+  assert(
+    leanWordBits(firstId) ==
+      leanWordBits(
+        runtimeTestInvoke(runtime, "lean_ptr_addr", Array[erased, first]),
+      ),
+  );
   bytes = Array[
     LeanText("λxy"),
     LeanText("zλx"),
@@ -122,6 +476,22 @@ fun runtimeChecks(runtime: mutable LeanExecution): void {
   );
   assert(leanNat(leanArray(original)[0]).toInt() == 3);
   assert(leanNat(leanArray(updated)[0]).toInt() == 4);
+  overlay = LeanArrayOverride(original, 0, four);
+  changedOverlay = leanArrayWrite(overlay, leanNatValue(1), three, false);
+  assert(
+    leanNat(leanArrayRead(runtime, overlay, leanNatValue(1), false)).toInt() ==
+      4,
+  );
+  assert(
+    leanNat(
+      leanArrayRead(runtime, changedOverlay, leanNatValue(1), false),
+    ).toInt() == 3,
+  );
+  assert(
+    leanNat(
+      leanArrayRead(runtime, changedOverlay, leanNatValue(0), false),
+    ).toInt() == 4,
+  );
   list = runtimeTestInvoke(
     runtime,
     "lean_array_to_list",
@@ -160,18 +530,191 @@ fun runtimeChecks(runtime: mutable LeanExecution): void {
       ),
     ),
   );
-  runtime.initializers.set("test", three);
+  runtime.!initializers = runtime.initializers.set("test", three);
   assert(leanNat(leanReadInitializer(runtime, "test")).toInt() == 3)
 }
 
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   runtimeChecks(runtime);
+  runtimePersistentArrays(runtime);
+  runtimeSimpValueChecks();
+  runtimeRegionStoreChecks();
   for (line in read_to_end().split("\n")) {
     if (line.isEmpty()) continue;
     parts = line.split("\t");
     parts[0] match {
+    | "constructor-tag" ->
+      tag = leanConstructorTag(parts[1]);
+      assert(tag == leanConstructorTag(parts[1]));
+      print_string(
+        tag.toString() + "\t" + leanConstructorOrdinal(tag).toString(),
+      )
+    | "unknown-constructor-tag" ->
+      _ = leanConstructorOrdinal(leanConstructorTag("unknown constructor"))
+    | "word-repr" ->
+      print_string(
+        leanText(
+          runtimeTestInvoke(
+            runtime,
+            "lean_string_of_usize",
+            Array[LeanWord("usize", LeanNat::parse(parts[1]).toWord())],
+          ),
+        ),
+      )
+    | "word-literal" ->
+      print_string(
+        LeanNat::fromWord(
+          leanWordBits(LeanScalar("uint64", parts[1])),
+        ).toString(),
+      )
+    | "int-construction" ->
+      natural = LeanNatural(LeanNat::parse(parts[1]));
+      positive = runtimeTestInvoke(runtime, "lean_nat_to_int", Array[natural]);
+      negative = runtimeTestInvoke(
+        runtime,
+        "lean_int_neg_succ_of_nat",
+        Array[natural],
+      );
+      assert(
+        leanIsTrue(
+          runtimeTestInvoke(runtime, "lean_int_dec_nonneg", Array[positive]),
+        ),
+      );
+      assert(
+        !leanIsTrue(
+          runtimeTestInvoke(runtime, "lean_int_dec_nonneg", Array[negative]),
+        ),
+      );
+      print_string(leanIntegerText(positive) + "\t" + leanIntegerText(negative))
+    | "string-character" ->
+      character = LeanWord("uint32", parts[2].toInt());
+      list = LeanCtor(
+        LeanTag.List_cons,
+        Array[character, LeanCtor(LeanTag.List_nil, Array[])],
+      );
+      made = runtimeTestInvoke(runtime, "lean_string_mk", Array[list]);
+      pushed = runtimeTestInvoke(
+        runtime,
+        "lean_string_push",
+        Array[LeanText(parts[1]), character],
+      );
+      contains = runtimeTestInvoke(
+        runtime,
+        "lean_string_contains",
+        Array[LeanText(parts[1]), character],
+      );
+      print_string(
+        Array[
+          leanText(made).bytes().map(byte -> byte.toInt().toString()).join(","),
+          leanText(pushed)
+            .bytes()
+            .map(byte -> byte.toInt().toString())
+            .join(","),
+          if (leanIsTrue(contains)) "1" else "0",
+        ].join("\t"),
+      )
+    | "utf8-total" ->
+      args = Array[LeanText(parts[1]), LeanNatural(LeanNat::parse(parts[2]))];
+      print_string(
+        Array[
+          leanWordBits(
+            runtimeTestInvoke(runtime, "lean_string_utf8_get", args),
+          ).toString(),
+          leanNat(
+            runtimeTestInvoke(runtime, "lean_string_utf8_next", args),
+          ).toString(),
+          leanNat(
+            runtimeTestInvoke(runtime, "lean_string_utf8_prev", args),
+          ).toString(),
+          if (
+            leanIsTrue(
+              runtimeTestInvoke(runtime, "lean_string_is_valid_pos", args),
+            )
+          ) "1" else {
+            "0"
+          },
+          if (
+            leanIsTrue(
+              runtimeTestInvoke(runtime, "lean_string_utf8_at_end", args),
+            )
+          ) "1" else {
+            "0"
+          },
+        ].join("\t"),
+      )
+    | "utf8-total-slice" ->
+      result = runtimeTestInvoke(
+        runtime,
+        "lean_string_utf8_extract",
+        Array[
+          LeanText(parts[1]),
+          LeanNatural(LeanNat::parse(parts[2])),
+          LeanNatural(LeanNat::parse(parts[3])),
+        ],
+      );
+      print_string(
+        leanText(result).bytes().map(byte -> byte.toInt().toString()).join(","),
+      )
+    | "utf8-byte-bounds" ->
+      _ = runtimeTestInvoke(
+        runtime,
+        "lean_string_get_byte_fast",
+        Array[LeanText("abc"), leanNatValue(3)],
+      )
+    | "int" ->
+      values = parts.drop(1).map(text ->
+        leanIntegerValue(
+          text.startsWith("-"),
+          LeanNat::parse(
+            if (text.startsWith("-")) {
+              String.unsafeSlice(text, 1, text.bytes().size())
+            } else {
+              text
+            },
+          ),
+        )
+      );
+      a = values[0];
+      b = values[1];
+      output = Array["lean_int_add", "lean_int_sub", "lean_int_mul"].map(op ->
+        leanIntegerText(runtimeTestInvoke(runtime, op, Array[a, b]))
+      );
+      comparisons = Array[
+        "lean_int_dec_eq",
+        "lean_int_dec_lt",
+        "lean_int_dec_le",
+      ].map(op ->
+        (if (leanIsTrue(runtimeTestInvoke(runtime, op, Array[a, b]))) "1" else {
+          "0"
+        })
+      );
+      print_string(
+        output
+          .concat(comparisons)
+          .concat(
+            Array[
+              leanIntegerText(
+                runtimeTestInvoke(runtime, "lean_int_neg", Array[a]),
+              ),
+              leanNat(
+                runtimeTestInvoke(runtime, "lean_nat_abs", Array[a]),
+              ).toString(),
+            ],
+          )
+          .join("\t"),
+      )
+    | "utf8-byte" ->
+      print_string(
+        leanWordBits(
+          runtimeTestInvoke(
+            runtime,
+            "lean_string_get_byte_fast",
+            Array[LeanText(parts[1]), LeanNatural(LeanNat::parse(parts[2]))],
+          ),
+        ).toString(),
+      )
     | "string-compare" ->
       result = runtimeTestInvoke(
         runtime,
@@ -179,6 +722,43 @@ fun main(): void {
         Array[LeanText(parts[1]), LeanText(parts[2])],
       );
       print_string(leanConstructorOrdinal(leanTag(result)).toString())
+    | "nat-pow" | "nat-gcd" ->
+      foreign = if (parts[0] == "nat-pow") "lean_nat_pow" else "lean_nat_gcd";
+      print_string(
+        leanNat(
+          runtimeTestInvoke(
+            runtime,
+            foreign,
+            Array[
+              LeanNatural(LeanNat::parse(parts[1])),
+              LeanNatural(LeanNat::parse(parts[2])),
+            ],
+          ),
+        ).toString(),
+      )
+    | "nat-pow-overflow" ->
+      _ = runtimeTestInvoke(
+        runtime,
+        "lean_nat_pow",
+        Array[leanNatValue(2), LeanNatural(LeanNat::parse("4294967296"))],
+      )
+    | "nat-canonical" ->
+      value = LeanNat::parse(parts[1]);
+      one = LeanNat::fromInt(1);
+      zero = LeanNat::fromInt(0);
+      // Structural cache keys require one representation for the same number,
+      // including results that cross into and back out of the large-value path.
+      for (equivalent in Array[
+        LeanNat::fromLimbs(value.asLimbs()),
+        LeanNat::parse(value.toString()),
+        value.add(one).sub(one),
+        value.mul(one),
+        value.divMod(one).i0,
+        value.shiftRight(zero),
+      ]) {
+        assert(native_eq(value, equivalent) == 0)
+      };
+      print_string("true")
     | "nat" ->
       a = LeanNat::parse(parts[1]);
       b = LeanNat::parse(parts[2]);
@@ -350,7 +930,7 @@ fun main(): void {
           LeanErased(),
           leanNatValue(0),
           LeanArray(Array[]),
-          LeanScalar("nat", "18446744073709551616"),
+          LeanNatLiterals.n18446744073709551616,
         ],
       )
     | _ -> leanFail("unknown runtime test command")

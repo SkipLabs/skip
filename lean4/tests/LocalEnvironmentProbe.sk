@@ -12,19 +12,19 @@ fun localProbeAxiom(
   name: LeanValue,
 ): LeanValue {
   LeanCtor(
-    "[\"Lean\",\"ConstantInfo\",\"axiomInfo\"]",
+    LeanTag.ConstantInfo_axiomInfo,
     Array[
       LeanCtor(
-        "[\"Lean\",\"AxiomVal\",\"mk\"]",
+        LeanTag.AxiomVal_mk,
         Array[
           LeanCtor(
-            "[\"Lean\",\"ConstantVal\",\"mk\"]",
+            LeanTag.ConstantVal_mk,
             Array[
               name,
-              LeanCtor("[\"List\",\"nil\"]", Array[]),
+              LeanCtor(LeanTag.List_nil, Array[]),
               L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
                 runtime,
-                LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+                LeanCtor(LeanTag.Level_zero__impl, Array[]),
               ),
             ],
           ),
@@ -38,7 +38,7 @@ fun localProbeAxiom(
 fun localEnvironmentProbe(): void {
   mode = read_to_end().trim();
   store = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   name = localProbeName(runtime, "localFact");
   info = localProbeAxiom(runtime, name);
   constants = store.mkdir(
@@ -49,8 +49,8 @@ fun localEnvironmentProbe(): void {
   );
   base = leanEnvironment(
     runtime,
-    LeanConstantsView("imports", constants),
-    LeanConstantsView("prefix", constants),
+    LeanConstantsView("imports", LeanConstantDirectory(constants)),
+    LeanConstantsView("prefix", LeanConstantDirectory(constants)),
     leanEmptyEnvironmentHeader(),
     LeanArray(Array[]),
     LeanArray(Array[]),
@@ -74,7 +74,7 @@ fun localEnvironmentProbe(): void {
     store,
     SKStore.DirName::create("/local-environment/result/"),
     (context, writer, key, _) ~> {
-      execution = mutable LeanExecution{store => context};
+      execution = mutable LeanExecution{store => Some(context)};
       value = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(
         execution,
         env,
@@ -88,7 +88,7 @@ fun localEnvironmentProbe(): void {
   store.initPre();
   store.update();
   key = SKStore.SID("lookup");
-  assert(leanTag(results.get(store, key).value) == "[\"Option\",\"none\"]");
+  assert(leanTag(results.get(store, key).value) == LeanTag.Option_none);
   missingTick = results.get(store, key).tick;
   // A declaration in a later command prefix does not satisfy this read.
   constants.writeArray(
@@ -106,7 +106,7 @@ fun localEnvironmentProbe(): void {
   store.update();
   found = results.get(store, key);
   assert(found.tick != missingTick);
-  assert(leanTag(found.value) == "[\"Option\",\"some\"]");
+  assert(leanTag(found.value) == LeanTag.Option_some);
   assert(native_eq(leanField(found.value, 0), info) == 0);
   foundTick = found.tick;
   constants.writeArray(
@@ -116,7 +116,7 @@ fun localEnvironmentProbe(): void {
   );
   store.update();
   assert(results.get(store, key).tick != foundTick);
-  assert(leanTag(results.get(store, key).value) == "[\"Option\",\"none\"]");
+  assert(leanTag(results.get(store, key).value) == LeanTag.Option_none);
   print_string(
     "Local Environment.find? passed: insertion after miss, deletion, prefix isolation",
   )

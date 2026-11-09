@@ -1,15 +1,16 @@
 // Structural level equality. Cached hash/data words are not part of identity.
 fun leanLevelEqual(a: LeanValue, b: LeanValue): Bool {
+  if (leanSameObject(a, b) != 0) return true;
   if (leanTag(a) != leanTag(b)) return false;
   leanTag(a) match {
-  | "[\"Lean\",\"Level\",\"zero\",\"_impl\"]" -> true
-  | "[\"Lean\",\"Level\",\"param\",\"_impl\"]"
-  | "[\"Lean\",\"Level\",\"mvar\",\"_impl\"]" ->
+  | LeanTag.Level_zero__impl -> true
+  | LeanTag.Level_param__impl
+  | LeanTag.Level_mvar__impl ->
     leanNameEqual(leanField(a, 1), leanField(b, 1))
-  | "[\"Lean\",\"Level\",\"succ\",\"_impl\"]" ->
+  | LeanTag.Level_succ__impl ->
     leanLevelEqual(leanField(a, 1), leanField(b, 1))
-  | "[\"Lean\",\"Level\",\"max\",\"_impl\"]"
-  | "[\"Lean\",\"Level\",\"imax\",\"_impl\"]" ->
+  | LeanTag.Level_max__impl
+  | LeanTag.Level_imax__impl ->
     leanLevelEqual(leanField(a, 1), leanField(b, 1)) &&
       leanLevelEqual(leanField(a, 2), leanField(b, 2))
   | _ -> leanFail("invalid Lean universe level")
@@ -20,10 +21,11 @@ fun leanLevelListEqual(a: LeanValue, b: LeanValue): Bool {
   left = a;
   right = b;
   loop {
+    if (leanSameObject(left, right) != 0) return true;
     if (leanTag(left) != leanTag(right)) return false;
     leanTag(left) match {
-    | "[\"List\",\"nil\"]" -> return true
-    | "[\"List\",\"cons\"]" ->
+    | LeanTag.List_nil -> return true
+    | LeanTag.List_cons ->
       if (!leanLevelEqual(leanField(left, 0), leanField(right, 0))) {
         return false
       };

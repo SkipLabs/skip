@@ -67,7 +67,7 @@ fun f_Compiler_LCNF_builtinRuntimeTypes_d1c6903512(
   _x_32_31: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "15"),
+    LeanNatLiterals.n15,
   );
   _x_33_32: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
     _runtime,
@@ -181,12 +181,12 @@ fun f_LCNF_isRuntimeBuiltinType_spec_0_7a17dc2a05(
   );
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" -> _x_3_4
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _x_3_4
+  | LeanTag.Bool_true ->
     _x_5_6: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
       _runtime,
       _x_2_3,
@@ -195,7 +195,7 @@ fun f_LCNF_isRuntimeBuiltinType_spec_0_7a17dc2a05(
       _runtime,
       _a_1,
       _as_0,
-      LeanScalar("usize", "0"),
+      LeanWord("usize", 0),
       _x_5_6,
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -215,7 +215,7 @@ fun f_isRuntimeBuiltinType_spec_0_spec_0_d1113b0c51(
     _stop_3,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -229,11 +229,11 @@ fun f_isRuntimeBuiltinType_spec_0_spec_0_d1113b0c51(
       _x_2_5,
     );
     leanTag(_x_3_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_5_8: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
         _runtime,
         _i_2,
-        LeanScalar("usize", "1"),
+        LeanWord("usize", 1),
       );
       f_isRuntimeBuiltinType_spec_0_spec_0_d1113b0c51(
         _runtime,
@@ -242,10 +242,10 @@ fun f_isRuntimeBuiltinType_spec_0_spec_0_d1113b0c51(
         _x_5_8,
         _stop_3,
       )
-    | "[\"Bool\",\"true\"]" -> _x_3_6
+    | LeanTag.Bool_true -> _x_3_6
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Bool_false, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

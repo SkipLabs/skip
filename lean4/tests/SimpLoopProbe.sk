@@ -1,0 +1,253 @@
+// Compare loop control, budgets, callbacks, errors and cache reuse against the
+// retained implementation. Full theorem tests separately validate proof terms.
+fun simpLoopProbePre(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  modeCode = leanNat(args[0]).toInt();
+  mode = modeCode % 5;
+  expr = args[1];
+  world = leanNatValue(leanNat(args[9]).toInt() + 1);
+  if (mode == 2) {
+    return LeanCtor(LeanTag.EST_Out_error, Array[LeanText("pre error"), world])
+  };
+  result = LeanCtor(
+    LeanTag.Meta_Simp_Result_mk,
+    Array[expr, LeanCtor(LeanTag.Option_none, Array[]), leanBool(modeCode < 5)],
+  );
+  step = if (
+    mode == 1 &&
+    leanTag(leanField(expr, 1)) == LeanTag.Level_zero__impl
+  ) {
+    next = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      runtime,
+      L4_Lean_Level.f_Level_succ_override_01cb6e5dce(
+        runtime,
+        leanField(expr, 1),
+      ),
+    );
+    LeanCtor(
+      LeanTag.Meta_Simp_Step_visit,
+      Array[leanReplaceField(result, 0, next)],
+    )
+  } else if (mode == 3 || mode == 4) {
+    optional = if (mode == 3) LeanCtor(LeanTag.Option_none, Array[]) else {
+      LeanCtor(LeanTag.Option_some, Array[result])
+    };
+    LeanCtor(LeanTag.Meta_Simp_Step_continue, Array[optional])
+  } else {
+    LeanCtor(LeanTag.Meta_Simp_Step_done, Array[result])
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[step, world])
+}
+
+fun simpLoopProbeCall(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+  original: Bool,
+  checkProof: Bool,
+): LeanValue {
+  implementation = if (original) {
+    if (checkProof) {
+      L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpImpl_2408473d27_fallback
+    } else {
+      L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpLoop_c21384c049_fallback
+    }
+  } else {
+    if (checkProof) {
+      L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpImpl_2408473d27
+    } else {
+      L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpLoop_c21384c049
+    }
+  };
+  implementation(
+    runtime,
+    args[0],
+    args[1],
+    args[2],
+    args[3],
+    args[4],
+    args[5],
+    args[6],
+    args[7],
+    args[8],
+  )
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeOptions(runtime);
+  meta = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  core = leanUnboundedCoreContext(runtime, "<simp-loop-probe>", "");
+  constants = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", constants),
+    LeanConstantsView("locals", constants),
+    leanEmptyEnvironmentHeader(),
+    LeanArray(Array[]),
+    LeanArray(Array[]),
+    false,
+    leanNatValue(0),
+  );
+  coreState = runtime.newRef(leanCoreState(runtime, environment));
+  expr = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(
+    runtime,
+  );
+  !config = leanReplaceField(config, 0, leanNatValue(1));
+  stats = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_instInhabitedStats_default_1c334e0b28(
+    runtime,
+  );
+  emptyHash = LeanCtor(
+    LeanTag.Std_DHashMap_Raw_mk,
+    Array[
+      leanNatValue(0),
+      LeanArray(
+        Array::fill(
+          16,
+          LeanCtor(LeanTag.Std_DHashMap_Internal_AssocList_nil, Array[]),
+        ),
+      ),
+    ],
+  );
+  cache = LeanCtor(
+    LeanTag.SMap_mk,
+    Array[
+      leanBool(true),
+      emptyHash,
+      LeanCtor(
+        LeanTag.PersistentHashMap_Node_entries,
+        Array[
+          L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+            runtime,
+            LeanErased(),
+          ),
+        ],
+      ),
+    ],
+  );
+  cold = leanField(core, 0);
+  cores = Array[
+    core,
+    leanReplaceField(core, 1, leanField(cold, 3)),
+    leanReplaceField(
+      core,
+      1,
+      LeanNatural(leanNat(leanField(cold, 3)).sub(LeanNat::fromInt(1))),
+    ),
+    leanReplaceField(core, 0, leanReplaceField(cold, 3, leanNatValue(0))),
+  ];
+  checks = 0;
+  for ((memoize, singlePass) in Array[
+    (false, false),
+    (false, true),
+    (true, false),
+    (true, true),
+  ]) {
+    cfg = leanReplaceField(
+      leanReplaceField(config, 3, leanBool(memoize)),
+      4,
+      leanBool(singlePass),
+    );
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(
+      runtime,
+      cfg,
+      LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(
+        runtime,
+      ),
+      leanField(cold, 2),
+      meta,
+      metaState,
+      core,
+      coreState,
+      leanNatValue(0),
+    );
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    context = leanField(contextResult, 0);
+    for (mode in Range(0, 50)) {
+      methods = LeanCtor(
+        LeanTag.Meta_Simp_Methods_mk,
+        Array[
+          LeanClosure(simpLoopProbePre, 10, Array[leanNatValue(mode / 5)]),
+          LeanClosure(simpLoopProbePre, 10, Array[leanNatValue(mode % 5)]),
+          LeanErased(),
+          LeanErased(),
+          LeanErased(),
+          LeanErased(),
+        ],
+      );
+      for (steps in Range(0, 3)) {
+        state = runtime.newRef(
+          LeanCtor(
+            LeanTag.Meta_Simp_State_mk,
+            Array[
+              cache,
+              emptyHash,
+              emptyHash,
+              leanField(stats, 0),
+              leanNatValue(steps),
+              leanField(stats, 1),
+            ],
+          ),
+        );
+        for (ctx in cores) {
+          for (checkProof in Array[false, true]) {
+            saved = runtime.checkpoint();
+            original = saved.restoreRaw();
+            actual = saved.restoreRaw();
+            args = Array[
+              expr,
+              methods,
+              context,
+              state,
+              meta,
+              metaState,
+              ctx,
+              coreState,
+              leanNatValue(0),
+            ];
+            for (_ in Range(0, 2)) {
+              before = simpLoopProbeCall(original, args, true, checkProof);
+              after = simpLoopProbeCall(actual, args, false, checkProof);
+              if (
+                native_eq(before, after) != 0 ||
+                native_eq(
+                  original.checkpoint().refs,
+                  actual.checkpoint().refs,
+                ) !=
+                  0
+              ) {
+                leanFail(
+                  "simplifier control mismatch: mode=" +
+                    mode.toString() +
+                    " steps=" +
+                    steps.toString() +
+                    " memoize=" +
+                    memoize.toString() +
+                    " singlePass=" +
+                    singlePass.toString() +
+                    " proofCheck=" +
+                    checkProof.toString(),
+                )
+              };
+              !checks = checks + 1
+            }
+          }
+        }
+      }
+    }
+  };
+  print_string(
+    "Simplifier loop differential cases passed: " + checks.toString(),
+  )
+}

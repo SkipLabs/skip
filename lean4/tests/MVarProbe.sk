@@ -20,10 +20,10 @@ fun mvarAssign(
   L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, ctx, name, value)
 }
 fun mvarOptionalData(value: LeanValue, level: Bool): JSON.Value {
-  if (leanTag(value) == "[\"Option\",\"none\"]") return JSON.Null();
+  if (leanTag(value) == LeanTag.Option_none) return JSON.Null();
   expr = leanField(value, 0);
   bits = if (!level) leanExprData(expr) else if (
-    leanTag(expr) == "[\"Lean\",\"Level\",\"zero\",\"_impl\"]"
+    leanTag(expr) == LeanTag.Level_zero__impl
   ) 2221 else {
     leanWordBits(leanField(expr, 0))
   };
@@ -32,13 +32,13 @@ fun mvarOptionalData(value: LeanValue, level: Bool): JSON.Value {
 fun main(): void {
   mode = read_to_end().trim();
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   aName = mvarName(runtime, "a");
   bName = mvarName(runtime, "b");
   uName = mvarName(runtime, "u");
   vName = mvarName(runtime, "v");
   x = mvarName(runtime, "x");
-  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
   p = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
   a = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, aName);
   b = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, bName);
@@ -96,7 +96,7 @@ fun main(): void {
   );
   bvar0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
   bvar1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(1));
-  defaultBinder = LeanCtor("[\"Lean\",\"BinderInfo\",\"default\"]", Array[]);
+  defaultBinder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
   identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
     runtime,
     x,
@@ -108,7 +108,7 @@ fun main(): void {
   pair = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
     runtime,
     x,
-    LeanCtor("[\"Lean\",\"BinderInfo\",\"implicit\"]", Array[]),
+    LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
     p,
     L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
       runtime,
@@ -132,16 +132,16 @@ fun main(): void {
       leanBool(false),
     ),
   );
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   metadata = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           mvarName(runtime, "marker"),
           LeanCtor(
-            "[\"Lean\",\"DataValue\",\"ofNat\"]",
+            LeanTag.DataValue_ofNat,
             Array[leanNatValue(7)],
           ),
         ],
@@ -211,8 +211,8 @@ fun main(): void {
         runtime,
         mvarName(runtime, "f"),
         LeanCtor(
-          "[\"List\",\"cons\"]",
-          Array[u, LeanCtor("[\"List\",\"cons\"]", Array[v, nil])],
+          LeanTag.List_cons,
+          Array[u, LeanCtor(LeanTag.List_cons, Array[v, nil])],
         ),
       ),
     ),
@@ -222,7 +222,7 @@ fun main(): void {
       L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
         runtime,
         x,
-        LeanCtor("[\"Lean\",\"BinderInfo\",\"instImplicit\"]", Array[]),
+        LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]),
         a,
         mvarApp(runtime, b, a),
       ),
@@ -249,6 +249,30 @@ fun main(): void {
     ),
   ];
   results = cases.map(entry -> {
+    // Compare the public core wrapper, including its resulting context. The
+    // retained ST implementation allocates two private references per call;
+    // the direct wrapper must preserve existing references and allocate none.
+    before = runtime.checkpoint();
+    original = before.restoreRaw();
+    expected = L4_Lean_MetavarContext.f_Lean_instantiateMVarsCore_57bcec2ce1_fallback(
+      original,
+      entry.i0,
+      entry.i1,
+    );
+    directRuntime = before.restoreRaw();
+    actual = L4_Lean_MetavarContext.f_Lean_instantiateMVarsCore_57bcec2ce1(
+      directRuntime,
+      entry.i0,
+      entry.i1,
+    );
+    invariant(
+      native_eq(actual, expected) == 0,
+      "direct metavariable substitution differs",
+    );
+    invariant(
+      native_eq(directRuntime.refs.snapshot(), before.refs) == 0,
+      "direct metavariable substitution changed execution references",
+    );
     result = L4_Lean_MetavarContext.f_Lean_instantiateExprMVarsImp_d8cff85628(
       runtime,
       entry.i0,
@@ -300,7 +324,7 @@ fun main(): void {
             level,
           );
           mvarOptionalData(
-            LeanCtor("[\"Option\",\"some\"]", Array[leanField(result, 1)]),
+            LeanCtor(LeanTag.Option_some, Array[leanField(result, 1)]),
             true,
           )
         }),

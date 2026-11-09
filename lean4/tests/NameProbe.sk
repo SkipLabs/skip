@@ -1,0 +1,114 @@
+// Compare maintained name construction/ordering with retained original routines.
+fun nameCompare(actual: LeanValue, expected: LeanValue): void {
+  if (native_eq(actual, expected) != 0) leanFail("name routine mismatch")
+}
+
+fun nameComparePairs(
+  runtime: mutable LeanExecution,
+  names: Array<LeanValue>,
+): Int {
+  for (left in names) {
+    for (right in names) {
+      nameCompare(
+        L4_Lean_Data_Name.f_Lean_Name_quickCmpImpl_fa3996fc71(
+          runtime,
+          left,
+          right,
+        ),
+        L4_Lean_Data_Name.f_Lean_Name_quickCmpImpl_fa3996fc71_fallback(
+          runtime,
+          left,
+          right,
+        ),
+      )
+    }
+  };
+  names.size() * names.size()
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  names: mutable Vector<LeanValue> = mutable Vector[
+    (LeanCtor(LeanTag.Name_anonymous__impl, Array[]) : LeanValue),
+  ];
+  strings = Array["", "a", "abc", "abcdefghijk", "é", "世界🙂"];
+  numbers = Array[
+    "0",
+    "1",
+    "9223372036854775807",
+    "9223372036854775808",
+    "18446744073709551615",
+    "18446744073709551616",
+    "18446744073709551617",
+    "340282366920938463463374607431768211456",
+  ];
+  count = 0;
+  for (_ in Range(0, 2)) {
+    prefixes = names.toArray();
+    for (i in Range(0, min(8, prefixes.size()))) {
+      prefix = prefixes[i];
+      for (text in strings) {
+        suffix = LeanText(text);
+        name = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+          runtime,
+          prefix,
+          suffix,
+        );
+        nameCompare(
+          name,
+          L4_Init_Prelude.f_Name_str_override_fde29b60d1_fallback(
+            runtime,
+            prefix,
+            suffix,
+          ),
+        );
+        names.push(name);
+        !count = count + 1
+      };
+      for (digits in numbers) {
+        for (suffix in Array[
+          LeanScalar("nat", digits),
+          leanBoxNat(LeanNat::parse(digits)),
+        ]) {
+          name = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+            runtime,
+            prefix,
+            suffix,
+          );
+          nameCompare(
+            name,
+            L4_Init_Prelude.f_Name_num_override_ca591eddf2_fallback(
+              runtime,
+              prefix,
+              suffix,
+            ),
+          );
+          names.push(name);
+          !count = count + 1
+        }
+      }
+    }
+  };
+  !count = count + nameComparePairs(runtime, names.toArray());
+  // Force collisions to exercise structural tie-breaking, with both unsigned
+  // hash extremes. Do not compare inconsistent hashes for the same name.
+  for (hash in Array[0, -1]) {
+    collisions: mutable Vector<LeanValue> = mutable Vector[];
+    for (name in names.toArray()) {
+      if (leanTag(name) != LeanTag.Name_anonymous__impl) {
+        collisions.push(
+          LeanCtor(
+            leanTag(name),
+            Array[
+              LeanWord("uint64", hash),
+              leanField(name, 1),
+              leanField(name, 2),
+            ],
+          ),
+        )
+      }
+    };
+    !count = count + nameComparePairs(runtime, collisions.toArray())
+  };
+  print_string(count.toString() + " name constructor/order comparisons passed")
+}

@@ -13,7 +13,7 @@ class LeanExtensionArray(
 ) {
   fun get(runtime: mutable LeanExecution, index: Int): LeanValue {
     key = this.slots[index];
-    values = this.entries.getArray(runtime.store, key);
+    values = this.entries.getArray(runtime.context(), key);
     if (values.size() != 1) {
       leanFail("imported extension state is unavailable: " + key.name)
     };
@@ -33,6 +33,8 @@ class LeanExtensionArray(
 fun leanValueArraySize(value: LeanValue): Int {
   value match {
   | LeanTrackedExtensionArray(view) -> view.slots.size()
+  | LeanArrayOverride(base, _, _) -> leanValueArraySize(base)
+  | LeanPersistentArray(values) -> values.size()
   | _ -> leanArray(value).size()
   }
 }
@@ -59,6 +61,76 @@ fun leanArrayRead(
   };
   value match {
   | LeanTrackedExtensionArray(view) -> view.get(runtime, index)
+  | LeanArrayOverride(base, changed, replacement) ->
+    if (index == changed) replacement else {
+      leanArrayRead(runtime, base, at, word)
+    }
+  | LeanPersistentArray(values) -> values[index]
   | _ -> leanArray(value)[index]
+  }
+}
+
+fun leanArrayWrite(
+  value: LeanValue,
+  at: LeanValue,
+  replacement: LeanValue,
+  word: Bool,
+): LeanValue {
+  size = leanValueArraySize(value);
+  index = if (word) {
+    bits = leanWordBits(at);
+    if (!bits.ult(size)) leanFail("Lean Array USize index out of bounds");
+    bits
+  } else {
+    n = leanNat(at);
+    if (n >= LeanNat::fromInt(size)) leanFail("Lean Array index out of bounds");
+    n.toInt()
+  };
+  value match {
+  | LeanTrackedExtensionArray(_) -> LeanArrayOverride(value, index, replacement)
+  | LeanArrayOverride(base, changed, _) if (changed == index) ->
+    LeanArrayOverride(base, index, replacement)
+  | LeanArrayOverride(_, _, _) -> LeanArrayOverride(value, index, replacement)
+  | LeanPersistentArray(values) ->
+    updated = values.clone();
+    updated.set(index, replacement);
+    LeanPersistentArray(updated.chill())
+  | LeanArray(values) if (values.size() > 128) ->
+    updated = Persistent.RadixTreeVector::mcreateFromItems(values);
+    updated.set(index, replacement);
+    LeanPersistentArray(updated.chill())
+  | _ ->
+    LeanArray(
+      leanArray(value).mapWithIndex((i, old) ->
+        if (i == index) replacement else old
+      ),
+    )
+  }
+}
+
+fun leanArrayPush(value: LeanValue, item: LeanValue): LeanValue {
+  value match {
+  | LeanPersistentArray(values) ->
+    updated = values.clone();
+    updated.push(item);
+    LeanPersistentArray(updated.chill())
+  | LeanArray(values) if (values.size() >= 128) ->
+    updated = Persistent.RadixTreeVector::mcreateFromItems(values);
+    updated.push(item);
+    LeanPersistentArray(updated.chill())
+  | _ -> LeanArray(leanArray(value).concat(Array[item]))
+  }
+}
+
+fun leanArrayPop(value: LeanValue): LeanValue {
+  value match {
+  | LeanPersistentArray(values) ->
+    if (values.size() == 0) return value;
+    updated = values.clone();
+    _ = updated.pop();
+    LeanPersistentArray(updated.chill())
+  | _ ->
+    values = leanArray(value);
+    LeanArray(values.take(max(0, values.size() - 1)))
   }
 }

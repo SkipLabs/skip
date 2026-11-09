@@ -1,0 +1,68 @@
+// Sharing and binder-scope checks for abstraction. The large input has 41 nodes
+// and over a trillion occurrences if expanded as a tree.
+fun main(): void {
+  context = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store => Some(context)};
+  xName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  yName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("y"));
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+  y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, yName);
+  zero = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+  one = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(1));
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  body = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    xName,
+    binder,
+    type,
+    x,
+  );
+  underBothScopes = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, x, body);
+  result = leanExprAbstractAt(runtime, underBothScopes, Array[x], 1, 0);
+  expected = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    zero,
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, xName, binder, type, one),
+  );
+  assert(native_eq(result, expected) == 0);
+  collision = leanReplaceField(y, 0, leanField(x, 0));
+  collided = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, x, collision);
+  assert(
+    native_eq(
+      leanExprAbstractAt(runtime, collided, Array[x], 1, 0),
+      L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, zero, collision),
+    ) == 0,
+  );
+  dag = x;
+  expectedDag = zero;
+  for (_ in Range(0, 40)) {
+    !dag = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, dag, dag);
+    !expectedDag = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+      runtime,
+      expectedDag,
+      expectedDag,
+    )
+  };
+  abstracted = leanExprAbstractAt(runtime, dag, Array[x], 1, 0);
+  assert(leanExprData(abstracted) == leanExprData(expectedDag));
+  current = abstracted;
+  for (_ in Range(0, 40)) {
+    assert(
+      leanSameObject(leanField(current, 1), leanField(current, 2)).toInt() != 0,
+    );
+    !current = leanField(current, 1)
+  };
+  assert(native_eq(current, zero) == 0);
+  // A later invocation with different substitutions must keep x free.
+  untouched = leanExprAbstractAt(runtime, dag, Array[y], 1, 0);
+  !current = untouched;
+  for (_ in Range(0, 40)) !current = leanField(current, 1);
+  assert(native_eq(current, x) == 0);
+  print_string(
+    "abstraction: DAG sharing, binder offsets, hash collision and per-call isolation passed",
+  )
+}

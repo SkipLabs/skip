@@ -47,14 +47,14 @@ fun f_Semaphore_availablePermits_lam_0_0878c982dd(
     _y_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_4_3: LeanValue = leanField(_x_3_2, 0);
     _state_5_4: LeanValue = leanField(_x_3_2, 1);
     leanTag(_val_4_3) match {
-    | "[\"_private\",\"Std\",\"Sync\",\"Semaphore\",0,\"Std\",\"SemaphoreState\",\"mk\"]" ->
+    | LeanTag.Private_Std_Sync_Semaphore_0_Std_SemaphoreState_mk ->
       _permits_5: LeanValue = leanField(_val_4_3, 0);
       _waiters_6: LeanValue = leanField(_val_4_3, 1);
-      LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_permits_5, _state_5_4])
+      LeanCtor(LeanTag.ST_Out_mk, Array[_permits_5, _state_5_4])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -124,26 +124,26 @@ fun f_Semaphore_tryAcquire_lam_0_62afb82531(
     _y_2_1,
   );
   leanTag(_x_3_2) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_4_3: LeanValue = leanField(_x_3_2, 0);
     _state_5_4: LeanValue = leanField(_x_3_2, 1);
     leanTag(_val_4_3) match {
-    | "[\"_private\",\"Std\",\"Sync\",\"Semaphore\",0,\"Std\",\"SemaphoreState\",\"mk\"]" ->
+    | LeanTag.Private_Std_Sync_Semaphore_0_Std_SemaphoreState_mk ->
       _permits_5: LeanValue = leanField(_val_4_3, 0);
       _waiters_6: LeanValue = leanField(_val_4_3, 1);
       _x_7_8: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
         _permits_5,
       );
       leanTag(_x_7_8) match {
-      | "[\"Bool\",\"false\"]" ->
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_7_8, _state_5_4])
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false ->
+        LeanCtor(LeanTag.ST_Out_mk, Array[_x_7_8, _state_5_4])
+      | LeanTag.Bool_true ->
         _x_10_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _permits_5,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         _x_12_13: LeanValue = L4_Init_System_ST.f_Prim_Ref_swap_b4291ad63a(
           _runtime,
@@ -151,16 +151,16 @@ fun f_Semaphore_tryAcquire_lam_0_62afb82531(
           LeanErased(),
           _y_1_0,
           LeanCtor(
-            "[\"_private\",\"Std\",\"Sync\",\"Semaphore\",0,\"Std\",\"SemaphoreState\",\"mk\"]",
+            LeanTag.Private_Std_Sync_Semaphore_0_Std_SemaphoreState_mk,
             Array[_x_10_11, _waiters_6],
           ),
           _state_5_4,
         );
         leanTag(_x_12_13) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_13_14: LeanValue = leanField(_x_12_13, 0);
           _state_14_15: LeanValue = leanField(_x_12_13, 1);
-          LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_7_8, _state_14_15])
+          LeanCtor(LeanTag.ST_Out_mk, Array[_x_7_8, _state_14_15])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")

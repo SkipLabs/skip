@@ -2,7 +2,7 @@
 // It must not touch unavailable async realization services.
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   count = runtime.newRef(leanNatValue(0));
   contexts = Array[
     LeanUnavailable("test Meta context"),
@@ -20,7 +20,7 @@ fun main(): void {
       for (i in Range(0, 5)) {
         assert(native_eq(args[i + 2], leanArray(args[1])[i]) == 0)
       };
-      LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[leanNatValue(42), args[6]])
+      LeanCtor(LeanTag.EST_Out_ok, Array[leanNatValue(42), args[6]])
     },
     7,
     Array[count, LeanArray(contexts)],

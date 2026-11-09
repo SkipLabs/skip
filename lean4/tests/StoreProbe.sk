@@ -8,10 +8,10 @@ class ConstantLookupResult(
 
 fun storeProbeName(text: String): LeanValue {
   LeanCtor(
-    "[\"Lean\",\"Name\",\"str\",\"_impl\"]",
+    LeanTag.Name_str__impl,
     Array[
       LeanWord("uint64", leanMixHash(1723, leanStringHash(text))),
-      LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
       LeanText(text),
     ],
   )
@@ -38,17 +38,17 @@ fun storeProbe(): void {
     ],
   );
   local: LeanValue = LeanTrackedConstants(
-    LeanConstantsView("prefix", constants),
+    LeanConstantsView("prefix", LeanConstantDirectory(constants)),
   );
   imported: LeanValue = LeanCtor(
-    "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+    LeanTag.ImportedConsts_mk,
     Array[
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
-      LeanTrackedConstants(LeanConstantsView("imports", constants)),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanTrackedConstants(LeanConstantsView("imports", LeanConstantDirectory(constants))),
     ],
   );
   map: LeanValue = LeanCtor(
-    "[\"Lean\",\"ConstMap\",\"mk\"]",
+    LeanTag.ConstMap_mk,
     Array[imported, local],
   );
   inputs = context.mkdir(
@@ -66,7 +66,7 @@ fun storeProbe(): void {
     context,
     SKStore.DirName::create("/lean/lookup-results/"),
     (context, writer, key, values) ~> {
-      runtime = mutable LeanExecution{store => context};
+      runtime = mutable LeanExecution{store => Some(context)};
       work = values.first;
       value = L4_Lean_ConstMap.f_Lean_ConstMap_find_cc35adf726(
         runtime,
@@ -85,7 +85,7 @@ fun storeProbe(): void {
   assert(leanNat(leanField(before.value, 0)).toInt() == 3);
   assert(
     leanTag(results.get(context, SKStore.SID("missing")).value) ==
-      "[\"Option\",\"none\"]",
+      LeanTag.Option_none,
   );
   constants.writeArray(
     context,
@@ -113,7 +113,7 @@ fun storeProbe(): void {
   context.update();
   assert(
     leanTag(results.get(context, SKStore.SID("missing")).value) ==
-      "[\"Option\",\"some\"]",
+      LeanTag.Option_some,
   );
   constants.writeArray(
     context,
@@ -123,7 +123,7 @@ fun storeProbe(): void {
   context.update();
   assert(
     leanTag(results.get(context, SKStore.SID("missing")).value) ==
-      "[\"Option\",\"none\"]",
+      LeanTag.Option_none,
   );
   // A later prefix is a separate view; it cannot satisfy an earlier lookup.
   constants.writeArray(
@@ -134,7 +134,7 @@ fun storeProbe(): void {
   context.update();
   assert(
     leanTag(results.get(context, SKStore.SID("missing")).value) ==
-      "[\"Option\",\"none\"]",
+      LeanTag.Option_none,
   );
   print_string(
     "SKStore constant reads passed: reuse, relevant edits, misses, deletion, prefix isolation",

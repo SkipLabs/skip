@@ -6,7 +6,7 @@ fun extraConstantsProbe(): void {
   );
   names = data.extraConstants.fromSome();
   context = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store => context};
+  runtime = mutable LeanExecution{store => Some(context)};
   entries = context.mkdir(
     LeanConstantKey::keyType,
     LeanConstantFile::type,
@@ -19,16 +19,16 @@ fun extraConstantsProbe(): void {
     ),
   );
   imported: LeanValue = LeanCtor(
-    "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+    LeanTag.ImportedConsts_mk,
     Array[
-      LeanCtor("[\"Option\",\"none\"]", Array[]),
-      LeanTrackedConstants(LeanConstantsView("extra", entries)),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanTrackedConstants(LeanConstantsView("extra", LeanConstantDirectory(entries))),
     ],
   );
   env = leanEnvironment(
     runtime,
-    LeanConstantsView("imports", entries),
-    LeanConstantsView("local", entries),
+    LeanConstantsView("imports", LeanConstantDirectory(entries)),
+    LeanConstantsView("local", LeanConstantDirectory(entries)),
     leanEmptyEnvironmentHeader(),
     LeanArray(Array[]),
     LeanArray(Array[]),
@@ -52,7 +52,7 @@ fun extraConstantsProbe(): void {
     context,
     SKStore.DirName::create("/extra/results/"),
     (context, writer, key, _) ~> {
-      execution = mutable LeanExecution{store => context};
+      execution = mutable LeanExecution{store => Some(context)};
       value = L4_Lean_Environment.f_Lean_Environment_getModuleIdxFor_01e73ed4b6(
         execution,
         env,
@@ -73,7 +73,7 @@ fun extraConstantsProbe(): void {
     assert(leanNat(value).toInt() == entry.i1 + 1)
   };
   key = SKStore.SID("query");
-  assert(leanTag(results.get(context, key).value) == "[\"Option\",\"none\"]");
+  assert(leanTag(results.get(context, key).value) == LeanTag.Option_none);
   tick = results.get(context, key).tick;
   entries.writeArray(
     context,
@@ -90,7 +90,7 @@ fun extraConstantsProbe(): void {
   context.update();
   assert(results.get(context, key).tick != tick);
   found = results.get(context, key).value;
-  assert(leanTag(found) == "[\"Option\",\"some\"]");
+  assert(leanTag(found) == LeanTag.Option_some);
   assert(leanNat(leanField(found, 0)).toInt() == 0);
   foundTick = results.get(context, key).tick;
   entries.writeArray(
@@ -100,7 +100,7 @@ fun extraConstantsProbe(): void {
   );
   context.update();
   assert(results.get(context, key).tick != foundTick);
-  assert(leanTag(results.get(context, key).value) == "[\"Option\",\"none\"]");
+  assert(leanTag(results.get(context, key).value) == LeanTag.Option_none);
   print_string(
     names.size().toString() +
       " extra module indices and negative-read invalidation passed",

@@ -7,8 +7,8 @@ fun f_Data_AC_insert_ccb54e6156(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"List\",\"nil\"]" -> LeanCtor("[\"List\",\"cons\"]", Array[_x_0, _x_1_1])
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanCtor(LeanTag.List_cons, Array[_x_0, _x_1_1])
+  | LeanTag.List_cons ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
     _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
@@ -17,15 +17,15 @@ fun f_Data_AC_insert_ccb54e6156(
       _head_3_2,
     );
     leanTag(_x_5_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_6_6: LeanValue = f_Data_AC_insert_ccb54e6156(
         _runtime,
         _x_0,
         _tail_4_3,
       );
-      LeanCtor("[\"List\",\"cons\"]", Array[_head_3_2, _x_6_6])
-    | "[\"Bool\",\"true\"]" ->
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_0, _x_1_1])
+      LeanCtor(LeanTag.List_cons, Array[_head_3_2, _x_6_6])
+    | LeanTag.Bool_true ->
+      LeanCtor(LeanTag.List_cons, Array[_x_0, _x_1_1])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -37,13 +37,13 @@ fun f_AC_Expr_toList_0003cb4230(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Data\",\"AC\",\"Expr\",\"var\"]" ->
+  | LeanTag.Data_AC_Expr_var ->
     _x_2_1: LeanValue = leanField(_x_1_0, 0);
     LeanCtor(
-      "[\"List\",\"cons\"]",
-      Array[_x_2_1, LeanCtor("[\"List\",\"nil\"]", Array[])],
+      LeanTag.List_cons,
+      Array[_x_2_1, LeanCtor(LeanTag.List_nil, Array[])],
     )
-  | "[\"Lean\",\"Data\",\"AC\",\"Expr\",\"op\"]" ->
+  | LeanTag.Data_AC_Expr_op ->
     _lhs_5_2: LeanValue = leanField(_x_1_0, 0);
     _rhs_6_3: LeanValue = leanField(_x_1_0, 1);
     _x_7_6: LeanValue = f_AC_Expr_toList_0003cb4230(_runtime, _lhs_5_2);
@@ -59,9 +59,9 @@ fun f_AC_mergeIdem_loop_454da432b7(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_2_1) match {
-  | "[\"List\",\"nil\"]" ->
-    LeanCtor("[\"List\",\"cons\"]", Array[_a_1_0, _a_2_1])
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil ->
+    LeanCtor(LeanTag.List_cons, Array[_a_1_0, _a_2_1])
+  | LeanTag.List_cons ->
     _head_4_2: LeanValue = leanField(_a_2_1, 0);
     _tail_5_3: LeanValue = leanField(_a_2_1, 1);
     _x_6_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -70,14 +70,14 @@ fun f_AC_mergeIdem_loop_454da432b7(
       _head_4_2,
     );
     leanTag(_x_6_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_6: LeanValue = f_AC_mergeIdem_loop_454da432b7(
         _runtime,
         _head_4_2,
         _tail_5_3,
       );
-      LeanCtor("[\"List\",\"cons\"]", Array[_a_1_0, _x_7_6])
-    | "[\"Bool\",\"true\"]" ->
+      LeanCtor(LeanTag.List_cons, Array[_a_1_0, _x_7_6])
+    | LeanTag.Bool_true ->
       f_AC_mergeIdem_loop_454da432b7(_runtime, _a_1_0, _tail_5_3)
     | _ -> leanFail("non-exhaustive Lean case")
     }
@@ -90,8 +90,8 @@ fun f_Data_AC_mergeIdem_d27deb5ca3(
   _xs_0: LeanValue,
 ): LeanValue {
   leanTag(_xs_0) match {
-  | "[\"List\",\"nil\"]" -> _xs_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _xs_0
+  | LeanTag.List_cons ->
     _head_1_1: LeanValue = leanField(_xs_0, 0);
     _tail_2_2: LeanValue = leanField(_xs_0, 1);
     f_AC_mergeIdem_loop_454da432b7(_runtime, _head_1_1, _tail_2_2)
@@ -105,8 +105,8 @@ fun f_AC_sort_loop_794a360817(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_2_1) match {
-  | "[\"List\",\"nil\"]" -> _a_1_0
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> _a_1_0
+  | LeanTag.List_cons ->
     _head_3_2: LeanValue = leanField(_a_2_1, 0);
     _tail_4_3: LeanValue = leanField(_a_2_1, 1);
     _x_5_4: LeanValue = f_Data_AC_insert_ccb54e6156(
@@ -125,7 +125,7 @@ fun f_Data_AC_sort_0f288b1431(
 ): LeanValue {
   f_AC_sort_loop_794a360817(
     _runtime,
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
     _xs_0,
   )
 }

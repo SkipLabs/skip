@@ -33,7 +33,7 @@ fun f_Substring_Raw_extract_54b551bb1c(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(3, leanField(_frame[0], 0));
         _frame.set(4, leanField(_frame[0], 1));
         _frame.set(5, leanField(_frame[0], 2));
@@ -42,7 +42,7 @@ fun f_Substring_Raw_extract_54b551bb1c(
           L4_Init_Prelude.f_Nat_ble_40aa3bdf39(_runtime, _frame[2], _frame[1]),
         );
         leanTag(_frame[11]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             12,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -60,25 +60,25 @@ fun f_Substring_Raw_extract_54b551bb1c(
             ),
           );
           leanTag(_frame[13]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[12];
             _frame.set(6, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[5];
             _frame.set(6, _jump0);
             !pc = 1;
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(14, LeanText(""));
-          _frame.set(15, LeanScalar("nat", "0"));
+          _frame.set(15, LeanNatLiterals.n0);
           _frame.set(
             16,
             LeanCtor(
-              "[\"Substring\",\"Raw\",\"mk\"]",
+              LeanTag.Substring_Raw_mk,
               Array[_frame[14], _frame[15], _frame[15]],
             ),
           );
@@ -97,20 +97,20 @@ fun f_Substring_Raw_extract_54b551bb1c(
         L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_runtime, _frame[5], _frame[7]),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           9,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[3], _frame[6], _frame[7]],
           ),
         );
         return _frame[9]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           10,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[3], _frame[6], _frame[5]],
           ),
         );
@@ -128,12 +128,12 @@ fun f_Substring_Raw_commonPrefix_8b349d27ba(
   _t_1: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2: LeanValue = leanField(_s_0, 0);
     _startPos_3: LeanValue = leanField(_s_0, 1);
     _stopPos_4: LeanValue = leanField(_s_0, 2);
     leanTag(_t_1) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_5: LeanValue = leanField(_t_1, 0);
       _startPos_6: LeanValue = leanField(_t_1, 1);
       _stopPos_7: LeanValue = leanField(_t_1, 2);
@@ -145,7 +145,7 @@ fun f_Substring_Raw_commonPrefix_8b349d27ba(
         _startPos_6,
       );
       LeanCtor(
-        "[\"Substring\",\"Raw\",\"mk\"]",
+        LeanTag.Substring_Raw_mk,
         Array[_str_2, _startPos_3, _x_1_8],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -166,12 +166,12 @@ fun f_Raw_foldr_lam_0_04651216c9(
   _decide_3_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _it_2,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_decide_3_7) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_y_1_0) match {
-    | "[\"String\",\"Slice\",\"mk\"]" ->
+    | LeanTag.String_Slice_mk ->
       _str_8: LeanValue = leanField(_y_1_0, 0);
       _startInclusive_9: LeanValue = leanField(_y_1_0, 1);
       _endExclusive_10: LeanValue = leanField(_y_1_0, 2);
@@ -179,7 +179,7 @@ fun f_Raw_foldr_lam_0_04651216c9(
       _x_5_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _it_2,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _prevPos_14: LeanValue = L4_Init_Data_String_FindPos.f_String_Slice_posLE_e4fbd445e7(
         _runtime,
@@ -205,7 +205,7 @@ fun f_Raw_foldr_lam_0_04651216c9(
       )
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _acc_3
+  | LeanTag.Bool_true -> _acc_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -230,7 +230,7 @@ fun f_Substring_Raw_posOf_42eaa5f052(
   _c_1: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2: LeanValue = leanField(_s_0, 0);
     _startPos_3: LeanValue = leanField(_s_0, 1);
     _stopPos_4: LeanValue = leanField(_s_0, 2);
@@ -240,32 +240,32 @@ fun f_Substring_Raw_posOf_42eaa5f052(
       _startPos_3,
     );
     leanTag(_x_1_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _stopPos_4, _startPos_3)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_3_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
         _runtime,
         _str_2,
         _stopPos_4,
       );
       leanTag(_x_3_7) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _stopPos_4, _startPos_3)
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_5_9: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
           _runtime,
           _startPos_3,
           _stopPos_4,
         );
         leanTag(_x_5_9) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           L4_Init_Prelude.f_Nat_sub_8647441ee5(
             _runtime,
             _stopPos_4,
             _startPos_3,
           )
-        | "[\"Bool\",\"true\"]" ->
-          _x_7_12: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
+        | LeanTag.Bool_true ->
+          _x_7_12: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
           _f_8_13: LeanValue = LeanClosure(
             L4_Init_Data_String_Substring.apply_f_Raw_posOf_lam_0_863686cfdb,
             9,
@@ -274,18 +274,18 @@ fun f_Substring_Raw_posOf_42eaa5f052(
           _x_9_14: LeanValue = L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
             _runtime,
             _f_8_13,
-            LeanScalar("nat", "0"),
+            LeanNatLiterals.n0,
             _x_7_12,
             LeanErased(),
           );
           leanTag(_x_9_14) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             L4_Init_Prelude.f_Nat_sub_8647441ee5(
               _runtime,
               _stopPos_4,
               _startPos_3,
             )
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _val_11_15: LeanValue = leanField(_x_9_14, 0);
             _val_11_15
           | _ -> leanFail("non-exhaustive Lean case")
@@ -315,7 +315,7 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, leanField(_frame[0], 2));
@@ -323,7 +323,7 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
           4,
           L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _frame[3], _frame[2]),
         );
-        _frame.set(5, LeanScalar("nat", "0"));
+        _frame.set(5, LeanNatLiterals.n0);
         _frame.set(
           6,
           L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -333,19 +333,19 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
           ),
         );
         leanTag(_frame[6]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(7, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+        | LeanTag.Bool_false ->
+          _frame.set(7, LeanCtor(LeanTag.Bool_true, Array[]));
           _frame.set(
             8,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[6], _frame[7]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[6], _frame[7]]),
           );
           _frame.set(
             9,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[6], _frame[8]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[6], _frame[8]]),
           );
           _frame.set(
             10,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[7], _frame[9]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[7], _frame[9]]),
           );
           _frame.set(
             18,
@@ -362,10 +362,10 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
             ),
           );
           leanTag(_frame[26]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               27,
               L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -375,10 +375,10 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
               ),
             );
             leanTag(_frame[27]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 28,
                 L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -388,14 +388,14 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
                 ),
               );
               leanTag(_frame[28]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 !pc = 2;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   29,
                   LeanCtor(
-                    "[\"String\",\"Slice\",\"mk\"]",
+                    LeanTag.String_Slice_mk,
                     Array[_frame[1], _frame[2], _frame[3], LeanErased()],
                   ),
                 );
@@ -409,8 +409,8 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(30, LeanCtor("[\"Bool\",\"false\"]", Array[]));
+        | LeanTag.Bool_true ->
+          _frame.set(30, LeanCtor(LeanTag.Bool_false, Array[]));
           return _frame[30]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
@@ -436,20 +436,20 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
         ),
       );
       leanTag(_frame[13]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _ = leanField(_frame[13], 0);
         _frame.set(14, leanField(_frame[13], 1));
         leanTag(_frame[14]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _ = leanField(_frame[14], 0);
           _frame.set(15, leanField(_frame[14], 1));
           leanTag(_frame[15]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(16, leanField(_frame[15], 0));
             _frame.set(17, leanField(_frame[15], 1));
             leanTag(_frame[17]) match {
-            | "[\"Bool\",\"false\"]" -> return _frame[6]
-            | "[\"Bool\",\"true\"]" -> return _frame[16]
+            | LeanTag.Bool_false -> return _frame[6]
+            | LeanTag.Bool_true -> return _frame[16]
             | _ -> return leanFail("non-exhaustive Lean case")
             }
           | _ -> return leanFail("non-exhaustive Lean case")
@@ -461,8 +461,8 @@ fun f_Substring_Raw_isNat_b5d39b0f67(
     | 2 ->
       _frame.set(19, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(20, LeanText("Option.get!"));
-      _frame.set(21, LeanScalar("nat", "22"));
-      _frame.set(22, LeanScalar("nat", "14"));
+      _frame.set(21, LeanNatLiterals.n22);
+      _frame.set(22, LeanNatLiterals.n14);
       _frame.set(23, LeanText("value is none"));
       _frame.set(
         24,
@@ -503,7 +503,7 @@ fun f_Substring_Raw_isEmpty_7b16e2666d(
   _ss_0: LeanValue,
 ): LeanValue {
   leanTag(_ss_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_ss_0, 0);
     _startPos_2_2: LeanValue = leanField(_ss_0, 1);
     _stopPos_3_3: LeanValue = leanField(_ss_0, 2);
@@ -515,7 +515,7 @@ fun f_Substring_Raw_isEmpty_7b16e2666d(
     L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_4_4,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -533,7 +533,7 @@ fun f_Substring_Raw_takeWhile_ee54951b66(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -545,7 +545,7 @@ fun f_Substring_Raw_takeWhile_ee54951b66(
       _startPos_4_3,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _startPos_4_3, _e_5],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -570,7 +570,7 @@ fun f_Raw_Internal_getImpl_ffd320dd28(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -594,7 +594,7 @@ fun f_Substring_atEnd_bf79edc5ce(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -619,12 +619,12 @@ fun f_Substring_Raw_dropPrefix_711aa976a5(
     _pre_1,
   );
   leanTag(_t_2) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_3: LeanValue = leanField(_t_2, 0);
     _startPos_2_4: LeanValue = leanField(_t_2, 1);
     _stopPos_3_5: LeanValue = leanField(_t_2, 2);
     leanTag(_pre_1) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_4_6: LeanValue = leanField(_pre_1, 0);
       _startPos_5_7: LeanValue = leanField(_pre_1, 1);
       _stopPos_6_8: LeanValue = leanField(_pre_1, 2);
@@ -644,18 +644,18 @@ fun f_Substring_Raw_dropPrefix_711aa976a5(
         _x_8_10,
       );
       leanTag(_x_9_11) match {
-      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+      | LeanTag.Bool_true ->
         leanTag(_s_0) match {
-        | "[\"Substring\",\"Raw\",\"mk\"]" ->
+        | LeanTag.Substring_Raw_mk ->
           _str_13: LeanValue = leanField(_s_0, 0);
           _startPos_14: LeanValue = leanField(_s_0, 1);
           _stopPos_15: LeanValue = leanField(_s_0, 2);
           LeanCtor(
-            "[\"Option\",\"some\"]",
+            LeanTag.Option_some,
             Array[
               LeanCtor(
-                "[\"Substring\",\"Raw\",\"mk\"]",
+                LeanTag.Substring_Raw_mk,
                 Array[_str_13, _stopPos_3_5, _stopPos_15],
               ),
             ],
@@ -676,7 +676,7 @@ fun f_Raw_Internal_prevImpl_9bc0012777(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -691,14 +691,14 @@ fun f_Raw_Internal_prevImpl_9bc0012777(
       _startPos_4_3,
     );
     leanTag(_decide_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
         _runtime,
         _str_3_2,
         _absP_5,
       );
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_7_7, _startPos_4_3)
-    | "[\"Bool\",\"true\"]" -> _a_2_1
+    | LeanTag.Bool_true -> _a_2_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -730,7 +730,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(17, leanField(_frame[0], 0));
         _frame.set(18, leanField(_frame[0], 1));
         _frame.set(19, leanField(_frame[0], 2));
@@ -751,7 +751,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
           ),
         );
         leanTag(_frame[45]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             46,
             L4_Init_Data_String_Basic.f_Pos_Raw_atEnd_fb658d32a3(
@@ -761,7 +761,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
             ),
           );
           leanTag(_frame[46]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               47,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -771,7 +771,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
               ),
             );
             leanTag(_frame[47]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 48,
                 L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -789,25 +789,25 @@ fun f_Raw_splitOn_loop_7c2730802f(
                 ),
               );
               leanTag(_frame[49]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 _jump0 = _frame[48];
                 _frame.set(39, _jump0);
                 !pc = 6;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _jump0 = _frame[19];
                 _frame.set(39, _jump0);
                 !pc = 6;
                 void
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(50, LeanText(""));
-              _frame.set(51, LeanScalar("nat", "0"));
+              _frame.set(51, LeanNatLiterals.n0);
               _frame.set(
                 52,
                 LeanCtor(
-                  "[\"Substring\",\"Raw\",\"mk\"]",
+                  LeanTag.Substring_Raw_mk,
                   Array[_frame[50], _frame[51], _frame[51]],
                 ),
               );
@@ -817,13 +817,13 @@ fun f_Raw_splitOn_loop_7c2730802f(
               void
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(53, LeanText(""));
-            _frame.set(54, LeanScalar("nat", "0"));
+            _frame.set(54, LeanNatLiterals.n0);
             _frame.set(
               55,
               LeanCtor(
-                "[\"Substring\",\"Raw\",\"mk\"]",
+                LeanTag.Substring_Raw_mk,
                 Array[_frame[53], _frame[54], _frame[54]],
               ),
             );
@@ -844,7 +844,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
               ),
             );
             leanTag(_frame[66]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 67,
                 L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -862,19 +862,19 @@ fun f_Raw_splitOn_loop_7c2730802f(
                 ),
               );
               leanTag(_frame[68]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 _jump0 = _frame[67];
                 _frame.set(61, _jump0);
                 !pc = 8;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _jump0 = _frame[19];
                 _frame.set(61, _jump0);
                 !pc = 8;
                 void
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[55];
               _frame.set(56, _jump0);
               !pc = 7;
@@ -883,7 +883,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             69,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -917,7 +917,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
             ),
           );
           leanTag(_frame[72]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               73,
               L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -927,7 +927,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
               ),
             );
             leanTag(_frame[73]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 74,
                 L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
@@ -948,14 +948,14 @@ fun f_Raw_splitOn_loop_7c2730802f(
               _frame.set(9, _jump0);
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[3];
               _frame.set(9, _jump0);
               !pc = 2;
               void
             | _ -> return leanFail("non-exhaustive Lean case")
             }
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               76,
               L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -965,7 +965,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
               ),
             );
             leanTag(_frame[76]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               _frame.set(
                 77,
                 L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
@@ -986,7 +986,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
               _frame.set(28, _jump0);
               !pc = 5;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _jump0 = _frame[3];
               _frame.set(28, _jump0);
               !pc = 5;
@@ -1002,7 +1002,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
     | 1 ->
       _frame.set(
         7,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[6], _frame[5]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[6], _frame[5]]),
       );
       _frame.set(
         8,
@@ -1010,7 +1010,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
       );
       return _frame[8]
     | 2 ->
-      _frame.set(10, LeanScalar("nat", "0"));
+      _frame.set(10, LeanNatLiterals.n0);
       _frame.set(
         11,
         f_Raw_splitOn_loop_7c2730802f(
@@ -1027,7 +1027,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
     | 3 ->
       _frame.set(
         15,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[14], _frame[5]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[14], _frame[5]]),
       );
       _frame.set(
         16,
@@ -1056,11 +1056,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         ),
       );
       leanTag(_frame[25]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           26,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[23], _frame[24]],
           ),
         );
@@ -1072,11 +1072,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         _frame.set(14, _jump2);
         !pc = 3;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           27,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[23], _frame[19]],
           ),
         );
@@ -1108,7 +1108,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
         ),
       );
       leanTag(_frame[30]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           31,
           f_Raw_splitOn_loop_7c2730802f(
@@ -1122,8 +1122,8 @@ fun f_Raw_splitOn_loop_7c2730802f(
           ),
         );
         return _frame[31]
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(32, LeanScalar("nat", "0"));
+      | LeanTag.Bool_true ->
+        _frame.set(32, LeanNatLiterals.n0);
         _frame.set(
           33,
           L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -1137,7 +1137,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
           L4_Init_Prelude.f_Nat_ble_40aa3bdf39(_runtime, _frame[33], _frame[2]),
         );
         leanTag(_frame[34]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             35,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -1155,7 +1155,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
             ),
           );
           leanTag(_frame[36]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[32];
             _jump1 = _frame[33];
             _jump2 = _frame[28];
@@ -1166,7 +1166,7 @@ fun f_Raw_splitOn_loop_7c2730802f(
             _frame.set(23, _jump3);
             !pc = 4;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[32];
             _jump1 = _frame[33];
             _jump2 = _frame[28];
@@ -1179,12 +1179,12 @@ fun f_Raw_splitOn_loop_7c2730802f(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(37, LeanText(""));
           _frame.set(
             38,
             LeanCtor(
-              "[\"Substring\",\"Raw\",\"mk\"]",
+              LeanTag.Substring_Raw_mk,
               Array[_frame[37], _frame[32], _frame[32]],
             ),
           );
@@ -1214,11 +1214,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         ),
       );
       leanTag(_frame[41]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           42,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[39], _frame[40]],
           ),
         );
@@ -1226,11 +1226,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         _frame.set(6, _jump0);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           43,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[39], _frame[19]],
           ),
         );
@@ -1243,11 +1243,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
     | 7 ->
       _frame.set(
         57,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[56], _frame[5]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[56], _frame[5]]),
       );
       _frame.set(
         58,
-        LeanCtor("[\"List\",\"cons\"]", Array[_frame[55], _frame[57]]),
+        LeanCtor(LeanTag.List_cons, Array[_frame[55], _frame[57]]),
       );
       _frame.set(
         59,
@@ -1268,11 +1268,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         ),
       );
       leanTag(_frame[63]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           64,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[61], _frame[62]],
           ),
         );
@@ -1280,11 +1280,11 @@ fun f_Raw_splitOn_loop_7c2730802f(
         _frame.set(56, _jump0);
         !pc = 7;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           65,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[17], _frame[61], _frame[19]],
           ),
         );
@@ -1319,8 +1319,8 @@ fun f_Raw_foldl_closed_3_c1e237c644(
     _runtime,
     _x_248_4,
     _x_247_3,
-    LeanScalar("nat", "22"),
-    LeanScalar("nat", "14"),
+    LeanNatLiterals.n22,
+    LeanNatLiterals.n14,
     _x_244_0,
   )
 }
@@ -1332,7 +1332,7 @@ fun f_Internal_allImpl_spec_0_eef52eb930(
   _pos_2: LeanValue,
 ): LeanValue {
   leanTag(_s_1) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_3: LeanValue = leanField(_s_1, 0);
     _startInclusive_4: LeanValue = leanField(_s_1, 1);
     _endExclusive_5: LeanValue = leanField(_s_1, 2);
@@ -1349,11 +1349,11 @@ fun f_Internal_allImpl_spec_0_eef52eb930(
     );
     _decide_4_10: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       _x_3_9,
     );
     leanTag(_decide_4_10) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_5_11: LeanValue = L4_Init_Data_String_Basic.f_String_decodeChar_368a7ef10a(
         _runtime,
         _str_3,
@@ -1362,8 +1362,8 @@ fun f_Internal_allImpl_spec_0_eef52eb930(
       );
       _x_6_12: LeanValue = leanApply(_runtime, _p_0, Array[_x_5_11]);
       leanTag(_x_6_12) match {
-      | "[\"Bool\",\"false\"]" -> _pos_2
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _pos_2
+      | LeanTag.Bool_true ->
         _x_7_13: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
           _runtime,
           _str_3,
@@ -1383,7 +1383,7 @@ fun f_Internal_allImpl_spec_0_eef52eb930(
         _x_11_17: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
           _pos_2,
-          LeanScalar("nat", "1"),
+          LeanNatLiterals.n1,
         );
         _x_12_18: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
           _runtime,
@@ -1391,14 +1391,14 @@ fun f_Internal_allImpl_spec_0_eef52eb930(
           _x_9_15,
         );
         leanTag(_x_12_18) match {
-        | "[\"Bool\",\"false\"]" -> _pos_2
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _pos_2
+        | LeanTag.Bool_true ->
           f_Internal_allImpl_spec_0_eef52eb930(_runtime, _p_0, _s_1, _x_9_15)
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> _pos_2
+    | LeanTag.Bool_true -> _pos_2
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1422,7 +1422,7 @@ fun f_Substring_Raw_all_a26d1ae1b7(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(10, leanField(_frame[0], 0));
         _frame.set(11, leanField(_frame[0], 1));
         _frame.set(12, leanField(_frame[0], 2));
@@ -1441,10 +1441,10 @@ fun f_Substring_Raw_all_a26d1ae1b7(
           ),
         );
         leanTag(_frame[23]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             24,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -1454,10 +1454,10 @@ fun f_Substring_Raw_all_a26d1ae1b7(
             ),
           );
           leanTag(_frame[24]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               25,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -1467,14 +1467,14 @@ fun f_Substring_Raw_all_a26d1ae1b7(
               ),
             );
             leanTag(_frame[25]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 26,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[10], _frame[11], _frame[12], LeanErased()],
                 ),
               );
@@ -1502,7 +1502,7 @@ fun f_Substring_Raw_all_a26d1ae1b7(
           _frame[1],
         ),
       );
-      _frame.set(6, LeanScalar("nat", "0"));
+      _frame.set(6, LeanNatLiterals.n0);
       _frame.set(
         7,
         L4_Init_Data_String_Slice_Pattern.f_Slice_Pos_skipWhile_8d4eef7b98(
@@ -1524,8 +1524,8 @@ fun f_Substring_Raw_all_a26d1ae1b7(
     | 2 ->
       _frame.set(14, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(15, LeanText("Option.get!"));
-      _frame.set(16, LeanScalar("nat", "22"));
-      _frame.set(17, LeanScalar("nat", "14"));
+      _frame.set(16, LeanNatLiterals.n22);
+      _frame.set(17, LeanNatLiterals.n14);
       _frame.set(18, LeanText("value is none"));
       _frame.set(
         19,
@@ -1543,7 +1543,7 @@ fun f_Substring_Raw_all_a26d1ae1b7(
         L4_Init_Prelude.f_panic_105135c0b4(_runtime, _frame[13], _frame[19]),
       );
       leanTag(_frame[20]) match {
-      | "[\"String\",\"Slice\",\"mk\"]" ->
+      | LeanTag.String_Slice_mk ->
         _ = leanField(_frame[20], 0);
         _frame.set(21, leanField(_frame[20], 1));
         _frame.set(22, leanField(_frame[20], 2));
@@ -1568,7 +1568,7 @@ fun f_Raw_Internal_isEmptyImpl_28a95e159c(
   _ss_0: LeanValue,
 ): LeanValue {
   leanTag(_ss_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_ss_0, 0);
     _startPos_2_2: LeanValue = leanField(_ss_0, 1);
     _stopPos_3_3: LeanValue = leanField(_ss_0, 2);
@@ -1580,7 +1580,7 @@ fun f_Raw_Internal_isEmptyImpl_28a95e159c(
     L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_4_4,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1592,7 +1592,7 @@ fun f_Substring_next_89c475272e(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -1607,14 +1607,14 @@ fun f_Substring_next_89c475272e(
       _stopPos_5_4,
     );
     leanTag(_decide_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
         _runtime,
         _str_3_2,
         _absP_5,
       );
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_7_7, _startPos_4_3)
-    | "[\"Bool\",\"true\"]" -> _a_2_1
+    | LeanTag.Bool_true -> _a_2_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1640,7 +1640,7 @@ fun f_Substring_Raw_foldr_4057c7715b(
     pc match {
     | 0 ->
       leanTag(_frame[2]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(7, leanField(_frame[2], 0));
         _frame.set(8, leanField(_frame[2], 1));
         _frame.set(9, leanField(_frame[2], 2));
@@ -1659,10 +1659,10 @@ fun f_Substring_Raw_foldr_4057c7715b(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             19,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -1672,10 +1672,10 @@ fun f_Substring_Raw_foldr_4057c7715b(
             ),
           );
           leanTag(_frame[19]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -1685,14 +1685,14 @@ fun f_Substring_Raw_foldr_4057c7715b(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 21,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[7], _frame[8], _frame[9], LeanErased()],
                 ),
               );
@@ -1738,8 +1738,8 @@ fun f_Substring_Raw_foldr_4057c7715b(
     | 2 ->
       _frame.set(11, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(12, LeanText("Option.get!"));
-      _frame.set(13, LeanScalar("nat", "22"));
-      _frame.set(14, LeanScalar("nat", "14"));
+      _frame.set(13, LeanNatLiterals.n22);
+      _frame.set(14, LeanNatLiterals.n14);
       _frame.set(15, LeanText("value is none"));
       _frame.set(
         16,
@@ -1771,7 +1771,7 @@ fun f_Substring_Raw_get_d73a37e8b2(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -1819,7 +1819,7 @@ fun f_Substring_Raw_foldr_094cdd6a37(
     pc match {
     | 0 ->
       leanTag(_frame[2]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(7, leanField(_frame[2], 0));
         _frame.set(8, leanField(_frame[2], 1));
         _frame.set(9, leanField(_frame[2], 2));
@@ -1838,10 +1838,10 @@ fun f_Substring_Raw_foldr_094cdd6a37(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             19,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -1851,10 +1851,10 @@ fun f_Substring_Raw_foldr_094cdd6a37(
             ),
           );
           leanTag(_frame[19]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -1864,14 +1864,14 @@ fun f_Substring_Raw_foldr_094cdd6a37(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 21,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[7], _frame[8], _frame[9], LeanErased()],
                 ),
               );
@@ -1917,8 +1917,8 @@ fun f_Substring_Raw_foldr_094cdd6a37(
     | 2 ->
       _frame.set(11, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(12, LeanText("Option.get!"));
-      _frame.set(13, LeanScalar("nat", "22"));
-      _frame.set(14, LeanScalar("nat", "14"));
+      _frame.set(13, LeanNatLiterals.n22);
+      _frame.set(14, LeanNatLiterals.n14);
       _frame.set(15, LeanText("value is none"));
       _frame.set(
         16,
@@ -1949,7 +1949,7 @@ fun f_Substring_Raw_toSlice_7e95e7049c(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1: LeanValue = leanField(_s_0, 0);
     _startPos_2: LeanValue = leanField(_s_0, 1);
     _stopPos_3: LeanValue = leanField(_s_0, 2);
@@ -1959,29 +1959,29 @@ fun f_Substring_Raw_toSlice_7e95e7049c(
       _startPos_2,
     );
     leanTag(_x_1_4) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Bool_true ->
       _x_3_6: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
         _runtime,
         _str_1,
         _stopPos_3,
       );
       leanTag(_x_3_6) match {
-      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+      | LeanTag.Bool_true ->
         _x_5_8: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
           _runtime,
           _startPos_2,
           _stopPos_3,
         );
         leanTag(_x_5_8) match {
-        | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+        | LeanTag.Bool_true ->
           LeanCtor(
-            "[\"Option\",\"some\"]",
+            LeanTag.Option_some,
             Array[
               LeanCtor(
-                "[\"String\",\"Slice\",\"mk\"]",
+                LeanTag.String_Slice_mk,
                 Array[_str_1, _startPos_2, _stopPos_3, LeanErased()],
               ),
             ],
@@ -2006,7 +2006,7 @@ fun f_Internal_takeWhileImpl_spec_0_af880d63f6(
   _x_3_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
     _runtime,
     _i_3,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_4_6: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
     _runtime,
@@ -2014,8 +2014,8 @@ fun f_Internal_takeWhileImpl_spec_0_af880d63f6(
     _stopPos_2,
   );
   leanTag(_x_4_6) match {
-  | "[\"Bool\",\"false\"]" -> _i_3
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _i_3
+  | LeanTag.Bool_true ->
     _x_5_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
       _runtime,
       _s_1,
@@ -2023,8 +2023,8 @@ fun f_Internal_takeWhileImpl_spec_0_af880d63f6(
     );
     _x_6_8: LeanValue = leanApply(_runtime, _a_1_0, Array[_x_5_7]);
     leanTag(_x_6_8) match {
-    | "[\"Bool\",\"false\"]" -> _i_3
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _i_3
+    | LeanTag.Bool_true ->
       _x_7_9: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
         _runtime,
         _s_1,
@@ -2049,12 +2049,12 @@ fun f_Substring_Raw_commonSuffix_6dc4ea1658(
   _t_1: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2: LeanValue = leanField(_s_0, 0);
     _startPos_3: LeanValue = leanField(_s_0, 1);
     _stopPos_4: LeanValue = leanField(_s_0, 2);
     leanTag(_t_1) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_5: LeanValue = leanField(_t_1, 0);
       _startPos_6: LeanValue = leanField(_t_1, 1);
       _stopPos_7: LeanValue = leanField(_t_1, 2);
@@ -2066,7 +2066,7 @@ fun f_Substring_Raw_commonSuffix_6dc4ea1658(
         _stopPos_7,
       );
       LeanCtor(
-        "[\"Substring\",\"Raw\",\"mk\"]",
+        LeanTag.Substring_Raw_mk,
         Array[_str_2, _x_1_8, _stopPos_4],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -2081,7 +2081,7 @@ fun f_Substring_Raw_drop_e677ec70bc(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -2089,7 +2089,7 @@ fun f_Substring_Raw_drop_e677ec70bc(
       _runtime,
       _x_1_0,
       _x_2_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_8_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
@@ -2097,7 +2097,7 @@ fun f_Substring_Raw_drop_e677ec70bc(
       _x_7_6,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _x_8_7, _stopPos_5_4],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2119,7 +2119,7 @@ fun f_Substring_Raw_toNat_8042c55a7f(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, leanField(_frame[0], 2));
@@ -2127,7 +2127,7 @@ fun f_Substring_Raw_toNat_8042c55a7f(
           4,
           L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _frame[3], _frame[2]),
         );
-        _frame.set(5, LeanScalar("nat", "0"));
+        _frame.set(5, LeanNatLiterals.n0);
         _frame.set(
           16,
           L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -2137,19 +2137,19 @@ fun f_Substring_Raw_toNat_8042c55a7f(
           ),
         );
         leanTag(_frame[16]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(17, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+        | LeanTag.Bool_false ->
+          _frame.set(17, LeanCtor(LeanTag.Bool_true, Array[]));
           _frame.set(
             18,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[16], _frame[17]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[16], _frame[17]]),
           );
           _frame.set(
             19,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[16], _frame[18]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[16], _frame[18]]),
           );
           _frame.set(
             20,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[17], _frame[19]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[17], _frame[19]]),
           );
           _frame.set(
             40,
@@ -2160,10 +2160,10 @@ fun f_Substring_Raw_toNat_8042c55a7f(
             ),
           );
           leanTag(_frame[40]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 4;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               41,
               L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -2173,10 +2173,10 @@ fun f_Substring_Raw_toNat_8042c55a7f(
               ),
             );
             leanTag(_frame[41]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 4;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 42,
                 L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -2186,14 +2186,14 @@ fun f_Substring_Raw_toNat_8042c55a7f(
                 ),
               );
               leanTag(_frame[42]) match {
-              | "[\"Bool\",\"false\"]" ->
+              | LeanTag.Bool_false ->
                 !pc = 4;
                 void
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   43,
                   LeanCtor(
-                    "[\"String\",\"Slice\",\"mk\"]",
+                    LeanTag.String_Slice_mk,
                     Array[_frame[1], _frame[2], _frame[3], LeanErased()],
                   ),
                 );
@@ -2207,8 +2207,8 @@ fun f_Substring_Raw_toNat_8042c55a7f(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(44, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        | LeanTag.Bool_true ->
+          _frame.set(44, LeanCtor(LeanTag.Option_none, Array[]));
           return _frame[44]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
@@ -2224,13 +2224,13 @@ fun f_Substring_Raw_toNat_8042c55a7f(
           _frame[5],
         ),
       );
-      _frame.set(8, LeanCtor("[\"Option\",\"some\"]", Array[_frame[7]]));
+      _frame.set(8, LeanCtor(LeanTag.Option_some, Array[_frame[7]]));
       return _frame[8]
     | 2 ->
       _frame.set(9, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(10, LeanText("Option.get!"));
-      _frame.set(11, LeanScalar("nat", "22"));
-      _frame.set(12, LeanScalar("nat", "14"));
+      _frame.set(11, LeanNatLiterals.n22);
+      _frame.set(12, LeanNatLiterals.n14);
       _frame.set(13, LeanText("value is none"));
       _frame.set(
         14,
@@ -2263,27 +2263,27 @@ fun f_Substring_Raw_toNat_8042c55a7f(
         ),
       );
       leanTag(_frame[22]) match {
-      | "[\"Prod\",\"mk\"]" ->
+      | LeanTag.Prod_mk ->
         _ = leanField(_frame[22], 0);
         _frame.set(23, leanField(_frame[22], 1));
         leanTag(_frame[23]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _ = leanField(_frame[23], 0);
           _frame.set(24, leanField(_frame[23], 1));
           leanTag(_frame[24]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(25, leanField(_frame[24], 0));
             _frame.set(26, leanField(_frame[24], 1));
             leanTag(_frame[26]) match {
-            | "[\"Bool\",\"false\"]" ->
-              _frame.set(27, LeanCtor("[\"Option\",\"none\"]", Array[]));
+            | LeanTag.Bool_false ->
+              _frame.set(27, LeanCtor(LeanTag.Option_none, Array[]));
               return _frame[27]
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               leanTag(_frame[25]) match {
-              | "[\"Bool\",\"false\"]" ->
-                _frame.set(28, LeanCtor("[\"Option\",\"none\"]", Array[]));
+              | LeanTag.Bool_false ->
+                _frame.set(28, LeanCtor(LeanTag.Option_none, Array[]));
                 return _frame[28]
-              | "[\"Bool\",\"true\"]" ->
+              | LeanTag.Bool_true ->
                 _frame.set(
                   29,
                   L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -2293,10 +2293,10 @@ fun f_Substring_Raw_toNat_8042c55a7f(
                   ),
                 );
                 leanTag(_frame[29]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   !pc = 2;
                   void
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _frame.set(
                     30,
                     L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -2306,10 +2306,10 @@ fun f_Substring_Raw_toNat_8042c55a7f(
                     ),
                   );
                   leanTag(_frame[30]) match {
-                  | "[\"Bool\",\"false\"]" ->
+                  | LeanTag.Bool_false ->
                     !pc = 2;
                     void
-                  | "[\"Bool\",\"true\"]" ->
+                  | LeanTag.Bool_true ->
                     _frame.set(
                       31,
                       L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -2319,14 +2319,14 @@ fun f_Substring_Raw_toNat_8042c55a7f(
                       ),
                     );
                     leanTag(_frame[31]) match {
-                    | "[\"Bool\",\"false\"]" ->
+                    | LeanTag.Bool_false ->
                       !pc = 2;
                       void
-                    | "[\"Bool\",\"true\"]" ->
+                    | LeanTag.Bool_true ->
                       _frame.set(
                         32,
                         LeanCtor(
-                          "[\"String\",\"Slice\",\"mk\"]",
+                          LeanTag.String_Slice_mk,
                           Array[_frame[1], _frame[2], _frame[3], LeanErased()],
                         ),
                       );
@@ -2353,8 +2353,8 @@ fun f_Substring_Raw_toNat_8042c55a7f(
     | 4 ->
       _frame.set(33, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(34, LeanText("Option.get!"));
-      _frame.set(35, LeanScalar("nat", "22"));
-      _frame.set(36, LeanScalar("nat", "14"));
+      _frame.set(35, LeanNatLiterals.n22);
+      _frame.set(36, LeanNatLiterals.n14);
       _frame.set(37, LeanText("value is none"));
       _frame.set(
         38,
@@ -2387,7 +2387,7 @@ fun f_Raw_toNat_spec_1_b2ef0e88fa(
   _b_2: LeanValue,
 ): LeanValue {
   leanTag(_y_1_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_3: LeanValue = leanField(_y_1_0, 0);
     _startInclusive_4: LeanValue = leanField(_y_1_0, 1);
     _endExclusive_5: LeanValue = leanField(_y_1_0, 2);
@@ -2403,7 +2403,7 @@ fun f_Raw_toNat_spec_1_b2ef0e88fa(
       _x_2_7,
     );
     leanTag(_decide_3_8) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_4_9: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _startInclusive_4,
@@ -2432,11 +2432,11 @@ fun f_Raw_toNat_spec_1_b2ef0e88fa(
         LeanScalar("uint32", "95"),
       );
       leanTag(_x_9_14) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_11_16: LeanValue = L4_Init_Prelude.f_Nat_mul_8d6effc865(
           _runtime,
           _b_2,
-          LeanScalar("nat", "10"),
+          LeanNatLiterals.n10,
         );
         _x_12_17: LeanValue = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
           _runtime,
@@ -2445,7 +2445,7 @@ fun f_Raw_toNat_spec_1_b2ef0e88fa(
         _x_14_19: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _x_12_17,
-          LeanScalar("nat", "48"),
+          LeanNatLiterals.n48,
         );
         _x_15_20: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
           _runtime,
@@ -2453,11 +2453,11 @@ fun f_Raw_toNat_spec_1_b2ef0e88fa(
           _x_14_19,
         );
         f_Raw_toNat_spec_1_b2ef0e88fa(_runtime, _y_1_0, _x_7_12, _x_15_20)
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         f_Raw_toNat_spec_1_b2ef0e88fa(_runtime, _y_1_0, _x_7_12, _b_2)
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" -> _b_2
+    | LeanTag.Bool_true -> _b_2
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2493,7 +2493,7 @@ fun f_Raw_posOf_lam_0_863686cfdb(
     _x_2_9,
   );
   leanTag(_decide_3_10) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_11: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _startPos_1,
@@ -2511,7 +2511,7 @@ fun f_Raw_posOf_lam_0_863686cfdb(
       _c_3,
     );
     leanTag(_x_6_13) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_14: LeanValue = L4_Init_Data_String_Basic.f_String_Pos_next_8ac80f5118(
         _runtime,
         _str_2,
@@ -2528,10 +2528,10 @@ fun f_Raw_posOf_lam_0_863686cfdb(
         _recur_8,
         Array[_x_8_15, _x_1_4, LeanErased(), LeanErased()],
       )
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_it_5])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_some, Array[_it_5])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _acc_6
+  | LeanTag.Bool_true -> _acc_6
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -2558,7 +2558,7 @@ fun f_Substring_isEmpty_4c5d5973ee(
   _ss_0: LeanValue,
 ): LeanValue {
   leanTag(_ss_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_ss_0, 0);
     _startPos_2_2: LeanValue = leanField(_ss_0, 1);
     _stopPos_3_3: LeanValue = leanField(_ss_0, 2);
@@ -2570,7 +2570,7 @@ fun f_Substring_isEmpty_4c5d5973ee(
     L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _x_4_4,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -2621,7 +2621,7 @@ fun f_Substring_Raw_trimLeft_c49859a20d(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_s_0, 0);
     _startPos_2_2: LeanValue = leanField(_s_0, 1);
     _stopPos_3_3: LeanValue = leanField(_s_0, 2);
@@ -2638,7 +2638,7 @@ fun f_Substring_Raw_trimLeft_c49859a20d(
       _startPos_2_2,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_1_1, _b_5, _stopPos_3_3],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2650,7 +2650,7 @@ fun f_Substring_Raw_trimRight_1656e80c5f(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_s_0, 0);
     _startPos_2_2: LeanValue = leanField(_s_0, 1);
     _stopPos_3_3: LeanValue = leanField(_s_0, 2);
@@ -2667,7 +2667,7 @@ fun f_Substring_Raw_trimRight_1656e80c5f(
       _stopPos_3_3,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_1_1, _startPos_2_2, _e_5],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -2679,7 +2679,7 @@ fun f_Substring_Raw_toString_e1c76c3527(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2_1: LeanValue = leanField(_x_1_0, 0);
     _startPos_3_2: LeanValue = leanField(_x_1_0, 1);
     _stopPos_4_3: LeanValue = leanField(_x_1_0, 2);
@@ -2699,12 +2699,12 @@ fun f_Substring_Raw_sameAs_3742189aa2(
   _ss2_1: LeanValue,
 ): LeanValue {
   leanTag(_ss1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2: LeanValue = leanField(_ss1_0, 0);
     _startPos_3: LeanValue = leanField(_ss1_0, 1);
     _stopPos_4: LeanValue = leanField(_ss1_0, 2);
     leanTag(_ss2_1) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_5: LeanValue = leanField(_ss2_1, 0);
       _startPos_6: LeanValue = leanField(_ss2_1, 1);
       _stopPos_7: LeanValue = leanField(_ss2_1, 2);
@@ -2714,8 +2714,8 @@ fun f_Substring_Raw_sameAs_3742189aa2(
         _startPos_6,
       );
       leanTag(_decide_1_8) match {
-      | "[\"Bool\",\"false\"]" -> _decide_1_8
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _decide_1_8
+      | LeanTag.Bool_true ->
         f_Substring_Raw_beq_424e486eb7(_runtime, _ss1_0, _ss2_1)
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -2730,7 +2730,7 @@ fun f_Substring_Raw_trim_15c6d21973(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2_1: LeanValue = leanField(_x_1_0, 0);
     _startPos_3_2: LeanValue = leanField(_x_1_0, 1);
     _stopPos_4_3: LeanValue = leanField(_x_1_0, 2);
@@ -2753,7 +2753,7 @@ fun f_Substring_Raw_trim_15c6d21973(
       _x_5_4,
       _stopPos_4_3,
     );
-    LeanCtor("[\"Substring\",\"Raw\",\"mk\"]", Array[_str_2_1, _b_5, _e_6])
+    LeanCtor(LeanTag.Substring_Raw_mk, Array[_str_2_1, _b_5, _e_6])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -2767,20 +2767,20 @@ fun f_Substring_Raw_prevn_9521b876a7(
   _isZero_4: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
     _runtime,
     _x_2_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   leanTag(_isZero_4) match {
-  | "[\"Bool\",\"true\"]" -> _x_3_2
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_true -> _x_3_2
+  | LeanTag.Bool_false ->
     leanTag(_x_1_0) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_4_5: LeanValue = leanField(_x_1_0, 0);
       _startPos_5_6: LeanValue = leanField(_x_1_0, 1);
       _stopPos_6_7: LeanValue = leanField(_x_1_0, 2);
       _n_7_9: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _x_2_1,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _absP_10: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
@@ -2793,7 +2793,7 @@ fun f_Substring_Raw_prevn_9521b876a7(
         _startPos_5_6,
       );
       leanTag(_decide_8_11) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_9_12: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
           _runtime,
           _str_4_5,
@@ -2805,7 +2805,7 @@ fun f_Substring_Raw_prevn_9521b876a7(
           _startPos_5_6,
         );
         f_Substring_Raw_prevn_9521b876a7(_runtime, _x_1_0, _n_7_9, _x_10_13)
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         f_Substring_Raw_prevn_9521b876a7(_runtime, _x_1_0, _n_7_9, _x_3_2)
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -2834,7 +2834,7 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
     pc match {
     | 0 ->
       leanTag(_frame[2]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(7, leanField(_frame[2], 0));
         _frame.set(8, leanField(_frame[2], 1));
         _frame.set(9, leanField(_frame[2], 2));
@@ -2853,10 +2853,10 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             19,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -2866,10 +2866,10 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
             ),
           );
           leanTag(_frame[19]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -2879,14 +2879,14 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 21,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[7], _frame[8], _frame[9], LeanErased()],
                 ),
               );
@@ -2911,7 +2911,7 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
           Array[_frame[3], _frame[0]],
         ),
       );
-      _frame.set(5, LeanScalar("nat", "0"));
+      _frame.set(5, LeanNatLiterals.n0);
       _frame.set(
         6,
         L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
@@ -2926,8 +2926,8 @@ fun f_Substring_Raw_foldl_13c71d5ef6(
     | 2 ->
       _frame.set(11, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(12, LeanText("Option.get!"));
-      _frame.set(13, LeanScalar("nat", "22"));
-      _frame.set(14, LeanScalar("nat", "14"));
+      _frame.set(13, LeanNatLiterals.n22);
+      _frame.set(14, LeanNatLiterals.n14);
       _frame.set(15, LeanText("value is none"));
       _frame.set(
         16,
@@ -2985,7 +2985,7 @@ fun f_Substring_Raw_contains_86dd853827(
         ),
       );
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(4, leanField(_frame[0], 0));
         _frame.set(5, leanField(_frame[0], 1));
         _frame.set(6, leanField(_frame[0], 2));
@@ -3021,10 +3021,10 @@ fun f_Substring_Raw_contains_86dd853827(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             19,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -3034,10 +3034,10 @@ fun f_Substring_Raw_contains_86dd853827(
             ),
           );
           leanTag(_frame[19]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -3047,14 +3047,14 @@ fun f_Substring_Raw_contains_86dd853827(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 21,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[4], _frame[5], _frame[6], LeanErased()],
                 ),
               );
@@ -3079,8 +3079,8 @@ fun f_Substring_Raw_contains_86dd853827(
     | 1 ->
       _frame.set(10, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(11, LeanText("Option.get!"));
-      _frame.set(12, LeanScalar("nat", "22"));
-      _frame.set(13, LeanScalar("nat", "14"));
+      _frame.set(12, LeanNatLiterals.n22);
+      _frame.set(13, LeanNatLiterals.n14);
       _frame.set(14, LeanText("value is none"));
       _frame.set(
         15,
@@ -3123,12 +3123,12 @@ fun f_Substring_Raw_dropSuffix_dd3edd77ea(
     _suff_1,
   );
   leanTag(_t_2) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_3: LeanValue = leanField(_t_2, 0);
     _startPos_2_4: LeanValue = leanField(_t_2, 1);
     _stopPos_3_5: LeanValue = leanField(_t_2, 2);
     leanTag(_suff_1) match {
-    | "[\"Substring\",\"Raw\",\"mk\"]" ->
+    | LeanTag.Substring_Raw_mk ->
       _str_4_6: LeanValue = leanField(_suff_1, 0);
       _startPos_5_7: LeanValue = leanField(_suff_1, 1);
       _stopPos_6_8: LeanValue = leanField(_suff_1, 2);
@@ -3148,18 +3148,18 @@ fun f_Substring_Raw_dropSuffix_dd3edd77ea(
         _x_8_10,
       );
       leanTag(_x_9_11) match {
-      | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_none, Array[])
+      | LeanTag.Bool_true ->
         leanTag(_s_0) match {
-        | "[\"Substring\",\"Raw\",\"mk\"]" ->
+        | LeanTag.Substring_Raw_mk ->
           _str_13: LeanValue = leanField(_s_0, 0);
           _startPos_14: LeanValue = leanField(_s_0, 1);
           _stopPos_15: LeanValue = leanField(_s_0, 2);
           LeanCtor(
-            "[\"Option\",\"some\"]",
+            LeanTag.Option_some,
             Array[
               LeanCtor(
-                "[\"Substring\",\"Raw\",\"mk\"]",
+                LeanTag.Substring_Raw_mk,
                 Array[_str_13, _startPos_14, _startPos_2_4],
               ),
             ],
@@ -3194,7 +3194,7 @@ fun f_Substring_Raw_dropWhile_7b52678a2d(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3206,7 +3206,7 @@ fun f_Substring_Raw_dropWhile_7b52678a2d(
       _startPos_4_3,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _b_5, _stopPos_5_4],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3219,7 +3219,7 @@ fun f_Substring_prev_d6e321343d(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -3234,14 +3234,14 @@ fun f_Substring_prev_d6e321343d(
       _startPos_4_3,
     );
     leanTag(_decide_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
         _runtime,
         _str_3_2,
         _absP_5,
       );
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_7_7, _startPos_4_3)
-    | "[\"Bool\",\"true\"]" -> _a_2_1
+    | LeanTag.Bool_true -> _a_2_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3254,7 +3254,7 @@ fun f_Substring_Raw_dropRightWhile_5125c457e7(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3266,7 +3266,7 @@ fun f_Substring_Raw_dropRightWhile_5125c457e7(
       _stopPos_5_4,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _startPos_4_3, _e_5],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3283,7 +3283,7 @@ fun f_Substring_Raw_takeWhileAux_4c86c0dd52(
   _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
     _runtime,
     _i_3,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
     _runtime,
@@ -3291,8 +3291,8 @@ fun f_Substring_Raw_takeWhileAux_4c86c0dd52(
     _stopPos_1,
   );
   leanTag(_x_3_6) match {
-  | "[\"Bool\",\"false\"]" -> _i_3
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _i_3
+  | LeanTag.Bool_true ->
     _x_4_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
       _runtime,
       _s_0,
@@ -3300,8 +3300,8 @@ fun f_Substring_Raw_takeWhileAux_4c86c0dd52(
     );
     _x_5_8: LeanValue = leanApply(_runtime, _p_2, Array[_x_4_7]);
     leanTag(_x_5_8) match {
-    | "[\"Bool\",\"false\"]" -> _i_3
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _i_3
+    | LeanTag.Bool_true ->
       _x_6_9: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
         _runtime,
         _s_0,
@@ -3325,7 +3325,7 @@ fun f_Raw_Internal_frontImpl_a46923d64d(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_s_0, 0);
     _startPos_2_2: LeanValue = leanField(_s_0, 1);
     _stopPos_3_3: LeanValue = leanField(_s_0, 2);
@@ -3354,7 +3354,7 @@ fun f_Raw_Internal_dropImpl_cc54b7c77f(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -3362,7 +3362,7 @@ fun f_Raw_Internal_dropImpl_cc54b7c77f(
       _runtime,
       _a_1_0,
       _a_2_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_8_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
@@ -3370,7 +3370,7 @@ fun f_Raw_Internal_dropImpl_cc54b7c77f(
       _x_7_6,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _x_8_7, _stopPos_5_4],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3387,7 +3387,7 @@ fun f_Substring_Raw_takeRightWhileAux_6b551a486a(
   _x_2_5: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
     _runtime,
     _begPos_1,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_3_6: LeanValue = L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
     _runtime,
@@ -3395,8 +3395,8 @@ fun f_Substring_Raw_takeRightWhileAux_6b551a486a(
     _i_3,
   );
   leanTag(_x_3_6) match {
-  | "[\"Bool\",\"false\"]" -> _i_3
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _i_3
+  | LeanTag.Bool_true ->
     _i_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
       _runtime,
       _s_0,
@@ -3409,8 +3409,8 @@ fun f_Substring_Raw_takeRightWhileAux_6b551a486a(
     );
     _x_4_9: LeanValue = leanApply(_runtime, _p_2, Array[_c_8]);
     leanTag(_x_4_9) match {
-    | "[\"Bool\",\"false\"]" -> _i_3
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _i_3
+    | LeanTag.Bool_true ->
       f_Substring_Raw_takeRightWhileAux_6b551a486a(
         _runtime,
         _s_0,
@@ -3430,7 +3430,7 @@ fun f_Substring_Raw_atEnd_ee58bdad59(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3449,7 +3449,7 @@ fun f_Substring_bsize_4014b4a3b8(
   _a_1_0: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2_1: LeanValue = leanField(_a_1_0, 0);
     _startPos_3_2: LeanValue = leanField(_a_1_0, 1);
     _stopPos_4_3: LeanValue = leanField(_a_1_0, 2);
@@ -3477,7 +3477,7 @@ fun f_Raw_Internal_extractImpl_b4929ff3ee(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(3, leanField(_frame[0], 0));
         _frame.set(4, leanField(_frame[0], 1));
         _frame.set(5, leanField(_frame[0], 2));
@@ -3486,7 +3486,7 @@ fun f_Raw_Internal_extractImpl_b4929ff3ee(
           L4_Init_Prelude.f_Nat_ble_40aa3bdf39(_runtime, _frame[2], _frame[1]),
         );
         leanTag(_frame[11]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             12,
             L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -3504,25 +3504,25 @@ fun f_Raw_Internal_extractImpl_b4929ff3ee(
             ),
           );
           leanTag(_frame[13]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[12];
             _frame.set(6, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[5];
             _frame.set(6, _jump0);
             !pc = 1;
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(14, LeanText(""));
-          _frame.set(15, LeanScalar("nat", "0"));
+          _frame.set(15, LeanNatLiterals.n0);
           _frame.set(
             16,
             LeanCtor(
-              "[\"Substring\",\"Raw\",\"mk\"]",
+              LeanTag.Substring_Raw_mk,
               Array[_frame[14], _frame[15], _frame[15]],
             ),
           );
@@ -3541,20 +3541,20 @@ fun f_Raw_Internal_extractImpl_b4929ff3ee(
         L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_runtime, _frame[5], _frame[7]),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           9,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[3], _frame[6], _frame[7]],
           ),
         );
         return _frame[9]
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           10,
           LeanCtor(
-            "[\"Substring\",\"Raw\",\"mk\"]",
+            LeanTag.Substring_Raw_mk,
             Array[_frame[3], _frame[6], _frame[5]],
           ),
         );
@@ -3572,7 +3572,7 @@ fun f_Substring_Raw_takeRight_e96ee87a23(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3593,7 +3593,7 @@ fun f_Substring_Raw_takeRight_e96ee87a23(
       _x_7_6,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _x_8_7, _stopPos_5_4],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3606,7 +3606,7 @@ fun f_Substring_Raw_takeRightWhile_4cacb724a8(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3618,7 +3618,7 @@ fun f_Substring_Raw_takeRightWhile_4cacb724a8(
       _stopPos_5_4,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _b_5, _stopPos_5_4],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3631,7 +3631,7 @@ fun f_Substring_Raw_dropRight_c9431aac25(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3652,7 +3652,7 @@ fun f_Substring_Raw_dropRight_c9431aac25(
       _x_7_6,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _startPos_4_3, _x_8_7],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3669,7 +3669,7 @@ fun f_Raw_foldl_lam_0_814ba7b33a(
   _recur_5: LeanValue,
 ): LeanValue {
   leanTag(_y_1_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_6: LeanValue = leanField(_y_1_0, 0);
     _startInclusive_7: LeanValue = leanField(_y_1_0, 1);
     _endExclusive_8: LeanValue = leanField(_y_1_0, 2);
@@ -3685,7 +3685,7 @@ fun f_Raw_foldl_lam_0_814ba7b33a(
       _x_2_10,
     );
     leanTag(_decide_3_11) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_4_12: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
         _runtime,
         _startInclusive_7,
@@ -3714,7 +3714,7 @@ fun f_Raw_foldl_lam_0_814ba7b33a(
         _recur_5,
         Array[_x_6_14, _x_8_16, LeanErased(), LeanErased()],
       )
-    | "[\"Bool\",\"true\"]" -> _acc_3
+    | LeanTag.Bool_true -> _acc_3
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3741,7 +3741,7 @@ fun f_Substring_Raw_prev_98e1e328d3(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -3756,14 +3756,14 @@ fun f_Substring_Raw_prev_98e1e328d3(
       _startPos_4_3,
     );
     leanTag(_decide_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
         _runtime,
         _str_3_2,
         _absP_5,
       );
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_7_7, _startPos_4_3)
-    | "[\"Bool\",\"true\"]" -> _x_2_1
+    | LeanTag.Bool_true -> _x_2_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3778,11 +3778,11 @@ fun f_Raw_commonPrefix_loop_e65fb6a35f(
   _tpos_3: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_4: LeanValue = leanField(_s_0, 0);
     _startPos_5: LeanValue = leanField(_s_0, 1);
     _stopPos_6: LeanValue = leanField(_s_0, 2);
-    _x_1_7: LeanValue = LeanScalar("nat", "1");
+    _x_1_7: LeanValue = LeanNatLiterals.n1;
     _x_2_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _spos_2,
@@ -3794,10 +3794,10 @@ fun f_Raw_commonPrefix_loop_e65fb6a35f(
       _stopPos_6,
     );
     leanTag(_x_3_9) match {
-    | "[\"Bool\",\"false\"]" -> _spos_2
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _spos_2
+    | LeanTag.Bool_true ->
       leanTag(_t_1) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _str_10: LeanValue = leanField(_t_1, 0);
         _startPos_11: LeanValue = leanField(_t_1, 1);
         _stopPos_12: LeanValue = leanField(_t_1, 2);
@@ -3812,8 +3812,8 @@ fun f_Raw_commonPrefix_loop_e65fb6a35f(
           _stopPos_12,
         );
         leanTag(_x_5_14) match {
-        | "[\"Bool\",\"false\"]" -> _spos_2
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _spos_2
+        | LeanTag.Bool_true ->
           _x_6_15: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_get_09fbf9e241(
             _runtime,
             _str_4,
@@ -3830,8 +3830,8 @@ fun f_Raw_commonPrefix_loop_e65fb6a35f(
             _x_7_16,
           );
           leanTag(_x_8_17) match {
-          | "[\"Bool\",\"false\"]" -> _spos_2
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_false -> _spos_2
+          | LeanTag.Bool_true ->
             _x_9_18: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
               _runtime,
               _str_4,
@@ -3866,7 +3866,7 @@ fun f_Substring_Raw_front_6de1416800(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_1_1: LeanValue = leanField(_s_0, 0);
     _startPos_2_2: LeanValue = leanField(_s_0, 1);
     _stopPos_3_3: LeanValue = leanField(_s_0, 2);
@@ -3884,7 +3884,7 @@ fun f_Raw_Internal_toStringImpl_29a33b23f4(
   _a_1_0: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2_1: LeanValue = leanField(_a_1_0, 0);
     _startPos_3_2: LeanValue = leanField(_a_1_0, 1);
     _stopPos_4_3: LeanValue = leanField(_a_1_0, 2);
@@ -3903,13 +3903,13 @@ fun f_Substring_Raw_ofSlice_8af7e44560(
   _s_0: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"String\",\"Slice\",\"mk\"]" ->
+  | LeanTag.String_Slice_mk ->
     _str_1: LeanValue = leanField(_s_0, 0);
     _startInclusive_2: LeanValue = leanField(_s_0, 1);
     _endExclusive_3: LeanValue = leanField(_s_0, 2);
     _startInclusive_le_endExc_4: LeanValue = leanField(_s_0, 3);
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_1, _startInclusive_2, _endExclusive_3],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -3936,7 +3936,7 @@ fun f_Substring_Raw_foldl_14cd0a097c(
     pc match {
     | 0 ->
       leanTag(_frame[2]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(7, leanField(_frame[2], 0));
         _frame.set(8, leanField(_frame[2], 1));
         _frame.set(9, leanField(_frame[2], 2));
@@ -3955,10 +3955,10 @@ fun f_Substring_Raw_foldl_14cd0a097c(
           ),
         );
         leanTag(_frame[18]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             19,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -3968,10 +3968,10 @@ fun f_Substring_Raw_foldl_14cd0a097c(
             ),
           );
           leanTag(_frame[19]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               20,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -3981,14 +3981,14 @@ fun f_Substring_Raw_foldl_14cd0a097c(
               ),
             );
             leanTag(_frame[20]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 21,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[7], _frame[8], _frame[9], LeanErased()],
                 ),
               );
@@ -4013,7 +4013,7 @@ fun f_Substring_Raw_foldl_14cd0a097c(
           Array[_frame[3], _frame[0]],
         ),
       );
-      _frame.set(5, LeanScalar("nat", "0"));
+      _frame.set(5, LeanNatLiterals.n0);
       _frame.set(
         6,
         L4_Init_WFExtrinsicFix.f_WellFounded_opaqueFix_8667686a02(
@@ -4028,8 +4028,8 @@ fun f_Substring_Raw_foldl_14cd0a097c(
     | 2 ->
       _frame.set(11, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(12, LeanText("Option.get!"));
-      _frame.set(13, LeanScalar("nat", "22"));
-      _frame.set(14, LeanScalar("nat", "14"));
+      _frame.set(13, LeanNatLiterals.n22);
+      _frame.set(14, LeanNatLiterals.n14);
       _frame.set(15, LeanText("value is none"));
       _frame.set(
         16,
@@ -4080,8 +4080,8 @@ fun f_Substring_Raw_splitOn_f0ef56f52d(
     LeanText(""),
   );
   leanTag(_x_2_3) match {
-  | "[\"Bool\",\"false\"]" ->
-    _x_3_4: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Bool_false ->
+    _x_3_4: LeanValue = LeanNatLiterals.n0;
     f_Raw_splitOn_loop_7c2730802f(
       _runtime,
       _s_0,
@@ -4089,12 +4089,12 @@ fun f_Substring_Raw_splitOn_f0ef56f52d(
       _x_3_4,
       _x_3_4,
       _x_3_4,
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     )
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     LeanCtor(
-      "[\"List\",\"cons\"]",
-      Array[_s_0, LeanCtor("[\"List\",\"nil\"]", Array[])],
+      LeanTag.List_cons,
+      Array[_s_0, LeanCtor(LeanTag.List_nil, Array[])],
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -4114,7 +4114,7 @@ fun f_Substring_Raw_next_a2a55f029b(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -4129,14 +4129,14 @@ fun f_Substring_Raw_next_a2a55f029b(
       _stopPos_5_4,
     );
     leanTag(_decide_6_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_next_a53006f51f(
         _runtime,
         _str_3_2,
         _absP_5,
       );
       L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, _x_7_7, _startPos_4_3)
-    | "[\"Bool\",\"true\"]" -> _x_2_1
+    | LeanTag.Bool_true -> _x_2_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -4160,7 +4160,7 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(18, leanField(_frame[0], 0));
         _frame.set(19, leanField(_frame[0], 1));
         _frame.set(20, leanField(_frame[0], 2));
@@ -4173,10 +4173,10 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
           ),
         );
         leanTag(_frame[21]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             22,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -4186,10 +4186,10 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
             ),
           );
           leanTag(_frame[22]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               23,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -4199,14 +4199,14 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
               ),
             );
             leanTag(_frame[23]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 2;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 24,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[18], _frame[19], _frame[20], LeanErased()],
                 ),
               );
@@ -4227,7 +4227,7 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("nat", "0"));
+      _frame.set(5, LeanNatLiterals.n0);
       _frame.set(
         6,
         f_Internal_allImpl_spec_0_eef52eb930(
@@ -4249,8 +4249,8 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
     | 2 ->
       _frame.set(9, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(10, LeanText("Option.get!"));
-      _frame.set(11, LeanScalar("nat", "22"));
-      _frame.set(12, LeanScalar("nat", "14"));
+      _frame.set(11, LeanNatLiterals.n22);
+      _frame.set(12, LeanNatLiterals.n14);
       _frame.set(13, LeanText("value is none"));
       _frame.set(
         14,
@@ -4268,7 +4268,7 @@ fun f_Raw_Internal_allImpl_ce1f1f2ff1(
         f_Internal_allImpl_spec_1_505d0d892b(_runtime, _frame[14]),
       );
       leanTag(_frame[15]) match {
-      | "[\"String\",\"Slice\",\"mk\"]" ->
+      | LeanTag.String_Slice_mk ->
         _ = leanField(_frame[15], 0);
         _frame.set(16, leanField(_frame[15], 1));
         _frame.set(17, leanField(_frame[15], 2));
@@ -4294,7 +4294,7 @@ fun f_Substring_Raw_take_c3fef31409(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_x_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_x_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_x_1_0, 2);
@@ -4302,7 +4302,7 @@ fun f_Substring_Raw_take_c3fef31409(
       _runtime,
       _x_1_0,
       _x_2_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_8_7: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
@@ -4310,7 +4310,7 @@ fun f_Substring_Raw_take_c3fef31409(
       _x_7_6,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _startPos_4_3, _x_8_7],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -4329,7 +4329,7 @@ fun f_Raw_Internal_takeWhileImpl_da77c334fe(
   _a_2_1: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_3_2: LeanValue = leanField(_a_1_0, 0);
     _startPos_4_3: LeanValue = leanField(_a_1_0, 1);
     _stopPos_5_4: LeanValue = leanField(_a_1_0, 2);
@@ -4341,7 +4341,7 @@ fun f_Raw_Internal_takeWhileImpl_da77c334fe(
       _startPos_4_3,
     );
     LeanCtor(
-      "[\"Substring\",\"Raw\",\"mk\"]",
+      LeanTag.Substring_Raw_mk,
       Array[_str_3_2, _startPos_4_3, _e_5],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -4374,7 +4374,7 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"String\",\"Slice\",\"mk\"]" ->
+      | LeanTag.String_Slice_mk ->
         _frame.set(6, leanField(_frame[0], 0));
         _frame.set(7, leanField(_frame[0], 1));
         _frame.set(8, leanField(_frame[0], 2));
@@ -4392,17 +4392,17 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
           ),
         );
         leanTag(_frame[10]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           leanTag(_frame[4]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(11, leanField(_frame[4], 0));
             _frame.set(12, leanField(_frame[4], 1));
             leanTag(_frame[12]) match {
-            | "[\"Prod\",\"mk\"]" ->
+            | LeanTag.Prod_mk ->
               _frame.set(13, leanField(_frame[12], 0));
               _frame.set(14, leanField(_frame[12], 1));
               leanTag(_frame[14]) match {
-              | "[\"Prod\",\"mk\"]" ->
+              | LeanTag.Prod_mk ->
                 _ = leanField(_frame[14], 0);
                 _frame.set(15, leanField(_frame[14], 1));
                 _frame.set(
@@ -4449,12 +4449,12 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
                   ),
                 );
                 leanTag(_frame[40]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _jump0 = _frame[40];
                   _frame.set(36, _jump0);
                   !pc = 4;
                   void
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _frame.set(41, LeanScalar("uint32", "57"));
                   _frame.set(
                     42,
@@ -4476,7 +4476,7 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" -> return _frame[4]
+        | LeanTag.Bool_true -> return _frame[4]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -4493,15 +4493,15 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
       );
       _frame.set(
         24,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[20], _frame[21]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[20], _frame[21]]),
       );
       _frame.set(
         25,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[23], _frame[24]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[23], _frame[24]]),
       );
       _frame.set(
         26,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[1], _frame[25]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[1], _frame[25]]),
       );
       _frame.set(
         27,
@@ -4514,14 +4514,14 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
       return _frame[27]
     | 2 ->
       leanTag(_frame[13]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[28];
         _jump1 = _frame[29];
         _frame.set(20, _jump0);
         _frame.set(21, _jump1);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(30, LeanScalar("uint32", "95"));
         _frame.set(
           31,
@@ -4532,14 +4532,14 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
           ),
         );
         leanTag(_frame[31]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[28];
           _jump1 = _frame[29];
           _frame.set(20, _jump0);
           _frame.set(21, _jump1);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[28];
           _jump1 = _frame[1];
           _frame.set(20, _jump0);
@@ -4552,14 +4552,14 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
       }
     | 3 ->
       leanTag(_frame[11]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[32];
         _jump1 = _frame[33];
         _frame.set(28, _jump0);
         _frame.set(29, _jump1);
         !pc = 2;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(34, LeanScalar("uint32", "95"));
         _frame.set(
           35,
@@ -4570,14 +4570,14 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
           ),
         );
         leanTag(_frame[35]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[32];
           _jump1 = _frame[33];
           _frame.set(28, _jump0);
           _frame.set(29, _jump1);
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[32];
           _jump1 = _frame[1];
           _frame.set(20, _jump0);
@@ -4590,16 +4590,16 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
       }
     | 4 ->
       leanTag(_frame[15]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[36];
         _jump1 = _frame[1];
         _frame.set(20, _jump0);
         _frame.set(21, _jump1);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         leanTag(_frame[36]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(37, LeanScalar("uint32", "95"));
           _frame.set(
             38,
@@ -4610,14 +4610,14 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
             ),
           );
           leanTag(_frame[38]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[36];
             _jump1 = _frame[1];
             _frame.set(20, _jump0);
             _frame.set(21, _jump1);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[36];
             _jump1 = _frame[38];
             _frame.set(32, _jump0);
@@ -4626,7 +4626,7 @@ fun f_Raw_isNat_lam_0_edc82fb7ff(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[36];
           _jump1 = _frame[2];
           _frame.set(32, _jump0);
@@ -4662,7 +4662,7 @@ fun f_Substring_toString_0515678e95(
   _a_1_0: LeanValue,
 ): LeanValue {
   leanTag(_a_1_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_2_1: LeanValue = leanField(_a_1_0, 0);
     _startPos_3_2: LeanValue = leanField(_a_1_0, 1);
     _stopPos_4_3: LeanValue = leanField(_a_1_0, 2);
@@ -4684,11 +4684,11 @@ fun f_Raw_commonSuffix_loop_6a3742fd08(
   _tpos_3: LeanValue,
 ): LeanValue {
   leanTag(_s_0) match {
-  | "[\"Substring\",\"Raw\",\"mk\"]" ->
+  | LeanTag.Substring_Raw_mk ->
     _str_4: LeanValue = leanField(_s_0, 0);
     _startPos_5: LeanValue = leanField(_s_0, 1);
     _stopPos_6: LeanValue = leanField(_s_0, 2);
-    _x_1_7: LeanValue = LeanScalar("nat", "1");
+    _x_1_7: LeanValue = LeanNatLiterals.n1;
     _x_2_8: LeanValue = L4_Init_Prelude.f_Nat_add_86990f4822(
       _runtime,
       _startPos_5,
@@ -4700,10 +4700,10 @@ fun f_Raw_commonSuffix_loop_6a3742fd08(
       _spos_2,
     );
     leanTag(_x_3_9) match {
-    | "[\"Bool\",\"false\"]" -> _spos_2
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _spos_2
+    | LeanTag.Bool_true ->
       leanTag(_t_1) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _str_10: LeanValue = leanField(_t_1, 0);
         _startPos_11: LeanValue = leanField(_t_1, 1);
         _stopPos_12: LeanValue = leanField(_t_1, 2);
@@ -4718,8 +4718,8 @@ fun f_Raw_commonSuffix_loop_6a3742fd08(
           _tpos_3,
         );
         leanTag(_x_5_14) match {
-        | "[\"Bool\",\"false\"]" -> _spos_2
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> _spos_2
+        | LeanTag.Bool_true ->
           _spos_15: LeanValue = L4_Init_Data_String_Basic.f_Pos_Raw_prev_3fc1f1c32f(
             _runtime,
             _str_4,
@@ -4746,8 +4746,8 @@ fun f_Raw_commonSuffix_loop_6a3742fd08(
             _x_7_18,
           );
           leanTag(_x_8_19) match {
-          | "[\"Bool\",\"false\"]" -> _spos_2
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_false -> _spos_2
+          | LeanTag.Bool_true ->
             f_Raw_commonSuffix_loop_6a3742fd08(
               _runtime,
               _s_0,
@@ -4791,7 +4791,7 @@ fun f_Substring_Raw_any_345dc33661(
         ),
       );
       leanTag(_frame[0]) match {
-      | "[\"Substring\",\"Raw\",\"mk\"]" ->
+      | LeanTag.Substring_Raw_mk ->
         _frame.set(3, leanField(_frame[0], 0));
         _frame.set(4, leanField(_frame[0], 1));
         _frame.set(5, leanField(_frame[0], 2));
@@ -4827,10 +4827,10 @@ fun f_Substring_Raw_any_345dc33661(
           ),
         );
         leanTag(_frame[17]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             18,
             L4_Init_Data_String_Basic.f_Pos_Raw_isValid_a3c5e667f2(
@@ -4840,10 +4840,10 @@ fun f_Substring_Raw_any_345dc33661(
             ),
           );
           leanTag(_frame[18]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               19,
               L4_Init_Prelude.f_Nat_ble_40aa3bdf39(
@@ -4853,14 +4853,14 @@ fun f_Substring_Raw_any_345dc33661(
               ),
             );
             leanTag(_frame[19]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               !pc = 1;
               void
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 20,
                 LeanCtor(
-                  "[\"String\",\"Slice\",\"mk\"]",
+                  LeanTag.String_Slice_mk,
                   Array[_frame[3], _frame[4], _frame[5], LeanErased()],
                 ),
               );
@@ -4885,8 +4885,8 @@ fun f_Substring_Raw_any_345dc33661(
     | 1 ->
       _frame.set(9, LeanText("Init.Data.Option.BasicAux"));
       _frame.set(10, LeanText("Option.get!"));
-      _frame.set(11, LeanScalar("nat", "22"));
-      _frame.set(12, LeanScalar("nat", "14"));
+      _frame.set(11, LeanNatLiterals.n22);
+      _frame.set(12, LeanNatLiterals.n14);
       _frame.set(13, LeanText("value is none"));
       _frame.set(
         14,
@@ -4939,7 +4939,7 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
     pc match {
     | 0 ->
       leanTag(_frame[1]) match {
-      | "[\"String\",\"Slice\",\"mk\"]" ->
+      | LeanTag.String_Slice_mk ->
         _frame.set(4, leanField(_frame[1], 0));
         _frame.set(5, leanField(_frame[1], 1));
         _frame.set(6, leanField(_frame[1], 2));
@@ -4957,20 +4957,20 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
           ),
         );
         leanTag(_frame[8]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           leanTag(_frame[3]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(9, leanField(_frame[3], 0));
             _frame.set(10, leanField(_frame[3], 1));
             leanTag(_frame[10]) match {
-            | "[\"Prod\",\"mk\"]" ->
+            | LeanTag.Prod_mk ->
               _frame.set(11, leanField(_frame[10], 0));
               _frame.set(12, leanField(_frame[10], 1));
               leanTag(_frame[12]) match {
-              | "[\"Prod\",\"mk\"]" ->
+              | LeanTag.Prod_mk ->
                 _ = leanField(_frame[12], 0);
                 _frame.set(13, leanField(_frame[12], 1));
-                _frame.set(14, LeanScalar("nat", "0"));
+                _frame.set(14, LeanNatLiterals.n0);
                 _frame.set(
                   15,
                   L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -4979,7 +4979,7 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
                     _frame[14],
                   ),
                 );
-                _frame.set(16, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+                _frame.set(16, LeanCtor(LeanTag.Bool_true, Array[]));
                 _frame.set(
                   17,
                   L4_Init_Prelude.f_Nat_add_86990f4822(
@@ -5024,12 +5024,12 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
                   ),
                 );
                 leanTag(_frame[41]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _jump0 = _frame[41];
                   _frame.set(37, _jump0);
                   !pc = 4;
                   void
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _frame.set(42, LeanScalar("uint32", "57"));
                   _frame.set(
                     43,
@@ -5051,7 +5051,7 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" -> return _frame[3]
+        | LeanTag.Bool_true -> return _frame[3]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -5068,15 +5068,15 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
       );
       _frame.set(
         25,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[21], _frame[22]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[21], _frame[22]]),
       );
       _frame.set(
         26,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[24], _frame[25]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[24], _frame[25]]),
       );
       _frame.set(
         27,
-        LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[15], _frame[26]]),
+        LeanCtor(LeanTag.Prod_mk, Array[_frame[15], _frame[26]]),
       );
       _frame.set(
         28,
@@ -5091,14 +5091,14 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
       return _frame[28]
     | 2 ->
       leanTag(_frame[11]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[29];
         _jump1 = _frame[30];
         _frame.set(21, _jump0);
         _frame.set(22, _jump1);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(31, LeanScalar("uint32", "95"));
         _frame.set(
           32,
@@ -5109,14 +5109,14 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
           ),
         );
         leanTag(_frame[32]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[29];
           _jump1 = _frame[30];
           _frame.set(21, _jump0);
           _frame.set(22, _jump1);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[29];
           _jump1 = _frame[15];
           _frame.set(21, _jump0);
@@ -5129,14 +5129,14 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
       }
     | 3 ->
       leanTag(_frame[9]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[33];
         _jump1 = _frame[34];
         _frame.set(29, _jump0);
         _frame.set(30, _jump1);
         !pc = 2;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(35, LeanScalar("uint32", "95"));
         _frame.set(
           36,
@@ -5147,14 +5147,14 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
           ),
         );
         leanTag(_frame[36]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _jump0 = _frame[33];
           _jump1 = _frame[34];
           _frame.set(29, _jump0);
           _frame.set(30, _jump1);
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[33];
           _jump1 = _frame[15];
           _frame.set(21, _jump0);
@@ -5167,16 +5167,16 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
       }
     | 4 ->
       leanTag(_frame[13]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _jump0 = _frame[37];
         _jump1 = _frame[15];
         _frame.set(21, _jump0);
         _frame.set(22, _jump1);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         leanTag(_frame[37]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(38, LeanScalar("uint32", "95"));
           _frame.set(
             39,
@@ -5187,14 +5187,14 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
             ),
           );
           leanTag(_frame[39]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[37];
             _jump1 = _frame[15];
             _frame.set(21, _jump0);
             _frame.set(22, _jump1);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[37];
             _jump1 = _frame[39];
             _frame.set(33, _jump0);
@@ -5203,7 +5203,7 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _jump0 = _frame[37];
           _jump1 = _frame[16];
           _frame.set(33, _jump0);
@@ -5222,10 +5222,10 @@ fun f_Raw_toNat_spec_0_ca6cfe5271(
 fun f_Raw_extract_closed_1_86bf8f8e48(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_88_0: LeanValue = LeanScalar("nat", "0");
-  _x_89_1: LeanValue = LeanScalar("nat", "0");
+  _x_88_0: LeanValue = LeanNatLiterals.n0;
+  _x_89_1: LeanValue = LeanNatLiterals.n0;
   _x_90_2: LeanValue = f_Raw_extract_closed_0_fbe04c5680(_runtime);
-  LeanCtor("[\"Substring\",\"Raw\",\"mk\"]", Array[_x_90_2, _x_89_1, _x_89_1])
+  LeanCtor(LeanTag.Substring_Raw_mk, Array[_x_90_2, _x_89_1, _x_89_1])
 }
 
 module end;

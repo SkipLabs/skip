@@ -2,7 +2,7 @@
 // idempotent bootstrap. No imported declarations are needed for this check.
 fun main(): void {
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   leanInitializeExceptions(runtime);
   count = runtime.refs.size();
   ids: mutable Set<Int> = mutable Set[];

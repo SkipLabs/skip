@@ -1,0 +1,212 @@
+// Function information cache lookup and publication.
+module L4_Lean_Meta_FunInfo;
+
+fun f_Lean_Meta_getFunInfoAux_f44d4b39aa(
+  _runtime: mutable LeanExecution,
+  fn: LeanValue,
+  maxArgs: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  emptyHigherOrderOutParams = LeanCtor(
+    LeanTag.Std_DTreeMap_Internal_Impl_leaf,
+    Array[],
+  );
+  computeFunInfoFromTelescope = LeanClosure(
+    L4_Lean_Meta_FunInfo.apply_f_Meta_getFunInfoAux_lam_0_d8ffe98521,
+    8,
+    Array[emptyHigherOrderOutParams],
+  );
+  computeFunInfo = LeanClosure(
+    L4_Lean_Meta_FunInfo.apply_f_Meta_getFunInfoAux_lam_1_882236de01,
+    8,
+    Array[fn, maxArgs, computeFunInfoFromTelescope],
+  );
+  funInfoHygieneName = f_FunInfo_hygCtx_hyg_2f0011a45b(_runtime);
+  basicHygieneName = L4_Lean_Meta_Basic.f_Basic_hygCtx_hyg_92f1623ff5(_runtime);
+
+  cacheKeyResult = L4_Lean_Meta_Basic.f_Lean_Meta_mkInfoCacheKey_fbf2958efb(
+    _runtime,
+    fn,
+    maxArgs,
+    metaContext,
+    world,
+  );
+  leanTag(cacheKeyResult) match {
+  | LeanTag.EST_Out_error -> cacheKeyResult
+  | LeanTag.EST_Out_ok ->
+    cacheKey = leanField(cacheKeyResult, 0);
+    worldAfterKey = leanField(cacheKeyResult, 1);
+    metaStateRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+      _runtime,
+      LeanErased(),
+      LeanErased(),
+      metaStateRef,
+      worldAfterKey,
+    );
+    leanTag(metaStateRead) match {
+    | LeanTag.ST_Out_mk ->
+      metaState = leanField(metaStateRead, 0);
+      worldAfterRead = leanField(metaStateRead, 1);
+      leanTag(metaState) match {
+      | LeanTag.Meta_State_mk ->
+        metaCache = leanField(metaState, 1);
+        leanTag(metaCache) match {
+        | LeanTag.Meta_Cache_mk ->
+          funInfoCache = leanField(metaCache, 1);
+          cachedInfo = f_Meta_getFunInfoAux_spec_7_630dc72e5b(
+            _runtime,
+            funInfoCache,
+            cacheKey,
+          );
+          leanTag(cachedInfo) match {
+          | LeanTag.Option_some ->
+            info = leanField(cachedInfo, 0);
+            LeanCtor(LeanTag.EST_Out_ok, Array[info, worldAfterRead])
+          | LeanTag.Option_none ->
+            computed = leanTag(fn) match {
+            | LeanTag.Expr_const__impl ->
+              constantName = leanField(fn, 1);
+              universeLevels = leanField(fn, 2);
+              levelsHaveMVars = f_Meta_getFunInfoAux_spec_8_814d17c8e1(
+                _runtime,
+                universeLevels,
+              );
+              leanTag(levelsHaveMVars) match {
+              | LeanTag.Bool_false ->
+                environmentKey = LeanCtor(
+                  LeanTag
+                    .Private_Lean_Meta_FunInfo_0_Lean_Meta_FunInfoEnvCacheKey_mk,
+                  Array[constantName, universeLevels, maxArgs],
+                );
+                f_Meta_getFunInfoAux_spec_9_90036b5f28(
+                  _runtime,
+                  funInfoHygieneName,
+                  basicHygieneName,
+                  constantName,
+                  environmentKey,
+                  computeFunInfo,
+                  metaContext,
+                  metaStateRef,
+                  coreContext,
+                  coreStateRef,
+                  worldAfterRead,
+                )
+              | LeanTag.Bool_true ->
+                f_Meta_getFunInfoAux_lam_1_882236de01(
+                  _runtime,
+                  fn,
+                  maxArgs,
+                  computeFunInfoFromTelescope,
+                  metaContext,
+                  metaStateRef,
+                  coreContext,
+                  coreStateRef,
+                  worldAfterRead,
+                )
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | _ ->
+              f_Meta_getFunInfoAux_lam_1_882236de01(
+                _runtime,
+                fn,
+                maxArgs,
+                computeFunInfoFromTelescope,
+                metaContext,
+                metaStateRef,
+                coreContext,
+                coreStateRef,
+                worldAfterRead,
+              )
+            };
+            leanTag(computed) match {
+            | LeanTag.EST_Out_error -> computed
+            | LeanTag.EST_Out_ok ->
+              info = leanField(computed, 0);
+              worldAfterCompute = leanField(computed, 1);
+              stateAndOldMeta = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+                _runtime,
+                LeanErased(),
+                LeanErased(),
+                metaStateRef,
+                worldAfterCompute,
+              );
+              leanTag(stateAndOldMeta) match {
+              | LeanTag.ST_Out_mk ->
+                oldMetaState = leanField(stateAndOldMeta, 0);
+                worldAfterTake = leanField(stateAndOldMeta, 1);
+                leanTag(oldMetaState) match {
+                | LeanTag.Meta_State_mk ->
+                  oldCache = leanField(oldMetaState, 1);
+                  leanTag(oldCache) match {
+                  | LeanTag.Meta_Cache_mk ->
+                    oldInfoCache = leanField(oldCache, 1);
+                    newInfoCache = f_Meta_getFunInfoAux_spec_6_7856747d48(
+                      _runtime,
+                      oldInfoCache,
+                      cacheKey,
+                      info,
+                    );
+                    newCache = LeanCtor(
+                      LeanTag.Meta_Cache_mk,
+                      Array[
+                        leanField(oldCache, 0),
+                        newInfoCache,
+                        leanField(oldCache, 2),
+                        leanField(oldCache, 3),
+                        leanField(oldCache, 4),
+                        leanField(oldCache, 5),
+                        leanField(oldCache, 6),
+                        leanField(oldCache, 7),
+                      ],
+                    );
+                    newMetaState = LeanCtor(
+                      LeanTag.Meta_State_mk,
+                      Array[
+                        leanField(oldMetaState, 0),
+                        newCache,
+                        leanField(oldMetaState, 2),
+                        leanField(oldMetaState, 3),
+                        leanField(oldMetaState, 4),
+                      ],
+                    );
+                    worldAfterWrite = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+                      _runtime,
+                      LeanErased(),
+                      LeanErased(),
+                      metaStateRef,
+                      newMetaState,
+                      worldAfterTake,
+                    );
+                    leanTag(worldAfterWrite) match {
+                    | LeanTag.ST_Out_mk ->
+                      LeanCtor(
+                        LeanTag.EST_Out_ok,
+                        Array[info, leanField(worldAfterWrite, 1)],
+                      )
+                    | _ -> leanFail("non-exhaustive Lean case")
+                    }
+                  | _ -> leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> leanFail("non-exhaustive Lean case")
+                }
+              | _ -> leanFail("non-exhaustive Lean case")
+              }
+            | _ -> leanFail("non-exhaustive Lean case")
+            }
+          | _ -> leanFail("non-exhaustive Lean case")
+          }
+        | _ -> leanFail("non-exhaustive Lean case")
+        }
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

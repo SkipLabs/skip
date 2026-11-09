@@ -1,0 +1,62 @@
+// The metavariable-free branch of Lean.Meta.CheckAssignmentQuick.checkImpl.
+// The original implementation is retained for expressions containing metavariables.
+// This traversal keeps the same free-variable checks, but uses a Skip-local DAG
+// set instead of interpreting Lean's PtrSet through boxed primitive operations.
+fun leanCheckAssignmentWithoutMVars(
+  runtime: mutable LeanExecution,
+  localContext: LeanValue,
+  metavariableDecl: LeanValue,
+  arguments: LeanValue,
+  expression: LeanValue,
+): Bool {
+  visited: mutable Map<LeanImmutableKey, Bool> = mutable Map[];
+  pending = mutable Vector[expression];
+  while (!pending.isEmpty()) {
+    expr = pending.pop();
+    if (leanExprData(expr).and(1.shl(40)) == 0) continue;
+    key = LeanImmutableKey(expr);
+    if (visited.maybeGet(key).default(false)) continue;
+    visited.set(key, true);
+    if (leanTag(expr) == LeanTag.Expr_fvar__impl) {
+      id = leanField(expr, 1);
+      if (
+        leanIsTrue(
+          L4_Lean_LocalContext.f_Lean_LocalContext_contains_2d192664ca(
+            runtime,
+            leanField(metavariableDecl, 1),
+            id,
+          ),
+        )
+      ) continue;
+      found = L4_Lean_LocalContext.f_Lean_LocalContext_find_001c4a7be2(
+        runtime,
+        localContext,
+        id,
+      );
+      if (leanTag(found) == LeanTag.Option_some) {
+        decl = leanField(found, 0);
+        if (
+          leanTag(decl) == LeanTag.LocalDecl_ldecl &&
+          !leanIsTrue(leanField(decl, 5))
+        ) return false;
+      };
+      allowed = false;
+      for (argument in leanArray(arguments)) {
+        if (leanNameEqual(leanField(argument, 1), id)) {
+          !allowed = true;
+          break void
+        }
+      };
+      if (!allowed) return false
+    } else {
+      // Reverse pushes retain Lean's left-to-right short-circuit traversal.
+      childFields = leanExprChildren(expr);
+      i = childFields.size();
+      while (i > 0) {
+        !i = i - 1;
+        pending.push(leanField(expr, childFields[i].i0))
+      }
+    }
+  };
+  true
+}

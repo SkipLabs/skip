@@ -9,16 +9,16 @@ fun leanProfile(
     runtime,
     LeanText("profiler"),
   );
-  enabled = L4_Lean_Data_Options.f_Lean_Options_getBool_b4c4887473(
+  profilingEnabled = L4_Lean_Data_Options.f_Lean_Options_getBool_b4c4887473(
     runtime,
     options,
     name,
     leanBool(false),
   );
-  if (leanIsTrue(enabled)) {
+  if (leanIsTrue(profilingEnabled)) {
     return leanPrimitive(
       "Lean.profileit [lean_profileit] with profiler enabled",
     )
   };
-  leanApply(runtime, action, Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])])
+  leanApply(runtime, action, Array[LeanCtor(LeanTag.PUnit_unit, Array[])])
 }

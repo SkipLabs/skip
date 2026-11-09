@@ -14,7 +14,7 @@ fun f_instReprCancellationReason_repr_closed_7_375dfdc263(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Std.instReprCancellationReason.repr._closed_5"
@@ -24,7 +24,7 @@ fun f_instReprCancellationReason_repr_closed_5_326416c0be(
   _x_231_0: LeanValue = f_instReprCancellationReason_repr_closed_4_ae6028b090(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_231_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_231_0])
 }
 // "_private.Std.Sync.CancellationToken.0.Std.CancellationToken.Consumer.ctorIdx._impl"
 fun f_Consumer_ctorIdx_impl_ff96217b94(
@@ -67,7 +67,7 @@ fun f_CancellationToken_wait_lam_0_520702c1ec(
   _y_1_1: LeanValue,
 ): LeanValue {
   leanTag(_a_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     _x_3_4: LeanValue = L4_Init_System_IOError.f_IO_userError_436e50ab44(
       _runtime,
       LeanText("cancellation token dropped"),
@@ -75,20 +75,20 @@ fun f_CancellationToken_wait_lam_0_520702c1ec(
     _x_5_6: LeanValue = L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
-      LeanCtor("[\"Except\",\"error\"]", Array[_x_3_4]),
+      LeanCtor(LeanTag.Except_error, Array[_x_3_4]),
     );
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_5_6, _y_1_1])
-  | "[\"Option\",\"some\"]" ->
+    LeanCtor(LeanTag.ST_Out_mk, Array[_x_5_6, _y_1_1])
+  | LeanTag.Option_some ->
     _val_7_2: LeanValue = leanField(_a_0, 0);
     _x_10_10: LeanValue = L4_Init_Core.f_Task_pure_8e8af46293(
       _runtime,
       LeanErased(),
       LeanCtor(
-        "[\"Except\",\"ok\"]",
-        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+        LeanTag.Except_ok,
+        Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
       ),
     );
-    LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_x_10_10, _y_1_1])
+    LeanCtor(LeanTag.ST_Out_mk, Array[_x_10_10, _y_1_1])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -124,7 +124,7 @@ fun f_CancellationToken_wait_spec_0_6981f0b15d(
   _y_1_2: LeanValue,
 ): LeanValue {
   leanTag(_mutex_0) match {
-  | "[\"_private\",\"Std\",\"Sync\",\"Mutex\",0,\"Std\",\"Mutex\",\"mk\"]" ->
+  | LeanTag.Private_Std_Sync_Mutex_0_Std_Mutex_mk ->
     _ref_3: LeanValue = leanField(_mutex_0, 0);
     _mutex_4: LeanValue = leanField(_mutex_0, 1);
     _x_2_5: LeanValue = L4_Std_Sync_Mutex.f_Std_BaseMutex_lock_ac2fb8a971(
@@ -133,12 +133,12 @@ fun f_CancellationToken_wait_spec_0_6981f0b15d(
       _y_1_2,
     );
     leanTag(_x_2_5) match {
-    | "[\"ST\",\"Out\",\"mk\"]" ->
+    | LeanTag.ST_Out_mk ->
       _val_3_6: LeanValue = leanField(_x_2_5, 0);
       _state_4_7: LeanValue = leanField(_x_2_5, 1);
       _r_8: LeanValue = leanApply(_runtime, _k_1, Array[_ref_3, _state_4_7]);
       leanTag(_r_8) match {
-      | "[\"EST\",\"Out\",\"ok\"]" ->
+      | LeanTag.EST_Out_ok ->
         _a_5_9: LeanValue = leanField(_r_8, 0);
         _a_6_10: LeanValue = leanField(_r_8, 1);
         _x_7_13: LeanValue = L4_Std_Sync_Mutex.f_Std_BaseMutex_unlock_6ed47120e3(
@@ -147,13 +147,13 @@ fun f_CancellationToken_wait_spec_0_6981f0b15d(
           _a_6_10,
         );
         leanTag(_x_7_13) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_8_14: LeanValue = leanField(_x_7_13, 0);
           _state_9_15: LeanValue = leanField(_x_7_13, 1);
-          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_a_5_9, _state_9_15])
+          LeanCtor(LeanTag.EST_Out_ok, Array[_a_5_9, _state_9_15])
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"EST\",\"Out\",\"error\"]" ->
+      | LeanTag.EST_Out_error ->
         _a_11_11: LeanValue = leanField(_r_8, 0);
         _a_12_12: LeanValue = leanField(_r_8, 1);
         _x_13_17: LeanValue = L4_Std_Sync_Mutex.f_Std_BaseMutex_unlock_6ed47120e3(
@@ -162,10 +162,10 @@ fun f_CancellationToken_wait_spec_0_6981f0b15d(
           _a_12_12,
         );
         leanTag(_x_13_17) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_14_18: LeanValue = leanField(_x_13_17, 0);
           _state_15_19: LeanValue = leanField(_x_13_17, 1);
-          LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_11_11, _state_15_19])
+          LeanCtor(LeanTag.EST_Out_error, Array[_a_11_11, _state_15_19])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
@@ -180,8 +180,8 @@ fun f_selector_lam_5_closed_2_1c20cfabce(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Option\",\"some\"]",
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    LeanTag.Option_some,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Std.CancellationToken.selector._lam_5._closed_1"
@@ -189,7 +189,7 @@ fun f_selector_lam_5_closed_1_446786a794(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_7138_0: LeanValue = f_selector_lam_5_closed_0_211b07b74f(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_7138_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_7138_0])
 }
 // "_private.Std.Sync.CancellationToken.0.Std.CancellationToken.Consumer.resolve._closed_0"
 fun f_Consumer_resolve_closed_0_b01ac611df(
@@ -198,7 +198,7 @@ fun f_Consumer_resolve_closed_0_b01ac611df(
   LeanClosure(
     L4_Std_Sync_CancellationToken.apply_f_Consumer_resolve_lam_0_7506fee28c,
     2,
-    Array[LeanCtor("[\"Bool\",\"false\"]", Array[])],
+    Array[LeanCtor(LeanTag.Bool_false, Array[])],
   )
 }
 // "Std.instToStringCancellationReason"
@@ -225,7 +225,7 @@ fun f_Std_CancellationReason_ctorElim_ad528ffaa2(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Std\",\"CancellationReason\",\"custom\"]" ->
+  | LeanTag.Std_CancellationReason_custom ->
     _msg_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_msg_2])
   | _ -> _k_1
@@ -238,7 +238,7 @@ fun f_instReprCancellationReason_repr_closed_9_4d15939d73(
   _x_246_0: LeanValue = f_instReprCancellationReason_repr_closed_8_2534b2e4be(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_246_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_246_0])
 }
 // "Std.Queue.filterM._at_.Std.CancellationToken.selector.spec_2._closed_0"
 fun f_selector_spec_2_closed_0_721ac24a0c(
@@ -295,8 +295,8 @@ fun f_CancellationToken_new_closed_1_4bf763232a(
 ): LeanValue {
   _x_63_0: LeanValue = f_CancellationToken_new_closed_0_7096edb76e(_runtime);
   LeanCtor(
-    "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"State\",\"mk\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[]), _x_63_0],
+    LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_State_mk,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), _x_63_0],
   )
 }
 // "Std.CancellationToken.wait"
@@ -326,7 +326,7 @@ fun f_instReprCancellationReason_repr_closed_3_d9f8b612be(
   _x_228_0: LeanValue = f_instReprCancellationReason_repr_closed_2_a38d7c3091(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_228_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_228_0])
 }
 // "_private.Std.Sync.CancellationToken.0.Std.CancellationToken.Consumer.normal.elim"
 fun f_Consumer_normal_elim_37719e449b(
@@ -358,7 +358,7 @@ fun f_selector_lam_2_closed_1_f359352f6b(
     L4_Std_Sync_CancellationToken
       .apply_f_CancellationToken_selector_lam_0_bf58fdbbec,
     3,
-    Array[LeanCtor("[\"Bool\",\"false\"]", Array[])],
+    Array[LeanCtor(LeanTag.Bool_false, Array[])],
   )
 }
 // "_private.Std.Sync.CancellationToken.0.Std.CancellationToken.Consumer.ctorElim._redArg"
@@ -368,10 +368,10 @@ fun f_CancellationToken_Consumer_ctorElim_91800f5dba(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"Consumer\",\"normal\"]" ->
+  | LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_Consumer_normal ->
     _promise_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_promise_2])
-  | "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"Consumer\",\"select\"]" ->
+  | LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_Consumer_select ->
     _finished_3: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_finished_3])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -392,8 +392,8 @@ fun f_spec_2_spec_2_closed_0_3648f6a33b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Bool\",\"true\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Bool_true, Array[])],
   )
 }
 // "Std.instReprCancellationReason.repr._closed_6"
@@ -402,7 +402,7 @@ fun f_instReprCancellationReason_repr_closed_6_966e28f2c4(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "2"),
+    LeanNatLiterals.n2,
   )
 }
 // "Std.instToStringCancellationReason._closed_0"
@@ -456,8 +456,8 @@ fun f_instReprCancellationReason_repr_closed_10_b42ad02d66(
     _runtime,
   );
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_249_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_249_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Std.instToStringCancellationReason._lam_0._closed_1"
@@ -513,7 +513,7 @@ fun f_instReprCancellationReason_repr_closed_1_9abbf457a2(
   _x_225_0: LeanValue = f_instReprCancellationReason_repr_closed_0_1d3b4c8de6(
     _runtime,
   );
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_225_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_225_0])
 }
 // "List.filterAuxM._at_.Std.Queue.filterM._at_.Std.CancellationToken.selector.spec_2.spec_2._redArg._closed_2"
 fun f_spec_2_spec_2_closed_2_5c92658cb6(
@@ -530,7 +530,7 @@ fun f_spec_2_spec_2_closed_1_a1b1e3c2a0(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_7317_0: LeanValue = f_spec_2_spec_2_closed_0_3648f6a33b(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_7317_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_7317_0])
 }
 // "Std.Mutex.atomically._at_.Std.CancellationToken.cancel.spec_1"
 fun f_CancellationToken_cancel_spec_1_3c1768f8ef(
@@ -568,8 +568,8 @@ fun f_selector_lam_5_closed_0_211b07b74f(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"Option\",\"none\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[])],
   )
 }
 // "Std.instBEqCancellationReason"
@@ -612,8 +612,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"CancellationReason\",\"deadline\"]" ->
-        _frame.set(24, LeanScalar("nat", "1024"));
+      | LeanTag.Std_CancellationReason_deadline ->
+        _frame.set(24, LeanNatLiterals.n1024);
         _frame.set(
           25,
           L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
@@ -623,8 +623,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           ),
         );
         leanTag(_frame[25]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(26, LeanScalar("nat", "2"));
+        | LeanTag.Bool_false ->
+          _frame.set(26, LeanNatLiterals.n2);
           _frame.set(
             27,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[26]),
@@ -633,8 +633,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           _frame.set(16, _jump0);
           !pc = 3;
           void
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(28, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(28, LeanNatLiterals.n1);
           _frame.set(
             29,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[28]),
@@ -645,8 +645,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Std\",\"CancellationReason\",\"shutdown\"]" ->
-        _frame.set(30, LeanScalar("nat", "1024"));
+      | LeanTag.Std_CancellationReason_shutdown ->
+        _frame.set(30, LeanNatLiterals.n1024);
         _frame.set(
           31,
           L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
@@ -656,8 +656,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           ),
         );
         leanTag(_frame[31]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(32, LeanScalar("nat", "2"));
+        | LeanTag.Bool_false ->
+          _frame.set(32, LeanNatLiterals.n2);
           _frame.set(
             33,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[32]),
@@ -666,8 +666,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           _frame.set(9, _jump0);
           !pc = 2;
           void
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(34, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(34, LeanNatLiterals.n1);
           _frame.set(
             35,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[34]),
@@ -678,8 +678,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Std\",\"CancellationReason\",\"cancel\"]" ->
-        _frame.set(36, LeanScalar("nat", "1024"));
+      | LeanTag.Std_CancellationReason_cancel ->
+        _frame.set(36, LeanNatLiterals.n1024);
         _frame.set(
           37,
           L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
@@ -689,8 +689,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           ),
         );
         leanTag(_frame[37]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(38, LeanScalar("nat", "2"));
+        | LeanTag.Bool_false ->
+          _frame.set(38, LeanNatLiterals.n2);
           _frame.set(
             39,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[38]),
@@ -699,8 +699,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           _frame.set(2, _jump0);
           !pc = 1;
           void
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(40, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(40, LeanNatLiterals.n1);
           _frame.set(
             41,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[40]),
@@ -711,9 +711,9 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           void
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Std\",\"CancellationReason\",\"custom\"]" ->
+      | LeanTag.Std_CancellationReason_custom ->
         _frame.set(23, leanField(_frame[0], 0));
-        _frame.set(54, LeanScalar("nat", "1024"));
+        _frame.set(54, LeanNatLiterals.n1024);
         _frame.set(
           55,
           L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
@@ -723,8 +723,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           ),
         );
         leanTag(_frame[55]) match {
-        | "[\"Bool\",\"false\"]" ->
-          _frame.set(56, LeanScalar("nat", "2"));
+        | LeanTag.Bool_false ->
+          _frame.set(56, LeanNatLiterals.n2);
           _frame.set(
             57,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[56]),
@@ -733,8 +733,8 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
           _frame.set(42, _jump0);
           !pc = 4;
           void
-        | "[\"Bool\",\"true\"]" ->
-          _frame.set(58, LeanScalar("nat", "1"));
+        | LeanTag.Bool_true ->
+          _frame.set(58, LeanNatLiterals.n1);
           _frame.set(
             59,
             L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(_runtime, _frame[58]),
@@ -751,22 +751,22 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
       _frame.set(3, LeanText("Std.CancellationReason.cancel"));
       _frame.set(
         4,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[3]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[3]]),
       );
       _frame.set(
         5,
-        LeanCtor("[\"Std\",\"Format\",\"nest\"]", Array[_frame[2], _frame[4]]),
+        LeanCtor(LeanTag.Std_Format_nest, Array[_frame[2], _frame[4]]),
       );
       _frame.set(
         6,
         LeanCtor(
-          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          LeanTag.Std_Format_FlattenBehavior_allOrNone,
           Array[],
         ),
       );
       _frame.set(
         7,
-        LeanCtor("[\"Std\",\"Format\",\"group\"]", Array[_frame[5], _frame[6]]),
+        LeanCtor(LeanTag.Std_Format_group, Array[_frame[5], _frame[6]]),
       );
       _frame.set(
         8,
@@ -781,23 +781,23 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
       _frame.set(10, LeanText("Std.CancellationReason.shutdown"));
       _frame.set(
         11,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[10]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[10]]),
       );
       _frame.set(
         12,
-        LeanCtor("[\"Std\",\"Format\",\"nest\"]", Array[_frame[9], _frame[11]]),
+        LeanCtor(LeanTag.Std_Format_nest, Array[_frame[9], _frame[11]]),
       );
       _frame.set(
         13,
         LeanCtor(
-          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          LeanTag.Std_Format_FlattenBehavior_allOrNone,
           Array[],
         ),
       );
       _frame.set(
         14,
         LeanCtor(
-          "[\"Std\",\"Format\",\"group\"]",
+          LeanTag.Std_Format_group,
           Array[_frame[12], _frame[13]],
         ),
       );
@@ -814,26 +814,26 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
       _frame.set(17, LeanText("Std.CancellationReason.deadline"));
       _frame.set(
         18,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[17]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[17]]),
       );
       _frame.set(
         19,
         LeanCtor(
-          "[\"Std\",\"Format\",\"nest\"]",
+          LeanTag.Std_Format_nest,
           Array[_frame[16], _frame[18]],
         ),
       );
       _frame.set(
         20,
         LeanCtor(
-          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          LeanTag.Std_Format_FlattenBehavior_allOrNone,
           Array[],
         ),
       );
       _frame.set(
         21,
         LeanCtor(
-          "[\"Std\",\"Format\",\"group\"]",
+          LeanTag.Std_Format_group,
           Array[_frame[19], _frame[20]],
         ),
       );
@@ -850,13 +850,13 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
       _frame.set(43, LeanText("Std.CancellationReason.custom"));
       _frame.set(
         44,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[43]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[43]]),
       );
-      _frame.set(45, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[]));
+      _frame.set(45, LeanCtor(LeanTag.Std_Format_line, Array[]));
       _frame.set(
         46,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[44], _frame[45]],
         ),
       );
@@ -866,33 +866,33 @@ fun f_Std_instReprCancellationReason_repr_3e0f9d8d4b(
       );
       _frame.set(
         48,
-        LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_frame[47]]),
+        LeanCtor(LeanTag.Std_Format_text, Array[_frame[47]]),
       );
       _frame.set(
         49,
         LeanCtor(
-          "[\"Std\",\"Format\",\"append\"]",
+          LeanTag.Std_Format_append,
           Array[_frame[46], _frame[48]],
         ),
       );
       _frame.set(
         50,
         LeanCtor(
-          "[\"Std\",\"Format\",\"nest\"]",
+          LeanTag.Std_Format_nest,
           Array[_frame[42], _frame[49]],
         ),
       );
       _frame.set(
         51,
         LeanCtor(
-          "[\"Std\",\"Format\",\"FlattenBehavior\",\"allOrNone\"]",
+          LeanTag.Std_Format_FlattenBehavior_allOrNone,
           Array[],
         ),
       );
       _frame.set(
         52,
         LeanCtor(
-          "[\"Std\",\"Format\",\"group\"]",
+          LeanTag.Std_Format_group,
           Array[_frame[50], _frame[51]],
         ),
       );
@@ -941,15 +941,15 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
     _y_3_2,
   );
   leanTag(_x_4_3) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_5_4: LeanValue = leanField(_x_4_3, 0);
     _state_6_5: LeanValue = leanField(_x_4_3, 1);
     leanTag(_val_5_4) match {
-    | "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"State\",\"mk\"]" ->
+    | LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_State_mk ->
       _reason_6: LeanValue = leanField(_val_5_4, 0);
       _consumers_7: LeanValue = leanField(_val_5_4, 1);
       leanTag(_reason_6) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _x_8_10: LeanValue = L4_Init_System_Promise.f_IO_Promise_new_1329c97b35(
           _runtime,
           LeanErased(),
@@ -957,7 +957,7 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
           _state_6_5,
         );
         leanTag(_x_8_10) match {
-        | "[\"ST\",\"Out\",\"mk\"]" ->
+        | LeanTag.ST_Out_mk ->
           _val_9_11: LeanValue = leanField(_x_8_10, 0);
           _state_10_12: LeanValue = leanField(_x_8_10, 1);
           _x_11_13: LeanValue = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
@@ -968,17 +968,17 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
             _state_10_12,
           );
           leanTag(_x_11_13) match {
-          | "[\"ST\",\"Out\",\"mk\"]" ->
+          | LeanTag.ST_Out_mk ->
             _val_12_14: LeanValue = leanField(_x_11_13, 0);
             _state_13_15: LeanValue = leanField(_x_11_13, 1);
             leanTag(_val_12_14) match {
-            | "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"State\",\"mk\"]" ->
+            | LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_State_mk ->
               _reason_16: LeanValue = leanField(_val_12_14, 0);
               _consumers_17: LeanValue = leanField(_val_12_14, 1);
               _x_15_19: LeanValue = L4_Init_Data_Queue.f_Std_Queue_enqueue_98e6d68da4(
                 _runtime,
                 LeanCtor(
-                  "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"Consumer\",\"normal\"]",
+                  LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_Consumer_normal,
                   Array[_val_9_11],
                 ),
                 _consumers_17,
@@ -989,13 +989,13 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
                 LeanErased(),
                 _y_2_1,
                 LeanCtor(
-                  "[\"_private\",\"Std\",\"Sync\",\"CancellationToken\",0,\"Std\",\"CancellationToken\",\"State\",\"mk\"]",
+                  LeanTag.Private_Std_Sync_CancellationToken_0_Std_CancellationToken_State_mk,
                   Array[_reason_16, _x_15_19],
                 ),
                 _state_13_15,
               );
               leanTag(_x_17_21) match {
-              | "[\"ST\",\"Out\",\"mk\"]" ->
+              | LeanTag.ST_Out_mk ->
                 _val_18_22: LeanValue = leanField(_x_17_21, 0);
                 _state_19_23: LeanValue = leanField(_x_17_21, 1);
                 _x_20_24: LeanValue = L4_Init_System_Promise.f_IO_Promise_result_5fc6840910(
@@ -1009,16 +1009,16 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
                   LeanErased(),
                   _x_20_24,
                   _f_1_0,
-                  LeanScalar("nat", "0"),
-                  LeanCtor("[\"Bool\",\"false\"]", Array[]),
+                  LeanNatLiterals.n0,
+                  LeanCtor(LeanTag.Bool_false, Array[]),
                   _state_19_23,
                 );
                 leanTag(_x_22_26) match {
-                | "[\"ST\",\"Out\",\"mk\"]" ->
+                | LeanTag.ST_Out_mk ->
                   _val_23_27: LeanValue = leanField(_x_22_26, 0);
                   _state_24_28: LeanValue = leanField(_x_22_26, 1);
                   LeanCtor(
-                    "[\"EST\",\"Out\",\"ok\"]",
+                    LeanTag.EST_Out_ok,
                     Array[_val_23_27, _state_24_28],
                   )
                 | _ -> leanFail("non-exhaustive Lean case")
@@ -1031,17 +1031,17 @@ fun f_CancellationToken_wait_lam_1_a76c5aff93(
           }
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _val_26_8: LeanValue = leanField(_reason_6, 0);
         _x_29_32: LeanValue = L4_Init_Core.f_Task_pure_8e8af46293(
           _runtime,
           LeanErased(),
           LeanCtor(
-            "[\"Except\",\"ok\"]",
-            Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+            LeanTag.Except_ok,
+            Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
           ),
         );
-        LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_29_32, _state_6_5])
+        LeanCtor(LeanTag.EST_Out_ok, Array[_x_29_32, _state_6_5])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1122,7 +1122,7 @@ fun f_wait_lam_0_closed_2_86e33f05a0(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_1646_0: LeanValue = f_wait_lam_0_closed_1_7d1221eb68(_runtime);
-  LeanCtor("[\"Except\",\"error\"]", Array[_x_1646_0])
+  LeanCtor(LeanTag.Except_error, Array[_x_1646_0])
 }
 // "Std.CancellationToken.selector._closed_1"
 fun f_CancellationToken_selector_closed_1_ac3280eeda(
@@ -1170,7 +1170,7 @@ fun f_selector_spec_0_closed_0_420957b52c(
   LeanClosure(
     L4_Std_Sync_CancellationToken.apply_f_selector_spec_0_lam_0_fe2c0bde34,
     3,
-    Array[LeanCtor("[\"Bool\",\"true\"]", Array[])],
+    Array[LeanCtor(LeanTag.Bool_true, Array[])],
   )
 }
 // "Std.Async.Waiter.race._at_._private.Std.Sync.CancellationToken.0.Std.CancellationToken.Consumer.resolve.spec_0._closed_0"
@@ -1178,8 +1178,8 @@ fun f_resolve_spec_0_closed_0_13a87242c7(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   LeanCtor(
-    "[\"Except\",\"ok\"]",
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    LeanTag.Except_ok,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Std.CancellationToken.new._closed_0"
@@ -1195,31 +1195,31 @@ fun f_Std_instBEqCancellationReason_beq_3bfa91f5bb(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Std\",\"CancellationReason\",\"deadline\"]" ->
+  | LeanTag.Std_CancellationReason_deadline ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"CancellationReason\",\"deadline\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_CancellationReason_deadline ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"CancellationReason\",\"shutdown\"]" ->
+  | LeanTag.Std_CancellationReason_shutdown ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"CancellationReason\",\"shutdown\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_CancellationReason_shutdown ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"CancellationReason\",\"cancel\"]" ->
+  | LeanTag.Std_CancellationReason_cancel ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"CancellationReason\",\"cancel\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_CancellationReason_cancel ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"CancellationReason\",\"custom\"]" ->
+  | LeanTag.Std_CancellationReason_custom ->
     _msg_9_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"CancellationReason\",\"custom\"]" ->
+    | LeanTag.Std_CancellationReason_custom ->
       _msg_10_9: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_String_decEq_88c69973f8(_runtime, _msg_9_2, _msg_10_9)
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -1238,7 +1238,7 @@ fun f_selector_lam_2_closed_2_4e8e69d3d5(
     L4_Std_Sync_CancellationToken
       .apply_f_CancellationToken_selector_lam_1_109a2adac9,
     2,
-    Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
   )
 }
 // "Std.instToStringCancellationReason._lam_0"
@@ -1247,10 +1247,10 @@ fun f_Std_instToStringCancellationReason_lam_0_96115be63d(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Std\",\"CancellationReason\",\"deadline\"]" -> LeanText("deadline")
-  | "[\"Std\",\"CancellationReason\",\"shutdown\"]" -> LeanText("shutdown")
-  | "[\"Std\",\"CancellationReason\",\"cancel\"]" -> LeanText("cancel")
-  | "[\"Std\",\"CancellationReason\",\"custom\"]" ->
+  | LeanTag.Std_CancellationReason_deadline -> LeanText("deadline")
+  | LeanTag.Std_CancellationReason_shutdown -> LeanText("shutdown")
+  | LeanTag.Std_CancellationReason_cancel -> LeanText("cancel")
+  | LeanTag.Std_CancellationReason_custom ->
     _msg_5_1: LeanValue = leanField(_x_1_0, 0);
     _x_7_6: LeanValue = L4_Init_Data_String_Defs.f_String_append_61d243de93(
       _runtime,
@@ -1283,21 +1283,21 @@ fun f_selector_lam_5_closed_4_098f3b0b16(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_7144_0: LeanValue = f_selector_lam_5_closed_3_4cdc0fbb5b(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_7144_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_7144_0])
 }
 // "Std.CancellationToken.selector._lam_2._closed_0"
 fun f_selector_lam_2_closed_0_64456c6a67(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_6964_0: LeanValue = f_resolve_spec_0_closed_0_13a87242c7(_runtime);
-  LeanCtor("[\"Std\",\"Async\",\"MaybeTask\",\"pure\"]", Array[_x_6964_0])
+  LeanCtor(LeanTag.Std_Async_MaybeTask_pure, Array[_x_6964_0])
 }
 // "Std.CancellationToken.selector._lam_5._closed_3"
 fun f_selector_lam_5_closed_3_4cdc0fbb5b(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_7142_0: LeanValue = f_selector_lam_5_closed_2_1c20cfabce(_runtime);
-  LeanCtor("[\"Except\",\"ok\"]", Array[_x_7142_0])
+  LeanCtor(LeanTag.Except_ok, Array[_x_7142_0])
 }
 // "Std.instReprCancellationReason.repr._closed_8"
 fun f_instReprCancellationReason_repr_closed_8_2534b2e4be(

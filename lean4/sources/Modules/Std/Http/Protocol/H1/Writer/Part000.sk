@@ -30,7 +30,7 @@ fun f_Writer_writeChunkedBody_spec_1_314d0c2fa8(
         ),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           9,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -42,7 +42,7 @@ fun f_Writer_writeChunkedBody_spec_1_314d0c2fa8(
           ),
         );
         leanTag(_frame[9]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(10, leanField(_frame[9], 0));
           _frame.set(11, leanField(_frame[9], 1));
           _frame.set(12, LeanText(";"));
@@ -63,12 +63,12 @@ fun f_Writer_writeChunkedBody_spec_1_314d0c2fa8(
             ),
           );
           leanTag(_frame[11]) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             _jump0 = _frame[14];
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(15, leanField(_frame[11], 0));
             _frame.set(16, LeanText("="));
             _frame.set(
@@ -102,11 +102,11 @@ fun f_Writer_writeChunkedBody_spec_1_314d0c2fa8(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[3]
+      | LeanTag.Bool_true -> return _frame[3]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(5, LeanWord("usize", 1));
       _frame.set(
         6,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -143,8 +143,8 @@ fun f_Writer_writeChunkedBody_spec_0_31dc4d2ba8(
     _sz_0,
   );
   leanTag(_x_1_3) match {
-  | "[\"Bool\",\"false\"]" -> _bs_2
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> _bs_2
+  | LeanTag.Bool_true ->
     _v_4: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -157,7 +157,7 @@ fun f_Writer_writeChunkedBody_spec_0_31dc4d2ba8(
       LeanErased(),
       _bs_2,
       _i_1,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
       LeanErased(),
     );
     _x_3_7: LeanValue = L4_Init_Data_UInt_BasicAux.f_UInt32_toUInt8_e61b5e14f2(
@@ -167,7 +167,7 @@ fun f_Writer_writeChunkedBody_spec_0_31dc4d2ba8(
     _x_5_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
       _i_1,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     _x_6_10: LeanValue = L4_Init_Data_Array_Basic.f_Array_uset_b3091c869e(
       _runtime,
@@ -192,7 +192,7 @@ fun f_H1_Writer_determineTransferMode_f2db2cdefb(
   _writer_0: LeanValue,
 ): LeanValue {
   leanTag(_writer_0) match {
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_mk ->
     _userData_1: LeanValue = leanField(_writer_0, 0);
     _outputData_2: LeanValue = leanField(_writer_0, 1);
     _state_3: LeanValue = leanField(_writer_0, 2);
@@ -203,16 +203,16 @@ fun f_H1_Writer_determineTransferMode_f2db2cdefb(
     _omitBody_8: LeanValue = leanField(_writer_0, 7);
     _userDataBytes_9: LeanValue = leanField(_writer_0, 8);
     leanTag(_knownSize_4) match {
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_1_10: LeanValue = leanField(_knownSize_4, 0);
       _val_1_10
     | _ ->
       leanTag(_userClosedBody_7) match {
-      | "[\"Bool\",\"false\"]" ->
-        LeanCtor("[\"Std\",\"Http\",\"Body\",\"Length\",\"chunked\"]", Array[])
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false ->
+        LeanCtor(LeanTag.Std_Http_Body_Length_chunked, Array[])
+      | LeanTag.Bool_true ->
         LeanCtor(
-          "[\"Std\",\"Http\",\"Body\",\"Length\",\"fixed\"]",
+          LeanTag.Std_Http_Body_Length_fixed,
           Array[_userDataBytes_9],
         )
       | _ -> leanFail("non-exhaustive Lean case")
@@ -228,55 +228,55 @@ fun f_Writer_instBEqState_beq_05514d3dd2(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"pending\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_pending ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"pending\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_pending ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"waitingHeaders\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_waitingHeaders ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"waitingHeaders\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_waitingHeaders ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"waitingForFlush\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_waitingForFlush ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"waitingForFlush\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_waitingForFlush ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyFixed\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyFixed ->
     _n_9_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyFixed\"]" ->
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyFixed ->
       _n_10_9: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, _n_9_2, _n_10_9)
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyChunked\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyChunked ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyChunked\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyChunked ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyClosingFrame\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyClosingFrame ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"writingBodyClosingFrame\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_writingBodyClosingFrame ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"complete\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_complete ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"complete\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_complete ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"closed\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_State_closed ->
     leanTag(_x_2_1) match {
-    | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"closed\"]" ->
-      LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | LeanTag.Std_Http_Protocol_H1_Writer_State_closed ->
+      LeanCtor(LeanTag.Bool_true, Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -317,7 +317,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
         ),
       );
       leanTag(_frame[15]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           16,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -329,7 +329,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
           ),
         );
         leanTag(_frame[16]) match {
-        | "[\"Std\",\"Http\",\"Chunk\",\"mk\"]" ->
+        | LeanTag.Std_Http_Chunk_mk ->
           _frame.set(17, leanField(_frame[16], 0));
           _frame.set(18, leanField(_frame[16], 1));
           _frame.set(
@@ -337,7 +337,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
             L4_Init_Prelude.f_ByteArray_size_7351955367(_runtime, _frame[17]),
           );
           _frame.set(45, LeanText(""));
-          _frame.set(46, LeanScalar("nat", "0"));
+          _frame.set(46, LeanNatLiterals.n0);
           _frame.set(
             47,
             L4_Init_Prelude.f_Array_size_3866d4555a(
@@ -355,13 +355,13 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
             ),
           );
           leanTag(_frame[48]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[45];
             _frame.set(20, _jump0);
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(49, LeanScalar("usize", "0"));
+          | LeanTag.Bool_true ->
+            _frame.set(49, LeanWord("usize", 0));
             _frame.set(
               50,
               L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -387,16 +387,16 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[3]
+      | LeanTag.Bool_true -> return _frame[3]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
       leanTag(_frame[3]) match {
-      | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+      | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
         _frame.set(5, leanField(_frame[3], 0));
         _frame.set(6, leanField(_frame[3], 1));
         leanTag(_frame[4]) match {
-        | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+        | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
           _frame.set(7, leanField(_frame[4], 0));
           _frame.set(8, leanField(_frame[4], 1));
           _frame.set(
@@ -418,11 +418,11 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
           _frame.set(
             11,
             LeanCtor(
-              "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+              LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
               Array[_frame[9], _frame[10]],
             ),
           );
-          _frame.set(12, LeanScalar("usize", "1"));
+          _frame.set(12, LeanWord("usize", 1));
           _frame.set(
             13,
             L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -447,7 +447,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 2 ->
-      _frame.set(21, LeanScalar("nat", "16"));
+      _frame.set(21, LeanNatLiterals.n16);
       _frame.set(
         22,
         L4_Init_Data_Repr.f_Nat_toDigits_0dd6e1cf71(
@@ -472,7 +472,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
           _frame[23],
         ),
       );
-      _frame.set(25, LeanScalar("usize", "0"));
+      _frame.set(25, LeanWord("usize", 0));
       _frame.set(
         26,
         f_Writer_writeChunkedBody_spec_0_31dc4d2ba8(
@@ -495,7 +495,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
         30,
         L4_Init_Prelude.f_String_toByteArray_f8944ff4b7(_runtime, _frame[29]),
       );
-      _frame.set(31, LeanScalar("nat", "5"));
+      _frame.set(31, LeanNatLiterals.n5);
       _frame.set(
         32,
         L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -549,7 +549,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
           _frame[30],
         ),
       );
-      _frame.set(38, LeanScalar("nat", "0"));
+      _frame.set(38, LeanNatLiterals.n0);
       _frame.set(
         39,
         L4_Init_Prelude.f_Array_size_3866d4555a(
@@ -567,11 +567,11 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
         ),
       );
       leanTag(_frame[40]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           41,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_frame[37], _frame[38]],
           ),
         );
@@ -579,7 +579,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
         _frame.set(4, _jump0);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           42,
           L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -600,7 +600,7 @@ fun f_Writer_writeChunkedBody_spec_2_390213dbe0(
         _frame.set(
           44,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_frame[37], _frame[43]],
           ),
         );
@@ -628,7 +628,7 @@ fun f_Writer_writeFixedBody_spec_0_680fccd286(
     _stop_2,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -648,7 +648,7 @@ fun f_Writer_writeFixedBody_spec_0_680fccd286(
     _x_6_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
       _runtime,
       _i_1,
-      LeanScalar("usize", "1"),
+      LeanWord("usize", 1),
     );
     f_Writer_writeFixedBody_spec_0_680fccd286(
       _runtime,
@@ -657,7 +657,7 @@ fun f_Writer_writeFixedBody_spec_0_680fccd286(
       _stop_2,
       _x_4_7,
     )
-  | "[\"Bool\",\"true\"]" -> _b_3
+  | LeanTag.Bool_true -> _b_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -667,7 +667,7 @@ fun f_H1_Writer_writeRawBody_18d7056853(
   _writer_0: LeanValue,
 ): LeanValue {
   leanTag(_writer_0) match {
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_mk ->
     _userData_1: LeanValue = leanField(_writer_0, 0);
     _outputData_2: LeanValue = leanField(_writer_0, 1);
     _state_3: LeanValue = leanField(_writer_0, 2);
@@ -677,7 +677,7 @@ fun f_H1_Writer_writeRawBody_18d7056853(
     _userClosedBody_7: LeanValue = leanField(_writer_0, 6);
     _omitBody_8: LeanValue = leanField(_writer_0, 7);
     _userDataBytes_9: LeanValue = leanField(_writer_0, 8);
-    _x_1_10: LeanValue = LeanScalar("nat", "0");
+    _x_1_10: LeanValue = LeanNatLiterals.n0;
     _x_2_11: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
@@ -694,9 +694,9 @@ fun f_H1_Writer_writeRawBody_18d7056853(
       _x_3_12,
     );
     leanTag(_x_4_13) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       LeanCtor(
-        "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+        LeanTag.Std_Http_Protocol_H1_Writer_mk,
         Array[
           _x_2_11,
           _outputData_2,
@@ -709,7 +709,7 @@ fun f_H1_Writer_writeRawBody_18d7056853(
           _x_1_10,
         ],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_7_16: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
         _runtime,
         _x_3_12,
@@ -717,12 +717,12 @@ fun f_H1_Writer_writeRawBody_18d7056853(
       _x_8_17: LeanValue = f_Writer_writeRawBody_spec_0_21efd82a6e(
         _runtime,
         _userData_1,
-        LeanScalar("usize", "0"),
+        LeanWord("usize", 0),
         _x_7_16,
         _outputData_2,
       );
       LeanCtor(
-        "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+        LeanTag.Std_Http_Protocol_H1_Writer_mk,
         Array[
           _x_2_11,
           _x_8_17,
@@ -750,7 +750,7 @@ fun f_H1_Writer_writeFinalChunk_28d69f7616(
     _writer_0,
   );
   leanTag(_writer_1) match {
-  | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]" ->
+  | LeanTag.Std_Http_Protocol_H1_Writer_mk ->
     _userData_2: LeanValue = leanField(_writer_1, 0);
     _outputData_3: LeanValue = leanField(_writer_1, 1);
     _state_4: LeanValue = leanField(_writer_1, 2);
@@ -761,7 +761,7 @@ fun f_H1_Writer_writeFinalChunk_28d69f7616(
     _omitBody_9: LeanValue = leanField(_writer_1, 7);
     _userDataBytes_10: LeanValue = leanField(_writer_1, 8);
     leanTag(_outputData_3) match {
-    | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+    | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
       _data_11: LeanValue = leanField(_outputData_3, 0);
       _size_12: LeanValue = leanField(_outputData_3, 1);
       _x_2_14: LeanValue = L4_Init_Prelude.f_String_toByteArray_f8944ff4b7(
@@ -784,15 +784,15 @@ fun f_H1_Writer_writeFinalChunk_28d69f7616(
         _x_4_16,
       );
       LeanCtor(
-        "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+        LeanTag.Std_Http_Protocol_H1_Writer_mk,
         Array[
           _userData_2,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_x_3_15, _x_5_17],
           ),
           LeanCtor(
-            "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"State\",\"complete\"]",
+            LeanTag.Std_Http_Protocol_H1_Writer_State_complete,
             Array[],
           ),
           _knownSize_5,
@@ -826,7 +826,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]" ->
+      | LeanTag.Std_Http_Protocol_H1_Writer_mk ->
         _frame.set(24, leanField(_frame[0], 0));
         _frame.set(25, leanField(_frame[0], 1));
         _frame.set(26, leanField(_frame[0], 2));
@@ -844,7 +844,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
             _frame[24],
           ),
         );
-        _frame.set(45, LeanScalar("nat", "0"));
+        _frame.set(45, LeanNatLiterals.n0);
         _frame.set(
           46,
           L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -854,7 +854,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
           ),
         );
         leanTag(_frame[46]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             47,
             L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -872,7 +872,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
             ),
           );
           leanTag(_frame[48]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[47];
             _jump1 = _frame[47];
             _jump2 = _frame[45];
@@ -881,16 +881,16 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
             _frame.set(35, _jump2);
             !pc = 2;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _frame.set(
               49,
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[47], _frame[45]]),
+              LeanCtor(LeanTag.Prod_mk, Array[_frame[47], _frame[45]]),
             );
             _frame.set(
               50,
-              LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[47], _frame[49]]),
+              LeanCtor(LeanTag.Prod_mk, Array[_frame[47], _frame[49]]),
             );
-            _frame.set(51, LeanScalar("usize", "0"));
+            _frame.set(51, LeanWord("usize", 0));
             _frame.set(
               52,
               L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -910,11 +910,11 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
               ),
             );
             leanTag(_frame[53]) match {
-            | "[\"Prod\",\"mk\"]" ->
+            | LeanTag.Prod_mk ->
               _frame.set(54, leanField(_frame[53], 0));
               _frame.set(55, leanField(_frame[53], 1));
               leanTag(_frame[55]) match {
-              | "[\"Prod\",\"mk\"]" ->
+              | LeanTag.Prod_mk ->
                 _frame.set(56, leanField(_frame[55], 0));
                 _frame.set(57, leanField(_frame[55], 1));
                 _jump0 = _frame[54];
@@ -931,10 +931,10 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
             }
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _frame.set(
             58,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[0], _frame[1]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[0], _frame[1]]),
           );
           return _frame[58]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -943,11 +943,11 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
       }
     | 1 ->
       leanTag(_frame[4]) match {
-      | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+      | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
         _frame.set(13, leanField(_frame[4], 0));
         _frame.set(14, leanField(_frame[4], 1));
         leanTag(_frame[12]) match {
-        | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+        | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
           _frame.set(15, leanField(_frame[12], 0));
           _frame.set(16, leanField(_frame[12], 1));
           _frame.set(
@@ -969,7 +969,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
           _frame.set(
             19,
             LeanCtor(
-              "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+              LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
               Array[_frame[17], _frame[18]],
             ),
           );
@@ -992,7 +992,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
           _frame.set(
             22,
             LeanCtor(
-              "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+              LeanTag.Std_Http_Protocol_H1_Writer_mk,
               Array[
                 _frame[6],
                 _frame[19],
@@ -1008,7 +1008,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
           );
           _frame.set(
             23,
-            LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[22], _frame[20]]),
+            LeanCtor(LeanTag.Prod_mk, Array[_frame[22], _frame[20]]),
           );
           return _frame[23]
         | _ -> return leanFail("non-exhaustive Lean case")
@@ -1016,7 +1016,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 2 ->
-      _frame.set(36, LeanScalar("nat", "0"));
+      _frame.set(36, LeanNatLiterals.n0);
       _frame.set(
         37,
         L4_Init_Prelude.f_Array_size_3866d4555a(
@@ -1034,11 +1034,11 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
         ),
       );
       leanTag(_frame[38]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           39,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_frame[33], _frame[36]],
           ),
         );
@@ -1066,8 +1066,8 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
         _frame.set(12, _jump10);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(40, LeanScalar("usize", "0"));
+      | LeanTag.Bool_true ->
+        _frame.set(40, LeanWord("usize", 0));
         _frame.set(
           41,
           L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -1088,7 +1088,7 @@ fun f_H1_Writer_writeFixedBody_59994a1a90(
         _frame.set(
           43,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_frame[33], _frame[42]],
           ),
         );
@@ -1136,7 +1136,7 @@ fun f_Writer_writeRawBody_spec_0_21efd82a6e(
     _stop_2,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -1145,11 +1145,11 @@ fun f_Writer_writeRawBody_spec_0_21efd82a6e(
       LeanErased(),
     );
     leanTag(_x_2_5) match {
-    | "[\"Std\",\"Http\",\"Chunk\",\"mk\"]" ->
+    | LeanTag.Std_Http_Chunk_mk ->
       _data_6: LeanValue = leanField(_x_2_5, 0);
       _extensions_7: LeanValue = leanField(_x_2_5, 1);
       leanTag(_b_3) match {
-      | "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]" ->
+      | LeanTag.Std_Http_Internal_ChunkedBuffer_mk ->
         _data_8: LeanValue = leanField(_b_3, 0);
         _size_9: LeanValue = leanField(_b_3, 1);
         _x_3_10: LeanValue = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
@@ -1170,7 +1170,7 @@ fun f_Writer_writeRawBody_spec_0_21efd82a6e(
         _x_8_15: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
           _runtime,
           _i_1,
-          LeanScalar("usize", "1"),
+          LeanWord("usize", 1),
         );
         f_Writer_writeRawBody_spec_0_21efd82a6e(
           _runtime,
@@ -1178,7 +1178,7 @@ fun f_Writer_writeRawBody_spec_0_21efd82a6e(
           _x_8_15,
           _stop_2,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Internal\",\"ChunkedBuffer\",\"mk\"]",
+            LeanTag.Std_Http_Internal_ChunkedBuffer_mk,
             Array[_x_3_10, _x_5_12],
           ),
         )
@@ -1186,7 +1186,7 @@ fun f_Writer_writeRawBody_spec_0_21efd82a6e(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> _b_3
+  | LeanTag.Bool_true -> _b_3
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1220,7 +1220,7 @@ fun f_Writer_writeChunkedBody_spec_3_68dbd59b5b(
         ),
       );
       leanTag(_frame[8]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           9,
           L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
@@ -1232,7 +1232,7 @@ fun f_Writer_writeChunkedBody_spec_3_68dbd59b5b(
           ),
         );
         leanTag(_frame[9]) match {
-        | "[\"Std\",\"Http\",\"Chunk\",\"mk\"]" ->
+        | LeanTag.Std_Http_Chunk_mk ->
           _frame.set(10, leanField(_frame[9], 0));
           _ = leanField(_frame[9], 1);
           _frame.set(
@@ -1243,7 +1243,7 @@ fun f_Writer_writeChunkedBody_spec_3_68dbd59b5b(
             ),
           );
           leanTag(_frame[11]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _frame.set(
               12,
               L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
@@ -1257,7 +1257,7 @@ fun f_Writer_writeChunkedBody_spec_3_68dbd59b5b(
             _frame.set(4, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_true ->
             _jump0 = _frame[3];
             _frame.set(4, _jump0);
             !pc = 1;
@@ -1266,11 +1266,11 @@ fun f_Writer_writeChunkedBody_spec_3_68dbd59b5b(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[3]
+      | LeanTag.Bool_true -> return _frame[3]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(5, LeanScalar("usize", "1"));
+      _frame.set(5, LeanWord("usize", 1));
       _frame.set(
         6,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -1310,7 +1310,7 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]" ->
+      | LeanTag.Std_Http_Protocol_H1_Writer_mk ->
         _frame.set(1, leanField(_frame[0], 0));
         _frame.set(2, leanField(_frame[0], 1));
         _frame.set(3, leanField(_frame[0], 2));
@@ -1328,7 +1328,7 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
             _frame[1],
           ),
         );
-        _frame.set(10, LeanScalar("nat", "0"));
+        _frame.set(10, LeanNatLiterals.n0);
         _frame.set(
           20,
           L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
@@ -1338,7 +1338,7 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
           ),
         );
         leanTag(_frame[20]) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _frame.set(
             21,
             L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
@@ -1356,13 +1356,13 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
             ),
           );
           leanTag(_frame[22]) match {
-          | "[\"Bool\",\"false\"]" ->
+          | LeanTag.Bool_false ->
             _jump0 = _frame[21];
             _frame.set(11, _jump0);
             !pc = 1;
             void
-          | "[\"Bool\",\"true\"]" ->
-            _frame.set(23, LeanScalar("usize", "0"));
+          | LeanTag.Bool_true ->
+            _frame.set(23, LeanWord("usize", 0));
             _frame.set(
               24,
               L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -1386,7 +1386,7 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
             void
           | _ -> return leanFail("non-exhaustive Lean case")
           }
-        | "[\"Bool\",\"true\"]" -> return _frame[0]
+        | LeanTag.Bool_true -> return _frame[0]
         | _ -> return leanFail("non-exhaustive Lean case")
         }
       | _ -> return leanFail("non-exhaustive Lean case")
@@ -1417,11 +1417,11 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
         ),
       );
       leanTag(_frame[14]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           15,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+            LeanTag.Std_Http_Protocol_H1_Writer_mk,
             Array[
               _frame[12],
               _frame[2],
@@ -1436,8 +1436,8 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
           ),
         );
         return _frame[15]
-      | "[\"Bool\",\"true\"]" ->
-        _frame.set(16, LeanScalar("usize", "0"));
+      | LeanTag.Bool_true ->
+        _frame.set(16, LeanWord("usize", 0));
         _frame.set(
           17,
           L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
@@ -1458,7 +1458,7 @@ fun f_H1_Writer_writeChunkedBody_1b39b17440(
         _frame.set(
           19,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Protocol\",\"H1\",\"Writer\",\"mk\"]",
+            LeanTag.Std_Http_Protocol_H1_Writer_mk,
             Array[
               _frame[12],
               _frame[18],
@@ -1511,13 +1511,13 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         ),
       );
       leanTag(_frame[9]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         leanTag(_frame[4]) match {
-        | "[\"Prod\",\"mk\"]" ->
+        | LeanTag.Prod_mk ->
           _frame.set(10, leanField(_frame[4], 0));
           _frame.set(11, leanField(_frame[4], 1));
           leanTag(_frame[11]) match {
-          | "[\"Prod\",\"mk\"]" ->
+          | LeanTag.Prod_mk ->
             _frame.set(12, leanField(_frame[11], 0));
             _frame.set(13, leanField(_frame[11], 1));
             _frame.set(
@@ -1539,12 +1539,12 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
               ),
             );
             leanTag(_frame[15]) match {
-            | "[\"Bool\",\"false\"]" ->
+            | LeanTag.Bool_false ->
               leanTag(_frame[14]) match {
-              | "[\"Std\",\"Http\",\"Chunk\",\"mk\"]" ->
+              | LeanTag.Std_Http_Chunk_mk ->
                 _frame.set(16, leanField(_frame[14], 0));
                 _frame.set(17, leanField(_frame[14], 1));
-                _frame.set(18, LeanScalar("nat", "0"));
+                _frame.set(18, LeanNatLiterals.n0);
                 _frame.set(
                   19,
                   L4_Init_Prelude.f_Nat_sub_8647441ee5(
@@ -1569,12 +1569,12 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
                   ),
                 );
                 leanTag(_frame[36]) match {
-                | "[\"Bool\",\"false\"]" ->
+                | LeanTag.Bool_false ->
                   _jump0 = _frame[19];
                   _frame.set(32, _jump0);
                   !pc = 3;
                   void
-                | "[\"Bool\",\"true\"]" ->
+                | LeanTag.Bool_true ->
                   _jump0 = _frame[20];
                   _frame.set(32, _jump0);
                   !pc = 3;
@@ -1583,7 +1583,7 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
                 }
               | _ -> return leanFail("non-exhaustive Lean case")
               }
-            | "[\"Bool\",\"true\"]" ->
+            | LeanTag.Bool_true ->
               _frame.set(
                 37,
                 L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
@@ -1595,11 +1595,11 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
               );
               _frame.set(
                 38,
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[37], _frame[13]]),
+                LeanCtor(LeanTag.Prod_mk, Array[_frame[37], _frame[13]]),
               );
               _frame.set(
                 39,
-                LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[10], _frame[38]]),
+                LeanCtor(LeanTag.Prod_mk, Array[_frame[10], _frame[38]]),
               );
               _jump0 = _frame[39];
               _frame.set(5, _jump0);
@@ -1611,11 +1611,11 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
           }
         | _ -> return leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" -> return _frame[4]
+      | LeanTag.Bool_true -> return _frame[4]
       | _ -> return leanFail("non-exhaustive Lean case")
       }
     | 1 ->
-      _frame.set(6, LeanScalar("usize", "1"));
+      _frame.set(6, LeanWord("usize", 1));
       _frame.set(
         7,
         L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
@@ -1650,20 +1650,20 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         ),
       );
       leanTag(_frame[24]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           25,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[12], _frame[23]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[12], _frame[23]]),
         );
         _frame.set(
           26,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[22], _frame[25]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[22], _frame[25]]),
         );
         _jump0 = _frame[26];
         _frame.set(5, _jump0);
         !pc = 1;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _frame.set(
           27,
           L4_Init_Data_ByteArray_Basic.f_ByteArray_extract_1aa209d344(
@@ -1676,7 +1676,7 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         _frame.set(
           28,
           LeanCtor(
-            "[\"Std\",\"Http\",\"Chunk\",\"mk\"]",
+            LeanTag.Std_Http_Chunk_mk,
             Array[_frame[27], _frame[17]],
           ),
         );
@@ -1691,11 +1691,11 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         );
         _frame.set(
           30,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[29], _frame[23]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[29], _frame[23]]),
         );
         _frame.set(
           31,
-          LeanCtor("[\"Prod\",\"mk\"]", Array[_frame[22], _frame[30]]),
+          LeanCtor(LeanTag.Prod_mk, Array[_frame[22], _frame[30]]),
         );
         _jump0 = _frame[31];
         _frame.set(5, _jump0);
@@ -1713,7 +1713,7 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         ),
       );
       leanTag(_frame[33]) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _frame.set(
           34,
           L4_Init_Data_ByteArray_Basic.f_ByteArray_extract_1aa209d344(
@@ -1738,7 +1738,7 @@ fun f_Writer_writeFixedBody_spec_1_a479b12677(
         _frame.set(22, _jump1);
         !pc = 2;
         void
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _jump0 = _frame[32];
         _jump1 = _frame[10];
         _frame.set(21, _jump0);

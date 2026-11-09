@@ -29,10 +29,10 @@ fun f_Lean_KVMap_getSyntax_bec418e85a(
 ): LeanValue {
   _x_1_3: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_0, _k_1);
   leanTag(_x_1_3) match {
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_2_4: LeanValue = leanField(_x_1_3, 0);
     leanTag(_val_2_4) match {
-    | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+    | LeanTag.DataValue_ofSyntax ->
       _v_3_5: LeanValue = leanField(_val_2_4, 0);
       _v_3_5
     | _ -> _defVal_2
@@ -65,21 +65,21 @@ fun f_Lean_KVMap_updateNat_8c5aa126ab(
     _runtime,
     _m_0,
     _k_1,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_5: LeanValue = leanApply(_runtime, _f_2, Array[_x_2_4]);
   f_Lean_KVMap_insertCore_2c01856eb9(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofNat\"]", Array[_x_3_5]),
+    LeanCtor(LeanTag.DataValue_ofNat, Array[_x_3_5]),
   )
 }
 // "Lean.instInhabitedKVMap.default"
 fun f_Lean_instInhabitedKVMap_default_ad57472c98(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"List\",\"nil\"]", Array[])
+  LeanCtor(LeanTag.List_nil, Array[])
 }
 // "Lean.DataValue.beqExp"
 fun f_Lean_DataValue_beqExp_490eb26d31(
@@ -103,8 +103,8 @@ fun f_instReprDataValue_repr_closed_16_2b12b195b5(
 ): LeanValue {
   _x_584_1: LeanValue = f_instReprDataValue_repr_closed_15_ca72f0f913(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_584_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_584_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.KVMap.instToString._closed_0"
@@ -125,13 +125,13 @@ fun f_KVMap_erase_spec_0_7f4606e8b0(
   _a_3_2: LeanValue,
 ): LeanValue {
   leanTag(_a_2_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_3_2)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_5_3: LeanValue = leanField(_a_2_1, 0);
     _tail_6_4: LeanValue = leanField(_a_2_1, 1);
     leanTag(_head_5_3) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_6: LeanValue = leanField(_head_5_3, 0);
       _snd_7: LeanValue = leanField(_head_5_3, 1);
       _x_7_8: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
@@ -140,14 +140,14 @@ fun f_KVMap_erase_spec_0_7f4606e8b0(
         _x_1_0,
       );
       leanTag(_x_7_8) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         f_KVMap_erase_spec_0_7f4606e8b0(
           _runtime,
           _x_1_0,
           _tail_6_4,
-          LeanCtor("[\"List\",\"cons\"]", Array[_head_5_3, _a_3_2]),
+          LeanCtor(LeanTag.List_cons, Array[_head_5_3, _a_3_2]),
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         f_KVMap_erase_spec_0_7f4606e8b0(_runtime, _x_1_0, _tail_6_4, _a_3_2)
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -182,7 +182,7 @@ fun f_KVMap_instValueNat_closed_1_d7b09db140(
 ): LeanValue {
   _f_46_0: LeanValue = f_KVMap_instValueNat_closed_0_705daf6e1f(_runtime);
   _f_47_1: LeanValue = f_Lean_instCoeNatDataValue_closed_0_954143cbba(_runtime);
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_47_1, _f_46_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_47_1, _f_46_0])
 }
 // "Lean.KVMap.instForInProdNameDataValueOfMonad._redArg"
 fun f_Lean_KVMap_instForInProdNameDataValueOfMonad_cdd5ba526d(
@@ -210,7 +210,7 @@ fun f_KVMap_instValueString_closed_1_8e2dbeb031(
   _f_47_1: LeanValue = f_Lean_instCoeStringDataValue_closed_0_d3ff3daad7(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_47_1, _f_46_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_47_1, _f_46_0])
 }
 // "Lean.KVMap.instValueName._closed_1"
 fun f_KVMap_instValueName_closed_1_d431220b9f(
@@ -220,7 +220,7 @@ fun f_KVMap_instValueName_closed_1_d431220b9f(
   _f_47_1: LeanValue = f_Lean_instCoeNameDataValue_closed_0_de54d4d960(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_47_1, _f_46_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_47_1, _f_46_0])
 }
 // "Lean.KVMap.updateName"
 fun f_Lean_KVMap_updateName_a71510e2b7(
@@ -233,14 +233,14 @@ fun f_Lean_KVMap_updateName_a71510e2b7(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"Name\",\"anonymous\",\"_impl\"]", Array[]),
+    LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
   );
   _x_3_5: LeanValue = leanApply(_runtime, _f_2, Array[_x_2_4]);
   f_Lean_KVMap_insertCore_2c01856eb9(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofName\"]", Array[_x_3_5]),
+    LeanCtor(LeanTag.DataValue_ofName, Array[_x_3_5]),
   )
 }
 // "Lean.instReprDataValue.repr._closed_6"
@@ -248,7 +248,7 @@ fun f_instReprDataValue_repr_closed_6_a07737ee2f(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_551_0: LeanValue = f_instReprDataValue_repr_closed_5_a4703f658b(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_551_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_551_0])
 }
 // "Lean.KVMap.updateBool"
 fun f_Lean_KVMap_updateBool_1a012d3a16(
@@ -261,14 +261,14 @@ fun f_Lean_KVMap_updateBool_1a012d3a16(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Bool\",\"false\"]", Array[]),
+    LeanCtor(LeanTag.Bool_false, Array[]),
   );
   _x_3_5: LeanValue = leanApply(_runtime, _f_2, Array[_x_2_4]);
   f_Lean_KVMap_insertCore_2c01856eb9(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofBool\"]", Array[_x_3_5]),
+    LeanCtor(LeanTag.DataValue_ofBool, Array[_x_3_5]),
   )
 }
 // "Lean.instCoeIntDataValue._closed_0"
@@ -323,7 +323,7 @@ fun f_spec_0_spec_0_closed_8_d6589f8aec(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_454_0: LeanValue = f_spec_0_spec_0_closed_4_1ec2b2a641(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_454_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_454_0])
 }
 // "Lean.KVMap.instValueDataValue._closed_1"
 fun f_KVMap_instValueDataValue_closed_1_bf1a972c8e(
@@ -340,18 +340,18 @@ fun f_Lean_KVMap_get_3c2983c165(
   _defVal_3: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_4: LeanValue = leanField(_inst_1_0, 0);
     _ofDataValue_5: LeanValue = leanField(_inst_1_0, 1);
     _x_2_6: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_1, _k_2);
     leanTag(_x_2_6) match {
-    | "[\"Option\",\"none\"]" -> _defVal_3
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> _defVal_3
+    | LeanTag.Option_some ->
       _val_3_7: LeanValue = leanField(_x_2_6, 0);
       _x_4_8: LeanValue = leanApply(_runtime, _ofDataValue_5, Array[_val_3_7]);
       leanTag(_x_4_8) match {
-      | "[\"Option\",\"none\"]" -> _defVal_3
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_none -> _defVal_3
+      | LeanTag.Option_some ->
         _val_5_9: LeanValue = leanField(_x_4_8, 0);
         _val_5_9
       | _ -> leanFail("non-exhaustive Lean case")
@@ -373,10 +373,10 @@ fun f_Lean_DataValue_getBoolEx_1a0d2e8fbe(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"DataValue\",\"ofBool\"]" ->
+  | LeanTag.DataValue_ofBool ->
     _v_2_1: LeanValue = leanField(_x_1_0, 0);
     _v_2_1
-  | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | _ -> LeanCtor(LeanTag.Bool_false, Array[])
   }
 }
 // "Lean.instReprKVMap.repr._redArg._closed_5"
@@ -384,7 +384,7 @@ fun f_instReprKVMap_repr_closed_5_6c7573a67d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_693_0: LeanValue = f_instReprKVMap_repr_closed_4_5c81801da2(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_693_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_693_0])
 }
 // "Lean.KVMap.forIn"
 fun f_Lean_KVMap_forIn_f4c434b10c(
@@ -439,7 +439,7 @@ fun f_instReprKVMap_repr_closed_2_50074cc82d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_687_0: LeanValue = f_instReprKVMap_repr_closed_1_9a6b10d8e0(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_687_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_687_0])
 }
 // "Lean.instCoeSyntaxDataValue._closed_0"
 fun f_Lean_instCoeSyntaxDataValue_closed_0_640244c899(
@@ -457,7 +457,7 @@ fun f_instReprDataValue_repr_closed_3_7eff0c00b4(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "2"),
+    LeanNatLiterals.n2,
   )
 }
 // "Lean.DataValue.ofBool.elim._redArg"
@@ -484,8 +484,8 @@ fun f_spec_0_spec_0_closed_3_95abf19af2(
 ): LeanValue {
   _x_445_1: LeanValue = f_spec_0_spec_0_closed_2_23db3fd1ee(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_445_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_445_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.DataValue.str._closed_0"
@@ -510,8 +510,8 @@ fun f_instReprDataValue_repr_closed_13_e9662e4d4e(
 ): LeanValue {
   _x_574_1: LeanValue = f_instReprDataValue_repr_closed_12_6b1c20337c(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_574_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_574_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.instReprDataValue.repr._closed_7"
@@ -520,8 +520,8 @@ fun f_instReprDataValue_repr_closed_7_fee03f7003(
 ): LeanValue {
   _x_554_1: LeanValue = f_instReprDataValue_repr_closed_6_a07737ee2f(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_554_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_554_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "List.repr._at_.Lean.instReprKVMap.repr.spec_0._redArg._closed_0"
@@ -546,7 +546,7 @@ fun f_instReprKVMap_repr_closed_7_e35e345e4e(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "11"),
+    LeanNatLiterals.n11,
   )
 }
 // "Lean.KVMap.instToString._lam_0"
@@ -568,7 +568,7 @@ fun f_instReprDataValue_repr_closed_19_e75ed9eb1a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_593_0: LeanValue = f_instReprDataValue_repr_closed_18_25dd2aaee2(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_593_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_593_0])
 }
 // "Lean.KVMap.setName"
 fun f_Lean_KVMap_setName_4e90b5957a(
@@ -581,7 +581,7 @@ fun f_Lean_KVMap_setName_4e90b5957a(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofName\"]", Array[_v_2]),
+    LeanCtor(LeanTag.DataValue_ofName, Array[_v_2]),
   )
 }
 // "List.repr._at_.Lean.instReprKVMap.repr.spec_0._redArg._closed_2"
@@ -595,7 +595,7 @@ fun f_repr_spec_0_closed_7_12991099f5(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_635_0: LeanValue = f_repr_spec_0_closed_3_b5cf6c477e(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_635_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_635_0])
 }
 // "Lean.KVMap.instBEq"
 fun f_Lean_KVMap_instBEq_750c538000(
@@ -633,13 +633,13 @@ fun f_Lean_KVMap_get_db4cb3b14f(
   _k_2: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_3: LeanValue = leanField(_inst_1_0, 0);
     _ofDataValue_4: LeanValue = leanField(_inst_1_0, 1);
     _x_2_5: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_1, _k_2);
     leanTag(_x_2_5) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Option_some ->
       _val_4_6: LeanValue = leanField(_x_2_5, 0);
       leanApply(_runtime, _ofDataValue_4, Array[_val_4_6])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -651,7 +651,7 @@ fun f_Lean_KVMap_get_db4cb3b14f(
 fun f_Lean_instInhabitedDataValue_default_30514a149d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"DataValue\",\"ofString\"]", Array[LeanText("")])
+  LeanCtor(LeanTag.DataValue_ofString, Array[LeanText("")])
 }
 // "Lean.KVMap.set._redArg"
 fun f_Lean_KVMap_set_82e49cd762(
@@ -662,7 +662,7 @@ fun f_Lean_KVMap_set_82e49cd762(
   _v_3: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_0) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_4: LeanValue = leanField(_inst_1_0, 0);
     _ofDataValue_5: LeanValue = leanField(_inst_1_0, 1);
     _x_2_6: LeanValue = leanApply(_runtime, _toDataValue_4, Array[_v_3]);
@@ -692,7 +692,7 @@ fun f_KVMap_instValueInt_closed_1_459f79d421(
 ): LeanValue {
   _f_46_0: LeanValue = f_KVMap_instValueInt_closed_0_8ed305c4af(_runtime);
   _f_47_1: LeanValue = f_Lean_instCoeIntDataValue_closed_0_c772bfcdb1(_runtime);
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_47_1, _f_46_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_47_1, _f_46_0])
 }
 // "Lean.instReprKVMap"
 fun f_Lean_instReprKVMap_a8e587dc12(
@@ -719,7 +719,7 @@ fun f_instReprKVMap_repr_closed_11_94e3faac8f(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_705_0: LeanValue = f_instReprKVMap_repr_closed_0_87e8b9cb13(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_705_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_705_0])
 }
 // "Lean.DataValue.ofBool.elim"
 fun f_DataValue_ofBool_elim_30967a30b1(
@@ -776,8 +776,8 @@ fun f_Lean_KVMap_findD_7c62e6bdc5(
 ): LeanValue {
   _x_1_3: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_0, _k_1);
   leanTag(_x_1_3) match {
-  | "[\"Option\",\"none\"]" -> _d_2
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _d_2
+  | LeanTag.Option_some ->
     _val_2_4: LeanValue = leanField(_x_1_3, 0);
     _val_2_4
   | _ -> leanFail("non-exhaustive Lean case")
@@ -800,7 +800,7 @@ fun f_instInhabitedDataValue_default_closed_1_aab80b5d23(
   _x_7_0: LeanValue = f_instInhabitedDataValue_default_closed_0_646a60e844(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"DataValue\",\"ofString\"]", Array[_x_7_0])
+  LeanCtor(LeanTag.DataValue_ofString, Array[_x_7_0])
 }
 // "Lean.instReprDataValue.repr._closed_17"
 fun f_instReprDataValue_repr_closed_17_6db4894d4a(
@@ -808,7 +808,7 @@ fun f_instReprDataValue_repr_closed_17_6db4894d4a(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Lean.instReprDataValue.repr._closed_15"
@@ -816,7 +816,7 @@ fun f_instReprDataValue_repr_closed_15_ca72f0f913(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_581_0: LeanValue = f_instReprDataValue_repr_closed_14_c7cfbfc0a3(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_581_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_581_0])
 }
 // "Lean.KVMap.instValueSyntax._closed_0"
 fun f_KVMap_instValueSyntax_closed_0_0118c3a35c(
@@ -833,7 +833,7 @@ fun f_instReprDataValue_repr_closed_1_eb926e83a1(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_541_0: LeanValue = f_instReprDataValue_repr_closed_0_c0ffaba410(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_541_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_541_0])
 }
 // "Lean.instReprKVMap.repr._redArg._closed_3"
 fun f_instReprKVMap_repr_closed_3_b925263ca4(
@@ -841,8 +841,8 @@ fun f_instReprKVMap_repr_closed_3_b925263ca4(
 ): LeanValue {
   _x_689_0: LeanValue = f_instReprKVMap_repr_closed_2_50074cc82d(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[LeanCtor("[\"Std\",\"Format\",\"nil\"]", Array[]), _x_689_0],
+    LeanTag.Std_Format_append,
+    Array[LeanCtor(LeanTag.Std_Format_nil, Array[]), _x_689_0],
   )
 }
 // "Lean.DataValue.ofNat.elim"
@@ -865,7 +865,7 @@ fun f_Lean_KVMap_set_e417b6e392(
   _v_4: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_1) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_5: LeanValue = leanField(_inst_1_1, 0);
     _ofDataValue_6: LeanValue = leanField(_inst_1_1, 1);
     _x_2_7: LeanValue = leanApply(_runtime, _toDataValue_5, Array[_v_4]);
@@ -901,7 +901,7 @@ fun f_KVMap_instValueDataValue_closed_2_99b144f885(
 ): LeanValue {
   _f_10_0: LeanValue = f_KVMap_instValueDataValue_closed_0_2955b24b3c(_runtime);
   _x_11_1: LeanValue = f_KVMap_instValueDataValue_closed_1_bf1a972c8e(_runtime);
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_x_11_1, _f_10_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_x_11_1, _f_10_0])
 }
 // "Lean.KVMap.update._redArg"
 fun f_Lean_KVMap_update_3c2b6b417e(
@@ -925,7 +925,7 @@ fun f_Lean_KVMap_update_3c2b6b417e(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+      | LeanTag.KVMap_Value_mk ->
         _frame.set(4, leanField(_frame[0], 0));
         _frame.set(5, leanField(_frame[0], 1));
         _frame.set(
@@ -933,13 +933,13 @@ fun f_Lean_KVMap_update_3c2b6b417e(
           f_Lean_KVMap_findCore_91166c7d37(_runtime, _frame[1], _frame[2]),
         );
         leanTag(_frame[12]) match {
-        | "[\"Option\",\"none\"]" ->
-          _frame.set(14, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        | LeanTag.Option_none ->
+          _frame.set(14, LeanCtor(LeanTag.Option_none, Array[]));
           _jump0 = _frame[14];
           _frame.set(6, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(13, leanField(_frame[12], 0));
           _frame.set(15, leanApply(_runtime, _frame[5], Array[_frame[13]]));
           _jump0 = _frame[15];
@@ -953,13 +953,13 @@ fun f_Lean_KVMap_update_3c2b6b417e(
     | 1 ->
       _frame.set(7, leanApply(_runtime, _frame[3], Array[_frame[6]]));
       leanTag(_frame[7]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(
           9,
           f_Lean_KVMap_erase_7422688833(_runtime, _frame[1], _frame[2]),
         );
         return _frame[9]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(8, leanField(_frame[7], 0));
         _frame.set(10, leanApply(_runtime, _frame[4], Array[_frame[8]]));
         _frame.set(
@@ -986,7 +986,7 @@ fun f_KVMap_instValueSyntax_closed_1_4a34f635d4(
   _f_47_1: LeanValue = f_Lean_instCoeSyntaxDataValue_closed_0_640244c899(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_47_1, _f_46_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_47_1, _f_46_0])
 }
 // "Lean.KVMap.setString"
 fun f_Lean_KVMap_setString_cad20593ac(
@@ -999,7 +999,7 @@ fun f_Lean_KVMap_setString_cad20593ac(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofString\"]", Array[_v_2]),
+    LeanCtor(LeanTag.DataValue_ofString, Array[_v_2]),
   )
 }
 // "List.repr._at_.Lean.instReprKVMap.repr.spec_0._redArg._closed_1"
@@ -1007,7 +1007,7 @@ fun f_repr_spec_0_closed_1_0378e8fb14(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_619_0: LeanValue = f_repr_spec_0_closed_0_e5b18b2f6a(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_619_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_619_0])
 }
 // "Lean.instReprKVMap.repr._redArg._closed_6"
 fun f_instReprKVMap_repr_closed_6_53de5f5def(
@@ -1015,7 +1015,7 @@ fun f_instReprKVMap_repr_closed_6_53de5f5def(
 ): LeanValue {
   _x_695_0: LeanValue = f_instReprKVMap_repr_closed_5_6c7573a67d(_runtime);
   _x_696_1: LeanValue = f_instReprKVMap_repr_closed_3_b925263ca4(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"append\"]", Array[_x_696_1, _x_695_0])
+  LeanCtor(LeanTag.Std_Format_append, Array[_x_696_1, _x_695_0])
 }
 // "Lean.instBEqDataValue"
 fun f_Lean_instBEqDataValue_24408442e8(
@@ -1044,7 +1044,7 @@ fun f_Lean_KVMap_setBool_5300be068b(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofBool\"]", Array[_v_2]),
+    LeanCtor(LeanTag.DataValue_ofBool, Array[_v_2]),
   )
 }
 // "Lean.KVMap.forIn._redArg._lam_0"
@@ -1075,8 +1075,8 @@ fun f_instReprDataValue_repr_closed_10_1622270d6d(
 ): LeanValue {
   _x_564_1: LeanValue = f_instReprDataValue_repr_closed_9_203878c981(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_564_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_564_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.KVMap.instToString"
@@ -1122,7 +1122,7 @@ fun f_KVMap_instValueBool_closed_1_3e56ce46f6(
   _f_38_1: LeanValue = f_Lean_instCoeBoolDataValue_closed_0_2745c3a3e7(
     _runtime,
   );
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_38_1, _f_37_0])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_38_1, _f_37_0])
 }
 // "Lean.DataValue.ctorElim._redArg"
 fun f_Lean_DataValue_ctorElim_c27caa153d(
@@ -1131,22 +1131,22 @@ fun f_Lean_DataValue_ctorElim_c27caa153d(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+  | LeanTag.DataValue_ofString ->
     _v_2: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_2])
-  | "[\"Lean\",\"DataValue\",\"ofBool\"]" ->
+  | LeanTag.DataValue_ofBool ->
     _v_3: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_3])
-  | "[\"Lean\",\"DataValue\",\"ofName\"]" ->
+  | LeanTag.DataValue_ofName ->
     _v_4: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_4])
-  | "[\"Lean\",\"DataValue\",\"ofNat\"]" ->
+  | LeanTag.DataValue_ofNat ->
     _v_5: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_5])
-  | "[\"Lean\",\"DataValue\",\"ofInt\"]" ->
+  | LeanTag.DataValue_ofInt ->
     _v_6: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_6])
-  | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+  | LeanTag.DataValue_ofSyntax ->
     _v_7: LeanValue = leanField(_t_0, 0);
     leanApply(_runtime, _k_1, Array[_v_7])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1166,7 +1166,7 @@ fun f_Lean_KVMap_instValueSyntax_f3f52db430(
     1,
     Array[],
   );
-  LeanCtor("[\"Lean\",\"KVMap\",\"Value\",\"mk\"]", Array[_f_1_0, _f_2_1])
+  LeanCtor(LeanTag.KVMap_Value_mk, Array[_f_1_0, _f_2_1])
 }
 // "Lean.DataValue.ofInt.elim._redArg"
 fun f_DataValue_ofInt_elim_eddf1adf32(
@@ -1181,7 +1181,7 @@ fun f_repr_spec_0_closed_6_204ba35b2a(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_633_0: LeanValue = f_repr_spec_0_closed_2_d1ba3cc82f(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_633_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_633_0])
 }
 // "Lean.instCoeNatDataValue._closed_0"
 fun f_Lean_instCoeNatDataValue_closed_0_954143cbba(
@@ -1207,7 +1207,7 @@ fun f_Lean_instCoeStringDataValue_closed_0_d3ff3daad7(
 fun f_Lean_instInhabitedKVMap_5b313be802(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  LeanCtor("[\"List\",\"nil\"]", Array[])
+  LeanCtor(LeanTag.List_nil, Array[])
 }
 // "Lean.KVMap.updateSyntax"
 fun f_Lean_KVMap_updateSyntax_1fee4f59bb(
@@ -1220,14 +1220,14 @@ fun f_Lean_KVMap_updateSyntax_1fee4f59bb(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"Syntax\",\"missing\"]", Array[]),
+    LeanCtor(LeanTag.Syntax_missing, Array[]),
   );
   _x_3_5: LeanValue = leanApply(_runtime, _f_2, Array[_x_2_4]);
   f_Lean_KVMap_insertCore_2c01856eb9(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofSyntax\"]", Array[_x_3_5]),
+    LeanCtor(LeanTag.DataValue_ofSyntax, Array[_x_3_5]),
   )
 }
 // "List.forIn'.loop._at_.Lean.KVMap.mergeBy.spec_0"
@@ -1267,7 +1267,7 @@ fun f_Lean_KVMap_erase_7422688833(
     _runtime,
     _x_2_1,
     _x_1_0,
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
   )
 }
 // "Lean.instReprKVMap.repr._redArg._closed_4"
@@ -1324,8 +1324,8 @@ fun f_instReprDataValue_repr_closed_2_2158ff6c25(
 ): LeanValue {
   _x_544_1: LeanValue = f_instReprDataValue_repr_closed_1_eb926e83a1(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_544_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_544_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.instCoeSyntaxDataValue"
@@ -1368,7 +1368,7 @@ fun f_Lean_KVMap_update_bf5f6f56c9(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+      | LeanTag.KVMap_Value_mk ->
         _frame.set(4, leanField(_frame[0], 0));
         _frame.set(5, leanField(_frame[0], 1));
         _frame.set(
@@ -1376,13 +1376,13 @@ fun f_Lean_KVMap_update_bf5f6f56c9(
           f_Lean_KVMap_findCore_91166c7d37(_runtime, _frame[1], _frame[2]),
         );
         leanTag(_frame[12]) match {
-        | "[\"Option\",\"none\"]" ->
-          _frame.set(14, LeanCtor("[\"Option\",\"none\"]", Array[]));
+        | LeanTag.Option_none ->
+          _frame.set(14, LeanCtor(LeanTag.Option_none, Array[]));
           _jump0 = _frame[14];
           _frame.set(6, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(13, leanField(_frame[12], 0));
           _frame.set(15, leanApply(_runtime, _frame[5], Array[_frame[13]]));
           _jump0 = _frame[15];
@@ -1396,13 +1396,13 @@ fun f_Lean_KVMap_update_bf5f6f56c9(
     | 1 ->
       _frame.set(7, leanApply(_runtime, _frame[3], Array[_frame[6]]));
       leanTag(_frame[7]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(
           9,
           f_Lean_KVMap_erase_7422688833(_runtime, _frame[1], _frame[2]),
         );
         return _frame[9]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(8, leanField(_frame[7], 0));
         _frame.set(10, leanApply(_runtime, _frame[4], Array[_frame[8]]));
         _frame.set(
@@ -1453,7 +1453,7 @@ fun f_Lean_KVMap_setInt_5932f4d333(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofInt\"]", Array[_v_2]),
+    LeanCtor(LeanTag.DataValue_ofInt, Array[_v_2]),
   )
 }
 // "Lean.instReprDataValue.repr._closed_0"
@@ -1467,14 +1467,14 @@ fun f_Lean_mkBoolDataValueEx_20cd24feef(
   _runtime: mutable LeanExecution,
   _b_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"DataValue\",\"ofBool\"]", Array[_b_0])
+  LeanCtor(LeanTag.DataValue_ofBool, Array[_b_0])
 }
 // "Prod.repr._at_.List.repr._at_.Lean.instReprKVMap.repr.spec_0.spec_0._redArg._closed_7"
 fun f_spec_0_spec_0_closed_7_f8a58519d0(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_452_0: LeanValue = f_spec_0_spec_0_closed_0_60230aac51(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_452_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_452_0])
 }
 // "Lean.instCoeNameDataValue"
 fun f_Lean_instCoeNameDataValue_76b7cec343(
@@ -1505,13 +1505,13 @@ fun f_Lean_KVMap_get_76888261ae(
   _k_3: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_1) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_4: LeanValue = leanField(_inst_1_1, 0);
     _ofDataValue_5: LeanValue = leanField(_inst_1_1, 1);
     _x_2_6: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_2, _k_3);
     leanTag(_x_2_6) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+    | LeanTag.Option_some ->
       _val_4_7: LeanValue = leanField(_x_2_6, 0);
       leanApply(_runtime, _ofDataValue_5, Array[_val_4_7])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1544,14 +1544,14 @@ fun f_instReprDataValue_repr_closed_9_203878c981(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_561_0: LeanValue = f_instReprDataValue_repr_closed_8_f6d3532413(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_561_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_561_0])
 }
 // "Lean.instReprDataValue.repr._closed_12"
 fun f_instReprDataValue_repr_closed_12_6b1c20337c(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_571_0: LeanValue = f_instReprDataValue_repr_closed_11_6e44cc8661(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_571_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_571_0])
 }
 // "Lean.DataValue.ofNat.elim._redArg"
 fun f_DataValue_ofNat_elim_cfb8774c73(
@@ -1579,7 +1579,7 @@ fun f_Lean_KVMap_updateString_4977ab24bb(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofString\"]", Array[_x_3_5]),
+    LeanCtor(LeanTag.DataValue_ofString, Array[_x_3_5]),
   )
 }
 // "Lean.instCoeSyntaxDataValue._lam_0"
@@ -1587,7 +1587,7 @@ fun f_Lean_instCoeSyntaxDataValue_lam_0_0144f8d3cc(
   _runtime: mutable LeanExecution,
   _v_0: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"Lean\",\"DataValue\",\"ofSyntax\"]", Array[_v_0])
+  LeanCtor(LeanTag.DataValue_ofSyntax, Array[_v_0])
 }
 fun apply_f_Lean_instCoeSyntaxDataValue_lam_0_0144f8d3cc(
   _runtime: mutable LeanExecution,
@@ -1660,8 +1660,8 @@ fun f_instReprDataValue_repr_closed_20_19c681e203(
 ): LeanValue {
   _x_596_1: LeanValue = f_instReprDataValue_repr_closed_19_e75ed9eb1a(_runtime);
   LeanCtor(
-    "[\"Std\",\"Format\",\"append\"]",
-    Array[_x_596_1, LeanCtor("[\"Std\",\"Format\",\"line\"]", Array[])],
+    LeanTag.Std_Format_append,
+    Array[_x_596_1, LeanCtor(LeanTag.Std_Format_line, Array[])],
   )
 }
 // "Lean.KVMap.instValueSyntax._lam_1"
@@ -1670,10 +1670,10 @@ fun f_KVMap_instValueSyntax_lam_1_2f28449791(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+  | LeanTag.DataValue_ofSyntax ->
     _v_2_1: LeanValue = leanField(_x_1_0, 0);
-    LeanCtor("[\"Option\",\"some\"]", Array[_v_2_1])
-  | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    LeanCtor(LeanTag.Option_some, Array[_v_2_1])
+  | _ -> LeanCtor(LeanTag.Option_none, Array[])
   }
 }
 fun apply_f_KVMap_instValueSyntax_lam_1_2f28449791(
@@ -1687,7 +1687,7 @@ fun f_instReprKVMap_repr_closed_12_781fa1b4b2(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_707_0: LeanValue = f_instReprKVMap_repr_closed_8_6120acd02c(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_707_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_707_0])
 }
 // "Lean.instReprDataValue"
 fun f_Lean_instReprDataValue_dfc4bcc0c1(
@@ -1704,7 +1704,7 @@ fun f_spec_0_spec_0_closed_2_23db3fd1ee(
   _runtime: mutable LeanExecution,
 ): LeanValue {
   _x_442_0: LeanValue = f_spec_0_spec_0_closed_1_2c1478b143(_runtime);
-  LeanCtor("[\"Std\",\"Format\",\"text\"]", Array[_x_442_0])
+  LeanCtor(LeanTag.Std_Format_text, Array[_x_442_0])
 }
 // "Lean.instCoeNameDataValue._closed_0"
 fun f_Lean_instCoeNameDataValue_closed_0_de54d4d960(
@@ -1751,10 +1751,10 @@ fun f_Lean_KVMap_getInt_605fceaa73(
 ): LeanValue {
   _x_1_3: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_0, _k_1);
   leanTag(_x_1_3) match {
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_2_4: LeanValue = leanField(_x_1_3, 0);
     leanTag(_val_2_4) match {
-    | "[\"Lean\",\"DataValue\",\"ofInt\"]" ->
+    | LeanTag.DataValue_ofInt ->
       _v_3_5: LeanValue = leanField(_val_2_4, 0);
       _v_3_5
     | _ -> _defVal_2
@@ -1772,18 +1772,18 @@ fun f_Lean_KVMap_get_dc9c9571b2(
   _defVal_4: LeanValue,
 ): LeanValue {
   leanTag(_inst_1_1) match {
-  | "[\"Lean\",\"KVMap\",\"Value\",\"mk\"]" ->
+  | LeanTag.KVMap_Value_mk ->
     _toDataValue_5: LeanValue = leanField(_inst_1_1, 0);
     _ofDataValue_6: LeanValue = leanField(_inst_1_1, 1);
     _x_2_7: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_2, _k_3);
     leanTag(_x_2_7) match {
-    | "[\"Option\",\"none\"]" -> _defVal_4
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> _defVal_4
+    | LeanTag.Option_some ->
       _val_3_8: LeanValue = leanField(_x_2_7, 0);
       _x_4_9: LeanValue = leanApply(_runtime, _ofDataValue_6, Array[_val_3_8]);
       leanTag(_x_4_9) match {
-      | "[\"Option\",\"none\"]" -> _defVal_4
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_none -> _defVal_4
+      | LeanTag.Option_some ->
         _val_5_10: LeanValue = leanField(_x_4_9, 0);
         _val_5_10
       | _ -> leanFail("non-exhaustive Lean case")
@@ -1826,7 +1826,7 @@ fun f_Lean_KVMap_updateInt_0aad79d6dc(
 ): LeanValue {
   _x_2_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_5: LeanValue = f_Lean_KVMap_getInt_605fceaa73(
     _runtime,
@@ -1839,7 +1839,7 @@ fun f_Lean_KVMap_updateInt_0aad79d6dc(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofInt\"]", Array[_x_4_6]),
+    LeanCtor(LeanTag.DataValue_ofInt, Array[_x_4_6]),
   )
 }
 // "Lean.DataValue.str._closed_1"
@@ -1859,7 +1859,7 @@ fun f_Lean_KVMap_setSyntax_977da93c37(
     _runtime,
     _m_0,
     _k_1,
-    LeanCtor("[\"Lean\",\"DataValue\",\"ofSyntax\"]", Array[_v_2]),
+    LeanCtor(LeanTag.DataValue_ofSyntax, Array[_v_2]),
   )
 }
 // "Lean.instReprKVMap.repr._redArg._closed_10"
@@ -1878,10 +1878,10 @@ fun f_Lean_KVMap_getString_d9bef9f9f3(
 ): LeanValue {
   _x_1_3: LeanValue = f_Lean_KVMap_findCore_91166c7d37(_runtime, _m_0, _k_1);
   leanTag(_x_1_3) match {
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_2_4: LeanValue = leanField(_x_1_3, 0);
     leanTag(_val_2_4) match {
-    | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+    | LeanTag.DataValue_ofString ->
       _v_3_5: LeanValue = leanField(_val_2_4, 0);
       _v_3_5
     | _ -> _defVal_2
@@ -1917,7 +1917,7 @@ fun f_instReprDataValue_repr_closed_4_4356fc33cb(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 module end;

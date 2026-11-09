@@ -1,0 +1,414 @@
+// Differential driver for the proposed unfoldDefinition? body. The proposed
+// function and retained fallback must both be linked in the probe build.
+fun unfoldProbeList(items: Array<LeanValue>): LeanValue {
+  result: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  i = items.size();
+  while (i > 0) {
+    !i = i - 1;
+    !result = LeanCtor(LeanTag.List_cons, Array[items[i], result])
+  };
+  result
+}
+
+fun unfoldProbeName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun unfoldProbeAxiom(
+  _runtime: mutable LeanExecution,
+  name: LeanValue,
+  type: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun unfoldProbeDefinition(
+  name: LeanValue,
+  levels: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+  hints: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, levels, type]),
+          value,
+          hints,
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(
+            LeanTag.List_cons,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[])],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+fun unfoldProbeCall(
+  runtime: mutable LeanExecution,
+  fallback: Bool,
+  expr: LeanValue,
+  ignoreTransparency: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (fallback) {
+    L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013_fallback(
+      runtime,
+      expr,
+      ignoreTransparency,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  } else {
+    L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013(
+      runtime,
+      expr,
+      ignoreTransparency,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  }
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  mkName = (s: String) -> unfoldProbeName(runtime, s);
+  valueName = mkName("unfoldProbe.value");
+  functionName = mkName("unfoldProbe.apply");
+  nonDefFunctionName = mkName("unfoldProbe.applyNonDefAux");
+  axiomName = mkName("unfoldProbe.axiom");
+  auxName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    functionName,
+    LeanText("_sunfold"),
+  );
+  nonDefAuxName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    nonDefFunctionName,
+    LeanText("_sunfold"),
+  );
+  absentName = mkName("unfoldProbe.missing");
+  uName = mkName("u");
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  levelU = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  levelUSucc = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, levelU);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  polyType = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelUSucc);
+  polyValue = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelU);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  oneLevel = unfoldProbeList(Array[uName]);
+  suppliedLevels = unfoldProbeList(Array[levelU]);
+  twoLevels = unfoldProbeList(Array[levelU, levelU]);
+
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  functionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    mkName("arg"),
+    binder,
+    prop,
+    prop,
+  );
+  functionValue = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    mkName("arg"),
+    binder,
+    prop,
+    bound,
+  );
+
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(
+    leanNameKey(valueName),
+    LeanConstantFile(
+      unfoldProbeDefinition(
+        valueName,
+        oneLevel,
+        polyType,
+        polyValue,
+        LeanCtor(LeanTag.ReducibilityHints_opaque, Array[]),
+      ),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(functionName),
+    LeanConstantFile(
+      unfoldProbeDefinition(
+        functionName,
+        nil,
+        functionType,
+        functionValue,
+        LeanCtor(
+          LeanTag.ReducibilityHints_regular,
+          Array[LeanWord("uint32", 0)],
+        ),
+      ),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(nonDefFunctionName),
+    LeanConstantFile(
+      unfoldProbeDefinition(
+        nonDefFunctionName,
+        nil,
+        functionType,
+        functionValue,
+        LeanCtor(
+          LeanTag.ReducibilityHints_regular,
+          Array[LeanWord("uint32", 0)],
+        ),
+      ),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(axiomName),
+    LeanConstantFile(unfoldProbeAxiom(runtime, axiomName, prop), None()),
+  );
+  // A simple identity auxiliary visits smartUnfoldingReduce? without requiring
+  // structural-recursion data. Its result is compared even if it returns none.
+  constants.set(
+    leanNameKey(auxName),
+    LeanConstantFile(
+      unfoldProbeDefinition(
+        auxName,
+        nil,
+        functionType,
+        functionValue,
+        LeanCtor(
+          LeanTag.ReducibilityHints_regular,
+          Array[LeanWord("uint32", 0)],
+        ),
+      ),
+      None(),
+    ),
+  );
+  // This second auxiliary deliberately is not a definition, covering the
+  // smart-info non-defn join and matcher-info check.
+  constants.set(
+    leanNameKey(nonDefAuxName),
+    LeanConstantFile(
+      unfoldProbeAxiom(runtime, nonDefAuxName, functionType),
+      None(),
+    ),
+  );
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView(
+      "imports",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    LeanConstantsView("locals", LeanConstantMap(constants.chill())),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    // No modules are imported by this fixture, including extra IR constants.
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+
+  defaults = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  stateRef = runtime.newRef(metaState);
+  core = leanUnboundedCoreContext(runtime, "<unfold-definition-probe>", "");
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+
+  valueConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    valueName,
+    suppliedLevels,
+  );
+  valueWrongArity = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    valueName,
+    nil,
+  );
+  valueTooManyLevels = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    valueName,
+    twoLevels,
+  );
+  functionConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    functionName,
+    nil,
+  );
+  nonDefFunctionConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    nonDefFunctionName,
+    nil,
+  );
+  argument = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, axiomName, nil);
+  functionApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    functionConst,
+    argument,
+  );
+  nonDefFunctionApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    nonDefFunctionConst,
+    argument,
+  );
+  axiomConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, axiomName, nil);
+  missingConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    absentName,
+    nil,
+  );
+  missingApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+    runtime,
+    missingConst,
+    argument,
+  );
+
+  // Structural-recursion metadata is still unsupported. Keep a runnable
+  // failure check for both routes instead of fabricating an absent position.
+  args = Environ.args().collect(Array);
+  if (args.size() == 2) {
+    assert(args[1] == "--unsupported-old" || args[1] == "--unsupported-new");
+    _unexpected = unfoldProbeCall(
+      runtime,
+      args[1] == "--unsupported-old",
+      functionApp,
+      leanBool(false),
+      defaults,
+      stateRef,
+      leanReplaceField(core, 3, LeanWord("uint16", 128)),
+      coreStateRef,
+      leanNatValue(61),
+    );
+    leanFail("expected structural-recursion metadata to remain unsupported")
+  };
+
+  expressions = Array[
+    valueConst,
+    valueWrongArity,
+    valueTooManyLevels,
+    functionConst,
+    functionApp,
+    nonDefFunctionApp,
+    axiomConst,
+    missingConst,
+    missingApp,
+  ];
+  checks = 0;
+  errors = 0;
+  for (flag in Array[0, 128]) {
+    configuredCore = leanReplaceField(core, 3, LeanWord("uint16", flag));
+    for (ignoreTransparency in Array[leanBool(false), leanBool(true)]) {
+      context = defaults;
+      for (expr in expressions) {
+        if (flag == 128 && native_eq(expr, functionApp) == 0) continue;
+        saved = runtime.checkpoint();
+        oldRuntime = saved.restoreRaw();
+        newRuntime = saved.restoreRaw();
+        expected = unfoldProbeCall(
+          oldRuntime,
+          true,
+          expr,
+          ignoreTransparency,
+          context,
+          stateRef,
+          configuredCore,
+          coreStateRef,
+          leanNatValue(61),
+        );
+        actual = unfoldProbeCall(
+          newRuntime,
+          false,
+          expr,
+          ignoreTransparency,
+          context,
+          stateRef,
+          configuredCore,
+          coreStateRef,
+          leanNatValue(61),
+        );
+        if (
+          native_eq(expected, actual) != 0 ||
+          native_eq(
+            oldRuntime.checkpoint().refs,
+            newRuntime.checkpoint().refs,
+          ) !=
+            0
+        ) {
+          leanFail(
+            "unfoldDefinition? result/reference mismatch: flag " +
+              flag.toString() +
+              ", expression " +
+              checks.toString(),
+          )
+        };
+        if (leanTag(actual) == LeanTag.EST_Out_error) !errors = errors + 1;
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(errors > 0);
+  assert(checks == 34);
+  print_string(
+    checks.toString() +
+      " unfoldDefinition? old/new cases match with " +
+      errors.toString() +
+      " propagated lookup errors",
+  )
+}

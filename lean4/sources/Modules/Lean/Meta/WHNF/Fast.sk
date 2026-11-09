@@ -1,0 +1,146 @@
+module L4_Lean_Meta_WHNF;
+
+// Common composite cases of whnfCore, before its general reduction frame.
+// Constant-headed applications, metavariables, projections, and tracing keep
+// the original implementation. These cases perform exactly the original steps.
+fun f_whnfCoreSimpleComposite(
+  runtime: mutable LeanExecution,
+  e: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): ?LeanValue {
+  tag = leanTag(e);
+  if (
+    tag != LeanTag.Expr_const__impl &&
+    tag != LeanTag.Expr_app__impl &&
+    tag != LeanTag.Expr_letE__impl
+  ) return None();
+  if (leanIsTrue(leanField(leanField(leanField(core, 0), 2), 1))) return None();
+  tag match {
+  | LeanTag.Expr_const__impl ->
+    Some(LeanCtor(LeanTag.EST_Out_ok, Array[e, world]))
+  | LeanTag.Expr_letE__impl ->
+    config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      runtime,
+      context,
+    );
+    zetaHave = leanField(config, 18);
+    body = leanField(e, 4);
+    if (
+      leanIsTrue(leanField(config, 15)) &&
+      (!leanIsTrue(leanField(e, 5)) || leanIsTrue(zetaHave))
+    ) {
+      expanded = f_Lean_Meta_expandLet_8cc6fa255d(
+        runtime,
+        body,
+        LeanArray(Array[leanField(e, 3)]),
+        zetaHave,
+      );
+      return Some(
+        f_whnfCore_go_spec_3_85c62e30bd(
+          runtime,
+          expanded,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        ),
+      )
+    };
+    if (
+      leanIsTrue(leanField(config, 17)) &&
+      !leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_hasLooseBVars_25b8fd0e1a(runtime, body),
+      )
+    ) {
+      consumed = f_Lean_Meta_consumeUnusedLet_d1bfc80f26(
+        runtime,
+        body,
+        leanBool(false),
+      );
+      return Some(
+        f_whnfCore_go_spec_3_85c62e30bd(
+          runtime,
+          consumed,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        ),
+      )
+    };
+    Some(LeanCtor(LeanTag.EST_Out_ok, Array[e, world]))
+  | LeanTag.Expr_app__impl ->
+    fn = leanField(e, 1);
+    while (leanTag(fn) == LeanTag.Expr_app__impl) {
+      !fn = leanField(fn, 1)
+    };
+    leanTag(fn) match {
+    | LeanTag.Expr_fvar__impl ->
+      found = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+        runtime,
+        leanField(fn, 1),
+        context,
+        core,
+        coreState,
+        world,
+      );
+      if (leanTag(found) == LeanTag.EST_Out_error) return Some(found);
+      decl = leanField(found, 0);
+      if (
+        leanTag(decl) == LeanTag.LocalDecl_cdecl ||
+        (leanTag(decl) == LeanTag.LocalDecl_ldecl &&
+          leanIsTrue(leanField(decl, 5)))
+      ) {
+        // The head cannot unfold. Delayed assignments and matcher/recursor
+        // reduction require a metavariable or constant head, respectively.
+        Some(
+          LeanCtor(LeanTag.EST_Out_ok, Array[e, leanField(found, 1)]),
+        )
+      } else {
+        None()
+      }
+    | LeanTag.Expr_lam__impl ->
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        runtime,
+        context,
+      );
+      if (!leanIsTrue(leanField(config, 13))) {
+        return Some(LeanCtor(LeanTag.EST_Out_ok, Array[e, world]))
+      };
+      reversed: mutable Vector<LeanValue> = mutable Vector[];
+      current = e;
+      while (leanTag(current) == LeanTag.Expr_app__impl) {
+        reversed.push(leanField(current, 2));
+        !current = leanField(current, 1)
+      };
+      reduced = L4_Lean_Expr.f_Lean_Expr_betaRev_7cc33c698c(
+        runtime,
+        fn,
+        LeanArray(reversed.toArray()),
+        leanBool(false),
+        leanBool(false),
+      );
+      Some(
+        f_whnfCore_go_spec_3_85c62e30bd(
+          runtime,
+          reduced,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        ),
+      )
+    | _ -> None()
+    }
+  | _ -> None()
+  }
+}
+
+module end;

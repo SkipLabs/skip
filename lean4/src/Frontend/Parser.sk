@@ -1,0 +1,87 @@
+// Run an existing maintained Lean parser, including its original whitespace,
+// error reporting and end-of-input checks. Callers supply the actual environment
+// and token table; this helper does not invent a grammar or register syntax.
+fun leanRunParser(
+  runtime: mutable LeanExecution,
+  parser: LeanValue,
+  environment: LeanValue,
+  tokens: LeanValue,
+  source: String,
+  fileName: String,
+): LeanValue {
+  input = LeanText(source);
+  inputContext = L4_Lean_Parser_Extension.f_Lean_Parser_mkInputContext_f2c59474cd(
+    runtime,
+    input,
+    LeanText(fileName),
+    leanBool(true),
+    leanNatValue(source.bytes().size()),
+    LeanErased(),
+  );
+  moduleContext = LeanCtor(
+    LeanTag.Parser_ParserModuleContext_mk,
+    Array[
+      environment,
+      L4_Lean_Data_Options.f_Lean_Options_empty_b09f582afb(runtime),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
+    ],
+  );
+  whitespace = LeanClosure(
+    L4_Lean_Parser_Basic.apply_f_Lean_Parser_whitespace_70b147edaf,
+    2,
+    Array[],
+  );
+  combined = LeanClosure(
+    L4_Lean_Parser_Basic.apply_f_Lean_Parser_andthenFn_e90f252acf,
+    4,
+    Array[whitespace, leanField(parser, 1)],
+  );
+  state = L4_Lean_Parser_Types.f_Parser_ParserFn_run_80560417aa(
+    runtime,
+    combined,
+    inputContext,
+    moduleContext,
+    tokens,
+    L4_Lean_Parser_Extension.f_Lean_Parser_mkParserState_0fad12a1e7(
+      runtime,
+      input,
+    ),
+  );
+  errors = L4_Lean_Parser_Types.f_Parser_ParserState_allErrors_403f462261(
+    runtime,
+    state,
+  );
+  if (leanArray(errors).isEmpty()) {
+    if (
+      leanIsTrue(
+        L4_Lean_Parser_Types.f_Parser_InputContext_atEnd_2795c49548(
+          runtime,
+          inputContext,
+          leanField(state, 2),
+        ),
+      )
+    ) {
+      syntax = L4_Lean_Parser_Types.f_Parser_SyntaxStack_back_d4f5029b0b(
+        runtime,
+        leanField(state, 0),
+      );
+      return LeanCtor(LeanTag.Except_ok, Array[syntax])
+    };
+    !state = L4_Lean_Parser_Types.f_Parser_ParserState_mkError_a1d6cdbe46(
+      runtime,
+      state,
+      LeanText("end of input"),
+    )
+  };
+  LeanCtor(
+    LeanTag.Except_error,
+    Array[
+      L4_Lean_Parser_Types.f_Parser_ParserState_toErrorMsg_fb2e4a51f7(
+        runtime,
+        inputContext,
+        state,
+      ),
+    ],
+  )
+}

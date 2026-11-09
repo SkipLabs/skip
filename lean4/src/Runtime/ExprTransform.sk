@@ -1,24 +1,24 @@
 // Runtime operations over Lean expressions. Rebuilding uses the maintained Lean
 // constructors, so hashes, binder annotations and cached metadata stay consistent.
-// These traversals currently revisit shared subtrees; a traversal-local memo table
-// is a future performance improvement, not an environment dependency cache.
+// Abstraction preserves sharing with a traversal-local memo table. Instantiation
+// and shifting still revisit shared subtrees; their DAG optimization is pending.
 
 // Child field index and number of additional binders in that child.
 fun leanExprChildren(expr: LeanValue): Array<(Int, Int)> {
   leanTag(expr) match {
-  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" -> Array[(1, 0), (2, 0)]
-  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+  | LeanTag.Expr_app__impl -> Array[(1, 0), (2, 0)]
+  | LeanTag.Expr_lam__impl
+  | LeanTag.Expr_forallE__impl ->
     Array[(2, 0), (3, 1)]
-  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" -> Array[(2, 0), (3, 0), (4, 1)]
-  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" -> Array[(2, 0)]
-  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" -> Array[(3, 0)]
-  | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]"
-  | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+  | LeanTag.Expr_letE__impl -> Array[(2, 0), (3, 0), (4, 1)]
+  | LeanTag.Expr_mdata__impl -> Array[(2, 0)]
+  | LeanTag.Expr_proj__impl -> Array[(3, 0)]
+  | LeanTag.Expr_bvar__impl
+  | LeanTag.Expr_fvar__impl
+  | LeanTag.Expr_mvar__impl
+  | LeanTag.Expr_sort__impl
+  | LeanTag.Expr_const__impl
+  | LeanTag.Expr_lit__impl ->
     Array[]
   | _ -> leanFail("invalid expression in Lean runtime traversal")
   }
@@ -30,9 +30,9 @@ fun leanExprRebuild(
   values: Array<LeanValue>,
 ): LeanValue {
   leanTag(expr) match {
-  | "[\"Lean\",\"Expr\",\"app\",\"_impl\"]" ->
+  | LeanTag.Expr_app__impl ->
     L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, values[0], values[1])
-  | "[\"Lean\",\"Expr\",\"lam\",\"_impl\"]" ->
+  | LeanTag.Expr_lam__impl ->
     L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
       runtime,
       leanField(expr, 1),
@@ -40,7 +40,7 @@ fun leanExprRebuild(
       values[0],
       values[1],
     )
-  | "[\"Lean\",\"Expr\",\"forallE\",\"_impl\"]" ->
+  | LeanTag.Expr_forallE__impl ->
     L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
       runtime,
       leanField(expr, 1),
@@ -48,7 +48,7 @@ fun leanExprRebuild(
       values[0],
       values[1],
     )
-  | "[\"Lean\",\"Expr\",\"letE\",\"_impl\"]" ->
+  | LeanTag.Expr_letE__impl ->
     L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
       runtime,
       leanField(expr, 1),
@@ -57,13 +57,13 @@ fun leanExprRebuild(
       values[2],
       leanField(expr, 5),
     )
-  | "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]" ->
+  | LeanTag.Expr_mdata__impl ->
     L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
       runtime,
       leanField(expr, 1),
       values[0],
     )
-  | "[\"Lean\",\"Expr\",\"proj\",\"_impl\"]" ->
+  | LeanTag.Expr_proj__impl ->
     L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
       runtime,
       leanField(expr, 1),
@@ -82,7 +82,7 @@ fun leanExprShift(
   delta: Int,
 ): LeanValue {
   if (delta == 0 || leanExprData(expr).ushr(44) <= cutoff) return expr;
-  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+  if (leanTag(expr) == LeanTag.Expr_bvar__impl) {
     index = leanNat(leanField(expr, 1)).toInt();
     if (index < cutoff) return expr;
     return L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(
@@ -113,7 +113,7 @@ fun leanExprInstantiate(
   offset: Int,
 ): LeanValue {
   if (subst.isEmpty() || leanExprData(expr).ushr(44) <= offset) return expr;
-  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+  if (leanTag(expr) == LeanTag.Expr_bvar__impl) {
     index = leanNat(leanField(expr, 1)).toInt();
     if (index < offset) return expr;
     if (index - offset < subst.size()) {
@@ -196,7 +196,7 @@ fun leanExprHasLooseBVarAt(expr: LeanValue, index: LeanValue): LeanValue {
 
 fun leanExprHasLooseBVar(expr: LeanValue, index: Int): Bool {
   if (leanExprData(expr).ushr(44) <= index) return false;
-  if (leanTag(expr) == "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]") {
+  if (leanTag(expr) == LeanTag.Expr_bvar__impl) {
     return leanNat(leanField(expr, 1)).toInt() == index
   };
   leanExprChildren(expr).any(child ->
@@ -207,6 +207,17 @@ fun leanExprHasLooseBVar(expr: LeanValue, index: Int): Bool {
 // Abstract free variables and metavariables. The last matching array entry wins;
 // bound indices are counted from the end of the selected prefix, under binders.
 // Entries of other Expr kinds are ignored, matching lean_expr_abstract_core.
+class LeanExprScopeKey(expr: LeanValue, offset: Int) uses Hashable, Equality {
+  fun hash(): Int {
+    LeanImmutableKey(this.expr).hash().xor(this.offset.shl(32))
+  }
+  fun ==(other: this): Bool {
+    this.offset == other.offset &&
+      (leanSameObject(this.expr, other.expr) != 0 ||
+        native_eq(this.expr, other.expr) == 0)
+  }
+}
+
 fun leanExprAbstractAt(
   runtime: mutable LeanExecution,
   expr: LeanValue,
@@ -214,11 +225,41 @@ fun leanExprAbstractAt(
   count: Int,
   offset: Int,
 ): LeanValue {
+  cache: mutable Map<LeanExprScopeKey, LeanValue> = mutable Map[];
+  leanExprAbstractVisit(runtime, expr, subst, count, offset, cache)
+}
+
+fun leanExprAbstractVisit(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  subst: Array<LeanValue>,
+  count: Int,
+  offset: Int,
+  cache: mutable Map<LeanExprScopeKey, LeanValue>,
+): LeanValue {
   if (count == 0 || leanExprData(expr).and(7.shl(40)) == 0) return expr;
+  key = LeanExprScopeKey(expr, offset);
+  cache.maybeGet(key) match {
+  | Some(result) -> return result
+  | None() -> void
+  };
+  result = leanExprAbstractNode(runtime, expr, subst, count, offset, cache);
+  cache.set(key, result);
+  result
+}
+
+fun leanExprAbstractNode(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  subst: Array<LeanValue>,
+  count: Int,
+  offset: Int,
+  cache: mutable Map<LeanExprScopeKey, LeanValue>,
+): LeanValue {
   tag = leanTag(expr);
   if (
-    tag == "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]" ||
-    tag == "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
+    tag == LeanTag.Expr_fvar__impl ||
+    tag == LeanTag.Expr_mvar__impl
   ) {
     i = count;
     while (i > 0) {
@@ -239,12 +280,13 @@ fun leanExprAbstractAt(
     runtime,
     expr,
     leanExprChildren(expr).map(child ->
-      leanExprAbstractAt(
+      leanExprAbstractVisit(
         runtime,
         leanField(expr, child.i0),
         subst,
         count,
         offset + child.i1,
+        cache,
       )
     ),
   )

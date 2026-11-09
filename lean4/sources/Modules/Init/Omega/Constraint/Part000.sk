@@ -12,8 +12,8 @@ fun f_Constraint_combine_lam_1_4f34abfccf(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" -> _y_1
-  | "[\"Bool\",\"true\"]" -> _x_0
+  | LeanTag.Bool_false -> _y_1
+  | LeanTag.Bool_true -> _x_0
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -46,7 +46,7 @@ fun f_Lean_Omega_bmod_coeffs_ff766180b3(
     _runtime,
     _m_0,
     _x_2,
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
   );
   _x_3_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
@@ -66,8 +66,8 @@ fun f_Lean_Omega_normalize_52cb594009(
 ): LeanValue {
   _x_1_1: LeanValue = f_Lean_Omega_normalize_eddb944d11(_runtime, _p_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> _p_0
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _p_0
+  | LeanTag.Option_some ->
     _val_2_2: LeanValue = leanField(_x_1_1, 0);
     _val_2_2
   | _ -> leanFail("non-exhaustive Lean case")
@@ -91,28 +91,28 @@ fun f_Omega_Constraint_add_7700142a89(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+      | LeanTag.Omega_Constraint_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[2]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _jump0 = _frame[2];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(13, leanField(_frame[2], 0));
           leanTag(_frame[1]) match {
-          | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+          | LeanTag.Omega_Constraint_mk ->
             _frame.set(14, leanField(_frame[1], 0));
             _ = leanField(_frame[1], 1);
             leanTag(_frame[14]) match {
-            | "[\"Option\",\"none\"]" ->
+            | LeanTag.Option_none ->
               _jump0 = _frame[14];
               _frame.set(4, _jump0);
               !pc = 1;
               void
-            | "[\"Option\",\"some\"]" ->
+            | LeanTag.Option_some ->
               _frame.set(15, leanField(_frame[14], 0));
               _frame.set(
                 16,
@@ -124,7 +124,7 @@ fun f_Omega_Constraint_add_7700142a89(
               );
               _frame.set(
                 17,
-                LeanCtor("[\"Option\",\"some\"]", Array[_frame[16]]),
+                LeanCtor(LeanTag.Option_some, Array[_frame[16]]),
               );
               _jump0 = _frame[17];
               _frame.set(4, _jump0);
@@ -140,32 +140,32 @@ fun f_Omega_Constraint_add_7700142a89(
       }
     | 1 ->
       leanTag(_frame[3]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(
           6,
           LeanCtor(
-            "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+            LeanTag.Omega_Constraint_mk,
             Array[_frame[4], _frame[3]],
           ),
         );
         return _frame[6]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(5, leanField(_frame[3], 0));
         leanTag(_frame[1]) match {
-        | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+        | LeanTag.Omega_Constraint_mk ->
           _ = leanField(_frame[1], 0);
           _frame.set(7, leanField(_frame[1], 1));
           leanTag(_frame[7]) match {
-          | "[\"Option\",\"none\"]" ->
+          | LeanTag.Option_none ->
             _frame.set(
               9,
               LeanCtor(
-                "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+                LeanTag.Omega_Constraint_mk,
                 Array[_frame[4], _frame[7]],
               ),
             );
             return _frame[9]
-          | "[\"Option\",\"some\"]" ->
+          | LeanTag.Option_some ->
             _frame.set(8, leanField(_frame[7], 0));
             _frame.set(
               10,
@@ -177,12 +177,12 @@ fun f_Omega_Constraint_add_7700142a89(
             );
             _frame.set(
               11,
-              LeanCtor("[\"Option\",\"some\"]", Array[_frame[10]]),
+              LeanCtor(LeanTag.Option_some, Array[_frame[10]]),
             );
             _frame.set(
               12,
               LeanCtor(
-                "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+                LeanTag.Omega_Constraint_mk,
                 Array[_frame[4], _frame[11]],
               ),
             );
@@ -202,8 +202,8 @@ fun f_Omega_Constraint_exact_d29234be16(
   _runtime: mutable LeanExecution,
   _r_0: LeanValue,
 ): LeanValue {
-  _x_1_1: LeanValue = LeanCtor("[\"Option\",\"some\"]", Array[_r_0]);
-  LeanCtor("[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]", Array[_x_1_1, _x_1_1])
+  _x_1_1: LeanValue = LeanCtor(LeanTag.Option_some, Array[_r_0]);
+  LeanCtor(LeanTag.Omega_Constraint_mk, Array[_x_1_1, _x_1_1])
 }
 // "List.mapTR.loop._at_.Lean.Omega.bmod_coeffs.spec_0"
 fun f_Omega_bmod_coeffs_spec_0_0d59cd6c71(
@@ -213,9 +213,9 @@ fun f_Omega_bmod_coeffs_spec_0_0d59cd6c71(
   _a_2_2: LeanValue,
 ): LeanValue {
   leanTag(_a_1_1) match {
-  | "[\"List\",\"nil\"]" ->
+  | LeanTag.List_nil ->
     L4_Init_Data_List_Basic.f_List_reverse_97a1249b31(_runtime, _a_2_2)
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_cons ->
     _head_4_3: LeanValue = leanField(_a_1_1, 0);
     _tail_5_4: LeanValue = leanField(_a_1_1, 1);
     _x_6_6: LeanValue = L4_Init_Data_Int_DivMod_Basic.f_Int_bmod_5bc141db3f(
@@ -227,7 +227,7 @@ fun f_Omega_bmod_coeffs_spec_0_0d59cd6c71(
       _runtime,
       _m_0,
       _tail_5_4,
-      LeanCtor("[\"List\",\"cons\"]", Array[_x_6_6, _a_2_2]),
+      LeanCtor(LeanTag.List_cons, Array[_x_6_6, _a_2_2]),
     )
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -238,11 +238,11 @@ fun f_Omega_Constraint_flip_76c3316112(
   _c_0: LeanValue,
 ): LeanValue {
   leanTag(_c_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_1: LeanValue = leanField(_c_0, 0);
     _upperBound_2: LeanValue = leanField(_c_0, 1);
     LeanCtor(
-      "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+      LeanTag.Omega_Constraint_mk,
       Array[_upperBound_2, _lowerBound_1],
     )
   | _ -> leanFail("non-exhaustive Lean case")
@@ -255,11 +255,11 @@ fun f_Omega_instBEqConstraint_beq_6c6b39a746(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_3_2: LeanValue = leanField(_x_1_0, 0);
     _upperBound_4_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+    | LeanTag.Omega_Constraint_mk ->
       _lowerBound_5_4: LeanValue = leanField(_x_2_1, 0);
       _upperBound_6_5: LeanValue = leanField(_x_2_1, 1);
       _x_7_6: LeanValue = f_instBEqConstraint_beq_spec_0_bea8408d0e(
@@ -268,8 +268,8 @@ fun f_Omega_instBEqConstraint_beq_6c6b39a746(
         _lowerBound_5_4,
       );
       leanTag(_x_7_6) match {
-      | "[\"Bool\",\"false\"]" -> _x_7_6
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_7_6
+      | LeanTag.Bool_true ->
         f_instBEqConstraint_beq_spec_0_bea8408d0e(
           _runtime,
           _upperBound_4_3,
@@ -306,14 +306,14 @@ fun f_Omega_Constraint_sat_1ee66fa388(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+      | LeanTag.Omega_Constraint_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[2]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(7, leanField(_frame[2], 0));
           _frame.set(
             8,
@@ -324,8 +324,8 @@ fun f_Omega_Constraint_sat_1ee66fa388(
             ),
           );
           leanTag(_frame[8]) match {
-          | "[\"Bool\",\"false\"]" -> return _frame[8]
-          | "[\"Bool\",\"true\"]" ->
+          | LeanTag.Bool_false -> return _frame[8]
+          | LeanTag.Bool_true ->
             !pc = 1;
             void
           | _ -> return leanFail("non-exhaustive Lean case")
@@ -336,10 +336,10 @@ fun f_Omega_Constraint_sat_1ee66fa388(
       }
     | 1 ->
       leanTag(_frame[3]) match {
-      | "[\"Option\",\"none\"]" ->
-        _frame.set(5, LeanCtor("[\"Bool\",\"true\"]", Array[]));
+      | LeanTag.Option_none ->
+        _frame.set(5, LeanCtor(LeanTag.Bool_true, Array[]));
         return _frame[5]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(4, leanField(_frame[3], 0));
         _frame.set(
           6,
@@ -375,12 +375,12 @@ fun f_Lean_Omega_positivize_cf74d38776(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_2_1: LeanValue = leanField(_x_1_0, 0);
     _snd_3_2: LeanValue = leanField(_x_1_0, 1);
     _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _x_6_5: LeanValue = L4_Init_Omega_IntList.f_Omega_IntList_leading_d519b8887a(
       _runtime,
@@ -392,11 +392,11 @@ fun f_Lean_Omega_positivize_cf74d38776(
       _x_6_5,
     );
     leanTag(_x_7_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_8_7: LeanValue = f_Omega_Constraint_neg_3884b10709(_runtime, _fst_2_1);
       _x_10_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       _x_11_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
         _runtime,
@@ -408,10 +408,10 @@ fun f_Lean_Omega_positivize_cf74d38776(
         _x_11_10,
       );
       LeanCtor(
-        "[\"Option\",\"some\"]",
-        Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_x_8_7, _x_12_11])],
+        LeanTag.Option_some,
+        Array[LeanCtor(LeanTag.Prod_mk, Array[_x_8_7, _x_12_11])],
       )
-    | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -424,12 +424,12 @@ fun f_Lean_Omega_tidy_64c3ccb24c(
 ): LeanValue {
   _x_2_1: LeanValue = f_Lean_Omega_positivize_cf74d38776(_runtime, _x_1_0);
   leanTag(_x_2_1) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     f_Lean_Omega_normalize_eddb944d11(_runtime, _x_1_0)
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_4_2: LeanValue = leanField(_x_2_1, 0);
     _x_5_4: LeanValue = f_Lean_Omega_normalize_52cb594009(_runtime, _val_4_2);
-    LeanCtor("[\"Option\",\"some\"]", Array[_x_5_4])
+    LeanCtor(LeanTag.Option_some, Array[_x_5_4])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -451,16 +451,16 @@ fun f_Omega_Constraint_div_a1732728c7(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+      | LeanTag.Omega_Constraint_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[2]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _jump0 = _frame[2];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(11, leanField(_frame[2], 0));
           _frame.set(
             12,
@@ -482,7 +482,7 @@ fun f_Omega_Constraint_div_a1732728c7(
             15,
             L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(_runtime, _frame[14]),
           );
-          _frame.set(16, LeanCtor("[\"Option\",\"some\"]", Array[_frame[15]]));
+          _frame.set(16, LeanCtor(LeanTag.Option_some, Array[_frame[15]]));
           _jump0 = _frame[16];
           _frame.set(4, _jump0);
           !pc = 1;
@@ -493,16 +493,16 @@ fun f_Omega_Constraint_div_a1732728c7(
       }
     | 1 ->
       leanTag(_frame[3]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(
           6,
           LeanCtor(
-            "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+            LeanTag.Omega_Constraint_mk,
             Array[_frame[4], _frame[3]],
           ),
         );
         return _frame[6]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(5, leanField(_frame[3], 0));
         _frame.set(
           7,
@@ -516,11 +516,11 @@ fun f_Omega_Constraint_div_a1732728c7(
             _frame[7],
           ),
         );
-        _frame.set(9, LeanCtor("[\"Option\",\"some\"]", Array[_frame[8]]));
+        _frame.set(9, LeanCtor(LeanTag.Option_some, Array[_frame[8]]));
         _frame.set(
           10,
           LeanCtor(
-            "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+            LeanTag.Omega_Constraint_mk,
             Array[_frame[4], _frame[9]],
           ),
         );
@@ -551,17 +551,17 @@ fun f_Omega_Constraint_impossible_0bf8244191(
 ): LeanValue {
   _x_2_1: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   );
   _x_5_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   LeanCtor(
-    "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+    LeanTag.Omega_Constraint_mk,
     Array[
-      LeanCtor("[\"Option\",\"some\"]", Array[_x_2_1]),
-      LeanCtor("[\"Option\",\"some\"]", Array[_x_5_4]),
+      LeanCtor(LeanTag.Option_some, Array[_x_2_1]),
+      LeanCtor(LeanTag.Option_some, Array[_x_5_4]),
     ],
   )
 }
@@ -573,7 +573,7 @@ fun f_Omega_Constraint_scale_096c91774e(
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
     _runtime,
@@ -581,14 +581,14 @@ fun f_Omega_Constraint_scale_096c91774e(
     _x_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
       _x_2_3,
       _k_0,
     );
     leanTag(_x_4_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _f_5_6: LeanValue = LeanClosure(
         L4_Init_Omega_Constraint.apply_f_Constraint_scale_lam_0_6e4fb5af61,
         2,
@@ -596,7 +596,7 @@ fun f_Omega_Constraint_scale_096c91774e(
       );
       _x_6_7: LeanValue = f_Omega_Constraint_flip_76c3316112(_runtime, _c_1);
       f_Omega_Constraint_map_deda613860(_runtime, _x_6_7, _f_5_6)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _f_8_9: LeanValue = LeanClosure(
         L4_Init_Omega_Constraint.apply_f_Constraint_scale_lam_0_6e4fb5af61,
         2,
@@ -605,19 +605,19 @@ fun f_Omega_Constraint_scale_096c91774e(
       f_Omega_Constraint_map_deda613860(_runtime, _c_1, _f_8_9)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _x_10_11: LeanValue = f_Omega_Constraint_isImpossible_2360593c2e(
       _runtime,
       _c_1,
     );
     leanTag(_x_10_11) match {
-    | "[\"Bool\",\"false\"]" ->
-      _x_11_12: LeanValue = LeanCtor("[\"Option\",\"some\"]", Array[_x_2_3]);
+    | LeanTag.Bool_false ->
+      _x_11_12: LeanValue = LeanCtor(LeanTag.Option_some, Array[_x_2_3]);
       LeanCtor(
-        "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+        LeanTag.Omega_Constraint_mk,
         Array[_x_11_12, _x_11_12],
       )
-    | "[\"Bool\",\"true\"]" -> _c_1
+    | LeanTag.Bool_true -> _c_1
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -630,8 +630,8 @@ fun f_Lean_Omega_tidy_ee8a6b8eb9(
 ): LeanValue {
   _x_1_1: LeanValue = f_Lean_Omega_tidy_64c3ccb24c(_runtime, _p_0);
   leanTag(_x_1_1) match {
-  | "[\"Option\",\"none\"]" -> _p_0
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_none -> _p_0
+  | LeanTag.Option_some ->
     _val_2_2: LeanValue = leanField(_x_1_1, 0);
     _val_2_2
   | _ -> leanFail("non-exhaustive Lean case")
@@ -649,8 +649,8 @@ fun f_Constraint_combine_lam_0_f9c7f6974b(
     _y_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" -> _x_0
-  | "[\"Bool\",\"true\"]" -> _y_1
+  | LeanTag.Bool_false -> _x_0
+  | LeanTag.Bool_true -> _y_1
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -678,19 +678,19 @@ fun f_Omega_Constraint_map_deda613860(
     pc match {
     | 0 ->
       leanTag(_frame[0]) match {
-      | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+      | LeanTag.Omega_Constraint_mk ->
         _frame.set(2, leanField(_frame[0], 0));
         _frame.set(3, leanField(_frame[0], 1));
         leanTag(_frame[2]) match {
-        | "[\"Option\",\"none\"]" ->
+        | LeanTag.Option_none ->
           _jump0 = _frame[2];
           _frame.set(4, _jump0);
           !pc = 1;
           void
-        | "[\"Option\",\"some\"]" ->
+        | LeanTag.Option_some ->
           _frame.set(10, leanField(_frame[2], 0));
           _frame.set(11, leanApply(_runtime, _frame[1], Array[_frame[10]]));
-          _frame.set(12, LeanCtor("[\"Option\",\"some\"]", Array[_frame[11]]));
+          _frame.set(12, LeanCtor(LeanTag.Option_some, Array[_frame[11]]));
           _jump0 = _frame[12];
           _frame.set(4, _jump0);
           !pc = 1;
@@ -701,23 +701,23 @@ fun f_Omega_Constraint_map_deda613860(
       }
     | 1 ->
       leanTag(_frame[3]) match {
-      | "[\"Option\",\"none\"]" ->
+      | LeanTag.Option_none ->
         _frame.set(
           6,
           LeanCtor(
-            "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+            LeanTag.Omega_Constraint_mk,
             Array[_frame[4], _frame[3]],
           ),
         );
         return _frame[6]
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _frame.set(5, leanField(_frame[3], 0));
         _frame.set(7, leanApply(_runtime, _frame[1], Array[_frame[5]]));
-        _frame.set(8, LeanCtor("[\"Option\",\"some\"]", Array[_frame[7]]));
+        _frame.set(8, LeanCtor(LeanTag.Option_some, Array[_frame[7]]));
         _frame.set(
           9,
           LeanCtor(
-            "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+            LeanTag.Omega_Constraint_mk,
             Array[_frame[4], _frame[8]],
           ),
         );
@@ -735,11 +735,11 @@ fun f_Omega_Constraint_combine_45605d19ee(
   _y_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_2: LeanValue = leanField(_x_0, 0);
     _upperBound_3: LeanValue = leanField(_x_0, 1);
     leanTag(_y_1) match {
-    | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+    | LeanTag.Omega_Constraint_mk ->
       _lowerBound_4: LeanValue = leanField(_y_1, 0);
       _upperBound_5: LeanValue = leanField(_y_1, 1);
       _f_1_6: LeanValue = LeanClosure(
@@ -765,7 +765,7 @@ fun f_Omega_Constraint_combine_45605d19ee(
         _upperBound_5,
       );
       LeanCtor(
-        "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]",
+        LeanTag.Omega_Constraint_mk,
         Array[_x_3_8, _x_4_9],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -777,8 +777,8 @@ fun f_Omega_Constraint_combine_45605d19ee(
 fun f_Omega_Constraint_trivial_cb30d47d5d(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  _x_1_0: LeanValue = LeanCtor("[\"Option\",\"none\"]", Array[]);
-  LeanCtor("[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]", Array[_x_1_0, _x_1_0])
+  _x_1_0: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  LeanCtor(LeanTag.Omega_Constraint_mk, Array[_x_1_0, _x_1_0])
 }
 // "Lean.Omega.instDecidableEqConstraint.decEq"
 fun f_Omega_instDecidableEqConstraint_decEq_d478b2ff03(
@@ -787,11 +787,11 @@ fun f_Omega_instDecidableEqConstraint_decEq_d478b2ff03(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_3_2: LeanValue = leanField(_x_1_0, 0);
     _upperBound_4_3: LeanValue = leanField(_x_1_0, 1);
     leanTag(_x_2_1) match {
-    | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+    | LeanTag.Omega_Constraint_mk ->
       _lowerBound_5_4: LeanValue = leanField(_x_2_1, 0);
       _upperBound_6_5: LeanValue = leanField(_x_2_1, 1);
       _x_7_6: LeanValue = LeanClosure(
@@ -806,8 +806,8 @@ fun f_Omega_instDecidableEqConstraint_decEq_d478b2ff03(
         _lowerBound_5_4,
       );
       leanTag(_x_8_7) match {
-      | "[\"Bool\",\"false\"]" -> _x_8_7
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_8_7
+      | LeanTag.Bool_true ->
         L4_Init_Data_Option_Basic.f_Option_instDecidableEq_39b7b19c41(
           _runtime,
           _x_7_6,
@@ -827,23 +827,23 @@ fun f_Omega_Constraint_isExact_54d1883c49(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_2_1: LeanValue = leanField(_x_1_0, 0);
     _upperBound_3_2: LeanValue = leanField(_x_1_0, 1);
     leanTag(_lowerBound_2_1) match {
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_lowerBound_2_1, 0);
       leanTag(_upperBound_3_2) match {
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _val_5_4: LeanValue = leanField(_upperBound_3_2, 0);
         L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
           _runtime,
           _val_4_3,
           _val_5_4,
         )
-      | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+      | _ -> LeanCtor(LeanTag.Bool_false, Array[])
       }
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }
@@ -854,28 +854,28 @@ fun f_Lean_Omega_normalize_eddb944d11(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Prod\",\"mk\"]" ->
+  | LeanTag.Prod_mk ->
     _fst_2_1: LeanValue = leanField(_x_1_0, 0);
     _snd_3_2: LeanValue = leanField(_x_1_0, 1);
     _gcd_3: LeanValue = L4_Init_Omega_IntList.f_Omega_IntList_gcd_2f399a76a0(
       _runtime,
       _snd_3_2,
     );
-    _x_4_4: LeanValue = LeanScalar("nat", "0");
+    _x_4_4: LeanValue = LeanNatLiterals.n0;
     _x_5_5: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _gcd_3,
       _x_4_4,
     );
     leanTag(_x_5_5) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_7_7: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
         _runtime,
         _gcd_3,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       leanTag(_x_7_7) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_8_8: LeanValue = f_Omega_Constraint_div_a1732728c7(
           _runtime,
           _fst_2_1,
@@ -891,13 +891,13 @@ fun f_Lean_Omega_normalize_eddb944d11(
           _x_9_9,
         );
         LeanCtor(
-          "[\"Option\",\"some\"]",
-          Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_x_8_8, _x_10_10])],
+          LeanTag.Option_some,
+          Array[LeanCtor(LeanTag.Prod_mk, Array[_x_8_8, _x_10_10])],
         )
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_none, Array[])
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_14_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
         _x_4_4,
@@ -908,19 +908,19 @@ fun f_Lean_Omega_normalize_eddb944d11(
         _x_14_14,
       );
       leanTag(_x_15_15) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_16_16: LeanValue = f_Omega_Constraint_impossible_0bf8244191(
           _runtime,
         );
         LeanCtor(
-          "[\"Option\",\"some\"]",
-          Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_x_16_16, _snd_3_2])],
+          LeanTag.Option_some,
+          Array[LeanCtor(LeanTag.Prod_mk, Array[_x_16_16, _snd_3_2])],
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _x_19_19: LeanValue = f_Omega_Constraint_trivial_cb30d47d5d(_runtime);
         LeanCtor(
-          "[\"Option\",\"some\"]",
-          Array[LeanCtor("[\"Prod\",\"mk\"]", Array[_x_19_19, _snd_3_2])],
+          LeanTag.Option_some,
+          Array[LeanCtor(LeanTag.Prod_mk, Array[_x_19_19, _snd_3_2])],
         )
       | _ -> leanFail("non-exhaustive Lean case")
       }
@@ -936,19 +936,19 @@ fun f_instBEqConstraint_beq_spec_0_bea8408d0e(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Option\",\"none\"]" ->
+  | LeanTag.Option_none ->
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_x_2_1, 0);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Option\",\"some\"]" ->
+  | LeanTag.Option_some ->
     _val_6_2: LeanValue = leanField(_x_1_0, 0);
     leanTag(_x_2_1) match {
-    | "[\"Option\",\"none\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_none -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Option_some ->
       _val_8_6: LeanValue = leanField(_x_2_1, 0);
       L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
         _runtime,
@@ -966,23 +966,23 @@ fun f_Omega_Constraint_isImpossible_2360593c2e(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Lean\",\"Omega\",\"Constraint\",\"mk\"]" ->
+  | LeanTag.Omega_Constraint_mk ->
     _lowerBound_2_1: LeanValue = leanField(_x_1_0, 0);
     _upperBound_3_2: LeanValue = leanField(_x_1_0, 1);
     leanTag(_lowerBound_2_1) match {
-    | "[\"Option\",\"some\"]" ->
+    | LeanTag.Option_some ->
       _val_4_3: LeanValue = leanField(_lowerBound_2_1, 0);
       leanTag(_upperBound_3_2) match {
-      | "[\"Option\",\"some\"]" ->
+      | LeanTag.Option_some ->
         _val_5_4: LeanValue = leanField(_upperBound_3_2, 0);
         L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
           _runtime,
           _val_5_4,
           _val_4_3,
         )
-      | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+      | _ -> LeanCtor(LeanTag.Bool_false, Array[])
       }
-    | _ -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Bool_false, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }

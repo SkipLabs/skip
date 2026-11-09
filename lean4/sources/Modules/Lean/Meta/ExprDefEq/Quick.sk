@@ -1,0 +1,195 @@
+// The inexpensive definitional-equality cases, before general reduction.
+module L4_Lean_Meta_ExprDefEq;
+
+// Convert a successful Boolean computation without losing its world or error.
+fun f_quickDefEqBoolResult(
+  runtime: mutable LeanExecution,
+  result: LeanValue,
+): LeanValue {
+  leanTag(result) match {
+  | LeanTag.EST_Out_error -> result
+  | LeanTag.EST_Out_ok ->
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        L4_Lean_Data_LBool.f_Lean_Bool_toLBool_b192e84fda(
+          runtime,
+          leanField(result, 0),
+        ),
+        leanField(result, 1),
+      ],
+    )
+  | _ -> leanFail("invalid definitional-equality result")
+  }
+}
+
+// "_private.Lean.Meta.ExprDefEq.0.Lean.Meta.isDefEqQuick"
+fun f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  consumedLeft = f_Lean_Meta_consumeLetIfZeta_c3f72853e8(
+    runtime,
+    left,
+    context,
+    world,
+  );
+  if (leanTag(consumedLeft) == LeanTag.EST_Out_error) return consumedLeft;
+  consumedRight = f_Lean_Meta_consumeLetIfZeta_c3f72853e8(
+    runtime,
+    right,
+    context,
+    leanField(consumedLeft, 1),
+  );
+  if (leanTag(consumedRight) == LeanTag.EST_Out_error) return consumedRight;
+  !left = leanField(consumedLeft, 0);
+  !right = leanField(consumedRight, 0);
+  !world = leanField(consumedRight, 1);
+
+  (leanTag(left), leanTag(right)) match {
+  | (LeanTag.Expr_lit__impl, LeanTag.Expr_lit__impl) ->
+    equal = L4_Lean_Expr.f_Lean_instBEqLiteral_beq_dea54cb2f4(
+      runtime,
+      leanField(left, 1),
+      leanField(right, 1),
+    );
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        L4_Lean_Data_LBool.f_Lean_Bool_toLBool_b192e84fda(runtime, equal),
+        world,
+      ],
+    )
+  | (LeanTag.Expr_sort__impl, LeanTag.Expr_sort__impl) ->
+    f_quickDefEqBoolResult(
+      runtime,
+      L4_Lean_Meta_Basic.f_Lean_Meta_isLevelDefEqAux_da8f7dc47b(
+        runtime,
+        leanField(left, 1),
+        leanField(right, 1),
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      ),
+    )
+  | (LeanTag.Expr_lam__impl, LeanTag.Expr_lam__impl)
+  | (LeanTag.Expr_forallE__impl, LeanTag.Expr_forallE__impl) ->
+    // Lean's eqv ignores binder names and annotations. Structural inequality
+    // would incorrectly force these expressions through binder unification.
+    if (
+      leanIsTrue(L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(runtime, left, right))
+    ) {
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_true, Array[]), world],
+      )
+    };
+    empty = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+      runtime,
+      LeanErased(),
+      LeanNatLiterals.n0,
+    );
+    f_quickDefEqBoolResult(
+      runtime,
+      f_Lean_Meta_isDefEqBindingAux_a2be492370(
+        runtime,
+        leanField(context, 3),
+        empty,
+        left,
+        right,
+        empty,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      ),
+    )
+  | (LeanTag.Expr_fvar__impl, LeanTag.Expr_fvar__impl) ->
+    leftId = leanField(left, 1);
+    rightId = leanField(right, 1);
+    if (
+      leanIsTrue(
+        L4_Lean_Expr.f_Lean_instBEqFVarId_beq_4f51202b34(
+          runtime,
+          leftId,
+          rightId,
+        ),
+      )
+    ) {
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_true, Array[]), world],
+      )
+    };
+    // A let-variable may still reduce. Check left first and preserve the
+    // short circuit: checking right can itself fail or change state.
+    leftLet = L4_Lean_Meta_Basic.f_Lean_FVarId_isLetVar_ed8dbb19d3(
+      runtime,
+      leftId,
+      leanBool(false),
+      context,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(leftLet) == LeanTag.EST_Out_error) return leftLet;
+    !world = leanField(leftLet, 1);
+    if (leanIsTrue(leanField(leftLet, 0))) {
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_undef, Array[]), world],
+      )
+    };
+    rightLet = L4_Lean_Meta_Basic.f_Lean_FVarId_isLetVar_ed8dbb19d3(
+      runtime,
+      rightId,
+      leanBool(false),
+      context,
+      core,
+      coreState,
+      world,
+    );
+    if (leanTag(rightLet) == LeanTag.EST_Out_error) return rightLet;
+    !world = leanField(rightLet, 1);
+    if (leanIsTrue(leanField(rightLet, 0))) {
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_undef, Array[]), world],
+      )
+    };
+    // Distinct ordinary variables can still be equal by proof irrelevance.
+    // Otherwise leave the answer undecided for later rules, including unit types.
+    f_Lean_Meta_isDefEqProofIrrel_d59b1dcb06(
+      runtime,
+      left,
+      right,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | _ ->
+    f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf(
+      runtime,
+      left,
+      right,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  }
+}
+
+module end;

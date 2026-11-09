@@ -6,7 +6,7 @@ fun f_instInhabitedST_lam_0_d491993820(
   _inst_1_0: LeanValue,
   _s_1: LeanValue,
 ): LeanValue {
-  LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_inst_1_0, _s_1])
+  LeanCtor(LeanTag.ST_Out_mk, Array[_inst_1_0, _s_1])
 }
 fun apply_f_instInhabitedST_lam_0_d491993820(
   _runtime: mutable LeanExecution,
@@ -23,12 +23,18 @@ fun f_Prim_Ref_swap_b4291ad63a(
   _a_3: LeanValue,
   _a_internal_hyg_1_4: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Prim.Ref.swap",
-    "lean_st_ref_swap",
-    Array[_value_0, _value_1, _r_2, _a_3, _a_internal_hyg_1_4],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Prim.Ref.swap",
+      "lean_st_ref_swap",
+      Array[_value_0, _value_1, _r_2, _a_3, _a_internal_hyg_1_4],
+    )
+  };
+  value = _runtime.readRef(_r_2);
+  _runtime.writeRef(_r_2, Some(_a_3));
+  leanSTResult(value, _a_internal_hyg_1_4)
 }
 fun apply_f_Prim_Ref_swap_b4291ad63a(
   _runtime: mutable LeanExecution,
@@ -51,12 +57,18 @@ fun f_Prim_Ref_take_7505bf778c(
   _r_2: LeanValue,
   _a_internal_hyg_1_3: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Prim.Ref.take",
-    "lean_st_ref_take",
-    Array[_value_0, _value_1, _r_2, _a_internal_hyg_1_3],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Prim.Ref.take",
+      "lean_st_ref_take",
+      Array[_value_0, _value_1, _r_2, _a_internal_hyg_1_3],
+    )
+  };
+  value = _runtime.readRef(_r_2);
+  _runtime.writeRef(_r_2, None());
+  leanSTResult(value, _a_internal_hyg_1_3)
 }
 fun apply_f_Prim_Ref_take_7505bf778c(
   _runtime: mutable LeanExecution,
@@ -73,12 +85,17 @@ fun f_Prim_Ref_put_334aaf25b1(
   _a_3: LeanValue,
   _a_internal_hyg_1_4: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Prim.Ref.put",
-    "lean_st_ref_put",
-    Array[_value_0, _value_1, _r_2, _a_3, _a_internal_hyg_1_4],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Prim.Ref.put",
+      "lean_st_ref_put",
+      Array[_value_0, _value_1, _r_2, _a_3, _a_internal_hyg_1_4],
+    )
+  };
+  _runtime.writeRef(_r_2, Some(_a_3));
+  leanSTResult(LeanCtor(LeanTag.PUnit_unit, Array[]), _a_internal_hyg_1_4)
 }
 fun apply_f_Prim_Ref_put_334aaf25b1(
   _runtime: mutable LeanExecution,
@@ -101,12 +118,16 @@ fun f_Prim_Ref_get_ab668afddb(
   _r_2: LeanValue,
   _a_internal_hyg_1_3: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Prim.Ref.get",
-    "lean_st_ref_get",
-    Array[_value_0, _value_1, _r_2, _a_internal_hyg_1_3],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Prim.Ref.get",
+      "lean_st_ref_get",
+      Array[_value_0, _value_1, _r_2, _a_internal_hyg_1_3],
+    )
+  };
+  leanSTResult(_runtime.readRef(_r_2), _a_internal_hyg_1_3)
 }
 fun apply_f_Prim_Ref_get_ab668afddb(
   _runtime: mutable LeanExecution,
@@ -122,12 +143,16 @@ fun f_ST_Prim_mkRef_23b2310680(
   _a_2: LeanValue,
   _a_internal_hyg_1_3: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Prim.mkRef",
-    "lean_st_mk_ref",
-    Array[_value_0, _value_1, _a_2, _a_internal_hyg_1_3],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Prim.mkRef",
+      "lean_st_mk_ref",
+      Array[_value_0, _value_1, _a_2, _a_internal_hyg_1_3],
+    )
+  };
+  leanSTResult(_runtime.newRef(_a_2), _a_internal_hyg_1_3)
 }
 fun apply_f_ST_Prim_mkRef_23b2310680(
   _runtime: mutable LeanExecution,
@@ -141,12 +166,16 @@ fun f_Internal_Void_mk_e3317dd99f(
   _value_0: LeanValue,
   _x_1: LeanValue,
 ): LeanValue {
-  leanInvokePrimitive(
-    _runtime,
-    "ST.Internal.Void.mk",
-    "lean_void_mk",
-    Array[_value_0, _x_1],
-  )
+  // Statically selected port primitive; preserve instrumentation on request.
+  if (_runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      _runtime,
+      "ST.Internal.Void.mk",
+      "lean_void_mk",
+      Array[_value_0, _x_1],
+    )
+  };
+  LeanErased()
 }
 // "runST._redArg"
 fun f_runST_ce71f65deb(
@@ -156,11 +185,11 @@ fun f_runST_ce71f65deb(
   _x_2_2: LeanValue = f_Internal_Void_mk_e3317dd99f(
     _runtime,
     LeanErased(),
-    LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+    LeanCtor(LeanTag.PUnit_unit, Array[]),
   );
   _x_3_3: LeanValue = leanApply(_runtime, _x_0, Array[LeanErased(), _x_2_2]);
   leanTag(_x_3_3) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_4_4: LeanValue = leanField(_x_3_3, 0);
     _state_5_5: LeanValue = leanField(_x_3_3, 1);
     _val_4_4
@@ -185,12 +214,12 @@ fun f_Prim_Ref_modifyGetUnsafe_2ff4998ebf(
     _a_1_5,
   );
   leanTag(_x_2_6) match {
-  | "[\"ST\",\"Out\",\"mk\"]" ->
+  | LeanTag.ST_Out_mk ->
     _val_3_7: LeanValue = leanField(_x_2_6, 0);
     _state_4_8: LeanValue = leanField(_x_2_6, 1);
     _x_5_9: LeanValue = leanApply(_runtime, _f_4, Array[_val_3_7]);
     leanTag(_x_5_9) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_6_10: LeanValue = leanField(_x_5_9, 0);
       _snd_7_11: LeanValue = leanField(_x_5_9, 1);
       _x_8_12: LeanValue = f_Prim_Ref_put_334aaf25b1(
@@ -202,10 +231,10 @@ fun f_Prim_Ref_modifyGetUnsafe_2ff4998ebf(
         _state_4_8,
       );
       leanTag(_x_8_12) match {
-      | "[\"ST\",\"Out\",\"mk\"]" ->
+      | LeanTag.ST_Out_mk ->
         _val_9_13: LeanValue = leanField(_x_8_12, 0);
         _state_10_14: LeanValue = leanField(_x_8_12, 1);
-        LeanCtor("[\"ST\",\"Out\",\"mk\"]", Array[_fst_6_10, _state_10_14])
+        LeanCtor(LeanTag.ST_Out_mk, Array[_fst_6_10, _state_10_14])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")

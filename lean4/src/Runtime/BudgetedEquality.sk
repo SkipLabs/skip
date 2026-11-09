@@ -1,9 +1,7 @@
-// A deterministic, conservative budget for Skip values. Native Lean explicitly
-// permits sharing to affect whether this operation returns undef. We do not
-// inspect pointers: unfold both trees, charge composite nodes and string bytes,
-// and return undef before exact equality if that work does not fit the budget.
-// Definite answers always use the existing alpha/structural equality operation.
-// This may miss cache hits that native pointer sharing would make inexpensive.
+// Like native Lean, shared expression objects compare equal without consuming
+// the traversal budget. Otherwise charge composite nodes and string bytes and
+// return undef when that work does not fit. Definite answers use the existing
+// alpha/structural equality operation. Syntax metadata remains unsupported.
 mutable class LeanEqualityBudget{mutable remaining: LeanNat} {
   mutable fun consume(n: Int): Bool {
     cost = LeanNat::fromInt(n);
@@ -14,15 +12,15 @@ mutable class LeanEqualityBudget{mutable remaining: LeanNat} {
 
   mutable fun metadata(value: LeanValue): Bool {
     entries = value;
-    while (leanTag(entries) == "[\"List\",\"cons\"]") {
+    while (leanTag(entries) == LeanTag.List_cons) {
       if (!this.consume(1)) return false;
       data = leanField(leanField(entries, 0), 1);
       leanTag(data) match {
-      | "[\"Lean\",\"DataValue\",\"ofString\"]" ->
+      | LeanTag.DataValue_ofString ->
         if (!this.consume(leanText(leanField(data, 0)).bytes().size())) {
           return false
         }
-      | "[\"Lean\",\"DataValue\",\"ofSyntax\"]" ->
+      | LeanTag.DataValue_ofSyntax ->
         leanFail(
           "not implemented: syntax metadata in budgeted expression equality",
         )
@@ -50,30 +48,34 @@ fun leanBudgetedExprEqual(
   while (!pending.isEmpty() && !exhausted) {
     (left, right) = pending.pop();
     if (
+      leanSameObject(left, right).toInt() != 0 &&
+      leanTag(left) != LeanTag.Expr_mdata__impl
+    ) continue;
+    if (
       leanTag(left) != leanTag(right) ||
       leanExprData(left).and(4294967295) != leanExprData(right).and(4294967295)
     ) {
       return leanSTResult(
-        LeanCtor("[\"Lean\",\"LBool\",\"false\"]", Array[]),
+        LeanCtor(LeanTag.LBool_false, Array[]),
         world,
       )
     };
     leanTag(left) match {
-    | "[\"Lean\",\"Expr\",\"bvar\",\"_impl\"]"
-    | "[\"Lean\",\"Expr\",\"fvar\",\"_impl\"]"
-    | "[\"Lean\",\"Expr\",\"mvar\",\"_impl\"]"
-    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    | LeanTag.Expr_bvar__impl
+    | LeanTag.Expr_fvar__impl
+    | LeanTag.Expr_mvar__impl
+    | LeanTag.Expr_sort__impl ->
       void
-    | "[\"Lean\",\"Expr\",\"lit\",\"_impl\"]" ->
+    | LeanTag.Expr_lit__impl ->
       l = leanField(left, 1);
       r = leanField(right, 1);
       if (leanTag(l) != leanTag(r)) {
         return leanSTResult(
-          LeanCtor("[\"Lean\",\"LBool\",\"false\"]", Array[]),
+          LeanCtor(LeanTag.LBool_false, Array[]),
           world,
         )
       };
-      if (leanTag(l) == "[\"Lean\",\"Literal\",\"strVal\"]") {
+      if (leanTag(l) == LeanTag.Literal_strVal) {
         !exhausted =
           !budget.consume(leanText(leanField(l, 0)).bytes().size()) ||
           !budget.consume(leanText(leanField(r, 0)).bytes().size())
@@ -82,7 +84,7 @@ fun leanBudgetedExprEqual(
       !exhausted = !budget.consume(1);
       if (
         !exhausted &&
-        leanTag(left) == "[\"Lean\",\"Expr\",\"mdata\",\"_impl\"]"
+        leanTag(left) == LeanTag.Expr_mdata__impl
       ) {
         !exhausted =
           !budget.metadata(leanField(left, 1)) ||
@@ -95,10 +97,10 @@ fun leanBudgetedExprEqual(
       }
     }
   };
-  tag = if (exhausted) "[\"Lean\",\"LBool\",\"undef\"]" else if (
+  tag = if (exhausted) LeanTag.LBool_undef else if (
     leanExprEqual(runtime, a, b, binders)
-  ) "[\"Lean\",\"LBool\",\"true\"]" else {
-    "[\"Lean\",\"LBool\",\"false\"]"
+  ) LeanTag.LBool_true else {
+    LeanTag.LBool_false
   };
   leanSTResult(LeanCtor(tag, Array[]), world)
 }

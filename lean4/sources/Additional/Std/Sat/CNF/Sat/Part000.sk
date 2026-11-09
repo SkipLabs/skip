@@ -16,28 +16,28 @@ fun f_Clause_eval_spec_0_451d14bc02(
   _x_1_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"List\",\"nil\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-  | "[\"List\",\"cons\"]" ->
+  | LeanTag.List_nil -> LeanCtor(LeanTag.Bool_false, Array[])
+  | LeanTag.List_cons ->
     _head_3_2: LeanValue = leanField(_x_1_1, 0);
     _tail_4_3: LeanValue = leanField(_x_1_1, 1);
     leanTag(_head_3_2) match {
-    | "[\"Prod\",\"mk\"]" ->
+    | LeanTag.Prod_mk ->
       _fst_5_5: LeanValue = leanField(_head_3_2, 0);
       _snd_6_6: LeanValue = leanField(_head_3_2, 1);
       _x_7_7: LeanValue = leanApply(_runtime, _a_0, Array[_fst_5_5]);
       leanTag(_snd_6_6) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         leanTag(_x_7_7) match {
-        | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_false -> LeanCtor(LeanTag.Bool_true, Array[])
+        | LeanTag.Bool_true ->
           f_Clause_eval_spec_0_451d14bc02(_runtime, _a_0, _tail_4_3)
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         leanTag(_x_7_7) match {
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           f_Clause_eval_spec_0_451d14bc02(_runtime, _a_0, _tail_4_3)
-        | "[\"Bool\",\"true\"]" -> _x_7_7
+        | LeanTag.Bool_true -> _x_7_7
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
@@ -81,7 +81,7 @@ fun f_CNF_eval_spec_0_1ffe848256(
     _stop_3,
   );
   leanTag(_x_1_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_2_5: LeanValue = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
       _runtime,
       LeanErased(),
@@ -91,8 +91,8 @@ fun f_CNF_eval_spec_0_1ffe848256(
     );
     _x_3_6: LeanValue = f_CNF_Clause_eval_bf2e68ff3b(_runtime, _a_0, _x_2_5);
     leanTag(_x_3_6) match {
-    | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Bool_true ->
       _x_6_9: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
         _runtime,
         _i_2,
@@ -101,7 +101,7 @@ fun f_CNF_eval_spec_0_1ffe848256(
       f_CNF_eval_spec_0_1ffe848256(_runtime, _a_0, _as_1, _x_6_9, _stop_3)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Bool_false, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -130,15 +130,15 @@ fun f_Sat_CNF_eval_9520ff5c07(
   );
   _x_3_4: LeanValue = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
     _x_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Bool_true, Array[])
+  | LeanTag.Bool_true ->
     leanTag(_x_3_4) match {
-    | "[\"Bool\",\"false\"]" -> _x_3_4
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_false -> _x_3_4
+    | LeanTag.Bool_true ->
       _x_6_7: LeanValue = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(
         _runtime,
         _x_2_3,
@@ -151,8 +151,8 @@ fun f_Sat_CNF_eval_9520ff5c07(
         _x_6_7,
       );
       leanTag(_x_7_8) match {
-      | "[\"Bool\",\"false\"]" -> _x_3_4
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
+      | LeanTag.Bool_false -> _x_3_4
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Bool_false, Array[])
       | _ -> leanFail("non-exhaustive Lean case")
       }
     | _ -> leanFail("non-exhaustive Lean case")

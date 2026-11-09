@@ -30,10 +30,10 @@ fun f_Expr_instantiateLevelParamsCore_replaceFn_22f5a1ded3(
     _e_1,
   );
   leanTag(_x_1_2) match {
-  | "[\"Bool\",\"false\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_e_1])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Option_some, Array[_e_1])
+  | LeanTag.Bool_true ->
     leanTag(_e_1) match {
-    | "[\"Lean\",\"Expr\",\"const\",\"_impl\"]" ->
+    | LeanTag.Expr_const__impl ->
       _data_4: LeanValue = leanField(_e_1, 0);
       _declName_3_5: LeanValue = leanField(_e_1, 1);
       _us_4_6: LeanValue = leanField(_e_1, 2);
@@ -47,7 +47,7 @@ fun f_Expr_instantiateLevelParamsCore_replaceFn_22f5a1ded3(
         _runtime,
         _f_5_9,
         _us_4_6,
-        LeanCtor("[\"List\",\"nil\"]", Array[]),
+        LeanCtor(LeanTag.List_nil, Array[]),
       );
       _x_8_12: LeanValue = L4_Init_Util.f_ptrEqList_9b717c366c(
         _runtime,
@@ -55,17 +55,17 @@ fun f_Expr_instantiateLevelParamsCore_replaceFn_22f5a1ded3(
         _x_7_11,
       );
       leanTag(_x_8_12) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_9_13: LeanValue = L4_Lean_Expr.f_Expr_const_override_2c7139db35(
           _runtime,
           _declName_3_5,
           _x_7_11,
         );
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_9_13])
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_e_1])
+        LeanCtor(LeanTag.Option_some, Array[_x_9_13])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_some, Array[_e_1])
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"Lean\",\"Expr\",\"sort\",\"_impl\"]" ->
+    | LeanTag.Expr_sort__impl ->
       _data_7: LeanValue = leanField(_e_1, 0);
       _u_12_8: LeanValue = leanField(_e_1, 1);
       _x_13_16: LeanValue = L4_Lean_Level.f_Level_substParams_go_5a53038a1b(
@@ -89,16 +89,16 @@ fun f_Expr_instantiateLevelParamsCore_replaceFn_22f5a1ded3(
         _x_15_18,
       );
       leanTag(_x_16_19) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _x_17_20: LeanValue = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
           _runtime,
           _x_13_16,
         );
-        LeanCtor("[\"Option\",\"some\"]", Array[_x_17_20])
-      | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Option\",\"some\"]", Array[_e_1])
+        LeanCtor(LeanTag.Option_some, Array[_x_17_20])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.Option_some, Array[_e_1])
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | _ -> LeanCtor("[\"Option\",\"none\"]", Array[])
+    | _ -> LeanCtor(LeanTag.Option_none, Array[])
     }
   | _ -> leanFail("non-exhaustive Lean case")
   }

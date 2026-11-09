@@ -1,0 +1,65 @@
+fun parserPosition(value: LeanValue): JSON.Value {
+  if (leanTag(value) == LeanTag.Option_none) return JSON.Null();
+  JSON.IntNumber(leanNat(leanField(value, 0)).toInt())
+}
+
+fun parserSyntax(
+  runtime: mutable LeanExecution,
+  syntax: LeanValue,
+): JSON.Value {
+  fields: mutable Vector<JSON.Value> = mutable Vector[];
+  kind = leanTag(syntax) match {
+  | LeanTag.Syntax_missing -> "missing"
+  | LeanTag.Syntax_atom ->
+    fields.push(JSON.String(leanText(leanField(syntax, 1))));
+    "atom"
+  | LeanTag.Syntax_ident ->
+    fields.push(
+      JSON.String(
+        leanText(
+          L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+            runtime,
+            leanField(syntax, 2),
+            leanBool(true),
+          ),
+        ),
+      ),
+    );
+    "ident"
+  | LeanTag.Syntax_node ->
+    fields.push(
+      JSON.String(
+        leanText(
+          L4_Init_Data_ToString_Name.f_Lean_Name_toString_6e1cab481e(
+            runtime,
+            leanField(syntax, 1),
+            leanBool(true),
+          ),
+        ),
+      ),
+    );
+    for (child in leanArray(leanField(syntax, 2))) {
+      fields.push(parserSyntax(runtime, child))
+    };
+    "node"
+  | _ -> leanFail("invalid parser syntax")
+  };
+  JSON.Object[
+    "kind" => JSON.String(kind),
+    "fields" => JSON.Array(fields.chill()),
+    "start" => parserPosition(
+      L4_Init_Prelude.f_Lean_Syntax_getPos_bcd324592d(
+        runtime,
+        syntax,
+        leanBool(false),
+      ),
+    ),
+    "end" => parserPosition(
+      L4_Init_Prelude.f_Lean_Syntax_getTailPos_0d9b409820(
+        runtime,
+        syntax,
+        leanBool(false),
+      ),
+    ),
+  ]
+}

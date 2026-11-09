@@ -6,7 +6,7 @@ fun extensionProbe(): void {
   );
   assert(data.constants.isEmpty() && data.extensions.size() == 6);
   store = SKStore.Context::create{}.mclone();
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   leanInitializeMetaExtensions(runtime);
   count = runtime.refs.size();
   print_string("Extension registration references: " + count.toString());
@@ -40,8 +40,8 @@ fun extensionProbe(): void {
   );
   env = leanEnvironment(
     runtime,
-    LeanConstantsView("Init", constants),
-    LeanConstantsView("local", constants),
+    LeanConstantsView("Init", LeanConstantDirectory(constants)),
+    LeanConstantsView("local", LeanConstantDirectory(constants)),
     LeanUnavailable("imported environment header"),
     extensions.i0,
     extensions.i1,

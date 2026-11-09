@@ -7,7 +7,7 @@ fun f_Time_PlainDate_toTimestampWithZone_8acd9f87b9(
   _tz_1: LeanValue,
 ): LeanValue {
   leanTag(_tz_1) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_2: LeanValue = leanField(_tz_1, 0);
     _name_3: LeanValue = leanField(_tz_1, 1);
     _abbreviation_4: LeanValue = leanField(_tz_1, 2);
@@ -16,23 +16,23 @@ fun f_Time_PlainDate_toTimestampWithZone_8acd9f87b9(
       _runtime,
     );
     _ltt_10: LeanValue = LeanCtor(
-      "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+      LeanTag.Std_Time_TimeZone_LocalTimeType_mk,
       Array[
         _offset_2,
         _isDST_5,
         _abbreviation_4,
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"wall\"]",
+          LeanTag.Std_Time_TimeZone_StdWall_wall,
           Array[],
         ),
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"local\"]",
+          LeanTag.Std_Time_TimeZone_UTLocal_local,
           Array[],
         ),
         _name_3,
       ],
     );
-    _x_5_11: LeanValue = LeanScalar("nat", "0");
+    _x_5_11: LeanValue = LeanNatLiterals.n0;
     _x_6_12: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
@@ -41,15 +41,15 @@ fun f_Time_PlainDate_toTimestampWithZone_8acd9f87b9(
     _wt_15: LeanValue = L4_Std_Time_DateTime_PlainDateTime.f_Time_PlainDateTime_toWallTime_3d27a30c84(
       _runtime,
       LeanCtor(
-        "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]",
+        LeanTag.Std_Time_PlainDateTime_mk,
         Array[_dt_0, _x_1_6],
       ),
     );
     _ltt_16: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_findLocalTimeTypeForWallTime_d9b0e52dd4(
       _runtime,
       LeanCtor(
-        "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]",
-        Array[_ltt_10, _x_6_12, LeanCtor("[\"Option\",\"none\"]", Array[])],
+        LeanTag.Std_Time_TimeZone_ZoneRules_mk,
+        Array[_ltt_10, _x_6_12, LeanCtor(LeanTag.Option_none, Array[])],
       ),
       _wt_15,
     );
@@ -58,13 +58,13 @@ fun f_Time_PlainDate_toTimestampWithZone_8acd9f87b9(
       _ltt_16,
     );
     leanTag(_tz_17) match {
-    | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+    | LeanTag.Std_Time_TimeZone_mk ->
       _offset_18: LeanValue = leanField(_tz_17, 0);
       _name_19: LeanValue = leanField(_tz_17, 1);
       _abbreviation_20: LeanValue = leanField(_tz_17, 2);
       _isDST_21: LeanValue = leanField(_tz_17, 3);
       leanTag(_wt_15) match {
-      | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+      | LeanTag.Std_Time_Duration_mk ->
         _second_22: LeanValue = leanField(_wt_15, 0);
         _nano_23: LeanValue = leanField(_wt_15, 1);
         _proof_24: LeanValue = leanField(_wt_15, 2);
@@ -82,7 +82,7 @@ fun f_Time_PlainDate_toTimestampWithZone_8acd9f87b9(
         );
         _x_13_29: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
           _runtime,
-          LeanScalar("nat", "1000000000"),
+          LeanNatLiterals.n1000000000,
         );
         _x_14_30: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
           _runtime,
@@ -130,7 +130,7 @@ fun f_Time_DateTime_now_de0a8b03b5(
     _a_1_0,
   );
   leanTag(_x_2_1) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_5_6: LeanValue = L4_Std_Time_Zoned_Database.f_Time_Database_defaultGetLocalZoneRules_5dc652306e(
@@ -138,7 +138,7 @@ fun f_Time_DateTime_now_de0a8b03b5(
       _a_4_3,
     );
     leanTag(_x_5_6) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_6_7: LeanValue = leanField(_x_5_6, 0);
       _a_7_8: LeanValue = leanField(_x_5_6, 1);
       _tz_11: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_timezoneAt_cd3c48a9d5(
@@ -157,25 +157,25 @@ fun f_Time_DateTime_now_de0a8b03b5(
         _f_8_12,
       );
       LeanCtor(
-        "[\"EST\",\"Out\",\"ok\"]",
+        LeanTag.EST_Out_ok,
         Array[
           LeanCtor(
-            "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]",
+            LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk,
             Array[_x_9_13, _a_3_2, _a_6_7, _tz_11],
           ),
           _a_7_8,
         ],
       )
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_12_9: LeanValue = leanField(_x_5_6, 0);
       _a_13_10: LeanValue = leanField(_x_5_6, 1);
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_12_9, _a_13_10])
+      LeanCtor(LeanTag.EST_Out_error, Array[_a_12_9, _a_13_10])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_15_4: LeanValue = leanField(_x_2_1, 0);
     _a_16_5: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_15_4, _a_16_5])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_15_4, _a_16_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -191,7 +191,7 @@ fun f_Time_PlainDate_toTimestamp_3835815755(
   _wt_4: LeanValue = L4_Std_Time_DateTime_PlainDateTime.f_Time_PlainDateTime_toWallTime_3d27a30c84(
     _runtime,
     LeanCtor(
-      "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]",
+      LeanTag.Std_Time_PlainDateTime_mk,
       Array[_dt_0, _x_1_2],
     ),
   );
@@ -205,19 +205,19 @@ fun f_Time_PlainDate_toTimestamp_3835815755(
     _ltt_5,
   );
   leanTag(_tz_6) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_7: LeanValue = leanField(_tz_6, 0);
     _name_8: LeanValue = leanField(_tz_6, 1);
     _abbreviation_9: LeanValue = leanField(_tz_6, 2);
     _isDST_10: LeanValue = leanField(_tz_6, 3);
     leanTag(_wt_4) match {
-    | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+    | LeanTag.Std_Time_Duration_mk ->
       _second_11: LeanValue = leanField(_wt_4, 0);
       _nano_12: LeanValue = leanField(_wt_4, 1);
       _proof_13: LeanValue = leanField(_wt_4, 2);
       _x_4_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_5_16: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
         _runtime,
@@ -229,7 +229,7 @@ fun f_Time_PlainDate_toTimestamp_3835815755(
       );
       _x_8_19: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1000000000"),
+        LeanNatLiterals.n1000000000,
       );
       _x_9_20: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
         _runtime,
@@ -272,29 +272,29 @@ fun f_Time_PlainDateTime_toTimestampWithZone_21e2552583(
   _tz_1: LeanValue,
 ): LeanValue {
   leanTag(_tz_1) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_2: LeanValue = leanField(_tz_1, 0);
     _name_3: LeanValue = leanField(_tz_1, 1);
     _abbreviation_4: LeanValue = leanField(_tz_1, 2);
     _isDST_5: LeanValue = leanField(_tz_1, 3);
     _ltt_8: LeanValue = LeanCtor(
-      "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+      LeanTag.Std_Time_TimeZone_LocalTimeType_mk,
       Array[
         _offset_2,
         _isDST_5,
         _abbreviation_4,
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"wall\"]",
+          LeanTag.Std_Time_TimeZone_StdWall_wall,
           Array[],
         ),
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"local\"]",
+          LeanTag.Std_Time_TimeZone_UTLocal_local,
           Array[],
         ),
         _name_3,
       ],
     );
-    _x_3_9: LeanValue = LeanScalar("nat", "0");
+    _x_3_9: LeanValue = LeanNatLiterals.n0;
     _x_4_10: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
@@ -307,8 +307,8 @@ fun f_Time_PlainDateTime_toTimestampWithZone_21e2552583(
     _ltt_14: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_findLocalTimeTypeForWallTime_d9b0e52dd4(
       _runtime,
       LeanCtor(
-        "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]",
-        Array[_ltt_8, _x_4_10, LeanCtor("[\"Option\",\"none\"]", Array[])],
+        LeanTag.Std_Time_TimeZone_ZoneRules_mk,
+        Array[_ltt_8, _x_4_10, LeanCtor(LeanTag.Option_none, Array[])],
       ),
       _wt_13,
     );
@@ -317,13 +317,13 @@ fun f_Time_PlainDateTime_toTimestampWithZone_21e2552583(
       _ltt_14,
     );
     leanTag(_tz_15) match {
-    | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+    | LeanTag.Std_Time_TimeZone_mk ->
       _offset_16: LeanValue = leanField(_tz_15, 0);
       _name_17: LeanValue = leanField(_tz_15, 1);
       _abbreviation_18: LeanValue = leanField(_tz_15, 2);
       _isDST_19: LeanValue = leanField(_tz_15, 3);
       leanTag(_wt_13) match {
-      | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+      | LeanTag.Std_Time_Duration_mk ->
         _second_20: LeanValue = leanField(_wt_13, 0);
         _nano_21: LeanValue = leanField(_wt_13, 1);
         _proof_22: LeanValue = leanField(_wt_13, 2);
@@ -341,7 +341,7 @@ fun f_Time_PlainDateTime_toTimestampWithZone_21e2552583(
         );
         _x_11_27: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
           _runtime,
-          LeanScalar("nat", "1000000000"),
+          LeanNatLiterals.n1000000000,
         );
         _x_12_28: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
           _runtime,
@@ -389,7 +389,7 @@ fun f_Time_PlainDate_now_24f9ff8661(
     _a_1_0,
   );
   leanTag(_x_2_1) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_5_6: LeanValue = L4_Std_Time_Zoned_Database.f_Time_Database_defaultGetLocalZoneRules_5dc652306e(
@@ -397,7 +397,7 @@ fun f_Time_PlainDate_now_24f9ff8661(
       _a_4_3,
     );
     leanTag(_x_5_6) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_6_7: LeanValue = leanField(_x_5_6, 0);
       _a_7_8: LeanValue = leanField(_x_5_6, 1);
       _x_8_11: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_findLocalTimeTypeForTimestamp_91a48f168c(
@@ -410,23 +410,23 @@ fun f_Time_PlainDate_now_24f9ff8661(
         _x_8_11,
       );
       leanTag(_x_9_12) match {
-      | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+      | LeanTag.Std_Time_TimeZone_mk ->
         _offset_13: LeanValue = leanField(_x_9_12, 0);
         _name_14: LeanValue = leanField(_x_9_12, 1);
         _abbreviation_15: LeanValue = leanField(_x_9_12, 2);
         _isDST_16: LeanValue = leanField(_x_9_12, 3);
         leanTag(_a_3_2) match {
-        | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+        | LeanTag.Std_Time_Duration_mk ->
           _second_17: LeanValue = leanField(_a_3_2, 0);
           _nano_18: LeanValue = leanField(_a_3_2, 1);
           _proof_19: LeanValue = leanField(_a_3_2, 2);
           _x_11_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "0"),
+            LeanNatLiterals.n0,
           );
           _x_13_23: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "1000000000"),
+            LeanNatLiterals.n1000000000,
           );
           _x_14_24: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
             _runtime,
@@ -462,26 +462,26 @@ fun f_Time_PlainDate_now_24f9ff8661(
             _x_17_29,
           );
           leanTag(_x_18_30) match {
-          | "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]" ->
+          | LeanTag.Std_Time_PlainDateTime_mk ->
             _date_31: LeanValue = leanField(_x_18_30, 0);
             _time_32: LeanValue = leanField(_x_18_30, 1);
-            LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_date_31, _a_7_8])
+            LeanCtor(LeanTag.EST_Out_ok, Array[_date_31, _a_7_8])
           | _ -> leanFail("non-exhaustive Lean case")
           }
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_20_9: LeanValue = leanField(_x_5_6, 0);
       _a_21_10: LeanValue = leanField(_x_5_6, 1);
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_20_9, _a_21_10])
+      LeanCtor(LeanTag.EST_Out_error, Array[_a_20_9, _a_21_10])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_23_4: LeanValue = leanField(_x_2_1, 0);
     _a_24_5: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_23_4, _a_24_5])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_23_4, _a_24_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -503,7 +503,7 @@ fun f_Time_DateTime_of_5067dd296b(
     _a_1_2,
   );
   leanTag(_x_3_4) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_4_5: LeanValue = leanField(_x_3_4, 0);
     _a_5_6: LeanValue = leanField(_x_3_4, 1);
     _wt_9: LeanValue = L4_Std_Time_DateTime_PlainDateTime.f_Time_PlainDateTime_toWallTime_3d27a30c84(
@@ -520,13 +520,13 @@ fun f_Time_DateTime_of_5067dd296b(
       _ltt_10,
     );
     leanTag(_tz_11) match {
-    | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+    | LeanTag.Std_Time_TimeZone_mk ->
       _offset_12: LeanValue = leanField(_tz_11, 0);
       _name_13: LeanValue = leanField(_tz_11, 1);
       _abbreviation_14: LeanValue = leanField(_tz_11, 2);
       _isDST_15: LeanValue = leanField(_tz_11, 3);
       leanTag(_wt_9) match {
-      | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+      | LeanTag.Std_Time_Duration_mk ->
         _second_16: LeanValue = leanField(_wt_9, 0);
         _nano_17: LeanValue = leanField(_wt_9, 1);
         _proof_18: LeanValue = leanField(_wt_9, 2);
@@ -537,7 +537,7 @@ fun f_Time_DateTime_of_5067dd296b(
         );
         _x_8_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
           _runtime,
-          LeanScalar("nat", "0"),
+          LeanNatLiterals.n0,
         );
         _x_9_22: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
           _runtime,
@@ -549,7 +549,7 @@ fun f_Time_DateTime_of_5067dd296b(
         );
         _x_12_25: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
           _runtime,
-          LeanScalar("nat", "1000000000"),
+          LeanNatLiterals.n1000000000,
         );
         _x_13_26: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
           _runtime,
@@ -581,10 +581,10 @@ fun f_Time_DateTime_of_5067dd296b(
           _x_15_30,
         );
         LeanCtor(
-          "[\"EST\",\"Out\",\"ok\"]",
+          LeanTag.EST_Out_ok,
           Array[
             LeanCtor(
-              "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]",
+              LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk,
               Array[_x_6_19, _x_16_31, _a_4_5, _tz_11],
             ),
             _a_5_6,
@@ -594,10 +594,10 @@ fun f_Time_DateTime_of_5067dd296b(
       }
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_19_7: LeanValue = leanField(_x_3_4, 0);
     _a_20_8: LeanValue = leanField(_x_3_4, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_19_7, _a_20_8])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_19_7, _a_20_8])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -607,7 +607,7 @@ fun f_PlainDateTime_now_closed_0_bc6ff42def(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Std.Time.DateTime.of._lam_0"
@@ -634,7 +634,7 @@ fun f_Time_PlainDateTime_now_dcc1e05f2f(
     _a_1_0,
   );
   leanTag(_x_2_1) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_5_6: LeanValue = L4_Std_Time_Zoned_Database.f_Time_Database_defaultGetLocalZoneRules_5dc652306e(
@@ -642,7 +642,7 @@ fun f_Time_PlainDateTime_now_dcc1e05f2f(
       _a_4_3,
     );
     leanTag(_x_5_6) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_6_7: LeanValue = leanField(_x_5_6, 0);
       _a_7_8: LeanValue = leanField(_x_5_6, 1);
       _x_8_11: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_findLocalTimeTypeForTimestamp_91a48f168c(
@@ -655,23 +655,23 @@ fun f_Time_PlainDateTime_now_dcc1e05f2f(
         _x_8_11,
       );
       leanTag(_x_9_12) match {
-      | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+      | LeanTag.Std_Time_TimeZone_mk ->
         _offset_13: LeanValue = leanField(_x_9_12, 0);
         _name_14: LeanValue = leanField(_x_9_12, 1);
         _abbreviation_15: LeanValue = leanField(_x_9_12, 2);
         _isDST_16: LeanValue = leanField(_x_9_12, 3);
         leanTag(_a_3_2) match {
-        | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+        | LeanTag.Std_Time_Duration_mk ->
           _second_17: LeanValue = leanField(_a_3_2, 0);
           _nano_18: LeanValue = leanField(_a_3_2, 1);
           _proof_19: LeanValue = leanField(_a_3_2, 2);
           _x_11_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "0"),
+            LeanNatLiterals.n0,
           );
           _x_13_23: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "1000000000"),
+            LeanNatLiterals.n1000000000,
           );
           _x_14_24: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
             _runtime,
@@ -706,21 +706,21 @@ fun f_Time_PlainDateTime_now_dcc1e05f2f(
             _runtime,
             _x_17_29,
           );
-          LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_x_18_30, _a_7_8])
+          LeanCtor(LeanTag.EST_Out_ok, Array[_x_18_30, _a_7_8])
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_20_9: LeanValue = leanField(_x_5_6, 0);
       _a_21_10: LeanValue = leanField(_x_5_6, 1);
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_20_9, _a_21_10])
+      LeanCtor(LeanTag.EST_Out_error, Array[_a_20_9, _a_21_10])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_23_4: LeanValue = leanField(_x_2_1, 0);
     _a_24_5: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_23_4, _a_24_5])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_23_4, _a_24_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -730,7 +730,7 @@ fun f_Time_DateTime_toPlainDate_be8d77f224(
   _dt_0: LeanValue,
 ): LeanValue {
   leanTag(_dt_0) match {
-  | "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]" ->
+  | LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk ->
     _date_1: LeanValue = leanField(_dt_0, 0);
     _timestamp_2: LeanValue = leanField(_dt_0, 1);
     _rules_3: LeanValue = leanField(_dt_0, 2);
@@ -741,7 +741,7 @@ fun f_Time_DateTime_toPlainDate_be8d77f224(
       _date_1,
     );
     leanTag(_x_1_5) match {
-    | "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]" ->
+    | LeanTag.Std_Time_PlainDateTime_mk ->
       _date_6: LeanValue = leanField(_x_1_5, 0);
       _time_7: LeanValue = leanField(_x_1_5, 1);
       _date_6
@@ -756,7 +756,7 @@ fun f_Time_DateTime_toPlainTime_a3b5e2eb5a(
   _dt_0: LeanValue,
 ): LeanValue {
   leanTag(_dt_0) match {
-  | "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]" ->
+  | LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk ->
     _date_1: LeanValue = leanField(_dt_0, 0);
     _timestamp_2: LeanValue = leanField(_dt_0, 1);
     _rules_3: LeanValue = leanField(_dt_0, 2);
@@ -767,7 +767,7 @@ fun f_Time_DateTime_toPlainTime_a3b5e2eb5a(
       _date_1,
     );
     leanTag(_x_1_5) match {
-    | "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]" ->
+    | LeanTag.Std_Time_PlainDateTime_mk ->
       _date_6: LeanValue = leanField(_x_1_5, 0);
       _time_7: LeanValue = leanField(_x_1_5, 1);
       _time_7
@@ -786,7 +786,7 @@ fun f_Time_DateTime_ofLocalDate_b0eca9ca91(
     _runtime,
   );
   _x_2_3: LeanValue = LeanCtor(
-    "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]",
+    LeanTag.Std_Time_PlainDateTime_mk,
     Array[_pd_0, _x_1_2],
   );
   _wt_4: LeanValue = L4_Std_Time_DateTime_PlainDateTime.f_Time_PlainDateTime_toWallTime_3d27a30c84(
@@ -803,13 +803,13 @@ fun f_Time_DateTime_ofLocalDate_b0eca9ca91(
     _ltt_5,
   );
   leanTag(_tz_6) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_7: LeanValue = leanField(_tz_6, 0);
     _name_8: LeanValue = leanField(_tz_6, 1);
     _abbreviation_9: LeanValue = leanField(_tz_6, 2);
     _isDST_10: LeanValue = leanField(_tz_6, 3);
     leanTag(_wt_4) match {
-    | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+    | LeanTag.Std_Time_Duration_mk ->
       _second_11: LeanValue = leanField(_wt_4, 0);
       _nano_12: LeanValue = leanField(_wt_4, 1);
       _proof_13: LeanValue = leanField(_wt_4, 2);
@@ -825,7 +825,7 @@ fun f_Time_DateTime_ofLocalDate_b0eca9ca91(
       );
       _x_6_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_7_18: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
         _runtime,
@@ -837,7 +837,7 @@ fun f_Time_DateTime_ofLocalDate_b0eca9ca91(
       );
       _x_10_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1000000000"),
+        LeanNatLiterals.n1000000000,
       );
       _x_11_22: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
         _runtime,
@@ -869,7 +869,7 @@ fun f_Time_DateTime_ofLocalDate_b0eca9ca91(
         _x_13_26,
       );
       LeanCtor(
-        "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]",
+        LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk,
         Array[_x_4_15, _x_14_27, _zr_1, _tz_6],
       )
     | _ -> leanFail("non-exhaustive Lean case")
@@ -911,19 +911,19 @@ fun f_Time_PlainDateTime_toTimestamp_9461b91583(
     _ltt_3,
   );
   leanTag(_tz_4) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_5: LeanValue = leanField(_tz_4, 0);
     _name_6: LeanValue = leanField(_tz_4, 1);
     _abbreviation_7: LeanValue = leanField(_tz_4, 2);
     _isDST_8: LeanValue = leanField(_tz_4, 3);
     leanTag(_wt_2) match {
-    | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+    | LeanTag.Std_Time_Duration_mk ->
       _second_9: LeanValue = leanField(_wt_2, 0);
       _nano_10: LeanValue = leanField(_wt_2, 1);
       _proof_11: LeanValue = leanField(_wt_2, 2);
       _x_2_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_3_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(
         _runtime,
@@ -935,7 +935,7 @@ fun f_Time_PlainDateTime_toTimestamp_9461b91583(
       );
       _x_6_17: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1000000000"),
+        LeanNatLiterals.n1000000000,
       );
       _x_7_18: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
         _runtime,
@@ -978,7 +978,7 @@ fun f_DateTime_ofLocalDateWithZone_closed_0_d6a32a389d(
   L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
     _runtime,
     LeanErased(),
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Std.Time.DateTime.now._lam_0"
@@ -989,23 +989,23 @@ fun f_DateTime_now_lam_0_256154ed42(
   _x_2_2: LeanValue,
 ): LeanValue {
   leanTag(_tz_0) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_3: LeanValue = leanField(_tz_0, 0);
     _name_4: LeanValue = leanField(_tz_0, 1);
     _abbreviation_5: LeanValue = leanField(_tz_0, 2);
     _isDST_6: LeanValue = leanField(_tz_0, 3);
     leanTag(_a_1_1) match {
-    | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+    | LeanTag.Std_Time_Duration_mk ->
       _second_7: LeanValue = leanField(_a_1_1, 0);
       _nano_8: LeanValue = leanField(_a_1_1, 1);
       _proof_9: LeanValue = leanField(_a_1_1, 2);
       _x_4_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _x_6_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1000000000"),
+        LeanNatLiterals.n1000000000,
       );
       _x_7_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
         _runtime,
@@ -1058,7 +1058,7 @@ fun f_Time_DateTime_ofLocalDateWithZone_62ef063a97(
   _zr_1: LeanValue,
 ): LeanValue {
   leanTag(_zr_1) match {
-  | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+  | LeanTag.Std_Time_TimeZone_mk ->
     _offset_2: LeanValue = leanField(_zr_1, 0);
     _name_3: LeanValue = leanField(_zr_1, 1);
     _abbreviation_4: LeanValue = leanField(_zr_1, 2);
@@ -1067,35 +1067,35 @@ fun f_Time_DateTime_ofLocalDateWithZone_62ef063a97(
       _runtime,
     );
     _x_2_7: LeanValue = LeanCtor(
-      "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]",
+      LeanTag.Std_Time_PlainDateTime_mk,
       Array[_pd_0, _x_1_6],
     );
     _ltt_10: LeanValue = LeanCtor(
-      "[\"Std\",\"Time\",\"TimeZone\",\"LocalTimeType\",\"mk\"]",
+      LeanTag.Std_Time_TimeZone_LocalTimeType_mk,
       Array[
         _offset_2,
         _isDST_5,
         _abbreviation_4,
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"StdWall\",\"wall\"]",
+          LeanTag.Std_Time_TimeZone_StdWall_wall,
           Array[],
         ),
         LeanCtor(
-          "[\"Std\",\"Time\",\"TimeZone\",\"UTLocal\",\"local\"]",
+          LeanTag.Std_Time_TimeZone_UTLocal_local,
           Array[],
         ),
         _name_3,
       ],
     );
-    _x_5_11: LeanValue = LeanScalar("nat", "0");
+    _x_5_11: LeanValue = LeanNatLiterals.n0;
     _x_6_12: LeanValue = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
       _runtime,
       LeanErased(),
       _x_5_11,
     );
     _x_8_14: LeanValue = LeanCtor(
-      "[\"Std\",\"Time\",\"TimeZone\",\"ZoneRules\",\"mk\"]",
-      Array[_ltt_10, _x_6_12, LeanCtor("[\"Option\",\"none\"]", Array[])],
+      LeanTag.Std_Time_TimeZone_ZoneRules_mk,
+      Array[_ltt_10, _x_6_12, LeanCtor(LeanTag.Option_none, Array[])],
     );
     _wt_15: LeanValue = L4_Std_Time_DateTime_PlainDateTime.f_Time_PlainDateTime_toWallTime_3d27a30c84(
       _runtime,
@@ -1111,13 +1111,13 @@ fun f_Time_DateTime_ofLocalDateWithZone_62ef063a97(
       _ltt_16,
     );
     leanTag(_tz_17) match {
-    | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+    | LeanTag.Std_Time_TimeZone_mk ->
       _offset_18: LeanValue = leanField(_tz_17, 0);
       _name_19: LeanValue = leanField(_tz_17, 1);
       _abbreviation_20: LeanValue = leanField(_tz_17, 2);
       _isDST_21: LeanValue = leanField(_tz_17, 3);
       leanTag(_wt_15) match {
-      | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+      | LeanTag.Std_Time_Duration_mk ->
         _second_22: LeanValue = leanField(_wt_15, 0);
         _nano_23: LeanValue = leanField(_wt_15, 1);
         _proof_24: LeanValue = leanField(_wt_15, 2);
@@ -1145,7 +1145,7 @@ fun f_Time_DateTime_ofLocalDateWithZone_62ef063a97(
         );
         _x_15_31: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
           _runtime,
-          LeanScalar("nat", "1000000000"),
+          LeanNatLiterals.n1000000000,
         );
         _x_16_32: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
           _runtime,
@@ -1177,7 +1177,7 @@ fun f_Time_DateTime_ofLocalDateWithZone_62ef063a97(
           _x_18_36,
         );
         LeanCtor(
-          "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]",
+          LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk,
           Array[_x_10_26, _x_19_37, _x_8_14, _tz_17],
         )
       | _ -> leanFail("non-exhaustive Lean case")
@@ -1197,7 +1197,7 @@ fun f_Time_PlainTime_now_8f7fd35ca3(
     _a_1_0,
   );
   leanTag(_x_2_1) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_2: LeanValue = leanField(_x_2_1, 0);
     _a_4_3: LeanValue = leanField(_x_2_1, 1);
     _x_5_6: LeanValue = L4_Std_Time_Zoned_Database.f_Time_Database_defaultGetLocalZoneRules_5dc652306e(
@@ -1205,7 +1205,7 @@ fun f_Time_PlainTime_now_8f7fd35ca3(
       _a_4_3,
     );
     leanTag(_x_5_6) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_6_7: LeanValue = leanField(_x_5_6, 0);
       _a_7_8: LeanValue = leanField(_x_5_6, 1);
       _x_8_11: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_findLocalTimeTypeForTimestamp_91a48f168c(
@@ -1218,23 +1218,23 @@ fun f_Time_PlainTime_now_8f7fd35ca3(
         _x_8_11,
       );
       leanTag(_x_9_12) match {
-      | "[\"Std\",\"Time\",\"TimeZone\",\"mk\"]" ->
+      | LeanTag.Std_Time_TimeZone_mk ->
         _offset_13: LeanValue = leanField(_x_9_12, 0);
         _name_14: LeanValue = leanField(_x_9_12, 1);
         _abbreviation_15: LeanValue = leanField(_x_9_12, 2);
         _isDST_16: LeanValue = leanField(_x_9_12, 3);
         leanTag(_a_3_2) match {
-        | "[\"Std\",\"Time\",\"Duration\",\"mk\"]" ->
+        | LeanTag.Std_Time_Duration_mk ->
           _second_17: LeanValue = leanField(_a_3_2, 0);
           _nano_18: LeanValue = leanField(_a_3_2, 1);
           _proof_19: LeanValue = leanField(_a_3_2, 2);
           _x_11_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "0"),
+            LeanNatLiterals.n0,
           );
           _x_13_23: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
             _runtime,
-            LeanScalar("nat", "1000000000"),
+            LeanNatLiterals.n1000000000,
           );
           _x_14_24: LeanValue = L4_Init_Data_Int_Basic.f_Int_mul_9ac1540172(
             _runtime,
@@ -1270,26 +1270,26 @@ fun f_Time_PlainTime_now_8f7fd35ca3(
             _x_17_29,
           );
           leanTag(_x_18_30) match {
-          | "[\"Std\",\"Time\",\"PlainDateTime\",\"mk\"]" ->
+          | LeanTag.Std_Time_PlainDateTime_mk ->
             _date_31: LeanValue = leanField(_x_18_30, 0);
             _time_32: LeanValue = leanField(_x_18_30, 1);
-            LeanCtor("[\"EST\",\"Out\",\"ok\"]", Array[_time_32, _a_7_8])
+            LeanCtor(LeanTag.EST_Out_ok, Array[_time_32, _a_7_8])
           | _ -> leanFail("non-exhaustive Lean case")
           }
         | _ -> leanFail("non-exhaustive Lean case")
         }
       | _ -> leanFail("non-exhaustive Lean case")
       }
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_20_9: LeanValue = leanField(_x_5_6, 0);
       _a_21_10: LeanValue = leanField(_x_5_6, 1);
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_20_9, _a_21_10])
+      LeanCtor(LeanTag.EST_Out_error, Array[_a_20_9, _a_21_10])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_23_4: LeanValue = leanField(_x_2_1, 0);
     _a_24_5: LeanValue = leanField(_x_2_1, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_23_4, _a_24_5])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_23_4, _a_24_5])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1304,7 +1304,7 @@ fun f_Time_DateTime_nowAt_3684a44803(
     _a_1_1,
   );
   leanTag(_x_2_2) match {
-  | "[\"EST\",\"Out\",\"ok\"]" ->
+  | LeanTag.EST_Out_ok ->
     _a_3_3: LeanValue = leanField(_x_2_2, 0);
     _a_4_4: LeanValue = leanField(_x_2_2, 1);
     _x_5_7: LeanValue = L4_Std_Time_Zoned_Database.f_Time_Database_defaultGetZoneRules_c68caa47dc(
@@ -1313,7 +1313,7 @@ fun f_Time_DateTime_nowAt_3684a44803(
       _a_4_4,
     );
     leanTag(_x_5_7) match {
-    | "[\"EST\",\"Out\",\"ok\"]" ->
+    | LeanTag.EST_Out_ok ->
       _a_6_8: LeanValue = leanField(_x_5_7, 0);
       _a_7_9: LeanValue = leanField(_x_5_7, 1);
       _tz_12: LeanValue = L4_Std_Time_Zoned_ZoneRules.f_TimeZone_ZoneRules_timezoneAt_cd3c48a9d5(
@@ -1332,25 +1332,25 @@ fun f_Time_DateTime_nowAt_3684a44803(
         _f_8_13,
       );
       LeanCtor(
-        "[\"EST\",\"Out\",\"ok\"]",
+        LeanTag.EST_Out_ok,
         Array[
           LeanCtor(
-            "[\"_private\",\"Std\",\"Time\",\"DateTime\",0,\"Std\",\"Time\",\"DateTime\",\"mk\"]",
+            LeanTag.Private_Std_Time_DateTime_0_Std_Time_DateTime_mk,
             Array[_x_9_14, _a_3_3, _a_6_8, _tz_12],
           ),
           _a_7_9,
         ],
       )
-    | "[\"EST\",\"Out\",\"error\"]" ->
+    | LeanTag.EST_Out_error ->
       _a_12_10: LeanValue = leanField(_x_5_7, 0);
       _a_13_11: LeanValue = leanField(_x_5_7, 1);
-      LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_12_10, _a_13_11])
+      LeanCtor(LeanTag.EST_Out_error, Array[_a_12_10, _a_13_11])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"EST\",\"Out\",\"error\"]" ->
+  | LeanTag.EST_Out_error ->
     _a_15_5: LeanValue = leanField(_x_2_2, 0);
     _a_16_6: LeanValue = leanField(_x_2_2, 1);
-    LeanCtor("[\"EST\",\"Out\",\"error\"]", Array[_a_15_5, _a_16_6])
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_15_5, _a_16_6])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1367,7 +1367,7 @@ fun f_PlainDateTime_now_closed_1_ca2d42fddc(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1000000000"),
+    LeanNatLiterals.n1000000000,
   )
 }
 

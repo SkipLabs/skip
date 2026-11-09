@@ -11,25 +11,25 @@ fun f_add_match_3_splitter_7935773a14(
   _h_3_5: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Dyadic\",\"zero\"]" -> leanApply(_runtime, _h_1_3, Array[_y_2_2])
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> leanApply(_runtime, _h_1_3, Array[_y_2_2])
+  | LeanTag.Dyadic_ofOdd ->
     _n_4_6: LeanValue = leanField(_x_1_1, 0);
     _k_5_7: LeanValue = leanField(_x_1_1, 1);
     _hn_6_8: LeanValue = leanField(_x_1_1, 2);
     leanTag(_y_2_2) match {
-    | "[\"Dyadic\",\"zero\"]" ->
+    | LeanTag.Dyadic_zero ->
       leanApply(
         _runtime,
         _h_2_4,
         Array[
           LeanCtor(
-            "[\"Dyadic\",\"ofOdd\"]",
+            LeanTag.Dyadic_ofOdd,
             Array[_n_4_6, _k_5_7, LeanErased()],
           ),
           LeanErased(),
         ],
       )
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_ofOdd ->
       _n_9_10: LeanValue = leanField(_y_2_2, 0);
       _k_10_11: LeanValue = leanField(_y_2_2, 1);
       _hn_11_12: LeanValue = leanField(_y_2_2, 2);
@@ -59,7 +59,7 @@ fun f_Dyadic_pow_closed_1_2adf1ec08a(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "1"),
+    LeanNatLiterals.n1,
   )
 }
 // "Dyadic.instIntCast"
@@ -80,7 +80,7 @@ fun f_Rat_toDyadic_78fc8284fe(
 ): LeanValue {
   _intZero_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _isNeg_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -88,9 +88,9 @@ fun f_Rat_toDyadic_78fc8284fe(
     _intZero_3,
   );
   leanTag(_isNeg_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     leanTag(_x_0) match {
-    | "[\"Rat\",\"mk'\"]" ->
+    | LeanTag.Rat_mk_ ->
       _num_5: LeanValue = leanField(_x_0, 0);
       _den_6: LeanValue = leanField(_x_0, 1);
       _den_nz_7: LeanValue = leanField(_x_0, 2);
@@ -116,9 +116,9 @@ fun f_Rat_toDyadic_78fc8284fe(
       f_Dyadic_ofIntWithPrec_fdcf95431a(_runtime, _x_4_12, _prec_1)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     leanTag(_x_0) match {
-    | "[\"Rat\",\"mk'\"]" ->
+    | LeanTag.Rat_mk_ ->
       _num_14: LeanValue = leanField(_x_0, 0);
       _den_15: LeanValue = leanField(_x_0, 1);
       _den_nz_16: LeanValue = leanField(_x_0, 2);
@@ -127,7 +127,7 @@ fun f_Rat_toDyadic_78fc8284fe(
         _runtime,
         _prec_1,
       );
-      _one_19: LeanValue = LeanScalar("nat", "1");
+      _one_19: LeanValue = LeanNatLiterals.n1;
       _a_6_20: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _abs_18,
@@ -167,7 +167,7 @@ fun f_toDyadic_match_1_splitter_6c2c9d5deb(
 ): LeanValue {
   _intZero_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _isNeg_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -175,13 +175,13 @@ fun f_toDyadic_match_1_splitter_6c2c9d5deb(
     _intZero_4,
   );
   leanTag(_isNeg_5) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _a_2_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _prec_1_0,
     );
     leanApply(_runtime, _h_1_1, Array[_a_2_6])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _abs_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _prec_1_0,
@@ -189,7 +189,7 @@ fun f_toDyadic_match_1_splitter_6c2c9d5deb(
     _a_4_10: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _abs_8,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     leanApply(_runtime, _h_2_2, Array[_a_4_10])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -202,15 +202,15 @@ fun f_Dyadic_add_b698edd2b4(
   _y_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _y_1
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _y_1
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" ->
-      LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_n_1_2, _k_2_3, LeanErased()])
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero ->
+      LeanCtor(LeanTag.Dyadic_ofOdd, Array[_n_1_2, _k_2_3, LeanErased()])
+    | LeanTag.Dyadic_ofOdd ->
       _n_5_5: LeanValue = leanField(_y_1, 0);
       _k_6_6: LeanValue = leanField(_y_1, 1);
       _hn_7_7: LeanValue = leanField(_y_1, 2);
@@ -219,7 +219,7 @@ fun f_Dyadic_add_b698edd2b4(
         _k_2_3,
         _k_6_6,
       );
-      _natZero_10: LeanValue = LeanScalar("nat", "0");
+      _natZero_10: LeanValue = LeanNatLiterals.n0;
       _intZero_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
         _natZero_10,
@@ -230,7 +230,7 @@ fun f_Dyadic_add_b698edd2b4(
         _intZero_11,
       );
       leanTag(_isNeg_12) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _a_9_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_8_9,
@@ -241,14 +241,14 @@ fun f_Dyadic_add_b698edd2b4(
           _natZero_10,
         );
         leanTag(_isZero_14) match {
-        | "[\"Bool\",\"true\"]" ->
+        | LeanTag.Bool_true ->
           _x_10_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_add_1dbe395e41(
             _runtime,
             _n_1_2,
             _n_5_5,
           );
           f_Dyadic_ofIntWithPrec_fdcf95431a(_runtime, _x_10_15, _k_2_3)
-        | "[\"Bool\",\"false\"]" ->
+        | LeanTag.Bool_false ->
           _x_12_17: LeanValue = L4_Init_Data_Int_Bitwise_Basic.f_Int_shiftLeft_0298138c93(
             _runtime,
             _n_5_5,
@@ -260,17 +260,17 @@ fun f_Dyadic_add_b698edd2b4(
             _x_12_17,
           );
           LeanCtor(
-            "[\"Dyadic\",\"ofOdd\"]",
+            LeanTag.Dyadic_ofOdd,
             Array[_x_13_18, _k_2_3, LeanErased()],
           )
         | _ -> leanFail("non-exhaustive Lean case")
         }
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _abs_20: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_8_9,
         );
-        _one_21: LeanValue = LeanScalar("nat", "1");
+        _one_21: LeanValue = LeanNatLiterals.n1;
         _a_15_22: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _abs_20,
@@ -292,7 +292,7 @@ fun f_Dyadic_add_b698edd2b4(
           _n_5_5,
         );
         LeanCtor(
-          "[\"Dyadic\",\"ofOdd\"]",
+          LeanTag.Dyadic_ofOdd,
           Array[_x_18_25, _k_6_6, LeanErased()],
         )
       | _ -> leanFail("non-exhaustive Lean case")
@@ -316,7 +316,7 @@ fun f_Dyadic_ofIntWithPrec_fdcf95431a(
 ): LeanValue {
   _x_2_3: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _x_3_4: LeanValue = L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
     _runtime,
@@ -324,7 +324,7 @@ fun f_Dyadic_ofIntWithPrec_fdcf95431a(
     _x_2_3,
   );
   leanTag(_x_3_4) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _x_4_5: LeanValue = L4_Init_Data_Int_Bitwise_Basic.f_Int_trailingZeros_24eeb5a6a4(
       _runtime,
       _i_0,
@@ -343,8 +343,8 @@ fun f_Dyadic_ofIntWithPrec_fdcf95431a(
       _prec_1,
       _x_6_7,
     );
-    LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_x_5_6, _x_7_8, LeanErased()])
-  | "[\"Bool\",\"true\"]" -> LeanCtor("[\"Dyadic\",\"zero\"]", Array[])
+    LeanCtor(LeanTag.Dyadic_ofOdd, Array[_x_5_6, _x_7_8, LeanErased()])
+  | LeanTag.Bool_true -> LeanCtor(LeanTag.Dyadic_zero, Array[])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -360,11 +360,11 @@ fun f_Dyadic_instNatCast_closed_0_61dbb3d9c1(
 }
 // "Dyadic.instLT"
 fun f_Dyadic_instLT_41d23a38c1(_runtime: mutable LeanExecution): LeanValue {
-  LeanCtor("[\"LT\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LT_mk, Array[LeanErased()])
 }
 // "Dyadic.instLE"
 fun f_Dyadic_instLE_b406bf81a7(_runtime: mutable LeanExecution): LeanValue {
-  LeanCtor("[\"LE\",\"mk\"]", Array[LeanErased()])
+  LeanCtor(LeanTag.LE_mk, Array[LeanErased()])
 }
 // "Dyadic.ble"
 fun f_Dyadic_ble_894977eb78(
@@ -373,32 +373,32 @@ fun f_Dyadic_ble_894977eb78(
   _y_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
+  | LeanTag.Dyadic_zero ->
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Dyadic_ofOdd ->
       _n_2_5: LeanValue = leanField(_y_1, 0);
       _k_3_6: LeanValue = leanField(_y_1, 1);
       _hn_4_7: LeanValue = leanField(_y_1, 2);
       _x_6_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_runtime, _x_6_10, _n_2_5)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_8_2: LeanValue = leanField(_x_0, 0);
     _k_9_3: LeanValue = leanField(_x_0, 1);
     _hn_10_4: LeanValue = leanField(_x_0, 2);
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" ->
+    | LeanTag.Dyadic_zero ->
       _x_12_16: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       L4_Init_Data_Int_Basic.f_Int_decLe_98db22ca5d(_runtime, _n_8_2, _x_12_16)
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_ofOdd ->
       _n_14_12: LeanValue = leanField(_y_1, 0);
       _k_15_13: LeanValue = leanField(_y_1, 1);
       _hn_16_14: LeanValue = leanField(_y_1, 2);
@@ -409,7 +409,7 @@ fun f_Dyadic_ble_894977eb78(
       );
       _intZero_20: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _isNeg_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
         _runtime,
@@ -417,7 +417,7 @@ fun f_Dyadic_ble_894977eb78(
         _intZero_20,
       );
       leanTag(_isNeg_21) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _a_18_22: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_17_18,
@@ -432,12 +432,12 @@ fun f_Dyadic_ble_894977eb78(
           _x_19_23,
           _n_14_12,
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _abs_25: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_17_18,
         );
-        _one_26: LeanValue = LeanScalar("nat", "1");
+        _one_26: LeanValue = LeanNatLiterals.n1;
         _a_21_27: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _abs_25,
@@ -512,7 +512,7 @@ fun f_Dyadic_instHShiftLeftInt_3ac90d3e61(
 fun f_Dyadic_toRat_closed_0_d4accacbfe(
   _runtime: mutable LeanExecution,
 ): LeanValue {
-  f_Dyadic_toRat_spec_0_5bb7bd2784(_runtime, LeanScalar("nat", "0"))
+  f_Dyadic_toRat_spec_0_5bb7bd2784(_runtime, LeanNatLiterals.n0)
 }
 // "Dyadic.neg"
 fun f_Dyadic_neg_5e2a8b8fb3(
@@ -520,8 +520,8 @@ fun f_Dyadic_neg_5e2a8b8fb3(
   _x_0: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_1: LeanValue = leanField(_x_0, 0);
     _k_2_2: LeanValue = leanField(_x_0, 1);
     _hn_3_3: LeanValue = leanField(_x_0, 2);
@@ -529,7 +529,7 @@ fun f_Dyadic_neg_5e2a8b8fb3(
       _runtime,
       _n_1_1,
     );
-    LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_x_4_4, _k_2_2, LeanErased()])
+    LeanCtor(LeanTag.Dyadic_ofOdd, Array[_x_4_4, _k_2_2, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -578,12 +578,12 @@ fun f_Dyadic_precision_16c2e41204(
   _x_1_0: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> LeanCtor("[\"Option\",\"none\"]", Array[])
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Dyadic_ofOdd ->
     _n_3_1: LeanValue = leanField(_x_1_0, 0);
     _k_4_2: LeanValue = leanField(_x_1_0, 1);
     _hn_5_3: LeanValue = leanField(_x_1_0, 2);
-    LeanCtor("[\"Option\",\"some\"]", Array[_k_4_2])
+    LeanCtor(LeanTag.Option_some, Array[_k_4_2])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -640,32 +640,32 @@ fun f_Dyadic_blt_6116ccb0fc(
   _y_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
+  | LeanTag.Dyadic_zero ->
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Dyadic_ofOdd ->
       _n_2_5: LeanValue = leanField(_y_1, 0);
       _k_3_6: LeanValue = leanField(_y_1, 1);
       _hn_4_7: LeanValue = leanField(_y_1, 2);
       _x_6_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(_runtime, _x_6_10, _n_2_5)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_8_2: LeanValue = leanField(_x_0, 0);
     _k_9_3: LeanValue = leanField(_x_0, 1);
     _hn_10_4: LeanValue = leanField(_x_0, 2);
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" ->
+    | LeanTag.Dyadic_zero ->
       _x_12_16: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(_runtime, _n_8_2, _x_12_16)
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_ofOdd ->
       _n_14_12: LeanValue = leanField(_y_1, 0);
       _k_15_13: LeanValue = leanField(_y_1, 1);
       _hn_16_14: LeanValue = leanField(_y_1, 2);
@@ -676,7 +676,7 @@ fun f_Dyadic_blt_6116ccb0fc(
       );
       _intZero_20: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "0"),
+        LeanNatLiterals.n0,
       );
       _isNeg_21: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
         _runtime,
@@ -684,7 +684,7 @@ fun f_Dyadic_blt_6116ccb0fc(
         _intZero_20,
       );
       leanTag(_isNeg_21) match {
-      | "[\"Bool\",\"false\"]" ->
+      | LeanTag.Bool_false ->
         _a_18_22: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_17_18,
@@ -699,12 +699,12 @@ fun f_Dyadic_blt_6116ccb0fc(
           _x_19_23,
           _n_14_12,
         )
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_true ->
         _abs_25: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
           _runtime,
           _x_17_18,
         );
-        _one_26: LeanValue = LeanScalar("nat", "1");
+        _one_26: LeanValue = LeanNatLiterals.n1;
         _a_21_27: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
           _runtime,
           _abs_25,
@@ -741,7 +741,7 @@ fun f_add_match_1_splitter_442c24a49b(
   _h_2_3: LeanValue,
   _h_3_4: LeanValue,
 ): LeanValue {
-  _natZero_5: LeanValue = LeanScalar("nat", "0");
+  _natZero_5: LeanValue = LeanNatLiterals.n0;
   _intZero_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
     _natZero_5,
@@ -752,7 +752,7 @@ fun f_add_match_1_splitter_442c24a49b(
     _intZero_6,
   );
   leanTag(_isNeg_7) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _a_2_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _x_1_1,
@@ -763,22 +763,22 @@ fun f_add_match_1_splitter_442c24a49b(
       _natZero_5,
     );
     leanTag(_isZero_9) match {
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       leanApply(
         _runtime,
         _h_1_2,
-        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+        Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
       )
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _n_5_13: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _a_2_8,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       leanApply(_runtime, _h_2_3, Array[_n_5_13])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _abs_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _x_1_1,
@@ -786,7 +786,7 @@ fun f_add_match_1_splitter_442c24a49b(
     _a_7_17: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _abs_15,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     leanApply(_runtime, _h_3_4, Array[_a_7_17])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -820,8 +820,8 @@ fun f_Dyadic_roundUp_0518a7670c(
   _prec_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
@@ -832,7 +832,7 @@ fun f_Dyadic_roundUp_0518a7670c(
     );
     _intZero_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _isNeg_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
@@ -840,7 +840,7 @@ fun f_Dyadic_roundUp_0518a7670c(
       _intZero_7,
     );
     leanTag(_isNeg_8) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _a_5_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _x_4_5,
@@ -859,7 +859,7 @@ fun f_Dyadic_roundUp_0518a7670c(
         _x_7_11,
       );
       f_Dyadic_ofIntWithPrec_fdcf95431a(_runtime, _x_8_12, _prec_1)
-    | "[\"Bool\",\"true\"]" -> _x_0
+    | LeanTag.Bool_true -> _x_0
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -911,8 +911,8 @@ fun f_Dyadic_ctorElim_d079804cf4(
   _k_1: LeanValue,
 ): LeanValue {
   leanTag(_t_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _k_1
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _k_1
+  | LeanTag.Dyadic_ofOdd ->
     _n_2: LeanValue = leanField(_t_0, 0);
     _k_3: LeanValue = leanField(_t_0, 1);
     _hn_4: LeanValue = leanField(_t_0, 2);
@@ -945,8 +945,8 @@ fun f_Dyadic_shiftLeft_5b0f1d4eb2(
   _i_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
@@ -955,7 +955,7 @@ fun f_Dyadic_shiftLeft_5b0f1d4eb2(
       _k_2_3,
       _i_1,
     );
-    LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_n_1_2, _x_4_5, LeanErased()])
+    LeanCtor(LeanTag.Dyadic_ofOdd, Array[_n_1_2, _x_4_5, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -979,23 +979,23 @@ fun f_instDecidableEqDyadic_decEq_f404858632(
   _x_2_1: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
+  | LeanTag.Dyadic_zero ->
     leanTag(_x_2_1) match {
-    | "[\"Dyadic\",\"zero\"]" -> LeanCtor("[\"Bool\",\"true\"]", Array[])
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero -> LeanCtor(LeanTag.Bool_true, Array[])
+    | LeanTag.Dyadic_ofOdd ->
       _n_4_5: LeanValue = leanField(_x_2_1, 0);
       _k_5_6: LeanValue = leanField(_x_2_1, 1);
       _hn_6_7: LeanValue = leanField(_x_2_1, 2);
-      LeanCtor("[\"Bool\",\"false\"]", Array[])
+      LeanCtor(LeanTag.Bool_false, Array[])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_8_2: LeanValue = leanField(_x_1_0, 0);
     _k_9_3: LeanValue = leanField(_x_1_0, 1);
     _hn_10_4: LeanValue = leanField(_x_1_0, 2);
     leanTag(_x_2_1) match {
-    | "[\"Dyadic\",\"zero\"]" -> LeanCtor("[\"Bool\",\"false\"]", Array[])
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero -> LeanCtor(LeanTag.Bool_false, Array[])
+    | LeanTag.Dyadic_ofOdd ->
       _n_12_10: LeanValue = leanField(_x_2_1, 0);
       _k_13_11: LeanValue = leanField(_x_2_1, 1);
       _hn_14_12: LeanValue = leanField(_x_2_1, 2);
@@ -1005,8 +1005,8 @@ fun f_instDecidableEqDyadic_decEq_f404858632(
         _n_12_10,
       );
       leanTag(_x_15_14) match {
-      | "[\"Bool\",\"false\"]" -> _x_15_14
-      | "[\"Bool\",\"true\"]" ->
+      | LeanTag.Bool_false -> _x_15_14
+      | LeanTag.Bool_true ->
         L4_Init_Data_Int_Basic.f_Int_decEq_7561db4c37(
           _runtime,
           _k_9_3,
@@ -1029,25 +1029,25 @@ fun f_add_match_3_splitter_cbc0217e45(
   _h_3_4: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> leanApply(_runtime, _h_1_2, Array[_y_2_1])
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> leanApply(_runtime, _h_1_2, Array[_y_2_1])
+  | LeanTag.Dyadic_ofOdd ->
     _n_4_5: LeanValue = leanField(_x_1_0, 0);
     _k_5_6: LeanValue = leanField(_x_1_0, 1);
     _hn_6_7: LeanValue = leanField(_x_1_0, 2);
     leanTag(_y_2_1) match {
-    | "[\"Dyadic\",\"zero\"]" ->
+    | LeanTag.Dyadic_zero ->
       leanApply(
         _runtime,
         _h_2_3,
         Array[
           LeanCtor(
-            "[\"Dyadic\",\"ofOdd\"]",
+            LeanTag.Dyadic_ofOdd,
             Array[_n_4_5, _k_5_6, LeanErased()],
           ),
           LeanErased(),
         ],
       )
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_ofOdd ->
       _n_9_9: LeanValue = leanField(_y_2_1, 0);
       _k_10_10: LeanValue = leanField(_y_2_1, 1);
       _hn_11_11: LeanValue = leanField(_y_2_1, 2);
@@ -1071,7 +1071,7 @@ fun f_toDyadic_match_1_splitter_46687c0c0d(
 ): LeanValue {
   _intZero_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   _isNeg_6: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
     _runtime,
@@ -1079,13 +1079,13 @@ fun f_toDyadic_match_1_splitter_46687c0c0d(
     _intZero_5,
   );
   leanTag(_isNeg_6) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _a_2_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _prec_1_1,
     );
     leanApply(_runtime, _h_1_2, Array[_a_2_7])
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _abs_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _prec_1_1,
@@ -1093,7 +1093,7 @@ fun f_toDyadic_match_1_splitter_46687c0c0d(
     _a_4_11: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _abs_9,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     leanApply(_runtime, _h_2_3, Array[_a_4_11])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1105,7 +1105,7 @@ fun f_Dyadic_ofIntWithPrec_closed_0_fc86b31260(
 ): LeanValue {
   L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   )
 }
 // "Dyadic.instMul"
@@ -1123,8 +1123,8 @@ fun f_Dyadic_roundDown_179fcca9d6(
   _prec_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
@@ -1135,7 +1135,7 @@ fun f_Dyadic_roundDown_179fcca9d6(
     );
     _intZero_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _isNeg_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
@@ -1143,7 +1143,7 @@ fun f_Dyadic_roundDown_179fcca9d6(
       _intZero_7,
     );
     leanTag(_isNeg_8) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _a_5_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _x_4_5,
@@ -1154,7 +1154,7 @@ fun f_Dyadic_roundDown_179fcca9d6(
         _a_5_9,
       );
       f_Dyadic_ofIntWithPrec_fdcf95431a(_runtime, _x_6_10, _prec_1)
-    | "[\"Bool\",\"true\"]" -> _x_0
+    | LeanTag.Bool_true -> _x_0
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1177,19 +1177,19 @@ fun f_toRat_match_1_splitter_3b7ef965b9(
   _h_3_4: LeanValue,
 ): LeanValue {
   leanTag(_x_1_1) match {
-  | "[\"Dyadic\",\"zero\"]" ->
+  | LeanTag.Dyadic_zero ->
     leanApply(
       _runtime,
       _h_1_2,
-      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
     )
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_4_5: LeanValue = leanField(_x_1_1, 0);
     _k_5_6: LeanValue = leanField(_x_1_1, 1);
     _hn_6_7: LeanValue = leanField(_x_1_1, 2);
     _intZero_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _isNeg_12: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
@@ -1197,13 +1197,13 @@ fun f_toRat_match_1_splitter_3b7ef965b9(
       _intZero_11,
     );
     leanTag(_isNeg_12) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _a_7_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_5_6,
       );
       leanApply(_runtime, _h_2_3, Array[_n_4_5, _a_7_13, LeanErased()])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _abs_15: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_5_6,
@@ -1211,7 +1211,7 @@ fun f_toRat_match_1_splitter_3b7ef965b9(
       _a_9_17: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _abs_15,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       leanApply(_runtime, _h_3_4, Array[_n_4_5, _a_9_17, LeanErased()])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1234,14 +1234,14 @@ fun f_Dyadic_mul_dc825ba298(
   _y_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
     leanTag(_y_1) match {
-    | "[\"Dyadic\",\"zero\"]" -> _y_1
-    | "[\"Dyadic\",\"ofOdd\"]" ->
+    | LeanTag.Dyadic_zero -> _y_1
+    | LeanTag.Dyadic_ofOdd ->
       _n_4_5: LeanValue = leanField(_y_1, 0);
       _k_5_6: LeanValue = leanField(_y_1, 1);
       _hn_6_7: LeanValue = leanField(_y_1, 2);
@@ -1255,7 +1255,7 @@ fun f_Dyadic_mul_dc825ba298(
         _k_2_3,
         _k_5_6,
       );
-      LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_x_7_8, _x_8_9, LeanErased()])
+      LeanCtor(LeanTag.Dyadic_ofOdd, Array[_x_7_8, _x_8_9, LeanErased()])
     | _ -> leanFail("non-exhaustive Lean case")
     }
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1276,19 +1276,19 @@ fun f_toRat_match_1_splitter_0ecc758ae3(
   _h_3_3: LeanValue,
 ): LeanValue {
   leanTag(_x_1_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
+  | LeanTag.Dyadic_zero ->
     leanApply(
       _runtime,
       _h_1_1,
-      Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
     )
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_4_4: LeanValue = leanField(_x_1_0, 0);
     _k_5_5: LeanValue = leanField(_x_1_0, 1);
     _hn_6_6: LeanValue = leanField(_x_1_0, 2);
     _intZero_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _isNeg_11: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
@@ -1296,13 +1296,13 @@ fun f_toRat_match_1_splitter_0ecc758ae3(
       _intZero_10,
     );
     leanTag(_isNeg_11) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _a_7_12: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_5_5,
       );
       leanApply(_runtime, _h_2_2, Array[_n_4_4, _a_7_12, LeanErased()])
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _abs_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_5_5,
@@ -1310,7 +1310,7 @@ fun f_toRat_match_1_splitter_0ecc758ae3(
       _a_9_16: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _abs_14,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       leanApply(_runtime, _h_3_3, Array[_n_4_4, _a_9_16, LeanErased()])
     | _ -> leanFail("non-exhaustive Lean case")
@@ -1379,7 +1379,7 @@ fun f_add_match_1_splitter_5e02701a4e(
   _h_2_2: LeanValue,
   _h_3_3: LeanValue,
 ): LeanValue {
-  _natZero_4: LeanValue = LeanScalar("nat", "0");
+  _natZero_4: LeanValue = LeanNatLiterals.n0;
   _intZero_5: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
     _natZero_4,
@@ -1390,7 +1390,7 @@ fun f_add_match_1_splitter_5e02701a4e(
     _intZero_5,
   );
   leanTag(_isNeg_6) match {
-  | "[\"Bool\",\"false\"]" ->
+  | LeanTag.Bool_false ->
     _a_2_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _x_1_0,
@@ -1401,22 +1401,22 @@ fun f_add_match_1_splitter_5e02701a4e(
       _natZero_4,
     );
     leanTag(_isZero_8) match {
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       leanApply(
         _runtime,
         _h_1_1,
-        Array[LeanCtor("[\"PUnit\",\"unit\"]", Array[])],
+        Array[LeanCtor(LeanTag.PUnit_unit, Array[])],
       )
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _n_5_12: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _a_2_7,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       leanApply(_runtime, _h_2_2, Array[_n_5_12])
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Bool\",\"true\"]" ->
+  | LeanTag.Bool_true ->
     _abs_14: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
       _runtime,
       _x_1_0,
@@ -1424,7 +1424,7 @@ fun f_add_match_1_splitter_5e02701a4e(
     _a_7_16: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
       _runtime,
       _abs_14,
-      LeanScalar("nat", "1"),
+      LeanNatLiterals.n1,
     );
     leanApply(_runtime, _h_3_3, Array[_a_7_16])
   | _ -> leanFail("non-exhaustive Lean case")
@@ -1455,7 +1455,7 @@ fun f_Dyadic_ofInt_404e8ee43c(
 ): LeanValue {
   _x_2_2: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
     _runtime,
-    LeanScalar("nat", "0"),
+    LeanNatLiterals.n0,
   );
   f_Dyadic_ofIntWithPrec_fdcf95431a(_runtime, _i_0, _x_2_2)
 }
@@ -1519,15 +1519,15 @@ fun f_Dyadic_toRat_cb428b5248(
   _x_0: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
-    f_Dyadic_toRat_spec_0_5bb7bd2784(_runtime, LeanScalar("nat", "0"))
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero ->
+    f_Dyadic_toRat_spec_0_5bb7bd2784(_runtime, LeanNatLiterals.n0)
+  | LeanTag.Dyadic_ofOdd ->
     _n_3_1: LeanValue = leanField(_x_0, 0);
     _k_4_2: LeanValue = leanField(_x_0, 1);
     _hn_5_3: LeanValue = leanField(_x_0, 2);
     _intZero_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
       _runtime,
-      LeanScalar("nat", "0"),
+      LeanNatLiterals.n0,
     );
     _isNeg_8: LeanValue = L4_Init_Data_Int_Basic.f_Int_decLt_d38a233c7e(
       _runtime,
@@ -1535,26 +1535,26 @@ fun f_Dyadic_toRat_cb428b5248(
       _intZero_7,
     );
     leanTag(_isNeg_8) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _a_6_9: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_4_2,
       );
       _x_8_11: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
         _runtime,
-        LeanScalar("nat", "2"),
+        LeanNatLiterals.n2,
         _a_6_9,
       );
       LeanCtor(
-        "[\"Rat\",\"mk'\"]",
+        LeanTag.Rat_mk_,
         Array[_n_3_1, _x_8_11, LeanErased(), LeanErased()],
       )
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _abs_13: LeanValue = L4_Init_Data_Int_Basic.f_Int_natAbs_c994772ef2(
         _runtime,
         _k_4_2,
       );
-      _one_14: LeanValue = LeanScalar("nat", "1");
+      _one_14: LeanValue = LeanNatLiterals.n1;
       _a_10_15: LeanValue = L4_Init_Prelude.f_Nat_sub_8647441ee5(
         _runtime,
         _abs_13,
@@ -1567,7 +1567,7 @@ fun f_Dyadic_toRat_cb428b5248(
       );
       _x_13_18: LeanValue = L4_Init_Prelude.f_Nat_pow_c3fca086ae(
         _runtime,
-        LeanScalar("nat", "2"),
+        LeanNatLiterals.n2,
         _x_12_17,
       );
       _x_14_19: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
@@ -1620,29 +1620,29 @@ fun f_Dyadic_pow_0d32c9f7d1(
   _i_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" ->
-    _x_1_5: LeanValue = LeanScalar("nat", "0");
+  | LeanTag.Dyadic_zero ->
+    _x_1_5: LeanValue = LeanNatLiterals.n0;
     _x_2_6: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
       _runtime,
       _i_1,
       _x_1_5,
     );
     leanTag(_x_2_6) match {
-    | "[\"Bool\",\"false\"]" ->
+    | LeanTag.Bool_false ->
       _x_3_7: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
         _x_1_5,
       );
       f_Dyadic_ofInt_404e8ee43c(_runtime, _x_3_7)
-    | "[\"Bool\",\"true\"]" ->
+    | LeanTag.Bool_true ->
       _x_6_10: LeanValue = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
         _runtime,
-        LeanScalar("nat", "1"),
+        LeanNatLiterals.n1,
       );
       f_Dyadic_ofInt_404e8ee43c(_runtime, _x_6_10)
     | _ -> leanFail("non-exhaustive Lean case")
     }
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_ofOdd ->
     _n_8_2: LeanValue = leanField(_x_0, 0);
     _k_9_3: LeanValue = leanField(_x_0, 1);
     _hn_10_4: LeanValue = leanField(_x_0, 2);
@@ -1660,7 +1660,7 @@ fun f_Dyadic_pow_0d32c9f7d1(
       _k_9_3,
       _x_12_13,
     );
-    LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_x_11_12, _x_13_14, LeanErased()])
+    LeanCtor(LeanTag.Dyadic_ofOdd, Array[_x_11_12, _x_13_14, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }
@@ -1684,8 +1684,8 @@ fun f_Dyadic_shiftRight_619130713e(
   _i_1: LeanValue,
 ): LeanValue {
   leanTag(_x_0) match {
-  | "[\"Dyadic\",\"zero\"]" -> _x_0
-  | "[\"Dyadic\",\"ofOdd\"]" ->
+  | LeanTag.Dyadic_zero -> _x_0
+  | LeanTag.Dyadic_ofOdd ->
     _n_1_2: LeanValue = leanField(_x_0, 0);
     _k_2_3: LeanValue = leanField(_x_0, 1);
     _hn_3_4: LeanValue = leanField(_x_0, 2);
@@ -1694,7 +1694,7 @@ fun f_Dyadic_shiftRight_619130713e(
       _k_2_3,
       _i_1,
     );
-    LeanCtor("[\"Dyadic\",\"ofOdd\"]", Array[_n_1_2, _x_4_5, LeanErased()])
+    LeanCtor(LeanTag.Dyadic_ofOdd, Array[_n_1_2, _x_4_5, LeanErased()])
   | _ -> leanFail("non-exhaustive Lean case")
   }
 }

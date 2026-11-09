@@ -14,15 +14,15 @@ fun exprApp(
 fun main(): void {
   mode = read_to_end().trim();
   store = SKStore.run(_ ~> void);
-  runtime = mutable LeanExecution{store};
+  runtime = mutable LeanExecution{store => Some(store)};
   p = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
     runtime,
-    LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
   );
   x = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
-  implicit = LeanCtor("[\"Lean\",\"BinderInfo\",\"implicit\"]", Array[]);
+  implicit = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
   instImplicit = LeanCtor(
-    "[\"Lean\",\"BinderInfo\",\"instImplicit\"]",
+    LeanTag.BinderInfo_instImplicit,
     Array[],
   );
   a = exprApp(runtime, exprBvar(runtime, 0), exprBvar(runtime, 2));
@@ -43,20 +43,20 @@ fun main(): void {
     leanBool(true),
   );
   subst = Array[exprBvar(runtime, 0), exprBvar(runtime, 2)];
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   marker = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
     runtime,
     LeanText("marker"),
   );
   metadata = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           marker,
           LeanCtor(
-            "[\"Lean\",\"DataValue\",\"ofNat\"]",
+            LeanTag.DataValue_ofNat,
             Array[leanNatValue(7)],
           ),
         ],
@@ -67,15 +67,15 @@ fun main(): void {
   md = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, lam);
   if (mode == "budget-syntax") {
     syntaxMetadata = LeanCtor(
-      "[\"List\",\"cons\"]",
+      LeanTag.List_cons,
       Array[
         LeanCtor(
-          "[\"Prod\",\"mk\"]",
+          LeanTag.Prod_mk,
           Array[
             marker,
             LeanCtor(
-              "[\"Lean\",\"DataValue\",\"ofSyntax\"]",
-              Array[LeanCtor("[\"Lean\",\"Syntax\",\"missing\"]", Array[])],
+              LeanTag.DataValue_ofSyntax,
+              Array[LeanCtor(LeanTag.Syntax_missing, Array[])],
             ),
           ],
         ),
@@ -107,10 +107,7 @@ fun main(): void {
     lam,
   );
   ranged = LeanArray(Array[p, exprBvar(runtime, 4), exprBvar(runtime, 5)]);
-  huge = LeanScalar(
-    "nat",
-    "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
-  );
+  huge = LeanNatLiterals.n10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000;
   results = Array[
     leanExprInstantiate(runtime, lam, subst, 0),
     L4_Lean_Expr.f_Lean_Expr_instantiate1_2af4e389c5(
@@ -189,14 +186,14 @@ fun main(): void {
   );
   y = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("y"));
   metadata8 = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
       LeanCtor(
-        "[\"Prod\",\"mk\"]",
+        LeanTag.Prod_mk,
         Array[
           marker,
           LeanCtor(
-            "[\"Lean\",\"DataValue\",\"ofNat\"]",
+            LeanTag.DataValue_ofNat,
             Array[leanNatValue(8)],
           ),
         ],
@@ -204,10 +201,10 @@ fun main(): void {
       nil,
     ],
   );
-  zero = LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
   // Level metadata does not affect equality; the constructor identity does.
   one = LeanCtor(
-    "[\"Lean\",\"Level\",\"succ\",\"_impl\"]",
+    LeanTag.Level_succ__impl,
     Array[LeanWord("uint64", 0), zero],
   );
   exprs = Array[
@@ -222,7 +219,7 @@ fun main(): void {
     L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
       runtime,
       x,
-      LeanCtor("[\"Lean\",\"BinderInfo\",\"default\"]", Array[]),
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
       exprBvar(runtime, 0),
       a,
     ),
@@ -260,17 +257,17 @@ fun main(): void {
   uName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("u"));
   vName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("v"));
   data = LeanWord("uint64", 0);
-  u = LeanCtor("[\"Lean\",\"Level\",\"param\",\"_impl\"]", Array[data, uName]);
-  v = LeanCtor("[\"Lean\",\"Level\",\"param\",\"_impl\"]", Array[data, vName]);
+  u = LeanCtor(LeanTag.Level_param__impl, Array[data, uName]);
+  v = LeanCtor(LeanTag.Level_param__impl, Array[data, vName]);
   levels = Array[
     zero,
     one,
     u,
     v,
-    LeanCtor("[\"Lean\",\"Level\",\"mvar\",\"_impl\"]", Array[data, uName]),
-    LeanCtor("[\"Lean\",\"Level\",\"max\",\"_impl\"]", Array[data, u, v]),
-    LeanCtor("[\"Lean\",\"Level\",\"imax\",\"_impl\"]", Array[data, u, v]),
-    LeanCtor("[\"Lean\",\"Level\",\"max\",\"_impl\"]", Array[data, u, v]),
+    LeanCtor(LeanTag.Level_mvar__impl, Array[data, uName]),
+    LeanCtor(LeanTag.Level_max__impl, Array[data, u, v]),
+    LeanCtor(LeanTag.Level_imax__impl, Array[data, u, v]),
+    LeanCtor(LeanTag.Level_max__impl, Array[data, u, v]),
   ];
   levelComparisons = mutable Vector[];
   for (left in levels) {
@@ -305,12 +302,12 @@ fun main(): void {
         L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
           runtime,
           f,
-          LeanCtor("[\"List\",\"cons\"]", Array[orderU, nil]),
+          LeanCtor(LeanTag.List_cons, Array[orderU, nil]),
         ),
         L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
           runtime,
           f,
-          LeanCtor("[\"List\",\"cons\"]", Array[orderV, nil]),
+          LeanCtor(LeanTag.List_cons, Array[orderV, nil]),
         ),
         L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, orderU),
         L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, orderV),

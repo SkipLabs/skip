@@ -1,0 +1,325 @@
+// Structured proposition classification. The original bodies remain oracles.
+module L4_Lean_Meta_InferType;
+
+// "_private.Lean.Meta.InferType.0.Lean.Meta.isPropQuickCore"
+fun f_Lean_Meta_isPropQuickCore_35cdb9cd39(
+  runtime: mutable LeanExecution,
+  subst: LeanValue,
+  expr: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  loop {
+    leanTag(expr) match {
+    | LeanTag.Expr_forallE__impl -> !expr = leanField(expr, 3)
+    | LeanTag.Expr_letE__impl -> !expr = leanField(expr, 4)
+    | LeanTag.Expr_mdata__impl -> !expr = leanField(expr, 2)
+    | LeanTag.Expr_lit__impl
+    | LeanTag.Expr_sort__impl
+    | LeanTag.Expr_lam__impl ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_false, Array[]), world],
+      )
+    | LeanTag.Expr_app__impl ->
+      return f_Lean_Meta_isPropQuickApp_4121d559b7(
+        runtime,
+        subst,
+        leanField(expr, 1),
+        LeanNatLiterals.n1,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      )
+    | LeanTag.Expr_const__impl
+    | LeanTag.Expr_fvar__impl
+    | LeanTag.Expr_mvar__impl ->
+      inferred = leanTag(expr) match {
+      | LeanTag.Expr_fvar__impl ->
+        f_Lean_Meta_inferFVarType_a80c4a3df7(
+          runtime,
+          leanField(expr, 1),
+          context,
+          core,
+          coreState,
+          world,
+        )
+      | LeanTag.Expr_mvar__impl ->
+        f_Lean_Meta_inferMVarType_5f4ea23b10(
+          runtime,
+          leanField(expr, 1),
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        )
+      | LeanTag.Expr_const__impl ->
+        levels = if (leanTag(leanField(subst, 0)) == LeanTag.List_nil) {
+          leanField(expr, 2)
+        } else {
+          f_Meta_isPropQuickApp_spec_0_cd72dc212c(
+            runtime,
+            subst,
+            leanField(expr, 2),
+            LeanCtor(LeanTag.List_nil, Array[]),
+          )
+        };
+        f_Lean_Meta_inferConstTypeLazy_72e1380dda(
+          runtime,
+          leanField(expr, 1),
+          levels,
+          context,
+          state,
+          core,
+          coreState,
+          world,
+        )
+      | _ -> leanFail("invalid proposition head")
+      };
+      leanTag(inferred) match {
+      | LeanTag.EST_Out_error -> return inferred
+      | LeanTag.EST_Out_ok ->
+        value = leanField(inferred, 0);
+        nextWorld = leanField(inferred, 1);
+        (type, typeSubst) = if (leanTag(expr) == LeanTag.Expr_const__impl) {
+          (leanField(value, 0), leanField(value, 1))
+        } else {
+          nil = LeanCtor(LeanTag.List_nil, Array[]);
+          (
+            value,
+            LeanCtor(
+              LeanTag.Private_Lean_Meta_InferType_0_Lean_Meta_LevelSubst_mk,
+              Array[nil, nil],
+            ),
+          )
+        };
+        return f_Lean_Meta_isArrowProp_446653b016(
+          runtime,
+          typeSubst,
+          type,
+          LeanNatLiterals.n0,
+          context,
+          state,
+          core,
+          coreState,
+          nextWorld,
+        )
+      | _ -> return leanFail("invalid proposition inference result")
+      }
+    | _ ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_undef, Array[]), world],
+      )
+    }
+  }
+}
+
+// "_private.Lean.Meta.InferType.0.Lean.Meta.isArrowProp"
+fun f_Lean_Meta_isArrowProp_446653b016(
+  runtime: mutable LeanExecution,
+  subst: LeanValue,
+  expr: LeanValue,
+  arity: LeanValue,
+  _context: LeanValue,
+  state: LeanValue,
+  _core: LeanValue,
+  _coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  remaining = leanNat(arity);
+  loop {
+    leanTag(expr) match {
+    | LeanTag.Expr_forallE__impl ->
+      if (remaining.isZero()) {
+        return LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[LeanCtor(LeanTag.LBool_false, Array[]), world],
+        )
+      };
+      !remaining = remaining.sub(LeanNat::fromInt(1));
+      !expr = leanField(expr, 3)
+    | LeanTag.Expr_letE__impl -> !expr = leanField(expr, 4)
+    | LeanTag.Expr_mdata__impl -> !expr = leanField(expr, 2)
+    | LeanTag.Expr_sort__impl if (remaining.isZero()) ->
+      level = leanField(expr, 1);
+      parameters = leanField(subst, 0);
+      if (leanTag(parameters) != LeanTag.List_nil) {
+        !level = L4_Lean_Level.f_Lean_Level_instantiateParams_5b06d0ac6d(
+          runtime,
+          level,
+          parameters,
+          leanField(subst, 1),
+        )
+      };
+      instantiated = f_Meta_isArrowProp_spec_0_95e1b4b2e6(
+        runtime,
+        level,
+        state,
+        world,
+      );
+      leanTag(instantiated) match {
+      | LeanTag.EST_Out_error -> return instantiated
+      | LeanTag.EST_Out_ok ->
+        zero = f_Lean_Meta_isAlwaysZero_7dde401b6c(
+          runtime,
+          leanField(instantiated, 0),
+        );
+        answer = L4_Lean_Data_LBool.f_Lean_Bool_toLBool_b192e84fda(
+          runtime,
+          zero,
+        );
+        return LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[answer, leanField(instantiated, 1)],
+        )
+      | _ -> return leanFail("invalid level instantiation result")
+      }
+    | _ ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.LBool_undef, Array[]), world],
+      )
+    }
+  }
+}
+
+// "_private.Lean.Meta.InferType.0.Lean.Meta.isArrowProposition'"
+fun f_Lean_Meta_isArrowProposition_d1b375b0b4(
+  runtime: mutable LeanExecution,
+  subst: LeanValue,
+  expr: LeanValue,
+  arity: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  remaining = leanNat(arity);
+  leanTag(expr) match {
+  | LeanTag.Expr_forallE__impl if (!remaining.isZero()) ->
+    result = f_Lean_Meta_isArrowProposition_d1b375b0b4(
+      runtime,
+      subst,
+      leanField(expr, 3),
+      leanBoxNat(remaining.sub(LeanNat::fromInt(1))),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    return f_finishArrowPropositionBinder(
+      runtime,
+      subst,
+      leanField(expr, 2),
+      result,
+    )
+  | LeanTag.Expr_letE__impl ->
+    result = f_Lean_Meta_isArrowProposition_d1b375b0b4(
+      runtime,
+      subst,
+      leanField(expr, 4),
+      arity,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    return f_finishArrowPropositionBinder(
+      runtime,
+      subst,
+      leanField(expr, 2),
+      result,
+    )
+  | LeanTag.Expr_mdata__impl ->
+    return f_Lean_Meta_isArrowProposition_d1b375b0b4(
+      runtime,
+      subst,
+      leanField(expr, 2),
+      arity,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | _ -> void
+  };
+  if (!remaining.isZero()) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(
+          LeanTag.Private_Lean_Meta_InferType_0_Lean_Meta_ArrowPropResult_undef,
+          Array[],
+        ),
+        world,
+      ],
+    )
+  };
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, expr);
+  if (leanTag(head) == LeanTag.Expr_bvar__impl) {
+    count = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, expr);
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(
+          LeanTag.Private_Lean_Meta_InferType_0_Lean_Meta_ArrowPropResult_bvar,
+          Array[leanField(head, 1), count],
+        ),
+        world,
+      ],
+    )
+  };
+  result = f_Lean_Meta_isPropQuickCore_35cdb9cd39(
+    runtime,
+    subst,
+    expr,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  leanTag(result) match {
+  | LeanTag.EST_Out_error -> result
+  | LeanTag.EST_Out_ok ->
+    answer = f_Lean_Meta_toArrowPropResult_4ad48b12d0(
+      runtime,
+      leanField(result, 0),
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[answer, leanField(result, 1)])
+  | _ -> leanFail("invalid proposition classification result")
+  }
+}
+
+fun f_finishArrowPropositionBinder(
+  runtime: mutable LeanExecution,
+  subst: LeanValue,
+  binderType: LeanValue,
+  result: LeanValue,
+): LeanValue {
+  leanTag(result) match {
+  | LeanTag.EST_Out_error -> result
+  | LeanTag.EST_Out_ok ->
+    answer = f_Meta_isArrowProposition_processResult_df84fef337(
+      runtime,
+      subst,
+      leanField(result, 0),
+      binderType,
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[answer, leanField(result, 1)])
+  | _ -> leanFail("invalid arrow proposition result")
+  }
+}
+
+module end;

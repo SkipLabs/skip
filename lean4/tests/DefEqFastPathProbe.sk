@@ -1,0 +1,131 @@
+// Compare the structured path with the retained implementation, including state
+// effects, reduction, false answers, recursion limits and the tracing fallback.
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  leanInitializeBinding(
+    runtime,
+    "_private.Lean.Data.Options.0.Lean.optionDeclsRef",
+    L4_Lean_Data_Options.f_Options_hygCtx_hyg_ef8060b22b,
+  );
+  leanInitializeBinding(
+    runtime,
+    "Lean.trace.profiler",
+    L4_Lean_Util_Trace.f_Trace_hygCtx_hyg_29ee821429,
+  );
+  context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  state = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  core = leanCoreContext("<defeq-fast-path-probe>", "");
+  coreState = runtime.newRef(
+    leanCoreState(runtime, LeanUnavailable("probe environment")),
+  );
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    L4_Lean_Level.f_Level_succ_override_01cb6e5dce(runtime, zero),
+  );
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  local = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    leanField(context, 3),
+    name,
+    name,
+    prop,
+    binder,
+    LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+  );
+  !context = leanReplaceField(context, 3, local);
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+  id = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    name,
+    binder,
+    prop,
+    bound,
+  );
+  beta = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, id, x);
+  letX = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    name,
+    prop,
+    x,
+    bound,
+    leanBool(false),
+  );
+  annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    LeanCtor(LeanTag.List_nil, Array[]),
+    x,
+  );
+  pairs = Array[
+    (prop, prop),
+    (prop, type),
+    (type, prop),
+    (x, x),
+    (id, id),
+    (beta, x),
+    (x, beta),
+    (letX, x),
+    (annotated, x),
+  ];
+  // The flag says tracing options are present, but this empty dictionary does
+  // not enable a trace. It exercises fallback dispatch without a fake trace.
+  cold = leanField(core, 0);
+  traceOptions = leanReplaceField(leanField(cold, 2), 1, leanBool(true));
+  traceCore = leanReplaceField(
+    core,
+    0,
+    leanReplaceField(cold, 2, traceOptions),
+  );
+  maxCore = leanReplaceField(core, 1, leanField(cold, 3));
+  unlimited = leanReplaceField(
+    core,
+    0,
+    leanReplaceField(cold, 3, leanNatValue(0)),
+  );
+  count = 0;
+  for (ctx in Array[core, traceCore, maxCore, unlimited]) {
+    for ((a, b) in pairs) {
+      saved = runtime.checkpoint();
+      original = saved.restoreRaw();
+      fast = saved.restoreRaw();
+      for (_ in Range(0, 2)) {
+        expected = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isExprDefEqAuxImpl_4b1d8193a6_fallback(
+          original,
+          a,
+          b,
+          context,
+          state,
+          ctx,
+          coreState,
+          LeanErased(),
+        );
+        actual = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isExprDefEqAuxImpl_4b1d8193a6(
+          fast,
+          a,
+          b,
+          context,
+          state,
+          ctx,
+          coreState,
+          LeanErased(),
+        );
+        assert(native_eq(expected, actual) == 0);
+        assert(
+          native_eq(original.checkpoint().refs, fast.checkpoint().refs) == 0,
+        );
+        !count = count + 1
+      }
+    }
+  };
+  print_string(
+    count.toString() +
+      " definitional-equality results and state snapshots match",
+  )
+}

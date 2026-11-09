@@ -1,0 +1,159 @@
+// Retained direct WHNF recursion; other reduction helpers remain shared.
+module L4_Lean_Meta_WHNF;
+
+// "_private.Lean.Meta.WHNF.0.Lean.Meta.whnfCore.go"
+fun f_Meta_whnfCore_go_95af72ae50_whnfOracle(
+  _runtime: mutable LeanExecution,
+  _e_0: LeanValue,
+  _a_1: LeanValue,
+  _a_2: LeanValue,
+  _a_3: LeanValue,
+  _a_4: LeanValue,
+  _a_1_5: LeanValue,
+): LeanValue {
+  f_whnfCore_go_spec_3_85c62e30bd_fallback(
+    _runtime,
+    _e_0,
+    _a_1,
+    _a_2,
+    _a_3,
+    _a_4,
+    _a_1_5,
+  )
+}
+
+// "_private.Lean.Meta.WHNF.0.Lean.Meta.deltaBetaDefinition._at_._private.Lean.Meta.WHNF.0.Lean.Meta.whnfCore.go.spec_0"
+fun f_whnfCore_go_spec_0_9f207115da_whnfOracle(
+  _runtime: mutable LeanExecution,
+  _y_1_0: LeanValue,
+  _c_1: LeanValue,
+  _lvls_2: LeanValue,
+  _revArgs_3: LeanValue,
+  _preserveMData_4: LeanValue,
+  _a_5: LeanValue,
+  _a_6: LeanValue,
+  _a_7: LeanValue,
+  _a_8: LeanValue,
+  _a_2_9: LeanValue,
+): LeanValue {
+  _x_3_10: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_levelParams_3f5c87f376(
+    _runtime,
+    _c_1,
+  );
+  _x_4_11: LeanValue = L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(
+    _runtime,
+    _x_3_10,
+  );
+  _x_5_12: LeanValue = L4_Init_Prelude.f_List_lengthTR_5b969ddfa7(
+    _runtime,
+    _lvls_2,
+  );
+  _x_6_13: LeanValue = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
+    _x_4_11,
+    _x_5_12,
+  );
+  leanTag(_x_6_13) match {
+  | LeanTag.Bool_false ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[_y_1_0, _a_2_9])
+  | LeanTag.Bool_true ->
+    _x_8_15: LeanValue = LeanCtor(LeanTag.Bool_false, Array[]);
+    _x_9_16: LeanValue = L4_Lean_CoreM.f_Lean_Core_instantiateValueLevelParams_f93716788b(
+      _runtime,
+      _c_1,
+      _lvls_2,
+      _x_8_15,
+      _a_7,
+      _a_8,
+      _a_2_9,
+    );
+    leanTag(_x_9_16) match {
+    | LeanTag.EST_Out_ok ->
+      _a_10_17: LeanValue = leanField(_x_9_16, 0);
+      _a_11_18: LeanValue = leanField(_x_9_16, 1);
+      _x_12_21: LeanValue = L4_Lean_Expr.f_Lean_Expr_betaRev_7cc33c698c(
+        _runtime,
+        _a_10_17,
+        _revArgs_3,
+        _x_8_15,
+        _preserveMData_4,
+      );
+      f_Meta_whnfCore_go_95af72ae50_whnfOracle(
+        _runtime,
+        _x_12_21,
+        _a_5,
+        _a_6,
+        _a_7,
+        _a_8,
+        _a_11_18,
+      )
+    | LeanTag.EST_Out_error ->
+      _a_14_19: LeanValue = leanField(_x_9_16, 0);
+      _a_15_20: LeanValue = leanField(_x_9_16, 1);
+      _x_9_16
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// "Lean.Meta.whnfEasyCases._at_._private.Lean.Meta.WHNF.0.Lean.Meta.whnfCore.go.spec_3._lam_2"
+fun f_go_spec_3_lam_2_2884939903_whnfOracle(
+  _runtime: mutable LeanExecution,
+  _val_1_0: LeanValue,
+  _e_1: LeanValue,
+  _y_2_2: LeanValue,
+  _y_3_3: LeanValue,
+  _y_4_4: LeanValue,
+  _y_5_5: LeanValue,
+  _y_6_6: LeanValue,
+): LeanValue {
+  _x_7_7: LeanValue = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+    _runtime,
+    _val_1_0,
+  );
+  _x_8_8: LeanValue = L4_Lean_Meta_Basic.f_Lean_Meta_recordUnfold_139663effb(
+    _runtime,
+    _x_7_7,
+    _y_3_3,
+    _y_4_4,
+    _y_6_6,
+  );
+  leanTag(_x_8_8) match {
+  | LeanTag.EST_Out_ok ->
+    _a_9_9: LeanValue = leanField(_x_8_8, 0);
+    _a_10_10: LeanValue = leanField(_x_8_8, 1);
+    f_Meta_whnfCore_go_95af72ae50_whnfOracle(
+      _runtime,
+      _e_1,
+      _y_2_2,
+      _y_3_3,
+      _y_4_4,
+      _y_5_5,
+      _a_10_10,
+    )
+  | LeanTag.EST_Out_error ->
+    _a_12_11: LeanValue = leanField(_x_8_8, 0);
+    _a_13_12: LeanValue = leanField(_x_8_8, 1);
+    LeanCtor(LeanTag.EST_Out_error, Array[_a_12_11, _a_13_12])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun apply_f_go_spec_3_lam_2_2884939903_whnfOracle(
+  _runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  f_go_spec_3_lam_2_2884939903_whnfOracle(
+    _runtime,
+    _args[0],
+    _args[1],
+    _args[2],
+    _args[3],
+    _args[4],
+    _args[5],
+    _args[6],
+  )
+}
+
+module end;

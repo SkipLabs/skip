@@ -1,0 +1,381 @@
+// Intermediate simplification work for the fixed, synchronous typed-input
+// driver. Only closed inputs using the original default methods are eligible.
+// A declined query falls back to the caller's original execution and state.
+class LeanSimpQueryKey(
+  expr: LeanValue,
+  simpContext: LeanValue,
+  normalizedSimp: LeanValue,
+  metaContext: LeanValue,
+  coreContext: LeanValue,
+) extends SKStore.Key {
+  fun toString(): String {
+    "simp(exprHash=" + leanExprData(this.expr).and(4294967295).toString() + ")"
+  }
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | key @ LeanSimpQueryKey _ ->
+      // Cached hashes accelerate lookup; collisions still compare full inputs.
+      byHash = leanExprData(this.expr)
+        .and(4294967295)
+        .compare(leanExprData(key.expr).and(4294967295));
+      if (byHash != EQ()) return byHash;
+      byExpr = leanSimpValueCompare(this.expr, key.expr);
+      if (byExpr != EQ()) return byExpr;
+      bySimp = leanSimpValueCompare(this.normalizedSimp, key.normalizedSimp);
+      if (bySimp != EQ()) return bySimp;
+      byMeta = leanSimpValueCompare(this.metaContext, key.metaContext);
+      if (byMeta != EQ()) return byMeta;
+      leanSimpValueCompare(this.coreContext, key.coreContext)
+    | _ -> this.getClassName().compare(other.getClassName())
+    }
+  }
+}
+
+class LeanSimpQueryResult(
+  result: ?LeanValue,
+  usedTheorems: Array<LeanValue>,
+  localSteps: LeanValue,
+  evaluatedAt: Int,
+  declined: String,
+  olderQueryKeys: SortedSet<SKStore.Key>,
+) extends SKStore.File
+
+fun leanSimpQueryDebug(message: String): void {
+  if (Environ.varOpt("LEAN_SKIP_QUERY_DEBUG") == Some("1")) {
+    print_string("simp-query: " + message)
+  }
+}
+
+fun leanSimpInitialState(runtime: mutable LeanExecution): LeanValue {
+  raw = LeanCtor(
+    LeanTag.Std_DHashMap_Raw_mk,
+    Array[
+      leanNatValue(0),
+      LeanArray(
+        Array::fill(
+          16,
+          LeanCtor(
+            LeanTag.Std_DHashMap_Internal_AssocList_nil,
+            Array[],
+          ),
+        ),
+      ),
+    ],
+  );
+  persistent = LeanCtor(
+    LeanTag.PersistentHashMap_Node_entries,
+    Array[
+      L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+        runtime,
+        LeanErased(),
+      ),
+    ],
+  );
+  cache = LeanCtor(
+    LeanTag.SMap_mk,
+    Array[leanBool(true), raw, persistent],
+  );
+  stats = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_instInhabitedStats_default_1c334e0b28(
+    runtime,
+  );
+  LeanCtor(
+    LeanTag.Meta_Simp_State_mk,
+    Array[
+      cache,
+      raw,
+      raw,
+      leanField(stats, 0),
+      leanNatValue(0),
+      leanField(stats, 1),
+    ],
+  )
+}
+
+fun leanSimpQueryDeclined(tick: Int, reason: String): LeanSimpQueryResult {
+  LeanSimpQueryResult(
+    None(),
+    Array[],
+    leanNatValue(0),
+    tick,
+    reason,
+    SortedSet[],
+  )
+}
+
+fun leanComputeSimpQuery(
+  context: mutable SKStore.Context,
+  queries: SKStore.LHandle<LeanSimpQueryKey, LeanSimpQueryResult>,
+  environment: LeanValue,
+  methods: LeanValue,
+  mask: Int,
+  bootstrap: LeanExecutionCheckpoint,
+  key: LeanSimpQueryKey,
+): LeanSimpQueryResult {
+  tick = context.getTick().value;
+  // Restore a private reference table from an immutable initialization template.
+  // No state produced while proving another query is part of this template.
+  runtime = bootstrap.restore(context);
+  runtime.!simpHook = Some((runtime, args) ~>
+    leanFetchSimpQuery(runtime, queries, environment, methods, mask, args)
+  );
+  initialMeta = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  initialCore = leanReplaceField(
+    leanCoreState(runtime, environment),
+    2,
+    LeanCtor(
+      LeanTag.NameGenerator_mk,
+      Array[leanSimpleName(runtime, "_skip_simp_query"), leanNatValue(1)],
+    ),
+  );
+  initialSimp = leanSimpInitialState(runtime);
+  metaRef = runtime.newRef(initialMeta);
+  coreRef = runtime.newRef(initialCore);
+  simpRef = runtime.newRef(initialSimp);
+  // Call the original body directly; its recursive calls go through the hook.
+  out = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpImpl_2408473d27(
+    runtime,
+    key.expr,
+    methods,
+    key.simpContext,
+    simpRef,
+    key.metaContext,
+    metaRef,
+    key.coreContext,
+    coreRef,
+    LeanErased(),
+  );
+  if (!leanMetaSucceeded(out)) {
+    return leanSimpQueryDeclined(tick, "Lean exception")
+  };
+  result = leanField(out, 0);
+  if (!leanIsTrue(leanField(result, 2))) {
+    return leanSimpQueryDeclined(tick, "Result.cache=false")
+  };
+  validator = mutable LeanSimpValueValidator{};
+  if (!validator.check(result)) {
+    return leanSimpQueryDeclined(tick, "open result")
+  };
+  if (leanExprData(leanField(result, 0)).ushr(44) != 0) {
+    return leanSimpQueryDeclined(tick, "loose bound variable in result")
+  };
+  proof = leanField(result, 1);
+  if (
+    leanTag(proof) == LeanTag.Option_some &&
+    leanExprData(leanField(proof, 0)).ushr(44) != 0
+  ) {
+    return leanSimpQueryDeclined(tick, "loose bound variable in proof")
+  };
+  finalCore = runtime.readRef(coreRef);
+  // Only fresh-name allocation and computational caches may be discarded.
+  for (field in Array[0, 1, 3, 4, 6, 7, 8, 9]) {
+    if (
+      native_eq(leanField(finalCore, field), leanField(initialCore, field)) != 0
+    ) {
+      return leanSimpQueryDeclined(tick, "observable Core state changed")
+    }
+  };
+  finalMeta = runtime.readRef(metaRef);
+  for (field in Array[2, 3, 4]) {
+    if (
+      native_eq(leanField(finalMeta, field), leanField(initialMeta, field)) != 0
+    ) {
+      return leanSimpQueryDeclined(tick, "observable Meta state changed")
+    }
+  };
+  finalSimp = runtime.readRef(simpRef);
+  if (native_eq(leanField(finalSimp, 5), leanField(initialSimp, 5)) != 0) {
+    return leanSimpQueryDeclined(tick, "simplifier diagnostics changed")
+  };
+  used = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_UsedSimps_toArray_637b29bb1f(
+    runtime,
+    leanField(finalSimp, 3),
+  );
+  if (!validator.check(used)) {
+    return leanSimpQueryDeclined(tick, "open theorem origin")
+  };
+  LeanSimpQueryResult(
+    Some(result),
+    leanArray(used),
+    leanField(finalSimp, 4),
+    tick,
+    "",
+    runtime.simpOlderQueryKeys,
+  )
+}
+
+fun leanFetchSimpQuery(
+  runtime: mutable LeanExecution,
+  queries: SKStore.LHandle<LeanSimpQueryKey, LeanSimpQueryResult>,
+  environment: LeanValue,
+  methods: LeanValue,
+  mask: Int,
+  args: Array<LeanValue>,
+): ?LeanValue {
+  expr = args[0];
+  data = leanExprData(expr);
+  // Sampling controls overhead; tests can select every sufficiently large term.
+  if (
+    data.ushr(32).and(255) < 4 ||
+    data.and(mask) != 0 ||
+    data.and(3.shl(41)) != 0 ||
+    data.ushr(44) != 0
+  ) return None();
+  if (native_eq(args[1], methods) != 0) {
+    leanSimpQueryDebug("methods differ");
+    return None()
+  };
+  if (native_eq(leanField(runtime.readRef(args[7]), 0), environment) != 0) {
+    leanSimpQueryDebug("environment differs");
+    return None()
+  };
+  metaContext = args[4];
+  if (
+    leanIsTrue(leanField(metaContext, 1)) ||
+    leanTag(leanField(metaContext, 5)) != LeanTag.Option_none ||
+    leanTag(leanField(metaContext, 7)) != LeanTag.Option_none
+  ) {
+    leanSimpQueryDebug("Meta context not eligible");
+    return None()
+  };
+  simpContext = args[2];
+  config = leanField(simpContext, 0);
+  if (!leanIsTrue(leanField(config, 3))) return None();
+  // Keep Lean's cheap within-execution cache in front of the persistent one.
+  local = L4_Lean_Meta_Tactic_Simp_Main.f_Simp_simpLoop_spec_4_cc6ea5540b(
+    runtime,
+    leanField(runtime.readRef(args[3]), 0),
+    expr,
+  );
+  if (leanTag(local) == LeanTag.Option_some) return None();
+  // Native simp's own expression cache excludes parent?. Only results carrying
+  // cache=true can be replayed across parents. All other context is in the key.
+  normalizedSimp = leanReplaceField(
+    simpContext,
+    9,
+    LeanCtor(LeanTag.Option_none, Array[]),
+  );
+  // This driver has a fixed high recursion limit. Isolated queries start at
+  // depth zero; bounded-resource equivalence is not part of this initial API.
+  coreContext = leanReplaceField(args[6], 1, leanNatValue(0));
+  validator = mutable LeanSimpValueValidator{allowUnavailable => true};
+  if (!validator.fields(Array[expr, simpContext, metaContext, coreContext])) {
+    leanSimpQueryDebug("key not eligible");
+    return None()
+  };
+  key = LeanSimpQueryKey(
+    expr,
+    simpContext,
+    normalizedSimp,
+    metaContext,
+    coreContext,
+  );
+  if (runtime.memoizeSimp && runtime.simpQueryFetches == 0) {
+    leanSimpQueryDebug("root key " + key.toString())
+  };
+  attempted = try {
+    Some(queries.get(runtime.context(), key))
+  } catch {
+  | SKStore.CyclicExn _ -> None()
+  | error -> throw error
+  };
+  cached = attempted match {
+  | Some(value) -> value
+  | None() -> return None()
+  };
+  runtime.!simpQueryFetches = runtime.simpQueryFetches + 1;
+  cached.result match {
+  | None() ->
+    leanSimpQueryDebug("query declined: " + cached.declined);
+    runtime.!simpQueryDeclines = runtime.simpQueryDeclines + 1;
+    None()
+  | Some(result) ->
+    state = runtime.readRef(args[3]);
+    // numSteps counts work, not the historical cost of a cached proof. Replaying
+    // that cost on every hit overcharged shared descendants and caused false
+    // exhaustion. Each isolated query enforces its own configured step limit;
+    // a single aggregate budget across the query graph is not implemented.
+    used = leanField(state, 3);
+    for (origin in cached.usedTheorems) {
+      !used = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_UsedSimps_insert_133fe488d4(
+        runtime,
+        used,
+        origin,
+      )
+    };
+    runtime.writeRef(args[3], Some(leanReplaceField(state, 3, used)));
+    if (cached.evaluatedAt < runtime.context().getTick().value) {
+      runtime.!simpOlderQueriesFetched = runtime.simpOlderQueriesFetched + 1;
+      runtime.!simpOlderQueryKeys = runtime.simpOlderQueryKeys.set(key)
+    } else {
+      // Propagate distinct older results used by newly computed descendants.
+      // Set union avoids double counting when a query is fetched twice in this
+      // tick. Provenance from an older evaluation is never replayed here.
+      for (older in cached.olderQueryKeys) {
+        runtime.!simpOlderQueryKeys = runtime.simpOlderQueryKeys.set(older)
+      }
+    };
+    Some(
+      L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_cacheResult_075347cddb(
+        runtime,
+        expr,
+        config,
+        result,
+        args[3],
+        args[8],
+      ),
+    )
+  }
+}
+
+fun leanRegisterSimpQueries(
+  runtime: mutable LeanExecution,
+  environment: LeanValue,
+): void {
+  methods = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(
+    runtime,
+    LeanArray(Array[]),
+  );
+  mask = runtime.simpQueryMask;
+  // The lazy callback below already collects each query's temporary execution.
+  // Sample long stretches between queries; collecting every recursive call
+  // repeatedly copies the same live state. This switch is diagnostic only.
+  regions = Environ.varOpt("LEAN_SKIP_QUERY_REGIONS").default("sampled");
+  if (regions != "0" && regions != "sampled" && regions != "all") {
+    leanFail("LEAN_SKIP_QUERY_REGIONS must be 0, sampled, or all")
+  };
+  initialized = mutable LeanExecution{
+    store => runtime.store,
+    unboundedHeartbeats => true,
+    collectSimpRegions => regions != "0",
+    denseSimpRegions => regions == "all",
+    simpQueryMask => mask,
+  };
+  leanInitializeSimp(initialized);
+  bootstrap = initialized.checkpoint();
+  queries = SKStore.LHandle::create(
+    LeanSimpQueryKey::keyType,
+    LeanSimpQueryResult::type,
+    runtime.context(),
+    SKStore.DirName::create("/simp/queries/"),
+    (context, self, key) ~>
+      SKStore.withRegion(context, (_, current) ~>
+        Array[
+          leanComputeSimpQuery(
+            current,
+            self,
+            environment,
+            methods,
+            mask,
+            bootstrap,
+            key,
+          ),
+        ]
+      )
+    ,
+  );
+  runtime.!simpHook = Some((runtime, args) ~>
+    leanFetchSimpQuery(runtime, queries, environment, methods, mask, args)
+  )
+}

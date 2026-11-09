@@ -1,0 +1,56 @@
+// Lean Int uses its mathematical constructor representation here. Magnitudes
+// remain arbitrary precision, including values outside Skip's host Int range.
+fun leanInteger(value: LeanValue): (Bool, LeanNat) {
+  leanTag(value) match {
+  | LeanTag.Int_ofNat -> (false, leanNat(leanField(value, 0)))
+  | LeanTag.Int_negSucc ->
+    (true, leanNat(leanField(value, 0)).add(LeanNat::fromInt(1)))
+  | _ -> leanFail("expected a Lean Int")
+  }
+}
+
+fun leanIntegerValue(negative: Bool, magnitude: LeanNat): LeanValue {
+  if (negative && !magnitude.isZero()) {
+    LeanCtor(
+      LeanTag.Int_negSucc,
+      Array[leanBoxNat(magnitude.sub(LeanNat::fromInt(1)))],
+    )
+  } else {
+    LeanCtor(LeanTag.Int_ofNat, Array[leanBoxNat(magnitude)])
+  }
+}
+
+fun leanIntegerAdd(a: LeanValue, b: LeanValue): LeanValue {
+  (negativeA, magnitudeA) = leanInteger(a);
+  (negativeB, magnitudeB) = leanInteger(b);
+  if (negativeA == negativeB) {
+    return leanIntegerValue(negativeA, magnitudeA.add(magnitudeB))
+  };
+  if (magnitudeA >= magnitudeB) {
+    leanIntegerValue(negativeA, magnitudeA.sub(magnitudeB))
+  } else {
+    leanIntegerValue(negativeB, magnitudeB.sub(magnitudeA))
+  }
+}
+
+fun leanIntegerNegate(value: LeanValue): LeanValue {
+  (negative, magnitude) = leanInteger(value);
+  leanIntegerValue(!negative, magnitude)
+}
+
+fun leanIntegerCompare(a: LeanValue, b: LeanValue): Int {
+  (negativeA, magnitudeA) = leanInteger(a);
+  (negativeB, magnitudeB) = leanInteger(b);
+  if (negativeA != negativeB) return if (negativeA) -1 else 1;
+  comparison = if (magnitudeA == magnitudeB) 0 else if (
+    magnitudeA < magnitudeB
+  ) -1 else {
+    1
+  };
+  if (negativeA) -comparison else comparison
+}
+
+fun leanIntegerText(value: LeanValue): String {
+  (negative, magnitude) = leanInteger(value);
+  (if (negative) "-" else "") + magnitude.toString()
+}

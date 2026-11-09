@@ -1,0 +1,267 @@
+// Typed-input bridge for `intro ...; simp only [...]`. The original maintained
+// Meta implementation opens binders, constructs rewrite rules and builds proofs.
+// This bridge does not parse Lean source or implement a replacement simplifier.
+fun leanMetaSucceeded(result: LeanValue): Bool {
+  leanTag(result) == LeanTag.EST_Out_ok
+}
+
+fun leanSimpOpened(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  // Captured script inputs, followed by the telescope callback's parameters.
+  openedStart = runtime.simpPhaseNow();
+  phaseStart = openedStart;
+  globals = leanArray(args[0]);
+  localIndices = leanArray(args[1]);
+  xs = args[2];
+  body = args[3];
+  metaContext = args[4];
+  metaState = args[5];
+  coreContext = args[6];
+  coreState = args[7];
+  world = args[8];
+  theorems = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_instInhabitedSimpTheorems_default_e7dd612eb4(
+    runtime,
+  );
+  // `depth` is explicitly selected for unfolding by this proof script.
+  !theorems = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheorems_addDeclToUnfoldCore_2626e6babd(
+    runtime,
+    theorems,
+    leanSimpleName(runtime, "depth"),
+  );
+  // These two rules are also included by Lean's `simp only` frontend.
+  builtins = Array[
+    leanSimpleName(runtime, "eq_self"),
+    leanSimpleName(runtime, "iff_self"),
+  ];
+  for (name in builtins.concat(globals)) {
+    added = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheorems_addConst_5a031d5a88(
+      runtime,
+      theorems,
+      name,
+      leanBool(true),
+      leanBool(false),
+      leanNatValue(1000),
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!leanMetaSucceeded(added)) return added;
+    !theorems = leanField(added, 0)
+  };
+  runtime.recordSimpPhase("globalRules", runtime.simpPhaseNow() - phaseStart);
+  !phaseStart = runtime.simpPhaseNow();
+  for (index in localIndices) {
+    i = leanNat(index).toInt();
+    locals = leanArray(xs);
+    if (i < 0 || i >= locals.size()) {
+      leanFail("simp script local index out of bounds")
+    };
+    proof = locals[i];
+    if (leanTag(proof) != LeanTag.Expr_fvar__impl) {
+      leanFail("simp telescope did not introduce a local variable")
+    };
+    origin = LeanCtor(
+      LeanTag.Meta_Origin_fvar,
+      Array[leanField(proof, 1)],
+    );
+    added = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheorems_add_744344db8f(
+      runtime,
+      theorems,
+      origin,
+      LeanArray(Array[]),
+      proof,
+      leanBool(false),
+      leanBool(true),
+      leanNatValue(1000),
+      L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Lean_Meta_simpGlobalConfig_0e6955ac68(
+        runtime,
+      ),
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!leanMetaSucceeded(added)) return added;
+    !theorems = leanField(added, 0)
+  };
+  runtime.recordSimpPhase("localRules", runtime.simpPhaseNow() - phaseStart);
+  !phaseStart = runtime.simpPhaseNow();
+  config = leanReplaceField(
+    L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime),
+    0,
+    leanNatValue(4000000),
+  );
+  contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(
+    runtime,
+    config,
+    LeanArray(Array[theorems]),
+    L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(
+      runtime,
+    ),
+    leanField(leanField(coreContext, 0), 2),
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!leanMetaSucceeded(contextResult)) return contextResult;
+  if (runtime.memoizeSimp) {
+    leanRegisterSimpQueries(runtime, leanField(runtime.readRef(coreState), 0))
+  };
+  runtime.recordSimpPhase("context", runtime.simpPhaseNow() - phaseStart);
+  !phaseStart = runtime.simpPhaseNow();
+  simplified = L4_Lean_Meta_Tactic_Simp_Main.f_Lean_Meta_simp_62ff973574(
+    runtime,
+    body,
+    leanField(contextResult, 0),
+    LeanArray(Array[]),
+    LeanCtor(LeanTag.Option_none, Array[]),
+    L4_Lean_Meta_Tactic_Simp_Types.f_Simp_instInhabitedStats_default_1c334e0b28(
+      runtime,
+    ),
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  runtime.recordSimpPhase("simplify", runtime.simpPhaseNow() - phaseStart);
+  !phaseStart = runtime.simpPhaseNow();
+  if (!leanMetaSucceeded(simplified)) return simplified;
+  result = leanField(leanField(simplified, 0), 0);
+  if (
+    !leanExprEqual(
+      runtime,
+      leanField(result, 0),
+      leanNamedConstant(runtime, "True"),
+      true,
+    )
+  ) {
+    message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+      runtime,
+      LeanCtor(
+        LeanTag.Std_Format_text,
+        Array[LeanText("simp did not close the typed goal")],
+      ),
+    );
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[
+        LeanCtor(
+          LeanTag.Exception_error,
+          Array[
+            LeanCtor(LeanTag.Syntax_missing, Array[]),
+            message,
+          ],
+        ),
+        world,
+      ],
+    )
+  };
+  equality = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Result_getProof_203173df41(
+    runtime,
+    result,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!leanMetaSucceeded(equality)) return equality;
+  proved = L4_Lean_Meta_AppBuilder.f_Lean_Meta_mkOfEqTrue_e19a32f6b8(
+    runtime,
+    leanField(equality, 0),
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!leanMetaSucceeded(proved)) return proved;
+  proofResult = L4_Lean_Meta_Basic.f_Lean_Meta_mkLambdaFVars_2bb3162322(
+    runtime,
+    xs,
+    leanField(proved, 0),
+    leanBool(false),
+    leanBool(true),
+    leanBool(false),
+    leanBool(true),
+    LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  runtime.recordSimpPhase("proof", runtime.simpPhaseNow() - phaseStart);
+  runtime.recordSimpPhase("openedTotal", runtime.simpPhaseNow() - openedStart);
+  proofResult
+}
+
+fun leanElaborateSimp(
+  runtime: mutable LeanExecution,
+  env: LeanValue,
+  expected: LeanValue,
+  globalRules: Array<LeanValue>,
+  localRules: Array<LeanValue>,
+): LeanValue {
+  start = runtime.simpPhaseNow();
+  metaContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaState = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreContext = leanUnboundedCoreContext(runtime, "<skip-simp>", "");
+  cold = leanField(coreContext, 0);
+  options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+    runtime,
+    L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(runtime),
+    leanField(cold, 2),
+    leanSimpleName(runtime, "maxRecDepth"),
+    leanNatValue(100000),
+  );
+  !coreContext = leanReplaceField(
+    coreContext,
+    0,
+    leanReplaceField(
+      leanReplaceField(cold, 2, options),
+      3,
+      leanNatValue(100000),
+    ),
+  );
+  coreState = runtime.newRef(leanCoreState(runtime, env));
+  callback = LeanClosure(
+    leanSimpOpened,
+    9,
+    Array[LeanArray(globalRules), LeanArray(localRules)],
+  );
+  runtime.recordSimpPhase("metaSetup", runtime.simpPhaseNow() - start);
+  telescopeStart = runtime.simpPhaseNow();
+  result = L4_Lean_Meta_Basic.f_Lean_Meta_forallTelescopeReducingImp_644d029026(
+    runtime,
+    LeanErased(),
+    expected,
+    callback,
+    leanBool(false),
+    leanBool(false),
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    LeanErased(),
+  );
+  runtime.recordSimpPhase(
+    "telescope",
+    runtime.simpPhaseNow() -
+      telescopeStart -
+      runtime.simpPhaseNs.maybeGet("openedTotal").default(0),
+  );
+  result
+}

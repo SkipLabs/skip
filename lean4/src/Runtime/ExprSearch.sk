@@ -1,0 +1,27 @@
+// Lean's find? visits the root, then function before argument (including partial
+// applications), binder type before body, and let type/value/body in that order.
+// The predicate is pure. Shared immutable expressions can be visited once.
+fun leanExprFind(
+  runtime: mutable LeanExecution,
+  predicate: LeanValue,
+  expr: LeanValue,
+): LeanValue {
+  pending = mutable Vector[expr];
+  visited: mutable Map<LeanImmutableKey, Bool> = mutable Map[];
+  while (!pending.isEmpty()) {
+    current = pending.pop();
+    key = LeanImmutableKey(current);
+    if (visited.maybeGet(key).isSome()) continue;
+    visited.set(key, true);
+    if (leanIsTrue(leanApply(runtime, predicate, Array[current]))) {
+      return LeanCtor(LeanTag.Option_some, Array[current])
+    };
+    childFields = leanExprChildren(current);
+    i = childFields.size();
+    while (i > 0) {
+      !i = i - 1;
+      pending.push(leanField(current, childFields[i].i0))
+    }
+  };
+  LeanCtor(LeanTag.Option_none, Array[])
+}

@@ -10,7 +10,7 @@ fun leanNamedConstant(runtime: mutable LeanExecution, name: String): LeanValue {
   L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
     runtime,
     leanSimpleName(runtime, name),
-    LeanCtor("[\"List\",\"nil\"]", Array[]),
+    LeanCtor(LeanTag.List_nil, Array[]),
   )
 }
 
@@ -29,10 +29,10 @@ fun leanApplyExpr(
 fun leanNatNumeral(runtime: mutable LeanExecution, n: LeanValue): LeanValue {
   literal = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, n);
   zeroLevels = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
-      LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     ],
   );
   ofNat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
@@ -61,7 +61,7 @@ fun leanNatDefinition(
   name: LeanValue,
   n: LeanValue,
 ): LeanValue {
-  nil = LeanCtor("[\"List\",\"nil\"]", Array[]);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
   definition = L4_Lean_Declaration.f_Lean_mkDefinitionValEx_04433553ec(
     runtime,
     name,
@@ -69,21 +69,21 @@ fun leanNatDefinition(
     leanNamedConstant(runtime, "Nat"),
     leanNatNumeral(runtime, n),
     LeanCtor(
-      "[\"Lean\",\"ReducibilityHints\",\"regular\"]",
+      LeanTag.ReducibilityHints_regular,
       Array[LeanWord("uint32", 2)],
     ),
-    LeanCtor("[\"Lean\",\"DefinitionSafety\",\"safe\"]", Array[]),
-    LeanCtor("[\"List\",\"cons\"]", Array[name, nil]),
+    LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+    LeanCtor(LeanTag.List_cons, Array[name, nil]),
   );
-  LeanCtor("[\"Lean\",\"ConstantInfo\",\"defnInfo\"]", Array[definition])
+  LeanCtor(LeanTag.ConstantInfo_defnInfo, Array[definition])
 }
 
 fun leanLimitTheoremType(runtime: mutable LeanExecution): LeanValue {
   zeroLevels = LeanCtor(
-    "[\"List\",\"cons\"]",
+    LeanTag.List_cons,
     Array[
-      LeanCtor("[\"Lean\",\"Level\",\"zero\",\"_impl\"]", Array[]),
-      LeanCtor("[\"List\",\"nil\"]", Array[]),
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      LeanCtor(LeanTag.List_nil, Array[]),
     ],
   );
   lt = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(

@@ -1,0 +1,196 @@
+module L4_Lean_Meta_InferType;
+
+// Shared implementation of checkInferTypeCache. The maintained original expands
+// this policy independently at each expression alternative into a 526-slot
+// frame. Keep the same cache, budgeted equality, invalidation and cancellation
+// semantics, with ordinary Skip locals and immutable state updates.
+fun f_inferTypeCached(
+  runtime: mutable LeanExecution,
+  e: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  cacheable =
+    leanIsTrue(leanField(context, 10)) &&
+    !leanIsTrue(L4_Lean_Expr.f_Lean_Expr_hasMVar_6b07f9e1fb(runtime, e));
+  key: ?LeanValue = None();
+  if (cacheable) {
+    keyed = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+      runtime,
+      e,
+      context,
+      world,
+    );
+    if (leanTag(keyed) == LeanTag.EST_Out_error) return keyed;
+    k = leanField(keyed, 0);
+    !world = leanField(keyed, 1);
+    !key = Some(k);
+    cache = leanField(leanField(runtime.readRef(state), 1), 0);
+    entry = f_inferTypeImp_infer_spec_2_3cc60cfed5(runtime, cache, k);
+    if (leanTag(entry) == LeanTag.Option_some) {
+      pair = leanField(entry, 0);
+      storedKey = leanField(pair, 0);
+      if (
+        leanWordBits(leanField(k, 1)) == leanWordBits(leanField(storedKey, 1))
+      ) {
+        equality = L4_Lean_Expr.f_Lean_Expr_equalBudgeted_2a70e26ec2(
+          runtime,
+          leanField(k, 0),
+          leanField(storedKey, 0),
+          LeanWord("usize", 64),
+          world,
+        );
+        !world = leanField(equality, 1);
+        leanTag(leanField(equality, 0)) match {
+        | LeanTag.LBool_true ->
+          return LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[leanField(pair, 1), world],
+          )
+        | LeanTag.LBool_undef ->
+          // An inconclusive comparison removes the entry, just as BudgetedCache.
+          f_replaceInferCache(
+            runtime,
+            state,
+            f_inferTypeImp_infer_spec_3_7ba6fb99f3(runtime, cache, k),
+          )
+        | LeanTag.LBool_false -> void
+        | _ -> leanFail("invalid inference-cache equality result")
+        }
+      }
+    }
+  };
+  cancel = leanField(leanField(core, 0), 10);
+  if (leanTag(cancel) == LeanTag.Option_some) {
+    checked = L4_Init_System_CancelToken.f_IO_CancelToken_isSet_0178382798(
+      runtime,
+      leanField(cancel, 0),
+      world,
+    );
+    !world = leanField(checked, 1);
+    if (leanIsTrue(leanField(checked, 0))) {
+      return f_inferTypeImp_infer_spec_0_dc65541f09(runtime, world)
+    }
+  };
+  result = f_inferTypeUncached(
+    runtime,
+    e,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  if (leanTag(result) == LeanTag.EST_Out_error) return result;
+  type = leanField(result, 0);
+  key match {
+  | Some(k) ->
+    if (
+      !leanIsTrue(L4_Lean_Expr.f_Lean_Expr_hasMVar_6b07f9e1fb(runtime, type))
+    ) {
+      cache = leanField(leanField(runtime.readRef(state), 1), 0);
+      f_replaceInferCache(
+        runtime,
+        state,
+        f_inferTypeImp_infer_spec_1_703ff25b8d(runtime, cache, k, type),
+      )
+    }
+  | None() -> void
+  };
+  result
+}
+
+fun f_replaceInferCache(
+  runtime: mutable LeanExecution,
+  state: LeanValue,
+  inferCache: LeanValue,
+): void {
+  current = runtime.readRef(state);
+  cache = leanReplaceField(leanField(current, 1), 0, inferCache);
+  runtime.writeRef(state, Some(leanReplaceField(current, 1, cache)))
+}
+
+fun f_inferTypeUncached(
+  runtime: mutable LeanExecution,
+  e: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  leanTag(e) match {
+  | LeanTag.Expr_const__impl ->
+    f_Lean_Meta_inferConstType_3a0fefa44f(
+      runtime,
+      leanField(e, 1),
+      leanField(e, 2),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Expr_app__impl ->
+    // The argument array is execution-local until the one immutable publication.
+    // Build it only on a cache miss; collecting arguments has no Meta effects.
+    reversed: mutable Vector<LeanValue> = mutable Vector[];
+    fn = e;
+    while (leanTag(fn) == LeanTag.Expr_app__impl) {
+      reversed.push(leanField(fn, 2));
+      !fn = leanField(fn, 1)
+    };
+    arguments = LeanArray(
+      Array::fillBy(reversed.size(), i -> reversed[reversed.size() - 1 - i]),
+    );
+    f_Lean_Meta_inferAppType_0c4ea27601(
+      runtime,
+      fn,
+      arguments,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Expr_forallE__impl ->
+    f_Lean_Meta_inferForallType_e92bb48786(
+      runtime,
+      e,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Expr_lam__impl
+  | LeanTag.Expr_letE__impl ->
+    f_Lean_Meta_inferLambdaType_f79d739c65(
+      runtime,
+      e,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | LeanTag.Expr_proj__impl ->
+    f_Lean_Meta_inferProjType_7e3c99dfdf(
+      runtime,
+      leanField(e, 1),
+      leanField(e, 2),
+      leanField(e, 3),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  | _ -> leanFail("unexpected expression in cached inference")
+  }
+}
+
+module end;

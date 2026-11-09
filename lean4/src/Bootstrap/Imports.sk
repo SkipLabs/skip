@@ -4,6 +4,7 @@ class LeanImportedEnvironment(
   extensions: LeanValue,
   extensionGenerations: LeanValue,
   trackedGeneration: LeanValue,
+  header: LeanValue,
 ) {
   fun atPrefix(
     runtime: mutable LeanExecution,
@@ -13,7 +14,7 @@ class LeanImportedEnvironment(
       runtime,
       this.constants,
       locals,
-      LeanUnavailable("imported environment header"),
+      this.header,
       this.extensions,
       this.extensionGenerations,
       true,
@@ -46,9 +47,17 @@ fun leanInstallImports(
   extensionData: LeanImportData,
   extraData: LeanImportData,
   root: String,
+  headerData: ?LeanImportData = None(),
+  direct: Bool = false,
 ): LeanImportedEnvironment {
   leanValidateImportModules(constantsData, extensionData);
   leanValidateImportModules(constantsData, extraData);
+  header = headerData match {
+  | Some(data) ->
+    leanValidateImportModules(constantsData, data);
+    data.environmentHeader
+  | None() -> constantsData.environmentHeader
+  };
   extraNames = extraData.extraConstants match {
   | Some(names) -> names
   | None() -> leanFail("imported extra constant names were not exported")
@@ -59,43 +68,86 @@ fun leanInstallImports(
     "Init",
     SKStore.DirName::create(root + "/extensions/"),
     extensionData.extensions,
+    direct,
   );
-  constants = runtime.store.mkdir(
-    LeanConstantKey::keyType,
-    LeanConstantFile::type,
-    SKStore.DirName::create(root + "/constants/"),
-    constantsData.constants.map(entry ->
-      (
-        LeanConstantKey("Init", leanNameKey(entry.i0)),
+  if (direct) {
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    extras: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (entry in constantsData.constants) {
+      constants.set(
+        leanNameKey(entry.i0),
         LeanConstantFile(entry.i1, Some(entry.i2)),
       )
-    ),
-  );
-  extras = runtime.store.mkdir(
-    LeanConstantKey::keyType,
-    LeanConstantFile::type,
-    SKStore.DirName::create(root + "/extra-constants/"),
-    extraNames.map(entry ->
-      (
-        LeanConstantKey("Init", leanNameKey(entry.i0)),
+    };
+    for (entry in extraNames) {
+      extras.set(
+        leanNameKey(entry.i0),
         LeanConstantFile(
-          LeanCtor("[\"PUnit\",\"unit\"]", Array[]),
+          LeanCtor(LeanTag.PUnit_unit, Array[]),
           Some(entry.i1),
         ),
       )
-    ),
-  );
+    };
+    return LeanImportedEnvironment(
+      LeanConstantsView("Init", LeanConstantMap(constants.chill())),
+      LeanCtor(
+        LeanTag.ImportedConsts_mk,
+        Array[
+          LeanCtor(LeanTag.Option_none, Array[]),
+          LeanTrackedConstants(
+            LeanConstantsView("Init", LeanConstantMap(extras.chill())),
+          ),
+        ],
+      ),
+      extensions.i0,
+      extensions.i1,
+      extensionData.trackedGeneration,
+      header,
+    )
+  };
+  constants = runtime
+    .context()
+    .mkdir(
+      LeanConstantKey::keyType,
+      LeanConstantFile::type,
+      SKStore.DirName::create(root + "/constants/"),
+      constantsData.constants.map(entry ->
+        (
+          LeanConstantKey("Init", leanNameKey(entry.i0)),
+          LeanConstantFile(entry.i1, Some(entry.i2)),
+        )
+      ),
+    );
+  extras = runtime
+    .context()
+    .mkdir(
+      LeanConstantKey::keyType,
+      LeanConstantFile::type,
+      SKStore.DirName::create(root + "/extra-constants/"),
+      extraNames.map(entry ->
+        (
+          LeanConstantKey("Init", leanNameKey(entry.i0)),
+          LeanConstantFile(
+            LeanCtor(LeanTag.PUnit_unit, Array[]),
+            Some(entry.i1),
+          ),
+        )
+      ),
+    );
   LeanImportedEnvironment(
-    LeanConstantsView("Init", constants),
+    LeanConstantsView("Init", LeanConstantDirectory(constants)),
     LeanCtor(
-      "[\"Lean\",\"ImportedConsts\",\"mk\"]",
+      LeanTag.ImportedConsts_mk,
       Array[
-        LeanCtor("[\"Option\",\"none\"]", Array[]),
-        LeanTrackedConstants(LeanConstantsView("Init", extras)),
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView("Init", LeanConstantDirectory(extras)),
+        ),
       ],
     ),
     extensions.i0,
     extensions.i1,
     extensionData.trackedGeneration,
+    header,
   )
 }
