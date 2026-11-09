@@ -1,0 +1,451 @@
+// Collect parameter dependencies, binder properties and higher-order class outputs.
+module L4_Lean_Meta_FunInfo;
+
+fun f_funInfoDecision(decision: LeanValue): Bool {
+  if (leanTag(decision) == LeanTag.Bool_true) {
+    return true
+  };
+  if (leanTag(decision) == LeanTag.Bool_false) {
+    return false
+  };
+  leanFail("non-exhaustive Lean case")
+}
+
+fun f_dependsOnHigherOrderOutput(
+  runtime: mutable LeanExecution,
+  higherOrderOutParams: LeanValue,
+  higherOrderPred: LeanValue,
+  declType: LeanValue,
+): LeanValue {
+  if (
+    leanTag(higherOrderOutParams) == LeanTag.Std_DTreeMap_Internal_Impl_leaf
+  ) {
+    return LeanCtor(LeanTag.Bool_false, Array[])
+  };
+  if (
+    leanTag(higherOrderOutParams) != LeanTag.Std_DTreeMap_Internal_Impl_inner
+  ) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  found = L4_Lean_Util_FindExpr.f_Lean_Expr_findImpl_6534067b74(
+    runtime,
+    higherOrderPred,
+    declType,
+  );
+  if (leanTag(found) == LeanTag.Option_some) {
+    return LeanCtor(LeanTag.Bool_true, Array[])
+  };
+  if (leanTag(found) == LeanTag.Option_none) {
+    return LeanCtor(LeanTag.Bool_false, Array[])
+  };
+  leanFail("non-exhaustive Lean case")
+}
+
+fun f_collectClassOutputs(
+  runtime: mutable LeanExecution,
+  classNameOpt: LeanValue,
+  declType: LeanValue,
+  fvars: LeanValue,
+  index: LeanValue,
+  upperBound: LeanValue,
+  pushedParams: LeanValue,
+  higherOrderOutParams: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  nextPair = LeanCtor(
+    LeanTag.Prod_mk,
+    Array[pushedParams, higherOrderOutParams],
+  );
+  if (leanTag(classNameOpt) == LeanTag.Option_none) {
+    msg = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      runtime,
+      LeanText("Lean.Meta.FunInfo"),
+      LeanText("_private.Lean.Meta.FunInfo.0.Lean.Meta.getFunInfoAux"),
+      LeanNatLiterals.n121,
+      LeanNatLiterals.n47,
+      LeanText("unreachable code has been reached"),
+    );
+    panicResult = f_Meta_getFunInfoAux_spec_3_273617aa32(
+      runtime,
+      msg,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    if (leanTag(panicResult) == LeanTag.EST_Out_error) {
+      return panicResult
+    };
+    if (leanTag(panicResult) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[nextPair, leanField(panicResult, 1)],
+    )
+  };
+  if (leanTag(classNameOpt) != LeanTag.Option_some) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  className = leanField(classNameOpt, 0);
+
+  refResult = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreStateRef,
+    world,
+  );
+  if (leanTag(refResult) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  coreState = leanField(refResult, 0);
+  coreWorld = leanField(refResult, 1);
+  if (leanTag(coreState) != LeanTag.Core_State_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  environment = leanField(coreState, 0);
+
+  positionsResult = L4_Lean_Class.f_Lean_getOutParamPositions_db0dd84075(
+    runtime,
+    environment,
+    className,
+  );
+  if (leanTag(positionsResult) == LeanTag.Option_none) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[nextPair, coreWorld])
+  };
+  if (leanTag(positionsResult) != LeanTag.Option_some) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  positions = leanField(positionsResult, 0);
+  positionsSize = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    positions,
+  );
+  sizeIsZero = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    runtime,
+    positionsSize,
+    LeanNatLiterals.n0,
+  );
+  if (f_funInfoDecision(sizeIsZero)) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[nextPair, coreWorld])
+  };
+
+  numArgs = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+    runtime,
+    declType,
+  );
+  propSort = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  appArgs = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+    runtime,
+    declType,
+    L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+      runtime,
+      LeanErased(),
+      numArgs,
+      propSort,
+    ),
+    L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, numArgs, LeanNatLiterals.n1),
+  );
+  appArgsSize = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    appArgs,
+  );
+  outputsResult = f_Meta_getFunInfoAux_spec_2_1936896188(
+    runtime,
+    appArgsSize,
+    positions,
+    appArgs,
+    fvars,
+    index,
+    upperBound,
+    LeanNatLiterals.n0,
+    nextPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    coreWorld,
+  );
+  if (leanTag(outputsResult) == LeanTag.EST_Out_error) {
+    return outputsResult
+  };
+  if (leanTag(outputsResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  outputsPair = leanField(outputsResult, 0);
+  if (leanTag(outputsPair) != LeanTag.Prod_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[leanField(outputsPair, 0), leanField(outputsPair, 1)],
+      ),
+      leanField(outputsResult, 1),
+    ],
+  )
+}
+
+fun f_collectParameterInfo(
+  runtime: mutable LeanExecution,
+  upperBound: LeanValue,
+  fvars: LeanValue,
+  index: LeanValue,
+  pair: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanTag(pair) != LeanTag.Prod_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  paramInfo = leanField(pair, 0);
+  higherOrderOutParams = leanField(pair, 1);
+
+  higherOrderPred = LeanClosure(
+    L4_Lean_Meta_FunInfo.apply_f_getFunInfoAux_spec_4_lam_1_91c06b6fec,
+    2,
+    Array[higherOrderOutParams],
+  );
+  telescopeCont = LeanClosure(
+    L4_Lean_Meta_FunInfo.apply_f_getFunInfoAux_spec_4_lam_0_95d7ee6b28,
+    7,
+    Array[],
+  );
+
+  fvar = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+    runtime,
+    LeanErased(),
+    fvars,
+    index,
+    LeanErased(),
+  );
+  declResult = L4_Lean_Meta_Basic.f_Lean_Meta_getFVarLocalDecl_53b3a14c72(
+    runtime,
+    fvar,
+    metaContext,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(declResult) == LeanTag.EST_Out_error) {
+    return declResult
+  };
+  if (leanTag(declResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  decl = leanField(declResult, 0);
+  afterDeclWorld = leanField(declResult, 1);
+
+  declType = L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(
+    runtime,
+    decl,
+  );
+  backDeps = f_Lean_Meta_collectDeps_56366e190e(runtime, fvars, declType);
+  dependsOnHigherOrderOutParam = f_dependsOnHigherOrderOutput(
+    runtime,
+    higherOrderOutParams,
+    higherOrderPred,
+    declType,
+  );
+
+  classResult = L4_Lean_Meta_Basic.f_Lean_Meta_isClass_a52be47aca(
+    runtime,
+    declType,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    afterDeclWorld,
+  );
+  if (leanTag(classResult) == LeanTag.EST_Out_error) {
+    return classResult
+  };
+  if (leanTag(classResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  classNameOpt = leanField(classResult, 0);
+  afterClassWorld = leanField(classResult, 1);
+
+  binderInfo = L4_Lean_LocalContext.f_Lean_LocalDecl_binderInfo_61abf5b9d5(
+    runtime,
+    decl,
+  );
+  isInstance = LeanCtor(LeanTag.Bool_false, Array[]);
+  if (leanTag(classNameOpt) == LeanTag.Option_some) {
+    explicit = L4_Lean_Expr.f_Lean_BinderInfo_isExplicit_984a6ac108(
+      runtime,
+      binderInfo,
+    );
+    if (leanTag(explicit) == LeanTag.Bool_false) {
+      !isInstance = LeanCtor(LeanTag.Bool_true, Array[])
+    } else if (leanTag(explicit) != LeanTag.Bool_true) {
+      return leanFail("non-exhaustive Lean case")
+    }
+  } else if (leanTag(classNameOpt) != LeanTag.Option_none) {
+    return leanFail("non-exhaustive Lean case")
+  };
+
+  updatedParams = f_Lean_Meta_updateHasFwdDeps_f4be133458(
+    runtime,
+    paramInfo,
+    backDeps,
+  );
+
+  propResult = L4_Lean_Meta_InferType.f_Lean_Meta_isProp_a6224e7718(
+    runtime,
+    declType,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    afterClassWorld,
+  );
+  if (leanTag(propResult) == LeanTag.EST_Out_error) {
+    return propResult
+  };
+  if (leanTag(propResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  isProp = leanField(propResult, 0);
+  afterPropWorld = leanField(propResult, 1);
+
+  telescopeResult = f_Meta_getFunInfoAux_spec_1_40c80ae1b9(
+    runtime,
+    declType,
+    telescopeCont,
+    LeanCtor(LeanTag.Bool_false, Array[]),
+    LeanCtor(LeanTag.Bool_false, Array[]),
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    afterPropWorld,
+  );
+  if (leanTag(telescopeResult) == LeanTag.EST_Out_error) {
+    return telescopeResult
+  };
+  if (leanTag(telescopeResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  isDecInst = leanField(telescopeResult, 0);
+  afterTelescopeWorld = leanField(telescopeResult, 1);
+
+  paramInfoEntry = LeanCtor(
+    LeanTag.Meta_ParamInfo_mk,
+    Array[
+      binderInfo,
+      LeanCtor(LeanTag.Bool_false, Array[]),
+      backDeps,
+      isProp,
+      isDecInst,
+      isInstance,
+      LeanCtor(LeanTag.Bool_false, Array[]),
+      dependsOnHigherOrderOutParam,
+    ],
+  );
+  pushedParams = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    runtime,
+    LeanErased(),
+    updatedParams,
+    paramInfoEntry,
+  );
+
+  nextPair: LeanValue = LeanCtor(
+    LeanTag.Prod_mk,
+    Array[pushedParams, higherOrderOutParams],
+  );
+  nextWorld = afterTelescopeWorld;
+  if (leanTag(isInstance) == LeanTag.Bool_true) {
+    classBranch = f_collectClassOutputs(
+      runtime,
+      classNameOpt,
+      declType,
+      fvars,
+      index,
+      upperBound,
+      pushedParams,
+      higherOrderOutParams,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      afterTelescopeWorld,
+    );
+    if (leanTag(classBranch) == LeanTag.EST_Out_error) {
+      return classBranch
+    };
+    if (leanTag(classBranch) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    !nextPair = leanField(classBranch, 0);
+    !nextWorld = leanField(classBranch, 1)
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[nextPair, nextWorld])
+}
+
+fun f_Meta_getFunInfoAux_spec_4_f0a9dec386(
+  runtime: mutable LeanExecution,
+  upperBound: LeanValue,
+  fvars: LeanValue,
+  index: LeanValue,
+  paramInfoAndOutParams: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  currentIndex = index;
+  parametersAndOutputs = paramInfoAndOutParams;
+  currentWorld = world;
+  while (
+    f_funInfoDecision(
+      L4_Init_Prelude.f_Nat_decLt_b34d01d051(runtime, currentIndex, upperBound),
+    )
+  ) {
+    step = f_collectParameterInfo(
+      runtime,
+      upperBound,
+      fvars,
+      currentIndex,
+      parametersAndOutputs,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      currentWorld,
+    );
+    if (leanTag(step) == LeanTag.EST_Out_error) {
+      return step
+    };
+    if (leanTag(step) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    !parametersAndOutputs = leanField(step, 0);
+    !currentWorld = leanField(step, 1);
+    !currentIndex = L4_Init_Prelude.f_Nat_add_86990f4822(
+      runtime,
+      currentIndex,
+      LeanNatLiterals.n1,
+    )
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[parametersAndOutputs, currentWorld])
+}
+
+module end;

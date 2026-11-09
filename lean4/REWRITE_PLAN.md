@@ -127,6 +127,27 @@ unconverted protocol a documented boundary is not completion.
 
 ## Work sequence
 
+### Pilot checkpoint (2026-11-09)
+
+The three initial tasks are integrated: key hashing, the universe-equality outer
+entry, and function-info parameter traversal. Incremental type-checking and
+focused execution checks pass; [the batch audit](provenance/rewrite-batches/2026-11-09-wave-01.json)
+records exact bodies, probes and coverage limits. These complete their structured
+control-flow conversion, not the remaining typed-interface work or whole-example
+performance gate.
+
+Vibe produced the drafts within eight minutes per task, but two workers exhausted
+their 300,000-token budgets before complete handoffs. Root and peer review finished
+missing fixtures and corrected naming, compiler errors and test expectations.
+Only the hash task completed all requested artifacts in the initial worker run.
+Three writers do not yet imply three independently accepted changes per run.
+
+The next bounded investment is compact task extraction, one guarded integration
+tool, and shared valid probe fixtures. Judge this tooling on the next batch's
+accepted output and review effort before increasing concurrency. The revised
+example-scoped estimate is 5–8 working days, including review and the final
+benchmark; the earlier 24–48 active-hour estimate underestimated validation work.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree

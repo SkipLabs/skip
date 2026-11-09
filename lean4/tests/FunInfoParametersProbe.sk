@@ -1,0 +1,404 @@
+// Compare parameter traversal results, reference state and immutable inputs.
+
+fun copySpec4Input(value: LeanValue): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.map(copySpec4Input))
+  | LeanArray(values) -> LeanArray(values.map(copySpec4Input))
+  | _ -> value
+  }
+}
+
+fun spec4FVars(
+  runtime: mutable LeanExecution,
+  names: Array<LeanValue>,
+): LeanValue {
+  fvars: mutable Vector<LeanValue> = mutable Vector[];
+  for (n in names) {
+    fvars.push(L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, n))
+  };
+  LeanArray(fvars.toArray())
+}
+
+fun spec4EmptyPair(): LeanValue {
+  LeanCtor(
+    LeanTag.Prod_mk,
+    Array[
+      LeanArray(Array[]),
+      LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]),
+    ],
+  )
+}
+
+fun spec4ProbeCall(
+  runtime: mutable LeanExecution,
+  fallback: Bool,
+  upperBound: LeanValue,
+  fvars: LeanValue,
+  index: LeanValue,
+  pair: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  method = if (fallback) {
+    L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_4_f0a9dec386_fallback
+  } else {
+    L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_4_f0a9dec386
+  };
+  method(
+    runtime,
+    upperBound,
+    fvars,
+    index,
+    pair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  )
+}
+
+fun checkSpec4Case(
+  saved: LeanExecutionCheckpoint,
+  upperBound: LeanValue,
+  fvarsA: LeanValue,
+  fvarsB: LeanValue,
+  pairA: LeanValue,
+  pairB: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  label: String,
+  index: LeanValue,
+  world: LeanValue,
+  expectSuccess: Bool,
+  expectedCount: Int,
+): Int {
+  original = saved.restoreRaw();
+  initialPair = copySpec4Input(pairA);
+  initialFVars = copySpec4Input(fvarsA);
+  structured = saved.restoreRaw();
+  for (_ in Range(0, 2)) {
+    expected = spec4ProbeCall(
+      original,
+      true,
+      upperBound,
+      fvarsA,
+      index,
+      pairA,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    actual = spec4ProbeCall(
+      structured,
+      false,
+      upperBound,
+      fvarsB,
+      index,
+      pairB,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    expectedTag = if (expectSuccess) LeanTag.EST_Out_ok else {
+      LeanTag.EST_Out_error
+    };
+    if (leanTag(actual) != expectedTag) {
+      leanFail("spec_4 unexpected success/error: " + label)
+    };
+    if (expectSuccess) {
+      parameters = leanArray(leanField(leanField(actual, 0), 0));
+      assert(parameters.size() == expectedCount);
+      if (
+        label == "dependent parameters" ||
+        label == "resume after first parameter"
+      ) {
+        assert(leanTag(leanField(parameters[0], 1)) == LeanTag.Bool_true);
+        assert(
+          native_eq(
+            leanField(parameters[1], 2),
+            LeanArray(Array[LeanNatLiterals.n0]),
+          ) == 0,
+        )
+      }
+    };
+    assert(native_eq(leanField(actual, 1), world) == 0);
+    if (native_eq(expected, actual) != 0) {
+      leanFail("spec_4 result mismatch: " + label)
+    };
+
+    if (native_eq(leanField(expected, 1), leanField(actual, 1)) != 0) {
+      leanFail("spec_4 world mismatch: " + label)
+    };
+    if (
+      native_eq(original.checkpoint().refs, structured.checkpoint().refs) != 0
+    ) {
+      leanFail("spec_4 reference mismatch: " + label)
+    };
+    if (
+      native_eq(fvarsA, initialFVars) != 0 ||
+      native_eq(fvarsB, initialFVars) != 0 ||
+      native_eq(pairA, initialPair) != 0 ||
+      native_eq(pairB, initialPair) != 0
+    ) {
+      leanFail("spec_4 mutated an input array: " + label)
+    }
+  };
+  2
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  aName = name("a");
+  bName = name("b");
+  cName = name("c");
+  ghostName = name("ghost");
+  hName = name("h");
+
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  fvarA = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, aName);
+
+  dependentType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    hName,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    fvarA,
+    prop,
+  );
+
+  localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+    runtime,
+  );
+  !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localContext,
+    aName,
+    aName,
+    prop,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+  );
+  !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localContext,
+    bName,
+    bName,
+    dependentType,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+  );
+  !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localContext,
+    cName,
+    cName,
+    prop,
+    LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
+    LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+  );
+
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView(
+      "imports",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    LeanConstantsView(
+      "locals",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+  coreContext = leanUnboundedCoreContext(runtime, "<funinfo-spec4-probe>", "");
+
+  defaultContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  defaultState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  metaContext = leanReplaceField(defaultContext, 3, localContext);
+  metaStateRef = runtime.newRef(defaultState);
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+
+  inputs: mutable Vector<
+    (String, LeanValue, Array<LeanValue>, Bool),
+  > = mutable Vector[];
+  inputs.push(
+    ("empty traversal", LeanNatLiterals.n0, (Array[] : Array<LeanValue>), true),
+  );
+  inputs.push(
+    ("single ordinary parameter", LeanNatLiterals.n1, Array[aName], true),
+  );
+  inputs.push(
+    ("dependent parameters", leanNatValue(2), Array[aName, bName], true),
+  );
+  inputs.push(
+    (
+      "partial traversal stops at upperBound",
+      LeanNatLiterals.n1,
+      Array[aName, bName],
+      true,
+    ),
+  );
+  inputs.push(
+    ("implicit non-class binder", LeanNatLiterals.n1, Array[cName], true),
+  );
+  inputs.push(
+    (
+      "unknown fvar propagates error",
+      LeanNatLiterals.n1,
+      Array[ghostName],
+      false,
+    ),
+  );
+  inputs.push(
+    ("later lookup error", leanNatValue(2), Array[aName, ghostName], false),
+  );
+
+  saved = runtime.checkpoint();
+  count = 0;
+  for ((label, upperBound, names, expectSuccess) in inputs.toArray()) {
+    fvarsA = spec4FVars(runtime, names);
+    fvarsB = spec4FVars(runtime, names);
+    pairA = spec4EmptyPair();
+    pairB = spec4EmptyPair();
+    !count =
+      count +
+      checkSpec4Case(
+        saved,
+        upperBound,
+        fvarsA,
+        fvarsB,
+        pairA,
+        pairB,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        label,
+        LeanNatLiterals.n0,
+        leanNatValue(71),
+        expectSuccess,
+        leanNat(upperBound).toInt(),
+      )
+  };
+  seededPair = LeanCtor(
+    LeanTag.Prod_mk,
+    Array[
+      LeanArray(
+        Array[
+          LeanCtor(
+            LeanTag.Meta_ParamInfo_mk,
+            Array[
+              LeanCtor(LeanTag.BinderInfo_default, Array[]),
+              leanBool(false),
+              LeanArray(Array[]),
+              leanBool(false),
+              leanBool(false),
+              leanBool(false),
+              leanBool(false),
+              leanBool(false),
+            ],
+          ),
+        ],
+      ),
+      LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]),
+    ],
+  );
+  for (laterError in Array[false, true]) {
+    names = if (laterError) Array[aName, ghostName] else Array[aName, bName];
+    !count =
+      count +
+      checkSpec4Case(
+        saved,
+        leanNatValue(2),
+        spec4FVars(runtime, names),
+        spec4FVars(runtime, names),
+        copySpec4Input(seededPair),
+        copySpec4Input(seededPair),
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        if (laterError) "error after seeded parameter" else {
+          "resume after first parameter"
+        },
+        LeanNatLiterals.n1,
+        leanNatValue(71),
+        !laterError,
+        2,
+      )
+  };
+  for (index in Array[leanNatValue(2), leanNatValue(3)]) {
+    for (fallback in Array[false, true]) {
+      untouched = LeanUnavailable("unused parameter state");
+      noOp = spec4ProbeCall(
+        runtime,
+        fallback,
+        leanNatValue(2),
+        untouched,
+        index,
+        untouched,
+        untouched,
+        untouched,
+        untouched,
+        untouched,
+        leanNatValue(71),
+      );
+      assert(
+        native_eq(
+          noOp,
+          LeanCtor(LeanTag.EST_Out_ok, Array[untouched, leanNatValue(71)]),
+        ) == 0,
+      );
+      !count = count + 1
+    }
+  };
+  assert(count == 22);
+  print_string(
+    count.toString() +
+      " spec_4 traversal result/world/reference comparisons passed (repeats included)",
+  )
+}

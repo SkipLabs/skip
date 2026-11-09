@@ -1,0 +1,70 @@
+{
+  "scope": "Three pilot control-flow rewrites; boxed representation conversion and whole-example performance pending.",
+  "skargo_check": "release passed incrementally",
+  "retained_body_audit": "All three original source files restore byte-for-byte to baseline by reversing only fallback identity/self-recursion changes.",
+  "records": [
+    {
+      "function": "L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa",
+      "original_source": "sources/Modules/Lean/Meta/DiscrTree/Types/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/DiscrTree/Types/Keys.sk",
+      "baseline_commit": "37ed8f182",
+      "original_body_sha256": "7912c960e62187e16a4d0451dfb9de4a1f83d8ab50e48c869aab6633b7a973cb",
+      "fallback_body_sha256": "ab333269fe85e88d765d56c9da215e8e3525959e91a8a36e59e0fb6da9bf46e6",
+      "current_catalog_body_sha256": "e22eb7612bf3425c80db994491e0de96c43202214e3227ef11739ced55eb29d7",
+      "checks": [
+        "6359 retained-body hash comparisons",
+        "30 fixed numeric hash vectors derived from native source"
+      ],
+      "probes": [
+        "tests/DiscrTreeKeyHashProbe.sk"
+      ],
+      "limits": [
+        "Name and literal helpers are shared; golden vectors are source-derived, not a native executable comparison."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1",
+      "original_source": "sources/Modules/Lean/Meta/LevelDefEq/Runtime000.sk",
+      "current_source": "sources/Modules/Lean/Meta/LevelDefEq/Entry.sk",
+      "baseline_commit": "37ed8f182",
+      "original_body_sha256": "5a0756f8df219da2f615deb114eae068d64ca6b62177ad7179eafdbb35f43ac1",
+      "fallback_body_sha256": "ab056cfc85c1527bf758ae2660a2af2026d9edfd8732def2b418b1759c5a8ed1",
+      "current_catalog_body_sha256": "4bce6ee8f53849f38888dc407bf0cb233e71240dc5920b5cf701040012189fbf",
+      "checks": [
+        "9408 result/world/reference comparisons: 696 errors, 2112 state changes",
+        "Named pure equality, assignment, read-only stuck-error and postponement outcomes"
+      ],
+      "probes": [
+        "tests/LevelDefEqEntryProbe.sk"
+      ],
+      "limits": [
+        "Recursive Basic/solver/callback helpers shared between comparison routes.",
+        "Trace-present disabled-class calls tested; enabled tracing retains original entry."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_4_f0a9dec386",
+      "original_source": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/FunInfo/Parameters.sk",
+      "baseline_commit": "37ed8f182",
+      "original_body_sha256": "eeb7c70abf211885a43458cc92ebdd7667132f48bcd17674afafa7d4d3e5687b",
+      "fallback_body_sha256": "0ece30963329ee044d5d5c735349578c18e637b084a3a158b0135624f928ac27",
+      "current_catalog_body_sha256": "eb31455c327178e9911e4f857d0b2bb67f37d5e1446e190d5811e3be7c3b93bc",
+      "checks": [
+        "22 traversal/resume/error/no-op checks with explicit outcomes and input preservation",
+        "14 class/output-parameter comparisons",
+        "10 native Lean class parameter-fact checks"
+      ],
+      "probes": [
+        "tests/FunInfoParametersProbe.sk",
+        "tests/FunInfoClassProbe.sk",
+        "tests/FunInfoClassReference.lean"
+      ],
+      "limits": [
+        "Decidable=true, runtime/interrupt errors and spec_2 inferType/WHNF errors remain coverage gaps.",
+        "Helpers retained unchanged; comparison does not independently validate them.",
+        "Known class with missing output metadata is unreachable in a stable valid class map; guard retained."
+      ]
+    }
+  ]
+}

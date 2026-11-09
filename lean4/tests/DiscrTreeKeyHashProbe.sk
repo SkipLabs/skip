@@ -1,0 +1,288 @@
+// Differential probe for the rewritten Lean.Meta.DiscrTree.Key.hash.
+// Compares the canonical f_DiscrTree_Key_hash_d0f27b96fa against the retained
+// f_DiscrTree_Key_hash_d0f27b96fa_fallback over all seven Key constructors,
+// anonymous/qualified/numeric names, Nat values across 2^64 in both scalar
+// and boxed representations, and natural/string literals.
+
+fun hashCompare(runtime: mutable LeanExecution, key: LeanValue): LeanValue {
+  before = runtime.checkpoint().refs;
+  canonical = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa(
+    runtime,
+    key,
+  );
+  fallback = L4_Lean_Meta_DiscrTree_Types.f_DiscrTree_Key_hash_d0f27b96fa_fallback(
+    runtime,
+    key,
+  );
+  if (native_eq(canonical, fallback) != 0) {
+    leanFail("Key.hash canonical/fallback mismatch")
+  };
+  // The result must keep the original uint64 LeanWord representation.
+  if (native_eq(canonical, LeanWord("uint64", leanWordBits(canonical))) != 0) {
+    leanFail("Key.hash result is not a uint64 word")
+  };
+  assert(native_eq(before, runtime.checkpoint().refs) == 0);
+  canonical
+}
+
+fun natFixtures(): Array<LeanValue> {
+  digits = Array[
+    "0",
+    "1",
+    "9223372036854775807",
+    "9223372036854775808",
+    "18446744073709551615",
+    "18446744073709551616",
+    "18446744073709551617",
+    "340282366920938463463374607431768211456",
+  ];
+  nats: mutable Vector<LeanValue> = mutable Vector[];
+  for (d in digits) {
+    nats.push(LeanScalar("nat", d));
+    nats.push(leanBoxNat(LeanNat::parse(d)))
+  };
+  nats.toArray()
+}
+
+fun nameFixtures(runtime: mutable LeanExecution): Array<LeanValue> {
+  anonymous = (LeanCtor(LeanTag.Name_anonymous__impl, Array[]) : LeanValue);
+  root = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("a"),
+  );
+  qualified = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    root,
+    LeanText("b"),
+  );
+  names: mutable Vector<LeanValue> = mutable Vector[anonymous, root, qualified];
+  for (text in Array["", "abc", "世界🙂"]) {
+    names.push(
+      L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+        runtime,
+        anonymous,
+        LeanText(text),
+      ),
+    )
+  };
+  for (prefix in Array[anonymous, root]) {
+    for (d in Array[
+      "0",
+      "1",
+      "18446744073709551616",
+      "340282366920938463463374607431768211456",
+    ]) {
+      names.push(
+        L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+          runtime,
+          prefix,
+          LeanScalar("nat", d),
+        ),
+      );
+      names.push(
+        L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+          runtime,
+          prefix,
+          leanBoxNat(LeanNat::parse(d)),
+        ),
+      )
+    }
+  };
+  names.toArray()
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{};
+  checkFixedKeyHashes(runtime);
+  nats = natFixtures();
+  names = nameFixtures(runtime);
+  count = 0;
+
+  // Fieldless constructors, checked against their exact original hashes.
+  starHash = hashCompare(
+    runtime,
+    (LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]) : LeanValue),
+  );
+  if (native_eq(starHash, LeanWord("uint64", 7883)) != 0) {
+    leanFail("star hash changed")
+  };
+  print_string("star " + leanWordBits(starHash).toString());
+  !count = count + 1;
+  otherHash = hashCompare(
+    runtime,
+    (LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]) : LeanValue),
+  );
+  if (native_eq(otherHash, LeanWord("uint64", 2411)) != 0) {
+    leanFail("other hash changed")
+  };
+  print_string("other " + leanWordBits(otherHash).toString());
+  !count = count + 1;
+  arrowHash = hashCompare(
+    runtime,
+    (LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]) : LeanValue),
+  );
+  if (native_eq(arrowHash, LeanWord("uint64", 17)) != 0) {
+    leanFail("arrow hash changed")
+  };
+  print_string("arrow " + leanWordBits(arrowHash).toString());
+  !count = count + 1;
+
+  // Literals: natural values (both Nat representations) and strings.
+  for (n in nats) {
+    _ = hashCompare(
+      runtime,
+      (LeanCtor(
+        LeanTag.Meta_DiscrTree_Key_lit,
+        Array[(LeanCtor(LeanTag.Literal_natVal, Array[n]) : LeanValue)],
+      ) : LeanValue),
+    );
+    !count = count + 1
+  };
+  for (text in Array["", "a", "hello", "世界🙂"]) {
+    _ = hashCompare(
+      runtime,
+      (LeanCtor(
+        LeanTag.Meta_DiscrTree_Key_lit,
+        Array[
+          (LeanCtor(LeanTag.Literal_strVal, Array[LeanText(text)]) : LeanValue),
+        ],
+      ) : LeanValue),
+    );
+    !count = count + 1
+  };
+
+  // fvar and const: every name fixture against every Nat fixture.
+  for (name in names) {
+    for (n in nats) {
+      _ = hashCompare(
+        runtime,
+        (LeanCtor(LeanTag.Meta_DiscrTree_Key_fvar, Array[name, n]) : LeanValue),
+      );
+      _ = hashCompare(
+        runtime,
+        (LeanCtor(
+          LeanTag.Meta_DiscrTree_Key_const,
+          Array[name, n],
+        ) : LeanValue),
+      );
+      !count = count + 2
+    }
+  };
+
+  // proj: every name fixture against every (index, arg) Nat pair.
+  for (name in names) {
+    for (i in nats) {
+      for (a in nats) {
+        _ = hashCompare(
+          runtime,
+          (LeanCtor(
+            LeanTag.Meta_DiscrTree_Key_proj,
+            Array[name, i, a],
+          ) : LeanValue),
+        );
+        !count = count + 1
+      }
+    }
+  };
+
+  print_string(count.toString() + " DiscrTree.Key.hash comparisons passed")
+}
+
+// Fixed vectors calculated from Lean's UInt64 mixer and UTF-8 string hash.
+fun checkFixedKeyHashes(runtime: mutable LeanExecution): void {
+  check = (key: LeanValue, expected: String) -> {
+    actual = hashCompare(runtime, key);
+    expectedBits = leanWordBits(LeanScalar("uint64", expected));
+    if (leanWordBits(actual) != expectedBits) {
+      leanFail("fixed Key.hash vector mismatch; expected " + expected)
+    }
+  };
+  natLiteral = (digits: String) ->
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_lit,
+      Array[LeanCtor(LeanTag.Literal_natVal, Array[LeanScalar("nat", digits)])],
+    );
+  stringLiteral = (text: String) ->
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_lit,
+      Array[LeanCtor(LeanTag.Literal_strVal, Array[LeanText(text)])],
+    );
+  constant = (name: LeanValue) ->
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_const, Array[name, LeanNatLiterals.n0]);
+  freeVariable = (name: LeanValue) ->
+    LeanCtor(LeanTag.Meta_DiscrTree_Key_fvar, Array[name, LeanNatLiterals.n1]);
+  projection = (name: LeanValue, index: String, arity: String) ->
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_proj,
+      Array[name, LeanScalar("nat", index), LeanScalar("nat", arity)],
+    );
+
+  anonymous = (LeanCtor(LeanTag.Name_anonymous__impl, Array[]) : LeanValue);
+  aName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("a"),
+  );
+  leanName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("Lean"),
+  );
+  leanMetaName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    leanName,
+    LeanText("Meta"),
+  );
+  numericName = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    runtime,
+    anonymous,
+    LeanNatLiterals.n1,
+  );
+  largeNumericName = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    runtime,
+    anonymous,
+    leanBoxNat(LeanNat::parse("18446744073709551616")),
+  );
+
+  check(LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]), "7883");
+  check(LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]), "2411");
+  check(LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]), "17");
+  check(natLiteral("0"), "6332312861659924714");
+  check(natLiteral("1"), "12768952433289769334");
+  check(natLiteral("9223372036854775807"), "80786288070597387");
+  check(natLiteral("9223372036854775808"), "3480588915479120106");
+  check(natLiteral("18446744073709551615"), "2932510234251401995");
+  check(natLiteral("18446744073709551616"), "6332312861659924714");
+  check(natLiteral("18446744073709551617"), "12768952433289769334");
+  check(
+    natLiteral("340282366920938463463374607431768211473"),
+    "6075621502718165741",
+  );
+  check(stringLiteral(""), "5048806050669445009");
+  check(stringLiteral("a"), "3120931747851251075");
+  check(stringLiteral("abcdefghijk"), "17354517992581506063");
+  check(stringLiteral("é"), "3294460876634063645");
+  check(stringLiteral("世界🙂"), "13605601860262792477");
+  check(constant(anonymous), "2959540397315366130");
+  check(freeVariable(anonymous), "14378633024237415242");
+  check(constant(aName), "17893125375162948426");
+  check(freeVariable(aName), "12120487279369411579");
+  check(constant(leanMetaName), "18088289815251648537");
+  check(freeVariable(leanMetaName), "5984794415884611200");
+  check(constant(numericName), "8728562873754174514");
+  check(freeVariable(numericName), "15159047658223549772");
+  check(constant(largeNumericName), "1896068496704026973");
+  check(freeVariable(largeNumericName), "10336649527600875190");
+  check(projection(anonymous, "0", "0"), "2756373387815918795");
+  check(projection(leanMetaName, "1", "2"), "14195127674633142265");
+  check(projection(leanMetaName, "2", "1"), "7294253668364283415");
+  check(
+    projection(
+      largeNumericName,
+      "18446744073709551617",
+      "340282366920938463463374607431768211473",
+    ),
+    "1470036682262657583",
+  )
+}

@@ -1,0 +1,78 @@
+// Dispatch universe equality, retaining Lean's tracing path when requested.
+module L4_Lean_Meta_LevelDefEq;
+
+fun f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+  runtime: mutable LeanExecution,
+  lhs: LeanValue,
+  rhs: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (
+    leanTag(lhs) == LeanTag.Level_succ__impl &&
+    leanTag(rhs) == LeanTag.Level_succ__impl
+  ) {
+    return L4_Lean_Meta_Basic.f_Lean_Meta_isLevelDefEqAux_da8f7dc47b(
+      runtime,
+      leanField(lhs, 1),
+      leanField(rhs, 1),
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  if (leanTag(coreContext) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(coreContext, 0);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  options = leanField(cold, 2);
+  if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(leanField(options, 1)) match {
+  | LeanTag.Bool_true ->
+    return f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1_fallback(
+      runtime,
+      lhs,
+      rhs,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  lhsBase = L4_Lean_Level.f_Lean_Level_getLevelOffset_ff2e04d99e(runtime, lhs);
+  rhsBase = L4_Lean_Level.f_Lean_Level_getLevelOffset_ff2e04d99e(runtime, rhs);
+  equalBases = L4_Lean_Level.f_Lean_Level_beq_a85e9a2f15(
+    runtime,
+    lhsBase,
+    rhsBase,
+  );
+  f_Meta_isLevelDefEqAuxImpl_lam_0_ce12114f26(
+    runtime,
+    equalBases,
+    lhs,
+    rhs,
+    leanBool(true),
+    LeanText("Meta"),
+    LeanText("isLevelDefEq"),
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  )
+}
+
+module end;

@@ -1,0 +1,481 @@
+// Compare the outer entry result, world and reference state with its
+// retained body. Recursive equality/solve helpers are shared by both routes.
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  mName = name("m");
+  nName = name("n");
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  succ = (u: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, u);
+  max = (u: LeanValue, v: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, u, v);
+  imax = (u: LeanValue, v: LeanValue) ->
+    L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, u, v);
+  one = succ(zero);
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, name("u"));
+  v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, name("v"));
+  m = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, mName);
+  n = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, nName);
+  levels = Array[
+    zero,
+    one,
+    succ(one),
+    u,
+    v,
+    m,
+    n,
+    succ(u),
+    succ(m),
+    max(u, v),
+    max(m, n),
+    max(u, m),
+    imax(u, m),
+    imax(m, n),
+  ];
+  context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  initialState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  mctx = leanField(initialState, 0);
+  for (id in Array[mName, nName]) {
+    !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(
+      runtime,
+      mctx,
+      id,
+    )
+  };
+  metaState = runtime.newRef(initialState);
+  constants = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", constants),
+    LeanConstantsView("locals", constants),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    // No modules are imported by this fixture, including extra IR constants.
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+  core = leanUnboundedCoreContext(
+    runtime,
+    "<level-defeq-outer entry-probe>",
+    "",
+  );
+  coreState = runtime.newRef(leanCoreState(runtime, environment));
+  cold = leanField(core, 0);
+  traceCore = leanReplaceField(
+    core,
+    0,
+    leanReplaceField(
+      cold,
+      2,
+      leanReplaceField(leanField(cold, 2), 1, leanBool(true)),
+    ),
+  );
+  checkNamedLevelDefEqEntries(
+    runtime,
+    context,
+    initialState,
+    mctx,
+    metaState,
+    core,
+    coreState,
+    mName,
+  );
+  checks = 0;
+  errors = 0;
+  effects = 0;
+  for (assignment in Array[None(), Some(zero), Some(one)]) {
+    assigned = assignment match {
+    | None() -> mctx
+    | Some(level) ->
+      L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+        runtime,
+        mctx,
+        mName,
+        level,
+      )
+    };
+    for (nested in Array[false, true]) {
+      activeMctx = if (nested) {
+        L4_Lean_MetavarContext.f_Lean_MetavarContext_incDepth_2d774c5ab2(
+          runtime,
+          assigned,
+          leanBool(false),
+        )
+      } else {
+        assigned
+      };
+      runtime.writeRef(
+        metaState,
+        Some(leanReplaceField(initialState, 0, activeMctx)),
+      );
+      for (stuck in Array[false, true]) {
+        config = leanReplaceField(
+          L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context),
+          4,
+          leanBool(stuck),
+        );
+        key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+          runtime,
+          config,
+        );
+        configured = leanReplaceField(
+          context,
+          0,
+          LeanCtor(
+            LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+            Array[config, key],
+          ),
+        );
+        for (coreContext in Array[core, traceCore]) {
+          for (lhs in levels) {
+            for (rhs in levels) {
+              saved = runtime.checkpoint();
+              original = saved.restoreRaw();
+              structured = saved.restoreRaw();
+              for (_ in Range(0, 2)) {
+                expected = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1_fallback(
+                  original,
+                  lhs,
+                  rhs,
+                  configured,
+                  metaState,
+                  coreContext,
+                  coreState,
+                  leanNatValue(53),
+                );
+                actual = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+                  structured,
+                  lhs,
+                  rhs,
+                  configured,
+                  metaState,
+                  coreContext,
+                  coreState,
+                  leanNatValue(53),
+                );
+                refs = structured.checkpoint().refs;
+                if (
+                  native_eq(expected, actual) != 0 ||
+                  native_eq(original.checkpoint().refs, refs) != 0
+                ) {
+                  leanFail(
+                    "universe equality outer entry mismatch: " +
+                      checks.toString(),
+                  )
+                };
+                if (native_eq(saved.refs, refs) != 0) !effects = effects + 1;
+                if (leanTag(actual) == LeanTag.EST_Out_error) {
+                  !errors = errors + 1
+                };
+                !checks = checks + 1
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+  assert(checks == 9408);
+  assert(errors > 0);
+  assert(effects > 0);
+  print_string(
+    checks.toString() +
+      " universe equality outer entry result/state comparisons passed, " +
+      errors.toString() +
+      " errors, " +
+      effects.toString() +
+      " state changes",
+  )
+}
+
+// Explicit outcomes complement the outer-entry differential matrix.
+fun checkNamedLevelDefEqEntries(
+  runtime: mutable LeanExecution,
+  metaContext: LeanValue,
+  initialMetaState: LeanValue,
+  declaredMctx: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  mvarName: LeanValue,
+): void {
+  fixture = runtime.checkpoint().restoreRaw();
+  fixture.writeRef(
+    metaStateRef,
+    Some(leanReplaceField(initialMetaState, 0, declaredMctx)),
+  );
+  zero = (LeanCtor(LeanTag.Level_zero__impl, Array[]) : LeanValue);
+  uName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    fixture,
+    LeanText("named_u"),
+  );
+  vName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    fixture,
+    LeanText("named_v"),
+  );
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(fixture, uName);
+  v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(fixture, vName);
+  m = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(fixture, mvarName);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(fixture, zero);
+  succU = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(fixture, u);
+  succV = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(fixture, v);
+  succM = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(fixture, m);
+  postponedRhs = L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(fixture, m, u);
+  world = leanNatValue(53);
+  baseline = fixture.checkpoint();
+  cold = leanField(coreContext, 0);
+  tracePresent = leanReplaceField(
+    coreContext,
+    0,
+    leanReplaceField(
+      cold,
+      2,
+      leanReplaceField(leanField(cold, 2), 1, leanBool(true)),
+    ),
+  );
+  expectBool = (label: String, result: LeanValue, expected: Bool) -> {
+    expectedResult = LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[leanBool(expected), world],
+    );
+    if (native_eq(result, expectedResult) != 0) {
+      leanFail("named level equality outcome: " + label)
+    }
+  };
+  checkPure = (
+    label: String,
+    lhs: LeanValue,
+    rhs: LeanValue,
+    expected: Bool,
+  ) -> {
+    for (core in Array[coreContext, tracePresent]) {
+      current = baseline.restoreRaw();
+      result = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+        current,
+        lhs,
+        rhs,
+        metaContext,
+        metaStateRef,
+        core,
+        coreStateRef,
+        world,
+      );
+      expectBool(label, result, expected);
+      if (native_eq(current.checkpoint().refs, baseline.refs) != 0) {
+        leanFail("pure level equality changed references: " + label)
+      }
+    }
+  };
+  checkPure("zero reflexive", zero, zero, true);
+  checkPure("equal parameter bases", u, u, true);
+  checkPure("different parameter bases", u, v, false);
+  checkPure("successors of equal bases", succU, succU, true);
+  checkPure("successors of different bases", succU, succV, false);
+  checkPure("same base, larger lhs offset", succU, u, false);
+  checkPure("same base, larger rhs offset", u, succU, false);
+  checkPure("zero versus successor", zero, one, false);
+  checkPure("same mvar base, different offsets", m, succM, false);
+
+  assignedRuntime = baseline.restoreRaw();
+  assigned = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+    assignedRuntime,
+    m,
+    u,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  expectBool("fresh mvar assignment", assigned, true);
+  assignedState = assignedRuntime.readRef(metaStateRef);
+  assignment = L4_Lean_MetavarContext.f_Lean_getLevelMVarAssignmentExp_65f9d81d1e(
+    assignedRuntime,
+    leanField(assignedState, 0),
+    mvarName,
+  );
+  assert(native_eq(assignment, LeanCtor(LeanTag.Option_some, Array[u])) == 0);
+  assert(
+    native_eq(leanField(assignedState, 3), leanField(initialMetaState, 3)) == 0,
+  );
+  afterAssignment = assignedRuntime.checkpoint();
+  assignedAgain = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+    assignedRuntime,
+    m,
+    u,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  expectBool("repeated assigned mvar equality", assignedAgain, true);
+  assert(
+    native_eq(assignedRuntime.checkpoint().refs, afterAssignment.refs) == 0,
+  );
+
+  preassignedRuntime = baseline.restoreRaw();
+  preassignedMctx = L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+    preassignedRuntime,
+    declaredMctx,
+    mvarName,
+    zero,
+  );
+  preassignedRuntime.writeRef(
+    metaStateRef,
+    Some(leanReplaceField(initialMetaState, 0, preassignedMctx)),
+  );
+  beforeInstantiation = preassignedRuntime.checkpoint();
+  instantiated = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+    preassignedRuntime,
+    m,
+    zero,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  expectBool("preassigned mvar instantiation", instantiated, true);
+  assert(
+    native_eq(preassignedRuntime.checkpoint().refs, beforeInstantiation.refs) ==
+      0,
+  );
+
+  for (stuck in Array[false, true]) {
+    readonlyRuntime = baseline.restoreRaw();
+    nestedMctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_incDepth_2d774c5ab2(
+      readonlyRuntime,
+      declaredMctx,
+      leanBool(false),
+    );
+    readonlyRuntime.writeRef(
+      metaStateRef,
+      Some(leanReplaceField(initialMetaState, 0, nestedMctx)),
+    );
+    config = leanReplaceField(
+      L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        readonlyRuntime,
+        metaContext,
+      ),
+      4,
+      leanBool(stuck),
+    );
+    configKey = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+      readonlyRuntime,
+      config,
+    );
+    configured = leanReplaceField(
+      metaContext,
+      0,
+      LeanCtor(
+        LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+        Array[config, configKey],
+      ),
+    );
+    beforeReadonly = readonlyRuntime.checkpoint();
+    result = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+      readonlyRuntime,
+      m,
+      u,
+      configured,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    if (stuck) {
+      exceptionId = leanReadInitializer(
+        readonlyRuntime,
+        "Lean.Meta.isDefEqStuckExceptionId",
+      );
+      expectedError = LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[
+          LeanCtor(
+            LeanTag.Exception_internal,
+            Array[exceptionId, LeanCtor(LeanTag.List_nil, Array[])],
+          ),
+          world,
+        ],
+      );
+      assert(native_eq(result, expectedError) == 0)
+    } else {
+      expectBool("readonly mvar without stuck exception", result, false)
+    };
+    assert(
+      native_eq(readonlyRuntime.checkpoint().refs, beforeReadonly.refs) == 0,
+    )
+  };
+
+  postponedRuntime = baseline.restoreRaw();
+  originalPostponed = leanArray(
+    L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_toArray_35eebe4fe9(
+      postponedRuntime,
+      leanField(initialMetaState, 3),
+    ),
+  );
+  for (attempt in Range(0, 2)) {
+    result = L4_Lean_Meta_LevelDefEq.f_Lean_Meta_isLevelDefEqAuxImpl_18657e11a1(
+      postponedRuntime,
+      m,
+      postponedRhs,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    expectBool("occurs constraint postponement", result, true);
+    state = postponedRuntime.readRef(metaStateRef);
+    assert(native_eq(leanField(state, 0), declaredMctx) == 0);
+    postponed = leanArray(
+      L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_toArray_35eebe4fe9(
+        postponedRuntime,
+        leanField(state, 3),
+      ),
+    );
+    assert(postponed.size() == originalPostponed.size() + attempt + 1);
+    expectedEntry = LeanCtor(
+      LeanTag.Meta_PostponedEntry_mk,
+      Array[
+        leanField(coreContext, 2),
+        m,
+        postponedRhs,
+        leanField(metaContext, 5),
+      ],
+    );
+    assert(native_eq(postponed[postponed.size() - 1], expectedEntry) == 0)
+  }
+}

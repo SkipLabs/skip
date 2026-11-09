@@ -1,0 +1,618 @@
+// Class-extension and higher-order dependency cases for the parameter traversal.
+// Link the canonical function and a retained body whose self-call also uses _fallback.
+fun classProbeName(runtime: mutable LeanExecution, name: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(name))
+}
+
+fun classProbeAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun classProbeFvar(runtime: mutable LeanExecution, name: LeanValue): LeanValue {
+  L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name)
+}
+
+fun classProbeApp(
+  runtime: mutable LeanExecution,
+  fn: LeanValue,
+  arg: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, fn, arg)
+}
+
+fun classProbeForall(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  domain: LeanValue,
+  body: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    domain,
+    body,
+  )
+}
+
+fun classProbeEmptyPair(): LeanValue {
+  LeanCtor(
+    LeanTag.Prod_mk,
+    Array[
+      LeanArray(Array[]),
+      LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]),
+    ],
+  )
+}
+
+fun classProbeCall(
+  runtime: mutable LeanExecution,
+  original: Bool,
+  upperBound: Int,
+  fvars: LeanValue,
+  index: Int,
+  pair: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+): LeanValue {
+  if (original) {
+    L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_4_f0a9dec386_fallback(
+      runtime,
+      leanNatValue(upperBound),
+      fvars,
+      leanNatValue(index),
+      pair,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      leanNatValue(37),
+    )
+  } else {
+    L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_4_f0a9dec386(
+      runtime,
+      leanNatValue(upperBound),
+      fvars,
+      leanNatValue(index),
+      pair,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      leanNatValue(37),
+    )
+  }
+}
+
+fun classProbeCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  upperBound: Int,
+  fvars: LeanValue,
+  index: Int,
+  pair: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  expectedFlags: Array<(Bool, Bool, Bool)>,
+  expectedDeps: Array<Array<Int>>,
+  expectError: Bool = false,
+): (LeanValue, LeanExecutionCheckpoint) {
+  original = saved.restoreRaw();
+  structured = saved.restoreRaw();
+  expected = classProbeCall(
+    original,
+    true,
+    upperBound,
+    fvars,
+    index,
+    pair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+  );
+  actual = classProbeCall(
+    structured,
+    false,
+    upperBound,
+    fvars,
+    index,
+    pair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+  );
+  if (
+    native_eq(expected, actual) != 0 ||
+    native_eq(original.checkpoint().refs, structured.checkpoint().refs) != 0
+  ) {
+    leanFail("FunInfo class result/reference mismatch: " + label)
+  };
+  assert(native_eq(leanField(actual, 1), leanNatValue(37)) == 0);
+  if (expectError) {
+    assert(leanTag(actual) == LeanTag.EST_Out_error);
+    assert(leanTag(leanField(actual, 0)) == LeanTag.Exception_error)
+  } else {
+    assert(leanTag(actual) == LeanTag.EST_Out_ok);
+    resultPair = leanField(actual, 0);
+    params = leanArray(leanField(resultPair, 0));
+    outParams = leanField(resultPair, 1);
+    assert(params.size() == expectedFlags.size());
+    assert(params.size() == expectedDeps.size());
+    for (i in Range(0, params.size())) {
+      param = params[i];
+      flags = expectedFlags[i];
+      assert(leanTag(param) == LeanTag.Meta_ParamInfo_mk);
+      assert(leanIsTrue(leanField(param, 5)) == flags.i0);
+      assert(leanIsTrue(leanField(param, 6)) == flags.i1);
+      assert(leanIsTrue(leanField(param, 7)) == flags.i2);
+      deps = leanArray(leanField(param, 2));
+      assert(deps.size() == expectedDeps[i].size());
+      for (j in Range(0, deps.size())) {
+        assert(leanNat(deps[j]).toInt() == expectedDeps[i][j])
+      };
+      hasForward = false;
+      for (laterDeps in expectedDeps) {
+        for (dependency in laterDeps) {
+          if (dependency == i) {
+            !hasForward = true
+          }
+        }
+      };
+      assert(leanIsTrue(leanField(param, 1)) == hasForward);
+      fvarId = L4_Lean_Expr.f_Lean_Expr_fvarId_93c02a0562(
+        structured,
+        leanArray(fvars)[i],
+      );
+      inOutSet = L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_spec_0_abf17c7e9b(
+        structured,
+        fvarId,
+        outParams,
+      );
+      assert(leanIsTrue(inOutSet) == flags.i1)
+    }
+  };
+  print_string("FunInfo class case passed: " + label);
+  (actual, structured.checkpoint())
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  uName = classProbeName(runtime, "u");
+  argName = classProbeName(runtime, "arg");
+  u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u);
+  bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  functionType = classProbeForall(runtime, argName, prop, prop);
+  outParamName = classProbeName(runtime, "outParam");
+  emptyName = classProbeName(runtime, "FixtureEmpty");
+  higherName = classProbeName(runtime, "FixtureHigher");
+  scalarName = classProbeName(runtime, "FixtureScalar");
+  absentName = classProbeName(runtime, "FixtureUnregistered");
+  outParam = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    outParamName,
+    LeanCtor(LeanTag.List_cons, Array[one, nil]),
+  );
+
+  // A real polymorphic identity definition lets addClass compute output positions.
+  outParamInfo = LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[
+              outParamName,
+              LeanCtor(LeanTag.List_cons, Array[uName, nil]),
+              classProbeForall(runtime, argName, sortU, sortU),
+            ],
+          ),
+          L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+            runtime,
+            argName,
+            LeanCtor(LeanTag.BinderInfo_default, Array[]),
+            sortU,
+            bvar,
+          ),
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[outParamName, nil]),
+        ],
+      ),
+    ],
+  );
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(
+    leanNameKey(outParamName),
+    LeanConstantFile(outParamInfo, None()),
+  );
+  constants.set(
+    leanNameKey(emptyName),
+    LeanConstantFile(classProbeAxiom(emptyName, prop), None()),
+  );
+  constants.set(
+    leanNameKey(absentName),
+    LeanConstantFile(classProbeAxiom(absentName, prop), None()),
+  );
+  constants.set(
+    leanNameKey(higherName),
+    LeanConstantFile(
+      classProbeAxiom(
+        higherName,
+        classProbeForall(
+          runtime,
+          argName,
+          classProbeApp(runtime, outParam, functionType),
+          prop,
+        ),
+      ),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(scalarName),
+    LeanConstantFile(
+      classProbeAxiom(
+        scalarName,
+        classProbeForall(
+          runtime,
+          argName,
+          classProbeApp(runtime, outParam, prop),
+          prop,
+        ),
+      ),
+      None(),
+    ),
+  );
+
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView(
+      "imports",
+      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+    ),
+    LeanConstantsView("locals", LeanConstantMap(constants.chill())),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(
+          LeanConstantsView(
+            "extra",
+            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
+          ),
+        ),
+      ],
+    ),
+  );
+  for (className in Array[emptyName, higherName, scalarName]) {
+    registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(
+      runtime,
+      environment,
+      className,
+    );
+    assert(leanTag(registered) == LeanTag.Except_ok);
+    !environment = leanField(registered, 0)
+  };
+  for ((className, expectedCount) in Array[
+    (emptyName, 0),
+    (higherName, 1),
+    (scalarName, 1),
+  ]) {
+    assert(
+      leanIsTrue(
+        L4_Lean_Class.f_Lean_isClass_8bc2d27716(
+          runtime,
+          environment,
+          className,
+        ),
+      ),
+    );
+    positions = L4_Lean_Class.f_Lean_getOutParamPositions_db0dd84075(
+      runtime,
+      environment,
+      className,
+    );
+    assert(leanTag(positions) == LeanTag.Option_some);
+    assert(leanArray(leanField(positions, 0)).size() == expectedCount);
+    if (expectedCount > 0) {
+      assert(leanNat(leanArray(leanField(positions, 0))[0]).toInt() == 0)
+    }
+  };
+  assert(
+    !leanIsTrue(
+      L4_Lean_Class.f_Lean_isClass_8bc2d27716(runtime, environment, absentName),
+    ),
+  );
+  assert(
+    leanTag(
+      L4_Lean_Class.f_Lean_getOutParamPositions_db0dd84075(
+        runtime,
+        environment,
+        absentName,
+      ),
+    ) == LeanTag.Option_none,
+  );
+
+  pName = classProbeName(runtime, "p");
+  fName = classProbeName(runtime, "f");
+  laterName = classProbeName(runtime, "later");
+  neutralName = classProbeName(runtime, "neutral");
+  ghostName = classProbeName(runtime, "ghost");
+  p = classProbeFvar(runtime, pName);
+  f = classProbeFvar(runtime, fName);
+  later = classProbeFvar(runtime, laterName);
+  neutral = classProbeFvar(runtime, neutralName);
+  ghost = classProbeFvar(runtime, ghostName);
+  higherType = classProbeApp(
+    runtime,
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, higherName, nil),
+    f,
+  );
+  scalarType = classProbeApp(
+    runtime,
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, scalarName, nil),
+    p,
+  );
+  localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+    runtime,
+  );
+  for ((name, type) in Array[
+    (pName, prop),
+    (fName, functionType),
+    (laterName, classProbeApp(runtime, f, p)),
+    (neutralName, prop),
+  ]) {
+    !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      localContext,
+      name,
+      name,
+      type,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    )
+  };
+  binders = Array[
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
+    LeanCtor(LeanTag.BinderInfo_strictImplicit, Array[]),
+    LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]),
+  ];
+  emptyBinders: mutable Vector<LeanValue> = mutable Vector[];
+  higherBinders: mutable Vector<LeanValue> = mutable Vector[];
+  for (i in Range(0, binders.size())) {
+    emptyLocalName = classProbeName(runtime, "empty" + i.toString());
+    higherLocalName = classProbeName(runtime, "higher" + i.toString());
+    for ((name, type) in Array[
+      (
+        emptyLocalName,
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, emptyName, nil),
+      ),
+      (higherLocalName, higherType),
+    ]) {
+      !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        runtime,
+        localContext,
+        name,
+        name,
+        type,
+        binders[i],
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    emptyBinders.push(classProbeFvar(runtime, emptyLocalName));
+    higherBinders.push(classProbeFvar(runtime, higherLocalName))
+  };
+  scalarLocalName = classProbeName(runtime, "scalar");
+  absentLocalName = classProbeName(runtime, "unregistered");
+  for ((name, type) in Array[
+    (scalarLocalName, scalarType),
+    (
+      absentLocalName,
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, absentName, nil),
+    ),
+  ]) {
+    !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      localContext,
+      name,
+      name,
+      type,
+      binders[3],
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    )
+  };
+  metaContext = leanReplaceField(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(runtime),
+    3,
+    localContext,
+  );
+  metaStateRef = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+  coreContext = leanUnboundedCoreContext(runtime, "<funinfo-class-probe>", "");
+  saved = runtime.checkpoint();
+  emptyPair = classProbeEmptyPair();
+  noFlags = (false, false, false);
+  noDeps: Array<Int> = Array[];
+
+  _ = classProbeCompare(
+    "unregistered class",
+    saved,
+    1,
+    LeanArray(Array[classProbeFvar(runtime, absentLocalName)]),
+    0,
+    emptyPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    Array[noFlags],
+    Array[noDeps],
+  );
+  for (i in Range(0, binders.size())) {
+    isInstance = i != 0;
+    _ = classProbeCompare(
+      "empty output positions, binder " + i.toString(),
+      saved,
+      1,
+      LeanArray(Array[emptyBinders[i]]),
+      0,
+      emptyPair,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      Array[(isInstance, false, false)],
+      Array[noDeps],
+    );
+    _ = classProbeCompare(
+      "higher-order output, binder " + i.toString(),
+      saved,
+      4,
+      LeanArray(Array[p, f, higherBinders[i], later]),
+      0,
+      emptyPair,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      Array[
+        noFlags,
+        (false, isInstance, false),
+        (isInstance, false, false),
+        (false, false, isInstance),
+      ],
+      Array[noDeps, noDeps, Array[1], Array[0, 1]],
+    )
+  };
+  _ = classProbeCompare(
+    "scalar output is not higher order",
+    saved,
+    2,
+    LeanArray(Array[p, classProbeFvar(runtime, scalarLocalName)]),
+    0,
+    emptyPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    Array[noFlags, (true, false, false)],
+    Array[noDeps, Array[0]],
+  );
+
+  fullFvars: LeanValue = LeanArray(
+    Array[p, f, higherBinders[3], later, neutral],
+  );
+  prefix = classProbeCompare(
+    "higher-order prefix",
+    saved,
+    3,
+    fullFvars,
+    0,
+    emptyPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    Array[noFlags, (false, true, false), (true, false, false)],
+    Array[noDeps, noDeps, Array[1]],
+  );
+  carriedPair = leanField(prefix.i0, 0);
+  _ = classProbeCompare(
+    "resume with carried output set hit and miss",
+    prefix.i1,
+    5,
+    fullFvars,
+    3,
+    carriedPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    Array[
+      noFlags,
+      (false, true, false),
+      (true, false, false),
+      (false, false, true),
+      noFlags,
+    ],
+    Array[noDeps, noDeps, Array[1], Array[0, 1], noDeps],
+  );
+  _ = classProbeCompare(
+    "later lookup error after class effects",
+    saved,
+    4,
+    LeanArray(Array[p, f, higherBinders[3], ghost]),
+    0,
+    emptyPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    (Array[] : Array<(Bool, Bool, Bool)>),
+    (Array[] : Array<Array<Int>>),
+    true,
+  );
+  _ = classProbeCompare(
+    "lookup error with carried prefix state",
+    prefix.i1,
+    4,
+    LeanArray(Array[p, f, higherBinders[3], ghost]),
+    3,
+    carriedPair,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    (Array[] : Array<(Bool, Bool, Bool)>),
+    (Array[] : Array<Array<Int>>),
+    true,
+  );
+  print_string("14 FunInfo class/out-parameter cases passed")
+}

@@ -8,14 +8,18 @@ baseline. Keep the native kernel unchanged and concentrate on elaboration.
 
 The user has authorized up to ten Vibe workers and two peer agents using the
 primary model for review/coordination. The user has now asked to execute the written plan and to commit periodically.
-The three implementation pilots are being prepared; the plan and skill review
-is complete. Reviewed code batches will be committed with their focused checks.
+The first three implementation pilots are integrated and pass focused checks.
+Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
 [rewrite-inventory.json](provenance/rewrite-inventory.json) preserves the sampled
-seed inventory. Its 85 remaining frame candidates are not complete execution
-coverage. The provisional schedule is 24–48 active hours with parallel writers
-and review leads, to be recalibrated after accepted implementation pilots.
+seed inventory. Its 85 initial frame candidates are not complete execution
+coverage. The revised estimate is about 5–8 working days for the example-scoped
+rewrite, review and final benchmark. The original 24–48 active-hour estimate was
+optimistic: stateful fixture coverage and review cost more than draft production.
+The next batch will trial compact task packets, guarded integration and shared
+probe fixtures to reduce repeated mechanical work. This does not invoke the
+historical transpiler or change Skip's compiler/runtime.
 
 Latest steering: make the maintained implementation ordinary, readable Skip.
 This is useful independently of performance; do not require a measured speedup
@@ -66,8 +70,8 @@ array rewrite, not a complete typed representation conversion.
 
 The parallel batch adds structured definition unfolding (`WHNF/Unfold.sk`),
 function-info cache entry (`FunInfo/Entry.sk`) and the universe-equality callback
-(`LevelDefEq/Callback.sk`). The larger universe-equality outer wrapper remains
-unchanged. All three preserve retained original bodies; recursive helpers are
+(`LevelDefEq/Callback.sk`). The larger universe-equality outer wrapper was left
+unchanged in that batch. All three preserve retained original bodies; recursive helpers are
 shared. Root review corrected state-reference arguments, a missing matcher
 branch, the axiom Unit-to-Option result and misleading role names in drafts.
 The integrated source type-checks. Focused execution validation passes 48
@@ -76,9 +80,26 @@ function-info, 34 supported unfolding and 9,408 universe-equality callback cases
 explicit unimplemented structural-recursion metadata failure; a successful smart
 unfold followed by that metadata query is not supported. Matcher-present and
 successful recursor fixtures remain coverage gaps. A proposed ordinary outer
-universe-equality wrapper is in the agent draft directory and is not installed.
+universe-equality wrapper has since been integrated in the pilot batch below.
 The mechanical audit passes all 2,880 original maintained files after reversing
 only recorded body/routing changes. No speedup is claimed yet for this batch.
+
+The first Vibe pilot batch adds `DiscrTree/Types/Keys.sk`, `LevelDefEq/Entry.sk`
+and `FunInfo/Parameters.sk`. All pass incremental release type-checking. Focused
+execution checks pass 6,359 hash comparisons plus 30 source-derived fixed hashes;
+9,408 universe entry comparisons (696 errors, 2,112 state changes) plus named
+expected outcomes; 22 parameter traversal/resume/error/no-op checks; and 14
+class/output-parameter cases. Ten corresponding class parameter-fact checks pass
+in native Lean. The retained parameter loop redirects its self-call too, keeping
+that oracle independent of the new loop. Original files restore byte-for-byte to
+commit `37ed8f182` when only the recorded fallback renames are reversed.
+The [batch audit](provenance/rewrite-batches/2026-11-09-wave-01.json) records
+hashes, probes and remaining coverage limits. Class registration uses real
+extension initialization; missing metadata for a known class is unreachable in a
+stable valid map. Decidable=true and downstream runtime/interrupt/helper errors
+still need additional coverage. Trace-enabled entry behavior retains the old
+body. These are control-flow rewrites with boxed interfaces; typed conversion,
+whole-example validation and performance assessment remain pending.
 
 Use `skargo check` while editing and a measurement release build after the example
 path rewrite type-checks and focused checks pass. `skargo check --release` checks the release
