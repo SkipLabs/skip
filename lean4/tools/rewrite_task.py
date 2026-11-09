@@ -228,7 +228,7 @@ def build_packet(
     reading = list(files)
     skill = (repository / "skills/lean-skip-refactor/SKILL.md").as_posix()
     add("task.md", worker_instructions(function, reading, skill, mode))
-    add(".vibe/config.toml", "enable_subagents = false\n")
+    add(".vibe/config.toml", "enable_subagents = false\napi_retry_max_elapsed_time = 0.0\n")
     manifest = {
         "task": task,
         "mode": mode,

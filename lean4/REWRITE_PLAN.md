@@ -164,6 +164,19 @@ Packets range from about 27–51 KiB, roughly 7,000–13,000 tokens by byte esti
 Actual accepted throughput is still being measured; the ETA has not been reduced
 solely because tooling exists.
 
+Wave two encountered provider HTTP 429 responses with the minute allowance
+exhausted. All six Vibe runs were stopped and exported. A single-worker attempt
+after a cooldown also received 429, so further Vibe launches are stopped for now;
+local work and the two Codex agents continue. The user explicitly requires staying
+within company limits. The current operating ceiling is one Vibe worker, with
+automatic API retries disabled and coordinator-managed cooldown; repeated quota
+failures do not trigger a retry loop. Do not infer available request capacity from
+the earlier ten-worker authorization.
+
+[rewrite-workloads.json](provenance/rewrite-workloads.json) freezes the 36 depth/edit
+cases and generated input hashes. This records scope, not completed execution
+coverage. A matching executable snapshot and observed-entry run are still needed.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree

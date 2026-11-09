@@ -58,7 +58,8 @@ class PacketTests(unittest.TestCase):
         self.assertNotIn("f_deep", contracts)
         self.assertNotIn("HelperBodies.sk", packet.files)
         self.assertNotIn("SKILL.md", packet.files)
-        self.assertEqual(packet.files[".vibe/config.toml"], b"enable_subagents = false\n")
+        self.assertEqual(packet.files[".vibe/config.toml"],
+                         b"enable_subagents = false\napi_retry_max_elapsed_time = 0.0\n")
         self.assertIn("not an instruction to read outside the packet", packet.files["task.md"].decode())
         self.assertEqual(packet.summary["dependency_count"], 2)
         self.assertEqual(packet.summary["bytes"], sum(map(len, packet.files.values())))

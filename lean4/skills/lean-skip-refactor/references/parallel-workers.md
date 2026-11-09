@@ -14,6 +14,16 @@ model may review semantic work concurrently. The primary Codex coordinator owns 
 interface decisions, source manifests and the single compiler queue. Delegation
 does not authorize workers to message third parties or publish changes.
 
+Current operating limit is **one Vibe worker at a time**: wave two encountered
+provider HTTP 429 responses with the minute allowance exhausted, and the user
+explicitly asked to remain within company limits. All six runs were stopped with
+exports preserved; overlapping retries must not resume. New packets set
+`api_retry_max_elapsed_time = 0.0` so the coordinator handles backoff. Wait for at
+least the provider's retry delay (at least one minute when none is supplied)
+before another attempt, and keep a repeated rate-limit failure stopped while
+doing local work. The advertised ten-instance maximum is not permission to
+exceed provider quotas. Do not increase concurrency without evidence of capacity.
+
 Start with three representative implementation tasks and scale after accepted
 output establishes useful throughput. Eight writers with two flexible slots is
 a default allocation, not a requirement to keep ten processes busy. A writer

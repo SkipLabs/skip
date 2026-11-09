@@ -8,6 +8,10 @@ baseline. Keep the native kernel unchanged and concentrate on elaboration.
 
 The user has authorized up to ten Vibe workers and two peer agents using the
 primary model for review/coordination. The user has now asked to execute the written plan and to commit periodically.
+Current provider limits take precedence: all parallel Vibe runs and a subsequent
+single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
+Codex/local work continues. Any later Vibe run is limited to one worker with
+automatic API retries disabled and a coordinator-managed cooldown.
 The first three implementation pilots are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
