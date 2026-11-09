@@ -1,0 +1,905 @@
+// Differential and expected-value checks for OfNat/Int literal recognition.
+fun litProbeCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  after = newRuntime.checkpoint();
+  if (native_eq(oldResult, newResult) != 0) {
+    leanFail("rewrite result mismatch: " + label)
+  };
+  if (native_eq(oldRuntime.checkpoint().refs, after.refs) != 0) {
+    leanFail("rewrite reference mismatch: " + label)
+  };
+  expected match {
+  | Some(value) ->
+    if (!rewriteProbeSameInput(newResult, value)) {
+      leanFail("rewrite unexpected outcome: " + label)
+    }
+  | None() -> void
+  };
+  (newResult, after)
+}
+
+fun litProbeName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun litProbeDepthContext(
+  base: LeanValue,
+  maximum: LeanValue,
+  current: LeanValue,
+  source: LeanValue,
+): LeanValue {
+  cold = leanReplaceField(leanField(base, 0), 3, maximum);
+  withCold = leanReplaceField(base, 0, cold);
+  withDepth = leanReplaceField(withCold, 1, current);
+  leanReplaceField(withDepth, 2, source)
+}
+
+fun litProbeDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun litProbeApply(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  argument: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, function, argument)
+}
+
+fun litProbeApply3(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  first: LeanValue,
+  second: LeanValue,
+  third: LeanValue,
+): LeanValue {
+  litProbeApply(
+    runtime,
+    litProbeApply(runtime, litProbeApply(runtime, function, first), second),
+    third,
+  )
+}
+
+fun litProbeAxiom(
+  name: LeanValue,
+  type: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun litProbeDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, LeanCtor(LeanTag.List_nil, Array[])]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun litProbeOfNat(
+  runtime: mutable LeanExecution,
+  useFallback: Bool,
+  expr: LeanValue,
+  typeName: LeanValue,
+  state: RewriteProbeState,
+  world: LeanValue,
+): LeanValue {
+  exprCopy = rewriteProbeCopyInput(expr);
+  typeNameCopy = rewriteProbeCopyInput(typeName);
+  metaContextCopy = rewriteProbeCopyInput(state.metaContext);
+  coreContextCopy = rewriteProbeCopyInput(state.coreContext);
+  callState = RewriteProbeState(
+    state.saved,
+    metaContextCopy,
+    state.metaStateRef,
+    coreContextCopy,
+    state.coreStateRef,
+  );
+  result = if (useFallback) {
+    L4_Lean_Meta_LitValues.f_Lean_Meta_getOfNatValue_4bf9090d48_fallback(
+      runtime,
+      exprCopy,
+      typeNameCopy,
+      callState.metaContext,
+      callState.metaStateRef,
+      callState.coreContext,
+      callState.coreStateRef,
+      world,
+    )
+  } else {
+    L4_Lean_Meta_LitValues.f_Lean_Meta_getOfNatValue_4bf9090d48(
+      runtime,
+      exprCopy,
+      typeNameCopy,
+      callState.metaContext,
+      callState.metaStateRef,
+      callState.coreContext,
+      callState.coreStateRef,
+      world,
+    )
+  };
+  if (!rewriteProbeSameInput(exprCopy, expr)) {
+    leanFail("getOfNatValue mutated expr input")
+  };
+  if (!rewriteProbeSameInput(typeNameCopy, typeName)) {
+    leanFail("getOfNatValue mutated type-name input")
+  };
+  if (!rewriteProbeSameInput(metaContextCopy, state.metaContext)) {
+    leanFail("getOfNatValue mutated Meta context input")
+  };
+  if (!rewriteProbeSameInput(coreContextCopy, state.coreContext)) {
+    leanFail("getOfNatValue mutated Core context input")
+  };
+  result
+}
+
+fun litProbeInt(
+  runtime: mutable LeanExecution,
+  useFallback: Bool,
+  expr: LeanValue,
+  state: RewriteProbeState,
+  world: LeanValue,
+): LeanValue {
+  exprCopy = rewriteProbeCopyInput(expr);
+  metaContextCopy = rewriteProbeCopyInput(state.metaContext);
+  coreContextCopy = rewriteProbeCopyInput(state.coreContext);
+  callState = RewriteProbeState(
+    state.saved,
+    metaContextCopy,
+    state.metaStateRef,
+    coreContextCopy,
+    state.coreStateRef,
+  );
+  result = if (useFallback) {
+    L4_Lean_Meta_LitValues.f_Lean_Meta_getIntValue_162deccdea_fallback(
+      runtime,
+      exprCopy,
+      callState.metaContext,
+      callState.metaStateRef,
+      callState.coreContext,
+      callState.coreStateRef,
+      world,
+    )
+  } else {
+    L4_Lean_Meta_LitValues.f_Lean_Meta_getIntValue_162deccdea(
+      runtime,
+      exprCopy,
+      callState.metaContext,
+      callState.metaStateRef,
+      callState.coreContext,
+      callState.coreStateRef,
+      world,
+    )
+  };
+  if (!rewriteProbeSameInput(exprCopy, expr)) {
+    leanFail("getIntValue mutated expr input")
+  };
+  if (!rewriteProbeSameInput(metaContextCopy, state.metaContext)) {
+    leanFail("getIntValue mutated Meta context input")
+  };
+  if (!rewriteProbeSameInput(coreContextCopy, state.coreContext)) {
+    leanFail("getIntValue mutated Core context input")
+  };
+  result
+}
+
+fun litProbeCheckOfNat(
+  label: String,
+  state: RewriteProbeState,
+  world: LeanValue,
+  expr: LeanValue,
+  typeName: LeanValue,
+  expected: LeanValue,
+): void {
+  inputBefore = rewriteProbeCopyInput(expr);
+  (actual, _after) = litProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(oldRuntime, true, expr, typeName, state, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(newRuntime, false, expr, typeName, state, world),
+    Some(expected),
+  );
+  assert(rewriteProbeSameInput(expr, inputBefore));
+  assert(leanTag(actual) == LeanTag.EST_Out_ok)
+}
+
+fun litProbeCheckOfNatColdWarm(
+  label: String,
+  state: RewriteProbeState,
+  world: LeanValue,
+  expr: LeanValue,
+  typeName: LeanValue,
+  expected: LeanValue,
+): void {
+  inputBefore = rewriteProbeCopyInput(expr);
+  (coldResult, coldState) = litProbeCompare(
+    label + " cold",
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(oldRuntime, true, expr, typeName, state, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(newRuntime, false, expr, typeName, state, world),
+    Some(expected),
+  );
+  if (rewriteProbeSameInput(state.saved.refs, coldState.refs)) {
+    leanFail("WHNF cold call did not publish expected state: " + label)
+  };
+  warmState = RewriteProbeState(
+    coldState,
+    state.metaContext,
+    state.metaStateRef,
+    state.coreContext,
+    state.coreStateRef,
+  );
+  (warmResult, warmCheckpoint) = litProbeCompare(
+    label + " warm",
+    coldState,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(oldRuntime, true, expr, typeName, warmState, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(newRuntime, false, expr, typeName, warmState, world),
+    Some(expected),
+  );
+  if (!rewriteProbeSameInput(coldState.refs, warmCheckpoint.refs)) {
+    leanFail("WHNF warm call changed the published state: " + label)
+  };
+  assert(leanTag(coldResult) == LeanTag.EST_Out_ok);
+  assert(leanTag(warmResult) == LeanTag.EST_Out_ok);
+  assert(rewriteProbeSameInput(expr, inputBefore))
+}
+
+fun litProbeCheckInt(
+  label: String,
+  state: RewriteProbeState,
+  world: LeanValue,
+  expr: LeanValue,
+  expected: LeanValue,
+): LeanValue {
+  inputBefore = rewriteProbeCopyInput(expr);
+  (actual, _after) = litProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeInt(oldRuntime, true, expr, state, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeInt(newRuntime, false, expr, state, world),
+    Some(expected),
+  );
+  assert(leanTag(actual) == LeanTag.EST_Out_ok);
+  assert(rewriteProbeSameInput(expr, inputBefore));
+  leanField(actual, 0)
+}
+
+fun litProbeCheckOfNatDepthError(
+  label: String,
+  state: RewriteProbeState,
+  world: LeanValue,
+  expr: LeanValue,
+  typeName: LeanValue,
+  expected: LeanValue,
+): void {
+  (result, _after) = litProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(oldRuntime, true, expr, typeName, state, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeOfNat(newRuntime, false, expr, typeName, state, world),
+    Some(expected),
+  );
+  if (leanTag(result) != LeanTag.EST_Out_error) {
+    leanFail("expected WHNF error: " + label)
+  };
+  if (leanTag(leanField(result, 0)) != LeanTag.Exception_error) {
+    leanFail("expected recursion-depth exception: " + label)
+  };
+  if (leanNat(leanField(result, 1)).toString() == "0") {
+    leanFail("expected nonzero error world: " + label)
+  }
+}
+
+fun litProbeCheckIntDepthError(
+  label: String,
+  state: RewriteProbeState,
+  world: LeanValue,
+  expr: LeanValue,
+  expected: LeanValue,
+): void {
+  (result, _after) = litProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~>
+      litProbeInt(oldRuntime, true, expr, state, world),
+    (newRuntime: mutable LeanExecution) ~>
+      litProbeInt(newRuntime, false, expr, state, world),
+    Some(expected),
+  );
+  if (leanTag(result) != LeanTag.EST_Out_error) {
+    leanFail("expected WHNF error: " + label)
+  };
+  if (leanTag(leanField(result, 0)) != LeanTag.Exception_error) {
+    leanFail("expected recursion-depth exception: " + label)
+  };
+  if (leanNat(leanField(result, 1)).toString() == "0") {
+    leanFail("expected nonzero error world: " + label)
+  }
+}
+
+fun litProbeRun(profile: Bool): void {
+  runtime = mutable LeanExecution{
+    unboundedHeartbeats => true,
+    profileRuntime => profile,
+  };
+  leanInitializeSimp(runtime);
+  name = (text: String) -> litProbeName(runtime, text);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  sortOne = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  natName = name("Nat");
+  intName = name("Int");
+  aliasName = name("AliasInt");
+  ofNatName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("OfNat"),
+    LeanText("ofNat"),
+  );
+  ofNatClassName = name("OfNat");
+  negName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Neg"),
+    LeanText("neg"),
+  );
+  negClassName = name("Neg");
+  intNegName = name("instanceNegInt");
+  natNegName = name("instanceNegNat");
+  intType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, intName, nil);
+  natType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
+  aliasType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, aliasName, nil);
+  ofNatClass = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, ofNatClassName, nil);
+  negClass = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, negClassName, nil);
+  ofNatMethod = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, ofNatName, nil);
+  negMethod = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, negName, nil);
+
+  index = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+  typeParameter = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n2);
+  classAlpha = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+  classIndex = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  ofNatClassType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name("alpha"),
+    binder,
+    sortOne,
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      name("index"),
+      binder,
+      natType,
+      sortOne,
+    ),
+  );
+  // `OfNat α n` has two arguments, unlike the three-argument literal method.
+  ofNatAtCurrentIndex = litProbeApply(
+    runtime,
+    litProbeApply(runtime, ofNatClass, classAlpha),
+    classIndex,
+  );
+  ofNatInstanceType = ofNatAtCurrentIndex;
+  ofNatValueBody = typeParameter;
+  ofNatValueType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name("alpha"),
+    binder,
+    sortOne,
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      name("index"),
+      binder,
+      natType,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        name("instance"),
+        binder,
+        ofNatInstanceType,
+        ofNatValueBody,
+      ),
+    ),
+  );
+  negClassType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name("alpha"),
+    binder,
+    sortOne,
+    sortOne,
+  );
+  negInstanceType = litProbeApply(runtime, negClass, classIndex);
+  negValueType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name("alpha"),
+    binder,
+    sortOne,
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      name("instance"),
+      binder,
+      negInstanceType,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        name("value"),
+        binder,
+        index,
+        typeParameter,
+      ),
+    ),
+  );
+
+  rawNat = (n: LeanValue) -> L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, n);
+  intAt = (n: LeanValue) -> litProbeApply(
+    runtime,
+    litProbeApply(runtime, ofNatClass, intType),
+    rawNat(n),
+  );
+  natAt = (n: LeanValue) -> litProbeApply(
+    runtime,
+    litProbeApply(runtime, ofNatClass, natType),
+    rawNat(n),
+  );
+  ofNatIntInstanceType = (n: LeanValue) -> intAt(n);
+  ofNatNatInstanceType = (n: LeanValue) -> natAt(n);
+  intOfNatInstance = (n: LeanValue, instanceName: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, instanceName, nil);
+  ofNatInt = (n: LeanValue) -> litProbeApply3(
+    runtime,
+    ofNatMethod,
+    intType,
+    rawNat(n),
+    intOfNatInstance(n, name("ofNatInt." + leanNat(n).toString())),
+  );
+  ofNatNat = (n: LeanValue) -> litProbeApply3(
+    runtime,
+    ofNatMethod,
+    natType,
+    rawNat(n),
+    intOfNatInstance(n, name("ofNatNat." + leanNat(n).toString())),
+  );
+  negInt = (value: LeanValue) -> litProbeApply3(
+    runtime,
+    negMethod,
+    intType,
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, intNegName, nil),
+    value,
+  );
+  negNat = (value: LeanValue) -> litProbeApply3(
+    runtime,
+    negMethod,
+    natType,
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natNegName, nil),
+    value,
+  );
+
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(leanNameKey(natName), LeanConstantFile(litProbeAxiom(natName, sortOne), None()));
+  constants.set(leanNameKey(intName), LeanConstantFile(litProbeAxiom(intName, sortOne), None()));
+  constants.set(leanNameKey(ofNatClassName), LeanConstantFile(litProbeAxiom(ofNatClassName, ofNatClassType), None()));
+  constants.set(leanNameKey(ofNatName), LeanConstantFile(litProbeAxiom(ofNatName, ofNatValueType), None()));
+  constants.set(leanNameKey(negClassName), LeanConstantFile(litProbeAxiom(negClassName, negClassType), None()));
+  constants.set(leanNameKey(negName), LeanConstantFile(litProbeAxiom(negName, negValueType), None()));
+  constants.set(leanNameKey(aliasName), LeanConstantFile(litProbeDefinition(aliasName, sortOne, intType), None()));
+  n0 = LeanNatLiterals.n0;
+  n3 = LeanNatLiterals.n3;
+  n7 = LeanNatLiterals.n7;
+  n12 = LeanNatLiterals.n12;
+  nlarge = LeanNatLiterals.n18446744073709551616;
+  for (n in Array[n0, n3, n7, n12, nlarge]) {
+    intInstanceType = ofNatIntInstanceType(n);
+    instanceName = name("ofNatInt." + leanNat(n).toString());
+    constants.set(leanNameKey(instanceName), LeanConstantFile(litProbeAxiom(instanceName, intInstanceType), None()));
+    natInstanceType = ofNatNatInstanceType(n);
+    natInstanceName = name("ofNatNat." + leanNat(n).toString());
+    constants.set(leanNameKey(natInstanceName), LeanConstantFile(litProbeAxiom(natInstanceName, natInstanceType), None()))
+  };
+  constants.set(
+    leanNameKey(intNegName),
+    LeanConstantFile(
+      litProbeAxiom(intNegName, litProbeApply(runtime, negClass, intType)),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(natNegName),
+    LeanConstantFile(
+      litProbeAxiom(natNegName, litProbeApply(runtime, negClass, natType)),
+      None(),
+    ),
+  );
+  environment = rewriteProbeEnvironment(runtime, constants.chill());
+  localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  state = rewriteProbeState(runtime, environment, localContext, "<literal-values-probe>");
+  world = leanNatValue(73);
+
+  positive12 = ofNatInt(n12);
+  positive0 = ofNatInt(n0);
+  positiveLarge = ofNatInt(nlarge);
+  viaAlias = litProbeApply3(
+    runtime,
+    ofNatMethod,
+    aliasType,
+    rawNat(n7),
+    intOfNatInstance(n7, name("ofNatInt.7")),
+  );
+  negativeAlias = negInt(viaAlias);
+  metadata = LeanCtor(LeanTag.List_nil, Array[]);
+  nestedNumeral = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    rawNat(n12),
+  );
+  ofNatMDataNumeral = litProbeApply3(
+    runtime,
+    ofNatMethod,
+    intType,
+    nestedNumeral,
+    intOfNatInstance(n12, name("ofNatInt.12")),
+  );
+  nestedExpression = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    ofNatMDataNumeral,
+  );
+  metadataSpinePrefix = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    litProbeApply(
+      runtime,
+      litProbeApply(runtime, ofNatMethod, intType),
+      rawNat(n12),
+    ),
+  );
+  metadataSpineExpression = litProbeApply(
+    runtime,
+    metadataSpinePrefix,
+    intOfNatInstance(n12, name("ofNatInt.12")),
+  );
+  wrongType = ofNatNat(n3);
+  partialOfNat = litProbeApply(runtime, ofNatMethod, intType);
+  ordinaryLiteral = rawNat(n3);
+  expectedSome12 = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[
+      LeanCtor(
+        LeanTag.Option_some,
+        Array[LeanCtor(LeanTag.Prod_mk, Array[n12, intType])],
+      ),
+      world,
+    ],
+  );
+  expectedSomeAlias = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[
+      LeanCtor(
+        LeanTag.Option_some,
+        Array[LeanCtor(LeanTag.Prod_mk, Array[n7, intType])],
+      ),
+      world,
+    ],
+  );
+  expectedNone = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  litProbeCheckOfNat("plain OfNat Int", state, world, positive12, intName, expectedSome12);
+  litProbeCheckOfNat("mdata numeral and expression", state, world, nestedExpression, intName, expectedSome12);
+  litProbeCheckOfNat("mdata between application spine nodes", state, world, metadataSpineExpression, intName, expectedSome12);
+  litProbeCheckOfNatColdWarm(
+    "WHNF type alias",
+    state,
+    world,
+    viaAlias,
+    intName,
+    expectedSomeAlias,
+  );
+  litProbeCheckOfNat("wrong numeral type", state, world, wrongType, intName, expectedNone);
+  litProbeCheckOfNat("partial OfNat application", state, world, partialOfNat, intName, expectedNone);
+  litProbeCheckOfNat("raw literal is not OfNat application", state, world, ordinaryLiteral, intName, expectedNone);
+  litProbeCheckOfNat("wrong requested type name", state, world, positive12, natName, expectedNone);
+
+  depthSource = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+    runtime,
+    LeanText("literal-values-depth-source"),
+  );
+  depthCoreContext = litProbeDepthContext(
+    state.coreContext,
+    LeanNatLiterals.n1,
+    LeanNatLiterals.n1,
+    depthSource,
+  );
+  depthState = RewriteProbeState(
+    state.saved,
+    state.metaContext,
+    state.metaStateRef,
+    depthCoreContext,
+    state.coreStateRef,
+  );
+  depthExpected = litProbeDepthError(runtime, depthSource, world);
+  assert(leanNat(world).toString() != "0");
+  litProbeCheckOfNatDepthError(
+    "OfNat WHNF recursion depth",
+    depthState,
+    world,
+    viaAlias,
+    intName,
+    depthExpected,
+  );
+  litProbeCheckIntDepthError(
+    "positive Int WHNF recursion depth",
+    depthState,
+    world,
+    viaAlias,
+    depthExpected,
+  );
+
+  natLocalName = name("literalValues.n");
+  natInstanceLocalName = name("literalValues.instOfNatIntN");
+  natLocal = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, natLocalName);
+  natInstanceLocal = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(
+    runtime,
+    natInstanceLocalName,
+  );
+  natInstanceLocalType = litProbeApply(
+    runtime,
+    litProbeApply(runtime, ofNatClass, intType),
+    natLocal,
+  );
+  localKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  localsWithNat = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localContext,
+    natLocalName,
+    natLocalName,
+    natType,
+    binder,
+    localKind,
+  );
+  localsWithInstance = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+    runtime,
+    localsWithNat,
+    natInstanceLocalName,
+    natInstanceLocalName,
+    natInstanceLocalType,
+    binder,
+    localKind,
+  );
+  nonliteralState = rewriteProbeState(
+    runtime,
+    environment,
+    localsWithInstance,
+    "<literal-values-nonliteral-probe>",
+  );
+  nonliteralNumeral = litProbeApply3(
+    runtime,
+    ofNatMethod,
+    intType,
+    natLocal,
+    natInstanceLocal,
+  );
+  litProbeCheckOfNat(
+    "well-typed nonliteral Nat payload",
+    nonliteralState,
+    world,
+    nonliteralNumeral,
+    intName,
+    expectedNone,
+  );
+  litProbeCheckInt(
+    "well-typed nonliteral Int payload",
+    nonliteralState,
+    world,
+    nonliteralNumeral,
+    expectedNone,
+  );
+  litProbeCheckIntDepthError(
+    "negative Int WHNF recursion depth",
+    depthState,
+    world,
+    negativeAlias,
+    depthExpected,
+  );
+
+  positiveExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(false, n12)]), world],
+  );
+  zeroExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(false, n0)]), world],
+  );
+  largeExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(false, nlarge)]), world],
+  );
+  negative12 = negInt(positive12);
+  negativeLarge = negInt(positiveLarge);
+  metadataWrappedNegative = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    metadata,
+    negative12,
+  );
+  negativeExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(true, n12)]), world],
+  );
+  negativeZeroExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(false, n0)]), world],
+  );
+  negativeLargeExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(true, nlarge)]), world],
+  );
+  intNoneExpected = expectedNone;
+  positiveResult = litProbeCheckInt("positive Int", state, world, positive12, positiveExpected);
+  zeroResult = litProbeCheckInt("zero Int", state, world, positive0, zeroExpected);
+  largeResult = litProbeCheckInt("large positive Int", state, world, positiveLarge, largeExpected);
+  negativeResult = litProbeCheckInt("negative Int", state, world, negative12, negativeExpected);
+  negativeZeroResult = litProbeCheckInt(
+    "negative zero Int",
+    state,
+    world,
+    negInt(positive0),
+    negativeZeroExpected,
+  );
+  metadataNegativeResult = litProbeCheckInt(
+    "metadata-wrapped negative Int",
+    state,
+    world,
+    metadataWrappedNegative,
+    negativeExpected,
+  );
+  negativeLargeResult = litProbeCheckInt("large negative Int", state, world, negativeLarge, negativeLargeExpected);
+  wrongNegative = negNat(ofNatNat(n3));
+  wrongNegativeResult = litProbeCheckInt("wrong negative payload type", state, world, wrongNegative, intNoneExpected);
+  assert(leanIntegerText(leanField(positiveResult, 0)) == "12");
+  assert(leanIntegerText(leanField(zeroResult, 0)) == "0");
+  assert(leanIntegerText(leanField(largeResult, 0)) == "18446744073709551616");
+  assert(leanIntegerText(leanField(negativeResult, 0)) == "-12");
+  assert(leanIntegerText(leanField(negativeZeroResult, 0)) == "0");
+  assert(leanIntegerText(leanField(metadataNegativeResult, 0)) == "-12");
+  assert(leanIntegerText(leanField(negativeLargeResult, 0)) == "-18446744073709551616");
+  assert(leanTag(wrongNegativeResult) == LeanTag.Option_none);
+
+  // A real, assigned metavariable of type `Neg`'s method is the outer
+  // expression head. Positive recognition rejects it first; negative
+  // recognition must instantiate that head with the Meta state reference.
+  mvarName = name("literalValues.assignedHead");
+  initialMetaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime);
+  mctx0 = leanField(initialMetaState, 0);
+  functionType = negValueType;
+  mctx1 = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+    runtime,
+    mctx0,
+    mvarName,
+    mvarName,
+    localContext,
+    LeanArray(Array[]),
+    functionType,
+    LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+    LeanNatLiterals.n0,
+  );
+  assignments = L4_Lean_MetavarContext.f_Lean_assignExp_spec_0_94a4c79ff8(
+    runtime,
+    leanField(mctx1, 8),
+    mvarName,
+    negMethod,
+  );
+  mctx2 = leanReplaceField(mctx1, 8, assignments);
+  assignedMetaState = leanReplaceField(initialMetaState, 0, mctx2);
+  runtime.writeRef(state.metaStateRef, Some(assignedMetaState));
+  assignedSaved = runtime.checkpoint();
+  assignedState = RewriteProbeState(
+    assignedSaved,
+    state.metaContext,
+    state.metaStateRef,
+    state.coreContext,
+    state.coreStateRef,
+  );
+  mvarHead = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mvarName);
+  assignedNegative = litProbeApply3(
+    runtime,
+    mvarHead,
+    intType,
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, intNegName, nil),
+    positive12,
+  );
+  assignedExpected = LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[leanIntegerValue(true, n12)]), world],
+  );
+  assignedResult = litProbeCheckInt(
+    "negative term with assigned metavariable head",
+    assignedState,
+    world,
+    assignedNegative,
+    assignedExpected,
+  );
+  assert(leanIntegerText(leanField(assignedResult, 0)) == "-12");
+}
+
+fun main(): void {
+  for (profile in Array[false, true]) litProbeRun(profile);
+  print_string("OfNat/Int literal recognition: differential and expected-value cases passed")
+}

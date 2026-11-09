@@ -1,0 +1,143 @@
+// Recognize `OfNat.ofNat type value instance` after metavariable-app
+// instantiation and WHNF-normalizing the type argument.
+module L4_Lean_Meta_LitValues;
+
+fun f_Lean_Meta_getOfNatValue_4bf9090d48(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  typeDeclarationName: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  instantiated = L4_Lean_Meta_Basic.f_Lean_Meta_instantiateMVarsIfMVarApp_05888c8640(
+    runtime,
+    expr,
+    metaStateRef,
+    world,
+  );
+  if (leanTag(instantiated) == LeanTag.EST_Out_error) return instantiated;
+  if (leanTag(instantiated) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(instantiated, 1);
+  cleanedExpr = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    runtime,
+    leanField(instantiated, 0),
+  );
+
+  if (
+    !leanIsTrue(L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, cleanedExpr))
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  withoutInstance = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    cleanedExpr,
+  );
+  if (
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, withoutInstance),
+    )
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  withoutNumeral = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    withoutInstance,
+  );
+  if (
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, withoutNumeral),
+    )
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  withoutType = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    withoutNumeral,
+  );
+  ofNatName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("OfNat"),
+    LeanText("ofNat"),
+  );
+  isOfNatApplication = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+    runtime,
+    withoutType,
+    ofNatName,
+  );
+  if (!leanIsTrue(isOfNatApplication)) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  rawNumeral = leanField(withoutInstance, 2);
+  rawType = leanField(withoutNumeral, 2);
+  reducedType = L4_Lean_Meta_Basic.f_Lean_Meta_whnfD_9c173fd0ba(
+    runtime,
+    rawType,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(reducedType) == LeanTag.EST_Out_error) return reducedType;
+  if (leanTag(reducedType) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  reducedTypeValue = leanField(reducedType, 0);
+  !world = leanField(reducedType, 1);
+  typeHead = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+    runtime,
+    reducedTypeValue,
+  );
+  hasExpectedType = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+    runtime,
+    typeHead,
+    typeDeclarationName,
+  );
+  if (!leanIsTrue(hasExpectedType)) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  cleanedNumeral = L4_Lean_Expr.f_Lean_Expr_consumeMData_5a2d9a12ed(
+    runtime,
+    rawNumeral,
+  );
+  if (leanTag(cleanedNumeral) != LeanTag.Expr_lit__impl) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  literal = leanField(cleanedNumeral, 1);
+  if (leanTag(literal) != LeanTag.Literal_natVal) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[
+      LeanCtor(
+        LeanTag.Option_some,
+        Array[
+          LeanCtor(
+            LeanTag.Prod_mk,
+            Array[leanField(literal, 0), reducedTypeValue],
+          ),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+module end;

@@ -1,0 +1,155 @@
+// Recognize positive and Neg.neg-encoded Int literals through the shared
+// OfNat recognizer. All effects and worlds flow from one attempt to the next.
+module L4_Lean_Meta_LitValues;
+
+fun f_Lean_Meta_getIntValue_162deccdea(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  intName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Int"),
+  );
+  positive = f_Lean_Meta_getOfNatValue_4bf9090d48(
+    runtime,
+    expr,
+    intName,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(positive) == LeanTag.EST_Out_error) return positive;
+  if (leanTag(positive) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(positive, 1);
+  positiveValue = leanField(positive, 0);
+  if (leanTag(positiveValue) == LeanTag.Option_some) {
+    pair = leanField(positiveValue, 0);
+    if (leanTag(pair) != LeanTag.Prod_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    magnitude = leanField(pair, 0);
+    value = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+      runtime,
+      magnitude,
+    );
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.Option_some, Array[value]), world],
+    )
+  };
+
+  instantiated = L4_Lean_Meta_Basic.f_Lean_Meta_instantiateMVarsIfMVarApp_05888c8640(
+    runtime,
+    expr,
+    metaStateRef,
+    world,
+  );
+  if (leanTag(instantiated) == LeanTag.EST_Out_error) return instantiated;
+  if (leanTag(instantiated) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(instantiated, 1);
+  cleanedExpr = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    runtime,
+    leanField(instantiated, 0),
+  );
+  if (
+    !leanIsTrue(L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, cleanedExpr))
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  withoutArgument = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    cleanedExpr,
+  );
+  if (
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, withoutArgument),
+    )
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  withoutInstance = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    withoutArgument,
+  );
+  if (
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, withoutInstance),
+    )
+  ) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  withoutType = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(
+    runtime,
+    withoutInstance,
+  );
+  negName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Neg"),
+    LeanText("neg"),
+  );
+  isNegApplication = L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(
+    runtime,
+    withoutType,
+    negName,
+  );
+  if (!leanIsTrue(isNegApplication)) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+
+  // Extract the argument from the instantiated, annotation-cleaned spine.
+  // Using the original input here loses assigned metavariable heads and
+  // metadata-wrapped applications.
+  argument = leanField(cleanedExpr, 2);
+  negativeMagnitude = f_Lean_Meta_getOfNatValue_4bf9090d48(
+    runtime,
+    argument,
+    intName,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(negativeMagnitude) == LeanTag.EST_Out_error) {
+    return negativeMagnitude
+  };
+  if (leanTag(negativeMagnitude) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(negativeMagnitude, 1);
+  negativeValue = leanField(negativeMagnitude, 0);
+  if (leanTag(negativeValue) != LeanTag.Option_some) return LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  );
+  pair = leanField(negativeValue, 0);
+  if (leanTag(pair) != LeanTag.Prod_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  magnitude = L4_Init_Data_Int_Basic.f_Int_ofNat_c4abd08ced(
+    runtime,
+    leanField(pair, 0),
+  );
+  value = L4_Init_Data_Int_Basic.f_Int_neg_d4732c083b(runtime, magnitude);
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[value]), world],
+  )
+}
+
+module end;

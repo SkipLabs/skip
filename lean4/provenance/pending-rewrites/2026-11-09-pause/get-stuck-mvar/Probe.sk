@@ -1,0 +1,477 @@
+// Stuck IDs and state effects using registered classes, projections and matchers.
+class StuckCase(label: String, expression: LeanValue, expected: ?LeanValue, unchanged: Bool)
+
+fun stuckApply(runtime: mutable LeanExecution, head: LeanValue, arguments: Array<LeanValue>): LeanValue {
+  result = head;
+  for (argument in arguments) !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument);
+  result
+}
+
+fun stuckBinders(runtime: mutable LeanExecution, domains: Array<(LeanValue, LeanTag.Value)>, body: LeanValue, lambda: Bool): LeanValue {
+  result = body;
+  for (offset in Range(0, domains.size())) {
+    (domain, binder) = domains[domains.size() - offset - 1];
+    !result = if (lambda) {
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, LeanCtor(LeanTag.Name_anonymous__impl, Array[]), LeanCtor(binder, Array[]), domain, result)
+    } else {
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, LeanCtor(LeanTag.Name_anonymous__impl, Array[]), LeanCtor(binder, Array[]), domain, result)
+    }
+  };
+  result
+}
+
+fun stuckArrow(runtime: mutable LeanExecution, domains: Array<LeanValue>, body: LeanValue, lambda: Bool = false): LeanValue {
+  stuckBinders(runtime, domains.map(domain -> (domain, LeanTag.BinderInfo_default)), body, lambda)
+}
+
+fun stuckAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[name, LeanCtor(LeanTag.List_nil, Array[]), type]), leanBool(false),
+  ])])
+}
+
+fun stuckDefinition(name: LeanValue, type: LeanValue, value: LeanValue): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(LeanTag.ConstantInfo_defnInfo, Array[LeanCtor(LeanTag.DefinitionVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]), value,
+    LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]), LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+    LeanCtor(LeanTag.List_cons, Array[name, nil]),
+  ])])
+}
+
+fun stuckStructure(name: LeanValue, ctor: LeanValue, type: LeanValue, ctorType: LeanValue, parameters: Int): Array<LeanValue> {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  singleton = (value: LeanValue) -> LeanCtor(LeanTag.List_cons, Array[value, nil]);
+  Array[
+    LeanCtor(LeanTag.ConstantInfo_inductInfo, Array[LeanCtor(LeanTag.InductiveVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]), leanNatValue(parameters), LeanNatLiterals.n0,
+      singleton(name), singleton(ctor), LeanNatLiterals.n0, leanBool(false), leanBool(false), leanBool(false),
+    ])]),
+    LeanCtor(LeanTag.ConstantInfo_ctorInfo, Array[LeanCtor(LeanTag.ConstructorVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[ctor, nil, ctorType]), name, LeanNatLiterals.n0,
+      leanNatValue(parameters), LeanNatLiterals.n1, leanBool(false),
+    ])]),
+  ]
+}
+
+fun stuckCheck(label: String, saved: LeanExecutionCheckpoint, state: RewriteProbeState, expression: LeanValue,
+  context: LeanValue, core: LeanValue, world: LeanValue, expected: LeanValue, unchanged: Bool): LeanExecutionCheckpoint {
+  oldExpression = rewriteProbeCopyInput(expression);
+  newExpression = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(label, saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_WHNF.f_Lean_Meta_getStuckMVar_d961eb9381_fallback(runtime,
+        oldExpression, oldContext, state.metaStateRef, oldCore, state.coreStateRef, world);
+      assert(rewriteProbeSameInput(expression, oldExpression));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_WHNF.f_Lean_Meta_getStuckMVar_d961eb9381(runtime,
+        newExpression, newContext, state.metaStateRef, newCore, state.coreStateRef, world);
+      assert(rewriteProbeSameInput(expression, newExpression));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    });
+  if (!rewriteProbeSameInput(result, expected)) leanFail("unexpected stuck result: " + label);
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  if (unchanged && native_eq(saved.refs, after.refs) != 0) leanFail("unexpected stuck state change: " + label);
+  after
+}
+
+fun stuckPolicy(runtime: mutable LeanExecution, arguments: Array<LeanValue>): LeanValue {
+  declarationName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(runtime, arguments[4]);
+  assert(rewriteProbeSameInput(declarationName, arguments[1]));
+  assert(rewriteProbeSameInput(leanField(arguments[2], 1), arguments[7]));
+  runtime.writeRef(arguments[0], Some(leanBoxNat(leanNat(runtime.readRef(arguments[0])).add(LeanNat::fromInt(1)))));
+  arguments[2]
+}
+
+fun stuckDepthError(runtime: mutable LeanExecution, source: LeanValue, world: LeanValue): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText("runtime"), LeanText("maxRecDepth"));
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(runtime,
+    LeanCtor(LeanTag.Std_Format_text, Array[LeanText("maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information")]));
+  LeanCtor(LeanTag.EST_Out_error, Array[LeanCtor(LeanTag.Exception_error,
+    Array[source, LeanCtor(LeanTag.MessageData_tagged, Array[tag, message])]), world])
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(builder);
+    leanInitializeBinding(builder, "Lean.Meta.Match.Extension.extension",
+      L4_Lean_Meta_Match_MatcherInfo.f_MatcherInfo_hygCtx_hyg_89b5cff17d);
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    singleton = (value: LeanValue) -> LeanCtor(LeanTag.List_cons, Array[value, nil]);
+    name = (s: String) -> L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    constant = (n: LeanValue) -> L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, n, nil);
+    variable = (n: LeanValue) -> L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, n);
+    bound = (i: Int) -> L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(i));
+    mvar = (n: LeanValue) -> L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, n);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, LeanCtor(LeanTag.Level_zero__impl, Array[])));
+    aName = name("StuckA");
+    a = constant(aName);
+    pName = name("StuckP");
+    p = constant(pName);
+    cName = name("StuckClass");
+    bName = name("StuckBox");
+    dName = name("StuckParent");
+    cpName = name("StuckIndexedClass");
+    c = constant(cName);
+    b = constant(bName);
+    d = constant(dName);
+    cp = constant(cpName);
+    cCtor = name("StuckClassMk");
+    bCtor = name("StuckBoxMk");
+    dCtor = name("StuckParentMk");
+    cpCtor = name("StuckIndexedClassMk");
+    operationType = stuckBinders(builder, Array[(a, LeanTag.BinderInfo_implicit), (a, LeanTag.BinderInfo_default),
+      (a, LeanTag.BinderInfo_default)], a, false);
+    operationValue = stuckBinders(builder, Array[(a, LeanTag.BinderInfo_implicit), (a, LeanTag.BinderInfo_default),
+      (a, LeanTag.BinderInfo_default)], bound(1), true);
+    projectName = name("stuckProject");
+    boxProjectName = name("stuckBoxProject");
+    indexedName = name("stuckIndexedProject");
+    auxiliaryName = name("stuckAuxiliary");
+    indexedAuxName = name("stuckIndexedAuxiliary");
+    nonclassAuxName = name("stuckBoxAuxiliary");
+    hugeProjectionName = name("stuckHugeProjection");
+    hugeAuxName = name("stuckHugeAuxiliary");
+    dualName = name("stuckDualProjection");
+    project = constant(projectName);
+    projectType = stuckBinders(builder, Array[(c, LeanTag.BinderInfo_instImplicit)], operationType, false);
+    projectValue = stuckBinders(builder, Array[(c, LeanTag.BinderInfo_instImplicit)],
+      L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cName, LeanNatLiterals.n0, bound(0)), true);
+    indexedDomains = Array[(a, LeanTag.BinderInfo_default),
+      (stuckApply(builder, cp, Array[bound(0)]), LeanTag.BinderInfo_instImplicit)];
+    indexedType = stuckBinders(builder, indexedDomains, operationType, false);
+    indexedValue = stuckBinders(builder, indexedDomains,
+      L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cpName, LeanNatLiterals.n0, bound(0)), true);
+    instanceName = name("stuckDefinedInstance");
+    identityName = name("stuckIdentity");
+    cValue = stuckApply(builder, constant(cCtor), Array[operationValue]);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      stuckAxiom(aName, type), stuckAxiom(pName, prop), stuckDefinition(projectName, projectType, projectValue),
+      stuckDefinition(indexedName, indexedType, indexedValue),
+      stuckDefinition(hugeProjectionName, indexedType, indexedValue),
+      stuckDefinition(instanceName, c, cValue), stuckDefinition(identityName, stuckArrow(builder, Array[a], a),
+        stuckArrow(builder, Array[a], bound(0), true)),
+      stuckDefinition(boxProjectName, stuckArrow(builder, Array[b], operationType),
+        stuckArrow(builder, Array[b], L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, bName, LeanNatLiterals.n0, bound(0)), true)),
+      stuckDefinition(dualName, stuckArrow(builder, Array[b], operationType),
+        stuckArrow(builder, Array[b], L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, bName, LeanNatLiterals.n0, bound(0)), true)),
+      stuckDefinition(auxiliaryName, stuckArrow(builder, Array[c], d),
+        stuckArrow(builder, Array[c], stuckApply(builder, constant(dCtor),
+          Array[L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cName, LeanNatLiterals.n0, bound(0))]), true)),
+      stuckDefinition(indexedAuxName, stuckBinders(builder, indexedDomains, d, false),
+        stuckBinders(builder, indexedDomains, stuckApply(builder, constant(dCtor),
+          Array[L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cpName, LeanNatLiterals.n0, bound(0))]), true)),
+      stuckDefinition(hugeAuxName, stuckBinders(builder, indexedDomains, d, false),
+        stuckBinders(builder, indexedDomains, stuckApply(builder, constant(dCtor),
+          Array[L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cpName, LeanNatLiterals.n0, bound(0))]), true)),
+      stuckDefinition(nonclassAuxName, stuckArrow(builder, Array[b], d),
+        stuckArrow(builder, Array[b], stuckApply(builder, constant(dCtor),
+          Array[L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, bName, LeanNatLiterals.n0, bound(0))]), true)),
+    ]) {
+      declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(builder, info);
+      constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+    };
+    for ((structureName, ctor, structureType, ctorType, parameters) in Array[
+      (cName, cCtor, type, stuckArrow(builder, Array[operationType], c), 0),
+      (bName, bCtor, type, stuckArrow(builder, Array[operationType], b), 0),
+      (dName, dCtor, type, stuckArrow(builder, Array[operationType], d), 0),
+      (cpName, cpCtor, stuckArrow(builder, Array[a], type),
+        stuckArrow(builder, Array[a, operationType], stuckApply(builder, cp, Array[bound(1)])), 1),
+    ]) {
+      for (info in stuckStructure(structureName, ctor, structureType, ctorType, parameters)) {
+        declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(builder, info);
+        constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+      }
+    };
+    emptyName = name("StuckEmpty");
+    empty = constant(emptyName);
+    recName = name("stuckEmptyRec");
+    recMotiveType = stuckArrow(builder, Array[empty], prop);
+    recType = stuckArrow(builder, Array[recMotiveType, empty], stuckApply(builder, bound(1), Array[bound(0)]));
+    for (info in Array[
+      LeanCtor(LeanTag.ConstantInfo_inductInfo, Array[LeanCtor(LeanTag.InductiveVal_mk, Array[
+        LeanCtor(LeanTag.ConstantVal_mk, Array[emptyName, nil, type]), LeanNatLiterals.n0, LeanNatLiterals.n0,
+        singleton(emptyName), nil, LeanNatLiterals.n0, leanBool(false), leanBool(false), leanBool(false),
+      ])]),
+      LeanCtor(LeanTag.ConstantInfo_recInfo, Array[LeanCtor(LeanTag.RecursorVal_mk, Array[
+        LeanCtor(LeanTag.ConstantVal_mk, Array[recName, nil, recType]), singleton(emptyName),
+        LeanNatLiterals.n0, LeanNatLiterals.n0, LeanNatLiterals.n1, LeanNatLiterals.n0, nil, leanBool(false), leanBool(false),
+      ])]),
+    ]) {
+      declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(builder, info);
+      constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+    };
+    truthName = name("StuckTruth");
+    truth = constant(truthName);
+    truthCtorName = name("StuckTruthIntro");
+    truthCtor = constant(truthCtorName);
+    kRecName = name("stuckTruthRec");
+    proofName = name("stuckProof");
+    kMotiveType = stuckArrow(builder, Array[truth], prop);
+    kMinorType = stuckApply(builder, bound(0), Array[truthCtor]);
+    kRecType = stuckArrow(builder, Array[kMotiveType, kMinorType, truth], stuckApply(builder, bound(2), Array[bound(0)]));
+    kRule = LeanCtor(LeanTag.RecursorRule_mk, Array[truthCtorName, LeanNatLiterals.n0,
+      stuckArrow(builder, Array[kMotiveType, kMinorType], bound(0), true)]);
+    for (info in Array[
+      stuckAxiom(proofName, p),
+      LeanCtor(LeanTag.ConstantInfo_inductInfo, Array[LeanCtor(LeanTag.InductiveVal_mk, Array[
+        LeanCtor(LeanTag.ConstantVal_mk, Array[truthName, nil, prop]), LeanNatLiterals.n0, LeanNatLiterals.n0,
+        singleton(truthName), singleton(truthCtorName), LeanNatLiterals.n0, leanBool(false), leanBool(false), leanBool(false),
+      ])]),
+      LeanCtor(LeanTag.ConstantInfo_ctorInfo, Array[LeanCtor(LeanTag.ConstructorVal_mk, Array[
+        LeanCtor(LeanTag.ConstantVal_mk, Array[truthCtorName, nil, truth]), truthName, LeanNatLiterals.n0,
+        LeanNatLiterals.n0, LeanNatLiterals.n0, leanBool(false),
+      ])]),
+      LeanCtor(LeanTag.ConstantInfo_recInfo, Array[LeanCtor(LeanTag.RecursorVal_mk, Array[
+        LeanCtor(LeanTag.ConstantVal_mk, Array[kRecName, nil, kRecType]), singleton(truthName),
+        LeanNatLiterals.n0, LeanNatLiterals.n0, LeanNatLiterals.n1, LeanNatLiterals.n1, singleton(kRule), leanBool(true), leanBool(false),
+      ])]),
+    ]) {
+      declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(builder, info);
+      constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+    };
+    matcherName = name("match_stuckInstance");
+    matcherMotiveType = stuckArrow(builder, Array[c, c], type);
+    matcherMotive = stuckArrow(builder, Array[c, c], c, true);
+    matcherAlternativeType = stuckArrow(builder, Array[c, c], stuckApply(builder, bound(4), Array[bound(1), bound(0)]));
+    matcherDomains = Array[c, matcherMotiveType, c, c, matcherAlternativeType];
+    matcherType = stuckArrow(builder, matcherDomains, stuckApply(builder, bound(3), Array[bound(2), bound(1)]));
+    matcherValue = stuckArrow(builder, matcherDomains, stuckApply(builder, bound(0), Array[bound(2), bound(1)]), true);
+    constants.set(leanNameKey(matcherName), LeanConstantFile(stuckDefinition(matcherName, matcherType, matcherValue), None()));
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    for (className in Array[cName, dName, cpName]) {
+      registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(builder, environment, className);
+      assert(leanTag(registered) == LeanTag.Except_ok);
+      !environment = leanField(registered, 0)
+    };
+    huge = leanBoxNat(LeanNat::parse("18446744073709551616"));
+    for ((n, ctor, parameters, fromClass) in Array[(projectName, cCtor, LeanNatLiterals.n0, true),
+      (boxProjectName, bCtor, LeanNatLiterals.n0, false), (indexedName, cpCtor, LeanNatLiterals.n1, true),
+      (hugeProjectionName, cpCtor, huge, true), (dualName, bCtor, LeanNatLiterals.n0, false)]) {
+      !environment = L4_Lean_ProjFns.f_Lean_addProjectionFnInfo_c5dc832838(builder, environment, n, ctor,
+        parameters, LeanNatLiterals.n0, leanBool(fromClass))
+    };
+    for ((n, parameters, fromClass) in Array[(auxiliaryName, LeanNatLiterals.n0, true),
+      (indexedAuxName, LeanNatLiterals.n1, true), (nonclassAuxName, LeanNatLiterals.n0, false),
+      (hugeAuxName, huge, true), (dualName, LeanNatLiterals.n0, true)]) {
+      !environment = L4_Lean_ProjFns.f_Lean_addAuxParentProjectionInfo_90060f4589(builder, environment, n, parameters, leanBool(fromClass))
+    };
+    matcherInfo = LeanCtor(LeanTag.Meta_Match_MatcherInfo_mk, Array[
+      LeanNatLiterals.n1, LeanNatLiterals.n2,
+      LeanArray(Array[LeanCtor(LeanTag.Meta_Match_AltParamInfo_mk, Array[LeanNatLiterals.n2, LeanNatLiterals.n0, leanBool(false)])]),
+      LeanCtor(LeanTag.Option_none, Array[]), LeanArray(Array[LeanCtor(LeanTag.Option_none, Array[]), LeanCtor(LeanTag.Option_none, Array[])]),
+      L4_Lean_Meta_Match_MatcherInfo.f_Match_instInhabitedOverlaps_default_4730f69016(builder),
+    ]);
+    !environment = L4_Lean_Meta_Match_MatcherInfo.f_Match_Extension_addMatcherInfo_c6808cf377(builder, environment, matcherName, matcherInfo);
+    xName = name("stuckX");
+    yName = name("stuckY");
+    instanceId = name("stuckInstance");
+    boxId = name("stuckBox");
+    emptyId = name("stuckEmpty");
+    x = variable(xName);
+    y = variable(yName);
+    instance = variable(instanceId);
+    box = variable(boxId);
+    emptyLocal = variable(emptyId);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((id, localType) in Array[(xName, a), (yName, a), (instanceId, c), (boxId, b), (emptyId, empty)]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(builder, locals, id, id, localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]), LeanCtor(LeanTag.LocalDeclKind_default, Array[]))
+    };
+    state = rewriteProbeState(builder, environment, locals, "<get-stuck-mvar>");
+    initialMeta = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMeta, 0);
+    maId = name("stuckMA");
+    mbId = name("stuckMB");
+    mcId = name("stuckMC");
+    mc2Id = name("stuckMC2");
+    mboxId = name("stuckMBox");
+    mfId = name("stuckMF");
+    meId = name("stuckME");
+    opaqueId = name("stuckOpaqueM");
+    assignedId = name("stuckAssigned");
+    linkedId = name("stuckLinked");
+    functionId = name("stuckAssignedFunction");
+    bodyId = name("stuckAssignedBody");
+    classAssignedId = name("stuckAssignedClass");
+    compressedId = name("stuckCompressedAssignment");
+    truthId = name("stuckMTruth");
+    for ((id, mType, kind) in Array[
+      (maId, a, LeanTag.MetavarKind_natural), (mbId, a, LeanTag.MetavarKind_natural),
+      (mcId, c, LeanTag.MetavarKind_natural), (mc2Id, c, LeanTag.MetavarKind_natural),
+      (mboxId, b, LeanTag.MetavarKind_natural), (mfId, operationType, LeanTag.MetavarKind_natural),
+      (meId, empty, LeanTag.MetavarKind_natural), (opaqueId, a, LeanTag.MetavarKind_syntheticOpaque),
+      (assignedId, a, LeanTag.MetavarKind_natural), (linkedId, a, LeanTag.MetavarKind_natural),
+      (functionId, stuckArrow(builder, Array[a], a), LeanTag.MetavarKind_natural),
+      (bodyId, a, LeanTag.MetavarKind_natural), (classAssignedId, c, LeanTag.MetavarKind_natural),
+      (compressedId, a, LeanTag.MetavarKind_natural), (truthId, truth, LeanTag.MetavarKind_natural),
+    ]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(builder, mctx,
+        id, id, locals, LeanArray(Array[]), mType, LeanCtor(kind, Array[]), LeanNatLiterals.n0)
+    };
+    for ((id, value) in Array[(assignedId, x), (linkedId, mvar(maId)),
+      (functionId, stuckArrow(builder, Array[a], bound(0), true)),
+      (bodyId, stuckApply(builder, constant(identityName), Array[mvar(maId)])),
+      (classAssignedId, stuckApply(builder, constant(cCtor), Array[mvar(mfId)])), (compressedId, mvar(assignedId))]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(builder, mctx, id, value)
+    };
+    builder.writeRef(state.metaStateRef, Some(leanReplaceField(initialMeta, 0, mctx)));
+    callbackCount = builder.newRef(LeanNatLiterals.n0);
+    saved = builder.checkpoint();
+    ma = mvar(maId);
+    mb = mvar(mbId);
+    mc = mvar(mcId);
+    mf = mvar(mfId);
+    metadata = L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(builder);
+    rawProjection = (value: LeanValue) -> L4_Lean_Expr.f_Lean_mkProj_3b27598f19(builder, cName, LeanNatLiterals.n0, value);
+    matcherMajor = stuckApply(builder, constant(matcherName), Array[instance, matcherMotive, mvar(mc2Id), instance,
+      stuckArrow(builder, Array[c, c], bound(1), true)]);
+    recMotive = stuckArrow(builder, Array[empty], p, true);
+    nestedMetadata = ma;
+    for (_index in Range(0, 64)) {
+      !nestedMetadata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, nestedMetadata)
+    };
+    unused = LeanUnavailable("getStuckMVar short circuit must not read this input");
+    noRefs = RewriteProbeState(saved, unused, unused, unused, unused);
+    metaOnly = RewriteProbeState(saved, unused, state.metaStateRef, unused, unused);
+    coreOnly = RewriteProbeState(saved, unused, unused, unused, state.coreStateRef);
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      ok = (id: ?LeanValue) -> LeanCtor(LeanTag.EST_Out_ok, Array[id match {
+        | Some(value) -> LeanCtor(LeanTag.Option_some, Array[value])
+        | None() -> LeanCtor(LeanTag.Option_none, Array[])
+      }, world]);
+      for (expression in Array[prop, x, bound(0), constant(projectName),
+        stuckArrow(builder, Array[a], ma, true), stuckApply(builder, x, Array[ma]),
+        stuckApply(builder, L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, project), Array[mc])]) {
+        _checked = stuckCheck("ineligible shape ignores metavariables underneath", saved, noRefs, expression,
+          unused, unused, world, ok(None()), true);
+        !checks = checks + 1
+      };
+      for (example in Array[
+        StuckCase("unassigned metavariable", ma, Some(maId), true),
+        StuckCase("opaque metavariable remains blocking", mvar(opaqueId), Some(opaqueId), true),
+        StuckCase("assigned value clears blocker", mvar(assignedId), None(), true),
+        StuckCase("assignment follows metavariable", mvar(linkedId), Some(maId), true),
+        StuckCase("assigned function head beta reduces", stuckApply(builder, mvar(functionId), Array[ma]), Some(maId), true),
+        StuckCase("unassigned function head wins", stuckApply(builder, mf, Array[x, ma, mb]), Some(mfId), true),
+        StuckCase("metadata recursion", L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, ma), Some(maId), true),
+        StuckCase("metadata loop preserves nested input", nestedMetadata, Some(maId), true),
+      ]) {
+        _checked = stuckCheck(example.label, saved, metaOnly, example.expression, unused, unused, world, ok(example.expected), example.unchanged);
+        !checks = checks + 1
+      };
+      for (example in Array[
+        StuckCase("constant app without mvars", stuckApply(builder, project, Array[instance, x, x, y]), None(), true),
+        StuckCase("unregistered constant app", stuckApply(builder, constant(name("stuckMissing")), Array[ma]), None(), true),
+        StuckCase("ordinary projection is not class", stuckApply(builder, constant(boxProjectName), Array[mvar(mboxId), ma, mb, x]), None(), true),
+        StuckCase("ordinary auxiliary is not class", stuckApply(builder, constant(nonclassAuxName), Array[mvar(mboxId)]), None(), true),
+        StuckCase("projection registration wins over auxiliary", stuckApply(builder, constant(dualName), Array[mvar(mboxId)]), None(), true),
+        StuckCase("auxiliary missing major skips parameter scan", stuckApply(builder, constant(indexedAuxName), Array[ma]), None(), true),
+        StuckCase("huge auxiliary index cannot wrap", stuckApply(builder, constant(hugeAuxName), Array[ma]), None(), true),
+        StuckCase("partial recursor skips major normalization", stuckApply(builder, constant(recName), Array[recMotive]), None(), true),
+        StuckCase("K recursor ignores blocking major", stuckApply(builder, constant(kRecName),
+          Array[stuckArrow(builder, Array[truth], p, true), constant(proofName), mvar(truthId)]), None(), true),
+      ]) {
+        _checked = stuckCheck(example.label, saved, coreOnly, example.expression, unused, unused, world, ok(example.expected), example.unchanged);
+        !checks = checks + 1
+      };
+      for (example in Array[
+        StuckCase("assigned ordinary body is not normalized", mvar(bodyId), None(), false),
+        StuckCase("raw projection normalizes its major", rawProjection(mc), Some(mcId), false),
+        StuckCase("applied raw projection keeps major priority", stuckApply(builder, rawProjection(mc), Array[ma, mb, x]), Some(mcId), false),
+        StuckCase("constructor field mvar is not major blocker", rawProjection(mvar(classAssignedId)), None(), false),
+        StuckCase("class instance precedes explicit arguments", stuckApply(builder, project, Array[mc, ma, mb, x]), Some(mcId), false),
+        StuckCase("first explicit stuck argument wins", stuckApply(builder, project, Array[instance, x, ma, mb]), Some(maId), false),
+        StuckCase("later explicit stuck argument", stuckApply(builder, project, Array[instance, x, x, mb]), Some(mbId), false),
+        StuckCase("implicit argument is skipped", stuckApply(builder, project, Array[instance, ma, x, y]), None(), false),
+        StuckCase("explicit arguments are not normalized", stuckApply(builder, project,
+          Array[instance, x, stuckApply(builder, constant(identityName), Array[ma]), mb]), Some(mbId), false),
+        StuckCase("partial explicit scan stops at argument end", stuckApply(builder, project, Array[instance, ma]), None(), false),
+        StuckCase("missing class major still scans parameters", stuckApply(builder, constant(indexedName), Array[ma]), Some(maId), false),
+        StuckCase("huge projection index still scans parameters", stuckApply(builder, constant(hugeProjectionName), Array[ma]), Some(maId), false),
+        StuckCase("auxiliary class major", stuckApply(builder, constant(auxiliaryName), Array[mc]), Some(mcId), false),
+        StuckCase("auxiliary known instance", stuckApply(builder, constant(auxiliaryName), Array[instance]), None(), true),
+        StuckCase("auxiliary normalizes assigned instance without scanning fields",
+          stuckApply(builder, constant(auxiliaryName), Array[mvar(classAssignedId)]), None(), false),
+        StuckCase("empty recursor major", stuckApply(builder, constant(recName), Array[recMotive, mvar(meId)]), Some(meId), false),
+        StuckCase("empty recursor known major", stuckApply(builder, constant(recName), Array[recMotive, emptyLocal]), None(), false),
+        StuckCase("matcher normalizes projection major", rawProjection(matcherMajor), Some(mc2Id), false),
+        StuckCase("matcher normalizes class instance", stuckApply(builder, project, Array[matcherMajor, x, ma, mb]), Some(mc2Id), false),
+      ]) {
+        _checked = stuckCheck(example.label, saved, state, example.expression, state.metaContext, state.coreContext, world, ok(example.expected), example.unchanged);
+        !checks = checks + 1
+      };
+      oversaturated = stuckApply(builder, project, Array[instance, x, x, y, ma]);
+      _bounded = stuckCheck("negative oversaturation stops at parameter end", saved, state, oversaturated,
+        state.metaContext, state.coreContext, world, ok(None()), false);
+      !checks = checks + 1;
+      for (arity in Array[129, 257]) {
+        for (earlyBlocker in Array[false, true]) {
+          arguments = Array::fillBy(arity, index ->
+            if (index == 0) instance else if (index == arity - 1 || (earlyBlocker && index == 2)) ma else x);
+          _large = stuckCheck("persistent arguments preserve bounded scan", saved, state,
+            stuckApply(builder, project, arguments), state.metaContext, state.coreContext, world,
+            ok(if (earlyBlocker) Some(maId) else None()), false);
+          !checks = checks + 1
+        }
+      };
+      compressed = stuckCheck("assignment normalization updates only its stored value", saved, metaOnly,
+        mvar(compressedId), unused, unused, world, ok(None()), false);
+      expectedRuntime = saved.restoreRaw();
+      expectedMeta = expectedRuntime.readRef(state.metaStateRef);
+      expectedMctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(expectedRuntime,
+        leanField(expectedMeta, 0), compressedId, x);
+      expectedRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(expectedMeta, 0, expectedMctx)));
+      assert(native_eq(compressed.refs, expectedRuntime.checkpoint().refs) == 0);
+      !checks = checks + 1;
+      limited = leanReplaceField(leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1), 0,
+        leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1));
+      for (expression in Array[rawProjection(mc), stuckApply(builder, project, Array[mc, ma, mb, x]),
+        stuckApply(builder, constant(recName), Array[recMotive, emptyLocal])]) {
+        _depth = stuckCheck("major normalization error before other arguments", saved, state, expression,
+          state.metaContext, limited, world, stuckDepthError(builder, leanField(limited, 2), world), true);
+        !checks = checks + 1
+      };
+      oracle = saved.restoreRaw();
+      functionError = L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfo_5b0f80513a(oracle, constant(indexedName),
+        LeanCtor(LeanTag.Option_none, Array[]), state.metaContext, state.metaStateRef, limited, state.coreStateRef, world);
+      assert(leanTag(functionError) == LeanTag.EST_Out_error);
+      functionFailure = stuckCheck("function info error before explicit parameter scan", saved, state,
+        stuckApply(builder, constant(indexedName), Array[ma]), state.metaContext, limited, world, functionError, false);
+      assert(native_eq(functionFailure.refs, oracle.checkpoint().refs) == 0);
+      !checks = checks + 1;
+      for (decision in Range(0, 3)) {
+        policyResult = if (decision == 2) {
+          LeanCtor(LeanTag.EST_Out_error, Array[LeanCtor(LeanTag.Exception_error, Array[leanField(state.coreContext, 2),
+            L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(builder, LeanText("stuck explicit argument error"))]), world])
+        } else { LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(decision == 1), world]) };
+        policy = LeanClosure(stuckPolicy, 8, Array[callbackCount, instanceName, policyResult]);
+        custom = leanReplaceField(state.metaContext, 7, LeanCtor(LeanTag.Option_some, Array[policy]));
+        argument = stuckApply(builder, rawProjection(constant(instanceName)), Array[x, x, y]);
+        expression = stuckApply(builder, project, Array[instance, x, argument, ma]);
+        after = stuckCheck("explicit argument policy " + decision.toString(), saved, state, expression, custom, state.coreContext,
+          world, if (decision == 2) policyResult else ok(Some(maId)), false);
+        afterRuntime = after.restoreRaw();
+        assert(leanNat(afterRuntime.readRef(callbackCount)) == LeanNat::fromInt(1));
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(checks == 224);
+  print_string("Stuck metavariable discovery passed " + checks.toString() + " cases")
+}

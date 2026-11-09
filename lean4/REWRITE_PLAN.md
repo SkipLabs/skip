@@ -1,5 +1,19 @@
 # Rewrite the measured example in parallel
 
+## Paused by the user (2026-11-09)
+
+Do not resume until the user asks. All three workers have stopped, and no
+compiler/probe job is running. The last validated code checkpoint is `a7c2b46c4`
+(wave seven). Literal-recognition source is integrated and type-checks, but its
+latest probe still needs independent review and execution; it is not accepted in
+the inventory. The stuck-metavariable rewrite remains an uncompiled draft.
+
+The [resume checkpoint](provenance/pending-rewrites/2026-11-09-pause/checkpoint.json)
+records exact states, artifact hashes and next actions. The same directory keeps
+copies of the pending source/probe handoffs and review notes in Git. Existing
+private worker directories and compiler caches remain available. The checkpoint
+commit preserves unfinished work and does not claim additional validation.
+
 ## Scope and result
 
 Rewrite the maintained Skip code exercised while elaborating and constructing

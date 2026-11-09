@@ -1,5 +1,10 @@
 # Conditional simplification implementation
 
+Paused at the user's request on 2026-11-09. Resume only after an explicit user
+instruction. See the [saved checkpoint](provenance/pending-rewrites/2026-11-09-pause/checkpoint.json)
+and the pause section of [REWRITE_PLAN.md](REWRITE_PLAN.md); pending literal and
+stuck-metavariable rewrites are not counted as validated.
+
 This is the active task. The GCD performance experiment and the broader Mathlib
 plan are deferred. The user does not require a separate incremental Lean
 baseline. Keep the native kernel unchanged and concentrate on elaboration.
