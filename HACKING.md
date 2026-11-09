@@ -35,8 +35,9 @@ encourages batching unrelated changes.
 
 - When a PR adds tests or CI steps, check the job durations on its CircleCI
   run against a recent run on `main`, and say in the PR description how much
-  the critical path moves. The critical path today is `compiler` followed by
-  the jobs that wait for it (`skargo`, `backend-regressions`).
+  the critical path moves. The critical path today is `compiler` (the stage1
+  build) followed by the jobs that wait for it (`compiler-tests`, `skargo`,
+  `backend-regressions`).
 - If a change pushes the pipeline past the budget, fix that in the same PR:
   run the work concurrently, split it into a job that runs in parallel, or move
   checks that don't need to gate every PR (e.g. for disabled experimental

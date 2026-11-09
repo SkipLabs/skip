@@ -182,21 +182,59 @@ jobs:
           name: Run runtime regressions
           command: bash skiplang/prelude/runtime/tests/run.sh
       - run:
-          name: Run compiler tests
+          name: Build stage1
           no_output_timeout: 30m
-          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
-          # "Rerun failed tests" button reruns only the failed test suites.
           command: |
-            mkdir -p ~/test-results
-            root="$PWD"
             cd skiplang/compiler
             python3 tools/incremental_profile.py run \
               --root "$PWD" --label ci-compiler-build \
               --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
               -- make STAGE=1 || { tail -n 100 runs/ci-compiler-build/command.log; exit 1; }
-            # The dev profile merges skc, skfmt and every test into one binary;
-            # incremental specialization of that combined graph exceeds this
-            # job's memory budget. Release builds the same tests separately.
+      - store_artifacts:
+          path: skiplang/compiler/runs
+          destination: compiler-resources
+      # compiler-tests and skargo's tests use stage1/{bin,lib}.
+      # backend-regressions also needs the matching .sklib archives (not the
+      # much larger .ll intermediates in the same directory) and the stage0
+      # compiler for archive compatibility.
+      # stage0/{bin,lib} is the toolchain the images ship; jobs with
+      # candidate_toolchain install it (see use-candidate-toolchain).
+      - persist_to_workspace:
+          root: .
+          paths:
+            - skiplang/compiler/stage1/bin
+            - skiplang/compiler/stage1/lib
+            - skiplang/compiler/stage1/target/host/release/deps/*.sklib
+            - skiplang/compiler/stage0/bin
+            - skiplang/compiler/stage0/lib/*.a
+            - skiplang/compiler/stage0/lib/*.sklib
+
+  # The language suite, on the compiler job's stage1 build. It runs beside the
+  # other jobs that wait for that build (skargo, backend-regressions) instead
+  # of extending the compiler job, which is on the critical path.
+  compiler-tests:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: xlarge.gen2
+    environment:
+      SKIP_CAPACITY: 12G
+    steps:
+      - custom-checkout:
+          submodules: true
+      - attach_workspace:
+          at: .
+      - run:
+          name: Run compiler tests
+          no_output_timeout: 30m
+          # run-sktest.sh wraps `skargo test` in `circleci tests run` so the
+          # "Rerun failed tests" button reruns only the failed test suites.
+          # The dev profile merges skc, skfmt and every test into one binary;
+          # incremental specialization of that combined graph exceeds this
+          # job's memory budget. Release builds the same tests separately.
+          command: |
+            mkdir -p ~/test-results
+            root="$PWD"
+            cd skiplang/compiler
             python3 tools/incremental_profile.py run \
               --root "$PWD" --label ci-compiler-tests \
               --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
@@ -209,20 +247,6 @@ jobs:
           destination: compiler-resources
       - store_test_results:
           path: ~/test-results
-      # skargo's tests use stage1/{bin,lib}. backend-regressions also needs the
-      # matching .sklib archives (not the much larger .ll intermediates in the
-      # same directory) and the stage0 compiler for archive compatibility.
-      # stage0/{bin,lib} is the toolchain the images ship; jobs with
-      # candidate_toolchain install it (see use-candidate-toolchain).
-      - persist_to_workspace:
-          root: .
-          paths:
-            - skiplang/compiler/stage1/bin
-            - skiplang/compiler/stage1/lib
-            - skiplang/compiler/stage1/target/host/release/deps/*.sklib
-            - skiplang/compiler/stage0/bin
-            - skiplang/compiler/stage0/lib/*.a
-            - skiplang/compiler/stage0/lib/*.sklib
 
   backend-regressions:
     parameters:
@@ -333,7 +357,7 @@ jobs:
   skip-package-tests:
     docker:
       - image: skiplabs/skiplang:latest
-    resource_class: medium
+    resource_class: << parameters.resource_class >>
     parameters:
       candidate_toolchain:
         type: boolean
@@ -343,6 +367,13 @@ jobs:
       candidate_compiler:
         type: boolean
         default: false
+      resource_class:
+        type: string
+        default: medium
+      test_jobs:
+        description: Test suites to run concurrently (sktest --jobs).
+        type: integer
+        default: 2
     steps:
       - custom-checkout:
           submodules: true
@@ -367,7 +398,7 @@ jobs:
               export SKTEST_SKCOPT=--release
             fi
             cd << parameters.dir >>
-            SKTEST_JOBS=2 SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
+            SKTEST_JOBS=<< parameters.test_jobs >> SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
               "$root/bin/run-sktest.sh"
       - store_test_results:
           path: ~/test-results

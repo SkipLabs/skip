@@ -259,11 +259,12 @@ changed_base_yml_sections() {
 if ! changed .circleci/base.yml; then
   while IFS= read -r section; do
     case "$section" in
-      # skargo and backend-regressions run on the compiler job's workspace.
+      # compiler-tests, skargo and backend-regressions run on the compiler
+      # job's workspace.
       compiler)
         SK_CHANGED[skiplang/compiler]=true
         SK_CHANGED[skiplang/skargo]=true ;;
-      backend-regressions) SK_CHANGED[skiplang/compiler]=true ;;
+      compiler-tests | backend-regressions) SK_CHANGED[skiplang/compiler]=true ;;
       skdb) SK_CHANGED[sql]=true ;;
       skdb-wasm) TS_CHANGED[sql]=true ;;
       check-ts) check_ts=true ;;
@@ -326,18 +327,26 @@ for dir in "${!SK_CHANGED[@]}"; do
         ;;
       skiplang/compiler)
         echo "      - compiler"
-        # Runs on the compiler job's stage1 build, beside the other jobs that
-        # wait for it, instead of extending the compiler job itself.
+        # These run on the compiler job's stage1 build, beside the other jobs
+        # that wait for it, instead of extending the compiler job itself.
+        echo "      - compiler-tests:"
+        echo "          requires:"
+        echo "            - compiler"
         echo "      - backend-regressions:"
         echo "          requires:"
         echo "            - compiler"
-        NAMES+=(compiler backend-regressions)
+        NAMES+=(compiler compiler-tests backend-regressions)
         ;;
       skiplang/skargo)
         echo "      - skip-package-tests:"
         echo "          dir: $dir"
         echo "          name: skargo"
         echo "          candidate_compiler: true"
+        # Its suites each build sample packages with the candidate compiler
+        # and take 1.5-5 min; run four at once so the job, which waits for
+        # compiler, is bounded by the longest suite rather than their sum.
+        echo "          resource_class: large.gen2"
+        echo "          test_jobs: 4"
         echo "          requires:"
         echo "            - compiler"
         NAMES+=(skargo)

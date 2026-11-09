@@ -20,9 +20,10 @@ exceeds 100 GiB of scratch space, 48 GiB of summed RSS, or its timeout. It reser
 delete their temporary caches when they finish; the monitor retains the command
 log, resource samples and result summary under `runs/<label>/`.
 
-The compiler CI job uses a 14 GiB RSS guard within its existing 16 GB allocation.
-It also monitors the compiler build and language suite, preserving the logs as
-artifacts so resource-limit failures identify the command that exceeded them.
+The compiler CI jobs use a 14 GiB RSS guard within their 16 GB allocation. The
+`compiler` job monitors the stage1 build and `compiler-tests` the language
+suite, preserving the logs as artifacts so resource-limit failures identify the
+command that exceeded them.
 
 ## Sharding in CI
 
