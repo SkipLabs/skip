@@ -200,23 +200,30 @@ fun defaultDependencyMode(): Int {
 /* Dependencies tracking. */
 /*****************************************************************************/
 
-// Small reader sets can avoid allocating a tree node per reader. Large fanout
-// still needs logarithmic updates, so arrays hold at most eight readers.
-// Both representations preserve ArrowKey order and immutable snapshots.
-private class ReaderBlockSet(
-  blocks: SortedMap<ArrowKey, Array<ArrowKey>>,
+// Share tree metadata across sorted blocks of at most 64 keys. Updates copy
+// one block and its tree path, preserving key order and immutable snapshots.
+private class DependencyBlockSet<K: Orderable>(
+  blocks: SortedMap<K, Array<K>>,
   count: Int,
 ) {
-  static fun fromSorted(values: Array<ArrowKey>): this {
+  static fun empty(): this {
+    static(SortedMap[], 0)
+  }
+
+  fun isEmpty(): Bool {
+    this.count == 0
+  }
+
+  static fun fromSorted(values: Array<K>): this {
     invariant(!values.isEmpty());
     static(SortedMap::singleton(values[0], values), values.size())
   }
 
-  fun values(): mutable Iterator<ArrowKey> {
+  fun values(): mutable Iterator<K> {
     for (block in this.blocks.values()) for (value in block) yield value
   }
 
-  private static fun lowerBound(values: Array<ArrowKey>, key: ArrowKey): Int {
+  private static fun lowerBound(values: Array<K>, key: K): Int {
     lo = 0;
     hi = values.size();
     while (lo < hi) {
@@ -226,11 +233,11 @@ private class ReaderBlockSet(
     lo
   }
 
-  // Each tree key is the first reader in its block. A key below the minimum
+  // Each tree key is the first entry in its block. A key below the minimum
   // belongs in the first block; other keys use the greatest preceding block.
-  private fun blockFor(key: ArrowKey): ?(ArrowKey, Array<ArrowKey>) {
+  private fun blockFor(key: K): ?(K, Array<K>) {
     tree = this.blocks;
-    previous: ?(ArrowKey, Array<ArrowKey>) = None();
+    previous: ?(K, Array<K>) = None();
     loop {
       tree match {
       | SortedMap.Nil() ->
@@ -247,12 +254,9 @@ private class ReaderBlockSet(
     }
   }
 
-  private fun neighbor(
-    key: ArrowKey,
-    before: Bool,
-  ): ?(ArrowKey, Array<ArrowKey>) {
+  private fun neighbor(key: K, before: Bool): ?(K, Array<K>) {
     tree = this.blocks;
-    found: ?(ArrowKey, Array<ArrowKey>) = None();
+    found: ?(K, Array<K>) = None();
     loop {
       tree match {
       | SortedMap.Nil() -> return found
@@ -268,7 +272,8 @@ private class ReaderBlockSet(
     }
   }
 
-  fun set(key: ArrowKey): this {
+  fun set(key: K): this {
+    if (this.count == 0) return static::fromSorted(Array[key]);
     (first, values) = this.blockFor(key).fromSome();
     index = static::lowerBound(values, key);
     if (index < values.size() && values[index].compare(key) == EQ()) {
@@ -290,7 +295,7 @@ private class ReaderBlockSet(
     static(blocks, this.count + 1)
   }
 
-  fun remove(key: ArrowKey): this {
+  fun remove(key: K): this {
     selected = this.blockFor(key);
     if (selected.isNone()) return this;
     (first, values) = selected.fromSome();
@@ -309,7 +314,7 @@ private class ReaderBlockSet(
     result = static(blocks, this.count - 1);
     if (!updated.isEmpty() && updated.size() < 16 && result.count > 8) {
       // Rebalance just two neighboring blocks. Repeated deletion must not
-      // leave one tree node per surviving reader in otherwise empty blocks.
+      // leave one tree node per surviving key in otherwise empty blocks.
       neighbor = result.neighbor(updated[0], true) match {
       | Some(entry) -> Some(entry)
       | None() -> result.neighbor(updated[0], false)
@@ -337,13 +342,9 @@ private class ReaderBlockSet(
     result
   }
 
-  fun hasSibling(arrow: ArrowKey): Bool {
-    comparePrefix = (other: ArrowKey) -> {
-      order = arrow.parentName.compare(other.parentName);
-      if (order == EQ()) arrow.childName.compare(other.childName) else order
-    };
+  fun hasPrefix(comparePrefix: K -> Order): Bool {
     tree = this.blocks;
-    previous: Array<ArrowKey> = Array[];
+    previous: Array<K> = Array[];
     loop {
       tree match {
       | SortedMap.Nil() ->
@@ -361,17 +362,33 @@ private class ReaderBlockSet(
   }
 }
 
+// Store a lone reader directly. The existing compact/block policies select
+// arrays of up to eight entries; larger sets use trees or blocks.
 private base class DependencyReaders {
   children =
+  | ReaderOne(item: ArrowKey)
   | ReaderArray(items: Array<ArrowKey>)
   | ReaderTree(tree: SortedMap<ArrowKey, void>)
-  | ReaderBlocks(blocks: ReaderBlockSet)
+  | ReaderBlocks(blocks: DependencyBlockSet<ArrowKey>)
 
-  static fun empty(compact: Bool, blocks: Bool): DependencyReaders {
-    if (compact || blocks) ReaderArray(Array[]) else ReaderTree(SortedMap[])
+  static fun empty(): DependencyReaders {
+    ReaderArray(Array[])
+  }
+
+  private static fun fromArray(values: Array<ArrowKey>): DependencyReaders {
+    if (values.size() == 1) ReaderOne(values[0]) else {
+      ReaderArray(values)
+    }
+  }
+
+  private static fun singleIterator(
+    value: ArrowKey,
+  ): mutable Iterator<ArrowKey> {
+    yield value
   }
 
   fun size(): Int
+  | ReaderOne(_) -> 1
   | ReaderArray(values) -> values.size()
   | ReaderTree(tree) -> tree.size()
   | ReaderBlocks(blocks) -> blocks.count
@@ -381,19 +398,32 @@ private base class DependencyReaders {
   }
 
   fun values(): mutable Iterator<ArrowKey>
+  | ReaderOne(value) -> static::singleIterator(value)
   | ReaderArray(values) -> values.values()
   | ReaderTree(tree) -> tree.keys()
   | ReaderBlocks(blocks) -> blocks.values()
 
   fun toSet(): SortedSet<ArrowKey>
+  | ReaderOne(value) -> SortedSet[value]
   | ReaderArray(values) -> SortedSet::createFromItems(values)
   | ReaderTree(tree) -> SortedSet(tree)
   | ReaderBlocks(blocks) -> SortedSet::createFromIterator(blocks.values())
 
-  fun set(key: ArrowKey, blockReaders: Bool): DependencyReaders
+  fun set(key: ArrowKey, compact: Bool, blockReaders: Bool): DependencyReaders
+  | ReaderOne(value) ->
+    if (!compact && !blockReaders) {
+      if (value.compare(key) == EQ()) return this;
+      return ReaderTree(SortedMap::singleton(value, void).set(key, void))
+    };
+    value.compare(key) match {
+    | EQ() -> this
+    | LT() -> ReaderArray(Array[value, key])
+    | GT() -> ReaderArray(Array[key, value])
+    }
   | ReaderTree(tree) -> ReaderTree(tree.set(key, void))
   | ReaderBlocks(blocks) -> ReaderBlocks(blocks.set(key))
   | ReaderArray(values) ->
+    if (values.isEmpty()) return ReaderOne(key);
     index = 0;
     while (index < values.size() && values[index].compare(key) == LT()) {
       !index = index + 1
@@ -409,7 +439,7 @@ private base class DependencyReaders {
         }),
       )
     } else if (blockReaders) {
-      ReaderBlocks(ReaderBlockSet::fromSorted(values).set(key))
+      ReaderBlocks(DependencyBlockSet::fromSorted(values).set(key))
     } else {
       tree = SortedMap::createFromIterator(
         values.values().map(value -> (value, void)),
@@ -418,17 +448,23 @@ private base class DependencyReaders {
     }
 
   fun remove(key: ArrowKey, compact: Bool): DependencyReaders
+  | ReaderOne(value) ->
+    if (value.compare(key) == EQ()) ReaderArray(Array[]) else this
   | ReaderBlocks(blocks) ->
     updated = blocks.remove(key);
-    if (updated.count <= 8) ReaderArray(updated.values().collect(Array)) else {
+    if (updated.count <= 8) {
+      static::fromArray(updated.values().collect(Array))
+    } else {
       ReaderBlocks(updated)
     }
   | ReaderArray(values) ->
-    ReaderArray(values.filter(value -> value.compare(key) != EQ()))
+    static::fromArray(values.filter(value -> value.compare(key) != EQ()))
   | ReaderTree(tree) ->
     updated = tree.remove(key);
-    if (compact && updated.size() <= 8) {
-      ReaderArray(updated.keys().collect(Array))
+    if (updated.size() == 1) {
+      ReaderOne(updated.minimum().fromSome().i0)
+    } else if (compact && updated.size() <= 8) {
+      static::fromArray(updated.keys().collect(Array))
     } else {
       ReaderTree(updated)
     }
@@ -438,7 +474,14 @@ private base class DependencyReaders {
   }
 
   fun hasSibling(arrow: ArrowKey): Bool
-  | ReaderBlocks(blocks) -> blocks.hasSibling(arrow)
+  | ReaderBlocks(blocks) ->
+    blocks.hasPrefix(other -> {
+      order = arrow.parentName.compare(other.parentName);
+      if (order == EQ()) arrow.childName.compare(other.childName) else order
+    })
+  | ReaderOne(value) ->
+    arrow.parentName.compare(value.parentName) == EQ() &&
+      arrow.childName.compare(value.childName) == EQ()
   | ReaderArray(values) ->
     values.any(reader ->
       arrow.parentName.compare(reader.parentName) == EQ() &&
@@ -464,7 +507,8 @@ private base class DependencyReaders {
 
 value class Deps private (
   private data: SortedMap<Path, DependencyReaders> = SortedMap[],
-  private idata: HashMap<DirName, SortedSet<Path>> = HashMap[],
+  // Directory cleanup needs ordered paths but no per-path tree metadata.
+  private idata: HashMap<DirName, DependencyBlockSet<Path>> = HashMap[],
   filters: SortedMap<Path, SortedMap<Int, Array<ReadFilter>>> = SortedMap[],
   nextFilterID: Int = 0,
   compactReaders: Bool = false,
@@ -581,10 +625,10 @@ value class Deps private (
 
   fun set(path: Path, arrowKey: ArrowKey): this {
     set = this.data.maybeGet(path) match {
-    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
+    | None() -> DependencyReaders::empty()
     | Some(x) -> x
     };
-    !set = set.set(arrowKey, this.blockReaders);
+    !set = set.set(arrowKey, this.compactReaders, this.blockReaders);
     !this.data[path] = set;
     !this = this.iset(arrowKey.childName, path);
     this
@@ -596,7 +640,7 @@ value class Deps private (
   ): SortedMap<ArrowKey, SortedSet<Path>> {
     reads = SortedMap<ArrowKey, SortedSet<Path>>[];
     this.idata.maybeGet(child).each(paths ->
-      paths.each(path ->
+      paths.values().each(path ->
         this.data.get(path)
           .values()
           .filter(ak -> ak.parentName == parent && ak.childName == child)
@@ -613,7 +657,7 @@ value class Deps private (
 
   private fun iset(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
-    | None() -> SortedSet[]
+    | None() -> DependencyBlockSet::empty()
     | Some(x) -> x
     };
     !iset = iset.set(arrow);
@@ -623,7 +667,7 @@ value class Deps private (
 
   private fun iremove(dirName: DirName, arrow: Path): this {
     iset = this.idata.maybeGet(dirName) match {
-    | None() -> SortedSet[]
+    | None() -> DependencyBlockSet::empty()
     | Some(x) -> x
     };
     !iset = iset.remove(arrow);
@@ -656,7 +700,7 @@ value class Deps private (
     skipInverseRemoval: Bool,
   ): this {
     set = this.data.maybeGet(path) match {
-    | None() -> DependencyReaders::empty(this.compactReaders, this.blockReaders)
+    | None() -> DependencyReaders::empty()
     | Some(x) -> x
     };
     !set = set.remove(arrowKey, this.compactReaders);
@@ -688,8 +732,10 @@ value class Deps private (
   }
 
   fun removeDir(dirName: DirName): this {
-    affected = this.idata.maybeGet(dirName).default(SortedSet[]);
-    for (path in affected) {
+    affected = this.idata.maybeGet(dirName).default(
+      DependencyBlockSet::empty(),
+    );
+    for (path in affected.values()) {
       for (reader in this.readers(path)) {
         if (reader.parentName == dirName || reader.childName == dirName) {
           // The inverse index for this child is removed below. Avoid
