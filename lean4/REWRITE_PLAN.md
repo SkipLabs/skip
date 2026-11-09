@@ -223,6 +223,22 @@ and internal helper hashes, probes and coverage limits. Incremental release
 checking passes; retained source files restore exactly to `72d71eabf`. Execution
 coverage for the fixed whole-example matrix and the final timing gate remain open.
 
+### Fourth checkpoint (2026-11-09)
+
+WHNF easy-case/cache dispatch is structured in `WHNF/Cache.sk`; 116 explicit
+state/cache/error comparisons pass, including nested updates, custom unfolding
+policy, warm hits and failure publication. The uncached and tracing helpers
+remain unchanged. `FunInfo/ForwardDependencies.sk` uses typed arrays/range bounds
+and a private vector for ordinary input arrays; 174 direct comparisons cover
+flags, preserved fields, unsigned no-op ranges and array publication. Other
+array representations and unusual ranges retain the original loop.
+
+Incremental release checking, 19 WHNF entry regressions and 36 function-info
+regressions pass. The [fourth audit](provenance/rewrite-batches/2026-11-09-wave-04.json)
+records hashes, preserved originals and coverage limits. The diagnostic coverage
+executable was frozen at the preceding `4e6d15791` checkpoint; its observations
+must be reconciled with these two newer routes, not attributed to these bodies.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree

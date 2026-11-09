@@ -1,0 +1,283 @@
+// Direct range updates preserve every ParamInfo field and array publication form.
+fun forwardDepsInfo(index: Int, flag: Bool): LeanValue {
+  binders = Array[
+    LeanTag.BinderInfo_default,
+    LeanTag.BinderInfo_implicit,
+    LeanTag.BinderInfo_strictImplicit,
+    LeanTag.BinderInfo_instImplicit,
+  ];
+  LeanCtor(
+    LeanTag.Meta_ParamInfo_mk,
+    Array[
+      LeanCtor(binders[index % 4], Array[]),
+      leanBool(flag),
+      LeanArray(Array[leanNatValue(index + 100)]),
+      leanBool(index % 2 == 0),
+      leanBool(index % 3 == 0),
+      leanBool(index % 2 == 1),
+      leanBool(index % 4 == 0),
+      leanBool(index % 3 == 1),
+    ],
+  )
+}
+
+fun forwardDepsArray(values: Array<LeanValue>, representation: Int): LeanValue {
+  if (representation == 1) {
+    return LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(values).chill(),
+    )
+  };
+  if (representation == 2 && !values.isEmpty()) {
+    return LeanArrayOverride(LeanArray(values), 0, values[0])
+  };
+  LeanArray(values)
+}
+
+fun forwardDepsValues(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+): LeanValue {
+  LeanArray(
+    Array::fillBy(leanValueArraySize(value), index ->
+      leanArrayRead(runtime, value, LeanWord("usize", index), true)
+    ),
+  )
+}
+
+fun checkForwardDeps(
+  saved: LeanExecutionCheckpoint,
+  label: String,
+  backDependencies: LeanValue,
+  parameters: LeanValue,
+  start: Int,
+  stop: Int,
+  expected: Array<LeanValue>,
+): void {
+  original = saved.restoreRaw();
+  replacement = saved.restoreRaw();
+  frozenParameters = rewriteProbeCopyInput(
+    forwardDepsValues(original, parameters),
+  );
+  frozenDependencies = rewriteProbeCopyInput(backDependencies);
+  oldResult = L4_Lean_Meta_FunInfo.f_Meta_updateHasFwdDeps_spec_0_d0135b43f9_fallback(
+    original,
+    backDependencies,
+    LeanWord("usize", stop),
+    LeanWord("usize", start),
+    parameters,
+  );
+  assert(
+    rewriteProbeSameInput(
+      forwardDepsValues(original, parameters),
+      frozenParameters,
+    ),
+  );
+  assert(rewriteProbeSameInput(backDependencies, frozenDependencies));
+  newResult = L4_Lean_Meta_FunInfo.f_Meta_updateHasFwdDeps_spec_0_d0135b43f9(
+    replacement,
+    backDependencies,
+    LeanWord("usize", stop),
+    LeanWord("usize", start),
+    parameters,
+  );
+  assert(
+    rewriteProbeSameInput(
+      forwardDepsValues(replacement, parameters),
+      frozenParameters,
+    ),
+  );
+  assert(rewriteProbeSameInput(backDependencies, frozenDependencies));
+  if (
+    !rewriteProbeSameInput(
+      forwardDepsValues(original, oldResult),
+      LeanArray(expected),
+    ) ||
+    !rewriteProbeSameInput(
+      forwardDepsValues(replacement, newResult),
+      LeanArray(expected),
+    )
+  ) leanFail("forward dependency fields: " + label);
+  (oldResult, newResult) match {
+  | (LeanArray(_), LeanArray(_))
+  | (LeanPersistentArray(_), LeanPersistentArray(_))
+  | (LeanArrayOverride(_, _, _), LeanArrayOverride(_, _, _)) ->
+    void
+  | _ -> leanFail("forward dependency representation: " + label)
+  };
+  assert(native_eq(saved.refs, original.checkpoint().refs) == 0);
+  assert(native_eq(saved.refs, replacement.checkpoint().refs) == 0)
+}
+
+fun main(): void {
+  flags = Array[false, true, false, false, true];
+  parameters = Array::fillBy(flags.size(), index ->
+    forwardDepsInfo(index, flags[index])
+  );
+  huge = LeanScalar("nat", "340282366920938463463374607431768211456");
+  cases: Array<(String, Array<LeanValue>, Int, Int, Array<Int>)> = Array[
+    ("empty dependencies", Array[], 0, 5, Array[]),
+    ("scalar Nat membership", Array[LeanScalar("nat", "2")], 0, 5, Array[2]),
+    (
+      "first and middle",
+      Array[leanNatValue(0), leanNatValue(2)],
+      0,
+      5,
+      Array[0, 2],
+    ),
+    (
+      "duplicates and huge Nat",
+      Array[leanNatValue(3), leanNatValue(3), huge],
+      0,
+      5,
+      Array[3],
+    ),
+    ("already true", Array[leanNatValue(1), leanNatValue(4)], 0, 5, Array[]),
+    ("no match", Array[leanNatValue(99), huge], 0, 5, Array[]),
+    (
+      "partial range",
+      Array[leanNatValue(0), leanNatValue(2), leanNatValue(4)],
+      1,
+      4,
+      Array[2],
+    ),
+    (
+      "resumed range",
+      Array[leanNatValue(0), leanNatValue(3), leanNatValue(4)],
+      3,
+      5,
+      Array[3],
+    ),
+    (
+      "prefix",
+      Array[leanNatValue(0), leanNatValue(2), leanNatValue(3)],
+      0,
+      2,
+      Array[0],
+    ),
+    ("equal bounds", Array[leanNatValue(3)], 3, 3, Array[]),
+    ("reversed bounds", Array[leanNatValue(3)], 4, 2, Array[]),
+    ("unsigned maximum index", Array[leanNatValue(0)], -1, 0, Array[]),
+    ("unsigned reversed bounds", Array[leanNatValue(0)], -1, -2, Array[]),
+  ];
+  count = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37)]));
+    saved = runtime.checkpoint();
+    for ((label, dependencies, start, stop, changed) in cases) {
+      expected = Array::fillBy(flags.size(), index ->
+        forwardDepsInfo(index, flags[index] || changed.contains(index))
+      );
+      for ((parameterForm, dependencyForm) in Array[
+        (0, 0),
+        (1, 0),
+        (0, 1),
+        (1, 1),
+        (2, 2),
+      ]) {
+        checkForwardDeps(
+          saved,
+          label,
+          forwardDepsArray(dependencies, dependencyForm),
+          forwardDepsArray(parameters, parameterForm),
+          start,
+          stop,
+          expected,
+        );
+        !count = count + 1
+      }
+    };
+    for (size in Array[127, 128, 129, 160]) {
+      clear = Array::fillBy(size, index -> forwardDepsInfo(index, false));
+      alreadySet = Array::fillBy(size, index -> forwardDepsInfo(index, true));
+      for ((label, input, dependencies, start, stop, expected) in Array[
+        (
+          "publication with changed flags",
+          clear,
+          LeanArray(Array[leanNatValue(0), leanNatValue(size - 1)]),
+          0,
+          size,
+          Array::fillBy(size, index ->
+            forwardDepsInfo(index, index == 0 || index == size - 1)
+          ),
+        ),
+        (
+          "publication with flags already true",
+          alreadySet,
+          LeanArray(Array[]),
+          0,
+          size,
+          alreadySet,
+        ),
+        (
+          "publication without matches",
+          clear,
+          LeanArray(Array[huge]),
+          0,
+          size,
+          clear,
+        ),
+        (
+          "unvisited array representation",
+          clear,
+          LeanArray(Array[]),
+          size,
+          size,
+          clear,
+        ),
+      ]) {
+        checkForwardDeps(
+          saved,
+          label,
+          dependencies,
+          LeanArray(input),
+          start,
+          stop,
+          expected,
+        );
+        !count = count + 1
+      }
+    };
+    allTrue = Array::fillBy(3, index -> forwardDepsInfo(index, true));
+    checkForwardDeps(
+      saved,
+      "true flags do not inspect dependencies",
+      LeanUnavailable("dependency membership must be skipped"),
+      LeanArray(allTrue),
+      0,
+      3,
+      allTrue,
+    );
+    !count = count + 1;
+    checkForwardDeps(
+      saved,
+      "ordinary arrays skip unused dependency elements",
+      LeanArray(Array[LeanUnavailable("dependency element must not be read")]),
+      LeanArray(allTrue),
+      0,
+      3,
+      allTrue,
+    );
+    !count = count + 1;
+    unavailable = LeanUnavailable("empty range must not inspect arrays");
+    for ((start, stop) in Array[(0, 0), (3, 2), (-1, 0), (-1, -2)]) {
+      for (method in Array[
+        L4_Lean_Meta_FunInfo.f_Meta_updateHasFwdDeps_spec_0_d0135b43f9_fallback,
+        L4_Lean_Meta_FunInfo.f_Meta_updateHasFwdDeps_spec_0_d0135b43f9,
+      ]) {
+        result = method(
+          runtime,
+          unavailable,
+          LeanWord("usize", stop),
+          LeanWord("usize", start),
+          unavailable,
+        );
+        assert(native_eq(result, unavailable) == 0);
+        assert(native_eq(saved.refs, runtime.checkpoint().refs) == 0)
+      };
+      !count = count + 1
+    }
+  };
+  assert(count == 174);
+  print_string("174 forward dependency checks passed\n")
+}

@@ -1,0 +1,73 @@
+// Mark forward dependencies over a bounded parameter range in a private workspace.
+module L4_Lean_Meta_FunInfo;
+
+fun f_markForwardDependencies(
+  parameters: Array<LeanValue>,
+  backDependencies: Array<LeanValue>,
+  start: Int,
+  stop: Int,
+): Array<LeanValue> {
+  updated = Vector::mcreateFromItems(parameters);
+  for (index in Range(start, stop)) {
+    info = parameters[index];
+    if (leanTag(info) != LeanTag.Meta_ParamInfo_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    flag = leanTag(leanField(info, 1));
+    if (flag == LeanTag.Bool_true) continue;
+    if (flag != LeanTag.Bool_false) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    naturalIndex = LeanNat::fromInt(index);
+    if (
+      backDependencies.any(dependency -> leanNat(dependency) == naturalIndex)
+    ) {
+      updated.set(index, leanReplaceField(info, 1, leanBool(true)))
+    }
+  };
+  updated.toArray()
+}
+
+fun f_Meta_updateHasFwdDeps_spec_0_d0135b43f9(
+  runtime: mutable LeanExecution,
+  backDependencies: LeanValue,
+  stop: LeanValue,
+  index: LeanValue,
+  parameters: LeanValue,
+): LeanValue {
+  if (
+    !leanIsTrue(
+      L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(runtime, index, stop),
+    )
+  ) return parameters;
+  (parameters, backDependencies) match {
+  | (LeanArray(values), LeanArray(dependencies)) ->
+    startIndex = leanWordBits(index);
+    stopIndex = leanWordBits(stop);
+    if (startIndex >= 0 && stopIndex >= 0 && stopIndex <= values.size()) {
+      result = f_markForwardDependencies(
+        values,
+        dependencies,
+        startIndex,
+        stopIndex,
+      );
+      // The original writes every visited slot, even when no flag changes.
+      if (result.size() > 128) {
+        return LeanPersistentArray(
+          Persistent.RadixTreeVector::mcreateFromItems(result).chill(),
+        )
+      };
+      return LeanArray(result)
+    }
+  | _ -> void
+  };
+  f_Meta_updateHasFwdDeps_spec_0_d0135b43f9_fallback(
+    runtime,
+    backDependencies,
+    stop,
+    index,
+    parameters,
+  )
+}
+
+module end;

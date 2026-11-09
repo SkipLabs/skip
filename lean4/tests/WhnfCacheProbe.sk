@@ -1,0 +1,716 @@
+// Easy-case dispatch, cache policy, nested updates, and errors use real Meta/Core state.
+fun whnfCacheDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun whnfCacheConfigure(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  zetaDelta: Bool,
+): LeanValue {
+  config = leanReplaceField(
+    L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context),
+    16,
+    leanBool(zetaDelta),
+  );
+  key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config);
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[config, key],
+    ),
+  )
+}
+
+fun whnfCacheEntry(
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  context: LeanValue,
+  expression: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  runtime = saved.restoreRaw();
+  key = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+    runtime,
+    expression,
+    context,
+    world,
+  );
+  assert(leanTag(key) == LeanTag.EST_Out_ok);
+  cache = leanField(runtime.readRef(state.metaStateRef), 1);
+  L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_4_fba3a797db(
+    runtime,
+    leanField(cache, 3),
+    leanField(key, 0),
+  )
+}
+
+fun whnfCacheHasTracked(
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  id: LeanValue,
+): Bool {
+  runtime = saved.restoreRaw();
+  tracked = leanField(runtime.readRef(state.metaStateRef), 2);
+  leanIsTrue(
+    L4_Lean_Meta_WHNF.f_go_spec_3_spec_3_3058eb84df(runtime, id, tracked),
+  )
+}
+
+fun whnfCacheCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  expression: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchangedRefs: Bool,
+): LeanExecutionCheckpoint {
+  oldExpr = rewriteProbeCopyInput(expression);
+  newExpr = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_6_f07976f502_fallback(
+        runtime,
+        oldExpr,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      ),
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_6_f07976f502(
+        runtime,
+        newExpr,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      )
+    ,
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("WHNF cache outcome: " + label)
+  };
+  for ((before, oldValue, newValue) in Array[
+    (expression, oldExpr, newExpr),
+    (context, oldContext, newContext),
+    (core, oldCore, newCore),
+  ]) {
+    if (
+      !rewriteProbeSameInput(before, oldValue) ||
+      !rewriteProbeSameInput(before, newValue)
+    ) {
+      leanFail("WHNF cache mutated input: " + label)
+    }
+  };
+  if (unchangedRefs && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("WHNF cache unexpected reference change: " + label)
+  };
+  after
+}
+
+// A user-supplied unfolding policy that refuses definitions and counts decisions.
+fun whnfCacheDenyUnfold(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  count = leanNat(runtime.readRef(args[0]));
+  runtime.writeRef(args[0], Some(leanBoxNat(count.add(LeanNat::fromInt(1)))));
+  LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(false), args[5]])
+}
+
+fun whnfCacheDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    fvar = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, id);
+    app = (fn: LeanValue, arg: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, fn, arg);
+    nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero),
+    );
+    innerName = name("whnfCacheInner");
+    outerName = name("whnfCacheOuter");
+    failingName = name("whnfCacheFailure");
+    inner = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, innerName, nil);
+    outer = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, outerName, nil);
+    failing = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, failingName, nil);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    constants.set(
+      leanNameKey(innerName),
+      LeanConstantFile(whnfCacheDefinition(innerName, type, prop), None()),
+    );
+    constants.set(
+      leanNameKey(outerName),
+      LeanConstantFile(whnfCacheDefinition(outerName, type, inner), None()),
+    );
+    constants.set(
+      leanNameKey(failingName),
+      LeanConstantFile(whnfCacheDefinition(failingName, type, inner), None()),
+    );
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    defaultKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+    implKind = LeanCtor(LeanTag.LocalDeclKind_implDetail, Array[]);
+    xName = name("x");
+    letName = name("localLet");
+    nestedName = name("nestedLet");
+    implName = name("implementationLet");
+    haveName = name("nondependentLet");
+    x = fvar(xName);
+    localLet = fvar(letName);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      builder,
+      locals,
+      xName,
+      xName,
+      prop,
+      binder,
+      defaultKind,
+    );
+    for ((id, value, nondep, kind) in Array[
+      (letName, x, false, defaultKind),
+      (nestedName, localLet, false, defaultKind),
+      (implName, x, false, implKind),
+      (haveName, x, true, implKind),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+        builder,
+        locals,
+        id,
+        id,
+        prop,
+        value,
+        leanBool(nondep),
+        kind,
+      )
+    };
+    state = rewriteProbeState(
+      builder,
+      environment,
+      locals,
+      "<whnf-cache-probe>",
+    );
+    context = whnfCacheConfigure(builder, state.metaContext, true);
+    disabled = whnfCacheConfigure(builder, state.metaContext, false);
+    selected = leanReplaceField(
+      disabled,
+      2,
+      L4_Lean_Expr.f_Lean_FVarIdSet_insert_0a48435746(
+        builder,
+        leanField(disabled, 2),
+        letName,
+      ),
+    );
+    selectedTracked = leanReplaceField(selected, 1, leanBool(true));
+    tracked = leanReplaceField(context, 1, leanBool(true));
+    trackedDisabled = leanReplaceField(disabled, 1, leanBool(true));
+    bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      xName,
+      binder,
+      prop,
+      bound,
+    );
+    typeIdentity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      xName,
+      binder,
+      type,
+      bound,
+    );
+    closedBeta = app(typeIdentity, prop);
+    closedLet = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      builder,
+      xName,
+      type,
+      prop,
+      bound,
+      leanBool(false),
+    );
+    functionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder,
+      xName,
+      binder,
+      prop,
+      prop,
+    );
+    literal = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanNatValue(5),
+    );
+    annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, nil, prop);
+    freeApplication = app(identity, x);
+    mName = name("unassigned");
+    meta = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, mName);
+    baseState = builder.readRef(state.metaStateRef);
+    mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+      builder,
+      leanField(baseState, 0),
+      mName,
+      mName,
+      locals,
+      LeanArray(Array[]),
+      prop,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+      LeanNatLiterals.n0,
+    );
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(baseState, 0, mctx)),
+    );
+    callbackCalls = builder.newRef(LeanNatLiterals.n0);
+    policy = LeanClosure(whnfCacheDenyUnfold, 6, Array[callbackCalls]);
+    custom = leanReplaceField(
+      context,
+      7,
+      LeanCtor(LeanTag.Option_some, Array[policy]),
+    );
+    saved = builder.checkpoint();
+    assignedRuntime = saved.restoreRaw();
+    assignedMctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(
+      assignedRuntime,
+      mctx,
+      mName,
+      localLet,
+    );
+    assignedRuntime.writeRef(
+      state.metaStateRef,
+      Some(
+        leanReplaceField(
+          assignedRuntime.readRef(state.metaStateRef),
+          0,
+          assignedMctx,
+        ),
+      ),
+    );
+    assigned = assignedRuntime.checkpoint();
+    none = LeanCtor(LeanTag.Option_none, Array[]);
+    source = L4_Init_Prelude.f_Lean_mkAtom_bee7a4bdb4(
+      builder,
+      LeanText("whnf-cache-source"),
+    );
+    limitedCore = leanReplaceField(
+      leanReplaceField(
+        state.coreContext,
+        0,
+        leanReplaceField(leanField(state.coreContext, 0), 3, leanNatValue(1)),
+      ),
+      1,
+      leanNatValue(1),
+    );
+    !limitedCore = leanReplaceField(limitedCore, 2, source);
+    for (world in Array[LeanNatLiterals.n0, leanNatValue(37)]) {
+      ok = (value: LeanValue) ->
+        LeanCtor(LeanTag.EST_Out_ok, Array[value, world]);
+      for ((label, expression, metaContext, result) in Array[
+        ("sort easy", prop, context, prop),
+        ("lambda easy", identity, context, identity),
+        ("forall easy", functionType, context, functionType),
+        ("literal easy", literal, context, literal),
+        ("metadata stripped", annotated, context, prop),
+        ("ordinary free variable", x, context, x),
+        ("local let unfolds", localLet, context, x),
+        ("zetaDelta disabled", localLet, disabled, localLet),
+        ("selected local let unfolds", localLet, selected, x),
+        ("implementation detail unfolds", fvar(implName), disabled, x),
+        (
+          "nondependent implementation let stays",
+          fvar(haveName),
+          tracked,
+          fvar(haveName),
+        ),
+        ("unassigned metavariable", meta, context, meta),
+      ]) {
+        _ = whnfCacheCheck(
+          label,
+          saved,
+          state,
+          expression,
+          metaContext,
+          state.coreContext,
+          world,
+          ok(result),
+          true,
+        );
+        !checks = checks + 1
+      };
+      easyState = RewriteProbeState(
+        saved,
+        LeanUnavailable("easy case must not inspect Meta.Context"),
+        LeanUnavailable("easy case must not read Meta.State"),
+        LeanUnavailable("easy case must not inspect Core.Context"),
+        LeanUnavailable("easy case must not read Core.State"),
+      );
+      _ = whnfCacheCheck(
+        "metadata easy case precedes context access",
+        saved,
+        easyState,
+        annotated,
+        easyState.metaContext,
+        easyState.coreContext,
+        world,
+        ok(prop),
+        true,
+      );
+      missingId = name("missingLocal");
+      errorRuntime = saved.restoreRaw();
+      missingError = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+        errorRuntime,
+        missingId,
+        context,
+        state.coreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(leanTag(missingError) == LeanTag.EST_Out_error);
+      assert(native_eq(leanField(missingError, 1), world) == 0);
+      missingAfter = whnfCacheCheck(
+        "unknown free variable propagates lookup error",
+        saved,
+        state,
+        fvar(missingId),
+        context,
+        state.coreContext,
+        world,
+        missingError,
+        false,
+      );
+      assert(native_eq(missingAfter.refs, errorRuntime.checkpoint().refs) == 0);
+      !checks = checks + 2;
+      afterSelected = whnfCacheCheck(
+        "selected local let tracked",
+        saved,
+        state,
+        localLet,
+        selectedTracked,
+        state.coreContext,
+        world,
+        ok(x),
+        false,
+      );
+      assert(whnfCacheHasTracked(afterSelected, state, letName));
+      afterImpl = whnfCacheCheck(
+        "implementation detail tracked",
+        saved,
+        state,
+        fvar(implName),
+        trackedDisabled,
+        state.coreContext,
+        world,
+        ok(x),
+        false,
+      );
+      assert(whnfCacheHasTracked(afterImpl, state, implName));
+      afterNested = whnfCacheCheck(
+        "nested local tracking retained",
+        saved,
+        state,
+        fvar(nestedName),
+        tracked,
+        state.coreContext,
+        world,
+        ok(x),
+        false,
+      );
+      assert(whnfCacheHasTracked(afterNested, state, nestedName));
+      assert(whnfCacheHasTracked(afterNested, state, letName));
+      afterAssigned = whnfCacheCheck(
+        "assigned metavariable follows local let",
+        assigned,
+        state,
+        meta,
+        tracked,
+        state.coreContext,
+        world,
+        ok(x),
+        false,
+      );
+      assert(whnfCacheHasTracked(afterAssigned, state, letName));
+      !checks = checks + 4;
+
+      for ((label, expression, expected) in Array[
+        ("free-variable application bypasses cache", freeApplication, x),
+        ("metavariable application bypasses cache", app(identity, meta), meta),
+      ]) {
+        after = whnfCacheCheck(
+          label,
+          saved,
+          state,
+          expression,
+          context,
+          state.coreContext,
+          world,
+          ok(expected),
+          true,
+        );
+        assert(
+          native_eq(
+            whnfCacheEntry(after, state, context, expression, world),
+            none,
+          ) == 0,
+        );
+        !checks = checks + 1
+      };
+      for ((label, expression) in Array[
+        ("closed beta result cached", closedBeta),
+        ("closed let result cached", closedLet),
+      ]) {
+        after = whnfCacheCheck(
+          label,
+          saved,
+          state,
+          expression,
+          context,
+          state.coreContext,
+          world,
+          ok(prop),
+          false,
+        );
+        assert(
+          native_eq(
+            whnfCacheEntry(after, state, context, expression, world),
+            LeanCtor(LeanTag.Option_some, Array[prop]),
+          ) == 0,
+        );
+        !checks = checks + 1
+      };
+      assert(
+        native_eq(whnfCacheEntry(saved, state, context, outer, world), none) ==
+          0,
+      );
+      cached = whnfCacheCheck(
+        "nested cache miss preserves inner entry",
+        saved,
+        state,
+        outer,
+        context,
+        state.coreContext,
+        world,
+        ok(prop),
+        false,
+      );
+      someProp = LeanCtor(LeanTag.Option_some, Array[prop]);
+      assert(
+        native_eq(
+          whnfCacheEntry(cached, state, context, outer, world),
+          someProp,
+        ) == 0,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(cached, state, context, inner, world),
+          someProp,
+        ) == 0,
+      );
+      _ = whnfCacheCheck(
+        "cache hit unchanged references",
+        cached,
+        state,
+        outer,
+        context,
+        state.coreContext,
+        world,
+        ok(prop),
+        true,
+      );
+      guardedState = RewriteProbeState(
+        cached,
+        context,
+        state.metaStateRef,
+        LeanUnavailable("cache hit must not inspect Core.Context"),
+        LeanUnavailable("cache hit must not read Core.State"),
+      );
+      _ = whnfCacheCheck(
+        "cache hit precedes uncached/Core access",
+        cached,
+        guardedState,
+        outer,
+        context,
+        guardedState.coreContext,
+        world,
+        ok(prop),
+        true,
+      );
+      separated = whnfCacheCheck(
+        "configuration key separates entries",
+        cached,
+        state,
+        outer,
+        disabled,
+        state.coreContext,
+        world,
+        ok(prop),
+        false,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(separated, state, context, outer, world),
+          someProp,
+        ) == 0,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(separated, state, disabled, outer, world),
+          someProp,
+        ) == 0,
+      );
+      !checks = checks + 4;
+
+      denied = whnfCacheCheck(
+        "custom predicate bypasses warmed cache",
+        cached,
+        state,
+        outer,
+        custom,
+        state.coreContext,
+        world,
+        ok(outer),
+        false,
+      );
+      deniedRuntime = denied.restoreRaw();
+      assert(
+        leanNat(deniedRuntime.readRef(callbackCalls)) > LeanNat::fromInt(0),
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(denied, state, context, outer, world),
+          someProp,
+        ) == 0,
+      );
+      !checks = checks + 1;
+      failed = whnfCacheCheck(
+        "uncached error leaves key absent",
+        saved,
+        state,
+        outer,
+        context,
+        limitedCore,
+        world,
+        whnfCacheDepthError(builder, source, world),
+        false,
+      );
+      assert(
+        native_eq(whnfCacheEntry(failed, state, context, outer, world), none) ==
+          0,
+      );
+      assert(
+        native_eq(whnfCacheEntry(failed, state, context, inner, world), none) ==
+          0,
+      );
+      preserved = whnfCacheCheck(
+        "uncached error preserves existing entries",
+        cached,
+        state,
+        failing,
+        context,
+        limitedCore,
+        world,
+        whnfCacheDepthError(builder, source, world),
+        false,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(preserved, state, context, failing, world),
+          none,
+        ) == 0,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(preserved, state, context, outer, world),
+          someProp,
+        ) == 0,
+      );
+      assert(
+        native_eq(
+          whnfCacheEntry(preserved, state, context, inner, world),
+          someProp,
+        ) == 0,
+      );
+      !checks = checks + 2
+    }
+  };
+  assert(checks == 116);
+  print_string("116 WHNF easy/cache/state/error comparisons passed\n")
+}

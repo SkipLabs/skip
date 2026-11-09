@@ -1,0 +1,273 @@
+// Resolve easy WHNF cases, then use the configuration-keyed cache when eligible.
+module L4_Lean_Meta_WHNF;
+
+fun f_Meta_whnfImp_spec_6_f07976f502(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  current = expression;
+  currentWorld = world;
+  loop {
+    leanTag(current) match {
+    | LeanTag.Expr_bvar__impl ->
+      message = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+        runtime,
+        LeanText("Lean.Meta.WHNF"),
+        LeanText("Lean.Meta.whnfEasyCases"),
+        LeanNatLiterals.n408,
+        LeanNatLiterals.n22,
+        LeanText("loose bvar in expression"),
+      );
+      return f_whnfCore_go_spec_1_07f1a97376(
+        runtime,
+        message,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      )
+    | LeanTag.Expr_sort__impl
+    | LeanTag.Expr_lam__impl
+    | LeanTag.Expr_forallE__impl
+    | LeanTag.Expr_lit__impl ->
+      return LeanCtor(LeanTag.EST_Out_ok, Array[current, currentWorld])
+    | LeanTag.Expr_mdata__impl ->
+      !current = leanField(current, 2);
+      continue
+    | LeanTag.Expr_mvar__impl ->
+      assignment = f_go_spec_3_spec_4_4c1323d7b7(
+        runtime,
+        leanField(current, 1),
+        metaStateRef,
+        currentWorld,
+      );
+      leanTag(assignment) match {
+      | LeanTag.EST_Out_error -> return assignment
+      | LeanTag.EST_Out_ok -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      };
+      !currentWorld = leanField(assignment, 1);
+      value = leanField(assignment, 0);
+      leanTag(value) match {
+      | LeanTag.Option_none ->
+        return LeanCtor(LeanTag.EST_Out_ok, Array[current, currentWorld])
+      | LeanTag.Option_some -> !current = leanField(value, 0)
+      | _ -> return leanFail("non-exhaustive Lean case")
+      };
+      continue
+    | LeanTag.Expr_fvar__impl ->
+      fvarId = leanField(current, 1);
+      declaration = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+        runtime,
+        fvarId,
+        metaContext,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      );
+      leanTag(declaration) match {
+      | LeanTag.EST_Out_error -> return declaration
+      | LeanTag.EST_Out_ok -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      };
+      !currentWorld = leanField(declaration, 1);
+      local = leanField(declaration, 0);
+      if (leanTag(local) != LeanTag.LocalDecl_ldecl) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[current, currentWorld])
+      };
+      value = leanField(local, 4);
+      if (leanTag(leanField(local, 5)) != LeanTag.Bool_false) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[current, currentWorld])
+      };
+      unfold = leanIsTrue(
+        L4_Lean_LocalContext.f_Lean_LocalDecl_isImplementationDetail_a1009b26d6(
+          runtime,
+          local,
+        ),
+      );
+      if (!unfold) {
+        config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+          runtime,
+          metaContext,
+        );
+        if (leanTag(config) != LeanTag.Meta_Config_mk) {
+          return leanFail("non-exhaustive Lean case")
+        };
+        !unfold = leanIsTrue(leanField(config, 16))
+      };
+      if (leanTag(metaContext) != LeanTag.Meta_Context_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      if (!unfold) {
+        !unfold = leanIsTrue(
+          f_go_spec_3_spec_3_3058eb84df(
+            runtime,
+            fvarId,
+            leanField(metaContext, 2),
+          ),
+        )
+      };
+      if (!unfold) {
+        return LeanCtor(LeanTag.EST_Out_ok, Array[current, currentWorld])
+      };
+      if (leanIsTrue(leanField(metaContext, 1))) {
+        tracked = L4_Lean_Meta_Basic.f_Lean_Meta_addZetaDeltaFVarId_162af9724c(
+          runtime,
+          fvarId,
+          metaStateRef,
+          currentWorld,
+        );
+        leanTag(tracked) match {
+        | LeanTag.EST_Out_error -> return tracked
+        | LeanTag.EST_Out_ok -> !currentWorld = leanField(tracked, 1)
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      };
+      !current = value;
+      continue
+    | _ -> void
+    };
+
+    useCache =
+      !leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_hasFVar_ec2474cd19(runtime, current),
+      ) &&
+      !leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_hasExprMVar_0a7c4cebda(runtime, current),
+      );
+    if (useCache) {
+      if (leanTag(metaContext) != LeanTag.Meta_Context_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      predicate = leanField(metaContext, 7);
+      leanTag(predicate) match {
+      | LeanTag.Option_none -> void
+      | LeanTag.Option_some ->
+        _ = leanField(predicate, 0);
+        !useCache = false
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    };
+    if (!useCache) {
+      return f_Meta_whnfImp_whnfUncached_c6f346edfc(
+        runtime,
+        current,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      )
+    };
+    keyResult = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+      runtime,
+      current,
+      metaContext,
+      currentWorld,
+    );
+    leanTag(keyResult) match {
+    | LeanTag.EST_Out_error -> return keyResult
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    key = leanField(keyResult, 0);
+    stateResult = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      metaStateRef,
+      leanField(keyResult, 1),
+    );
+    if (leanTag(stateResult) != LeanTag.ST_Out_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    state = leanField(stateResult, 0);
+    !currentWorld = leanField(stateResult, 1);
+    if (leanTag(state) != LeanTag.Meta_State_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    cache = leanField(state, 1);
+    if (leanTag(cache) != LeanTag.Meta_Cache_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    cached = f_Meta_whnfImp_spec_4_fba3a797db(
+      runtime,
+      leanField(cache, 3),
+      key,
+    );
+    leanTag(cached) match {
+    | LeanTag.Option_some ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanField(cached, 0), currentWorld],
+      )
+    | LeanTag.Option_none -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    reduced = f_Meta_whnfImp_whnfUncached_c6f346edfc(
+      runtime,
+      current,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      currentWorld,
+    );
+    leanTag(reduced) match {
+    | LeanTag.EST_Out_error -> return reduced
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    value = leanField(reduced, 0);
+    // Reduction can update Meta.State and other cache entries before this insertion.
+    taken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      metaStateRef,
+      leanField(reduced, 1),
+    );
+    if (leanTag(taken) != LeanTag.ST_Out_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    latestState = leanField(taken, 0);
+    if (leanTag(latestState) != LeanTag.Meta_State_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    latestCache = leanField(latestState, 1);
+    if (leanTag(latestCache) != LeanTag.Meta_Cache_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    entries = f_Meta_whnfImp_spec_5_f0f1dbb78c(
+      runtime,
+      leanField(latestCache, 3),
+      key,
+      value,
+    );
+    updated = leanReplaceField(
+      latestState,
+      1,
+      leanReplaceField(latestCache, 3, entries),
+    );
+    stored = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      metaStateRef,
+      updated,
+      leanField(taken, 1),
+    );
+    if (leanTag(stored) != LeanTag.ST_Out_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    return LeanCtor(LeanTag.EST_Out_ok, Array[value, leanField(stored, 1)])
+  }
+}
+
+module end;

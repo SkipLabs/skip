@@ -1,0 +1,61 @@
+{
+  "scope": "WHNF easy/cache dispatch and forward dependency updates; whole-example coverage build predates this batch.",
+  "skargo_check": "incremental release passed in 2.383s",
+  "retained_body_audit": "Both original source files restore byte-for-byte to 4e6d15791 by reversing only the recorded fallback identities and all direct self-calls.",
+  "records": [
+    {
+      "function": "L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_6_f07976f502",
+      "original_source": "sources/Modules/Lean/Meta/WHNF/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/WHNF/Cache.sk",
+      "baseline_commit": "4e6d15791",
+      "original_body_sha256": "a37d4a18a2f070184a30ea3f2af6781b6f3a59fd0a2be29bb66d29cb1ea033bd",
+      "fallback_body_sha256": "44551636b6145c2dbef24284de05d3e12ac9dade957a5229d78371811394bc44",
+      "current_catalog_body_sha256": "91aeb8c832640f4a16f5130cacb8ffb85a123d4349d7b8c1d8f84e7e26d13a90",
+      "current_file_sha256": "1a4ea94aee379d9c94ca516355f0c028cfda2a94bb1e3b52c309f098e12a19be",
+      "internal_helper_hashes": {},
+      "checks": [
+        "116 result/world/reference comparisons: 29 scenarios across two worlds and profiling off/on",
+        "Easy cases, local/mvar assignments, zeta tracking, cache eligibility, hits/misses, custom unfold policy and exact errors",
+        "Nested cache entries survive outer insertion; failing normalization preserves earlier entries and publishes no failed entry",
+        "19 WHNF depth-entry regressions and 36 FunInfo parameter/class regressions pass"
+      ],
+      "probes": [
+        "tests/WhnfCacheProbe.sk"
+      ],
+      "probe_sha256": "7668a9fa573e621f59f1856ad56a1c1f670ee5b344dce0f6ad974e62fb3195de",
+      "limits": [
+        "Expression/context/state/result interfaces remain LeanValue; local decisions use Bool.",
+        "The uncached/trace implementation and lookup/reference/cache helpers remain shared; nested uncached recursion re-enters the canonical wrapper.",
+        "Loose-bvar panic, enabled tracing, malformed constructors and unreachable injected helper-result errors are not executed by this probe."
+      ]
+    },
+    {
+      "function": "L4_Lean_Meta_FunInfo.f_Meta_updateHasFwdDeps_spec_0_d0135b43f9",
+      "original_source": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
+      "current_source": "sources/Modules/Lean/Meta/FunInfo/ForwardDependencies.sk",
+      "baseline_commit": "4e6d15791",
+      "original_body_sha256": "b4a19d264fec993d6948de69629c2e838f868aef4a6aa9c8d91829e95203ea27",
+      "fallback_body_sha256": "f1313ab2fba73bd2ec35a1c034828e3524bdab037815cc4c4ded02df97b1d621",
+      "current_catalog_body_sha256": "eff1ee8e1cf1d1ac09a96f5c04b434336d7bb34bf16112a4b2950eacb9a85415",
+      "current_file_sha256": "0550e2305521128372e1ddf90371f68a5f6f88867b5eee85d1f9ae207a48152c",
+      "internal_helper_hashes": {
+        "f_markForwardDependencies": "b71924d17367506853acf179c2624f78c632f0ec032d5beccc66d767f9dbe706"
+      },
+      "checks": [
+        "174 direct comparisons in profiling-off/on modes with exact expected parameter fields and array publication forms",
+        "Partial/resumed/unsigned no-op ranges, arbitrary Nat membership, scalar/canonical equality and original true flags",
+        "127/128/129/160 array sizes; ordinary/persistent/override inputs; unused dependency sentinels test early guards and the typed loop",
+        "36 parameter/class regressions pass"
+      ],
+      "probes": [
+        "tests/ForwardDependenciesProbe.sk"
+      ],
+      "probe_sha256": "78c9caf33de89d66ef418f941544e77c511c4f768aeaa28f2b69f1d364063b63",
+      "limits": [
+        "Typed Array/range/private-vector route covers valid bounded ordinary arrays; other representations/ranges retain the original loop.",
+        "Tracked arrays, active out-of-bounds/wrapping paths and malformed parameter/flag errors are retained but not executed here.",
+        "ParamInfo fields remain boxed; primitive and array-write diagnostic counts intentionally change."
+      ]
+    }
+  ]
+}

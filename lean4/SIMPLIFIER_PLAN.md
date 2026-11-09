@@ -129,6 +129,16 @@ checking. The [third audit](provenance/rewrite-batches/2026-11-09-wave-03.json)
 records helper hashes and the remaining boxed payload/compatibility boundaries.
 No whole-example performance claim follows from these focused checks.
 
+`WHNF/Cache.sk` now structures easy cases and configuration-keyed cache dispatch;
+116 state/cache/error comparisons pass. `FunInfo/ForwardDependencies.sk` uses a
+private vector over typed ordinary arrays and bounded host indices; 174 checks
+pass, with other representations/ranges retaining their original route.
+Incremental release checking, 19 WHNF entry and 36 function-info regressions
+also pass. [Wave four](provenance/rewrite-batches/2026-11-09-wave-04.json) records
+the retained-body audit and remaining interface/fixture limits. The separate
+coverage executable predates this batch; its observed entries identify the
+earlier body hashes, while these replacements have focused validation only.
+
 Use `skargo check` while editing and a measurement release build after the example
 path rewrite type-checks and focused checks pass. `skargo check --release` checks the release
 configuration without object generation; `skargo build --release` creates the
