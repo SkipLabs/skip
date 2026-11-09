@@ -15,6 +15,11 @@ import subprocess
 
 from select_sources import ROOT, NON_CODE, REFERENCE, catalog
 
+META_INCLUDES = [ROOT / 'src/Bootstrap' / (name + '.sk') for name in (
+    'Initialize', 'Options', 'Core', 'Environment', 'Exceptions',
+    'Extensions', 'SimpInitialization', 'ImportData',
+)]
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -23,6 +28,10 @@ def main():
     parser.add_argument('--release', action='store_true', help='Compile the probe with release optimization')
     parser.add_argument('--include', type=Path, action='append', default=[],
                         help='Additional handwritten Skip source used by this probe')
+    parser.add_argument('--meta', action='store_true',
+                        help='Include the initialized Meta/Core bootstrap support')
+    parser.add_argument('--rewrite-harness', action='store_true',
+                        help='Include shared rewrite fixtures and comparisons (implies --meta)')
     args = parser.parse_args()
     build = ROOT / 'build/probes' / args.name
     build.mkdir(parents=True, exist_ok=True)
@@ -30,6 +39,11 @@ def main():
               (ROOT / 'src/Smoke.sk').read_text() +
               '\nfun main(): void { leanSmoke(); print_string("smoke passed") }\n')
     includes = sorted((ROOT / 'src/Runtime').glob('*.sk')) + args.include
+    if args.meta or args.rewrite_harness:
+        includes += META_INCLUDES
+    if args.rewrite_harness:
+        includes.append(ROOT / 'tests/Support/RewriteProbe.sk')
+    includes = list(dict.fromkeys(path.resolve() for path in includes))
     referenced_source = driver + '\n'.join(p.read_text() for p in includes)
     pending = [(m[1] + '.' + m[2]) for m in REFERENCE.finditer(NON_CODE.sub('', referenced_source)) if m[1]]
     functions, _ = catalog()

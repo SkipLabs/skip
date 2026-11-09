@@ -1,10 +1,10 @@
 # Parallel rewrite workers
 
 Read this when coordinating or reviewing external Vibe workers for this port.
-The active task allocation and completion scope live in `REWRITE_PLAN.md`, three
-directories above this reference. Read that plan and `SIMPLIFIER_PLAN.md` from
-the repository snapshot supplied to the task; a copied skill may not retain
-working relative links, so the coordinator must include those files explicitly.
+The coordinator reads the active allocation and scope in `REWRITE_PLAN.md` and
+`SIMPLIFIER_PLAN.md`, three directories above this reference. Worker packets
+contain the relevant constraints and task-specific contracts; they need not copy
+the entire plans or follow links outside their assigned directory.
 
 ## Roles and limits
 
@@ -50,7 +50,7 @@ Include:
   paths; one active owner per function and shared interface.
 - Original bodies with hashes, helper signatures with argument roles, and pinned
   native Lean references where available. Preserve full bodies for comparison.
-- This skill, the active plan, relevant local conventions, and working probes.
+- Relevant skill/plan constraints, local conventions, and working probe fixtures.
 - The desired semantic change or cleanup, the representation contract, and the
   required output. Task size is one function or a small coherent recursive group.
 - The human-review standard: meaningful names, coherent files, straightforward
@@ -61,6 +61,26 @@ Workers read supplied context and write only draft source/probes/reports in thei
 task directory. They do not touch production, shared manifests, Skip itself,
 the historical transpiler or compiler caches. Request missing interfaces from
 the coordinator in the task report; do not invent signatures or implementations.
+
+Use `tools/rewrite_task.py` to prepare bounded packets from current source. It
+hashes the exact original body and inputs, includes helper signatures by default,
+and accepts explicit helper bodies, native source excerpts, role notes and probe
+support files. Existing task directories are rejected. The byte/token summary
+helps detect an oversized task before launching it; token counts are only a
+bytes-based estimate. Two initial workers exhausted 300,000-token budgets with
+large packets, so reduce irrelevant context before simply raising limits.
+
+```sh
+python3 tools/rewrite_task.py \
+  --function L4_Module.f_target \
+  --task-dir build/vibe-workers/wave-next/task \
+  --assignment-file build/assignments/task.md \
+  --role-contract-file build/assignments/roles.md \
+  --support-file tests/Support/RewriteProbe.sk
+```
+
+Provide actual maintained identities and owner-written role contracts. The
+packet tool does not infer semantic argument roles from `LeanValue` types.
 
 ## Launch and supervise
 
@@ -155,6 +175,44 @@ An independent peer reviews the patch against the original and records concrete
 findings. The primary checks its source hashes, resolves conflicts and applies it.
 A stale hash requires reconciliation; do not automatically apply an old patch over
 new source. Update manifests and original-name provenance once, centrally.
+
+For a reviewed single-function rewrite into a new same-module file, use
+`tools/rewrite_integrate.py`. It defaults to a dry-run diff. `--apply` checks
+frozen inputs and the current body, retains the original with redirected direct
+self-calls, updates the build/provenance paths, and writes an audit under `build/`.
+It preserves unrelated source edits and refuses conflicting declarations.
+Canonical ABI types/count/order are checked; identical `LeanValue` types do not
+establish correct context/state/world roles. Recursive closure adapters and
+unsupported signatures need explicit handling rather than automatic integration.
+Do not treat a successful apply as semantic acceptance. Format with `skfmt`,
+then check and execute the relevant probes.
+
+```sh
+python3 tools/rewrite_integrate.py \
+  --manifest build/vibe-workers/wave-next/task/input-manifest.json \
+  --replacement build/vibe-workers/wave-next/task/Reviewed.sk \
+  --destination sources/Modules/Module/Readable.sk
+# Repeat with --apply after reviewing the diff.
+```
+
+`tests/Support/RewriteProbe.sk` supplies initialized empty-import environment
+construction, a named Meta/Core fixture, isolated result/reference comparison,
+and copies of constructor/array inputs. Initialize runtime extensions before
+using its environment builder. It does not generate semantic cases: expected
+outcomes, branch coverage, repeated-call state and unsupported-path assertions
+remain the task owner's responsibility. Its copying helper rebuilds constructors
+and ordinary arrays; other immutable value representations remain shared.
+
+```sh
+python3 tools/probe.py --release --rewrite-harness \
+  --name task-check --driver tests/TaskProbe.sk
+```
+
+`--rewrite-harness` also includes Meta/Core bootstrap support; `--meta` includes
+that support alone. These flags avoid repeating the bootstrap source list. Probe
+selection still copies maintained function bodies verbatim. The integration tool
+does not automatically update the completion ledger: record actual checks and
+coverage limits there after validation.
 
 Run incremental `skargo check --release`, then focused execution checks. Retain
 `target/`; serialize compiler/probe jobs. A focused probe selects verbatim

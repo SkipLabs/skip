@@ -1,0 +1,104 @@
+// Valid empty-import fixtures and isolated comparisons for maintained-code rewrites.
+class RewriteProbeState(
+  saved: LeanExecutionCheckpoint,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+)
+
+fun rewriteProbeEnvironment(
+  runtime: mutable LeanExecution,
+  constants: Map<String, LeanConstantFile>,
+): LeanValue {
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  empty = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", empty),
+    LeanConstantsView("locals", LeanConstantMap(constants)),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+    LeanCtor(
+      LeanTag.ImportedConsts_mk,
+      Array[
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanTrackedConstants(LeanConstantsView("extra", empty)),
+      ],
+    ),
+  )
+}
+
+fun rewriteProbeState(
+  runtime: mutable LeanExecution,
+  environment: LeanValue,
+  localContext: LeanValue,
+  fileName: String,
+): RewriteProbeState {
+  metaContext = leanReplaceField(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(runtime),
+    3,
+    localContext,
+  );
+  metaStateRef = runtime.newRef(
+    L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(runtime),
+  );
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+  coreContext = leanUnboundedCoreContext(runtime, fileName, "");
+  RewriteProbeState(
+    runtime.checkpoint(),
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+  )
+}
+
+fun rewriteProbeCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  after = newRuntime.checkpoint();
+  if (native_eq(oldResult, newResult) != 0) {
+    leanFail("rewrite result mismatch: " + label)
+  };
+  if (native_eq(oldRuntime.checkpoint().refs, after.refs) != 0) {
+    leanFail("rewrite reference mismatch: " + label)
+  };
+  expected match {
+  | Some(value) ->
+    if (native_eq(newResult, value) != 0) {
+      leanFail("rewrite unexpected outcome: " + label)
+    }
+  | None() -> void
+  };
+  (newResult, after)
+}
+
+fun rewriteProbeCopyInput(value: LeanValue): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.map(rewriteProbeCopyInput))
+  | LeanArray(values) -> LeanArray(values.map(rewriteProbeCopyInput))
+  | _ -> value
+  }
+}

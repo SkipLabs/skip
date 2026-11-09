@@ -1,13 +1,5 @@
 // Compare parameter traversal results, reference state and immutable inputs.
 
-fun copySpec4Input(value: LeanValue): LeanValue {
-  value match {
-  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.map(copySpec4Input))
-  | LeanArray(values) -> LeanArray(values.map(copySpec4Input))
-  | _ -> value
-  }
-}
-
 fun spec4FVars(
   runtime: mutable LeanExecution,
   names: Array<LeanValue>,
@@ -79,8 +71,8 @@ fun checkSpec4Case(
   expectedCount: Int,
 ): Int {
   original = saved.restoreRaw();
-  initialPair = copySpec4Input(pairA);
-  initialFVars = copySpec4Input(fvarsA);
+  initialPair = rewriteProbeCopyInput(pairA);
+  initialFVars = rewriteProbeCopyInput(fvarsA);
   structured = saved.restoreRaw();
   for (_ in Range(0, 2)) {
     expected = spec4ProbeCall(
@@ -211,56 +203,17 @@ fun main(): void {
     LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
   );
 
-  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+  environment = rewriteProbeEnvironment(runtime, Map[]);
+  fixture = rewriteProbeState(
     runtime,
-    LeanErased(),
+    environment,
+    localContext,
+    "<funinfo-spec4-probe>",
   );
-  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
-    runtime,
-    LeanArray(Array[]),
-    leanField(extensions, 1),
-  );
-  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
-  assert(leanTag(generations) == LeanTag.EST_Out_ok);
-  environment = leanEnvironment(
-    runtime,
-    LeanConstantsView(
-      "imports",
-      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
-    ),
-    LeanConstantsView(
-      "locals",
-      LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
-    ),
-    leanEmptyEnvironmentHeader(),
-    leanField(extensions, 0),
-    leanField(generations, 0),
-    false,
-    LeanNatLiterals.n0,
-    LeanCtor(
-      LeanTag.ImportedConsts_mk,
-      Array[
-        LeanCtor(LeanTag.Option_none, Array[]),
-        LeanTrackedConstants(
-          LeanConstantsView(
-            "extra",
-            LeanConstantMap((Map[] : Map<String, LeanConstantFile>)),
-          ),
-        ),
-      ],
-    ),
-  );
-  coreContext = leanUnboundedCoreContext(runtime, "<funinfo-spec4-probe>", "");
-
-  defaultContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
-    runtime,
-  );
-  defaultState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
-    runtime,
-  );
-  metaContext = leanReplaceField(defaultContext, 3, localContext);
-  metaStateRef = runtime.newRef(defaultState);
-  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+  metaContext = fixture.metaContext;
+  metaStateRef = fixture.metaStateRef;
+  coreContext = fixture.coreContext;
+  coreStateRef = fixture.coreStateRef;
 
   inputs: mutable Vector<
     (String, LeanValue, Array<LeanValue>, Bool),
@@ -356,8 +309,8 @@ fun main(): void {
         leanNatValue(2),
         spec4FVars(runtime, names),
         spec4FVars(runtime, names),
-        copySpec4Input(seededPair),
-        copySpec4Input(seededPair),
+        rewriteProbeCopyInput(seededPair),
+        rewriteProbeCopyInput(seededPair),
         metaContext,
         metaStateRef,
         coreContext,

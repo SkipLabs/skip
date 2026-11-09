@@ -148,6 +148,22 @@ accepted output and review effort before increasing concurrency. The revised
 example-scoped estimate is 5–8 working days, including review and the final
 benchmark; the earlier 24–48 active-hour estimate underestimated validation work.
 
+The tools now exist: `tools/rewrite_task.py`, `tools/rewrite_integrate.py`, and
+`tests/Support/RewriteProbe.sk`, with `tools/probe.py --rewrite-harness` for the
+shared fixture. Thirty-three Python tests pass for packet creation, probe-only
+assignments, hash/ABI guards, preservation and rollback. The parameter traversal's
+22 checks still pass using the shared fixture. Integration and packet construction
+do not assert semantic correctness; roles with identical `LeanValue` types still
+need review. The skill's parallel-worker reference contains the commands.
+
+After the user asked about more workers, wave two started six Vibe instances:
+four rewrites (floating-literal candidate predicate, discrimination-tree prefix
+search, WHNF depth wrapper, dependency-collection entry) and two probe tasks
+(additional function-info cases and independent WHNF entry expectations).
+Packets range from about 27–51 KiB, roughly 7,000–13,000 tokens by byte estimate.
+Actual accepted throughput is still being measured; the ETA has not been reduced
+solely because tooling exists.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree

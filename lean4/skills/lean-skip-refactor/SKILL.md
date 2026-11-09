@@ -29,6 +29,9 @@ rewrite and completion criteria. For delegation, also read
 [parallel-workers.md](references/parallel-workers.md). The user permits at most
 ten Vibe instances; two peer Codex agents can review and coordinate alongside
 the primary. Task ownership and the single compiler queue remain explicit.
+Use the packet/integration tools and shared probe fixtures documented in that
+reference to avoid repeating extraction, fallback preservation and test setup.
+Those tools establish mechanical consistency, not semantic correctness.
 
 ## Make the result human-reviewable
 
