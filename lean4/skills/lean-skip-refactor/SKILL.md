@@ -33,6 +33,9 @@ the primary. Task ownership and the single compiler queue remain explicit.
 Use the packet/integration tools and shared probe fixtures documented in that
 reference to avoid repeating extraction, fallback preservation and test setup.
 Those tools establish mechanical consistency, not semantic correctness.
+For the fixed workload's observed-entry audit, follow
+[execution-coverage.md](references/execution-coverage.md). Diagnostic timings are
+never performance evidence, and unmarked helpers need separate inspection.
 
 ## Make the result human-reviewable
 

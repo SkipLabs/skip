@@ -1,0 +1,101 @@
+// Entry marks survive raw allocation regions and stop at an immutable snapshot.
+fun coverageInner(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  runtime.recordSimpPhase("__entry:inner", 0);
+  LeanCtor(LeanTag.EST_Out_ok, Array[args[1], leanNatValue(37)])
+}
+
+fun coverageRegionAction(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  mode = leanNat(args[0]).toInt();
+  runtime.recordSimpPhase("__entry:region", 0);
+  runtime.writeRef(args[2], Some(leanNatValue(mode + 1)));
+  if (mode == 2) throw RuntimeError("coverage-region-test");
+  if (mode == 3) return runtime.inRegion(coverageInner, args);
+  tag = if (mode == 0) LeanTag.EST_Out_ok else LeanTag.EST_Out_error;
+  LeanCtor(tag, Array[args[1], leanNatValue(37)])
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{profileSimpPhases => true};
+  ref = runtime.newRef(leanNatValue(0));
+  runtime.recordSimpPhase("setup", 1);
+  runtime.!simpPhaseNs = SortedMap::create();
+  runtime.recordSimpPhase("__entry:outer", 0);
+  saved = runtime.checkpoint();
+  error = LeanCtor(
+    LeanTag.Exception_error,
+    Array[
+      LeanCtor(LeanTag.Syntax_missing, Array[]),
+      LeanCtor(
+        LeanTag.MessageData_ofFormatWithInfos,
+        Array[
+          LeanCtor(
+            LeanTag.FormatWithInfos_mk,
+            Array[
+              LeanCtor(
+                LeanTag.Std_Format_text,
+                Array[LeanText("coverage error")],
+              ),
+              LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]),
+            ],
+          ),
+        ],
+      ),
+    ],
+  );
+  for (mode in Range(0, 4)) {
+    current = saved.restoreRaw();
+    payload: LeanValue = if (mode == 1) error else leanNatValue(42);
+    caught = try {
+      result = current.inRegion(
+        coverageRegionAction,
+        Array[leanNatValue(mode), payload, ref],
+      );
+      assert(mode != 2);
+      expectedTag = if (mode == 1) LeanTag.EST_Out_error else {
+        LeanTag.EST_Out_ok
+      };
+      assert(leanTag(result) == expectedTag);
+      assert(native_eq(leanField(result, 0), payload) == 0);
+      assert(leanNat(leanField(result, 1)).toInt() == 37);
+      false
+    } catch {
+    | RuntimeError(message) ->
+      assert(mode == 2 && message == "coverage-region-test");
+      true
+    | other -> throw other
+    };
+    assert(caught == (mode == 2));
+    assert(current.profileSimpPhases);
+    assert(current.simpPhaseNs.maybeGet("__entry:outer") == Some(0));
+    assert(current.simpPhaseNs.maybeGet("__entry:region") == Some(0));
+    assert(current.simpPhaseNs.maybeGet("setup").isNone());
+    assert(leanNat(current.readRef(ref)).toInt() == mode + 1);
+    expectedRegions = if (mode == 3) 2 else 1;
+    assert(current.regionCount == expectedRegions);
+    if (mode == 3) {
+      assert(current.simpPhaseNs.maybeGet("__entry:inner") == Some(0))
+    };
+    captured = current.simpPhaseNs;
+    current.recordSimpPhase("__entry:outside", 0);
+    assert(captured.maybeGet("__entry:outside").isNone());
+    assert(current.simpPhaseNs.maybeGet("__entry:outside") == Some(0));
+    restored = current.checkpoint().restoreRaw();
+    assert(restored.simpPhaseNs.maybeGet("__entry:region") == Some(0))
+  };
+  assert(runtime.simpPhaseNs.maybeGet("__entry:region").isNone());
+  assert(leanNat(runtime.readRef(ref)).toInt() == 0);
+  disabled = mutable LeanExecution{};
+  disabledRef = disabled.newRef(leanNatValue(0));
+  _ = disabled.inRegion(
+    coverageRegionAction,
+    Array[leanNatValue(0), leanNatValue(42), disabledRef],
+  );
+  assert(disabled.simpPhaseNs.size() == 0);
+  print_string("entry coverage region retention passed\n")
+}

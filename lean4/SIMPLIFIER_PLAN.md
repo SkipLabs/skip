@@ -12,7 +12,7 @@ Current provider limits take precedence: all parallel Vibe runs and a subsequent
 single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
 Codex/local work continues. Any later Vibe run is limited to one worker with
 automatic API retries disabled and a coordinator-managed cooldown.
-The first three implementation pilots are integrated and pass focused checks.
+The first four rewrite batches are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
@@ -138,6 +138,23 @@ also pass. [Wave four](provenance/rewrite-batches/2026-11-09-wave-04.json) recor
 the retained-body audit and remaining interface/fixture limits. The separate
 coverage executable predates this batch; its observed entries identify the
 earlier body hashes, while these replacements have focused validation only.
+
+The diagnostic coverage run completes the 36-case frozen matrix at depths
+0, 1, 2 and 6. It observes 1,225 function entries; 28 proofs pass the native
+kernel against the imported `Goal`, and eight invalid cases report the exact
+expected failure without producing a proof. Native imports are rebuilt privately
+from the frozen Lean source. [The coverage record](provenance/rewrite-execution-coverage.json)
+binds per-case entries, body/input hashes and executable/snapshot identities.
+The 212 unmarked declarations and static call/closure frontier still need review.
+No diagnostic timing is used as performance evidence.
+
+`tools/rewrite_coverage.py` prepares the separate source copy, and
+`tools/run_rewrite_coverage.py` validates and runs it. Distinct package and binary
+names permit shared dependency artifacts without replacing production outputs.
+The diagnostic release check/build passed under the 44 GiB guard. Forty-one
+Python tooling tests and the raw-region retention probe pass. The optional native
+checker `--type-const Goal` accepts the existing Skip proof and rejects an
+unrelated valid proof; its legacy document-type mode remains available.
 
 Use `skargo check` while editing and a measurement release build after the example
 path rewrite type-checks and focused checks pass. `skargo check --release` checks the release

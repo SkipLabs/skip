@@ -103,12 +103,16 @@ def decode (source : String) : Except String (Array DefinitionVal × Expr × Exp
 end SkipProof
 
 def main (args : List String) : IO UInt32 := do
-  let (path, moduleName, jsonOutput) ← match args with
-    | [path] => pure (path, `Init, false)
-    | [path, "--json"] => pure (path, `Init, true)
-    | [path, "--import", name] => pure (path, name.toName, false)
-    | [path, "--import", name, "--json"] => pure (path, name.toName, true)
-    | _ => throw <| IO.userError "usage: CheckProof.lean proof.json [--import MODULE] [--json]"
+  let (path, moduleName, jsonOutput, typeConstant?) ← match args with
+    | [path] => pure (path, `Init, false, none)
+    | [path, "--json"] => pure (path, `Init, true, none)
+    | [path, "--import", name] => pure (path, name.toName, false, none)
+    | [path, "--import", name, "--json"] => pure (path, name.toName, true, none)
+    | [path, "--import", name, "--type-const", target] =>
+      pure (path, name.toName, false, some target.toName)
+    | [path, "--import", name, "--type-const", target, "--json"] =>
+      pure (path, name.toName, true, some target.toName)
+    | _ => throw <| IO.userError "usage: CheckProof.lean proof.json [--import MODULE [--type-const NAME]] [--json]"
   let start ← IO.monoNanosNow
   let (definitions, type, value) ← match SkipProof.decode (← IO.FS.readFile path) with
     | .ok result => pure result
@@ -119,6 +123,9 @@ def main (args : List String) : IO UInt32 := do
   let beginImport ← IO.monoNanosNow
   initSearchPath (← findSysroot)
   let mut env ← importModules #[{ module := moduleName }] {} (leakEnv := true)
+  if let some target := typeConstant? then
+    unless env.contains target do
+      throw <| IO.userError s!"requested type constant {target} is not in the imported environment"
   let importNs := (← IO.monoNanosNow) - beginImport
   let beginKernel ← IO.monoNanosNow
   for definition in definitions do
@@ -127,13 +134,15 @@ def main (args : List String) : IO UInt32 := do
     | .error _ =>
       IO.eprintln s!"Native Lean kernel rejected local definition {definition.name}"
       return 1
-  let decl := Declaration.thmDecl { name := `_skip_checked_result, levelParams := [], type, value }
+  let checkedType := typeConstant?.map mkConst |>.getD type
+  let decl := Declaration.thmDecl { name := `_skip_checked_result, levelParams := [], type := checkedType, value }
   let checked := env.addDeclCore 0 100000 decl none (doCheck := true)
   let accepted := checked matches .ok _
   let kernelNs := (← IO.monoNanosNow) - beginKernel
   if jsonOutput then
     IO.println <| (Json.mkObj [
-      ("accepted", toJson accepted), ("decodeNs", toJson decodeNs),
+      ("accepted", toJson accepted), ("typeConstant", toJson (typeConstant?.map Name.toString)),
+      ("decodeNs", toJson decodeNs),
       ("importNs", toJson importNs), ("kernelNs", toJson kernelNs)]).compress
   else if accepted then IO.println "Native Lean kernel accepted the Skip-produced proof"
   else IO.eprintln "Native Lean kernel rejected the Skip-produced proof"

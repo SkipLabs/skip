@@ -59,6 +59,14 @@ list, ownership groups, evidence, and source hashes. The profile predates some
 rewrites. Sampling misses short or inlined calls and is not complete coverage;
 the 85 candidates are not a promise that only 85 routines remain.
 
+The separate diagnostic run now records 1,225 function entries across all 36
+frozen cases. All 28 successful proofs pass the native kernel against the
+imported `Goal`; all eight broken cases produce the expected simplification
+failure and no proof. [Execution coverage](provenance/rewrite-execution-coverage.json)
+records body hashes, per-case entries, build/snapshot identities and 212 unmarked
+declarations. Static frontier review and reconciliation with newer bodies remain
+open; an observed entry is not a branch-coverage or rewrite-completion claim.
+
 Before declaring the example's path complete:
 
 1. Reconcile sampled identities with current routing and retained fallbacks.
