@@ -6,8 +6,9 @@ baseline. Keep the native kernel unchanged and concentrate on elaboration.
 
 ## Current priority: raw execution (2026-11-09)
 
-The user has authorized up to ten Vibe workers and two peer agents using the
-primary model for review/coordination. The user has now asked to execute the written plan and to commit periodically.
+The user has reassigned both peer agents to implementation: unfolding/WHNF and
+key-ordering/dependency helpers. The primary independently reviews and integrates
+their patches and owns the single compiler queue. Periodic commits are authorized.
 Current provider limits take precedence: all parallel Vibe runs and a subsequent
 single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
 Codex/local work continues. Any later Vibe run is limited to one worker with
@@ -17,10 +18,11 @@ Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
 [rewrite-inventory.json](provenance/rewrite-inventory.json) preserves the sampled
-seed inventory. Its 85 initial frame candidates are not complete execution
-coverage. The revised estimate is about 5–8 working days for the example-scoped
-rewrite, review and final benchmark. The original 24–48 active-hour estimate was
-optimistic: stateful fixture coverage and review cost more than draft production.
+seed and the full observed-entry inventory. There are 185 remaining frame routines
+(73 seed and 112 newly observed); other entries need explicit dispositions, not
+automatic conversion. The previous 5–8 working-day estimate predates this scope
+reconciliation and provider limits. Re-estimate from accepted batches under the
+two-writer allocation; the earlier 24–48 active-hour estimate was optimistic.
 The second batch used compact task packets, guarded integration and shared
 probe fixtures to reduce repeated mechanical work. This does not invoke the
 historical transpiler or change Skip's compiler/runtime.
@@ -46,8 +48,8 @@ measurement release build until that path is converted. Do not stop after each
 helper to measure a partially converted path. Only a representative converted execution path can test
 whether this is sufficient for parity; a single helper cannot. Document module
 ownership, interface invariants and checks so the work can later be delegated.
-The prior three-worker batch is validated below. The new mixed-model workflow
-has two peer review leads and up to ten Vibe instances; the primary retains
+The prior three-worker batch is validated below. The current workflow has two
+Codex implementation owners; the primary retains independent review,
 integration and the single compiler queue. Worker completion alone is not
 validation. Code must also pass a human readability review, with light comments
 and high-level documentation only where useful.
@@ -145,7 +147,11 @@ kernel against the imported `Goal`, and eight invalid cases report the exact
 expected failure without producing a proof. Native imports are rebuilt privately
 from the frozen Lean source. [The coverage record](provenance/rewrite-execution-coverage.json)
 binds per-case entries, body/input hashes and executable/snapshot identities.
-The 212 unmarked declarations and static call/closure frontier still need review.
+The [static frontier audit](provenance/rewrite-static-frontier.md) classifies
+unmarked dependencies, implicit methods and conditional closure/primitive calls.
+These are qualified static evidence, not additional observed entries or completed
+typed-interface conversions. The inventory reconciles all observed identities;
+the two wave-four replacements postdate this coverage snapshot.
 No diagnostic timing is used as performance evidence.
 
 `tools/rewrite_coverage.py` prepares the separate source copy, and

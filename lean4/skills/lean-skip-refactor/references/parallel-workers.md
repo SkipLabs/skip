@@ -1,6 +1,6 @@
 # Parallel rewrite workers
 
-Read this when coordinating or reviewing external Vibe workers for this port.
+Read this when coordinating Codex or external Vibe workers for this port.
 The coordinator reads the active allocation and scope in `REWRITE_PLAN.md` and
 `SIMPLIFIER_PLAN.md`, three directories above this reference. Worker packets
 contain the relevant constraints and task-specific contracts; they need not copy
@@ -9,9 +9,12 @@ the entire plans or follow links outside their assigned directory.
 ## Roles and limits
 
 The user permits up to ten Vibe instances concurrently. Count writers, reviewers,
-probe authors and retries in that same limit. Two Codex peers using the primary
-model may review semantic work concurrently. The primary Codex coordinator owns production edits,
-interface decisions, source manifests and the single compiler queue. Delegation
+probe authors and retries in that same limit. Both Codex peers now own disjoint
+implementation tasks at the user's request. The primary supplies independent
+semantic/readability review and owns production edits, interface decisions,
+source manifests and the single compiler queue. Let the writers continue their
+next bounded tasks while the primary validates a handoff. Do not assign both to
+general audits while conversion waits. Delegation
 does not authorize workers to message third parties or publish changes.
 
 Current operating limit is **one Vibe worker at a time**: wave two encountered
@@ -181,8 +184,9 @@ runtime behavior. Unsupported paths remain explicit failure checks.
 
 ## Integration and completion
 
-An independent peer reviews the patch against the original and records concrete
-findings. The primary checks its source hashes, resolves conflicts and applies it.
+An independent reviewer (normally the primary for peer-authored code) reviews
+the patch against the original and records concrete findings. The primary checks
+its source hashes, resolves conflicts and applies it.
 A stale hash requires reconciliation; do not automatically apply an old patch over
 new source. Update manifests and original-name provenance once, centrally.
 

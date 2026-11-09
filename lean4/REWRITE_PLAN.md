@@ -1,4 +1,4 @@
-# Rewrite the measured example with Vibe workers
+# Rewrite the measured example in parallel
 
 ## Scope and result
 
@@ -64,8 +64,14 @@ frozen cases. All 28 successful proofs pass the native kernel against the
 imported `Goal`; all eight broken cases produce the expected simplification
 failure and no proof. [Execution coverage](provenance/rewrite-execution-coverage.json)
 records body hashes, per-case entries, build/snapshot identities and 212 unmarked
-declarations. Static frontier review and reconciliation with newer bodies remain
-open; an observed entry is not a branch-coverage or rewrite-completion claim.
+declarations. Reconciliation finds 185 remaining frame routines: 73 from the seed
+and 112 newly observed, totaling 85,566 old body lines. The other observed entries
+need dispositions, not automatic rewrites. Only the wave-four cache and forward
+dependency bodies changed after the snapshot. Their focused checks do not turn
+the earlier observations into coverage of their replacement branches.
+The [static frontier audit](provenance/rewrite-static-frontier.md) identifies
+unmarked dependencies and distinguishes them from conditional candidates.
+An observed entry is not a branch-coverage or rewrite-completion claim.
 
 Before declaring the example's path complete:
 
@@ -90,25 +96,24 @@ Before declaring the example's path complete:
 
 ## People, processes and ownership
 
-The user authorizes **at most ten concurrent Vibe instances**. Two additional
-Codex agents using the primary agent's model provide parallel semantic review
-and coordination; the primary agent owns final integration and user updates.
-This session permits four concurrent built-in agents including the primary;
-the proposed primary plus two reviewers fits that limit.
+The user has reassigned both Codex peers from standing review roles to
+implementation. The current team is two writers plus the primary, within this
+session's four-agent limit. Vibe remains stopped after provider quota failures;
+the earlier ten-instance authorization does not override those limits.
 
-- Primary: source/interface contracts, task queue, integration, manifests,
-  compiler access, final validation and reporting.
-- Review lead A: reduction, equality, inference, and expression/state semantics.
-- Review lead B: simplifier, lookup, environment behavior and validation coverage.
-- Vibe: initially three bounded implementation tasks; scale toward eight writers
-  after reviewed output and behavioral checks establish useful throughput.
-  The other two slots can prepare probes, perform independent reviews, or take
-  additional disjoint tasks when the review queue permits.
+- Primary: independent semantic/readability review, source/interface contracts,
+  integration, manifests, the single compiler queue, final validation and updates.
+- Implementation owner A (`rewrite_execution_lead`): unfolding eligibility
+  (`canUnfoldDefault`, `getUnfoldableConstNoEx`), then uncached WHNF.
+- Implementation owner B (`rewrite_semantics_lead`): discrimination-tree key
+  ordering, then function-info dependency sorting.
 
-The two review leads use the same model as the primary agent, with focused task
-context. They can own difficult rewrites as well as reviews, but cannot review
-their own implementation as the independent reviewer. All three can inspect
-code concurrently. One owner runs compiler jobs and applies production edits.
+Each writer supplies source and executable probes from frozen current inputs in
+a private task directory. The primary reviews and integrates one batch while
+the writers continue disjoint work. Writers do not independently approve their
+own changes. Request a bounded second opinion only when a concrete semantic
+question warrants it; do not reserve either writer for general audit work.
+Keep at most two completed drafts waiting per writer and four in total.
 
 The following are ownership lanes, not eight simultaneous monolithic rewrites.
 Give a worker one function or a small mutually recursive group at a time. Rebalance
@@ -350,7 +355,14 @@ its later first-run target remains at most twice the raw baseline.
 
 ## Scheduling estimate
 
-Planning range: **24–48 hours of active elapsed work**, approximately three to
+The original estimate below and the later 5–8 working-day pilot estimate predate
+the complete execution inventory and the provider quota failures. Neither is a
+current completion promise. The new inventory contains 112 additional frame
+routines, mostly already present in depth-0 execution. Re-estimate coherent
+families from accepted throughput under the two-writer allocation; source-line
+counts and twice as many candidates do not imply a proportional duration.
+
+Original planning range: **24–48 hours of active elapsed work**, approximately three to
 six eight-hour working days, using Vibe workers plus two parallel review leads.
 This is not measured Vibe throughput and does not assume tenfold acceleration.
 The connectivity and read-only review trials establish headless execution,

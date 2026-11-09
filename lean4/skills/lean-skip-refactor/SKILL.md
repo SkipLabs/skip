@@ -28,8 +28,10 @@ Read [REWRITE_PLAN.md](../../REWRITE_PLAN.md) for the current example-scoped
 rewrite and completion criteria. For delegation, also read
 [parallel-workers.md](references/parallel-workers.md). The user permits at most
 ten Vibe instances, subject to provider quotas; current quota failures have
-stopped Vibe launches. Two peer Codex agents can review and coordinate alongside
-the primary. Task ownership and the single compiler queue remain explicit.
+stopped Vibe launches. The user has assigned both peer Codex agents to conversion;
+the primary independently reviews and integrates their code and owns the single
+compiler queue. Keep their tasks disjoint and let drafting overlap validation.
+Do not keep both peers in standing review/audit roles while implementation waits.
 Use the packet/integration tools and shared probe fixtures documented in that
 reference to avoid repeating extraction, fallback preservation and test setup.
 Those tools establish mechanical consistency, not semantic correctness.
