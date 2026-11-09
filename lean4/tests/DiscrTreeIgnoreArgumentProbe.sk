@@ -1,0 +1,529 @@
+// FunInfo-derived binders, independent filtering outcomes, and short-circuit effects.
+fun ignoreArgAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun ignoreArgInfoArray(values: Array<LeanValue>, form: Int): LeanValue {
+  if (form == 1) {
+    return LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(values).chill(),
+    )
+  };
+  if (form == 2) return LeanArrayOverride(LeanArray(values), 15, values[6]);
+  LeanArray(values)
+}
+
+fun ignoreArgInputUnchanged(before: LeanValue, after: LeanValue): Bool {
+  (before, after) match {
+  | (
+    LeanArrayOverride(oldBase, oldIndex, oldEntry),
+    LeanArrayOverride(newBase, newIndex, newEntry),
+  ) ->
+    oldIndex == newIndex &&
+      rewriteProbeSameInput(oldBase, newBase) &&
+      rewriteProbeSameInput(oldEntry, newEntry)
+  | _ -> rewriteProbeSameInput(before, after)
+  }
+}
+
+fun ignoreArgCopyInfo(value: LeanValue): LeanValue {
+  value match {
+  | LeanArrayOverride(base, index, entry) ->
+    LeanArrayOverride(
+      rewriteProbeCopyInput(base),
+      index,
+      rewriteProbeCopyInput(entry),
+    )
+  | _ -> rewriteProbeCopyInput(value)
+  }
+}
+
+fun ignoreArgCheck(
+  label: String,
+  state: RewriteProbeState,
+  saved: LeanExecutionCheckpoint,
+  argument: LeanValue,
+  position: LeanValue,
+  infos: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: ?Bool,
+  unchangedRefs: Bool = false,
+): LeanExecutionCheckpoint {
+  oldArgument = rewriteProbeCopyInput(argument);
+  newArgument = rewriteProbeCopyInput(argument);
+  oldInfo = ignoreArgCopyInfo(infos);
+  newInfo = ignoreArgCopyInfo(infos);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_ignoreArg_7a19174686_fallback(
+        runtime,
+        oldArgument,
+        position,
+        oldInfo,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(argument, oldArgument));
+      assert(ignoreArgInputUnchanged(infos, oldInfo));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_ignoreArg_7a19174686(
+        runtime,
+        newArgument,
+        position,
+        newInfo,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(argument, newArgument));
+      assert(ignoreArgInputUnchanged(infos, newInfo));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  );
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  expected match {
+  | Some(ignored) ->
+    if (leanTag(result) != LeanTag.EST_Out_ok) {
+      leanFail("ignoreArg expected success: " + label)
+    };
+    if (!rewriteProbeSameInput(leanField(result, 0), leanBool(ignored))) {
+      leanFail("ignoreArg unexpected filtering: " + label)
+    }
+  | None() ->
+    if (leanTag(result) != LeanTag.EST_Out_error) {
+      leanFail("ignoreArg expected failure: " + label)
+    };
+    assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error)
+  };
+  if (unchangedRefs) assert(native_eq(saved.refs, after.refs) == 0);
+  after
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    constant = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, id, nil);
+    variable = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, id);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+        builder,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      ),
+    );
+    aName = name("IgnoreArgA");
+    pName = name("IgnoreArgP");
+    className = name("IgnoreArgClass");
+    a = constant(aName);
+    p = constant(pName);
+    classType = constant(className);
+    domains = Array[
+      (a, LeanTag.BinderInfo_default),
+      (p, LeanTag.BinderInfo_default),
+      (type, LeanTag.BinderInfo_implicit),
+      (type, LeanTag.BinderInfo_strictImplicit),
+      (a, LeanTag.BinderInfo_implicit),
+      (a, LeanTag.BinderInfo_strictImplicit),
+      (classType, LeanTag.BinderInfo_instImplicit),
+      (classType, LeanTag.BinderInfo_implicit),
+      (classType, LeanTag.BinderInfo_strictImplicit),
+      (classType, LeanTag.BinderInfo_default),
+      (a, LeanTag.BinderInfo_instImplicit),
+      (p, LeanTag.BinderInfo_instImplicit),
+      (p, LeanTag.BinderInfo_implicit),
+      (p, LeanTag.BinderInfo_strictImplicit),
+      (type, LeanTag.BinderInfo_default),
+      (type, LeanTag.BinderInfo_implicit),
+    ];
+    fnType = a;
+    for (offset in Range(0, domains.size())) {
+      (domain, binder) = domains[domains.size() - offset - 1];
+      !fnType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        builder,
+        name("arg" + offset.toString()),
+        LeanCtor(binder, Array[]),
+        domain,
+        fnType,
+      )
+    };
+    fnName = name("ignoreArgFn");
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      ignoreArgAxiom(aName, type),
+      ignoreArgAxiom(pName, prop),
+      ignoreArgAxiom(className, type),
+      ignoreArgAxiom(fnName, fnType),
+    ]) {
+      id = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(id), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(
+      builder,
+      environment,
+      className,
+    );
+    assert(leanTag(registered) == LeanTag.Except_ok);
+    !environment = leanField(registered, 0);
+    assert(
+      leanIsTrue(
+        L4_Lean_Class.f_Lean_isClass_8bc2d27716(
+          builder,
+          environment,
+          className,
+        ),
+      ),
+    );
+    xName = name("ignoreArgX");
+    proofName = name("ignoreArgProof");
+    instanceName = name("ignoreArgInstance");
+    missingName = name("ignoreArgMissing");
+    badName = name("ignoreArgBadType");
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((id, localType) in Array[
+      (xName, a),
+      (proofName, p),
+      (instanceName, classType),
+      (badName, constant(missingName)),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        id,
+        id,
+        localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(builder, environment, locals, "<ignore-arg>");
+    initialMetaState = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMetaState, 0);
+    dataMVarName = name("ignoreArgDataMVar");
+    proofMVarName = name("ignoreArgProofMVar");
+    typeMVarName = name("ignoreArgTypeMVar");
+    for ((id, mType) in Array[
+      (dataMVarName, a),
+      (proofMVarName, p),
+      (typeMVarName, type),
+    ]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        builder,
+        mctx,
+        id,
+        id,
+        locals,
+        LeanArray(Array[]),
+        mType,
+        LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+        LeanNatLiterals.n0,
+      )
+    };
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(initialMetaState, 0, mctx)),
+    );
+    generated = L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfoNArgs_67bc938efe(
+      builder,
+      constant(fnName),
+      leanNatValue(16),
+      state.metaContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      leanNatValue(37),
+    );
+    assert(leanTag(generated) == LeanTag.EST_Out_ok);
+    assert(leanTag(leanField(generated, 0)) == LeanTag.Meta_FunInfo_mk);
+    infoValues = leanArray(leanField(leanField(generated, 0), 0));
+    assert(infoValues.size() == 16);
+    for (i in Range(0, infoValues.size())) {
+      assert(leanTag(leanField(infoValues[i], 0)) == domains[i].i1);
+      assert(leanIsTrue(leanField(infoValues[i], 5)) == (i >= 6 && i <= 8))
+    };
+    saved = builder.checkpoint();
+    x = variable(xName);
+    proof = variable(proofName);
+    instance = variable(instanceName);
+    arguments = Array[
+      x,
+      proof,
+      a,
+      a,
+      x,
+      x,
+      instance,
+      instance,
+      instance,
+      instance,
+      x,
+      proof,
+      proof,
+      proof,
+      a,
+      prop,
+    ];
+    ignored = Array[
+      false,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ];
+    for (world in Array[LeanErased(), leanNatValue(37)]) {
+      for (form in Range(0, 3)) {
+        infos = ignoreArgInfoArray(infoValues, form);
+        for (i in Range(0, arguments.size())) {
+          expected = ignored[i] || (form == 2 && i == 15);
+          for (position in Array[
+            leanNatValue(i),
+            LeanScalar("nat", i.toString()),
+          ]) {
+            warm = ignoreArgCheck(
+              "FunInfo binder",
+              state,
+              saved,
+              arguments[i],
+              position,
+              infos,
+              state.metaContext,
+              state.coreContext,
+              world,
+              Some(expected),
+              i >= 6 && i <= 8,
+            );
+            _ = ignoreArgCheck(
+              "warm FunInfo binder",
+              state,
+              warm,
+              arguments[i],
+              position,
+              infos,
+              state.metaContext,
+              state.coreContext,
+              world,
+              Some(expected),
+              i >= 6 && i <= 8,
+            );
+            !count = count + 2
+          }
+        };
+        for ((id, proofExpected, typeExpected) in Array[
+          (dataMVarName, false, false),
+          (proofMVarName, true, false),
+          (typeMVarName, false, true),
+        ]) {
+          expression = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, id);
+          for ((position, expected) in Array[
+            (0, proofExpected),
+            (2, !typeExpected),
+            (3, !typeExpected),
+          ]) {
+            _ = ignoreArgCheck(
+              "declared metavariable",
+              state,
+              saved,
+              expression,
+              leanNatValue(position),
+              infos,
+              state.metaContext,
+              state.coreContext,
+              world,
+              Some(expected),
+            );
+            !count = count + 1
+          }
+        };
+        for (position in Array[
+          leanNatValue(16),
+          leanNatValue(17),
+          LeanScalar("nat", "340282366920938463463374607431768211456"),
+          leanBoxNat(LeanNat::parse("340282366920938463463374607431768211456")),
+        ]) {
+          for ((expression, expected) in Array[
+            (x, false),
+            (proof, true),
+            (a, false),
+            (prop, false),
+            (instance, false),
+          ]) {
+            _ = ignoreArgCheck(
+              "out of range uses proof test",
+              state,
+              saved,
+              expression,
+              position,
+              infos,
+              state.metaContext,
+              state.coreContext,
+              world,
+              Some(expected),
+            );
+            !count = count + 1
+          }
+        };
+        for (position in Array[0, 2, 3, 10, 16]) {
+          for (expression in Array[
+            variable(missingName),
+            constant(missingName),
+          ]) {
+            _ = ignoreArgCheck(
+              "selected predicate lookup error",
+              state,
+              saved,
+              expression,
+              leanNatValue(position),
+              infos,
+              state.metaContext,
+              state.coreContext,
+              world,
+              None(),
+            );
+            !count = count + 1
+          }
+        };
+        for (position in Array[0, 10, 16]) {
+          _ = ignoreArgCheck(
+            "error in argument's declared type",
+            state,
+            saved,
+            variable(badName),
+            leanNatValue(position),
+            infos,
+            state.metaContext,
+            state.coreContext,
+            world,
+            None(),
+          );
+          !count = count + 1
+        };
+        unavailable = LeanUnavailable(
+          "instance branch must not inspect argument or contexts",
+        );
+        for (position in Array[6, 7, 8]) {
+          _ = ignoreArgCheck(
+            "instance before type lookup",
+            state,
+            saved,
+            unavailable,
+            leanNatValue(position),
+            infos,
+            unavailable,
+            unavailable,
+            world,
+            Some(true),
+            true,
+          );
+          !count = count + 1
+        }
+      };
+      for (infos in Array[
+        LeanArray(Array[]),
+        LeanPersistentArray(
+          Persistent.RadixTreeVector::mcreateFromItems(
+            (Array[] : Array<LeanValue>),
+          ).chill(),
+        ),
+      ]) {
+        for ((expression, expected) in Array[
+          (x, false),
+          (proof, true),
+          (a, false),
+        ]) {
+          _ = ignoreArgCheck(
+            "empty parameter info",
+            state,
+            saved,
+            expression,
+            LeanNatLiterals.n0,
+            infos,
+            state.metaContext,
+            state.coreContext,
+            world,
+            Some(expected),
+          );
+          !count = count + 1
+        }
+      };
+      poisonInfo = LeanArray(
+        Array[LeanUnavailable("out-of-range lookup must not read entries")],
+      );
+      _ = ignoreArgCheck(
+        "large position leaves entries untouched",
+        state,
+        saved,
+        proof,
+        LeanScalar("nat", "18446744073709551616"),
+        poisonInfo,
+        state.metaContext,
+        state.coreContext,
+        world,
+        Some(true),
+      );
+      !count = count + 1
+    }
+  };
+  assert(count == 1336);
+  print_string("ignoreArg comparisons: " + count.toString() + "\n")
+}

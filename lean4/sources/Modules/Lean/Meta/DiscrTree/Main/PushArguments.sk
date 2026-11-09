@@ -1,0 +1,280 @@
+// Select an indexing key and append its filtered arguments to the traversal stack.
+module L4_Lean_Meta_DiscrTree_Main;
+
+fun f_pushArgsResult(
+  key: LeanValue,
+  pending: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Prod_mk, Array[key, pending]), world],
+  )
+}
+
+// "_private.Lean.Meta.DiscrTree.Main.0.Lean.Meta.DiscrTree.pushArgs"
+fun f_Meta_DiscrTree_pushArgs_3739c772a5(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+  pending: LeanValue,
+  expression: LeanValue,
+  noIndexAtArgs: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  annotation = L4_Lean_Meta_DiscrTree_Basic.f_Meta_DiscrTree_hasNoindexAnnotation_83b9658d95(
+    runtime,
+    expression,
+  );
+  leanTag(annotation) match {
+  | LeanTag.Bool_true ->
+    return f_pushArgsResult(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+      pending,
+      world,
+    )
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  reduced = f_Meta_DiscrTree_reduceDT_9eb01806dc(
+    runtime,
+    expression,
+    root,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+  if (leanTag(reduced) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  value = leanField(reduced, 0);
+  reducedWorld = leanField(reduced, 1);
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, value);
+  prepared: (LeanValue, LeanValue, LeanValue, LeanValue) = leanTag(head) match {
+  | LeanTag.Expr_lit__impl ->
+    return f_pushArgsResult(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[leanField(head, 1)]),
+      pending,
+      reducedWorld,
+    )
+  | LeanTag.Expr_const__impl ->
+    name = leanField(head, 1);
+    currentWorld = reducedWorld;
+    if (!leanIsTrue(root)) {
+      numeral = f_Meta_DiscrTree_toNatLit_7d849234a0(runtime, value);
+      if (leanTag(numeral) == LeanTag.Option_some) {
+        return f_pushArgsResult(
+          LeanCtor(
+            LeanTag.Meta_DiscrTree_Key_lit,
+            Array[leanField(numeral, 0)],
+          ),
+          pending,
+          currentWorld,
+        )
+      };
+      offset = f_Meta_DiscrTree_isOffset_ea967cc398(
+        runtime,
+        name,
+        value,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      );
+      if (leanTag(offset) == LeanTag.EST_Out_error) return offset;
+      if (leanTag(offset) != LeanTag.EST_Out_ok) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      !currentWorld = leanField(offset, 1);
+      leanTag(leanField(offset, 0)) match {
+      | LeanTag.Bool_true ->
+        return f_pushArgsResult(
+          LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+          pending,
+          currentWorld,
+        )
+      | LeanTag.Bool_false -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    };
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    (
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_const, Array[name, arity]),
+      arity,
+      pending,
+      currentWorld,
+    )
+  | LeanTag.Expr_proj__impl ->
+    name = leanField(head, 1);
+    coreRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      coreStateRef,
+      reducedWorld,
+    );
+    if (leanTag(coreRead) != LeanTag.ST_Out_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    coreState = leanField(coreRead, 0);
+    if (leanTag(coreState) != LeanTag.Core_State_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    classResult = L4_Lean_Class.f_Lean_isClass_8bc2d27716(
+      runtime,
+      leanField(coreState, 0),
+      name,
+    );
+    base = leanTag(classResult) match {
+    | LeanTag.Bool_false -> leanField(head, 3)
+    | LeanTag.Bool_true ->
+      L4_Lean_Meta_DiscrTree_Basic.f_Meta_DiscrTree_mkNoindexAnnotation_07e6ca2f5a(
+        runtime,
+        leanField(head, 3),
+      )
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    key = LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_proj,
+      Array[name, leanField(head, 2), arity],
+    );
+    withBase = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+      runtime,
+      LeanErased(),
+      pending,
+      base,
+    );
+    (key, arity, withBase, leanField(coreRead, 1))
+  | LeanTag.Expr_fvar__impl ->
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    (
+      LeanCtor(
+        LeanTag.Meta_DiscrTree_Key_fvar,
+        Array[leanField(head, 1), arity],
+      ),
+      arity,
+      pending,
+      reducedWorld,
+    )
+  | LeanTag.Expr_mvar__impl ->
+    id = leanField(head, 1);
+    temporary = L4_Lean_Expr.f_Lean_instBEqMVarId_beq_fc799f33a5(
+      runtime,
+      id,
+      f_Meta_DiscrTree_tmpMVarId_0c66a20616(runtime),
+    );
+    leanTag(temporary) match {
+    | LeanTag.Bool_true ->
+      return f_pushArgsResult(
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+        pending,
+        reducedWorld,
+      )
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    readOnlyResult = L4_Lean_Meta_Basic.f_Lean_MVarId_isReadOnlyOrSyntheticOpaque_763f632737(
+      runtime,
+      id,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      reducedWorld,
+    );
+    if (leanTag(readOnlyResult) == LeanTag.EST_Out_error) return readOnlyResult;
+    if (leanTag(readOnlyResult) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    keyKind = leanTag(leanField(readOnlyResult, 0)) match {
+    | LeanTag.Bool_true -> LeanTag.Meta_DiscrTree_Key_other
+    | LeanTag.Bool_false -> LeanTag.Meta_DiscrTree_Key_star
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    return f_pushArgsResult(
+      LeanCtor(keyKind, Array[]),
+      pending,
+      leanField(readOnlyResult, 1),
+    )
+  | LeanTag.Expr_forallE__impl ->
+    withDomain = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+      runtime,
+      LeanErased(),
+      pending,
+      leanField(head, 2),
+    );
+    return f_pushArgsResult(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+      withDomain,
+      reducedWorld,
+    )
+  | _ ->
+    return f_pushArgsResult(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]),
+      pending,
+      reducedWorld,
+    )
+  };
+  (key, arity, nextPending, headWorld) = prepared;
+  infoResult = L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfoNArgs_67bc938efe(
+    runtime,
+    head,
+    arity,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    headWorld,
+  );
+  if (leanTag(infoResult) == LeanTag.EST_Out_error) return infoResult;
+  if (leanTag(infoResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  infoWorld = leanField(infoResult, 1);
+  leanTag(noIndexAtArgs) match {
+  | LeanTag.Bool_true ->
+    f_pushArgsResult(
+      key,
+      f_Meta_DiscrTree_pushWildcards_388436220b(runtime, arity, nextPending),
+      infoWorld,
+    )
+  | LeanTag.Bool_false ->
+    info = leanField(infoResult, 0);
+    if (leanTag(info) != LeanTag.Meta_FunInfo_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    last = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      runtime,
+      arity,
+      LeanNatLiterals.n1,
+    );
+    pushed = f_Meta_DiscrTree_pushArgsAux_9fa194ffa2(
+      runtime,
+      leanField(info, 0),
+      last,
+      value,
+      nextPending,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      infoWorld,
+    );
+    if (leanTag(pushed) == LeanTag.EST_Out_error) return pushed;
+    if (leanTag(pushed) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    f_pushArgsResult(key, leanField(pushed, 0), leanField(pushed, 1))
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

@@ -104,8 +104,8 @@ the earlier ten-instance authorization does not override those limits.
 
 - Primary: independent semantic/readability review, source/interface contracts,
   integration, manifests, the single compiler queue, final validation and updates.
-- Implementation owner A (`rewrite_execution_lead`): WHNF, currently matcher
-  reduction after uncached WHNF and natural-operation dispatch.
+- Implementation owner A (`rewrite_execution_lead`): WHNF, currently stuck
+  metavariable detection after matcher reduction.
 - Implementation owner B (`rewrite_semantics_lead`): discrimination trees,
   currently argument insertion after key/argument extraction.
 - Implementation owner C (`unfold_definition`): literal-value recognition,
@@ -302,6 +302,32 @@ There are now 178 remaining observed frame routines (70 seed, 108 newly observed
 and 19 validated frame rewrites in these waves. Performance remains unmeasured.
 The user's request for more capacity adds a third implementation owner while
 retaining independent primary review and the single compiler queue.
+
+### Seventh checkpoint: matcher reduction and argument filtering (2026-11-09)
+
+`WHNF/MatcherReduction.sk` exposes saturation, declaration instantiation and the
+alternative telescope, using arbitrary-precision Nat counts. Its 508 comparisons
+include genuine registered matcher metadata, multiple alternatives, extra
+arguments, universe instantiation, callback decisions and ordered cache/error
+effects. Restricted transparency modes exercise the unchanged nested-dite
+helper's no-dite path; actual nested-dite transformation remains a coverage gap.
+Two subprocess checks preserve the explicit `matchPatternAttr` initialization
+failure. Empty metadata uses the port's erased KVMap representation.
+
+`DiscrTree/Main/PushArguments.sk` keeps the required FunInfo computation before
+the no-index decision, projection base annotations and argument order; 932 cases
+pass. `IgnoreArgument.sk` reads native array sizes with arbitrary Nat bounds and
+uses the existing runtime-aware read adapter. Its 1,336 cases use real
+FunInfo-produced parameter records, including implicit type arguments, class
+instances and proof arguments. Tracked SKStore-array fixtures remain untested.
+
+The combined run also passes 1,095 earlier key-argument and WHNF regressions.
+Incremental release checking passes; the target cache is retained. The
+[seventh audit](provenance/rewrite-batches/2026-11-09-wave-07.json) records source
+preservation and remaining shared-helper/boxed-interface limits. These seven
+waves have 22 validated frame rewrites; 175 observed frames remain (68 seed,
+107 newly observed). The literal-recognition pair is still under review and is
+not included in these counts. No performance benchmark was run.
 
 ### 1. Freeze task inputs and calibrate
 

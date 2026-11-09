@@ -1,0 +1,212 @@
+module L4_Lean_Meta_WHNF;
+
+// Prepare a saturated matcher before reducing it with fresh alternative variables.
+fun f_Lean_Meta_reduceMatcher_6453efd516(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  stripped = L4_Lean_Expr.f_Lean_Expr_consumeMData_5a2d9a12ed(
+    runtime,
+    expression,
+  );
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, stripped);
+  if (leanTag(head) != LeanTag.Expr_const__impl) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(LeanTag.Meta_ReduceMatcherResult_notMatcher, Array[]),
+        world,
+      ],
+    )
+  };
+  declarationName = leanField(head, 1);
+  levels = leanField(head, 2);
+  lookup = f_Meta_reduceMatcher_spec_0_4ac858d2ec(
+    runtime,
+    declarationName,
+    coreStateRef,
+    world,
+  );
+  leanTag(lookup) match {
+  | LeanTag.EST_Out_error ->
+    return leanFail("unreachable: Lean.Meta.reduceMatcher?")
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  currentWorld = leanField(lookup, 1);
+  optionalInfo = leanField(lookup, 0);
+  if (leanTag(optionalInfo) != LeanTag.Option_some) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(LeanTag.Meta_ReduceMatcherResult_notMatcher, Array[]),
+        currentWorld,
+      ],
+    )
+  };
+  info = leanField(optionalInfo, 0);
+  if (leanTag(info) != LeanTag.Meta_Match_MatcherInfo_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  argumentCount = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+    runtime,
+    stripped,
+  );
+  dummy = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  storage = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    runtime,
+    LeanErased(),
+    argumentCount,
+    dummy,
+  );
+  lastArgument = leanBoxNat(leanNat(argumentCount).sub(LeanNat::fromInt(1)));
+  arguments = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+    runtime,
+    stripped,
+    storage,
+    lastArgument,
+  );
+  prefixSize = leanNat(leanField(info, 0))
+    .add(LeanNat::fromInt(1))
+    .add(leanNat(leanField(info, 1)));
+  argumentSize = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    arguments,
+  );
+  alternativeCount = L4_Lean_Meta_Match_MatcherInfo.f_Match_MatcherInfo_numAlts_e527c3cf00(
+    runtime,
+    info,
+  );
+  requiredSize = prefixSize.add(leanNat(alternativeCount));
+  if (leanNat(argumentSize) < requiredSize) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(LeanTag.Meta_ReduceMatcherResult_partialApp, Array[]),
+        currentWorld,
+      ],
+    )
+  };
+  declaration = f_Meta_toCtorWhenStructure_spec_0_d52d3d3bb6(
+    runtime,
+    declarationName,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    currentWorld,
+  );
+  leanTag(declaration) match {
+  | LeanTag.EST_Out_error -> return declaration
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  instantiated = L4_Lean_CoreM.f_Lean_Core_instantiateValueLevelParams_f93716788b(
+    runtime,
+    leanField(declaration, 0),
+    levels,
+    leanBool(false),
+    coreContext,
+    coreStateRef,
+    leanField(declaration, 1),
+  );
+  leanTag(instantiated) match {
+  | LeanTag.EST_Out_error -> return instantiated
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  value = leanField(instantiated, 0);
+  !currentWorld = leanField(instantiated, 1);
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    metaContext,
+  );
+  if (leanTag(config) != LeanTag.Meta_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  transparency = leanTag(leanField(config, 9));
+  if (
+    transparency == LeanTag.Meta_TransparencyMode_reducible ||
+    transparency == LeanTag.Meta_TransparencyMode_instances ||
+    transparency == LeanTag.Meta_TransparencyMode_implicit
+  ) {
+    unfolded = f_Lean_Meta_unfoldNestedDIte_82cd4294fe(
+      runtime,
+      value,
+      coreContext,
+      coreStateRef,
+      currentWorld,
+    );
+    leanTag(unfolded) match {
+    | LeanTag.EST_Out_error -> return unfolded
+    | LeanTag.EST_Out_ok ->
+      !value = leanField(unfolded, 0);
+      !currentWorld = leanField(unfolded, 1)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  };
+  prefix = L4_Init_Data_Array_Subarray.f_Array_toSubarray_0ba25fcf44(
+    runtime,
+    arguments,
+    LeanNatLiterals.n0,
+    leanBoxNat(prefixSize),
+  );
+  prefixArguments = L4_Init_Data_Slice_Array_Iterator.f_Subarray_copy_8d96856070(
+    runtime,
+    prefix,
+  );
+  auxiliary = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(
+    runtime,
+    value,
+    prefixArguments,
+  );
+  continuation = LeanClosure(
+    L4_Lean_Meta_WHNF.apply_f_Meta_reduceMatcher_lam_0_8baeb5aa01,
+    12,
+    Array[
+      auxiliary,
+      leanBoxNat(prefixSize),
+      arguments,
+      leanBoxNat(requiredSize),
+      argumentSize,
+    ],
+  );
+  inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    runtime,
+    auxiliary,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    currentWorld,
+  );
+  leanTag(inferred) match {
+  | LeanTag.EST_Out_error -> inferred
+  | LeanTag.EST_Out_ok ->
+    f_Meta_reduceMatcher_spec_2_c621b9a6b5(
+      runtime,
+      leanField(inferred, 0),
+      LeanCtor(LeanTag.Option_some, Array[alternativeCount]),
+      continuation,
+      leanBool(false),
+      leanBool(false),
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      leanField(inferred, 1),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

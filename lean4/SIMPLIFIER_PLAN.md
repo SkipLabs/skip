@@ -14,13 +14,13 @@ Current provider limits take precedence: all parallel Vibe runs and a subsequent
 single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
 Codex/local work continues. Any later Vibe run is limited to one worker with
 automatic API retries disabled and a coordinator-managed cooldown.
-The first six rewrite batches are integrated and pass focused checks.
+The first seven rewrite batches are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
 [rewrite-inventory.json](provenance/rewrite-inventory.json) preserves the sampled
-seed and the full observed-entry inventory. There are 178 remaining frame routines
-(70 seed and 108 newly observed); other entries need explicit dispositions, not
+seed and the full observed-entry inventory. There are 175 remaining frame routines
+(68 seed and 107 newly observed); other entries need explicit dispositions, not
 automatic conversion. The previous 5–8 working-day estimate predates this scope
 reconciliation and provider limits. Re-estimate from accepted batches under the
 current allocation; the earlier 24–48 active-hour estimate was optimistic.
@@ -33,6 +33,13 @@ arguments: 1,440 focused comparisons, 135 WHNF regressions and 12 explicit-failu
 subprocess cases pass. Nat bitwise/left-shift primitives remain unimplemented;
 bounded heartbeats and excessive exponents still fail explicitly. The audit and
 coverage limits are in [REWRITE_PLAN.md](REWRITE_PLAN.md). No new timing claim.
+
+The seventh batch adds matcher reduction and discrimination-tree argument
+insertion/filtering: 2,776 new comparisons, 1,095 regressions and two explicit
+matcher-attribute failures pass in the combined release probe. Actual nested-dite
+transformation and tracked parameter-array fixtures remain outside these checks;
+the corresponding unchanged helpers remain available. The literal-recognition
+pair is still under review and is not counted as accepted.
 
 Latest steering: make the maintained implementation ordinary, readable Skip.
 This is useful independently of performance; do not require a measured speedup

@@ -1,0 +1,77 @@
+// Keep type arguments indexed; replace instances and non-type implicit arguments.
+module L4_Lean_Meta_DiscrTree_Main;
+
+// "_private.Lean.Meta.DiscrTree.Main.0.Lean.Meta.DiscrTree.ignoreArg"
+fun f_Meta_DiscrTree_ignoreArg_7a19174686(
+  runtime: mutable LeanExecution,
+  argument: LeanValue,
+  position: LeanValue,
+  parameterInfo: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  count = leanValueArraySize(parameterInfo);
+  if (leanNat(position) >= LeanNat::fromInt(count)) {
+    return L4_Lean_Meta_InferType.f_Lean_Meta_isProof_16699223c4(
+      runtime,
+      argument,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  info = leanArrayRead(runtime, parameterInfo, position, false);
+  if (leanTag(info) != LeanTag.Meta_ParamInfo_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(leanField(info, 5)) match {
+  | LeanTag.Bool_true ->
+    return LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(true), world])
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  binder = leanTag(leanField(info, 0));
+  if (
+    binder != LeanTag.BinderInfo_implicit &&
+    binder != LeanTag.BinderInfo_strictImplicit
+  ) {
+    return L4_Lean_Meta_InferType.f_Lean_Meta_isProof_16699223c4(
+      runtime,
+      argument,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  typeResult = L4_Lean_Meta_InferType.f_Lean_Meta_isType_59a4c431b4(
+    runtime,
+    argument,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(typeResult) == LeanTag.EST_Out_error) return typeResult;
+  if (leanTag(typeResult) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  ignored = leanTag(leanField(typeResult, 0)) match {
+  | LeanTag.Bool_false -> true
+  | LeanTag.Bool_true -> false
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[leanBool(ignored), leanField(typeResult, 1)],
+  )
+}
+
+module end;
