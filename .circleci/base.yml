@@ -357,7 +357,7 @@ jobs:
   skip-package-tests:
     docker:
       - image: skiplabs/skiplang:latest
-    resource_class: medium
+    resource_class: << parameters.resource_class >>
     parameters:
       candidate_toolchain:
         type: boolean
@@ -367,6 +367,13 @@ jobs:
       candidate_compiler:
         type: boolean
         default: false
+      resource_class:
+        type: string
+        default: medium
+      test_jobs:
+        description: Test suites to run concurrently (sktest --jobs).
+        type: integer
+        default: 2
     steps:
       - custom-checkout:
           submodules: true
@@ -391,7 +398,7 @@ jobs:
               export SKTEST_SKCOPT=--release
             fi
             cd << parameters.dir >>
-            SKTEST_JOBS=2 SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
+            SKTEST_JOBS=<< parameters.test_jobs >> SKTEST_JUNIT=$HOME/test-results/$(tr / - \<<< "<< parameters.dir >>").xml \
               "$root/bin/run-sktest.sh"
       - store_test_results:
           path: ~/test-results

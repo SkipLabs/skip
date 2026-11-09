@@ -342,6 +342,11 @@ for dir in "${!SK_CHANGED[@]}"; do
         echo "          dir: $dir"
         echo "          name: skargo"
         echo "          candidate_compiler: true"
+        # Its suites each build sample packages with the candidate compiler
+        # and take 1.5-5 min; run four at once so the job, which waits for
+        # compiler, is bounded by the longest suite rather than their sum.
+        echo "          resource_class: large.gen2"
+        echo "          test_jobs: 4"
         echo "          requires:"
         echo "            - compiler"
         NAMES+=(skargo)
