@@ -1,0 +1,14 @@
+# isOffset roles, branch order, and required checks
+After runtime: fName Name, expression Expr, Meta.Context, Meta.State reference, Core.Context, Core.State reference, world. Returns EST Bool/world. Caller contract: expression is an application headed by fName; the function does not independently verify this assumption. Keep structural Name equality, not strings/hash-only comparisons. Arbitrary Nat/Expr metadata remain valid.
+
+Try in this exact order:
+1. Name Nat.add AND expression arity2: return isNumeral(lastArg), same world; no context/state access.
+2. Name Add.add AND arity4: get forward argument0 (=reverse index3); call isNatType with all four context/ref roles. Error propagates. False returns helper result/world; true returns isNumeral(lastArg) with helper world.
+3. Name HAdd.hAdd AND arity6: get forward argument1 (=reverse index4), NOT argument0 or2; same isNatType/error/lastArg protocol.
+4. Return name==Nat.succ AND arity1. Nat.succ accepts any argument, not only numerals. Unrelated names return false without inspecting expression arity. Failed name/arity checks fall through, with no inappropriate WHNF call.
+
+isNatType(expr,metaContext,metaStateRef,coreContext,coreStateRef,world) performs normal whnf (current transparency), then Expr.isConstOf Nat on the WHOLE reduced type (not arbitrary application head). isNumeral is a shared pure syntax recognizer. Preserve short circuit before inspecting the last payload when type check is false/error. Explicit EST success/error tags must stay checked; errors cannot become false.
+
+Use real initialized states and typed declarations. ExistingProbe.sk is validated PushArguments probe with Add/Nat fixture examples; it shares this original helper and is not a differential driver for your target. OffsetFixture.sk supplies correct monomorphic Add/HAdd method type constructors; copy helpers into your new Probe.sk as needed. Class axioms/types and actual instance constants must be in the fixture constant map, using Expr raw literal constructors rather than bare Nat payload values. Include valid Nat/non-Nat/alias type examples and a genuine WHNF recursion-depth error (Core cold field3 maxDepth=1, Core field1 currentDepth=1). Add/HAdd type checks must run before numeral checks even when lastArg is nonnumeral.
+
+Independent cases: all four heads, unrelated names, exact/wrong arities, last literal/successor/zero/nonnumeral, huge literal, HAdd where only type argument1 is Nat, Nat.succ nonnumeral true, WHNF alias cold/warm state. Pure-name/arity branches with unavailable unused contexts establish short circuit. Compare exact old/new result and refs; separate copied Expr/Name/context inputs and check each immediately after its call; independently expected Bool/error/world. Publish no fake successful extension/state behavior. Report shared numeral/WHNF helpers and any malformed-input branch gaps.

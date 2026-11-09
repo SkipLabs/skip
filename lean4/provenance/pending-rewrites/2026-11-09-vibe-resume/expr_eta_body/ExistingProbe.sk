@@ -1,0 +1,486 @@
+// These checks include substitution under binders and native Lean metadata.
+fun exprBvar(runtime: mutable LeanExecution, n: Int): LeanValue {
+  L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(n))
+}
+
+fun exprApp(
+  runtime: mutable LeanExecution,
+  f: LeanValue,
+  a: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, f, a)
+}
+
+fun main(): void {
+  mode = read_to_end().trim();
+  store = SKStore.run(_ ~> void);
+  runtime = mutable LeanExecution{store => Some(store)};
+  p = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  x = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+  implicit = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+  instImplicit = LeanCtor(
+    LeanTag.BinderInfo_instImplicit,
+    Array[],
+  );
+  a = exprApp(runtime, exprBvar(runtime, 0), exprBvar(runtime, 2));
+  lam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    implicit,
+    exprBvar(runtime, 0),
+    a,
+  );
+  all = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, x, instImplicit, p, a);
+  binding = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    runtime,
+    x,
+    p,
+    exprBvar(runtime, 0),
+    a,
+    leanBool(true),
+  );
+  subst = Array[exprBvar(runtime, 0), exprBvar(runtime, 2)];
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  marker = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("marker"),
+  );
+  metadata = LeanCtor(
+    LeanTag.List_cons,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[
+          marker,
+          LeanCtor(
+            LeanTag.DataValue_ofNat,
+            Array[leanNatValue(7)],
+          ),
+        ],
+      ),
+      nil,
+    ],
+  );
+  md = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, lam);
+  if (mode == "budget-syntax") {
+    syntaxMetadata = LeanCtor(
+      LeanTag.List_cons,
+      Array[
+        LeanCtor(
+          LeanTag.Prod_mk,
+          Array[
+            marker,
+            LeanCtor(
+              LeanTag.DataValue_ofSyntax,
+              Array[LeanCtor(LeanTag.Syntax_missing, Array[])],
+            ),
+          ],
+        ),
+        nil,
+      ],
+    );
+    syntaxExpr = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+      runtime,
+      syntaxMetadata,
+      p,
+    );
+    _ = L4_Lean_Expr.f_Lean_Expr_equalBudgeted_2a70e26ec2(
+      runtime,
+      syntaxExpr,
+      syntaxExpr,
+      LeanWord("usize", 4096),
+      LeanErased(),
+    );
+    leanFail("budgeted Syntax comparison unexpectedly accepted")
+  };
+  pair = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("Pair"),
+  );
+  projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    runtime,
+    pair,
+    leanNatValue(0),
+    lam,
+  );
+  ranged = LeanArray(Array[p, exprBvar(runtime, 4), exprBvar(runtime, 5)]);
+  huge = LeanNatLiterals.n10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000;
+  results = Array[
+    leanExprInstantiate(runtime, lam, subst, 0),
+    L4_Lean_Expr.f_Lean_Expr_instantiate1_2af4e389c5(
+      runtime,
+      all,
+      exprBvar(runtime, 3),
+    ),
+    leanExprInstantiate(runtime, binding, subst, 0),
+    leanExprInstantiateRange(
+      runtime,
+      a,
+      leanNatValue(1),
+      leanNatValue(3),
+      ranged,
+      true,
+    ),
+    leanExprInstantiateRange(
+      runtime,
+      a,
+      leanNatValue(1),
+      leanNatValue(3),
+      ranged,
+      false,
+    ),
+    leanExprShiftRange(runtime, lam, leanNatValue(1), leanNatValue(2), false),
+    leanExprShiftRange(runtime, lam, leanNatValue(1), leanNatValue(1), true),
+    leanExprInstantiate(runtime, md, Array[exprBvar(runtime, 2)], 0),
+    leanExprInstantiate(runtime, projection, subst, 0),
+    leanExprShiftRange(runtime, lam, leanNatValue(0), leanNatValue(1), true),
+    leanExprShiftRange(runtime, lam, huge, huge, false),
+  ];
+  // A context sentinel proves the exact no-metavariable path does not read or
+  // modify assignments. Bound variables are allowed on this path.
+  context = LeanUnavailable("metavariable context sentinel");
+  for (expr in results) {
+    instantiated = L4_Lean_MetavarContext.f_Lean_instantiateExprMVarsImp_d8cff85628(
+      runtime,
+      context,
+      expr,
+    );
+    assert(native_eq(leanField(instantiated, 0), context) == 0);
+    assert(leanExprEqual(runtime, leanField(instantiated, 1), expr, true))
+  };
+  expectedLam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    implicit,
+    exprBvar(runtime, 0),
+    exprApp(runtime, exprBvar(runtime, 0), exprBvar(runtime, 3)),
+  );
+  assert(native_eq(results[0], expectedLam) == 0);
+  assert(
+    native_eq(
+      results[3],
+      exprApp(runtime, exprBvar(runtime, 5), exprBvar(runtime, 0)),
+    ) == 0,
+  );
+  assert(
+    native_eq(
+      results[4],
+      exprApp(runtime, exprBvar(runtime, 4), exprBvar(runtime, 0)),
+    ) == 0,
+  );
+  assert(native_eq(results[9], lam) == 0 && native_eq(results[10], lam) == 0);
+  assert(leanExprHasLooseBVar(lam, 0) && leanExprHasLooseBVar(lam, 1));
+  assert(
+    !leanExprHasLooseBVar(lam, 2) &&
+      !leanIsTrue(leanExprHasLooseBVarAt(lam, huge)),
+  );
+  print_string(
+    "[" +
+      results
+        .map(e -> LeanNat::fromWord(leanExprData(e)).toString())
+        .join(",") +
+      "]",
+  );
+  y = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("y"));
+  metadata8 = LeanCtor(
+    LeanTag.List_cons,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[
+          marker,
+          LeanCtor(
+            LeanTag.DataValue_ofNat,
+            Array[leanNatValue(8)],
+          ),
+        ],
+      ),
+      nil,
+    ],
+  );
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  // Level metadata does not affect equality; the constructor identity does.
+  one = LeanCtor(
+    LeanTag.Level_succ__impl,
+    Array[LeanWord("uint64", 0), zero],
+  );
+  exprs = Array[
+    lam,
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      y,
+      implicit,
+      exprBvar(runtime, 0),
+      a,
+    ),
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      x,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      exprBvar(runtime, 0),
+      a,
+    ),
+    binding,
+    L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      runtime,
+      x,
+      p,
+      exprBvar(runtime, 0),
+      a,
+      leanBool(false),
+    ),
+    md,
+    L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata8, lam),
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(3)),
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, leanNatValue(4)),
+    p,
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one),
+    projection,
+    L4_Lean_Expr.f_Lean_mkProj_3b27598f19(runtime, pair, leanNatValue(1), lam),
+  ];
+  comparisons = mutable Vector[];
+  for (left in exprs) {
+    for (right in exprs) {
+      comparisons.push(
+        "[" +
+          leanExprEqual(runtime, left, right, false).toString() +
+          "," +
+          leanExprEqual(runtime, left, right, true).toString() +
+          "]",
+      )
+    }
+  };
+  print_string("[" + comparisons.toArray().join(",") + "]");
+  uName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("u"));
+  vName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("v"));
+  data = LeanWord("uint64", 0);
+  u = LeanCtor(LeanTag.Level_param__impl, Array[data, uName]);
+  v = LeanCtor(LeanTag.Level_param__impl, Array[data, vName]);
+  levels = Array[
+    zero,
+    one,
+    u,
+    v,
+    LeanCtor(LeanTag.Level_mvar__impl, Array[data, uName]),
+    LeanCtor(LeanTag.Level_max__impl, Array[data, u, v]),
+    LeanCtor(LeanTag.Level_imax__impl, Array[data, u, v]),
+    LeanCtor(LeanTag.Level_max__impl, Array[data, u, v]),
+  ];
+  levelComparisons = mutable Vector[];
+  for (left in levels) {
+    for (right in levels) {
+      levelComparisons.push(leanLevelEqual(left, right).toString())
+    }
+  };
+  print_string("[" + levelComparisons.toArray().join(",") + "]");
+  // Ordering consumes cached hashes/depths, so use properly constructed levels.
+  orderU = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  orderV = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, vName);
+  orderOne = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  f = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("f"));
+  ordered = exprs
+    .mapWithIndex((i, e) ->
+      if (i == 10) {
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, orderOne)
+      } else {
+        e
+      }
+    )
+    .concat(
+      Array[
+        exprBvar(runtime, 0),
+        exprBvar(runtime, 2),
+        a,
+        all,
+        L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, uName),
+        L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, vName),
+        L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, uName),
+        L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, vName),
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+          runtime,
+          f,
+          LeanCtor(LeanTag.List_cons, Array[orderU, nil]),
+        ),
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+          runtime,
+          f,
+          LeanCtor(LeanTag.List_cons, Array[orderV, nil]),
+        ),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, orderU),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, orderV),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, orderV),
+        ),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(runtime, orderU, orderV),
+        ),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, orderU, orderV),
+        ),
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, uName),
+        ),
+        L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("a")),
+        L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("λ")),
+        L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("a\u0000b")),
+      ],
+    );
+  ordering = mutable Vector[];
+  for (left in ordered) {
+    for (right in ordered) {
+      quick = L4_Lean_Expr.f_Lean_Expr_quickLt_134860d5eb(runtime, left, right);
+      slow = L4_Lean_Expr.f_Lean_Expr_lt_804e67ad82(runtime, left, right);
+      ordering.push(
+        "[" +
+          leanIsTrue(quick).toString() +
+          "," +
+          leanIsTrue(slow).toString() +
+          "]",
+      )
+    }
+  };
+  print_string("[" + ordering.toArray().join(",") + "]");
+  fx = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, x);
+  fy = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, y);
+  mx = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, x);
+  mixed = exprApp(runtime, fx, exprApp(runtime, mx, fy));
+  nested = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    x,
+    implicit,
+    p,
+    mixed,
+  );
+  abstracts = Array[
+    (mixed, Array[fx, fy, mx]),
+    (nested, Array[fx, fy, mx]),
+    (mixed, Array[fx, fx]),
+    (mixed, Array[mx]),
+    (mixed, Array[p, fx]),
+  ].map(entry ->
+    L4_Lean_Expr.f_Lean_Expr_abstract_7fc2655610(
+      runtime,
+      entry.i0,
+      LeanArray(entry.i1),
+    )
+  )
+    .concat(
+      Array[
+        L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+          runtime,
+          mixed,
+          leanNatValue(1),
+          LeanArray(Array[fx, fy, mx]),
+        ),
+        L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+          runtime,
+          mixed,
+          leanNatValue(0),
+          LeanArray(Array[fx]),
+        ),
+        L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+          runtime,
+          mixed,
+          huge,
+          LeanArray(Array[fx, fy, mx]),
+        ),
+        L4_Lean_Expr.f_Lean_Expr_abstract_7fc2655610(
+          runtime,
+          mixed,
+          LeanArray(Array[]),
+        ),
+      ],
+    )
+    .concat(
+      Array[
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+          runtime,
+          x,
+          instImplicit,
+          fx,
+          nested,
+        ),
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          x,
+          fx,
+          fy,
+          nested,
+          leanBool(true),
+        ),
+        L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, nested),
+        L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+          runtime,
+          pair,
+          leanNatValue(0),
+          nested,
+        ),
+        exprApp(runtime, exprBvar(runtime, 0), fx),
+      ].map(expr ->
+        L4_Lean_Expr.f_Lean_Expr_abstract_7fc2655610(
+          runtime,
+          expr,
+          LeanArray(Array[fx, fy, mx]),
+        )
+      ),
+    );
+  // The final existing-bound-variable fixture abstracts only fx.
+  finalAbstract = L4_Lean_Expr.f_Lean_Expr_abstract_7fc2655610(
+    runtime,
+    exprApp(runtime, exprBvar(runtime, 0), fx),
+    LeanArray(Array[fx]),
+  );
+  checkedAbstracts = abstracts.mapWithIndex((i, e) ->
+    if (i == 13) finalAbstract else e
+  );
+  print_string(
+    "[" +
+      checkedAbstracts
+        .map(e -> LeanNat::fromWord(leanExprData(e)).toString())
+        .join(",") +
+      "]",
+  );
+  budgets: mutable Vector<String> = mutable Vector[];
+  world = LeanUnavailable("budgeted equality world token");
+  for (fuel in Array[0, 1, 2, 4, 16, 4096]) {
+    answers: mutable Vector<String> = mutable Vector[];
+    for (left in ordered) {
+      for (right in ordered) {
+        alpha = L4_Lean_Expr.f_Lean_Expr_eqvBudgeted_c7a4522b61(
+          runtime,
+          left,
+          right,
+          LeanWord("usize", fuel),
+          world,
+        );
+        structural = L4_Lean_Expr.f_Lean_Expr_equalBudgeted_2a70e26ec2(
+          runtime,
+          left,
+          right,
+          LeanWord("usize", fuel),
+          world,
+        );
+        assert(native_eq(leanField(alpha, 1), world) == 0);
+        assert(native_eq(leanField(structural, 1), world) == 0);
+        answers.push(
+          "[" +
+            leanConstructorOrdinal(leanTag(leanField(alpha, 0))).toString() +
+            "," +
+            leanConstructorOrdinal(
+              leanTag(leanField(structural, 0)),
+            ).toString() +
+            "]",
+        )
+      }
+    };
+    budgets.push("[" + answers.toArray().join(",") + "]")
+  };
+  print_string("[" + budgets.toArray().join(",") + "]")
+}

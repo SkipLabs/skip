@@ -1,0 +1,26 @@
+// Correct de Bruijn indices for monomorphic Add/HAdd method declarations.
+fun resumeOffsetApply(runtime: mutable LeanExecution, head: LeanValue, args: Array<LeanValue>): LeanValue {
+  result = head;
+  for (arg in args) { !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, arg) };
+  result
+}
+
+fun resumeOffsetForall(runtime: mutable LeanExecution, domains: Array<LeanValue>, body: LeanValue): LeanValue {
+  result = body;
+  for (offset in Range(0, domains.size())) {
+    !result = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      LeanCtor(LeanTag.BinderInfo_default, Array[]), domains[domains.size() - offset - 1], result)
+  };
+  result
+}
+
+fun resumeOffsetAddMethodType(runtime: mutable LeanExecution, typeSort: LeanValue, addClass: LeanValue): LeanValue {
+  bvar = (i: Int) -> L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(i));
+  resumeOffsetForall(runtime, Array[typeSort, resumeOffsetApply(runtime, addClass, Array[bvar(0)]), bvar(1), bvar(2)], bvar(3))
+}
+
+fun resumeOffsetHAddMethodType(runtime: mutable LeanExecution, typeSort: LeanValue, hAddClass: LeanValue): LeanValue {
+  bvar = (i: Int) -> L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(i));
+  instanceType = resumeOffsetApply(runtime, hAddClass, Array[bvar(2), bvar(1), bvar(0)]);
+  resumeOffsetForall(runtime, Array[typeSort, typeSort, typeSort, instanceType, bvar(3), bvar(3)], bvar(3))
+}

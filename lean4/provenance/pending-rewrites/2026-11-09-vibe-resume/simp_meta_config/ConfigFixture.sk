@@ -1,0 +1,15 @@
+// Reusable valid setup. Call leanInitializeSimp(runtime) before constructing state.
+fun resumeConfigState(runtime: mutable LeanExecution): RewriteProbeState {
+  environment = rewriteProbeEnvironment(runtime, (Map[] : Map<String, LeanConstantFile>));
+  rewriteProbeState(runtime, environment,
+    L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime), "<simp-meta-config>")
+}
+
+fun resumeSimpConfig(runtime: mutable LeanExecution): LeanValue {
+  L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime)
+}
+
+fun resumeContextWithConfig(runtime: mutable LeanExecution, context: LeanValue, config: LeanValue): LeanValue {
+  leanReplaceField(context, 0, LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    Array[config, L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config)]))
+}

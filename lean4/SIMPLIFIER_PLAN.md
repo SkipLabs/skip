@@ -1,9 +1,13 @@
 # Conditional simplification implementation
 
-Paused at the user's request on 2026-11-09. Resume only after an explicit user
-instruction. See the [saved checkpoint](provenance/pending-rewrites/2026-11-09-pause/checkpoint.json)
-and the pause section of [REWRITE_PLAN.md](REWRITE_PLAN.md); pending literal and
-stuck-metavariable rewrites are not counted as validated.
+The user resumed on 2026-11-09. An initial Mistral Large worker produced an
+unvalidated draft, then failed with HTTP 503 `Service unavailable`, not confirmed
+quota exhaustion. The user then selected GLM-5.3 and requested ten instances
+immediately, reducing concurrency on errors. That pool is active with five code
+and five independent probe assignments plus three Codex reviewers. See the
+[restart checkpoint](provenance/pending-rewrites/2026-11-09-vibe-resume/checkpoint.json)
+and [REWRITE_PLAN.md](REWRITE_PLAN.md). Pending literal and stuck-metavariable
+rewrites are under validation and remain unaccepted until checks pass.
 
 This is the active task. The GCD performance experiment and the broader Mathlib
 plan are deferred. The user does not require a separate incremental Lean
@@ -11,14 +15,14 @@ baseline. Keep the native kernel unchanged and concentrate on elaboration.
 
 ## Current priority: raw execution (2026-11-09)
 
-The user has increased the team to three implementation agents: unfolding/WHNF,
-discrimination-tree helpers and literal-value recognition. Together with the
-primary this fills the current four-active-agent session limit. The primary independently reviews and integrates
-their patches and owns the single compiler queue. Periodic commits are authorized.
-Current provider limits take precedence: all parallel Vibe runs and a subsequent
-single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
-Codex/local work continues. Any later Vibe run is limited to one worker with
-automatic API retries disabled and a coordinator-managed cooldown.
+The latest allocation permits ten Vibe writers and three Codex packet owners
+and reviewers. Together with the primary, the reviewers fill the current four
+active Codex agent slots. The primary reviews and integrates their handoffs and
+owns the single compiler queue. Periodic commits are authorized. Earlier Vibe
+runs hit HTTP 429; the newly authorized restart stopped on HTTP 503 before
+scaling beyond one worker. The user-authorized GLM pool supersedes that stop.
+Keep automatic retries disabled, reduce concurrency on availability errors and
+report suspected rate limiting immediately; do not silently change provider/model.
 The first seven rewrite batches are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
@@ -67,8 +71,8 @@ measurement release build until that path is converted. Do not stop after each
 helper to measure a partially converted path. Only a representative converted execution path can test
 whether this is sufficient for parity; a single helper cannot. Document module
 ownership, interface invariants and checks so the work can later be delegated.
-The prior three-worker batch is validated below. The current workflow has three
-Codex implementation owners; the primary retains independent review,
+The prior three-worker batch is validated below. The current workflow assigns
+Vibe implementation and three Codex reviewers; the primary retains independent review,
 integration and the single compiler queue. Worker completion alone is not
 validation. Code must also pass a human readability review, with light comments
 and high-level documentation only where useful.

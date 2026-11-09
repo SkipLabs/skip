@@ -1,0 +1,977 @@
+// Expected indexing/filter outcomes with real declarations and isolated reference state.
+class PushArgsExample(
+  label: String,
+  expression: LeanValue,
+  key: LeanValue,
+  indexed: Array<LeanValue>,
+  unindexed: Array<LeanValue>,
+)
+
+fun pushArgsAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun pushArgsApply(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun pushArgsForall(
+  runtime: mutable LeanExecution,
+  domains: Array<(LeanValue, LeanTag.Value)>,
+  body: LeanValue,
+): LeanValue {
+  result = body;
+  for (offset in Range(0, domains.size())) {
+    (domain, binder) = domains[domains.size() - offset - 1];
+    !result = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      LeanCtor(binder, Array[]),
+      domain,
+      result,
+    )
+  };
+  result
+}
+
+fun pushArgsArrow(
+  runtime: mutable LeanExecution,
+  domains: Array<LeanValue>,
+  body: LeanValue,
+): LeanValue {
+  pushArgsForall(
+    runtime,
+    domains.map(domain -> (domain, LeanTag.BinderInfo_default)),
+    body,
+  )
+}
+
+fun pushArgsContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun pushArgsCheck(
+  label: String,
+  state: RewriteProbeState,
+  saved: LeanExecutionCheckpoint,
+  expression: LeanValue,
+  pending: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  root: Bool,
+  noIndex: Bool,
+  world: LeanValue,
+  expectedKey: ?LeanValue,
+  expectedPending: Array<LeanValue>,
+  expectedRefsChanged: ?Bool = None(),
+): LeanExecutionCheckpoint {
+  oldExpression = rewriteProbeCopyInput(expression);
+  newExpression = rewriteProbeCopyInput(expression);
+  oldPending = rewriteProbeCopyInput(pending);
+  newPending = rewriteProbeCopyInput(pending);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_pushArgs_3739c772a5_fallback(
+        runtime,
+        leanBool(root),
+        oldPending,
+        oldExpression,
+        leanBool(noIndex),
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, oldExpression));
+      assert(rewriteProbeSameInput(pending, oldPending));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_pushArgs_3739c772a5(
+        runtime,
+        leanBool(root),
+        newPending,
+        newExpression,
+        leanBool(noIndex),
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, newExpression));
+      assert(rewriteProbeSameInput(pending, newPending));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  );
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  expectedKey match {
+  | None() ->
+    if (leanTag(result) != LeanTag.EST_Out_error) {
+      leanFail("pushArgs expected error: " + label)
+    };
+    assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error)
+  | Some(key) ->
+    if (leanTag(result) != LeanTag.EST_Out_ok) {
+      leanFail("pushArgs expected success: " + label)
+    };
+    pair = leanField(result, 0);
+    assert(leanTag(pair) == LeanTag.Prod_mk);
+    if (!rewriteProbeSameInput(leanField(pair, 0), key)) {
+      leanFail("pushArgs unexpected key: " + label)
+    };
+    todo = leanField(pair, 1);
+    if (
+      !rewriteProbeSameInput(
+        LeanArray(leanArray(todo)),
+        LeanArray(expectedPending),
+      )
+    ) {
+      leanFail("pushArgs unexpected pending order: " + label)
+    };
+    inputPersistent = pending match {
+    | LeanPersistentArray(_) -> true
+    | _ -> false
+    };
+    expectedPersistent =
+      inputPersistent ||
+      (expectedPending.size() > leanValueArraySize(pending) &&
+        expectedPending.size() > 128);
+    outputPersistent = todo match {
+    | LeanArray(_) -> false
+    | LeanPersistentArray(_) -> true
+    | _ -> leanFail("unexpected pushArgs array representation")
+    };
+    assert(outputPersistent == expectedPersistent)
+  };
+  expectedRefsChanged match {
+  | None() -> void
+  | Some(changed) -> assert((native_eq(saved.refs, after.refs) != 0) == changed)
+  };
+  after
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, n, nil);
+    variable = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, n);
+    bound = (i: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(i));
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+        builder,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      ),
+    );
+    aName = name("PushArgsA");
+    a = constant(aName);
+    pName = name("PushArgsP");
+    p = constant(pName);
+    className = name("PushArgsClass");
+    boxName = name("PushArgsBox");
+    classType = constant(className);
+    boxType = constant(boxName);
+    binaryType = pushArgsArrow(builder, Array[a, a], a);
+    ternaryType = pushArgsArrow(builder, Array[a, a, a], a);
+    dataName = name("pushArgsData");
+    mixedName = name("pushArgsMixed");
+    mixedType = pushArgsForall(
+      builder,
+      Array[
+        (type, LeanTag.BinderInfo_implicit),
+        (type, LeanTag.BinderInfo_strictImplicit),
+        (a, LeanTag.BinderInfo_implicit),
+        (a, LeanTag.BinderInfo_strictImplicit),
+        (classType, LeanTag.BinderInfo_instImplicit),
+        (p, LeanTag.BinderInfo_default),
+        (a, LeanTag.BinderInfo_default),
+        (classType, LeanTag.BinderInfo_default),
+      ],
+      a,
+    );
+    natName = name("Nat");
+    natType = constant(natName);
+    zeroName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("zero"),
+    );
+    succName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("succ"),
+    );
+    addName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("add"),
+    );
+    genericAddName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Add"),
+      LeanText("add"),
+    );
+    natBinaryType = pushArgsArrow(builder, Array[natType, natType], natType);
+    // The operation's two binders shift the outer type variable at each step.
+    polyBinary = pushArgsArrow(
+      builder,
+      Array[bound(0)],
+      pushArgsArrow(builder, Array[bound(1)], bound(2)),
+    );
+    genericAddType = pushArgsArrow(
+      builder,
+      Array[type, polyBinary, bound(1), bound(2)],
+      bound(3),
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      pushArgsAxiom(aName, type),
+      pushArgsAxiom(pName, prop),
+      pushArgsAxiom(dataName, ternaryType),
+      pushArgsAxiom(mixedName, mixedType),
+      pushArgsAxiom(natName, type),
+      pushArgsAxiom(zeroName, natType),
+      pushArgsAxiom(succName, pushArgsArrow(builder, Array[natType], natType)),
+      pushArgsAxiom(addName, natBinaryType),
+      pushArgsAxiom(genericAddName, genericAddType),
+    ]) {
+      infoName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(infoName), LeanConstantFile(info, None()))
+    };
+    for (structureName in Array[boxName, className]) {
+      ctorName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        builder,
+        leanField(structureName, 2),
+        LeanText("mk"),
+      );
+      singleton = (value: LeanValue) ->
+        LeanCtor(LeanTag.List_cons, Array[value, nil]);
+      info = LeanCtor(
+        LeanTag.ConstantInfo_inductInfo,
+        Array[
+          LeanCtor(
+            LeanTag.InductiveVal_mk,
+            Array[
+              LeanCtor(LeanTag.ConstantVal_mk, Array[structureName, nil, type]),
+              LeanNatLiterals.n0,
+              LeanNatLiterals.n0,
+              singleton(structureName),
+              singleton(ctorName),
+              LeanNatLiterals.n0,
+              leanBool(false),
+              leanBool(false),
+              leanBool(false),
+            ],
+          ),
+        ],
+      );
+      ctorInfo = LeanCtor(
+        LeanTag.ConstantInfo_ctorInfo,
+        Array[
+          LeanCtor(
+            LeanTag.ConstructorVal_mk,
+            Array[
+              LeanCtor(
+                LeanTag.ConstantVal_mk,
+                Array[
+                  ctorName,
+                  nil,
+                  pushArgsArrow(
+                    builder,
+                    Array[binaryType],
+                    constant(structureName),
+                  ),
+                ],
+              ),
+              structureName,
+              LeanNatLiterals.n0,
+              LeanNatLiterals.n0,
+              LeanNatLiterals.n1,
+              leanBool(false),
+            ],
+          ),
+        ],
+      );
+      constants.set(leanNameKey(structureName), LeanConstantFile(info, None()));
+      constants.set(leanNameKey(ctorName), LeanConstantFile(ctorInfo, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(
+      builder,
+      environment,
+      className,
+    );
+    assert(leanTag(registered) == LeanTag.Except_ok);
+    !environment = leanField(registered, 0);
+    assert(
+      leanIsTrue(
+        L4_Lean_Class.f_Lean_isClass_8bc2d27716(
+          builder,
+          environment,
+          className,
+        ),
+      ),
+    );
+    assert(
+      !leanIsTrue(
+        L4_Lean_Class.f_Lean_isClass_8bc2d27716(builder, environment, boxName),
+      ),
+    );
+    xName = name("pushArgsX");
+    yName = name("pushArgsY");
+    zName = name("pushArgsZ");
+    proofName = name("pushArgsProof");
+    classId = name("pushArgsInstance");
+    boxId = name("pushArgsBox");
+    fnName = name("pushArgsFn");
+    mixedId = name("pushArgsMixedFn");
+    nName = name("pushArgsN");
+    kName = name("pushArgsK");
+    natOpId = name("pushArgsNatOp");
+    dataOpId = name("pushArgsDataOp");
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((id, localType) in Array[
+      (xName, a),
+      (yName, a),
+      (zName, a),
+      (proofName, p),
+      (classId, classType),
+      (boxId, boxType),
+      (fnName, ternaryType),
+      (mixedId, mixedType),
+      (nName, natType),
+      (kName, natType),
+      (natOpId, natBinaryType),
+      (dataOpId, binaryType),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        id,
+        id,
+        localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(builder, environment, locals, "<push-args>");
+    initialMetaState = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMetaState, 0);
+    mName = name("pushArgsM");
+    opaqueName = name("pushArgsOpaque");
+    for ((id, kind) in Array[
+      (mName, LeanTag.MetavarKind_natural),
+      (opaqueName, LeanTag.MetavarKind_syntheticOpaque),
+    ]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        builder,
+        mctx,
+        id,
+        id,
+        locals,
+        LeanArray(Array[]),
+        a,
+        LeanCtor(kind, Array[]),
+        LeanNatLiterals.n0,
+      )
+    };
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(initialMetaState, 0, mctx)),
+    );
+    saved = builder.checkpoint();
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    config = leanReplaceField(
+      leanReplaceField(
+        leanReplaceField(
+          baseConfig,
+          9,
+          LeanCtor(LeanTag.Meta_TransparencyMode_none, Array[]),
+        ),
+        12,
+        leanBool(false),
+      ),
+      14,
+      LeanCtor(LeanTag.Meta_ProjReductionKind_no, Array[]),
+    );
+    context = pushArgsContext(builder, state.metaContext, config);
+    x = variable(xName);
+    y = variable(yName);
+    z = variable(zName);
+    proof = variable(proofName);
+    instance = variable(classId);
+    box = variable(boxId);
+    n = variable(nName);
+    k = variable(kName);
+    m = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, mName);
+    opaque = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, opaqueName);
+    tmp = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(
+      builder,
+      name("_discr_tree_tmp"),
+    );
+    noindexName = name("noindex");
+    noindex = (value: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkAnnotation_fe98cbf276(builder, noindexName, value);
+    star = LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]);
+    other = LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]);
+    constKey = (id: LeanValue, arity: Int) ->
+      LeanCtor(
+        LeanTag.Meta_DiscrTree_Key_const,
+        Array[id, leanNatValue(arity)],
+      );
+    fvarKey = (id: LeanValue, arity: Int) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_fvar, Array[id, leanNatValue(arity)]);
+    literalKey = (value: LeanValue) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[value]);
+    cases: mutable Vector<PushArgsExample> = mutable Vector[];
+    for (literal in Array[
+      LeanCtor(
+        LeanTag.Literal_natVal,
+        Array[
+          leanBoxNat(LeanNat::parse("184467440737095516170000000000000000000")),
+        ],
+      ),
+      LeanCtor(LeanTag.Literal_strVal, Array[LeanText("pending 世界")]),
+    ]) {
+      cases.push(
+        PushArgsExample(
+          "literal",
+          L4_Lean_Expr.f_Expr_lit_override_362af36df7(builder, literal),
+          literalKey(literal),
+          Array[],
+          Array[],
+        ),
+      )
+    };
+    for (arguments in Array[
+      (Array[] : Array<LeanValue>),
+      Array[x],
+      Array[x, y, z],
+    ]) {
+      reversed = Array::fillBy(arguments.size(), i ->
+        arguments[arguments.size() - i - 1]
+      );
+      wildcards = Array::fillBy(arguments.size(), _ -> tmp);
+      cases.push(
+        PushArgsExample(
+          "constant data order",
+          pushArgsApply(builder, constant(dataName), arguments),
+          constKey(dataName, arguments.size()),
+          reversed,
+          wildcards,
+        ),
+      );
+      cases.push(
+        PushArgsExample(
+          "fvar data order",
+          pushArgsApply(builder, variable(fnName), arguments),
+          fvarKey(fnName, arguments.size()),
+          reversed,
+          wildcards,
+        ),
+      )
+    };
+    mixedArguments = Array[a, a, x, y, instance, proof, z, instance];
+    mixedExpected = Array[instance, z, tmp, tmp, tmp, tmp, a, a];
+    for (head in Array[constant(mixedName), variable(mixedId)]) {
+      key = if (leanTag(head) == LeanTag.Expr_const__impl) {
+        constKey(mixedName, 8)
+      } else {
+        fvarKey(mixedId, 8)
+      };
+      cases.push(
+        PushArgsExample(
+          "mixed type/value/proof/instance filtering",
+          pushArgsApply(builder, head, mixedArguments),
+          key,
+          mixedExpected,
+          Array::fillBy(8, _ -> tmp),
+        ),
+      )
+    };
+    for ((structureName, base, expectedBase) in Array[
+      (boxName, box, box),
+      (className, instance, noindex(instance)),
+    ]) {
+      projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+        builder,
+        structureName,
+        LeanNatLiterals.n0,
+        base,
+      );
+      for (arguments in Array[(Array[] : Array<LeanValue>), Array[x, y]]) {
+        key = LeanCtor(
+          LeanTag.Meta_DiscrTree_Key_proj,
+          Array[
+            structureName,
+            LeanNatLiterals.n0,
+            leanNatValue(arguments.size()),
+          ],
+        );
+        cases.push(
+          PushArgsExample(
+            "projection base before args",
+            pushArgsApply(builder, projection, arguments),
+            key,
+            Array[expectedBase].concat(
+              Array::fillBy(arguments.size(), i ->
+                arguments[arguments.size() - i - 1]
+              ),
+            ),
+            Array[expectedBase].concat(
+              Array::fillBy(arguments.size(), _ -> tmp),
+            ),
+          ),
+        )
+      }
+    };
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      xName,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      a,
+      bound(0),
+    );
+    for ((label, expression, key, suffix) in Array[
+      ("sort", prop, other, (Array[] : Array<LeanValue>)),
+      ("lambda", identity, other, Array[]),
+      (
+        "forall domain",
+        pushArgsArrow(builder, Array[a], a),
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+        Array[a],
+      ),
+      (
+        "dependent forall",
+        pushArgsArrow(builder, Array[type], bound(0)),
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+        Array[type],
+      ),
+      ("tmp mvar without declaration", tmp, star, Array[]),
+      ("natural mvar", m, star, Array[]),
+      ("opaque mvar", opaque, other, Array[]),
+      (
+        "beta new head",
+        pushArgsApply(builder, identity, Array[x]),
+        fvarKey(xName, 0),
+        Array[],
+      ),
+      (
+        "let new head",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          builder,
+          zName,
+          a,
+          x,
+          bound(0),
+          leanBool(false),
+        ),
+        fvarKey(xName, 0),
+        Array[],
+      ),
+    ]) {
+      cases.push(PushArgsExample(label, expression, key, suffix, suffix))
+    };
+    world = leanNatValue(37);
+    for (persistent in Array[false, true]) {
+      seed = Array[z, x];
+      pending = if (persistent) {
+        LeanPersistentArray(
+          Persistent.RadixTreeVector::mcreateFromItems(seed).chill(),
+        )
+      } else {
+        LeanArray(seed)
+      };
+      for (root in Array[false, true]) {
+        for (noIndex in Array[false, true]) {
+          for (example in cases.toArray()) {
+            expected = seed.concat(
+              if (noIndex) example.unindexed else example.indexed,
+            );
+            warm = pushArgsCheck(
+              example.label,
+              state,
+              saved,
+              example.expression,
+              pending,
+              context,
+              state.coreContext,
+              root,
+              noIndex,
+              world,
+              Some(example.key),
+              expected,
+            );
+            _ = pushArgsCheck(
+              "warm " + example.label,
+              state,
+              warm,
+              example.expression,
+              pending,
+              context,
+              state.coreContext,
+              root,
+              noIndex,
+              world,
+              Some(example.key),
+              expected,
+            );
+            !count = count + 2
+          };
+          unavailable = LeanUnavailable(
+            "noindex expression must skip all Meta/Core context use",
+          );
+          _ = pushArgsCheck(
+            "noindex before reduction",
+            state,
+            saved,
+            noindex(variable(name("pushArgsMissing"))),
+            pending,
+            unavailable,
+            unavailable,
+            root,
+            noIndex,
+            world,
+            Some(star),
+            seed,
+            Some(false),
+          );
+          !count = count + 1;
+          for ((headName, arguments, nestedKey) in Array[
+            (
+              succName,
+              Array[constant(zeroName)],
+              literalKey(
+                LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n1]),
+              ),
+            ),
+            (succName, Array[n], star),
+            (
+              addName,
+              Array[
+                n,
+                L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+                  builder,
+                  LeanNatLiterals.n2,
+                ),
+              ],
+              star,
+            ),
+          ]) {
+            expected = if (root) {
+              seed.concat(
+                if (noIndex) Array::fillBy(arguments.size(), _ -> tmp) else {
+                  Array::fillBy(arguments.size(), i ->
+                    arguments[arguments.size() - i - 1]
+                  )
+                },
+              )
+            } else {
+              seed
+            };
+            _ = pushArgsCheck(
+              "root/nested numeral and offset",
+              state,
+              saved,
+              pushArgsApply(builder, constant(headName), arguments),
+              pending,
+              context,
+              state.coreContext,
+              root,
+              noIndex,
+              world,
+              Some(
+                if (root) constKey(headName, arguments.size()) else nestedKey,
+              ),
+              expected,
+            );
+            !count = count + 1
+          };
+          for (arguments in Array[Array[n, k]]) {
+            _ = pushArgsCheck(
+              "non-offset natural addition",
+              state,
+              saved,
+              pushArgsApply(builder, constant(addName), arguments),
+              pending,
+              context,
+              state.coreContext,
+              root,
+              noIndex,
+              world,
+              Some(constKey(addName, 2)),
+              seed.concat(if (noIndex) Array[tmp, tmp] else Array[k, n]),
+            );
+            !count = count + 1
+          };
+          for ((arguments, offset) in Array[
+            (
+              Array[
+                natType,
+                variable(natOpId),
+                n,
+                L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+                  builder,
+                  LeanNatLiterals.n2,
+                ),
+              ],
+              true,
+            ),
+            (Array[a, variable(dataOpId), x, y], false),
+          ]) {
+            addAsStar = !root && offset;
+            expected = if (addAsStar) seed else {
+              seed.concat(
+                if (noIndex) Array::fillBy(4, _ -> tmp) else {
+                  Array::fillBy(4, i -> arguments[3 - i])
+                },
+              )
+            };
+            _ = pushArgsCheck(
+              "generic addition checks Nat type",
+              state,
+              saved,
+              pushArgsApply(builder, constant(genericAddName), arguments),
+              pending,
+              context,
+              state.coreContext,
+              root,
+              noIndex,
+              world,
+              Some(if (addAsStar) star else constKey(genericAddName, 4)),
+              expected,
+            );
+            !count = count + 1
+          }
+        }
+      }
+    };
+    for (seedSize in Array[124, 125, 126, 127, 128]) {
+      seed = Array::fillBy(seedSize, i -> if (i % 2 == 0) x else y);
+      for (noIndex in Array[false, true]) {
+        suffix = if (noIndex) Array[tmp, tmp, tmp] else Array[z, y, x];
+        _ = pushArgsCheck(
+          "publication across 128",
+          state,
+          saved,
+          pushArgsApply(builder, constant(dataName), Array[x, y, z]),
+          LeanArray(seed),
+          context,
+          state.coreContext,
+          true,
+          noIndex,
+          world,
+          Some(constKey(dataName, 3)),
+          seed.concat(suffix),
+        );
+        !count = count + 1
+      }
+    };
+    seed = Array[y, z];
+    pending = LeanArray(seed);
+    for (noIndex in Array[false, true]) {
+      _ = pushArgsCheck(
+        "FunInfo still runs for zero args",
+        state,
+        saved,
+        constant(dataName),
+        pending,
+        context,
+        state.coreContext,
+        true,
+        noIndex,
+        world,
+        Some(constKey(dataName, 0)),
+        seed,
+        Some(true),
+      );
+      missing = variable(name("pushArgsMissing"));
+      for (expression in Array[
+        constant(name("pushArgsMissing")),
+        missing,
+        L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, name("pushArgsMissing")),
+        L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+          builder,
+          className,
+          LeanNatLiterals.n0,
+          missing,
+        ),
+      ]) {
+        _ = pushArgsCheck(
+          "lookup failure including noIndex mode",
+          state,
+          saved,
+          expression,
+          pending,
+          context,
+          state.coreContext,
+          true,
+          noIndex,
+          world,
+          None(),
+          Array[],
+        );
+        !count = count + 1
+      };
+      !count = count + 1;
+      for (arguments in Array[Array[missing, y, z], Array[x, y, missing]]) {
+        _ = pushArgsCheck(
+          "argument failure after FunInfo cache update",
+          state,
+          saved,
+          pushArgsApply(builder, constant(dataName), arguments),
+          pending,
+          context,
+          state.coreContext,
+          true,
+          noIndex,
+          world,
+          if (noIndex) Some(constKey(dataName, 3)) else None(),
+          seed.concat(Array[tmp, tmp, tmp]),
+          Some(true),
+        );
+        !count = count + 1
+      };
+      invalidTypeArgs = Array[missing, variable(natOpId), n, k];
+      _ = pushArgsCheck(
+        "offset type reduction failure",
+        state,
+        saved,
+        pushArgsApply(builder, constant(genericAddName), invalidTypeArgs),
+        pending,
+        context,
+        state.coreContext,
+        false,
+        noIndex,
+        world,
+        None(),
+        Array[],
+      );
+      !count = count + 1;
+      for (assignOpaque in Array[false, true]) {
+        for (stuck in Array[false, true]) {
+          configured = pushArgsContext(
+            builder,
+            state.metaContext,
+            leanReplaceField(
+              leanReplaceField(config, 7, leanBool(assignOpaque)),
+              4,
+              leanBool(stuck),
+            ),
+          );
+          _ = pushArgsCheck(
+            "opaque policy ignores stuck setting",
+            state,
+            saved,
+            opaque,
+            pending,
+            configured,
+            state.coreContext,
+            true,
+            noIndex,
+            world,
+            Some(if (assignOpaque) star else other),
+            seed,
+          );
+          deeper = saved.restoreRaw();
+          deeper.writeRef(
+            state.metaStateRef,
+            Some(
+              leanReplaceField(
+                initialMetaState,
+                0,
+                leanReplaceField(mctx, 0, LeanNatLiterals.n1),
+              ),
+            ),
+          );
+          _ = pushArgsCheck(
+            "readonly depth ignores stuck setting",
+            state,
+            deeper.checkpoint(),
+            m,
+            pending,
+            configured,
+            state.coreContext,
+            true,
+            noIndex,
+            world,
+            Some(other),
+            seed,
+          );
+          !count = count + 2
+        }
+      }
+    }
+  };
+  assert(count == 932);
+  print_string("pushArgs comparisons: " + count.toString() + "\n")
+}

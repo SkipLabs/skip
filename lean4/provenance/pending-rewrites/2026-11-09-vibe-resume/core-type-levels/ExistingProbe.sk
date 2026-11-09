@@ -1,0 +1,1079 @@
+// Registered, typed matcher fixtures with named results and isolated state.
+class MatcherCase(label: String, expression: LeanValue, expected: LeanValue)
+
+fun matcherApply(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun matcherBinders(
+  runtime: mutable LeanExecution,
+  domains: Array<LeanValue>,
+  body: LeanValue,
+  lambda: Bool,
+): LeanValue {
+  result = body;
+  for (offset in Range(0, domains.size())) {
+    domain = domains[domains.size() - offset - 1];
+    !result = if (lambda) {
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        runtime,
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        domain,
+        result,
+      )
+    } else {
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        domain,
+        result,
+      )
+    }
+  };
+  result
+}
+
+fun matcherDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+  parameters: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, parameters, type]),
+          value,
+          LeanCtor(
+            LeanTag.ReducibilityHints_regular,
+            Array[LeanWord("uint32", 1)],
+          ),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(
+            LeanTag.List_cons,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[])],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+fun matcherAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun matcherInfo(runtime: mutable LeanExecution, alternatives: Int): LeanValue {
+  LeanCtor(
+    LeanTag.Meta_Match_MatcherInfo_mk,
+    Array[
+      LeanNatLiterals.n1,
+      LeanNatLiterals.n2,
+      LeanArray(
+        Array::fill(
+          alternatives,
+          LeanCtor(
+            LeanTag.Meta_Match_AltParamInfo_mk,
+            Array[LeanNatLiterals.n2, LeanNatLiterals.n0, leanBool(false)],
+          ),
+        ),
+      ),
+      LeanCtor(LeanTag.Option_none, Array[]),
+      LeanArray(
+        Array[
+          LeanCtor(LeanTag.Option_none, Array[]),
+          LeanCtor(LeanTag.Option_none, Array[]),
+        ],
+      ),
+      L4_Lean_Meta_Match_MatcherInfo.f_Match_instInhabitedOverlaps_default_4730f69016(
+        runtime,
+      ),
+    ],
+  )
+}
+
+fun matcherContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun matcherCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  expression: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: ?LeanValue,
+  unchangedRefs: Bool,
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldExpression = rewriteProbeCopyInput(expression);
+  newExpression = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceMatcher_6453efd516_fallback(
+        runtime,
+        oldExpression,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, oldExpression));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceMatcher_6453efd516(
+        runtime,
+        newExpression,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, newExpression));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  );
+  if (!rewriteProbeSameInput(leanField(result, 1), world)) {
+    leanFail("matcher world: " + label)
+  };
+  expected match {
+  | Some(value) ->
+    if (!rewriteProbeSameInput(result, value)) {
+      leanFail("matcher expected outcome: " + label)
+    }
+  | None() ->
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    assert(
+      leanTag(leanField(result, 0)) == LeanTag.Meta_ReduceMatcherResult_stuck,
+    )
+  };
+  if (unchangedRefs && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("matcher unexpected write: " + label)
+  };
+  (result, after)
+}
+
+fun matcherAssertStuck(
+  result: LeanValue,
+  head: LeanValue,
+  prefix: Array<LeanValue>,
+): void {
+  stuck = leanField(leanField(result, 0), 0);
+  assert(leanTag(stuck) == LeanTag.Expr_app__impl);
+  assert(leanTag(leanField(stuck, 2)) == LeanTag.Expr_fvar__impl);
+  cursor = leanField(stuck, 1);
+  for (offset in Range(0, prefix.size())) {
+    assert(leanTag(cursor) == LeanTag.Expr_app__impl);
+    assert(
+      rewriteProbeSameInput(
+        leanField(cursor, 2),
+        prefix[prefix.size() - offset - 1],
+      ),
+    );
+    !cursor = leanField(cursor, 1)
+  };
+  assert(rewriteProbeSameInput(cursor, head))
+}
+
+fun matcherCachedValue(
+  runtime: mutable LeanExecution,
+  state: RewriteProbeState,
+  name: LeanValue,
+  levels: LeanValue,
+  value: LeanValue,
+): void {
+  cache = leanField(leanField(runtime.readRef(state.coreStateRef), 5), 1);
+  found = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    runtime,
+    cache,
+    name,
+  );
+  assert(leanTag(found) == LeanTag.Option_some);
+  entry = leanField(found, 0);
+  assert(rewriteProbeSameInput(leanField(entry, 0), levels));
+  assert(rewriteProbeSameInput(leanField(entry, 1), value))
+}
+
+fun matcherPolicy(
+  runtime: mutable LeanExecution,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  assert(leanTag(arguments[3]) == LeanTag.Meta_Config_mk);
+  declarationName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+    runtime,
+    arguments[4],
+  );
+  assert(rewriteProbeSameInput(declarationName, arguments[1]));
+  assert(rewriteProbeSameInput(leanField(arguments[2], 1), arguments[7]));
+  count = leanNat(runtime.readRef(arguments[0]));
+  runtime.writeRef(
+    arguments[0],
+    Some(leanBoxNat(count.add(LeanNat::fromInt(1)))),
+  );
+  arguments[2]
+}
+
+fun matcherDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun main(): void {
+  failureMode = Environ.varOpt("LEAN_SKIP_TEST_MATCHER_FAILURE") match {
+  | Some(value) -> value
+  | None() -> ""
+  };
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    leanInitializeBinding(
+      builder,
+      "Lean.Meta.Match.Extension.extension",
+      L4_Lean_Meta_Match_MatcherInfo.f_MatcherInfo_hygCtx_hyg_89b5cff17d,
+    );
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, n, nil);
+    variable = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, n);
+    bound = (i: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(i));
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, one);
+    pName = name("MatcherP");
+    qName = name("MatcherQ");
+    p = constant(pName);
+    q = constant(qName);
+    xName = name("matcherX");
+    yName = name("matcherY");
+    zName = name("matcherZ");
+    qxName = name("matcherQX");
+    qyName = name("matcherQY");
+    x = variable(xName);
+    y = variable(yName);
+    z = variable(zName);
+    qx = variable(qxName);
+    qy = variable(qyName);
+    motiveType = matcherBinders(builder, Array[p, p], prop, false);
+    motive = matcherBinders(builder, Array[p, p], p, true);
+    first = matcherBinders(builder, Array[p, p], bound(1), true);
+    second = matcherBinders(builder, Array[p, p], bound(0), true);
+    binaryType = matcherBinders(builder, Array[p, p], p, false);
+    functionMotive = matcherBinders(builder, Array[p, p], binaryType, true);
+    functionAlternative = matcherBinders(
+      builder,
+      Array[p, p, p, p],
+      bound(1),
+      true,
+    );
+    alternatives: mutable Array<LeanValue> = Array::mfill(
+      2,
+      (LeanErased() : LeanValue),
+    );
+    for (index in Range(0, 2)) {
+      alternatives.set(
+        index,
+        matcherBinders(
+          builder,
+          Array[p, p],
+          matcherApply(builder, bound(4 + index), Array[bound(1), bound(0)]),
+          false,
+        ),
+      )
+    };
+    singleDomains = Array[p, motiveType, p, p, alternatives[0]];
+    doubleDomains = Array[
+      p,
+      motiveType,
+      p,
+      p,
+      alternatives[0],
+      alternatives[1],
+    ];
+    prefixDomains = Array[p, motiveType, p, p];
+    singleType = matcherBinders(
+      builder,
+      singleDomains,
+      matcherApply(builder, bound(3), Array[bound(2), bound(1)]),
+      false,
+    );
+    doubleType = matcherBinders(
+      builder,
+      doubleDomains,
+      matcherApply(builder, bound(4), Array[bound(3), bound(2)]),
+      false,
+    );
+    emptyType = matcherBinders(
+      builder,
+      prefixDomains,
+      matcherApply(builder, bound(2), Array[bound(1), bound(0)]),
+      false,
+    );
+    singleValue = matcherBinders(
+      builder,
+      singleDomains,
+      matcherApply(builder, bound(0), Array[bound(2), bound(1)]),
+      true,
+    );
+    doubleFirst = matcherBinders(
+      builder,
+      doubleDomains,
+      matcherApply(builder, bound(1), Array[bound(3), bound(2)]),
+      true,
+    );
+    doubleSecond = matcherBinders(
+      builder,
+      doubleDomains,
+      matcherApply(builder, bound(0), Array[bound(3), bound(2)]),
+      true,
+    );
+    singleName = name("match_selector");
+    firstName = name("match_first");
+    secondName = name("match_second");
+    emptyName = name("match_empty");
+    stuckName = name("match_stuck");
+    helperName = name("matcherHelper");
+    aliasName = name("match_alias");
+    opaqueHead = constant(name("matcherOpaque"));
+    emptyHead = constant(name("matcherEmptyOpaque"));
+    single = constant(singleName);
+    doubleA = constant(firstName);
+    doubleB = constant(secondName);
+    helper = constant(helperName);
+    axiomName = name("match_axiom");
+    opaqueName = name("match_opaque");
+    missingName = name("match_missing");
+    largeParams = name("match_large_params");
+    largeDiscrs = name("match_large_discrs");
+    hiddenName = name("selector_without_match_prefix");
+    uName = name("matcherU");
+    universe = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, uName);
+    sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, universe);
+    polyMotiveType = matcherBinders(
+      builder,
+      Array[bound(0), bound(1)],
+      sortU,
+      false,
+    );
+    polyAltType = matcherBinders(
+      builder,
+      Array[bound(3), bound(4)],
+      matcherApply(builder, bound(4), Array[bound(1), bound(0)]),
+      false,
+    );
+    polyDomains = Array[sortU, polyMotiveType, bound(1), bound(2), polyAltType];
+    polyType = matcherBinders(
+      builder,
+      polyDomains,
+      matcherApply(builder, bound(3), Array[bound(2), bound(1)]),
+      false,
+    );
+    polyValue = matcherBinders(
+      builder,
+      polyDomains,
+      matcherApply(builder, bound(0), Array[bound(2), bound(1)]),
+      true,
+    );
+    polyName = name("match_polymorphic");
+    singleton = (value: LeanValue) ->
+      LeanCtor(LeanTag.List_cons, Array[value, nil]);
+    axiomInfo = matcherAxiom(axiomName, singleType);
+    opaqueInfo = LeanCtor(
+      LeanTag.ConstantInfo_opaqueInfo,
+      Array[
+        LeanCtor(
+          LeanTag.OpaqueVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[opaqueName, nil, singleType],
+            ),
+            singleValue,
+            leanBool(false),
+            singleton(opaqueName),
+          ],
+        ),
+      ],
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      matcherAxiom(pName, prop),
+      matcherAxiom(qName, type),
+      matcherDefinition(singleName, singleType, singleValue, nil),
+      matcherDefinition(firstName, doubleType, doubleFirst, nil),
+      matcherDefinition(secondName, doubleType, doubleSecond, nil),
+      matcherAxiom(name("matcherOpaque"), singleType),
+      matcherAxiom(name("matcherEmptyOpaque"), emptyType),
+      matcherDefinition(stuckName, singleType, opaqueHead, nil),
+      matcherDefinition(emptyName, emptyType, emptyHead, nil),
+      matcherDefinition(helperName, singleType, singleValue, nil),
+      matcherDefinition(aliasName, singleType, helper, nil),
+      matcherDefinition(polyName, polyType, polyValue, singleton(uName)),
+      matcherDefinition(hiddenName, singleType, singleValue, nil),
+      axiomInfo,
+      opaqueInfo,
+    ]) {
+      declarationName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(
+        leanNameKey(declarationName),
+        LeanConstantFile(info, None()),
+      )
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    helperStatus = if (
+      failureMode == "old-pattern" ||
+      failureMode == "new-pattern"
+    ) {
+      LeanTag.ReducibilityStatus_semireducible
+    } else {
+      LeanTag.ReducibilityStatus_reducible
+    };
+    !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+      builder,
+      environment,
+      helperName,
+      LeanCtor(helperStatus, Array[]),
+      LeanCtor(LeanTag.AttributeKind_global, Array[]),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+    );
+    for ((n, alternativesCount) in Array[
+      (singleName, 1),
+      (firstName, 2),
+      (secondName, 2),
+      (emptyName, 0),
+      (stuckName, 1),
+      (aliasName, 1),
+      (polyName, 1),
+      (hiddenName, 1),
+      (axiomName, 1),
+      (opaqueName, 1),
+      (missingName, 1),
+    ]) {
+      !environment = L4_Lean_Meta_Match_MatcherInfo.f_Match_Extension_addMatcherInfo_c6808cf377(
+        builder,
+        environment,
+        n,
+        matcherInfo(builder, alternativesCount),
+      )
+    };
+    huge = leanBoxNat(LeanNat::parse("18446744073709551616"));
+    for ((n, index) in Array[(largeParams, 0), (largeDiscrs, 1)]) {
+      !environment = L4_Lean_Meta_Match_MatcherInfo.f_Match_Extension_addMatcherInfo_c6808cf377(
+        builder,
+        environment,
+        n,
+        leanReplaceField(matcherInfo(builder, 1), index, huge),
+      )
+    };
+    assert(
+      leanTag(
+        L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_getMatcherInfoCore_1c101d378d(
+          builder,
+          environment,
+          singleName,
+        ),
+      ) == LeanTag.Option_some,
+    );
+    assert(
+      leanTag(
+        L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_getMatcherInfoCore_1c101d378d(
+          builder,
+          environment,
+          hiddenName,
+        ),
+      ) == LeanTag.Option_none,
+    );
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((n, localType) in Array[
+      (xName, p),
+      (yName, p),
+      (zName, p),
+      (qxName, q),
+      (qyName, q),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        n,
+        n,
+        localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(builder, environment, locals, "<reduce-matcher>");
+    callbackCount = builder.newRef(LeanNatLiterals.n0);
+    saved = builder.checkpoint();
+    config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    unused = LeanUnavailable(
+      "matcher short circuit must not inspect this input",
+    );
+    noMeta = RewriteProbeState(
+      saved,
+      unused,
+      unused,
+      unused,
+      state.coreStateRef,
+    );
+    noRefs = RewriteProbeState(saved, unused, unused, unused, unused);
+    metadata = L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(builder);
+    saturated = matcherApply(builder, single, Array[z, motive, x, y, first]);
+    reduced = (value: LeanValue) ->
+      LeanCtor(LeanTag.Meta_ReduceMatcherResult_reduced, Array[value]);
+    notMatcher = LeanCtor(LeanTag.Meta_ReduceMatcherResult_notMatcher, Array[]);
+    partial = LeanCtor(LeanTag.Meta_ReduceMatcherResult_partialApp, Array[]);
+    if (failureMode == "old-pattern" || failureMode == "new-pattern") {
+      restricted = matcherContext(
+        builder,
+        state.metaContext,
+        leanReplaceField(
+          config,
+          9,
+          LeanCtor(LeanTag.Meta_TransparencyMode_reducible, Array[]),
+        ),
+      );
+      expression = matcherApply(
+        builder,
+        constant(aliasName),
+        Array[z, motive, x, y, first],
+      );
+      _result = if (failureMode == "old-pattern") {
+        L4_Lean_Meta_WHNF.f_Lean_Meta_reduceMatcher_6453efd516_fallback(
+          builder,
+          expression,
+          restricted,
+          state.metaStateRef,
+          state.coreContext,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      } else {
+        L4_Lean_Meta_WHNF.f_Lean_Meta_reduceMatcher_6453efd516(
+          builder,
+          expression,
+          restricted,
+          state.metaStateRef,
+          state.coreContext,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      };
+      leanFail("unsupported matchPatternAttr unexpectedly succeeded");
+      return void
+    };
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      ok = (value: LeanValue) ->
+        LeanCtor(LeanTag.EST_Out_ok, Array[value, world]);
+      for ((label, expression) in Array[
+        ("sort is not matcher", prop),
+        ("free variable is not matcher", x),
+        ("bound variable is not matcher", bound(0)),
+        ("lambda head is not reduced", matcherApply(builder, first, Array[x])),
+        (
+          "metadata under application stays on head",
+          matcherApply(
+            builder,
+            L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, single),
+            Array[x],
+          ),
+        ),
+      ]) {
+        _checked = matcherCheck(
+          label,
+          saved,
+          noRefs,
+          expression,
+          unused,
+          unused,
+          world,
+          Some(ok(notMatcher)),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for ((label, expression) in Array[
+        ("ordinary constant is not matcher", constant(pName)),
+        ("unregistered matcher-looking name", constant(name("match_absent"))),
+        ("registration without match prefix is ignored", constant(hiddenName)),
+      ]) {
+        _checked = matcherCheck(
+          label,
+          saved,
+          noMeta,
+          expression,
+          unused,
+          unused,
+          world,
+          Some(ok(notMatcher)),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for ((head, arguments) in Array[
+        (single, Array[z, motive, x, y, first]),
+        (doubleA, Array[z, motive, x, y, first, second]),
+      ]) {
+        expression = head;
+        for (argument in arguments) {
+          _checked = matcherCheck(
+            "partial before context and declaration reads",
+            saved,
+            noMeta,
+            expression,
+            unused,
+            unused,
+            world,
+            Some(ok(partial)),
+            true,
+          );
+          !expression = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+            builder,
+            expression,
+            argument,
+          );
+          !checks = checks + 1
+        }
+      };
+      for (n in Array[largeParams, largeDiscrs]) {
+        _checked = matcherCheck(
+          "arbitrary Nat count remains partial",
+          saved,
+          noMeta,
+          constant(n),
+          unused,
+          unused,
+          world,
+          Some(ok(partial)),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for (mode in Array[
+        LeanTag.Meta_TransparencyMode_none,
+        LeanTag.Meta_TransparencyMode_default,
+        LeanTag.Meta_TransparencyMode_all,
+        LeanTag.Meta_TransparencyMode_reducible,
+        LeanTag.Meta_TransparencyMode_instances,
+        LeanTag.Meta_TransparencyMode_implicit,
+      ]) {
+        context = matcherContext(
+          builder,
+          state.metaContext,
+          leanReplaceField(config, 9, LeanCtor(mode, Array[])),
+        );
+        for (example in Array[
+          MatcherCase("first discriminant", saturated, reduced(x)),
+          MatcherCase(
+            "second discriminant",
+            matcherApply(builder, single, Array[z, motive, x, y, second]),
+            reduced(y),
+          ),
+          MatcherCase(
+            "first of two alternatives",
+            matcherApply(
+              builder,
+              doubleA,
+              Array[z, motive, x, y, first, second],
+            ),
+            reduced(x),
+          ),
+          MatcherCase(
+            "second of two alternatives",
+            matcherApply(
+              builder,
+              doubleB,
+              Array[z, motive, x, y, first, second],
+            ),
+            reduced(y),
+          ),
+          MatcherCase(
+            "outer metadata consumed",
+            L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+              builder,
+              metadata,
+              saturated,
+            ),
+            reduced(x),
+          ),
+          MatcherCase(
+            "empty alternatives stuck",
+            matcherApply(builder, constant(emptyName), Array[z, motive, x, y]),
+            LeanCtor(
+              LeanTag.Meta_ReduceMatcherResult_stuck,
+              Array[matcherApply(builder, emptyHead, Array[z, motive, x, y])],
+            ),
+          ),
+          MatcherCase(
+            "function result without extra arguments",
+            matcherApply(
+              builder,
+              single,
+              Array[z, functionMotive, x, y, functionAlternative],
+            ),
+            reduced(first),
+          ),
+          MatcherCase(
+            "one extra argument",
+            matcherApply(
+              builder,
+              single,
+              Array[z, functionMotive, x, y, functionAlternative, z],
+            ),
+            reduced(matcherBinders(builder, Array[p], z, true)),
+          ),
+          MatcherCase(
+            "two extra arguments in order",
+            matcherApply(
+              builder,
+              single,
+              Array[z, functionMotive, x, y, functionAlternative, z, x],
+            ),
+            reduced(z),
+          ),
+          MatcherCase(
+            "universe zero",
+            matcherApply(
+              builder,
+              L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+                builder,
+                polyName,
+                singleton(zero),
+              ),
+              Array[p, motive, x, y, first],
+            ),
+            reduced(x),
+          ),
+          MatcherCase(
+            "universe one",
+            matcherApply(
+              builder,
+              L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+                builder,
+                polyName,
+                singleton(one),
+              ),
+              Array[
+                q,
+                matcherBinders(builder, Array[q, q], q, true),
+                qx,
+                qy,
+                matcherBinders(builder, Array[q, q], bound(1), true),
+              ],
+            ),
+            reduced(qx),
+          ),
+        ]) {
+          _checked = matcherCheck(
+            example.label,
+            saved,
+            state,
+            example.expression,
+            context,
+            state.coreContext,
+            world,
+            Some(ok(example.expected)),
+            false,
+          );
+          !checks = checks + 1
+        };
+        (stuck, _stuckAfter) = matcherCheck(
+          "opaque body keeps fresh alternative",
+          saved,
+          state,
+          matcherApply(
+            builder,
+            constant(stuckName),
+            Array[z, motive, x, y, first],
+          ),
+          context,
+          state.coreContext,
+          world,
+          None(),
+          false,
+        );
+        matcherAssertStuck(stuck, opaqueHead, Array[z, motive, x, y]);
+        !checks = checks + 1;
+        (_coldResult, warmed) = matcherCheck(
+          "cold value cache",
+          saved,
+          state,
+          saturated,
+          context,
+          state.coreContext,
+          world,
+          Some(ok(reduced(x))),
+          false,
+        );
+        warmRuntime = warmed.restoreRaw();
+        matcherCachedValue(warmRuntime, state, singleName, nil, singleValue);
+        _warmResult = matcherCheck(
+          "warm value and inference caches",
+          warmed,
+          state,
+          saturated,
+          context,
+          state.coreContext,
+          world,
+          Some(ok(reduced(x))),
+          false,
+        );
+        !checks = checks + 2;
+        for (decision in Range(0, 3)) {
+          policyResult = if (decision == 2) {
+            LeanCtor(
+              LeanTag.EST_Out_error,
+              Array[
+                LeanCtor(
+                  LeanTag.Exception_error,
+                  Array[
+                    leanField(state.coreContext, 2),
+                    L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                      builder,
+                      LeanText("matcher policy error"),
+                    ),
+                  ],
+                ),
+                world,
+              ],
+            )
+          } else {
+            LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(decision == 1), world])
+          };
+          policy = LeanClosure(
+            matcherPolicy,
+            8,
+            Array[callbackCount, helperName, policyResult],
+          );
+          custom = leanReplaceField(
+            context,
+            7,
+            LeanCtor(LeanTag.Option_some, Array[policy]),
+          );
+          restricted =
+            mode == LeanTag.Meta_TransparencyMode_reducible ||
+            mode == LeanTag.Meta_TransparencyMode_instances ||
+            mode == LeanTag.Meta_TransparencyMode_implicit;
+          expected = if (restricted || decision == 1) {
+            Some(ok(reduced(x)))
+          } else if (decision == 2) Some(policyResult) else {
+            None()
+          };
+          (result, after) = matcherCheck(
+            "callback decision " + decision.toString(),
+            saved,
+            state,
+            matcherApply(
+              builder,
+              constant(aliasName),
+              Array[z, motive, x, y, first],
+            ),
+            custom,
+            state.coreContext,
+            world,
+            expected,
+            false,
+          );
+          if (!restricted && decision == 0) {
+            matcherAssertStuck(result, helper, Array[z, motive, x, y])
+          };
+          afterRuntime = after.restoreRaw();
+          assert(
+            leanNat(afterRuntime.readRef(callbackCount)) ==
+              LeanNat::fromInt(if (restricted) 0 else 1),
+          );
+          !checks = checks + 1
+        }
+      };
+      for (info in Array[axiomInfo, opaqueInfo]) {
+        n = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+          builder,
+          info,
+        );
+        oracle = saved.restoreRaw();
+        error = L4_Lean_CoreM.f_Lean_Core_instantiateValueLevelParams_f93716788b(
+          oracle,
+          info,
+          nil,
+          leanBool(false),
+          state.coreContext,
+          state.coreStateRef,
+          world,
+        );
+        assert(leanTag(error) == LeanTag.EST_Out_error);
+        (_result, after) = matcherCheck(
+          "value instantiation rejects axiom or opaque declaration",
+          saved,
+          noMeta,
+          matcherApply(builder, constant(n), Array[z, motive, x, y, first]),
+          unused,
+          state.coreContext,
+          world,
+          Some(error),
+          false,
+        );
+        assert(native_eq(after.refs, oracle.checkpoint().refs) == 0);
+        !checks = checks + 1
+      };
+      oracle = saved.restoreRaw();
+      error = L4_Lean_Meta_WHNF.f_Meta_toCtorWhenStructure_spec_0_d52d3d3bb6(
+        oracle,
+        missingName,
+        state.metaContext,
+        state.metaStateRef,
+        state.coreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(leanTag(error) == LeanTag.EST_Out_error);
+      (_missing, missingAfter) = matcherCheck(
+        "registered missing declaration propagates lookup error",
+        saved,
+        state,
+        matcherApply(
+          builder,
+          constant(missingName),
+          Array[z, motive, x, y, first],
+        ),
+        state.metaContext,
+        state.coreContext,
+        world,
+        Some(error),
+        false,
+      );
+      assert(native_eq(missingAfter.refs, oracle.checkpoint().refs) == 0);
+      !checks = checks + 1;
+      limited = leanReplaceField(
+        leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1),
+        0,
+        leanReplaceField(
+          leanField(state.coreContext, 0),
+          3,
+          LeanNatLiterals.n1,
+        ),
+      );
+      (_depth, depthAfter) = matcherCheck(
+        "instantiation cache precedes inference depth error",
+        saved,
+        state,
+        saturated,
+        state.metaContext,
+        limited,
+        world,
+        Some(matcherDepthError(builder, leanField(limited, 2), world)),
+        false,
+      );
+      depthRuntime = depthAfter.restoreRaw();
+      matcherCachedValue(depthRuntime, state, singleName, nil, singleValue);
+      originalRuntime = saved.restoreRaw();
+      assert(
+        native_eq(
+          depthRuntime.readRef(state.metaStateRef),
+          originalRuntime.readRef(state.metaStateRef),
+        ) == 0,
+      );
+      !checks = checks + 1
+    }
+  };
+  assert(checks == 508);
+  print_string("Matcher reduction passed " + checks.toString() + " cases")
+}

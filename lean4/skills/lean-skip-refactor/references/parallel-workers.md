@@ -9,28 +9,34 @@ the entire plans or follow links outside their assigned directory.
 ## Roles and limits
 
 The user permits up to ten Vibe instances concurrently. Count writers, reviewers,
-probe authors and retries in that same limit. Three Codex peers now own disjoint
-implementation tasks at the user's request. This fills the current four-active-agent
+probe authors and retries in that same limit. The latest allocation assigns
+three Codex peers to packet preparation and independent review of Vibe drafts.
+This fills the current four-active-agent
 session limit including the primary; it is not a subscription-wide quota claim.
 The primary supplies independent
 semantic/readability review and owns production edits, interface decisions,
-source manifests and the single compiler queue. Let the writers continue their
-next bounded tasks while the primary validates a handoff. Do not assign peers to
-general audits while conversion waits. Delegation
+source manifests and the single compiler queue. Let writers continue their
+next bounded tasks while reviewers validate handoffs, within the queue limits
+below. Delegation
 does not authorize workers to message third parties or publish changes.
 
-Current operating limit is **one Vibe worker at a time**: wave two encountered
-provider HTTP 429 responses with the minute allowance exhausted, and the user
-explicitly asked to remain within company limits. All six runs were stopped with
-exports preserved; overlapping retries must not resume. New packets set
-`api_retry_max_elapsed_time = 0.0` so the coordinator handles backoff. Wait for at
-least the provider's retry delay (at least one minute when none is supplied)
-before another attempt, and keep a repeated rate-limit failure stopped while
-doing local work. The advertised ten-instance maximum is not permission to
-exceed provider quotas. Do not increase concurrency without evidence of capacity.
+Earlier runs encountered HTTP 429 with the minute allowance exhausted. The user
+later changed configuration, then selected GLM-5.3 and explicitly requested ten
+workers immediately with reduced concurrency on errors. Keep
+`api_retry_max_elapsed_time = 0.0`: coordinate any retries and honor the provider's
+retry delay. Report errors and the resulting allocation. Availability failures
+may reduce the pool; quota failures stop scheduling and active worker groups
+for assessment. Preserve exports and never switch providers/models to bypass a
+limit without authorization.
+Distinguish confirmed 429/quota errors from availability failures such as 503;
+neither an exit code nor a successful first request proves capacity for ten
+workers. The active plan records whether a restart is currently stopped.
 
-Start with three representative implementation tasks and scale after accepted
-output establishes useful throughput. Eight writers with two flexible slots is
+For a new allocation without explicit concurrency steering, start with a few
+representative implementation tasks and scale after accepted output establishes
+useful throughput. The current user explicitly requested ten immediately; the
+initial GLM allocation is five writers and five independent probe authors.
+Eight writers with two flexible slots is
 a default allocation, not a requirement to keep ten processes busy. A writer
 cannot supply its own independent approval. Review leads can implement difficult
 pieces, with another lead or the primary reviewing those changes.

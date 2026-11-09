@@ -1,9 +1,40 @@
 # Rewrite the measured example in parallel
 
-## Paused by the user (2026-11-09)
+## Active GLM restart (2026-11-09)
 
-Do not resume until the user asks. All three workers have stopped, and no
-compiler/probe job is running. The last validated code checkpoint is `a7c2b46c4`
+After the failure below, the user selected GLM-5.3 and explicitly requested ten
+workers immediately, reducing concurrency on errors. Ten `glm-5-3` workers are
+running in `build/vibe-workers/glm-2026-11-09`: five implementation assignments
+and five independent probe assignments for the same functions. Three Codex peers
+review their output; the primary owns integration and the single compiler queue.
+The initial functions are eta-expanded bodies, Core type/value level instantiation,
+discrimination-tree offset recognition and simplifier Meta configuration.
+
+Automatic API retries and nested agents remain disabled. The supervisor reduces
+concurrency on service-availability errors; confirmed rate-limit/configuration
+errors stop the pool for assessment. Honor provider retry delays before new calls.
+Completion of a worker does not count as acceptance or a performance result.
+
+### Earlier restart stopped after a provider failure
+
+The user resumed work with authorization for ten Vibe writers and Codex reviewers,
+and instructed us to stop and report suspected rate limiting. A single canary
+worker produced an unvalidated `etaExpandedBody` draft, then exited with HTTP 503,
+`Service unavailable` (provider code 3800). This is an infrastructure failure,
+not confirmed HTTP 429 or quota exhaustion. No automatic retry or expansion of
+the pool occurred. That attempt stopped for the user's assessment; the subsequent
+explicit GLM restart is recorded above.
+
+Four additional frozen packets are ready: Core type/value level instantiation,
+discrimination-tree offset recognition and simplifier Meta configuration.
+The [restart checkpoint](provenance/pending-rewrites/2026-11-09-vibe-resume/checkpoint.json)
+archives the five packets, unfinished draft, sanitized failure record and remaining
+assignments. No production source changed and no new validation is claimed.
+
+### Earlier pause checkpoint
+
+The earlier user pause was superseded by the restart above. The last validated
+code checkpoint remains `a7c2b46c4`
 (wave seven). Literal-recognition source is integrated and type-checks, but its
 latest probe still needs independent review and execution; it is not accepted in
 the inventory. The stuck-metavariable rewrite remains an uncompiled draft.
@@ -110,26 +141,24 @@ Before declaring the example's path complete:
 
 ## People, processes and ownership
 
-The user has requested more implementation capacity. The current team is three
-writers plus the primary, filling this session's four-active-agent limit. This
-session limit does not establish the user's subscription-wide allowance.
-Vibe remains stopped after provider quota failures;
-the earlier ten-instance authorization does not override those limits.
+The latest allocation is up to ten Vibe writers with three Codex packet owners
+and reviewers, plus the primary. The four Codex agents fill this session's active
+agent limit; that limit does not establish a subscription-wide allowance. The
+active model/concurrency policy is recorded above.
 
 - Primary: independent semantic/readability review, source/interface contracts,
   integration, manifests, the single compiler queue, final validation and updates.
-- Implementation owner A (`rewrite_execution_lead`): WHNF, currently stuck
-  metavariable detection after matcher reduction.
-- Implementation owner B (`rewrite_semantics_lead`): discrimination trees,
-  currently argument insertion after key/argument extraction.
-- Implementation owner C (`unfold_definition`): literal-value recognition,
-  starting with `getOfNatValue` and `getIntValue`.
+- Reviewer A (`rewrite_execution_lead`): reduction and Core level caches;
+  independent review of the pending literal probe.
+- Reviewer B (`rewrite_semantics_lead`): discrimination trees and simplifier;
+  independent review of the pending stuck-metavariable handoff.
+- Reviewer C (`unfold_definition`): inference and unification.
 
 Each writer supplies source and executable probes from frozen current inputs in
 a private task directory. The primary reviews and integrates one batch while
 the writers continue disjoint work. Writers do not independently approve their
-own changes. Request a bounded second opinion only when a concrete semantic
-question warrants it; do not reserve writers for general audit work.
+own changes. Codex peers review Vibe drafts against exact originals, contracts
+and expected outcomes; the primary retains integration and the compiler queue.
 Keep at most two completed drafts waiting per writer and four in total.
 
 The following are ownership lanes, not eight simultaneous monolithic rewrites.

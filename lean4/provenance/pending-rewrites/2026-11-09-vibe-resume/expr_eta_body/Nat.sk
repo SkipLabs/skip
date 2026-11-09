@@ -1,0 +1,242 @@
+// Small naturals use Skip's nonnegative Int range. Larger values retain the
+// arbitrary-precision implementation. Factories keep the representation canonical.
+const leanSmallNaturals: Array<LeanNat> = Array::fillBy(256, n ->
+  LeanSmallNat(n)
+);
+const leanSmallNaturalValues: Array<LeanValue> = leanSmallNaturals.map(n ->
+  LeanNatural(n)
+);
+
+base class LeanNat uses Orderable, Show {
+  children =
+  | LeanSmallNat(value: Int)
+  | LeanLargeNat(value: LeanNatLimbs)
+
+  static fun fromInt(value: Int): LeanNat {
+    invariant(value >= 0, "Negative Lean Nat");
+    if (value < 256) leanSmallNaturals[value] else LeanSmallNat(value)
+  }
+
+  static fun fromLimbs(value: LeanNatLimbs): LeanNat {
+    value.maybeInt() match {
+    | Some(small) -> LeanNat::fromInt(small)
+    | None() -> LeanLargeNat(value)
+    }
+  }
+
+  static fun create(limbs: Array<Int>): LeanNat {
+    LeanNat::fromLimbs(LeanNatLimbs::create(limbs))
+  }
+
+  static fun parse(text: String): LeanNat {
+    invariant(!text.isEmpty(), "Empty Lean Nat");
+    bytes = text.bytes();
+    if (bytes.size() <= 18) {
+      value = 0;
+      for (byte in bytes) {
+        digit = byte.toInt() - 48;
+        invariant(digit >= 0 && digit <= 9, "Invalid Lean Nat literal");
+        !value = value * 10 + digit
+      };
+      return LeanNat::fromInt(value)
+    };
+    LeanNat::fromLimbs(LeanNatLimbs::parse(text))
+  }
+
+  static fun fromWord(bits: Int): LeanNat {
+    if (bits >= 0) LeanNat::fromInt(bits) else {
+      LeanLargeNat(LeanNatLimbs::fromWord(bits))
+    }
+  }
+
+  fun asLimbs(): LeanNatLimbs {
+    this match {
+    | LeanSmallNat(value) -> LeanNatLimbs::fromInt(value)
+    | LeanLargeNat(value) -> value
+    }
+  }
+
+  fun toString(): String {
+    this match {
+    | LeanSmallNat(value) -> value.toString()
+    | LeanLargeNat(value) -> value.toString()
+    }
+  }
+
+  fun compare(other: LeanNat): Order {
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) -> left.compare(right)
+    | (LeanSmallNat _, LeanLargeNat _) -> LT()
+    | (LeanLargeNat _, LeanSmallNat _) -> GT()
+    | (LeanLargeNat(left), LeanLargeNat(right)) -> left.compare(right)
+    }
+  }
+
+  // These predicates answer directly instead of constructing an Order and
+  // dispatching another equality operation on it for every index comparison.
+  fun ==(other: LeanNat): Bool {
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) -> left == right
+    | (LeanLargeNat(left), LeanLargeNat(right)) -> left == right
+    | _ -> false
+    }
+  }
+
+  fun <(other: LeanNat): Bool {
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) -> left < right
+    | (LeanSmallNat _, LeanLargeNat _) -> true
+    | (LeanLargeNat _, LeanSmallNat _) -> false
+    | (LeanLargeNat(left), LeanLargeNat(right)) -> left < right
+    }
+  }
+
+  fun <=(other: LeanNat): Bool {
+    !(other < this)
+  }
+  fun >(other: LeanNat): Bool {
+    other < this
+  }
+  fun >=(other: LeanNat): Bool {
+    !(this < other)
+  }
+
+  fun isZero(): Bool {
+    this match {
+    | LeanSmallNat(value) -> value == 0
+    | LeanLargeNat _ -> false
+    }
+  }
+
+  fun toInt(): Int {
+    this match {
+    | LeanSmallNat(value) -> value
+    | LeanLargeNat(value) -> value.toInt()
+    }
+  }
+
+  // Modular conversion is intentional for Lean UInt64/USize conversions.
+  fun toWord(): Int {
+    this match {
+    | LeanSmallNat(value) -> value
+    | LeanLargeNat(value) -> value.toWord()
+    }
+  }
+
+  fun add(other: LeanNat): LeanNat {
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) ->
+      sum = left + right;
+      // Two nonnegative Ints overflow the signed range exactly when this is negative.
+      if (sum >= 0) return LeanNat::fromInt(sum)
+    | _ -> void
+    };
+    LeanNat::fromLimbs(this.asLimbs().add(other.asLimbs()))
+  }
+
+  fun sub(other: LeanNat): LeanNat {
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) ->
+      return LeanNat::fromInt(max(0, left - right))
+    | (LeanSmallNat _, LeanLargeNat _) -> return LeanNat::fromInt(0)
+    | _ -> void
+    };
+    LeanNat::fromLimbs(this.asLimbs().sub(other.asLimbs()))
+  }
+
+  fun mulSmall(factor: Int): LeanNat {
+    invariant(factor >= 0 && factor <= 4294967296, "Invalid limb multiplier");
+    if (factor == 0) return LeanNat::fromInt(0);
+    if (factor == 1) return this;
+    this match {
+    | LeanSmallNat(value) ->
+      if (value <= Int::max / factor) return LeanNat::fromInt(value * factor)
+    | _ -> void
+    };
+    LeanNat::fromLimbs(this.asLimbs().mulSmall(factor))
+  }
+
+  fun mul(other: LeanNat): LeanNat {
+    if (this.isZero() || other.isZero()) return LeanNat::fromInt(0);
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) ->
+      if (left <= Int::max / right) return LeanNat::fromInt(left * right)
+    | _ -> void
+    };
+    LeanNat::fromLimbs(this.asLimbs().mul(other.asLimbs()))
+  }
+
+  fun pow(exponent: LeanNat): LeanNat {
+    if (exponent.isZero()) return LeanNat::fromInt(1);
+    if (this.isZero() || this == LeanNat::fromInt(1)) return this;
+    if (exponent > LeanNat::fromInt(4294967295)) {
+      return leanFail("Nat.pow exponent is too big")
+    };
+    remaining = exponent.toInt();
+    base = this;
+    result = LeanNat::fromInt(1);
+    while (remaining > 0) {
+      if (remaining.and(1) == 1) !result = result.mul(base);
+      !remaining = remaining.ushr(1);
+      if (remaining > 0) !base = base.mul(base)
+    };
+    result
+  }
+
+  fun gcd(other: LeanNat): LeanNat {
+    a = this;
+    b = other;
+    while (!b.isZero()) {
+      remainder = a.divMod(b).i1;
+      !a = b;
+      !b = remainder
+    };
+    a
+  }
+
+  fun divMod(other: LeanNat): (LeanNat, LeanNat) {
+    if (other.isZero()) return (LeanNat::fromInt(0), this);
+    (this, other) match {
+    | (LeanSmallNat(left), LeanSmallNat(right)) ->
+      return (LeanNat::fromInt(left / right), LeanNat::fromInt(left % right))
+    | (LeanSmallNat _, LeanLargeNat _) -> return (LeanNat::fromInt(0), this)
+    | _ -> void
+    };
+    (quotient, remainder) = this.asLimbs().divMod(other.asLimbs());
+    (LeanNat::fromLimbs(quotient), LeanNat::fromLimbs(remainder))
+  }
+
+  fun shiftRight(amount: LeanNat): LeanNat {
+    if (amount.isZero()) return this;
+    (this, amount) match {
+    | (LeanSmallNat(value), LeanSmallNat(bits)) ->
+      return LeanNat::fromInt(if (bits >= 63) 0 else value.ushr(bits))
+    | (LeanSmallNat _, LeanLargeNat _) -> return LeanNat::fromInt(0)
+    | _ -> void
+    };
+    LeanNat::fromLimbs(this.asLimbs().shiftRight(amount.asLimbs()))
+  }
+}
+
+fun leanNat(value: LeanValue): LeanNat {
+  value match {
+  | LeanNatural(n) -> n
+  | LeanScalar("nat", digits) -> LeanNat::parse(digits)
+  | LeanUnavailable(description) -> leanFail("not implemented: " + description)
+  | _ -> leanFail("expected a Lean Nat")
+  }
+}
+
+fun leanNatValue(n: Int): LeanValue {
+  if (n >= 0 && n < 256) return leanSmallNaturalValues[n];
+  LeanNatural(LeanNat::fromInt(n))
+}
+
+// Arithmetic often returns tiny counters. Reuse their immutable value wrappers
+// as well as the natural itself. Large results retain the ordinary wrapper.
+fun leanBoxNat(n: LeanNat): LeanValue {
+  n match {
+  | LeanSmallNat(value) if (value < 256) -> leanSmallNaturalValues[value]
+  | _ -> LeanNatural(n)
+  }
+}
