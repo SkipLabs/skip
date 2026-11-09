@@ -6,26 +6,33 @@ baseline. Keep the native kernel unchanged and concentrate on elaboration.
 
 ## Current priority: raw execution (2026-11-09)
 
-The user has reassigned both peer agents to implementation: unfolding/WHNF and
-key-ordering/dependency helpers. The primary independently reviews and integrates
+The user has increased the team to three implementation agents: unfolding/WHNF,
+discrimination-tree helpers and literal-value recognition. Together with the
+primary this fills the current four-active-agent session limit. The primary independently reviews and integrates
 their patches and owns the single compiler queue. Periodic commits are authorized.
 Current provider limits take precedence: all parallel Vibe runs and a subsequent
 single-worker trial hit HTTP 429. Further Vibe launches are stopped for now;
 Codex/local work continues. Any later Vibe run is limited to one worker with
 automatic API retries disabled and a coordinator-managed cooldown.
-The first five rewrite batches are integrated and pass focused checks.
+The first six rewrite batches are integrated and pass focused checks.
 Reviewed code batches are committed with their validation evidence.
 [REWRITE_PLAN.md](REWRITE_PLAN.md) defines ownership, current-working-tree task
 inputs, review/validation, human readability and the final benchmark gate.
 [rewrite-inventory.json](provenance/rewrite-inventory.json) preserves the sampled
-seed and the full observed-entry inventory. There are 181 remaining frame routines
-(73 seed and 108 newly observed); other entries need explicit dispositions, not
+seed and the full observed-entry inventory. There are 178 remaining frame routines
+(70 seed and 108 newly observed); other entries need explicit dispositions, not
 automatic conversion. The previous 5–8 working-day estimate predates this scope
 reconciliation and provider limits. Re-estimate from accepted batches under the
-two-writer allocation; the earlier 24–48 active-hour estimate was optimistic.
+current allocation; the earlier 24–48 active-hour estimate was optimistic.
 The second batch used compact task packets, guarded integration and shared
 probe fixtures to reduce repeated mechanical work. This does not invoke the
 historical transpiler or change Skip's compiler/runtime.
+
+The sixth batch validates uncached WHNF, Nat dispatch and discrimination-key
+arguments: 1,440 focused comparisons, 135 WHNF regressions and 12 explicit-failure
+subprocess cases pass. Nat bitwise/left-shift primitives remain unimplemented;
+bounded heartbeats and excessive exponents still fail explicitly. The audit and
+coverage limits are in [REWRITE_PLAN.md](REWRITE_PLAN.md). No new timing claim.
 
 Latest steering: make the maintained implementation ordinary, readable Skip.
 This is useful independently of performance; do not require a measured speedup
@@ -48,7 +55,7 @@ measurement release build until that path is converted. Do not stop after each
 helper to measure a partially converted path. Only a representative converted execution path can test
 whether this is sufficient for parity; a single helper cannot. Document module
 ownership, interface invariants and checks so the work can later be delegated.
-The prior three-worker batch is validated below. The current workflow has two
+The prior three-worker batch is validated below. The current workflow has three
 Codex implementation owners; the primary retains independent review,
 integration and the single compiler queue. Worker completion alone is not
 validation. Code must also pass a human readability review, with light comments

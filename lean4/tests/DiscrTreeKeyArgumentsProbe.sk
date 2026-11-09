@@ -1,0 +1,1094 @@
+// Explicit key/argument outcomes, isolated state, and real matcher metadata.
+class KeyArgsExample(
+  label: String,
+  expression: LeanValue,
+  key: LeanValue,
+  arguments: Array<LeanValue>,
+)
+
+fun keyArgsAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun keyArgsDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(
+            LeanTag.ReducibilityHints_regular,
+            Array[LeanWord("uint32", 1)],
+          ),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun keyArgsApply(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun keyArgsBinders(
+  runtime: mutable LeanExecution,
+  domains: Array<LeanValue>,
+  body: LeanValue,
+  lambda: Bool,
+): LeanValue {
+  result = body;
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  for (offset in Range(0, domains.size())) {
+    domain = domains[domains.size() - offset - 1];
+    !result = if (lambda) {
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        runtime,
+        anonymous,
+        binder,
+        domain,
+        result,
+      )
+    } else {
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        anonymous,
+        binder,
+        domain,
+        result,
+      )
+    }
+  };
+  result
+}
+
+fun keyArgsContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun keyArgsCheck(
+  label: String,
+  state: RewriteProbeState,
+  saved: LeanExecutionCheckpoint,
+  expression: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  isMatch: Bool,
+  root: Bool,
+  world: LeanValue,
+  expectedKey: ?LeanValue,
+  expectedArguments: Array<LeanValue>,
+  expectedException: ?LeanValue = None(),
+): LeanExecutionCheckpoint {
+  oldExpression = rewriteProbeCopyInput(expression);
+  newExpression = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getKeyArgs_8dfa358241_fallback(
+        runtime,
+        oldExpression,
+        leanBool(isMatch),
+        leanBool(root),
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, oldExpression));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getKeyArgs_8dfa358241(
+        runtime,
+        newExpression,
+        leanBool(isMatch),
+        leanBool(root),
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expression, newExpression));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  );
+  if (!rewriteProbeSameInput(leanField(result, 1), world)) {
+    leanFail("getKeyArgs changed world: " + label)
+  };
+  expectedKey match {
+  | None() ->
+    if (leanTag(result) != LeanTag.EST_Out_error) {
+      leanFail("getKeyArgs expected error: " + label)
+    };
+    expectedException match {
+    | Some(exception) ->
+      if (!rewriteProbeSameInput(leanField(result, 0), exception)) {
+        leanFail("getKeyArgs unexpected exception: " + label)
+      }
+    | None() -> assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error)
+    }
+  | Some(key) ->
+    if (leanTag(result) != LeanTag.EST_Out_ok) {
+      leanFail("getKeyArgs expected success: " + label)
+    };
+    pair = leanField(result, 0);
+    assert(leanTag(pair) == LeanTag.Prod_mk);
+    if (!rewriteProbeSameInput(leanField(pair, 0), key)) {
+      leanFail("getKeyArgs unexpected key: " + label)
+    };
+    arguments = leanField(pair, 1);
+    if (
+      !rewriteProbeSameInput(
+        LeanArray(leanArray(arguments)),
+        LeanArray(expectedArguments),
+      )
+    ) {
+      leanFail("getKeyArgs unexpected argument order: " + label)
+    };
+    if (
+      leanTag(key) == LeanTag.Meta_DiscrTree_Key_const ||
+      leanTag(key) == LeanTag.Meta_DiscrTree_Key_fvar
+    ) {
+      arguments match {
+      | LeanArray(_) -> assert(expectedArguments.size() <= 128)
+      | LeanPersistentArray(_) -> assert(expectedArguments.size() > 128)
+      | _ -> leanFail("getKeyArgs unexpected reverse-argument representation")
+      }
+    }
+  };
+  after
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    leanInitializeBinding(
+      builder,
+      "Lean.Meta.Match.Extension.extension",
+      L4_Lean_Meta_Match_MatcherInfo.f_MatcherInfo_hygCtx_hyg_89b5cff17d,
+    );
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+        builder,
+        n,
+        LeanCtor(LeanTag.List_nil, Array[]),
+      );
+    variable = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, n);
+    bound = (i: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(i));
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+        builder,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      ),
+    );
+    pName = name("KeyArgsP");
+    p = constant(pName);
+    functionType = keyArgsBinders(builder, Array[p, p, p], p, false);
+    binaryType = keyArgsBinders(builder, Array[p, p], p, false);
+    binaryValue = keyArgsBinders(builder, Array[p, p], bound(1), true);
+    fnName = name("keyArgsFn");
+    fn = variable(fnName);
+    xName = name("keyArgsX");
+    yName = name("keyArgsY");
+    zName = name("keyArgsZ");
+    x = variable(xName);
+    y = variable(yName);
+    z = variable(zName);
+    cName = name("keyArgsConstant");
+    definitionName = name("keyArgsReducible");
+    boxName = name("KeyArgsBox");
+    boxCtorName = name("KeyArgsBoxMk");
+    boxType = constant(boxName);
+    boxId = name("keyArgsBox");
+    box = variable(boxId);
+    emptyName = name("KeyArgsEmpty");
+    emptyType = constant(emptyName);
+    recName = name("keyArgsEmptyRec");
+    matcherName = name("match_keyArgs");
+    natName = name("Nat");
+    natType = constant(natName);
+    zeroName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("zero"),
+    );
+    succName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("succ"),
+    );
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    singleton = (value: LeanValue) ->
+      LeanCtor(LeanTag.List_cons, Array[value, nil]);
+    motiveType = keyArgsBinders(builder, Array[p, p], prop, false);
+    motive = keyArgsBinders(builder, Array[p, p], p, true);
+    // In the alternative's type the outer motive is under two discriminants and two local binders.
+    alternativeType = keyArgsBinders(
+      builder,
+      Array[p, p],
+      keyArgsApply(builder, bound(4), Array[bound(1), bound(0)]),
+      false,
+    );
+    matcherDomains = Array[p, motiveType, p, p, alternativeType];
+    matcherType = keyArgsBinders(
+      builder,
+      matcherDomains,
+      keyArgsApply(builder, bound(3), Array[bound(2), bound(1)]),
+      false,
+    );
+    matcherValue = keyArgsBinders(
+      builder,
+      matcherDomains,
+      keyArgsApply(builder, bound(0), Array[bound(2), bound(1)]),
+      true,
+    );
+    recMotiveType = keyArgsBinders(builder, Array[emptyType], prop, false);
+    recType = keyArgsBinders(
+      builder,
+      Array[recMotiveType, emptyType],
+      keyArgsApply(builder, bound(1), Array[bound(0)]),
+      false,
+    );
+    boxInfo = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[boxName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            singleton(boxName),
+            singleton(boxCtorName),
+            LeanNatLiterals.n0,
+            leanBool(false),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    boxCtorInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[
+                boxCtorName,
+                nil,
+                keyArgsBinders(builder, Array[binaryType], boxType, false),
+              ],
+            ),
+            boxName,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n1,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    emptyInfo = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[emptyName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            singleton(emptyName),
+            nil,
+            LeanNatLiterals.n0,
+            leanBool(false),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    recInfo = LeanCtor(
+      LeanTag.ConstantInfo_recInfo,
+      Array[
+        LeanCtor(
+          LeanTag.RecursorVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[recName, nil, recType]),
+            singleton(emptyName),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n1,
+            LeanNatLiterals.n0,
+            nil,
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      keyArgsAxiom(pName, prop),
+      keyArgsAxiom(cName, functionType),
+      keyArgsDefinition(definitionName, binaryType, binaryValue),
+      keyArgsDefinition(matcherName, matcherType, matcherValue),
+      keyArgsAxiom(natName, type),
+      keyArgsAxiom(zeroName, natType),
+      keyArgsAxiom(
+        succName,
+        keyArgsBinders(builder, Array[natType], natType, false),
+      ),
+      boxInfo,
+      boxCtorInfo,
+      emptyInfo,
+      recInfo,
+    ]) {
+      infoName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(infoName), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    for ((n, status) in Array[
+      (definitionName, LeanTag.ReducibilityStatus_reducible),
+      (matcherName, LeanTag.ReducibilityStatus_semireducible),
+    ]) {
+      !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+        builder,
+        environment,
+        n,
+        LeanCtor(status, Array[]),
+        LeanCtor(LeanTag.AttributeKind_global, Array[]),
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      );
+    };
+    matcherInfo = LeanCtor(
+      LeanTag.Meta_Match_MatcherInfo_mk,
+      Array[
+        LeanNatLiterals.n1,
+        LeanNatLiterals.n2,
+        LeanArray(
+          Array[
+            LeanCtor(
+              LeanTag.Meta_Match_AltParamInfo_mk,
+              Array[LeanNatLiterals.n2, LeanNatLiterals.n0, leanBool(false)],
+            ),
+          ],
+        ),
+        LeanCtor(LeanTag.Option_none, Array[]),
+        LeanArray(
+          Array[
+            LeanCtor(LeanTag.Option_none, Array[]),
+            LeanCtor(LeanTag.Option_none, Array[]),
+          ],
+        ),
+        L4_Lean_Meta_Match_MatcherInfo.f_Match_instInhabitedOverlaps_default_4730f69016(
+          builder,
+        ),
+      ],
+    );
+    !environment = L4_Lean_Meta_Match_MatcherInfo.f_Match_Extension_addMatcherInfo_c6808cf377(
+      builder,
+      environment,
+      matcherName,
+      matcherInfo,
+    );
+    assert(
+      leanTag(
+        L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_getMatcherInfoCore_1c101d378d(
+          builder,
+          environment,
+          matcherName,
+        ),
+      ) == LeanTag.Option_some,
+    );
+    assert(
+      leanIsTrue(
+        L4_Lean_MonadEnv.f_Lean_isRecCore_dcaab1b366(
+          builder,
+          environment,
+          recName,
+        ),
+      ),
+    );
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((id, localType) in Array[
+      (xName, p),
+      (yName, p),
+      (zName, p),
+      (fnName, functionType),
+      (boxId, boxType),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        id,
+        id,
+        localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(builder, environment, locals, "<get-key-args>");
+    initialMetaState = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMetaState, 0);
+    mName = name("keyArgsM");
+    opaqueName = name("keyArgsOpaque");
+    alternativeName = name("keyArgsAlternative");
+    majorName = name("keyArgsMajor");
+    for ((id, mType, kind) in Array[
+      (mName, p, LeanTag.MetavarKind_natural),
+      (opaqueName, p, LeanTag.MetavarKind_syntheticOpaque),
+      (alternativeName, binaryType, LeanTag.MetavarKind_natural),
+      (majorName, emptyType, LeanTag.MetavarKind_natural),
+    ]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        builder,
+        mctx,
+        id,
+        id,
+        locals,
+        LeanArray(Array[]),
+        mType,
+        LeanCtor(kind, Array[]),
+        LeanNatLiterals.n0,
+      )
+    };
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(initialMetaState, 0, mctx)),
+    );
+    saved = builder.checkpoint();
+    mvar = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, id);
+    m = mvar(mName);
+    opaque = mvar(opaqueName);
+    alternative = mvar(alternativeName);
+    major = mvar(majorName);
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    quietConfig = leanReplaceField(
+      leanReplaceField(
+        baseConfig,
+        9,
+        LeanCtor(LeanTag.Meta_TransparencyMode_none, Array[]),
+      ),
+      12,
+      leanBool(false),
+    );
+    quietContext = keyArgsContext(builder, state.metaContext, quietConfig);
+    other = LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]);
+    star = LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]);
+    fvarKey = (n: LeanValue, arity: Int) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_fvar, Array[n, leanNatValue(arity)]);
+    constKey = (n: LeanValue, arity: Int) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_const, Array[n, leanNatValue(arity)]);
+    literalKey = (literal: LeanValue) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[literal]);
+    cases: mutable Vector<KeyArgsExample> = mutable Vector[];
+    for (literal in Array[
+      LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n0]),
+      LeanCtor(
+        LeanTag.Literal_natVal,
+        Array[
+          leanBoxNat(LeanNat::parse("184467440737095516170000000000000000000")),
+        ],
+      ),
+      LeanCtor(LeanTag.Literal_strVal, Array[LeanText("keys 世界")]),
+    ]) {
+      cases.push(
+        KeyArgsExample(
+          "literal",
+          L4_Lean_Expr.f_Expr_lit_override_362af36df7(builder, literal),
+          literalKey(literal),
+          Array[],
+        ),
+      )
+    };
+    for (arguments in Array[
+      (Array[] : Array<LeanValue>),
+      Array[x],
+      Array[x, y, z],
+    ]) {
+      reversed = Array::fillBy(arguments.size(), i ->
+        arguments[arguments.size() - i - 1]
+      );
+      cases.push(
+        KeyArgsExample(
+          "constant args",
+          keyArgsApply(builder, constant(cName), arguments),
+          constKey(cName, arguments.size()),
+          reversed,
+        ),
+      );
+      cases.push(
+        KeyArgsExample(
+          "free-variable args",
+          keyArgsApply(builder, fn, arguments),
+          fvarKey(fnName, arguments.size()),
+          reversed,
+        ),
+      )
+    };
+    projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+      builder,
+      boxName,
+      LeanNatLiterals.n0,
+      box,
+    );
+    for (arguments in Array[(Array[] : Array<LeanValue>), Array[x, y]]) {
+      reversed = Array::fillBy(arguments.size(), i ->
+        arguments[arguments.size() - i - 1]
+      );
+      cases.push(
+        KeyArgsExample(
+          "projection base prefix",
+          keyArgsApply(builder, projection, arguments),
+          LeanCtor(
+            LeanTag.Meta_DiscrTree_Key_proj,
+            Array[boxName, LeanNatLiterals.n0, leanNatValue(arguments.size())],
+          ),
+          Array[box].concat(reversed),
+        ),
+      )
+    };
+    cases.push(
+      KeyArgsExample(
+        "independent forall",
+        keyArgsBinders(builder, Array[p], p, false),
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+        Array[p],
+      ),
+    );
+    cases.push(
+      KeyArgsExample(
+        "dependent forall",
+        keyArgsBinders(builder, Array[type], bound(0), false),
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+        Array[type],
+      ),
+    );
+    cases.push(KeyArgsExample("sort", prop, other, Array[]));
+    identity = keyArgsBinders(builder, Array[p], bound(0), true);
+    cases.push(KeyArgsExample("lambda", identity, other, Array[]));
+    cases.push(
+      KeyArgsExample(
+        "beta reduced",
+        keyArgsApply(builder, identity, Array[x]),
+        fvarKey(xName, 0),
+        Array[],
+      ),
+    );
+    cases.push(
+      KeyArgsExample(
+        "let reduced",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          builder,
+          zName,
+          p,
+          x,
+          bound(0),
+          leanBool(false),
+        ),
+        fvarKey(xName, 0),
+        Array[],
+      ),
+    );
+    for (example in cases.toArray()) {
+      cases.push(
+        KeyArgsExample(
+          "metadata " + example.label,
+          L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+            builder,
+            nil,
+            example.expression,
+          ),
+          example.key,
+          example.arguments,
+        ),
+      )
+    };
+    world = leanNatValue(37);
+    for (root in Array[false, true]) {
+      for (isMatch in Array[false, true]) {
+        for (example in cases.toArray()) {
+          warm = keyArgsCheck(
+            example.label,
+            state,
+            saved,
+            example.expression,
+            quietContext,
+            state.coreContext,
+            isMatch,
+            root,
+            world,
+            Some(example.key),
+            example.arguments,
+          );
+          _ = keyArgsCheck(
+            "warm " + example.label,
+            state,
+            warm,
+            example.expression,
+            quietContext,
+            state.coreContext,
+            isMatch,
+            root,
+            world,
+            Some(example.key),
+            example.arguments,
+          );
+          !count = count + 2
+        };
+        numeral = keyArgsApply(
+          builder,
+          constant(succName),
+          Array[constant(zeroName)],
+        );
+        expectedNumeral = if (root) constKey(succName, 1) else {
+          literalKey(
+            LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n1]),
+          )
+        };
+        _ = keyArgsCheck(
+          "root numeral precedence",
+          state,
+          saved,
+          numeral,
+          quietContext,
+          state.coreContext,
+          isMatch,
+          root,
+          world,
+          Some(expectedNumeral),
+          if (root) Array[constant(zeroName)] else Array[],
+        );
+        !count = count + 1;
+        _ = keyArgsCheck(
+          "root preserves definition before bad key",
+          state,
+          saved,
+          constant(definitionName),
+          state.metaContext,
+          state.coreContext,
+          isMatch,
+          root,
+          world,
+          Some(if (root) constKey(definitionName, 0) else other),
+          Array[],
+        );
+        _ = keyArgsCheck(
+          "definition reduction selects new head",
+          state,
+          saved,
+          keyArgsApply(builder, constant(definitionName), Array[x, y]),
+          state.metaContext,
+          state.coreContext,
+          isMatch,
+          root,
+          world,
+          Some(fvarKey(xName, 0)),
+          Array[],
+        );
+        !count = count + 2;
+        for (stuck in Array[false, true]) {
+          for (assignOpaque in Array[false, true]) {
+            config = leanReplaceField(
+              leanReplaceField(quietConfig, 4, leanBool(stuck)),
+              7,
+              leanBool(assignOpaque),
+            );
+            context = keyArgsContext(builder, state.metaContext, config);
+            for ((expression, readOnly) in Array[
+              (m, false),
+              (opaque, !assignOpaque),
+            ]) {
+              key = if (isMatch || (!stuck && readOnly)) other else star;
+              _ = keyArgsCheck(
+                "metavariable policy",
+                state,
+                saved,
+                expression,
+                context,
+                state.coreContext,
+                isMatch,
+                root,
+                world,
+                Some(key),
+                Array[],
+              );
+              !count = count + 1
+            };
+            deeper = saved.restoreRaw();
+            deeper.writeRef(
+              state.metaStateRef,
+              Some(
+                leanReplaceField(
+                  initialMetaState,
+                  0,
+                  leanReplaceField(mctx, 0, LeanNatLiterals.n1),
+                ),
+              ),
+            );
+            _ = keyArgsCheck(
+              "different-depth metavariable",
+              state,
+              deeper.checkpoint(),
+              m,
+              context,
+              state.coreContext,
+              isMatch,
+              root,
+              world,
+              Some(if (isMatch || !stuck) other else star),
+              Array[],
+            );
+            !count = count + 1
+          }
+        };
+        assigned = saved.restoreRaw();
+        assignedMctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(
+          assigned,
+          mctx,
+          mName,
+          x,
+        );
+        assigned.writeRef(
+          state.metaStateRef,
+          Some(leanReplaceField(initialMetaState, 0, assignedMctx)),
+        );
+        _ = keyArgsCheck(
+          "assigned metavariable",
+          state,
+          assigned.checkpoint(),
+          m,
+          quietContext,
+          state.coreContext,
+          isMatch,
+          root,
+          world,
+          Some(fvarKey(xName, 0)),
+          Array[],
+        );
+        !count = count + 1;
+        for (stuck in Array[false, true]) {
+          context = keyArgsContext(
+            builder,
+            state.metaContext,
+            leanReplaceField(quietConfig, 4, leanBool(stuck)),
+          );
+          stuckException = LeanCtor(
+            LeanTag.Exception_internal,
+            Array[
+              leanReadInitializer(builder, "Lean.Meta.isDefEqStuckExceptionId"),
+              nil,
+            ],
+          );
+          for ((arguments, discriminantMVar) in Array[
+            (Array[x, motive, x, y, binaryValue], false),
+            (Array[m, motive, x, y, binaryValue], false),
+            (Array[x, motive, x, y, alternative], false),
+            (Array[x, motive, m, y, binaryValue], true),
+            (Array[x, motive, x, m, binaryValue], true),
+            (Array[m, motive, m, m, alternative], true),
+          ]) {
+            expression = keyArgsApply(
+              builder,
+              constant(matcherName),
+              arguments,
+            );
+            assert(
+              leanTag(
+                L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_isMatcherAppCore_1cbda10bbf(
+                  builder,
+                  environment,
+                  expression,
+                ),
+              ) == LeanTag.Option_some,
+            );
+            error = stuck && discriminantMVar;
+            _ = keyArgsCheck(
+              "matcher discriminant slice",
+              state,
+              saved,
+              expression,
+              context,
+              state.coreContext,
+              isMatch,
+              root,
+              world,
+              if (error) None() else Some(constKey(matcherName, 5)),
+              Array::fillBy(arguments.size(), i ->
+                arguments[arguments.size() - i - 1]
+              ),
+              if (error) Some(stuckException) else None(),
+            );
+            !count = count + 1
+          };
+          partialArguments = Array[x, motive, m, y];
+          partial = keyArgsApply(
+            builder,
+            constant(matcherName),
+            partialArguments,
+          );
+          assert(
+            leanTag(
+              L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_isMatcherAppCore_1cbda10bbf(
+                builder,
+                environment,
+                partial,
+              ),
+            ) == LeanTag.Option_none,
+          );
+          _ = keyArgsCheck(
+            "partial matcher is not a matcher app",
+            state,
+            saved,
+            partial,
+            context,
+            state.coreContext,
+            isMatch,
+            root,
+            world,
+            Some(constKey(matcherName, 4)),
+            Array[y, m, motive, x],
+          );
+          !count = count + 1;
+          for ((headName, arguments) in Array[
+            (definitionName, Array[m, x]),
+            (
+              recName,
+              Array[keyArgsBinders(builder, Array[emptyType], p, true), major],
+            ),
+          ]) {
+            _ = keyArgsCheck(
+              "reducible or recursor stuck",
+              state,
+              saved,
+              keyArgsApply(builder, constant(headName), arguments),
+              context,
+              state.coreContext,
+              isMatch,
+              root,
+              world,
+              if (stuck) None() else Some(constKey(headName, arguments.size())),
+              Array::fillBy(arguments.size(), i ->
+                arguments[arguments.size() - i - 1]
+              ),
+              if (stuck) Some(stuckException) else None(),
+            );
+            !count = count + 1
+          };
+          _ = keyArgsCheck(
+            "ordinary non-recursor with metavariable",
+            state,
+            saved,
+            keyArgsApply(builder, constant(cName), Array[m]),
+            context,
+            state.coreContext,
+            isMatch,
+            root,
+            world,
+            Some(constKey(cName, 1)),
+            Array[m],
+          );
+          !count = count + 1
+        }
+      }
+    };
+    for (arity in Array[127, 128, 129]) {
+      largeName = name("keyArgsLarge" + arity.toString());
+      largeType = keyArgsBinders(
+        builder,
+        Array::fillBy(arity, _ -> p),
+        p,
+        false,
+      );
+      largeLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        largeName,
+        largeName,
+        largeType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      );
+      largeContext = leanReplaceField(quietContext, 3, largeLocals);
+      arguments = Array::fillBy(arity, i ->
+        if (i % 3 == 0) x else if (i % 3 == 1) y else z
+      );
+      expression = keyArgsApply(builder, variable(largeName), arguments);
+      reversed = Array::fillBy(arity, i -> arguments[arity - i - 1]);
+      for (root in Array[false, true]) {
+        warm = keyArgsCheck(
+          "large reverse arguments",
+          state,
+          saved,
+          expression,
+          largeContext,
+          state.coreContext,
+          false,
+          root,
+          world,
+          Some(fvarKey(largeName, arity)),
+          reversed,
+        );
+        _ = keyArgsCheck(
+          "warm large reverse arguments",
+          state,
+          warm,
+          expression,
+          largeContext,
+          state.coreContext,
+          false,
+          root,
+          world,
+          Some(fvarKey(largeName, arity)),
+          reversed,
+        );
+        !count = count + 2
+      }
+    };
+    missing = name("keyArgsMissing");
+    for (root in Array[false, true]) {
+      _ = keyArgsCheck(
+        "readonly declaration lookup error",
+        state,
+        saved,
+        mvar(missing),
+        quietContext,
+        state.coreContext,
+        false,
+        root,
+        world,
+        None(),
+        Array[],
+      );
+      _ = keyArgsCheck(
+        "reduction free-variable lookup error",
+        state,
+        saved,
+        variable(missing),
+        quietContext,
+        state.coreContext,
+        false,
+        root,
+        world,
+        None(),
+        Array[],
+      );
+      _ = keyArgsCheck(
+        "matching does not query missing mvar declaration",
+        state,
+        saved,
+        mvar(missing),
+        quietContext,
+        state.coreContext,
+        true,
+        root,
+        world,
+        Some(other),
+        Array[],
+      );
+      stuckContext = keyArgsContext(
+        builder,
+        state.metaContext,
+        leanReplaceField(quietConfig, 4, leanBool(true)),
+      );
+      _ = keyArgsCheck(
+        "stuck mode does not query missing mvar declaration",
+        state,
+        saved,
+        mvar(missing),
+        stuckContext,
+        state.coreContext,
+        false,
+        root,
+        world,
+        Some(star),
+        Array[],
+      );
+      !count = count + 4
+    }
+  };
+  assert(count == 872);
+  print_string("getKeyArgs comparisons: " + count.toString())
+}

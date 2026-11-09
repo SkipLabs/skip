@@ -1,0 +1,309 @@
+// Discrimination keys use the reduced head and retain arguments in traversal order.
+module L4_Lean_Meta_DiscrTree_Main;
+
+fun f_keyArgsSuccess(
+  key: LeanValue,
+  arguments: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Prod_mk, Array[key, arguments]), world],
+  )
+}
+
+fun f_reverseKeyArgs(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  arity: LeanValue,
+): LeanValue {
+  empty = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+    runtime,
+    LeanErased(),
+    arity,
+  );
+  L4_Lean_Expr.f_Lean_Expr_getAppRevArgsAux_45acc94c99(
+    runtime,
+    expression,
+    empty,
+  )
+}
+
+fun f_checkConstantKeyStuck(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  reducible = f_DiscrTree_getKeyArgs_spec_0_6d7e8be9c8(
+    runtime,
+    name,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(reducible) == LeanTag.EST_Out_error) return reducible;
+  if (leanTag(reducible) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  currentWorld = leanField(reducible, 1);
+  if (leanIsTrue(leanField(reducible, 0))) {
+    return L4_Lean_Meta_Basic.f_Lean_Meta_throwIsDefEqStuck_0918dc8a78(
+      runtime,
+      currentWorld,
+    )
+  };
+  coreRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreStateRef,
+    currentWorld,
+  );
+  if (leanTag(coreRead) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  environment = leanField(leanField(coreRead, 0), 0);
+  !currentWorld = leanField(coreRead, 1);
+  matcher = L4_Lean_Meta_Match_MatcherInfo.f_Lean_Meta_isMatcherAppCore_1cbda10bbf(
+    runtime,
+    environment,
+    expression,
+  );
+  if (leanTag(matcher) == LeanTag.Option_some) {
+    info = leanField(matcher, 0);
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+      runtime,
+      expression,
+    );
+    dummy = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+      runtime,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    arguments = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+      runtime,
+      LeanErased(),
+      arity,
+      dummy,
+    );
+    last = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+      runtime,
+      arity,
+      LeanNatLiterals.n1,
+    );
+    !arguments = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+      runtime,
+      expression,
+      arguments,
+      last,
+    );
+    firstDiscriminant = L4_Lean_Meta_Match_MatcherInfo.f_Match_MatcherInfo_getFirstDiscrPos_3cd33ff67c(
+      runtime,
+      info,
+    );
+    stop = L4_Init_Prelude.f_Nat_add_86990f4822(
+      runtime,
+      firstDiscriminant,
+      leanField(info, 1),
+    );
+    discriminants = L4_Init_Data_Array_Subarray.f_Array_toSubarray_0ba25fcf44(
+      runtime,
+      arguments,
+      firstDiscriminant,
+      stop,
+    );
+    return f_DiscrTree_getKeyArgs_spec_1_870e9b1630(
+      runtime,
+      discriminants,
+      LeanCtor(LeanTag.PUnit_unit, Array[]),
+      currentWorld,
+    )
+  };
+  recursor = f_DiscrTree_getKeyArgs_spec_2_b908c5ad23(
+    runtime,
+    name,
+    coreStateRef,
+    currentWorld,
+  );
+  if (leanTag(recursor) == LeanTag.EST_Out_error) {
+    return leanFail(
+      "unreachable: _private.Lean.Meta.DiscrTree.Main.0.Lean.Meta.DiscrTree.getKeyArgs",
+    )
+  };
+  if (leanTag(recursor) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  !currentWorld = leanField(recursor, 1);
+  if (leanIsTrue(leanField(recursor, 0))) {
+    return L4_Lean_Meta_Basic.f_Lean_Meta_throwIsDefEqStuck_0918dc8a78(
+      runtime,
+      currentWorld,
+    )
+  };
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[]), currentWorld],
+  )
+}
+
+// "_private.Lean.Meta.DiscrTree.Main.0.Lean.Meta.DiscrTree.getKeyArgs"
+fun f_Meta_DiscrTree_getKeyArgs_8dfa358241(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  isMatch: LeanValue,
+  root: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  reduced = f_Meta_DiscrTree_reduceDT_9eb01806dc(
+    runtime,
+    expression,
+    root,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+  if (leanTag(reduced) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  value = leanField(reduced, 0);
+  currentWorld = leanField(reduced, 1);
+  empty = LeanArray(Array[]);
+  if (!leanIsTrue(root)) {
+    numeral = f_Meta_DiscrTree_toNatLit_7d849234a0(runtime, value);
+    if (leanTag(numeral) == LeanTag.Option_some) {
+      return f_keyArgsSuccess(
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[leanField(numeral, 0)]),
+        empty,
+        currentWorld,
+      )
+    }
+  };
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, value);
+  leanTag(head) match {
+  | LeanTag.Expr_lit__impl ->
+    f_keyArgsSuccess(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[leanField(head, 1)]),
+      empty,
+      currentWorld,
+    )
+  | LeanTag.Expr_const__impl ->
+    name = leanField(head, 1);
+    config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      runtime,
+      metaContext,
+    );
+    if (
+      leanIsTrue(leanField(config, 4)) &&
+      leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_hasExprMVar_0a7c4cebda(runtime, value),
+      )
+    ) {
+      checked = f_checkConstantKeyStuck(
+        runtime,
+        name,
+        value,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      );
+      if (leanTag(checked) == LeanTag.EST_Out_error) return checked;
+      if (leanTag(checked) != LeanTag.EST_Out_ok) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      !currentWorld = leanField(checked, 1)
+    };
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    key = LeanCtor(LeanTag.Meta_DiscrTree_Key_const, Array[name, arity]);
+    f_keyArgsSuccess(key, f_reverseKeyArgs(runtime, value, arity), currentWorld)
+  | LeanTag.Expr_fvar__impl ->
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    key = LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_fvar,
+      Array[leanField(head, 1), arity],
+    );
+    f_keyArgsSuccess(key, f_reverseKeyArgs(runtime, value, arity), currentWorld)
+  | LeanTag.Expr_mvar__impl ->
+    if (leanIsTrue(isMatch)) {
+      return f_keyArgsSuccess(
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]),
+        empty,
+        currentWorld,
+      )
+    };
+    config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      runtime,
+      metaContext,
+    );
+    if (leanIsTrue(leanField(config, 4))) {
+      return f_keyArgsSuccess(
+        LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]),
+        empty,
+        currentWorld,
+      )
+    };
+    readOnlyResult = L4_Lean_Meta_Basic.f_Lean_MVarId_isReadOnlyOrSyntheticOpaque_763f632737(
+      runtime,
+      leanField(head, 1),
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      currentWorld,
+    );
+    if (leanTag(readOnlyResult) == LeanTag.EST_Out_error) return readOnlyResult;
+    if (leanTag(readOnlyResult) != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    keyKind = if (leanIsTrue(leanField(readOnlyResult, 0))) {
+      LeanTag.Meta_DiscrTree_Key_other
+    } else {
+      LeanTag.Meta_DiscrTree_Key_star
+    };
+    f_keyArgsSuccess(
+      LeanCtor(keyKind, Array[]),
+      empty,
+      leanField(readOnlyResult, 1),
+    )
+  | LeanTag.Expr_proj__impl ->
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, value);
+    key = LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_proj,
+      Array[leanField(head, 1), leanField(head, 2), arity],
+    );
+    arguments = L4_Init_Data_Array_Basic.f_Array_append_156887c1ee(
+      runtime,
+      LeanArray(Array[leanField(head, 3)]),
+      f_reverseKeyArgs(runtime, value, arity),
+    );
+    f_keyArgsSuccess(key, arguments, currentWorld)
+  | LeanTag.Expr_forallE__impl ->
+    f_keyArgsSuccess(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]),
+      LeanArray(Array[leanField(head, 2)]),
+      currentWorld,
+    )
+  | _ ->
+    f_keyArgsSuccess(
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]),
+      empty,
+      currentWorld,
+    )
+  }
+}
+
+module end;

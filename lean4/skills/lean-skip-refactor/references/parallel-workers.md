@@ -9,11 +9,13 @@ the entire plans or follow links outside their assigned directory.
 ## Roles and limits
 
 The user permits up to ten Vibe instances concurrently. Count writers, reviewers,
-probe authors and retries in that same limit. Both Codex peers now own disjoint
-implementation tasks at the user's request. The primary supplies independent
+probe authors and retries in that same limit. Three Codex peers now own disjoint
+implementation tasks at the user's request. This fills the current four-active-agent
+session limit including the primary; it is not a subscription-wide quota claim.
+The primary supplies independent
 semantic/readability review and owns production edits, interface decisions,
 source manifests and the single compiler queue. Let the writers continue their
-next bounded tasks while the primary validates a handoff. Do not assign both to
+next bounded tasks while the primary validates a handoff. Do not assign peers to
 general audits while conversion waits. Delegation
 does not authorize workers to message third parties or publish changes.
 
@@ -233,6 +235,13 @@ that support alone. These flags avoid repeating the bootstrap source list. Probe
 selection still copies maintained function bodies verbatim. The integration tool
 does not automatically update the completion ledger: record actual checks and
 coverage limits there after validation.
+
+Check the port's primitive implementations before treating new test cases as
+supported behavior. For example, Nat bitwise and left-shift dispatch can reach
+explicitly unimplemented primitives. Keep those failures and compare old/new
+exit status and diagnostics in separate subprocess cases; do not silently drop
+them or count their arithmetic results as validated. Keep expected cache writes
+in stateful fixtures: an unchanged WHNF expression can still publish a cache entry.
 
 Run incremental `skargo check --release`, then focused execution checks. Retain
 `target/`; serialize compiler/probe jobs. A focused probe selects verbatim

@@ -96,23 +96,26 @@ Before declaring the example's path complete:
 
 ## People, processes and ownership
 
-The user has reassigned both Codex peers from standing review roles to
-implementation. The current team is two writers plus the primary, within this
-session's four-agent limit. Vibe remains stopped after provider quota failures;
+The user has requested more implementation capacity. The current team is three
+writers plus the primary, filling this session's four-active-agent limit. This
+session limit does not establish the user's subscription-wide allowance.
+Vibe remains stopped after provider quota failures;
 the earlier ten-instance authorization does not override those limits.
 
 - Primary: independent semantic/readability review, source/interface contracts,
   integration, manifests, the single compiler queue, final validation and updates.
-- Implementation owner A (`rewrite_execution_lead`): unfolding eligibility
-  (`canUnfoldDefault`, `getUnfoldableConstNoEx`), then uncached WHNF.
-- Implementation owner B (`rewrite_semantics_lead`): discrimination-tree key
-  ordering, then function-info dependency sorting.
+- Implementation owner A (`rewrite_execution_lead`): WHNF, currently matcher
+  reduction after uncached WHNF and natural-operation dispatch.
+- Implementation owner B (`rewrite_semantics_lead`): discrimination trees,
+  currently argument insertion after key/argument extraction.
+- Implementation owner C (`unfold_definition`): literal-value recognition,
+  starting with `getOfNatValue` and `getIntValue`.
 
 Each writer supplies source and executable probes from frozen current inputs in
 a private task directory. The primary reviews and integrates one batch while
 the writers continue disjoint work. Writers do not independently approve their
 own changes. Request a bounded second opinion only when a concrete semantic
-question warrants it; do not reserve either writer for general audit work.
+question warrants it; do not reserve writers for general audit work.
 Keep at most two completed drafts waiting per writer and four in total.
 
 The following are ownership lanes, not eight simultaneous monolithic rewrites.
@@ -273,6 +276,33 @@ records hashes and remaining boxed interfaces/fixture gaps. The inventory now ha
 181 remaining observed frame routines (73 seed, 108 newly observed), with 16
 validated rewrites in these five waves. No new performance result is claimed.
 
+### Sixth checkpoint: reduction and indexing (2026-11-09)
+
+`WHNF/Uncached.sk` exposes the no-trace reduction pipeline and keeps the complete
+trace branch in the retained implementation. Its 88 cases cover ordered errors,
+custom unfolding, recursion depth and cache publication. `WHNF/NaturalReduction.sk`
+recognizes exact Nat applications and dispatches to the existing operand helpers;
+480 comparisons cover arithmetic, recognition, limits and state effects.
+`DiscrTree/Main/KeyArguments.sk` exposes key selection and stuck checks; 872 cases
+include real matcher extension state, recursors and argument-array boundaries.
+
+The arithmetic fixtures initially assumed four unimplemented primitives existed
+and that unchanged opaque/zero normalization would not populate WHNF caches.
+The maintained probes now check the actual supported boundary and expected cache
+writes. `Nat.land`, `Nat.lor`, `Nat.xor` and `Nat.shiftLeft` remain unimplemented.
+Twelve subprocess checks preserve their failures, the heartbeat-counter failure
+and the excessive-exponent failure in both old and new routes. No dummy success
+or primitive implementation was added.
+
+Another 135 WHNF regressions pass with the three replacements integrated.
+Incremental `skargo check --release` passes with the existing target cache.
+The [sixth audit](provenance/rewrite-batches/2026-11-09-wave-06.json) records exact
+bodies, source preservation, checks and remaining boxed interfaces/coverage gaps.
+There are now 178 remaining observed frame routines (70 seed, 108 newly observed)
+and 19 validated frame rewrites in these waves. Performance remains unmeasured.
+The user's request for more capacity adds a third implementation owner while
+retaining independent primary review and the single compiler queue.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree
@@ -380,7 +410,7 @@ The original estimate below and the later 5–8 working-day pilot estimate preda
 the complete execution inventory and the provider quota failures. Neither is a
 current completion promise. The new inventory contains 112 additional frame
 routines, mostly already present in depth-0 execution. Re-estimate coherent
-families from accepted throughput under the two-writer allocation; source-line
+families from accepted throughput under the current allocation; source-line
 counts and twice as many candidates do not imply a proportional duration.
 
 Original planning range: **24–48 hours of active elapsed work**, approximately three to

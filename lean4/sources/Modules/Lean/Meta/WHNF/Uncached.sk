@@ -1,0 +1,121 @@
+module L4_Lean_Meta_WHNF;
+
+// Untraced reduction stages; trace/profiler handling retains its original route.
+fun f_Meta_whnfImp_whnfUncached_c6f346edfc(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanTag(coreContext) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(coreContext, 0);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  options = leanField(cold, 2);
+  if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(leanField(options, 1)) match {
+  | LeanTag.Bool_true ->
+    return f_Meta_whnfImp_whnfUncached_c6f346edfc_fallback(
+      runtime,
+      expression,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  checked = L4_Lean_CoreM.f_Lean_Core_checkSystem_ccc29ea7a7(
+    runtime,
+    LeanText("whnf"),
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(checked) == LeanTag.EST_Out_error) return checked;
+  if (leanTag(checked) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  reduced = f_Meta_whnfCore_go_95af72ae50(
+    runtime,
+    expression,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    leanField(checked, 1),
+  );
+  if (leanTag(reduced) == LeanTag.EST_Out_error) return reduced;
+  if (leanTag(reduced) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  reducedExpression = leanField(reduced, 0);
+  natural = f_Lean_Meta_reduceNat_5f31079878(
+    runtime,
+    reducedExpression,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    leanField(reduced, 1),
+  );
+  if (leanTag(natural) == LeanTag.EST_Out_error) return natural;
+  if (leanTag(natural) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  naturalValue = leanField(natural, 0);
+  leanTag(naturalValue) match {
+  | LeanTag.Option_some ->
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[leanField(naturalValue, 0), leanField(natural, 1)],
+    )
+  | LeanTag.Option_none -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  unfolded = f_Lean_Meta_unfoldDefinition_1936145013(
+    runtime,
+    reducedExpression,
+    leanBool(false),
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    leanField(natural, 1),
+  );
+  if (leanTag(unfolded) == LeanTag.EST_Out_error) return unfolded;
+  if (leanTag(unfolded) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  unfoldedValue = leanField(unfolded, 0);
+  leanTag(unfoldedValue) match {
+  | LeanTag.Option_none ->
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[reducedExpression, leanField(unfolded, 1)],
+    )
+  | LeanTag.Option_some ->
+    f_Lean_Meta_whnfImp_1c79221716(
+      runtime,
+      leanField(unfoldedValue, 0),
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      leanField(unfolded, 1),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

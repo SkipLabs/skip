@@ -1,0 +1,675 @@
+// Differential uncached WHNF stages and expected values/effects.
+
+fun uncachedDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun uncachedContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun uncachedOption(
+  runtime: mutable LeanExecution,
+  core: LeanValue,
+  name: LeanValue,
+  value: Bool,
+): LeanValue {
+  options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+    runtime,
+    L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime),
+    leanField(leanField(core, 0), 2),
+    name,
+    leanBool(value),
+  );
+  L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(runtime, core, options)
+}
+
+fun uncachedPolicy(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  count = leanNat(runtime.readRef(args[0]));
+  runtime.writeRef(args[0], Some(leanBoxNat(count.add(LeanNat::fromInt(1)))));
+  args[1]
+}
+
+fun uncachedBoundedFailure(original: Bool): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  core = leanUnboundedCoreContext(runtime, "<uncached-bounded>", "");
+  cold = leanField(core, 0);
+  options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+    runtime,
+    L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(runtime),
+    leanField(cold, 2),
+    leanHeartbeatOptionNames(runtime)[0],
+    LeanNatLiterals.n1,
+  );
+  !core = leanReplaceField(
+    core,
+    0,
+    leanReplaceField(leanReplaceField(cold, 2, options), 7, LeanNatLiterals.n1),
+  );
+  unused = LeanUnavailable(
+    "bounded check must precede expression and Meta access",
+  );
+  _result = if (original) {
+    L4_Lean_Meta_WHNF.f_Meta_whnfImp_whnfUncached_c6f346edfc_fallback(
+      runtime,
+      unused,
+      unused,
+      unused,
+      core,
+      unused,
+      LeanErased(),
+    )
+  } else {
+    L4_Lean_Meta_WHNF.f_Meta_whnfImp_whnfUncached_c6f346edfc(
+      runtime,
+      unused,
+      unused,
+      unused,
+      core,
+      unused,
+      LeanErased(),
+    )
+  };
+  leanFail("unsupported bounded heartbeats unexpectedly succeeded")
+}
+
+fun uncachedCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  expression: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchangedRefs: Bool,
+): LeanExecutionCheckpoint {
+  oldExpr = rewriteProbeCopyInput(expression);
+  newExpr = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Meta_whnfImp_whnfUncached_c6f346edfc_fallback(
+        runtime,
+        oldExpr,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      ),
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Meta_whnfImp_whnfUncached_c6f346edfc(
+        runtime,
+        newExpr,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      )
+    ,
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("Uncached WHNF outcome: " + label)
+  };
+  for ((before, oldValue, newValue) in Array[
+    (expression, oldExpr, newExpr),
+    (context, oldContext, newContext),
+    (core, oldCore, newCore),
+  ]) {
+    if (
+      !rewriteProbeSameInput(before, oldValue) ||
+      !rewriteProbeSameInput(before, newValue)
+    ) {
+      leanFail("Uncached WHNF mutated input: " + label)
+    }
+  };
+  if (unchangedRefs && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("Uncached WHNF unexpected reference change: " + label)
+  };
+  after
+}
+
+fun uncachedDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun uncachedEntry(
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  context: LeanValue,
+  expression: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  runtime = saved.restoreRaw();
+  key = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+    runtime,
+    expression,
+    context,
+    world,
+  );
+  assert(leanTag(key) == LeanTag.EST_Out_ok);
+  cache = leanField(runtime.readRef(state.metaStateRef), 1);
+  L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_4_fba3a797db(
+    runtime,
+    leanField(cache, 3),
+    leanField(key, 0),
+  )
+}
+
+fun main(): void {
+  mode = Environ.varOpt("LEAN_SKIP_TEST_UNCACHED_FAILURE") match {
+  | Some(value) -> value
+  | None() -> ""
+  };
+  if (mode == "old-bounded" || mode == "new-bounded") {
+    uncachedBoundedFailure(mode == "old-bounded");
+    return void
+  };
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    app = (fn: LeanValue, arg: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, fn, arg);
+    nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero),
+    );
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    xName = name("uncachedX");
+    natName = name("Nat");
+    zeroName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("zero"),
+    );
+    succName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("succ"),
+    );
+    nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, natName, nil);
+    succ = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, succName, nil);
+    natInfo = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[natName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanCtor(LeanTag.List_cons, Array[natName, nil]),
+            LeanCtor(
+              LeanTag.List_cons,
+              Array[
+                zeroName,
+                LeanCtor(LeanTag.List_cons, Array[succName, nil]),
+              ],
+            ),
+            LeanNatLiterals.n0,
+            leanBool(true),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    zeroInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[zeroName, nil, nat]),
+            natName,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    succInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[
+                succName,
+                nil,
+                L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+                  builder,
+                  xName,
+                  binder,
+                  nat,
+                  nat,
+                ),
+              ],
+            ),
+            natName,
+            LeanNatLiterals.n1,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n1,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    innerName = name("uncachedInner");
+    outerName = name("uncachedOuter");
+    opaqueName = name("uncachedOpaque");
+    inner = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, innerName, nil);
+    outer = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, outerName, nil);
+    opaque = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, opaqueName, nil);
+    opaqueInfo = LeanCtor(
+      LeanTag.ConstantInfo_opaqueInfo,
+      Array[
+        LeanCtor(
+          LeanTag.OpaqueVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[opaqueName, nil, type]),
+            prop,
+            leanBool(false),
+            LeanCtor(LeanTag.List_cons, Array[opaqueName, nil]),
+          ],
+        ),
+      ],
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      natInfo,
+      zeroInfo,
+      succInfo,
+      opaqueInfo,
+      uncachedDefinition(innerName, type, prop),
+      uncachedDefinition(outerName, type, inner),
+    ]) {
+      declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      builder,
+      locals,
+      xName,
+      xName,
+      nat,
+      binder,
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    state = rewriteProbeState(builder, environment, locals, "<whnf-uncached>");
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    config = leanReplaceField(baseConfig, 12, leanBool(false));
+    context = uncachedContext(builder, state.metaContext, config);
+    noUnfold = uncachedContext(
+      builder,
+      context,
+      leanReplaceField(
+        config,
+        9,
+        LeanCtor(LeanTag.Meta_TransparencyMode_none, Array[]),
+      ),
+    );
+    diagnosticCore = uncachedOption(
+      builder,
+      state.coreContext,
+      name("diagnostics"),
+      true,
+    );
+    traceName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("trace"),
+      LeanText("UncachedProbe"),
+    );
+    unrelatedTrace = uncachedOption(
+      builder,
+      state.coreContext,
+      traceName,
+      true,
+    );
+    assert(
+      leanIsTrue(leanField(leanField(leanField(unrelatedTrace, 0), 2), 1)),
+    );
+    limited = leanReplaceField(
+      leanReplaceField(diagnosticCore, 1, LeanNatLiterals.n1),
+      0,
+      leanReplaceField(leanField(diagnosticCore, 0), 3, LeanNatLiterals.n1),
+    );
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      xName,
+      binder,
+      type,
+      b0,
+    );
+    beta = app(identity, prop);
+    annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, nil, prop);
+    x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, xName);
+    unknownName = name("uncachedUnknownLocal");
+    unknown = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, unknownName);
+    seven = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanNatValue(7),
+    );
+    eight = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanNatValue(8),
+    );
+    large = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanBoxNat(leanNat(LeanScalar("nat", "18446744073709551616"))),
+    );
+    nextLarge = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanBoxNat(leanNat(LeanScalar("nat", "18446744073709551617"))),
+    );
+    succSeven = app(succ, seven);
+    succLarge = app(succ, large);
+    succX = app(succ, x);
+    callbackCount = builder.newRef(LeanNatLiterals.n0);
+    saved = builder.checkpoint();
+    for (world in Array[LeanErased(), leanNatValue(37)]) {
+      for ((label, expression, expected, unchanged) in Array[
+        ("unchanged sort", prop, prop, true),
+        ("unchanged literal", seven, seven, true),
+        ("metadata removed before later stages", annotated, prop, true),
+        ("beta reduction before later stages", beta, prop, true),
+        ("opaque declaration stays folded", opaque, opaque, true),
+        ("Nat successor", succSeven, eight, true),
+        ("Nat successor beyond machine width", succLarge, nextLarge, true),
+        ("non-numeral successor stays folded", succX, succX, true),
+        ("definition unfolds then recurs", inner, prop, false),
+        ("nested definition unfolds", outer, prop, false),
+      ]) {
+        after = uncachedCheck(
+          label,
+          saved,
+          state,
+          expression,
+          context,
+          state.coreContext,
+          world,
+          LeanCtor(LeanTag.EST_Out_ok, Array[expected, world]),
+          unchanged,
+        );
+        if (label == "nested definition unfolds") {
+          assert(
+            leanTag(uncachedEntry(after, state, context, outer, world)) ==
+              LeanTag.Option_none,
+          );
+          assert(
+            rewriteProbeSameInput(
+              uncachedEntry(after, state, context, inner, world),
+              LeanCtor(LeanTag.Option_some, Array[prop]),
+            ),
+          )
+        };
+        !checks = checks + 1
+      };
+      _refused = uncachedCheck(
+        "transparency none is respected",
+        saved,
+        state,
+        inner,
+        noUnfold,
+        state.coreContext,
+        world,
+        LeanCtor(LeanTag.EST_Out_ok, Array[inner, world]),
+        true,
+      );
+      _atLimit = uncachedCheck(
+        "uncached helper adds no depth step",
+        saved,
+        state,
+        prop,
+        context,
+        limited,
+        world,
+        LeanCtor(LeanTag.EST_Out_ok, Array[prop, world]),
+        true,
+      );
+      _natLimit = uncachedCheck(
+        "Nat argument normalization reaches depth limit",
+        saved,
+        state,
+        succSeven,
+        context,
+        limited,
+        world,
+        uncachedDepthError(builder, leanField(limited, 2), world),
+        true,
+      );
+      failure = uncachedCheck(
+        "recursive entry fails after unfolding",
+        saved,
+        state,
+        inner,
+        context,
+        limited,
+        world,
+        uncachedDepthError(builder, leanField(limited, 2), world),
+        false,
+      );
+      failureRuntime = failure.restoreRaw();
+      diagnostic = leanField(failureRuntime.readRef(state.metaStateRef), 4);
+      count = L4_Lean_MetavarContext.f_MetavarContext_findUserName_spec_0_03d4ed3e50(
+        failureRuntime,
+        leanField(diagnostic, 0),
+        innerName,
+      );
+      assert(
+        native_eq(
+          count,
+          LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n1]),
+        ) == 0,
+      );
+      assert(
+        leanTag(uncachedEntry(failure, state, context, inner, world)) ==
+          LeanTag.Option_none,
+      );
+      !checks = checks + 4;
+      errorRuntime = saved.restoreRaw();
+      localError = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+        errorRuntime,
+        unknownName,
+        context,
+        state.coreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(leanTag(localError) == LeanTag.EST_Out_error);
+      assert(native_eq(leanField(localError, 1), world) == 0);
+      localFailure = uncachedCheck(
+        "core local lookup error",
+        saved,
+        state,
+        unknown,
+        context,
+        state.coreContext,
+        world,
+        localError,
+        false,
+      );
+      assert(native_eq(localFailure.refs, errorRuntime.checkpoint().refs) == 0);
+      !checks = checks + 1;
+      for (raises in Array[false, true]) {
+        policyResult = if (raises) {
+          LeanCtor(
+            LeanTag.EST_Out_error,
+            Array[
+              LeanCtor(
+                LeanTag.Exception_error,
+                Array[
+                  leanField(state.coreContext, 2),
+                  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+                    builder,
+                    LeanText("uncached policy refused"),
+                  ),
+                ],
+              ),
+              world,
+            ],
+          )
+        } else {
+          LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(false), world])
+        };
+        policy = LeanClosure(
+          uncachedPolicy,
+          7,
+          Array[callbackCount, policyResult],
+        );
+        custom = leanReplaceField(
+          context,
+          7,
+          LeanCtor(LeanTag.Option_some, Array[policy]),
+        );
+        expected = if (raises) policyResult else {
+          LeanCtor(LeanTag.EST_Out_ok, Array[inner, world])
+        };
+        after = uncachedCheck(
+          "custom unfolding decision " + raises.toString(),
+          saved,
+          state,
+          inner,
+          custom,
+          state.coreContext,
+          world,
+          expected,
+          false,
+        );
+        expectedRuntime = saved.restoreRaw();
+        expectedRuntime.writeRef(callbackCount, Some(LeanNatLiterals.n1));
+        assert(native_eq(after.refs, expectedRuntime.checkpoint().refs) == 0);
+        _natShortCircuit = uncachedCheck(
+          "Nat success skips custom unfolding",
+          saved,
+          state,
+          succSeven,
+          custom,
+          state.coreContext,
+          world,
+          LeanCtor(LeanTag.EST_Out_ok, Array[eight, world]),
+          true,
+        );
+        !checks = checks + 2
+      };
+      for ((label, expression, expected, unchanged) in Array[
+        ("trace compatibility sort", prop, prop, true),
+        ("trace compatibility Nat", succSeven, eight, true),
+        ("trace compatibility definition", inner, prop, false),
+      ]) {
+        _traced = uncachedCheck(
+          label,
+          saved,
+          state,
+          expression,
+          context,
+          unrelatedTrace,
+          world,
+          LeanCtor(LeanTag.EST_Out_ok, Array[expected, world]),
+          unchanged,
+        );
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(checks == 88);
+  print_string("Uncached WHNF passed " + checks.toString() + " cases")
+}

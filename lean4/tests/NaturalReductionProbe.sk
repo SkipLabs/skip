@@ -1,0 +1,959 @@
+// Nat operation dispatch, exact name/arity recognition, and ordered operand effects.
+
+fun reduceNatProbeDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun reduceNatProbeLiteral(
+  runtime: mutable LeanExecution,
+  decimal: String,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+    runtime,
+    leanBoxNat(leanNat(LeanScalar("nat", decimal))),
+  )
+}
+
+fun reduceNatProbeApply(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  args: Array<LeanValue>,
+): LeanValue {
+  result = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime,
+    name,
+    LeanCtor(LeanTag.List_nil, Array[]),
+  );
+  for (arg in args) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, arg)
+  };
+  result
+}
+
+fun reduceNatProbePolicy(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+    runtime,
+    args[4],
+  );
+  calls = leanArray(runtime.readRef(args[0])).concat(Array[name]);
+  runtime.writeRef(args[0], Some(LeanArray(calls)));
+  if (
+    leanTag(args[1]) == LeanTag.Option_some &&
+    leanNameEqual(leanField(args[1], 0), name)
+  ) {
+    LeanCtor(LeanTag.EST_Out_error, Array[args[2], args[7]])
+  } else {
+    LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(true), args[7]])
+  }
+}
+
+fun reduceNatProbeContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun reduceNatProbeCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  expression: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchangedRefs: Bool,
+): LeanExecutionCheckpoint {
+  oldExpr = rewriteProbeCopyInput(expression);
+  newExpr = rewriteProbeCopyInput(expression);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878_fallback(
+        runtime,
+        oldExpr,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      ),
+    (runtime: mutable LeanExecution) ~>
+      L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878(
+        runtime,
+        newExpr,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      )
+    ,
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("Nat reduction outcome: " + label)
+  };
+  for ((before, oldValue, newValue) in Array[
+    (expression, oldExpr, newExpr),
+    (context, oldContext, newContext),
+    (core, oldCore, newCore),
+  ]) {
+    if (
+      !rewriteProbeSameInput(before, oldValue) ||
+      !rewriteProbeSameInput(before, newValue)
+    ) {
+      leanFail("Nat reduction mutated input: " + label)
+    }
+  };
+  if (unchangedRefs && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("Nat reduction unexpected reference change: " + label)
+  };
+  after
+}
+
+fun reduceNatProbeDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    natName = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        builder,
+        LeanText("Nat"),
+        LeanText(text),
+      );
+    literal = (text: String) -> reduceNatProbeLiteral(builder, text);
+    apply = (op: String, args: Array<LeanValue>) ->
+      reduceNatProbeApply(builder, natName(op), args);
+    nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+    none = (LeanCtor(LeanTag.Option_none, Array[]) : LeanValue);
+    zeroLevel = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zeroLevel),
+    );
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    xName = name("reduceNatX");
+    natTypeName = name("Nat");
+    zeroName = natName("zero");
+    succName = natName("succ");
+    nat = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, natTypeName, nil);
+    natInfo = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[natTypeName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanCtor(LeanTag.List_cons, Array[natTypeName, nil]),
+            LeanCtor(
+              LeanTag.List_cons,
+              Array[
+                zeroName,
+                LeanCtor(LeanTag.List_cons, Array[succName, nil]),
+              ],
+            ),
+            LeanNatLiterals.n0,
+            leanBool(true),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    zeroInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[zeroName, nil, nat]),
+            natTypeName,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    succInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[
+                succName,
+                nil,
+                L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+                  builder,
+                  xName,
+                  binder,
+                  nat,
+                  nat,
+                ),
+              ],
+            ),
+            natTypeName,
+            LeanNatLiterals.n1,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n1,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    leftName = name("reduceNatLeft");
+    rightName = name("reduceNatRight");
+    opaqueName = name("reduceNatOpaque");
+    left = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, leftName, nil);
+    right = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, rightName, nil);
+    opaque = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, opaqueName, nil);
+    opaqueInfo = LeanCtor(
+      LeanTag.ConstantInfo_opaqueInfo,
+      Array[
+        LeanCtor(
+          LeanTag.OpaqueVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[opaqueName, nil, nat]),
+            literal("7"),
+            leanBool(false),
+            LeanCtor(LeanTag.List_cons, Array[opaqueName, nil]),
+          ],
+        ),
+      ],
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      natInfo,
+      zeroInfo,
+      succInfo,
+      opaqueInfo,
+      reduceNatProbeDefinition(leftName, nat, literal("7")),
+      reduceNatProbeDefinition(rightName, nat, literal("11")),
+    ]) {
+      declName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(declName), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      builder,
+      locals,
+      xName,
+      xName,
+      nat,
+      binder,
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    state = rewriteProbeState(builder, environment, locals, "<reduce-nat>");
+    baseState = builder.readRef(state.metaStateRef);
+    mctx = leanField(baseState, 0);
+    assignedName = name("reduceNatAssigned");
+    unassignedName = name("reduceNatUnassigned");
+    for (id in Array[assignedName, unassignedName]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        builder,
+        mctx,
+        id,
+        id,
+        locals,
+        LeanArray(Array[]),
+        nat,
+        LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+        LeanNatLiterals.n0,
+      )
+    };
+    !mctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(
+      builder,
+      mctx,
+      assignedName,
+      literal("7"),
+    );
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(baseState, 0, mctx)),
+    );
+    assigned = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, assignedName);
+    unassigned = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, unassignedName);
+    free = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, xName);
+    config = leanReplaceField(
+      L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        builder,
+        state.metaContext,
+      ),
+      12,
+      leanBool(false),
+    );
+    context = reduceNatProbeContext(builder, state.metaContext, config);
+    limitCore = leanReplaceField(
+      leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1),
+      0,
+      leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1),
+    );
+    thresholdName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("exponentiation"),
+      LeanText("threshold"),
+    );
+    thresholdOptions = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+      builder,
+      L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(builder),
+      leanField(leanField(state.coreContext, 0), 2),
+      thresholdName,
+      leanNatValue(4),
+    );
+    thresholdCore = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(
+      builder,
+      state.coreContext,
+      thresholdOptions,
+    );
+    warningKind = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("unsafe"),
+      LeanText("exponentiation"),
+    );
+    callLog = builder.newRef(LeanArray(Array[]));
+    saved = builder.checkpoint();
+    alreadyWarned = saved.restoreRaw();
+    marked = L4_Lean_CoreM.f_Lean_logMessageKind_d9e5dd966e(
+      alreadyWarned,
+      warningKind,
+      state.coreStateRef,
+      LeanErased(),
+    );
+    assert(
+      leanTag(marked) == LeanTag.EST_Out_ok && leanIsTrue(leanField(marked, 0)),
+    );
+    warned = alreadyWarned.checkpoint();
+    failureMode = Environ.varOpt("LEAN_SKIP_TEST_REDUCE_NAT_FAILURE") match {
+    | Some(value) -> value
+    | None() -> ""
+    };
+    if (failureMode == "old-pow-limit" || failureMode == "new-pow-limit") {
+      options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+        builder,
+        L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(builder),
+        leanField(leanField(state.coreContext, 0), 2),
+        thresholdName,
+        leanNatValue(4294967296),
+      );
+      core = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(
+        builder,
+        state.coreContext,
+        options,
+      );
+      expression = apply("pow", Array[literal("2"), literal("4294967296")]);
+      runtime = saved.restoreRaw();
+      _result = if (failureMode == "old-pow-limit") {
+        L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878_fallback(
+          runtime,
+          expression,
+          context,
+          state.metaStateRef,
+          core,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      } else {
+        L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878(
+          runtime,
+          expression,
+          context,
+          state.metaStateRef,
+          core,
+          state.coreStateRef,
+          LeanErased(),
+        )
+      };
+      leanFail("Nat.pow exponent bound unexpectedly succeeded")
+    };
+    for (operation in Array["land", "lor", "xor", "shiftLeft"]) {
+      if (
+        failureMode == "old-" + operation ||
+        failureMode == "new-" + operation
+      ) {
+        expression = apply(
+          operation,
+          Array[literal("18446744073709551619"), literal("5")],
+        );
+        runtime = saved.restoreRaw();
+        _result = if (failureMode == "old-" + operation) {
+          L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878_fallback(
+            runtime,
+            expression,
+            context,
+            state.metaStateRef,
+            state.coreContext,
+            state.coreStateRef,
+            LeanErased(),
+          )
+        } else {
+          L4_Lean_Meta_WHNF.f_Lean_Meta_reduceNat_5f31079878(
+            runtime,
+            expression,
+            context,
+            state.metaStateRef,
+            state.coreContext,
+            state.coreStateRef,
+            LeanErased(),
+          )
+        };
+        leanFail(
+          "unsupported Nat operation unexpectedly succeeded: " + operation,
+        )
+      }
+    };
+    arithmetic = Array[
+      ("add", "17", "5", "22"),
+      ("add", "18446744073709551616", "1", "18446744073709551617"),
+      ("sub", "17", "5", "12"),
+      ("sub", "5", "17", "0"),
+      ("sub", "18446744073709551616", "1", "18446744073709551615"),
+      ("mul", "17", "5", "85"),
+      ("mul", "18446744073709551616", "3", "55340232221128654848"),
+      ("div", "17", "5", "3"),
+      ("div", "17", "0", "0"),
+      ("div", "18446744073709551617", "3", "6148914691236517205"),
+      ("mod", "17", "5", "2"),
+      ("mod", "17", "0", "17"),
+      ("mod", "18446744073709551617", "3", "2"),
+      ("pow", "2", "10", "1024"),
+      ("pow", "0", "0", "1"),
+      ("pow", "2", "65", "36893488147419103232"),
+      ("gcd", "48", "18", "6"),
+      ("gcd", "0", "0", "0"),
+      (
+        "gcd",
+        "18446744073709551616",
+        "55340232221128654848",
+        "18446744073709551616",
+      ),
+      (
+        "shiftRight",
+        "340282366920938463463374607431768211471",
+        "64",
+        "18446744073709551616",
+      ),
+      ("shiftRight", "17", "18446744073709551616", "0"),
+      ("shiftRight", "17", "0", "17"),
+    ];
+    operations = Array[
+      "succ",
+      "add",
+      "sub",
+      "mul",
+      "div",
+      "mod",
+      "pow",
+      "gcd",
+      "beq",
+      "ble",
+      "land",
+      "lor",
+      "xor",
+      "shiftLeft",
+      "shiftRight",
+    ];
+    anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+    nested = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+      builder,
+      L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        builder,
+        LeanText("Other"),
+        LeanText("Nat"),
+      ),
+      LeanText("add"),
+    );
+    numericPrefix = L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+      builder,
+      anonymous,
+      LeanNatLiterals.n1,
+    );
+    wrongNames = Array[
+      anonymous,
+      name("Nat"),
+      name("Nat.add"),
+      name("Nat.succ"),
+      nested,
+      L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        builder,
+        LeanText("nat"),
+        LeanText("add"),
+      ),
+      L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+        builder,
+        name("Nat"),
+        LeanNatLiterals.n1,
+      ),
+      L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+        builder,
+        numericPrefix,
+        LeanText("add"),
+      ),
+      natName("unknown"),
+      natName("Add"),
+    ];
+    for (world in Array[LeanErased(), leanNatValue(37)]) {
+      noResult = LeanCtor(LeanTag.EST_Out_ok, Array[none, world]);
+      for ((op, a, b, expected) in arithmetic) {
+        _after = reduceNatProbeCheck(
+          op + "/" + a + "/" + b,
+          saved,
+          state,
+          apply(op, Array[literal(a), literal(b)]),
+          context,
+          state.coreContext,
+          world,
+          LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[
+              LeanCtor(LeanTag.Option_some, Array[literal(expected)]),
+              world,
+            ],
+          ),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for ((a, expected) in Array[
+        ("0", "1"),
+        ("18446744073709551616", "18446744073709551617"),
+      ]) {
+        _after = reduceNatProbeCheck(
+          "successor " + a,
+          saved,
+          state,
+          apply("succ", Array[literal(a)]),
+          context,
+          state.coreContext,
+          world,
+          LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[
+              LeanCtor(LeanTag.Option_some, Array[literal(expected)]),
+              world,
+            ],
+          ),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for ((op, a, b, answer) in Array[
+        ("beq", "17", "17", true),
+        ("beq", "17", "5", false),
+        ("ble", "5", "17", true),
+        ("ble", "17", "5", false),
+        ("ble", "17", "17", true),
+        ("beq", "18446744073709551616", "18446744073709551617", false),
+      ]) {
+        boolName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          builder,
+          LeanText("Bool"),
+          LeanText(if (answer) "true" else "false"),
+        );
+        expected = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+          builder,
+          boolName,
+          nil,
+        );
+        _after = reduceNatProbeCheck(
+          op + " predicate",
+          saved,
+          state,
+          apply(op, Array[literal(a), literal(b)]),
+          context,
+          state.coreContext,
+          world,
+          LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[LeanCtor(LeanTag.Option_some, Array[expected]), world],
+          ),
+          true,
+        );
+        !checks = checks + 1
+      };
+      unused = LeanUnavailable("rejected shape must not inspect context");
+      for (op in operations) {
+        for (arity in Array[0, if (op == "succ") 2 else 1, 3]) {
+          args = Array::fill(arity, literal("7"));
+          _after = reduceNatProbeCheck(
+            op + " wrong arity " + arity.toString(),
+            saved,
+            state,
+            apply(op, args),
+            unused,
+            unused,
+            world,
+            noResult,
+            true,
+          );
+          !checks = checks + 1
+        }
+      };
+      for (wrongName in wrongNames) {
+        for (arity in Array[1, 2]) {
+          expression = reduceNatProbeApply(
+            builder,
+            wrongName,
+            Array::fill(arity, literal("7")),
+          );
+          !expression = leanReplaceField(
+            expression,
+            2,
+            LeanUnavailable("unrecognized head must not inspect its operand"),
+          );
+          _after = reduceNatProbeCheck(
+            "unrecognized structured name",
+            saved,
+            state,
+            expression,
+            unused,
+            unused,
+            world,
+            noResult,
+            true,
+          );
+          !checks = checks + 1
+        }
+      };
+      for (expression in Array[literal("7"), type, free]) {
+        _after = reduceNatProbeCheck(
+          "non-application",
+          saved,
+          state,
+          expression,
+          unused,
+          unused,
+          world,
+          noResult,
+          true,
+        );
+        !checks = checks + 1
+      };
+      b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+      lambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        builder,
+        xName,
+        binder,
+        nat,
+        b0,
+      );
+      taggedHead = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+        builder,
+        nil,
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, natName("succ"), nil),
+      );
+      for (head in Array[lambda, taggedHead]) {
+        expression = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+          builder,
+          head,
+          literal("7"),
+        );
+        _after = reduceNatProbeCheck(
+          "nonconstant direct head",
+          saved,
+          state,
+          expression,
+          unused,
+          unused,
+          world,
+          noResult,
+          true,
+        );
+        !checks = checks + 1
+      };
+      for (op in Array["succ", "add", "beq", "pow"]) {
+        args = if (op == "succ") Array[free] else Array[free, right];
+        _after = reduceNatProbeCheck(
+          "free first operand short circuit " + op,
+          saved,
+          state,
+          apply(op, args),
+          unused,
+          unused,
+          world,
+          noResult,
+          true,
+        );
+        !checks = checks + 1
+      };
+      for ((label, arg, expected) in Array[
+        (
+          "assigned mvar",
+          assigned,
+          LeanCtor(LeanTag.Option_some, Array[literal("8")]),
+        ),
+        ("unassigned mvar", unassigned, none),
+        ("opaque Nat", opaque, none),
+        (
+          "constructor zero",
+          L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, zeroName, nil),
+          LeanCtor(LeanTag.Option_some, Array[literal("1")]),
+        ),
+      ]) {
+        after = reduceNatProbeCheck(
+          label,
+          saved,
+          state,
+          apply("succ", Array[arg]),
+          context,
+          state.coreContext,
+          world,
+          LeanCtor(LeanTag.EST_Out_ok, Array[expected, world]),
+          label == "assigned mvar" || label == "unassigned mvar",
+        );
+        if (label == "opaque Nat" || label == "constructor zero") {
+          expectedRuntime = saved.restoreRaw();
+          key = L4_Lean_Meta_Basic.f_Lean_Meta_mkExprConfigCacheKey_bd795fcce4(
+            expectedRuntime,
+            arg,
+            context,
+            world,
+          );
+          assert(leanTag(key) == LeanTag.EST_Out_ok);
+          expectedState = expectedRuntime.readRef(state.metaStateRef);
+          cache = leanField(expectedState, 1);
+          entries = L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_5_f0f1dbb78c(
+            expectedRuntime,
+            leanField(cache, 3),
+            leanField(key, 0),
+            arg,
+          );
+          expectedRuntime.writeRef(
+            state.metaStateRef,
+            Some(
+              leanReplaceField(
+                expectedState,
+                1,
+                leanReplaceField(cache, 3, entries),
+              ),
+            ),
+          );
+          assert(native_eq(expectedRuntime.checkpoint().refs, after.refs) == 0)
+        };
+        !checks = checks + 1
+      };
+      for ((exponent, expected) in Array[
+        ("4", LeanCtor(LeanTag.Option_some, Array[literal("81")])),
+        ("5", none),
+        ("18446744073709551616", none),
+      ]) {
+        _after = reduceNatProbeCheck(
+          "exponent threshold " + exponent,
+          warned,
+          state,
+          apply("pow", Array[literal("3"), literal(exponent)]),
+          context,
+          thresholdCore,
+          world,
+          LeanCtor(LeanTag.EST_Out_ok, Array[expected, world]),
+          true,
+        );
+        !checks = checks + 1
+      };
+      for (op in Array["succ", "add", "beq", "pow"]) {
+        args = if (op == "succ") Array[literal("7")] else {
+          Array[literal("7"), literal("11")]
+        };
+        _after = reduceNatProbeCheck(
+          "operand normalization depth error " + op,
+          saved,
+          state,
+          apply(op, args),
+          context,
+          limitCore,
+          world,
+          reduceNatProbeDepthError(builder, leanField(limitCore, 2), world),
+          true,
+        );
+        !checks = checks + 1
+      };
+      exception = LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          leanField(state.coreContext, 2),
+          L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+            builder,
+            LeanText("Nat operand policy failed"),
+          ),
+        ],
+      );
+      for ((label, first, second, failName, expectedNames, expected) in Array[
+        (
+          "left-to-right success",
+          left,
+          right,
+          none,
+          Array[leftName, rightName],
+          LeanCtor(
+            LeanTag.EST_Out_ok,
+            Array[LeanCtor(LeanTag.Option_some, Array[literal("18")]), world],
+          ),
+        ),
+        (
+          "left failure skips right",
+          left,
+          right,
+          LeanCtor(LeanTag.Option_some, Array[leftName]),
+          Array[leftName],
+          LeanCtor(LeanTag.EST_Out_error, Array[exception, world]),
+        ),
+        (
+          "right failure retains left effects",
+          left,
+          right,
+          LeanCtor(LeanTag.Option_some, Array[rightName]),
+          Array[leftName, rightName],
+          LeanCtor(LeanTag.EST_Out_error, Array[exception, world]),
+        ),
+        (
+          "opaque first skips right",
+          opaque,
+          right,
+          LeanCtor(LeanTag.Option_some, Array[rightName]),
+          (Array[] : Array<LeanValue>),
+          noResult,
+        ),
+        (
+          "free second retains left effects",
+          left,
+          free,
+          none,
+          Array[leftName],
+          noResult,
+        ),
+      ]) {
+        policy = LeanClosure(
+          reduceNatProbePolicy,
+          8,
+          Array[callLog, failName, exception],
+        );
+        custom = leanReplaceField(
+          context,
+          7,
+          LeanCtor(LeanTag.Option_some, Array[policy]),
+        );
+        after = reduceNatProbeCheck(
+          label,
+          saved,
+          state,
+          apply("add", Array[first, second]),
+          custom,
+          state.coreContext,
+          world,
+          expected,
+          false,
+        );
+        current = after.restoreRaw();
+        assert(
+          rewriteProbeSameInput(
+            current.readRef(callLog),
+            LeanArray(expectedNames),
+          ),
+        );
+        if (
+          label == "left failure skips right" ||
+          label == "opaque first skips right"
+        ) {
+          expectedRuntime = saved.restoreRaw();
+          expectedRuntime.writeRef(callLog, Some(LeanArray(expectedNames)));
+          assert(native_eq(expectedRuntime.checkpoint().refs, after.refs) == 0)
+        };
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(checks == 480);
+  print_string(
+    "Nat-reduction dispatcher passed " + checks.toString() + " cases",
+  )
+}
