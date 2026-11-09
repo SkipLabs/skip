@@ -1,0 +1,444 @@
+// Exact numeral recognition, conversion, and guarded-wrapper expectations.
+class NumeralFixture(
+  label: String,
+  expression: LeanValue,
+  accepted: Bool,
+  value: ?LeanValue,
+)
+
+fun numeralTestConst(
+  runtime: mutable LeanExecution,
+  parts: Array<String>,
+  levels: LeanValue,
+): LeanValue {
+  name: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  for (part in parts) {
+    !name = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+      runtime,
+      name,
+      LeanText(part),
+    )
+  };
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name, levels)
+}
+
+fun numeralTestApp(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun checkNumeralFixture(
+  runtime: mutable LeanExecution,
+  fixture: NumeralFixture,
+): void {
+  saved = runtime.checkpoint();
+  frozenExpression = rewriteProbeCopyInput(fixture.expression);
+  expectedValue = fixture.value match {
+  | None() -> LeanCtor(LeanTag.Option_none, Array[])
+  | Some(value) -> LeanCtor(LeanTag.Option_some, Array[value])
+  };
+  for (useOriginal in Array[true, false]) {
+    current = saved.restoreRaw();
+    predicate = if (useOriginal) {
+      L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_isNumeral_e955d5d959_fallback
+    } else {
+      L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_isNumeral_e955d5d959
+    };
+    conversion = if (useOriginal) {
+      L4_Lean_Meta_DiscrTree_Main.f_DiscrTree_toNatLit_loop_fea062450d_fallback
+    } else {
+      L4_Lean_Meta_DiscrTree_Main.f_DiscrTree_toNatLit_loop_fea062450d
+    };
+    accepted = predicate(current, fixture.expression);
+    if (native_eq(accepted, leanBool(fixture.accepted)) != 0) {
+      leanFail("numeral predicate: " + fixture.label)
+    };
+    if (!rewriteProbeSameInput(fixture.expression, frozenExpression)) {
+      leanFail("numeral predicate changed input: " + fixture.label)
+    };
+    assert(native_eq(current.checkpoint().refs, saved.refs) == 0);
+    value = conversion(current, fixture.expression);
+    if (native_eq(value, expectedValue) != 0) {
+      leanFail("numeral conversion or Nat representation: " + fixture.label)
+    };
+    if (!rewriteProbeSameInput(fixture.expression, frozenExpression)) {
+      leanFail("numeral conversion changed input: " + fixture.label)
+    };
+    assert(native_eq(current.checkpoint().refs, saved.refs) == 0)
+  };
+  current = saved.restoreRaw();
+  wrapped = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_toNatLit_7d849234a0(
+    current,
+    fixture.expression,
+  );
+  expectedLiteral = if (fixture.accepted) {
+    fixture.value match {
+    | Some(value) ->
+      LeanCtor(
+        LeanTag.Option_some,
+        Array[LeanCtor(LeanTag.Literal_natVal, Array[value])],
+      )
+    | None() -> leanFail("invalid positive numeral fixture: " + fixture.label)
+    }
+  } else {
+    LeanCtor(LeanTag.Option_none, Array[])
+  };
+  if (native_eq(wrapped, expectedLiteral) != 0) {
+    leanFail("guarded numeral conversion: " + fixture.label)
+  };
+  if (!rewriteProbeSameInput(fixture.expression, frozenExpression)) {
+    leanFail("guarded numeral conversion changed input: " + fixture.label)
+  };
+  assert(native_eq(current.checkpoint().refs, saved.refs) == 0)
+}
+
+fun main(): void {
+  builder = mutable LeanExecution{};
+  nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+  levelZero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  levels = LeanCtor(LeanTag.List_cons, Array[levelZero, nil]);
+  constant = (parts: Array<String>) -> numeralTestConst(builder, parts, nil);
+  app = (head: LeanValue, arguments: Array<LeanValue>) ->
+    numeralTestApp(builder, head, arguments);
+  raw = (value: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(builder, value);
+  successorHead = constant(Array["Nat", "succ"]);
+  zeroHead = constant(Array["Nat", "zero"]);
+  ofNatHead = constant(Array["OfNat", "ofNat"]);
+  natType = constant(Array["Nat"]);
+  instance = constant(Array["instOfNatNat"]);
+  successor = (argument: LeanValue) -> app(successorHead, Array[argument]);
+  ofNat = (argument: LeanValue) ->
+    app(ofNatHead, Array[natType, argument, instance]);
+  seven = leanNatValue(7);
+  literal = raw(seven);
+  stringLiteral = L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(
+    builder,
+    LeanText("7"),
+  );
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+  sort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, levelZero);
+  binderName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    builder,
+    LeanText("x"),
+  );
+  binderInfo = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  free = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, binderName);
+  meta = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, binderName);
+  lambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    binderName,
+    binderInfo,
+    natType,
+    bound,
+  );
+  forallExpr = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    builder,
+    binderName,
+    binderInfo,
+    natType,
+    bound,
+  );
+  letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    builder,
+    binderName,
+    natType,
+    literal,
+    bound,
+    leanBool(false),
+  );
+  projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    builder,
+    binderName,
+    LeanNatLiterals.n0,
+    free,
+  );
+  metadata = LeanCtor(
+    LeanTag.List_cons,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[binderName, LeanCtor(LeanTag.DataValue_ofNat, Array[seven])],
+      ),
+      nil,
+    ],
+  );
+  annotated = (expression: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, expression);
+  fixtures: mutable Vector<NumeralFixture> = mutable Vector[];
+  for ((label, expression) in Array[
+    ("bound variable", bound),
+    ("free variable", free),
+    ("metavariable", meta),
+    ("sort", sort),
+    ("ordinary constant", natType),
+    ("lambda", lambda),
+    ("forall", forallExpr),
+    ("let", letExpr),
+    ("projection", projection),
+    ("string literal", stringLiteral),
+    ("metadata on literal", annotated(literal)),
+    ("metadata on whole application", annotated(successor(literal))),
+    (
+      "metadata on function head",
+      app(annotated(successorHead), Array[literal]),
+    ),
+    ("metadata on middle argument", ofNat(annotated(literal))),
+    ("variable application head", app(free, Array[literal])),
+    ("string literal application head", app(stringLiteral, Array[literal])),
+  ]) {
+    fixtures.push(NumeralFixture(label, expression, false, None()))
+  };
+  fixtures.push(
+    NumeralFixture("Nat.zero", zeroHead, true, Some(LeanNatLiterals.n0)),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "Nat.zero applied",
+      app(zeroHead, Array[literal]),
+      false,
+      None(),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture("Nat.succ unapplied", successorHead, false, None()),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "Nat.succ oversaturated",
+      app(successorHead, Array[literal, literal]),
+      false,
+      None(),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture("Nat.succ nonnumeral", successor(free), false, None()),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "successor of zero",
+      successor(zeroHead),
+      true,
+      Some(leanNatValue(1)),
+    ),
+  );
+  for (count in Array[0, 1, 2, 4]) {
+    arguments = Array[natType, literal, instance, literal].take(count);
+    fixtures.push(
+      NumeralFixture(
+        "OfNat arity " + count.toString(),
+        app(ofNatHead, arguments),
+        false,
+        None(),
+      ),
+    )
+  };
+  fixtures.push(
+    NumeralFixture(
+      "OfNat ignores type and instance",
+      app(ofNatHead, Array[stringLiteral, literal, annotated(free)]),
+      true,
+      Some(seven),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "OfNat middle alone determines result",
+      app(ofNatHead, Array[literal, free, literal]),
+      false,
+      None(),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "OfNat zero",
+      ofNat(zeroHead),
+      true,
+      Some(LeanNatLiterals.n0),
+    ),
+  );
+  for ((parts, arguments) in Array[
+    (Array["Nat.succ"], Array[literal]),
+    (Array["Namespace", "Nat", "succ"], Array[literal]),
+    (Array["Nat", "Succ"], Array[literal]),
+    (Array["Nat.zero"], Array[]),
+    (Array["Namespace", "Nat", "zero"], Array[]),
+    (Array["OfNat.ofNat"], Array[natType, literal, instance]),
+    (Array["Namespace", "OfNat", "ofNat"], Array[natType, literal, instance]),
+    (Array["OfNat", "ofNatExtra"], Array[natType, literal, instance]),
+  ]) {
+    fixtures.push(
+      NumeralFixture(
+        "lookalike name " + parts.join("/"),
+        app(constant(parts), arguments),
+        false,
+        None(),
+      ),
+    )
+  };
+  fixtures.push(
+    NumeralFixture(
+      "zero universe arguments ignored",
+      numeralTestConst(builder, Array["Nat", "zero"], levels),
+      true,
+      Some(LeanNatLiterals.n0),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "successor universe arguments ignored",
+      app(
+        numeralTestConst(builder, Array["Nat", "succ"], levels),
+        Array[literal],
+      ),
+      true,
+      Some(leanNatValue(8)),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "OfNat universe arguments ignored",
+      app(
+        numeralTestConst(builder, Array["OfNat", "ofNat"], levels),
+        Array[natType, literal, instance],
+      ),
+      true,
+      Some(seven),
+    ),
+  );
+  digits = Array[
+    ("0", "1"),
+    ("1", "2"),
+    ("9223372036854775807", "9223372036854775808"),
+    ("9223372036854775808", "9223372036854775809"),
+    ("18446744073709551615", "18446744073709551616"),
+    ("18446744073709551616", "18446744073709551617"),
+    (
+      "340282366920938463463374607431768211456",
+      "340282366920938463463374607431768211457",
+    ),
+  ];
+  for ((before, after) in digits) {
+    for (value in Array[
+      LeanScalar("nat", before),
+      leanBoxNat(LeanNat::parse(before)),
+    ]) {
+      expression = raw(value);
+      next = leanBoxNat(LeanNat::parse(after));
+      fixtures.push(
+        NumeralFixture("raw Nat " + before, expression, true, Some(value)),
+      );
+      fixtures.push(
+        NumeralFixture(
+          "OfNat preserves Nat " + before,
+          ofNat(expression),
+          true,
+          Some(value),
+        ),
+      );
+      fixtures.push(
+        NumeralFixture(
+          "successor Nat " + before,
+          successor(expression),
+          true,
+          Some(next),
+        ),
+      );
+      fixtures.push(
+        NumeralFixture(
+          "OfNat of successor " + before,
+          ofNat(successor(expression)),
+          true,
+          Some(next),
+        ),
+      );
+      fixtures.push(
+        NumeralFixture(
+          "successor of OfNat " + before,
+          successor(ofNat(expression)),
+          true,
+          Some(next),
+        ),
+      )
+    }
+  };
+  appliedLiteral = app(literal, Array[free]);
+  fixtures.push(
+    NumeralFixture("applied raw literal", appliedLiteral, false, Some(seven)),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "twice applied raw literal",
+      app(appliedLiteral, Array[free]),
+      false,
+      Some(seven),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "successor of applied literal",
+      successor(appliedLiteral),
+      false,
+      Some(leanNatValue(8)),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture(
+      "OfNat of applied literal",
+      ofNat(appliedLiteral),
+      false,
+      Some(seven),
+    ),
+  );
+  chain: LeanValue = zeroHead;
+  rejectedChain: LeanValue = free;
+  for (_ in Range(0, 32)) {
+    !chain = successor(ofNat(chain));
+    !rejectedChain = successor(ofNat(rejectedChain))
+  };
+  fixtures.push(
+    NumeralFixture(
+      "nested mixed numeral chain",
+      chain,
+      true,
+      Some(leanNatValue(32)),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture("nested mixed rejected chain", rejectedChain, false, None()),
+  );
+  unchangedPayload = (LeanScalar("nat", "18446744073709551616") : LeanValue);
+  nestedOfNat = raw(unchangedPayload);
+  rejectedOfNat: LeanValue = free;
+  for (_ in Range(0, 32)) {
+    !nestedOfNat = ofNat(nestedOfNat);
+    !rejectedOfNat = ofNat(rejectedOfNat)
+  };
+  fixtures.push(
+    NumeralFixture(
+      "nested OfNat preserves scalar payload",
+      nestedOfNat,
+      true,
+      Some(unchangedPayload),
+    ),
+  );
+  fixtures.push(
+    NumeralFixture("nested OfNat rejected", rejectedOfNat, false, None()),
+  );
+  assert(fixtures.size() == 118);
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(29)]));
+    for (fixture in fixtures.toArray()) checkNumeralFixture(runtime, fixture)
+  };
+  print_string(
+    "Numeral syntax: 236 fixtures checked against explicit predicate, conversion and wrapper outcomes\n",
+  )
+}

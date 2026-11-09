@@ -1,0 +1,233 @@
+// Direct visitor comparisons cover discovery order and carried dependency arrays.
+fun dependencyVisitCheck(
+  saved: LeanExecutionCheckpoint,
+  label: String,
+  variables: LeanValue,
+  expression: LeanValue,
+  initial: LeanValue,
+  expected: Array<LeanValue>,
+  expectedPersistent: ?Bool = None(),
+): void {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  frozenVariables = rewriteProbeCopyInput(variables);
+  frozenExpression = rewriteProbeCopyInput(expression);
+  frozenInitial = rewriteProbeCopyInput(initial);
+  original = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_visit_c7a0fd662b_fallback(
+    oldRuntime,
+    variables,
+    expression,
+    initial,
+  );
+  replacement = L4_Lean_Meta_FunInfo.f_Meta_collectDeps_visit_c7a0fd662b(
+    newRuntime,
+    variables,
+    expression,
+    initial,
+  );
+  if (
+    !rewriteProbeSameInput(
+      LeanArray(leanArray(original)),
+      LeanArray(expected),
+    ) ||
+    !rewriteProbeSameInput(
+      LeanArray(leanArray(replacement)),
+      LeanArray(expected),
+    )
+  ) {
+    leanFail("dependency visitor result: " + label)
+  };
+  (original, replacement) match {
+  | (LeanArray(_), LeanArray(_))
+  | (LeanPersistentArray(_), LeanPersistentArray(_)) ->
+    void
+  | _ -> leanFail("dependency visitor publication representation: " + label)
+  };
+  expectedPersistent match {
+  | Some(expectedKind) ->
+    actualKind = replacement match {
+    | LeanPersistentArray(_) -> true
+    | _ -> false
+    };
+    assert(actualKind == expectedKind)
+  | None() -> void
+  };
+  assert(rewriteProbeSameInput(variables, frozenVariables));
+  assert(rewriteProbeSameInput(expression, frozenExpression));
+  assert(rewriteProbeSameInput(initial, frozenInitial));
+  assert(native_eq(saved.refs, oldRuntime.checkpoint().refs) == 0);
+  assert(native_eq(saved.refs, newRuntime.checkpoint().refs) == 0);
+}
+
+fun main(): void {
+  builder = mutable LeanExecution{};
+  name = (text: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+  fvar = (text: String) ->
+    L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, name(text));
+  app = (fn: LeanValue, arg: LeanValue) ->
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, fn, arg);
+  x = fvar("x");
+  y = fvar("y");
+  z = fvar("z");
+  variables: Array<LeanValue> = Array[x, y, z];
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    builder,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+  binderName = name("bound");
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  lambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    binderName,
+    binder,
+    z,
+    app(x, y),
+  );
+  forall = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    builder,
+    binderName,
+    binder,
+    y,
+    z,
+  );
+  letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    builder,
+    binderName,
+    z,
+    x,
+    y,
+    leanBool(false),
+  );
+  projection = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    builder,
+    name("Pair"),
+    LeanNatLiterals.n0,
+    y,
+  );
+  metadata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    LeanCtor(LeanTag.List_nil, Array[]),
+    app(z, x),
+  );
+  closedLambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    binderName,
+    binder,
+    prop,
+    bound,
+  );
+  closedForall = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    builder,
+    binderName,
+    binder,
+    prop,
+    bound,
+  );
+  closedLet = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    builder,
+    binderName,
+    prop,
+    bound,
+    bound,
+    leanBool(false),
+  );
+  shared = app(z, x);
+  cases: Array<(String, Array<LeanValue>, LeanValue, Array<Int>)> = Array[
+    ("sort", variables, prop, Array[]),
+    ("bound variable", variables, bound, Array[]),
+    ("missing variable", variables, fvar("missing"), Array[]),
+    ("empty variables", Array[], x, Array[]),
+    ("single variable", variables, y, Array[1]),
+    ("equal copied variable", variables, rewriteProbeCopyInput(y), Array[1]),
+    ("first repeated variable", Array[y, x, y], y, Array[0]),
+    ("application order", variables, app(z, app(y, x)), Array[2, 1, 0]),
+    ("repeated variable", variables, app(y, y), Array[1]),
+    ("lambda order", variables, lambda, Array[2, 0, 1]),
+    ("forall order", variables, forall, Array[1, 2]),
+    ("let order", variables, letExpr, Array[2, 0, 1]),
+    ("projection", variables, projection, Array[1]),
+    ("metadata", variables, metadata, Array[2, 0]),
+    ("shared expression", variables, app(shared, shared), Array[2, 0]),
+    ("closed application", variables, app(bound, bound), Array[]),
+    ("closed lambda", variables, closedLambda, Array[]),
+    ("closed forall", variables, closedForall, Array[]),
+    ("closed let", variables, closedLet, Array[]),
+  ];
+  huge = LeanScalar("nat", "340282366920938463463374607431768211456");
+  prefixes: Array<Array<LeanValue>> = Array[
+    Array[],
+    Array[leanNatValue(1)],
+    Array[LeanScalar("nat", "1")],
+    Array[leanNatValue(8), leanNatValue(1), leanNatValue(8), huge],
+  ];
+  count = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37)]));
+    saved = runtime.checkpoint();
+    for ((label, vars, expression, discovery) in cases) {
+      for (prefix in prefixes) {
+        expected = Vector::mcreateFromItems(prefix);
+        for (index in discovery) {
+          if (!prefix.any(value -> leanNat(value) == LeanNat::fromInt(index))) {
+            expected.push(leanNatValue(index))
+          }
+        };
+        for (persistentVariables in Array[false, true]) {
+          for (persistentPrefix in Array[false, true]) {
+            varsValue: LeanValue = if (persistentVariables) {
+              LeanPersistentArray(
+                Persistent.RadixTreeVector::mcreateFromItems(vars).chill(),
+              )
+            } else {
+              LeanArray(vars)
+            };
+            prefixValue: LeanValue = if (persistentPrefix) {
+              LeanPersistentArray(
+                Persistent.RadixTreeVector::mcreateFromItems(prefix).chill(),
+              )
+            } else {
+              LeanArray(prefix)
+            };
+            dependencyVisitCheck(
+              saved,
+              label,
+              varsValue,
+              expression,
+              prefixValue,
+              expected.toArray(),
+            );
+            !count = count + 1
+          }
+        }
+      }
+    };
+    many = Array::fillBy(130, i -> fvar("v" + i.toString()));
+    for (size in Array[127, 128, 129]) {
+      prefix = Array::fillBy(size, i -> leanNatValue(i));
+      dependencyVisitCheck(
+        saved,
+        "publication boundary",
+        LeanArray(many),
+        many[size],
+        LeanArray(prefix),
+        prefix.concat(Array[leanNatValue(size)]),
+        Some(size >= 128),
+      );
+      dependencyVisitCheck(
+        saved,
+        "unchanged large array",
+        LeanArray(many),
+        many[0],
+        LeanArray(prefix),
+        prefix,
+        Some(false),
+      );
+      !count = count + 2
+    }
+  };
+  assert(count == 620);
+  print_string("620 direct dependency visitor checks passed\n")
+}

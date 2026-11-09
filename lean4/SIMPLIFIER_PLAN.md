@@ -115,8 +115,19 @@ copied-array comparison across element specializations and rejection of changed
 contents. The [second audit](provenance/rewrite-batches/2026-11-09-wave-02.json)
 records exact hashes and limitations. All four retained source files restore
 byte-for-byte to `796037fe7` by reversing only recorded fallback identity changes.
-These entries retain boxed interfaces; the deeper visitor/sorter and WHNF helpers
-remain shared. Vibe quota failures stopped launches; Codex/local work continues.
+These entries retain boxed interfaces; at this checkpoint the deeper visitor/sorter
+and WHNF helpers remained shared. Vibe quota failures stopped launches;
+Codex/local work continues.
+
+The next batch adds `DiscrTree/Main/NumeralPredicate.sk`, `NumeralValue.sk` and
+`FunInfo/DependencyVisitor.sk`. Native Bool/optional results replace the internal
+numeral result protocol; 236 fixture runs pass. Dependency traversal uses private
+vectors and an explicit stack on ordinary arrays, with immutable publication and
+the original route retained for other representations. Its 620 direct comparisons
+and 80 collector/function-info regressions pass, as does incremental release
+checking. The [third audit](provenance/rewrite-batches/2026-11-09-wave-03.json)
+records helper hashes and the remaining boxed payload/compatibility boundaries.
+No whole-example performance claim follows from these focused checks.
 
 Use `skargo check` while editing and a measurement release build after the example
 path rewrite type-checks and focused checks pass. `skargo check --release` checks the release

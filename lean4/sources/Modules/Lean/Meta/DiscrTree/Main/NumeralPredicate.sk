@@ -1,0 +1,113 @@
+// Recognize numeral syntax without inspecting types or evaluating expressions.
+module L4_Lean_Meta_DiscrTree_Main;
+
+fun f_isNumeral(runtime: mutable LeanExecution, expression: LeanValue): Bool {
+  current = expression;
+  loop {
+    if (
+      leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_isRawNatLit_b81d6a1d5c(runtime, current),
+      )
+    ) {
+      return true
+    };
+    head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, current);
+    if (
+      !leanIsTrue(L4_Lean_Expr.f_Lean_Expr_isConst_c54d56be4f(runtime, head))
+    ) {
+      return false
+    };
+    name = L4_Lean_Expr.f_Lean_Expr_constName_a0c6339167(runtime, head);
+    successorName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("Nat"),
+      LeanText("succ"),
+    );
+    if (
+      leanIsTrue(
+        L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+          runtime,
+          name,
+          successorName,
+        ),
+      )
+    ) {
+      arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+        runtime,
+        current,
+      );
+      if (
+        leanIsTrue(
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+            runtime,
+            arity,
+            LeanNatLiterals.n1,
+          ),
+        )
+      ) {
+        !current = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(runtime, current);
+        continue
+      }
+    };
+    ofNatName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("OfNat"),
+      LeanText("ofNat"),
+    );
+    if (
+      leanIsTrue(
+        L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, name, ofNatName),
+      )
+    ) {
+      arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+        runtime,
+        current,
+      );
+      if (
+        leanIsTrue(
+          L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+            runtime,
+            arity,
+            LeanNatLiterals.n3,
+          ),
+        )
+      ) {
+        !current = L4_Lean_Expr.f_Lean_Expr_getRevArg_587d3ee448(
+          runtime,
+          current,
+          LeanNatLiterals.n1,
+        );
+        continue
+      }
+    };
+    zeroName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("Nat"),
+      LeanText("zero"),
+    );
+    if (
+      !leanIsTrue(
+        L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, name, zeroName),
+      )
+    ) {
+      return false
+    };
+    arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, current);
+    return leanIsTrue(
+      L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+        runtime,
+        arity,
+        LeanNatLiterals.n0,
+      ),
+    )
+  }
+}
+
+fun f_Meta_DiscrTree_isNumeral_e955d5d959(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+): LeanValue {
+  leanBool(f_isNumeral(runtime, expression))
+}
+
+module end;

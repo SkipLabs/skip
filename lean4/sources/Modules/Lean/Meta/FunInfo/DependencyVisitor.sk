@@ -1,0 +1,96 @@
+// Collect dependency indices in expression order using private mutable workspaces.
+module L4_Lean_Meta_FunInfo;
+
+fun f_appendDependency(
+  runtime: mutable LeanExecution,
+  variables: Array<LeanValue>,
+  expression: LeanValue,
+  dependencies: mutable Vector<LeanValue>,
+): void {
+  for (index in Range(0, variables.size())) {
+    if (!leanExprEqual(runtime, variables[index], expression, false)) continue;
+    naturalIndex = LeanNat::fromInt(index);
+    for (dependency in dependencies) {
+      if (leanNat(dependency) == naturalIndex) return void
+    };
+    dependencies.push(leanNatValue(index));
+    return void
+  }
+}
+
+fun f_collectDependencyIndices(
+  runtime: mutable LeanExecution,
+  variables: Array<LeanValue>,
+  expression: LeanValue,
+  initial: Array<LeanValue>,
+): ?Array<LeanValue> {
+  dependencies = Vector::mcreateFromItems(initial);
+  pending = mutable Vector[expression];
+  while (!pending.isEmpty()) {
+    current = pending.pop();
+    tag = leanTag(current);
+    tag match {
+    | LeanTag.Expr_app__impl
+    | LeanTag.Expr_forallE__impl
+    | LeanTag.Expr_lam__impl
+    | LeanTag.Expr_letE__impl ->
+      if (leanExprData(current).and(1.shl(40)) == 0) continue;
+      // Push children in reverse so the stack preserves Lean's visit order.
+      if (tag == LeanTag.Expr_app__impl) {
+        pending.push(leanField(current, 2));
+        pending.push(leanField(current, 1))
+      } else if (tag == LeanTag.Expr_letE__impl) {
+        pending.push(leanField(current, 4));
+        pending.push(leanField(current, 3));
+        pending.push(leanField(current, 2))
+      } else {
+        pending.push(leanField(current, 3));
+        pending.push(leanField(current, 2))
+      }
+    | LeanTag.Expr_proj__impl -> pending.push(leanField(current, 3))
+    | LeanTag.Expr_mdata__impl -> pending.push(leanField(current, 2))
+    | LeanTag.Expr_fvar__impl ->
+      f_appendDependency(runtime, variables, current, dependencies)
+    | _ -> void
+    }
+  };
+  if (dependencies.size() == initial.size()) None() else {
+    Some(dependencies.toArray())
+  }
+}
+
+fun f_Meta_collectDeps_visit_c7a0fd662b(
+  runtime: mutable LeanExecution,
+  fvars: LeanValue,
+  expression: LeanValue,
+  initial: LeanValue,
+): LeanValue {
+  (fvars, initial) match {
+  | (LeanArray(variables), LeanArray(dependencies)) ->
+    f_collectDependencyIndices(
+      runtime,
+      variables,
+      expression,
+      dependencies,
+    ) match {
+    | None() -> initial
+    | Some(result) ->
+      if (result.size() > 128) {
+        LeanPersistentArray(
+          Persistent.RadixTreeVector::mcreateFromItems(result).chill(),
+        )
+      } else {
+        LeanArray(result)
+      }
+    }
+  | _ ->
+    f_Meta_collectDeps_visit_c7a0fd662b_fallback(
+      runtime,
+      fvars,
+      expression,
+      initial,
+    )
+  }
+}
+
+module end;

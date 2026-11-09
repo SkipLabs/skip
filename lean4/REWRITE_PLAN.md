@@ -200,6 +200,29 @@ dependency visitor/sorter and deeper WHNF helpers remain shared. Complete path
 coverage, coherent typed interfaces, whole-proof validation and timing remain
 open; this checkpoint does not establish a speedup.
 
+### Third checkpoint (2026-11-09)
+
+Numeral recognition/conversion now use host `Bool`/optional results internally;
+their compatibility entry points retain the original boxed ABI. The conversion
+preserves an unchanged literal's Nat wrapper. All 236 fixture runs pass explicit
+predicate, conversion and guarded-wrapper expectations, including large naturals,
+exact arities and nested successful/failed chains.
+
+Dependency traversal now uses a private stack and dependency vector for ordinary
+arrays, preserving expression order and publishing an immutable result. It keeps
+existing indices, duplicates and Nat representations, and preserves the array's
+ordinary/persistent publication boundary. Other input array representations use
+the retained visitor. All 620 direct visitor comparisons pass, including 164
+calls through the new route and 456 compatibility cases; 44 collector and 36
+function-info regression checks pass too. This replaces the earlier visitor
+shared by both collection-entry routes. Expression equality and Nat primitives
+are still shared, and payloads remain boxed.
+
+The [third audit](provenance/rewrite-batches/2026-11-09-wave-03.json) binds canonical
+and internal helper hashes, probes and coverage limits. Incremental release
+checking passes; retained source files restore exactly to `72d71eabf`. Execution
+coverage for the fixed whole-example matrix and the final timing gate remain open.
+
 ### 1. Freeze task inputs and calibrate
 
 Use the current working tree, including untracked maintained files. A worktree
