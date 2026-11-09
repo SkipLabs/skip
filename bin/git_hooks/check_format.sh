@@ -13,6 +13,9 @@ BLACK_VERSION=$(grep '^black==' requirements-dev.txt | cut -d'=' -f3)
 # `npx prettier@`, which silently pulls the *latest* prettier instead of the
 # pinned one and then reports spurious formatting diffs whenever they disagree.
 export PRETTIER_VERSION
+# Same default as the Makefile; run `PRETTIER_LOG_LEVEL=debug git commit` for
+# Prettier's debug output. Exported for the same reason as PRETTIER_VERSION.
+export PRETTIER_LOG_LEVEL=${PRETTIER_LOG_LEVEL:-warn}
 if [ -z "$PRETTIER_VERSION" ] || [ "$PRETTIER_VERSION" = "null" ]; then
     echo "Error: could not read prettier version from package.json devDependencies"
     exit 1
@@ -33,7 +36,7 @@ check-file () {
     elif [[ "$file" =~ .*\.(c|cc|cpp|h|hh|hpp)$ ]]; then # keep in sync with fmt-c in Makefile
         fmt="clang-format --assume-filename=$file"
     elif [[ "$file" =~ .*\.(css|html|js|json|mjs|ts|tsx)$ ]]; then # keep in sync with .prettierignore
-        fmt="npx -y prettier@$PRETTIER_VERSION --stdin-filepath $file --loglevel debug"
+        fmt="npx -y prettier@$PRETTIER_VERSION --stdin-filepath $file --log-level $PRETTIER_LOG_LEVEL"
     elif [[ "$file" == *.py ]]; then # keep in sync with fmt-py in Makefile
         fmt="black - --quiet --line-length 80 --stdin-filename $file"
     else
