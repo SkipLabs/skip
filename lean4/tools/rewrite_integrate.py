@@ -160,7 +160,7 @@ def body_for_hash(text: str, function: Function, expected: str, label: str) -> s
     raise IntegrationError(f"Original body hash mismatch: {label}")
 
 
-def retained_body(body: str, module: str, name: str) -> str:
+def retained_body(body: str, module: str, name: str, *, retain_adapter: bool = False) -> str:
     replacements = []
     masked = code_mask(body)
     for match in REFERENCE.finditer(masked):
@@ -168,12 +168,12 @@ def retained_body(body: str, module: str, name: str) -> str:
             continue
         if match[1] is None and masked[:match.start()].rstrip().endswith("."):
             continue
-        require(match[2] != "apply_" + name,
+        require(retain_adapter or match[2] != "apply_" + name,
                 "Recursive closure adapter needs an explicitly reviewed fallback adapter")
-        if match[2] == name:
-            replacements.append((match.start(2), match.end(2)))
-    for start, end in reversed(replacements):
-        body = body[:start] + name + "_fallback" + body[end:]
+        if match[2] == name or (retain_adapter and match[2] == "apply_" + name):
+            replacements.append((match.start(2), match.end(2), match[2]))
+    for start, end, identity in reversed(replacements):
+        body = body[:start] + identity + "_fallback" + body[end:]
     return body
 
 
@@ -209,7 +209,8 @@ class Plan:
 
 
 def prepare_plan(root: Path, manifest_path: Path, replacement_path: Path,
-                 destination: str, audit_path: Path | None = None) -> Plan:
+                 destination: str, audit_path: Path | None = None,
+                 closure_adapter_sha256: str | None = None) -> Plan:
     root, manifest_path, replacement_path = root.resolve(), manifest_path.resolve(), replacement_path.resolve()
     audit_path = (audit_path or manifest_path.parent / "integration-audit.json").absolute()
     require(audit_path.is_relative_to(root), "Audit must be inside the repository")
@@ -282,11 +283,36 @@ def prepare_plan(root: Path, manifest_path: Path, replacement_path: Path,
     require(name + "_fallback" not in definitions, "Retained fallback already exists")
     require(not (replacement_names - {name}) & definitions.keys(), "Replacement helper conflicts with an existing definition")
 
+    adapter_audit = None
+    if closure_adapter_sha256 is not None:
+        adapter_name = "apply_" + name
+        require(definitions.get(adapter_name) == source_path,
+                "Reviewed closure adapter must be in the canonical source file")
+        require(adapter_name + "_fallback" not in definitions and
+                adapter_name + "_fallback" not in replacement_names,
+                "Retained closure adapter already exists")
+        require(adapter_name not in replacement_names,
+                "Replacement must not redefine the existing closure adapter")
+        adapter = next(f for f in source_functions if f.name == adapter_name)
+        adapter_body = source[adapter.start:adapter.end]
+        check_hash(adapter_body.encode(), closure_adapter_sha256, "reviewed closure adapter")
+        retained_adapter = retained_body(adapter_body, module, name, retain_adapter=True)
+        adapter_audit = {
+            "identity": module + "." + adapter_name,
+            "original_body": adapter_body,
+            "original_sha256": closure_adapter_sha256,
+            "retained_body": retained_adapter,
+            "retained_sha256": digest(retained_adapter.encode()),
+        }
+
     target = targets[0]
     # Preserve the source outside the exact function span, including its comment.
     before_body = source[target.start:target.end]
-    fallback = retained_body(before_body, module, name)
-    updated_source = source[:target.start] + fallback + source[target.end:]
+    fallback = retained_body(before_body, module, name, retain_adapter=adapter_audit is not None)
+    retained = fallback
+    if adapter_audit is not None:
+        retained += "\n\n" + adapter_audit["retained_body"]
+    updated_source = source[:target.start] + retained + source[target.end:]
     build_path = root / "sources/build.txt"
     build_before = build_path.read_bytes()
     build_lines = build_before.decode().splitlines()
@@ -330,14 +356,16 @@ def prepare_plan(root: Path, manifest_path: Path, replacement_path: Path,
         "retained_function_sha256": digest(fallback.encode()),
         "canonical_abi": abi,
         "abi_check": "Parameter types/order and return type match; argument roles still require semantic review.",
-        "shared_helpers": "Only direct self references are redirected; other recursive helpers remain shared.",
+        "shared_helpers": "Direct self references and any explicitly retained closure adapter are redirected; other helpers remain shared.",
+        "closure_adapter": adapter_audit,
         "validation": "pending; integration does not imply semantic acceptance",
         "changes": [{"path": p.relative_to(root).as_posix(),
                      "before_sha256": None if old is None else digest(old),
                      "after_sha256": digest(new)} for p, (old, new) in changes.items()],
     }
     changes[audit_path] = (None, (json.dumps(audit, indent=2) + "\n").encode())
-    return Plan((root, manifest_path, replacement_path, destination, audit_path), changes, inputs, audit)
+    return Plan((root, manifest_path, replacement_path, destination, audit_path,
+                 closure_adapter_sha256), changes, inputs, audit)
 
 
 def apply_plan(plan: Plan) -> None:
@@ -389,10 +417,13 @@ def main() -> int:
     parser.add_argument("--replacement", type=Path, required=True)
     parser.add_argument("--destination", required=True, help="New repository-relative source path")
     parser.add_argument("--audit", type=Path)
+    parser.add_argument("--closure-adapter-sha256",
+                        help="SHA256 of an independently reviewed apply_ adapter declaration/body to retain")
     parser.add_argument("--apply", action="store_true")
     args = parser.parse_args()
     try:
-        plan = prepare_plan(args.root, args.manifest, args.replacement, args.destination, args.audit)
+        plan = prepare_plan(args.root, args.manifest, args.replacement, args.destination,
+                            args.audit, args.closure_adapter_sha256)
         print("APPLY" if args.apply else "DRY RUN (no files written)")
         print(f"Original body SHA256: {plan.audit['original_body_sha256']}")
         print("Canonical ABI matched; argument roles and semantics still require review.")

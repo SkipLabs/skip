@@ -8,6 +8,17 @@ the entire plans or follow links outside their assigned directory.
 
 ## Roles and limits
 
+The latest user instruction authorizes a bounded experiment with **one Vibe
+client and ten built-in subagents**, instead of ten CLI clients. For this run,
+set `enable_subagents = true`, `max_subagents = 10` and
+`max_concurrent_subagents = 10` in the coordinator's local configuration; keep
+API retries disabled. Give ten children disjoint writer/probe output paths,
+prohibit grandchildren and production/compiler access, and verify actual spawn
+results rather than counting the requested allocation. Preserve the coordinator
+export and child journals. Stop on provider failures; the experiment does not
+authorize repeated launches or a return to the old client pool. The generic
+single-worker configuration below still disables delegation for separate clients.
+
 The user permits up to ten Vibe instances concurrently. Count writers, reviewers,
 probe authors and retries in that same limit. The latest allocation assigns
 three Codex peers to packet preparation and independent review of Vibe drafts.
@@ -204,8 +215,13 @@ frozen inputs and the current body, retains the original with redirected direct
 self-calls, updates the build/provenance paths, and writes an audit under `build/`.
 It preserves unrelated source edits and refuses conflicting declarations.
 Canonical ABI types/count/order are checked; identical `LeanValue` types do not
-establish correct context/state/world roles. Recursive closure adapters and
-unsupported signatures need explicit handling rather than automatic integration.
+establish correct context/state/world roles. Recursive closure adapters are
+rejected by default. After independent review, `--closure-adapter-sha256 HASH`
+pins the exact same-file `apply_` declaration/body and copies it with its calls
+redirected to the retained fallback. The original function's captured adapter
+references are redirected too; the public adapter stays canonical. The audit
+records both adapter bodies/hashes, and stale hashes fail before writes.
+Unsupported signatures still need explicit handling.
 Do not treat a successful apply as semantic acceptance. Format with `skfmt`,
 then check and execute the relevant probes.
 

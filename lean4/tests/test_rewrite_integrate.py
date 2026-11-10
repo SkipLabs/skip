@@ -66,11 +66,37 @@ module end;
     def relative(self, path):
         return path.relative_to(self.root).as_posix()
 
-    def plan(self):
-        return integrate.prepare_plan(self.root, self.manifest, self.replacement, self.destination)
+    def plan(self, **kwargs):
+        return integrate.prepare_plan(self.root, self.manifest, self.replacement,
+                                      self.destination, **kwargs)
 
     def files(self):
         return {self.relative(p): p.read_bytes() for p in self.root.rglob("*") if p.is_file()}
+
+    def closure_fixture(self):
+        """Freeze a canonical body with direct and closure-adapter recursion."""
+        self.body = self.body.replace(
+            "  f_work(n - 1)",
+            '''  // apply_f_work and L4_Example.apply_f_work are documentation.
+  label2 = "apply_f_work L4_Example.apply_f_work";
+  callback = L4_Example
+    . apply_f_work;
+  callback(n) + apply_f_work(n) + Other.apply_f_work(n) +
+    L4_Other.apply_f_work(n) + f_work(n - 1)''')
+        self.adapter = '''fun apply_f_work(n: Int): Int {
+  /* apply_f_work /* f_work */ L4_Example.f_work */
+  label = "f_work apply_f_work";
+  if (n == 0) return f_work(0);
+  apply_f_work(n - 1) + L4_Example.f_work(n) + L4_Other.f_work(n)
+}'''
+        self.source.write_text(self.prefix + self.body + "\n\n" + self.adapter + self.suffix)
+        original = self.task / "Original.sk"
+        original.write_text(self.prefix + self.body + "\n\nmodule end;\n")
+        manifest = json.loads(self.manifest.read_text())
+        manifest["body_sha256"] = hashlib.sha256(self.body.encode()).hexdigest()
+        manifest["inputs"]["Original.sk"] = hashlib.sha256(original.read_bytes()).hexdigest()
+        self.manifest.write_text(json.dumps(manifest))
+        return hashlib.sha256(self.adapter.encode()).hexdigest()
 
     def test_cli_defaults_to_dry_run(self):
         before = self.files()
@@ -189,6 +215,131 @@ module end;
     def test_retained_adapter_recursion_is_not_silently_shared(self):
         with self.assertRaisesRegex(integrate.IntegrationError, "closure adapter"):
             integrate.retained_body("fun f_work() { L4_Example.apply_f_work }", "L4_Example", "f_work")
+
+    def test_unreviewed_adapter_fails_before_any_writes(self):
+        self.closure_fixture()
+        before = self.files()
+        with self.assertRaisesRegex(integrate.IntegrationError, "explicitly reviewed fallback adapter"):
+            self.plan()
+        self.assertEqual(self.files(), before)
+
+    def test_reviewed_adapter_retains_closed_fallback_routes_and_audit(self):
+        adapter_hash = self.closure_fixture()
+        before = self.files()
+        plan = self.plan(closure_adapter_sha256=adapter_hash)
+        self.assertEqual(self.files(), before)
+        self.assertEqual(plan.arguments[-1], adapter_hash)
+        integrate.apply_plan(plan)
+        source = self.source.read_text()
+        _, functions = integrate.parse_functions(source, "integrated source")
+        bodies = {f.name: source[f.start:f.end] for f in functions}
+        self.assertEqual(set(bodies), {
+            "f_work_fallback", "apply_f_work_fallback", "apply_f_work", "f_unrelated",
+        })
+        # The public adapter must continue to call the new canonical routine.
+        self.assertEqual(bodies["apply_f_work"], self.adapter)
+        fallback = bodies["f_work_fallback"]
+        retained_adapter = bodies["apply_f_work_fallback"]
+        self.assertIn(". apply_f_work_fallback;", fallback)
+        self.assertIn("callback(n) + apply_f_work_fallback(n)", fallback)
+        self.assertIn("f_work_fallback(n - 1) + L4_Example.f_work_fallback(0)", fallback)
+        self.assertIn("return f_work_fallback(0)", retained_adapter)
+        self.assertIn("apply_f_work_fallback(n - 1) + L4_Example.f_work_fallback(n)", retained_adapter)
+        for body in (fallback, retained_adapter):
+            masked = integrate.code_mask(body)
+            self.assertNotRegex(masked, r"(?<![\w.])(?:L4_Example\s*\.\s*)?(?:apply_)?f_work\b")
+        self.assertIn("Other.apply_f_work(n)", fallback)
+        self.assertIn("L4_Other.apply_f_work(n)", fallback)
+        self.assertIn("L4_Other.f_work(n)", retained_adapter)
+        self.assertIn('// apply_f_work and L4_Example.apply_f_work are documentation.', fallback)
+        self.assertIn('"apply_f_work L4_Example.apply_f_work"', fallback)
+        self.assertIn('/* apply_f_work /* f_work */ L4_Example.f_work */', retained_adapter)
+        self.assertIn('"f_work apply_f_work"', retained_adapter)
+        audit = json.loads((self.task / "integration-audit.json").read_text())
+        self.assertEqual(audit["closure_adapter"], {
+            "identity": "L4_Example.apply_f_work",
+            "original_body": self.adapter,
+            "original_sha256": adapter_hash,
+            "retained_body": retained_adapter,
+            "retained_sha256": hashlib.sha256(retained_adapter.encode()).hexdigest(),
+        })
+        self.assertEqual(audit["retained_function_sha256"], hashlib.sha256(fallback.encode()).hexdigest())
+
+    def test_changed_reviewed_adapter_rejects_planning_without_writes(self):
+        adapter_hash = self.closure_fixture()
+        self.source.write_text(self.source.read_text().replace(
+            self.adapter, self.adapter.replace("return f_work(0)", "return f_work(1)")))
+        before = self.files()
+        with self.assertRaisesRegex(integrate.IntegrationError, "Hash mismatch: reviewed closure adapter"):
+            self.plan(closure_adapter_sha256=adapter_hash)
+        self.assertEqual(self.files(), before)
+
+    def test_changed_adapter_after_preflight_rejects_before_staging(self):
+        adapter_hash = self.closure_fixture()
+        plan = self.plan(closure_adapter_sha256=adapter_hash)
+        self.source.write_text(self.source.read_text().replace(
+            self.adapter, self.adapter.replace("return f_work(0)", "return f_work(1)")))
+        before = self.files()
+        with patch.object(integrate.tempfile, "NamedTemporaryFile") as stage:
+            with self.assertRaisesRegex(integrate.IntegrationError, "Hash mismatch: reviewed closure adapter"):
+                integrate.apply_plan(plan)
+            stage.assert_not_called()
+        self.assertEqual(self.files(), before)
+
+    def test_reviewed_adapter_must_exist_in_same_source(self):
+        adapter_hash = self.closure_fixture()
+        self.source.write_text(self.source.read_text().replace("\n\n" + self.adapter, ""))
+        before = self.files()
+        with self.assertRaisesRegex(integrate.IntegrationError, "canonical source file"):
+            self.plan(closure_adapter_sha256=adapter_hash)
+        self.assertEqual(self.files(), before)
+        (self.source.parent / "Adapter.sk").write_text(
+            self.prefix + self.adapter + "\nmodule end;\n")
+        before = self.files()
+        with self.assertRaisesRegex(integrate.IntegrationError, "canonical source file"):
+            self.plan(closure_adapter_sha256=adapter_hash)
+        self.assertEqual(self.files(), before)
+
+    def test_existing_retained_adapter_and_replacement_adapter_are_rejected(self):
+        adapter_hash = self.closure_fixture()
+        source_before = self.source.read_text()
+        replacement_before = self.replacement.read_text()
+        for location, name, message in (
+            (self.source, "apply_f_work_fallback", "Retained closure adapter already exists"),
+            (self.replacement, "apply_f_work_fallback", "Retained closure adapter already exists"),
+            (self.replacement, "apply_f_work", "helper conflicts"),
+        ):
+            with self.subTest(location=location.name, name=name):
+                self.source.write_text(source_before)
+                self.replacement.write_text(replacement_before)
+                location.write_text(location.read_text().replace(
+                    "module end;", f"fun {name}(n: Int): Int {{\n  n\n}}\nmodule end;"))
+                before = self.files()
+                with self.assertRaisesRegex(integrate.IntegrationError, message):
+                    self.plan(closure_adapter_sha256=adapter_hash)
+                self.assertEqual(self.files(), before)
+
+    def test_invalid_adapter_hash_rejects_before_writes(self):
+        self.closure_fixture()
+        before = self.files()
+        for adapter_hash in ("", "not-a-hash", "0" * 63, "A" * 64):
+            with self.subTest(adapter_hash=adapter_hash):
+                with self.assertRaisesRegex(integrate.IntegrationError, "Invalid SHA256.*closure adapter"):
+                    self.plan(closure_adapter_sha256=adapter_hash)
+                self.assertEqual(self.files(), before)
+
+    def test_cli_accepts_reviewed_adapter_hash_but_remains_dry_run(self):
+        adapter_hash = self.closure_fixture()
+        before = self.files()
+        result = subprocess.run([
+            sys.executable, str(Path(integrate.__file__)), "--root", str(self.root),
+            "--manifest", str(self.manifest), "--replacement", str(self.replacement),
+            "--destination", self.destination, "--closure-adapter-sha256", adapter_hash,
+        ], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("DRY RUN (no files written)", result.stdout)
+        self.assertIn("+fun apply_f_work_fallback", result.stdout)
+        self.assertEqual(self.files(), before)
 
     def test_masks_literals_comments_and_respects_qualified_references(self):
         body = '''fun f_work() {

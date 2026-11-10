@@ -27,18 +27,16 @@ adapters. `src/Elaboration/` connects typed inputs to the maintained Meta code;
 Read [REWRITE_PLAN.md](../../REWRITE_PLAN.md) for the current example-scoped
 rewrite and completion criteria. For delegation, also read
 [parallel-workers.md](references/parallel-workers.md). The user permits at most
-ten Vibe instances, subject to provider quotas. The latest allocation uses Vibe
-writers and three peer Codex packet owners/reviewers, filling the four active
-Codex slots together with the primary. The primary reviews and integrates their
-handoffs and owns the single compiler queue. Keep tasks disjoint and let drafting
-overlap validation. The latest user steering stops Vibe until explicitly resumed;
-use the Codex peers for implementation and independent review. During provider failures, peers can continue implementation
-locally with another peer or the primary reviewing their changes. Follow the
-active plan for whether launches are stopped;
-the latest user instruction permits reducing concurrency on errors. Keep API
-retries disabled, report suspected quota failures, and honor provider retry delays.
+ten Vibe workers, subject to provider quotas. Three peer Codex agents implement
+and independently review private handoffs; the primary reviews and integrates
+them and owns the single compiler queue. Keep tasks disjoint and let drafting
+overlap validation. Follow the active plan for provider launches: the latest
+trial uses one Vibe coordinator with ten built-in children, replacing the stopped
+separate-client pool. Keep API retries disabled, report provider failures, and
+honor retry delays. Independent local work can continue during provider failures.
 Use the packet/integration tools and shared probe fixtures documented in that
 reference to avoid repeating extraction, fallback preservation and test setup.
+Do not generalize a bounded retry into permission for repeated failed launches.
 Those tools establish mechanical consistency, not semantic correctness.
 For the fixed workload's observed-entry audit, follow
 [execution-coverage.md](references/execution-coverage.md). Diagnostic timings are

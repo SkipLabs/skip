@@ -2,9 +2,30 @@
 
 ## Current execution and ninth validated batch (2026-11-10)
 
-Latest steering: **stop using Vibe until the user asks to retry it**. All Vibe
-workers have exited. The team is the primary plus three Codex implementation and
-review peers, with one compiler queue. The current planning range to the full
+Latest steering authorizes **one Vibe client using ten built-in subagents** as a
+bounded experiment, superseding the stop below for this run only. The installed
+Vibe 3.1.0 schema supports `enable_subagents`, `max_subagents` and
+`max_concurrent_subagents`; the task config enables delegation with both limits
+set to ten and API retries disabled. Its tool output confirms ten running children,
+five writers and five independent probe authors, for a disjoint five-function
+Simp.Main batch. Private artifacts are in
+`build/vibe-workers/native-subagents-2026-11-10/`. One GLM coordinator was launched;
+no separate CLI worker pool or additional batches are authorized by this experiment.
+The trial finished in **217.52 seconds**, exit 0, with ten child exports all using
+`zai-glm-5-3` and no observed provider error. Five source drafts and five probe
+drafts exist. [The run record](provenance/worker-runs/2026-11-10-native-subagents.json)
+keeps sanitized settings, child model/status evidence and artifact hashes. The
+parent repaired an `undefined` packet-path launch bug and reported a cross-packet
+probe overwrite; external review checks final artifact ownership.
+
+These are drafts, not validated rewrites: initial review found probes without
+standalone fixtures/entry points, API/ABI mistakes and a source behavior change.
+Three Codex peers are correcting them privately while the previous batch validates.
+One successful orchestration run does not establish accepted throughput or a
+speedup. Provider failures stop any authorized run for assessment.
+
+The main team is the primary plus three Codex implementation and review peers,
+with one compiler queue. The current planning range to the full
 rewrite benchmark is 4–7 continuous-work days, uncertain because larger routines
 and representation conversion remain. Re-estimate from accepted work.
 
@@ -195,7 +216,8 @@ Before declaring the example's path complete:
 ## People, processes and ownership
 
 The current allocation is three Codex implementation/review peers plus the
-primary; Vibe is stopped until the user asks to retry. The four Codex agents fill this session's active
+primary, alongside the explicitly authorized single-session Vibe experiment
+described above. The four Codex agents fill this session's active
 agent limit; that limit does not establish a subscription-wide allowance. The
 active model/concurrency policy is recorded above.
 
