@@ -1,0 +1,248 @@
+// Differential coverage for ordinary reads and retained non-flat semantics.
+
+fun arrayReadOld(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+  at: LeanValue,
+  word: Bool,
+): LeanValue {
+  size = leanValueArraySize(value);
+  index = if (word) {
+    bits = leanWordBits(at);
+    if (!bits.ult(size)) leanFail("Lean Array USize index out of bounds");
+    bits
+  } else {
+    n = leanNat(at);
+    if (n >= LeanNat::fromInt(size)) {
+      leanFail(
+        "Lean Array index out of bounds (panic recovery is not implemented)",
+      )
+    };
+    n.toInt()
+  };
+  value match {
+  | LeanTrackedExtensionArray(view) -> view.get(runtime, index)
+  | LeanArrayOverride(base, changed, replacement) ->
+    if (index == changed) replacement else {
+      arrayReadOld(runtime, base, at, word)
+    }
+  | LeanPersistentArray(values) -> values[index]
+  | _ -> leanArray(value)[index]
+  }
+}
+
+fun arrayReadCheck(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+  index: Int,
+  expected: LeanValue,
+): Int {
+  for (at in Array[leanNatValue(index), LeanScalar("nat", index.toString())]) {
+    actual = leanArrayRead(runtime, value, at, false);
+    prior = arrayReadOld(runtime, value, at, false);
+    assert(leanSameObject(actual, prior) != 0);
+    assert(native_eq(actual, expected) == 0)
+  };
+  for (at in Array[
+    LeanWord("usize", index),
+    leanNatValue(index),
+    LeanScalar("usize", index.toString()),
+    LeanNatural(
+      LeanNat::parse("18446744073709551616").add(LeanNat::fromInt(index)),
+    ),
+  ]) {
+    actual = leanArrayRead(runtime, value, at, true);
+    prior = arrayReadOld(runtime, value, at, true);
+    assert(leanSameObject(actual, prior) != 0);
+    assert(native_eq(actual, expected) == 0)
+  };
+  6
+}
+
+fun arrayReadFixture(
+  runtime: mutable LeanExecution,
+  generations: Bool,
+): LeanValue {
+  keys = Array[
+    LeanExtensionKey("probe", "present"),
+    LeanExtensionKey("probe", "missing"),
+    LeanExtensionKey("probe", "untracked"),
+  ];
+  entries = runtime
+    .context()
+    .mkdir(
+      LeanExtensionKey::keyType,
+      LeanExtensionFile::type,
+      SKStore.DirName::create("/array-read/extensions/"),
+      Array[
+        (keys[0], LeanExtensionFile(LeanText("state"), Some(leanNatValue(7)))),
+        (keys[2], LeanExtensionFile(LeanText("untracked"), None())),
+      ],
+    );
+  LeanTrackedExtensionArray(LeanExtensionArray(keys, entries, generations))
+}
+
+fun arrayReadFailure(old: Bool, mode: String): void {
+  runtime = mutable LeanExecution{
+    store => Some(SKStore.Context::create{}.mclone()),
+  };
+  ordinary: LeanValue = LeanArray(Array[LeanText("kept")]);
+  tracked = arrayReadFixture(runtime, mode == "generation");
+  (value, at, word) = mode match {
+  | "empty-nat" -> (LeanArray(Array[]), leanNatValue(0), false)
+  | "nat-bound" -> (ordinary, leanNatValue(1), false)
+  | "big-nat" -> (ordinary, LeanScalar("nat", "18446744073709551616"), false)
+  | "word-bound" -> (ordinary, LeanWord("usize", 1), true)
+  | "negative-word" -> (ordinary, LeanWord("usize", -1), true)
+  | "bad-nat" -> (ordinary, LeanText("bad index"), false)
+  | "bad-word" -> (ordinary, LeanText("bad index"), true)
+  | "bad-array-first" ->
+    (LeanText("bad array"), LeanUnavailable("index sentinel"), false)
+  | "unavailable-first" ->
+    (LeanUnavailable("array sentinel"), LeanUnavailable("index sentinel"), true)
+  | "override-base-first" ->
+    (
+      LeanArrayOverride(
+        LeanUnavailable("base sentinel"),
+        0,
+        LeanText("replacement"),
+      ),
+      LeanUnavailable("index sentinel"),
+      false,
+    )
+  | "tracked-bound" -> (tracked, leanNatValue(3), false)
+  | "tracked-index-first" -> (tracked, LeanUnavailable("index sentinel"), false)
+  | "missing" -> (tracked, leanNatValue(1), false)
+  | "generation" -> (tracked, leanNatValue(2), false)
+  | "raw-tracked" -> (tracked, leanNatValue(0), false)
+  | _ -> leanFail("unknown array read failure mode")
+  };
+  selected = if (mode == "raw-tracked") mutable LeanExecution{} else runtime;
+  _ = if (old) arrayReadOld(selected, value, at, word) else {
+    leanArrayRead(selected, value, at, word)
+  };
+  leanFail("unexpected array read failure-case success")
+}
+
+fun main(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 3) return arrayReadFailure(args[1] == "old", args[2]);
+  assert(args.size() == 1);
+  count = 0;
+  runtime = mutable LeanExecution{};
+  for (size in Array[1, 129, 1025]) {
+    constructors: Array<LeanCtor> = Array::fillBy(size, i ->
+      LeanCtor(LeanTag.Option_some, Array[leanNatValue(i)])
+    );
+    texts: Array<LeanText> = Array::fillBy(size, i -> LeanText(i.toString()));
+    mixed: Array<LeanValue> = Array::fillBy(size, i ->
+      if (i % 2 == 0) LeanUnavailable("dormant element") else {
+        LeanText(i.toString())
+      }
+    );
+    for (fields in Array[constructors, texts, mixed]) {
+      for (persistent in Array[false, true]) {
+        value: LeanValue = if (persistent) {
+          LeanPersistentArray(
+            Persistent.RadixTreeVector::mcreateFromItems(fields).chill(),
+          )
+        } else {
+          LeanArray(fields)
+        };
+        reference = runtime.newRef(value);
+        checkpoint = runtime.checkpoint();
+        changed = leanArrayWrite(
+          value,
+          leanNatValue(0),
+          LeanText("changed"),
+          false,
+        );
+        runtime.writeRef(reference, Some(changed));
+        restored = checkpoint.restoreRaw();
+        for (i in Range(0, size)) {
+          !count = count + arrayReadCheck(runtime, value, i, fields[i]);
+          !count =
+            count +
+            arrayReadCheck(restored, restored.readRef(reference), i, fields[i]);
+          expected: LeanValue = if (i == 0) LeanText("changed") else fields[i];
+          !count = count + arrayReadCheck(runtime, changed, i, expected)
+        }
+      }
+    }
+  };
+  base: LeanValue = LeanArray(
+    Array[LeanText("zero"), LeanText("one"), LeanText("two")],
+  );
+  override: LeanValue = LeanArrayOverride(
+    LeanArrayOverride(base, 0, LeanUnavailable("hidden")),
+    0,
+    LeanText("outer"),
+  );
+  for (i in Range(0, 3)) {
+    !count =
+      count +
+      arrayReadCheck(
+        runtime,
+        override,
+        i,
+        if (i == 0) LeanText("outer") else leanArray(base)[i],
+      )
+  };
+  trackedRuntime = mutable LeanExecution{
+    store => Some(SKStore.Context::create{}.mclone()),
+  };
+  tracked = arrayReadFixture(trackedRuntime, false);
+  !count =
+    count + arrayReadCheck(trackedRuntime, tracked, 0, LeanText("state"));
+  tracked match {
+  | LeanTrackedExtensionArray(view) ->
+    generations: LeanValue = LeanTrackedExtensionArray(
+      LeanExtensionArray(view.slots, view.entries, true),
+    );
+    !count =
+      count + arrayReadCheck(trackedRuntime, generations, 0, leanNatValue(7));
+    view.entries.writeArray(
+      trackedRuntime.context(),
+      view.slots[0],
+      Array[LeanExtensionFile(LeanText("updated"), Some(leanNatValue(8)))],
+    );
+    !count =
+      count + arrayReadCheck(trackedRuntime, tracked, 0, LeanText("updated"));
+    !count =
+      count + arrayReadCheck(trackedRuntime, generations, 0, leanNatValue(8))
+  | _ -> leanFail("expected tracked fixture")
+  };
+  // Replacements do not read missing store entries or demand a raw-mode context.
+  for (index in Array[0, 1]) {
+    replaced: LeanValue = LeanArrayOverride(
+      tracked,
+      index,
+      LeanUnavailable("replacement stays dormant"),
+    );
+    !count =
+      count +
+      arrayReadCheck(
+        runtime,
+        replaced,
+        index,
+        LeanUnavailable("replacement stays dormant"),
+      )
+  };
+  for (flag in Array[false, true]) {
+    at = leanBool(flag);
+    expected = leanArray(base)[if (flag) 1 else 0];
+    assert(
+      leanSameObject(leanArrayRead(runtime, base, at, true), expected) != 0,
+    );
+    assert(
+      leanSameObject(arrayReadOld(runtime, base, at, true), expected) != 0,
+    );
+    !count = count + 1
+  };
+  assert(count == 124796);
+  print_string(
+    "array read: " +
+      count.toString() +
+      " old/new comparisons passed; snapshots and dormant values preserved",
+  )
+}

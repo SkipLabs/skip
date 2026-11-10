@@ -27,8 +27,16 @@ at depth 6, roughly 22% below the earlier Skip median. Release identity is
 `47416933818fbca62445456d526abdbe4b888aed`. It passes 592 focused cases, 16 exact
 failure subprocesses and all 29 new whole-proof Goal checks. See the
 [batch audit](provenance/rewrite-batches/2026-11-10-hot-arrays-cache.json).
-Current inventory is 44 validated frame rewrites plus seven non-frame entries,
-with 153 observed frames remaining. The subsequent user-suggested `@always_inline`
+The next closed batch (QuickOther, metadata inlining, ordinary-array reads)
+measures **627.043 ms** versus its contemporaneously rerun saved baseline of
+**663.334 ms** and native **197.922 ms**: 5.47% lower, still **3.17× native**.
+All 29 Skip proofs pass imported-Goal checking; focused/runtime checks and the
+release build pass. The earlier 619.073 ms baseline is a different timing series,
+not the comparison for this batch. See the
+[closed-batch audit](provenance/performance/2026-11-10-quick-array-batch.md).
+Keep selected changes batched before benchmarking, as requested by the user.
+Current inventory is 45 validated frame rewrites plus seven non-frame entries,
+with 152 observed frames remaining. The subsequent user-suggested `@always_inline`
 experiment on three primitive helpers is recorded in the pause notice above and
 [AGENT_HANDOFF.md](AGENT_HANDOFF.md). No near-parity result is established.
 The latest five non-frame entries pass 986 new comparisons plus 5,501 regressions

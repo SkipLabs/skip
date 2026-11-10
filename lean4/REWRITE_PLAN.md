@@ -15,8 +15,19 @@ Seven alternating depth-6 pairs measure **632.956 ms old / 619.073 ms new /
 materialization cases, four exact failures, and 8,967 runtime checks plus 19
 failure boundaries pass. A fresh post-inline profile is available. See the
 [array materialization report](provenance/performance/2026-11-10-array-materialization.md).
-QuickOther integration must account for the pre-existing `QuickOracle.sk`
-fallback; the standard guarded dry run refuses it without writes.
+The next closed batch is now accepted: structured QuickOther, `leanExprData`
+inlining, and the ordinary-array read fast path. Seven alternating depth-6 pairs
+measure **663.334 ms saved baseline / 627.043 ms new / 197.922 ms native**: a 5.47%
+median reduction, still **3.17× native**. All 29 Skip proofs pass imported-Goal
+checking. The old binary ran slower than its earlier 619.073 ms series, so use the
+contemporaneous paired comparison. See the
+[batch audit](provenance/performance/2026-11-10-quick-array-batch.md) for source
+identities, 124,796 array-read comparisons, exact failures and validation scope.
+Guarded QuickOther integration preserved the pre-existing `QuickOracle.sk` byte
+for byte; the archived packet remains immutable. Inventory now has **45 validated
+frame rewrites and 152 remaining** (72,939 lines); lane counts were recalculated,
+including correction of the prior inference subtotal from 28 to 27. User steering
+is to batch selected changes and benchmark at batch end, not after every edit.
 
 ## Current execution: profile and optimize hot paths (2026-11-10)
 

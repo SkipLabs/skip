@@ -9,6 +9,9 @@ Optimization resumed at the user's request on 2026-11-10; see
 [REWRITE_PLAN.md](REWRITE_PLAN.md) for current work. [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
 and [PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) preserve the detailed and short
 historical checkpoints, including measurements, commands and pending reviews.
+The latest [closed-batch measurement](provenance/performance/2026-11-10-quick-array-batch.md)
+records 627.043 ms raw depth-6 elaboration versus 663.334 ms for the saved baseline
+and 197.922 ms native Lean; all 29 Skip proofs passed imported-Goal checking.
 
 ## Build
 

@@ -1,0 +1,548 @@
+module L4_Lean_Meta_ExprDefEq;
+
+fun f_quickOtherBool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_true -> true
+  | LeanTag.Bool_false -> false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_quickOtherToLBool(
+  runtime: mutable LeanExecution,
+  result: LeanValue,
+): LeanValue {
+  leanTag(result) match {
+  | LeanTag.EST_Out_ok ->
+    value = L4_Lean_Data_LBool.f_Lean_Bool_toLBool_b192e84fda(
+      runtime,
+      leanField(result, 0),
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[value, leanField(result, 1)])
+  | LeanTag.EST_Out_error ->
+    LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(result, 0), leanField(result, 1)],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_quickOtherArguments(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  dummy: LeanValue,
+): LeanValue {
+  count = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+    runtime,
+    expression,
+  );
+  arguments = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(
+    runtime,
+    LeanErased(),
+    count,
+    dummy,
+  );
+  last = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+    runtime,
+    count,
+    LeanNatLiterals.n1,
+  );
+  L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(
+    runtime,
+    expression,
+    arguments,
+    last,
+  )
+}
+
+fun f_quickOtherTraceClass(
+  runtime: mutable LeanExecution,
+  core: LeanValue,
+  stuck: Bool,
+): ?LeanValue {
+  if (leanTag(core) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(core, 0);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  options = leanField(cold, 2);
+  inherited = leanField(cold, 11);
+  if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  if (!f_quickOtherBool(leanField(options, 1))) return None();
+  cls = if (stuck) {
+    L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+      runtime,
+      LeanText("Meta"),
+      LeanText("isDefEq"),
+      LeanText("stuck"),
+    )
+  } else {
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      runtime,
+      LeanText("Meta"),
+      LeanText("isDefEq"),
+    )
+  };
+  prefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("trace"),
+  );
+  optionName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+    runtime,
+    prefix,
+    cls,
+  );
+  enabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(
+    runtime,
+    inherited,
+    options,
+    optionName,
+  );
+  if (f_quickOtherBool(enabled)) Some(cls) else None()
+}
+
+// Preserve the early syntactic exits before touching contexts or state.
+fun f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  state: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  leftAnnotation = L4_Lean_Expr.f_Lean_patternAnnotation_2d6afa1f80(
+    runtime,
+    left,
+  );
+  if (leanTag(leftAnnotation) == LeanTag.Option_some) {
+    return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+      runtime,
+      leanField(leftAnnotation, 0),
+      right,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  rightAnnotation = L4_Lean_Expr.f_Lean_patternAnnotation_2d6afa1f80(
+    runtime,
+    right,
+  );
+  if (leanTag(rightAnnotation) == LeanTag.Option_some) {
+    return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+      runtime,
+      left,
+      leanField(rightAnnotation, 0),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  if (
+    f_quickOtherBool(
+      L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(runtime, left, right),
+    ) ||
+    f_quickOtherBool(f_Lean_Meta_etaEq_106ca628f4(runtime, left, right)) ||
+    f_quickOtherBool(f_Lean_Meta_etaEq_106ca628f4(runtime, right, left))
+  ) {
+    yes: LeanValue = LeanCtor(LeanTag.LBool_true, Array[]);
+    return LeanCtor(LeanTag.EST_Out_ok, Array[yes, world])
+  };
+  leftHead = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, left);
+  rightHead = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, right);
+  leftIsMVar = f_quickOtherBool(
+    L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(runtime, leftHead),
+  );
+  if (
+    !leftIsMVar &&
+    !f_quickOtherBool(
+      L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(runtime, rightHead),
+    )
+  ) {
+    unknown: LeanValue = LeanCtor(LeanTag.LBool_undef, Array[]);
+    return LeanCtor(LeanTag.EST_Out_ok, Array[unknown, world])
+  };
+  leftAssigned = f_Lean_Meta_isAssigned_972c1d4934(
+    runtime,
+    leftHead,
+    state,
+    world,
+  );
+  leanTag(leftAssigned) match {
+  | LeanTag.EST_Out_error -> return leftAssigned
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(leftAssigned, 1);
+  if (f_quickOtherBool(leanField(leftAssigned, 0))) {
+    instantiated = f_Meta_synthInstanceTypedMVarAndUnify_spec_0_ba8275ee71(
+      runtime,
+      left,
+      state,
+      world,
+    );
+    leanTag(instantiated) match {
+    | LeanTag.EST_Out_error -> return instantiated
+    | LeanTag.EST_Out_ok ->
+      return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+        runtime,
+        leanField(instantiated, 0),
+        right,
+        context,
+        state,
+        core,
+        coreState,
+        leanField(instantiated, 1),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  rightAssigned = f_Lean_Meta_isAssigned_972c1d4934(
+    runtime,
+    rightHead,
+    state,
+    world,
+  );
+  leanTag(rightAssigned) match {
+  | LeanTag.EST_Out_error -> return rightAssigned
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(rightAssigned, 1);
+  if (f_quickOtherBool(leanField(rightAssigned, 0))) {
+    instantiated = f_Meta_synthInstanceTypedMVarAndUnify_spec_0_ba8275ee71(
+      runtime,
+      right,
+      state,
+      world,
+    );
+    leanTag(instantiated) match {
+    | LeanTag.EST_Out_error -> return instantiated
+    | LeanTag.EST_Out_ok ->
+      return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+        runtime,
+        left,
+        leanField(instantiated, 0),
+        context,
+        state,
+        core,
+        coreState,
+        leanField(instantiated, 1),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  };
+  leftExpanded = f_Lean_Meta_expandDelayedAssigned_d0d6a72503(
+    runtime,
+    left,
+    context,
+    state,
+    world,
+  );
+  leanTag(leftExpanded) match {
+  | LeanTag.EST_Out_error -> return leftExpanded
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(leftExpanded, 1);
+  expansion = leanField(leftExpanded, 0);
+  if (leanTag(expansion) == LeanTag.Option_some) {
+    return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+      runtime,
+      leanField(expansion, 0),
+      right,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  rightExpanded = f_Lean_Meta_expandDelayedAssigned_d0d6a72503(
+    runtime,
+    right,
+    context,
+    state,
+    world,
+  );
+  leanTag(rightExpanded) match {
+  | LeanTag.EST_Out_error -> return rightExpanded
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(rightExpanded, 1);
+  rightExpansion = leanField(rightExpanded, 0);
+  if (leanTag(rightExpansion) == LeanTag.Option_some) {
+    return f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+      runtime,
+      left,
+      leanField(rightExpansion, 0),
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  if (
+    leftIsMVar &&
+    f_quickOtherBool(
+      L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(runtime, rightHead),
+    ) &&
+    f_quickOtherBool(
+      L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(runtime, leftHead, rightHead),
+    )
+  ) {
+    dummy = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(
+      runtime,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    leftArgs = f_quickOtherArguments(runtime, left, dummy);
+    rightArgs = f_quickOtherArguments(runtime, right, dummy);
+    return f_quickOtherToLBool(
+      runtime,
+      f_Lean_Meta_isDefEqMVarSelf_15c5015e22(
+        runtime,
+        leftHead,
+        leftArgs,
+        rightArgs,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      ),
+    )
+  };
+  leftAssignable = f_Lean_Meta_isAssignable_d5b47bd6e4(
+    runtime,
+    leftHead,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  leanTag(leftAssignable) match {
+  | LeanTag.EST_Out_error -> return leftAssignable
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(leftAssignable, 1);
+  rightAssignable = f_Lean_Meta_isAssignable_d5b47bd6e4(
+    runtime,
+    rightHead,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  leanTag(rightAssignable) match {
+  | LeanTag.EST_Out_error -> return rightAssignable
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(rightAssignable, 1);
+  leftFlag = leanField(leftAssignable, 0);
+  rightFlag = leanField(rightAssignable, 0);
+  f_quickOtherTraceClass(runtime, core, false) match {
+  | Some(cls) ->
+    leftMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+      runtime,
+      left,
+    );
+    space = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText(" "),
+    );
+    message: LeanValue = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[leftMessage, space],
+    );
+    leftDescription = f_Meta_isDefEqQuickOther_lam_0_3a362e1831(
+      runtime,
+      leftFlag,
+    );
+    leftStatus = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      leftDescription,
+    );
+    !message = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[message, leftStatus],
+    );
+    relation = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText(" =?= "),
+    );
+    !message = LeanCtor(LeanTag.MessageData_compose, Array[message, relation]);
+    rightMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+      runtime,
+      right,
+    );
+    !message = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[message, rightMessage],
+    );
+    !message = LeanCtor(LeanTag.MessageData_compose, Array[message, space]);
+    rightDescription = f_Meta_isDefEqQuickOther_lam_0_3a362e1831(
+      runtime,
+      rightFlag,
+    );
+    rightStatus = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      rightDescription,
+    );
+    !message = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[message, rightStatus],
+    );
+    traced = f_isDefEqEtaStruct_go_spec_1_241494c927(
+      runtime,
+      cls,
+      message,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    leanTag(traced) match {
+    | LeanTag.EST_Out_error -> return traced
+    | LeanTag.EST_Out_ok -> !world = leanField(traced, 1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | None() -> void
+  };
+  canAssignLeft = f_quickOtherBool(leftFlag);
+  canAssignRight = f_quickOtherBool(rightFlag);
+  if (canAssignLeft && !canAssignRight) {
+    return f_quickOtherToLBool(
+      runtime,
+      f_Lean_Meta_processAssignment_c29dd3e006(
+        runtime,
+        left,
+        right,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      ),
+    )
+  };
+  if (!canAssignLeft && canAssignRight) {
+    return f_quickOtherToLBool(
+      runtime,
+      f_Lean_Meta_processAssignment_c29dd3e006(
+        runtime,
+        right,
+        left,
+        context,
+        state,
+        core,
+        coreState,
+        world,
+      ),
+    )
+  };
+  if (canAssignLeft) {
+    return f_Lean_Meta_isDefEqQuickMVarMVar_a4edf45184(
+      runtime,
+      left,
+      right,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    )
+  };
+  proofIrrelevance = f_Lean_Meta_isDefEqProofIrrel_d59b1dcb06(
+    runtime,
+    left,
+    right,
+    context,
+    state,
+    core,
+    coreState,
+    world,
+  );
+  leanTag(proofIrrelevance) match {
+  | LeanTag.EST_Out_error -> return proofIrrelevance
+  | LeanTag.EST_Out_ok -> void
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  leanTag(leanField(proofIrrelevance, 0)) match {
+  | LeanTag.LBool_true
+  | LeanTag.LBool_false ->
+    return proofIrrelevance
+  | _ -> void
+  };
+  !world = leanField(proofIrrelevance, 1);
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    context,
+  );
+  if (leanTag(config) != LeanTag.Meta_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  if (!f_quickOtherBool(leanField(config, 4))) {
+    no: LeanValue = LeanCtor(LeanTag.LBool_false, Array[]);
+    return LeanCtor(LeanTag.EST_Out_ok, Array[no, world])
+  };
+  f_quickOtherTraceClass(runtime, core, true) match {
+  | Some(cls) ->
+    leftMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+      runtime,
+      left,
+    );
+    relation = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText(" =?= "),
+    );
+    prefix: LeanValue = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[leftMessage, relation],
+    );
+    rightMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+      runtime,
+      right,
+    );
+    message: LeanValue = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[prefix, rightMessage],
+    );
+    traced = f_isDefEqEtaStruct_go_spec_1_241494c927(
+      runtime,
+      cls,
+      message,
+      context,
+      state,
+      core,
+      coreState,
+      world,
+    );
+    leanTag(traced) match {
+    | LeanTag.EST_Out_error -> return traced
+    | LeanTag.EST_Out_ok -> !world = leanField(traced, 1)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | None() -> void
+  };
+  L4_Lean_Meta_Basic.f_Lean_Meta_throwIsDefEqStuck_0918dc8a78(runtime, world)
+}
+
+module end;

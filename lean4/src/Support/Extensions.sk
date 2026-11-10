@@ -39,14 +39,9 @@ fun leanValueArraySize(value: LeanValue): Int {
   }
 }
 
-fun leanArrayRead(
-  runtime: mutable LeanExecution,
-  value: LeanValue,
-  at: LeanValue,
-  word: Bool,
-): LeanValue {
-  size = leanValueArraySize(value);
-  index = if (word) {
+@always_inline
+fun leanArrayReadIndex(size: Int, at: LeanValue, word: Bool): Int {
+  if (word) {
     bits = leanWordBits(at);
     if (!bits.ult(size)) leanFail("Lean Array USize index out of bounds");
     bits
@@ -58,7 +53,31 @@ fun leanArrayRead(
       )
     };
     n.toInt()
-  };
+  }
+}
+
+fun leanArrayRead(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+  at: LeanValue,
+  word: Bool,
+): LeanValue {
+  value match {
+  | LeanArray(values) -> values[leanArrayReadIndex(values.size(), at, word)]
+  | _ -> leanArrayReadOther(runtime, value, at, word)
+  }
+}
+
+// Keep tracked-store access and recursive overrides off the ordinary read path.
+@no_inline
+fun leanArrayReadOther(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+  at: LeanValue,
+  word: Bool,
+): LeanValue {
+  size = leanValueArraySize(value);
+  index = leanArrayReadIndex(size, at, word);
   value match {
   | LeanTrackedExtensionArray(view) -> view.get(runtime, index)
   | LeanArrayOverride(base, changed, replacement) ->
