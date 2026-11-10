@@ -594,7 +594,7 @@
       "samples": 5,
       "lane": "expressions_and_state",
       "source_body_sha256": "95492cc83120d5b2eb81a909d6d5297e255cafb13f3c54cff635a0a94abfc220",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "coverage": "observed_entry_in_frozen_matrix",
@@ -605,7 +605,12 @@
         "body_sha256": "95492cc83120d5b2eb81a909d6d5297e255cafb13f3c54cff635a0a94abfc220",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "This is a generated tail-recursive traversal with unused metadata/argument projections and slot-style names, not a wrapper around a typed helper.",
+      "remaining_work": "Replace with a named ordinary loop over the boxed Expr boundary, preserving that metadata wrappers are not stripped. No new Expr representation is required for this small traversal.",
+      "coherent_family": "application spines"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
@@ -1970,7 +1975,7 @@
       "samples": 2,
       "lane": "expressions_and_state",
       "source_body_sha256": "c87203e59a32e26351c5991a763f846fe8d1315532ae32f5d2c12828c6e2a1bf",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "coverage": "observed_entry_in_frozen_matrix",
@@ -1981,7 +1986,12 @@
         "body_sha256": "c87203e59a32e26351c5991a763f846fe8d1315532ae32f5d2c12828c6e2a1bf",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The constructor performs a sequence of boxed UInt64 conversion, hash mixing, UInt32 conversion, Nat addition and mkData dispatch before allocating Expr.bvar. Native word/Nat primitives exist, but the actual constructor algorithm still bounces through boxed intermediates.",
+      "remaining_work": "Decode the Nat once, compute typed word metadata, and box only publication. Preserve modulo hash semantics, the 1048575 packed-range guard and arbitrary-Nat rejection behavior.",
+      "coherent_family": "expression constructors"
     },
     {
       "name": "L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_eab4f1c354",
@@ -7774,9 +7784,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -7787,7 +7797,12 @@
         "body_sha256": "4e66d7f6cff90ea5c37073f1629da94382b8de4f3fb7f7528b9f03fd167d2968",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "already_idiomatic",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "A native unsigned shift extracts the 20-bit field; the public word width is preserved. This is already the direct implementation, not a forwarding wrapper around boxed UInt operations.",
+      "remaining_work": "No algorithm conversion needed. Keep import-word decoding and exact UInt32 result shape.",
+      "coherent_family": "metadata"
     },
     {
       "name": "L4_Lean_Expr.f_Expr_lit_override_362af36df7",
@@ -7854,9 +7869,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Part000.sk",
       "lines": 8,
       "frame": 0,
@@ -7867,7 +7882,12 @@
         "body_sha256": "f1a8ef6037eae80d62e871b3710f618bbd5218f4c7db72b981374738ade3815a",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "compatibility_boundary",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "This alias forwards to Expr.equal and thereby to the reviewed typed Bool core. The wrapper adds no recursive algorithm or intermediate boxed arithmetic.",
+      "remaining_work": "Retain the public alias; generated argument spelling alone does not justify a separate rewrite.",
+      "coherent_family": "expression equality"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_ExprStructEq_hash_4027e4e691",
@@ -8074,9 +8094,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Part001.sk",
       "lines": 8,
       "frame": 0,
@@ -8087,16 +8107,21 @@
         "body_sha256": "2141f605cdfff44b0edb8f863830de33a97dbbc9bf78d69f143523825272b1af",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "compatibility_boundary",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The named Lean ABI boxes the Bool returned by leanExprEqual, whose core is an explicit native work vector and Boolean algorithm. Passing true preserves binder names and annotations.",
+      "remaining_work": "Keep the compatibility entry. This does not independently accept every Name/Level/KVMap helper called by the core.",
+      "coherent_family": "expression equality"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Part000.sk",
       "lines": 8,
       "frame": 0,
@@ -8107,7 +8132,12 @@
         "body_sha256": "d6c35f4e57ce53fe3ac16a95533d7682e290e8d0e0fcbf9643980e1ae8082659",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "compatibility_boundary",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The existing public identity delegates to the same typed Bool core with binders=false; this is a meaningful semantic mode, not generic structural equality.",
+      "remaining_work": "Keep this adapter and preserve binder-insensitive semantics in all future callers.",
+      "coherent_family": "expression equality"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_etaExpandedBody_830d1175cd",
@@ -8164,7 +8194,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Expr/Part001.sk",
@@ -8177,7 +8207,12 @@
         "body_sha256": "76c2d182031f34529ea34759ba993ce178cdc1d8c2d058311d2c25fd09ffd631",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_and_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The short wrapper enters a generated recursive lambda-prefix scan with boxed Nat increments. The recently rewritten etaExpandedBody removes its frame but still uses boxed Nat/Bool helpers, so there is no fully typed recognition boundary to accept yet.",
+      "remaining_work": "Treat lambda-prefix scan and eta body as one recognition family. Use arbitrary-precision counter semantics and a native optional Expr result internally.",
+      "coherent_family": "eta recognition"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_fvarId_93c02a0562",
@@ -8224,7 +8259,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Expr/Part000.sk",
@@ -8237,7 +8272,12 @@
         "body_sha256": "3930848e9e63b41c6df677ae706b5c55e37017e31ed0a615f2ee8274bdfdf2bb",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_and_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The generated recursive spine walk increments a boxed Nat through a compatibility helper at every node. Non-frame control flow alone does not make it idiomatic.",
+      "remaining_work": "Use a readable spine loop and LeanNat accumulator without narrowing an arbitrary caller-supplied count to host Int.",
+      "coherent_family": "application spines"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c",
@@ -8384,9 +8424,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -8397,16 +8437,21 @@
         "body_sha256": "9a440214ff832add21aa539410eec6f0aad7d570bd63d9cbec12cc69845ff90c",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "already_idiomatic",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The complete predicate uses native Int masks and a host Bool, boxing only the public result. The 41/42-bit distinction is explicit and uses the maintained metadata decoder.",
+      "remaining_work": "Retain this boundary; this review does not certify constructors that originally populated metadata.",
+      "coherent_family": "metadata"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_hash_9ccb6f80a4",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -8417,7 +8462,12 @@
         "body_sha256": "ce05ec99593ef1521c4514c3a7737fa2fee34663c74e98edf965fa1a0a63be53",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "already_idiomatic",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The complete operation is one native Int mask (low 32 bits), then one ABI LeanWord. No boxed arithmetic chain or hidden generated traversal remains in this entry.",
+      "remaining_work": "Expr itself stays boxed at its stable ABI. No new implementation requested for this accessor.",
+      "coherent_family": "metadata"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_headBeta_d2d563c891",
@@ -8804,9 +8854,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Part001.sk",
       "lines": 8,
       "frame": 0,
@@ -8817,7 +8867,12 @@
         "body_sha256": "e83d43ea5c70fc00c546460171d38dfefa41bd758ea45a8b4261e53c074aade5",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "compatibility_boundary",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The wrapper boxes a native Bool from leanExprLt(...,quick=true). The implementation uses typed Int kind/hash comparisons and structured lexicographic code; it never substitutes pointer addresses for order.",
+      "remaining_work": "Retain the boundary. Name/Literal comparison helpers and worst-case recursive depth are separate transitive audit items, not certified here.",
+      "coherent_family": "expression ordering"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_rawNatLit_058f0c0873",
@@ -9244,7 +9299,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Expr/Part000.sk",
@@ -9257,7 +9312,12 @@
         "body_sha256": "33dba37db192053c34ef316d4d77ef0959873a6b53cf0f7b624b13b40dbb2ef0",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The public wrapper only forwards to an unconverted constructor chain, so its seven lines do not establish a typed representation boundary.",
+      "remaining_work": "Keep this ABI identity while converting the bvar constructor/metadata assembly as one bounded cluster.",
+      "coherent_family": "expression constructors"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_mkConst_b40a363b86",
@@ -9644,7 +9704,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Level/Part000.sk",
@@ -9657,7 +9717,12 @@
         "body_sha256": "4c5a386d0c205782168b7edd4c16a5aac140bb614e8f23c296a71c164f3dc68b",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The Array<LeanValue> closure ABI itself is mechanical, but its target is the unconverted boxed-list recursive lookup below. It is not evidence that the lookup family has a typed implementation.",
+      "remaining_work": "Retain or explicitly redirect this adapter when converting the whole substitution family; do not count it as independent algorithm completion.",
+      "coherent_family": "level parameter substitution"
     },
     {
       "name": "L4_Lean_Level.f_Lean_Level_beq_a85e9a2f15",
@@ -9724,7 +9789,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Level/Part000.sk",
@@ -9737,14 +9802,19 @@
         "body_sha256": "5bfcd341376e02b189c84a6774b1acd9fdb75cc989dd8c5e098ea7cd60612f38",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_and_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The public call hides getOffsetAux recursion that boxes Nat.add at each successor. No typed counting implementation sits behind the wrapper.",
+      "remaining_work": "Use a readable successor loop and typed Nat accumulator; preserve the generic auxiliary starting-offset contract.",
+      "coherent_family": "level offsets"
     },
     {
       "name": "L4_Lean_Level.f_Lean_Level_getParamSubst_aceb1f3078",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Level/Part000.sk",
@@ -9757,7 +9827,12 @@
         "body_sha256": "6da3231a8b103f7dd72478376fdf920745115fc41b3bc8946b6be8b9bc2a48cf",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_and_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The 37-line body is a generated nested list/Bool match and recursive search with slot-style names. It has no typed optional result or lookup structure, and stops when either list ceases to be cons.",
+      "remaining_work": "Use a named iterative zip search or a first-match-preserving typed lookup. Test duplicate names, unequal lengths, absence and exact level identity.",
+      "coherent_family": "level parameter substitution"
     },
     {
       "name": "L4_Lean_Level.f_Lean_Level_hasMVar_1e5dea1793",
@@ -9804,9 +9879,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -9817,14 +9892,19 @@
         "body_sha256": "847e6c383185d85d3761d742e4d4330f303a4439431a7e205dd29070d5fd811b",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "already_idiomatic",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "Native Int masking performs the work. The decoder handles the special Level.zero metadata 2221; one final LeanWord preserves the original public width.",
+      "remaining_work": "No new implementation requested for this accessor.",
+      "coherent_family": "metadata"
     },
     {
       "name": "L4_Lean_Level.f_Lean_Level_instantiateParams_5b06d0ac6d",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Level/Part000.sk",
@@ -9837,7 +9917,12 @@
         "body_sha256": "93261b245fe9929529acb9e58cb7d6daf25fac6ae47036e6b26ea89f89061a72",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_and_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "It allocates a LeanClosure over two boxed lists and delegates to a 114-line generated recursive substParams walker. There is no typed lookup/traversal boundary behind this public entry yet.",
+      "remaining_work": "Convert the lookup and level traversal together; preserve first-match lookup, mismatched list truncation, sharing and unchanged-node publication.",
+      "coherent_family": "level parameter substitution"
     },
     {
       "name": "L4_Lean_Level.f_Lean_Level_isAlreadyNormalizedCheap_3bb7316e95",
@@ -10444,7 +10529,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/LocalContext/Part000.sk",
@@ -10457,7 +10542,12 @@
         "body_sha256": "0df94b1f74b4927ec612080c8d1cdcbfc3d77104c145d70f93012c8b6fd16fd9",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_control_flow_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "Both constructor arms project every field into generated names although only field three is returned. There is no typed LocalDecl view behind this adapter; the fixed layout is spread through the body.",
+      "remaining_work": "A small explicit declaration-view or two-tag projection can remove dead reads and expose the role. Low priority; retain failure on unexpected declaration tags.",
+      "coherent_family": "local declaration views"
     },
     {
       "name": "L4_Lean_LocalContext.f_LocalContext_contains_spec_0_4a694146a1",
@@ -23557,7 +23647,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/MetavarContext/Part001.sk",
@@ -23570,14 +23660,19 @@
         "body_sha256": "321f9bb11aefba757685367401cf49abfed5663ea931f86e9caaa85a1b157dec",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "The tiny wrapper hides a real traversal. Although the adapter class has native Bool/Option/maps, the context/result pair is boxed and the source explicitly lacks traversal-local DAG sharing. Direct/delayed assignment handling cannot be marked complete merely from this forwarding entry.",
+      "remaining_work": "Audit and complete a memoized direct-assignment traversal/publication boundary, retaining existing delayed/cyclic unsupported errors. Do not merely rewrite this wrapper.",
+      "coherent_family": "metavariable instantiation"
     },
     {
       "name": "L4_Lean_MetavarContext.f_Lean_instantiateLevelMVarsImp_29f9cd6589",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/MetavarContext/Part000.sk",
@@ -23590,7 +23685,12 @@
         "body_sha256": "13d436ed16444858e5eb008810250ee05872a9924d59a4c4ea4eb38ecce59057",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "disposition": "needs_representation_work",
+      "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
+      "triage_rationale": "This is the same incomplete traversal boundary in level mode. The native class is useful partial conversion, but recursively repeated sublevels and boxed context/result construction remain; a Bool mode flag is not evidence of complete representation conversion.",
+      "remaining_work": "Share the coherent instantiation work with the expression entry, including context updates, cycle guards and DAG memoization.",
+      "coherent_family": "metavariable instantiation"
     },
     {
       "name": "L4_Lean_MetavarContext.f_Lean_instantiateMVarsCore_57bcec2ce1",
@@ -25133,5 +25233,12 @@
       }
     }
   ],
-  "latest_batch": "provenance/rewrite-batches/2026-11-10-wave-10.json"
+  "latest_batch": "provenance/rewrite-batches/2026-11-10-wave-10.json",
+  "nonframe_triage": {
+    "reviewed_entries": 20,
+    "already_idiomatic": 4,
+    "compatibility_boundaries": 4,
+    "reviewed_pending": 12,
+    "unreviewed_entries": 1008
+  }
 }

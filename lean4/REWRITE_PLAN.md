@@ -24,6 +24,13 @@ Three Codex peers are correcting them privately while the previous batch validat
 One successful orchestration run does not establish accepted throughput or a
 speedup. Provider failures stop any authorized run for assessment.
 
+Review of the five drafts required substantial source corrections and replacement
+of most probe drafts. The coordinator trial demonstrates working delegation, but
+does not yet demonstrate a net time saving over Codex implementation. Do not infer
+throughput from its four-minute draft time. A future trial should use narrow
+implementation contracts with working tests; test design and acceptance stay with
+the primary and independent reviewers. No further provider batch is running.
+
 The main team is the primary plus three Codex implementation and review peers,
 with one compiler queue. The current planning range to the full
 rewrite benchmark is 4–7 continuous-work days, uncertain because larger routines
@@ -63,6 +70,14 @@ heartbeats remain unsupported. No production stub, compiler/runtime or kernel
 change was needed. Typed hashes/predicates and structured control flow are
 improved; broader boxed interfaces and other observed entries still need review.
 No new whole-example performance claim is made.
+
+The first [non-frame review](provenance/rewrite-triage/2026-11-10-expression-boundaries.json)
+classifies 20 observed entries: four existing native metadata operations, four
+reviewed compatibility boundaries over native equality/order implementations,
+and twelve entries needing further work. Another 1,008 non-frame entries remain
+unreviewed. These are static dispositions, not new rewrites or evidence that all
+transitive callees are converted. Pending families include application spines,
+level substitution/offsets, expression constructors and metavariable traversal.
 
 The ninth batch added WHNF cache insertion and discrimination-tree match traversal.
 It passes **444 new differential cases and 1,281 regressions** in one combined
