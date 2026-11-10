@@ -2,6 +2,9 @@
 /* Persistent memory storage. */
 /*****************************************************************************/
 
+#ifdef __ELF__
+#include <elf.h>
+#endif
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
@@ -485,9 +488,20 @@ void sk_commit(Contexts new_root, uint32_t sync) {
 
 typedef struct file_mapping file_mapping_t;
 
+// A persistent heap holds absolute pointers into the executable that wrote it
+// (vtables, type descriptors, constants), so only that exact executable may
+// reopen it. The header records the executable's GNU build-id: the linker
+// derives it from the linked contents, so it is stable when the same inputs
+// are rebuilt (e.g. in a fresh checkout) and changes with any change to code,
+// runtime, layouts, flags or toolchain (#1606).
+#define SK_MAPPING_MAGIC 0x31504d4e504b53ULL  // "SKPNMP1" (little-endian)
+#define SK_BUILD_ID_MAX 64
+
 typedef struct {
-  int64_t version;
+  uint64_t magic;
   file_mapping_t* bottom_addr;
+  uint32_t build_id_size;
+  unsigned char build_id[SK_BUILD_ID_MAX];
 } file_mapping_header_t;
 
 struct file_mapping {
@@ -515,11 +529,91 @@ static int sk_flock(int fd, int operation) {
 }
 
 /*****************************************************************************/
+/* Identity of the running executable. */
+/*****************************************************************************/
+
+#ifdef __ELF__
+// Defined by the linker at the start of the executable's ELF header. Weak, so
+// a link without it yields NULL instead of failing.
+extern const Elf64_Ehdr __ehdr_start
+    __attribute__((weak, visibility("hidden")));
+
+// Copies the NT_GNU_BUILD_ID note of the object containing this code into
+// `out` and returns its size, or 0 when it has none.
+static uint32_t sk_read_build_id(unsigned char* out, uint32_t max) {
+  const Elf64_Ehdr* eh = &__ehdr_start;
+  if (eh == NULL || memcmp(eh->e_ident, ELFMAG, SELFMAG) != 0) {
+    return 0;
+  }
+  const Elf64_Phdr* ph = (const Elf64_Phdr*)((const char*)eh + eh->e_phoff);
+  // The ELF header is mapped by the load segment at file offset 0; its
+  // address gives the load bias (0 for the non-PIE executables skc links).
+  uintptr_t bias = 0;
+  int found = 0;
+  for (int i = 0; i < eh->e_phnum; i++) {
+    if (ph[i].p_type == PT_LOAD && ph[i].p_offset == 0) {
+      bias = (uintptr_t)eh - ph[i].p_vaddr;
+      found = 1;
+      break;
+    }
+  }
+  if (!found) {
+    return 0;
+  }
+  for (int i = 0; i < eh->e_phnum; i++) {
+    if (ph[i].p_type != PT_NOTE) {
+      continue;
+    }
+    const char* note = (const char*)(bias + ph[i].p_vaddr);
+    const char* end = note + ph[i].p_memsz;
+    while (note + sizeof(Elf64_Nhdr) <= end) {
+      const Elf64_Nhdr* nhdr = (const Elf64_Nhdr*)note;
+      const char* name = note + sizeof(*nhdr);
+      const unsigned char* desc =
+          (const unsigned char*)(name + ((nhdr->n_namesz + 3) & ~3u));
+      if (nhdr->n_type == NT_GNU_BUILD_ID && nhdr->n_namesz == 4 &&
+          memcmp(name, "GNU", 4) == 0) {
+        if (nhdr->n_descsz == 0 || nhdr->n_descsz > max) {
+          return 0;
+        }
+        memcpy(out, desc, nhdr->n_descsz);
+        return nhdr->n_descsz;
+      }
+      note = (const char*)desc + ((nhdr->n_descsz + 3) & ~3u);
+    }
+  }
+  return 0;
+}
+#else
+static uint32_t sk_read_build_id(unsigned char* out, uint32_t max) {
+  (void)out;
+  (void)max;
+  return 0;
+}
+#endif
+
+// Fills `header` with this executable's identity. A persistent heap cannot be
+// checked without one, so refuse to create or load it.
+static void sk_mapping_identity(file_mapping_header_t* header) {
+  memset(header, 0, sizeof(*header));
+  header->magic = SK_MAPPING_MAGIC;
+  header->build_id_size = sk_read_build_id(header->build_id, SK_BUILD_ID_MAX);
+  if (header->build_id_size == 0) {
+    fprintf(stderr,
+            "Error: this executable has no GNU build-id, which persistent "
+            "files require (link with -Wl,--build-id)\n");
+    exit(ERROR_MAPPING_VERSION);
+  }
+}
+
+/*****************************************************************************/
 /* Creates a new file mapping. */
 /*****************************************************************************/
 
 void sk_create_mapping(char* fileName, size_t icapacity) {
   file_mapping_t* mapping;
+  file_mapping_header_t identity;
+  memset(&identity, 0, sizeof(identity));
   int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
   if (fileName == NULL) {
@@ -529,6 +623,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
     mapping = mmap(NULL, icapacity, prot,
                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
   } else {
+    sk_mapping_identity(&identity);
     fd = open(fileName, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     if (fd == -1) {
       // perror may change errno (glibc sets EINVAL when stderr is not a tty).
@@ -550,7 +645,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
     exit(ERROR_MAPPING_FAILED);
   }
 
-  mapping->header.version = SKIP_get_version();
+  mapping->header = identity;
   mapping->header.bottom_addr = mapping;
 
   gmutex_attr = &mapping->gmutex_attr;
@@ -638,8 +733,16 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_MAPPING_MEMORY);
   }
 
-  if (header.version != SKIP_get_version()) {
-    fprintf(stderr, "Error: wrong file format: %s\n", fileName);
+  file_mapping_header_t identity;
+  sk_mapping_identity(&identity);
+  if (header.magic != SK_MAPPING_MAGIC ||
+      header.build_id_size != identity.build_id_size ||
+      memcmp(header.build_id, identity.build_id, identity.build_id_size) != 0) {
+    fprintf(stderr,
+            "Error: wrong file format: %s was written by a different "
+            "executable (build-id mismatch); delete it and rerun with "
+            "--init\n",
+            fileName);
     exit(ERROR_MAPPING_VERSION);
   }
 

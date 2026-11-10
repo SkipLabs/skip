@@ -72,9 +72,9 @@ the sum of invocation times separately; their sum is not update latency.
 `create_incremental_fixture.py`, `replay_incremental_fixture.py`,
 `replay_incremental_branch.py` and `replay_incremental_corpus.py` exercise fixed
 edit sequences. `llvm_artifact_diff.py` compares emitted artifacts.
-`persistent_census.c` inspects retained state using the exact host executable
-and matching runtime version. Never reopen a cache with an incompatible host or
-bypass its format and constant-identity guards.
+`persistent_census.c` inspects retained state using the exact host executable,
+whose GNU build-id must match the cache header. Never reopen a cache with an
+incompatible host or bypass its format and constant-identity guards.
 
 Keep raw caches and compiler binaries outside the checkout. Export bounded
 summaries, toolchain/source identities and correctness results before deleting

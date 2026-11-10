@@ -10,10 +10,6 @@
 
 #include "../palloc.c"
 
-int SKIP_get_version(void) {
-  return 42;
-}
-
 static int create_in_child(const char* path, const char* log) {
   pid_t child = fork();
   if (child == 0) {

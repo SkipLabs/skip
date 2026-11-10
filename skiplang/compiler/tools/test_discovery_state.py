@@ -4,9 +4,9 @@ Run serially under incremental_profile.py with TMPDIR in its scratch root.
 SKC_STATE_TEST_COMPILER supplies a wrapper with the matching sysroot;
 SKC_STATE_TEST_FLAGS is a JSON array of candidate switches. Evidence is written
 to SKC_STATE_TEST_REPORT when set, before the temporary cache is deleted.
-Optional SKC_STATE_TEST_CENSUS, SKC_STATE_TEST_HOST and
-SKC_STATE_TEST_RUNTIME_VERSION capture read-only heap snapshots after warmup and
-at completion, using the exact compiler executable and matching runtime version.
+Optional SKC_STATE_TEST_CENSUS and SKC_STATE_TEST_HOST capture read-only heap
+snapshots after warmup and at completion, using the exact compiler executable
+(the census checks its GNU build-id against the cache header).
 """
 
 import csv
@@ -239,7 +239,6 @@ class DiscoveryStateTests(unittest.TestCase):
                         tool,
                         os.environ["SKC_STATE_TEST_HOST"],
                         str(data),
-                        os.environ["SKC_STATE_TEST_RUNTIME_VERSION"],
                     ],
                     text=True,
                     capture_output=True,

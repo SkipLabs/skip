@@ -29,6 +29,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -o "$runtime_test_dir/mapping-exists"
 "$runtime_test_dir/mapping-exists"
 
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread "$runtime_test_sources/persistent_mapping_identity.c" \
+  -o "$runtime_test_dir/mapping-identity"
+"$runtime_test_dir/mapping-identity"
+
 for runtime_test_opt in -O0 -O2; do
   # Keep every UBSan check, using traps so the optional diagnostic runtime is
   # not required by minimal LLVM installations such as the CI image.

@@ -4,18 +4,6 @@ fun main(): void {
   out_dir = Environ.var("OUT_DIR");
   pic = (Environ.var("RELOCATION_MODEL") == "pic");
 
-  // Persistent files contain native layouts and allocator free-list classes.
-  // A rebuilt runtime must reject files produced by a different build.
-  // These persisted scheduler layouts can change without any C source change.
-  // Regenerate the runtime format version when they change as well.
-  print_string("skargo:rerun-if-changed=src/skstore/Context.sk");
-  print_string("skargo:rerun-if-changed=src/skstore/EagerDir.sk");
-  magic_c = Path.join(out_dir, "magic.c");
-  FileSystem.writeTextFile(
-    magic_c,
-    `int SKIP_get_version() { return (int)${Time.time_ms()}; }`,
-  );
-
   print_string("skargo:rerun-if-changed=runtime/alloc_size_classes.h");
 
   srcs = Array[
@@ -35,21 +23,32 @@ fun main(): void {
     "runtime/xoroshiro128plus.c",
   ];
 
-  cfg = Cc.Build()
-    .pic(pic)
-    .flags(Cc.kRecommendedCflags)
-    .files(srcs)
-    .file(magic_c);
+  cfg = Cc.Build().pic(pic).flags(Cc.kRecommendedCflags).files(srcs);
   srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
 
   // TODO: `skargo:rerun-if-changed` on sources.
   target match {
   | "wasm32-unknown-unknown" ->
+    // Wasm heaps are persisted by the host (e.g. skdb's IndexedDB storage),
+    // which keys them on SKIP_get_version(): a rebuilt runtime must not reuse
+    // a heap with native layouts and allocator free-list classes from another
+    // build. Persisted scheduler layouts can change without any C source
+    // change, so regenerate the version when they change as well. Native
+    // persistent files are keyed on the executable's build-id instead (see
+    // palloc.c).
+    print_string("skargo:rerun-if-changed=src/skstore/Context.sk");
+    print_string("skargo:rerun-if-changed=src/skstore/EagerDir.sk");
+    magic_c = Path.join(out_dir, "magic.c");
+    FileSystem.writeTextFile(
+      magic_c,
+      `int SKIP_get_version() { return (int)${Time.time_ms()}; }`,
+    );
     wasm_srcs = Array["runtime/runtime32_specific.c"];
     wasm_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
     cfg
       .define("SKIP32")
       .files(wasm_srcs)
+      .file(magic_c)
       .flags(Array["--target=wasm32", "-emit-llvm", "-nostdlibinc"])
       .compile("skip_runtime");
     print_string("skargo:skc-preamble=preamble/preamble32.ll");

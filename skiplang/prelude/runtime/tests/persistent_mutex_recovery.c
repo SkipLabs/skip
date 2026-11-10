@@ -7,10 +7,6 @@
 
 #include "../palloc.c"
 
-int SKIP_get_version(void) {
-  return 42;
-}
-
 int main(void) {
   char path[] = "/tmp/test-palloc-mutex-XXXXXX";
   int initial = mkstemp(path);

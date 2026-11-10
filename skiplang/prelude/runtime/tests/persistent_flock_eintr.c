@@ -9,10 +9,6 @@
 
 #include "../palloc.c"
 
-int SKIP_get_version(void) {
-  return 42;
-}
-
 static volatile sig_atomic_t interrupts = 0;
 
 static void count_interrupt(int sig) {
