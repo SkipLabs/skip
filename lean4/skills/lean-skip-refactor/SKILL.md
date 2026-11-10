@@ -31,7 +31,8 @@ ten Vibe instances, subject to provider quotas. The latest allocation uses Vibe
 writers and three peer Codex packet owners/reviewers, filling the four active
 Codex slots together with the primary. The primary reviews and integrates their
 handoffs and owns the single compiler queue. Keep tasks disjoint and let drafting
-overlap validation. During provider failures, peers can continue implementation
+overlap validation. The latest user steering stops Vibe until explicitly resumed;
+use the Codex peers for implementation and independent review. During provider failures, peers can continue implementation
 locally with another peer or the primary reviewing their changes. Follow the
 active plan for whether launches are stopped;
 the latest user instruction permits reducing concurrency on errors. Keep API

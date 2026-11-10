@@ -1,0 +1,1144 @@
+// Differential probe for the Meta whnf ExprConfigCacheKey cache insertion
+// rewrite (L4_Lean_Meta_WHNF.f_whnfImp_spec_5_spec_10_5a205bd6f4). Every case
+// runs the maintained function and the retained fallback on restored runtime
+// snapshots, requiring identical full results and unchanged ref state, then
+// asserts concrete published node contents, lookup results and preservation
+// of the input nodes. This pure function has no world parameter; the semantic
+// reference state is the runtime ref snapshot.
+
+fun whnfProbeNullEntry(): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[])
+}
+
+fun whnfProbeEntry(key: LeanValue, value: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+}
+
+fun whnfProbeRefEntry(child: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[child])
+}
+
+fun whnfProbeEntriesNode(entries: Array<LeanValue>): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(entries)])
+}
+
+fun whnfProbeCollisionNode(
+  keys: Array<LeanValue>,
+  values: Array<LeanValue>,
+): LeanValue {
+  assert(keys.size() == values.size());
+  LeanCtor(
+    LeanTag.PersistentHashMap_Node_collision,
+    Array[LeanArray(keys), LeanArray(values), LeanErased()],
+  )
+}
+
+fun whnfProbeEmptyEntries(): LeanValue {
+  LeanCtor(
+    LeanTag.PersistentHashMap_Node_entries,
+    Array[
+      LeanArray(
+        Array::fill(
+          32,
+          (LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[]) : LeanValue),
+        ),
+      ),
+    ],
+  )
+}
+
+fun whnfProbeEntriesSlotsAt(slot: Int, entry: LeanValue): Array<LeanValue> {
+  assert(slot >= 0);
+  assert(slot < 32);
+  out: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, 32)) {
+    out.push(if (index == slot) entry else whnfProbeNullEntry())
+  };
+  out.toArray()
+}
+
+fun whnfProbeNatExpr(
+  runtime: mutable LeanExecution,
+  digits: String,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+    runtime,
+    leanBoxNat(LeanNat::parse(digits)),
+  )
+}
+
+fun whnfProbeKey(expr: LeanValue, config: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ExprConfigCacheKey_mk,
+    Array[expr, config],
+  )
+}
+
+fun whnfProbeNatKey(
+  runtime: mutable LeanExecution,
+  digits: String,
+  config: LeanValue,
+): LeanValue {
+  whnfProbeKey(whnfProbeNatExpr(runtime, digits), config)
+}
+
+// mixHash(Lean.Expr.hash expr, configKey) converted to USize, as in the
+// maintained insert/find wrappers.
+fun whnfProbeFullHash(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+): LeanValue {
+  exprHash = L4_Lean_Expr.f_Lean_Expr_hash_9ccb6f80a4(
+    runtime,
+    leanField(key, 0),
+  );
+  mixed = L4_Init_Prelude.f_mixHash_f2b5fd4ac9(
+    runtime,
+    exprHash,
+    leanField(key, 1),
+  );
+  L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(runtime, mixed)
+}
+
+fun whnfProbeBucket(hash: LeanValue): Int {
+  leanWordBits(hash).and(31)
+}
+
+fun whnfProbeEntryAt(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  slot: Int,
+): LeanValue {
+  L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+    runtime,
+    LeanErased(),
+    leanField(node, 0),
+    leanNatValue(slot),
+    LeanErased(),
+  )
+}
+
+fun whnfProbeCollisionKey(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  index: Int,
+): LeanValue {
+  L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+    runtime,
+    LeanErased(),
+    leanField(node, 0),
+    leanNatValue(index),
+    LeanErased(),
+  )
+}
+
+fun whnfProbeCollisionValue(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  index: Int,
+): LeanValue {
+  L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+    runtime,
+    LeanErased(),
+    leanField(node, 1),
+    leanNatValue(index),
+    LeanErased(),
+  )
+}
+
+// Nat comparison using the verified decLt route only: equal iff neither side
+// is strictly smaller.
+fun whnfProbeNatEq(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: Int,
+): Bool {
+  leftLt = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    runtime,
+    left,
+    leanNatValue(right),
+  );
+  if (leanIsTrue(leftLt)) {
+    return false
+  };
+  rightLt = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    runtime,
+    leanNatValue(right),
+    left,
+  );
+  if (leanIsTrue(rightLt)) {
+    return false
+  };
+  true
+}
+
+fun whnfProbeArraySizeIs(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  expected: Int,
+): Bool {
+  size = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    leanField(node, 0),
+  );
+  whnfProbeNatEq(runtime, size, expected)
+}
+
+fun whnfProbeCollisionSizeIs(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  expected: Int,
+): Bool {
+  size = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_getCollisionNodeSize_4ef93619b3(
+    runtime,
+    node,
+  );
+  whnfProbeNatEq(runtime, size, expected)
+}
+
+fun whnfProbeLookupFound(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+  key: LeanValue,
+): Bool {
+  leanTag(
+    L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_4_fba3a797db(runtime, root, key),
+  ) == LeanTag.Option_some
+}
+
+fun whnfProbeLookupValue(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+  key: LeanValue,
+): ?LeanValue {
+  result = L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_4_fba3a797db(
+    runtime,
+    root,
+    key,
+  );
+  if (leanTag(result) == LeanTag.Option_some) {
+    Some(leanField(result, 0))
+  } else {
+    None()
+  }
+}
+
+fun whnfProbeAssertFullHashCollision(
+  runtime: mutable LeanExecution,
+  label: String,
+  keys: Array<LeanValue>,
+  baseHash: LeanValue,
+): void {
+  for (index in Range(0, keys.size())) {
+    hash = whnfProbeFullHash(runtime, keys[index]);
+    if (native_eq(hash, baseHash) != 0) {
+      leanFail("whnf key hash mismatch: " + label)
+    };
+    for (other in Range(0, index)) {
+      equalExprs = L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(
+        runtime,
+        leanField(keys[index], 0),
+        leanField(keys[other], 0),
+      );
+      if (leanIsTrue(equalExprs)) {
+        leanFail("whnf colliding keys not distinct: " + label)
+      }
+    }
+  }
+}
+
+// Full snapshot of an entries node's slot array, re-read after the insertion
+// to prove the previously published node was left exactly as it was.
+fun whnfProbeSnapshotSlots(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  length: Int,
+): Array<LeanValue> {
+  slots: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, length)) {
+    slots.push(whnfProbeEntryAt(runtime, node, index))
+  };
+  slots.toArray()
+}
+
+fun whnfProbeAssertEntriesPreserved(
+  runtime: mutable LeanExecution,
+  label: String,
+  node: LeanValue,
+  expected: Array<LeanValue>,
+): void {
+  for (index in Range(0, expected.size())) {
+    if (
+      native_eq(whnfProbeEntryAt(runtime, node, index), expected[index]) != 0
+    ) {
+      leanFail("whnf input node mutated: " + label)
+    }
+  }
+}
+
+// Differential insert: old fallback (with redirected self-recursion) and the
+// maintained canonical body must return equal full results and must not
+// change the runtime's ref state relative to the pre-call checkpoint.
+fun whnfProbeInsertOnce(
+  runtime: mutable LeanExecution,
+  label: String,
+  node: LeanValue,
+  hash: LeanValue,
+  depth: Int,
+  key: LeanValue,
+  value: LeanValue,
+  expected: ?LeanValue = None(),
+): LeanValue {
+  saved = runtime.checkpoint();
+  original = saved.restoreRaw();
+  rewritten = saved.restoreRaw();
+  oldNode = rewriteProbeCopyInput(node);
+  newNode = rewriteProbeCopyInput(node);
+  oldKey = rewriteProbeCopyInput(key);
+  newKey = rewriteProbeCopyInput(key);
+  oldValue = rewriteProbeCopyInput(value);
+  newValue = rewriteProbeCopyInput(value);
+  oldResult = L4_Lean_Meta_WHNF.f_whnfImp_spec_5_spec_10_5a205bd6f4_fallback(
+    original,
+    oldNode,
+    hash,
+    LeanWord("usize", depth),
+    oldKey,
+    oldValue,
+  );
+  assert(rewriteProbeSameInput(node, oldNode));
+  assert(rewriteProbeSameInput(key, oldKey));
+  assert(rewriteProbeSameInput(value, oldValue));
+  newResult = L4_Lean_Meta_WHNF.f_whnfImp_spec_5_spec_10_5a205bd6f4(
+    rewritten,
+    newNode,
+    hash,
+    LeanWord("usize", depth),
+    newKey,
+    newValue,
+  );
+  assert(rewriteProbeSameInput(node, newNode));
+  assert(rewriteProbeSameInput(key, newKey));
+  assert(rewriteProbeSameInput(value, newValue));
+  if (native_eq(oldResult, newResult) != 0) {
+    leanFail("whnf insertAux old/new mismatch: " + label)
+  };
+  expected match {
+  | Some(expectedNode) ->
+    if (!rewriteProbeSameInput(newResult, expectedNode)) {
+      leanFail("whnf insertAux unexpected new result: " + label)
+    };
+    if (!rewriteProbeSameInput(oldResult, expectedNode)) {
+      leanFail("whnf insertAux unexpected old result: " + label)
+    }
+  | None() -> void
+  };
+  assert(native_eq(original.checkpoint().refs, saved.refs) == 0);
+  assert(native_eq(rewritten.checkpoint().refs, saved.refs) == 0);
+  newResult
+}
+
+fun whnfProbeFindOtherBucketKey(
+  runtime: mutable LeanExecution,
+  targetBucket: Int,
+  avoidHash: LeanValue,
+  config: LeanValue,
+  prefix: String,
+): ?LeanValue {
+  for (offset in Range(0, 4000)) {
+    key = whnfProbeNatKey(runtime, prefix + offset.toString(), config);
+    hash = whnfProbeFullHash(runtime, key);
+    if (whnfProbeBucket(hash) == targetBucket) {
+      if (native_eq(hash, avoidHash) != 0) {
+        return Some(key)
+      }
+    }
+  };
+  None()
+}
+
+fun whnfProbeFindSmallBucketKey(
+  runtime: mutable LeanExecution,
+  bucketLimit: Int,
+  config: LeanValue,
+  prefix: String,
+): ?LeanValue {
+  for (offset in Range(0, 10000)) {
+    key = whnfProbeNatKey(runtime, prefix + offset.toString(), config);
+    if (whnfProbeBucket(whnfProbeFullHash(runtime, key)) < bucketLimit) {
+      return Some(key)
+    }
+  };
+  None()
+}
+
+// A null slot is filled with the inserted pair; a pre-existing sibling entry
+// anywhere else in the array is left untouched and the input array is not
+// mutated in place.
+fun whnfProbeCaseNullInsert(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  key = whnfProbeNatKey(runtime, "12345678901234567", config);
+  value = whnfProbeNatExpr(runtime, "2100000000000000001");
+  siblingValue = whnfProbeNatExpr(runtime, "2100000000000000002");
+  hash = whnfProbeFullHash(runtime, key);
+  bucket = whnfProbeBucket(hash);
+  siblingSlot = (bucket + 7) % 32;
+  siblingKey = whnfProbeFindOtherBucketKey(
+    runtime,
+    siblingSlot,
+    hash,
+    config,
+    "765432109876",
+  ) match {
+  | Some(found) -> found
+  | None() -> leanFail("no sibling key with requested bucket")
+  };
+  assert(
+    whnfProbeBucket(whnfProbeFullHash(runtime, siblingKey)) == siblingSlot,
+  );
+  slots = whnfProbeEntriesSlotsAt(
+    siblingSlot,
+    whnfProbeEntry(siblingKey, siblingValue),
+  );
+  root = whnfProbeEntriesNode(slots);
+  assert(!whnfProbeLookupFound(runtime, root, key));
+  newRoot = whnfProbeInsertOnce(
+    runtime,
+    "null insertion",
+    root,
+    hash,
+    1,
+    key,
+    value,
+  );
+  assert(leanTag(newRoot) == LeanTag.PersistentHashMap_Node_entries);
+  slotEntry = whnfProbeEntryAt(runtime, newRoot, bucket);
+  assert(leanTag(slotEntry) == LeanTag.PersistentHashMap_Entry_entry);
+  assert(native_eq(leanField(slotEntry, 0), key) == 0);
+  assert(native_eq(leanField(slotEntry, 1), value) == 0);
+  assert(
+    native_eq(
+      whnfProbeEntryAt(runtime, newRoot, siblingSlot),
+      whnfProbeEntry(siblingKey, siblingValue),
+    ) == 0,
+  );
+  whnfProbeAssertEntriesPreserved(runtime, "null insertion", root, slots);
+  for (index in Range(0, 32)) {
+    if (index != bucket) {
+      if (index != siblingSlot) {
+        assert(
+          leanTag(whnfProbeEntryAt(runtime, newRoot, index)) ==
+            LeanTag.PersistentHashMap_Entry_null,
+        )
+      }
+    }
+  };
+  lookup = whnfProbeLookupValue(runtime, newRoot, key);
+  lookup match {
+  | Some(found) -> assert(native_eq(found, value) == 0)
+  | None() -> leanFail("whnf null insertion invisible to lookup")
+  };
+  1
+}
+
+// A separately constructed, equal expression is the same key: an equal-key
+// insert replaces both the stored key and the stored value.
+fun whnfProbeCaseReplaceEqualKey(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  storedExpr = whnfProbeNatExpr(runtime, "135792468012345678");
+  freshExpr = whnfProbeNatExpr(runtime, "135792468012345678");
+  assert(
+    leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(runtime, storedExpr, freshExpr),
+    ),
+  );
+  storedKey = whnfProbeKey(storedExpr, config);
+  freshKey = whnfProbeKey(freshExpr, config);
+  oldValue = whnfProbeNatExpr(runtime, "3100000000000000001");
+  newValue = whnfProbeNatExpr(runtime, "3100000000000000002");
+  hash = whnfProbeFullHash(runtime, freshKey);
+  assert(native_eq(hash, whnfProbeFullHash(runtime, storedKey)) == 0);
+  bucket = whnfProbeBucket(hash);
+  slots = whnfProbeEntriesSlotsAt(bucket, whnfProbeEntry(storedKey, oldValue));
+  root = whnfProbeEntriesNode(slots);
+  newRoot = whnfProbeInsertOnce(
+    runtime,
+    "equal key replacement",
+    root,
+    hash,
+    1,
+    freshKey,
+    newValue,
+  );
+  slotEntry = whnfProbeEntryAt(runtime, newRoot, bucket);
+  assert(leanTag(slotEntry) == LeanTag.PersistentHashMap_Entry_entry);
+  assert(native_eq(leanField(slotEntry, 0), freshKey) == 0);
+  assert(native_eq(leanField(slotEntry, 1), newValue) == 0);
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "equal key replacement",
+    root,
+    slots,
+  );
+  lookup = whnfProbeLookupValue(runtime, newRoot, storedKey);
+  lookup match {
+  | Some(found) -> assert(native_eq(found, newValue) == 0)
+  | None() -> leanFail("whnf original key lost after replacement")
+  };
+  1
+}
+
+// An unequal key sharing the bucket prefix turns the slot into a collision
+// reference combining the stored pair first and the new pair second.
+fun whnfProbeCaseSameBucketUnequalKey(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  storedKey = whnfProbeNatKey(runtime, "55000000000000000001", config);
+  storedValue = whnfProbeNatExpr(runtime, "3200000000000000001");
+  secondValue = whnfProbeNatExpr(runtime, "3200000000000000002");
+  hash = whnfProbeFullHash(runtime, storedKey);
+  bucket = whnfProbeBucket(hash);
+  found = whnfProbeFindOtherBucketKey(
+    runtime,
+    bucket,
+    hash,
+    config,
+    "440000000000000",
+  );
+  found match {
+  | None() -> leanFail("whnf no same-bucket unequal key found for fixture")
+  | Some(secondKey) ->
+    secondHash = whnfProbeFullHash(runtime, secondKey);
+    assert(whnfProbeBucket(secondHash) == bucket);
+    assert(native_eq(secondHash, hash) != 0);
+    assert(
+      !leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(
+          runtime,
+          leanField(storedKey, 0),
+          leanField(secondKey, 0),
+        ),
+      ),
+    );
+    slots = whnfProbeEntriesSlotsAt(
+      bucket,
+      whnfProbeEntry(storedKey, storedValue),
+    );
+    root = whnfProbeEntriesNode(slots);
+    newRoot = whnfProbeInsertOnce(
+      runtime,
+      "same bucket unequal key",
+      root,
+      secondHash,
+      1,
+      secondKey,
+      secondValue,
+    );
+    slotEntry = whnfProbeEntryAt(runtime, newRoot, bucket);
+    assert(leanTag(slotEntry) == LeanTag.PersistentHashMap_Entry_ref);
+    collision = leanField(slotEntry, 0);
+    assert(leanTag(collision) == LeanTag.PersistentHashMap_Node_collision);
+    assert(whnfProbeCollisionSizeIs(runtime, collision, 2));
+    assert(
+      native_eq(whnfProbeCollisionKey(runtime, collision, 0), storedKey) == 0,
+    );
+    assert(
+      native_eq(whnfProbeCollisionKey(runtime, collision, 1), secondKey) == 0,
+    );
+    assert(
+      native_eq(whnfProbeCollisionValue(runtime, collision, 0), storedValue) ==
+        0,
+    );
+    assert(
+      native_eq(whnfProbeCollisionValue(runtime, collision, 1), secondValue) ==
+        0,
+    );
+    whnfProbeAssertEntriesPreserved(
+      runtime,
+      "same bucket unequal key",
+      root,
+      slots,
+    );
+    firstLookup = whnfProbeLookupValue(runtime, newRoot, storedKey);
+    firstLookup match {
+    | Some(foundValue) -> assert(native_eq(foundValue, storedValue) == 0)
+    | None() -> leanFail("whnf collision lost the stored key")
+    };
+    secondLookup = whnfProbeLookupValue(runtime, newRoot, secondKey);
+    secondLookup match {
+    | Some(foundValue) -> assert(native_eq(foundValue, secondValue) == 0)
+    | None() -> leanFail("whnf collision lost the inserted key")
+    };
+    1
+  }
+}
+
+// A slot holding Entry_ref descends five hash bits deeper; the deep equal key
+// is replaced in the child node without disturbing the outer level.
+fun whnfProbeCaseRefDescent(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  deepKey = whnfProbeNatKey(runtime, "66000000000000000001", config);
+  deepOld = whnfProbeNatExpr(runtime, "3300000000000000001");
+  deepNew = whnfProbeNatExpr(runtime, "3300000000000000002");
+  hash = whnfProbeFullHash(runtime, deepKey);
+  outerBucket = whnfProbeBucket(hash);
+  shifted = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+    runtime,
+    hash,
+    LeanWord("usize", 5),
+  );
+  innerBucket = whnfProbeBucket(shifted);
+  innerSlots = whnfProbeEntriesSlotsAt(
+    innerBucket,
+    whnfProbeEntry(deepKey, deepOld),
+  );
+  inner = whnfProbeEntriesNode(innerSlots);
+  outerSlots = whnfProbeEntriesSlotsAt(outerBucket, whnfProbeRefEntry(inner));
+  outer = whnfProbeEntriesNode(outerSlots);
+  newOuter = whnfProbeInsertOnce(
+    runtime,
+    "child reference descent",
+    outer,
+    hash,
+    1,
+    deepKey,
+    deepNew,
+  );
+  outerEntry = whnfProbeEntryAt(runtime, newOuter, outerBucket);
+  assert(leanTag(outerEntry) == LeanTag.PersistentHashMap_Entry_ref);
+  newInner = leanField(outerEntry, 0);
+  assert(leanTag(newInner) == LeanTag.PersistentHashMap_Node_entries);
+  innerEntry = whnfProbeEntryAt(runtime, newInner, innerBucket);
+  assert(leanTag(innerEntry) == LeanTag.PersistentHashMap_Entry_entry);
+  assert(native_eq(leanField(innerEntry, 0), deepKey) == 0);
+  assert(native_eq(leanField(innerEntry, 1), deepNew) == 0);
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "child reference descent inner",
+    inner,
+    innerSlots,
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "child reference descent outer",
+    outer,
+    outerSlots,
+  );
+  assert(
+    !whnfProbeLookupFound(
+      runtime,
+      newOuter,
+      whnfProbeNatKey(runtime, "99900000000000000001", config),
+    ),
+  );
+  lookup = whnfProbeLookupValue(runtime, newOuter, deepKey);
+  lookup match {
+  | Some(found) -> assert(native_eq(found, deepNew) == 0)
+  | None() -> leanFail("whnf descent lost the deep key")
+  };
+  1
+}
+
+// Grow a collision through real insertions of genuinely hash-colliding,
+// pairwise-distinct keys: null -> entry, first collision, append to size 3,
+// in-collision replacement, then the size 3 -> 4 expansion below max depth.
+fun whnfProbeCaseCollisionChain(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  digits = Array[
+    "7",
+    "18446744073709551623",
+    "36893488147419103239",
+    "73786976294838206471",
+  ];
+  values = Array[
+    whnfProbeNatExpr(runtime, "4200000000000000001"),
+    whnfProbeNatExpr(runtime, "4200000000000000002"),
+    whnfProbeNatExpr(runtime, "4200000000000000003"),
+    whnfProbeNatExpr(runtime, "4200000000000000004"),
+  ];
+  refreshValue = whnfProbeNatExpr(runtime, "4200000000000000005");
+  keyArr: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, digits.size())) {
+    keyArr.push(whnfProbeNatKey(runtime, digits[index], config))
+  };
+  keys = keyArr.toArray();
+  baseHash = whnfProbeFullHash(runtime, keys[0]);
+  whnfProbeAssertFullHashCollision(runtime, "collision chain", keys, baseHash);
+  bucket = whnfProbeBucket(baseHash);
+  root0 = whnfProbeEmptyEntries();
+  snapshot0 = whnfProbeSnapshotSlots(runtime, root0, 32);
+  root1 = whnfProbeInsertOnce(
+    runtime,
+    "collision chain null entry",
+    root0,
+    whnfProbeFullHash(runtime, keys[0]),
+    1,
+    keys[0],
+    values[0],
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "collision chain null entry",
+    root0,
+    snapshot0,
+  );
+  firstEntry = whnfProbeEntryAt(runtime, root1, bucket);
+  assert(leanTag(firstEntry) == LeanTag.PersistentHashMap_Entry_entry);
+  assert(native_eq(leanField(firstEntry, 0), keys[0]) == 0);
+  assert(native_eq(leanField(firstEntry, 1), values[0]) == 0);
+  snapshot1 = whnfProbeSnapshotSlots(runtime, root1, 32);
+  root2 = whnfProbeInsertOnce(
+    runtime,
+    "collision chain first collision",
+    root1,
+    whnfProbeFullHash(runtime, keys[1]),
+    1,
+    keys[1],
+    values[1],
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "collision chain first collision",
+    root1,
+    snapshot1,
+  );
+  slotEntry2 = whnfProbeEntryAt(runtime, root2, bucket);
+  assert(leanTag(slotEntry2) == LeanTag.PersistentHashMap_Entry_ref);
+  collision2 = leanField(slotEntry2, 0);
+  assert(leanTag(collision2) == LeanTag.PersistentHashMap_Node_collision);
+  assert(whnfProbeCollisionSizeIs(runtime, collision2, 2));
+  assert(
+    native_eq(whnfProbeCollisionKey(runtime, collision2, 0), keys[0]) == 0,
+  );
+  assert(
+    native_eq(whnfProbeCollisionKey(runtime, collision2, 1), keys[1]) == 0,
+  );
+  snapshot2 = whnfProbeSnapshotSlots(runtime, root2, 32);
+  root3 = whnfProbeInsertOnce(
+    runtime,
+    "collision chain append",
+    root2,
+    whnfProbeFullHash(runtime, keys[2]),
+    1,
+    keys[2],
+    values[2],
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "collision chain append",
+    root2,
+    snapshot2,
+  );
+  slotEntry3 = whnfProbeEntryAt(runtime, root3, bucket);
+  assert(leanTag(slotEntry3) == LeanTag.PersistentHashMap_Entry_ref);
+  collision3 = leanField(slotEntry3, 0);
+  assert(whnfProbeCollisionSizeIs(runtime, collision3, 3));
+  // In-collision replacement with a separately constructed equal key.
+  refreshKey = whnfProbeNatKey(runtime, digits[0], config);
+  assert(
+    leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(
+        runtime,
+        leanField(refreshKey, 0),
+        leanField(keys[0], 0),
+      ),
+    ),
+  );
+  snapshot3 = whnfProbeSnapshotSlots(runtime, root3, 32);
+  root4 = whnfProbeInsertOnce(
+    runtime,
+    "collision chain replace",
+    root3,
+    whnfProbeFullHash(runtime, refreshKey),
+    1,
+    refreshKey,
+    refreshValue,
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "collision chain replace",
+    root3,
+    snapshot3,
+  );
+  slotEntry4 = whnfProbeEntryAt(runtime, root4, bucket);
+  assert(leanTag(slotEntry4) == LeanTag.PersistentHashMap_Entry_ref);
+  assert(whnfProbeCollisionSizeIs(runtime, leanField(slotEntry4, 0), 3));
+  // The fourth key reaches size 4 below depth 7: the collision is rebuilt as
+  // a fresh entries node by reinserting every pair.
+  snapshot4 = whnfProbeSnapshotSlots(runtime, root4, 32);
+  root5 = whnfProbeInsertOnce(
+    runtime,
+    "collision chain 3 to 4 expansion",
+    root4,
+    whnfProbeFullHash(runtime, keys[3]),
+    1,
+    keys[3],
+    values[3],
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "collision chain 3 to 4 expansion",
+    root4,
+    snapshot4,
+  );
+  slotEntry5 = whnfProbeEntryAt(runtime, root5, bucket);
+  assert(leanTag(slotEntry5) == LeanTag.PersistentHashMap_Entry_ref);
+  rebuilt = leanField(slotEntry5, 0);
+  assert(leanTag(rebuilt) == LeanTag.PersistentHashMap_Node_entries);
+  for (index in Range(0, 4)) {
+    chainLookup = whnfProbeLookupValue(runtime, root5, keys[index]);
+    chainLookup match {
+    | Some(found) ->
+      assert(
+        native_eq(found, if (index == 0) refreshValue else values[index]) == 0,
+      )
+    | None() -> leanFail("whnf expansion lost a colliding key")
+    }
+  };
+  5
+}
+
+// At depth 7 and above, collision nodes must keep growing and never expand
+// into entries nodes, even at size >= 4.
+fun whnfProbeCollisionRoot(
+  runtime: mutable LeanExecution,
+  leaf: LeanValue,
+  fullHash: LeanValue,
+  depth: Int,
+): LeanValue {
+  result = leaf;
+  for (offset in Range(0, depth - 1)) {
+    ancestorDepth = depth - offset - 1;
+    shifted = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      runtime,
+      fullHash,
+      LeanWord("usize", 5 * (ancestorDepth - 1)),
+    );
+    !result = whnfProbeEntriesNode(
+      whnfProbeEntriesSlotsAt(
+        whnfProbeBucket(shifted),
+        whnfProbeRefEntry(result),
+      ),
+    )
+  };
+  result
+}
+
+fun whnfProbeCaseDeepCollisionRetained(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  digits = Array[
+    "7",
+    "18446744073709551623",
+    "36893488147419103239",
+    "73786976294838206471",
+    "147573952589676412935",
+    "295147905179352825863",
+  ];
+  values = Array[
+    whnfProbeNatExpr(runtime, "4100000000000000001"),
+    whnfProbeNatExpr(runtime, "4100000000000000002"),
+    whnfProbeNatExpr(runtime, "4100000000000000003"),
+    whnfProbeNatExpr(runtime, "4100000000000000004"),
+    whnfProbeNatExpr(runtime, "4100000000000000005"),
+    whnfProbeNatExpr(runtime, "4100000000000000006"),
+  ];
+  keyArr: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, digits.size())) {
+    keyArr.push(whnfProbeNatKey(runtime, digits[index], config))
+  };
+  keys = keyArr.toArray();
+  baseHash = whnfProbeFullHash(runtime, keys[0]);
+  whnfProbeAssertFullHashCollision(
+    runtime,
+    "depth retained collision",
+    keys,
+    baseHash,
+  );
+  nodeKeys: mutable Vector<LeanValue> = mutable Vector[];
+  nodeValues: mutable Vector<LeanValue> = mutable Vector[];
+  for (index in Range(0, 4)) {
+    nodeKeys.push(keys[index]);
+    nodeValues.push(values[index])
+  };
+  deepCollision = whnfProbeCollisionNode(
+    nodeKeys.toArray(),
+    nodeValues.toArray(),
+  );
+  holder = whnfProbeCollisionRoot(runtime, deepCollision, baseHash, 7);
+  for (index in Range(0, 4)) {
+    assert(whnfProbeLookupFound(runtime, holder, keys[index]))
+  };
+  retained5 = whnfProbeInsertOnce(
+    runtime,
+    "depth-7 collision append retained",
+    deepCollision,
+    L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      runtime,
+      baseHash,
+      LeanWord("usize", 30),
+    ),
+    7,
+    keys[4],
+    values[4],
+  );
+  assert(leanTag(retained5) == LeanTag.PersistentHashMap_Node_collision);
+  assert(whnfProbeCollisionSizeIs(runtime, retained5, 5));
+  for (index in Range(0, 4)) {
+    if (
+      native_eq(
+        whnfProbeCollisionKey(runtime, deepCollision, index),
+        keys[index],
+      ) != 0
+    ) {
+      leanFail("whnf depth-7 append mutated the input collision keys")
+    }
+  };
+  holder5 = whnfProbeCollisionRoot(runtime, retained5, baseHash, 7);
+  for (index in Range(0, 5)) {
+    retainedLookup = whnfProbeLookupValue(runtime, holder5, keys[index]);
+    retainedLookup match {
+    | Some(found) -> assert(native_eq(found, values[index]) == 0)
+    | None() -> leanFail("whnf depth-7 collision lost a key")
+    }
+  };
+  retained6 = whnfProbeInsertOnce(
+    runtime,
+    "depth-8 collision append retained",
+    retained5,
+    L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+      runtime,
+      baseHash,
+      LeanWord("usize", 35),
+    ),
+    8,
+    keys[5],
+    values[5],
+  );
+  assert(leanTag(retained6) == LeanTag.PersistentHashMap_Node_collision);
+  assert(whnfProbeCollisionSizeIs(runtime, retained6, 6));
+  holder6 = whnfProbeCollisionRoot(runtime, retained6, baseHash, 8);
+  for (index in Range(0, 6)) {
+    finalLookup = whnfProbeLookupValue(runtime, holder6, keys[index]);
+    finalLookup match {
+    | Some(foundValue) ->
+      assert(rewriteProbeSameInput(foundValue, values[index]))
+    | None() -> leanFail("depth-8 collision lost a key")
+    }
+  };
+  2
+}
+
+// Negative boundaries on short entries arrays: a slot index equal to the
+// array size must return the input node unchanged; an in-range slot of a
+// short array is still updated and keeps the short length.
+fun whnfProbeCaseShortEntriesArrays(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  key = whnfProbeNatKey(runtime, "88000000000000000001", config);
+  value = whnfProbeNatExpr(runtime, "3500000000000000001");
+  hash = whnfProbeFullHash(runtime, key);
+  bucket = whnfProbeBucket(hash);
+  shortSlots = Array::fill(bucket, (whnfProbeNullEntry() : LeanValue));
+  shortNode = whnfProbeEntriesNode(shortSlots);
+  _outOfRange = whnfProbeInsertOnce(
+    runtime,
+    "entries array out of range",
+    shortNode,
+    hash,
+    1,
+    key,
+    value,
+    Some(shortNode),
+  );
+  whnfProbeAssertEntriesPreserved(
+    runtime,
+    "entries array out of range",
+    shortNode,
+    shortSlots,
+  );
+  found = whnfProbeFindSmallBucketKey(runtime, 8, config, "77000000000000");
+  found match {
+  | None() ->
+    leanFail("whnf no small-bucket key found for short entries fixture")
+  | Some(innerKey) ->
+    innerHash = whnfProbeFullHash(runtime, innerKey);
+    innerBucket = whnfProbeBucket(innerHash);
+    emptyShortSlots = Array::fill(8, (whnfProbeNullEntry() : LeanValue));
+    emptyShort = whnfProbeEntriesNode(emptyShortSlots);
+    updatedShort = whnfProbeInsertOnce(
+      runtime,
+      "short entries in range",
+      emptyShort,
+      innerHash,
+      1,
+      innerKey,
+      value,
+    );
+    assert(whnfProbeArraySizeIs(runtime, updatedShort, 8));
+    slotEntry = whnfProbeEntryAt(runtime, updatedShort, innerBucket);
+    assert(leanTag(slotEntry) == LeanTag.PersistentHashMap_Entry_entry);
+    assert(native_eq(leanField(slotEntry, 0), innerKey) == 0);
+    assert(native_eq(leanField(slotEntry, 1), value) == 0);
+    whnfProbeAssertEntriesPreserved(
+      runtime,
+      "short entries in range",
+      emptyShort,
+      emptyShortSlots,
+    );
+    shortLookup = whnfProbeLookupValue(runtime, updatedShort, innerKey);
+    shortLookup match {
+    | Some(foundValue) -> assert(native_eq(foundValue, value) == 0)
+    | None() -> leanFail("whnf short entries lost the inserted key")
+    };
+    2
+  }
+}
+
+// The same expression with a different config key is a different key (the
+// expression compares equal, the UInt64 config keys do not), landing at the
+// same bucket by construction: the slot becomes a collision reference.
+fun whnfProbeCaseSameExprDiffConfig(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+): Int {
+  expr = whnfProbeNatExpr(runtime, "314159265358");
+  hash1 = whnfProbeFullHash(runtime, whnfProbeKey(expr, config));
+  bucket = whnfProbeBucket(hash1);
+  value1 = whnfProbeNatExpr(runtime, "3600000000000000001");
+  value2 = whnfProbeNatExpr(runtime, "3600000000000000002");
+  foundConfig: ?LeanValue = None();
+  for (configIndex in Range(0, 4096)) {
+    candidateConfig = LeanWord("uint64", configIndex);
+    candidateHash = whnfProbeFullHash(
+      runtime,
+      whnfProbeKey(expr, candidateConfig),
+    );
+    if (whnfProbeBucket(candidateHash) == bucket) {
+      if (native_eq(candidateHash, hash1) != 0) {
+        !foundConfig = Some(candidateConfig)
+      }
+    }
+  };
+  foundConfig match {
+  | None() -> leanFail("whnf no colliding config key found for fixture")
+  | Some(secondConfig) ->
+    key1 = whnfProbeKey(expr, config);
+    key2 = whnfProbeKey(expr, secondConfig);
+    hash2 = whnfProbeFullHash(runtime, key2);
+    assert(whnfProbeBucket(hash2) == bucket);
+    assert(native_eq(hash2, hash1) != 0);
+    assert(
+      leanIsTrue(
+        L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(runtime, expr, expr),
+      ),
+    );
+    assert(
+      !leanIsTrue(
+        L4_Init_Prelude.f_UInt64_decEq_97f4edb260(
+          runtime,
+          config,
+          secondConfig,
+        ),
+      ),
+    );
+    slots = whnfProbeEntriesSlotsAt(bucket, whnfProbeEntry(key1, value1));
+    root = whnfProbeEntriesNode(slots);
+    newRoot = whnfProbeInsertOnce(
+      runtime,
+      "same expression different config key",
+      root,
+      hash2,
+      1,
+      key2,
+      value2,
+    );
+    slotEntry = whnfProbeEntryAt(runtime, newRoot, bucket);
+    assert(leanTag(slotEntry) == LeanTag.PersistentHashMap_Entry_ref);
+    collision = leanField(slotEntry, 0);
+    assert(whnfProbeCollisionSizeIs(runtime, collision, 2));
+    assert(native_eq(whnfProbeCollisionKey(runtime, collision, 0), key1) == 0);
+    assert(native_eq(whnfProbeCollisionKey(runtime, collision, 1), key2) == 0);
+    whnfProbeAssertEntriesPreserved(
+      runtime,
+      "same expression different config key",
+      root,
+      slots,
+    );
+    firstLookup = whnfProbeLookupValue(runtime, newRoot, key1);
+    firstLookup match {
+    | Some(foundValue) -> assert(native_eq(foundValue, value1) == 0)
+    | None() -> leanFail("whnf config collision lost the first key")
+    };
+    secondLookup = whnfProbeLookupValue(runtime, newRoot, key2);
+    secondLookup match {
+    | Some(foundValue) -> assert(native_eq(foundValue, value2) == 0)
+    | None() -> leanFail("whnf config collision lost the second key")
+    };
+    1
+  }
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    config = LeanWord("uint64", 424242);
+    !checks = checks + whnfProbeCaseNullInsert(runtime, config);
+    !checks = checks + whnfProbeCaseReplaceEqualKey(runtime, config);
+    !checks = checks + whnfProbeCaseSameBucketUnequalKey(runtime, config);
+    !checks = checks + whnfProbeCaseRefDescent(runtime, config);
+    !checks = checks + whnfProbeCaseCollisionChain(runtime, config);
+    !checks = checks + whnfProbeCaseDeepCollisionRetained(runtime, config);
+    !checks = checks + whnfProbeCaseShortEntriesArrays(runtime, config);
+    !checks = checks + whnfProbeCaseSameExprDiffConfig(runtime, config);
+    // Whole-root wrapper: it must route through the maintained canonical entry
+    // point with the same computed hash and depth-1 conventions.
+    wrapperKey = whnfProbeNatKey(runtime, "12000000000000057005", config);
+    wrapperValue = whnfProbeNatExpr(runtime, "3700000000000000001");
+    wrappedRoot = L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_5_f0f1dbb78c(
+      runtime,
+      whnfProbeEmptyEntries(),
+      wrapperKey,
+      wrapperValue,
+    );
+    assert(whnfProbeLookupFound(runtime, wrappedRoot, wrapperKey));
+    wrapperValue2 = whnfProbeNatExpr(runtime, "3700000000000000002");
+    wrappedRoot2 = L4_Lean_Meta_WHNF.f_Meta_whnfImp_spec_5_f0f1dbb78c(
+      runtime,
+      wrappedRoot,
+      wrapperKey,
+      wrapperValue2,
+    );
+    directRoot2 = L4_Lean_Meta_WHNF.f_whnfImp_spec_5_spec_10_5a205bd6f4(
+      runtime,
+      wrappedRoot,
+      whnfProbeFullHash(runtime, wrapperKey),
+      LeanWord("usize", 1),
+      wrapperKey,
+      wrapperValue2,
+    );
+    assert(native_eq(wrappedRoot2, directRoot2) == 0);
+    wrapperLookup = whnfProbeLookupValue(runtime, wrappedRoot2, wrapperKey);
+    wrapperLookup match {
+    | Some(found) -> assert(native_eq(found, wrapperValue2) == 0)
+    | None() -> leanFail("whnf wrapper insertion lost its key")
+    };
+  };
+  assert(checks == 28);
+  print_string(
+    checks.toString() + " whnf cache insert differential cases passed",
+  )
+}

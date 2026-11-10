@@ -1,6 +1,12 @@
 # Rewrite the measured example in parallel
 
-## Overnight execution and eighth validated batch (2026-11-10)
+## Current execution and ninth validated batch (2026-11-10)
+
+Latest steering: **stop using Vibe until the user asks to retry it**. All Vibe
+workers have exited. The team is the primary plus three Codex implementation and
+review peers, with one compiler queue. The current planning range to the full
+rewrite benchmark is 4–7 continuous-work days, uncertain because larger routines
+and representation conversion remain. Re-estimate from accepted work.
 
 The user authorizes continuous work: finish the exercised-path rewrite, run the
 release benchmark against vanilla Lean, then move to SKStore if raw execution is
@@ -14,28 +20,38 @@ had connection failures and was reduced to two. Smaller writer retries rejected
 the unsupported `medium` reasoning setting, then timed out with supported `low`.
 No HTTP 429 was observed in these GLM runs. Vibe is currently idle; three Codex
 peers continue local implementation/review and the primary owns integration and
-the compiler queue. Retry a small pool when appropriate, increasing toward ten
-only after reliable completed requests and while review capacity remains.
-Preserve provider cooldowns and report errors without treating local token caps
-as provider quotas. A provider outage does not stop independent local work.
+the compiler queue. The user has since explicitly stopped Vibe usage, superseding
+the earlier request to ramp it back up. A provider outage does not stop independent
+local work. Preserve the failed-run evidence without automatic retries.
 
-Eight more routines pass the combined release probe: **1,058 differential cases**
+The ninth batch adds WHNF cache insertion and discrimination-tree match traversal.
+It passes **444 new differential cases and 1,281 regressions** in one combined
+release probe. The [ninth audit](provenance/rewrite-batches/2026-11-10-wave-09.json)
+binds tested sources and retained originals. There are **32 validated frame
+rewrites and 165 remaining observed frames**, containing 76,766 old source lines.
+This is control-flow progress; boxed interfaces and the other observed entries
+still need review. No new full-example performance claim is made.
+
+Work is grouped into small related families with shared fixtures and combined
+validation runs. Three Codex peers implement and cross-review private handoffs;
+the primary integrates reviewed changes and owns the compiler queue. Incremental
+release checks retain the target directory. Additional drafts are bounded by
+review capacity; more workers alone would not remove the integration bottleneck.
+
+The previous eight routines pass **1,058 differential cases**
 across stuck-metavariable discovery (224), literal recognition (46 for two routines),
 simplifier Meta configuration (328), eta bodies (68), offset recognition (140),
 Core type caches (108) and Core value caches (144). The
 [eighth audit](provenance/rewrite-batches/2026-11-10-wave-08.json) binds exact tested
-source/probe hashes and checks retained originals. There are **30 validated frame
-rewrites and 167 remaining observed frames**. Boxed interfaces and other observed
-entries still need review; this is not completion of the example path.
+source/probe hashes and checks retained originals.
 
 The literal result needed an explicit `LeanValue` pair to preserve boxed array
 specialization; exact old/new comparisons remain intact. Probe corrections include
 valid constructor/universe layouts, actual helper types, independent config fields,
 error/cache expectations, full reference/input checks and valid bound-variable
 indices. No new runtime stub or compiler change was introduced. The native kernel
-and typed-import boundary remain unchanged. GetMatchLoop and WHNF cache insertion
-have reviewed private handoffs pending validation; inference/unification work
-continues. No new full-example performance claim.
+and typed-import boundary remain unchanged. Application inference, local-instance
+scoping, unification hints and used-simplification sets are the next bounded tasks.
 
 ## GLM restart history (2026-11-09)
 
@@ -178,8 +194,8 @@ Before declaring the example's path complete:
 
 ## People, processes and ownership
 
-The latest allocation is up to ten Vibe writers with three Codex packet owners
-and reviewers, plus the primary. The four Codex agents fill this session's active
+The current allocation is three Codex implementation/review peers plus the
+primary; Vibe is stopped until the user asks to retry. The four Codex agents fill this session's active
 agent limit; that limit does not establish a subscription-wide allowance. The
 active model/concurrency policy is recorded above.
 

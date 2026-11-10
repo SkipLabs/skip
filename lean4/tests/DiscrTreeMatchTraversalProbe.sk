@@ -1,0 +1,1098 @@
+// Executable probe for the unchanged
+// L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatchLoop_afa84324e9.
+// Every case runs the retained fallback oracle (exact original ABI, identity
+// guaranteed by the assignment) and the canonical function on identically
+// restored runtimes, then asserts independently derived expected payloads,
+// worlds and input preservation from the reference traversal contract.
+
+class MatchLoopCase(
+  label: String,
+  context: LeanValue,
+  todo: LeanValue,
+  trie: LeanValue,
+  seed: LeanValue,
+  expectError: Bool,
+  expected: LeanValue,
+  expectedException: LeanValue,
+)
+
+// --- fixture helpers copied from the validated getKeyArgs setup ---
+
+fun matchLoopAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun matchLoopDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(
+            LeanTag.ReducibilityHints_regular,
+            Array[LeanWord("uint32", 1)],
+          ),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun matchLoopApply(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun matchLoopBinders(
+  runtime: mutable LeanExecution,
+  domains: Array<LeanValue>,
+  body: LeanValue,
+  lambda: Bool,
+): LeanValue {
+  result = body;
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  for (offset in Range(0, domains.size())) {
+    domain = domains[domains.size() - offset - 1];
+    !result = if (lambda) {
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        runtime,
+        anonymous,
+        binder,
+        domain,
+        result,
+      )
+    } else {
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        anonymous,
+        binder,
+        domain,
+        result,
+      )
+    }
+  };
+  result
+}
+
+fun matchLoopContext(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+// --- trie fixtures copied from TrieFixture.sk (children in strict Key order) ---
+
+fun resumeTrieNode(
+  values: Array<LeanValue>,
+  childEdges: Array<LeanValue>,
+): LeanValue {
+  LeanCtor(
+    LeanTag.Meta_DiscrTree_Trie_node,
+    Array[LeanArray(values), LeanArray(childEdges)],
+  )
+}
+
+fun resumeTrieLeaf(label: String): LeanValue {
+  resumeTrieNode(Array[LeanText(label)], (Array[] : Array<LeanValue>))
+}
+
+fun resumeTrieChain(key: LeanValue, child: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Meta_DiscrTree_Trie_chain, Array[key, child])
+}
+
+fun resumeTrieChild(key: LeanValue, child: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Prod_mk, Array[key, child])
+}
+
+// A chain gets one concrete child per level, so exactly `level` pending
+// expressions are consumed before reaching the payload leaf.
+fun matchLoopDeepTrie(level: Int, key: LeanValue): LeanValue {
+  if (level <= 0) {
+    resumeTrieNode(Array[LeanText("deepEnd")], (Array[] : Array<LeanValue>))
+  } else {
+    resumeTrieNode(
+      (Array[] : Array<LeanValue>),
+      Array[resumeTrieChild(key, matchLoopDeepTrie(level - 1, key))],
+    )
+  }
+}
+
+// --- probe check: fallback oracle vs canonical plus independent expected facts ---
+
+fun matchLoopCheck(
+  label: String,
+  state: RewriteProbeState,
+  saved: LeanExecutionCheckpoint,
+  context: LeanValue,
+  todo: LeanValue,
+  trie: LeanValue,
+  seed: LeanValue,
+  expectError: Bool,
+  expected: LeanValue,
+  expectedException: LeanValue,
+  world: LeanValue,
+  coreOverride: ?LeanValue = None(),
+): LeanExecutionCheckpoint {
+  core = coreOverride match {
+  | Some(value) -> value
+  | None() -> state.coreContext
+  };
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  oldTodo = rewriteProbeCopyInput(todo);
+  newTodo = rewriteProbeCopyInput(todo);
+  oldTrie = rewriteProbeCopyInput(trie);
+  newTrie = rewriteProbeCopyInput(trie);
+  oldSeed = rewriteProbeCopyInput(seed);
+  newSeed = rewriteProbeCopyInput(seed);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      value = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatchLoop_afa84324e9_fallback(
+        runtime,
+        oldTodo,
+        oldTrie,
+        oldSeed,
+        oldContext,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(todo, oldTodo));
+      assert(rewriteProbeSameInput(trie, oldTrie));
+      assert(rewriteProbeSameInput(seed, oldSeed));
+      assert(rewriteProbeSameInput(context, oldContext));
+      assert(rewriteProbeSameInput(core, oldCore));
+      value
+    },
+    (runtime: mutable LeanExecution) ~> {
+      value = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatchLoop_afa84324e9(
+        runtime,
+        newTodo,
+        newTrie,
+        newSeed,
+        newContext,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(todo, newTodo));
+      assert(rewriteProbeSameInput(trie, newTrie));
+      assert(rewriteProbeSameInput(seed, newSeed));
+      assert(rewriteProbeSameInput(context, newContext));
+      assert(rewriteProbeSameInput(core, newCore));
+      value
+    },
+  );
+  if (expectError) {
+    if (leanTag(result) != LeanTag.EST_Out_error) {
+      leanFail("getMatchLoop expected error: " + label)
+    };
+    if (leanTag(expectedException) == LeanTag.Option_some) {
+      if (
+        !rewriteProbeSameInput(
+          leanField(result, 0),
+          leanField(expectedException, 0),
+        )
+      ) {
+        leanFail("getMatchLoop unexpected exception: " + label)
+      }
+    } else {
+      assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error)
+    }
+  } else {
+    if (leanTag(result) != LeanTag.EST_Out_ok) {
+      leanFail("getMatchLoop expected success: " + label)
+    };
+    // Expected payloads compare contents; old/new result representation remains exact.
+    if (
+      !rewriteProbeSameInput(
+        LeanArray(leanArray(leanField(result, 0))),
+        expected,
+      )
+    ) {
+      leanFail("getMatchLoop unexpected payload: " + label)
+    };
+  };
+  if (!rewriteProbeSameInput(leanField(result, 1), world)) {
+    leanFail("getMatchLoop unexpected world: " + label)
+  };
+  noEffects =
+    leanValueArraySize(todo) == 0 ||
+    (leanTag(trie) == LeanTag.Meta_DiscrTree_Trie_node &&
+      leanValueArraySize(leanField(trie, 1)) == 0);
+  if (noEffects && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("getMatchLoop early return changed refs: " + label)
+  };
+  after
+}
+
+// Inputs use the actual persistent array representation, including node children and values.
+fun matchLoopPersistentArray(value: LeanValue): LeanValue {
+  LeanPersistentArray(
+    Persistent.RadixTreeVector::mcreateFromItems(leanArray(value)).chill(),
+  )
+}
+
+fun matchLoopPersistentTrie(trie: LeanValue): LeanValue {
+  leanTag(trie) match {
+  | LeanTag.Meta_DiscrTree_Trie_chain ->
+    LeanCtor(
+      LeanTag.Meta_DiscrTree_Trie_chain,
+      Array[leanField(trie, 0), matchLoopPersistentTrie(leanField(trie, 1))],
+    )
+  | LeanTag.Meta_DiscrTree_Trie_node ->
+    childEdges = leanArray(leanField(trie, 1)).map(entry ->
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[
+          leanField(entry, 0),
+          matchLoopPersistentTrie(leanField(entry, 1)),
+        ],
+      )
+    );
+    values: LeanValue = matchLoopPersistentArray(leanField(trie, 0));
+    edges: LeanValue = matchLoopPersistentArray(LeanArray(childEdges));
+    LeanCtor(LeanTag.Meta_DiscrTree_Trie_node, Array[values, edges])
+  | _ -> leanFail("unexpected probe trie")
+  }
+}
+
+fun matchLoopDepthException(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.Exception_error,
+    Array[source, LeanCtor(LeanTag.MessageData_tagged, Array[tag, message])],
+  )
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    leanInitializeBinding(
+      builder,
+      "Lean.Meta.Match.Extension.extension",
+      L4_Lean_Meta_Match_MatcherInfo.f_MatcherInfo_hygCtx_hyg_89b5cff17d,
+    );
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+        builder,
+        n,
+        LeanCtor(LeanTag.List_nil, Array[]),
+      );
+    variable = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, n);
+    bound = (i: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(i));
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+        builder,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      ),
+    );
+    pName = name("MatchLoopP");
+    p = constant(pName);
+    functionType = matchLoopBinders(builder, Array[p, p, p], p, false);
+    binaryType = matchLoopBinders(builder, Array[p, p], p, false);
+    binaryValue = matchLoopBinders(builder, Array[p, p], bound(1), true);
+    cName = name("matchLoopHead");
+    defName = name("matchLoopReducible");
+    fnName = name("matchLoopFn");
+    fn = variable(fnName);
+    xName = name("matchLoopX");
+    x = variable(xName);
+    yName = name("matchLoopY");
+    y = variable(yName);
+    natName = name("Nat");
+    natType = constant(natName);
+    zeroName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("zero"),
+    );
+    succName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+      builder,
+      LeanText("Nat"),
+      LeanText("succ"),
+    );
+    natZero = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      builder,
+      zeroName,
+      LeanCtor(LeanTag.List_nil, Array[]),
+    );
+    natSucc = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      builder,
+      succName,
+      LeanCtor(LeanTag.List_nil, Array[]),
+    );
+    boxName = name("MatchLoopBox");
+    boxCtorName = name("MatchLoopBoxMk");
+    boxType = constant(boxName);
+    boxId = name("matchLoopBox");
+    box = variable(boxId);
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    singleton = (n: LeanValue) -> LeanCtor(LeanTag.List_cons, Array[n, nil]);
+    boxInfo = LeanCtor(
+      LeanTag.ConstantInfo_inductInfo,
+      Array[
+        LeanCtor(
+          LeanTag.InductiveVal_mk,
+          Array[
+            LeanCtor(LeanTag.ConstantVal_mk, Array[boxName, nil, type]),
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            singleton(boxName),
+            singleton(boxCtorName),
+            LeanNatLiterals.n0,
+            leanBool(false),
+            leanBool(false),
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    boxCtorInfo = LeanCtor(
+      LeanTag.ConstantInfo_ctorInfo,
+      Array[
+        LeanCtor(
+          LeanTag.ConstructorVal_mk,
+          Array[
+            LeanCtor(
+              LeanTag.ConstantVal_mk,
+              Array[
+                boxCtorName,
+                nil,
+                matchLoopBinders(builder, Array[binaryType], boxType, false),
+              ],
+            ),
+            boxName,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n0,
+            LeanNatLiterals.n1,
+            leanBool(false),
+          ],
+        ),
+      ],
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      matchLoopAxiom(pName, prop),
+      matchLoopAxiom(cName, functionType),
+      matchLoopDefinition(defName, binaryType, binaryValue),
+      matchLoopAxiom(natName, type),
+      matchLoopAxiom(zeroName, natType),
+      matchLoopAxiom(
+        succName,
+        matchLoopBinders(builder, Array[natType], natType, false),
+      ),
+      boxInfo,
+      boxCtorInfo,
+    ]) {
+      infoName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(infoName), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+      builder,
+      environment,
+      defName,
+      LeanCtor(LeanTag.ReducibilityStatus_reducible, Array[]),
+      LeanCtor(LeanTag.AttributeKind_global, Array[]),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+    );
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    for ((id, localType) in Array[
+      (xName, p),
+      (yName, p),
+      (fnName, functionType),
+      (boxId, boxType),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        builder,
+        locals,
+        id,
+        id,
+        localType,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(
+      builder,
+      environment,
+      locals,
+      "<discr-match-loop>",
+    );
+    initialMetaState = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMetaState, 0);
+    mName = name("matchLoopM");
+    !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+      builder,
+      mctx,
+      mName,
+      mName,
+      locals,
+      LeanArray(Array[]),
+      p,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+      LeanNatLiterals.n0,
+    );
+    builder.writeRef(
+      state.metaStateRef,
+      Some(leanReplaceField(initialMetaState, 0, mctx)),
+    );
+    saved = builder.checkpoint();
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      builder,
+      state.metaContext,
+    );
+    quietConfig = leanReplaceField(
+      leanReplaceField(
+        baseConfig,
+        9,
+        LeanCtor(LeanTag.Meta_TransparencyMode_none, Array[]),
+      ),
+      12,
+      leanBool(false),
+    );
+    quietContext = matchLoopContext(builder, state.metaContext, quietConfig);
+    stuckContext = matchLoopContext(
+      builder,
+      state.metaContext,
+      leanReplaceField(quietConfig, 4, leanBool(true)),
+    );
+    stuckException = LeanCtor(
+      LeanTag.Exception_internal,
+      Array[
+        leanReadInitializer(builder, "Lean.Meta.isDefEqStuckExceptionId"),
+        nil,
+      ],
+    );
+    expectStuck = LeanCtor(LeanTag.Option_some, Array[stuckException]);
+    expectAnyException = LeanCtor(LeanTag.Option_none, Array[]);
+    constC = constant(cName);
+    constP = constant(pName);
+    appCX = matchLoopApply(builder, constC, Array[x]);
+    appCY = matchLoopApply(builder, constC, Array[y]);
+    appFnXY = matchLoopApply(builder, fn, Array[x, y]);
+    missingName = name("matchLoopMissing");
+    badExpr = variable(missingName);
+    missingRuntime = saved.restoreRaw();
+    missing = L4_Lean_Meta_Basic.f_Lean_FVarId_getDecl_aa69d92952(
+      missingRuntime,
+      missingName,
+      state.metaContext,
+      state.coreContext,
+      state.coreStateRef,
+      LeanErased(),
+    );
+    assert(leanTag(missing) == LeanTag.EST_Out_error);
+    expectedMissing = LeanCtor(
+      LeanTag.Option_some,
+      Array[leanField(missing, 0)],
+    );
+    mvarExpr = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, mName);
+    stuckExpr = matchLoopApply(builder, constant(defName), Array[mvarExpr, x]);
+    numeralExpr = matchLoopApply(builder, natSucc, Array[natZero]);
+    zeroExpr = L4_Lean_Expr.f_Expr_lit_override_362af36df7(
+      builder,
+      LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n0]),
+    );
+    strExpr = L4_Lean_Expr.f_Expr_lit_override_362af36df7(
+      builder,
+      LeanCtor(LeanTag.Literal_strVal, Array[LeanText("discr")]),
+    );
+    arrowExpr = matchLoopBinders(builder, Array[p], p, false);
+    projExpr = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+      builder,
+      boxName,
+      LeanNatLiterals.n0,
+      box,
+    );
+    starKey = LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]);
+    otherKey = LeanCtor(LeanTag.Meta_DiscrTree_Key_other, Array[]);
+    arrowKey = LeanCtor(LeanTag.Meta_DiscrTree_Key_arrow, Array[]);
+    fvarKey = (n: LeanValue, arity: Int) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_fvar, Array[n, leanNatValue(arity)]);
+    constKey = (n: LeanValue, arity: Int) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_const, Array[n, leanNatValue(arity)]);
+    litKey = (literal: LeanValue) ->
+      LeanCtor(LeanTag.Meta_DiscrTree_Key_lit, Array[literal]);
+    projKey = LeanCtor(
+      LeanTag.Meta_DiscrTree_Key_proj,
+      Array[boxName, LeanNatLiterals.n0, leanNatValue(0)],
+    );
+    payload = (labels: Array<String>) ->
+      LeanArray(Array::fillBy(labels.size(), (i: Int) -> LeanText(labels[i])));
+    kept = payload(Array["kept"]);
+    seeded = payload(Array["seed"]);
+    nothingTodo = LeanArray((Array[] : Array<LeanValue>));
+    keptPayload = payload(Array["kept"]);
+    starExactTrie = resumeTrieNode(
+      (Array[] : Array<LeanValue>),
+      Array[
+        resumeTrieChild(starKey, resumeTrieLeaf("W")),
+        resumeTrieChild(constKey(cName, 0), resumeTrieLeaf("E")),
+      ],
+    );
+    concreteOnlyTrie = resumeTrieNode(
+      (Array[] : Array<LeanValue>),
+      Array[resumeTrieChild(constKey(cName, 0), resumeTrieLeaf("E"))],
+    );
+    reuseTrie = resumeTrieNode(
+      (Array[] : Array<LeanValue>),
+      Array[
+        // The star visit consumes `x`, and the concrete visit must still see
+        // `x` because both routes share one popped-todo snapshot.
+        resumeTrieChild(
+          starKey,
+          resumeTrieChain(fvarKey(xName, 0), resumeTrieLeaf("W")),
+        ),
+        resumeTrieChild(
+          constKey(cName, 1),
+          resumeTrieChain(
+            fvarKey(yName, 0),
+            resumeTrieChain(fvarKey(xName, 0), resumeTrieLeaf("XYE")),
+          ),
+        ),
+      ],
+    );
+    nodeErrorTrie = resumeTrieNode(
+      (Array[] : Array<LeanValue>),
+      Array[
+        resumeTrieChild(
+          starKey,
+          resumeTrieChain(constKey(cName, 0), resumeTrieLeaf("neverStarDeep")),
+        ),
+        resumeTrieChild(
+          constKey(cName, 0),
+          resumeTrieLeaf("neverConcreteVisit"),
+        ),
+      ],
+    );
+    deepTrieExpr = matchLoopDeepTrie(130, constKey(cName, 0));
+    deepTodo = LeanArray(Array::fillBy(130, _ -> constC));
+    deepSeed = (n: Int) -> payload(Array::fillBy(n, _ -> "deepSeed"));
+    seedExpected = (n: Int) ->
+      payload((Array::fillBy(n, _ -> "deepSeed")).concat(Array["a", "b"]));
+    cases: mutable Vector<MatchLoopCase> = mutable Vector[];
+    cases.push(
+      MatchLoopCase(
+        "chain empty todo keeps result",
+        quietContext,
+        nothingTodo,
+        resumeTrieChain(constKey(cName, 0), resumeTrieLeaf("neverChainEmpty")),
+        kept,
+        false,
+        kept,
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain star edge discards arguments",
+        quietContext,
+        LeanArray(Array[appCX]),
+        resumeTrieChain(starKey, resumeTrieLeaf("starHit")),
+        nothingTodo,
+        false,
+        payload(Array["starHit"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain matching concrete key continues with arguments",
+        quietContext,
+        LeanArray(Array[appCX]),
+        resumeTrieChain(
+          constKey(cName, 1),
+          resumeTrieChain(fvarKey(xName, 0), resumeTrieLeaf("deep")),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["deep"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain key mismatch keeps result and helper world",
+        quietContext,
+        LeanArray(Array[appCX]),
+        resumeTrieChain(constKey(pName, 0), resumeTrieLeaf("neverMismatch")),
+        kept,
+        false,
+        keptPayload,
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain metavariable matches other key in match mode",
+        quietContext,
+        LeanArray(Array[mvarExpr]),
+        resumeTrieChain(otherKey, resumeTrieLeaf("mvar")),
+        nothingTodo,
+        false,
+        payload(Array["mvar"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain numeral literal key",
+        quietContext,
+        LeanArray(Array[numeralExpr]),
+        resumeTrieChain(
+          litKey(LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n1])),
+          resumeTrieLeaf("one"),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["one"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain literal expression key",
+        quietContext,
+        LeanArray(Array[zeroExpr]),
+        resumeTrieChain(
+          litKey(LeanCtor(LeanTag.Literal_natVal, Array[LeanNatLiterals.n0])),
+          resumeTrieLeaf("zero"),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["zero"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain string literal key",
+        quietContext,
+        LeanArray(Array[strExpr]),
+        resumeTrieChain(
+          litKey(LeanCtor(LeanTag.Literal_strVal, Array[LeanText("discr")])),
+          resumeTrieLeaf("str"),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["str"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain arrow key with domain continuation",
+        quietContext,
+        LeanArray(Array[arrowExpr]),
+        resumeTrieChain(
+          arrowKey,
+          resumeTrieChain(constKey(pName, 0), resumeTrieLeaf("arrow")),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["arrow"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain projection key with base continuation",
+        quietContext,
+        LeanArray(Array[projExpr]),
+        resumeTrieChain(
+          projKey,
+          resumeTrieChain(fvarKey(boxId, 0), resumeTrieLeaf("proj")),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["proj"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain star edge still extracts key",
+        quietContext,
+        LeanArray(Array[badExpr]),
+        resumeTrieChain(starKey, resumeTrieLeaf("neverStarError")),
+        nothingTodo,
+        true,
+        nothingTodo,
+        expectedMissing,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "chain stuck key extraction error",
+        stuckContext,
+        LeanArray(Array[stuckExpr]),
+        resumeTrieChain(fvarKey(xName, 0), resumeTrieLeaf("neverStuck")),
+        nothingTodo,
+        true,
+        nothingTodo,
+        expectStuck,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node empty todo appends values keeping duplicate order",
+        quietContext,
+        nothingTodo,
+        resumeTrieNode(
+          Array[LeanText("a"), LeanText("b"), LeanText("a")],
+          Array[resumeTrieChild(starKey, resumeTrieLeaf("neverStar"))],
+        ),
+        payload(Array["seed"]),
+        false,
+        payload(Array["seed", "a", "b", "a"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node without children ignores erroneous back expression",
+        quietContext,
+        LeanArray(Array[badExpr]),
+        resumeTrieNode(Array[LeanText("v")], (Array[] : Array<LeanValue>)),
+        kept,
+        false,
+        keptPayload,
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node star-first then exact hit appends in order",
+        quietContext,
+        LeanArray(Array[constC]),
+        starExactTrie,
+        seeded,
+        false,
+        payload(Array["seed", "W", "E"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node star-first with missing exact returns star result",
+        quietContext,
+        LeanArray(Array[constP]),
+        starExactTrie,
+        seeded,
+        false,
+        payload(Array["seed", "W"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node single concrete child lookup miss",
+        quietContext,
+        LeanArray(Array[constP]),
+        concreteOnlyTrie,
+        nothingTodo,
+        false,
+        nothingTodo,
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node reuses todo across star and concrete visits",
+        quietContext,
+        LeanArray(Array[x, appCY]),
+        reuseTrie,
+        nothingTodo,
+        false,
+        payload(Array["W", "XYE"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "application argument order traverses first argument first",
+        quietContext,
+        LeanArray(Array[appFnXY]),
+        resumeTrieChain(
+          fvarKey(fnName, 2),
+          resumeTrieChain(
+            fvarKey(xName, 0),
+            resumeTrieChain(fvarKey(yName, 0), resumeTrieLeaf("fxy")),
+          ),
+        ),
+        nothingTodo,
+        false,
+        payload(Array["fxy"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "application argument order rejects reversed edge key",
+        quietContext,
+        LeanArray(Array[appFnXY]),
+        resumeTrieChain(
+          fvarKey(fnName, 2),
+          resumeTrieChain(fvarKey(yName, 0), resumeTrieLeaf("wrong")),
+        ),
+        kept,
+        false,
+        keptPayload,
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node append crosses 128 with 127-element seed",
+        quietContext,
+        nothingTodo,
+        resumeTrieNode(
+          Array[LeanText("a"), LeanText("b")],
+          (Array[] : Array<LeanValue>),
+        ),
+        deepSeed(127),
+        false,
+        seedExpected(127),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node append crosses 128 with 128-element seed",
+        quietContext,
+        nothingTodo,
+        resumeTrieNode(
+          Array[LeanText("a"), LeanText("b")],
+          (Array[] : Array<LeanValue>),
+        ),
+        deepSeed(128),
+        false,
+        seedExpected(128),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "deep pending todo traverses 130 levels",
+        quietContext,
+        deepTodo,
+        deepTrieExpr,
+        nothingTodo,
+        false,
+        payload(Array["deepEnd"]),
+        expectAnyException,
+      ),
+    );
+    cases.push(
+      MatchLoopCase(
+        "node star traversal error stops concrete visit",
+        quietContext,
+        LeanArray(Array[badExpr, constC]),
+        nodeErrorTrie,
+        kept,
+        true,
+        nothingTodo,
+        expectedMissing,
+      ),
+    );
+    limited = leanReplaceField(
+      leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1),
+      0,
+      leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1),
+    );
+    for (persistent in Array[false, true]) {
+      for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+        for (probeCase in cases.toArray()) {
+          todo = if (persistent) matchLoopPersistentArray(probeCase.todo) else {
+            probeCase.todo
+          };
+          trie = if (persistent) matchLoopPersistentTrie(probeCase.trie) else {
+            probeCase.trie
+          };
+          seed = if (persistent) matchLoopPersistentArray(probeCase.seed) else {
+            probeCase.seed
+          };
+          warm = matchLoopCheck(
+            probeCase.label,
+            state,
+            saved,
+            probeCase.context,
+            todo,
+            trie,
+            seed,
+            probeCase.expectError,
+            probeCase.expected,
+            probeCase.expectedException,
+            world,
+          );
+          _warm = matchLoopCheck(
+            "warm " + probeCase.label,
+            state,
+            warm,
+            probeCase.context,
+            todo,
+            trie,
+            seed,
+            probeCase.expectError,
+            probeCase.expected,
+            probeCase.expectedException,
+            world,
+          );
+          !count = count + 2
+        };
+        expectedDepth = LeanCtor(
+          LeanTag.Option_some,
+          Array[matchLoopDepthException(builder, leanField(limited, 2))],
+        );
+        for (trie in Array[
+          resumeTrieChain(starKey, resumeTrieLeaf("never")),
+          starExactTrie,
+        ]) {
+          checkedTrie = if (persistent) matchLoopPersistentTrie(trie) else trie;
+          pending: LeanValue = LeanArray(Array[projExpr]);
+          checkedTodo = if (persistent) matchLoopPersistentArray(pending) else {
+            pending
+          };
+          before = matchLoopCheck(
+            "depth error before wildcard visit",
+            state,
+            saved,
+            quietContext,
+            checkedTodo,
+            checkedTrie,
+            kept,
+            true,
+            nothingTodo,
+            expectedDepth,
+            world,
+            Some(limited),
+          );
+          assert(native_eq(saved.refs, before.refs) == 0);
+          !count = count + 1
+        };
+        unused = LeanUnavailable(
+          "getMatchLoop early return must not inspect Meta/Core inputs",
+        );
+        noContexts = RewriteProbeState(saved, unused, unused, unused, unused);
+        for ((todo, trie) in Array[
+          (nothingTodo, resumeTrieChain(starKey, resumeTrieLeaf("never"))),
+          (
+            LeanArray(Array[badExpr]),
+            resumeTrieNode(
+              Array[LeanText("unused")],
+              (Array[] : Array<LeanValue>),
+            ),
+          ),
+        ]) {
+          checkedTodo = if (persistent) matchLoopPersistentArray(todo) else {
+            todo
+          };
+          checkedTrie = if (persistent) matchLoopPersistentTrie(trie) else trie;
+          _noContext = matchLoopCheck(
+            "early return ignores all contexts",
+            noContexts,
+            saved,
+            unused,
+            checkedTodo,
+            checkedTrie,
+            kept,
+            false,
+            keptPayload,
+            expectAnyException,
+            world,
+          );
+          !count = count + 1
+        }
+      }
+    }
+  };
+  assert(count == 416);
+  print_string("getMatchLoop comparisons: " + count.toString())
+}
