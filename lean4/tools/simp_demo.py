@@ -193,10 +193,10 @@ def run_edit_session(lean, binary, snapshot, depth, env, result_dir):
         if succeeds:
             for mode in ('incremental', 'fresh'):
                 run([lean, '-j1', '-s65536', '-M8000', '--run', ROOT/'tools/CheckProof.lean',
-                     output/f'{mode}-proof.json', '--import', 'SimpProblem', '--json'],
+                     output/f'{mode}-proof.json', '--import', 'SimpProblem', '--type-const', 'Goal', '--json'],
                     output/f'{mode}-kernel.log', local_env)
                 checks[mode] = record(output/f'{mode}-kernel.log')
-                if not checks[mode]['accepted']:
+                if not checks[mode]['accepted'] or checks[mode].get('typeConstant') != 'Goal':
                     raise RuntimeError(f'{label}/{mode}: native kernel rejected the proof')
         def checked_work(stats, mode):
             kernel = checks.get(mode, {})
@@ -309,10 +309,10 @@ def main():
         if not skip['elaborated']:
             raise RuntimeError(f'Skip did not elaborate the goal: {skip["diagnostic"]}')
         checker_wall = run([lean, '-j1', '-s65536', '-M8000', '--run', ROOT/'tools/CheckProof.lean',
-                            proof, '--import', 'SimpProblem', '--json'], sample_dir/'kernel.log', env)
+                            proof, '--import', 'SimpProblem', '--type-const', 'Goal', '--json'], sample_dir/'kernel.log', env)
         native = record(sample_dir/'native-api.log')
         kernel = record(sample_dir/'kernel.log')
-        if not native['accepted'] or not kernel['accepted']:
+        if not native['accepted'] or not kernel['accepted'] or kernel.get('typeConstant') != 'Goal':
             raise RuntimeError('A proof was not independently accepted')
         checked_work = skip['setupNs'] + skip['elaborationNs'] + skip['exportNs'] + kernel['decodeNs'] + kernel['kernelNs']
         samples.append({'nativeSourceWallNs': source_wall, 'nativeApiWallNs': native_wall,

@@ -5,6 +5,13 @@ and rewriting its dominant hot paths. This supersedes finishing the whole exerci
 path before measuring. Build the current release, establish fresh/warm raw timings,
 then use elaboration-only samples to choose the next changes. SKStore follows raw
 near parity; Skip compiler/runtime changes still require stopping for discussion.
+The current release is measured: depth-6 fresh elaboration is 1047.816 ms versus
+native Lean's 196.237 ms; warmed uncached medians are 1015.144 ms versus 172.024 ms.
+All 34 fresh Skip proofs pass native checking against imported Goal. The
+[profiled baseline](provenance/performance/2026-11-10-profiled-baseline.md) records
+the full small-input matrix. Allocation zeroing accounts for 34.49% of elaboration
+samples, with ordinary array/constructor updates and inference-cache insertion
+chosen for the next bounded changes. No near-parity result is established.
 The latest five non-frame entries pass 986 new comparisons plus 5,501 regressions
 and 16 explicit-failure subprocesses. There are 43 validated frame rewrites plus
 five non-frame entries; 154 observed frames remain.
@@ -94,7 +101,7 @@ integration and the single compiler queue. Worker completion alone is not
 validation. Code must also pass a human readability review, with light comments
 and high-level documentation only where useful.
 
-The last measured optimization binary is `3a39683903b646272777bea5968aa63ec685b457`:
+The earlier measured optimization binary was `3a39683903b646272777bea5968aa63ec685b457`:
 depth-0 fresh elaboration medians are Skip 1.796 ms versus Lean 0.940 ms.
 Repeated uncached runs have later medians 0.922 versus 0.239 ms. Neither is
 parity, and warm runs are not first-run measurements. Tags, literals, naturals,
@@ -105,7 +112,7 @@ documents the workflow for extending this work to the rest of the maintained
 source. Keep the no-compiler/runtime-changes constraint and explicit failure
 boundaries. Do not revive the historical transpiler.
 
-The current, not-yet-benchmarked batch replaces the 278-slot WHNF core dispatcher
+An earlier batch, now included in the current measured release, replaces the 278-slot WHNF core dispatcher
 with `WHNF/Core.sk`, including private mutable argument accumulation followed by
 immutable publication. The old dispatcher and a separately redirected wrapper
 route remain for comparison. Trace-enabled and invalid-expression paths retain

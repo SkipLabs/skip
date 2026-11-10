@@ -10,6 +10,15 @@ and kernel checking; diagnostic instrumentation is not a performance baseline.
 Unconverted cold routines remain explicit inventory work, not a prerequisite to
 the next benchmark. Skip's compiler/runtime remain out of scope. Vibe is idle.
 
+The current release is now measured: depth-6 fresh elaboration is 1047.816 ms
+versus native Lean's 196.237 ms; warmed uncached execution is 1015.144 ms versus
+172.024 ms. All 34 fresh Skip proofs pass native checking against imported Goal.
+The [profiled baseline](provenance/performance/2026-11-10-profiled-baseline.md)
+records the small-input matrix and evidence. Allocation zeroing accounts for
+34.49% of elaboration samples. Focus next on ordinary array/constructor updates
+and the inference-cache hash-trie family; defer the cold Simp.reduce packet.
+Neither the profile nor earlier rewrites establish near parity yet.
+
 Latest steering authorizes **one Vibe client using ten built-in subagents** as a
 bounded experiment, superseding the stop below for this run only. The installed
 Vibe 3.1.0 schema supports `enable_subagents`, `max_subagents` and
@@ -68,8 +77,8 @@ Four related Expr bodies now share `Applications.sk`. Native arithmetic/metadata
 operations replace intermediate dispatch/boxing; profiling behavior is preserved.
 The [twelfth audit](provenance/rewrite-batches/2026-11-10-wave-12.json) records exact
 bodies, both release probes and limits. The tally is **43 validated frame rewrites
-plus five non-frame entries; 154 observed frames remain**. These changes have not
-yet been measured in the whole-example executable.
+plus five non-frame entries; 154 observed frames remain**. These changes are
+included in the current whole-example baseline above.
 
 The eleventh batch validates five Simp.Main routines: application classification,
 module-use lookup, definition unfolding, local-value reduction and dsimp reduction
