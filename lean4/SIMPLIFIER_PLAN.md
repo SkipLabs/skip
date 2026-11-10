@@ -1,10 +1,15 @@
 # Conditional simplification implementation
 
-**Paused at the user's explicit request (2026-11-10).**
-[PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) records the validated release and
-unintegrated work. Latest depth-6 medians after three `@always_inline` annotations
-are 638.291 ms in Skip and 192.626 ms in native Lean; all 29 new proofs passed.
-Do not continue builds, benchmarks or rewrites until the user resumes.
+**Resumed at the user's request (2026-11-10), with up to ten subagents authorized.**
+[PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) records the historical validated release
+and unintegrated work. Baseline depth-6 medians after three `@always_inline`
+annotations are 638.291 ms in Skip and 192.626 ms in native Lean; all 29 proofs
+passed. The current bounded work targets the `leanArray` capture allocation and
+finishes independent QuickOther review; builds and benchmarks remain serialized.
+The outlined array release now measures **619.073 ms** at depth 6 versus
+**632.956 ms** for the saved baseline and **190.646 ms** native in seven alternating
+pairs. All proofs and focused/runtime checks pass; near parity remains unfinished.
+See the [array report](provenance/performance/2026-11-10-array-materialization.md).
 
 Current work (2026-11-10): the user now requests profiling the actual benchmark
 and rewriting its dominant hot paths. This supersedes finishing the whole exercised

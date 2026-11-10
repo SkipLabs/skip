@@ -5,10 +5,10 @@ code at commit `63fbf3d3588b404bbe707721df61ecd41885a6f6`. The Skip source is
 now authoritative. Building never invokes Lean, Python, or the transpiler and
 never rewrites source files.
 
-The current optimization work is paused. [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
-contains the detailed implementation state, measurements, commands and pending
-work for the next agent; [PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) is the short
-checkpoint. Resume implementation only when the user requests it.
+Optimization resumed at the user's request on 2026-11-10; see
+[REWRITE_PLAN.md](REWRITE_PLAN.md) for current work. [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
+and [PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) preserve the detailed and short
+historical checkpoints, including measurements, commands and pending reviews.
 
 ## Build
 

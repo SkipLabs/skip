@@ -1,0 +1,120 @@
+// Production leanArray: exact representation, dormant values and old snapshots.
+
+fun arrayMaterializationCheck(
+  actual: Array<LeanValue>,
+  expected: Array<LeanValue>,
+): void {
+  assert(actual.size() == expected.size());
+  for (i in Range(0, expected.size())) {
+    assert(leanSameObject(actual[i], expected[i]) != 0)
+  }
+}
+
+fun arrayMaterializationCase(fields: Array<LeanValue>, persistent: Bool): void {
+  // Copy the observations: comparing an alias with itself would miss mutation.
+  before = fields.mapWithIndex((_i, value) -> value);
+  input: LeanValue = if (persistent) {
+    values = Persistent.RadixTreeVector::mcreateFromItems(fields);
+    LeanPersistentArray(values.chill())
+  } else {
+    LeanArray(fields)
+  };
+  // Persistent fillBy returns boxed LeanValue storage; ordinary concrete storage
+  // must pass through unchanged, not be widened by a new materialization.
+  expected = if (persistent) before else fields;
+  result: Array<LeanValue> = leanArray(input);
+  assert(native_eq(result, expected) == 0);
+  arrayMaterializationCheck(result, before);
+  arrayMaterializationCheck(fields, before);
+
+  runtime = mutable LeanExecution{};
+  sourceRef = runtime.newRef(input);
+  resultRef = runtime.newRef(LeanArray(result));
+  snapshot = runtime.checkpoint();
+  replacement: LeanValue = LeanUnavailable("stored without inspection");
+  for (reference in Array[sourceRef, resultRef]) {
+    value = runtime.readRef(reference);
+    changed = if (before.size() == 0) {
+      leanArrayPush(value, replacement)
+    } else {
+      leanArrayWrite(value, leanNatValue(before.size() - 1), replacement, false)
+    };
+    runtime.writeRef(reference, Some(changed));
+    observed = leanArray(changed);
+    assert(observed.size() == max(1, before.size()));
+    for (i in Range(0, observed.size())) {
+      item = if (i == observed.size() - 1) replacement else before[i];
+      assert(leanSameObject(observed[i], item) != 0)
+    }
+  };
+  // Re-materialize the old source and hold the first result across both updates.
+  assert(native_eq(leanArray(input), expected) == 0);
+  assert(native_eq(result, expected) == 0);
+  arrayMaterializationCheck(leanArray(input), before);
+  arrayMaterializationCheck(result, before);
+  arrayMaterializationCheck(fields, before);
+  restored = snapshot.restoreRaw();
+  for (reference in Array[sourceRef, resultRef]) {
+    saved = leanArray(restored.readRef(reference));
+    assert(native_eq(saved, expected) == 0);
+    arrayMaterializationCheck(saved, before)
+  }
+}
+
+fun arrayMaterializationTracked(): LeanValue {
+  // Even an empty, valid tracked view must fail rather than flatten to Array[].
+  context = SKStore.Context::create{}.mclone();
+  entries = context.mkdir(
+    LeanExtensionKey::keyType,
+    LeanExtensionFile::type,
+    SKStore.DirName::create("/array-materialization/extensions/"),
+    Array[],
+  );
+  LeanTrackedExtensionArray(LeanExtensionArray(Array[], entries, false))
+}
+
+// Overrides remain unsupported; their dormant replacement must not be inspected.
+fun arrayMaterializationFailure(mode: String): void {
+  input: LeanValue = mode match {
+  | "tracked" -> arrayMaterializationTracked()
+  | "unavailable" -> LeanUnavailable("materialization sentinel")
+  | "non-array" -> LeanText("not an array")
+  | "override" ->
+    LeanArrayOverride(
+      LeanArray(Array[LeanText("kept")]),
+      0,
+      LeanUnavailable("override sentinel must not be inspected"),
+    )
+  | _ -> leanFail("unknown array materialization failure mode: " + mode)
+  };
+  _ = leanArray(input);
+  leanFail("unexpected materialization failure-case success")
+}
+
+fun main(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 2) return arrayMaterializationFailure(args[1]);
+  assert(args.size() == 1);
+  count = 0;
+  for (size in Array[0, 1, 129, 1025]) {
+    constructors: Array<LeanCtor> = Array::fillBy(size, i ->
+      LeanCtor(LeanTag.Option_some, Array[leanNatValue(i)])
+    );
+    texts: Array<LeanText> = Array::fillBy(size, i -> LeanText(i.toString()));
+    mixed: Array<LeanValue> = Array::fillBy(size, i ->
+      if (i % 2 == 0) LeanUnavailable("kept") else LeanText(i.toString())
+    );
+    for (fields in Array[constructors, texts, mixed]) {
+      for (persistent in Array[false, true]) {
+        arrayMaterializationCase(fields, persistent);
+        !count = count + 1
+      }
+    }
+  };
+  assert(count == 24);
+  print_string(
+    "array materialization: " +
+      count.toString() +
+      " cases passed; exact arrays and old snapshots preserved",
+  )
+}

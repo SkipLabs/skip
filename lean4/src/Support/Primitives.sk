@@ -1,9 +1,18 @@
 // Implementations shared by the original named runtime entry points. Unknown
 // functions keep failing with both their Lean name and their foreign symbol.
+
+// Keep callback capture allocation off the ordinary-array path.
+@no_inline
+fun leanMaterializePersistentArray(
+  values: Persistent.RadixTreeVector<LeanValue>,
+): Array<LeanValue> {
+  Array::fillBy(values.size(), i -> values[i])
+}
+
 fun leanArray(value: LeanValue): Array<LeanValue> {
   value match {
   | LeanArray(values) -> values
-  | LeanPersistentArray(values) -> Array::fillBy(values.size(), i -> values[i])
+  | LeanPersistentArray(values) -> leanMaterializePersistentArray(values)
   | LeanTrackedExtensionArray(_) ->
     leanFail(
       "mutation/materialization of tracked Lean extension arrays is not implemented",

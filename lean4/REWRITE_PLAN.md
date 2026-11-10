@@ -1,10 +1,22 @@
 # Rewrite the measured example in parallel
 
-**Paused at the user's explicit request (2026-11-10).** See
-[PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) before doing more work. The completed
-three-helper inlining experiment measures depth-6 Skip elaboration at 638.291 ms
-versus native Lean 192.626 ms, with all 29 new proofs accepted. Resume only when
-the user asks; the sections below preserve the plan and prior results.
+**Resumed at the user's request (2026-11-10), with up to ten subagents authorized.**
+The [handoff](AGENT_HANDOFF.md) and [pause checkpoint](PAUSE_CHECKPOINT.md) preserve
+historical evidence: depth-6 Skip elaboration at 638.291 ms versus native Lean
+192.626 ms, with all 29 proofs accepted. Current work starts with the confirmed
+`leanArray` capture allocation and independent review of the pending QuickOther
+draft. Keep one compiler/benchmark queue, preserve caches, and optimize raw
+execution before SKStore. No Skip compiler/runtime changes or external worker
+clients are part of this resumption.
+
+The first resumed change removes the ordinary `leanArray` capture allocation.
+Seven alternating depth-6 pairs measure **632.956 ms old / 619.073 ms new /
+190.646 ms native**, with every proof Goal-checked. Release validation, 24 focused
+materialization cases, four exact failures, and 8,967 runtime checks plus 19
+failure boundaries pass. A fresh post-inline profile is available. See the
+[array materialization report](provenance/performance/2026-11-10-array-materialization.md).
+QuickOther integration must account for the pre-existing `QuickOracle.sk`
+fallback; the standard guarded dry run refuses it without writes.
 
 ## Current execution: profile and optimize hot paths (2026-11-10)
 

@@ -1,0 +1,896 @@
+{
+  "change": "Outline persistent-array materialization; ordinary leanArray no longer allocates capture cell",
+  "baseline_revision": "03caebc6c29a4782dd9a4f9273444d0a41cec5ac",
+  "old_build_id": "c1737554b2d8af75cc88e0cea42395228046b0a2",
+  "new_build_id": "2d6a3596e30c00b3e68b3610c1363c95b0c054e4",
+  "binary_sha256": {
+    "old": "834f61c74637bdd22e9b1c95ad88c3172028245b47f38e6edb2ad7964df964f0",
+    "new": "dd2554e4b6b1ab961f45d6e8820184c62b1effed66b7f6cb84a43d5d9f21d746"
+  },
+  "source_hashes": {
+    "src/Support/Primitives.sk": "e65e7e12b59707c4dc653f560055f8a049ac7bd8ea9665c5234ccbded1f4ce69",
+    "tests/ArrayMaterializationProbe.sk": "6d224ff114efc9b5fd0104d5b6f3693d25e38b0548682303ff1c834db0d22de0"
+  },
+  "flags": {
+    "LEAN_SKIP_PROFILE": "0",
+    "LEAN_SKIP_PHASES": "0",
+    "LEAN_SKIP_SIMP_CACHE": "0",
+    "LEAN_SKIP_REGIONS": "sampled"
+  },
+  "input_sha256": "fc101f7bcb851dca7754f0474f486fd200db3855a65053cbb7f0cf645d0751f2",
+  "fresh": [
+    {
+      "depth": 0,
+      "runs": 7,
+      "skip_ms": [
+        1.507667,
+        1.42075,
+        1.419667,
+        1.5705,
+        1.50625,
+        1.101792,
+        1.365333
+      ],
+      "lean_ms": [
+        1.103166,
+        0.95925,
+        0.978708,
+        0.961708,
+        1.001959,
+        0.976084,
+        0.94925
+      ]
+    },
+    {
+      "depth": 2,
+      "runs": 7,
+      "skip_ms": [
+        5.556792,
+        5.698167,
+        5.83575,
+        6.027291,
+        5.619667,
+        5.626125,
+        5.517958
+      ],
+      "lean_ms": [
+        2.049292,
+        2.116792,
+        2.12325,
+        2.06975,
+        2.061791,
+        2.0745,
+        2.352375
+      ]
+    },
+    {
+      "depth": 6,
+      "runs": 1,
+      "skip_ms": [
+        592.199417
+      ],
+      "lean_ms": [
+        192.104792
+      ]
+    }
+  ],
+  "alternating_depth6": [
+    {
+      "index": 0,
+      "order": [
+        "old",
+        "new"
+      ],
+      "old_ms": 632.956208,
+      "new_ms": 597.275417,
+      "native_ms": 191.673916,
+      "old_peak_rss_bytes": 1950846976,
+      "new_peak_rss_bytes": 1725403136
+    },
+    {
+      "index": 1,
+      "order": [
+        "new",
+        "old"
+      ],
+      "old_ms": 650.030959,
+      "new_ms": 600.713458,
+      "native_ms": 190.126625,
+      "old_peak_rss_bytes": 1953259520,
+      "new_peak_rss_bytes": 1903448064
+    },
+    {
+      "index": 2,
+      "order": [
+        "old",
+        "new"
+      ],
+      "old_ms": 628.1005,
+      "new_ms": 621.679126,
+      "native_ms": 190.758375,
+      "old_peak_rss_bytes": 1769451520,
+      "new_peak_rss_bytes": 1886777344
+    },
+    {
+      "index": 3,
+      "order": [
+        "new",
+        "old"
+      ],
+      "old_ms": 619.888458,
+      "new_ms": 619.073084,
+      "native_ms": 190.331292,
+      "old_peak_rss_bytes": 1735344128,
+      "new_peak_rss_bytes": 1890226176
+    },
+    {
+      "index": 4,
+      "order": [
+        "old",
+        "new"
+      ],
+      "old_ms": 660.836626,
+      "new_ms": 635.545833,
+      "native_ms": 204.186,
+      "old_peak_rss_bytes": 1877622784,
+      "new_peak_rss_bytes": 1732632576
+    },
+    {
+      "index": 5,
+      "order": [
+        "new",
+        "old"
+      ],
+      "old_ms": 621.116458,
+      "new_ms": 621.077208,
+      "native_ms": 190.645792,
+      "old_peak_rss_bytes": 1951121408,
+      "new_peak_rss_bytes": 1877692416
+    },
+    {
+      "index": 6,
+      "order": [
+        "old",
+        "new"
+      ],
+      "old_ms": 641.289292,
+      "new_ms": 609.6975,
+      "native_ms": 190.12775,
+      "old_peak_rss_bytes": 1830486016,
+      "new_peak_rss_bytes": 1902403584
+    }
+  ],
+  "depth6_medians_ms": {
+    "old": 632.956208,
+    "new": 619.073084,
+    "native": 190.645792
+  },
+  "checks": {
+    "release_check": "passed",
+    "release_build": "passed",
+    "runtime_vectors_and_checks": 8967,
+    "runtime_failure_boundaries": 19,
+    "array_materialization_cases": 24,
+    "materialization_failures": [
+      {
+        "mode": "tracked",
+        "returncode": 86,
+        "stdout": "",
+        "stderr": "Lean-to-Skip: mutation/materialization of tracked Lean extension arrays is not implemented\n"
+      },
+      {
+        "mode": "unavailable",
+        "returncode": 86,
+        "stdout": "",
+        "stderr": "Lean-to-Skip: not implemented: materialization sentinel\n"
+      },
+      {
+        "mode": "non-array",
+        "returncode": 86,
+        "stdout": "",
+        "stderr": "Lean-to-Skip: expected a Lean Array\n"
+      },
+      {
+        "mode": "override",
+        "returncode": 86,
+        "stdout": "",
+        "stderr": "Lean-to-Skip: expected a Lean Array\n"
+      }
+    ],
+    "fresh_new_proofs_Goal_checked": 22,
+    "fresh_old_proofs_Goal_checked": 7,
+    "native_comparisons": 22,
+    "raw_query_fetches": 0
+  },
+  "profile": {
+    "totalSamples": 6357,
+    "capturedSamples": 6878,
+    "elaborationIntervals": 20,
+    "scope": "elaboration only",
+    "kind": "SIGPROF frame-pointer samples (possibly truncated)",
+    "symbols": [
+      {
+        "name": "__memset_zva64",
+        "samples": 1256,
+        "percent": 19.757747365109328
+      },
+      {
+        "name": "Array__.ConcreteMetaImpl__fill__Closure0__call",
+        "samples": 357,
+        "percent": 5.615856536101935
+      },
+      {
+        "name": "SKIP_Obstack_alloc",
+        "samples": 256,
+        "percent": 4.027056787792984
+      },
+      {
+        "name": "SKIP_Obstack_calloc",
+        "samples": 199,
+        "percent": 3.1304074248859526
+      },
+      {
+        "name": "brk",
+        "samples": 146,
+        "percent": 2.2966808242881864
+      },
+      {
+        "name": "__memcpy_generic",
+        "samples": 133,
+        "percent": 2.092181846783074
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_checkAssignment_8abdc549fe",
+        "samples": 116,
+        "percent": 1.8247601069686958
+      },
+      {
+        "name": "SKIP_copy_with_pages",
+        "samples": 107,
+        "percent": 1.6831838917728488
+      },
+      {
+        "name": "[lean4-simp, no symbol]",
+        "samples": 94,
+        "percent": 1.4786849142677363
+      },
+      {
+        "name": "sk.leanArrayRead",
+        "samples": 93,
+        "percent": 1.46295422369042
+      },
+      {
+        "name": "sk_stack_push",
+        "samples": 85,
+        "percent": 1.3371086990718892
+      },
+      {
+        "name": "sk_get_obstack_idx",
+        "samples": 80,
+        "percent": 1.2584552461853076
+      },
+      {
+        "name": "sk.leanExprData",
+        "samples": 78,
+        "percent": 1.2269938650306749
+      },
+      {
+        "name": "sk.L4_Lean_Meta_InferType_f_inferCacheFindEntry",
+        "samples": 73,
+        "percent": 1.1483404121440932
+      },
+      {
+        "name": "sk.Map__setLoop.1",
+        "samples": 64,
+        "percent": 1.006764196948246
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
+        "samples": 61,
+        "percent": 0.959572125216297
+      },
+      {
+        "name": "sk.leanApply",
+        "samples": 58,
+        "percent": 0.9123800534843479
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf",
+        "samples": 54,
+        "percent": 0.8494572911750826
+      },
+      {
+        "name": "sk_stack_pop",
+        "samples": 46,
+        "percent": 0.7236117665565518
+      },
+      {
+        "name": "SortedMap.Node__maybeGetItem",
+        "samples": 46,
+        "percent": 0.7236117665565518
+      },
+      {
+        "name": "SKIP_String_concat2",
+        "samples": 46,
+        "percent": 0.7236117665565518
+      },
+      {
+        "name": "sk.leanStringHash",
+        "samples": 41,
+        "percent": 0.6449583136699701
+      },
+      {
+        "name": "sk.leanReplaceField",
+        "samples": 41,
+        "percent": 0.6449583136699701
+      },
+      {
+        "name": "sk.leanExprAbstractVisit",
+        "samples": 41,
+        "percent": 0.6449583136699701
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Tactic_Simp_Rewrite_f_Simp_rewrite_rewriteUsingIndex_2de5b683e1",
+        "samples": 40,
+        "percent": 0.6292276230926538
+      },
+      {
+        "name": "sk.leanWordBitsOther",
+        "samples": 40,
+        "percent": 0.6292276230926538
+      },
+      {
+        "name": "sk.LeanExecution__readRef",
+        "samples": 40,
+        "percent": 0.6292276230926538
+      },
+      {
+        "name": "sk.Map__growCapacity.1",
+        "samples": 36,
+        "percent": 0.5663048607833884
+      },
+      {
+        "name": "sk.L4_Lean_Expr_f_Lean_Expr_getAppFn_05707344ce",
+        "samples": 35,
+        "percent": 0.550574170206072
+      },
+      {
+        "name": "sk.LeanTag_Known__EE",
+        "samples": 35,
+        "percent": 0.550574170206072
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Tactic_Simp_Rewrite_f_Simp_preDefault_lam_0_da18db3c18",
+        "samples": 35,
+        "percent": 0.550574170206072
+      },
+      {
+        "name": "sk.leanExprEqualCore",
+        "samples": 33,
+        "percent": 0.5191127890514393
+      },
+      {
+        "name": "get_sk_string",
+        "samples": 31,
+        "percent": 0.48765140789680667
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Basic_f_Meta_Context_config_2f4f6fdcbe",
+        "samples": 31,
+        "percent": 0.48765140789680667
+      },
+      {
+        "name": "Array__concat__Closure0__call.2",
+        "samples": 31,
+        "percent": 0.48765140789680667
+      },
+      {
+        "name": "sk.L4_Init_Prelude_f_mixHash_f2b5fd4ac9",
+        "samples": 30,
+        "percent": 0.4719207173194903
+      },
+      {
+        "name": "sk.leanArray",
+        "samples": 29,
+        "percent": 0.45619002674217396
+      },
+      {
+        "name": "sk.L4_Init_Data_UInt_Basic_f_USize_land_9e95e03ccb",
+        "samples": 29,
+        "percent": 0.45619002674217396
+      },
+      {
+        "name": "sk.leanInvokePrimitiveCore",
+        "samples": 28,
+        "percent": 0.44045933616485766
+      },
+      {
+        "name": "SKIP_String_getByte",
+        "samples": 28,
+        "percent": 0.44045933616485766
+      }
+    ],
+    "inclusive": [
+      {
+        "name": "__memset_zva64",
+        "samples": 1256,
+        "percent": 19.757747365109328
+      },
+      {
+        "name": "sk.SKStore_withRegionValue__Closure0__call.2",
+        "samples": 532,
+        "percent": 8.368727387132296
+      },
+      {
+        "name": "SKIP_destroy_Obstack_with_value",
+        "samples": 527,
+        "percent": 8.290073934245713
+      },
+      {
+        "name": "SKIP_copy_with_pages",
+        "samples": 384,
+        "percent": 6.040585181689476
+      },
+      {
+        "name": "Array__.ConcreteMetaImpl__fill__Closure0__call",
+        "samples": 357,
+        "percent": 5.615856536101935
+      },
+      {
+        "name": "SKIP_Obstack_alloc",
+        "samples": 257,
+        "percent": 4.0427874783703
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_checkAssignment_8abdc549fe",
+        "samples": 251,
+        "percent": 3.9484033349064025
+      },
+      {
+        "name": "SKIP_Obstack_calloc",
+        "samples": 200,
+        "percent": 3.146138115463269
+      },
+      {
+        "name": "sk.leanApply",
+        "samples": 189,
+        "percent": 2.973100519112789
+      },
+      {
+        "name": "sbrk",
+        "samples": 146,
+        "percent": 2.2966808242881864
+      },
+      {
+        "name": "__glibc_morecore",
+        "samples": 146,
+        "percent": 2.2966808242881864
+      },
+      {
+        "name": "brk",
+        "samples": 146,
+        "percent": 2.2966808242881864
+      },
+      {
+        "name": "free",
+        "samples": 145,
+        "percent": 2.2809501337108697
+      },
+      {
+        "name": "systrim.constprop.0",
+        "samples": 143,
+        "percent": 2.2494887525562373
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
+        "samples": 135,
+        "percent": 2.1236432279377064
+      },
+      {
+        "name": "sk.Map__growCapacity.1",
+        "samples": 133,
+        "percent": 2.092181846783074
+      },
+      {
+        "name": "__memcpy_generic",
+        "samples": 133,
+        "percent": 2.092181846783074
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf",
+        "samples": 125,
+        "percent": 1.9663363221645431
+      },
+      {
+        "name": "sk.leanArrayRead",
+        "samples": 106,
+        "percent": 1.6674532011955325
+      },
+      {
+        "name": "SKIP_String_concat2",
+        "samples": 101,
+        "percent": 1.5887997483089507
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Offset_f_Meta_evalNat_visit_be1fb46d98",
+        "samples": 101,
+        "percent": 1.5887997483089507
+      },
+      {
+        "name": "[lean4-simp, no symbol]",
+        "samples": 94,
+        "percent": 1.4786849142677363
+      },
+      {
+        "name": "sk.leanReplaceField",
+        "samples": 94,
+        "percent": 1.4786849142677363
+      },
+      {
+        "name": "sk.leanNameKey",
+        "samples": 90,
+        "percent": 1.4157621519584709
+      },
+      {
+        "name": "sk.leanStringHash",
+        "samples": 85,
+        "percent": 1.3371086990718892
+      },
+      {
+        "name": "sk_stack_push",
+        "samples": 85,
+        "percent": 1.3371086990718892
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Tactic_Simp_Types_f_Simp_simpAppUsingCongr_visit_2a5858316e",
+        "samples": 84,
+        "percent": 1.321378008494573
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Tactic_Simp_Rewrite_f_Simp_rewrite_rewriteUsingIndex_2de5b683e1",
+        "samples": 82,
+        "percent": 1.2899166273399403
+      },
+      {
+        "name": "sk.leanExprAbstractVisit",
+        "samples": 82,
+        "percent": 1.2899166273399403
+      },
+      {
+        "name": "sk_get_obstack_idx",
+        "samples": 80,
+        "percent": 1.2584552461853076
+      },
+      {
+        "name": "sk.leanExprEqualCore",
+        "samples": 79,
+        "percent": 1.242724555607991
+      },
+      {
+        "name": "sk.leanExprData",
+        "samples": 78,
+        "percent": 1.2269938650306749
+      },
+      {
+        "name": "sk.leanArrayWrite",
+        "samples": 78,
+        "percent": 1.2269938650306749
+      },
+      {
+        "name": "sk.L4_Lean_Meta_InferType_f_inferCacheFindEntry",
+        "samples": 75,
+        "percent": 1.179801793298726
+      },
+      {
+        "name": "sk.L4_Lean_Meta_InferType_f_Lean_Meta_inferTypeImp_31f204953c",
+        "samples": 73,
+        "percent": 1.1483404121440932
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Tactic_Simp_Rewrite_f_Simp_preDefault_lam_0_da18db3c18",
+        "samples": 73,
+        "percent": 1.1483404121440932
+      },
+      {
+        "name": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_isDefEqArgs_5347aadf73",
+        "samples": 69,
+        "percent": 1.0854176498348278
+      },
+      {
+        "name": "SKIP_isEq",
+        "samples": 68,
+        "percent": 1.0696869592575113
+      },
+      {
+        "name": "sk.L4_Init_System_ST_f_Prim_Ref_get_ab668afddb",
+        "samples": 67,
+        "percent": 1.053956268680195
+      },
+      {
+        "name": "sk.L4_Lean_Meta_Basic_f_Meta_Config_toKey_993126c67a",
+        "samples": 66,
+        "percent": 1.0382255781028786
+      }
+    ],
+    "callers": [
+      {
+        "caller": "sk.SKStore_withRegionValue__Closure0__call.2",
+        "callee": "SKIP_destroy_Obstack_with_value",
+        "samples": 527
+      },
+      {
+        "caller": "SKIP_destroy_Obstack_with_value",
+        "callee": "SKIP_copy_with_pages",
+        "samples": 384
+      },
+      {
+        "caller": "sbrk",
+        "callee": "brk",
+        "samples": 146
+      },
+      {
+        "caller": "__glibc_morecore",
+        "callee": "sbrk",
+        "samples": 146
+      },
+      {
+        "caller": "systrim.constprop.0",
+        "callee": "__glibc_morecore",
+        "samples": 143
+      },
+      {
+        "caller": "free",
+        "callee": "systrim.constprop.0",
+        "samples": 143
+      },
+      {
+        "caller": "SKIP_destroy_Obstack_with_value",
+        "callee": "free",
+        "samples": 143
+      },
+      {
+        "caller": "SKIP_copy_with_pages",
+        "callee": "sk_get_obstack_idx",
+        "samples": 80
+      },
+      {
+        "caller": "SKIP_copy_with_pages",
+        "callee": "sk_stack_push",
+        "samples": 76
+      },
+      {
+        "caller": "sk.leanNameKey",
+        "callee": "SKIP_String_concat2",
+        "samples": 71
+      },
+      {
+        "caller": "sk.Map__growCapacity.1",
+        "callee": "__memset_zva64",
+        "samples": 67
+      },
+      {
+        "caller": "SKIP_copy_with_pages",
+        "callee": "sk_stack_pop",
+        "samples": 45
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_Offset_f_Meta_evalNat_visit_be1fb46d98",
+        "callee": "__memset_zva64",
+        "samples": 43
+      },
+      {
+        "caller": "SKIP_copy_with_pages",
+        "callee": "__memcpy_generic",
+        "samples": 41
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_Basic_f_Meta_Config_toKey_993126c67a",
+        "callee": "sk.leanWordBitsOther",
+        "samples": 40
+      },
+      {
+        "caller": "SKIP_isEq",
+        "callee": "SKIP_native_eq_obj",
+        "samples": 38
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_checkAssignment_8abdc549fe",
+        "callee": "sk.Map__setLoop.1",
+        "samples": 37
+      },
+      {
+        "caller": "sk.leanArrayWrite",
+        "callee": "__memcpy_generic",
+        "samples": 36
+      },
+      {
+        "caller": "sk.leanExprEqualCore",
+        "callee": "SKIP_isEq",
+        "samples": 35
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf",
+        "callee": "__memset_zva64",
+        "samples": 34
+      },
+      {
+        "caller": "sk.L4_Init_System_ST_f_Prim_Ref_get_ab668afddb",
+        "callee": "__memset_zva64",
+        "samples": 34
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
+        "callee": "Array__.ConcreteMetaImpl__fill__Closure0__call",
+        "samples": 33
+      },
+      {
+        "caller": "sk.leanApply",
+        "callee": "__memset_zva64",
+        "samples": 32
+      },
+      {
+        "caller": "sk.LeanConstantsView__lookup",
+        "callee": "SKIP_String_concat2",
+        "samples": 29
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
+        "callee": "__memset_zva64",
+        "samples": 29
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf",
+        "callee": "Array__.ConcreteMetaImpl__fill__Closure0__call",
+        "samples": 28
+      },
+      {
+        "caller": "sk.leanStringHash",
+        "callee": "SKIP_String_getByte",
+        "samples": 28
+      },
+      {
+        "caller": "sk.Map___ConcreteMetaImpl__mcreateFromItems.3",
+        "callee": "__memset_zva64",
+        "samples": 27
+      },
+      {
+        "caller": "SKIP_String_concat2",
+        "callee": "__memcpy_generic",
+        "samples": 27
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Lean_Meta_checkAssignment_8abdc549fe",
+        "callee": "sk.leanExprData",
+        "samples": 26
+      },
+      {
+        "caller": "sk.Map__growCapacity.1",
+        "callee": "sk.Map__setLoop.1",
+        "samples": 26
+      },
+      {
+        "caller": "sk.leanApply",
+        "callee": "Array__concat__Closure0__call.2",
+        "samples": 26
+      },
+      {
+        "caller": "sk.leanReplaceField",
+        "callee": "SKIP_Obstack_alloc",
+        "samples": 25
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_Tactic_Simp_Types_f_Simp_simpAppUsingCongr_visit_2a5858316e",
+        "callee": "__memset_zva64",
+        "samples": 25
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_ExprDefEq_f_Meta_isDefEqArgs_spec_0_ab10670c66",
+        "callee": "__memset_zva64",
+        "samples": 24
+      },
+      {
+        "caller": "L4_Lean_AddDecl.f_spec_7_spec_11_spec_19_07d344d9c0",
+        "callee": "sk.leanArrayRead",
+        "samples": 23
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_Tactic_Simp_Main_f_Simp_reduceStep_lam_0_382ac6986b",
+        "callee": "__memset_zva64",
+        "samples": 23
+      },
+      {
+        "caller": "sk.L4_Lean_Meta_Tactic_Simp_Rewrite_f_Simp_preDefault_lam_0_da18db3c18",
+        "callee": "__memset_zva64",
+        "samples": 23
+      },
+      {
+        "caller": "sk.leanReplaceField",
+        "callee": "__memcpy_generic",
+        "samples": 22
+      },
+      {
+        "caller": "sk.L4_Init_Prelude_f_mixHash_f2b5fd4ac9",
+        "callee": "SKIP_Obstack_alloc",
+        "samples": 21
+      }
+    ],
+    "listed_entries": "Top 40 of each list; complete local report hash in artifacts"
+  },
+  "diagnostic_final_proof_Goal_checked": true,
+  "limits": [
+    "Seven alternating depth6 pairs; small median improvement, not raw parity.",
+    "Depth0/2 only new binary measured; historical comparisons not alternating.",
+    "20 diagnostic steps overwrite one proof; only final diagnostic proof separately Goal-checked.",
+    "CPU samples are not allocation counts; stacks are often truncated.",
+    "RSS polls every 50ms; short-run zero RSS is not zero actual memory.",
+    "Skargo printed 2896.2s while external process-group measurement recorded 218.38s; external measurement reported below."
+  ],
+  "artifacts": [
+    {
+      "path": "build/handoff-resume/array-check.log",
+      "sha256": "3d90516558019147df97671416929a782b917de62d800a982d227caa8927835a"
+    },
+    {
+      "path": "build/handoff-resume/array-build.log",
+      "sha256": "7be41c6062b22ead622778fc7b6585866231702c5b8c1de60e50de76da9fa392"
+    },
+    {
+      "path": "build/handoff-resume/array-runtime.log",
+      "sha256": "e9cf5b414385c6d93e0265ad91cd71b0d7cfbc03dd040fe4e23e6dd036f6c147"
+    },
+    {
+      "path": "build/handoff-resume/array-probe.log",
+      "sha256": "c30f983b2e13ca6faef1af8e9ce521430525d64b17a40085d49d119bfc3484ff"
+    },
+    {
+      "path": "build/handoff-resume/array-failures.json",
+      "sha256": "8381d6b4040c339102cb386761abd8ff4c3b2e4f8f35ad05c8ec83e046a8604b"
+    },
+    {
+      "path": "build/handoff-resume/lean-array-before.asm",
+      "sha256": "1ff4a92fbef02deea28faab22910ba52ea49689e0441ba79328142bca79b70ce"
+    },
+    {
+      "path": "build/handoff-resume/lean-array-after.asm",
+      "sha256": "59c564c23919f533eb894204b6d2f962947e3e557599c04c21d772f161568c05"
+    },
+    {
+      "path": "build/handoff-resume/array/summary.json",
+      "sha256": "ab1b74c015b187393eabae71e597b0adb94de31b2f514c01dd0cd2a75a695fab"
+    },
+    {
+      "path": "build/handoff-resume/array-sampled/capture.json",
+      "sha256": "a3cd23076e328535d4b0ccb663963b4db88765941fd2510a976a8c0f368b3fa3"
+    },
+    {
+      "path": "build/handoff-resume/array-sampled/elaboration.json",
+      "sha256": "f38bcf6f87b0b0bc745b9105df2c6b97896b734f603e1d2442182a1ca2c75048"
+    }
+  ],
+  "array-check-memory.json": {
+    "command": [
+      "skargo",
+      "check",
+      "--release"
+    ],
+    "returncode": 0,
+    "guardStopped": false,
+    "seconds": 0.5,
+    "sampledPeakBytes": 2785280,
+    "childMaxRssKiB": 498380
+  },
+  "array-build-memory.json": {
+    "command": [
+      "skargo",
+      "build",
+      "--release",
+      "--bin",
+      "lean4-simp"
+    ],
+    "returncode": 0,
+    "guardStopped": false,
+    "seconds": 218.38,
+    "sampledPeakBytes": 19152060416,
+    "childMaxRssKiB": 18916656
+  }
+}
