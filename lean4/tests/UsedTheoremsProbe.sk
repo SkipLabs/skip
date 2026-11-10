@@ -1,0 +1,423 @@
+// Origin identity/hash vectors and persistent UsedSimps map boundary checks.
+class UsedSimpProbeKey(origin: LeanValue, identity: Int)
+class UsedSimpProbePair(origin: LeanValue, value: LeanValue)
+
+fun usedProbeDecl(name: LeanValue, post: Bool, inverted: Bool): LeanValue {
+  LeanCtor(
+    LeanTag.Meta_Origin_decl,
+    Array[name, leanBool(post), leanBool(inverted)],
+  )
+}
+
+fun usedProbeOther(name: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Meta_Origin_other, Array[name])
+}
+
+fun usedProbeNumber(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+): LeanValue {
+  L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    runtime,
+    LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+    value,
+  )
+}
+
+fun usedProbeEmpty(representation: Int): LeanValue {
+  nullEntry: LeanValue = LeanCtor(
+    LeanTag.PersistentHashMap_Entry_null,
+    Array[],
+  );
+  entries = Array::fill(32, nullEntry);
+  storage: LeanValue = if (representation == 0) {
+    LeanArray(entries)
+  } else {
+    persistent: LeanValue = LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(entries).chill(),
+    );
+    if (representation == 1) persistent else {
+      LeanArrayOverride(persistent, 0, nullEntry)
+    }
+  };
+  LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[storage])
+}
+
+fun usedProbeArrayKind(value: LeanValue): Int {
+  value match {
+  | LeanArray(_) -> 0
+  | LeanPersistentArray(_) -> 1
+  | LeanArrayOverride(_, _, _) -> 2
+  | _ -> leanFail("unexpected UsedSimps array representation")
+  }
+}
+
+fun usedProbePairs(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+): Array<UsedSimpProbePair> {
+  result: mutable Vector<UsedSimpProbePair> = mutable Vector[];
+  leanTag(root) match {
+  | LeanTag.PersistentHashMap_Node_entries ->
+    entries = leanField(root, 0);
+    for (index in Range(0, leanValueArraySize(entries))) {
+      entry = leanArrayRead(runtime, entries, leanNatValue(index), false);
+      leanTag(entry) match {
+      | LeanTag.PersistentHashMap_Entry_null -> void
+      | LeanTag.PersistentHashMap_Entry_entry ->
+        result.push(UsedSimpProbePair(leanField(entry, 0), leanField(entry, 1)))
+      | LeanTag.PersistentHashMap_Entry_ref ->
+        for (pair in usedProbePairs(runtime, leanField(entry, 0))) {
+          result.push(pair)
+        }
+      | _ -> leanFail("unexpected UsedSimps entry")
+      }
+    }
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanField(root, 0);
+    values = leanField(root, 1);
+    assert(leanValueArraySize(keys) == leanValueArraySize(values));
+    for (index in Range(0, leanValueArraySize(keys))) {
+      result.push(
+        UsedSimpProbePair(
+          leanArrayRead(runtime, keys, leanNatValue(index), false),
+          leanArrayRead(runtime, values, leanNatValue(index), false),
+        ),
+      )
+    }
+  | _ -> leanFail("unexpected UsedSimps node")
+  };
+  result.toArray()
+}
+
+fun usedProbePersistentCollision(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+): Bool {
+  if (leanTag(root) == LeanTag.PersistentHashMap_Node_collision) {
+    return usedProbeArrayKind(leanField(root, 0)) == 1 &&
+      usedProbeArrayKind(leanField(root, 1)) == 1
+  };
+  assert(leanTag(root) == LeanTag.PersistentHashMap_Node_entries);
+  entries = leanField(root, 0);
+  for (index in Range(0, leanValueArraySize(entries))) {
+    entry = leanArrayRead(runtime, entries, leanNatValue(index), false);
+    if (leanTag(entry) == LeanTag.PersistentHashMap_Entry_ref) {
+      if (usedProbePersistentCollision(runtime, leanField(entry, 0))) {
+        return true
+      }
+    }
+  };
+  false
+}
+
+fun usedProbeContains(
+  saved: LeanExecutionCheckpoint,
+  root: LeanValue,
+  origin: LeanValue,
+  expected: Bool,
+): void {
+  (result, after) = rewriteProbeCompare(
+    "UsedSimps.contains",
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      input = rewriteProbeCopyInput(root);
+      key = rewriteProbeCopyInput(origin);
+      value = L4_Lean_Meta_Tactic_Simp_Types.f_UsedSimps_contains_spec_0_36179bfd36_fallback(
+        runtime,
+        input,
+        key,
+      );
+      assert(rewriteProbeSameInput(root, input));
+      assert(rewriteProbeSameInput(origin, key));
+      value
+    },
+    (runtime: mutable LeanExecution) ~> {
+      input = rewriteProbeCopyInput(root);
+      key = rewriteProbeCopyInput(origin);
+      value = L4_Lean_Meta_Tactic_Simp_Types.f_UsedSimps_contains_spec_0_36179bfd36(
+        runtime,
+        input,
+        key,
+      );
+      assert(rewriteProbeSameInput(root, input));
+      assert(rewriteProbeSameInput(origin, key));
+      value
+    },
+    Some(leanBool(expected)),
+  );
+  assert(native_eq(result, leanBool(expected)) == 0);
+  assert(native_eq(saved.refs, after.refs) == 0)
+}
+
+fun usedProbeInsert(
+  saved: LeanExecutionCheckpoint,
+  root: LeanValue,
+  origin: LeanValue,
+  insertionIndex: LeanValue,
+): LeanValue {
+  (result, after) = rewriteProbeCompare(
+    "UsedSimps.insert",
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      input = rewriteProbeCopyInput(root);
+      key = rewriteProbeCopyInput(origin);
+      index = rewriteProbeCopyInput(insertionIndex);
+      value = L4_Lean_Meta_Tactic_Simp_Types.f_UsedSimps_insert_spec_0_cd57cf6bb6_fallback(
+        runtime,
+        input,
+        key,
+        index,
+      );
+      assert(rewriteProbeSameInput(root, input));
+      assert(rewriteProbeSameInput(origin, key));
+      assert(rewriteProbeSameInput(insertionIndex, index));
+      value
+    },
+    (runtime: mutable LeanExecution) ~> {
+      input = rewriteProbeCopyInput(root);
+      key = rewriteProbeCopyInput(origin);
+      index = rewriteProbeCopyInput(insertionIndex);
+      value = L4_Lean_Meta_Tactic_Simp_Types.f_UsedSimps_insert_spec_0_cd57cf6bb6(
+        runtime,
+        input,
+        key,
+        index,
+      );
+      assert(rewriteProbeSameInput(root, input));
+      assert(rewriteProbeSameInput(origin, key));
+      assert(rewriteProbeSameInput(insertionIndex, index));
+      value
+    },
+  );
+  assert(native_eq(saved.refs, after.refs) == 0);
+  result
+}
+
+fun usedProbeKeys(runtime: mutable LeanExecution): Array<UsedSimpProbeKey> {
+  anonymous: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  alpha = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("alpha"),
+  );
+  unicodeName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("β"),
+  );
+  nested = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    alpha,
+    LeanText("nested"),
+  );
+  smallNumber = usedProbeNumber(runtime, leanNatValue(17));
+  largeNumber = usedProbeNumber(
+    runtime,
+    leanBoxNat(LeanNat::parse("18446744073709551616")),
+  );
+  largerNumber = usedProbeNumber(
+    runtime,
+    leanBoxNat(LeanNat::parse("36893488147419103232")),
+  );
+  assert(leanNameHashBits(smallNumber) == leanNameHashBits(largeNumber));
+  assert(leanNameHashBits(largeNumber) == leanNameHashBits(largerNumber));
+  assert(
+    !leanIsTrue(
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+        runtime,
+        largeNumber,
+        largerNumber,
+      ),
+    ),
+  );
+  Array[
+    UsedSimpProbeKey(usedProbeDecl(alpha, false, false), 0),
+    UsedSimpProbeKey(usedProbeDecl(alpha, true, false), 0),
+    UsedSimpProbeKey(usedProbeDecl(alpha, false, true), 1),
+    UsedSimpProbeKey(usedProbeDecl(alpha, true, true), 1),
+    UsedSimpProbeKey(LeanCtor(LeanTag.Meta_Origin_fvar, Array[alpha]), 2),
+    UsedSimpProbeKey(
+      LeanCtor(
+        LeanTag.Meta_Origin_stx,
+        Array[alpha, LeanCtor(LeanTag.Syntax_missing, Array[])],
+      ),
+      2,
+    ),
+    UsedSimpProbeKey(usedProbeOther(alpha), 2),
+    UsedSimpProbeKey(usedProbeOther(anonymous), 3),
+    UsedSimpProbeKey(usedProbeOther(smallNumber), 4),
+    UsedSimpProbeKey(usedProbeOther(largeNumber), 5),
+    UsedSimpProbeKey(usedProbeOther(largerNumber), 6),
+    UsedSimpProbeKey(usedProbeOther(unicodeName), 7),
+    UsedSimpProbeKey(usedProbeOther(nested), 8),
+  ]
+}
+
+fun usedProbeHashVectors(runtime: mutable LeanExecution): Int {
+  anonymous: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  number = usedProbeNumber(runtime, leanNatValue(17));
+  keys = Array[
+    usedProbeOther(anonymous),
+    usedProbeDecl(anonymous, true, false),
+    usedProbeDecl(anonymous, false, true),
+    usedProbeOther(number),
+    usedProbeDecl(number, false, false),
+    usedProbeDecl(number, true, true),
+  ];
+  expected = Array[
+    1723,
+    -76611080454830978,
+    8507242618548079515,
+    -4250238100072028871,
+    5856101332335221972,
+    2557748172283339249,
+  ];
+  for (index in Range(0, keys.size())) {
+    assert(
+      L4_Lean_Meta_Tactic_Simp_Types.f_usedSimpOriginHashBits(
+        runtime,
+        keys[index],
+      ) == expected[index],
+    )
+  };
+  expected.size()
+}
+
+fun usedProbeMatrix(
+  runtime: mutable LeanExecution,
+  saved: LeanExecutionCheckpoint,
+): Int {
+  keys = usedProbeKeys(runtime);
+  aliases = Array[1, 0, 3, 2, 5, 6, 4, 7, 8, 9, 10, 11, 12];
+  replacementIndex = leanBoxNat(
+    LeanNat::parse("340282366920938463463374607431768211457"),
+  );
+  count = 0;
+  for (representation in Range(0, 3)) {
+    empty = usedProbeEmpty(representation);
+    for (query in keys) {
+      usedProbeContains(saved, empty, query.origin, false);
+      !count = count + 1
+    };
+    for (index in Range(0, keys.size())) {
+      stored = keys[index];
+      inserted = usedProbeInsert(
+        saved,
+        empty,
+        stored.origin,
+        leanNatValue(index),
+      );
+      !count = count + 1;
+      pairs = usedProbePairs(runtime, inserted);
+      assert(pairs.size() == 1);
+      assert(rewriteProbeSameInput(pairs[0].origin, stored.origin));
+      assert(leanNat(pairs[0].value) == LeanNat::fromInt(index));
+      assert(usedProbeArrayKind(leanField(inserted, 0)) == representation);
+      for (query in keys) {
+        usedProbeContains(
+          saved,
+          inserted,
+          query.origin,
+          query.identity == stored.identity,
+        );
+        !count = count + 1
+      };
+      alias = keys[aliases[index]];
+      assert(alias.identity == stored.identity);
+      replaced = usedProbeInsert(
+        saved,
+        inserted,
+        alias.origin,
+        replacementIndex,
+      );
+      !count = count + 1;
+      replacedPairs = usedProbePairs(runtime, replaced);
+      assert(replacedPairs.size() == 1);
+      assert(rewriteProbeSameInput(replacedPairs[0].origin, alias.origin));
+      assert(native_eq(replacedPairs[0].value, replacementIndex) == 0);
+      assert(usedProbeArrayKind(leanField(replaced, 0)) == representation);
+      retainedPairs = usedProbePairs(runtime, inserted);
+      assert(leanNat(retainedPairs[0].value) == LeanNat::fromInt(index));
+      assert(usedProbePairs(runtime, empty).size() == 0)
+    }
+  };
+  count
+}
+
+fun usedProbeLongCollision(
+  runtime: mutable LeanExecution,
+  saved: LeanExecutionCheckpoint,
+): Int {
+  base = LeanNat::parse("18446744073709551616");
+  keys: mutable Vector<LeanValue> = mutable Vector[];
+  root = usedProbeEmpty(0);
+  rootAt128: LeanValue = LeanErased();
+  rootAt129: LeanValue = LeanErased();
+  for (index in Range(0, 130)) {
+    name = usedProbeNumber(
+      runtime,
+      leanBoxNat(base.add(LeanNat::fromInt(index))),
+    );
+    assert(leanNameHashBits(name) == -4250238100072028871);
+    origin = usedProbeOther(name);
+    keys.push(origin);
+    !root = usedProbeInsert(saved, root, origin, leanNatValue(index));
+    if (index == 127) {
+      !rootAt128 = root;
+      assert(!usedProbePersistentCollision(runtime, root))
+    };
+    if (index == 128) {
+      !rootAt129 = root;
+      assert(usedProbePersistentCollision(runtime, root))
+    }
+  };
+  assert(usedProbePersistentCollision(runtime, root));
+  assert(usedProbePairs(runtime, rootAt128).size() == 128);
+  assert(usedProbePairs(runtime, rootAt129).size() == 129);
+  pairs = usedProbePairs(runtime, root);
+  assert(pairs.size() == 130);
+  for (index in Range(0, 130)) {
+    assert(rewriteProbeSameInput(pairs[index].origin, keys[index]));
+    assert(leanNat(pairs[index].value) == LeanNat::fromInt(index));
+    usedProbeContains(saved, root, keys[index], true)
+  };
+  missing = usedProbeOther(
+    usedProbeNumber(runtime, leanBoxNat(base.add(LeanNat::fromInt(200)))),
+  );
+  usedProbeContains(saved, root, missing, false);
+  hugeIndex = leanBoxNat(LeanNat::parse("1844674407370955161600000"));
+  replaced = usedProbeInsert(saved, root, keys[64], hugeIndex);
+  replacedPairs = usedProbePairs(runtime, replaced);
+  assert(replacedPairs.size() == 130);
+  for (index in Range(0, 130)) {
+    assert(rewriteProbeSameInput(replacedPairs[index].origin, keys[index]));
+    expected = if (index == 64) hugeIndex else leanNatValue(index);
+    assert(native_eq(replacedPairs[index].value, expected) == 0)
+  };
+  assert(
+    leanNat(usedProbePairs(runtime, root)[64].value) == LeanNat::fromInt(64),
+  );
+  262
+}
+
+fun main(): void {
+  comparisons = 0;
+  hashVectors = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37), leanNatValue(91)]));
+    saved = runtime.checkpoint();
+    !hashVectors = hashVectors + usedProbeHashVectors(runtime);
+    !comparisons = comparisons + usedProbeMatrix(runtime, saved);
+    !comparisons = comparisons + usedProbeLongCollision(runtime, saved)
+  };
+  assert(comparisons == 1772);
+  assert(hashVectors == 12);
+  print_string(
+    comparisons.toString() +
+      " UsedSimps differential comparisons and " +
+      hashVectors.toString() +
+      " fixed hash vectors passed",
+  )
+}

@@ -1,0 +1,109 @@
+module L4_Lean_Meta_InferType;
+
+// Consume binders lazily; instantiate the pending argument slice only before WHNF.
+fun f_Meta_inferAppType_spec_0_75045726c9(
+  runtime: mutable LeanExecution,
+  upperBound: LeanValue,
+  args: LeanValue,
+  function: LeanValue,
+  argumentIndex: LeanValue,
+  typeAndStart: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  index = argumentIndex;
+  pending = typeAndStart;
+  currentWorld = world;
+  while (leanNat(index) < leanNat(upperBound)) {
+    if (leanTag(pending) != LeanTag.Prod_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    currentType = leanField(pending, 0);
+    start = leanField(pending, 1);
+    if (leanTag(currentType) == LeanTag.Expr_forallE__impl) {
+      !pending = LeanCtor(
+        LeanTag.Prod_mk,
+        Array[leanField(currentType, 3), start],
+      )
+    } else {
+      instantiated = f_Lean_Expr_instantiateBetaRevRange_f0f8f871e2(
+        runtime,
+        currentType,
+        start,
+        index,
+        args,
+      );
+      normalized = L4_Lean_Meta_Basic.f_Lean_Meta_whnf_6493600863(
+        runtime,
+        instantiated,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        currentWorld,
+      );
+      leanTag(normalized) match {
+      | LeanTag.EST_Out_error ->
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(normalized, 0), leanField(normalized, 1)],
+        )
+      | LeanTag.EST_Out_ok ->
+        reducedType = leanField(normalized, 0);
+        !currentWorld = leanField(normalized, 1);
+        if (leanTag(reducedType) == LeanTag.Expr_forallE__impl) {
+          !pending = LeanCtor(
+            LeanTag.Prod_mk,
+            Array[leanField(reducedType, 3), index],
+          )
+        } else {
+          prefixEnd = L4_Init_Prelude.f_Nat_add_86990f4822(
+            runtime,
+            index,
+            LeanNatLiterals.n1,
+          );
+          prefix = L4_Lean_Expr.f_Lean_mkAppRange_567caa00f1(
+            runtime,
+            function,
+            LeanNatLiterals.n0,
+            prefixEnd,
+            args,
+          );
+          failure = f_Lean_Meta_throwFunctionExpected_eb146bb9ad(
+            runtime,
+            prefix,
+            metaContext,
+            metaStateRef,
+            coreContext,
+            coreStateRef,
+            currentWorld,
+          );
+          leanTag(failure) match {
+          | LeanTag.EST_Out_error ->
+            return LeanCtor(
+              LeanTag.EST_Out_error,
+              Array[leanField(failure, 0), leanField(failure, 1)],
+            )
+          | LeanTag.EST_Out_ok ->
+            // Preserve the original continuation even if the throwing helper succeeds.
+            !pending = LeanCtor(LeanTag.Prod_mk, Array[currentType, start]);
+            !currentWorld = leanField(failure, 1)
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    };
+    !index = L4_Init_Prelude.f_Nat_add_86990f4822(
+      runtime,
+      index,
+      LeanNatLiterals.n1,
+    )
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[pending, currentWorld])
+}
+
+module end;

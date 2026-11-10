@@ -1,6 +1,6 @@
 # Rewrite the measured example in parallel
 
-## Current execution and ninth validated batch (2026-11-10)
+## Current execution and tenth validated batch (2026-11-10)
 
 Latest steering authorizes **one Vibe client using ten built-in subagents** as a
 bounded experiment, superseding the stop below for this run only. The installed
@@ -45,11 +45,30 @@ the compiler queue. The user has since explicitly stopped Vibe usage, supersedin
 the earlier request to ramp it back up. A provider outage does not stop independent
 local work. Preserve the failed-run evidence without automatic retries.
 
-The ninth batch adds WHNF cache insertion and discrimination-tree match traversal.
+The tenth batch validates six routines: application binder consumption, scoped
+local instances, used-theorem lookup/insertion hashing, definitional-equality
+cache classification and unification-hint search. It passes **2,424 new
+differential comparisons plus 1,725 regressions**, with 16 extra application
+wrapper checks and 12 fixed hash vectors. Incremental release checking took
+2.322 seconds; the combined release probe selects 3,977 verbatim maintained
+functions. The [tenth audit](provenance/rewrite-batches/2026-11-10-wave-10.json)
+binds exact tested bodies and preserved originals, including the local-instance
+recursive closure adapter. **38 frame rewrites are validated; 159 remain.**
+
+The local-instance fixture required separate reducibility-extension registration
+for its aliases; definition hints alone did not allow reducible-only unfolding.
+Its independent three-instance expectation is preserved. The hint-registration
+fixture now explicitly selects the existing unbounded heartbeat mode. Bounded
+heartbeats remain unsupported. No production stub, compiler/runtime or kernel
+change was needed. Typed hashes/predicates and structured control flow are
+improved; broader boxed interfaces and other observed entries still need review.
+No new whole-example performance claim is made.
+
+The ninth batch added WHNF cache insertion and discrimination-tree match traversal.
 It passes **444 new differential cases and 1,281 regressions** in one combined
 release probe. The [ninth audit](provenance/rewrite-batches/2026-11-10-wave-09.json)
-binds tested sources and retained originals. There are **32 validated frame
-rewrites and 165 remaining observed frames**, containing 76,766 old source lines.
+binds tested sources and retained originals. At that checkpoint there were 32
+validated frame rewrites and 165 remaining observed frames, containing 76,766 old source lines.
 This is control-flow progress; boxed interfaces and the other observed entries
 still need review. No new full-example performance claim is made.
 
@@ -71,8 +90,9 @@ specialization; exact old/new comparisons remain intact. Probe corrections inclu
 valid constructor/universe layouts, actual helper types, independent config fields,
 error/cache expectations, full reference/input checks and valid bound-variable
 indices. No new runtime stub or compiler change was introduced. The native kernel
-and typed-import boundary remain unchanged. Application inference, local-instance
-scoping, unification hints and used-simplification sets are the next bounded tasks.
+and typed-import boundary remain unchanged. The next batch is the five Simp.Main
+routines from the native-subagent experiment; each source/probe is independently
+corrected before integration.
 
 ## GLM restart history (2026-11-09)
 

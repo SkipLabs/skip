@@ -1,0 +1,659 @@
+// Application-type continuation: pending slices, real reductions, and exact effects.
+class InferAppInput(
+  function: LeanValue,
+  args: LeanValue,
+  upperBound: LeanValue,
+  index: LeanValue,
+  pending: LeanValue,
+)
+
+class InferAppCase(
+  label: String,
+  input: InferAppInput,
+  expected: LeanValue,
+  finished: ?LeanValue,
+  pure: Bool,
+)
+
+fun inferAppPair(type: LeanValue, start: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Prod_mk, Array[type, start])
+}
+
+fun inferAppDeclaration(
+  name: LeanValue,
+  type: LeanValue,
+  body: ?LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  base = LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]);
+  body match {
+  | None() ->
+    LeanCtor(
+      LeanTag.ConstantInfo_axiomInfo,
+      Array[LeanCtor(LeanTag.AxiomVal_mk, Array[base, leanBool(false)])],
+    )
+  | Some(value) ->
+    LeanCtor(
+      LeanTag.ConstantInfo_defnInfo,
+      Array[
+        LeanCtor(
+          LeanTag.DefinitionVal_mk,
+          Array[
+            base,
+            value,
+            LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+            LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+            LeanCtor(LeanTag.List_cons, Array[name, nil]),
+          ],
+        ),
+      ],
+    )
+  }
+}
+
+fun inferAppCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  input: InferAppInput,
+  meta: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  unusedRefs: Bool,
+): (LeanValue, LeanExecutionCheckpoint) {
+  unused = LeanUnavailable(
+    "direct application binders must not read state references",
+  );
+  metaRef = if (unusedRefs) unused else state.metaStateRef;
+  coreRef = if (unusedRefs) unused else state.coreStateRef;
+  oldArgs = rewriteProbeCopyInput(input.args);
+  newArgs = rewriteProbeCopyInput(input.args);
+  oldFunction = rewriteProbeCopyInput(input.function);
+  newFunction = rewriteProbeCopyInput(input.function);
+  oldPending = rewriteProbeCopyInput(input.pending);
+  newPending = rewriteProbeCopyInput(input.pending);
+  oldMeta = rewriteProbeCopyInput(meta);
+  newMeta = rewriteProbeCopyInput(meta);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_InferType.f_Meta_inferAppType_spec_0_75045726c9_fallback(
+        runtime,
+        input.upperBound,
+        oldArgs,
+        oldFunction,
+        input.index,
+        oldPending,
+        oldMeta,
+        metaRef,
+        oldCore,
+        coreRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(input.args, oldArgs));
+      assert(rewriteProbeSameInput(input.function, oldFunction));
+      assert(rewriteProbeSameInput(input.pending, oldPending));
+      assert(rewriteProbeSameInput(meta, oldMeta));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_InferType.f_Meta_inferAppType_spec_0_75045726c9(
+        runtime,
+        input.upperBound,
+        newArgs,
+        newFunction,
+        input.index,
+        newPending,
+        newMeta,
+        metaRef,
+        newCore,
+        coreRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(input.args, newArgs));
+      assert(rewriteProbeSameInput(input.function, newFunction));
+      assert(rewriteProbeSameInput(input.pending, newPending));
+      assert(rewriteProbeSameInput(meta, newMeta));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  )
+}
+
+fun inferAppCheck(
+  item: InferAppCase,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  world: LeanValue,
+): LeanExecutionCheckpoint {
+  unused = LeanUnavailable("direct application binders must not read contexts");
+  meta = if (item.pure) unused else state.metaContext;
+  core = if (item.pure) unused else state.coreContext;
+  (result, after) = inferAppCompare(
+    item.label,
+    saved,
+    state,
+    item.input,
+    meta,
+    core,
+    world,
+    item.pure,
+  );
+  assert(leanTag(result) == LeanTag.EST_Out_ok);
+  assert(rewriteProbeSameInput(leanField(result, 0), item.expected));
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  if (item.pure) assert(native_eq(saved.refs, after.refs) == 0);
+  item.finished match {
+  | Some(expectedType) ->
+    runtime = after.restoreRaw();
+    pair = leanField(result, 0);
+    actualType = L4_Lean_Meta_InferType.f_Lean_Expr_instantiateBetaRevRange_f0f8f871e2(
+      runtime,
+      leanField(pair, 0),
+      leanField(pair, 1),
+      item.input.upperBound,
+      item.input.args,
+    );
+    assert(rewriteProbeSameInput(actualType, expectedType))
+  | None() -> void
+  };
+  after
+}
+
+fun inferAppContains(value: LeanValue, expected: LeanValue): Bool {
+  if (rewriteProbeSameInput(value, expected)) return true;
+  value match {
+  | LeanCtor(_, fields) ->
+    for (field in fields) {
+      if (inferAppContains(field, expected)) return true
+    };
+    false
+  | LeanArray(fields) ->
+    for (field in fields) {
+      if (inferAppContains(field, expected)) return true
+    };
+    false
+  | _ -> false
+  }
+}
+
+fun inferAppFunctionError(
+  label: String,
+  state: RewriteProbeState,
+  input: InferAppInput,
+  normalizedInput: LeanValue,
+  expectedPrefix: LeanValue,
+  world: LeanValue,
+): void {
+  (result, after) = inferAppCompare(
+    label,
+    state.saved,
+    state,
+    input,
+    state.metaContext,
+    state.coreContext,
+    world,
+    false,
+  );
+  assert(leanTag(result) == LeanTag.EST_Out_error);
+  exception = leanField(result, 0);
+  assert(leanTag(exception) == LeanTag.Exception_error);
+  assert(
+    rewriteProbeSameInput(
+      leanField(exception, 0),
+      leanField(state.coreContext, 2),
+    ),
+  );
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  oracleRuntime = state.saved.restoreRaw();
+  normalized = L4_Lean_Meta_Basic.f_Lean_Meta_whnf_6493600863(
+    oracleRuntime,
+    normalizedInput,
+    state.metaContext,
+    state.metaStateRef,
+    state.coreContext,
+    state.coreStateRef,
+    world,
+  );
+  assert(leanTag(normalized) == LeanTag.EST_Out_ok);
+  expected = L4_Lean_Meta_InferType.f_Lean_Meta_throwFunctionExpected_eb146bb9ad(
+    oracleRuntime,
+    expectedPrefix,
+    state.metaContext,
+    state.metaStateRef,
+    state.coreContext,
+    state.coreStateRef,
+    leanField(normalized, 1),
+  );
+  assert(rewriteProbeSameInput(result, expected));
+  assert(native_eq(after.refs, oracleRuntime.checkpoint().refs) == 0);
+  message = LeanCtor(
+    LeanTag.MessageData_compose,
+    Array[
+      L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+        oracleRuntime,
+        LeanText("function expected"),
+      ),
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(
+        oracleRuntime,
+        expectedPrefix,
+      ),
+    ],
+  );
+  assert(inferAppContains(leanField(exception, 1), message))
+}
+
+fun inferAppDepthError(
+  label: String,
+  state: RewriteProbeState,
+  input: InferAppInput,
+  world: LeanValue,
+): void {
+  core = leanReplaceField(
+    state.coreContext,
+    0,
+    leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1),
+  );
+  !core = leanReplaceField(core, 1, LeanNatLiterals.n1);
+  (result, after) = inferAppCompare(
+    label,
+    state.saved,
+    state,
+    input,
+    state.metaContext,
+    core,
+    world,
+    false,
+  );
+  oracle = state.saved.restoreRaw();
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    oracle,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    oracle,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  expected = LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          leanField(core, 2),
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  );
+  assert(rewriteProbeSameInput(result, expected));
+  assert(native_eq(state.saved.refs, after.refs) == 0)
+}
+
+fun main(): void {
+  checks = 0;
+  wrappers = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, n, nil);
+    forall = (domain: LeanValue, body: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        builder,
+        anonymous,
+        binder,
+        domain,
+        body,
+      );
+    lambda = (domain: LeanValue, body: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        builder,
+        anonymous,
+        binder,
+        domain,
+        body,
+      );
+    app = (fn: LeanValue, arg: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, fn, arg);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+    type0 = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, one);
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+    b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n1);
+    pName = name("inferApp.P");
+    proofName = name("inferApp.p");
+    aliasName = name("inferApp.FunTy");
+    nestedName = name("inferApp.NestedTy");
+    chooseTypeName = name("inferApp.ChooseTy");
+    simpleName = name("inferApp.simple");
+    depName = name("inferApp.dependent");
+    chooseName = name("inferApp.choose");
+    betaName = name("inferApp.beta");
+    leadName = name("inferApp.lead");
+    aliasHeadName = name("inferApp.aliasHead");
+    longName = name("inferApp.long");
+    pType = constant(pName);
+    proof = constant(proofName);
+    alias = constant(aliasName);
+    nestedAlias = constant(nestedName);
+    chooseAlias = constant(chooseTypeName);
+    simple = constant(simpleName);
+    dependent = constant(depName);
+    choose = constant(chooseName);
+    beta = constant(betaName);
+    lead = constant(leadName);
+    aliasHead = constant(aliasHeadName);
+    longHead = constant(longName);
+    simpleType = forall(pType, pType);
+    depTail = forall(b0, b1);
+    depType = forall(type0, depTail);
+    chooseType = forall(prop, b0);
+    nestedType = forall(pType, alias);
+    betaType = forall(forall(pType, prop), forall(pType, app(b1, b0)));
+    leadType = forall(pType, chooseAlias);
+    betaArgument = lambda(pType, alias);
+    longType = pType;
+    for (_ in Range(0, 128)) !longType = forall(pType, longType);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for ((n, t, value) in Array[
+      (pName, prop, (None() : ?LeanValue)),
+      (proofName, pType, (None() : ?LeanValue)),
+      (aliasName, prop, Some(simpleType)),
+      (nestedName, prop, Some(nestedType)),
+      (chooseTypeName, prop, Some(chooseType)),
+      (simpleName, simpleType, (None() : ?LeanValue)),
+      (depName, depType, (None() : ?LeanValue)),
+      (chooseName, chooseType, (None() : ?LeanValue)),
+      (betaName, betaType, (None() : ?LeanValue)),
+      (leadName, leadType, (None() : ?LeanValue)),
+      (aliasHeadName, alias, (None() : ?LeanValue)),
+      (longName, longType, (None() : ?LeanValue)),
+    ]) {
+      constants.set(
+        leanNameKey(n),
+        LeanConstantFile(inferAppDeclaration(n, t, value), None()),
+      )
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    state = rewriteProbeState(builder, environment, locals, "<infer-app-type>");
+    n0 = LeanNatLiterals.n0;
+    n1 = LeanNatLiterals.n1;
+    n2 = LeanNatLiterals.n2;
+    n3 = LeanNatLiterals.n3;
+    empty = LeanArray(Array[]);
+    proofArgs = LeanArray(Array[proof]);
+    depArgs = LeanArray(Array[prop, pType]);
+    chooseArgs = LeanArray(Array[alias, proof]);
+    nestedArgs = LeanArray(Array[nestedAlias, proof, proof]);
+    betaArgs = LeanArray(Array[betaArgument, proof, proof]);
+    leadArgs = LeanArray(Array[proof, alias, proof]);
+    unused = LeanUnavailable(
+      "completed range or direct binder must not inspect this input",
+    );
+    huge = LeanScalar("nat", "18446744073709551616");
+    hugeNext = LeanScalar("nat", "18446744073709551617");
+    cases = Array[
+      InferAppCase(
+        "zero real arguments",
+        InferAppInput(simple, empty, n0, n0, inferAppPair(simpleType, n0)),
+        inferAppPair(simpleType, n0),
+        Some(simpleType),
+        true,
+      ),
+      InferAppCase(
+        "one direct binder",
+        InferAppInput(simple, proofArgs, n1, n0, inferAppPair(simpleType, n0)),
+        inferAppPair(pType, n0),
+        Some(pType),
+        true,
+      ),
+      InferAppCase(
+        "zero dependent arguments",
+        InferAppInput(dependent, empty, n0, n0, inferAppPair(depType, n0)),
+        inferAppPair(depType, n0),
+        Some(depType),
+        true,
+      ),
+      InferAppCase(
+        "dependent partial application",
+        InferAppInput(dependent, depArgs, n1, n0, inferAppPair(depType, n0)),
+        inferAppPair(depTail, n0),
+        Some(forall(prop, prop)),
+        true,
+      ),
+      InferAppCase(
+        "dependent complete application",
+        InferAppInput(dependent, depArgs, n2, n0, inferAppPair(depType, n0)),
+        inferAppPair(b1, n0),
+        Some(prop),
+        true,
+      ),
+      InferAppCase(
+        "resume dependent direct binder",
+        InferAppInput(dependent, depArgs, n2, n1, inferAppPair(depTail, n0)),
+        inferAppPair(b1, n0),
+        Some(prop),
+        true,
+      ),
+      InferAppCase(
+        "pending argument unfolds to forall",
+        InferAppInput(choose, chooseArgs, n2, n0, inferAppPair(chooseType, n0)),
+        inferAppPair(pType, n1),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "pending argument is already forall",
+        InferAppInput(
+          choose,
+          LeanArray(Array[simpleType, proof]),
+          n2,
+          n0,
+          inferAppPair(chooseType, n0),
+        ),
+        inferAppPair(pType, n1),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "two normalization resets",
+        InferAppInput(choose, nestedArgs, n3, n0, inferAppPair(chooseType, n0)),
+        inferAppPair(pType, n2),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "pending slice beta reduces lambda",
+        InferAppInput(beta, betaArgs, n3, n0, inferAppPair(betaType, n0)),
+        inferAppPair(pType, n2),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "nonzero pending start",
+        InferAppInput(lead, leadArgs, n3, n2, inferAppPair(b0, n1)),
+        inferAppPair(pType, n2),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "produce nonzero pending start",
+        InferAppInput(lead, leadArgs, n3, n0, inferAppPair(leadType, n0)),
+        inferAppPair(pType, n2),
+        Some(pType),
+        false,
+      ),
+      InferAppCase(
+        "128 direct binders",
+        InferAppInput(
+          longHead,
+          LeanArray(Array::fill(128, proof)),
+          leanNatValue(128),
+          n0,
+          inferAppPair(longType, n0),
+        ),
+        inferAppPair(pType, n0),
+        Some(pType),
+        true,
+      ),
+      InferAppCase(
+        "empty range reads no pair",
+        InferAppInput(unused, unused, n0, n0, unused),
+        unused,
+        None(),
+        true,
+      ),
+      InferAppCase(
+        "finished range reads no pair",
+        InferAppInput(unused, unused, n1, n2, unused),
+        unused,
+        None(),
+        true,
+      ),
+      InferAppCase(
+        "large finished index",
+        InferAppInput(unused, unused, huge, huge, unused),
+        unused,
+        None(),
+        true,
+      ),
+      InferAppCase(
+        "large index advances without Int narrowing",
+        InferAppInput(
+          unused,
+          unused,
+          hugeNext,
+          huge,
+          inferAppPair(simpleType, huge),
+        ),
+        inferAppPair(pType, huge),
+        None(),
+        true,
+      ),
+    ];
+    aliasCase = InferAppCase(
+      "reducible initial function type",
+      InferAppInput(aliasHead, proofArgs, n1, n0, inferAppPair(alias, n0)),
+      inferAppPair(pType, n0),
+      Some(pType),
+      false,
+    );
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(83)]) {
+      for (item in cases) {
+        _after = inferAppCheck(item, state.saved, state, world);
+        !checks = checks + 1
+      };
+      cold = inferAppCheck(aliasCase, state.saved, state, world);
+      assert(native_eq(cold.refs, state.saved.refs) != 0);
+      warm = inferAppCheck(aliasCase, cold, state, world);
+      assert(native_eq(warm.refs, cold.refs) == 0);
+      !checks = checks + 2;
+
+      inferAppFunctionError(
+        "non-function head",
+        state,
+        InferAppInput(proof, proofArgs, n1, n0, inferAppPair(pType, n0)),
+        pType,
+        app(proof, proof),
+        world,
+      );
+      inferAppFunctionError(
+        "function-expected prefix includes consumed binder",
+        state,
+        InferAppInput(
+          simple,
+          LeanArray(Array[proof, proof]),
+          n2,
+          n0,
+          inferAppPair(simpleType, n0),
+        ),
+        pType,
+        app(app(simple, proof), proof),
+        world,
+      );
+      inferAppFunctionError(
+        "function-expected prefix after pending substitution",
+        state,
+        InferAppInput(
+          choose,
+          LeanArray(Array[pType, proof]),
+          n2,
+          n0,
+          inferAppPair(chooseType, n0),
+        ),
+        pType,
+        app(app(choose, pType), proof),
+        world,
+      );
+      inferAppDepthError(
+        "WHNF error avoids function prefix",
+        state,
+        InferAppInput(unused, unused, n1, n0, inferAppPair(pType, n0)),
+        world,
+      );
+      inferAppDepthError(
+        "WHNF error after direct binder",
+        state,
+        InferAppInput(unused, chooseArgs, n2, n0, inferAppPair(chooseType, n0)),
+        world,
+      );
+      !checks = checks + 5;
+
+      for ((head, args, expectedType) in Array[
+        (simple, proofArgs, pType),
+        (dependent, depArgs, prop),
+        (choose, nestedArgs, pType),
+        (beta, betaArgs, pType),
+      ]) {
+        runtime = state.saved.restoreRaw();
+        result = L4_Lean_Meta_InferType.f_Lean_Meta_inferAppType_0c4ea27601(
+          runtime,
+          head,
+          args,
+          state.metaContext,
+          state.metaStateRef,
+          state.coreContext,
+          state.coreStateRef,
+          world,
+        );
+        assert(leanTag(result) == LeanTag.EST_Out_ok);
+        assert(rewriteProbeSameInput(leanField(result, 0), expectedType));
+        assert(rewriteProbeSameInput(leanField(result, 1), world));
+        !wrappers = wrappers + 1
+      }
+    }
+  };
+  assert(checks == 96);
+  assert(wrappers == 16);
+  print_string(
+    "Infer-app-type probe passed " +
+      checks.toString() +
+      " differential cases and " +
+      wrappers.toString() +
+      " wrapper checks",
+  )
+}

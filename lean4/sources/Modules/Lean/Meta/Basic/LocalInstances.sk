@@ -1,0 +1,190 @@
+module L4_Lean_Meta_Basic;
+
+// Add class-typed locals to the Meta context while visiting the requested suffix.
+fun f_Lean_Meta_withNewLocalInstancesImp_afterInstance(
+  runtime: mutable LeanExecution,
+  fvars: LeanValue,
+  index: LeanValue,
+  continuation: LeanValue,
+  className: LeanValue,
+  fvar: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  nextIndex = L4_Init_Prelude.f_Nat_add_86990f4822(
+    runtime,
+    index,
+    LeanNatLiterals.n1,
+  );
+  next = LeanClosure(
+    L4_Lean_Meta_Basic.apply_f_Lean_Meta_withNewLocalInstancesImp_88b4382583,
+    8,
+    Array[fvars, nextIndex, continuation],
+  );
+  f_Meta_withNewLocalInstancesImp_spec_2_e4ff1a63ec(
+    runtime,
+    className,
+    fvar,
+    next,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  )
+}
+
+fun f_Lean_Meta_withNewLocalInstancesImp_88b4382583(
+  runtime: mutable LeanExecution,
+  fvars: LeanValue,
+  index: LeanValue,
+  continuation: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  size = L4_Init_Prelude.f_Array_size_3866d4555a(runtime, LeanErased(), fvars);
+  currentIndex = index;
+  currentWorld = world;
+  while (leanNat(currentIndex) < leanNat(size)) {
+    fvar = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      runtime,
+      LeanErased(),
+      fvars,
+      currentIndex,
+      LeanErased(),
+    );
+    localDeclResult = f_Lean_Meta_getFVarLocalDecl_53b3a14c72(
+      runtime,
+      fvar,
+      metaContext,
+      coreContext,
+      coreStateRef,
+      currentWorld,
+    );
+    localDeclTag = leanTag(localDeclResult);
+    if (localDeclTag == LeanTag.EST_Out_error) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(localDeclResult, 0), leanField(localDeclResult, 1)],
+      )
+    };
+    if (localDeclTag != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    localDecl = leanField(localDeclResult, 0);
+    worldAfterDecl = leanField(localDeclResult, 1);
+    type = L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(
+      runtime,
+      localDecl,
+    );
+    quickResult = f_Lean_Meta_isClassQuick_24462fa9ac(
+      runtime,
+      type,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      worldAfterDecl,
+    );
+    quickTag = leanTag(quickResult);
+    if (quickTag == LeanTag.EST_Out_error) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(quickResult, 0), leanField(quickResult, 1)],
+      )
+    };
+    if (quickTag != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    classResult = leanField(quickResult, 0);
+    worldAfterQuick = leanField(quickResult, 1);
+    classTag = leanTag(classResult);
+    if (classTag == LeanTag.LOption_none) {
+      !currentIndex = L4_Init_Prelude.f_Nat_add_86990f4822(
+        runtime,
+        currentIndex,
+        LeanNatLiterals.n1,
+      );
+      !currentWorld = worldAfterQuick;
+      continue
+    };
+    if (classTag == LeanTag.LOption_some) {
+      return f_Lean_Meta_withNewLocalInstancesImp_afterInstance(
+        runtime,
+        fvars,
+        currentIndex,
+        continuation,
+        leanField(classResult, 0),
+        fvar,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        worldAfterQuick,
+      )
+    };
+    if (classTag != LeanTag.LOption_undef) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    expensiveResult = f_Lean_Meta_isClassExpensive_0fd0f1ada5(
+      runtime,
+      type,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      worldAfterQuick,
+    );
+    expensiveTag = leanTag(expensiveResult);
+    if (expensiveTag == LeanTag.EST_Out_error) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(expensiveResult, 0), leanField(expensiveResult, 1)],
+      )
+    };
+    if (expensiveTag != LeanTag.EST_Out_ok) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    expensiveClass = leanField(expensiveResult, 0);
+    worldAfterExpensive = leanField(expensiveResult, 1);
+    expensiveClassTag = leanTag(expensiveClass);
+    if (expensiveClassTag == LeanTag.Option_none) {
+      !currentIndex = L4_Init_Prelude.f_Nat_add_86990f4822(
+        runtime,
+        currentIndex,
+        LeanNatLiterals.n1,
+      );
+      !currentWorld = worldAfterExpensive;
+      continue
+    };
+    if (expensiveClassTag == LeanTag.Option_some) {
+      return f_Lean_Meta_withNewLocalInstancesImp_afterInstance(
+        runtime,
+        fvars,
+        currentIndex,
+        continuation,
+        leanField(expensiveClass, 0),
+        fvar,
+        metaContext,
+        metaStateRef,
+        coreContext,
+        coreStateRef,
+        worldAfterExpensive,
+      )
+    };
+    return leanFail("non-exhaustive Lean case")
+  };
+  leanApply(
+    runtime,
+    continuation,
+    Array[metaContext, metaStateRef, coreContext, coreStateRef, currentWorld],
+  )
+}
+
+module end;

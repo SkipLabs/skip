@@ -96,6 +96,14 @@ types, universe arguments and reference handles. Compare full reference state
 as well as returned values. Say which recursive helpers are shared by the old
 and new routes; a shared helper is not an independent oracle for itself.
 
+Definition hints and reducibility registration are separate. An abbreviation
+fixture used under `withReducible` must also enter the reducibility extension;
+otherwise the absent entry defaults to semireducible. See the registered aliases
+in `tests/LocalInstancesProbe.sk`. Keep independent expected results when a fixture
+fails and identify the missing contract rather than weakening the assertion.
+Select the supported unbounded heartbeat mode explicitly for effectful fixtures;
+bounded heartbeat behavior remains an explicit unsupported path.
+
 A completed helper is a progress checkpoint within this ongoing optimization
 task. Continue through the remaining authorized batches and measurements; do
 not treat the helper's completion as completion of the parity investigation.

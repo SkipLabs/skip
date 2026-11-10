@@ -1,0 +1,512 @@
+// Typed local-instance fixtures and an observable MetaM continuation.
+fun localInstanceSummary(values: Array<LeanValue>): String {
+  description = "";
+  for (value in values) {
+    if (leanTag(value) == LeanTag.LocalInstance_mk) {
+      !description =
+        description +
+        " " +
+        leanNameKey(leanField(value, 0)) +
+        ":" +
+        leanNameKey(leanField(leanField(value, 1), 1))
+    }
+  };
+  description
+}
+
+fun localInstanceDifference(actual: LeanValue, expected: LeanValue): String {
+  if (rewriteProbeSameInput(actual, expected)) return "";
+  (actual, expected) match {
+  | (
+    LeanCtor(actualTag, actualFields),
+    LeanCtor(expectedTag, expectedFields),
+  ) ->
+    if (actualTag != expectedTag) {
+      return actualTag.toString() + " != " + expectedTag.toString()
+    };
+    if (actualFields.size() != expectedFields.size()) {
+      return "constructor arity differs"
+    };
+    for (index in Range(0, actualFields.size())) {
+      difference = localInstanceDifference(
+        actualFields[index],
+        expectedFields[index],
+      );
+      if (difference != "") {
+        return actualTag.toString() +
+          "[" +
+          index.toString() +
+          "]: " +
+          difference
+      }
+    };
+    "constructor representation differs"
+  | (LeanArray(actualValues), LeanArray(expectedValues)) ->
+    if (actualValues.size() != expectedValues.size()) {
+      return "array size " +
+        actualValues.size().toString() +
+        " != " +
+        expectedValues.size().toString() +
+        " actual:" +
+        localInstanceSummary(actualValues) +
+        " expected:" +
+        localInstanceSummary(expectedValues)
+    };
+    for (index in Range(0, actualValues.size())) {
+      difference = localInstanceDifference(
+        actualValues[index],
+        expectedValues[index],
+      );
+      if (difference != "") {
+        return "array[" + index.toString() + "]: " + difference
+      }
+    };
+    "array representation differs"
+  | (LeanText(actualText), LeanText(expectedText)) ->
+    actualText + " != " + expectedText
+  | (LeanNatural(actualNat), LeanNatural(expectedNat)) ->
+    actualNat.toString() + " != " + expectedNat.toString()
+  | (LeanWord(actualKind, actualBits), LeanWord(expectedKind, expectedBits)) ->
+    actualKind +
+      ":" +
+      actualBits.toString() +
+      " != " +
+      expectedKind +
+      ":" +
+      expectedBits.toString()
+  | (LeanArrayOverride(_, _, _), _) -> "unexpected array override"
+  | (LeanPersistentArray(_), _) -> "unexpected persistent array"
+  | _ -> "leaf representation or value differs"
+  }
+}
+
+fun localInstanceName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun localInstanceAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun localInstanceDef(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          value,
+          LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(
+            LeanTag.List_cons,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[])],
+          ),
+        ],
+      ),
+    ],
+  )
+}
+
+fun localInstanceContinuation(
+  runtime: mutable LeanExecution,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  counter = arguments[0];
+  calls = leanNat(runtime.readRef(counter)).toInt();
+  runtime.writeRef(counter, Some(leanNatValue(calls + 1)));
+  shouldFail = leanIsTrue(arguments[1]);
+  metaContext = arguments[2];
+  coreContext = arguments[4];
+  world = arguments[6];
+  if (shouldFail) {
+    failureWorld = leanNatValue(99);
+    message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText("continuation failure"),
+    );
+    exception = LeanCtor(
+      LeanTag.Exception_error,
+      Array[leanField(coreContext, 2), message],
+    );
+    return LeanCtor(LeanTag.EST_Out_error, Array[exception, failureWorld])
+  };
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[
+      LeanCtor(LeanTag.Prod_mk, Array[leanField(metaContext, 4), world]),
+      world,
+    ],
+  )
+}
+
+fun localInstanceCall(
+  runtime: mutable LeanExecution,
+  original: Bool,
+  fvars: LeanValue,
+  index: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+  callback: LeanValue,
+): LeanValue {
+  if (original) {
+    L4_Lean_Meta_Basic.f_Lean_Meta_withNewLocalInstancesImp_88b4382583_fallback(
+      runtime,
+      fvars,
+      index,
+      callback,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  } else {
+    L4_Lean_Meta_Basic.f_Lean_Meta_withNewLocalInstancesImp_88b4382583(
+      runtime,
+      fvars,
+      index,
+      callback,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  }
+}
+
+fun localInstanceCheck(
+  label: String,
+  state: RewriteProbeState,
+  fvars: LeanValue,
+  index: LeanValue,
+  expected: LeanValue,
+  world: LeanValue,
+  callbackFails: Bool = false,
+): void {
+  originalRuntime = state.saved.restoreRaw();
+  replacementRuntime = state.saved.restoreRaw();
+  originalCounter = originalRuntime.newRef(leanNatValue(0));
+  replacementCounter = replacementRuntime.newRef(leanNatValue(0));
+  originalCallback = LeanClosure(
+    localInstanceContinuation,
+    7,
+    Array[originalCounter, leanBool(callbackFails)],
+  );
+  replacementCallback = LeanClosure(
+    localInstanceContinuation,
+    7,
+    Array[replacementCounter, leanBool(callbackFails)],
+  );
+  originalFvars = rewriteProbeCopyInput(fvars);
+  replacementFvars = rewriteProbeCopyInput(fvars);
+  originalMeta = rewriteProbeCopyInput(state.metaContext);
+  replacementMeta = rewriteProbeCopyInput(state.metaContext);
+  originalCore = rewriteProbeCopyInput(state.coreContext);
+  replacementCore = rewriteProbeCopyInput(state.coreContext);
+  original = localInstanceCall(
+    originalRuntime,
+    true,
+    originalFvars,
+    index,
+    originalMeta,
+    state.metaStateRef,
+    originalCore,
+    state.coreStateRef,
+    world,
+    originalCallback,
+  );
+  replacement = localInstanceCall(
+    replacementRuntime,
+    false,
+    replacementFvars,
+    index,
+    replacementMeta,
+    state.metaStateRef,
+    replacementCore,
+    state.coreStateRef,
+    world,
+    replacementCallback,
+  );
+  invariant(
+    rewriteProbeSameInput(originalFvars, fvars),
+    label + ": original fvars changed",
+  );
+  invariant(
+    rewriteProbeSameInput(replacementFvars, fvars),
+    label + ": replacement fvars changed",
+  );
+  invariant(
+    rewriteProbeSameInput(originalMeta, state.metaContext),
+    label + ": original Meta context changed",
+  );
+  invariant(
+    rewriteProbeSameInput(replacementMeta, state.metaContext),
+    label + ": replacement Meta context changed",
+  );
+  invariant(
+    rewriteProbeSameInput(originalCore, state.coreContext),
+    label + ": original Core context changed",
+  );
+  invariant(
+    rewriteProbeSameInput(replacementCore, state.coreContext),
+    label + ": replacement Core context changed",
+  );
+  invariant(
+    leanNat(originalRuntime.readRef(originalCounter)).toInt() == 1,
+    label + ": original callback count",
+  );
+  invariant(
+    leanNat(replacementRuntime.readRef(replacementCounter)).toInt() == 1,
+    label + ": replacement callback count",
+  );
+  invariant(
+    native_eq(original, replacement) == 0,
+    label + ": old/new results differ",
+  );
+  invariant(
+    native_eq(
+      originalRuntime.checkpoint().refs,
+      replacementRuntime.checkpoint().refs,
+    ) == 0,
+    label + ": old/new references differ",
+  );
+  difference = localInstanceDifference(replacement, expected);
+  invariant(difference == "", label + ": unexpected result: " + difference);
+  invariant(
+    leanTag(replacement) == leanTag(expected),
+    label + ": unexpected result tag",
+  );
+  print_string("withNewLocalInstancesImp case passed: " + label)
+}
+
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  localKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  name = (s: String) -> localInstanceName(runtime, s);
+  className = name("ProbeClass");
+  classAliasName = name("ProbeClassAlias");
+  plainName = name("ProbePlain");
+  plainAliasName = name("ProbePlainAlias");
+  classConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, className, nil);
+  plainConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, plainName, nil);
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(
+    leanNameKey(className),
+    LeanConstantFile(localInstanceAxiom(className, prop), None()),
+  );
+  constants.set(
+    leanNameKey(classAliasName),
+    LeanConstantFile(
+      localInstanceDef(classAliasName, prop, classConst),
+      None(),
+    ),
+  );
+  constants.set(
+    leanNameKey(plainName),
+    LeanConstantFile(localInstanceAxiom(plainName, prop), None()),
+  );
+  constants.set(
+    leanNameKey(plainAliasName),
+    LeanConstantFile(
+      localInstanceDef(plainAliasName, prop, plainConst),
+      None(),
+    ),
+  );
+  environment = rewriteProbeEnvironment(runtime, constants.chill());
+  registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(
+    runtime,
+    environment,
+    className,
+  );
+  invariant(
+    leanTag(registered) == LeanTag.Except_ok,
+    "local-instance class registration failed",
+  );
+  !environment = leanField(registered, 0);
+  for (aliasName in Array[classAliasName, plainAliasName]) {
+    !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+      runtime,
+      environment,
+      aliasName,
+      LeanCtor(LeanTag.ReducibilityStatus_reducible, Array[]),
+      LeanCtor(LeanTag.AttributeKind_global, Array[]),
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+    )
+  };
+
+  classFvarName = name("classLocal");
+  aliasFvarName = name("aliasLocal");
+  plainFvarName = name("plainLocal");
+  plainAliasFvarName = name("plainAliasLocal");
+  classFvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, classFvarName);
+  aliasFvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, aliasFvarName);
+  plainFvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, plainFvarName);
+  plainAliasFvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(
+    runtime,
+    plainAliasFvarName,
+  );
+  locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  for ((localName, type) in Array[
+    (classFvarName, classConst),
+    (
+      aliasFvarName,
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, classAliasName, nil),
+    ),
+    (plainFvarName, plainConst),
+    (
+      plainAliasFvarName,
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, plainAliasName, nil),
+    ),
+  ]) {
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      locals,
+      localName,
+      localName,
+      type,
+      binder,
+      localKind,
+    )
+  };
+  defaults = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  metaContext = leanReplaceField(defaults, 3, locals);
+  initialInstances = LeanArray(
+    Array[LeanCtor(LeanTag.LocalInstance_mk, Array[className, classFvar])],
+  );
+  !metaContext = leanReplaceField(metaContext, 4, initialInstances);
+  metaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  metaStateRef = runtime.newRef(metaState);
+  coreContext = leanUnboundedCoreContext(runtime, "<with-local-instances>", "");
+  coreStateRef = runtime.newRef(leanCoreState(runtime, environment));
+  saved = runtime.checkpoint();
+  state = RewriteProbeState(
+    saved,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+  );
+  fvars = LeanArray(Array[classFvar, aliasFvar, plainFvar, plainAliasFvar]);
+  world = leanNatValue(29);
+  emptyInstances = initialInstances;
+  expectedFirst = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    runtime,
+    LeanErased(),
+    emptyInstances,
+    LeanCtor(LeanTag.LocalInstance_mk, Array[className, classFvar]),
+  );
+  expectedAll = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    runtime,
+    LeanErased(),
+    expectedFirst,
+    LeanCtor(LeanTag.LocalInstance_mk, Array[className, aliasFvar]),
+  );
+  localInstanceCheck(
+    "quick class, expensive alias, and skips",
+    state,
+    fvars,
+    LeanNatLiterals.n0,
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.Prod_mk, Array[expectedAll, world]), world],
+    ),
+    world,
+  );
+  localInstanceCheck(
+    "suffix begins at alias class",
+    state,
+    fvars,
+    LeanNatLiterals.n1,
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[
+        LeanCtor(
+          LeanTag.Prod_mk,
+          Array[
+            L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+              runtime,
+              LeanErased(),
+              emptyInstances,
+              LeanCtor(LeanTag.LocalInstance_mk, Array[className, aliasFvar]),
+            ),
+            world,
+          ],
+        ),
+        world,
+      ],
+    ),
+    world,
+  );
+  localInstanceCheck(
+    "empty suffix calls continuation",
+    state,
+    fvars,
+    LeanNatLiterals.n4,
+    LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.Prod_mk, Array[emptyInstances, world]), world],
+    ),
+    world,
+  );
+  errorWorld = leanNatValue(99);
+  errorMessage = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    runtime,
+    LeanText("continuation failure"),
+  );
+  continuationError = LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[leanField(coreContext, 2), errorMessage],
+      ),
+      errorWorld,
+    ],
+  );
+  localInstanceCheck(
+    "continuation error through scoped instances",
+    state,
+    fvars,
+    LeanNatLiterals.n0,
+    continuationError,
+    world,
+    true,
+  );
+  print_string("withNewLocalInstancesImp differential probe completed")
+}

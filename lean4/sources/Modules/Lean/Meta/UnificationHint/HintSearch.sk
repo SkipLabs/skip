@@ -1,0 +1,282 @@
+module L4_Lean_Meta_UnificationHint;
+
+// Trace the comparison, find registered hints, and try them in tree order.
+
+fun f_traceHintComparison(
+  runtime: mutable LeanExecution,
+  t: LeanValue,
+  s: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  if (leanTag(coreContext) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(coreContext, 0);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  options = leanField(cold, 2);
+  inheritedTraceOptions = leanField(cold, 11);
+  if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  optionsGate = leanField(options, 1);
+  if (leanTag(optionsGate) == LeanTag.Bool_false) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world],
+    )
+  };
+  if (leanTag(optionsGate) != LeanTag.Bool_true) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  traceClass = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+    runtime,
+    LeanText("Meta"),
+    LeanText("isDefEq"),
+    LeanText("hint"),
+  );
+  optionName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+    runtime,
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("trace")),
+    traceClass,
+  );
+  traceActive = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(
+    runtime,
+    inheritedTraceOptions,
+    options,
+    optionName,
+  );
+  if (leanTag(traceActive) == LeanTag.Bool_false) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world],
+    )
+  };
+  if (leanTag(traceActive) != LeanTag.Bool_true) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  lhsMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, t);
+  separatorMessage = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+    runtime,
+    LeanText(" =?= "),
+  );
+  lhsWithSeparator = LeanCtor(
+    LeanTag.MessageData_compose,
+    Array[lhsMessage, separatorMessage],
+  );
+  message = LeanCtor(
+    LeanTag.MessageData_compose,
+    Array[
+      lhsWithSeparator,
+      L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, s),
+    ],
+  );
+  f_tryUnificationHints_tryCandidate_spec_3_0bb3f1aa1c(
+    runtime,
+    traceClass,
+    message,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  )
+}
+
+fun f_tryHintCandidates(
+  runtime: mutable LeanExecution,
+  t: LeanValue,
+  s: LeanValue,
+  unificationHintsGate: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  recorded = f_Lean_Meta_getRecordedHints_474c1df527(
+    runtime,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(recorded) == LeanTag.EST_Out_error) {
+    return recorded
+  };
+  if (leanTag(recorded) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  recordedHints = leanField(recorded, 0);
+  recordedWorld = leanField(recorded, 1);
+  // Search uses the hint module config; candidate tests use the caller context.
+  moduleConfigWithKey = f_Lean_Meta_config_c5519b4ae2(runtime);
+  if (
+    leanTag(moduleConfigWithKey) !=
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk
+  ) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  searchConfig = leanField(moduleConfigWithKey, 0);
+  if (leanTag(metaContext) != LeanTag.Meta_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  searchConfigWithKey = LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    Array[
+      searchConfig,
+      L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, searchConfig),
+    ],
+  );
+  searchContext = LeanCtor(
+    LeanTag.Meta_Context_mk,
+    Array[
+      searchConfigWithKey,
+      leanField(metaContext, 1),
+      leanField(metaContext, 2),
+      leanField(metaContext, 3),
+      leanField(metaContext, 4),
+      leanField(metaContext, 5),
+      leanField(metaContext, 6),
+      leanField(metaContext, 7),
+      leanField(metaContext, 8),
+      leanField(metaContext, 9),
+      leanField(metaContext, 10),
+    ],
+  );
+  matched = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatch_67afc66ca7(
+    runtime,
+    recordedHints,
+    t,
+    searchContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    recordedWorld,
+  );
+  if (leanTag(matched) == LeanTag.EST_Out_error) {
+    return matched
+  };
+  if (leanTag(matched) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  candidates = leanField(matched, 0);
+  matchedWorld = leanField(matched, 1);
+  noAnswer: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  unit: LeanValue = LeanCtor(LeanTag.PUnit_unit, Array[]);
+  initialOutcome: LeanValue = LeanCtor(LeanTag.Prod_mk, Array[noAnswer, unit]);
+  tested = f_Meta_tryUnificationHints_spec_0_3921dd0a9a(
+    runtime,
+    t,
+    s,
+    unificationHintsGate,
+    candidates,
+    L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+      runtime,
+      LeanErased(),
+      candidates,
+    ),
+    LeanWord("usize", 0),
+    initialOutcome,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    matchedWorld,
+  );
+  if (leanTag(tested) == LeanTag.EST_Out_error) {
+    return tested
+  };
+  if (leanTag(tested) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  outcome = leanField(tested, 0);
+  outcomeWorld = leanField(tested, 1);
+  if (leanTag(outcome) != LeanTag.Prod_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  answer = leanField(outcome, 0);
+  if (leanTag(answer) == LeanTag.Option_none) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.Bool_false, Array[]), outcomeWorld],
+    )
+  };
+  if (leanTag(answer) != LeanTag.Option_some) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[leanField(answer, 0), outcomeWorld])
+}
+
+fun f_Lean_Meta_tryUnificationHints_9bcdc2c308(
+  runtime: mutable LeanExecution,
+  t: LeanValue,
+  s: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  traced = f_traceHintComparison(
+    runtime,
+    t,
+    s,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (leanTag(traced) == LeanTag.EST_Out_error) {
+    return traced
+  };
+  if (leanTag(traced) != LeanTag.EST_Out_ok) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  tracedWorld = leanField(traced, 1);
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    metaContext,
+  );
+  if (leanTag(config) != LeanTag.Meta_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  unificationHintsGate = leanField(config, 5);
+  if (leanTag(unificationHintsGate) == LeanTag.Bool_false) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[unificationHintsGate, tracedWorld],
+    )
+  };
+  if (leanTag(unificationHintsGate) != LeanTag.Bool_true) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  tIsMVar = L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(runtime, t);
+  if (leanTag(tIsMVar) == LeanTag.Bool_true) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.Bool_false, Array[]), tracedWorld],
+    )
+  };
+  if (leanTag(tIsMVar) != LeanTag.Bool_false) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_tryHintCandidates(
+    runtime,
+    t,
+    s,
+    unificationHintsGate,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    tracedWorld,
+  )
+}
+
+module end;

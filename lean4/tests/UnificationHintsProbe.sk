@@ -1,0 +1,534 @@
+// Bounded differential driver for tryUnificationHints.
+// Shared helpers come from tests/Support/RewriteProbe.sk.
+
+fun uhProbeName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun uhProbeEq(
+  runtime: mutable LeanExecution,
+  lhs: LeanValue,
+  rhs: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  levelZero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  levelOne = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, levelZero);
+  levels = LeanCtor(LeanTag.List_cons, Array[levelOne, nil]);
+  eqName = uhProbeName(runtime, "Eq");
+  natName = uhProbeName(runtime, "Nat");
+  eqConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, eqName, levels);
+  natType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, natName, nil);
+  eqAtType = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, eqConst, natType);
+  eqAtLhs = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, eqAtType, lhs);
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, eqAtLhs, rhs)
+}
+
+fun uhProbeAxiom(
+  name: LeanValue,
+  levelParams: LeanValue,
+  type: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, levelParams, type]),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun uhProbeDefinition(
+  name: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  nil = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(
+    LeanTag.ConstantInfo_defnInfo,
+    Array[
+      LeanCtor(
+        LeanTag.DefinitionVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]),
+          value,
+          LeanCtor(
+            LeanTag.ReducibilityHints_regular,
+            Array[LeanWord("uint32", 1)],
+          ),
+          LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+          LeanCtor(LeanTag.List_cons, Array[name, nil]),
+        ],
+      ),
+    ],
+  )
+}
+
+fun uhProbeContextWithHints(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  enabled: Bool,
+): LeanValue {
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    context,
+  );
+  updatedConfig = leanReplaceField(config, 5, leanBool(enabled));
+  keyedConfig = LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    Array[
+      updatedConfig,
+      L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, updatedConfig),
+    ],
+  );
+  leanReplaceField(context, 0, keyedConfig)
+}
+
+fun uhProbeOpenTraceGate(core: LeanValue): LeanValue {
+  cold = leanField(core, 0);
+  options = leanField(cold, 2);
+  traceOptions = leanReplaceField(options, 1, leanBool(true));
+  leanReplaceField(core, 0, leanReplaceField(cold, 2, traceOptions))
+}
+
+class UhProbeState(
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+)
+
+fun uhProbeCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: UhProbeState,
+  expressionT: LeanValue,
+  expressionS: LeanValue,
+  metaContext: LeanValue,
+  coreContext: LeanValue,
+  world: LeanValue,
+  expectedBool: Bool,
+  expectNoRefChange: Bool,
+): LeanExecutionCheckpoint {
+  oldT = rewriteProbeCopyInput(expressionT);
+  newT = rewriteProbeCopyInput(expressionT);
+  oldS = rewriteProbeCopyInput(expressionS);
+  newS = rewriteProbeCopyInput(expressionS);
+  oldMeta = rewriteProbeCopyInput(metaContext);
+  newMeta = rewriteProbeCopyInput(metaContext);
+  oldCore = rewriteProbeCopyInput(coreContext);
+  newCore = rewriteProbeCopyInput(coreContext);
+  expected = LeanCtor(LeanTag.EST_Out_ok, Array[leanBool(expectedBool), world]);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      value = L4_Lean_Meta_UnificationHint.f_Lean_Meta_tryUnificationHints_9bcdc2c308_fallback(
+        runtime,
+        oldT,
+        oldS,
+        oldMeta,
+        state.metaStateRef,
+        oldCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expressionT, oldT));
+      assert(rewriteProbeSameInput(expressionS, oldS));
+      assert(rewriteProbeSameInput(metaContext, oldMeta));
+      assert(rewriteProbeSameInput(coreContext, oldCore));
+      value
+    },
+    (runtime: mutable LeanExecution) ~> {
+      value = L4_Lean_Meta_UnificationHint.f_Lean_Meta_tryUnificationHints_9bcdc2c308(
+        runtime,
+        newT,
+        newS,
+        newMeta,
+        state.metaStateRef,
+        newCore,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(expressionT, newT));
+      assert(rewriteProbeSameInput(expressionS, newS));
+      assert(rewriteProbeSameInput(metaContext, newMeta));
+      assert(rewriteProbeSameInput(coreContext, newCore));
+      value
+    },
+    Some(expected),
+  );
+  if (expectNoRefChange && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("tryUnificationHints changed fast-path references: " + label)
+  };
+  if (leanTag(result) != LeanTag.EST_Out_ok) {
+    leanFail("tryUnificationHints unexpected result tag: " + label)
+  };
+  if (native_eq(leanField(result, 1), world) != 0) {
+    leanFail("tryUnificationHints unexpected world: " + label)
+  };
+  after
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    zero = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      LeanNatLiterals.n0,
+    );
+    one = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      LeanNatLiterals.n1,
+    );
+    levelOne = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+      builder,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, levelOne);
+    uName = uhProbeName(builder, "probeU");
+    u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, uName);
+    sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, u);
+    natName = uhProbeName(builder, "Nat");
+    eqName = uhProbeName(builder, "Eq");
+    natType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, natName, nil);
+    eqType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder,
+      uhProbeName(builder, "alpha"),
+      LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
+      sortU,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        builder,
+        uhProbeName(builder, "lhs"),
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0),
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+          builder,
+          uhProbeName(builder, "rhs"),
+          LeanCtor(LeanTag.BinderInfo_default, Array[]),
+          L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n1),
+          prop,
+        ),
+      ),
+    );
+    hintName = uhProbeName(builder, "Probe.unificationHint.zero");
+    wildcardName = uhProbeName(builder, "Probe.unificationHint.anyToOne");
+    hintBody = uhProbeEq(builder, zero, zero);
+    hintInfo = uhProbeDefinition(hintName, prop, hintBody);
+    wildcardBody = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      uhProbeName(builder, "z"),
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      natType,
+      uhProbeEq(
+        builder,
+        L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0),
+        one,
+      ),
+    );
+    wildcardType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder,
+      uhProbeName(builder, "z"),
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      natType,
+      prop,
+    );
+    wildcardInfo = uhProbeDefinition(wildcardName, wildcardType, wildcardBody);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    constants.set(
+      leanNameKey(natName),
+      LeanConstantFile(uhProbeAxiom(natName, nil, type), None()),
+    );
+    constants.set(
+      leanNameKey(eqName),
+      LeanConstantFile(
+        uhProbeAxiom(
+          eqName,
+          LeanCtor(LeanTag.List_cons, Array[uName, nil]),
+          eqType,
+        ),
+        None(),
+      ),
+    );
+    constants.set(leanNameKey(hintName), LeanConstantFile(hintInfo, None()));
+    constants.set(
+      leanNameKey(wildcardName),
+      LeanConstantFile(wildcardInfo, None()),
+    );
+    extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+      builder,
+      LeanErased(),
+    );
+    assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+    generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+      builder,
+      LeanArray(Array[]),
+      leanField(extensions, 1),
+    );
+    assert(leanTag(generations) == LeanTag.EST_Out_ok);
+    empty = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+    environment = leanEnvironment(
+      builder,
+      LeanConstantsView("imports", empty),
+      LeanConstantsView("locals", LeanConstantMap(constants.chill())),
+      leanEmptyEnvironmentHeader(),
+      leanField(extensions, 0),
+      leanField(generations, 0),
+      false,
+      LeanNatLiterals.n0,
+      LeanCtor(
+        LeanTag.ImportedConsts_mk,
+        Array[
+          LeanCtor(LeanTag.Option_none, Array[]),
+          LeanTrackedConstants(LeanConstantsView("extra", empty)),
+        ],
+      ),
+    );
+    baseContext = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+      builder,
+    );
+    localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+      builder,
+    );
+    metaContext = leanReplaceField(baseContext, 3, localContext);
+    initialMetaState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+      builder,
+    );
+    mvarName = uhProbeName(builder, "probeMvar");
+    mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+      builder,
+      leanField(initialMetaState, 0),
+      mvarName,
+      mvarName,
+      localContext,
+      LeanArray(Array[]),
+      prop,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+      LeanNatLiterals.n0,
+    );
+    !initialMetaState = leanReplaceField(initialMetaState, 0, mctx);
+    metaStateRef = builder.newRef(initialMetaState);
+    coreContext = leanUnboundedCoreContext(
+      builder,
+      "<unification-hint-probe>",
+      "",
+    );
+    coreStateRef = builder.newRef(leanCoreState(builder, environment));
+    state = UhProbeState(metaContext, metaStateRef, coreContext, coreStateRef);
+    mvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, mvarName);
+    savedEmpty = builder.checkpoint();
+    world = leanNatValue(37);
+    enabledContext = uhProbeContextWithHints(builder, metaContext, true);
+    disabledContext = uhProbeContextWithHints(builder, metaContext, false);
+    traceCore = uhProbeOpenTraceGate(state.coreContext);
+    _ = uhProbeCheck(
+      "disabled-config-short-circuit",
+      savedEmpty,
+      state,
+      zero,
+      zero,
+      disabledContext,
+      state.coreContext,
+      world,
+      false,
+      true,
+    );
+    !count = count + 1;
+    _ = uhProbeCheck(
+      "enabled-mvar-short-circuit",
+      savedEmpty,
+      state,
+      mvar,
+      zero,
+      enabledContext,
+      state.coreContext,
+      world,
+      false,
+      true,
+    );
+    !count = count + 1;
+    _ = uhProbeCheck(
+      "empty-hints",
+      savedEmpty,
+      state,
+      zero,
+      zero,
+      enabledContext,
+      state.coreContext,
+      world,
+      false,
+      false,
+    );
+    !count = count + 1;
+    _ = uhProbeCheck(
+      "cached-trace-gate-open-no-entry",
+      savedEmpty,
+      state,
+      zero,
+      zero,
+      disabledContext,
+      traceCore,
+      world,
+      false,
+      true,
+    );
+    !count = count + 1;
+    _ = uhProbeCheck(
+      "cached trace gate while trace option is off",
+      savedEmpty,
+      state,
+      zero,
+      zero,
+      enabledContext,
+      traceCore,
+      world,
+      false,
+      false,
+    );
+    !count = count + 1;
+    registerWildcard = L4_Lean_Meta_UnificationHint.f_Lean_Meta_addUnificationHint_27fa4f9040(
+      builder,
+      wildcardName,
+      LeanCtor(LeanTag.AttributeKind_global, Array[]),
+      metaContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      world,
+    );
+    if (leanTag(registerWildcard) != LeanTag.EST_Out_ok) {
+      leanFail("probe hint registration failed")
+    };
+    if (native_eq(leanField(registerWildcard, 1), world) != 0) {
+      leanFail("probe hint registration changed world")
+    };
+    savedWildcard = builder.checkpoint();
+    beforeWildcardMctx = leanField(builder.readRef(state.metaStateRef), 0);
+    afterFailedWildcard = uhProbeCheck(
+      "wildcard candidate fails constraint and rolls back",
+      savedWildcard,
+      state,
+      zero,
+      zero,
+      enabledContext,
+      state.coreContext,
+      leanField(registerWildcard, 1),
+      false,
+      false,
+    );
+    afterFailedRuntime = afterFailedWildcard.restoreRaw();
+    afterFailedMctx = leanField(
+      afterFailedRuntime.readRef(state.metaStateRef),
+      0,
+    );
+    assert(native_eq(beforeWildcardMctx, afterFailedMctx) == 0);
+    !count = count + 1;
+
+    recordedHints = L4_Lean_Meta_UnificationHint.f_Lean_Meta_getRecordedHints_474c1df527(
+      builder,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(registerWildcard, 1),
+    );
+    assert(leanTag(recordedHints) == LeanTag.EST_Out_ok);
+    candidates = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatch_67afc66ca7(
+      builder,
+      leanField(recordedHints, 0),
+      zero,
+      enabledContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(recordedHints, 1),
+    );
+    assert(leanTag(candidates) == LeanTag.EST_Out_ok);
+    candidateNames = leanArray(leanField(candidates, 0));
+    assert(candidateNames.size() == 1);
+    assert(native_eq(candidateNames[0], wildcardName) == 0);
+
+    registerExact = L4_Lean_Meta_UnificationHint.f_Lean_Meta_addUnificationHint_27fa4f9040(
+      builder,
+      hintName,
+      LeanCtor(LeanTag.AttributeKind_global, Array[]),
+      metaContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(registerWildcard, 1),
+    );
+    if (leanTag(registerExact) != LeanTag.EST_Out_ok) {
+      leanFail("exact probe hint registration failed")
+    };
+    if (
+      native_eq(leanField(registerExact, 1), leanField(registerWildcard, 1)) !=
+      0
+    ) {
+      leanFail("exact hint registration changed world")
+    };
+    savedWithHint = builder.checkpoint();
+    combinedHints = L4_Lean_Meta_UnificationHint.f_Lean_Meta_getRecordedHints_474c1df527(
+      builder,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(registerExact, 1),
+    );
+    assert(leanTag(combinedHints) == LeanTag.EST_Out_ok);
+    combinedCandidates = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_getMatch_67afc66ca7(
+      builder,
+      leanField(combinedHints, 0),
+      zero,
+      enabledContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(combinedHints, 1),
+    );
+    assert(leanTag(combinedCandidates) == LeanTag.EST_Out_ok);
+    combinedNames = leanArray(leanField(combinedCandidates, 0));
+    assert(combinedNames.size() == 2);
+    assert(native_eq(combinedNames[0], wildcardName) == 0);
+    assert(native_eq(combinedNames[1], hintName) == 0);
+    _ = uhProbeCheck(
+      "registered-hint-matches",
+      savedWithHint,
+      state,
+      zero,
+      zero,
+      enabledContext,
+      state.coreContext,
+      leanField(registerExact, 1),
+      true,
+      false,
+    );
+    !count = count + 1;
+    _ = uhProbeCheck(
+      "registered-hint-does-not-match",
+      savedWithHint,
+      state,
+      one,
+      zero,
+      enabledContext,
+      state.coreContext,
+      leanField(registerExact, 1),
+      false,
+      false,
+    );
+    !count = count + 1
+  };
+  assert(count == 16);
+  print_string("tryUnificationHints bounded comparisons: " + count.toString())
+}

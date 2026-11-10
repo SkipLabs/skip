@@ -1,0 +1,426 @@
+// Cache policy depends on expression metadata and the presence of a predicate.
+class DefEqCacheKindCase(label: String, expr: LeanValue, hasMVar: Bool)
+
+fun defEqCacheKindPredicate(
+  _runtime: mutable LeanExecution,
+  _arguments: Array<LeanValue>,
+): LeanValue {
+  leanFail("cache classification must not invoke the unfolding predicate")
+}
+
+fun defEqCacheKindCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  world: LeanValue,
+  transient: Bool,
+): void {
+  originalLeft = rewriteProbeCopyInput(left);
+  originalRight = rewriteProbeCopyInput(right);
+  originalContext = rewriteProbeCopyInput(context);
+  replacementLeft = rewriteProbeCopyInput(left);
+  replacementRight = rewriteProbeCopyInput(right);
+  replacementContext = rewriteProbeCopyInput(context);
+  kind: LeanValue = if (transient) {
+    LeanCtor(LeanTag.Meta_DefEqCacheKind_transient, Array[])
+  } else {
+    LeanCtor(LeanTag.Meta_DefEqCacheKind_permanent, Array[])
+  };
+  (_, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_getDefEqCacheKind_5a348f177f_fallback(
+        runtime,
+        originalLeft,
+        originalRight,
+        originalContext,
+        world,
+      );
+      assert(rewriteProbeSameInput(originalLeft, left));
+      assert(rewriteProbeSameInput(originalRight, right));
+      assert(rewriteProbeSameInput(originalContext, context));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_getDefEqCacheKind_5a348f177f(
+        runtime,
+        replacementLeft,
+        replacementRight,
+        replacementContext,
+        world,
+      );
+      assert(rewriteProbeSameInput(replacementLeft, left));
+      assert(rewriteProbeSameInput(replacementRight, right));
+      assert(rewriteProbeSameInput(replacementContext, context));
+      result
+    },
+    Some(LeanCtor(LeanTag.EST_Out_ok, Array[kind, world])),
+  );
+  assert(native_eq(saved.refs, after.refs) == 0)
+}
+
+fun main(): void {
+  comparisons = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("cacheProbe"),
+    );
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    parameter = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, name);
+    levelMVar = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, name);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    sortParam = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, parameter);
+    sortMVar = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelMVar);
+    constant = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name, nil);
+    constParam = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      name,
+      LeanCtor(LeanTag.List_cons, Array[parameter, nil]),
+    );
+    constMVar = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      name,
+      LeanCtor(LeanTag.List_cons, Array[levelMVar, nil]),
+    );
+    fvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name);
+    mvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, name);
+    bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    metadata = L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(runtime);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      name,
+      binder,
+      prop,
+      bvar,
+    );
+    cases = Array[
+      DefEqCacheKindCase("sort zero", prop, false),
+      DefEqCacheKindCase("sort parameter", sortParam, false),
+      DefEqCacheKindCase("sort metavariable", sortMVar, true),
+      DefEqCacheKindCase(
+        "sort successor metavariable",
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, levelMVar),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "sort max metavariable",
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelMax_68700d1eab(
+            runtime,
+            parameter,
+            levelMVar,
+          ),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "sort imax metavariable",
+        L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+          runtime,
+          L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(
+            runtime,
+            levelMVar,
+            parameter,
+          ),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase("constant without levels", constant, false),
+      DefEqCacheKindCase("constant parameter", constParam, false),
+      DefEqCacheKindCase("constant metavariable", constMVar, true),
+      DefEqCacheKindCase("free variable", fvar, false),
+      DefEqCacheKindCase("expression metavariable", mvar, true),
+      DefEqCacheKindCase("bound variable", bvar, false),
+      DefEqCacheKindCase(
+        "natural literal",
+        L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, LeanNatLiterals.n7),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "string literal",
+        L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("cache")),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "application without metavariables",
+        L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, constant),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "application function metavariable",
+        L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, mvar, constant),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "application argument metavariable",
+        L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, mvar),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "lambda domain metavariable",
+        L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+          runtime,
+          name,
+          binder,
+          mvar,
+          bvar,
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "lambda body metavariable",
+        L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+          runtime,
+          name,
+          binder,
+          prop,
+          mvar,
+        ),
+        true,
+      ),
+      DefEqCacheKindCase("lambda without metavariables", identity, false),
+      DefEqCacheKindCase(
+        "forall domain metavariable",
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+          runtime,
+          name,
+          binder,
+          mvar,
+          prop,
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "forall body metavariable",
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+          runtime,
+          name,
+          binder,
+          prop,
+          mvar,
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "forall without metavariables",
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+          runtime,
+          name,
+          binder,
+          prop,
+          prop,
+        ),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "let type metavariable",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          name,
+          mvar,
+          constant,
+          bvar,
+          leanBool(false),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "let value metavariable",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          name,
+          prop,
+          mvar,
+          bvar,
+          leanBool(false),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "let body metavariable",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          name,
+          prop,
+          constant,
+          mvar,
+          leanBool(false),
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "let without metavariables",
+        L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+          runtime,
+          name,
+          prop,
+          constant,
+          bvar,
+          leanBool(false),
+        ),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "metadata without metavariables",
+        L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, constant),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "metadata metavariable",
+        L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, metadata, mvar),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "projection without metavariables",
+        L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+          runtime,
+          name,
+          LeanNatLiterals.n0,
+          constant,
+        ),
+        false,
+      ),
+      DefEqCacheKindCase(
+        "projection metavariable",
+        L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+          runtime,
+          name,
+          LeanNatLiterals.n0,
+          mvar,
+        ),
+        true,
+      ),
+      DefEqCacheKindCase(
+        "expression and universe metavariables",
+        L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, constMVar, mvar),
+        true,
+      ),
+    ];
+    assert(cases.size() == 32);
+    context = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+      runtime,
+    );
+    custom = leanReplaceField(
+      context,
+      7,
+      LeanCtor(
+        LeanTag.Option_some,
+        Array[LeanClosure(defEqCacheKindPredicate, 5, Array[])],
+      ),
+    );
+    unavailable = LeanUnavailable("cache classification must skip this input");
+    customUnavailable = leanReplaceField(
+      context,
+      7,
+      LeanCtor(LeanTag.Option_some, Array[unavailable]),
+    );
+    witnessValues: Array<LeanValue> = Array[constant, prop, leanNatValue(71)];
+    _stateWitness = runtime.newRef(LeanArray(witnessValues));
+    saved = runtime.checkpoint();
+    worlds: Array<LeanValue> = Array[LeanErased(), leanNatValue(29)];
+    for (world in worlds) {
+      for (item in cases) {
+        for ((policy, customPolicy) in Array[
+          (context, false),
+          (custom, true),
+        ]) {
+          defEqCacheKindCheck(
+            item.label + " left",
+            saved,
+            item.expr,
+            prop,
+            policy,
+            world,
+            item.hasMVar || customPolicy,
+          );
+          defEqCacheKindCheck(
+            item.label + " right",
+            saved,
+            prop,
+            item.expr,
+            policy,
+            world,
+            item.hasMVar || customPolicy,
+          );
+          !comparisons = comparisons + 2
+        }
+      };
+      defEqCacheKindCheck(
+        "left expression mvar skips right and context",
+        saved,
+        mvar,
+        unavailable,
+        unavailable,
+        world,
+        true,
+      );
+      defEqCacheKindCheck(
+        "left universe mvar skips right and context",
+        saved,
+        sortMVar,
+        unavailable,
+        unavailable,
+        world,
+        true,
+      );
+      defEqCacheKindCheck(
+        "right expression mvar skips context",
+        saved,
+        prop,
+        mvar,
+        unavailable,
+        world,
+        true,
+      );
+      defEqCacheKindCheck(
+        "right universe mvar skips context",
+        saved,
+        prop,
+        sortMVar,
+        unavailable,
+        world,
+        true,
+      );
+      defEqCacheKindCheck(
+        "predicate payload is not called",
+        saved,
+        prop,
+        prop,
+        customUnavailable,
+        world,
+        true,
+      );
+      defEqCacheKindCheck(
+        "both expressions contain mvars",
+        saved,
+        mvar,
+        sortMVar,
+        context,
+        world,
+        true,
+      );
+      !comparisons = comparisons + 6
+    }
+  };
+  assert(comparisons == 536);
+  print_string(
+    "getDefEqCacheKind: " +
+      comparisons.toString() +
+      " differential cases passed",
+  )
+}

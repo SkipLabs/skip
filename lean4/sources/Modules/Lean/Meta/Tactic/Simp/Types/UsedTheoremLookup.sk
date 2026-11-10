@@ -1,0 +1,47 @@
+module L4_Lean_Meta_Tactic_Simp_Types;
+
+fun f_usedSimpNameHashBits(name: LeanValue): Int {
+  leanTag(name) match {
+  | LeanTag.Name_anonymous__impl -> 1723
+  | LeanTag.Name_str__impl
+  | LeanTag.Name_num__impl ->
+    leanWordBits(leanField(name, 0))
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_usedSimpOriginHashBits(
+  runtime: mutable LeanExecution,
+  origin: LeanValue,
+): Int {
+  if (leanTag(origin) == LeanTag.Meta_Origin_decl) {
+    name = leanField(origin, 0);
+    inverted = leanField(origin, 2);
+    salt = leanTag(inverted) match {
+    | LeanTag.Bool_false -> 13
+    | LeanTag.Bool_true -> 11
+    | _ -> leanFail("non-exhaustive Lean case")
+    };
+    leanMixHash(f_usedSimpNameHashBits(name), salt)
+  } else {
+    name = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_Origin_key_c1787d6ead(
+      runtime,
+      origin,
+    );
+    f_usedSimpNameHashBits(name)
+  }
+}
+
+fun f_UsedSimps_contains_spec_0_36179bfd36(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+  origin: LeanValue,
+): LeanValue {
+  hash: LeanValue = LeanWord(
+    "usize",
+    f_usedSimpOriginHashBits(runtime, origin),
+  );
+  f_contains_spec_0_spec_0_5203d6fa76(runtime, root, hash, origin)
+}
+
+module end;
