@@ -531,8 +531,10 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   } else {
     fd = open(fileName, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     if (fd == -1) {
+      // perror may change errno (glibc sets EINVAL when stderr is not a tty).
+      int open_errno = errno;
       perror("ERROR: could not create persistent mapping");
-      exit(errno == EEXIST ? ERROR_MAPPING_EXISTS : ERROR_FILE_IO);
+      exit(open_errno == EEXIST ? ERROR_MAPPING_EXISTS : ERROR_FILE_IO);
     }
     if (sk_flock(fd, LOCK_EX) != 0) {
       perror("ERROR: could not lock persistent mapping");

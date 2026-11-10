@@ -74,6 +74,22 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-persistent-flock-eintr
 ```
 
+# Existing persistent mapping
+
+Creating a mapping over an existing file must exit with `ERROR_MAPPING_EXISTS`
+(40), which tells "already initialized" apart from a real I/O failure
+(`ERROR_FILE_IO`, 45). The runtime reports the error with `perror`, which may
+change `errno`; with glibc and stderr redirected, it sets `EINVAL`. This test
+redirects stderr, creates a mapping twice, and checks the second exit code.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/persistent_mapping_exists.c \
+  -o /tmp/test-persistent-mapping-exists
+/tmp/test-persistent-mapping-exists
+```
+
 # Reference masks
 
 The object traversals use 64-bit reference masks. This regression exercises
