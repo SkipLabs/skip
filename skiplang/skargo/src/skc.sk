@@ -1,5 +1,9 @@
 module Skargo;
 
+// skc's exit status when its --data file was written by another executable
+// (ERROR_MAPPING_VERSION in prelude/runtime/runtime.h).
+const kSkcErrorMappingVersion: Int = 43;
+
 class Skc(cmd: String, extra_options: Array<String>) {
   fun process(): mutable ProcessBuilder {
     process = ProcessBuilder::create{
@@ -36,6 +40,15 @@ mutable class ProcessBuilder private {
 
   mutable fun args(values: Array<String>): void {
     values.each(this.arg)
+  }
+
+  // Replaces every argument equal to `from` with `to`.
+  mutable fun replace_arg(from: String, to: String): void {
+    for (i in Range(0, this.process_args.size())) {
+      if (this.process_args[i] == from) {
+        this.process_args.set(i, to)
+      }
+    }
   }
 
   mutable fun env(key: String, value: String): void {

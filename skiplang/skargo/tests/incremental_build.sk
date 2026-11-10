@@ -147,6 +147,34 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   );
   run_probe(pure, "2");
 
+  // A database written by another skc executable (e.g. a rebuilt compiler
+  // pointed at the same target dir) fails skc's build-id check with exit 43.
+  // It is a stale cache: skargo discards it and rebuilds instead of failing
+  // (#1500, #1606). Corrupt one header byte inside the build-id.
+  for (database in databases) {
+    T.expectTrue(
+      System.subprocess(
+        Array[
+          "sh",
+          "-c",
+          "printf '\\377' | dd of=\"$0\" bs=1 seek=20 conv=notrunc 2>/dev/null",
+          database,
+        ],
+      )
+        .fromSuccess()
+        .success(),
+    )
+  };
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", "200001010000.02", source])
+      .fromSuccess()
+      .success(),
+  );
+  foreign = build(skargo, pure);
+  T.expectTrue(foreign.stderr.contains("Discarding"), foreign.stderr);
+  T.expectTrue(foreign.stderr.contains("--init "), foreign.stderr);
+  run_probe(pure, "2");
+
   // A fingerprint cannot make a missing primary artifact fresh.
   artifacts = FileSystem.readFilesRecursive(
     pure + "/target/host/dev/deps",
