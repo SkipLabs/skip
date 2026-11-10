@@ -247,6 +247,11 @@ preservation and expected results that embed a copy. Keep exact old/new result
 and reference comparisons where both routes use the same representations. This
 helper is a test comparison, not expression equality or a cache-key policy.
 
+`restoreRaw` restores saved profiling counters as well as references. Check event
+count deltas against the saved baseline when fixture construction used profiling;
+do not assume that a restored runtime starts with zero events. Exclude elapsed
+profiling time from exact state comparisons, while retaining event-count checks.
+
 ```sh
 python3 tools/probe.py --release --rewrite-harness \
   --name task-check --driver tests/TaskProbe.sk
@@ -275,8 +280,9 @@ in stateful fixtures: an unchanged WHNF expression can still publish a cache ent
 Run incremental `skargo check --release`, then focused execution checks. Retain
 `target/`; serialize compiler/probe jobs. A focused probe selects verbatim
 maintained bodies and is not the retired transpiler. Keep generated probe binaries
-out of claims about full application validation. No per-helper performance runs;
-follow the active plan's final whole-path benchmark gate.
+out of claims about full application validation. The latest plan uses profiles
+of the actual workload to select hot-path batches, followed by whole-example
+measurements. A helper-only speedup does not establish whole-proof parity.
 
 Maintain statuses such as queued, drafting, review, needs-revision, checked and
 integrated. Only accepted code with recorded checks counts toward completion.

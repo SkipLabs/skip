@@ -68,11 +68,10 @@ unfinished representation conversion.
 
 ## Refactor coherent pieces
 
-The user's preference is to fix obvious representation and readability problems
-in coherent batches, finishing the example's exercised path before benchmarking.
-Do not require a profile proving every
-cleanup is hot. Use profiling when it resolves a real design choice or explains
-a remaining gap. Cleaner code is a benefit; a speedup is a measured claim.
+The user's latest preference is to profile the actual benchmark and focus rewrites
+on its dominant costs. This supersedes finishing the entire exercised path before
+benchmarking. Use coherent hot-path batches, retaining readability and semantic
+review. Cleaner code is a benefit; a speedup is a measured claim.
 
 The aim is ordinary Skip while preserving Lean's algorithms. A control-flow
 rewrite can be complete for one function while its interfaces still use boxed
@@ -207,12 +206,12 @@ from the retired code transpiler.
 The user authorizes periodic Git checkpoints. Commit coherent reviewed batches
 with focused checks and necessary documentation. Stage owned paths or exact
 changes, preserving unrelated working-tree and staged work. State remaining
-validation gaps; defer performance benchmarking to the final example-path gate.
+validation gaps; measure the actual workload after coherent hot-path batches.
 
 ## Build and validate the batch
 
 Use `skargo check` during editing and focused probes to validate coherent batches.
-Reserve the measurement `skargo build --release` for the completed exercised path;
+Use a cached `skargo build --release` for current benchmark/profile checkpoints;
 a correctness-only integration build is appropriate if a specific concern cannot
 be checked by focused probes. Do not compile and link the entire executable merely
 to discover type errors. Retain `target/` for both
@@ -282,12 +281,10 @@ elaboration intervals; the same process also spends time resetting state and
 exporting proofs. Unknown libc symbols are unresolved costs, not proof of copying.
 
 After each coherent batch, record changes, checks and remaining unsupported
-behavior in the active plan. The current user steering is to finish converting
-the example's exercised path before the next performance comparison; do not
-interrupt every helper or batch with a benchmark. Continue incremental checking
-and focused behavioral validation during that work. Once the path is converted,
-build release, validate whole proofs and measure. Inspect material regressions
-then. The earlier inline `LeanCtor2`/`LeanCtor3` experiment reduced allocation
+behavior in the active plan. Current steering is to profile the actual workload,
+select dominant costs, validate focused rewrites, then build release and measure
+again with whole-proof checks. A complete inventory conversion is no longer a
+prerequisite to measurement. The earlier inline `LeanCtor2`/`LeanCtor3` experiment reduced allocation
 but slightly slowed execution and substantially increased build memory; it was
 reverted. This is evidence to measure new designs, not a ban on typed values.
 General mutable-local lowering also previously exposed native-code-generation

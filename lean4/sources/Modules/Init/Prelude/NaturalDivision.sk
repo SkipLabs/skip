@@ -1,0 +1,22 @@
+// Natural division keeps arbitrary precision and total division by zero.
+module L4_Init_Prelude;
+
+fun f_Nat_div_d9df18e4c4(
+  runtime: mutable LeanExecution,
+  dividend: LeanValue,
+  divisor: LeanValue,
+): LeanValue {
+  if (runtime.profileRuntime) {
+    return leanInvokePrimitive(
+      runtime,
+      "Nat.div",
+      "lean_nat_div",
+      Array[dividend, divisor],
+    )
+  };
+  numerator = leanNat(dividend);
+  denominator = leanNat(divisor);
+  leanBoxNat(numerator.divMod(denominator).i0)
+}
+
+module end;

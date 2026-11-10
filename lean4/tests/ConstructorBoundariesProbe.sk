@@ -1,0 +1,461 @@
+// Fixed arithmetic/metadata outcomes and publication checks for three boundaries.
+class BoundaryNatCase(dividend: String, divisor: String, quotient: String)
+class BoundaryDataCase(
+  functionData: String,
+  argumentData: String,
+  resultData: String,
+)
+
+fun boundaryCheckState(
+  before: LeanExecutionCheckpoint,
+  after: LeanExecutionCheckpoint,
+  events: Int,
+): void {
+  assert(native_eq(before.refs, after.refs) == 0);
+  assert(native_eq(before.initializers, after.initializers) == 0);
+  assert(native_eq(before.immutableIdentities, after.immutableIdentities) == 0);
+  assert(before.initializing == after.initializing);
+  assert(before.unboundedHeartbeats == after.unboundedHeartbeats);
+  assert(before.sharedValueRealizations == after.sharedValueRealizations);
+  assert(before.profileRuntime == after.profileRuntime);
+  assert(before.collectSimpRegions == after.collectSimpRegions);
+  assert(before.denseSimpRegions == after.denseSimpRegions);
+  assert(before.memoizeSimp == after.memoizeSimp);
+  assert(before.simpQueryMask == after.simpQueryMask);
+  assert(native_eq(before.simpHook, after.simpHook) == 0);
+  assert(native_eq(before.simpOlderQueryKeys, after.simpOlderQueryKeys) == 0);
+  assert(before.profileSimpPhases == after.profileSimpPhases);
+  assert(native_eq(before.simpPhaseNs, after.simpPhaseNs) == 0);
+  assert(after.metrics.size() == before.metrics.size());
+  for (i in Range(0, before.metrics.size())) {
+    if (i != 7) {
+      delta = if (i == 6) events else 0;
+      assert(after.metrics[i] == before.metrics[i] + delta)
+    }
+  };
+  if (!before.profileRuntime) assert(after.metrics[7] == before.metrics[7])
+}
+
+fun boundaryNatInput(digits: String, scalar: Bool): LeanValue {
+  if (scalar) LeanScalar("nat", "000" + digits) else {
+    leanBoxNat(LeanNat::parse(digits))
+  }
+}
+
+fun boundaryCheckDivision(
+  item: BoundaryNatCase,
+  leftScalar: Bool,
+  rightScalar: Bool,
+  profile: Bool,
+): void {
+  builder = mutable LeanExecution{profileRuntime => profile};
+  _ref = builder.newRef(LeanText("division sentinel"));
+  saved = builder.checkpoint();
+  original = saved.restoreRaw();
+  replacement = saved.restoreRaw();
+  dividend = boundaryNatInput(item.dividend, leftScalar);
+  divisor = boundaryNatInput(item.divisor, rightScalar);
+  oldResult = L4_Init_Prelude.f_Nat_div_d9df18e4c4_fallback(
+    original,
+    dividend,
+    divisor,
+  );
+  newResult = L4_Init_Prelude.f_Nat_div_d9df18e4c4(
+    replacement,
+    dividend,
+    divisor,
+  );
+  expected = leanBoxNat(LeanNat::parse(item.quotient));
+  assert(native_eq(oldResult, newResult) == 0);
+  assert(native_eq(newResult, expected) == 0);
+  assert(leanNat(newResult).toString() == item.quotient);
+  if (leanNat(expected) < LeanNat::fromInt(256)) {
+    assert(leanSameObject(newResult, expected) != 0)
+  };
+  boundaryCheckState(saved, original.checkpoint(), if (profile) 1 else 0);
+  boundaryCheckState(saved, replacement.checkpoint(), if (profile) 1 else 0);
+  assert(native_eq(dividend, boundaryNatInput(item.dividend, leftScalar)) == 0);
+  assert(native_eq(divisor, boundaryNatInput(item.divisor, rightScalar)) == 0)
+}
+
+fun boundaryWord(digits: String, scalar: Bool): LeanValue {
+  if (scalar) LeanScalar("uint64", "000" + digits) else {
+    LeanWord("uint64", leanWordBits(LeanScalar("uint64", digits)))
+  }
+}
+
+fun boundaryMetadataForm(expr: LeanValue, scalar: Bool): LeanValue {
+  if (scalar) {
+    leanReplaceField(
+      expr,
+      0,
+      LeanScalar(
+        "uint64",
+        "000" + LeanNat::fromWord(leanExprData(expr)).toString(),
+      ),
+    )
+  } else {
+    expr
+  }
+}
+
+fun boundaryCheckPublication(
+  result: LeanValue,
+  function: LeanValue,
+  argument: LeanValue,
+  expectedBits: ?String,
+): void {
+  assert(leanTag(result) == LeanTag.Expr_app__impl);
+  assert(leanSameObject(leanField(result, 1), function) != 0);
+  assert(leanSameObject(leanField(result, 2), argument) != 0);
+  if (leanSameObject(function, argument) != 0) {
+    assert(leanSameObject(leanField(result, 1), leanField(result, 2)) != 0)
+  };
+  leanField(result, 0) match {
+  | LeanWord("uint64", bits) ->
+    expectedBits match {
+    | Some(digits) -> assert(bits == leanWordBits(LeanScalar("uint64", digits)))
+    | None() -> void
+    };
+    functionBits = leanExprData(function);
+    argumentBits = leanExprData(argument);
+    assert(
+      bits.ushr(32).and(255) ==
+        min(
+          255,
+          max(functionBits.ushr(32).and(255), argumentBits.ushr(32).and(255)) +
+            1,
+        ),
+    );
+    assert(bits.ushr(44) == max(functionBits.ushr(44), argumentBits.ushr(44)));
+    assert(
+      bits.and(15.shl(40)) == functionBits.or(argumentBits).and(15.shl(40)),
+    )
+  | _ -> leanFail("application metadata must publish a computed UInt64")
+  }
+}
+
+fun boundaryCheckApplication(
+  function: LeanValue,
+  argument: LeanValue,
+  expectedBits: ?String,
+  alias: Bool,
+  profile: Bool,
+): void {
+  builder = mutable LeanExecution{profileRuntime => profile};
+  _ref = builder.newRef(LeanText("application sentinel"));
+  saved = builder.checkpoint();
+  original = saved.restoreRaw();
+  replacement = saved.restoreRaw();
+  shared = leanSameObject(function, argument) != 0;
+  oldFunction = rewriteProbeCopyInput(function);
+  oldArgument = if (shared) oldFunction else rewriteProbeCopyInput(argument);
+  newFunction = rewriteProbeCopyInput(function);
+  newArgument = if (shared) newFunction else rewriteProbeCopyInput(argument);
+  oldResult = L4_Lean_Expr.f_Expr_app_override_84f3f08ede_fallback(
+    original,
+    oldFunction,
+    oldArgument,
+  );
+  assert(rewriteProbeSameInput(oldFunction, function));
+  assert(rewriteProbeSameInput(oldArgument, argument));
+  newResult = if (alias) {
+    L4_Lean_Expr.f_Lean_mkApp_4478491ddb(replacement, newFunction, newArgument)
+  } else {
+    L4_Lean_Expr.f_Expr_app_override_84f3f08ede(
+      replacement,
+      newFunction,
+      newArgument,
+    )
+  };
+  assert(rewriteProbeSameInput(newFunction, function));
+  assert(rewriteProbeSameInput(newArgument, argument));
+  assert(native_eq(oldResult, newResult) == 0);
+  boundaryCheckPublication(oldResult, oldFunction, oldArgument, expectedBits);
+  boundaryCheckPublication(newResult, newFunction, newArgument, expectedBits);
+  events = if (profile) 3 else 0;
+  boundaryCheckState(saved, original.checkpoint(), events);
+  boundaryCheckState(saved, replacement.checkpoint(), events);
+  if (alias) {
+    aliasRuntime = saved.restoreRaw();
+    aliasFunction = rewriteProbeCopyInput(function);
+    aliasArgument = if (shared) aliasFunction else {
+      rewriteProbeCopyInput(argument)
+    };
+    aliasResult = L4_Lean_Expr.f_Lean_mkApp_4478491ddb_fallback(
+      aliasRuntime,
+      aliasFunction,
+      aliasArgument,
+    );
+    assert(rewriteProbeSameInput(aliasFunction, function));
+    assert(rewriteProbeSameInput(aliasArgument, argument));
+    assert(native_eq(aliasResult, oldResult) == 0);
+    boundaryCheckPublication(
+      aliasResult,
+      aliasFunction,
+      aliasArgument,
+      expectedBits,
+    );
+    boundaryCheckState(saved, aliasRuntime.checkpoint(), events)
+  }
+}
+
+fun boundaryFailure(mode: String, profile: Bool): void {
+  runtime = mutable LeanExecution{profileRuntime => profile};
+  old =
+    mode == "old-app-left" ||
+    mode == "old-app-right" ||
+    mode == "old-div-left" ||
+    mode == "old-div-right";
+  if (
+    mode == "old-div-left" ||
+    mode == "new-div-left" ||
+    mode == "old-div-right" ||
+    mode == "new-div-right"
+  ) {
+    left: LeanValue = if (mode == "old-div-left" || mode == "new-div-left") {
+      LeanUnavailable("division-left")
+    } else {
+      LeanNatLiterals.n0
+    };
+    right: LeanValue = LeanUnavailable("division-right");
+    _result = if (old) {
+      L4_Init_Prelude.f_Nat_div_d9df18e4c4_fallback(runtime, left, right)
+    } else {
+      L4_Init_Prelude.f_Nat_div_d9df18e4c4(runtime, left, right)
+    };
+    leanFail("division failure fixture unexpectedly succeeded")
+  } else if (
+    mode == "old-app-left" ||
+    mode == "new-app-left" ||
+    mode == "old-app-right" ||
+    mode == "new-app-right"
+  ) {
+    data: LeanValue = if (mode == "old-app-left" || mode == "new-app-left") {
+      LeanUnavailable("application-left-data")
+    } else {
+      LeanWord("uint64", 0)
+    };
+    function: LeanValue = LeanCtor(
+      LeanTag.Expr_fvar__impl,
+      Array[data, LeanUnavailable("unused function payload")],
+    );
+    argument: LeanValue = LeanCtor(
+      LeanTag.Expr_fvar__impl,
+      Array[
+        LeanUnavailable("application-right-data"),
+        LeanUnavailable("unused argument payload"),
+      ],
+    );
+    _result = if (old) {
+      L4_Lean_Expr.f_Expr_app_override_84f3f08ede_fallback(
+        runtime,
+        function,
+        argument,
+      )
+    } else {
+      L4_Lean_Expr.f_Expr_app_override_84f3f08ede(runtime, function, argument)
+    };
+    leanFail("application failure fixture unexpectedly succeeded")
+  } else {
+    leanFail("unknown constructor-boundary failure mode")
+  }
+}
+
+fun main(): void {
+  failure = Environ.varOpt("LEAN_SKIP_TEST_BOUNDARY_FAILURE") match {
+  | Some(value) -> value
+  | None() -> ""
+  };
+  if (!failure.isEmpty()) {
+    profile = Environ.varOpt("LEAN_SKIP_TEST_BOUNDARY_PROFILE") match {
+    | Some(value) -> value == "1"
+    | None() -> false
+    };
+    boundaryFailure(failure, profile);
+    return void
+  };
+  divisionCases = Array[
+    BoundaryNatCase("0", "0", "0"),
+    BoundaryNatCase("0", "1", "0"),
+    BoundaryNatCase("7", "0", "0"),
+    BoundaryNatCase("7", "2", "3"),
+    BoundaryNatCase("255", "1", "255"),
+    BoundaryNatCase("256", "1", "256"),
+    BoundaryNatCase("9223372036854775807", "1", "9223372036854775807"),
+    BoundaryNatCase("9223372036854775808", "2", "4611686018427387904"),
+    BoundaryNatCase("9223372036854775808", "9223372036854775807", "1"),
+    BoundaryNatCase("18446744073709551616", "18446744073709551615", "1"),
+    BoundaryNatCase("18446744073709551616", "2", "9223372036854775808"),
+    BoundaryNatCase("18446744073709551615", "65536", "281474976710655"),
+    BoundaryNatCase(
+      "340282366920938463463374607431768211455",
+      "18446744073709551615",
+      "18446744073709551617",
+    ),
+    BoundaryNatCase(
+      "340282366920938463463374607431768211456",
+      "18446744073709551617",
+      "18446744073709551615",
+    ),
+    BoundaryNatCase("340282366920938463463374607431768211456", "0", "0"),
+    BoundaryNatCase("1", "340282366920938463463374607431768211456", "0"),
+    BoundaryNatCase(
+      "10000000000000000000000000000000000000000",
+      "10",
+      "1000000000000000000000000000000000000000",
+    ),
+    BoundaryNatCase(
+      "10000000000000000000000000000000000000000",
+      "10000000000000000000000000000000000000000",
+      "1",
+    ),
+    BoundaryNatCase(
+      "10000000000000000000000000000000000000000",
+      "10000000000000000000000000000000000000001",
+      "0",
+    ),
+    BoundaryNatCase(
+      "9999999999999999999999999999999999999999",
+      "10000000000000000000000000000000000000000",
+      "0",
+    ),
+  ];
+  fixedData = Array[
+    BoundaryDataCase("0", "0", "8159259492"),
+    BoundaryDataCase("305419896", "2596069104", "5028369884"),
+    BoundaryDataCase("1095216660481", "1090921693186", "1098921437717"),
+    BoundaryDataCase("18695992639487", "54975581388800", "56083252276063"),
+    BoundaryDataCase("18446744073709551615", "0", "18446744073278876511"),
+    BoundaryDataCase(
+      "9223372036854775808",
+      "9223372036854775807",
+      "9223389626894849573",
+    ),
+    BoundaryDataCase("2203318222971", "4406636446152", "6613628811603"),
+    BoundaryDataCase(
+      "22518028201623567",
+      "53867479826666",
+      "22519097417396547",
+    ),
+  ];
+  builder = mutable LeanExecution{};
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    builder,
+    LeanText("boundary"),
+  );
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    builder,
+    L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, zero),
+  );
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+  binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    name,
+    binder,
+    type,
+    bound,
+  );
+  applied = L4_Lean_Expr.f_Expr_app_override_84f3f08ede_fallback(
+    builder,
+    identity,
+    prop,
+  );
+  deep = prop;
+  for (_ in Range(0, 260)) {
+    !deep = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      builder,
+      name,
+      binder,
+      type,
+      deep,
+    )
+  };
+  operands: Array<LeanValue> = Array[
+    bound,
+    L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, name),
+    L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, name),
+    L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder,
+      L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, name),
+    ),
+    L4_Lean_Expr.f_Lean_mkConst_b40a363b86(builder, name, nil),
+    applied,
+    identity,
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, name, binder, type, type),
+    L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+      builder,
+      name,
+      type,
+      prop,
+      bound,
+      leanBool(false),
+    ),
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      builder,
+      leanBoxNat(LeanNat::parse("18446744073709551616")),
+    ),
+    L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+      builder,
+      L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(builder),
+      identity,
+    ),
+    L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+      builder,
+      name,
+      LeanNatLiterals.n0,
+      prop,
+    ),
+    L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, leanNatValue(1048574)),
+    deep,
+  ];
+  checks = 0;
+  for (profile in Array[false, true]) {
+    for (leftScalar in Array[false, true]) {
+      for (rightScalar in Array[false, true]) {
+        for (item in divisionCases) {
+          boundaryCheckDivision(item, leftScalar, rightScalar, profile);
+          !checks = checks + 1
+        };
+        for (alias in Array[false, true]) {
+          for (item in fixedData) {
+            function: LeanValue = LeanCtor(
+              LeanTag.Expr_fvar__impl,
+              Array[boundaryWord(item.functionData, leftScalar), name],
+            );
+            argument: LeanValue = LeanCtor(
+              LeanTag.Expr_fvar__impl,
+              Array[boundaryWord(item.argumentData, rightScalar), name],
+            );
+            boundaryCheckApplication(
+              function,
+              argument,
+              Some(item.resultData),
+              alias,
+              profile,
+            );
+            !checks = checks + 1
+          };
+          for (operand in operands) {
+            left = boundaryMetadataForm(operand, leftScalar);
+            right = boundaryMetadataForm(prop, rightScalar);
+            boundaryCheckApplication(left, right, None(), alias, profile);
+            boundaryCheckApplication(right, left, None(), alias, profile);
+            boundaryCheckApplication(left, left, None(), alias, profile);
+            !checks = checks + 3
+          }
+        }
+      }
+    }
+  };
+  assert(checks == 960);
+  print_string(
+    "constructor boundaries: " +
+      checks.toString() +
+      " differential cases passed",
+  )
+}

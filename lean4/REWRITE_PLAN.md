@@ -1,6 +1,14 @@
 # Rewrite the measured example in parallel
 
-## Current execution and eleventh validated batch (2026-11-10)
+## Current execution: profile and optimize hot paths (2026-11-10)
+
+Latest user steering replaces the earlier whole-path rewrite gate: checkpoint the
+validated code, build the current release executable, profile the actual benchmark,
+and concentrate subsequent rewrites on dominant costs. Re-measure after coherent
+hot-path changes. Keep cold and warm raw elaboration separate from imports/export
+and kernel checking; diagnostic instrumentation is not a performance baseline.
+Unconverted cold routines remain explicit inventory work, not a prerequisite to
+the next benchmark. Skip's compiler/runtime remain out of scope. Vibe is idle.
 
 Latest steering authorizes **one Vibe client using ten built-in subagents** as a
 bounded experiment, superseding the stop below for this run only. The installed
@@ -32,16 +40,16 @@ implementation contracts with working tests; test design and acceptance stay wit
 the primary and independent reviewers. No further provider batch is running.
 
 The main team is the primary plus three Codex implementation and review peers,
-with one compiler queue. The current planning range to the full
-rewrite benchmark is 4–7 continuous-work days, uncertain because larger routines
-and representation conversion remain. Re-estimate from accepted work.
+with one compiler queue. The previous 4–7 continuous-work-day estimate covered
+the full exercised-path rewrite and no longer describes the profiling-first
+approach. Re-estimate remaining optimization after the current profile.
 
-The user authorizes continuous work: finish the exercised-path rewrite, run the
-release benchmark against vanilla Lean, then move to SKStore if raw execution is
-near parity. Otherwise improve this port's code and representations and measure
-again. Stop at a demonstrated need to change Skip's compiler/runtime; do not make
-those changes. Preserve first-run performance and the later SKStore initialization
-target of at most twice the raw baseline. Do not stop after a helper or checkpoint.
+The user authorizes continuous work: compare current release execution against
+vanilla Lean, use profiles to focus improvements, then move to SKStore if raw
+execution is near parity. Otherwise improve this port's code and representations
+and measure again. Stop at a demonstrated need to change Skip's compiler/runtime;
+do not make those changes. Preserve first-run performance and the later SKStore
+initialization target of at most twice the raw baseline.
 
 Two ten-worker GLM batches launched. The first had no provider errors; the second
 had connection failures and was reduced to two. Smaller writer retries rejected
@@ -51,6 +59,17 @@ peers continue local implementation/review and the primary owns integration and
 the compiler queue. The user has since explicitly stopped Vibe usage, superseding
 the earlier request to ramp it back up. A provider outage does not stop independent
 local work. Preserve the failed-run evidence without automatic retries.
+
+The twelfth batch validates five non-frame entries: natural division, application
+construction and its public alias, application head traversal and argument count.
+It passes **986 new comparisons plus 5,501 regressions**, and 16 explicit-failure
+subprocess checks. The naming-only alias is not a separate algorithm optimization.
+Four related Expr bodies now share `Applications.sk`. Native arithmetic/metadata
+operations replace intermediate dispatch/boxing; profiling behavior is preserved.
+The [twelfth audit](provenance/rewrite-batches/2026-11-10-wave-12.json) records exact
+bodies, both release probes and limits. The tally is **43 validated frame rewrites
+plus five non-frame entries; 154 observed frames remain**. These changes have not
+yet been measured in the whole-example executable.
 
 The eleventh batch validates five Simp.Main routines: application classification,
 module-use lookup, definition unfolding, local-value reduction and dsimp reduction
@@ -91,8 +110,9 @@ improved; broader boxed interfaces and other observed entries still need review.
 No new whole-example performance claim is made.
 
 Three non-frame reviews now classify 60 observed entries: eleven existing native
-operations, fourteen reviewed compatibility boundaries and thirty-five entries
-needing further work. Another 968 non-frame entries remain unreviewed. See the
+operations, fourteen reviewed compatibility boundaries, five subsequently rewritten
+entries and thirty entries needing further work. Another 968 non-frame entries
+remain unreviewed. See the
 [expression review](provenance/rewrite-triage/2026-11-10-expression-boundaries.json),
 [native boundary review](provenance/rewrite-triage/2026-11-10-native-boundaries.json)
 and [closure review](provenance/rewrite-triage/2026-11-10-closure-adapters.json).
@@ -128,9 +148,9 @@ valid constructor/universe layouts, actual helper types, independent config fiel
 error/cache expectations, full reference/input checks and valid bound-variable
 indices. No new runtime stub or compiler change was introduced. The native kernel
 and typed-import boundary remain unchanged. The five Simp.Main routines from the
-native-subagent experiment subsequently passed the eleventh batch. Current private
-follow-ups cover application-spine traversal and the remaining Nat division /
-application-constructor boundaries, with independent Codex review.
+native-subagent experiment subsequently passed the eleventh batch; the division
+and application boundaries passed the twelfth. Further speculative rewrite drafts
+are stopped while the current release benchmark is built and profiled.
 
 ## GLM restart history (2026-11-09)
 
@@ -546,8 +566,8 @@ authoritative task ledger. The user authorizes periodic Git commits. Commit the 
 coherent reviewed code batches with their focused checks and documentation.
 Stage the owned files or exact changes; do not sweep unrelated working-tree or
 already-staged work into a checkpoint. Record unexecuted checks and explicit
-limitations honestly in the checkpoint notes. Performance validation remains
-at the final gate and is not required for every intermediate commit.
+limitations honestly in the checkpoint notes. Measure whole-example performance
+after coherent hot-path batches; a commit alone is not a speedup claim.
 
 Keep old bodies available for comparison without
 silently routing the measured normal path back through them.
@@ -566,10 +586,10 @@ The primary can perform a correctness-only integration build if a real concern
 cannot be checked by focused probes. Do not resume per-helper performance
 benchmarks. Keep compiler jobs serialized even with ten remote model workers.
 
-### 4. Close coverage, then measure
+### 4. Measure and profile the actual workload
 
-Finish the coverage ledger and internal-interface review before the next
-performance comparison. Run a cached `skargo build --release`, then submit every
+Use the coverage ledger to identify remaining work without making its completion
+a benchmark prerequisite. Run a cached `skargo build --release`, then submit every
 successful whole-example proof to native Lean's kernel and confirm expected
 rejections in the edit matrix. The kernel check complements state/error tests;
 it cannot establish that caches or failed/backtracking computations were preserved.
@@ -588,10 +608,10 @@ its later first-run target remains at most twice the raw baseline.
 
 ## Completion checks
 
-- Every identified exercised routine has a reviewed disposition, with current
-  routes and dynamic callbacks accounted for. Coverage uncertainty is explicit.
-- Ordinary exercised logic is structured Skip; retained `LeanValue` adapters
-  and any remaining translation-shaped boundaries have documented reasons.
+- Measured hot paths have reviewed changes and matching validation evidence;
+  unresolved inventory entries and coverage uncertainty remain explicit.
+- Rewritten hot-path logic is structured Skip; retained `LeanValue` adapters
+  and unchanged translation-shaped boundaries are identified honestly.
 - A human readability review passes: clear names and contracts, coherent files,
   understandable control flow, restrained comments and necessary design notes.
 - Full functions remain available. Unsupported structural-recursion metadata

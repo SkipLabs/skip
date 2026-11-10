@@ -1,0 +1,69 @@
+// Application construction and function-spine traversal.
+module L4_Lean_Expr;
+
+fun f_Expr_app_override_84f3f08ede(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  argument: LeanValue,
+): LeanValue {
+  data: LeanValue = if (runtime.profileRuntime) {
+    functionData = f_Lean_Expr_data_8b4646e8ed(runtime, function);
+    argumentData = f_Lean_Expr_data_8b4646e8ed(runtime, argument);
+    f_Lean_Expr_mkAppData_03dac2cc5c(runtime, functionData, argumentData)
+  } else {
+    functionBits = leanExprData(function);
+    argumentBits = leanExprData(argument);
+    leanExprMakeAppData(functionBits, argumentBits)
+  };
+  LeanCtor(LeanTag.Expr_app__impl, Array[data, function, argument])
+}
+
+fun f_Lean_mkApp_4478491ddb(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  argument: LeanValue,
+): LeanValue {
+  f_Expr_app_override_84f3f08ede(runtime, function, argument)
+}
+
+fun f_Lean_Expr_getAppFn_05707344ce(
+  _runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  current = expr;
+  while (leanTag(current) == LeanTag.Expr_app__impl) {
+    !current = leanField(current, 1)
+  };
+  current
+}
+
+fun f_Lean_Expr_getAppNumArgsAux_62e193b5dc(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  initialCount: LeanValue,
+): LeanValue {
+  if (leanTag(expr) != LeanTag.Expr_app__impl) return initialCount;
+
+  current = expr;
+  if (runtime.profileRuntime) {
+    boxedCount = initialCount;
+    while (leanTag(current) == LeanTag.Expr_app__impl) {
+      !boxedCount = L4_Init_Prelude.f_Nat_add_86990f4822(
+        runtime,
+        boxedCount,
+        LeanNatLiterals.n1,
+      );
+      !current = leanField(current, 1)
+    };
+    return boxedCount
+  };
+
+  nativeCount = leanNat(initialCount);
+  while (leanTag(current) == LeanTag.Expr_app__impl) {
+    !nativeCount = nativeCount.add(LeanNat::fromInt(1));
+    !current = leanField(current, 1)
+  };
+  leanBoxNat(nativeCount)
+}
+
+module end;

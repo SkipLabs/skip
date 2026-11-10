@@ -1,12 +1,15 @@
 # Conditional simplification implementation
 
-Current overnight work (2026-11-10): continue the rewrite, benchmark the completed
-raw path, then SKStore if near parity; otherwise optimize this port's representations.
-The user requires stopping before any Skip compiler/runtime change. Twenty-one
-resumed rewrites are validated; the latest five pass 1,352 new comparisons plus
-4,149 regressions. There are 43 validated frame rewrites and 154 observed frames remain.
+Current work (2026-11-10): the user now requests profiling the actual benchmark
+and rewriting its dominant hot paths. This supersedes finishing the whole exercised
+path before measuring. Build the current release, establish fresh/warm raw timings,
+then use elaboration-only samples to choose the next changes. SKStore follows raw
+near parity; Skip compiler/runtime changes still require stopping for discussion.
+The latest five non-frame entries pass 986 new comparisons plus 5,501 regressions
+and 16 explicit-failure subprocesses. There are 43 validated frame rewrites plus
+five non-frame entries; 154 observed frames remain.
 See the current section of [REWRITE_PLAN.md](REWRITE_PLAN.md) and the
-[eleventh audit](provenance/rewrite-batches/2026-11-10-wave-11.json).
+[twelfth audit](provenance/rewrite-batches/2026-11-10-wave-12.json).
 The user has now authorized one bounded Vibe retry using ten built-in subagents
 inside one client, after stopping the earlier separate-client pools. The trial
 finished in 217.52 seconds without observed provider errors; ten child exports
@@ -80,12 +83,10 @@ Continue a coherent pilot on the small theorem's execution path. The promised
 reduction, unification and inference routines into named locals and structured control
 flow, then introduce typed values across coherent interfaces where beneficial.
 Retain the algorithms, cache policies and native proof-checking boundary.
-Latest steering: finish the rewrite of the code exercised by the example before
-the next performance comparison. Keep incremental type-checking and focused
-behavioral comparisons during the rewrite; defer performance benchmarks and the
-measurement release build until that path is converted. Do not stop after each
-helper to measure a partially converted path. Only a representative converted execution path can test
-whether this is sufficient for parity; a single helper cannot. Document module
+Latest steering: profile the current benchmark and target dominant costs. Keep
+incremental type-checking and focused behavioral comparisons during each hot-path
+batch, then measure the whole workload again. A microbenchmark of one helper
+cannot establish whole-proof parity. Document module
 ownership, interface invariants and checks so the work can later be delegated.
 The prior three-worker batch is validated below. The current workflow assigns
 Vibe implementation and three Codex reviewers; the primary retains independent review,

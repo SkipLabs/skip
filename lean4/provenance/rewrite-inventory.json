@@ -588,15 +588,15 @@
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce",
-      "path": "sources/Modules/Lean/Expr/Part001.sk",
-      "lines": 14,
+      "path": "sources/Modules/Lean/Expr/Applications.sk",
+      "lines": 10,
       "frame": 0,
       "samples": 5,
       "lane": "expressions_and_state",
-      "source_body_sha256": "95492cc83120d5b2eb81a909d6d5297e255cafb13f3c54cff635a0a94abfc220",
-      "status": "triaged_pending",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "source_body_sha256": "1c9c46615454bcb90e91824e3feb3622079a6df6bc7c6b6056347a6b9968e3bb",
+      "status": "native_boundary_validated",
+      "control_flow": "structured",
+      "representation": "native_control_flow_or_arithmetic; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "f56cb6bc0926994f5bc1b6f14a7fe494b8d906269799143a299761ee4abe8c6e",
@@ -604,13 +604,20 @@
         "snapshot_revision": "4e6d15791",
         "body_sha256": "95492cc83120d5b2eb81a909d6d5297e255cafb13f3c54cff635a0a94abfc220",
         "case_count": 36,
-        "current_body_matches_snapshot": true
+        "current_body_matches_snapshot": false
       },
       "disposition": "needs_control_flow_work",
       "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
       "triage_rationale": "This is a generated tail-recursive traversal with unused metadata/argument projections and slot-style names, not a wrapper around a typed helper.",
-      "remaining_work": "Replace with a named ordinary loop over the boxed Expr boundary, preserving that metadata wrappers are not stripped. No new Expr representation is required for this small traversal.",
-      "coherent_family": "application spines"
+      "remaining_work": "Retain boxed public ABI; broader callers/node representation remain outside this bounded conversion.",
+      "coherent_family": "application spines",
+      "validation": [
+        "Ten exact old/new head comparisons across profiles: non-app, left spine, metadata at root/head and two applications over metadata. Independent expected tree contents after input copying; full refs unchanged."
+      ],
+      "coverage_limits": [
+        "Constructors and field/tag accessors remain shared. These are syntactic expression fixtures; no kernel or type-inference claim. Metadata wrappers deliberately stop the traversal. Expr boundary remains boxed."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-10-wave-12.json"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6",
@@ -2129,15 +2136,15 @@
     },
     {
       "name": "L4_Lean_Expr.f_Expr_app_override_84f3f08ede",
-      "path": "sources/Modules/Lean/Expr/Part001.sk",
-      "lines": 18,
+      "path": "sources/Modules/Lean/Expr/Applications.sk",
+      "lines": 16,
       "frame": 0,
       "samples": 2,
       "lane": "expressions_and_state",
-      "source_body_sha256": "9a0fa78f97851697734bfc01968cbe206da1c7e2145db0d150a91478abfbb890",
-      "status": "triaged_pending",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "source_body_sha256": "3c6cae519504621b230eb902ff884d8d4902471ebd3efab0d1f87d7e8189c29a",
+      "status": "native_boundary_validated",
+      "control_flow": "structured",
+      "representation": "native_control_flow_or_arithmetic; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "280f59ea08b3eff997fce46dfb9f9e3e2324f433d6b53d7a7ff875fb5d2b0006",
@@ -2145,12 +2152,20 @@
         "snapshot_revision": "4e6d15791",
         "body_sha256": "9a0fa78f97851697734bfc01968cbe206da1c7e2145db0d150a91478abfbb890",
         "case_count": 36,
-        "current_body_matches_snapshot": true
+        "current_body_matches_snapshot": false
       },
       "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
       "triage_rationale": "The 19-line constructor uses generated _x_1_2/_x_2_3/_x_3_4 locals and passes two boxed metadata words through separate canonical calls before the native leaf. The leaf already implements typed packing, but this entry has not become a readable constructor boundary. This is remaining adapter/readability work, not an undiscovered arithmetic algorithm.",
-      "remaining_work": "Use named function/argument metadata and a coherent typed packing boundary, preserving two ordered Expr.data calls plus one mkAppData instrumentation event when profiling. Preserve UInt64 publication for imported scalar metadata, saturated depth, flags, max loose range, low-32-bit hash and immutable child sharing.",
-      "coherent_family": "expression application construction"
+      "remaining_work": "Retain boxed public ABI; broader callers/node representation remain outside this bounded conversion.",
+      "coherent_family": "expression application construction",
+      "validation": [
+        "Application pair shares 800 cases: 128 fixed packed-word comparisons and 672 maintained-constructor pairings across all 12 Expr forms, loose-range boundary, 260 binder depths, scalar/computed metadata, alias/override routes and both profiles.",
+        "Retained override independently compared with each new route; fixed word vectors, UInt64 publication, exact child sharing, immediate copied-input preservation and full checkpoint comparison excluding profiling duration. Three profile events preserved. Eight failure subprocesses check metadata-read order."
+      ],
+      "coverage_limits": [
+        "Some metadata words are synthetic layout vectors; syntax fixtures are not all typed terms. Packing/Nat/hash backends remain shared and native Lean was not executed for this probe. Expr node storage and final metadata word remain boxed."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-10-wave-12.json"
     },
     {
       "name": "L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973",
@@ -5410,24 +5425,33 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "triaged_pending",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Init/Prelude/Part000.sk",
-      "lines": 8,
+      "status": "native_boundary_validated",
+      "control_flow": "structured",
+      "representation": "native_control_flow_or_arithmetic; boxed_public_boundary",
+      "path": "sources/Modules/Init/Prelude/NaturalDivision.sk",
+      "lines": 17,
       "frame": 0,
-      "source_body_sha256": "b96e09bbda7e77cbb2e111fc8fe209fb34463f6c3d610f337944925a5028052c",
+      "source_body_sha256": "9d59d5ea809206ede4178fe30796f72740528e12f254c482567852f86011875d",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "b96e09bbda7e77cbb2e111fc8fe209fb34463f6c3d610f337944925a5028052c",
         "case_count": 36,
-        "current_body_matches_snapshot": true
+        "current_body_matches_snapshot": false
       },
       "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
       "triage_rationale": "The backend is already typed and handles division by zero as (0, dividend), but this public hot-path boundary still constructs Array<LeanValue> and performs textual foreign-symbol dispatch even when profiling is disabled. Native division alone does not finish the adapter cleanup.",
-      "remaining_work": "Use the same direct typed dispatch pattern as add/sub/mul, retaining the instrumented route and full Nat.divMod semantics. No arithmetic algorithm replacement is required.",
-      "coherent_family": "natural arithmetic and comparisons"
+      "remaining_work": "Retain boxed public ABI; broader callers/node representation remain outside this bounded conversion.",
+      "coherent_family": "natural arithmetic and comparisons",
+      "planning_source_body_sha256": "b96e09bbda7e77cbb2e111fc8fe209fb34463f6c3d610f337944925a5028052c",
+      "validation": [
+        "160 exact differential divisions across 20 fixed decimal vectors, independently selected scalar/computed inputs and both profiling modes. Zero divisors, host-word boundaries and 128-bit/larger operands; canonical/pool output and full checkpoints except profiling duration.",
+        "Eight old/new failure subprocesses preserve left-first decode failures, including zero divided by unavailable input. Profile path preserves one primitive event."
+      ],
+      "coverage_limits": [
+        "Typed LeanNat.divMod remains shared; fixed integer expectations supplement the differential oracle. No new arithmetic algorithm or all-input proof. Boxed operands/final Nat and optional profiling argument array remain."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-10-wave-12.json"
     },
     {
       "name": "L4_Init_Prelude.f_Nat_mul_8d6effc865",
@@ -8316,25 +8340,34 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "triaged_pending",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Expr/Part000.sk",
-      "lines": 20,
+      "status": "native_boundary_validated",
+      "control_flow": "structured",
+      "representation": "native_control_flow_or_arithmetic; boxed_public_boundary",
+      "path": "sources/Modules/Lean/Expr/Applications.sk",
+      "lines": 28,
       "frame": 0,
-      "source_body_sha256": "3930848e9e63b41c6df677ae706b5c55e37017e31ed0a615f2ee8274bdfdf2bb",
+      "source_body_sha256": "5ffeccaf3d4e3eed054d78d926d550952090568b47df0b33c25e14694532f81c",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "3930848e9e63b41c6df677ae706b5c55e37017e31ed0a615f2ee8274bdfdf2bb",
         "case_count": 36,
-        "current_body_matches_snapshot": true
+        "current_body_matches_snapshot": false
       },
       "disposition": "needs_representation_and_control_flow_work",
       "triage_report": "provenance/rewrite-triage/2026-11-10-expression-boundaries.json",
       "triage_rationale": "The generated recursive spine walk increments a boxed Nat through a compatibility helper at every node. Non-frame control flow alone does not make it idiomatic.",
-      "remaining_work": "Use a readable spine loop and LeanNat accumulator without narrowing an arbitrary caller-supplied count to host Int.",
-      "coherent_family": "application spines"
+      "remaining_work": "Retain boxed public ABI; broader callers/node representation remain outside this bounded conversion.",
+      "coherent_family": "application spines",
+      "planning_source_body_sha256": "3930848e9e63b41c6df677ae706b5c55e37017e31ed0a615f2ee8274bdfdf2bb",
+      "validation": [
+        "Sixteen exact comparisons across profiles: exact untouched scalar/unavailable counter identity on non-app roots, first-link canonicalization, 101-digit counter +3, machine-word crossings and metadata stopping.",
+        "Immediate copied-input checks, exact full refs and saved-baseline-aware primitive counts (one per app only in profile mode). Retained recursive body calls only its own fallback."
+      ],
+      "coverage_limits": [
+        "Typed LeanNat add and constructors remain shared. Long-spine stack behavior and unsupported counter values reached under actual app nodes are not exercised. No-app inputs remain untouched; internal ordinary counter is typed and boxed once on publication."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-10-wave-12.json"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c",
@@ -9340,24 +9373,32 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "triaged_pending",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
-      "path": "sources/Modules/Lean/Expr/Part001.sk",
-      "lines": 8,
+      "status": "native_boundary_validated",
+      "control_flow": "structured",
+      "representation": "native_control_flow_or_arithmetic; boxed_public_boundary",
+      "path": "sources/Modules/Lean/Expr/Applications.sk",
+      "lines": 7,
       "frame": 0,
-      "source_body_sha256": "0ac00f86b66e67e1515f2b593a119c12775599c285b8196a5f787c38878c711b",
+      "source_body_sha256": "9353667d9da7f460c3774e836dc81f77b47d6c7f40758b8cc3ec92669d87a9db",
       "coverage": "observed_entry_in_frozen_matrix",
       "execution_evidence": {
         "snapshot_revision": "4e6d15791",
         "body_sha256": "0ac00f86b66e67e1515f2b593a119c12775599c285b8196a5f787c38878c711b",
         "case_count": 36,
-        "current_body_matches_snapshot": true
+        "current_body_matches_snapshot": false
       },
       "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
       "triage_rationale": "This forwarding identity reaches the still translation-shaped application constructor below. A typed metadata leaf exists, but accepting only this alias would conceal the remaining constructor/readability boundary.",
-      "remaining_work": "Convert with Expr.app override as one small family. Keep the public identity, original operands, result layout and instrumentation behavior.",
-      "coherent_family": "expression application construction"
+      "remaining_work": "Retain boxed public ABI; broader callers/node representation remain outside this bounded conversion.",
+      "coherent_family": "expression application construction",
+      "planning_source_body_sha256": "0ac00f86b66e67e1515f2b593a119c12775599c285b8196a5f787c38878c711b",
+      "validation": [
+        "Public alias is included in the same 800 application cases, not an extra 800. Alias cases compare both the retained alias and retained override, check publication, state and profile counts."
+      ],
+      "coverage_limits": [
+        "Only argument readability changes at this alias; no separate algorithm speedup claimed. Retained alias calls canonical constructor, so retained-override/fixed-vector checks are the independent boundary evidence."
+      ],
+      "batch": "provenance/rewrite-batches/2026-11-10-wave-12.json"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d",
@@ -25457,12 +25498,14 @@
       }
     }
   ],
-  "latest_batch": "provenance/rewrite-batches/2026-11-10-wave-11.json",
+  "latest_batch": "provenance/rewrite-batches/2026-11-10-wave-12.json",
   "nonframe_triage": {
     "reviewed_entries": 60,
     "already_idiomatic": 11,
     "compatibility_boundaries": 14,
-    "reviewed_pending": 35,
-    "unreviewed_entries": 968
-  }
+    "reviewed_pending": 30,
+    "unreviewed_entries": 968,
+    "subsequently_rewritten": 5
+  },
+  "validated_nonframe_rewrites_in_waves": 5
 }

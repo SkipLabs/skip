@@ -1,0 +1,271 @@
+fun appSpineExprApp(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  argument: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, function, argument)
+}
+
+fun appSpineMetadata(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    runtime,
+    L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(runtime),
+    expr,
+  )
+}
+
+fun appSpineCheckFn(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  expr: LeanValue,
+  expected: LeanValue,
+): void {
+  oldExpr = rewriteProbeCopyInput(expr);
+  newExpr = rewriteProbeCopyInput(expr);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (oldRuntime: mutable LeanExecution) ~> {
+      output = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce_fallback(
+        oldRuntime,
+        oldExpr,
+      );
+      assert(rewriteProbeSameInput(oldExpr, expr));
+      output
+    },
+    (newRuntime: mutable LeanExecution) ~> {
+      output = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(
+        newRuntime,
+        newExpr,
+      );
+      assert(rewriteProbeSameInput(newExpr, expr));
+      output
+    },
+    None(),
+  );
+  assert(rewriteProbeSameInput(result, expected));
+  assert(native_eq(after.refs, saved.refs) == 0)
+}
+
+fun appSpineCheckCount(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  expr: LeanValue,
+  initialCount: LeanValue,
+  appCount: Int,
+  expected: LeanValue,
+): void {
+  oldExpr = rewriteProbeCopyInput(expr);
+  newExpr = rewriteProbeCopyInput(expr);
+  oldCount = rewriteProbeCopyInput(initialCount);
+  newCount = rewriteProbeCopyInput(initialCount);
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = L4_Lean_Expr.f_Lean_Expr_getAppNumArgsAux_62e193b5dc_fallback(
+    oldRuntime,
+    oldExpr,
+    oldCount,
+  );
+  assert(rewriteProbeSameInput(oldExpr, expr));
+  assert(rewriteProbeSameInput(oldCount, initialCount));
+  newResult = L4_Lean_Expr.f_Lean_Expr_getAppNumArgsAux_62e193b5dc(
+    newRuntime,
+    newExpr,
+    newCount,
+  );
+  assert(rewriteProbeSameInput(newExpr, expr));
+  assert(rewriteProbeSameInput(newCount, initialCount));
+  if (native_eq(oldResult, newResult) != 0) {
+    leanFail("old/new result mismatch: " + label)
+  };
+  if (!rewriteProbeSameInput(newResult, expected)) {
+    leanFail("unexpected count: " + label)
+  };
+  if (appCount == 0) {
+    assert(leanSameObject(oldResult, initialCount) != 0);
+    assert(leanSameObject(newResult, initialCount) != 0)
+  };
+  if (
+    native_eq(oldRuntime.checkpoint().refs, newRuntime.checkpoint().refs) != 0
+  ) {
+    leanFail("old/new ref mismatch: " + label)
+  };
+  if (native_eq(saved.refs, newRuntime.checkpoint().refs) != 0) {
+    leanFail("unexpected ref change: " + label)
+  };
+  expectedPrimitiveCount =
+    saved.metrics[6] + (if (saved.profileRuntime) appCount else 0);
+  assert(oldRuntime.primitiveCount == expectedPrimitiveCount);
+  assert(newRuntime.primitiveCount == expectedPrimitiveCount)
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    _ = runtime.newRef(LeanText("application-spine sentinel"));
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    sort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("appSpine.f"),
+    );
+    head = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      name,
+      LeanCtor(LeanTag.List_nil, Array[]),
+    );
+    arg1 = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(
+      runtime,
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        runtime,
+        LeanText("appSpine.x"),
+      ),
+    );
+    arg2 = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(
+      runtime,
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        runtime,
+        LeanText("appSpine.y"),
+      ),
+    );
+    arg3 = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(
+      runtime,
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+        runtime,
+        LeanText("appSpine.z"),
+      ),
+    );
+    metadataTree = appSpineMetadata(
+      runtime,
+      appSpineExprApp(runtime, head, arg1),
+    );
+    oneApp = appSpineExprApp(runtime, head, arg1);
+    twoApps = appSpineExprApp(runtime, oneApp, arg2);
+    threeApps = appSpineExprApp(runtime, twoApps, arg3);
+    appAboveMetadata = appSpineExprApp(runtime, metadataTree, arg2);
+    twoAppsAboveMetadata = appSpineExprApp(runtime, appAboveMetadata, arg3);
+    metadataAboveApps = appSpineMetadata(runtime, threeApps);
+    saved = runtime.checkpoint();
+
+    appSpineCheckFn("non-app expression is returned", saved, sort, sort);
+    appSpineCheckFn(
+      "left application spine reaches its head",
+      saved,
+      threeApps,
+      head,
+    );
+    appSpineCheckFn(
+      "metadata at function head is not skipped",
+      saved,
+      appAboveMetadata,
+      metadataTree,
+    );
+    appSpineCheckFn(
+      "metadata at root is terminal",
+      saved,
+      metadataAboveApps,
+      metadataAboveApps,
+    );
+    appSpineCheckFn(
+      "two applications stop at metadata head",
+      saved,
+      twoAppsAboveMetadata,
+      metadataTree,
+    );
+    !checks = checks + 5;
+
+    noncanonicalSmall = LeanScalar("nat", "0007");
+    noncanonicalLarge = LeanScalar("nat", "18446744073709551616");
+    hugeCounter = LeanScalar(
+      "nat",
+      "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+    );
+    unavailableCounter = LeanUnavailable(
+      "counter must not be decoded on a non-app root",
+    );
+    expectedThree = leanBoxNat(
+      LeanNat::parse(
+        "10000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000003",
+      ),
+    );
+    expectedAboveMetadata = leanBoxNat(LeanNat::parse("18446744073709551617"));
+    expectedTwo = leanBoxNat(LeanNat::parse("18446744073709551618"));
+
+    appSpineCheckCount(
+      "non-app returns alternate Nat spelling unchanged",
+      saved,
+      sort,
+      noncanonicalSmall,
+      0,
+      noncanonicalSmall,
+    );
+    appSpineCheckCount(
+      "non-app does not decode unused counter",
+      saved,
+      sort,
+      unavailableCounter,
+      0,
+      unavailableCounter,
+    );
+    appSpineCheckCount(
+      "metadata root does not expose nested apps",
+      saved,
+      metadataAboveApps,
+      unavailableCounter,
+      0,
+      unavailableCounter,
+    );
+    appSpineCheckCount(
+      "one app canonicalizes the input Nat",
+      saved,
+      oneApp,
+      noncanonicalSmall,
+      1,
+      leanNatValue(8),
+    );
+    appSpineCheckCount(
+      "three apps preserve arbitrary precision",
+      saved,
+      threeApps,
+      hugeCounter,
+      3,
+      expectedThree,
+    );
+    appSpineCheckCount(
+      "one app above the machine word remains exact",
+      saved,
+      oneApp,
+      noncanonicalLarge,
+      1,
+      leanBoxNat(LeanNat::parse("18446744073709551617")),
+    );
+    appSpineCheckCount(
+      "metadata head stops count after outer app",
+      saved,
+      appAboveMetadata,
+      noncanonicalLarge,
+      1,
+      expectedAboveMetadata,
+    );
+    appSpineCheckCount(
+      "two apps before metadata add above the machine word",
+      saved,
+      twoAppsAboveMetadata,
+      noncanonicalLarge,
+      2,
+      expectedTwo,
+    );
+    !checks = checks + 8
+  };
+  assert(checks == 26);
+  print_string(
+    "application spines: " + checks.toString() + " differential cases",
+  )
+}
