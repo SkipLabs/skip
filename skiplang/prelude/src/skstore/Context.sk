@@ -173,7 +173,19 @@ fun run(f: (mutable Context) -> void): mutable Context {
 /*****************************************************************************/
 // Synthetic read paths reuse ordinary reader registration and cleanup. The
 // source key remains separate so projections never change stored collection keys.
-class FilteredReadKey(source: Key, projectionHash: Int, id: Int) extends Key
+// They live in the source's `filters()` directory, not the source's own: maps
+// keyed by Path would otherwise compare them with the collection's keys, whose
+// compare may reject other Key classes (#1622).
+class FilteredReadKey(
+  sourceDir: DirName,
+  source: Key,
+  projectionHash: Int,
+  id: Int,
+) extends Key {
+  fun sourcePath(): Path {
+    Path::create(this.sourceDir, this.source)
+  }
+}
 
 class ReadFilter(
   id: Int,
@@ -183,8 +195,13 @@ class ReadFilter(
 ) {
   fun path(source: Path): Path {
     Path::create(
-      source.dirName,
-      FilteredReadKey(source.baseName, this.projectionHash, this.id),
+      source.dirName.filters(),
+      FilteredReadKey(
+        source.dirName,
+        source.baseName,
+        this.projectionHash,
+        this.id,
+      ),
     )
   }
 }
@@ -561,8 +578,8 @@ value class Deps private (
 
   fun importFilter(from: this, read: Path): this {
     read.baseName match {
-    | FilteredReadKey(source, projectionHash, id) ->
-      path = Path::create(read.dirName, source);
+    | key @ FilteredReadKey(_, _, projectionHash, id) ->
+      path = key.sourcePath();
       bucket = from.filters.get(path).get(projectionHash);
       filter = bucket.find(filter -> filter.id == id).fromSome();
       groups = this.filters.maybeGet(path).default(SortedMap[]);
@@ -663,9 +680,8 @@ value class Deps private (
     if (set.isEmpty()) {
       !this.data = this.data.remove(path);
       path.baseName match {
-      | FilteredReadKey(source, projectionHash, id) ->
-        sourcePath = Path::create(path.dirName, source);
-        !this = this.removeFilter(sourcePath, projectionHash, id)
+      | key @ FilteredReadKey(_, _, projectionHash, id) ->
+        !this = this.removeFilter(key.sourcePath(), projectionHash, id)
       | _ -> void
       }
     } else {
