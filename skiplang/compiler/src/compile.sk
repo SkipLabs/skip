@@ -147,6 +147,12 @@ fun getLinkArgs(
     } else {
       Array["-no-pie"]
     };
+    // The runtime keys persistent files (--init/--data) on the executable's
+    // GNU build-id (prelude/runtime/palloc.c); not every toolchain emits one
+    // by default. Mach-O has no build-id note.
+    if (!config.target.contains("apple")) {
+      !flags = flags.concat(Array["-Wl,--build-id"])
+    };
 
     Some(
       Array[
