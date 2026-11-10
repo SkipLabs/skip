@@ -539,4 +539,92 @@ fun testReadFilterImport(): void {
   T.expectEq(Array[2], getData(context, outputName, SKStore.IID(0)).map(toInt));
 }
 
+// Like downstream keys (e.g. skjs's FPath), compare rejects other Key classes.
+class StrictFilterKey(value: Int) extends SKStore.Key {
+  fun compare(other: SKStore.Key): Order {
+    other match {
+    | StrictFilterKey(value) -> this.value.compare(value)
+    | _ -> invariant_violation("StrictFilterKey compared to another Key class")
+    }
+  }
+}
+
+// A reader that both reads a collection and reads it through a projection
+// records a plain path and a filtered path for that collection. Dependency
+// maps order them together, so the filtered path must not put a foreign key
+// class next to the collection's own keys (#1622).
+@test
+fun testReadFilterStrictSourceKeys(): void {
+  sourceName = SKStore.DirName::create("/filter-strict-source/");
+  triggerName = SKStore.DirName::create("/filter-strict-trigger/");
+  outputName = SKStore.DirName::create("/filter-strict-output/");
+  context = SKStore.run(context ~> {
+    source = context.mkdir(
+      StrictFilterKey::keyType,
+      ReadFilterPair::type,
+      sourceName,
+      Array[
+        (StrictFilterKey(0), ReadFilterPair(1, 10)),
+        (StrictFilterKey(1), ReadFilterPair(2, 20)),
+      ],
+    );
+    trigger = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      triggerName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+    _ = trigger.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputName,
+      (context, writer, key, _) ~> {
+        recordReadFilter(context, 0);
+        plain = source.getArray(context, StrictFilterKey(0));
+        filtered = source.getArrayFilter(context, StrictFilterKey(1), pair ~>
+          SKStore.IntFile(pair.first)
+        );
+        filteredAgain = source.getArrayFilter(
+          context,
+          StrictFilterKey(0),
+          pair ~> SKStore.IntFile(pair.first),
+        );
+        writer.set(
+          key,
+          SKStore.IntFile(
+            plain[0].first * 100 +
+              filtered[0].value * 10 +
+              filteredAgain[0].value,
+          ),
+        );
+      },
+    );
+  });
+  result = () -> getData(context, outputName, SKStore.IID(0)).map(toInt);
+  T.expectEq(Array[121], result());
+  T.expectEq(1, readFilterCount(context, 0));
+  write(context, sourceName, StrictFilterKey(1), Array[ReadFilterPair(2, 21)]);
+  context.update();
+  T.expectEq(
+    1,
+    readFilterCount(context, 0),
+    "Unobserved fields do not invalidate",
+  );
+  write(context, sourceName, StrictFilterKey(1), Array[ReadFilterPair(3, 21)]);
+  context.update();
+  T.expectEq(2, readFilterCount(context, 0), "Observed fields invalidate");
+  T.expectEq(Array[131], result());
+  write(context, sourceName, StrictFilterKey(0), Array[ReadFilterPair(4, 10)]);
+  context.update();
+  T.expectEq(Array[434], result());
+  T.expectEq(3, readFilterCount(context, 0));
+  write(context, triggerName, SKStore.IID(0), Array[]);
+  context.update();
+  T.expectEq(Array<Int>[], result(), "Removing the reader drops its filters");
+  write(context, sourceName, StrictFilterKey(1), Array[ReadFilterPair(5, 21)]);
+  context.update();
+  T.expectEq(3, readFilterCount(context, 0), "Removed readers do not rerun");
+}
+
 module end;
