@@ -466,6 +466,7 @@ mutable class BuildRunner(
       skc.arg(dispatcher_path)
     };
 
+    reuse_state_db = false;
     if (!unit.target.is_build_script()) {
       // A compiler database belongs to one compilation unit. Sharing it across
       // packages or targets replaces the cached source/config inputs each time
@@ -474,16 +475,8 @@ mutable class BuildRunner(
       state_dir = this.fingerprint_dir_for(unit);
       this.create_dir(state_dir);
       state_db_path = Path.join(state_dir, "state.db");
-      skc.args(
-        Array[
-          if (FileSystem.exists(state_db_path)) {
-            "--data"
-          } else {
-            "--init"
-          },
-          state_db_path,
-        ],
-      )
+      !reuse_state_db = FileSystem.exists(state_db_path);
+      skc.args(Array[if (reuse_state_db) "--data" else "--init", state_db_path])
     };
 
     unit.target.kind match {
@@ -522,7 +515,27 @@ mutable class BuildRunner(
       skc.arg("--no-link")
     };
 
-    p = this.run_cmd(skc);
+    p = if (reuse_state_db) {
+      // The runtime only reopens a database written by the same skc
+      // executable (it compares GNU build-ids). Another compiler's database,
+      // e.g. from a rebuilt or different skc pointed at this target dir, is a
+      // stale cache: discard it and rebuild instead of failing (#1500, #1606).
+      first = this.exec_cmd(skc);
+      if (first.exitcode() == kSkcErrorMappingVersion) {
+        state_db_path = Path.join(this.fingerprint_dir_for(unit), "state.db");
+        this.bctx.gctx.console.status(
+          "Discarding",
+          `${state_db_path}, written by a different skc`,
+        );
+        _ = system(`rm -f ${state_db_path}`);
+        skc.replace_arg("--data", "--init");
+        this.run_cmd(skc)
+      } else {
+        this.check_cmd(first)
+      }
+    } else {
+      this.run_cmd(skc)
+    };
 
     if (separate_link) {
       link_status_path = Path.join(
@@ -577,6 +590,13 @@ mutable class BuildRunner(
   private readonly fun run_cmd(
     cmd: readonly ProcessBuilder,
   ): System.CompletedProcess {
+    this.check_cmd(this.exec_cmd(cmd))
+  }
+
+  // Runs `cmd` and returns its result even when it failed.
+  private readonly fun exec_cmd(
+    cmd: readonly ProcessBuilder,
+  ): System.CompletedProcess {
     this.bctx.gctx.console.verbose(() -> {
       env = if (this.bctx.gctx.console.verbosity >= VerbosityProlix()) {
         cmd.get_env().items().map(kv -> `${kv.i0}=${kv.i1}`).collect(Array)
@@ -590,17 +610,21 @@ mutable class BuildRunner(
       )
     });
 
-    p = if (this.bctx.gctx.console.verbosity >= VerbosityProlix()) {
+    if (this.bctx.gctx.console.verbosity >= VerbosityProlix()) {
       cmd.run(print_raw, print_error_raw)
     } else {
       cmd.run()
-    };
+    }
+  }
 
+  // Exits with an error when `p` failed, and returns it otherwise.
+  private readonly fun check_cmd(
+    p: System.CompletedProcess,
+  ): System.CompletedProcess {
     if (!p.success()) {
       this.bctx.gctx.console.error(subprocess_error_message(p));
       skipExit(3);
     };
-
     p
   }
 

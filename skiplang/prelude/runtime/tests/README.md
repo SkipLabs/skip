@@ -90,6 +90,22 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-persistent-mapping-exists
 ```
 
+# Persistent mapping identity
+
+A persistent heap records the GNU build-id of the executable that created it,
+and only an executable with the same build-id may reopen it (#1606). This test
+checks the header, reopens with the same executable, then rejects a header with
+a different build-id and one in the previous (version-stamp) format with
+`ERROR_MAPPING_VERSION`.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/persistent_mapping_identity.c \
+  -o /tmp/test-persistent-mapping-identity
+/tmp/test-persistent-mapping-identity
+```
+
 # Reference masks
 
 The object traversals use 64-bit reference masks. This regression exercises

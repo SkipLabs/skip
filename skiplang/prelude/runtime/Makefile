@@ -31,11 +31,13 @@ NATIVE_FILES=\
 CFILES32=$(CFILES) runtime32_specific.c
 BCFILES32=magic.bc $(CFILES32:.c=.bc)
 OFILES=$(CFILES:.c=.o)
-ONATIVE_FILES=magic.o $(NATIVE_FILES:.c=.o)
+ONATIVE_FILES=$(NATIVE_FILES:.c=.o)
 
 .PHONY: default
 default: libskip_runtime64.a libskip_runtime32.bc
 
+# Only the wasm runtime uses SKIP_get_version(): native persistent files are
+# keyed on the executable's build-id (palloc.c).
 magic.c:
 	date | cksum | awk '{print "unsigned long version = " $$1 ";"}' > magic.c
 	echo "int SKIP_get_version() { return (int)version; }" >> magic.c

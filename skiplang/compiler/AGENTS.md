@@ -25,5 +25,5 @@ the `bootstrap` submodule. The root [AGENTS.md](../../AGENTS.md) applies too.
 ## Gotchas
 
 - `build/`, `stage0/`, `stage1/`, `runs/`, `tools/runs/`, `tools/__pycache__/` are gitignored — never commit them. `runs/` and `tools/runs/` hold `tools/incremental_profile.py` evidence.
-- `state.db` persistent caches are per-unit and not portable across compiler or runtime versions; delete and re-`--init` when in doubt.
+- `state.db` persistent caches are per-unit and only reopen with the exact `skc` executable that wrote them: the runtime compares the executable's GNU build-id with the header and exits 43 on a mismatch. skargo then discards the stale `state.db` and rebuilds with `--init`. A cache survives a fresh checkout only if the rebuilt `skc` is byte-identical (same inputs, flags and paths).
 - The compiler self-build needs a large heap; CI bounds it with `tools/incremental_profile.py` (RSS/disk/timeout). The dev-profile merged test binary exceeds the CI memory budget — use `SKTEST_PROFILE=release` for the language suite.

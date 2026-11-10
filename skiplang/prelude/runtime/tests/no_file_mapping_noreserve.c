@@ -7,10 +7,6 @@
 #define SKIP64 1
 #include "../palloc.c"
 
-int SKIP_get_version(void) {
-  return 42;
-}
-
 int main(void) {
   sk_create_mapping(NULL, DEFAULT_CAPACITY);
   uintptr_t heap = (uintptr_t)ginfo;

@@ -19,8 +19,24 @@ FIXTURE = r"""
 #include <stdint.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <elf.h>
 #include <unistd.h>
-unsigned long version = 123456;
+// The executable's own GNU build-id, which the database header must record.
+extern const Elf64_Ehdr __ehdr_start;
+static unsigned build_id(unsigned char *out) {
+  const Elf64_Phdr *ph = (const void *)((const char *)&__ehdr_start + __ehdr_start.e_phoff);
+  for (int i = 0; i < __ehdr_start.e_phnum; i++) {
+    if (ph[i].p_type != PT_NOTE) continue;
+    const char *p = (const char *)ph[i].p_vaddr, *end = p + ph[i].p_memsz;
+    while (p + sizeof(Elf64_Nhdr) <= end) {
+      const Elf64_Nhdr *n = (const void *)p;
+      const char *desc = p + sizeof(*n) + ((n->n_namesz + 3) & ~3u);
+      if (n->n_type == NT_GNU_BUILD_ID) { memcpy(out, desc, n->n_descsz); return n->n_descsz; }
+      p = desc + ((n->n_descsz + 3) & ~3u);
+    }
+  }
+  return 0;
+}
 struct RootType {
   uint8_t refs, kind, unused, has_name;
   uint16_t header, unused_header;
@@ -36,14 +52,16 @@ struct Global {
   size_t allocated;
 };
 struct Mapping {
-  int64_t version; void *base;
+  uint64_t magic; void *base;
+  uint32_t build_id_size; unsigned char build_id[64];
   pthread_mutexattr_t attr; pthread_mutex_t mutex;
   struct Global global;
   uint64_t gid; size_t capacity; void **constants;
 };
 int main(int argc, char **argv) {
   int pairs = argc == 3 && !strcmp(argv[2], "pairs");
-  if (argc != 2 && !pairs) return 2;
+  if (argc != 2 && !pairs && !(argc == 3 && !strcmp(argv[2], "foreign")))
+    return 2;
   size_t capacity = 1024*1024;
   int fd = open(argv[1], O_RDWR|O_CREAT|O_EXCL, 0600);
   if (fd < 0 || ftruncate(fd, capacity+1)) return 3;
@@ -51,7 +69,10 @@ int main(int argc, char **argv) {
                    MAP_SHARED|MAP_FIXED_NOREPLACE, fd, 0);
   if (base == MAP_FAILED) return 4;
   struct Mapping *m = (void *)base;
-  m->version=version; m->base=base; m->capacity=capacity;
+  m->magic=0x31504d4e504b53ULL; m->base=base; m->capacity=capacity;
+  m->build_id_size=build_id(m->build_id);
+  if (!m->build_id_size) return 5;
+  if (argc == 3 && !strcmp(argv[2], "foreign")) m->build_id[0] ^= 0xff;
   // Three references to one string: one from the root and two from an array.
   // Allocations include 32 bytes for the root, 320 for the 300-byte string,
   // and 40 for the two-element array, whose refcount precedes both metadata words.
@@ -138,9 +159,9 @@ class PersistentCensusTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
-    def census(self, version="123456"):
+    def census(self, database=None):
         return subprocess.run(
-            [self.tool, self.fixture, self.database, version],
+            [self.tool, self.fixture, database or self.database],
             capture_output=True,
             text=True,
         )
@@ -190,7 +211,6 @@ class PersistentCensusTests(unittest.TestCase):
                 self.tool,
                 self.fixture,
                 database,
-                "123456",
                 "--pair-vtable",
                 rows["Fixture.Root"]["vtable"],
             ],
@@ -221,7 +241,6 @@ class PersistentCensusTests(unittest.TestCase):
                 self.tool,
                 self.fixture,
                 self.database,
-                "123456",
                 "--pair-vtable",
                 rows["Fixture.Array"]["vtable"],
             ],
@@ -233,10 +252,12 @@ class PersistentCensusTests(unittest.TestCase):
             "requires a 16-byte class with two references", result.stderr
         )
 
-    def test_format_mismatch_is_rejected(self):
-        result = self.census("123457")
+    def test_other_executables_database_is_rejected(self):
+        database = self.root / "foreign.db"
+        subprocess.run([self.fixture, database, "foreign"], check=True)
+        result = self.census(database)
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn("runtime version mismatch", result.stderr)
+        self.assertIn("build-id mismatch", result.stderr)
 
 
 if __name__ == "__main__":

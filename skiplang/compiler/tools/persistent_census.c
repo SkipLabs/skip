@@ -30,9 +30,15 @@ typedef struct {
   char *head, *end, *filename;
   size_t allocated;
 } Global;
+// The header written by prelude/runtime/palloc.c (file_mapping_header_t): the
+// heap may only be read with the executable whose GNU build-id it records.
+#define MAPPING_MAGIC 0x31504d4e504b53ULL
+#define BUILD_ID_MAX 64
 typedef struct {
-  int64_t version;
+  uint64_t magic;
   void* base;
+  uint32_t build_id_size;
+  unsigned char build_id[BUILD_ID_MAX];
   pthread_mutexattr_t attributes;
   pthread_mutex_t mutex;
   Global global;
@@ -87,7 +93,35 @@ static void require(int condition, const char* message) {
 static void read_exact(int fd, void* buffer, size_t size, off_t offset) {
   require(pread(fd, buffer, size, offset) == (ssize_t)size, "short file read");
 }
-static void map_image(const char* path, int64_t expected_version) {
+static unsigned char image_build_id[BUILD_ID_MAX];
+static uint32_t image_build_id_size = 0;
+// Records the executable's NT_GNU_BUILD_ID note from its PT_NOTE segments.
+static void read_build_id(int fd, const Elf64_Phdr* ph, int count) {
+  for (int i = 0; i < count && !image_build_id_size; i++) {
+    if (ph[i].p_type != PT_NOTE || ph[i].p_filesz > (1 << 20)) continue;
+    char* notes = malloc(ph[i].p_filesz);
+    if (!notes) fail("note allocation");
+    read_exact(fd, notes, ph[i].p_filesz, ph[i].p_offset);
+    for (size_t at = 0; at + sizeof(Elf64_Nhdr) <= ph[i].p_filesz;) {
+      Elf64_Nhdr* n = (Elf64_Nhdr*)(notes + at);
+      size_t name = at + sizeof(*n);
+      size_t desc = name + ((n->n_namesz + 3) & ~3u);
+      if (desc + n->n_descsz > ph[i].p_filesz) break;
+      if (n->n_type == NT_GNU_BUILD_ID && n->n_namesz == 4 &&
+          !memcmp(notes + name, "GNU", 4)) {
+        require(n->n_descsz && n->n_descsz <= BUILD_ID_MAX,
+                "invalid compiler build-id");
+        memcpy(image_build_id, notes + desc, n->n_descsz);
+        image_build_id_size = n->n_descsz;
+        break;
+      }
+      at = desc + ((n->n_descsz + 3) & ~3u);
+    }
+    free(notes);
+  }
+  require(image_build_id_size, "compiler has no GNU build-id");
+}
+static void map_image(const char* path) {
   int fd = open(path, O_RDONLY | O_CLOEXEC);
   if (fd < 0) fail("open compiler");
   Elf64_Ehdr eh;
@@ -101,6 +135,7 @@ static void map_image(const char* path, int64_t expected_version) {
   Elf64_Phdr* ph = calloc(eh.e_phnum, sizeof(*ph));
   if (!ph) fail("program header allocation");
   read_exact(fd, ph, eh.e_phnum * sizeof(*ph), eh.e_phoff);
+  read_build_id(fd, ph, eh.e_phnum);
   uintptr_t page = (uintptr_t)sysconf(_SC_PAGESIZE);
   image.begin = UINTPTR_MAX;
   for (int i = 0; i < eh.e_phnum; i++)
@@ -123,38 +158,7 @@ static void map_image(const char* path, int64_t expected_version) {
       read_exact(fd, (void*)ph[i].p_vaddr, ph[i].p_filesz, ph[i].p_offset);
     }
   free(ph);
-  require(eh.e_shentsize == sizeof(Elf64_Shdr),
-          "unexpected ELF section headers");
-  Elf64_Shdr* sh = calloc(eh.e_shnum, sizeof(*sh));
-  if (!sh) fail("section header allocation");
-  read_exact(fd, sh, eh.e_shnum * sizeof(*sh), eh.e_shoff);
-  int found = 0;
-  int64_t version = 0;
-  for (int i = 0; i < eh.e_shnum; i++)
-    if (sh[i].sh_type == SHT_SYMTAB) {
-      require(sh[i].sh_link < eh.e_shnum, "invalid ELF symbol strings");
-      Elf64_Shdr names = sh[sh[i].sh_link];
-      char* text = malloc(names.sh_size);
-      Elf64_Sym* symbols = malloc(sh[i].sh_size);
-      if (!text || !symbols) fail("symbol allocation");
-      read_exact(fd, text, names.sh_size, names.sh_offset);
-      read_exact(fd, symbols, sh[i].sh_size, sh[i].sh_offset);
-      for (size_t j = 0; j < sh[i].sh_size / sizeof(*symbols); j++) {
-        Elf64_Sym s = symbols[j];
-        if (s.st_name < names.sh_size && !strcmp(text + s.st_name, "version")) {
-          require(within(image, (void*)s.st_value, 8),
-                  "invalid runtime version symbol");
-          version = (int32_t)*(uint64_t*)s.st_value;
-          found = 1;
-        }
-      }
-      free(text);
-      free(symbols);
-    }
-  free(sh);
   close(fd);
-  if (found)
-    require(version == expected_version, "compiler runtime version mismatch");
   if (mprotect(base, image.end - image.begin, PROT_READ))
     fail("protect compiler image");
 }
@@ -284,23 +288,19 @@ static void csv_name(const char* name) {
   putchar('"');
 }
 int main(int argc, char** argv) {
-  if (argc != 4 && argc != 6) {
+  if (argc != 3 && argc != 5) {
     fprintf(stderr,
-            "usage: persistent-census EXACT-COMPILER STATE.DB RUNTIME-VERSION "
+            "usage: persistent-census EXACT-COMPILER STATE.DB "
             "[--pair-vtable ADDRESS]\n");
     return 2;
   }
   char* tail;
-  int64_t version = (int32_t)strtoll(argv[3], &tail, 10);
-  require(
-      *argv[3] && !*tail,
-      "invalid expected runtime version (from the matching build's magic.c)");
-  map_image(argv[1], version);
-  if (argc == 6) {
-    require(!strcmp(argv[4], "--pair-vtable"), "unknown census option");
+  map_image(argv[1]);
+  if (argc == 5) {
+    require(!strcmp(argv[3], "--pair-vtable"), "unknown census option");
     errno = 0;
-    uint64_t address = strtoull(argv[5], &tail, 0);
-    require(!errno && *argv[5] && !*tail && address && address <= UINTPTR_MAX,
+    uint64_t address = strtoull(argv[4], &tail, 0);
+    require(!errno && *argv[4] && !*tail && address && address <= UINTPTR_MAX,
             "invalid pair vtable address");
     pair_vtable = (uintptr_t)address;
     require(!(pair_vtable & 7) && within(image, (void*)pair_vtable, 16),
@@ -320,7 +320,11 @@ int main(int argc, char** argv) {
   if (fstat(fd, &st)) fail("stat database");
   Mapping header;
   read_exact(fd, &header, sizeof(header), 0);
-  require(header.version == version, "runtime format version mismatch");
+  require(header.magic == MAPPING_MAGIC &&
+              header.build_id_size == image_build_id_size &&
+              !memcmp(header.build_id, image_build_id, image_build_id_size),
+          "database was written by a different executable (build-id "
+          "mismatch)");
   require(header.capacity + 1 == (uint64_t)st.st_size &&
               (uintptr_t)header.global.end ==
                   (uintptr_t)header.base + header.capacity,
