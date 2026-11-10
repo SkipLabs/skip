@@ -139,8 +139,8 @@ for skargo_toml in **/Skargo.toml; do
     [ -n "$dep_path" ] || continue
     resolved=$(realpath -m --relative-to=. "$dir/$dep_path" 2>/dev/null)
     [ -f "$resolved/Skargo.toml" ] && deps="$deps $resolved"
-  done < <(awk '/^\[(dev-|build-)?dependencies\]/{d=1;next} /^\[/{d=0} d && /path *=/{print}' "$skargo_toml" \
-           | grep -oE 'path *= *"[^"]+"' | sed 's/.*"\(.*\)"/\1/')
+  done < <(awk '/^\[(dev-|build-)?dependencies\]/{d=1;next} /^\[/{d=0} d && /path"? *=/{print}' "$skargo_toml" \
+           | grep -oE '"?path"? *= *"[^"]+"' | sed 's/.*"\(.*\)"/\1/')
   SK_DEPS["$dir"]="$deps"
 done
 
@@ -167,9 +167,14 @@ while [ "${#queue[@]}" -gt 0 ]; do
 done
 
 # Skargo's incremental integration tests exercise the compiler from this checkout.
-# Schedule its producer even when only the driver changed.
+# Schedule its producer even when only the driver changed, and rerun them when
+# the compiler itself changes: skargo does not depend on the skc package, so the
+# reverse-dependency walk above does not reach it (#1631).
 if ${SK_CHANGED[skiplang/skargo]:-false}; then
   SK_CHANGED[skiplang/compiler]=true
+fi
+if ${SK_LIB_CHANGED[skiplang/compiler]:-false}; then
+  SK_CHANGED[skiplang/skargo]=true
 fi
 
 check_ts=false
