@@ -1,5 +1,11 @@
 # Rewrite the measured example in parallel
 
+**Paused at the user's explicit request (2026-11-10).** See
+[PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) before doing more work. The completed
+three-helper inlining experiment measures depth-6 Skip elaboration at 638.291 ms
+versus native Lean 192.626 ms, with all 29 new proofs accepted. Resume only when
+the user asks; the sections below preserve the plan and prior results.
+
 ## Current execution: profile and optimize hot paths (2026-11-10)
 
 Latest user steering replaces the earlier whole-path rewrite gate: checkpoint the

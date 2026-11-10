@@ -1,5 +1,11 @@
 # Conditional simplification implementation
 
+**Paused at the user's explicit request (2026-11-10).**
+[PAUSE_CHECKPOINT.md](PAUSE_CHECKPOINT.md) records the validated release and
+unintegrated work. Latest depth-6 medians after three `@always_inline` annotations
+are 638.291 ms in Skip and 192.626 ms in native Lean; all 29 new proofs passed.
+Do not continue builds, benchmarks or rewrites until the user resumes.
+
 Current work (2026-11-10): the user now requests profiling the actual benchmark
 and rewriting its dominant hot paths. This supersedes finishing the whole exercised
 path before measuring. Build the current release, establish fresh/warm raw timings,
