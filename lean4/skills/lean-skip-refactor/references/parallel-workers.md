@@ -258,6 +258,13 @@ selection still copies maintained function bodies verbatim. The integration tool
 does not automatically update the completion ledger: record actual checks and
 coverage limits there after validation.
 
+Keep a global `main` in standalone probes. The selector discovers qualified
+maintained-function references; qualify canonical and fallback calls even inside
+a same-module probe wrapper. Otherwise the compiler can report an unbound function
+whose body was simply never selected. The real `leanSimpInitialState` constructor
+is in bootstrap support, so fixtures can use it without importing the SKStore
+query implementation or duplicating its state layout.
+
 Check the port's primitive implementations before treating new test cases as
 supported behavior. For example, Nat bitwise and left-shift dispatch can reach
 explicitly unimplemented primitives. Keep those failures and compare old/new

@@ -1,0 +1,57 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// Ignore ordinary transparency settings, but respect an explicit irreducible status.
+fun f_Meta_Simp_unfoldDefinitionAny_5ed2cdcbc1(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, expr);
+  currentWorld = world;
+  if (leanTag(head) == LeanTag.Expr_const__impl) {
+    checked = f_Simp_unfoldDefinitionAny_spec_0_8a057061b8(
+      runtime,
+      leanField(head, 1),
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    );
+    leanTag(checked) match {
+    | LeanTag.EST_Out_error ->
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(checked, 0), leanField(checked, 1)],
+      )
+    | LeanTag.EST_Out_ok ->
+      !currentWorld = leanField(checked, 1);
+      leanTag(leanField(checked, 0)) match {
+      | LeanTag.Bool_true ->
+        return LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[LeanCtor(LeanTag.Option_none, Array[]), currentWorld],
+        )
+      | LeanTag.Bool_false -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  };
+  L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013(
+    runtime,
+    expr,
+    leanBool(true),
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    currentWorld,
+  )
+}
+
+module end;

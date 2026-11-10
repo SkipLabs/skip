@@ -1,0 +1,54 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// Literal applications remain intact; all other applications use congruence.
+fun f_Meta_Simp_simpApp_877f738eda(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  methods: LeanValue,
+  simpContext: LeanValue,
+  simpStateRef: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  isLiteral = leanTag(
+    f_Meta_Simp_isOfNatNatLit_cc91ede8c4(runtime, expr),
+  ) match {
+  | LeanTag.Bool_true -> true
+  | LeanTag.Bool_false ->
+    leanTag(f_Meta_Simp_isOfScientificLit_66a8b8277a(runtime, expr)) match {
+    | LeanTag.Bool_true -> true
+    | LeanTag.Bool_false ->
+      leanTag(f_Meta_Simp_isCharLit_64140e1312(runtime, expr)) match {
+      | LeanTag.Bool_true -> true
+      | LeanTag.Bool_false -> false
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  if (isLiteral) {
+    result: LeanValue = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[expr, LeanCtor(LeanTag.Option_none, Array[]), leanBool(true)],
+    );
+    return LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+  };
+  f_Meta_Simp_congr_87fd851104(
+    runtime,
+    expr,
+    methods,
+    simpContext,
+    simpStateRef,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  )
+}
+
+module end;

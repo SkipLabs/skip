@@ -2,16 +2,17 @@
 
 Current overnight work (2026-11-10): continue the rewrite, benchmark the completed
 raw path, then SKStore if near parity; otherwise optimize this port's representations.
-The user requires stopping before any Skip compiler/runtime change. Sixteen resumed
-rewrites are validated; the latest six pass 2,424 new comparisons plus 1,725
-regressions. There are 38 validated frame rewrites and 159 observed frames remain.
+The user requires stopping before any Skip compiler/runtime change. Twenty-one
+resumed rewrites are validated; the latest five pass 1,352 new comparisons plus
+4,149 regressions. There are 43 validated frame rewrites and 154 observed frames remain.
 See the current section of [REWRITE_PLAN.md](REWRITE_PLAN.md) and the
-[tenth audit](provenance/rewrite-batches/2026-11-10-wave-10.json).
+[eleventh audit](provenance/rewrite-batches/2026-11-10-wave-11.json).
 The user has now authorized one bounded Vibe retry using ten built-in subagents
 inside one client, after stopping the earlier separate-client pools. The trial
 finished in 217.52 seconds without observed provider errors; ten child exports
-and five paired drafts are present. Codex review found incomplete tests and source
-defects, so no draft is accepted yet.
+and five paired drafts were produced. Codex substantially corrected the source
+and replaced most tests before the five routines passed validation. The trial
+has not established a net time saving; Vibe remains idle.
 Codex implementation/review and the serialized compiler queue continue. The following restart
 notes preserve historical allocation, not a claim that those workers still run.
 

@@ -1,0 +1,534 @@
+// Typed literal applications and real congruence with observable Simproc callbacks.
+class SimpAppFixture(
+  saved: LeanExecutionCheckpoint,
+  meta: LeanValue,
+  metaRef: LeanValue,
+  core: LeanValue,
+  coreRef: LeanValue,
+  context: LeanValue,
+  stateRef: LeanValue,
+  methods: LeanValue,
+  logRef: LeanValue,
+)
+
+fun simpAppAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun simpAppForall(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  domain: LeanValue,
+  body: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    name,
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    domain,
+    body,
+  )
+}
+
+fun simpAppApply(
+  runtime: mutable LeanExecution,
+  function: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = function;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun simpAppObserve(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  // Captures: log, fail flag, Simp.State ref, Meta.State ref, Core.State ref.
+  assert(native_eq(args[8], args[2]) == 0);
+  assert(native_eq(args[10], args[3]) == 0);
+  assert(native_eq(args[12], args[4]) == 0);
+  expression = args[5];
+  previous = leanArray(runtime.readRef(args[0]));
+  runtime.writeRef(args[0], Some(LeanArray(previous.append(expression))));
+  world = leanBoxNat(leanNat(args[13]).add(LeanNat::fromInt(1)));
+  if (leanIsTrue(args[1])) {
+    message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      runtime,
+      LeanText("simpApp callback failed"),
+    );
+    exception: LeanValue = LeanCtor(
+      LeanTag.Exception_error,
+      Array[leanField(args[11], 2), message],
+    );
+    return LeanCtor(LeanTag.EST_Out_error, Array[exception, world])
+  };
+  result: LeanValue = LeanCtor(
+    LeanTag.Meta_Simp_Result_mk,
+    Array[expression, LeanCtor(LeanTag.Option_none, Array[]), leanBool(true)],
+  );
+  step: LeanValue = LeanCtor(LeanTag.Meta_Simp_Step_done, Array[result]);
+  LeanCtor(LeanTag.EST_Out_ok, Array[step, world])
+}
+
+fun simpAppCheck(
+  label: String,
+  fixture: SimpAppFixture,
+  expression: LeanValue,
+  world: LeanValue,
+  visited: Array<LeanValue>,
+  error: Bool = false,
+  unusedTail: Bool = false,
+  callbackFails: Bool = false,
+): void {
+  unused = LeanUnavailable(
+    "literal simplification must not inspect Simp/Meta/Core arguments",
+  );
+  methods = leanReplaceField(
+    fixture.methods,
+    0,
+    LeanClosure(
+      simpAppObserve,
+      14,
+      Array[
+        fixture.logRef,
+        leanBool(callbackFails),
+        fixture.stateRef,
+        fixture.metaRef,
+        fixture.coreRef,
+      ],
+    ),
+  );
+  tail: Array<LeanValue> = if (unusedTail) {
+    Array[unused, unused, unused, unused, unused, unused, unused]
+  } else {
+    Array[
+      methods,
+      fixture.context,
+      fixture.stateRef,
+      fixture.meta,
+      fixture.metaRef,
+      fixture.core,
+      fixture.coreRef,
+    ]
+  };
+  originalExpr = rewriteProbeCopyInput(expression);
+  replacementExpr = rewriteProbeCopyInput(expression);
+  originalTail = tail.map(rewriteProbeCopyInput);
+  replacementTail = tail.map(rewriteProbeCopyInput);
+  (result, after) = rewriteProbeCompare(
+    label,
+    fixture.saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpApp_877f738eda_fallback(
+        runtime,
+        originalExpr,
+        originalTail[0],
+        originalTail[1],
+        originalTail[2],
+        originalTail[3],
+        originalTail[4],
+        originalTail[5],
+        originalTail[6],
+        world,
+      );
+      assert(rewriteProbeSameInput(originalExpr, expression));
+      for (i in Range(0, tail.size())) {
+        assert(rewriteProbeSameInput(originalTail[i], tail[i]))
+      };
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_simpApp_877f738eda(
+        runtime,
+        replacementExpr,
+        replacementTail[0],
+        replacementTail[1],
+        replacementTail[2],
+        replacementTail[3],
+        replacementTail[4],
+        replacementTail[5],
+        replacementTail[6],
+        world,
+      );
+      assert(rewriteProbeSameInput(replacementExpr, expression));
+      for (i in Range(0, tail.size())) {
+        assert(rewriteProbeSameInput(replacementTail[i], tail[i]))
+      };
+      result
+    },
+  );
+  observed = after.restoreRaw();
+  assert(
+    rewriteProbeSameInput(observed.readRef(fixture.logRef), LeanArray(visited)),
+  );
+  expectedWorld = leanBoxNat(
+    leanNat(world).add(LeanNat::fromInt(visited.size())),
+  );
+  assert(native_eq(leanField(result, 1), expectedWorld) == 0);
+  if (error) {
+    assert(leanTag(result) == LeanTag.EST_Out_error);
+    exception = leanField(result, 0);
+    assert(leanTag(exception) == LeanTag.Exception_error);
+    assert(
+      rewriteProbeSameInput(
+        leanField(exception, 0),
+        leanField(fixture.core, 2),
+      ),
+    );
+    if (callbackFails) {
+      message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+        observed,
+        LeanText("simpApp callback failed"),
+      );
+      assert(rewriteProbeSameInput(leanField(exception, 1), message))
+    }
+  } else {
+    expected: LeanValue = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[expression, LeanCtor(LeanTag.Option_none, Array[]), leanBool(true)],
+    );
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    assert(rewriteProbeSameInput(leanField(result, 0), expected))
+  };
+  if (!error && visited.size() == 0) {
+    assert(native_eq(after.refs, fixture.saved.refs) == 0)
+  }
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+    qualified = (a: String, b: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        runtime,
+        LeanText(a),
+        LeanText(b),
+      );
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      runtime,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero),
+    );
+    constant = (n: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, n, nil);
+    bound = (n: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(n));
+    natName = name("Nat");
+    boolName = name("Bool");
+    charName = name("Char");
+    pName = name("SimpAppP");
+    valueName = name("simpAppValue");
+    functionName = name("simpAppFunction");
+    nat = constant(natName);
+    bool = constant(boolName);
+    char = constant(charName);
+    p = constant(pName);
+    value = constant(valueName);
+    function = constant(functionName);
+    functionType = simpAppForall(runtime, name("x"), p, p);
+    natClassName = name("OfNat");
+    scientificClassName = name("OfScientific");
+    natMethodName = qualified("OfNat", "ofNat");
+    scientificMethodName = qualified("OfScientific", "ofScientific");
+    charMethodName = qualified("Char", "ofNat");
+    natClass = constant(natClassName);
+    scientificClass = constant(scientificClassName);
+    natMethod = constant(natMethodName);
+    scientificMethod = constant(scientificMethodName);
+    charMethod = constant(charMethodName);
+    natInstanceName = name("simpAppNatInstance");
+    scientificInstanceName = name("simpAppScientificInstance");
+    boolValueName = qualified("Bool", "false");
+    alphaName = name("alpha");
+    indexName = name("index");
+    instanceName = name("instance");
+    natClassType = simpAppForall(
+      runtime,
+      alphaName,
+      type,
+      simpAppForall(runtime, indexName, nat, type),
+    );
+    natMethodType = simpAppForall(
+      runtime,
+      alphaName,
+      type,
+      simpAppForall(
+        runtime,
+        indexName,
+        nat,
+        simpAppForall(
+          runtime,
+          instanceName,
+          simpAppApply(runtime, natClass, Array[bound(1), bound(0)]),
+          bound(2),
+        ),
+      ),
+    );
+    natInstanceType = simpAppForall(
+      runtime,
+      indexName,
+      nat,
+      simpAppApply(runtime, natClass, Array[nat, bound(0)]),
+    );
+    scientificClassType = simpAppForall(runtime, alphaName, type, type);
+    scientificMethodType = simpAppForall(
+      runtime,
+      alphaName,
+      type,
+      simpAppForall(
+        runtime,
+        instanceName,
+        simpAppApply(runtime, scientificClass, Array[bound(0)]),
+        simpAppForall(
+          runtime,
+          name("mantissa"),
+          nat,
+          simpAppForall(
+            runtime,
+            name("negativeExponent"),
+            bool,
+            simpAppForall(runtime, name("exponent"), nat, bound(4)),
+          ),
+        ),
+      ),
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for ((declName, declType) in Array[
+      (natName, type),
+      (boolName, type),
+      (charName, type),
+      (pName, type),
+      (valueName, p),
+      (functionName, functionType),
+      (natClassName, natClassType),
+      (natMethodName, natMethodType),
+      (natInstanceName, natInstanceType),
+      (scientificClassName, scientificClassType),
+      (scientificMethodName, scientificMethodType),
+      (
+        scientificInstanceName,
+        simpAppApply(runtime, scientificClass, Array[nat]),
+      ),
+      (charMethodName, simpAppForall(runtime, indexName, nat, char)),
+      (boolValueName, bool),
+    ]) {
+      constants.set(
+        leanNameKey(declName),
+        LeanConstantFile(simpAppAxiom(declName, declType), None()),
+      )
+    };
+    localName = name("simpAppLocalFunction");
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime),
+      localName,
+      localName,
+      functionType,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    localFunction = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, localName);
+    state = rewriteProbeState(
+      runtime,
+      rewriteProbeEnvironment(runtime, constants.chill()),
+      locals,
+      "<simp-app>",
+    );
+    simpConfig = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(
+      runtime,
+    );
+    !simpConfig = leanReplaceField(simpConfig, 3, leanBool(false));
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(
+      runtime,
+      simpConfig,
+      LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(
+        runtime,
+      ),
+      leanField(leanField(state.coreContext, 0), 2),
+      state.metaContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      LeanNatLiterals.n0,
+    );
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    simpStateRef = runtime.newRef(leanSimpInitialState(runtime));
+    logRef = runtime.newRef(LeanArray(Array[]));
+    methods = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(
+      runtime,
+      LeanArray(Array[]),
+    );
+    literals: mutable Vector<
+      (String, LeanValue, LeanValue, Int),
+    > = mutable Vector[];
+    for (n in Array[
+      LeanNatLiterals.n0,
+      leanBoxNat(LeanNat::parse("18446744073709551623")),
+    ]) {
+      raw = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, n);
+      instance = simpAppApply(runtime, constant(natInstanceName), Array[raw]);
+      literals.push(
+        (
+          "OfNat " + leanNat(n).toString(),
+          simpAppApply(runtime, natMethod, Array[nat, raw, instance]),
+          nat,
+          1,
+        ),
+      );
+      literals.push(
+        (
+          "OfScientific " + leanNat(n).toString(),
+          simpAppApply(
+            runtime,
+            scientificMethod,
+            Array[
+              nat,
+              constant(scientificInstanceName),
+              raw,
+              constant(boolValueName),
+              raw,
+            ],
+          ),
+          nat,
+          2,
+        ),
+      )
+    };
+    for (n in Array[LeanNatLiterals.n0, leanNatValue(65)]) {
+      raw = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, n);
+      literals.push(
+        (
+          "Char " + leanNat(n).toString(),
+          simpAppApply(runtime, charMethod, Array[raw]),
+          char,
+          3,
+        ),
+      )
+    };
+    literalCases = literals.toArray();
+    for ((label, expr, expectedType, branch) in literalCases) {
+      inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+        runtime,
+        expr,
+        state.metaContext,
+        state.metaStateRef,
+        state.coreContext,
+        state.coreStateRef,
+        LeanNatLiterals.n0,
+      );
+      if (leanTag(inferred) != LeanTag.EST_Out_ok) {
+        leanFail("literal type inference failed: " + label)
+      };
+      assert(rewriteProbeSameInput(leanField(inferred, 0), expectedType));
+      assert(
+        leanIsTrue(
+          L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_isOfNatNatLit_cc91ede8c4(
+            runtime,
+            expr,
+          ),
+        ) == (branch == 1),
+      );
+      assert(
+        leanIsTrue(
+          L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_isOfScientificLit_66a8b8277a(
+            runtime,
+            expr,
+          ),
+        ) == (branch == 2),
+      );
+      assert(
+        leanIsTrue(
+          L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_isCharLit_64140e1312(
+            runtime,
+            expr,
+          ),
+        ) == (branch == 3),
+      )
+    };
+    fixture = SimpAppFixture(
+      runtime.checkpoint(),
+      state.metaContext,
+      state.metaStateRef,
+      state.coreContext,
+      state.coreStateRef,
+      leanField(contextResult, 0),
+      simpStateRef,
+      methods,
+      logRef,
+    );
+    for (world in Array[leanNatValue(29), leanNatValue(43)]) {
+      for ((label, expr, _type, _branch) in literalCases) {
+        simpAppCheck(label, fixture, expr, world, Array[]);
+        simpAppCheck(
+          label + " skips effects",
+          fixture,
+          expr,
+          world,
+          Array[],
+          false,
+          true,
+        );
+        !checks = checks + 2
+      };
+      for (head in Array[function, localFunction]) {
+        application = simpAppApply(runtime, head, Array[value]);
+        simpAppCheck(
+          "congruence visits head then argument",
+          fixture,
+          application,
+          world,
+          Array[head, value],
+        );
+        simpAppCheck(
+          "congruence propagates callback error",
+          fixture,
+          application,
+          world,
+          Array[head],
+          true,
+          false,
+          true,
+        );
+        !checks = checks + 2
+      };
+      missing = constant(name("simpAppMissing"));
+      simpAppCheck(
+        "congruence propagates unknown constant",
+        fixture,
+        simpAppApply(runtime, missing, Array[value]),
+        world,
+        Array[],
+        true,
+      );
+      !checks = checks + 1
+    }
+  };
+  assert(checks == 68);
+  print_string("simpApp: " + checks.toString() + " differential cases passed")
+}

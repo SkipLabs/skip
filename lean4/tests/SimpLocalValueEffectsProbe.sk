@@ -1,0 +1,600 @@
+// Real local theorem membership, recording effects, and nondependent let refusal.
+class ReduceFVarEffectsFixture(
+  saved: LeanExecutionCheckpoint,
+  meta: LeanValue,
+  core: LeanValue,
+  coreRef: LeanValue,
+  simpRef: LeanValue,
+  initialSimp: LeanValue,
+  retainedSimp: LeanValue,
+)
+
+class ReduceFVarEffectsCase(
+  label: String,
+  expr: LeanValue,
+  zetaDelta: Bool,
+  theorems: LeanValue,
+  expected: LeanValue,
+  recorded: ?LeanValue = None(),
+)
+
+fun rfEffectsConfig(runtime: mutable LeanExecution, enabled: Bool): LeanValue {
+  config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(
+    runtime,
+  );
+  leanReplaceField(config, 18, leanBool(enabled))
+}
+
+// Inspect map entries directly so the oracle does not use contains/insert/toArray.
+fun rfEffectsPairs(
+  runtime: mutable LeanExecution,
+  root: LeanValue,
+): Array<(LeanValue, LeanValue)> {
+  pairs: mutable Vector<(LeanValue, LeanValue)> = mutable Vector[];
+  leanTag(root) match {
+  | LeanTag.PersistentHashMap_Node_entries ->
+    entries = leanField(root, 0);
+    for (i in Range(0, leanValueArraySize(entries))) {
+      entry = leanArrayRead(runtime, entries, leanNatValue(i), false);
+      leanTag(entry) match {
+      | LeanTag.PersistentHashMap_Entry_null -> void
+      | LeanTag.PersistentHashMap_Entry_entry ->
+        pairs.push((leanField(entry, 0), leanField(entry, 1)))
+      | LeanTag.PersistentHashMap_Entry_ref ->
+        for (pair in rfEffectsPairs(runtime, leanField(entry, 0))) {
+          pairs.push(pair)
+        }
+      | _ -> leanFail("unexpected recording map entry")
+      }
+    }
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanField(root, 0);
+    values = leanField(root, 1);
+    assert(leanValueArraySize(keys) == leanValueArraySize(values));
+    for (i in Range(0, leanValueArraySize(keys))) {
+      pairs.push(
+        (
+          leanArrayRead(runtime, keys, leanNatValue(i), false),
+          leanArrayRead(runtime, values, leanNatValue(i), false),
+        ),
+      )
+    }
+  | _ -> leanFail("unexpected recording map node")
+  };
+  pairs.toArray()
+}
+
+fun rfEffectsExpectMap(
+  runtime: mutable LeanExecution,
+  map: LeanValue,
+  origins: Array<LeanValue>,
+  values: Array<Int>,
+): void {
+  assert(origins.size() == values.size());
+  pairs = rfEffectsPairs(runtime, map);
+  assert(pairs.size() == origins.size());
+  for (i in Range(0, origins.size())) {
+    matches = 0;
+    for ((origin, value) in pairs) {
+      if (rewriteProbeSameInput(origin, origins[i])) {
+        assert(leanNat(value) == LeanNat::fromInt(values[i]));
+        !matches = matches + 1
+      }
+    };
+    assert(matches == 1)
+  }
+}
+
+fun rfEffectsExpectState(
+  runtime: mutable LeanExecution,
+  actual: LeanValue,
+  initial: LeanValue,
+  origins: Array<LeanValue>,
+  diagnosticCounts: Array<Int>,
+): void {
+  assert(leanTag(actual) == LeanTag.Meta_Simp_State_mk);
+  for (field in Array[0, 1, 2, 4]) {
+    assert(native_eq(leanField(actual, field), leanField(initial, field)) == 0)
+  };
+  used = leanField(actual, 3);
+  assert(leanTag(used) == LeanTag.Meta_Simp_UsedSimps_mk);
+  assert(leanNat(leanField(used, 1)) == LeanNat::fromInt(origins.size()));
+  rfEffectsExpectMap(
+    runtime,
+    leanField(used, 0),
+    origins,
+    Array::fillBy(origins.size(), i -> i),
+  );
+  diagnostics = leanField(actual, 5);
+  initialDiagnostics = leanField(initial, 5);
+  assert(leanTag(diagnostics) == LeanTag.Meta_Simp_Diagnostics_mk);
+  if (diagnosticCounts.size() == 0) {
+    assert(native_eq(diagnostics, initialDiagnostics) == 0);
+    rfEffectsExpectMap(runtime, leanField(diagnostics, 0), Array[], Array[])
+  } else {
+    for (field in Array[1, 2, 3]) {
+      assert(
+        native_eq(
+          leanField(diagnostics, field),
+          leanField(initialDiagnostics, field),
+        ) == 0,
+      )
+    };
+    rfEffectsExpectMap(
+      runtime,
+      leanField(diagnostics, 0),
+      origins,
+      diagnosticCounts,
+    )
+  }
+}
+
+fun rfEffectsCheck(
+  label: String,
+  fixture: ReduceFVarEffectsFixture,
+  saved: LeanExecutionCheckpoint,
+  config: LeanValue,
+  theorems: LeanValue,
+  expr: LeanValue,
+  world: LeanValue,
+  expectedExpr: ?LeanValue,
+  expectedOrigins: Array<LeanValue>,
+  expectedCounts: Array<Int>,
+): LeanExecutionCheckpoint {
+  inputs = Array[config, theorems, expr, fixture.meta, fixture.core];
+  oldInputs = inputs.map(rewriteProbeCopyInput);
+  newInputs = inputs.map(rewriteProbeCopyInput);
+  before = saved.restoreRaw();
+  startingSimp = before.readRef(fixture.simpRef);
+  preservedSimp = rewriteProbeCopyInput(startingSimp);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceFVar_a65f64b706_fallback(
+        runtime,
+        oldInputs[0],
+        oldInputs[1],
+        oldInputs[2],
+        fixture.simpRef,
+        oldInputs[3],
+        oldInputs[4],
+        fixture.coreRef,
+        world,
+      );
+      for (i in Range(0, inputs.size())) {
+        assert(rewriteProbeSameInput(oldInputs[i], inputs[i]))
+      };
+      assert(rewriteProbeSameInput(startingSimp, preservedSimp));
+      assert(rewriteProbeSameInput(fixture.initialSimp, fixture.retainedSimp));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceFVar_a65f64b706(
+        runtime,
+        newInputs[0],
+        newInputs[1],
+        newInputs[2],
+        fixture.simpRef,
+        newInputs[3],
+        newInputs[4],
+        fixture.coreRef,
+        world,
+      );
+      for (i in Range(0, inputs.size())) {
+        assert(rewriteProbeSameInput(newInputs[i], inputs[i]))
+      };
+      assert(rewriteProbeSameInput(startingSimp, preservedSimp));
+      assert(rewriteProbeSameInput(fixture.initialSimp, fixture.retainedSimp));
+      result
+    },
+  );
+  assert(native_eq(leanField(result, 1), world) == 0);
+  expectedExpr match {
+  | Some(expected) ->
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    assert(rewriteProbeSameInput(leanField(result, 0), expected))
+  | None() ->
+    assert(leanTag(result) == LeanTag.EST_Out_error);
+    exception = leanField(result, 0);
+    assert(leanTag(exception) == LeanTag.Exception_error);
+    assert(
+      rewriteProbeSameInput(
+        leanField(exception, 0),
+        leanField(fixture.core, 2),
+      ),
+    )
+  };
+  observed = after.restoreRaw();
+  rfEffectsExpectState(
+    observed,
+    observed.readRef(fixture.simpRef),
+    fixture.initialSimp,
+    expectedOrigins,
+    expectedCounts,
+  );
+  assert(rewriteProbeSameInput(fixture.initialSimp, fixture.retainedSimp));
+  // Only the Simp.State cell may change, including across the carried-state sequence.
+  observed.writeRef(fixture.simpRef, Some(fixture.initialSimp));
+  assert(native_eq(observed.checkpoint().refs, fixture.saved.refs) == 0);
+  after
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    for (diagnostics in Array[false, true]) {
+      runtime = mutable LeanExecution{
+        unboundedHeartbeats => true,
+        profileRuntime => profile,
+      };
+      leanInitializeSimp(runtime);
+      name = (text: String) ->
+        L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text));
+      fvar = (id: LeanValue) ->
+        L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, id);
+      origin = (id: LeanValue) ->
+        (LeanCtor(LeanTag.Meta_Origin_fvar, Array[id]) : LeanValue);
+      prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+        runtime,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      );
+      binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+      ordinary: LeanValue = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+      implementation: LeanValue = LeanCtor(
+        LeanTag.LocalDeclKind_implDetail,
+        Array[],
+      );
+      seedId = name("rfEffects.seed");
+      xId = name("rfEffects.x");
+      letId = name("rfEffects.let");
+      otherId = name("rfEffects.other");
+      implId = name("rfEffects.impl");
+      nondepId = name("rfEffects.nondep");
+      implNondepId = name("rfEffects.implNondep");
+      missingId = name("rfEffects.missing");
+      x = fvar(xId);
+      locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+        runtime,
+      );
+      for (id in Array[seedId, xId]) {
+        !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+          runtime,
+          locals,
+          id,
+          id,
+          prop,
+          binder,
+          ordinary,
+        )
+      };
+      for ((id, nondep, kind) in Array[
+        (letId, false, ordinary),
+        (otherId, false, ordinary),
+        (implId, false, implementation),
+        (nondepId, true, ordinary),
+        (implNondepId, true, implementation),
+      ]) {
+        !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+          runtime,
+          locals,
+          id,
+          id,
+          prop,
+          x,
+          leanBool(nondep),
+          kind,
+        )
+      };
+      base = rewriteProbeState(
+        runtime,
+        rewriteProbeEnvironment(
+          runtime,
+          (Map[] : Map<String, LeanConstantFile>),
+        ),
+        locals,
+        "<reduce-fvar-effects>",
+      );
+      options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+        runtime,
+        L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime),
+        leanField(leanField(base.coreContext, 0), 2),
+        name("diagnostics"),
+        leanBool(diagnostics),
+      );
+      core = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(
+        runtime,
+        base.coreContext,
+        options,
+      );
+      assert((leanWordBits(leanField(core, 3)).and(512) != 0) == diagnostics);
+      simpRef = runtime.newRef(
+        leanReplaceField(leanSimpInitialState(runtime), 4, leanNatValue(7)),
+      );
+      seedOrigin = origin(seedId);
+      seeded = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_recordSimpTheorem_aa5c92accb(
+        runtime,
+        seedOrigin,
+        simpRef,
+        core,
+        base.coreStateRef,
+        LeanNatLiterals.n0,
+      );
+      assert(leanTag(seeded) == LeanTag.EST_Out_ok);
+      initialSimp = runtime.readRef(simpRef);
+      seedCounts: Array<Int> = if (diagnostics) Array[1] else Array[];
+      rfEffectsExpectState(
+        runtime,
+        initialSimp,
+        initialSimp,
+        Array[seedOrigin],
+        seedCounts,
+      );
+
+      empty = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_instInhabitedSimpTheorems_default_e7dd612eb4(
+        runtime,
+      );
+      addLet = (id: LeanValue) ->
+        L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheorems_addLetDeclToUnfold_bf80aff094(
+          runtime,
+          empty,
+          id,
+        );
+      onlyLet = addLet(letId);
+      noTheorems: LeanValue = LeanArray(Array[]);
+      lateTheorems: LeanValue = LeanArray(Array[empty, onlyLet]);
+      persistentLate: LeanValue = LeanPersistentArray(
+        Persistent.RadixTreeVector::mcreateFromItems(
+          (Array[empty, onlyLet] : Array<LeanValue>),
+        ).chill(),
+      );
+      duplicateTheorems: LeanValue = LeanArray(Array[onlyLet, onlyLet]);
+      nondepTheorems: LeanValue = LeanArray(Array[empty, addLet(nondepId)]);
+      implTheorems: LeanValue = LeanArray(Array[addLet(implId)]);
+      implNondepTheorems: LeanValue = LeanArray(Array[addLet(implNondepId)]);
+      assert(
+        leanIsTrue(
+          L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheoremsArray_isLetDeclToUnfold_187f40f687(
+            runtime,
+            lateTheorems,
+            letId,
+          ),
+        ),
+      );
+      assert(
+        !leanIsTrue(
+          L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheoremsArray_isLetDeclToUnfold_187f40f687(
+            runtime,
+            lateTheorems,
+            otherId,
+          ),
+        ),
+      );
+      fixture = ReduceFVarEffectsFixture(
+        runtime.checkpoint(),
+        base.metaContext,
+        core,
+        base.coreStateRef,
+        simpRef,
+        initialSimp,
+        rewriteProbeCopyInput(initialSimp),
+      );
+      letExpr = fvar(letId);
+      implExpr = fvar(implId);
+      nondepExpr = fvar(nondepId);
+      implNondepExpr = fvar(implNondepId);
+      letOrigin = origin(letId);
+      nondepOrigin = origin(nondepId);
+      world = if (diagnostics) leanNatValue(97) else leanNatValue(43);
+      cases = Array[
+        ReduceFVarEffectsCase(
+          "zeta unfolds local let",
+          letExpr,
+          true,
+          noTheorems,
+          x,
+        ),
+        ReduceFVarEffectsCase(
+          "zeta keeps local declaration",
+          x,
+          true,
+          noTheorems,
+          x,
+        ),
+        ReduceFVarEffectsCase(
+          "ordinary declaration unchanged",
+          x,
+          false,
+          noTheorems,
+          x,
+        ),
+        ReduceFVarEffectsCase(
+          "unlisted local let unchanged",
+          letExpr,
+          false,
+          noTheorems,
+          letExpr,
+        ),
+        ReduceFVarEffectsCase(
+          "implementation detail unfolds",
+          implExpr,
+          false,
+          noTheorems,
+          x,
+        ),
+        ReduceFVarEffectsCase(
+          "zeta refuses nondependent let",
+          nondepExpr,
+          true,
+          noTheorems,
+          nondepExpr,
+        ),
+        ReduceFVarEffectsCase(
+          "implementation detail refuses nondependent let",
+          implNondepExpr,
+          false,
+          noTheorems,
+          implNondepExpr,
+        ),
+        ReduceFVarEffectsCase(
+          "late membership records and unfolds",
+          letExpr,
+          false,
+          lateTheorems,
+          x,
+          Some(letOrigin),
+        ),
+        ReduceFVarEffectsCase(
+          "nonempty membership miss",
+          fvar(otherId),
+          false,
+          lateTheorems,
+          fvar(otherId),
+        ),
+        ReduceFVarEffectsCase(
+          "listed implementation detail records",
+          implExpr,
+          false,
+          implTheorems,
+          x,
+          Some(origin(implId)),
+        ),
+        ReduceFVarEffectsCase(
+          "listed nondependent let records before refusal",
+          nondepExpr,
+          false,
+          nondepTheorems,
+          nondepExpr,
+          Some(nondepOrigin),
+        ),
+        ReduceFVarEffectsCase(
+          "zeta bypasses recording despite membership",
+          letExpr,
+          true,
+          lateTheorems,
+          x,
+        ),
+        ReduceFVarEffectsCase(
+          "duplicate membership records once",
+          letExpr,
+          false,
+          duplicateTheorems,
+          x,
+          Some(letOrigin),
+        ),
+        ReduceFVarEffectsCase(
+          "listed nondependent implementation detail records",
+          implNondepExpr,
+          false,
+          implNondepTheorems,
+          implNondepExpr,
+          Some(origin(implNondepId)),
+        ),
+        ReduceFVarEffectsCase(
+          "persistent theorem array membership",
+          letExpr,
+          false,
+          persistentLate,
+          x,
+          Some(letOrigin),
+        ),
+      ];
+      for (item in cases) {
+        expectedOrigins: Array<LeanValue> = item.recorded match {
+        | None() -> Array[seedOrigin]
+        | Some(recorded) -> Array[seedOrigin, recorded]
+        };
+        expectedCounts: Array<Int> = if (diagnostics) {
+          Array::fill(expectedOrigins.size(), 1)
+        } else {
+          Array[]
+        };
+        _ = rfEffectsCheck(
+          item.label,
+          fixture,
+          fixture.saved,
+          rfEffectsConfig(runtime, item.zetaDelta),
+          item.theorems,
+          item.expr,
+          world,
+          Some(item.expected),
+          expectedOrigins,
+          expectedCounts,
+        );
+        !checks = checks + 1
+      };
+      unavailable: LeanValue = LeanUnavailable(
+        "lookup failure must precede config and theorem reads",
+      );
+      missing = fvar(missingId);
+      _ = rfEffectsCheck(
+        "unknown local before unused inputs",
+        fixture,
+        fixture.saved,
+        unavailable,
+        unavailable,
+        missing,
+        world,
+        None(),
+        Array[seedOrigin],
+        seedCounts,
+      );
+      !checks = checks + 1;
+
+      config = rfEffectsConfig(runtime, false);
+      afterFirst = rfEffectsCheck(
+        "sequence first recording",
+        fixture,
+        fixture.saved,
+        config,
+        lateTheorems,
+        letExpr,
+        world,
+        Some(x),
+        Array[seedOrigin, letOrigin],
+        if (diagnostics) Array[1, 1] else Array[],
+      );
+      afterRepeat = rfEffectsCheck(
+        "sequence repeat keeps insertion position",
+        fixture,
+        afterFirst,
+        config,
+        lateTheorems,
+        letExpr,
+        world,
+        Some(x),
+        Array[seedOrigin, letOrigin],
+        if (diagnostics) Array[1, 2] else Array[],
+      );
+      afterRefusal = rfEffectsCheck(
+        "sequence records refused nondependent let",
+        fixture,
+        afterRepeat,
+        config,
+        nondepTheorems,
+        nondepExpr,
+        world,
+        Some(nondepExpr),
+        Array[seedOrigin, letOrigin, nondepOrigin],
+        if (diagnostics) Array[1, 2, 1] else Array[],
+      );
+      _ = rfEffectsCheck(
+        "later lookup error retains recorded prefix",
+        fixture,
+        afterRefusal,
+        unavailable,
+        unavailable,
+        missing,
+        world,
+        None(),
+        Array[seedOrigin, letOrigin, nondepOrigin],
+        if (diagnostics) Array[1, 2, 1] else Array[],
+      );
+      !checks = checks + 4
+    }
+  };
+  assert(checks == 80);
+  print_string(
+    "reduceFVar effects: " + checks.toString() + " differential cases passed",
+  )
+}

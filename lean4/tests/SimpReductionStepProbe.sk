@@ -1,0 +1,267 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+class DsimpProbeState(
+  checkpoint: LeanExecutionCheckpoint,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  simpContext: LeanValue,
+  simpStateRef: LeanValue,
+  methodsRef: LeanValue,
+)
+
+fun dsimpProbeCheck(
+  label: String,
+  state: DsimpProbeState,
+  expr: LeanValue,
+  expectedExpr: ?LeanValue,
+  world: LeanValue,
+): LeanValue {
+  oldExpr = rewriteProbeCopyInput(expr);
+  newExpr = rewriteProbeCopyInput(expr);
+  oldSimpContext = rewriteProbeCopyInput(state.simpContext);
+  newSimpContext = rewriteProbeCopyInput(state.simpContext);
+  oldMetaContext = rewriteProbeCopyInput(state.metaContext);
+  newMetaContext = rewriteProbeCopyInput(state.metaContext);
+  oldCoreContext = rewriteProbeCopyInput(state.coreContext);
+  newCoreContext = rewriteProbeCopyInput(state.coreContext);
+  (result, _) = rewriteProbeCompare(
+    label,
+    state.checkpoint,
+    (oldRuntime: mutable LeanExecution) ~> {
+      output = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpReduce_ce40a5e837_fallback(
+        oldRuntime,
+        oldExpr,
+        state.methodsRef,
+        oldSimpContext,
+        state.simpStateRef,
+        oldMetaContext,
+        state.metaStateRef,
+        oldCoreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(oldExpr, expr));
+      assert(rewriteProbeSameInput(oldSimpContext, state.simpContext));
+      assert(rewriteProbeSameInput(oldMetaContext, state.metaContext));
+      assert(rewriteProbeSameInput(oldCoreContext, state.coreContext));
+      output
+    },
+    (newRuntime: mutable LeanExecution) ~> {
+      output = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpReduce_ce40a5e837(
+        newRuntime,
+        newExpr,
+        state.methodsRef,
+        newSimpContext,
+        state.simpStateRef,
+        newMetaContext,
+        state.metaStateRef,
+        newCoreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(newExpr, expr));
+      assert(rewriteProbeSameInput(newSimpContext, state.simpContext));
+      assert(rewriteProbeSameInput(newMetaContext, state.metaContext));
+      assert(rewriteProbeSameInput(newCoreContext, state.coreContext));
+      output
+    },
+  );
+  expectedExpr match {
+  | Some(value) ->
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    step = leanField(result, 0);
+    if (native_eq(value, expr) == 0) {
+      assert(leanTag(step) == LeanTag.TransformStep_done);
+      assert(rewriteProbeSameInput(leanField(step, 0), expr))
+    } else {
+      assert(leanTag(step) == LeanTag.TransformStep_visit);
+      assert(rewriteProbeSameInput(leanField(step, 0), value))
+    };
+    assert(native_eq(leanField(result, 1), world) == 0)
+  | None() -> assert(leanTag(result) == LeanTag.EST_Out_error)
+  };
+  result
+}
+
+fun runReductionStepProbe(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    emptyMap: Map<String, LeanConstantFile> = Map[];
+    environment = rewriteProbeEnvironment(runtime, emptyMap);
+    metaLocalContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+      runtime,
+    );
+    metaState = rewriteProbeState(
+      runtime,
+      environment,
+      metaLocalContext,
+      "<dsimp-reduce-probe>",
+    );
+
+    config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(
+      runtime,
+    );
+    !config = leanReplaceField(config, 18, leanBool(true));
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(
+      runtime,
+      config,
+      LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(
+        runtime,
+      ),
+      leanField(leanField(metaState.coreContext, 0), 2),
+      metaState.metaContext,
+      metaState.metaStateRef,
+      metaState.coreContext,
+      metaState.coreStateRef,
+      leanNatValue(0),
+    );
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    simpStateRef = runtime.newRef(leanSimpInitialState(runtime));
+    methodsRef = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(
+      runtime,
+      LeanArray(Array[]),
+    );
+    fixture = DsimpProbeState(
+      runtime.checkpoint(),
+      metaState.metaContext,
+      metaState.metaStateRef,
+      metaState.coreContext,
+      metaState.coreStateRef,
+      leanField(contextResult, 0),
+      simpStateRef,
+      methodsRef,
+    );
+
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    xName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("dsimp.x"),
+    );
+    x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+    unknownName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("dsimp.unknown"),
+    );
+    unknown = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, unknownName);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      metaLocalContext,
+      xName,
+      xName,
+      prop,
+      binder,
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    letName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      runtime,
+      LeanText("dsimp.let"),
+    );
+    letFVar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, letName);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+      runtime,
+      locals,
+      letName,
+      letName,
+      prop,
+      x,
+      leanBool(false),
+      LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    localsState = rewriteProbeState(
+      runtime,
+      environment,
+      locals,
+      "<dsimp-reduce-locals>",
+    );
+    localsContextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(
+      runtime,
+      config,
+      LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(
+        runtime,
+      ),
+      leanField(leanField(localsState.coreContext, 0), 2),
+      localsState.metaContext,
+      localsState.metaStateRef,
+      localsState.coreContext,
+      localsState.coreStateRef,
+      leanNatValue(0),
+    );
+    assert(leanTag(localsContextResult) == LeanTag.EST_Out_ok);
+    localsFixture = DsimpProbeState(
+      runtime.checkpoint(),
+      localsState.metaContext,
+      localsState.metaStateRef,
+      localsState.coreContext,
+      localsState.coreStateRef,
+      leanField(localsContextResult, 0),
+      simpStateRef,
+      methodsRef,
+    );
+
+    bvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(0));
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      xName,
+      binder,
+      type,
+      bvar,
+    );
+    betaRedex = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, prop);
+    world = leanNatValue(71);
+    _ = dsimpProbeCheck("sort unchanged", fixture, prop, Some(prop), world);
+    !cases = cases + 1;
+    _ = dsimpProbeCheck(
+      "beta redex visits reduced expression",
+      fixture,
+      betaRedex,
+      Some(prop),
+      world,
+    );
+    !cases = cases + 1;
+    _ = dsimpProbeCheck(
+      "free variable stays unchanged",
+      localsFixture,
+      x,
+      Some(x),
+      world,
+    );
+    !cases = cases + 1;
+    _ = dsimpProbeCheck(
+      "local let fvar zeta-reduces",
+      localsFixture,
+      letFVar,
+      Some(x),
+      world,
+    );
+    !cases = cases + 1;
+    _ = dsimpProbeCheck(
+      "unknown fvar propagates error",
+      fixture,
+      unknown,
+      None(),
+      world,
+    );
+    !cases = cases + 1
+  };
+  assert(cases == 10);
+  print_string("dsimpReduce: " + cases.toString() + " differential cases")
+}
+
+module end;
+
+fun main(): void {
+  L4_Lean_Meta_Tactic_Simp_Main.runReductionStepProbe()
+}

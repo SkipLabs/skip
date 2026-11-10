@@ -1,0 +1,117 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// Unfold a local value when zeta or simp-theorem rules request it.
+fun f_Meta_Simp_reduceFVar_a65f64b706(
+  runtime: mutable LeanExecution,
+  config: LeanValue,
+  theorems: LeanValue,
+  expr: LeanValue,
+  simpStateRef: LeanValue,
+  metaContext: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  declarationResult = L4_Lean_Meta_Basic.f_Lean_Meta_getFVarLocalDecl_53b3a14c72(
+    runtime,
+    expr,
+    metaContext,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  leanTag(declarationResult) match {
+  | LeanTag.EST_Out_error ->
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(declarationResult, 0), leanField(declarationResult, 1)],
+    )
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+
+  localDecl = leanField(declarationResult, 0);
+  nextWorld = leanField(declarationResult, 1);
+  zetaDelta: LeanValue = (LeanErased() : LeanValue);
+  leanTag(config) match {
+  | LeanTag.Meta_Simp_Config_mk -> !zetaDelta = leanField(config, 18)
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  shouldUnfold = leanTag(zetaDelta) match {
+  | LeanTag.Bool_true -> true
+  | LeanTag.Bool_false ->
+    letDecl = f_Simp_reduceFVar_lam_0_3f4bff23bb(
+      runtime,
+      expr,
+      theorems,
+      LeanCtor(LeanTag.PUnit_unit, Array[]),
+    );
+    leanTag(letDecl) match {
+    | LeanTag.Bool_true -> true
+    | LeanTag.Bool_false ->
+      implementationDetail = L4_Lean_LocalContext.f_Lean_LocalDecl_isImplementationDetail_a1009b26d6(
+        runtime,
+        localDecl,
+      );
+      leanTag(implementationDetail) match {
+      | LeanTag.Bool_true -> true
+      | LeanTag.Bool_false -> false
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  if (!shouldUnfold) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[expr, nextWorld])
+  };
+
+  if (leanTag(zetaDelta) == LeanTag.Bool_false) {
+    letDeclForRecording = f_Simp_reduceFVar_lam_0_3f4bff23bb(
+      runtime,
+      expr,
+      theorems,
+      LeanCtor(LeanTag.PUnit_unit, Array[]),
+    );
+    leanTag(letDeclForRecording) match {
+    | LeanTag.Bool_true ->
+      fvarId = L4_Lean_LocalContext.f_Lean_LocalDecl_fvarId_49e5d778ff(
+        runtime,
+        localDecl,
+      );
+      recordResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_recordSimpTheorem_aa5c92accb(
+        runtime,
+        LeanCtor(LeanTag.Meta_Origin_fvar, Array[fvarId]),
+        simpStateRef,
+        coreContext,
+        coreStateRef,
+        nextWorld,
+      );
+      leanTag(recordResult) match {
+      | LeanTag.EST_Out_error ->
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(recordResult, 0), leanField(recordResult, 1)],
+        )
+      | LeanTag.EST_Out_ok -> !nextWorld = leanField(recordResult, 1)
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  };
+
+  valueResult = L4_Lean_LocalContext.f_Lean_LocalDecl_value_a648a2b80f(
+    runtime,
+    localDecl,
+    LeanCtor(LeanTag.Bool_false, Array[]),
+  );
+  leanTag(valueResult) match {
+  | LeanTag.Option_some ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[leanField(valueResult, 0), nextWorld])
+  | LeanTag.Option_none -> LeanCtor(LeanTag.EST_Out_ok, Array[expr, nextWorld])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

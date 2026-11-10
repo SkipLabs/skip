@@ -1,0 +1,29 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// Look up the modules indirectly used by a declaration's simplifier rule.
+fun f_recordSimpUses_spec_0_spec_2_09b224d049(
+  runtime: mutable LeanExecution,
+  usesByDecl: LeanValue,
+  declarationName: LeanValue,
+): LeanValue {
+  if (leanTag(usesByDecl) != LeanTag.Std_DHashMap_Raw_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  _ = leanField(usesByDecl, 0);
+  buckets = leanField(usesByDecl, 1);
+  bucketCount = leanValueArraySize(buckets);
+  hashBits = leanTag(declarationName) match {
+  | LeanTag.Name_anonymous__impl -> 1723
+  | LeanTag.Name_str__impl
+  | LeanTag.Name_num__impl ->
+    leanWordBits(leanField(declarationName, 0))
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  folded = hashBits.xor(hashBits.ushr(32));
+  scrambled = folded.xor(folded.ushr(16));
+  index: LeanValue = LeanWord("usize", scrambled.and(bucketCount - 1));
+  bucket = leanArrayRead(runtime, buckets, index, true);
+  f_spec_0_spec_2_spec_5_6d381cf2dd(runtime, declarationName, bucket)
+}
+
+module end;

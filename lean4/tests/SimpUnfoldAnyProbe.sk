@@ -1,0 +1,425 @@
+// Real reducibility attributes, typed definitions, and unchanged-input checks.
+class UnfoldAnyCase(
+  label: String,
+  expr: LeanValue,
+  value: ?LeanValue,
+  error: Bool = false,
+)
+
+fun unfoldAnyDeclaration(
+  name: LeanValue,
+  levels: LeanValue,
+  type: LeanValue,
+  value: ?LeanValue,
+): LeanValue {
+  base: LeanValue = LeanCtor(LeanTag.ConstantVal_mk, Array[name, levels, type]);
+  value match {
+  | None() ->
+    LeanCtor(
+      LeanTag.ConstantInfo_axiomInfo,
+      Array[LeanCtor(LeanTag.AxiomVal_mk, Array[base, leanBool(false)])],
+    )
+  | Some(body) ->
+    LeanCtor(
+      LeanTag.ConstantInfo_defnInfo,
+      Array[
+        LeanCtor(
+          LeanTag.DefinitionVal_mk,
+          Array[
+            base,
+            body,
+            LeanCtor(
+              LeanTag.ReducibilityHints_regular,
+              Array[LeanWord("uint32", 0)],
+            ),
+            LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+            LeanCtor(
+              LeanTag.List_cons,
+              Array[name, LeanCtor(LeanTag.List_nil, Array[])],
+            ),
+          ],
+        ),
+      ],
+    )
+  }
+}
+
+fun unfoldAnyCheck(
+  item: UnfoldAnyCase,
+  state: RewriteProbeState,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+  unchanged: Bool = false,
+): void {
+  oldExpr = rewriteProbeCopyInput(item.expr);
+  newExpr = rewriteProbeCopyInput(item.expr);
+  oldMeta = rewriteProbeCopyInput(metaContext);
+  newMeta = rewriteProbeCopyInput(metaContext);
+  oldCore = rewriteProbeCopyInput(coreContext);
+  newCore = rewriteProbeCopyInput(coreContext);
+  (result, after) = rewriteProbeCompare(
+    item.label,
+    state.saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_unfoldDefinitionAny_5ed2cdcbc1_fallback(
+        runtime,
+        oldExpr,
+        oldMeta,
+        metaStateRef,
+        oldCore,
+        coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(oldExpr, item.expr));
+      assert(rewriteProbeSameInput(oldMeta, metaContext));
+      assert(rewriteProbeSameInput(oldCore, coreContext));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_unfoldDefinitionAny_5ed2cdcbc1(
+        runtime,
+        newExpr,
+        newMeta,
+        metaStateRef,
+        newCore,
+        coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(newExpr, item.expr));
+      assert(rewriteProbeSameInput(newMeta, metaContext));
+      assert(rewriteProbeSameInput(newCore, coreContext));
+      result
+    },
+  );
+  invariant(
+    native_eq(leanField(result, 1), world) == 0,
+    item.label + ": world",
+  );
+  if (item.error) {
+    invariant(
+      leanTag(result) == LeanTag.EST_Out_error,
+      item.label + ": expected error",
+    );
+    exception = leanField(result, 0);
+    invariant(
+      leanTag(exception) == LeanTag.Exception_error,
+      item.label + ": exception tag",
+    );
+    assert(
+      rewriteProbeSameInput(leanField(exception, 0), leanField(coreContext, 2)),
+    )
+  } else {
+    invariant(
+      leanTag(result) == LeanTag.EST_Out_ok,
+      item.label + ": expected success",
+    );
+    expected: LeanValue = item.value match {
+    | None() -> LeanCtor(LeanTag.Option_none, Array[])
+    | Some(value) -> LeanCtor(LeanTag.Option_some, Array[value])
+    };
+    invariant(
+      rewriteProbeSameInput(leanField(result, 0), expected),
+      item.label + ": unfolded value",
+    )
+  };
+  if (unchanged) {
+    invariant(
+      native_eq(after.refs, state.saved.refs) == 0,
+      item.label + ": unchanged references",
+    )
+  }
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text));
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    propositionName = name("unfoldAny.P");
+    proposition = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      propositionName,
+      nil,
+    );
+    identityName = name("unfoldAny.identity");
+    identityType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      name("P"),
+      binder,
+      prop,
+      prop,
+    );
+    identityValue = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      name("P"),
+      binder,
+      prop,
+      bound,
+    );
+    identity = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      identityName,
+      nil,
+    );
+    appliedIdentity = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(
+      runtime,
+      identity,
+      proposition,
+    );
+    universeName = name("u");
+    universe = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(
+      runtime,
+      universeName,
+    );
+    polyName = name("unfoldAny.universe");
+    polyValue = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, universe);
+    polyType = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      runtime,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, universe),
+    );
+    parameters: LeanValue = LeanCtor(
+      LeanTag.List_cons,
+      Array[universeName, nil],
+    );
+    levels: LeanValue = LeanCtor(LeanTag.List_cons, Array[zero, nil]);
+    statuses = Array[
+      LeanTag.ReducibilityStatus_reducible,
+      LeanTag.ReducibilityStatus_instanceReducible,
+      LeanTag.ReducibilityStatus_implicitReducible,
+      LeanTag.ReducibilityStatus_semireducible,
+      LeanTag.ReducibilityStatus_irreducible,
+    ];
+    aliases = statuses.map(status -> name("unfoldAny." + status.toString()));
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    constants.set(
+      leanNameKey(propositionName),
+      LeanConstantFile(
+        unfoldAnyDeclaration(propositionName, nil, prop, None()),
+        None(),
+      ),
+    );
+    constants.set(
+      leanNameKey(identityName),
+      LeanConstantFile(
+        unfoldAnyDeclaration(
+          identityName,
+          nil,
+          identityType,
+          Some(identityValue),
+        ),
+        None(),
+      ),
+    );
+    constants.set(
+      leanNameKey(polyName),
+      LeanConstantFile(
+        unfoldAnyDeclaration(polyName, parameters, polyType, Some(polyValue)),
+        None(),
+      ),
+    );
+    for (alias in aliases) {
+      constants.set(
+        leanNameKey(alias),
+        LeanConstantFile(
+          unfoldAnyDeclaration(alias, nil, prop, Some(proposition)),
+          None(),
+        ),
+      )
+    };
+    environment = rewriteProbeEnvironment(runtime, constants.chill());
+    for (i in Range(0, statuses.size())) {
+      !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+        runtime,
+        environment,
+        aliases[i],
+        LeanCtor(statuses[i], Array[]),
+        LeanCtor(LeanTag.AttributeKind_global, Array[]),
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      );
+      assert(
+        leanTag(
+          L4_Lean_ReducibilityAttrs.f_Lean_getReducibilityStatusCore_bb23a1ec3f(
+            runtime,
+            environment,
+            aliases[i],
+          ),
+        ) == statuses[i],
+      )
+    };
+    state = rewriteProbeState(
+      runtime,
+      environment,
+      L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime),
+      "<unfold-any>",
+    );
+    core = leanReplaceField(state.coreContext, 3, LeanWord("uint16", 0));
+    absent = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+      runtime,
+      name("unfoldAny.missing"),
+      nil,
+    );
+    annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+      runtime,
+      L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(runtime),
+      identity,
+    );
+    cases: mutable Vector<UnfoldAnyCase> = mutable Vector[];
+    for (i in Range(0, aliases.size())) {
+      expected = if (statuses[i] == LeanTag.ReducibilityStatus_irreducible) {
+        None()
+      } else {
+        Some(proposition)
+      };
+      cases.push(
+        UnfoldAnyCase(
+          statuses[i].toString(),
+          L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, aliases[i], nil),
+          expected,
+        ),
+      )
+    };
+    cases.push(UnfoldAnyCase("function value", identity, Some(identityValue)));
+    cases.push(
+      UnfoldAnyCase("beta application", appliedIdentity, Some(proposition)),
+    );
+    cases.push(
+      UnfoldAnyCase("axiom has no unfoldable value", proposition, None()),
+    );
+    cases.push(UnfoldAnyCase("missing constant is none", absent, None()));
+    cases.push(
+      UnfoldAnyCase(
+        "missing applied constant is none",
+        L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, absent, proposition),
+        None(),
+      ),
+    );
+    cases.push(
+      UnfoldAnyCase(
+        "universe substitution",
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, polyName, levels),
+        Some(prop),
+      ),
+    );
+    cases.push(
+      UnfoldAnyCase(
+        "missing universe arity is refused",
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, polyName, nil),
+        None(),
+      ),
+    );
+    cases.push(
+      UnfoldAnyCase(
+        "extra universe arity is refused",
+        L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+          runtime,
+          polyName,
+          LeanCtor(LeanTag.List_cons, Array[zero, levels]),
+        ),
+        None(),
+      ),
+    );
+    cases.push(UnfoldAnyCase("sort is not a definition", prop, None()));
+    cases.push(
+      UnfoldAnyCase("lambda is not delta unfolded", identityValue, None()),
+    );
+    cases.push(
+      UnfoldAnyCase("metadata remains an outer node", annotated, None()),
+    );
+    fixtures = cases.toArray();
+    invariant(
+      fixtures.size() == 16,
+      "unfold fixture count: " + fixtures.size().toString(),
+    );
+    baseConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      runtime,
+      state.metaContext,
+    );
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(43)]) {
+      for (mode in Array[
+        LeanTag.Meta_TransparencyMode_none,
+        LeanTag.Meta_TransparencyMode_reducible,
+        LeanTag.Meta_TransparencyMode_instances,
+        LeanTag.Meta_TransparencyMode_implicit,
+        LeanTag.Meta_TransparencyMode_default,
+        LeanTag.Meta_TransparencyMode_all,
+      ]) {
+        config = leanReplaceField(baseConfig, 9, LeanCtor(mode, Array[]));
+        context = leanReplaceField(
+          state.metaContext,
+          0,
+          LeanCtor(
+            LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+            Array[
+              config,
+              L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+                runtime,
+                config,
+              ),
+            ],
+          ),
+        );
+        for (item in fixtures) {
+          unfoldAnyCheck(
+            item,
+            state,
+            context,
+            state.metaStateRef,
+            core,
+            state.coreStateRef,
+            world,
+          );
+          !checks = checks + 1
+        }
+      };
+      unused = LeanUnavailable(
+        "unfold-any short circuit must not read this context or reference",
+      );
+      unfoldAnyCheck(
+        UnfoldAnyCase(
+          "irreducibility only needs Core state",
+          L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, aliases[4], nil),
+          None(),
+        ),
+        state,
+        unused,
+        unused,
+        unused,
+        state.coreStateRef,
+        world,
+        true,
+      );
+      unfoldAnyCheck(
+        UnfoldAnyCase(
+          "nonconstant nonapplication needs no state",
+          prop,
+          None(),
+        ),
+        state,
+        unused,
+        unused,
+        unused,
+        unused,
+        world,
+        true,
+      );
+      !checks = checks + 2
+    }
+  };
+  assert(checks == 392);
+  print_string(
+    "unfoldDefinitionAny: " + checks.toString() + " differential cases passed",
+  )
+}

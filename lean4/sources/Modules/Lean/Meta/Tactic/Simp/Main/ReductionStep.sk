@@ -1,0 +1,107 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// Run reduction and return a visit step only when the expression changes.
+fun f_Meta_Simp_dsimpReduce_ce40a5e837(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  methodsRef: LeanValue,
+  simpContext: LeanValue,
+  simpStateRef: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  reducedResult = f_Meta_Simp_reduce_2d4439ae62(
+    runtime,
+    expr,
+    methodsRef,
+    simpContext,
+    simpStateRef,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  leanTag(reducedResult) match {
+  | LeanTag.EST_Out_error ->
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(reducedResult, 0), leanField(reducedResult, 1)],
+    )
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+
+  reducedExpr = leanField(reducedResult, 0);
+  reducedWorld = leanField(reducedResult, 1);
+  isFreeVariable = L4_Lean_Expr.f_Lean_Expr_isFVar_e287a25d26(
+    runtime,
+    reducedExpr,
+  );
+  leanTag(isFreeVariable) match {
+  | LeanTag.Bool_false ->
+    f_dsimpReduceFinish_ce40a5e837(runtime, expr, reducedExpr, reducedWorld)
+  | LeanTag.Bool_true ->
+    config: LeanValue = (LeanErased() : LeanValue);
+    theorems: LeanValue = (LeanErased() : LeanValue);
+    leanTag(simpContext) match {
+    | LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk ->
+      !config = leanField(simpContext, 0);
+      !theorems = leanField(simpContext, 7)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    fvarResult = f_Meta_Simp_reduceFVar_a65f64b706(
+      runtime,
+      config,
+      theorems,
+      reducedExpr,
+      simpStateRef,
+      metaContext,
+      coreContext,
+      coreStateRef,
+      reducedWorld,
+    );
+    leanTag(fvarResult) match {
+    | LeanTag.EST_Out_error ->
+      LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(fvarResult, 0), leanField(fvarResult, 1)],
+      )
+    | LeanTag.EST_Out_ok ->
+      f_dsimpReduceFinish_ce40a5e837(
+        runtime,
+        expr,
+        leanField(fvarResult, 0),
+        leanField(fvarResult, 1),
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_dsimpReduceFinish_ce40a5e837(
+  runtime: mutable LeanExecution,
+  originalExpr: LeanValue,
+  resultExpr: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  equality = L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(
+    runtime,
+    resultExpr,
+    originalExpr,
+  );
+  step = leanTag(equality) match {
+  | LeanTag.Bool_true ->
+    LeanCtor(LeanTag.TransformStep_done, Array[originalExpr])
+  | LeanTag.Bool_false ->
+    LeanCtor(LeanTag.TransformStep_visit, Array[resultExpr])
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[step, world])
+}
+
+module end;

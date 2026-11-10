@@ -1,6 +1,6 @@
 # Rewrite the measured example in parallel
 
-## Current execution and tenth validated batch (2026-11-10)
+## Current execution and eleventh validated batch (2026-11-10)
 
 Latest steering authorizes **one Vibe client using ten built-in subagents** as a
 bounded experiment, superseding the stop below for this run only. The installed
@@ -18,9 +18,9 @@ keeps sanitized settings, child model/status evidence and artifact hashes. The
 parent repaired an `undefined` packet-path launch bug and reported a cross-packet
 probe overwrite; external review checks final artifact ownership.
 
-These are drafts, not validated rewrites: initial review found probes without
-standalone fixtures/entry points, API/ABI mistakes and a source behavior change.
-Three Codex peers are correcting them privately while the previous batch validates.
+Initial review found probes without standalone fixtures/entry points, API/ABI
+mistakes and a source behavior change. Codex corrections are now validated in
+the eleventh batch below; the original Vibe artifacts were not accepted as-is.
 One successful orchestration run does not establish accepted throughput or a
 speedup. Provider failures stop any authorized run for assessment.
 
@@ -52,6 +52,24 @@ the compiler queue. The user has since explicitly stopped Vibe usage, supersedin
 the earlier request to ramp it back up. A provider outage does not stop independent
 local work. Preserve the failed-run evidence without automatic retries.
 
+The eleventh batch validates five Simp.Main routines: application classification,
+module-use lookup, definition unfolding, local-value reduction and dsimp reduction
+steps. It passes **1,352 new differential comparisons plus 4,149 regressions**,
+including 80 additional theorem-recording cases with independently checked entries,
+insertion order, diagnostic counts and preserved prior state. The combined release
+probe selects 6,811 verbatim maintained functions. Incremental release checking
+also passes. The [eleventh audit](provenance/rewrite-batches/2026-11-10-wave-11.json)
+binds tested bodies and retained originals. **43 frame rewrites are validated;
+154 remain.**
+
+The real simplifier-state initializer moved unchanged into bootstrap support so
+fixtures use the execution implementation directly. A mistaken test expectation
+for missing applied constants was corrected against native Lean's lookup and
+projection paths: all 392 unfolding cases succeed with an Option result; they do
+not exercise EST error propagation. Error forwarding remains source-reviewed.
+Other explicit coverage limits are in the audit. No runtime stub, Skip compiler,
+kernel or whole-example performance change is claimed.
+
 The tenth batch validates six routines: application binder consumption, scoped
 local instances, used-theorem lookup/insertion hashing, definitional-equality
 cache classification and unification-hint search. It passes **2,424 new
@@ -60,7 +78,8 @@ wrapper checks and 12 fixed hash vectors. Incremental release checking took
 2.322 seconds; the combined release probe selects 3,977 verbatim maintained
 functions. The [tenth audit](provenance/rewrite-batches/2026-11-10-wave-10.json)
 binds exact tested bodies and preserved originals, including the local-instance
-recursive closure adapter. **38 frame rewrites are validated; 159 remain.**
+recursive closure adapter. At that checkpoint, 38 frame rewrites were validated
+and 159 remained.
 
 The local-instance fixture required separate reducibility-extension registration
 for its aliases; definition hints alone did not allow reducible-only unfolding.
@@ -105,9 +124,10 @@ specialization; exact old/new comparisons remain intact. Probe corrections inclu
 valid constructor/universe layouts, actual helper types, independent config fields,
 error/cache expectations, full reference/input checks and valid bound-variable
 indices. No new runtime stub or compiler change was introduced. The native kernel
-and typed-import boundary remain unchanged. The next batch is the five Simp.Main
-routines from the native-subagent experiment; each source/probe is independently
-corrected before integration.
+and typed-import boundary remain unchanged. The five Simp.Main routines from the
+native-subagent experiment subsequently passed the eleventh batch. Current private
+follow-ups cover application-spine traversal and the remaining Nat division /
+application-constructor boundaries, with independent Codex review.
 
 ## GLM restart history (2026-11-09)
 

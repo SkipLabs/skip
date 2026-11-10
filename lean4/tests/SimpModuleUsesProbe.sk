@@ -1,0 +1,249 @@
+// Valid indirect-module-use maps: concrete hits, misses, collisions and array forms.
+class RecordUsesProbeEntry(name: LeanValue, modules: LeanValue)
+
+fun recordUsesProbeNumber(
+  runtime: mutable LeanExecution,
+  prefix: LeanValue,
+  digits: String,
+): LeanValue {
+  L4_Init_Prelude.f_Name_num_override_ca591eddf2(
+    runtime,
+    prefix,
+    leanBoxNat(LeanNat::parse(digits)),
+  )
+}
+
+fun recordUsesProbeBucket(
+  runtime: mutable LeanExecution,
+  name: LeanValue,
+  size: Int,
+): Int {
+  hash: LeanValue = LeanWord("uint64", leanNameHashBits(name));
+  upper = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+    runtime,
+    hash,
+    LeanWord("uint64", 32),
+  );
+  folded = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+    runtime,
+    hash,
+    upper,
+  );
+  lower = L4_Init_Data_UInt_Basic.f_UInt64_shiftRight_3838e8e5a8(
+    runtime,
+    folded,
+    LeanWord("uint64", 16),
+  );
+  scrambled = L4_Init_Data_UInt_Basic.f_UInt64_xor_5cc42b1d96(
+    runtime,
+    folded,
+    lower,
+  );
+  bucket = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+    runtime,
+    L4_Init_Data_UInt_Basic.f_UInt64_toUSize_59eca95223(runtime, scrambled),
+    LeanWord("usize", size - 1),
+  );
+  index = leanWordBits(bucket);
+  assert(index >= 0 && index < size);
+  index
+}
+
+fun recordUsesProbeModules(index: Int): LeanValue {
+  if (index == 0) return LeanArray(Array[]);
+  values = Array[leanNatValue(index), leanNatValue(index + 17)];
+  if (index == 1) {
+    return LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(values).chill(),
+    )
+  };
+  if (index == 2) {
+    return LeanArrayOverride(LeanArray(values), 0, values[0])
+  };
+  LeanArray(values)
+}
+
+fun recordUsesProbeEntries(
+  runtime: mutable LeanExecution,
+): Array<RecordUsesProbeEntry> {
+  anonymous: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  alpha = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("alpha"),
+  );
+  unicodeName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    anonymous,
+    LeanText("β"),
+  );
+  nested = L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+    runtime,
+    alpha,
+    LeanText("tail"),
+  );
+  names = Array[
+    anonymous,
+    alpha,
+    unicodeName,
+    nested,
+    recordUsesProbeNumber(runtime, anonymous, "17"),
+    recordUsesProbeNumber(runtime, anonymous, "18446744073709551616"),
+    recordUsesProbeNumber(runtime, anonymous, "36893488147419103232"),
+    recordUsesProbeNumber(runtime, alpha, "18446744073709551617"),
+    recordUsesProbeNumber(runtime, anonymous, "0"),
+    recordUsesProbeNumber(runtime, anonymous, "9223372036854775807"),
+  ];
+  assert(leanNameHashBits(names[4]) == -4250238100072028871);
+  assert(leanNameHashBits(names[4]) == leanNameHashBits(names[5]));
+  assert(leanNameHashBits(names[5]) == leanNameHashBits(names[6]));
+  assert(recordUsesProbeBucket(runtime, anonymous, 32) == 27);
+  assert(recordUsesProbeBucket(runtime, names[4], 32) == 10);
+  result: mutable Vector<RecordUsesProbeEntry> = mutable Vector[];
+  for (index in Range(0, names.size())) {
+    for (earlier in Range(0, index)) {
+      assert(
+        !leanIsTrue(
+          L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+            runtime,
+            names[index],
+            names[earlier],
+          ),
+        ),
+      )
+    };
+    result.push(
+      RecordUsesProbeEntry(names[index], recordUsesProbeModules(index)),
+    )
+  };
+  result.toArray()
+}
+
+fun recordUsesProbeMap(
+  runtime: mutable LeanExecution,
+  entries: Array<RecordUsesProbeEntry>,
+  bucketCount: Int,
+  representation: Int,
+): LeanValue {
+  buckets: mutable Vector<LeanValue> = mutable Vector[];
+  for (_ in Range(0, bucketCount)) {
+    buckets.push(LeanCtor(LeanTag.Std_DHashMap_Internal_AssocList_nil, Array[]))
+  };
+  for (entry in entries) {
+    index = recordUsesProbeBucket(runtime, entry.name, bucketCount);
+    buckets.set(
+      index,
+      LeanCtor(
+        LeanTag.Std_DHashMap_Internal_AssocList_cons,
+        Array[entry.name, entry.modules, buckets[index]],
+      ),
+    )
+  };
+  slots = buckets.toArray();
+  storage: LeanValue = if (representation == 0) {
+    LeanArray(slots)
+  } else {
+    persistent: LeanValue = LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(slots).chill(),
+    );
+    if (representation == 1) persistent else {
+      LeanArrayOverride(persistent, 0, slots[0])
+    }
+  };
+  LeanCtor(
+    LeanTag.Std_DHashMap_Raw_mk,
+    Array[leanNatValue(entries.size()), storage],
+  )
+}
+
+fun recordUsesProbeCheck(
+  saved: LeanExecutionCheckpoint,
+  map: LeanValue,
+  name: LeanValue,
+  expected: LeanValue,
+): void {
+  (result, after) = rewriteProbeCompare(
+    "recordSimpUses map lookup",
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      oldMap = rewriteProbeCopyInput(map);
+      oldName = rewriteProbeCopyInput(name);
+      value = L4_Lean_Meta_Tactic_Simp_Main.f_recordSimpUses_spec_0_spec_2_09b224d049_fallback(
+        runtime,
+        oldMap,
+        oldName,
+      );
+      assert(rewriteProbeSameInput(map, oldMap));
+      assert(rewriteProbeSameInput(name, oldName));
+      value
+    },
+    (runtime: mutable LeanExecution) ~> {
+      newMap = rewriteProbeCopyInput(map);
+      newName = rewriteProbeCopyInput(name);
+      value = L4_Lean_Meta_Tactic_Simp_Main.f_recordSimpUses_spec_0_spec_2_09b224d049(
+        runtime,
+        newMap,
+        newName,
+      );
+      assert(rewriteProbeSameInput(map, newMap));
+      assert(rewriteProbeSameInput(name, newName));
+      value
+    },
+    Some(expected),
+  );
+  assert(native_eq(result, expected) == 0);
+  assert(native_eq(saved.refs, after.refs) == 0)
+}
+
+fun main(): void {
+  comparisons = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _ = runtime.newRef(LeanArray(Array[leanNatValue(37), leanNatValue(19)]));
+    saved = runtime.checkpoint();
+    entries = recordUsesProbeEntries(runtime);
+    anonymous: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+    missing = Array[
+      L4_Init_Prelude.f_Name_str_override_fde29b60d1(
+        runtime,
+        anonymous,
+        LeanText("absent"),
+      ),
+      recordUsesProbeNumber(runtime, anonymous, "18446744073709551617"),
+    ];
+    none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+    for (bucketCount in Array[1, 2, 4, 8, 32, 256]) {
+      for (representation in Range(0, 3)) {
+        empty = recordUsesProbeMap(
+          runtime,
+          Array[],
+          bucketCount,
+          representation,
+        );
+        populated = recordUsesProbeMap(
+          runtime,
+          entries,
+          bucketCount,
+          representation,
+        );
+        for (entry in entries) {
+          recordUsesProbeCheck(saved, empty, entry.name, none);
+          expected: LeanValue = LeanCtor(
+            LeanTag.Option_some,
+            Array[entry.modules],
+          );
+          recordUsesProbeCheck(saved, populated, entry.name, expected);
+          !comparisons = comparisons + 2
+        };
+        for (name in missing) {
+          recordUsesProbeCheck(saved, populated, name, none);
+          !comparisons = comparisons + 1
+        }
+      }
+    }
+  };
+  assert(comparisons == 792);
+  print_string(
+    comparisons.toString() + " recordSimpUses lookup comparisons passed",
+  )
+}

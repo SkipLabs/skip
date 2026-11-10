@@ -1,0 +1,234 @@
+// Minimal differential fixtures using canonical expression/local-context
+// constructors. The unrecorded Simp.State ref is a sentinel: these cases have
+// an empty theorem array and never enter recordSimpTheorem.
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+fun rfProbeName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun rfProbeConfig(runtime: mutable LeanExecution, zetaDelta: Bool): LeanValue {
+  config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(
+    runtime,
+  );
+  leanReplaceField(config, 18, leanBool(zetaDelta))
+}
+
+fun rfProbeRun(
+  label: String,
+  state: RewriteProbeState,
+  simpStateRef: LeanValue,
+  config: LeanValue,
+  theorems: LeanValue,
+  expr: LeanValue,
+  world: LeanValue,
+  expectedExpr: ?LeanValue,
+): LeanValue {
+  oldExpr = rewriteProbeCopyInput(expr);
+  newExpr = rewriteProbeCopyInput(expr);
+  oldConfig = rewriteProbeCopyInput(config);
+  newConfig = rewriteProbeCopyInput(config);
+  oldMetaContext = rewriteProbeCopyInput(state.metaContext);
+  newMetaContext = rewriteProbeCopyInput(state.metaContext);
+  oldCoreContext = rewriteProbeCopyInput(state.coreContext);
+  newCoreContext = rewriteProbeCopyInput(state.coreContext);
+  (result, after) = rewriteProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceFVar_a65f64b706_fallback(
+        oldRuntime,
+        oldConfig,
+        theorems,
+        oldExpr,
+        simpStateRef,
+        oldMetaContext,
+        oldCoreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(oldExpr, expr));
+      result
+    },
+    (newRuntime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceFVar_a65f64b706(
+        newRuntime,
+        newConfig,
+        theorems,
+        newExpr,
+        simpStateRef,
+        newMetaContext,
+        newCoreContext,
+        state.coreStateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(newExpr, expr));
+      result
+    },
+  );
+  assert(rewriteProbeSameInput(oldConfig, config));
+  assert(rewriteProbeSameInput(newConfig, config));
+  assert(rewriteProbeSameInput(oldMetaContext, state.metaContext));
+  assert(rewriteProbeSameInput(newMetaContext, state.metaContext));
+  assert(rewriteProbeSameInput(oldCoreContext, state.coreContext));
+  assert(rewriteProbeSameInput(newCoreContext, state.coreContext));
+  expectedExpr match {
+  | Some(expected) ->
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    assert(rewriteProbeSameInput(leanField(result, 0), expected));
+    assert(rewriteProbeSameInput(leanField(result, 1), world))
+  | None() -> assert(leanTag(result) == LeanTag.EST_Out_error)
+  };
+  assert(native_eq(state.saved.refs, after.refs) == 0);
+  result
+}
+
+fun runLocalValuesProbe(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      runtime,
+      LeanCtor(LeanTag.Level_zero__impl, Array[]),
+    );
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    defaultKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+    implKind = LeanCtor(LeanTag.LocalDeclKind_implDetail, Array[]);
+    name = (text: String) -> rfProbeName(runtime, text);
+    fvar = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, id);
+    xId = name("rf.x");
+    letId = name("rf.let");
+    implId = name("rf.impl");
+    missingId = name("rf.missing");
+    x = fvar(xId);
+    localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+      runtime,
+    );
+    !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      localContext,
+      xId,
+      xId,
+      prop,
+      binder,
+      defaultKind,
+    );
+    !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+      runtime,
+      localContext,
+      letId,
+      letId,
+      prop,
+      x,
+      leanBool(false),
+      defaultKind,
+    );
+    !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+      runtime,
+      localContext,
+      implId,
+      implId,
+      prop,
+      x,
+      leanBool(false),
+      implKind,
+    );
+    environment = rewriteProbeEnvironment(
+      runtime,
+      (Map[] : Map<String, LeanConstantFile>),
+    );
+    baseState = rewriteProbeState(
+      runtime,
+      environment,
+      localContext,
+      "<reduce-fvar-probe>",
+    );
+    simpStateRef = runtime.newRef(
+      LeanUnavailable("recordSimpTheorem is unreachable with empty theorems"),
+    );
+    state = RewriteProbeState(
+      runtime.checkpoint(),
+      baseState.metaContext,
+      baseState.metaStateRef,
+      baseState.coreContext,
+      baseState.coreStateRef,
+    );
+    theorems = LeanArray(Array[]);
+    world = leanNatValue(43);
+    letExpr = fvar(letId);
+    implExpr = fvar(implId);
+    xExpr = fvar(xId);
+    missingExpr = fvar(missingId);
+    letConfig = rfProbeConfig(runtime, true);
+    ordinaryConfig = rfProbeConfig(runtime, false);
+
+    _ = rfProbeRun(
+      "zeta delta unfolds local let",
+      state,
+      simpStateRef,
+      letConfig,
+      theorems,
+      letExpr,
+      world,
+      Some(xExpr),
+    );
+    !cases = cases + 1;
+    _ = rfProbeRun(
+      "zeta delta keeps local declaration",
+      state,
+      simpStateRef,
+      letConfig,
+      theorems,
+      xExpr,
+      world,
+      Some(xExpr),
+    );
+    !cases = cases + 1;
+    _ = rfProbeRun(
+      "ordinary free variable stays unchanged",
+      state,
+      simpStateRef,
+      ordinaryConfig,
+      theorems,
+      xExpr,
+      world,
+      Some(xExpr),
+    );
+    !cases = cases + 1;
+    _ = rfProbeRun(
+      "implementation detail local let unfolds",
+      state,
+      simpStateRef,
+      ordinaryConfig,
+      theorems,
+      implExpr,
+      world,
+      Some(xExpr),
+    );
+    !cases = cases + 1;
+    _ = rfProbeRun(
+      "unknown free variable error",
+      state,
+      simpStateRef,
+      ordinaryConfig,
+      theorems,
+      missingExpr,
+      world,
+      None(),
+    );
+    !cases = cases + 1
+  };
+  assert(cases == 10);
+  print_string("reduceFVar differential cases: " + cases.toString())
+}
+
+module end;
+
+fun main(): void {
+  L4_Lean_Meta_Tactic_Simp_Main.runLocalValuesProbe()
+}

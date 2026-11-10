@@ -75,3 +75,48 @@ fun leanInitializeSimp(runtime: mutable LeanExecution): void {
     L4_Lean_ExtraModUses.f_ExtraModUses_hygCtx_hyg_b3982dc2be,
   );
 }
+
+fun leanSimpInitialState(runtime: mutable LeanExecution): LeanValue {
+  raw = LeanCtor(
+    LeanTag.Std_DHashMap_Raw_mk,
+    Array[
+      leanNatValue(0),
+      LeanArray(
+        Array::fill(
+          16,
+          LeanCtor(
+            LeanTag.Std_DHashMap_Internal_AssocList_nil,
+            Array[],
+          ),
+        ),
+      ),
+    ],
+  );
+  persistent = LeanCtor(
+    LeanTag.PersistentHashMap_Node_entries,
+    Array[
+      L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+        runtime,
+        LeanErased(),
+      ),
+    ],
+  );
+  cache = LeanCtor(
+    LeanTag.SMap_mk,
+    Array[leanBool(true), raw, persistent],
+  );
+  stats = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_instInhabitedStats_default_1c334e0b28(
+    runtime,
+  );
+  LeanCtor(
+    LeanTag.Meta_Simp_State_mk,
+    Array[
+      cache,
+      raw,
+      raw,
+      leanField(stats, 0),
+      leanNatValue(0),
+      leanField(stats, 1),
+    ],
+  )
+}
