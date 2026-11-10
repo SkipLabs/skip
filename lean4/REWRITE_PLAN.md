@@ -90,13 +90,16 @@ change was needed. Typed hashes/predicates and structured control flow are
 improved; broader boxed interfaces and other observed entries still need review.
 No new whole-example performance claim is made.
 
-The first [non-frame review](provenance/rewrite-triage/2026-11-10-expression-boundaries.json)
-classifies 20 observed entries: four existing native metadata operations, four
-reviewed compatibility boundaries over native equality/order implementations,
-and twelve entries needing further work. Another 1,008 non-frame entries remain
-unreviewed. These are static dispositions, not new rewrites or evidence that all
-transitive callees are converted. Pending families include application spines,
-level substitution/offsets, expression constructors and metavariable traversal.
+Three non-frame reviews now classify 60 observed entries: eleven existing native
+operations, fourteen reviewed compatibility boundaries and thirty-five entries
+needing further work. Another 968 non-frame entries remain unreviewed. See the
+[expression review](provenance/rewrite-triage/2026-11-10-expression-boundaries.json),
+[native boundary review](provenance/rewrite-triage/2026-11-10-native-boundaries.json)
+and [closure review](provenance/rewrite-triage/2026-11-10-closure-adapters.json).
+All twenty reviewed closure adapters remain pending their target-family work.
+These are static dispositions, not new rewrites or evidence that all transitive
+callees are converted. Pending families include application spines, level
+substitution/offsets, expression constructors and metavariable traversal.
 
 The ninth batch added WHNF cache insertion and discrimination-tree match traversal.
 It passes **444 new differential cases and 1,281 regressions** in one combined

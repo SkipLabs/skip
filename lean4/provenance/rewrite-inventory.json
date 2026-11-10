@@ -952,9 +952,9 @@
       "samples": 3,
       "lane": "shared_helpers_triage",
       "source_body_sha256": "1d4255824c2c854635e986945bb3ccef4a699e407819f567ba09c4329a156e03",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "3cb5100a0c200e549823121802e847820eae5ed774426be697d1592550fcecfd",
@@ -963,7 +963,11 @@
         "body_sha256": "1d4255824c2c854635e986945bb3ccef4a699e407819f567ba09c4329a156e03",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The uninstrumented boundary returns a boxed native Bool from typed LeanNat predicates. Small cases compare Int directly; canonical small/large cases avoid narrowing, and large comparison uses the native limb representation. Mono-erased Decidable remains the required Bool constructor result.",
+      "remaining_work": "Retain the compatibility identity and profile dispatch. This is not acceptance of boxed comparison chains in unconverted callers.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660",
@@ -1232,9 +1236,9 @@
       "samples": 3,
       "lane": "shared_helpers_triage",
       "source_body_sha256": "b5480536951d2f2bd676e19eac9a0cba044e61161b06db297fe762bd66b8a213",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "daa99b1fc5ab7d0f1ce58d1f8a47e268aa7d92e00d556d38f676a3511cc1f6eb",
@@ -1243,7 +1247,11 @@
         "body_sha256": "b5480536951d2f2bd676e19eac9a0cba044e61161b06db297fe762bd66b8a213",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The uninstrumented boundary returns a boxed native Bool from typed LeanNat predicates. Small cases compare Int directly; canonical small/large cases avoid narrowing, and large comparison uses the native limb representation. Mono-erased Decidable remains the required Bool constructor result.",
+      "remaining_work": "Retain the compatibility identity and profile dispatch. This is not acceptance of boxed comparison chains in unconverted callers.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Lean_Meta_InferType.f_Meta_inferAppType_spec_0_75045726c9",
@@ -2127,7 +2135,7 @@
       "samples": 2,
       "lane": "expressions_and_state",
       "source_body_sha256": "9a0fa78f97851697734bfc01968cbe206da1c7e2145db0d150a91478abfbb890",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "coverage": "observed_entry_in_frozen_matrix",
@@ -2138,7 +2146,11 @@
         "body_sha256": "9a0fa78f97851697734bfc01968cbe206da1c7e2145db0d150a91478abfbb890",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The 19-line constructor uses generated _x_1_2/_x_2_3/_x_3_4 locals and passes two boxed metadata words through separate canonical calls before the native leaf. The leaf already implements typed packing, but this entry has not become a readable constructor boundary. This is remaining adapter/readability work, not an undiscovered arithmetic algorithm.",
+      "remaining_work": "Use named function/argument metadata and a coherent typed packing boundary, preserving two ordered Expr.data calls plus one mkAppData instrumentation event when profiling. Preserve UInt64 publication for imported scalar metadata, saturated depth, flags, max loose range, low-32-bit hash and immutable child sharing.",
+      "coherent_family": "expression application construction"
     },
     {
       "name": "L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973",
@@ -2608,9 +2620,9 @@
       "samples": 1,
       "lane": "shared_helpers_triage",
       "source_body_sha256": "584bbf1af66d9059ca032aaddc877edb2aad395ed6f5bcc43f29a1a3f35c622b",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "5b326beea57dd5791a75380d1773878aca900057a9ec97d4b7f36e8240f5fa5a",
@@ -2619,7 +2631,11 @@
         "body_sha256": "584bbf1af66d9059ca032aaddc877edb2aad395ed6f5bcc43f29a1a3f35c622b",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "Two small nonnegative Int inputs use a checked signed sum; overflow enters native limb arithmetic and normalization. The public body boxes only the final result, except for the explicitly requested instrumentation route.",
+      "remaining_work": "Retain this public ABI. Imported decimal payloads are decoded at the boundary; this does not accept every caller's repeated boxed arithmetic or every unrelated primitive.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Lean_Meta_Basic.f_Meta_withNewMCtxDepthImp_lam_0_96a565830f",
@@ -3159,9 +3175,9 @@
       "samples": 1,
       "lane": "shared_helpers_triage",
       "source_body_sha256": "ec6daf143be8354c70d5bf90ec419106ba6ea286c99ee718d90a243e9e51df54",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "dfe837d04412cd9ab349d8114ea183a8c082cd88237ba34dad83c87c31dd7496",
@@ -3170,7 +3186,11 @@
         "body_sha256": "ec6daf143be8354c70d5bf90ec419106ba6ea286c99ee718d90a243e9e51df54",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The complete constructor has named prefix/suffix/hash roles and computes the hash in native String/Int code. It publishes one immutable node with the original prefix and suffix payloads; no generated algorithm is hidden behind the entry.",
+      "remaining_work": "Retain the boxed Name ABI and payload sharing. No Name-wide representation conversion is claimed.",
+      "coherent_family": "name construction and equality"
     },
     {
       "name": "L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a",
@@ -3592,9 +3612,9 @@
       "samples": 1,
       "lane": "shared_helpers_triage",
       "source_body_sha256": "e326fa4da6e81c67cbf6e61a3f18cf146f67d4784ba24812ea12661a2dc98f59",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "coverage": "observed_entry_in_frozen_matrix",
       "in_sampled_seed": true,
       "planning_source_body_sha256": "3dfb70ed7ca3ff6cfbc8e7f1ad42e5403771dff006e2031444df9737ac78f97e",
@@ -3603,7 +3623,11 @@
         "body_sha256": "e326fa4da6e81c67cbf6e61a3f18cf146f67d4784ba24812ea12661a2dc98f59",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The suffix is decoded once to LeanNat. Values below 2^64 contribute their full word bits; all larger values contribute 17. The original arbitrary-precision suffix is still published, so deliberate hash collisions do not merge names.",
+      "remaining_work": "Retain native hash computation and exact boxed payload publication; do not narrow a large suffix merely because the cache hash is UInt64.",
+      "coherent_family": "name construction and equality"
     },
     {
       "name": "L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduce_2d4439ae62",
@@ -5174,9 +5198,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part000.sk",
       "lines": 17,
       "frame": 0,
@@ -5187,7 +5211,11 @@
         "body_sha256": "49d931e7370b65b694c7472d032480e58b0295c7410ff6e58274848eba670ce3",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The wrapper reaches leanNameEqual, an explicit tag-directed Bool algorithm with native String/LeanNat suffix comparisons. It checks physical identity only as a positive shortcut and compares complete prefixes/payloads; matching hashes are never treated as equality.",
+      "remaining_work": "Retain this compatibility boundary. The implementation still recursively follows boxed Name prefixes; this review supplies no stack-depth or performance claim and does not require a new Name representation for this simple structural operation.",
+      "coherent_family": "name construction and equality"
     },
     {
       "name": "L4_Init_Prelude.f_Lean_Name_eraseMacroScopes_788e8400bd",
@@ -5234,9 +5262,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part001.sk",
       "lines": 11,
       "frame": 0,
@@ -5247,7 +5275,11 @@
         "body_sha256": "741ace639049b3de990fb55d90f77180664149899fcd791303e73b98fb600531",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The short alias supplies the anonymous prefix and reaches the already readable native-hash Name constructor reviewed in this batch. Its target is not an unresolved generated helper.",
+      "remaining_work": "Retain the public convenience identity. Generated parameter spelling alone does not create a new algorithmic work item.",
+      "coherent_family": "name construction and equality"
     },
     {
       "name": "L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad",
@@ -5354,9 +5386,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part001.sk",
       "lines": 17,
       "frame": 0,
@@ -5367,14 +5399,18 @@
         "body_sha256": "84692c3c59bc1cea40bf5e88568aa49821b78eedf677088f3acbe984e49c1cb5",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The uninstrumented boundary returns a boxed native Bool from typed LeanNat predicates. Small cases compare Int directly; canonical small/large cases avoid narrowing, and large comparison uses the native limb representation. Mono-erased Decidable remains the required Bool constructor result.",
+      "remaining_work": "Retain the compatibility identity and profile dispatch. This is not acceptance of boxed comparison chains in unconverted callers.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Init_Prelude.f_Nat_div_d9df18e4c4",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Init/Prelude/Part000.sk",
@@ -5387,16 +5423,20 @@
         "body_sha256": "b96e09bbda7e77cbb2e111fc8fe209fb34463f6c3d610f337944925a5028052c",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The backend is already typed and handles division by zero as (0, dividend), but this public hot-path boundary still constructs Array<LeanValue> and performs textual foreign-symbol dispatch even when profiling is disabled. Native division alone does not finish the adapter cleanup.",
+      "remaining_work": "Use the same direct typed dispatch pattern as add/sub/mul, retaining the instrumented route and full Nat.divMod semantics. No arithmetic algorithm replacement is required.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Init_Prelude.f_Nat_mul_8d6effc865",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part001.sk",
       "lines": 17,
       "frame": 0,
@@ -5407,16 +5447,20 @@
         "body_sha256": "dc26bb3c16fef721beb319b2a2042bc8e232dbf32f022bb69bab65ea71f71535",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "Zero is handled before host division; the small product is accepted only under Int::max / right. Larger products use native limb loops and canonical publication, not boxed Lean arithmetic calls.",
+      "remaining_work": "Retain this public ABI. Imported decimal payloads are decoded at the boundary; this does not accept every caller's repeated boxed arithmetic or every unrelated primitive.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Init_Prelude.f_Nat_pow_c3fca086ae",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part001.sk",
       "lines": 17,
       "frame": 0,
@@ -5427,16 +5471,20 @@
         "body_sha256": "fcbe9a21c0c3d611da77c515f8d1d47bd062cea187883561baef1f34eacdd401",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The native implementation uses exponentiation by squaring with LeanNat base/result and a checked Int exponent. Exponent zero and base zero/one precede the >4294967295 explicit failure; arbitrary base precision and canonical results are preserved.",
+      "remaining_work": "Retain this public ABI. Imported decimal payloads are decoded at the boundary; this does not accept every caller's repeated boxed arithmetic or every unrelated primitive.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Init_Prelude.f_Nat_sub_8647441ee5",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "shared_helpers_triage",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Init/Prelude/Part001.sk",
       "lines": 17,
       "frame": 0,
@@ -5447,7 +5495,11 @@
         "body_sha256": "40fc611d721bae4890f44b0f1e8a1da455e65ae555a7885607840323d0fdf6e6",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "Small and mixed small/large cases are direct native decisions. Large subtraction uses a named borrow loop, then canonicalizes. No generated recursive arithmetic remains behind this boundary.",
+      "remaining_work": "Retain this public ABI. Imported decimal payloads are decoded at the boundary; this does not accept every caller's repeated boxed arithmetic or every unrelated primitive.",
+      "coherent_family": "natural arithmetic and comparisons"
     },
     {
       "name": "L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f",
@@ -7164,7 +7216,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "environment",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Environment/Part001.sk",
@@ -7177,7 +7229,12 @@
         "body_sha256": "ccbb504b659bccf05d3b99ecaa515cc7f18c35f18eb3783d36e9eee9bbd36303",
         "case_count": 28,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Environment.f_EnvExtension_modifyStateCore_lam_0_78149622f2"
     },
     {
       "name": "L4_Lean_Environment.f_AsyncConsts_findPrefix_spec_0_2f8d710a74",
@@ -8794,9 +8851,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "compatibility_boundary",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Expr/Part001.sk",
       "lines": 17,
       "frame": 0,
@@ -8807,7 +8864,11 @@
         "body_sha256": "c0d6a8846e78e8178419b6c9f665b1475de9606001776711373a58b31eccd432",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "Both metadata words are decoded once at this ABI boundary. leanExprMakeAppData uses native Int operations for depth saturation, flag union, range maximum and 32-bit hash mixing, then boxes only the published UInt64. This typed leaf is complete even though its higher-level constructor caller remains pending.",
+      "remaining_work": "Retain the typed leaf and instrumented route. Do not count mkApp or Expr.app override as converted on this leaf's evidence alone.",
+      "coherent_family": "expression application construction"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_Expr_mkData_9e4edaf0b9",
@@ -9279,7 +9340,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Expr/Part001.sk",
@@ -9292,7 +9353,11 @@
         "body_sha256": "0ac00f86b66e67e1515f2b593a119c12775599c285b8196a5f787c38878c711b",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "This forwarding identity reaches the still translation-shaped application constructor below. A typed metadata leaf exists, but accepting only this alias would conceal the remaining constructor/readability boundary.",
+      "remaining_work": "Convert with Expr.app override as one small family. Keep the public identity, original operands, result layout and instrumentation behavior.",
+      "coherent_family": "expression application construction"
     },
     {
       "name": "L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d",
@@ -10229,9 +10294,9 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -10242,16 +10307,20 @@
         "body_sha256": "f97a878d42e7488feef3284b2ff4f86b271faecf80f53a34ecead1fc95a90303",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "A native unsigned shift by 40 extracts the depth field and the public result is explicitly UInt32, retaining the declared width. No generated helper or boxed UInt operation chain remains in this entry.",
+      "remaining_work": "Retain the accessor and compatible literal-word decoder. Constructor metadata validity and unrelated word primitives remain outside this disposition.",
+      "coherent_family": "level metadata"
     },
     {
       "name": "L4_Lean_Level.f_Level_Data_hasMVar_a8d498d5a2",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -10262,16 +10331,20 @@
         "body_sha256": "bc0bd2345fb4021e40778cb76ae17352778e3a63cce35f9e62d47b05e07327a7",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "A native Int mask of bit 32 produces a host Bool, boxed only at the public boundary. No generated helper or boxed UInt operation chain remains in this entry.",
+      "remaining_work": "Retain the accessor and compatible literal-word decoder. Constructor metadata validity and unrelated word primitives remain outside this disposition.",
+      "coherent_family": "level metadata"
     },
     {
       "name": "L4_Lean_Level.f_Level_Data_hasParam_1083112b5b",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -10282,16 +10355,20 @@
         "body_sha256": "d79cf4a1856f2881b065f00ec90de793e294b689824f01e85f5419ff29a2e715",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "A native Int mask of bit 33 produces a host Bool, boxed only at the public boundary. No generated helper or boxed UInt operation chain remains in this entry.",
+      "remaining_work": "Retain the accessor and compatible literal-word decoder. Constructor metadata validity and unrelated word primitives remain outside this disposition.",
+      "coherent_family": "level metadata"
     },
     {
       "name": "L4_Lean_Level.f_Level_Data_hash_e7a8397800",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -10302,16 +10379,20 @@
         "body_sha256": "d6685066f03081e4942e75fabf01485b0f088e93ba52508a104e3b1d1d0abd30",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "One native Int mask extracts exactly the low 32 bits and the public result is explicitly UInt64. No generated helper or boxed UInt operation chain remains in this entry.",
+      "remaining_work": "Retain the accessor and compatible literal-word decoder. Constructor metadata validity and unrelated word primitives remain outside this disposition.",
+      "coherent_family": "level metadata"
     },
     {
       "name": "L4_Lean_Level.f_Level_data_override_dbd511c826",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "expressions_and_state",
-      "status": "needs_triage",
-      "control_flow": "not_yet_reviewed",
-      "representation": "not_yet_reviewed",
+      "status": "already_idiomatic",
+      "control_flow": "native_implementation_at_compatibility_boundary",
+      "representation": "typed_internal_operations; boxed_public_boundary",
       "path": "sources/Modules/Lean/Level/Metadata.sk",
       "lines": 7,
       "frame": 0,
@@ -10322,7 +10403,11 @@
         "body_sha256": "9dd622d5222e6708f16cb858f68fadc66f25925769761ed74f7e01cac1d64396",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-native-boundaries.json",
+      "triage_rationale": "The helper is a complete, readable tag-checked fixed-field accessor: Level.zero produces UInt64 2221 and each other valid constructor returns its existing metadata field. A typed LeanTag decision plus direct immutable projection needs no boxed arithmetic or synthetic Level wrapper.",
+      "remaining_work": "Retain exact stored-payload identity for nonzero levels; this is a projection, not permission to normalize a stored scalar or certify all Level constructors.",
+      "coherent_family": "level metadata"
     },
     {
       "name": "L4_Lean_Level.f_Level_mvar_override_09553944a9",
@@ -10754,7 +10839,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/AppBuilder/Part000.sk",
@@ -10767,14 +10852,19 @@
         "body_sha256": "8e1ca0e27683c0b66975b3f5d843a306af4fa2baf500c14717975328344bcdf2",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_AppBuilder.f_Lean_Meta_mkEqTrue_2e67086571"
     },
     {
       "name": "L4_Lean_Meta_AppBuilder.apply_f_Meta_mkAppM_lam_0_673c18b0f0",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/AppBuilder/Part001.sk",
@@ -10787,14 +10877,19 @@
         "body_sha256": "ebe36ff18d41c60a26d790b7473b9222f79ad7f3a5e742297e1c751356a2daa0",
         "case_count": 35,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_AppBuilder.f_Meta_mkAppM_lam_0_673c18b0f0"
     },
     {
       "name": "L4_Lean_Meta_AppBuilder.apply_f_Meta_mkAppM_spec_0_a41e985519",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/AppBuilder/Part001.sk",
@@ -10807,7 +10902,12 @@
         "body_sha256": "2fc625de28c095bd10a4550de0cfddcc957bc2369d81fbd4882c782add82da5b",
         "case_count": 35,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_AppBuilder.f_Meta_mkAppM_spec_0_a41e985519"
     },
     {
       "name": "L4_Lean_Meta_AppBuilder.f_Lean_Meta_infer_9e54719906",
@@ -11154,7 +11254,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/Basic/Part000.sk",
@@ -11167,14 +11267,19 @@
         "body_sha256": "0500175f16c5c560fd408d17d1127bbbf86e8ff23e22f4ac769d0043ab166506",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_Basic.f_Lean_Meta_isExprDefEqAux_34c5c35f5e"
     },
     {
       "name": "L4_Lean_Meta_Basic.apply_f_forallTelescopeReducingAuxAux_process_lam_0_30cae2ab9c",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/Basic/Part001.sk",
@@ -11187,7 +11292,12 @@
         "body_sha256": "f136e7aacbfabf3cfb1d437d48ce26185401e69ba323cfd352b52e000c019db9",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_Basic.f_forallTelescopeReducingAuxAux_process_lam_0_30cae2ab9c"
     },
     {
       "name": "L4_Lean_Meta_Basic.f_Basic_hygCtx_hyg_92f1623ff5",
@@ -13569,7 +13679,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime001.sk",
@@ -13582,14 +13692,19 @@
         "body_sha256": "7607d789c5a8c24a756681f64f30e4fa0e03cf0019a42fdfe9ceb8b68255344d",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_Meta_checkTypesAndAssign_lam_4_e3f7cfee18"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_Meta_checkTypesAndAssign_lam_5_b5898f8e40",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime002.sk",
@@ -13602,14 +13717,19 @@
         "body_sha256": "f5d398bc10e73bb9c6593f6e1e68b474c123b84e97281260271669176c06cd23",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_Meta_checkTypesAndAssign_lam_5_b5898f8e40"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_Meta_isDefEqBindingAux_spec_1_d164e94063",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime000.sk",
@@ -13622,14 +13742,19 @@
         "body_sha256": "807034292ce8323aef05c531d21c476066f6e90772e9350029c276ffa78a8867",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqBindingAux_spec_1_d164e94063"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_Meta_isDefEqQuickOther_lam_1_b3f6433ed3",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime000.sk",
@@ -13642,14 +13767,19 @@
         "body_sha256": "3cf14a75450b71401ae8a1d407df7696984983a03bfb417b41571421920c8e35",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqQuickOther_lam_1_b3f6433ed3"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_Meta_isUnitLikeType_lam_1_459eabacd1",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime002.sk",
@@ -13662,14 +13792,19 @@
         "body_sha256": "6c9aeb5e35a78975bab8d8a9d2525b4b90f0e6bf505b2ba553761efc38134323",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_Meta_isUnitLikeType_lam_1_459eabacd1"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_expandIfNeeded_spec_1_lam_0_95c302b54c",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime002.sk",
@@ -13682,14 +13817,19 @@
         "body_sha256": "905635f155bddadd6e7782930d0e635063a8976c96d1c92b0d2da9bf5cf03ced",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_expandIfNeeded_spec_1_lam_0_95c302b54c"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.apply_f_isDefEqArgsFirstPass_spec_0_lam_2_c22303d708",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "equality",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/ExprDefEq/Runtime000.sk",
@@ -13702,7 +13842,12 @@
         "body_sha256": "9b88102b9781be59171da35f156d7038b9d357b87dab2c07e5665da7eee9588e",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_ExprDefEq.f_isDefEqArgsFirstPass_spec_0_lam_2_c22303d708"
     },
     {
       "name": "L4_Lean_Meta_ExprDefEq.f_Lean_Meta_cacheUnitLike_71b7d717d3",
@@ -15099,7 +15244,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
@@ -15112,14 +15257,19 @@
         "body_sha256": "b9ac550eae20adbc5eb70688d345f305d13c064e9a538909aba4d348f0d63de8",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_lam_0_d8ffe98521"
     },
     {
       "name": "L4_Lean_Meta_FunInfo.apply_f_Meta_getFunInfoAux_lam_1_882236de01",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
@@ -15132,14 +15282,19 @@
         "body_sha256": "310e403de85f2d047d8576050847917a051a942505daaabea2c1c0f1309f0a62",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_FunInfo.f_Meta_getFunInfoAux_lam_1_882236de01"
     },
     {
       "name": "L4_Lean_Meta_FunInfo.apply_f_getFunInfoAux_spec_1_lam_0_4a863dd8a0",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
@@ -15152,14 +15307,19 @@
         "body_sha256": "3660764027cf1b69fb971ac61c245ab8a2030831f19afdab52ca4b1692db7354",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_FunInfo.f_getFunInfoAux_spec_1_lam_0_4a863dd8a0"
     },
     {
       "name": "L4_Lean_Meta_FunInfo.apply_f_getFunInfoAux_spec_4_lam_0_95d7ee6b28",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/FunInfo/Part000.sk",
@@ -15172,7 +15332,12 @@
         "body_sha256": "67ea4149e5300c937d8d20070044edd0d71fa1da514689ad14c77ed1531e1c1c",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_FunInfo.f_getFunInfoAux_spec_4_lam_0_95d7ee6b28"
     },
     {
       "name": "L4_Lean_Meta_FunInfo.f_FunInfo_hygCtx_hyg_2f0011a45b",
@@ -15816,7 +15981,7 @@
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/InferType/Part000.sk",
@@ -15829,14 +15994,19 @@
         "body_sha256": "b41e52729f8efa78fa0bb61058103ee7041f325f353c06e36af6097bf1be8ea1",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_InferType.f_Meta_inferForallType_lam_0_c460b8b557"
     },
     {
       "name": "L4_Lean_Meta_InferType.apply_f_Meta_inferLambdaType_lam_0_ea0ca83284",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/InferType/Part000.sk",
@@ -15849,14 +16019,19 @@
         "body_sha256": "4d1b19af4530d3d1f7d62769ad44464276527dfdc03fa1c77a347b165f732ff4",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_InferType.f_Meta_inferLambdaType_lam_0_ea0ca83284"
     },
     {
       "name": "L4_Lean_Meta_InferType.apply_f_inferForallType_spec_1_lam_0_15735cdcb1",
       "samples": 0,
       "in_sampled_seed": false,
       "lane": "inference",
-      "status": "needs_triage",
+      "status": "triaged_pending",
       "control_flow": "not_yet_reviewed",
       "representation": "not_yet_reviewed",
       "path": "sources/Modules/Lean/Meta/InferType/Part000.sk",
@@ -15869,7 +16044,12 @@
         "body_sha256": "80353a4df17641427c19d1fa57aca6c894a0b2f05e84d33e24c2bb5f85b26ef3",
         "case_count": 36,
         "current_body_matches_snapshot": true
-      }
+      },
+      "triage_report": "provenance/rewrite-triage/2026-11-10-closure-adapters.json",
+      "triage_rationale": "pending: target has no independently reviewed/accepted native implementation in the current inventory; adapter forwarding alone does not optimize or complete the target",
+      "remaining_work": "Review and convert the target family before accepting this mechanical closure ABI.",
+      "coherent_family": "closure adapters",
+      "target_function": "L4_Lean_Meta_InferType.f_inferForallType_spec_1_lam_0_15735cdcb1"
     },
     {
       "name": "L4_Lean_Meta_InferType.f_Expr_instantiateBetaRevRange_spec_0_13eec55b26",
@@ -25279,10 +25459,10 @@
   ],
   "latest_batch": "provenance/rewrite-batches/2026-11-10-wave-11.json",
   "nonframe_triage": {
-    "reviewed_entries": 20,
-    "already_idiomatic": 4,
-    "compatibility_boundaries": 4,
-    "reviewed_pending": 12,
-    "unreviewed_entries": 1008
+    "reviewed_entries": 60,
+    "already_idiomatic": 11,
+    "compatibility_boundaries": 14,
+    "reviewed_pending": 35,
+    "unreviewed_entries": 968
   }
 }
