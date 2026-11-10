@@ -23,8 +23,9 @@ at depth 6, roughly 22% below the earlier Skip median. Release identity is
 failure subprocesses and all 29 new whole-proof Goal checks. See the
 [batch audit](provenance/rewrite-batches/2026-11-10-hot-arrays-cache.json).
 Current inventory is 44 validated frame rewrites plus seven non-frame entries,
-with 153 observed frames remaining. A separate user-suggested `@always_inline`
-experiment on three primitive helpers is next. No near-parity result is established.
+with 153 observed frames remaining. The subsequent user-suggested `@always_inline`
+experiment on three primitive helpers is recorded in the pause notice above and
+[AGENT_HANDOFF.md](AGENT_HANDOFF.md). No near-parity result is established.
 The latest five non-frame entries pass 986 new comparisons plus 5,501 regressions
 and 16 explicit-failure subprocesses. There are 43 validated frame rewrites plus
 five non-frame entries; 154 observed frames remain.

@@ -37,9 +37,11 @@ records identities, timings and remaining limits. Current count: 44 validated
 frame rewrites plus seven non-frame entries; 153 observed frames remain. This
 count is inventory, not a prerequisite to the next measurement.
 
-The user suggests `@always_inline` for primitive helpers. Next compare a separate
-experiment on `leanField`, `leanNat` and `leanExprDataValue`, checking release
-call sites, text size and paired proof timings. A private `isDefEqQuickOther`
+The user suggested `@always_inline` for primitive helpers. That separate
+experiment on `leanField`, `leanNat` and `leanExprDataValue` is now committed in
+`fa9550dfc` and measured at 638.291 ms versus native Lean 192.626 ms at depth 6.
+Post-inline call-site analysis remains pending. [AGENT_HANDOFF.md](AGENT_HANDOFF.md)
+records the complete paused state and next steps. A private `isDefEqQuickOther`
 rewrite is also authorized by its confirmed frame-allocation profile; no broader
 defeq rewrite is selected. Keep Skip compiler/runtime unchanged.
 

@@ -1,5 +1,9 @@
 # Paused at the user's request, 2026-11-10
 
+For a new agent, start with [AGENT_HANDOFF.md](AGENT_HANDOFF.md). It expands this
+checkpoint with architecture, reproducible commands, semantic pitfalls, pending
+review requirements and a portable archive of the unaccepted next draft.
+
 The user explicitly requested a pause after the completed inlining measurement.
 No more optimization, builds or benchmarks should run until the user resumes.
 The prior continuous-work authorization is suspended. Preserve `target/` and

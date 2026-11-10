@@ -1,0 +1,262 @@
+class QuickOtherProbeCase(
+  label: String,
+  left: LeanValue,
+  right: LeanValue,
+  metavariables: LeanValue,
+  answer: LeanTag.Value,
+  assignments: Array<(LeanValue, LeanValue)>,
+  stuck: Bool,
+  proofIrrelevance: Bool,
+  unusedContexts: Bool,
+)
+
+fun quickOtherCase(
+  label: String, left: LeanValue, right: LeanValue, metavariables: LeanValue,
+  answer: LeanTag.Value, assignments: Array<(LeanValue, LeanValue)> = Array[],
+  stuck: Bool = false, proofIrrelevance: Bool = true, unusedContexts: Bool = false,
+): QuickOtherProbeCase {
+  QuickOtherProbeCase(label, left, right, metavariables, answer, assignments, stuck, proofIrrelevance, unusedContexts)
+}
+
+fun quickOtherName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun quickOtherAssignment(runtime: mutable LeanExecution, metavariables: LeanValue, id: LeanValue): LeanValue {
+  L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(runtime, metavariables, id)
+}
+
+fun quickOtherConfigure(runtime: mutable LeanExecution, context: LeanValue, stuck: Bool, proof: Bool): LeanValue {
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context);
+  !config = leanReplaceField(config, 4, leanBool(stuck));
+  !config = leanReplaceField(config, 6, leanBool(proof));
+  key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config);
+  leanReplaceField(context, 0, LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[config, key]))
+}
+
+fun quickOtherProbeCheck(
+  runtime: mutable LeanExecution, fixture: RewriteProbeState, item: QuickOtherProbeCase,
+  initialState: LeanValue, core: LeanValue, ids: Array<LeanValue>, world: LeanValue,
+): void {
+  runtime.writeRef(fixture.metaStateRef, Some(leanReplaceField(initialState, 0, item.metavariables)));
+  context = quickOtherConfigure(runtime, fixture.metaContext, item.stuck, item.proofIrrelevance);
+  unused = LeanUnavailable("quick equality early exit must not read context/state");
+  metaContext = if (item.unusedContexts) unused else context;
+  metaState = if (item.unusedContexts) unused else fixture.metaStateRef;
+  coreContext = if (item.unusedContexts) unused else core;
+  coreState = if (item.unusedContexts) unused else fixture.coreStateRef;
+  leftCopy = rewriteProbeCopyInput(item.left);
+  rightCopy = rewriteProbeCopyInput(item.right);
+  contextCopy = rewriteProbeCopyInput(metaContext);
+  coreCopy = rewriteProbeCopyInput(coreContext);
+  saved = runtime.checkpoint();
+  original = saved.restoreRaw();
+  fresh = saved.restoreRaw();
+  previous = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf_fallback(
+    original, item.left, item.right, metaContext, metaState, coreContext, coreState, world,
+  );
+  assert(rewriteProbeSameInput(item.left, leftCopy));
+  assert(rewriteProbeSameInput(item.right, rightCopy));
+  assert(rewriteProbeSameInput(metaContext, contextCopy));
+  assert(rewriteProbeSameInput(coreContext, coreCopy));
+  result = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf(
+    fresh, item.left, item.right, metaContext, metaState, coreContext, coreState, world,
+  );
+  assert(rewriteProbeSameInput(item.left, leftCopy));
+  assert(rewriteProbeSameInput(item.right, rightCopy));
+  assert(rewriteProbeSameInput(metaContext, contextCopy));
+  assert(rewriteProbeSameInput(coreContext, coreCopy));
+  if (native_eq(previous, result) != 0) leanFail("quickOther result mismatch: " + item.label);
+  oldAfter = original.checkpoint();
+  newAfter = fresh.checkpoint();
+  if (native_eq(oldAfter.refs, newAfter.refs) != 0) leanFail("quickOther state mismatch: " + item.label);
+  assert(native_eq(oldAfter.initializers, newAfter.initializers) == 0);
+  assert(native_eq(oldAfter.immutableIdentities, newAfter.immutableIdentities) == 0);
+  assert(native_eq(leanField(result, 1), world) == 0);
+  if (item.answer == LeanTag.EST_Out_error) {
+    if (leanTag(result) != LeanTag.EST_Out_error) leanFail("quickOther expected error: " + item.label);
+    if (item.stuck) {
+      id = leanReadInitializer(runtime, "Lean.Meta.isDefEqStuckExceptionId");
+      expected: LeanValue = LeanCtor(LeanTag.Exception_internal, Array[id, LeanCtor(LeanTag.List_nil, Array[])]);
+      assert(native_eq(leanField(result, 0), expected) == 0)
+    }
+  } else {
+    if (leanTag(result) != LeanTag.EST_Out_ok || leanTag(leanField(result, 0)) != item.answer) {
+      leanFail("quickOther unexpected answer: " + item.label)
+    }
+  };
+  for (i in Range(0, oldAfter.metrics.size())) {
+    if (i != 4 && i != 7) assert(oldAfter.metrics[i] == newAfter.metrics[i])
+  };
+  if (item.unusedContexts) assert(native_eq(saved.refs, newAfter.refs) == 0);
+  assert(native_eq(runtime.readRef(fixture.coreStateRef), fresh.readRef(fixture.coreStateRef)) == 0);
+  current = leanField(fresh.readRef(fixture.metaStateRef), 0);
+  for (id in ids) {
+    expected = quickOtherAssignment(runtime, item.metavariables, id);
+    for ((assigned, value) in item.assignments) {
+      if (leanNameEqual(id, assigned)) !expected = LeanCtor(LeanTag.Option_some, Array[value])
+    };
+    if (native_eq(quickOtherAssignment(fresh, current, id), expected) != 0) {
+      leanFail("quickOther unexpected assignment: " + item.label + " / " + leanNameKey(id))
+    }
+  }
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero));
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    localKind: LeanValue = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+    aId = quickOtherName(runtime, "QuickA");
+    xId = quickOtherName(runtime, "quickX");
+    yId = quickOtherName(runtime, "quickY");
+    pId = quickOtherName(runtime, "QuickP");
+    qId = quickOtherName(runtime, "QuickQ");
+    proofId = quickOtherName(runtime, "quickProof");
+    functionId = quickOtherName(runtime, "quickFunction");
+    a = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, aId);
+    x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xId);
+    y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, yId);
+    p = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, pId);
+    q = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, qId);
+    proof = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, proofId);
+    function = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, functionId);
+    arrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, xId, binder, a, a);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+    for ((id, localType) in Array[(aId, type), (xId, a), (yId, a), (pId, prop), (qId, prop), (proofId, p), (functionId, arrow)]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, id, id, localType, binder, localKind)
+    };
+    environment = rewriteProbeEnvironment(runtime, (Map[] : Map<String, LeanConstantFile>));
+    fixture = rewriteProbeState(runtime, environment, locals, "<quick-other-probe>");
+    initialState = runtime.readRef(fixture.metaStateRef);
+    mId = quickOtherName(runtime, "quickM");
+    nId = quickOtherName(runtime, "quickN");
+    mfId = quickOtherName(runtime, "quickMF");
+    oId = quickOtherName(runtime, "quickOpaque");
+    o2Id = quickOtherName(runtime, "quickOpaque2");
+    ofId = quickOtherName(runtime, "quickOpaqueFunction");
+    opId = quickOtherName(runtime, "quickOpaqueProof");
+    op2Id = quickOtherName(runtime, "quickOpaqueProof2");
+    oqId = quickOtherName(runtime, "quickOpaqueOtherProof");
+    missingId = quickOtherName(runtime, "quickMissing");
+    ids = Array[mId, nId, mfId, oId, o2Id, ofId, opId, op2Id, oqId];
+    metavariables = leanField(initialState, 0);
+    for ((id, declarationType, kind) in Array[
+      (mId, a, LeanTag.MetavarKind_natural), (nId, a, LeanTag.MetavarKind_natural),
+      (mfId, arrow, LeanTag.MetavarKind_natural), (oId, a, LeanTag.MetavarKind_syntheticOpaque),
+      (o2Id, a, LeanTag.MetavarKind_syntheticOpaque), (ofId, arrow, LeanTag.MetavarKind_syntheticOpaque),
+      (opId, p, LeanTag.MetavarKind_syntheticOpaque), (op2Id, p, LeanTag.MetavarKind_syntheticOpaque),
+      (oqId, q, LeanTag.MetavarKind_syntheticOpaque),
+    ]) {
+      !metavariables = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        runtime, metavariables, id, id, locals, LeanArray(Array[]), declarationType, LeanCtor(kind, Array[]), LeanNatLiterals.n0,
+      )
+    };
+    m = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mId);
+    n = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, nId);
+    mf = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mfId);
+    opaque = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, oId);
+    opaque2 = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, o2Id);
+    opaqueFunction = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, ofId);
+    opaqueProof = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, opId);
+    opaqueProof2 = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, op2Id);
+    opaqueOtherProof = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, oqId);
+    missing = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, missingId);
+    bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, xId, binder, a, bound);
+    renamed = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, yId, binder, a, bound);
+    eta = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, xId, binder, a, L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, function, bound));
+    betaX = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, x);
+    fx = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, opaqueFunction, x);
+    fy = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, opaqueFunction, y);
+    fbeta = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, opaqueFunction, betaX);
+    mfx = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, mf, x);
+    functionM = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, function, m);
+    annotation = L4_Lean_Expr.f_Lean_mkInaccessible_a43b25930b(runtime, x);
+    pattern = L4_Lean_Expr.f_Lean_mkPatternWithRef_68c7a1955a(runtime, x, leanField(fixture.coreContext, 2));
+    metadata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(runtime, L4_Lean_Data_KVMap.f_Lean_KVMap_empty_7965074cf9(runtime), x);
+    assigned = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, metavariables, mId, x);
+    assignedBoth = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, assigned, nId, y);
+    cases = Array[
+      quickOtherCase("equal expression ignores contexts", x, x, metavariables, LeanTag.LBool_true, Array[], false, true, true),
+      quickOtherCase("binder names ignored by eqv", identity, renamed, metavariables, LeanTag.LBool_true, Array[], false, true, true),
+      quickOtherCase("eta left", eta, function, metavariables, LeanTag.LBool_true, Array[], false, true, true),
+      quickOtherCase("eta right", function, eta, metavariables, LeanTag.LBool_true, Array[], false, true, true),
+      quickOtherCase("distinct non-mvar heads", x, y, metavariables, LeanTag.LBool_undef, Array[], false, true, true),
+      quickOtherCase("nested mvar is not a mvar head", functionM, x, metavariables, LeanTag.LBool_undef, Array[], false, true, true),
+      quickOtherCase("ordinary metadata ignored", metadata, x, metavariables, LeanTag.LBool_true, Array[], false, true, true),
+      quickOtherCase("left inaccessible annotation", annotation, x, metavariables, LeanTag.LBool_true),
+      quickOtherCase("right inaccessible annotation", x, annotation, metavariables, LeanTag.LBool_true),
+      quickOtherCase("left pattern reference", pattern, x, metavariables, LeanTag.LBool_true),
+      quickOtherCase("right pattern reference", x, pattern, metavariables, LeanTag.LBool_true),
+      quickOtherCase("two annotations", annotation, pattern, metavariables, LeanTag.LBool_true),
+      quickOtherCase("assigned left instantiates", m, x, assigned, LeanTag.LBool_true),
+      quickOtherCase("assigned right instantiates", x, m, assigned, LeanTag.LBool_true),
+      quickOtherCase("both assigned preserve left priority", m, n, assignedBoth, LeanTag.LBool_undef),
+      quickOtherCase("assign left", m, x, metavariables, LeanTag.LBool_true, Array[(mId, x)]),
+      quickOtherCase("assign right", x, m, metavariables, LeanTag.LBool_true, Array[(mId, x)]),
+      quickOtherCase("two assignable mvars", m, n, metavariables, LeanTag.LBool_true, Array[(mId, n)]),
+      quickOtherCase("bare right assignment has priority", mfx, n, metavariables, LeanTag.LBool_true, Array[(nId, mfx)]),
+      quickOtherCase("same head beta-equal arguments", fx, fbeta, metavariables, LeanTag.LBool_true),
+      quickOtherCase("same opaque head unequal arguments", fx, fy, metavariables, LeanTag.LBool_false),
+      quickOtherCase("same head raw arity mismatch", opaqueFunction, fx, metavariables, LeanTag.LBool_false),
+      quickOtherCase("two opaque data terms", opaque, opaque2, metavariables, LeanTag.LBool_false),
+      quickOtherCase("opaque data stuck exception", opaque, opaque2, metavariables, LeanTag.EST_Out_error, Array[], true),
+      quickOtherCase("proof irrelevance true", opaqueProof, opaqueProof2, metavariables, LeanTag.LBool_true),
+      quickOtherCase("proof irrelevance false", opaqueProof, opaqueOtherProof, metavariables, LeanTag.LBool_false),
+      quickOtherCase("proof irrelevance disabled", opaqueProof, opaqueProof2, metavariables, LeanTag.LBool_false, Array[], false, false),
+      quickOtherCase("disabled proof irrelevance stuck", opaqueProof, opaqueProof2, metavariables, LeanTag.EST_Out_error, Array[], true, false),
+      quickOtherCase("opaque proof versus local proof", opaqueProof, proof, metavariables, LeanTag.LBool_true),
+      quickOtherCase("undeclared left mvar error", missing, x, metavariables, LeanTag.EST_Out_error),
+      quickOtherCase("undeclared right mvar error", x, missing, metavariables, LeanTag.EST_Out_error),
+    ];
+    failure = Environ.varOpt("LEAN_SKIP_TEST_QUICK_OTHER_FAILURE");
+    failure match {
+    | Some(mode) ->
+      delayed = mode == "old-delayed" || mode == "new-delayed";
+      old = mode == "old-delayed" || mode == "old-trace";
+      if (!delayed && mode != "old-trace" && mode != "new-trace") leanFail("unknown quickOther failure mode");
+      core = fixture.coreContext;
+      state = metavariables;
+      if (delayed) {
+        !state = L4_Lean_MetavarContext.f_Lean_assignDelayedMVar_lam_0_21c1d3cc9b(
+          runtime, LeanArray(Array[]), nId,
+          LeanClosure(L4_Lean_Expr.apply_f_Lean_instBEqMVarId_beq_fc799f33a5, 2, Array[]),
+          LeanClosure(L4_Lean_Expr.apply_f_Lean_instHashableMVarId_hash_524addd803, 1, Array[]),
+          mId, state,
+        )
+      } else {
+        traceName = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("trace"), LeanText("Meta"), LeanText("isDefEq"));
+        cold = leanField(core, 0);
+        options = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(runtime, leanField(cold, 2), traceName, leanBool(true));
+        !core = leanReplaceField(core, 0, leanReplaceField(cold, 2, options))
+      };
+      runtime.writeRef(fixture.metaStateRef, Some(leanReplaceField(initialState, 0, state)));
+      if (old) {
+        _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf_fallback(runtime, m, x, fixture.metaContext, fixture.metaStateRef, core, fixture.coreStateRef, LeanNatLiterals.n0)
+      } else {
+        _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuickOther_f3a8ea9bdf(runtime, m, x, fixture.metaContext, fixture.metaStateRef, core, fixture.coreStateRef, LeanNatLiterals.n0)
+      };
+      leanFail("quickOther unsupported fixture unexpectedly returned")
+    | None() -> void
+    };
+    cold = leanField(fixture.coreContext, 0);
+    traceOptions = leanReplaceField(leanField(cold, 2), 1, leanBool(true));
+    traceCore = leanReplaceField(fixture.coreContext, 0, leanReplaceField(cold, 2, traceOptions));
+    for (core in Array[fixture.coreContext, traceCore]) {
+      for (world in Array[leanNatValue(37), LeanNatLiterals.n18446744073709551616]) {
+        for (item in cases) {
+          quickOtherProbeCheck(runtime, fixture, item, initialState, core, ids, world);
+          !checks = checks + 1
+        }
+      }
+    }
+  };
+  assert(checks == 248);
+  print_string(checks.toString() + " quickOther comparisons passed")
+}

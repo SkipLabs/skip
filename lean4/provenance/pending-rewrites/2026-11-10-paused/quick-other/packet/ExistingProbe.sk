@@ -1,0 +1,287 @@
+// Compare the structured dispatcher with its retained body and recursive route.
+// Deeper unification helpers are shared. Check results, worlds and reference state.
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  leanInitializeSimp(runtime);
+  name = (s: String) ->
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(s));
+  xName = name("x");
+  yName = name("y");
+  pName = name("p");
+  qName = name("q");
+  zName = name("z");
+  mName = name("m");
+  uName = name("u");
+  unknown = name("unknown");
+  zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  param = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+  mu = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, mName);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+  sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, param);
+  sortM = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, mu);
+  fvar = (n: LeanValue) -> L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, n);
+  x = fvar(xName);
+  y = fvar(yName);
+  p = fvar(pName);
+  q = fvar(qName);
+  z = fvar(zName);
+  missing = fvar(unknown);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  implicit = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+  localKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  for ((n, t) in Array[(xName, prop), (yName, prop), (pName, x), (qName, x)]) {
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      runtime,
+      locals,
+      n,
+      n,
+      t,
+      binder,
+      localKind,
+    )
+  };
+  !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(
+    runtime,
+    locals,
+    zName,
+    zName,
+    prop,
+    x,
+    leanBool(false),
+    localKind,
+  );
+  defaults = L4_Lean_Meta_Basic.f_Meta_instInhabitedContext_default_0798ec5988(
+    runtime,
+  );
+  context = leanReplaceField(defaults, 3, locals);
+  initialState = L4_Lean_Meta_Basic.f_Meta_instInhabitedState_default_581318f17c(
+    runtime,
+  );
+  mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(
+    runtime,
+    leanField(initialState, 0),
+    mName,
+  );
+  !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+    runtime,
+    mctx,
+    mName,
+    mName,
+    locals,
+    LeanArray(Array[]),
+    prop,
+    LeanCtor(LeanTag.MetavarKind_natural, Array[]),
+    LeanNatLiterals.n0,
+  );
+  m = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mName);
+  state = runtime.newRef(leanReplaceField(initialState, 0, mctx));
+  constants = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  // Register real extension callbacks and create their initial states. An empty
+  // constants map alone is insufficient when binder checks consult unification hints.
+  extensions = L4_Lean_Environment.f_Lean_EnvExtension_mkInitialExtStates_0da187769b(
+    runtime,
+    LeanErased(),
+  );
+  generations = L4_Lean_Environment.f_Lean_EnvExtension_ensureGensArraySize_12e77b18b8(
+    runtime,
+    LeanArray(Array[]),
+    leanField(extensions, 1),
+  );
+  assert(leanTag(extensions) == LeanTag.EST_Out_ok);
+  assert(leanTag(generations) == LeanTag.EST_Out_ok);
+  environment = leanEnvironment(
+    runtime,
+    LeanConstantsView("imports", constants),
+    LeanConstantsView("locals", constants),
+    leanEmptyEnvironmentHeader(),
+    leanField(extensions, 0),
+    leanField(generations, 0),
+    false,
+    LeanNatLiterals.n0,
+  );
+  core = leanUnboundedCoreContext(runtime, "<defeq-quick-probe>", "");
+  coreState = runtime.newRef(leanCoreState(runtime, environment));
+  limitedCore = leanReplaceField(
+    leanReplaceField(
+      core,
+      0,
+      leanReplaceField(leanField(core, 0), 3, LeanNatLiterals.n1),
+    ),
+    1,
+    LeanNatLiterals.n1,
+  );
+  pairs: mutable Vector<(LeanValue, LeanValue)> = mutable Vector[];
+  literals = Array[
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, LeanNatLiterals.n0),
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, LeanNatLiterals.n1),
+    L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+      runtime,
+      LeanNatLiterals.n18446744073709551616,
+    ),
+    L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("a")),
+    L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(runtime, LeanText("λ\u0000b")),
+  ];
+  for (group in Array[
+    literals,
+    Array[prop, type, sortU, sortM],
+    Array[x, y, p, q, z, missing],
+  ]) {
+    for (left in group) for (right in group) pairs.push((left, right))
+  };
+  bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  for (makeBinder in Array[
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1,
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3,
+  ]) {
+    binders = Array[
+      makeBinder(runtime, xName, binder, prop, bound),
+      makeBinder(runtime, yName, implicit, prop, bound),
+      makeBinder(runtime, xName, binder, type, bound),
+      makeBinder(runtime, xName, binder, sortM, bound),
+      makeBinder(runtime, xName, binder, prop, prop),
+    ];
+    for (left in binders) for (right in binders) pairs.push((left, right))
+  };
+  // Exercise both let-consumption flags and annotation/assignment recursion.
+  for (nondep in Array[false, true]) {
+    for (body in Array[x, bound]) {
+      letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+        runtime,
+        zName,
+        prop,
+        x,
+        body,
+        leanBool(nondep),
+      );
+      pairs.push((letExpr, x));
+      pairs.push((x, letExpr))
+    }
+  };
+  for ((left, right) in Array[
+    (m, x),
+    (x, m),
+    (m, m),
+    (prop, x),
+    (x, prop),
+    (literals[0], prop),
+  ]) {
+    pairs.push((left, right));
+    annotated = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+      runtime,
+      LeanCtor(LeanTag.List_nil, Array[]),
+      left,
+    );
+    pairs.push((annotated, right));
+    pairs.push((right, annotated))
+  };
+  inputs = pairs.toArray();
+  count = 0;
+  errors = 0;
+  effects = 0;
+  yes = 0;
+  no = 0;
+  undecided = 0;
+  for (assignment in Array[None(), Some(zero), Some(one)]) {
+    assigned = assignment match {
+    | None() -> mctx
+    | Some(level) ->
+      L4_Lean_MetavarContext.f_Lean_assignLevelMVarExp_3aaad3f7ed(
+        runtime,
+        mctx,
+        mName,
+        level,
+      )
+    };
+    runtime.writeRef(state, Some(leanReplaceField(initialState, 0, assigned)));
+    for (flags in Range(0, 8)) {
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+        runtime,
+        context,
+      );
+      !config = leanReplaceField(config, 15, leanBool(flags.and(1) != 0));
+      !config = leanReplaceField(config, 17, leanBool(flags.and(2) != 0));
+      !config = leanReplaceField(config, 18, leanBool(flags.and(4) != 0));
+      key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config);
+      configured = leanReplaceField(
+        context,
+        0,
+        LeanCtor(
+          LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+          Array[config, key],
+        ),
+      );
+      for (coreContext in Array[core, limitedCore]) {
+        for (index in Range(0, inputs.size())) {
+          (left, right) = inputs[index];
+          saved = runtime.checkpoint();
+          original = saved.restoreRaw();
+          structured = saved.restoreRaw();
+          // The second call also checks reuse of the state established by the first.
+          for (_ in Range(0, 2)) {
+            expected = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuick_d24cf2e2e4_fallback(
+              original,
+              left,
+              right,
+              configured,
+              state,
+              coreContext,
+              coreState,
+              leanNatValue(37),
+            );
+            actual = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqQuick_d24cf2e2e4(
+              structured,
+              left,
+              right,
+              configured,
+              state,
+              coreContext,
+              coreState,
+              leanNatValue(37),
+            );
+            refs = structured.checkpoint().refs;
+            if (
+              native_eq(expected, actual) != 0 ||
+              native_eq(original.checkpoint().refs, refs) != 0
+            ) {
+              leanFail(
+                "quick equality mismatch: pair " +
+                  index.toString() +
+                  " flags " +
+                  flags.toString(),
+              )
+            };
+            if (native_eq(saved.refs, refs) != 0) !effects = effects + 1;
+            if (leanTag(actual) == LeanTag.EST_Out_error) {
+              !errors = errors + 1
+            } else {
+              leanTag(leanField(actual, 0)) match {
+              | LeanTag.LBool_true -> !yes = yes + 1
+              | LeanTag.LBool_false -> !no = no + 1
+              | LeanTag.LBool_undef -> !undecided = undecided + 1
+              | _ -> leanFail("invalid quick equality answer")
+              }
+            };
+            !count = count + 1
+          }
+        }
+      }
+    }
+  };
+  assert(errors > 0 && effects > 0 && yes > 0 && no > 0 && undecided > 0);
+  print_string(
+    count.toString() +
+      " quick equality result/state comparisons passed; " +
+      errors.toString() +
+      " errors, " +
+      effects.toString() +
+      " state changes; true/false/undef " +
+      yes.toString() +
+      "/" +
+      no.toString() +
+      "/" +
+      undecided.toString(),
+  )
+}
