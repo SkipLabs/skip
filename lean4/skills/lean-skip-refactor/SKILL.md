@@ -156,6 +156,12 @@ not treat the helper's completion as completion of the parity investigation.
   publication, caching or snapshots. An old Lean value or backtracking state
   must retain its original contents; apparent single-use in one benchmark is
   not proof of exclusive ownership.
+  For a single immutable array update, clone then set can avoid a per-element
+  mapper. Ordinary `chill()` can introduce a second copy: inspect release code.
+  `unsafe_chill_trust_me(copy)` is valid only when the newly allocated mutable
+  array has never escaped, no mutable alias survives, and it is not used after
+  publication. Document that ownership locally and test earlier roots/snapshots,
+  concrete element specializations and heterogeneous replacements.
 - Preserve array element types at boxed boundaries when requiring exact retained
   behavior. A nested `Array[LeanCtor(...)]` can specialize differently from the
   original `Array<LeanValue>`, making `native_eq` fail even when contents match.
@@ -279,6 +285,19 @@ For CPU sampling of repeated runs, enable `LEAN_SKIP_SAMPLE_TIMESTAMPS` with
 `tools/profile_cpu.py --elaboration-log LOG`. This filters samples to actual
 elaboration intervals; the same process also spends time resetting state and
 exporting proofs. Unknown libc symbols are unresolved costs, not proof of copying.
+`tools/profile_cpu.py --debug-symbols ELF=DEBUG --output REPORT` accepts separate
+symbols after checking matching ELF Build IDs, while retaining the original
+object's load segments. Keep the exact mapped library and debug-file identities;
+do not install or upgrade a library merely to symbolize an existing capture.
+Distinguish allocation zeroing from copying and identify actual call sites before
+assigning either cost to translated frames. Short stacks limit deeper attribution.
+
+The user suggests `@always_inline` for primitive hot helpers. Inspect existing
+repo examples and release call sites, then measure a small experiment. Preserve
+cold/error behavior and avoid spreading large matches through every caller.
+If annotating maintained `f_` bodies, ensure source-selection/probe tooling retains
+the annotation; its current catalog starts at `fun`, unlike verbatim Support files.
+Inlining is a port-source optimization and needs no compiler/runtime modification.
 
 After each coherent batch, record changes, checks and remaining unsupported
 behavior in the active plan. Current steering is to profile the actual workload,

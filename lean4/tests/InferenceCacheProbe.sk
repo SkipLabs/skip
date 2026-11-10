@@ -1,0 +1,760 @@
+// Inference-cache publication, approximate-key policy, and isolated effects.
+fun inferProbeExpr(runtime: mutable LeanExecution, digits: String): LeanValue {
+  L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(
+    runtime,
+    leanBoxNat(LeanNat::parse(digits)),
+  )
+}
+
+fun inferProbeKey(expr: LeanValue, config: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ExprConfigCacheKey_mk,
+    Array[expr, config],
+  )
+}
+
+fun inferProbeHash(runtime: mutable LeanExecution, key: LeanValue): Int {
+  hash = L4_Lean_Expr.f_Lean_Expr_hash_9ccb6f80a4(runtime, leanField(key, 0));
+  leanWordBits(
+    L4_Init_Prelude.f_mixHash_f2b5fd4ac9(runtime, hash, leanField(key, 1)),
+  )
+}
+
+// Invert mixHash to construct real keys with a chosen shared bucket prefix.
+fun inferProbeKeyForHash(
+  runtime: mutable LeanExecution,
+  expr: LeanValue,
+  hash: Int,
+): LeanValue {
+  exprHash = leanWordBits(
+    L4_Lean_Expr.f_Lean_Expr_hash_9ccb6f80a4(runtime, expr),
+  );
+  mixed = (hash * 6879827495036328381).xor(exprHash).xor(-4132994306676758123);
+  config = mixed.xor(mixed.ushr(47)) * 6879827495036328381;
+  key = inferProbeKey(expr, LeanWord("uint64", config));
+  assert(inferProbeHash(runtime, key) == hash);
+  key
+}
+
+fun inferProbeWord(bits: Int, scalar: Bool): LeanValue {
+  if (scalar) LeanScalar("usize", LeanNat::fromWord(bits).toString()) else {
+    LeanWord("usize", bits)
+  }
+}
+
+fun inferProbeNull(): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[])
+}
+fun inferProbeEntry(key: LeanValue, value: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+}
+fun inferProbeRef(node: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[node])
+}
+fun inferProbeNode(entries: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[entries])
+}
+fun inferProbeCollision(
+  keys: Array<LeanValue>,
+  values: Array<LeanValue>,
+): LeanValue {
+  assert(keys.size() == values.size());
+  LeanCtor(
+    LeanTag.PersistentHashMap_Node_collision,
+    Array[LeanArray(keys), LeanArray(values), LeanErased()],
+  )
+}
+fun inferProbeSome(key: LeanValue, value: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.Option_some,
+    Array[LeanCtor(LeanTag.Prod_mk, Array[key, value])],
+  )
+}
+fun inferProbeNone(): LeanValue {
+  LeanCtor(LeanTag.Option_none, Array[])
+}
+
+fun inferProbeArray(size: Int, shape: Int, changed: Int): LeanValue {
+  values: Array<LeanValue> = Array::fill(size, inferProbeNull());
+  shape match {
+  | 0 -> LeanArray(values)
+  | 1 ->
+    LeanPersistentArray(
+      Persistent.RadixTreeVector::mcreateFromItems(values).chill(),
+    )
+  | 2 -> LeanArrayOverride(LeanArray(values), changed, inferProbeNull())
+  | _ -> leanFail("invalid inference-probe array shape")
+  }
+}
+
+fun inferProbeAt(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  bucket: Int,
+): LeanValue {
+  leanArrayRead(runtime, leanField(node, 0), LeanWord("usize", bucket), true)
+}
+
+// Materialize a separate semantic snapshot, including persistent and override arrays.
+fun inferProbeSnapshot(
+  runtime: mutable LeanExecution,
+  value: LeanValue,
+): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) ->
+    copied: mutable Vector<LeanValue> = mutable Vector[];
+    for (field in fields) copied.push(inferProbeSnapshot(runtime, field));
+    LeanCtor(tag, copied.toArray())
+  | LeanArray(_)
+  | LeanPersistentArray(_)
+  | LeanArrayOverride(_, _, _) ->
+    copied: mutable Vector<LeanValue> = mutable Vector[];
+    for (i in Range(0, leanValueArraySize(value))) {
+      copied.push(
+        inferProbeSnapshot(
+          runtime,
+          leanArrayRead(runtime, value, LeanWord("usize", i), true),
+        ),
+      )
+    };
+    LeanArray(copied.toArray())
+  | _ -> value
+  }
+}
+
+fun inferProbeUnchanged(
+  runtime: mutable LeanExecution,
+  label: String,
+  value: LeanValue,
+  before: LeanValue,
+): void {
+  if (native_eq(inferProbeSnapshot(runtime, value), before) != 0) {
+    leanFail("inference cache mutated input: " + label)
+  }
+}
+
+fun inferProbeState(
+  before: LeanExecutionCheckpoint,
+  after: LeanExecutionCheckpoint,
+): void {
+  assert(native_eq(before.refs, after.refs) == 0);
+  assert(native_eq(before.initializers, after.initializers) == 0);
+  assert(native_eq(before.immutableIdentities, after.immutableIdentities) == 0);
+  assert(before.initializing == after.initializing);
+  assert(before.unboundedHeartbeats == after.unboundedHeartbeats);
+  assert(before.sharedValueRealizations == after.sharedValueRealizations);
+  assert(before.profileRuntime == after.profileRuntime);
+  assert(before.collectSimpRegions == after.collectSimpRegions);
+  assert(before.denseSimpRegions == after.denseSimpRegions);
+  assert(before.memoizeSimp == after.memoizeSimp);
+  assert(before.simpQueryMask == after.simpQueryMask);
+  assert(native_eq(before.simpHook, after.simpHook) == 0);
+  assert(native_eq(before.simpOlderQueryKeys, after.simpOlderQueryKeys) == 0);
+  assert(before.profileSimpPhases == after.profileSimpPhases);
+  assert(native_eq(before.simpPhaseNs, after.simpPhaseNs) == 0);
+  for (i in Range(0, before.metrics.size())) {
+    if (
+      !before.profileRuntime ||
+      (i != 0 && i != 1 && i != 2 && i != 6 && i != 7)
+    ) {
+      assert(before.metrics[i] == after.metrics[i])
+    }
+  }
+}
+
+fun inferProbeEffects(
+  before: LeanExecutionCheckpoint,
+  oldAfter: LeanExecutionCheckpoint,
+  newAfter: LeanExecutionCheckpoint,
+): void {
+  inferProbeState(before, oldAfter);
+  inferProbeState(before, newAfter);
+  for (i in Range(0, oldAfter.metrics.size())) {
+    if (i != 7) assert(oldAfter.metrics[i] == newAfter.metrics[i])
+  }
+}
+
+fun inferProbeInsert(
+  runtime: mutable LeanExecution,
+  label: String,
+  node: LeanValue,
+  hash: LeanValue,
+  depth: LeanValue,
+  key: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  saved = runtime.checkpoint();
+  old = saved.restoreRaw();
+  fresh = saved.restoreRaw();
+  beforeNode = inferProbeSnapshot(runtime, node);
+  beforeKey = inferProbeSnapshot(runtime, key);
+  beforeValue = inferProbeSnapshot(runtime, value);
+  previous = L4_Lean_Meta_InferType.f_infer_spec_1_spec_1_ac68cfa009_fallback(
+    old,
+    node,
+    hash,
+    depth,
+    key,
+    value,
+  );
+  inferProbeUnchanged(runtime, label, node, beforeNode);
+  inferProbeUnchanged(runtime, label, key, beforeKey);
+  inferProbeUnchanged(runtime, label, value, beforeValue);
+  result = L4_Lean_Meta_InferType.f_infer_spec_1_spec_1_ac68cfa009(
+    fresh,
+    node,
+    hash,
+    depth,
+    key,
+    value,
+  );
+  inferProbeUnchanged(runtime, label, node, beforeNode);
+  inferProbeUnchanged(runtime, label, key, beforeKey);
+  inferProbeUnchanged(runtime, label, value, beforeValue);
+  if (native_eq(previous, result) != 0) {
+    leanFail("inference insert result mismatch: " + label)
+  };
+  inferProbeEffects(saved, old.checkpoint(), fresh.checkpoint());
+  result
+}
+
+fun inferProbeFind(
+  runtime: mutable LeanExecution,
+  label: String,
+  node: LeanValue,
+  hash: LeanValue,
+  key: LeanValue,
+  expected: LeanValue,
+  wrapper: Bool,
+): Int {
+  saved = runtime.checkpoint();
+  old = saved.restoreRaw();
+  fresh = saved.restoreRaw();
+  beforeNode = inferProbeSnapshot(runtime, node);
+  beforeKey = inferProbeSnapshot(runtime, key);
+  previous = if (wrapper) {
+    L4_Lean_Meta_InferType.f_inferTypeImp_infer_spec_2_3cc60cfed5_fallback(
+      old,
+      node,
+      key,
+    )
+  } else {
+    L4_Lean_Meta_InferType.f_infer_spec_2_spec_3_9a6be69b2b_fallback(
+      old,
+      node,
+      hash,
+      key,
+    )
+  };
+  inferProbeUnchanged(runtime, label, node, beforeNode);
+  inferProbeUnchanged(runtime, label, key, beforeKey);
+  result = if (wrapper) {
+    L4_Lean_Meta_InferType.f_inferTypeImp_infer_spec_2_3cc60cfed5(
+      fresh,
+      node,
+      key,
+    )
+  } else {
+    L4_Lean_Meta_InferType.f_infer_spec_2_spec_3_9a6be69b2b(
+      fresh,
+      node,
+      hash,
+      key,
+    )
+  };
+  inferProbeUnchanged(runtime, label, node, beforeNode);
+  inferProbeUnchanged(runtime, label, key, beforeKey);
+  if (native_eq(previous, result) != 0) {
+    leanFail("inference lookup result mismatch: " + label)
+  };
+  if (native_eq(result, expected) != 0) {
+    leanFail("inference lookup unexpected result: " + label)
+  };
+  inferProbeEffects(saved, old.checkpoint(), fresh.checkpoint());
+  1
+}
+
+fun inferProbeEntries(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+  value: LeanValue,
+  hash: Int,
+  scalar: Bool,
+): Int {
+  checks = 0;
+  bucket = hash.and(31);
+  for (size in Array[32, 160]) {
+    for (shape in Array[0, 1, 2]) {
+      for (changed in Array[bucket, (bucket + 1) % 32]) {
+        root = inferProbeNode(inferProbeArray(size, shape, changed));
+        result = inferProbeInsert(
+          runtime,
+          "null publication",
+          root,
+          inferProbeWord(hash, scalar),
+          inferProbeWord(1, scalar),
+          key,
+          value,
+        );
+        !checks = checks + 1;
+        entry = inferProbeAt(runtime, result, bucket);
+        assert(leanTag(entry) == LeanTag.PersistentHashMap_Entry_entry);
+        assert(leanSameObject(leanField(entry, 0), key) != 0);
+        assert(leanSameObject(leanField(entry, 1), value) != 0);
+        assert(leanValueArraySize(leanField(result, 0)) == size);
+        for (i in Range(0, size)) {
+          if (i != bucket) {
+            assert(
+              leanTag(inferProbeAt(runtime, result, i)) ==
+                LeanTag.PersistentHashMap_Entry_null,
+            )
+          }
+        };
+        for (wrapper in Array[false, true]) {
+          !checks =
+            checks +
+            inferProbeFind(
+              runtime,
+              "published entry hit",
+              result,
+              inferProbeWord(hash, scalar),
+              key,
+              inferProbeSome(key, value),
+              wrapper,
+            )
+        };
+        miss = inferProbeKeyForHash(
+          runtime,
+          leanField(key, 0),
+          hash.xor(1.shl(40)),
+        );
+        !checks =
+          checks +
+          inferProbeFind(
+            runtime,
+            "same bucket hash miss",
+            result,
+            inferProbeWord(hash.xor(1.shl(40)), scalar),
+            miss,
+            inferProbeNone(),
+            false,
+          )
+      }
+    }
+  };
+  checks
+}
+
+fun inferProbeApproximate(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+  value: LeanValue,
+  hash: Int,
+): Int {
+  otherExpr = inferProbeExpr(runtime, "18446744073709551623");
+  assert(
+    !leanIsTrue(
+      L4_Lean_Expr.f_Lean_Expr_equal_c60fe9d3e7(
+        runtime,
+        leanField(key, 0),
+        otherExpr,
+      ),
+    ),
+  );
+  otherKey = inferProbeKey(otherExpr, leanField(key, 1));
+  assert(inferProbeHash(runtime, otherKey) == hash);
+  root = inferProbeNode(
+    leanArrayWrite(
+      inferProbeArray(32, 0, 0),
+      LeanWord("usize", hash.and(31)),
+      inferProbeEntry(key, value),
+      true,
+    ),
+  );
+  checks = 0;
+  for (wrapper in Array[false, true]) {
+    !checks =
+      checks +
+      inferProbeFind(
+        runtime,
+        "full hash collision returns stored pair",
+        root,
+        LeanWord("usize", hash),
+        otherKey,
+        inferProbeSome(key, value),
+        wrapper,
+      )
+  };
+  replacement = inferProbeExpr(runtime, "23");
+  result = inferProbeInsert(
+    runtime,
+    "full hash collision replaces entry",
+    root,
+    LeanWord("usize", hash),
+    LeanWord("usize", 1),
+    otherKey,
+    replacement,
+  );
+  entry = inferProbeAt(runtime, result, hash.and(31));
+  assert(leanTag(entry) == LeanTag.PersistentHashMap_Entry_entry);
+  assert(leanSameObject(leanField(entry, 0), otherKey) != 0);
+  assert(leanSameObject(leanField(entry, 1), replacement) != 0);
+  !checks = checks + 1;
+  !checks =
+    checks +
+    inferProbeFind(
+      runtime,
+      "old full-hash key sees replacement",
+      result,
+      LeanWord("usize", hash),
+      key,
+      inferProbeSome(otherKey, replacement),
+      false,
+    );
+  checks
+}
+
+fun inferProbeCollisions(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+  hash: Int,
+): Int {
+  keys: mutable Vector<LeanValue> = mutable Vector[];
+  values: mutable Vector<LeanValue> = mutable Vector[];
+  for (i in Range(0, 4)) {
+    keys.push(
+      inferProbeKeyForHash(runtime, leanField(key, 0), hash.xor(i.shl(30))),
+    );
+    values.push(inferProbeExpr(runtime, (100 + i).toString()))
+  };
+  empty = inferProbeNode(inferProbeArray(32, 0, 0));
+  root = inferProbeInsert(
+    runtime,
+    "first collision-chain entry",
+    empty,
+    LeanWord("usize", hash),
+    LeanWord("usize", 1),
+    keys[0],
+    values[0],
+  );
+  checks = 1;
+  for (i in Range(1, 4)) {
+    !root = inferProbeInsert(
+      runtime,
+      "shared-prefix insertion",
+      root,
+      LeanWord("usize", hash.xor(i.shl(30))),
+      LeanWord("usize", 1),
+      keys[i],
+      values[i],
+    );
+    !checks = checks + 1;
+    for (j in Range(0, i + 1)) {
+      !checks =
+        checks +
+        inferProbeFind(
+          runtime,
+          "shared-prefix lookup",
+          root,
+          LeanWord("usize", hash.xor(j.shl(30))),
+          keys[j],
+          inferProbeSome(keys[j], values[j]),
+          true,
+        )
+    }
+  };
+  child = leanField(inferProbeAt(runtime, root, hash.and(31)), 0);
+  assert(leanTag(child) == LeanTag.PersistentHashMap_Node_entries);
+  for (level in Range(1, 6)) {
+    nextEntry = inferProbeAt(runtime, child, hash.ushr(5 * level).and(31));
+    assert(leanTag(nextEntry) == LeanTag.PersistentHashMap_Entry_ref);
+    !child = leanField(nextEntry, 0)
+  };
+  assert(leanTag(child) == LeanTag.PersistentHashMap_Node_collision);
+  assert(leanValueArraySize(leanField(child, 0)) == 4);
+  for (i in Range(0, 4)) {
+    assert(
+      native_eq(
+        leanArrayRead(runtime, leanField(child, 0), leanNatValue(i), false),
+        keys[i],
+      ) == 0,
+    );
+    assert(
+      native_eq(
+        leanArrayRead(runtime, leanField(child, 1), leanNatValue(i), false),
+        values[i],
+      ) == 0,
+    )
+  };
+  collision = inferProbeCollision(
+    Array[keys[0], keys[1], keys[2]],
+    Array[values[0], values[1], values[2]],
+  );
+  for (depth in Array[
+    7,
+    8,
+    leanWordBits(LeanScalar("usize", "9223372036854775808")),
+    -1,
+  ]) {
+    appended = inferProbeInsert(
+      runtime,
+      "unsigned depth retains collision",
+      collision,
+      LeanWord("usize", hash.ushr(30)),
+      LeanWord("usize", depth),
+      keys[3],
+      values[3],
+    );
+    !checks = checks + 1;
+    assert(leanTag(appended) == LeanTag.PersistentHashMap_Node_collision);
+    assert(leanValueArraySize(leanField(appended, 0)) == 4);
+    for (i in Range(0, 4)) {
+      assert(
+        native_eq(
+          leanArrayRead(
+            runtime,
+            leanField(appended, 0),
+            leanNatValue(i),
+            false,
+          ),
+          keys[i],
+        ) == 0,
+      );
+      assert(
+        native_eq(
+          leanArrayRead(
+            runtime,
+            leanField(appended, 1),
+            leanNatValue(i),
+            false,
+          ),
+          values[i],
+        ) == 0,
+      )
+    };
+    !checks =
+      checks +
+      inferProbeFind(
+        runtime,
+        "collision fourth pair",
+        appended,
+        LeanUnavailable("collision lookup must ignore hash"),
+        keys[3],
+        inferProbeSome(keys[3], values[3]),
+        false,
+      )
+  };
+  replacement = inferProbeExpr(runtime, "999");
+  replaced = inferProbeInsert(
+    runtime,
+    "collision replacement retains index",
+    collision,
+    LeanUnavailable("collision insert must ignore hash"),
+    LeanWord("usize", 7),
+    keys[1],
+    replacement,
+  );
+  !checks = checks + 1;
+  assert(leanValueArraySize(leanField(replaced, 0)) == 3);
+  assert(
+    leanSameObject(
+      leanArrayRead(runtime, leanField(replaced, 1), LeanNatLiterals.n1, false),
+      replacement,
+    ) != 0,
+  );
+  !checks =
+    checks +
+    inferProbeFind(
+      runtime,
+      "collision replacement lookup",
+      replaced,
+      LeanWord("usize", 0),
+      keys[1],
+      inferProbeSome(keys[1], replacement),
+      false,
+    );
+  absent = inferProbeKeyForHash(
+    runtime,
+    leanField(key, 0),
+    hash.xor(4.shl(30)),
+  );
+  !checks =
+    checks +
+    inferProbeFind(
+      runtime,
+      "collision miss",
+      replaced,
+      LeanWord("usize", 0),
+      absent,
+      inferProbeNone(),
+      false,
+    );
+  checks
+}
+
+fun inferProbeBoundaries(
+  runtime: mutable LeanExecution,
+  key: LeanValue,
+  value: LeanValue,
+  hash: Int,
+): Int {
+  unused = LeanUnavailable("unused inference cache input");
+  short = inferProbeNode(
+    LeanArray(Array::fill(hash.and(31), inferProbeNull())),
+  );
+  result = inferProbeInsert(
+    runtime,
+    "short array ignores depth/key/value",
+    short,
+    LeanWord("usize", hash),
+    unused,
+    unused,
+    unused,
+  );
+  assert(leanSameObject(result, short) != 0);
+  emptyCollision = inferProbeCollision(Array[], Array[]);
+  checks =
+    1 +
+    inferProbeFind(
+      runtime,
+      "empty collision ignores hash/key",
+      emptyCollision,
+      unused,
+      unused,
+      inferProbeNone(),
+      false,
+    );
+  full = inferProbeNode(inferProbeArray(32, 0, 0));
+  inserted = inferProbeInsert(
+    runtime,
+    "null slot ignores depth",
+    full,
+    LeanWord("usize", hash),
+    unused,
+    key,
+    value,
+  );
+  assert(
+    leanTag(inferProbeAt(runtime, inserted, hash.and(31))) ==
+      LeanTag.PersistentHashMap_Entry_entry,
+  );
+  !checks = checks + 1;
+  child = inferProbeNode(inferProbeArray(32, 0, 0));
+  parent = inferProbeNode(
+    leanArrayWrite(
+      inferProbeArray(32, 0, 0),
+      LeanWord("usize", hash.and(31)),
+      inferProbeRef(child),
+      true,
+    ),
+  );
+  descended = inferProbeInsert(
+    runtime,
+    "maximum-depth ref descent",
+    parent,
+    LeanWord("usize", hash),
+    LeanWord("usize", -1),
+    key,
+    value,
+  );
+  !checks = checks + 1;
+  inner = leanField(inferProbeAt(runtime, descended, hash.and(31)), 0);
+  assert(
+    native_eq(
+      inferProbeAt(runtime, inner, hash.ushr(5).and(31)),
+      inferProbeEntry(key, value),
+    ) == 0,
+  );
+  !checks =
+    checks +
+    inferProbeFind(
+      runtime,
+      "maximum-depth descent lookup",
+      descended,
+      LeanWord("usize", hash),
+      key,
+      inferProbeSome(key, value),
+      false,
+    );
+  keys: mutable Vector<LeanValue> = mutable Vector[];
+  for (i in Range(0, 4)) {
+    keys.push(
+      inferProbeKeyForHash(runtime, leanField(key, 0), hash.xor(i.shl(30))),
+    )
+  };
+  collision = inferProbeCollision(
+    Array[keys[0], keys[1], keys[2]],
+    Array[value, value, value],
+  );
+  holder = inferProbeNode(
+    leanArrayWrite(
+      inferProbeArray(32, 0, 0),
+      LeanWord("usize", hash.and(31)),
+      inferProbeRef(collision),
+      true,
+    ),
+  );
+  wrapped = inferProbeInsert(
+    runtime,
+    "wrapped depth zero expands collision",
+    holder,
+    LeanWord("usize", hash.xor(3.shl(30))),
+    LeanWord("usize", -1),
+    keys[3],
+    value,
+  );
+  wrappedChild = leanField(inferProbeAt(runtime, wrapped, hash.and(31)), 0);
+  assert(leanTag(wrappedChild) == LeanTag.PersistentHashMap_Node_entries);
+  checks + 1
+}
+
+fun inferProbeFailure(mode: String): void {
+  runtime = mutable LeanExecution{};
+  expr = inferProbeExpr(runtime, "7");
+  key = inferProbeKeyForHash(runtime, expr, 31);
+  root = inferProbeNode(LeanArray(Array::fill(31, inferProbeNull())));
+  if (mode == "old-short") {
+    _ = L4_Lean_Meta_InferType.f_infer_spec_2_spec_3_9a6be69b2b_fallback(
+      runtime,
+      root,
+      LeanWord("usize", 31),
+      key,
+    )
+  } else if (mode == "new-short") {
+    _ = L4_Lean_Meta_InferType.f_infer_spec_2_spec_3_9a6be69b2b(
+      runtime,
+      root,
+      LeanWord("usize", 31),
+      key,
+    )
+  } else {
+    leanFail("unknown inference cache failure mode")
+  };
+  leanFail("inference cache failure fixture unexpectedly returned")
+}
+
+fun main(): void {
+  Environ.varOpt("LEAN_SKIP_TEST_INFER_CACHE_FAILURE") match {
+  | Some(mode) ->
+    inferProbeFailure(mode);
+    return void
+  | None() -> void
+  };
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    for (hash in Array[0, -1]) {
+      expr = inferProbeExpr(runtime, "7");
+      key = inferProbeKeyForHash(runtime, expr, hash);
+      value = inferProbeExpr(runtime, "17");
+      for (scalar in Array[false, true]) {
+        !checks = checks + inferProbeEntries(runtime, key, value, hash, scalar)
+      };
+      !checks = checks + inferProbeApproximate(runtime, key, value, hash);
+      !checks = checks + inferProbeCollisions(runtime, key, hash);
+      !checks = checks + inferProbeBoundaries(runtime, key, value, hash)
+    }
+  };
+  assert(checks == 520);
+  print_string(checks.toString() + " inference cache checks passed")
+}

@@ -10,7 +10,7 @@ and kernel checking; diagnostic instrumentation is not a performance baseline.
 Unconverted cold routines remain explicit inventory work, not a prerequisite to
 the next benchmark. Skip's compiler/runtime remain out of scope. Vibe is idle.
 
-The current release is now measured: depth-6 fresh elaboration is 1047.816 ms
+The pre-optimization release was measured: depth-6 fresh elaboration is 1047.816 ms
 versus native Lean's 196.237 ms; warmed uncached execution is 1015.144 ms versus
 172.024 ms. All 34 fresh Skip proofs pass native checking against imported Goal.
 The [profiled baseline](provenance/performance/2026-11-10-profiled-baseline.md)
@@ -18,6 +18,24 @@ records the small-input matrix and evidence. Allocation zeroing accounts for
 34.49% of elaboration samples. Focus next on ordinary array/constructor updates
 and the inference-cache hash-trie family; defer the cold Simp.reduce packet.
 Neither the profile nor earlier rewrites establish near parity yet.
+
+The first profile-selected batch now measures **821.289 ms versus Lean 199.670 ms**
+at depth 6 (seven fresh runs each), about 22% below the pre-batch Skip median.
+Ordinary array/constructor updates clone once and publish privately owned storage;
+inference-cache lookup/insertion uses native hash/index/depth and one immutable
+array update per level. Profiling/scalar compatibility routes and approximate
+hash-only cache policy remain intact. There are **592 focused checks, 16 exact
+failure subprocesses and 29 accepted whole proofs** for this release. The
+[hot-batch audit](provenance/rewrite-batches/2026-11-10-hot-arrays-cache.json)
+records identities, timings and remaining limits. Current count: 44 validated
+frame rewrites plus seven non-frame entries; 153 observed frames remain. This
+count is inventory, not a prerequisite to the next measurement.
+
+The user suggests `@always_inline` for primitive helpers. Next compare a separate
+experiment on `leanField`, `leanNat` and `leanExprDataValue`, checking release
+call sites, text size and paired proof timings. A private `isDefEqQuickOther`
+rewrite is also authorized by its confirmed frame-allocation profile; no broader
+defeq rewrite is selected. Keep Skip compiler/runtime unchanged.
 
 Latest steering authorizes **one Vibe client using ten built-in subagents** as a
 bounded experiment, superseding the stop below for this run only. The installed

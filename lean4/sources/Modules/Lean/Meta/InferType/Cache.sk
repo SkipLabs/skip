@@ -1,0 +1,255 @@
+module L4_Lean_Meta_InferType;
+
+// The approximate inference cache compares combined hashes; its caller checks Expr equality.
+fun f_inferCacheHash(key: LeanValue): Int {
+  leanTag(key) match {
+  | LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ExprConfigCacheKey_mk ->
+    expr = leanField(key, 0);
+    config = leanField(key, 1);
+    leanMixHash(leanExprData(expr).and(4294967295), leanWordBits(config))
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inferCacheSameHash(key: LeanValue, storedKey: LeanValue): Bool {
+  if (
+    leanTag(key) !=
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ExprConfigCacheKey_mk
+  ) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  expr = leanField(key, 0);
+  config = leanField(key, 1);
+  if (
+    leanTag(storedKey) !=
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ExprConfigCacheKey_mk
+  ) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  storedExpr = leanField(storedKey, 0);
+  storedConfig = leanField(storedKey, 1);
+  hash = leanMixHash(leanExprData(expr).and(4294967295), leanWordBits(config));
+  storedHash = leanMixHash(
+    leanExprData(storedExpr).and(4294967295),
+    leanWordBits(storedConfig),
+  );
+  hash == storedHash
+}
+
+fun f_inferCacheEntryAt(
+  runtime: mutable LeanExecution,
+  entries: LeanValue,
+  index: Int,
+): LeanValue {
+  entries match {
+  | LeanArray(values) -> values[index]
+  | _ -> leanArrayRead(runtime, entries, LeanWord("usize", index), true)
+  }
+}
+
+fun f_inferTypeImp_infer_spec_2_3cc60cfed5(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  key: LeanValue,
+): LeanValue {
+  if (runtime.profileRuntime) {
+    return f_inferTypeImp_infer_spec_2_3cc60cfed5_fallback(runtime, node, key)
+  };
+  f_inferCacheFindEntry(runtime, node, f_inferCacheHash(key), key)
+}
+
+fun f_inferCacheFindEntry(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  hash: Int,
+  key: LeanValue,
+): LeanValue {
+  loop {
+    leanTag(node) match {
+    | LeanTag.PersistentHashMap_Node_entries ->
+      entries = leanField(node, 0);
+      bucket = hash.and(31);
+      if (bucket >= leanValueArraySize(entries)) {
+        return f_infer_spec_2_spec_3_9a6be69b2b_fallback(
+          runtime,
+          node,
+          LeanWord("usize", hash),
+          key,
+        )
+      };
+      entry = f_inferCacheEntryAt(runtime, entries, bucket);
+      leanTag(entry) match {
+      | LeanTag.PersistentHashMap_Entry_entry ->
+        storedKey = leanField(entry, 0);
+        value = leanField(entry, 1);
+        if (!f_inferCacheSameHash(key, storedKey)) {
+          return LeanCtor(LeanTag.Option_none, Array[])
+        };
+        return LeanCtor(
+          LeanTag.Option_some,
+          Array[LeanCtor(LeanTag.Prod_mk, Array[storedKey, value])],
+        )
+      | LeanTag.PersistentHashMap_Entry_ref ->
+        !node = leanField(entry, 0);
+        !hash = hash.ushr(5)
+      | LeanTag.PersistentHashMap_Entry_null ->
+        return LeanCtor(LeanTag.Option_none, Array[])
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.PersistentHashMap_Node_collision ->
+      keys = leanField(node, 0);
+      values = leanField(node, 1);
+      _ = leanField(node, 2);
+      return f_spec_2_spec_3_spec_6_bc35e50817(
+        runtime,
+        keys,
+        values,
+        LeanNatLiterals.n0,
+        key,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  }
+}
+
+fun f_infer_spec_2_spec_3_9a6be69b2b(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  hash: LeanValue,
+  key: LeanValue,
+): LeanValue {
+  if (!runtime.profileRuntime) {
+    hash match {
+    | LeanWord(_, bits) ->
+      return f_inferCacheFindEntry(runtime, node, bits, key)
+    | _ -> void
+    }
+  };
+  f_infer_spec_2_spec_3_9a6be69b2b_fallback(runtime, node, hash, key)
+}
+
+fun f_inferCacheInsert(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  hash: Int,
+  depth: Int,
+  key: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  leanTag(node) match {
+  | LeanTag.PersistentHashMap_Node_entries ->
+    entries = leanField(node, 0);
+    bucket = hash.and(31);
+    if (bucket >= leanValueArraySize(entries)) return node;
+    entry = f_inferCacheEntryAt(runtime, entries, bucket);
+    replacement: LeanValue = leanTag(entry) match {
+    | LeanTag.PersistentHashMap_Entry_null ->
+      LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+    | LeanTag.PersistentHashMap_Entry_entry ->
+      storedKey = leanField(entry, 0);
+      storedValue = leanField(entry, 1);
+      if (f_inferCacheSameHash(key, storedKey)) {
+        LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+      } else {
+        collision = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkCollisionNode_6a9ae0c1b1(
+          runtime,
+          storedKey,
+          storedValue,
+          key,
+          value,
+        );
+        LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[collision])
+      }
+    | LeanTag.PersistentHashMap_Entry_ref ->
+      child = f_inferCacheInsert(
+        runtime,
+        leanField(entry, 0),
+        hash.ushr(5),
+        depth + 1,
+        key,
+        value,
+      );
+      LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[child])
+    | _ -> leanFail("non-exhaustive Lean case")
+    };
+    // The original temporary PUnit write was never published to a caller.
+    updated = leanArrayWrite(
+      entries,
+      LeanWord("usize", bucket),
+      replacement,
+      true,
+    );
+    LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[updated])
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanField(node, 0);
+    values = leanField(node, 1);
+    _ = leanField(node, 2);
+    normalized: LeanValue = LeanCtor(
+      LeanTag.PersistentHashMap_Node_collision,
+      Array[keys, values, LeanErased()],
+    );
+    updated = f_spec_1_spec_1_spec_2_bc9a0e49ca(
+      runtime,
+      normalized,
+      key,
+      value,
+    );
+    if (depth.uge(7)) return updated;
+    size = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_getCollisionNodeSize_4ef93619b3(
+      runtime,
+      updated,
+    );
+    if (leanNat(size) < LeanNat::fromInt(4)) return updated;
+    leanTag(updated) match {
+    | LeanTag.PersistentHashMap_Node_collision ->
+      newKeys = leanField(updated, 0);
+      newValues = leanField(updated, 1);
+      _ = leanField(updated, 2);
+      empty = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntries_8e6ec2b40b(
+        runtime,
+        LeanErased(),
+      );
+      f_spec_1_spec_1_spec_3_aa2c989b91(
+        runtime,
+        LeanWord("usize", depth),
+        newKeys,
+        newValues,
+        LeanNatLiterals.n0,
+        empty,
+      )
+    | LeanTag.PersistentHashMap_Node_entries ->
+      leanFail(
+        "unreachable: Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_._private.Lean.Meta.InferType.0.Lean.Meta.inferTypeImp.infer.spec_1.spec_1._redArg",
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_infer_spec_1_spec_1_ac68cfa009(
+  runtime: mutable LeanExecution,
+  node: LeanValue,
+  hash: LeanValue,
+  depth: LeanValue,
+  key: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  if (!runtime.profileRuntime) {
+    (hash, depth) match {
+    | (LeanWord(_, hashBits), LeanWord(_, depthBits)) ->
+      return f_inferCacheInsert(runtime, node, hashBits, depthBits, key, value)
+    | _ -> void
+    }
+  };
+  f_infer_spec_1_spec_1_ac68cfa009_fallback(
+    runtime,
+    node,
+    hash,
+    depth,
+    key,
+    value,
+  )
+}
+
+module end;

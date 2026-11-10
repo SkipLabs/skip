@@ -1,0 +1,235 @@
+// Copy-on-write updates preserve concrete array inputs and earlier snapshots.
+
+fun arrayUpdateOldleanReplaceField(
+  value: LeanValue,
+  index: Int,
+  replacement: LeanValue,
+): LeanValue {
+  _ = leanField(value, index);
+  value match {
+  | LeanCtor(name, fields) ->
+    LeanCtor(
+      name,
+      fields.mapWithIndex((i, field) -> if (i == index) replacement else field),
+    )
+  | _ -> leanFail("replacement in a non-constructor Lean value")
+  }
+}
+
+fun arrayUpdateOldleanArrayWrite(
+  value: LeanValue,
+  at: LeanValue,
+  replacement: LeanValue,
+  word: Bool,
+): LeanValue {
+  size = leanValueArraySize(value);
+  index = if (word) {
+    bits = leanWordBits(at);
+    if (!bits.ult(size)) leanFail("Lean Array USize index out of bounds");
+    bits
+  } else {
+    n = leanNat(at);
+    if (n >= LeanNat::fromInt(size)) leanFail("Lean Array index out of bounds");
+    n.toInt()
+  };
+  value match {
+  | LeanTrackedExtensionArray(_) -> LeanArrayOverride(value, index, replacement)
+  | LeanArrayOverride(base, changed, _) if (changed == index) ->
+    LeanArrayOverride(base, index, replacement)
+  | LeanArrayOverride(_, _, _) -> LeanArrayOverride(value, index, replacement)
+  | LeanPersistentArray(values) ->
+    updated = values.clone();
+    updated.set(index, replacement);
+    LeanPersistentArray(updated.chill())
+  | LeanArray(values) if (values.size() > 128) ->
+    updated = Persistent.RadixTreeVector::mcreateFromItems(values);
+    updated.set(index, replacement);
+    LeanPersistentArray(updated.chill())
+  | _ ->
+    LeanArray(
+      leanArray(value).mapWithIndex((i, old) ->
+        if (i == index) replacement else old
+      ),
+    )
+  }
+}
+
+fun arrayUpdateCtor(i: Int): LeanCtor {
+  LeanCtor(LeanTag.Option_some, Array[leanNatValue(i)])
+}
+
+fun arrayUpdateCheckFields(
+  actual: Array<LeanValue>,
+  expected: Array<LeanValue>,
+): void {
+  assert(actual.size() == expected.size());
+  for (i in Range(0, actual.size())) {
+    assert(leanSameObject(actual[i], expected[i]) != 0)
+  }
+}
+
+fun arrayUpdateFlat(fields: Array<LeanValue>, index: Int, word: Bool): void {
+  before = fields.mapWithIndex((_i, value) -> value);
+  input: LeanValue = LeanArray(fields);
+  replacement: LeanValue = LeanUnavailable("stored without inspection");
+  at: LeanValue = if (word) LeanWord("usize", index) else leanNatValue(index);
+  old = arrayUpdateOldleanArrayWrite(input, at, replacement, word);
+  result = leanArrayWrite(input, at, replacement, word);
+  assert(native_eq(old, result) == 0);
+  arrayUpdateCheckFields(fields, before);
+  result match {
+  | LeanArray(_) -> assert(fields.size() <= 128)
+  | LeanPersistentArray(_) -> assert(fields.size() > 128)
+  | _ -> leanFail("unexpected array representation")
+  };
+  runtime = mutable LeanExecution{};
+  reference = runtime.newRef(input);
+  snapshot = runtime.checkpoint();
+  runtime.writeRef(reference, Some(result));
+  for (i in Range(0, fields.size())) {
+    expected = if (i == index) replacement else before[i];
+    assert(
+      leanSameObject(
+        leanArrayRead(runtime, result, leanNatValue(i), false),
+        expected,
+      ) != 0,
+    )
+  };
+  for (next in Array[index, (index + 1) % fields.size()]) {
+    again = leanArrayWrite(
+      result,
+      leanNatValue(next),
+      LeanText("second"),
+      false,
+    );
+    assert(
+      native_eq(
+        again,
+        arrayUpdateOldleanArrayWrite(
+          old,
+          leanNatValue(next),
+          LeanText("second"),
+          false,
+        ),
+      ) == 0,
+    );
+    for (i in Range(0, fields.size())) {
+      expected = if (i == index) replacement else before[i];
+      assert(
+        leanSameObject(
+          leanArrayRead(runtime, result, leanNatValue(i), false),
+          expected,
+        ) != 0,
+      )
+    }
+  };
+  arrayUpdateCheckFields(
+    leanArray(snapshot.restoreRaw().readRef(reference)),
+    before,
+  );
+  arrayUpdateCheckFields(fields, before)
+}
+
+fun arrayUpdateConstructor(fields: Array<LeanValue>, index: Int): void {
+  before = fields.mapWithIndex((_i, value) -> value);
+  input: LeanValue = LeanCtor(LeanTag.Prod_mk, fields);
+  replacement: LeanValue = LeanUnavailable("stored without inspection");
+  old = arrayUpdateOldleanReplaceField(input, index, replacement);
+  result = leanReplaceField(input, index, replacement);
+  assert(native_eq(old, result) == 0);
+  assert(leanTag(result) == LeanTag.Prod_mk);
+  arrayUpdateCheckFields(fields, before);
+  for (next in Array[index, (index + 1) % fields.size()]) {
+    again = leanReplaceField(result, next, LeanText("second"));
+    assert(
+      native_eq(
+        again,
+        arrayUpdateOldleanReplaceField(old, next, LeanText("second")),
+      ) == 0,
+    );
+    for (i in Range(0, fields.size())) {
+      expected = if (i == index) replacement else before[i];
+      assert(leanSameObject(leanField(result, i), expected) != 0);
+      assert(leanSameObject(leanField(input, i), before[i]) != 0)
+    }
+  };
+  same = leanReplaceField(input, index, fields[index]);
+  assert(
+    native_eq(
+      same,
+      arrayUpdateOldleanReplaceField(input, index, fields[index]),
+    ) == 0,
+  );
+  arrayUpdateCheckFields(fields, before)
+}
+
+fun arrayUpdateFailure(old: Bool, mode: String): void {
+  if (
+    mode == "field-negative" ||
+    mode == "field-large" ||
+    mode == "field-unavailable"
+  ) {
+    input: LeanValue = if (mode == "field-unavailable") {
+      LeanUnavailable("field sentinel")
+    } else {
+      LeanCtor(LeanTag.Prod_mk, Array[LeanText("kept")])
+    };
+    index = if (mode == "field-negative") -1 else 1;
+    _ = if (old) {
+      arrayUpdateOldleanReplaceField(input, index, LeanErased())
+    } else {
+      leanReplaceField(input, index, LeanErased())
+    };
+  } else {
+    input: LeanValue = mode match {
+    | "array-unavailable" -> LeanUnavailable("array sentinel")
+    | "array-empty" -> LeanArray(Array[])
+    | _ -> LeanArray(Array[LeanText("kept")])
+    };
+    word = mode == "array-word";
+    at: LeanValue = mode match {
+    | "array-unavailable" -> LeanUnavailable("index sentinel")
+    | "array-word" -> LeanWord("usize", -1)
+    | "array-huge" ->
+      leanBoxNat(LeanNat::parse("10000000000000000000000000000000000000000"))
+    | _ -> leanNatValue(1)
+    };
+    _ = if (old) {
+      arrayUpdateOldleanArrayWrite(input, at, LeanErased(), word)
+    } else {
+      leanArrayWrite(input, at, LeanErased(), word)
+    };
+  };
+  leanFail("unexpected failure-case success")
+}
+
+fun main(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 3) return arrayUpdateFailure(args[1] == "old", args[2]);
+  count = 0;
+  for (size in Array[1, 2, 128, 129]) {
+    constructors: Array<LeanCtor> = Array::fillBy(size, i ->
+      arrayUpdateCtor(i)
+    );
+    texts: Array<LeanText> = Array::fillBy(size, i -> LeanText(i.toString()));
+    mixed: Array<LeanValue> = Array::fillBy(size, i ->
+      if (i % 2 == 0) arrayUpdateCtor(i) else LeanUnavailable("kept")
+    );
+    for (fields in Array[constructors, texts, mixed]) {
+      for (index in Array[0, size - 1]) {
+        for (word in Array[false, true]) {
+          arrayUpdateFlat(fields, index, word);
+          !count = count + 1
+        };
+        arrayUpdateConstructor(fields, index);
+        !count = count + 1
+      }
+    }
+  };
+  assert(count == 72);
+  print_string(
+    "array updates: " +
+      count.toString() +
+      " cases passed; old roots and snapshots preserved",
+  )
+}

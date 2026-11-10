@@ -194,10 +194,10 @@ fun leanReplaceField(
   _ = leanField(value, index);
   value match {
   | LeanCtor(name, fields) ->
-    LeanCtor(
-      name,
-      fields.mapWithIndex((i, field) -> if (i == index) replacement else field),
-    )
+    updated = fields.clone();
+    updated.set(index, replacement);
+    // The fresh copy has no mutable aliases outside this function.
+    LeanCtor(name, unsafe_chill_trust_me(updated))
   | _ -> leanFail("replacement in a non-constructor Lean value")
   }
 }

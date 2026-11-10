@@ -100,11 +100,10 @@ fun leanArrayWrite(
     updated.set(index, replacement);
     LeanPersistentArray(updated.chill())
   | _ ->
-    LeanArray(
-      leanArray(value).mapWithIndex((i, old) ->
-        if (i == index) replacement else old
-      ),
-    )
+    updated = leanArray(value).clone();
+    updated.set(index, replacement);
+    // The fresh copy has no mutable aliases outside this function.
+    LeanArray(unsafe_chill_trust_me(updated))
   }
 }
 

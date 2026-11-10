@@ -7,8 +7,10 @@ must keep the binary unchanged between capture and this symbolization step.
 import argparse
 import bisect
 from collections import Counter
+import hashlib
 import json
 from pathlib import Path
+import re
 import struct
 import subprocess
 
@@ -21,9 +23,35 @@ def main():
                         help='Original mapped path when symbolizing a saved copy of the executable')
     parser.add_argument('--elaboration-log', type=Path,
                         help='Keep only timestamped samples inside recorded elaboration intervals')
+    parser.add_argument('--debug-symbols', action='append', default=[], metavar='ELF=DEBUG',
+                        help='Use a separate debug ELF with the same Build ID for an exact mapped object')
+    parser.add_argument('--output', type=Path, help='Write the report here instead of beside the samples')
     args = parser.parse_args()
     binary = args.binary.resolve()
     mapped_binary = (args.mapped_binary or args.binary).resolve()
+    debug_files, debug_identities = {}, []
+    def build_id(path):
+        notes = subprocess.run(['readelf', '-n', path], text=True,
+                               capture_output=True, check=True).stdout
+        match = re.search(r'Build ID: ([0-9a-f]+)', notes)
+        if not match:
+            raise RuntimeError(f'Missing ELF Build ID: {path}')
+        return match[1]
+
+    for argument in args.debug_symbols:
+        object_name, separator, debug_name = argument.partition('=')
+        if not separator or not object_name or not debug_name:
+            parser.error('--debug-symbols requires ELF=DEBUG')
+        path, debug = Path(object_name).resolve(), Path(debug_name).resolve()
+        identity = build_id(path)
+        if identity != build_id(debug):
+            raise RuntimeError(f'Debug Build ID does not match {path}: {debug}')
+        if path in debug_files:
+            parser.error(f'Duplicate debug mapping: {path}')
+        debug_files[path] = debug
+        debug_identities.append({'object': str(path), 'debug': str(debug), 'buildId': identity,
+                                 'objectSha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                                 'debugSha256': hashlib.sha256(debug.read_bytes()).hexdigest()})
     maps = []
     for line in Path(str(args.samples)+'.maps').read_text().splitlines():
         columns = line.split(maxsplit=5)
@@ -32,8 +60,9 @@ def main():
         maps.append((start, end, int(columns[2], 16), path))
     def symbol_table(path):
         symbols = []
+        symbol_file = debug_files.get(path.resolve(), path)
         for options in ([], ['-D']):
-            result = subprocess.run(['nm', *options, '-S', '--defined-only', '--numeric-sort', path],
+            result = subprocess.run(['nm', *options, '-S', '--defined-only', '--numeric-sort', symbol_file],
                                     text=True, capture_output=True)
             for line in result.stdout.splitlines():
                 parts = line.split(maxsplit=3)
@@ -125,6 +154,7 @@ def main():
     report = {'binary': str(binary), 'mappedBinary': str(mapped_binary), 'totalSamples': total,
               'capturedSamples': captured, 'elaborationIntervals': len(windows),
               'scope': 'elaboration only' if windows else 'complete process',
+              'debugSymbols': debug_identities,
               'kind': 'SIGPROF frame-pointer samples (possibly truncated)' if stacks else 'SIGPROF flat instruction-pointer samples',
               'symbols': [{'name': name, 'samples': count, 'percent': 100*count/total}
                           for name, count in counts.most_common()]}
@@ -132,7 +162,7 @@ def main():
         report['inclusive'] = [{'name': n, 'samples': c, 'percent': 100*c/total} for n, c in inclusive.most_common()]
         report['callers'] = [{'caller': a, 'callee': b, 'samples': c} for (a, b), c in callers.most_common()]
     suffix = '.elaboration.json' if windows else '.json'
-    args.samples.with_suffix(suffix).write_text(json.dumps(report, indent=2)+'\n')
+    (args.output or args.samples.with_suffix(suffix)).write_text(json.dumps(report, indent=2)+'\n')
     for row in report['symbols'][:30]:
         print(f'{row["percent"]:6.2f}% {row["samples"]:6} {row["name"]}')
 

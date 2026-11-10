@@ -5,13 +5,20 @@ and rewriting its dominant hot paths. This supersedes finishing the whole exerci
 path before measuring. Build the current release, establish fresh/warm raw timings,
 then use elaboration-only samples to choose the next changes. SKStore follows raw
 near parity; Skip compiler/runtime changes still require stopping for discussion.
-The current release is measured: depth-6 fresh elaboration is 1047.816 ms versus
+The pre-batch release measured depth-6 fresh elaboration at 1047.816 ms versus
 native Lean's 196.237 ms; warmed uncached medians are 1015.144 ms versus 172.024 ms.
 All 34 fresh Skip proofs pass native checking against imported Goal. The
 [profiled baseline](provenance/performance/2026-11-10-profiled-baseline.md) records
 the full small-input matrix. Allocation zeroing accounts for 34.49% of elaboration
-samples, with ordinary array/constructor updates and inference-cache insertion
-chosen for the next bounded changes. No near-parity result is established.
+samples. The first bounded changes to ordinary array/constructor updates and
+inference-cache lookup/insertion now measure **821.289 ms versus Lean 199.670 ms**
+at depth 6, roughly 22% below the earlier Skip median. Release identity is
+`47416933818fbca62445456d526abdbe4b888aed`. It passes 592 focused cases, 16 exact
+failure subprocesses and all 29 new whole-proof Goal checks. See the
+[batch audit](provenance/rewrite-batches/2026-11-10-hot-arrays-cache.json).
+Current inventory is 44 validated frame rewrites plus seven non-frame entries,
+with 153 observed frames remaining. A separate user-suggested `@always_inline`
+experiment on three primitive helpers is next. No near-parity result is established.
 The latest five non-frame entries pass 986 new comparisons plus 5,501 regressions
 and 16 explicit-failure subprocesses. There are 43 validated frame rewrites plus
 five non-frame entries; 154 observed frames remain.
