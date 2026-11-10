@@ -1,0 +1,781 @@
+// Core value-cache behavior, with independent expected expressions and full reference checks.
+class ValueCacheCase(
+  label: String,
+  constant: LeanValue,
+  levels: LeanValue,
+  allowOpaque: Bool,
+  expected: ?LeanValue,
+)
+
+fun valueCacheDeclaration(
+  kind: LeanTag.Value,
+  name: LeanValue,
+  parameters: LeanValue,
+  type: LeanValue,
+  value: LeanValue,
+): LeanValue {
+  base = LeanCtor(LeanTag.ConstantVal_mk, Array[name, parameters, type]);
+  all = LeanCtor(
+    LeanTag.List_cons,
+    Array[name, LeanCtor(LeanTag.List_nil, Array[])],
+  );
+  payload = kind match {
+  | LeanTag.ConstantInfo_defnInfo ->
+    LeanCtor(
+      LeanTag.DefinitionVal_mk,
+      Array[
+        base,
+        value,
+        LeanCtor(
+          LeanTag.ReducibilityHints_regular,
+          Array[LeanWord("uint32", 1)],
+        ),
+        LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+        all,
+      ],
+    )
+  | LeanTag.ConstantInfo_thmInfo ->
+    LeanCtor(LeanTag.TheoremVal_mk, Array[base, value, all])
+  | LeanTag.ConstantInfo_opaqueInfo ->
+    LeanCtor(LeanTag.OpaqueVal_mk, Array[base, value, leanBool(false), all])
+  | LeanTag.ConstantInfo_axiomInfo ->
+    LeanCtor(LeanTag.AxiomVal_mk, Array[base, leanBool(false)])
+  | _ -> leanFail("unexpected value-cache fixture declaration kind")
+  };
+  LeanCtor(kind, Array[payload])
+}
+
+// The proposition is forall (alpha : Sort u) (p : Prop), p -> p.
+fun valueCacheTheorem(
+  runtime: mutable LeanExecution,
+  level: LeanValue,
+): (LeanValue, LeanValue) {
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+    runtime,
+    LeanCtor(LeanTag.Level_zero__impl, Array[]),
+  );
+  alphaType = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, level);
+  var0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  var1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+  identityType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    anonymous,
+    binder,
+    var0,
+    var1,
+  );
+  identityValue = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    anonymous,
+    binder,
+    var0,
+    var0,
+  );
+  proposition = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    anonymous,
+    binder,
+    prop,
+    identityType,
+  );
+  proof = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    runtime,
+    anonymous,
+    binder,
+    prop,
+    identityValue,
+  );
+  (
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      anonymous,
+      binder,
+      alphaType,
+      proposition,
+    ),
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      runtime,
+      anonymous,
+      binder,
+      alphaType,
+      proof,
+    ),
+  )
+}
+
+fun valueCacheFind(
+  runtime: mutable LeanExecution,
+  stateRef: LeanValue,
+  cacheIndex: Int,
+  name: LeanValue,
+): LeanValue {
+  cache = leanField(runtime.readRef(stateRef), 5);
+  L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    runtime,
+    leanField(cache, cacheIndex),
+    name,
+  )
+}
+
+fun valueCacheExpectEntry(
+  runtime: mutable LeanExecution,
+  stateRef: LeanValue,
+  cacheIndex: Int,
+  name: LeanValue,
+  levels: LeanValue,
+  expression: LeanValue,
+): void {
+  entry = valueCacheFind(runtime, stateRef, cacheIndex, name);
+  assert(leanTag(entry) == LeanTag.Option_some);
+  pair = leanField(entry, 0);
+  assert(leanTag(pair) == LeanTag.Prod_mk);
+  assert(rewriteProbeSameInput(leanField(pair, 0), levels));
+  assert(rewriteProbeSameInput(leanField(pair, 1), expression))
+}
+
+fun valueCacheSeed(
+  runtime: mutable LeanExecution,
+  stateRef: LeanValue,
+  cacheIndex: Int,
+  name: LeanValue,
+  levels: LeanValue,
+  expression: LeanValue,
+): void {
+  state = runtime.readRef(stateRef);
+  cache = leanField(state, 5);
+  entries = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_0_7566395d10(
+    runtime,
+    leanField(cache, cacheIndex),
+    name,
+    LeanCtor(LeanTag.Prod_mk, Array[levels, expression]),
+  );
+  runtime.writeRef(
+    stateRef,
+    Some(
+      leanReplaceField(state, 5, leanReplaceField(cache, cacheIndex, entries)),
+    ),
+  )
+}
+
+fun valueCacheContains(value: LeanValue, expected: LeanValue): Bool {
+  if (rewriteProbeSameInput(value, expected)) return true;
+  value match {
+  | LeanCtor(_, fields) ->
+    for (field in fields) {
+      if (valueCacheContains(field, expected)) return true
+    };
+    false
+  | LeanArray(fields) ->
+    for (field in fields) {
+      if (valueCacheContains(field, expected)) return true
+    };
+    false
+  | _ -> false
+  }
+}
+
+fun valueCacheCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  stateRef: LeanValue,
+  constant: LeanValue,
+  levels: LeanValue,
+  allowOpaque: LeanValue,
+  context: LeanValue,
+  world: LeanValue,
+  expected: ?LeanValue,
+  writes: Bool,
+): LeanExecutionCheckpoint {
+  oldConstant = rewriteProbeCopyInput(constant);
+  newConstant = rewriteProbeCopyInput(constant);
+  oldLevels = rewriteProbeCopyInput(levels);
+  newLevels = rewriteProbeCopyInput(levels);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      outcome = L4_Lean_CoreM.f_Lean_Core_instantiateValueLevelParams_f93716788b_fallback(
+        runtime,
+        oldConstant,
+        oldLevels,
+        allowOpaque,
+        oldContext,
+        stateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(constant, oldConstant));
+      assert(rewriteProbeSameInput(levels, oldLevels));
+      assert(rewriteProbeSameInput(context, oldContext));
+      outcome
+    },
+    (runtime: mutable LeanExecution) ~> {
+      outcome = L4_Lean_CoreM.f_Lean_Core_instantiateValueLevelParams_f93716788b(
+        runtime,
+        newConstant,
+        newLevels,
+        allowOpaque,
+        newContext,
+        stateRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(constant, newConstant));
+      assert(rewriteProbeSameInput(levels, newLevels));
+      assert(rewriteProbeSameInput(context, newContext));
+      outcome
+    },
+  );
+  beforeRuntime = saved.restoreRaw();
+  afterRuntime = after.restoreRaw();
+  beforeState = beforeRuntime.readRef(stateRef);
+  afterState = afterRuntime.readRef(stateRef);
+  name = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+    beforeRuntime,
+    constant,
+  );
+  assert(rewriteProbeSameInput(leanField(result, 1), world));
+  expected match {
+  | Some(expression) ->
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    assert(rewriteProbeSameInput(leanField(result, 0), expression));
+    valueCacheExpectEntry(afterRuntime, stateRef, 1, name, levels, expression)
+  | None() ->
+    assert(!writes);
+    assert(leanTag(result) == LeanTag.EST_Out_error);
+    exception = leanField(result, 0);
+    assert(leanTag(exception) == LeanTag.Exception_error);
+    assert(
+      rewriteProbeSameInput(leanField(exception, 0), leanField(context, 2)),
+    );
+    message = LeanCtor(
+      LeanTag.MessageData_compose,
+      Array[
+        L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+          beforeRuntime,
+          LeanText("Not a definition or theorem: "),
+        ),
+        L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+          beforeRuntime,
+          name,
+          leanBool(false),
+        ),
+      ],
+    );
+    assert(valueCacheContains(leanField(exception, 1), message));
+    oracle = L4_Lean_CoreM.f_Core_instantiateValueLevelParams_spec_0_3f209b9321(
+      beforeRuntime,
+      message,
+      context,
+      stateRef,
+      world,
+    );
+    assert(rewriteProbeSameInput(result, oracle))
+  };
+  if (writes) {
+    assert(native_eq(saved.refs, after.refs) != 0);
+    assert(leanTag(afterState) == LeanTag.Core_State_mk);
+    oldCache = leanField(beforeState, 5);
+    newCache = leanField(afterState, 5);
+    assert(leanTag(newCache) == LeanTag.Core_Cache_mk);
+    assert(native_eq(leanField(oldCache, 0), leanField(newCache, 0)) == 0);
+    assert(
+      rewriteProbeSameInput(
+        beforeState,
+        leanReplaceField(afterState, 5, oldCache),
+      ),
+    );
+    // Restore only this cell in a throwaway runtime to expose every other ref change.
+    afterRuntime.writeRef(stateRef, Some(beforeState));
+    assert(native_eq(saved.refs, afterRuntime.checkpoint().refs) == 0)
+  } else {
+    assert(native_eq(saved.refs, after.refs) == 0)
+  };
+  after
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    list = (head: LeanValue) -> LeanCtor(LeanTag.List_cons, Array[head, nil]);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(text));
+    sort = (level: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, level);
+    succ = (level: LeanValue) ->
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, level);
+    maxLevel = (left: LeanValue, right: LeanValue) ->
+      L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(builder, left, right);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = succ(zero);
+    two = succ(one);
+    u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, name("u"));
+    v = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, name("v"));
+    w = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(builder, name("w"));
+    prop = sort(zero);
+    type0 = sort(one);
+    maxUV = maxLevel(u, v);
+    paramsU = list(name("u"));
+    paramsUV = LeanCtor(LeanTag.List_cons, Array[name("u"), list(name("v"))]);
+    dName = name("valueCacheD");
+    eName = name("valueCacheE");
+    tName = name("valueCacheT");
+    oName = name("valueCacheO");
+    aName = name("valueCacheA");
+    rName = name("valueCacheReserved");
+    definition = valueCacheDeclaration(
+      LeanTag.ConstantInfo_defnInfo,
+      dName,
+      paramsU,
+      sort(succ(u)),
+      sort(u),
+    );
+    twoParams = valueCacheDeclaration(
+      LeanTag.ConstantInfo_defnInfo,
+      eName,
+      paramsUV,
+      sort(succ(maxUV)),
+      sort(maxUV),
+    );
+    (theoremType, theoremProof) = valueCacheTheorem(builder, u);
+    (_theoremTypeZero, theoremProofZero) = valueCacheTheorem(builder, zero);
+    theorem = valueCacheDeclaration(
+      LeanTag.ConstantInfo_thmInfo,
+      tName,
+      paramsU,
+      theoremType,
+      theoremProof,
+    );
+    opaque = valueCacheDeclaration(
+      LeanTag.ConstantInfo_opaqueInfo,
+      oName,
+      paramsU,
+      sort(succ(u)),
+      sort(u),
+    );
+    axiom = valueCacheDeclaration(
+      LeanTag.ConstantInfo_axiomInfo,
+      aName,
+      nil,
+      type0,
+      LeanErased(),
+    );
+    reserved = valueCacheDeclaration(
+      LeanTag.ConstantInfo_defnInfo,
+      rName,
+      paramsU,
+      sort(succ(u)),
+      sort(u),
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for (info in Array[
+      definition,
+      twoParams,
+      theorem,
+      opaque,
+      axiom,
+      reserved,
+    ]) {
+      constantName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+        builder,
+        info,
+      );
+      constants.set(leanNameKey(constantName), LeanConstantFile(info, None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    state = rewriteProbeState(builder, environment, locals, "<value-cache>");
+    ref = state.coreStateRef;
+    us0 = list(zero);
+    us1 = list(one);
+    us01 = LeanCtor(LeanTag.List_cons, Array[zero, us1]);
+    us012 = LeanCtor(
+      LeanTag.List_cons,
+      Array[zero, LeanCtor(LeanTag.List_cons, Array[one, list(two)])],
+    );
+    valueCacheSeed(builder, ref, 0, dName, list(w), sort(succ(w)));
+    valueCacheSeed(builder, ref, 1, rName, us0, prop);
+    base = builder.checkpoint();
+    unusedContext = LeanUnavailable(
+      "successful value-cache call must not inspect Core.Context",
+    );
+    unusedFlag = LeanUnavailable("cache hit must not inspect allowOpaque");
+    coldCases = Array[
+      ValueCacheCase("definition zero", definition, us0, false, Some(prop)),
+      ValueCacheCase(
+        "definition successor",
+        definition,
+        us1,
+        false,
+        Some(type0),
+      ),
+      ValueCacheCase(
+        "definition empty substitution",
+        definition,
+        nil,
+        false,
+        Some(sort(u)),
+      ),
+      ValueCacheCase(
+        "definition extra substitutions",
+        definition,
+        us012,
+        false,
+        Some(prop),
+      ),
+      ValueCacheCase(
+        "definition named parameter",
+        definition,
+        list(w),
+        false,
+        Some(sort(w)),
+      ),
+      ValueCacheCase(
+        "definition max level",
+        definition,
+        list(maxUV),
+        false,
+        Some(sort(maxUV)),
+      ),
+      ValueCacheCase(
+        "short substitution retains v",
+        twoParams,
+        us0,
+        false,
+        Some(sort(v)),
+      ),
+      ValueCacheCase(
+        "short substitution retains max 1 v",
+        twoParams,
+        us1,
+        false,
+        Some(sort(maxLevel(one, v))),
+      ),
+      ValueCacheCase("two parameters", twoParams, us01, false, Some(type0)),
+      ValueCacheCase(
+        "two parameters plus extra",
+        twoParams,
+        us012,
+        false,
+        Some(type0),
+      ),
+      ValueCacheCase(
+        "two parameters unchanged",
+        twoParams,
+        nil,
+        false,
+        Some(sort(maxUV)),
+      ),
+      ValueCacheCase(
+        "theorem requires allowOpaque",
+        theorem,
+        us0,
+        false,
+        None(),
+      ),
+      ValueCacheCase(
+        "theorem proof substitution",
+        theorem,
+        us0,
+        true,
+        Some(theoremProofZero),
+      ),
+      ValueCacheCase("opaque requires allowOpaque", opaque, us0, false, None()),
+      ValueCacheCase("opaque accepted", opaque, us0, true, Some(prop)),
+      ValueCacheCase("axiom false", axiom, us0, false, None()),
+      ValueCacheCase("axiom true", axiom, us0, true, None()),
+      ValueCacheCase(
+        "definition allows true",
+        definition,
+        us0,
+        true,
+        Some(prop),
+      ),
+    ];
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      for (item in coldCases) {
+        writes = item.expected match {
+        | Some(_) -> true
+        | None() -> false
+        };
+        context = if (writes) unusedContext else state.coreContext;
+        afterCold = valueCacheCheck(
+          item.label,
+          base,
+          ref,
+          item.constant,
+          item.levels,
+          leanBool(item.allowOpaque),
+          context,
+          world,
+          item.expected,
+          writes,
+        );
+        checkedRuntime = afterCold.restoreRaw();
+        valueCacheExpectEntry(
+          checkedRuntime,
+          ref,
+          0,
+          dName,
+          list(w),
+          sort(succ(w)),
+        );
+        valueCacheExpectEntry(checkedRuntime, ref, 1, rName, us0, prop);
+        !checks = checks + 1
+      };
+
+      warm = valueCacheCheck(
+        "prime definition",
+        base,
+        ref,
+        definition,
+        us0,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(prop),
+        true,
+      );
+      _hit = valueCacheCheck(
+        "matching hit skips flag and context",
+        warm,
+        ref,
+        definition,
+        us0,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      // Only this hit-only fixture has intentionally unusable type/value payloads.
+      unusedPayload = LeanUnavailable(
+        "matching hit must not inspect declaration payload",
+      );
+      bodyBlind = valueCacheDeclaration(
+        LeanTag.ConstantInfo_defnInfo,
+        dName,
+        paramsU,
+        unusedPayload,
+        unusedPayload,
+      );
+      _bodyHit = valueCacheCheck(
+        "name-only hit skips body",
+        warm,
+        ref,
+        bodyBlind,
+        us0,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      changed = valueCacheCheck(
+        "different level overwrites",
+        warm,
+        ref,
+        definition,
+        us1,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(type0),
+        true,
+      );
+      _latestHit = valueCacheCheck(
+        "latest level hits",
+        changed,
+        ref,
+        definition,
+        us1,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(type0),
+        false,
+      );
+      prefix = valueCacheCheck(
+        "longer level list misses",
+        changed,
+        ref,
+        definition,
+        us01,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(prop),
+        true,
+      );
+      shorter = valueCacheCheck(
+        "shorter level list misses",
+        prefix,
+        ref,
+        definition,
+        us0,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(prop),
+        true,
+      );
+      second = valueCacheCheck(
+        "second name preserves first",
+        shorter,
+        ref,
+        twoParams,
+        us0,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(sort(v)),
+        true,
+      );
+      isolated = valueCacheCheck(
+        "first name survives second",
+        second,
+        ref,
+        definition,
+        us0,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      isolatedRuntime = isolated.restoreRaw();
+      valueCacheExpectEntry(isolatedRuntime, ref, 1, eName, us0, sort(v));
+      valueCacheExpectEntry(isolatedRuntime, ref, 1, rName, us0, prop);
+      !checks = checks + 9;
+
+      opaqueWarm = valueCacheCheck(
+        "prime opaque with true",
+        base,
+        ref,
+        opaque,
+        us0,
+        leanBool(true),
+        unusedContext,
+        world,
+        Some(prop),
+        true,
+      );
+      _opaqueFalseHit = valueCacheCheck(
+        "opaque cached true then requested false",
+        opaqueWarm,
+        ref,
+        opaque,
+        us0,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      _opaqueMiss = valueCacheCheck(
+        "opaque false mismatch preserves cache",
+        opaqueWarm,
+        ref,
+        opaque,
+        us1,
+        leanBool(false),
+        state.coreContext,
+        world,
+        None(),
+        false,
+      );
+      _opaqueFlagHit = valueCacheCheck(
+        "opaque hit skips flag",
+        opaqueWarm,
+        ref,
+        opaque,
+        us0,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      !checks = checks + 4;
+
+      theoremWarm = valueCacheCheck(
+        "prime theorem with true",
+        base,
+        ref,
+        theorem,
+        us0,
+        leanBool(true),
+        unusedContext,
+        world,
+        Some(theoremProofZero),
+        true,
+      );
+      _theoremFalseHit = valueCacheCheck(
+        "theorem cached true then requested false",
+        theoremWarm,
+        ref,
+        theorem,
+        us0,
+        leanBool(false),
+        unusedContext,
+        world,
+        Some(theoremProofZero),
+        false,
+      );
+      !checks = checks + 2;
+
+      seeded = base.restoreRaw();
+      valueCacheSeed(seeded, ref, 1, aName, us0, prop);
+      axiomWarm = seeded.checkpoint();
+      _axiomHit = valueCacheCheck(
+        "seeded axiom hit precedes hasValue",
+        axiomWarm,
+        ref,
+        axiom,
+        us0,
+        unusedFlag,
+        unusedContext,
+        world,
+        Some(prop),
+        false,
+      );
+      _axiomMiss = valueCacheCheck(
+        "seeded axiom different levels errors",
+        axiomWarm,
+        ref,
+        axiom,
+        us1,
+        leanBool(false),
+        state.coreContext,
+        world,
+        None(),
+        false,
+      );
+      _axiomEmpty = valueCacheCheck(
+        "seeded axiom empty levels errors",
+        axiomWarm,
+        ref,
+        axiom,
+        nil,
+        leanBool(false),
+        state.coreContext,
+        world,
+        None(),
+        false,
+      );
+      !checks = checks + 3
+    }
+  };
+  assert(checks == 144);
+  print_string(
+    "Value-cache probe passed " + checks.toString() + " differential cases",
+  )
+}

@@ -1,5 +1,16 @@
 # Conditional simplification implementation
 
+Current overnight work (2026-11-10): continue the rewrite, benchmark the completed
+raw path, then SKStore if near parity; otherwise optimize this port's representations.
+The user requires stopping before any Skip compiler/runtime change. Eight resumed
+rewrites now pass 1,058 focused differential cases; 30 frame rewrites are validated,
+167 observed frames remain. See the current section of [REWRITE_PLAN.md](REWRITE_PLAN.md)
+and the [eighth audit](provenance/rewrite-batches/2026-11-10-wave-08.json).
+Vibe is currently idle after connection failures and smaller-pool timeouts. Codex
+implementation/review and the serialized compiler queue continue. Ramp Vibe back
+toward ten only when completed requests show reliability. The following restart
+notes preserve historical allocation, not a claim that those workers still run.
+
 The user resumed on 2026-11-09. An initial Mistral Large worker produced an
 unvalidated draft, then failed with HTTP 503 `Service unavailable`, not confirmed
 quota exhaustion. The user then selected GLM-5.3 and requested ten instances

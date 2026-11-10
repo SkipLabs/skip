@@ -1,0 +1,159 @@
+module L4_Lean_Meta_DiscrTree_Main;
+
+// Type-directed addition checks its selected type before examining the offset payload.
+fun f_offsetWithNatType(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  typeArgument: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  checked = f_Meta_DiscrTree_isNatType_05222d4a8e(
+    runtime,
+    typeArgument,
+    metaContext,
+    metaStateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  leanTag(checked) match {
+  | LeanTag.EST_Out_error -> return checked
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(leanField(checked, 0)) match {
+  | LeanTag.Bool_false -> return checked
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  lastArgument = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(
+    runtime,
+    expression,
+  );
+  numeral: LeanValue = f_Meta_DiscrTree_isNumeral_e955d5d959(
+    runtime,
+    lastArgument,
+  );
+  LeanCtor(LeanTag.EST_Out_ok, Array[numeral, leanField(checked, 1)])
+}
+
+fun f_Meta_DiscrTree_isOffset_ea967cc398(
+  runtime: mutable LeanExecution,
+  functionName: LeanValue,
+  expression: LeanValue,
+  metaContext: LeanValue,
+  metaStateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  natAdd = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Nat"),
+    LeanText("add"),
+  );
+  if (
+    leanIsTrue(
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, functionName, natAdd),
+    ) &&
+    leanNat(
+      L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, expression),
+    ) ==
+      LeanNat::fromInt(2)
+  ) {
+    lastArgument = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(
+      runtime,
+      expression,
+    );
+    numeral: LeanValue = f_Meta_DiscrTree_isNumeral_e955d5d959(
+      runtime,
+      lastArgument,
+    );
+    return LeanCtor(LeanTag.EST_Out_ok, Array[numeral, world])
+  };
+  add = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Add"),
+    LeanText("add"),
+  );
+  if (
+    leanIsTrue(
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, functionName, add),
+    ) &&
+    leanNat(
+      L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, expression),
+    ) ==
+      LeanNat::fromInt(4)
+  ) {
+    typeArgument = L4_Lean_Expr.f_Lean_Expr_getRevArg_587d3ee448(
+      runtime,
+      expression,
+      LeanNatLiterals.n3,
+    );
+    return f_offsetWithNatType(
+      runtime,
+      expression,
+      typeArgument,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  hAdd = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("HAdd"),
+    LeanText("hAdd"),
+  );
+  if (
+    leanIsTrue(
+      L4_Init_Prelude.f_Lean_Name_beq_2965acc154(runtime, functionName, hAdd),
+    ) &&
+    leanNat(
+      L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, expression),
+    ) ==
+      LeanNat::fromInt(6)
+  ) {
+    typeArgument = L4_Lean_Expr.f_Lean_Expr_getRevArg_587d3ee448(
+      runtime,
+      expression,
+      LeanNatLiterals.n4,
+    );
+    return f_offsetWithNatType(
+      runtime,
+      expression,
+      typeArgument,
+      metaContext,
+      metaStateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  successor = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("Nat"),
+    LeanText("succ"),
+  );
+  matches: LeanValue = L4_Init_Prelude.f_Lean_Name_beq_2965acc154(
+    runtime,
+    functionName,
+    successor,
+  );
+  if (!leanIsTrue(matches)) {
+    return LeanCtor(LeanTag.EST_Out_ok, Array[matches, world])
+  };
+  arity = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(
+    runtime,
+    expression,
+  );
+  unary: LeanValue = leanBool(leanNat(arity) == LeanNat::fromInt(1));
+  LeanCtor(LeanTag.EST_Out_ok, Array[unary, world])
+}
+
+module end;

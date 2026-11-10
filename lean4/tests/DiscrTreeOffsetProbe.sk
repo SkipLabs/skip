@@ -1,0 +1,513 @@
+// Typed offset fixtures, exact state comparisons, and independent numeral/error expectations.
+class OffsetCase(
+  label: String,
+  head: LeanValue,
+  expression: LeanValue,
+  expected: Bool,
+  pure: Bool,
+  warm: Bool,
+)
+
+fun offsetApply(
+  runtime: mutable LeanExecution,
+  head: LeanValue,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  result = head;
+  for (argument in arguments) {
+    !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, argument)
+  };
+  result
+}
+
+fun offsetForall(
+  runtime: mutable LeanExecution,
+  domains: Array<LeanValue>,
+  body: LeanValue,
+): LeanValue {
+  result = body;
+  for (offset in Range(0, domains.size())) {
+    !result = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      runtime,
+      LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      domains[domains.size() - offset - 1],
+      result,
+    )
+  };
+  result
+}
+
+fun offsetAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(
+            LeanTag.ConstantVal_mk,
+            Array[name, LeanCtor(LeanTag.List_nil, Array[]), type],
+          ),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun offsetCheck(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  head: LeanValue,
+  expression: LeanValue,
+  coreContext: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  pure: Bool,
+  unchanged: Bool,
+): LeanExecutionCheckpoint {
+  unused = LeanUnavailable(
+    "isOffset pure branch must not inspect Meta/Core roles",
+  );
+  meta = if (pure) unused else state.metaContext;
+  core = if (pure) unused else coreContext;
+  metaRef = if (pure) unused else state.metaStateRef;
+  coreRef = if (pure) unused else state.coreStateRef;
+  oldHead = rewriteProbeCopyInput(head);
+  newHead = rewriteProbeCopyInput(head);
+  oldExpression = rewriteProbeCopyInput(expression);
+  newExpression = rewriteProbeCopyInput(expression);
+  oldMeta = rewriteProbeCopyInput(meta);
+  newMeta = rewriteProbeCopyInput(meta);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  (result, after) = rewriteProbeCompare(
+    label,
+    saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_isOffset_ea967cc398_fallback(
+        runtime,
+        oldHead,
+        oldExpression,
+        oldMeta,
+        metaRef,
+        oldCore,
+        coreRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(head, oldHead));
+      assert(rewriteProbeSameInput(expression, oldExpression));
+      assert(rewriteProbeSameInput(meta, oldMeta));
+      assert(rewriteProbeSameInput(core, oldCore));
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_DiscrTree_Main.f_Meta_DiscrTree_isOffset_ea967cc398(
+        runtime,
+        newHead,
+        newExpression,
+        newMeta,
+        metaRef,
+        newCore,
+        coreRef,
+        world,
+      );
+      assert(rewriteProbeSameInput(head, newHead));
+      assert(rewriteProbeSameInput(expression, newExpression));
+      assert(rewriteProbeSameInput(meta, newMeta));
+      assert(rewriteProbeSameInput(core, newCore));
+      result
+    },
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    leanFail("unexpected offset result: " + label)
+  };
+  assert(native_eq(leanField(result, 1), world) == 0);
+  if (unchanged && native_eq(saved.refs, after.refs) != 0) {
+    leanFail("unexpected offset state: " + label)
+  };
+  after
+}
+
+fun offsetDepthError(
+  runtime: mutable LeanExecution,
+  source: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  tag = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText("runtime"),
+    LeanText("maxRecDepth"),
+  );
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime,
+    LeanCtor(
+      LeanTag.Std_Format_text,
+      Array[
+        LeanText(
+          "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+        ),
+      ],
+    ),
+  );
+  LeanCtor(
+    LeanTag.EST_Out_error,
+    Array[
+      LeanCtor(
+        LeanTag.Exception_error,
+        Array[
+          source,
+          LeanCtor(LeanTag.MessageData_tagged, Array[tag, message]),
+        ],
+      ),
+      world,
+    ],
+  )
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    name = (text: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text));
+    name2 = (first: String, last: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+        runtime,
+        LeanText(first),
+        LeanText(last),
+      );
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    constant = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, id, nil);
+    bound = (index: Int) ->
+      L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(index));
+    apply = (head: LeanValue, args: Array<LeanValue>) ->
+      offsetApply(runtime, head, args);
+    arrow = (domains: Array<LeanValue>, body: LeanValue) ->
+      offsetForall(runtime, domains, body);
+    natName = name("Nat");
+    otherName = name("OffsetOther");
+    nat = constant(natName);
+    other = constant(otherName);
+    typeSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      runtime,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(
+        runtime,
+        LeanCtor(LeanTag.Level_zero__impl, Array[]),
+      ),
+    );
+    zeroName = name2("Nat", "zero");
+    succName = name2("Nat", "succ");
+    natAddName = name2("Nat", "add");
+    addName = name2("Add", "add");
+    hAddName = name2("HAdd", "hAdd");
+    addClassName = name("Add");
+    hAddClassName = name("HAdd");
+    addClass = constant(addClassName);
+    hAddClass = constant(hAddClassName);
+    addNatName = name("offsetAddNat");
+    addOtherName = name("offsetAddOther");
+    hAllName = name("offsetHAllNat");
+    hMiddleName = name("offsetHMiddleNat");
+    hFirstName = name("offsetHFirstNat");
+    hThirdName = name("offsetHThirdNat");
+    addType = arrow(
+      Array[typeSort, apply(addClass, Array[bound(0)]), bound(1), bound(2)],
+      bound(3),
+    );
+    hInstance = apply(hAddClass, Array[bound(2), bound(1), bound(0)]);
+    hAddType = arrow(
+      Array[typeSort, typeSort, typeSort, hInstance, bound(3), bound(3)],
+      bound(3),
+    );
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for ((id, type) in Array[
+      (natName, typeSort),
+      (otherName, typeSort),
+      (zeroName, nat),
+      (succName, arrow(Array[nat], nat)),
+      (natAddName, arrow(Array[nat, nat], nat)),
+      (addClassName, arrow(Array[typeSort], typeSort)),
+      (hAddClassName, arrow(Array[typeSort, typeSort, typeSort], typeSort)),
+      (addName, addType),
+      (hAddName, hAddType),
+      (addNatName, apply(addClass, Array[nat])),
+      (addOtherName, apply(addClass, Array[other])),
+      (hAllName, apply(hAddClass, Array[nat, nat, nat])),
+      (hMiddleName, apply(hAddClass, Array[other, nat, other])),
+      (hFirstName, apply(hAddClass, Array[nat, other, other])),
+      (hThirdName, apply(hAddClass, Array[other, other, nat])),
+    ]) {
+      constants.set(
+        leanNameKey(id),
+        LeanConstantFile(offsetAxiom(id, type), None()),
+      )
+    };
+    localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+      runtime,
+    );
+    nName = name("offsetN");
+    kName = name("offsetK");
+    xName = name("offsetX");
+    yName = name("offsetY");
+    for ((id, type) in Array[
+      (nName, nat),
+      (kName, nat),
+      (xName, other),
+      (yName, other),
+    ]) {
+      !localContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+        runtime,
+        localContext,
+        id,
+        id,
+        type,
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+      )
+    };
+    state = rewriteProbeState(
+      runtime,
+      rewriteProbeEnvironment(runtime, constants.chill()),
+      localContext,
+      "<offset>",
+    );
+    variable = (id: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, id);
+    n = variable(nName);
+    k = variable(kName);
+    x = variable(xName);
+    y = variable(yName);
+    literal = (value: LeanValue) ->
+      L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, value);
+    zero = literal(LeanNatLiterals.n0);
+    seven = literal(leanNatValue(7));
+    huge = literal(
+      leanBoxNat(LeanNat::parse("184467440737095516160000000000000000000")),
+    );
+    successor = (value: LeanValue) -> apply(constant(succName), Array[value]);
+    alias = apply(
+      L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+        runtime,
+        LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+        LeanCtor(LeanTag.BinderInfo_default, Array[]),
+        typeSort,
+        nat,
+      ),
+      Array[other],
+    );
+    addNat = constant(addNatName);
+    addOther = constant(addOtherName);
+    hAll = constant(hAllName);
+    hMiddle = constant(hMiddleName);
+    cases: mutable Vector<OffsetCase> = mutable Vector[];
+    for ((label, value, expected) in Array[
+      ("raw zero", zero, true),
+      ("raw seven", seven, true),
+      ("huge", huge, true),
+      ("Nat.zero", constant(zeroName), true),
+      ("successor", successor(zero), true),
+      ("nested successor", successor(successor(seven)), true),
+      ("nonnumeral", k, false),
+      ("successor of nonnumeral", successor(k), false),
+    ]) {
+      cases.push(
+        OffsetCase(
+          "Nat.add " + label,
+          natAddName,
+          apply(constant(natAddName), Array[n, value]),
+          expected,
+          true,
+          false,
+        ),
+      )
+    };
+    for ((label, head, expression, expected) in Array[
+      ("succ bare", succName, constant(succName), false),
+      ("succ nonnumeral", succName, successor(k), true),
+      ("succ numeral", succName, successor(seven), true),
+      (
+        "succ excess arity boundary",
+        succName,
+        apply(constant(succName), Array[k, seven]),
+        false,
+      ),
+      (
+        "Nat.add partial",
+        natAddName,
+        apply(constant(natAddName), Array[n]),
+        false,
+      ),
+      (
+        "Nat.add excess arity boundary",
+        natAddName,
+        apply(constant(natAddName), Array[n, k, seven]),
+        false,
+      ),
+      (
+        "Add partial",
+        addName,
+        apply(constant(addName), Array[nat, addNat, n]),
+        false,
+      ),
+      (
+        "Add excess arity boundary",
+        addName,
+        apply(constant(addName), Array[nat, addNat, n, k, seven]),
+        false,
+      ),
+      (
+        "HAdd partial",
+        hAddName,
+        apply(constant(hAddName), Array[nat, nat, nat, hAll, n]),
+        false,
+      ),
+      (
+        "HAdd excess arity boundary",
+        hAddName,
+        apply(constant(hAddName), Array[nat, nat, nat, hAll, n, k, seven]),
+        false,
+      ),
+      (
+        "unrelated ignores expression",
+        name("offsetUnrelated"),
+        LeanUnavailable("no arity read permitted"),
+        false,
+      ),
+    ]) cases.push(OffsetCase(label, head, expression, expected, true, false));
+    for ((label, head, arguments, expected, warm) in Array[
+      ("Add Nat", addName, Array[nat, addNat, n, seven], true, false),
+      ("Add Nat nonnumeral", addName, Array[nat, addNat, n, k], false, false),
+      ("Add other", addName, Array[other, addOther, x, y], false, false),
+      ("Add alias", addName, Array[alias, addNat, n, seven], true, true),
+      (
+        "HAdd all Nat",
+        hAddName,
+        Array[nat, nat, nat, hAll, n, seven],
+        true,
+        false,
+      ),
+      (
+        "HAdd middle-only Nat",
+        hAddName,
+        Array[other, nat, other, hMiddle, x, seven],
+        true,
+        false,
+      ),
+      (
+        "HAdd first-only Nat",
+        hAddName,
+        Array[nat, other, other, constant(hFirstName), n, y],
+        false,
+        false,
+      ),
+      (
+        "HAdd third-only Nat",
+        hAddName,
+        Array[other, other, nat, constant(hThirdName), x, y],
+        false,
+        false,
+      ),
+      (
+        "HAdd nonnumeral",
+        hAddName,
+        Array[other, nat, other, hMiddle, x, k],
+        false,
+        false,
+      ),
+      (
+        "HAdd alias",
+        hAddName,
+        Array[other, alias, other, hMiddle, x, seven],
+        true,
+        true,
+      ),
+    ]) {
+      cases.push(
+        OffsetCase(
+          label,
+          head,
+          apply(constant(head), arguments),
+          expected,
+          false,
+          warm,
+        ),
+      )
+    };
+    allCases = cases.toArray();
+    assert(allCases.size() == 29);
+    limited = leanReplaceField(
+      leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1),
+      0,
+      leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1),
+    );
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      for (example in allCases) {
+        expected: LeanValue = LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[leanBool(example.expected), world],
+        );
+        after = offsetCheck(
+          example.label,
+          state.saved,
+          state,
+          example.head,
+          example.expression,
+          state.coreContext,
+          world,
+          expected,
+          example.pure,
+          example.pure,
+        );
+        !checks = checks + 1;
+        if (example.warm) {
+          assert(native_eq(state.saved.refs, after.refs) != 0);
+          _warm = offsetCheck(
+            example.label + " warm",
+            after,
+            state,
+            example.head,
+            example.expression,
+            state.coreContext,
+            world,
+            expected,
+            false,
+            true,
+          );
+          !checks = checks + 1
+        }
+      };
+      for ((head, arguments) in Array[
+        (addName, Array[alias, addNat, n, seven]),
+        (addName, Array[alias, addNat, n, k]),
+        (hAddName, Array[other, alias, other, hMiddle, x, seven]),
+        (hAddName, Array[other, alias, other, hMiddle, x, k]),
+      ]) {
+        _error = offsetCheck(
+          "type error before numeral check",
+          state.saved,
+          state,
+          head,
+          apply(constant(head), arguments),
+          limited,
+          world,
+          offsetDepthError(runtime, leanField(limited, 2), world),
+          false,
+          true,
+        );
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(checks == 140);
+  print_string(
+    "Offset recognition passed " + checks.toString() + " comparisons",
+  )
+}

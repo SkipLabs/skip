@@ -1,0 +1,67 @@
+module L4_Lean_Expr;
+
+// "_private.Lean.Expr.0.Lean.Expr.etaExpandedBody"
+// Peel the requested bvar applications and return a closed residual.
+fun f_Lean_Expr_etaExpandedBody_830d1175cd(
+  _runtime: mutable LeanExecution,
+  expression: LeanValue,
+  remainingArguments: LeanValue,
+  nextIndex: LeanValue,
+): LeanValue {
+  residual = expression;
+  remaining = remainingArguments;
+  expectedIndex = nextIndex;
+  loop {
+    exhausted = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+      _runtime,
+      remaining,
+      LeanNatLiterals.n0,
+    );
+    leanTag(exhausted) match {
+    | LeanTag.Bool_true ->
+      hasLoose = f_Lean_Expr_hasLooseBVars_25b8fd0e1a(_runtime, residual);
+      leanTag(hasLoose) match {
+      | LeanTag.Bool_false ->
+        return LeanCtor(LeanTag.Option_some, Array[residual])
+      | LeanTag.Bool_true -> return LeanCtor(LeanTag.Option_none, Array[])
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.Bool_false ->
+      leanTag(residual) match {
+      | LeanTag.Expr_app__impl ->
+        appFn = leanField(residual, 1);
+        appArg = leanField(residual, 2);
+        leanTag(appArg) match {
+        | LeanTag.Expr_bvar__impl ->
+          argIndex = leanField(appArg, 1);
+          matches = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+            _runtime,
+            argIndex,
+            expectedIndex,
+          );
+          leanTag(matches) match {
+          | LeanTag.Bool_true ->
+            !remaining = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+              _runtime,
+              remaining,
+              LeanNatLiterals.n1,
+            );
+            !expectedIndex = L4_Init_Prelude.f_Nat_add_86990f4822(
+              _runtime,
+              expectedIndex,
+              LeanNatLiterals.n1,
+            );
+            !residual = appFn
+          | LeanTag.Bool_false -> return LeanCtor(LeanTag.Option_none, Array[])
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return LeanCtor(LeanTag.Option_none, Array[])
+        }
+      | _ -> return LeanCtor(LeanTag.Option_none, Array[])
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  }
+}
+
+module end;

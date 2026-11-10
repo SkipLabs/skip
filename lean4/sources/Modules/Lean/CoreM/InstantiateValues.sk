@@ -1,0 +1,192 @@
+module L4_Lean_CoreM;
+
+// Instantiate declaration values and retain the latest universe substitution per name.
+
+fun f_cachedInstantiatedValue(
+  runtime: mutable LeanExecution,
+  instLevelValue: LeanValue,
+  constantName: LeanValue,
+  requestedLevels: LeanValue,
+): ?LeanValue {
+  found = f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    runtime,
+    instLevelValue,
+    constantName,
+  );
+  leanTag(found) match {
+  | LeanTag.Option_some ->
+    entry = leanField(found, 0);
+    if (leanTag(entry) != LeanTag.Prod_mk) {
+      leanFail("non-exhaustive Lean case")
+    };
+    storedLevels = leanField(entry, 0);
+    storedExpr = leanField(entry, 1);
+    levelsMatch = f_Core_instantiateTypeLevelParams_spec_2_3e3e102607(
+      runtime,
+      requestedLevels,
+      storedLevels,
+    );
+    leanTag(levelsMatch) match {
+    | LeanTag.Bool_true -> Some(storedExpr)
+    | LeanTag.Bool_false -> None()
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> None()
+  }
+}
+
+fun f_Lean_Core_instantiateValueLevelParams_f93716788b(
+  runtime: mutable LeanExecution,
+  constant: LeanValue,
+  requestedLevels: LeanValue,
+  allowOpaque: LeanValue,
+  context: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  readState = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreStateRef,
+    world,
+  );
+  if (leanTag(readState) != LeanTag.ST_Out_mk) {
+    leanFail("non-exhaustive Lean case")
+  };
+  coreState = leanField(readState, 0);
+  worldAfterRead = leanField(readState, 1);
+  coreCache = leanTag(coreState) match {
+  | LeanTag.Core_State_mk -> leanField(coreState, 5)
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  instLevelValueCache = leanTag(coreCache) match {
+  | LeanTag.Core_Cache_mk -> leanField(coreCache, 1)
+  | _ -> leanFail("non-exhaustive Lean case")
+  };
+  constantName = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(
+    runtime,
+    constant,
+  );
+  cacheHit = f_cachedInstantiatedValue(
+    runtime,
+    instLevelValueCache,
+    constantName,
+    requestedLevels,
+  );
+  cacheHit match {
+  | Some(value) -> LeanCtor(LeanTag.EST_Out_ok, Array[value, worldAfterRead])
+  | None() ->
+    hasValue = L4_Lean_Declaration.f_Lean_ConstantInfo_hasValue_1c71df3b04(
+      runtime,
+      constant,
+      allowOpaque,
+    );
+    leanTag(hasValue) match {
+    | LeanTag.Bool_true ->
+      instantiatedValue = L4_Lean_Environment.f_Lean_ConstantInfo_instantiateValueLevelParams_8b04a88118(
+        runtime,
+        constant,
+        requestedLevels,
+        allowOpaque,
+      );
+      taken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+        runtime,
+        LeanErased(),
+        LeanErased(),
+        coreStateRef,
+        worldAfterRead,
+      );
+      if (leanTag(taken) != LeanTag.ST_Out_mk) {
+        leanFail("non-exhaustive Lean case")
+      };
+      takenCoreState = leanField(taken, 0);
+      worldAfterTake = leanField(taken, 1);
+      currentCache = leanTag(takenCoreState) match {
+      | LeanTag.Core_State_mk -> leanField(takenCoreState, 5)
+      | _ -> leanFail("non-exhaustive Lean case")
+      };
+      if (leanTag(currentCache) != LeanTag.Core_Cache_mk) {
+        leanFail("non-exhaustive Lean case")
+      };
+      instLevelType = leanField(currentCache, 0);
+      oldInstLevelValue = leanField(currentCache, 1);
+      newInstLevelValue = f_Core_instantiateTypeLevelParams_spec_0_7566395d10(
+        runtime,
+        oldInstLevelValue,
+        constantName,
+        LeanCtor(LeanTag.Prod_mk, Array[requestedLevels, instantiatedValue]),
+      );
+      newCache = LeanCtor(
+        LeanTag.Core_Cache_mk,
+        Array[instLevelType, newInstLevelValue],
+      );
+      newState = LeanCtor(
+        LeanTag.Core_State_mk,
+        Array[
+          leanField(takenCoreState, 0),
+          leanField(takenCoreState, 1),
+          leanField(takenCoreState, 2),
+          leanField(takenCoreState, 3),
+          leanField(takenCoreState, 4),
+          newCache,
+          leanField(takenCoreState, 6),
+          leanField(takenCoreState, 7),
+          leanField(takenCoreState, 8),
+          leanField(takenCoreState, 9),
+        ],
+      );
+      putState = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+        runtime,
+        LeanErased(),
+        LeanErased(),
+        coreStateRef,
+        newState,
+        worldAfterTake,
+      );
+      leanTag(putState) match {
+      | LeanTag.ST_Out_mk ->
+        LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[instantiatedValue, leanField(putState, 1)],
+        )
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.Bool_false ->
+      message = LeanCtor(
+        LeanTag.MessageData_compose,
+        Array[
+          L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+            runtime,
+            LeanText("Not a definition or theorem: "),
+          ),
+          L4_Lean_Message.f_Lean_MessageData_ofConstName_ea14939c45(
+            runtime,
+            constantName,
+            hasValue,
+          ),
+        ],
+      );
+      thrown = f_Core_instantiateValueLevelParams_spec_0_3f209b9321(
+        runtime,
+        message,
+        context,
+        coreStateRef,
+        worldAfterRead,
+      );
+      leanTag(thrown) match {
+      | LeanTag.EST_Out_error ->
+        LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(thrown, 0), leanField(thrown, 1)],
+        )
+      | LeanTag.EST_Out_ok ->
+        leanFail("unreachable: Lean.Core.instantiateValueLevelParams")
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  }
+}
+
+module end;

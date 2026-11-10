@@ -1,0 +1,569 @@
+// Independent differential and reference-state probe for etaExpandedBody.
+// This file uses the copy/equality helpers in tests/Support/RewriteProbe.sk.
+fun probeOptionSome(payload: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Option_some, Array[payload])
+}
+
+fun probeOptionNone(): LeanValue {
+  LeanCtor(LeanTag.Option_none, Array[])
+}
+
+fun probeBigNat(text: String): LeanValue {
+  // Arbitrary-precision Nat literal via the runtime parser (Nat.sk support).
+  LeanNatural(LeanNat::parse(text))
+}
+
+fun probeAssertEq(actual: LeanValue, expected: LeanValue, label: String): void {
+  if (native_eq(actual, expected) != 0) {
+    leanFail("probe equality failure: " + label)
+  }
+}
+
+fun probeAssertSameObject(
+  actual: LeanValue,
+  expected: LeanValue,
+  label: String,
+): void {
+  if (leanSameObject(actual, expected) == 0) {
+    leanFail("probe identity failure: " + label)
+  }
+}
+
+fun probeBvar(runtime: mutable LeanExecution, n: Int): LeanValue {
+  L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, leanNatValue(n))
+}
+
+fun probeApp(
+  runtime: mutable LeanExecution,
+  f: LeanValue,
+  a: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, f, a)
+}
+
+// One case = (expr, remainingArguments, nextIndex, expectedOption,
+// residualSentinel, label). residualSentinel is the exact residual object
+// for expected-some cases and a LeanErased placeholder for none cases.
+fun probeRunCase(
+  runtime: mutable LeanExecution,
+  entry: (LeanValue, LeanValue, LeanValue, LeanValue, LeanValue, String),
+): LeanValue {
+  expr = entry.i0;
+  remaining = entry.i1;
+  startIndex = entry.i2;
+  expected = entry.i3;
+  residual = entry.i4;
+  label = entry.i5;
+  saved = runtime.checkpoint();
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  repeatRuntime = saved.restoreRaw();
+  oldInput = rewriteProbeCopyInput(expr);
+  newInput = rewriteProbeCopyInput(expr);
+  repeatInput = rewriteProbeCopyInput(expr);
+  oracle = L4_Lean_Expr.f_Lean_Expr_etaExpandedBody_830d1175cd_fallback(
+    oldRuntime,
+    expr,
+    remaining,
+    startIndex,
+  );
+  if (!rewriteProbeSameInput(expr, oldInput)) {
+    leanFail("fallback mutated input: " + label)
+  };
+  if (native_eq(saved.refs, oldRuntime.checkpoint().refs) != 0) {
+    leanFail("fallback changed runtime references: " + label)
+  };
+  canonical = L4_Lean_Expr.f_Lean_Expr_etaExpandedBody_830d1175cd(
+    newRuntime,
+    expr,
+    remaining,
+    startIndex,
+  );
+  if (!rewriteProbeSameInput(expr, newInput)) {
+    leanFail("replacement mutated input: " + label)
+  };
+  if (native_eq(saved.refs, newRuntime.checkpoint().refs) != 0) {
+    leanFail("replacement changed runtime references: " + label)
+  };
+  canonicalRepeat = L4_Lean_Expr.f_Lean_Expr_etaExpandedBody_830d1175cd(
+    repeatRuntime,
+    expr,
+    remaining,
+    startIndex,
+  );
+  if (!rewriteProbeSameInput(expr, repeatInput)) {
+    leanFail("repeat call mutated input: " + label)
+  };
+  if (native_eq(saved.refs, repeatRuntime.checkpoint().refs) != 0) {
+    leanFail("repeat call changed runtime references: " + label)
+  };
+  probeAssertEq(canonical, expected, "expected-" + label);
+  probeAssertEq(canonicalRepeat, canonical, "determinism-" + label);
+  probeAssertEq(oracle, canonical, "oracle-" + label);
+  leanTag(canonical) match {
+  | LeanTag.Option_some ->
+    probeAssertSameObject(
+      leanField(canonical, 0),
+      residual,
+      "replacement-identity-" + label,
+    );
+    probeAssertSameObject(
+      leanField(oracle, 0),
+      residual,
+      "fallback-identity-" + label,
+    );
+    void
+  | LeanTag.Option_none -> void
+  | _ -> leanFail("probe result is not an Option: " + label)
+  };
+  canonical
+}
+
+fun main(): void {
+  builder = mutable LeanExecution{};
+  levelZero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  xName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("x"));
+  fName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("f"));
+  gName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("g"));
+  pairName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    builder,
+    LeanText("Pair"),
+  );
+  marker = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    builder,
+    LeanText("marker"),
+  );
+  implicitBinder = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+  listNil = LeanCtor(LeanTag.List_nil, Array[]);
+  metadataList = LeanCtor(
+    LeanTag.List_cons,
+    Array[
+      LeanCtor(
+        LeanTag.Prod_mk,
+        Array[
+          marker,
+          LeanCtor(LeanTag.DataValue_ofNat, Array[leanNatValue(7)]),
+        ],
+      ),
+      listNil,
+    ],
+  );
+  sortZero = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, levelZero);
+  fx = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, fName);
+  fy = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, gName);
+  bvar0 = probeBvar(builder, 0);
+  bvar1 = probeBvar(builder, 1);
+  bvar2 = probeBvar(builder, 2);
+  openBvar = probeBvar(builder, 3);
+  looseBvar = probeBvar(builder, 5);
+  appFxFy = probeApp(builder, fx, fy);
+  appLooseArg = probeApp(builder, fx, bvar0);
+  appWrongIndex = probeApp(builder, fx, bvar1);
+  lamLoose = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    xName,
+    implicitBinder,
+    sortZero,
+    probeApp(builder, fx, looseBvar),
+  );
+  lamBound = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    xName,
+    implicitBinder,
+    sortZero,
+    probeApp(builder, fx, bvar0),
+  );
+  peelLam = probeApp(builder, lamBound, bvar0);
+  spineTwoDeep = probeApp(builder, probeApp(builder, fx, bvar1), bvar0);
+  spineThree = probeApp(
+    builder,
+    probeApp(builder, probeApp(builder, fx, bvar2), bvar1),
+    bvar0,
+  );
+  spineTwoMismatch = probeApp(builder, probeApp(builder, fx, bvar2), bvar0);
+  // Expr supports bvars only through 1048575. Keep expression indices valid;
+  // use larger Nats only as counters/starting indices for mismatch checks.
+  bigIndex = probeBigNat("1048573");
+  bigIndexNext = probeBigNat("1048574");
+  hugeIndex = probeBigNat("18446744073709551621");
+  hugeCount = probeBigNat("1180591620717411303431");
+  bigCount = probeBigNat("18446744073709551618");
+  bvarBig = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, bigIndex);
+  bvarBigNext = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, bigIndexNext);
+  appBigIndex = probeApp(builder, sortZero, looseBvar);
+  appMaxIndex = probeApp(builder, sortZero, bvarBig);
+  appBigIndexTail = probeApp(
+    builder,
+    probeApp(builder, fx, bvarBigNext),
+    bvarBig,
+  );
+  mdataAppLoose = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    metadataList,
+    appLooseArg,
+  );
+  mdataSort = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    metadataList,
+    sortZero,
+  );
+  mdataBvar = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    metadataList,
+    bvar0,
+  );
+  mdataFy = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadataList, fy);
+  appMdataBvar = probeApp(builder, fx, mdataBvar);
+  appMdataFy = probeApp(builder, fx, mdataFy);
+  appMdataSort = probeApp(builder, mdataSort, bvar0);
+  lamDeepLoose = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    xName,
+    implicitBinder,
+    sortZero,
+    probeApp(builder, bvar2, bvar0),
+  );
+  appLamDeepLoose = probeApp(builder, lamDeepLoose, bvar0);
+  letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    builder,
+    xName,
+    sortZero,
+    fx,
+    fy,
+    leanBool(true),
+  );
+  appLet = probeApp(builder, letExpr, bvar0);
+  projExpr = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(
+    builder,
+    pairName,
+    leanNatValue(0),
+    lamBound,
+  );
+  appProj = probeApp(builder, projExpr, bvar0);
+  appResidualApp = probeApp(builder, appFxFy, bvar0);
+  expectedNone = probeOptionNone();
+  erased = LeanErased();
+  cases = Array[
+    (
+      sortZero,
+      leanNatValue(0),
+      leanNatValue(0),
+      probeOptionSome(sortZero),
+      sortZero,
+      "zero-count-closed-sort",
+    ),
+    (
+      appFxFy,
+      leanNatValue(0),
+      leanNatValue(0),
+      probeOptionSome(appFxFy),
+      appFxFy,
+      "zero-count-closed-app",
+    ),
+    (
+      openBvar,
+      leanNatValue(0),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "zero-count-open-bvar",
+    ),
+    (
+      appLooseArg,
+      leanNatValue(0),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "zero-count-app-loose-arg",
+    ),
+    (
+      lamLoose,
+      leanNatValue(0),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "zero-count-lam-loose-body",
+    ),
+    (
+      lamBound,
+      leanNatValue(0),
+      leanNatValue(0),
+      probeOptionSome(lamBound),
+      lamBound,
+      "zero-count-closed-lam",
+    ),
+    (
+      peelLam,
+      leanNatValue(1),
+      leanNatValue(0),
+      probeOptionSome(lamBound),
+      lamBound,
+      "peel-one-lam-residual",
+    ),
+    (
+      spineThree,
+      leanNatValue(3),
+      leanNatValue(0),
+      probeOptionSome(fx),
+      fx,
+      "peel-three-index-succession",
+    ),
+    (
+      spineTwoDeep,
+      leanNatValue(2),
+      leanNatValue(0),
+      probeOptionSome(fx),
+      fx,
+      "peel-two-deep",
+    ),
+    (
+      appWrongIndex,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "peel-index-mismatch",
+    ),
+    (
+      appLooseArg,
+      leanNatValue(1),
+      leanNatValue(5),
+      expectedNone,
+      erased,
+      "peel-nextindex-mismatch",
+    ),
+    (
+      spineTwoMismatch,
+      leanNatValue(2),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "peel-second-level-mismatch",
+    ),
+    (
+      appLooseArg,
+      leanNatValue(2),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "too-short-spine",
+    ),
+    (
+      appFxFy,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "nonbvar-arg-positive-count",
+    ),
+    (
+      sortZero,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "nonapp-positive-count",
+    ),
+    (
+      sortZero,
+      hugeCount,
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "huge-count-nonapp-fails-fast",
+    ),
+    (
+      appWrongIndex,
+      hugeCount,
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "huge-count-first-arg-mismatch",
+    ),
+    (
+      spineTwoDeep,
+      bigCount,
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "huge-count-short-spine",
+    ),
+    (
+      appBigIndex,
+      leanNatValue(1),
+      leanNatValue(5),
+      probeOptionSome(sortZero),
+      sortZero,
+      "valid-bvar5-match",
+    ),
+    (
+      appMaxIndex,
+      leanNatValue(1),
+      bigIndex,
+      probeOptionSome(sortZero),
+      sortZero,
+      "largest-valid-one-peel",
+    ),
+    (
+      appBigIndex,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "valid-bvar5-mismatch-zero",
+    ),
+    (
+      appBigIndex,
+      leanNatValue(1),
+      hugeIndex,
+      expectedNone,
+      erased,
+      "huge-start-must-not-wrap-to-bvar5",
+    ),
+    (
+      appBigIndexTail,
+      leanNatValue(2),
+      bigIndex,
+      probeOptionSome(fx),
+      fx,
+      "big-index-two-peel-arithmetic",
+    ),
+    (
+      mdataAppLoose,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "mdata-head-not-peeled",
+    ),
+    (
+      mdataAppLoose,
+      leanNatValue(0),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "mdata-head-zero-count-open",
+    ),
+    (
+      mdataSort,
+      leanNatValue(0),
+      leanNatValue(0),
+      probeOptionSome(mdataSort),
+      mdataSort,
+      "mdata-head-zero-count-closed",
+    ),
+    (
+      appMdataBvar,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "mdata-arg-blocks-peel",
+    ),
+    (
+      appMdataBvar,
+      leanNatValue(0),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "mdata-arg-zero-count-open",
+    ),
+    (
+      appMdataFy,
+      leanNatValue(0),
+      leanNatValue(0),
+      probeOptionSome(appMdataFy),
+      appMdataFy,
+      "mdata-arg-zero-count-closed",
+    ),
+    (
+      appMdataSort,
+      leanNatValue(1),
+      leanNatValue(0),
+      probeOptionSome(mdataSort),
+      mdataSort,
+      "mdata-residual-identity",
+    ),
+    (
+      appLamDeepLoose,
+      leanNatValue(1),
+      leanNatValue(0),
+      expectedNone,
+      erased,
+      "residual-loose-under-binders",
+    ),
+    (
+      appLet,
+      leanNatValue(1),
+      leanNatValue(0),
+      probeOptionSome(letExpr),
+      letExpr,
+      "let-residual-identity",
+    ),
+    (
+      appProj,
+      leanNatValue(1),
+      leanNatValue(0),
+      probeOptionSome(projExpr),
+      projExpr,
+      "proj-residual-identity",
+    ),
+    (
+      appResidualApp,
+      leanNatValue(1),
+      leanNatValue(0),
+      probeOptionSome(appFxFy),
+      appFxFy,
+      "peel-residual-app",
+    ),
+  ];
+  count = 0;
+  for (profile in Array[false, true]) {
+    caseRuntime = mutable LeanExecution{profileRuntime => profile};
+    _ = caseRuntime.newRef(LeanArray(Array[leanNatValue(37)]));
+    for (entry in cases) {
+      _ = probeRunCase(caseRuntime, entry);
+      !count = count + 1
+    }
+  };
+  // Deep structural immutability: rebuild the most ornamented fixtures from
+  // fresh builder calls and demand exact equality with the probed originals.
+  rebuiltLam = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+    builder,
+    xName,
+    implicitBinder,
+    sortZero,
+    probeApp(builder, fx, bvar0),
+  );
+  probeAssertEq(rebuiltLam, lamBound, "rebuild-lam-bound");
+  rebuiltSpine = probeApp(
+    builder,
+    probeApp(builder, probeApp(builder, fx, bvar2), bvar1),
+    bvar0,
+  );
+  probeAssertEq(rebuiltSpine, spineThree, "rebuild-three-spine");
+  rebuiltBigBvar = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, bigIndex);
+  probeAssertEq(rebuiltBigBvar, bvarBig, "rebuild-big-bvar");
+  rebuiltMdata = L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(
+    builder,
+    metadataList,
+    sortZero,
+  );
+  probeAssertEq(rebuiltMdata, mdataSort, "rebuild-mdata");
+  rebuiltLet = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(
+    builder,
+    xName,
+    sortZero,
+    fx,
+    fy,
+    leanBool(true),
+  );
+  probeAssertEq(rebuiltLet, letExpr, "rebuild-let");
+  healthSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, levelZero);
+  probeAssertEq(healthSort, sortZero, "runtime-health");
+  print_string(
+    "etaExpandedBody probe complete: " +
+      count.toString() +
+      " profile/case runs (34 cases × 2 profiles)",
+  )
+}

@@ -1,0 +1,849 @@
+// Core type-cache substitution, hit priority, and isolated state checks.
+class CoreInstProbeCase(
+  label: String,
+  declared: LeanValue,
+  levels: LeanValue,
+  expected: LeanValue,
+  previous: LeanValue,
+  rewrites: Bool,
+)
+
+fun coreInstProbeLevels(levels: Array<LeanValue>): LeanValue {
+  result = LeanCtor(LeanTag.List_nil, Array[]);
+  for (offset in Range(0, levels.size())) {
+    !result = LeanCtor(
+      LeanTag.List_cons,
+      Array[levels[levels.size() - offset - 1], result],
+    )
+  };
+  result
+}
+
+fun coreInstProbeConstantVal(
+  constantName: LeanValue,
+  levelParams: LeanValue,
+  type: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.ConstantVal_mk, Array[constantName, levelParams, type])
+}
+
+// Intentional negative short-circuit fixture: the cached name carries an
+// unusable type payload. A cache hit must return the cached expression without
+// inspecting it; any recomputation would trap on the sentinel.
+fun coreInstProbeSentinelVal(
+  constantName: LeanValue,
+  levelParams: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantVal_mk,
+    Array[
+      constantName,
+      levelParams,
+      LeanUnavailable(
+        "cache hit must not inspect the ConstantVal type payload",
+      ),
+    ],
+  )
+}
+
+fun coreInstProbeEntryValue(
+  levels: LeanValue,
+  expression: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.Prod_mk, Array[levels, expression])
+}
+
+fun coreInstProbeAxiomInfo(
+  axiomName: LeanValue,
+  levelParams: LeanValue,
+  type: LeanValue,
+): LeanValue {
+  LeanCtor(
+    LeanTag.ConstantInfo_axiomInfo,
+    Array[
+      LeanCtor(
+        LeanTag.AxiomVal_mk,
+        Array[
+          LeanCtor(LeanTag.ConstantVal_mk, Array[axiomName, levelParams, type]),
+          leanBool(false),
+        ],
+      ),
+    ],
+  )
+}
+
+fun coreInstProbeSort(
+  runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, level)
+}
+
+fun coreInstProbeSucc(
+  runtime: mutable LeanExecution,
+  level: LeanValue,
+): LeanValue {
+  L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, level)
+}
+
+fun coreInstProbeParam(
+  runtime: mutable LeanExecution,
+  paramName: LeanValue,
+): LeanValue {
+  L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, paramName)
+}
+
+fun coreInstProbeConst(
+  runtime: mutable LeanExecution,
+  constantName: LeanValue,
+  levels: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, constantName, levels)
+}
+
+fun coreInstProbeForall(
+  runtime: mutable LeanExecution,
+  domain: LeanValue,
+  body: LeanValue,
+): LeanValue {
+  L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+    runtime,
+    LeanCtor(LeanTag.Name_anonymous__impl, Array[]),
+    LeanCtor(LeanTag.BinderInfo_default, Array[]),
+    domain,
+    body,
+  )
+}
+
+fun coreInstProbeTypeCacheEntry(
+  runtime: mutable LeanExecution,
+  state: LeanValue,
+  constantName: LeanValue,
+  levels: LeanValue,
+  expression: LeanValue,
+  label: String,
+): void {
+  typeCache = leanField(leanField(state, 5), 0);
+  found = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    runtime,
+    typeCache,
+    constantName,
+  );
+  if (leanTag(found) != LeanTag.Option_some) {
+    leanFail("type cache entry missing: " + label)
+  };
+  entry = leanField(found, 0);
+  assert(leanTag(entry) == LeanTag.Prod_mk);
+  if (!rewriteProbeSameInput(leanField(entry, 0), levels)) {
+    leanFail("type cache levels mismatch: " + label)
+  };
+  if (!rewriteProbeSameInput(leanField(entry, 1), expression)) {
+    leanFail("type cache expression mismatch: " + label)
+  }
+}
+
+fun coreInstProbeValueCacheEmpty(
+  runtime: mutable LeanExecution,
+  state: LeanValue,
+  constantName: LeanValue,
+  label: String,
+): void {
+  valueCache = leanField(leanField(state, 5), 1);
+  found = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    runtime,
+    valueCache,
+    constantName,
+  );
+  if (leanTag(found) != LeanTag.Option_none) {
+    leanFail("instLevelValue cache unexpectedly populated: " + label)
+  }
+}
+
+// Everything outside Core.State field 5 subfield 0 must survive a cache
+// update: fields 0..4 and 6..9 plus the sibling instLevelValue map.
+fun coreInstProbeUnrelatedFieldsUnchanged(
+  before: LeanValue,
+  after: LeanValue,
+  label: String,
+): void {
+  for (field in Array[0, 1, 2, 3, 4, 6, 7, 8, 9]) {
+    if (
+      !rewriteProbeSameInput(leanField(before, field), leanField(after, field))
+    ) {
+      leanFail("unrelated Core.State field changed: " + label)
+    }
+  };
+  if (
+    !rewriteProbeSameInput(
+      leanField(leanField(before, 5), 1),
+      leanField(leanField(after, 5), 1),
+    )
+  ) {
+    leanFail("instLevelValue cache changed: " + label)
+  }
+}
+
+fun coreInstProbeCall(
+  probe: CoreInstProbeCase,
+  saved: LeanExecutionCheckpoint,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): (LeanValue, LeanExecutionCheckpoint) {
+  label = probe.label;
+  assert(leanTag(probe.declared) == LeanTag.ConstantVal_mk);
+  oldDeclared = rewriteProbeCopyInput(probe.declared);
+  newDeclared = rewriteProbeCopyInput(probe.declared);
+  oldLevels = rewriteProbeCopyInput(probe.levels);
+  newLevels = rewriteProbeCopyInput(probe.levels);
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldState = oldRuntime.readRef(coreStateRef);
+  newState = newRuntime.readRef(coreStateRef);
+  assert(leanTag(oldState) == LeanTag.Core_State_mk);
+  assert(leanTag(leanField(oldState, 5)) == LeanTag.Core_Cache_mk);
+  if (!rewriteProbeSameInput(oldState, newState)) {
+    leanFail("pre-call Core.State diverged: " + label)
+  };
+  constantName = leanField(probe.declared, 0);
+  previousEntry = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+    oldRuntime,
+    leanField(leanField(oldState, 5), 0),
+    constantName,
+  );
+  leanTag(probe.previous) match {
+  | LeanTag.Option_some ->
+    assert(leanTag(previousEntry) == LeanTag.Option_some);
+    if (
+      !rewriteProbeSameInput(
+        leanField(previousEntry, 0),
+        leanField(probe.previous, 0),
+      )
+    ) {
+      leanFail("pre-call cache entry mismatch: " + label)
+    }
+  | LeanTag.Option_none ->
+    if (leanTag(previousEntry) != LeanTag.Option_none) {
+      leanFail("pre-call cache entry unexpectedly present: " + label)
+    }
+  | _ -> leanFail("invalid previous entry fixture: " + label)
+  };
+  oldResult = L4_Lean_CoreM.f_Lean_Core_instantiateTypeLevelParams_f6c933c2c6_fallback(
+    oldRuntime,
+    oldDeclared,
+    oldLevels,
+    coreStateRef,
+    world,
+  );
+  newResult = L4_Lean_CoreM.f_Lean_Core_instantiateTypeLevelParams_f6c933c2c6(
+    newRuntime,
+    newDeclared,
+    newLevels,
+    coreStateRef,
+    world,
+  );
+  if (native_eq(oldResult, newResult) != 0) {
+    leanFail("canonical and fallback results diverged: " + label)
+  };
+  for (result in Array[oldResult, newResult]) {
+    assert(leanTag(result) == LeanTag.EST_Out_ok);
+    if (!rewriteProbeSameInput(leanField(result, 0), probe.expected)) {
+      leanFail("instantiated type mismatch: " + label)
+    };
+    if (!rewriteProbeSameInput(leanField(result, 1), world)) {
+      leanFail("returned world mismatch: " + label)
+    }
+  };
+  oldAfter = oldRuntime.readRef(coreStateRef);
+  newAfter = newRuntime.readRef(coreStateRef);
+  assert(leanTag(oldAfter) == LeanTag.Core_State_mk);
+  assert(leanTag(leanField(oldAfter, 5)) == LeanTag.Core_Cache_mk);
+  if (native_eq(oldAfter, newAfter) != 0) {
+    leanFail("post-call Core.State diverged: " + label)
+  };
+  coreInstProbeTypeCacheEntry(
+    oldRuntime,
+    oldAfter,
+    constantName,
+    probe.levels,
+    probe.expected,
+    label,
+  );
+  coreInstProbeTypeCacheEntry(
+    newRuntime,
+    newAfter,
+    constantName,
+    probe.levels,
+    probe.expected,
+    label,
+  );
+  coreInstProbeValueCacheEmpty(oldRuntime, oldAfter, constantName, label);
+  coreInstProbeValueCacheEmpty(newRuntime, newAfter, constantName, label);
+  oldCheckpoint = oldRuntime.checkpoint();
+  newCheckpoint = newRuntime.checkpoint();
+  if (native_eq(oldCheckpoint.refs, newCheckpoint.refs) != 0) {
+    leanFail("full reference snapshots diverged: " + label)
+  };
+  if (probe.rewrites) {
+    coreInstProbeUnrelatedFieldsUnchanged(newState, newAfter, label);
+    assert(native_eq(saved.refs, newCheckpoint.refs) != 0);
+    onlyCoreChanged = newCheckpoint.restoreRaw();
+    onlyCoreChanged.writeRef(coreStateRef, Some(newState));
+    assert(native_eq(saved.refs, onlyCoreChanged.checkpoint().refs) == 0)
+  } else {
+    if (!rewriteProbeSameInput(oldState, oldAfter)) {
+      leanFail("cache hit changed Core.State: " + label)
+    };
+    if (native_eq(newCheckpoint.refs, saved.refs) != 0) {
+      leanFail("cache hit wrote state references: " + label)
+    }
+  };
+  if (!rewriteProbeSameInput(probe.declared, oldDeclared)) {
+    leanFail("constant input mutated on the fallback route: " + label)
+  };
+  if (!rewriteProbeSameInput(probe.declared, newDeclared)) {
+    leanFail("constant input mutated on the canonical route: " + label)
+  };
+  if (!rewriteProbeSameInput(probe.levels, oldLevels)) {
+    leanFail("levels input mutated on the fallback route: " + label)
+  };
+  if (!rewriteProbeSameInput(probe.levels, newLevels)) {
+    leanFail("levels input mutated on the canonical route: " + label)
+  };
+  (newResult, newCheckpoint)
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(builder);
+    name = (s: String) ->
+      L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText(s));
+    nilEntry = LeanCtor(LeanTag.Option_none, Array[]);
+    zero = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    zeroAgain = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = coreInstProbeSucc(builder, zero);
+    oneAgain = coreInstProbeSucc(builder, zeroAgain);
+    two = coreInstProbeSucc(builder, one);
+    twoAgain = coreInstProbeSucc(builder, oneAgain);
+    uName = name("coreInstProbe.u");
+    vName = name("coreInstProbe.v");
+    wName = name("coreInstProbe.w");
+    paramU = coreInstProbeParam(builder, uName);
+    paramV = coreInstProbeParam(builder, vName);
+    paramW = coreInstProbeParam(builder, wName);
+    paramWAgain = coreInstProbeParam(builder, wName);
+    maxOne = L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(builder, one, paramW);
+    maxOneAgain = L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(
+      builder,
+      oneAgain,
+      paramWAgain,
+    );
+    maxTwo = L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(builder, two, paramW);
+    maxTwoAgain = L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(
+      builder,
+      twoAgain,
+      paramWAgain,
+    );
+    kName = name("coreInstProbe.k");
+    kOneName = name("coreInstProbe.kOne");
+    reserveName = name("coreInstProbe.reservedValue");
+    zeroList = coreInstProbeLevels(Array[zero]);
+    zeroListAgain = coreInstProbeLevels(Array[zeroAgain]);
+    oneList = coreInstProbeLevels(Array[one]);
+    oneListAgain = coreInstProbeLevels(Array[oneAgain]);
+    twoList = coreInstProbeLevels(Array[two]);
+    twoListAgain = coreInstProbeLevels(Array[twoAgain]);
+    paramWList = coreInstProbeLevels(Array[paramW]);
+    paramWListAgain = coreInstProbeLevels(Array[paramWAgain]);
+    maxList = coreInstProbeLevels(Array[maxOne]);
+    maxListAgain = coreInstProbeLevels(Array[maxOneAgain]);
+    maxTwoList = coreInstProbeLevels(Array[maxTwo]);
+    maxTwoListAgain = coreInstProbeLevels(Array[maxTwoAgain]);
+    nilList = LeanCtor(LeanTag.List_nil, Array[]);
+    nilListAgain = LeanCtor(LeanTag.List_nil, Array[]);
+    longList = coreInstProbeLevels(Array[zero, one, two]);
+    longListAgain = coreInstProbeLevels(Array[zeroAgain, oneAgain, twoAgain]);
+    longSwapList = coreInstProbeLevels(Array[one, two, zero]);
+    longSwapListAgain = coreInstProbeLevels(
+      Array[oneAgain, twoAgain, zeroAgain],
+    );
+    uParams = coreInstProbeLevels(Array[uName]);
+    bothParams = coreInstProbeLevels(Array[uName, vName]);
+    pairList = coreInstProbeLevels(Array[zero, one]);
+    typeA = coreInstProbeSort(builder, paramU);
+    typeB = coreInstProbeForall(
+      builder,
+      coreInstProbeSort(builder, paramU),
+      coreInstProbeSort(builder, coreInstProbeSucc(builder, paramU)),
+    );
+    typeC = coreInstProbeConst(
+      builder,
+      kName,
+      coreInstProbeLevels(Array[paramU, zero]),
+    );
+    typeD = coreInstProbeSort(builder, paramU);
+    typeE = coreInstProbeForall(
+      builder,
+      coreInstProbeSort(builder, paramU),
+      coreInstProbeSort(builder, paramV),
+    );
+    typeF = coreInstProbeSort(builder, paramU);
+    typeG1 = coreInstProbeConst(
+      builder,
+      kOneName,
+      coreInstProbeLevels(Array[paramU]),
+    );
+    typeG2 = coreInstProbeConst(
+      builder,
+      kName,
+      coreInstProbeLevels(Array[paramU, paramV]),
+    );
+    nameA = name("coreInstProbe.sortZero");
+    nameB = name("coreInstProbe.succForall");
+    nameC = name("coreInstProbe.constLevels");
+    nameD = name("coreInstProbe.maxLevel");
+    nameE = name("coreInstProbe.forallTwo");
+    nameF = name("coreInstProbe.longSub");
+    nameG1 = name("coreInstProbe.first");
+    nameG2 = name("coreInstProbe.second");
+    declaredA = coreInstProbeConstantVal(nameA, uParams, typeA);
+    sentinelA = coreInstProbeSentinelVal(nameA, uParams);
+    declaredB = coreInstProbeConstantVal(nameB, uParams, typeB);
+    declaredC = coreInstProbeConstantVal(nameC, uParams, typeC);
+    sentinelC = coreInstProbeSentinelVal(nameC, uParams);
+    declaredD = coreInstProbeConstantVal(nameD, uParams, typeD);
+    declaredE = coreInstProbeConstantVal(nameE, bothParams, typeE);
+    declaredF = coreInstProbeConstantVal(nameF, uParams, typeF);
+    declaredG1 = coreInstProbeConstantVal(nameG1, uParams, typeG1);
+    declaredG2 = coreInstProbeConstantVal(nameG2, bothParams, typeG2);
+    // Same name and requested levels as declaredG1 but a different body: the
+    // cache is keyed by the constant name alone, so this must stay a pure hit.
+    declaredG3 = coreInstProbeConstantVal(nameG1, bothParams, typeE);
+    expAZero = coreInstProbeSort(builder, zero);
+    expAOne = coreInstProbeSort(builder, one);
+    expBOne = coreInstProbeForall(
+      builder,
+      coreInstProbeSort(builder, one),
+      coreInstProbeSort(builder, coreInstProbeSucc(builder, one)),
+    );
+    expBParamW = coreInstProbeForall(
+      builder,
+      coreInstProbeSort(builder, paramW),
+      coreInstProbeSort(builder, coreInstProbeSucc(builder, paramW)),
+    );
+    expCParamW = coreInstProbeConst(
+      builder,
+      kName,
+      coreInstProbeLevels(Array[paramW, zero]),
+    );
+    expCTwo = coreInstProbeConst(
+      builder,
+      kName,
+      coreInstProbeLevels(Array[two, zero]),
+    );
+    expDMax = coreInstProbeSort(builder, maxOne);
+    expDMaxTwo = coreInstProbeSort(builder, maxTwo);
+    expEEmpty = typeE;
+    expEOneShort = coreInstProbeForall(
+      builder,
+      coreInstProbeSort(builder, one),
+      coreInstProbeSort(builder, paramV),
+    );
+    expFZero = coreInstProbeSort(builder, zero);
+    expFOne = coreInstProbeSort(builder, one);
+    expG1 = coreInstProbeConst(builder, kOneName, zeroList);
+    expG2 = coreInstProbeConst(builder, kName, pairList);
+    entryA1 = coreInstProbeEntryValue(zeroList, expAZero);
+    entryA2 = coreInstProbeEntryValue(oneList, expAOne);
+    entryB1 = coreInstProbeEntryValue(oneList, expBOne);
+    entryB2 = coreInstProbeEntryValue(paramWList, expBParamW);
+    entryC1 = coreInstProbeEntryValue(paramWList, expCParamW);
+    entryC2 = coreInstProbeEntryValue(twoList, expCTwo);
+    entryD1 = coreInstProbeEntryValue(maxList, expDMax);
+    entryD2 = coreInstProbeEntryValue(maxTwoList, expDMaxTwo);
+    entryE1 = coreInstProbeEntryValue(nilList, expEEmpty);
+    entryE2 = coreInstProbeEntryValue(oneList, expEOneShort);
+    entryF1 = coreInstProbeEntryValue(longList, expFZero);
+    entryF2 = coreInstProbeEntryValue(longSwapList, expFOne);
+    entryG1 = coreInstProbeEntryValue(zeroList, expG1);
+    some = (entry: LeanValue) -> LeanCtor(LeanTag.Option_some, Array[entry]);
+    probeCases = Array[
+      CoreInstProbeCase(
+        "zero levels: cold substitution",
+        declaredA,
+        zeroList,
+        expAZero,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "zero levels: rebuilt hit skips the type payload",
+        sentinelA,
+        zeroListAgain,
+        expAZero,
+        some(entryA1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "zero then one levels: mismatch recomputes",
+        declaredA,
+        oneList,
+        expAOne,
+        some(entryA1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "most recent levels replace the older entry",
+        sentinelA,
+        oneListAgain,
+        expAOne,
+        some(entryA2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "succ levels: cold substitution under a binder",
+        declaredB,
+        oneList,
+        expBOne,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "succ levels: separately built list is a hit",
+        declaredB,
+        oneListAgain,
+        expBOne,
+        some(entryB1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "succ then param levels: mismatch recomputes",
+        declaredB,
+        paramWList,
+        expBParamW,
+        some(entryB1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "param levels: hit keeps the newest cached type",
+        declaredB,
+        paramWListAgain,
+        expBParamW,
+        some(entryB2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "param into const level list: cold substitution",
+        declaredC,
+        paramWList,
+        expCParamW,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "const level list: rebuilt hit skips the type payload",
+        sentinelC,
+        paramWListAgain,
+        expCParamW,
+        some(entryC1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "const level list: another level recomputes",
+        declaredC,
+        twoList,
+        expCTwo,
+        some(entryC1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "const level list: rebuilt succ level hits",
+        sentinelC,
+        twoListAgain,
+        expCTwo,
+        some(entryC2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "max levels: cold substitution",
+        declaredD,
+        maxList,
+        expDMax,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "max levels: rebuilt max is a structural hit",
+        declaredD,
+        maxListAgain,
+        expDMax,
+        some(entryD1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "max levels: a different max recomputes",
+        declaredD,
+        maxTwoList,
+        expDMaxTwo,
+        some(entryD1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "max levels: hit keeps the newest cached type",
+        declaredD,
+        maxTwoListAgain,
+        expDMaxTwo,
+        some(entryD2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "empty substitution leaves the type unchanged",
+        declaredE,
+        nilList,
+        expEEmpty,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "empty substitution: rebuilt empty list hits",
+        declaredE,
+        nilListAgain,
+        expEEmpty,
+        some(entryE1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "short substitution pairs the shared shorter prefix",
+        declaredE,
+        oneList,
+        expEOneShort,
+        some(entryE1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "short substitution: rebuilt level hits",
+        declaredE,
+        oneListAgain,
+        expEOneShort,
+        some(entryE2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "long substitution truncates to the shorter list",
+        declaredF,
+        longList,
+        expFZero,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "long substitution: rebuilt list hits",
+        declaredF,
+        longListAgain,
+        expFZero,
+        some(entryF1),
+        false,
+      ),
+      CoreInstProbeCase(
+        "long substitution reordered recomputes",
+        declaredF,
+        longSwapList,
+        expFOne,
+        some(entryF1),
+        true,
+      ),
+      CoreInstProbeCase(
+        "long substitution reordered: rebuilt hits",
+        declaredF,
+        longSwapListAgain,
+        expFOne,
+        some(entryF2),
+        false,
+      ),
+      CoreInstProbeCase(
+        "multiple names: first entry cached",
+        declaredG1,
+        zeroList,
+        expG1,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "multiple names: second entry cached alongside",
+        declaredG2,
+        pairList,
+        expG2,
+        nilEntry,
+        true,
+      ),
+      CoreInstProbeCase(
+        "same name and levels with a different body stays a hit",
+        declaredG3,
+        zeroListAgain,
+        expG1,
+        some(entryG1),
+        false,
+      ),
+    ];
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for ((declarationName, levelParams, declarationType) in Array[
+      (nameA, uParams, typeA),
+      (nameB, uParams, typeB),
+      (nameC, uParams, typeC),
+      (nameD, uParams, typeD),
+      (nameE, bothParams, typeE),
+      (nameF, uParams, typeF),
+      (nameG1, uParams, typeG1),
+      (nameG2, bothParams, typeG2),
+    ]) {
+      constants.set(
+        leanNameKey(declarationName),
+        LeanConstantFile(
+          coreInstProbeAxiomInfo(declarationName, levelParams, declarationType),
+          None(),
+        ),
+      )
+    };
+    // kOne has one universe parameter; k has two. Each is a declared type.
+    constants.set(
+      leanNameKey(kOneName),
+      LeanConstantFile(
+        coreInstProbeAxiomInfo(
+          kOneName,
+          uParams,
+          coreInstProbeSort(builder, coreInstProbeSucc(builder, paramU)),
+        ),
+        None(),
+      ),
+    );
+    kSort = L4_Lean_Level.f_Lean_mkLevelMax_e105c82600(builder, paramU, paramV);
+    constants.set(
+      leanNameKey(kName),
+      LeanConstantFile(
+        coreInstProbeAxiomInfo(
+          kName,
+          bothParams,
+          coreInstProbeSort(builder, coreInstProbeSucc(builder, kSort)),
+        ),
+        None(),
+      ),
+    );
+    reserveInfo = LeanCtor(
+      LeanTag.ConstantInfo_defnInfo,
+      Array[
+        LeanCtor(
+          LeanTag.DefinitionVal_mk,
+          Array[
+            coreInstProbeConstantVal(
+              reserveName,
+              nilList,
+              coreInstProbeSort(builder, one),
+            ),
+            coreInstProbeSort(builder, zero),
+            LeanCtor(
+              LeanTag.ReducibilityHints_regular,
+              Array[LeanWord("uint32", 1)],
+            ),
+            LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+            coreInstProbeLevels(Array[reserveName]),
+          ],
+        ),
+      ],
+    );
+    constants.set(
+      leanNameKey(reserveName),
+      LeanConstantFile(reserveInfo, None()),
+    );
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    localContext = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(
+      builder,
+    );
+    state = rewriteProbeState(
+      builder,
+      environment,
+      localContext,
+      "<core-instantiate-type-levels>",
+    );
+    coreStateRef = state.coreStateRef;
+    seededCoreState = builder.readRef(coreStateRef);
+    seededCache = leanField(seededCoreState, 5);
+    reservedValue = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_0_7566395d10(
+      builder,
+      leanField(seededCache, 1),
+      reserveName,
+      coreInstProbeEntryValue(nilList, coreInstProbeSort(builder, zero)),
+    );
+    builder.writeRef(
+      coreStateRef,
+      Some(
+        leanReplaceField(
+          seededCoreState,
+          5,
+          leanReplaceField(seededCache, 1, reservedValue),
+        ),
+      ),
+    );
+    base = builder.checkpoint();
+    initialRuntime = base.restoreRaw();
+    initialState = initialRuntime.readRef(coreStateRef);
+    assert(leanTag(initialState) == LeanTag.Core_State_mk);
+    initialCache = leanField(initialState, 5);
+    assert(leanTag(initialCache) == LeanTag.Core_Cache_mk);
+    absentName = name("coreInstProbe.absent");
+    coreInstProbeValueCacheEmpty(
+      initialRuntime,
+      initialState,
+      absentName,
+      "unrelated name is absent from seeded instLevelValue",
+    );
+    absentEntry = L4_Lean_CoreM.f_Core_instantiateTypeLevelParams_spec_1_79ed31d527(
+      initialRuntime,
+      leanField(initialCache, 0),
+      absentName,
+    );
+    assert(leanTag(absentEntry) == LeanTag.Option_none);
+    !checks = checks + 1;
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      checkpoint = base;
+      for (probeCase in probeCases) {
+        (_result, afterCall) = coreInstProbeCall(
+          probeCase,
+          checkpoint,
+          coreStateRef,
+          world,
+        );
+        !checkpoint = afterCall;
+        !checks = checks + 1
+      };
+      finalRuntime = checkpoint.restoreRaw();
+      finalState = finalRuntime.readRef(coreStateRef);
+      coreInstProbeTypeCacheEntry(
+        finalRuntime,
+        finalState,
+        nameG1,
+        zeroList,
+        expG1,
+        "multiple names keep earlier entries",
+      );
+      coreInstProbeTypeCacheEntry(
+        finalRuntime,
+        finalState,
+        nameA,
+        oneList,
+        expAOne,
+        "replaced most recent levels persist",
+      );
+      !checks = checks + 1
+    }
+  };
+  assert(checks == 114);
+  print_string(
+    "Core.instantiateTypeLevelParams probe passed " +
+      checks.toString() +
+      " named checks (108 differential calls)",
+  )
+}

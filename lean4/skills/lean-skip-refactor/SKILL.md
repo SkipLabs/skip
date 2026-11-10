@@ -31,7 +31,9 @@ ten Vibe instances, subject to provider quotas. The latest allocation uses Vibe
 writers and three peer Codex packet owners/reviewers, filling the four active
 Codex slots together with the primary. The primary reviews and integrates their
 handoffs and owns the single compiler queue. Keep tasks disjoint and let drafting
-overlap validation. Follow the active plan for whether launches are stopped;
+overlap validation. During provider failures, peers can continue implementation
+locally with another peer or the primary reviewing their changes. Follow the
+active plan for whether launches are stopped;
 the latest user instruction permits reducing concurrency on errors. Keep API
 retries disabled, report suspected quota failures, and honor provider retry delays.
 Use the packet/integration tools and shared probe fixtures documented in that
@@ -148,6 +150,17 @@ not treat the helper's completion as completion of the parity investigation.
   publication, caching or snapshots. An old Lean value or backtracking state
   must retain its original contents; apparent single-use in one benchmark is
   not proof of exclusive ownership.
+- Preserve array element types at boxed boundaries when requiring exact retained
+  behavior. A nested `Array[LeanCtor(...)]` can specialize differently from the
+  original `Array<LeanValue>`, making `native_eq` fail even when contents match.
+  Use an explicit `LeanValue` local for the published payload where necessary;
+  diagnose the representation difference rather than weakening comparisons.
+- Build valid expression/level fixtures with maintained constructors. Arbitrary
+  Nat counters do not imply arbitrary valid bound-variable indices: the current
+  packed expression metadata limits the loose-variable range to 1,048,575.
+  Test huge counters against valid expressions, including values that would
+  falsely match if narrowed, instead of forging metadata or expecting huge
+  `mkBVar` calls to succeed.
 - Preserve DAG sharing in expression transformations. Cache keys must include
   binder depth and relevant context/substitutions; hashes alone are not keys.
   Physical equality proves equality only, never inequality.

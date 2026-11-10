@@ -1,0 +1,77 @@
+module L4_Lean_Meta_Tactic_Simp_Types;
+
+// Apply Simp reduction settings to the current Meta configuration and refresh its key.
+fun f_Meta_Simp_mkMetaConfig_e5deadd2ab(
+  runtime: mutable LeanExecution,
+  simpConfig: LeanValue,
+  metaContext: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  current = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+    runtime,
+    metaContext,
+  );
+  if (leanTag(current) != LeanTag.Meta_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  foApprox = leanField(current, 0);
+  ctxApprox = leanField(current, 1);
+  quasiPatternApprox = leanField(current, 2);
+  constApprox = leanField(current, 3);
+  isDefEqStuckEx = leanField(current, 4);
+  unificationHints = leanField(current, 5);
+  proofIrrelevance = leanField(current, 6);
+  assignSyntheticOpaque = leanField(current, 7);
+  offsetCnstrs = leanField(current, 8);
+  univApprox = leanField(current, 11);
+  canUnfoldPredicateConfig = leanField(current, 19);
+  if (leanTag(simpConfig) != LeanTag.Meta_Simp_Config_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  zeta = leanField(simpConfig, 5);
+  beta = leanField(simpConfig, 6);
+  etaStruct = leanField(simpConfig, 8);
+  iota = leanField(simpConfig, 9);
+  proj = leanField(simpConfig, 10);
+  zetaDelta = leanField(simpConfig, 18);
+  zetaUnused = leanField(simpConfig, 21);
+  zetaHave = leanField(simpConfig, 23);
+  projection: LeanValue = leanTag(proj) match {
+  | LeanTag.Bool_false -> LeanCtor(LeanTag.Meta_ProjReductionKind_no, Array[])
+  | LeanTag.Bool_true ->
+    LeanCtor(LeanTag.Meta_ProjReductionKind_yesWithDelta, Array[])
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  updatedConfig: LeanValue = LeanCtor(
+    LeanTag.Meta_Config_mk,
+    Array[
+      foApprox,
+      ctxApprox,
+      quasiPatternApprox,
+      constApprox,
+      isDefEqStuckEx,
+      unificationHints,
+      proofIrrelevance,
+      assignSyntheticOpaque,
+      offsetCnstrs,
+      LeanCtor(LeanTag.Meta_TransparencyMode_reducible, Array[]),
+      etaStruct,
+      univApprox,
+      iota,
+      beta,
+      projection,
+      zeta,
+      zetaDelta,
+      zetaUnused,
+      zetaHave,
+      canUnfoldPredicateConfig,
+    ],
+  );
+  keyedConfig: LeanValue = L4_Lean_Meta_Basic.f_Meta_Config_toConfigWithKey_7c42a5030d(
+    runtime,
+    updatedConfig,
+  );
+  LeanCtor(LeanTag.EST_Out_ok, Array[keyedConfig, world])
+}
+
+module end;

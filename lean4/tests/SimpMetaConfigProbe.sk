@@ -1,0 +1,317 @@
+// Record-field selection, unchanged inputs and state, and the shared config-key boundary.
+fun resumeConfigState(runtime: mutable LeanExecution): RewriteProbeState {
+  environment = rewriteProbeEnvironment(
+    runtime,
+    (Map[] : Map<String, LeanConstantFile>),
+  );
+  rewriteProbeState(
+    runtime,
+    environment,
+    L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime),
+    "<simp-meta-config>",
+  )
+}
+
+fun resumeSimpConfig(runtime: mutable LeanExecution): LeanValue {
+  L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime)
+}
+
+fun resumeContextWithConfig(
+  runtime: mutable LeanExecution,
+  context: LeanValue,
+  config: LeanValue,
+): LeanValue {
+  leanReplaceField(
+    context,
+    0,
+    LeanCtor(
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+      Array[
+        config,
+        L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config),
+      ],
+    ),
+  )
+}
+
+fun metaConfigProbeExpected(current: LeanValue, simp: LeanValue): LeanValue {
+  projection = if (leanIsTrue(leanField(simp, 10))) {
+    LeanCtor(LeanTag.Meta_ProjReductionKind_yesWithDelta, Array[])
+  } else {
+    LeanCtor(LeanTag.Meta_ProjReductionKind_no, Array[])
+  };
+  LeanCtor(
+    LeanTag.Meta_Config_mk,
+    Array[
+      leanField(current, 0),
+      leanField(current, 1),
+      leanField(current, 2),
+      leanField(current, 3),
+      leanField(current, 4),
+      leanField(current, 5),
+      leanField(current, 6),
+      leanField(current, 7),
+      leanField(current, 8),
+      LeanCtor(LeanTag.Meta_TransparencyMode_reducible, Array[]),
+      leanField(simp, 8),
+      leanField(current, 11),
+      leanField(simp, 9),
+      leanField(simp, 6),
+      projection,
+      leanField(simp, 5),
+      leanField(simp, 18),
+      leanField(simp, 21),
+      leanField(simp, 23),
+      leanField(current, 19),
+    ],
+  )
+}
+
+fun metaConfigProbeCheck(
+  runtime: mutable LeanExecution,
+  state: RewriteProbeState,
+  label: String,
+  current: LeanValue,
+  simp: LeanValue,
+  world: LeanValue,
+): void {
+  context = resumeContextWithConfig(runtime, state.metaContext, current);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldSimp = rewriteProbeCopyInput(simp);
+  newSimp = rewriteProbeCopyInput(simp);
+  (result, after) = rewriteProbeCompare(
+    label,
+    state.saved,
+    (oldRuntime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkMetaConfig_e5deadd2ab_fallback(
+        oldRuntime,
+        oldSimp,
+        oldContext,
+        world,
+      );
+      assert(rewriteProbeSameInput(simp, oldSimp));
+      assert(rewriteProbeSameInput(context, oldContext));
+      result
+    },
+    (newRuntime: mutable LeanExecution) ~> {
+      result = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkMetaConfig_e5deadd2ab(
+        newRuntime,
+        newSimp,
+        newContext,
+        world,
+      );
+      assert(rewriteProbeSameInput(simp, newSimp));
+      assert(rewriteProbeSameInput(context, newContext));
+      result
+    },
+  );
+  if (native_eq(after.refs, state.saved.refs) != 0) {
+    leanFail("mkMetaConfig changed refs: " + label)
+  };
+  if (leanTag(result) != LeanTag.EST_Out_ok) {
+    leanFail("mkMetaConfig failed: " + label)
+  };
+  if (native_eq(leanField(result, 1), world) != 0) {
+    leanFail("mkMetaConfig changed world: " + label)
+  };
+  keyed = leanField(result, 0);
+  assert(
+    leanTag(keyed) ==
+      LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+  );
+  config = leanField(keyed, 0);
+  expected = metaConfigProbeExpected(current, simp);
+  if (!rewriteProbeSameInput(config, expected)) {
+    leanFail("mkMetaConfig selected wrong fields: " + label)
+  };
+  // Key encoding is deliberately checked through the unchanged shared helper.
+  expectedKey = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+    runtime,
+    expected,
+  );
+  if (native_eq(leanField(keyed, 1), expectedKey) != 0) {
+    leanFail("mkMetaConfig key mismatch: " + label)
+  }
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{
+      unboundedHeartbeats => true,
+      profileRuntime => profile,
+    };
+    leanInitializeSimp(runtime);
+    state = resumeConfigState(runtime);
+    current = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(
+      runtime,
+      state.metaContext,
+    );
+    simpDefaults = resumeSimpConfig(runtime);
+    assert(leanTag(current) == LeanTag.Meta_Config_mk);
+    assert(leanTag(simpDefaults) == LeanTag.Meta_Simp_Config_mk);
+    etaModes = Array[
+      LeanTag.Meta_EtaStructMode_all,
+      LeanTag.Meta_EtaStructMode_notClasses,
+      LeanTag.Meta_EtaStructMode_none,
+    ];
+    reductionFields = Array[5, 6, 9, 10, 18, 21, 23];
+    disabled = leanReplaceField(
+      simpDefaults,
+      8,
+      LeanCtor(LeanTag.Meta_EtaStructMode_none, Array[]),
+    );
+    for (field in reductionFields) {
+      !disabled = leanReplaceField(disabled, field, leanBool(false))
+    };
+    cases: mutable Vector<(String, LeanValue, LeanValue)> = mutable Vector[];
+    cases.push(("base defaults", current, disabled));
+    for (field in Array[
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      11,
+      12,
+      13,
+      15,
+      16,
+      17,
+      18,
+      19,
+    ]) {
+      changed = leanReplaceField(
+        current,
+        field,
+        leanBool(!leanIsTrue(leanField(current, field))),
+      );
+      cases.push(("base Bool " + field.toString(), changed, disabled))
+    };
+    for (mode in Array[
+      LeanTag.Meta_TransparencyMode_all,
+      LeanTag.Meta_TransparencyMode_default,
+      LeanTag.Meta_TransparencyMode_reducible,
+      LeanTag.Meta_TransparencyMode_instances,
+      LeanTag.Meta_TransparencyMode_none,
+      LeanTag.Meta_TransparencyMode_implicit,
+    ]) {
+      cases.push(
+        (
+          "base transparency " + mode.toString(),
+          leanReplaceField(current, 9, LeanCtor(mode, Array[])),
+          disabled,
+        ),
+      )
+    };
+    for (mode in etaModes) {
+      cases.push(
+        (
+          "base eta " + mode.toString(),
+          leanReplaceField(current, 10, LeanCtor(mode, Array[])),
+          disabled,
+        ),
+      )
+    };
+    for (mode in Array[
+      LeanTag.Meta_ProjReductionKind_no,
+      LeanTag.Meta_ProjReductionKind_yes,
+      LeanTag.Meta_ProjReductionKind_yesWithDelta,
+      LeanTag.Meta_ProjReductionKind_yesWithDeltaI,
+    ]) {
+      cases.push(
+        (
+          "base projection " + mode.toString(),
+          leanReplaceField(current, 14, LeanCtor(mode, Array[])),
+          disabled,
+        ),
+      )
+    };
+    // Separating vectors detect swaps between every mapped Simp Bool field.
+    for (mode in etaModes) {
+      for (row in Range(0, 9)) {
+        simp = leanReplaceField(disabled, 8, LeanCtor(mode, Array[]));
+        for (index in Range(0, reductionFields.size())) {
+          !simp = leanReplaceField(
+            simp,
+            reductionFields[index],
+            leanBool(row == index + 1 || row == 8),
+          )
+        };
+        cases.push(
+          (
+            "simp eta " + mode.toString() + " flags " + row.toString(),
+            current,
+            simp,
+          ),
+        )
+      }
+    };
+    for (field in Array[
+      2,
+      3,
+      4,
+      7,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      19,
+      20,
+      22,
+      24,
+      25,
+      26,
+      27,
+      28,
+      30,
+      31,
+    ]) {
+      changed = leanReplaceField(
+        simpDefaults,
+        field,
+        leanBool(!leanIsTrue(leanField(simpDefaults, field))),
+      );
+      cases.push(("unused Simp Bool " + field.toString(), current, changed))
+    };
+    huge = leanBoxNat(LeanNat::parse("18446744073709551616"));
+    for (field in Array[0, 1]) {
+      cases.push(
+        (
+          "unused Simp Nat " + field.toString(),
+          current,
+          leanReplaceField(simpDefaults, field, huge),
+        ),
+      )
+    };
+    cases.push(
+      (
+        "unused maxSuggestions",
+        current,
+        leanReplaceField(
+          simpDefaults,
+          29,
+          LeanCtor(LeanTag.Option_some, Array[huge]),
+        ),
+      ),
+    );
+    configurations = cases.toArray();
+    assert(configurations.size() == 82);
+    for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+      for ((label, base, simp) in configurations) {
+        metaConfigProbeCheck(runtime, state, label, base, simp, world);
+        !checks = checks + 1
+      }
+    }
+  };
+  assert(checks == 328);
+  print_string("Simp Meta.Config passed " + checks.toString() + " comparisons")
+}
