@@ -85,8 +85,10 @@ stage0/lib/libstd.sklib: stage0/bin/skc $(shell find ../prelude/src -name '*.sk'
 
 # Persistent files are keyed on the executable's GNU build-id on ELF. Mach-O
 # executables always carry an LC_UUID instead, and ld64 rejects --build-id.
+# On macOS, link with lld: ld64 rejects the non-object members of .sklib
+# archives.
 ifeq ($(shell uname -s),Darwin)
-STAGE0_LDFLAGS ?=
+STAGE0_LDFLAGS ?= -fuse-ld=lld
 else
 STAGE0_LDFLAGS ?= -no-pie -Wl,--build-id
 endif
