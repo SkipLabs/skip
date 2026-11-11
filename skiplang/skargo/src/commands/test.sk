@@ -66,10 +66,13 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
     !opts.filter = CompileFilter::all_tests()
   };
   bctx = create_bctx(gctx, ws, opts);
+  jobs = args.getInt("jobs");
   withTimer(
     () -> {
       build_runner = BuildRunner::create(bctx);
-      build_runner.compile()
+      // Cap compilation parallelism: a single skc self-build already peaks
+      // near the CI compiler job's memory guard.
+      build_runner.compile(/* check = */ false, /* jobs = */ min(jobs, 4))
     },
     t ->
       gctx.console.status(
@@ -82,7 +85,6 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   // TODO: Pass args directly after --.
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
-  jobs = args.getInt("jobs");
   list = if (args.getBool("list")) Some("--list") else None();
 
   // Find the test unit: a TestTarget (normal mode) or a HardlinkTarget
