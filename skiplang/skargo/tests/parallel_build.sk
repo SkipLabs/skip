@@ -57,6 +57,82 @@ untracked fun skargo_under_test(): ?String {
   }
 }
 
+// An executable shell script at `path`.
+@allow_tracked_call
+untracked fun write_script(path: String, text: String): void {
+  write_file(path, "#!/bin/sh\n" + text);
+  T.expectTrue(
+    System.subprocess(Array["chmod", "+x", path]).fromSuccess().success(),
+  )
+}
+
+@allow_tracked_call
+untracked fun which(name: String): String {
+  System.subprocess(Array["sh", "-c", `command -v ${name}`])
+    .fromSuccess()
+    .stdout.trim()
+}
+
+// Whether the process recorded in `pid_file` still runs (zombies count as
+// gone: only their exit status is left).
+@allow_tracked_call
+untracked fun process_alive(pid_file: String): Bool {
+  pid = FileSystem.readTextFile(pid_file).trim();
+  state = System.subprocess(Array["ps", "-o", "stat=", "-p", pid])
+    .fromSuccess()
+    .stdout.trim();
+  !state.isEmpty() && !state.startsWith("Z")
+}
+
+// Waits up to ~5s for the process in `pid_file` to be gone.
+@allow_tracked_call
+untracked fun process_gone(pid_file: String): Bool {
+  for (_ in Range(0, 50)) {
+    if (!process_alive(pid_file)) return true;
+    Time.sleep_ms(100)
+  };
+  false
+}
+
+// A package with a lib and two bins, `app` and `slow`. Both bins depend only
+// on the lib, so the parallel scheduler builds them side by side. Returns the
+// directory and the tools dir holding `skc`/`clang++` wrappers: compiling
+// `slow` sleeps (recording its pid in `slow.pid`), linking `app` fails when
+// `fail_link` is set.
+@allow_tracked_call
+untracked fun write_two_bins(root: String): (String, String) {
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  dir = root + "/two";
+  write_file(
+    dir + "/Skargo.toml",
+    `[package]\nname = "two"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n[[bin]]\nname = "app"\nmain = "Two.app"\n[[bin]]\nname = "slow"\nmain = "Two.slow"\n`,
+  );
+  write_file(
+    dir + "/src/lib.sk",
+    "module Two; untracked fun app(): void { print_raw(\"app\") } untracked fun slow(): void { print_raw(\"slow\") } module end;\n",
+  );
+  tools = root + "/tools";
+  real_skc = which("skc");
+  real_clang = which("clang++");
+  write_script(
+    tools + "/skc",
+    `case " $* " in *" Two.slow=skip_main "*) if [ -e "${root}/slow" ]; then echo $$ > "${root}/slow.pid"; exec sleep 60; fi;; esac\nexec "${real_skc}" "$@"\n`,
+  );
+  write_script(
+    tools + "/clang++",
+    `case " $* " in *"/deps/app-"*) if [ -e "${root}/fail_link" ]; then echo "fake link failure" >&2; exit 7; fi;; esac\nexec "${real_clang}" "$@"\n`,
+  );
+  (dir, tools)
+}
+
+@allow_tracked_call
+untracked fun tools_env(tools: String): Map<String, String> {
+  Map["SKC" => tools + "/skc", "PATH" => tools + ":" + Environ.var("PATH")]
+}
+
 // A workspace `app` with a bin, depending on two independent libs `pa` and
 // `pb`. `app_lib_files` extra source files make app's lib (and so its bin)
 // heavy for the parallel scheduler.
@@ -137,6 +213,37 @@ fun test_parallel_heavy_bin_builds_alone(): void {
   T.expectTrue(lightResult.success(), lightResult.stderr);
   T.expectTrue(!lightResult.stderr.contains("Heavy: app"), lightResult.stderr);
   T.expectEq(run(light + "/target/host/release/app"), "4")
+}
+
+// A failed external link stops the build like a failed compile: the link is
+// an in-flight process, so on its failure the units still compiling are
+// killed and skargo exits 3, instead of exiting from inside the link step and
+// leaving them running (and writing to their state.db files).
+@test
+fun test_parallel_link_failure_kills_in_flight_units(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-link-failure");
+  (dir, tools) = write_two_bins(root);
+  write_file(root + "/slow", "");
+  write_file(root + "/fail_link", "");
+  result = build(skargo, dir, Array["--release"], tools_env(tools));
+  T.expectEq(result.exitcode(), 3, result.stderr);
+  T.expectTrue(result.stderr.contains("fake link failure"), result.stderr);
+  T.expectTrue(FileSystem.exists(root + "/slow.pid"), result.stderr);
+  T.expectTrue(process_gone(root + "/slow.pid"), "slow compile left running");
+  // The failed link is retried by the next build.
+  T.expectTrue(
+    System.subprocess(Array["rm", root + "/slow", root + "/fail_link"])
+      .fromSuccess()
+      .success(),
+  );
+  retry = build(skargo, dir, Array["--release"], tools_env(tools));
+  T.expectTrue(retry.success(), retry.stderr);
+  T.expectEq(run(dir + "/target/host/release/app"), "app");
+  T.expectEq(run(dir + "/target/host/release/slow"), "slow")
 }
 
 module end;

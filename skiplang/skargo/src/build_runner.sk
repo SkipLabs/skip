@@ -58,14 +58,25 @@ class BuildScriptOutput{
   }
 }
 
+private base class ReapResult {
+  children =
+  | ReapDone()
+  | ReapRunning()
+  | ReapFailed()
+}
+
+// A unit being built by `compile_parallel`. Its current process is either the
+// skc/build-script command (`linking` false) or, for units with a separate
+// link step, the external link that follows it (`linking` true).
 mutable class InFlightUnit(
   unit: Unit,
-  argv: Array<String>,
-  popen: mutable Posix.Popen,
+  mutable argv: Array<String>,
+  mutable popen: mutable Posix.Popen,
   stdout_path: String,
   stderr_path: String,
   is_build_script: Bool,
   separate_link: Bool,
+  mutable linking: Bool = false,
 ) {
   static fun create(
     unit: Unit,
@@ -408,7 +419,11 @@ mutable class BuildRunner(
         inf = in_flight[i];
         status_opt = inf.popen.poll();
         if (status_opt.isSome()) {
-          if (!this.reap_unit(inf, status_opt.fromSome(), check)) {
+          !progressed = true;
+          this.reap_unit(inf, status_opt.fromSome(), check) match {
+          | ReapDone() -> completed.set(inf.unit, true)
+          | ReapRunning() -> remaining.push(inf)
+          | ReapFailed() ->
             // Kill the other in-flight units; the failed one is already dead.
             // `poll()` guards against killing an exited-but-unreaped process:
             // the native kill exits the whole process on ESRCH.
@@ -420,9 +435,7 @@ mutable class BuildRunner(
               !j = j + 1
             };
             skipExit(3)
-          };
-          completed.set(inf.unit, true);
-          !progressed = true
+          }
         } else {
           remaining.push(inf)
         };
@@ -522,12 +535,11 @@ mutable class BuildRunner(
         Path.join(fingerprint_dir, "parallel.stderr"),
       )
     };
-    argv = cmd.get_argv();
     popen = this.spawn_process(cmd, stdout_path, stderr_path);
     in_flight.push(
       InFlightUnit::create(
         unit,
-        argv,
+        cmd.get_argv(),
         popen,
         stdout_path,
         stderr_path,
@@ -537,17 +549,28 @@ mutable class BuildRunner(
     )
   }
 
+  // Handles the exit of `inf`'s current process. A finished skc may start the
+  // unit's external link, which keeps the unit in flight.
   private mutable fun reap_unit(
     inf: mutable InFlightUnit,
     status: Posix.WExitStatus,
     check: Bool,
-  ): Bool {
+  ): ReapResult {
     stdout = FileSystem.readTextFile(inf.stdout_path);
     stderr = FileSystem.readTextFile(inf.stderr_path);
     p = System.CompletedProcess(inf.argv, status, stdout, stderr);
+    if (inf.linking) {
+      if (!p.success()) {
+        this.bctx.gctx.console.error(subprocess_error_message(p));
+        return ReapFailed()
+      };
+      FileSystem.writeTextFile(this.link_status_file_for(inf.unit), "complete");
+      this.finish_unit(inf.unit, check);
+      return ReapDone()
+    };
     if (!p.success()) {
       this.bctx.gctx.console.error(subprocess_error_message(p));
-      return false
+      return ReapFailed()
     };
     if (inf.is_build_script) {
       bs_out = BuildScriptOutput::create(stdout);
@@ -555,19 +578,43 @@ mutable class BuildRunner(
       FileSystem.writeTextFile(
         this.fingerprint_dep_file_for(inf.unit),
         bs_out.rerun_if_changed.join("\n"),
-      )
-    } else {
-      this.post_skc(inf.unit, inf.separate_link, p);
-      // Check-mode roots only run `skc --check`: no link, no fingerprint.
-      if (!(check && this.bctx.roots.contains(inf.unit))) {
-        this.link_targets(inf.unit);
-        FileSystem.writeTextFile(
-          this.fingerprint_file_for(inf.unit),
-          this.fingerprint_for(inf.unit).toStringHex(),
-        )
+      );
+      this.finish_unit(inf.unit, check);
+      return ReapDone()
+    };
+    if (inf.separate_link) {
+      this.link_cmd(inf.unit, p) match {
+      | Some(link_cmd) ->
+        this.respawn(inf, link_cmd, true);
+        return ReapRunning()
+      | None() -> void
       }
     };
-    true
+    // Check-mode roots only run `skc --check`: no link, no fingerprint.
+    if (!(check && this.bctx.roots.contains(inf.unit))) {
+      this.finish_unit(inf.unit, check)
+    };
+    ReapDone()
+  }
+
+  private mutable fun finish_unit(unit: Unit, check: Bool): void {
+    if (check && this.bctx.roots.contains(unit)) return void;
+    this.link_targets(unit);
+    FileSystem.writeTextFile(
+      this.fingerprint_file_for(unit),
+      this.fingerprint_for(unit).toStringHex(),
+    )
+  }
+
+  // Starts `cmd` as `inf`'s next process, reusing its log files.
+  private mutable fun respawn(
+    inf: mutable InFlightUnit,
+    cmd: mutable ProcessBuilder,
+    linking: Bool,
+  ): void {
+    inf.!argv = cmd.get_argv();
+    inf.!linking = linking;
+    inf.!popen = this.spawn_process(cmd, inf.stdout_path, inf.stderr_path)
   }
 
   // Run `cmd` with stdout/stderr redirected to files so several units can
@@ -867,54 +914,67 @@ mutable class BuildRunner(
     separate_link: Bool,
     p: System.CompletedProcess,
   ): void {
-    if (separate_link) {
-      link_status_path = Path.join(
-        this.fingerprint_dir_for(unit),
-        "link-status",
-      );
-      // A clean backend emits no link plan. Its inputs include native archive
-      // hashes and linker options, so an existing output is already current.
-      // Still replay the saved plan when the primary output was removed.
-      if (
-        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
-        this.outputs_for(unit).all(output -> FileSystem.exists(output.path)) &&
-        FileSystem.exists(link_status_path) &&
-        FileSystem.readTextFile(link_status_path) == "complete"
-      ) {
-        return void
-      };
-      // A cached compiler backend has no new stdout side effect. Retain its
-      // link plan per unit so an unchanged LLVM module can still be linked.
-      link_plan_path = Path.join(this.fingerprint_dir_for(unit), "link-args");
-      link_output = if (
-        !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
-        FileSystem.exists(link_plan_path)
-      ) {
-        FileSystem.readTextFile(link_plan_path)
-      } else {
-        p.stdout
-      };
-      (cmd, args) = parse_link_args(link_output) match {
-      | Success(v) -> v
-      | Failure(msg) ->
-        this.bctx.gctx.console.error(
-          `Failed to parse link args from skc output: ${msg}`,
-        );
-        skipExit(3)
-      };
-      FileSystem.writeTextFile(
-        link_plan_path,
-        "---LINK_ARGS_BEGIN---\n" +
-          Array[cmd].concat(args).join("\n") +
-          "\n---LINK_ARGS_END---\n",
-      );
-      link_cmd = ProcessBuilder::create{cmd, args};
-      // skc commits its cache before the external linker runs. A failed link
-      // must be retried even when an older executable still exists.
-      FileSystem.writeTextFile(link_status_path, "pending");
+    if (!separate_link) return void;
+    this.link_cmd(unit, p) match {
+    | Some(link_cmd) ->
       _ = this.run_cmd(link_cmd);
-      FileSystem.writeTextFile(link_status_path, "complete")
+      FileSystem.writeTextFile(this.link_status_file_for(unit), "complete")
+    | None() -> void
     }
+  }
+
+  private mutable fun link_status_file_for(unit: Unit): String {
+    Path.join(this.fingerprint_dir_for(unit), "link-status")
+  }
+
+  // The external link for `unit` after a `--no-link` skc run `p`, or None()
+  // when its output is already current. Marks the link pending: the caller
+  // marks it complete once the command succeeded.
+  private mutable fun link_cmd(
+    unit: Unit,
+    p: System.CompletedProcess,
+  ): ?mutable ProcessBuilder {
+    link_status_path = this.link_status_file_for(unit);
+    // A clean backend emits no link plan. Its inputs include native archive
+    // hashes and linker options, so an existing output is already current.
+    // Still replay the saved plan when the primary output was removed.
+    if (
+      !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+      this.outputs_for(unit).all(output -> FileSystem.exists(output.path)) &&
+      FileSystem.exists(link_status_path) &&
+      FileSystem.readTextFile(link_status_path) == "complete"
+    ) {
+      return None()
+    };
+    // A cached compiler backend has no new stdout side effect. Retain its
+    // link plan per unit so an unchanged LLVM module can still be linked.
+    link_plan_path = Path.join(this.fingerprint_dir_for(unit), "link-args");
+    link_output = if (
+      !p.stdout.contains("---LINK_ARGS_BEGIN---") &&
+      FileSystem.exists(link_plan_path)
+    ) {
+      FileSystem.readTextFile(link_plan_path)
+    } else {
+      p.stdout
+    };
+    (cmd, args) = parse_link_args(link_output) match {
+    | Success(v) -> v
+    | Failure(msg) ->
+      this.bctx.gctx.console.error(
+        `Failed to parse link args from skc output: ${msg}`,
+      );
+      skipExit(3)
+    };
+    FileSystem.writeTextFile(
+      link_plan_path,
+      "---LINK_ARGS_BEGIN---\n" +
+        Array[cmd].concat(args).join("\n") +
+        "\n---LINK_ARGS_END---\n",
+    );
+    // skc commits its cache before the external linker runs. A failed link
+    // must be retried even when an older executable still exists.
+    FileSystem.writeTextFile(link_status_path, "pending");
+    Some(ProcessBuilder::create{cmd, args})
   }
 
   private readonly fun run_cmd(
