@@ -211,14 +211,19 @@ fun leanApply(
   if (args.isEmpty()) return v;
   v match {
   | LeanClosure(invoke, arity, captured) ->
+    // Keep concat even with empty captures: it preserves the captured receiver's
+    // concrete array class, rather than borrowing the incoming argument array.
+    // At exact saturation, take only copies this fresh array with the same class.
     all = captured.concat(args);
     if (all.size() < arity) {
       LeanClosure(invoke, arity, all)
+    } else if (all.size() == arity) {
+      invoke(runtime, all)
     } else {
+      // Do not apply the surplus until this invocation has completed. Keep the
+      // existing take/drop semantics even for zero or malformed negative arity.
       result = invoke(runtime, all.take(arity));
-      if (all.size() == arity) result else {
-        leanApply(runtime, result, all.drop(arity))
-      }
+      leanApply(runtime, result, all.drop(arity))
     }
   | _ -> leanFail("application of non-closure")
   }

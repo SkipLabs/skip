@@ -1,0 +1,261 @@
+// Execute only after the parent integrates all six replacements and *_fallback bodies.
+// Differential routes share indirect helpers; fixed expectations below are intentional.
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  fixture = f_equalityProbe_fixture(runtime);
+  state = fixture.state;
+  poison = LeanUnavailable("equality-wave short circuit demanded unused input");
+  explicit = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_default);
+  implicit = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_implicit);
+  proof = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_default, true);
+  higherOrder = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_default, false, true);
+  dependent = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_default, false, false, true);
+  instance = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_instImplicit, false, false, false, true);
+  none = LeanCtor(LeanTag.Option_none, Array[]);
+  checks = 0;
+  for (world in Array[leanNatValue(37), LeanNatLiterals.n18446744073709551616]) {
+    earlyExitCheckpoint = runtime.checkpoint();
+    // Exhausted private loops must preserve even opaque/nonstandard accumulators.
+    for (cursor in Array[LeanNatLiterals.n0, LeanNatLiterals.n18446744073709551616]) {
+      accumulator = LeanText("untouched first-pass carry");
+      _ = f_equalityProbe_compare("first pass exhausted", earlyExitCheckpoint, Array[accumulator],
+        old ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6_fallback(old, cursor, poison, poison, poison, poison, poison, cursor, accumulator, poison, poison, poison, poison, world),
+        fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6(fresh, cursor, poison, poison, poison, poison, poison, cursor, accumulator, poison, poison, poison, poison, world),
+        Some(f_equalityProbe_ok(accumulator, world)));
+      !checks = checks + 1
+    };
+    for (cursor in Array[LeanWord("usize", 0), LeanWord("usize", -1)]) {
+      accumulator = LeanText("untouched second-pass carry");
+      _ = f_equalityProbe_compare("second pass exhausted unsigned", earlyExitCheckpoint, Array[accumulator],
+        old ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgs_spec_1_8eb660ca90_fallback(old, poison, poison, poison, poison, poison, poison, poison, poison, cursor, cursor, accumulator, poison, poison, poison, poison, world),
+        fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgs_spec_1_8eb660ca90(fresh, poison, poison, poison, poison, poison, poison, poison, poison, cursor, cursor, accumulator, poison, poison, poison, poison, world),
+        Some(f_equalityProbe_ok(accumulator, world)));
+      !checks = checks + 1
+    };
+    _ = f_equalityProbe_compare("unequal arity ignores function and contexts", earlyExitCheckpoint, Array[],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqArgs_5347aadf73_fallback(old, poison, LeanArray(Array[]), LeanArray(Array[poison]), poison, poison, poison, poison, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqArgs_5347aadf73(fresh, poison, LeanArray(Array[]), LeanArray(Array[poison]), poison, poison, poison, poison, world),
+      Some(f_equalityProbe_ok(leanBool(false), world)));
+    _ = f_equalityProbe_compare("closed assignment ignores declaration and state", earlyExitCheckpoint, Array[fixture.prop],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, poison, LeanArray(Array[]), fixture.prop, poison, poison, poison, poison, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, poison, LeanArray(Array[]), fixture.prop, poison, poison, poison, poison, world),
+      Some(f_equalityProbe_ok(LeanCtor(LeanTag.Option_some, Array[fixture.prop]), world)));
+    !checks = checks + 2;
+    for (transparency in Array[LeanTag.Meta_TransparencyMode_reducible, LeanTag.Meta_TransparencyMode_implicit, LeanTag.Meta_TransparencyMode_all]) {
+      argumentContext = f_equalityProbe_configure(runtime, state.metaContext, transparency, false);
+      for (flags in Array[0, 1, 8, 9]) {
+        respect = leanBool(flags.and(1) != 0);
+        bump = leanBool(flags.and(8) != 0);
+        argumentCoreBase = leanReplaceField(state.coreContext, 3, LeanWord("uint16", flags));
+        // A trace option set to false exercises hasTrace without enabling unsupported IO.
+        traceName = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("trace"), LeanText("Meta"), LeanText("isDefEq"));
+        traceOptions = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(runtime, leanField(leanField(argumentCoreBase, 0), 2), traceName, leanBool(false));
+        argumentCoreContext = leanReplaceField(argumentCoreBase, 0, leanReplaceField(leanField(argumentCoreBase, 0), 2, traceOptions));
+        argumentPassCheckpoint = runtime.checkpoint();
+        // label, parameters, left/right, resume cursor, incoming/expected accumulator.
+        firstCases = Array[
+          ("explicit equal", Array[explicit], Array[fixture.prop], Array[fixture.prop], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+          ("explicit mismatch stops before poison", Array[explicit, poison], Array[fixture.prop, poison], Array[fixture.type, poison], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[], true)),
+          ("postponed implicit", Array[implicit], Array[fixture.x], Array[fixture.y], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[LeanNatLiterals.n0], Array[])),
+          ("proof irrelevance", Array[proof], Array[fixture.x], Array[fixture.y], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+          ("explicit proof with abstracted mvar", Array[proof], Array[fixture.m], Array[fixture.x], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+          ("eta mvar implicit", Array[implicit], Array[fixture.m], Array[fixture.x], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+          ("eta mvar instance binder", Array[instance], Array[fixture.m], Array[fixture.x], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+          ("higher-order dependencies stay ordered", Array[higherOrder, dependent, implicit], Array[fixture.x, fixture.y, fixture.x], Array[fixture.y, fixture.x, fixture.y], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[leanNatValue(2)], Array[LeanNatLiterals.n0, LeanNatLiterals.n1])),
+          ("resumed first pass preserves queues", Array[poison, implicit, dependent], Array[poison, fixture.x, fixture.y], Array[poison, fixture.y, fixture.x], 1, f_equalityProbe_queues(Array[leanNatValue(41)], Array[leanNatValue(42)]), f_equalityProbe_queues(Array[leanNatValue(41), LeanNatLiterals.n1], Array[leanNatValue(42), leanNatValue(2)])),
+          ("argument default lookup", Array[explicit], Array[], Array[], 0, f_equalityProbe_queues(Array[], Array[]), f_equalityProbe_queues(Array[], Array[])),
+        ];
+        for ((label, parameters, left, right, cursor, initial, expected) in firstCases) {
+          params = LeanArray(parameters);
+          leftArgs = LeanArray(left);
+          rightArgs = LeanArray(right);
+          count = leanNatValue(parameters.size());
+          result = f_equalityProbe_compare(label, argumentPassCheckpoint, Array[params, leftArgs, rightArgs, argumentContext, argumentCoreContext, initial],
+            old ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6_fallback(old, count, params, leftArgs, rightArgs, respect, bump, leanNatValue(cursor), initial, argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+            fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6(fresh, count, params, leftArgs, rightArgs, respect, bump, leanNatValue(cursor), initial, argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+            Some(f_equalityProbe_ok(expected, world)));
+          if (label == "explicit proof with abstracted mvar" || label == "eta mvar implicit" || label == "eta mvar instance binder") {
+            after = result.i1.restoreRaw();
+            assert(native_eq(f_equalityProbe_assignment(after, state.metaStateRef, fixture.mId), LeanCtor(LeanTag.Option_some, Array[fixture.x])) == 0)
+          };
+          !checks = checks + 1
+        };
+        secondCases = Array[
+          ("second equal", Array[explicit], Array[fixture.prop], Array[fixture.prop], Array[LeanNatLiterals.n0], 0, false),
+          ("second instance typed", Array[instance], Array[fixture.prop], Array[fixture.prop], Array[LeanNatLiterals.n0], 0, false),
+          ("second failure short circuits", Array[explicit, poison], Array[fixture.prop, poison], Array[fixture.type, poison], Array[LeanNatLiterals.n0, LeanNatLiterals.n1], 0, true),
+          ("second resume", Array[explicit], Array[fixture.prop], Array[fixture.prop], Array[poison, LeanNatLiterals.n0], 1, false),
+          ("second default lookup", Array[], Array[], Array[], Array[leanNatValue(12)], 0, false),
+        ];
+        for ((label, parameters, left, right, indices, cursor, failed) in secondCases) {
+          params = LeanArray(parameters);
+          leftArgs = LeanArray(left);
+          rightArgs = LeanArray(right);
+          queue = LeanArray(indices);
+          // Deliberately mismatched explicit length hints exercise false implicitFlag.
+          for (rightHint in Array[leanNatValue(left.size()), leanNatValue(left.size() + 1)]) {
+            _ = f_equalityProbe_compare(label, argumentPassCheckpoint, Array[params, leftArgs, rightArgs, queue],
+              old ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgs_spec_1_8eb660ca90_fallback(old, leftArgs, rightArgs, params, respect, bump, leanNatValue(left.size()), rightHint, queue, LeanWord("usize", indices.size()), LeanWord("usize", cursor), LeanText("prior carry"), argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+              fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgs_spec_1_8eb660ca90(fresh, leftArgs, rightArgs, params, respect, bump, leanNatValue(left.size()), rightHint, queue, LeanWord("usize", indices.size()), LeanWord("usize", cursor), LeanText("prior carry"), argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+              Some(f_equalityProbe_ok(f_equalityProbe_loopResult(failed), world)));
+            !checks = checks + 1
+          }
+        };
+        bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+        identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, fixture.xId, LeanCtor(LeanTag.BinderInfo_default, Array[]), fixture.prop, bound);
+        for ((label, left, right, expected) in Array[
+          ("outer empty", Array[], Array[], true),
+          ("outer equal", Array[fixture.x], Array[fixture.x], true),
+          ("outer mismatch", Array[fixture.x], Array[fixture.y], false),
+          ("outer extra args equal", Array[fixture.x, fixture.prop], Array[fixture.x, fixture.prop], true),
+          ("outer extra args differ", Array[fixture.x, fixture.prop], Array[fixture.x, fixture.type], false),
+        ]) {
+          leftArgs = LeanArray(left);
+          rightArgs = LeanArray(right);
+          _ = f_equalityProbe_compare(label, argumentPassCheckpoint, Array[identity, leftArgs, rightArgs],
+            old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqArgs_5347aadf73_fallback(old, identity, leftArgs, rightArgs, argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+            fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_isDefEqArgs_5347aadf73(fresh, identity, leftArgs, rightArgs, argumentContext, state.metaStateRef, argumentCoreContext, state.coreStateRef, world),
+            Some(f_equalityProbe_ok(leanBool(expected), world)));
+          !checks = checks + 1
+        }
+      }
+    };
+    context = f_equalityProbe_configure(runtime, state.metaContext, LeanTag.Meta_TransparencyMode_default, false);
+    core = leanReplaceField(state.coreContext, 3, LeanWord("uint16", 0));
+    assignmentCheckpoint = runtime.checkpoint();
+    for ((label, id, args, value, expected) in Array[
+      ("in scope", fixture.mId, Array[], fixture.x, LeanCtor(LeanTag.Option_some, Array[fixture.x])),
+      ("permitted argument", fixture.nId, Array[fixture.x], fixture.x, LeanCtor(LeanTag.Option_some, Array[fixture.x])),
+      ("bad scope", fixture.nId, Array[], fixture.x, none),
+      ("direct occurs cycle", fixture.mId, Array[], fixture.m, none),
+      ("let replacement", fixture.nId, Array[fixture.x], fixture.z, LeanCtor(LeanTag.Option_some, Array[fixture.x])),
+    ]) {
+      arguments = LeanArray(args);
+      _ = f_equalityProbe_compare(label, assignmentCheckpoint, Array[arguments, value],
+        old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, id, arguments, value, context, state.metaStateRef, core, state.coreStateRef, world),
+        fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, id, arguments, value, context, state.metaStateRef, core, state.coreStateRef, world),
+        Some(f_equalityProbe_ok(expected, world)));
+      !checks = checks + 1
+    };
+    // Distinct nodes with a colliding expression header cannot hide the second free variable.
+    collision = leanReplaceField(fixture.y, 0, leanField(fixture.x, 0));
+    collidingPair = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, fixture.x, collision);
+    _ = f_equalityProbe_compare("assignment hash collision rejects y", assignmentCheckpoint, Array[collidingPair],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, fixture.nId, LeanArray(Array[fixture.x]), collidingPair, context, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, fixture.nId, LeanArray(Array[fixture.x]), collidingPair, context, state.metaStateRef, core, state.coreStateRef, world),
+      Some(f_equalityProbe_ok(none, world)));
+    !checks = checks + 1;
+    // Closed assignments, assigned-mvar substitution, and a cycle through a mvar type.
+    typedId = f_equalityProbe_name(runtime, "typedDependency");
+    typedMVar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, typedId);
+    typedContext = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, fixture.metavariables, typedId, typedId, fixture.locals, LeanArray(Array[]), fixture.m, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    typedRuntime = assignmentCheckpoint.restoreRaw();
+    typedRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(fixture.metaState, 0, typedContext)));
+    _ = f_equalityProbe_compare("cycle through candidate mvar type", typedRuntime.checkpoint(), Array[typedMVar],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, fixture.mId, LeanArray(Array[]), typedMVar, context, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, fixture.mId, LeanArray(Array[]), typedMVar, context, state.metaStateRef, core, state.coreStateRef, world),
+      Some(f_equalityProbe_ok(none, world)));
+    !checks = checks + 1;
+    assignedContext = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, fixture.metavariables, fixture.mId, fixture.x);
+    assignedRuntime = assignmentCheckpoint.restoreRaw();
+    assignedRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(fixture.metaState, 0, assignedContext)));
+    _ = f_equalityProbe_compare("assigned rhs mvar becomes allowed argument", assignedRuntime.checkpoint(), Array[assignedContext],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, fixture.nId, LeanArray(Array[fixture.x]), fixture.m, context, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, fixture.nId, LeanArray(Array[fixture.x]), fixture.m, context, state.metaStateRef, core, state.coreStateRef, world),
+      Some(f_equalityProbe_ok(LeanCtor(LeanTag.Option_some, Array[fixture.x]), world)));
+    !checks = checks + 1;
+    // Argument-type occurs check must precede the otherwise closed-value return.
+    wId = f_equalityProbe_name(runtime, "w");
+    w = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, wId);
+    cyclicLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, fixture.locals, wId, wId, fixture.m, LeanCtor(LeanTag.BinderInfo_default, Array[]), LeanCtor(LeanTag.LocalDeclKind_default, Array[]));
+    cyclicContext = leanReplaceField(context, 3, cyclicLocals);
+    _ = f_equalityProbe_compare("argument type cycle before closed shortcut", assignmentCheckpoint, Array[cyclicContext],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(old, fixture.mId, LeanArray(Array[w]), fixture.prop, cyclicContext, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(fresh, fixture.mId, LeanArray(Array[w]), fixture.prop, cyclicContext, state.metaStateRef, core, state.coreStateRef, world),
+      Some(f_equalityProbe_ok(none, world)));
+    !checks = checks + 1;
+    for (flags in Array[0, 1, 2, 3]) {
+      assignmentCore = leanReplaceField(core, 3, LeanWord("uint16", flags));
+      for ((label, lhs, rhs, expected, assigned) in Array[
+        ("commit compatible", fixture.m, fixture.x, true, true),
+        ("type mismatch no commit", fixture.m, fixture.prop, false, false),
+        ("non mvar ignores value", fixture.x, poison, false, false),
+      ]) {
+        result = f_equalityProbe_compare(label, assignmentCheckpoint, Array[lhs, rhs, assignmentCore],
+          old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25_fallback(old, lhs, rhs, context, state.metaStateRef, assignmentCore, state.coreStateRef, world),
+          fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25(fresh, lhs, rhs, context, state.metaStateRef, assignmentCore, state.coreStateRef, world),
+          Some(f_equalityProbe_ok(leanBool(expected), world)));
+        after = result.i1.restoreRaw();
+        expectedAssignment = if (assigned) LeanCtor(LeanTag.Option_some, Array[fixture.x]) else none;
+        assert(native_eq(f_equalityProbe_assignment(after, state.metaStateRef, fixture.mId), expectedAssignment) == 0);
+        // A successful assignment must not leak to the retained checkpoint.
+        before = assignmentCheckpoint.restoreRaw();
+        assert(native_eq(f_equalityProbe_assignment(before, state.metaStateRef, fixture.mId), none) == 0);
+        !checks = checks + 1
+      }
+    };
+    inferenceError = f_equalityProbe_compare("failed inference does not assign", assignmentCheckpoint, Array[],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25_fallback(old, fixture.m, fixture.missing, context, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25(fresh, fixture.m, fixture.missing, context, state.metaStateRef, core, state.coreStateRef, world));
+    assert(leanTag(inferenceError.i0) == LeanTag.EST_Out_error);
+    assert(native_eq(leanField(inferenceError.i0, 1), world) == 0);
+    errorRuntime = inferenceError.i1.restoreRaw();
+    assert(native_eq(f_equalityProbe_assignment(errorRuntime, state.metaStateRef, fixture.mId), none) == 0);
+    !checks = checks + 1;
+    // Three local declarations x, let z := x, y exercise the in-between-let path.
+    // The resulting real term must reduce to its first argument after two applications.
+    twoId = f_equalityProbe_name(runtime, "twoArguments");
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    twoType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, fixture.xId, binder, fixture.prop,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, fixture.xId, binder, fixture.prop, fixture.prop));
+    twoContext = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, fixture.metavariables, twoId, twoId, fixture.emptyContext, LeanArray(Array[]), twoType, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    twoMVar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, twoId);
+    twoDecl = leanField(L4_Lean_MetavarContext.f_Lean_MetavarContext_findDecl_1605282e53(runtime, twoContext, twoId), 0);
+    twoRuntime = assignmentCheckpoint.restoreRaw();
+    twoRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(fixture.metaState, 0, twoContext)));
+    letPath = f_equalityProbe_compare("process in-between let dependency path", twoRuntime.checkpoint(), Array[twoMVar, twoDecl],
+      old ~> L4_Lean_Meta_ExprDefEq.f_Meta_processAssignment_process_afbeb98acf_fallback(old, twoMVar, twoDecl, LeanNatLiterals.n0, LeanArray(Array[fixture.x, fixture.y]), fixture.x, context, state.metaStateRef, core, state.coreStateRef, world),
+      fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_processAssignment_process_afbeb98acf(fresh, twoMVar, twoDecl, LeanNatLiterals.n0, LeanArray(Array[fixture.x, fixture.y]), fixture.x, context, state.metaStateRef, core, state.coreStateRef, world),
+      Some(f_equalityProbe_ok(leanBool(true), world)));
+    letAfter = letPath.i1.restoreRaw();
+    letAssignment = f_equalityProbe_assignment(letAfter, state.metaStateRef, twoId);
+    assert(leanTag(letAssignment) == LeanTag.Option_some);
+    applied = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(letAfter,
+      L4_Lean_Expr.f_Lean_mkApp_4478491ddb(letAfter, leanField(letAssignment, 0), fixture.x), fixture.y);
+    reduced = L4_Lean_Meta_Basic.f_Lean_Meta_isExprDefEqAux_34c5c35f5e(letAfter, applied, fixture.x, context, state.metaStateRef, core, state.coreStateRef, world);
+    assert(leanTag(reduced) == LeanTag.EST_Out_ok && leanIsTrue(leanField(reduced, 0)));
+    !checks = checks + 1;
+    for ((label, lhs, id, args, rhs, cursor, expected, lambdaAssignment) in Array[
+      ("process empty commit", fixture.m, fixture.mId, Array[], fixture.x, 0, true, false),
+      ("process pattern lambda", fixture.functionMVar, fixture.functionId, Array[fixture.x], fixture.x, 0, true, true),
+      ("process resumed pattern", fixture.functionMVar, fixture.functionId, Array[fixture.x], fixture.x, 1, true, true),
+      ("process duplicate rejects", fixture.functionMVar, fixture.functionId, Array[fixture.x, fixture.x], fixture.x, 0, false, false),
+      ("process non-fvar rejects", fixture.functionMVar, fixture.functionId, Array[fixture.prop], fixture.x, 0, false, false),
+      ("process context-local rejects", fixture.m, fixture.mId, Array[fixture.x], fixture.x, 0, false, false),
+      ("process self-head rejects", fixture.m, fixture.mId, Array[], fixture.m, 0, false, false),
+    ]) {
+      declaration = leanField(L4_Lean_MetavarContext.f_Lean_MetavarContext_findDecl_1605282e53(runtime, fixture.metavariables, id), 0);
+      arguments = LeanArray(args);
+      result = f_equalityProbe_compare(label, assignmentCheckpoint, Array[arguments, rhs, declaration],
+        old ~> L4_Lean_Meta_ExprDefEq.f_Meta_processAssignment_process_afbeb98acf_fallback(old, lhs, declaration, leanNatValue(cursor), arguments, rhs, context, state.metaStateRef, core, state.coreStateRef, world),
+        fresh ~> L4_Lean_Meta_ExprDefEq.f_Meta_processAssignment_process_afbeb98acf(fresh, lhs, declaration, leanNatValue(cursor), arguments, rhs, context, state.metaStateRef, core, state.coreStateRef, world),
+        Some(f_equalityProbe_ok(leanBool(expected), world)));
+      after = result.i1.restoreRaw();
+      assignment = f_equalityProbe_assignment(after, state.metaStateRef, id);
+      if (lambdaAssignment) {
+        assert(leanTag(assignment) == LeanTag.Option_some);
+        lambda = leanField(assignment, 0);
+        assert(leanTag(lambda) == LeanTag.Expr_lam__impl);
+        assert(native_eq(leanField(lambda, 2), fixture.prop) == 0);
+        body = leanField(lambda, 3);
+        assert(leanTag(body) == LeanTag.Expr_bvar__impl);
+        assert(leanNat(leanField(body, 1)) == LeanNat::fromInt(0))
+      } else {
+        assert(native_eq(assignment, if (expected) LeanCtor(LeanTag.Option_some, Array[fixture.x]) else none) == 0)
+      };
+      !checks = checks + 1
+    }
+  };
+  assert(checks == 672);
+  print_string("equality wave: " + checks.toString() + " isolated comparisons with independent expectations")
+}

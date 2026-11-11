@@ -1,0 +1,300 @@
+module L4_Lean_Meta_ExprDefEq;
+
+// "_private.Lean.Meta.ExprDefEq.0.Lean.Meta.checkTypesAndAssign"
+fun f_Lean_Meta_checkTypesAndAssign_592ac0ae25(
+  _runtime: mutable LeanExecution,
+  _mvar_0_input: LeanValue,
+  _v_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_1_6_input: LeanValue,
+): LeanValue {
+  metavariable = _mvar_0_input;
+  candidate = _v_1_input;
+  context = _a_2_input;
+  stateRef = _a_3_input;
+  coreContext = _a_4_input;
+  coreStateRef = _a_5_input;
+  traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
+    LeanText("Meta"),
+    LeanText("isDefEq"),
+    LeanText("assign"),
+    LeanText("checkTypes"),
+  );
+  notMetavariable = leanBool(
+    !f_equalityWave_bool(
+      L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(_runtime, metavariable),
+    ),
+  );
+  coreFields = f_equalityWave_fields(coreContext, LeanTag.Core_Context_mk, 8);
+  options = f_equalityWave_options(coreContext);
+  enabled = leanBool(true);
+  action = LeanClosure(
+    L4_Lean_Meta_ExprDefEq.apply_f_Meta_checkTypesAndAssign_lam_6_c254477e5c,
+    12,
+    Array[
+      notMetavariable,
+      metavariable,
+      candidate,
+      enabled,
+      LeanText("Meta"),
+      LeanText("isDefEq"),
+      traceClass,
+    ],
+  );
+  // The existing action owns all actual type comparison, assignment and backtracking.
+  if (!f_equalityWave_bool(leanField(options, 1))) {
+    return f_Meta_checkTypesAndAssign_lam_6_c254477e5c(
+      _runtime,
+      notMetavariable,
+      metavariable,
+      candidate,
+      enabled,
+      LeanText("Meta"),
+      LeanText("isDefEq"),
+      traceClass,
+      context,
+      stateRef,
+      coreContext,
+      coreStateRef,
+      _a_1_6_input,
+    )
+  };
+  traceEnabled = leanBool(
+    f_equalityWave_traceEnabled(_runtime, coreContext, traceClass),
+  );
+  if (!f_equalityWave_bool(traceEnabled)) {
+    profilerOption = leanReadInitializer(_runtime, "Lean.trace.profiler");
+    profilerEnabled = f_Meta_checkTypesAndAssign_spec_2_95bc3b8040(
+      _runtime,
+      options,
+      profilerOption,
+    );
+    if (!f_equalityWave_bool(profilerEnabled)) {
+      return f_Meta_checkTypesAndAssign_lam_6_c254477e5c(
+        _runtime,
+        notMetavariable,
+        metavariable,
+        candidate,
+        enabled,
+        LeanText("Meta"),
+        LeanText("isDefEq"),
+        traceClass,
+        context,
+        stateRef,
+        coreContext,
+        coreStateRef,
+        _a_1_6_input,
+      )
+    }
+  };
+  // Save and clear only the trace collection, using the original ref get/take/put helper.
+  savedTracesResult = f_Meta_checkTypesAndAssign_spec_1_39f0d9bdff(
+    _runtime,
+    coreStateRef,
+    _a_1_6_input,
+  );
+  if (f_equalityWave_isError(savedTracesResult)) {
+    return leanFail(
+      "unreachable: _private.Lean.Meta.ExprDefEq.0.Lean.Meta.checkTypesAndAssign",
+    )
+  };
+  savedTraces = leanField(savedTracesResult, 0);
+  savedTracesWorld = leanField(savedTracesResult, 1);
+  syntaxRef = coreFields[2];
+  replacedRef = L4_Init_Prelude.f_Lean_replaceRef_b8b2945239(
+    _runtime,
+    syntaxRef,
+    syntaxRef,
+  );
+  messageContext = LeanCtor(
+    LeanTag.Core_Context_mk,
+    Array[
+      coreFields[0],
+      coreFields[1],
+      replacedRef,
+      coreFields[3],
+      LeanErased(),
+      coreFields[5],
+      coreFields[6],
+      coreFields[7],
+    ],
+  );
+  metavariableTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    _runtime,
+    metavariable,
+    context,
+    stateRef,
+    messageContext,
+    coreStateRef,
+    savedTracesWorld,
+  );
+  if (f_equalityWave_isError(metavariableTypeResult)) {
+    return f_equalityWave_error(metavariableTypeResult)
+  };
+  metavariableType = leanField(metavariableTypeResult, 0);
+  candidateTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    _runtime,
+    candidate,
+    context,
+    stateRef,
+    messageContext,
+    coreStateRef,
+    leanField(metavariableTypeResult, 1),
+  );
+  if (f_equalityWave_isError(candidateTypeResult)) {
+    return f_equalityWave_error(candidateTypeResult)
+  };
+  candidateType = leanField(candidateTypeResult, 0);
+  opening = f_equalityWave_message(_runtime, "(");
+  metavariableMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+    _runtime,
+    metavariable,
+  );
+  message = f_equalityWave_compose(opening, metavariableMessage);
+  colon = f_equalityWave_message(_runtime, " : ");
+  !message = f_equalityWave_compose(message, colon);
+  metavariableTypeMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+    _runtime,
+    metavariableType,
+  );
+  !message = f_equalityWave_compose(message, metavariableTypeMessage);
+  assignment = f_equalityWave_message(_runtime, ") := (");
+  !message = f_equalityWave_compose(message, assignment);
+  candidateMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+    _runtime,
+    candidate,
+  );
+  !message = f_equalityWave_compose(message, candidateMessage);
+  !message = f_equalityWave_compose(message, colon);
+  candidateTypeMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+    _runtime,
+    candidateType,
+  );
+  !message = f_equalityWave_compose(message, candidateTypeMessage);
+  closing = f_equalityWave_message(_runtime, ")");
+  !message = f_equalityWave_compose(message, closing);
+  contextualMessage = f_go_spec_1_spec_1_0840abbeed(
+    _runtime,
+    message,
+    context,
+    stateRef,
+    messageContext,
+    coreStateRef,
+    leanField(candidateTypeResult, 1),
+  );
+  if (f_equalityWave_isError(contextualMessage)) {
+    return leanFail(
+      "unreachable: _private.Lean.Meta.ExprDefEq.0.Lean.Meta.checkTypesAndAssign",
+    )
+  };
+  contextualPayload = leanField(contextualMessage, 0);
+  contextualWorld = leanField(contextualMessage, 1);
+  heartbeatOption = leanReadInitializer(
+    _runtime,
+    "Lean.trace.profiler.useHeartbeats",
+  );
+  useHeartbeats = f_equalityWave_bool(
+    f_Meta_checkTypesAndAssign_spec_2_95bc3b8040(
+      _runtime,
+      options,
+      heartbeatOption,
+    ),
+  );
+  start = f_equalityWave_expect(
+    if (useHeartbeats) {
+      L4_Init_System_IO.f_IO_getNumHeartbeats_2b32cd415d(
+        _runtime,
+        contextualWorld,
+      )
+    } else {
+      L4_Init_System_IO.f_IO_monoNanosNow_f8df510195(_runtime, contextualWorld)
+    },
+    LeanTag.ST_Out_mk,
+  );
+  startValue = leanField(start, 0);
+  startWorld = leanField(start, 1);
+  result = leanApply(
+    _runtime,
+    action,
+    Array[context, stateRef, coreContext, coreStateRef, startWorld],
+  );
+  outcome = if (f_equalityWave_isError(result)) {
+    LeanCtor(LeanTag.Except_error, Array[leanField(result, 0)])
+  } else {
+    LeanCtor(LeanTag.Except_ok, Array[leanField(result, 0)])
+  };
+  // Sample and finalize on both success and monadic error; never bypass trace restoration.
+  stop = f_equalityWave_expect(
+    if (useHeartbeats) {
+      L4_Init_System_IO.f_IO_getNumHeartbeats_2b32cd415d(
+        _runtime,
+        leanField(result, 1),
+      )
+    } else {
+      L4_Init_System_IO.f_IO_monoNanosNow_f8df510195(
+        _runtime,
+        leanField(result, 1),
+      )
+    },
+    LeanTag.ST_Out_mk,
+  );
+  stopValue = leanField(stop, 0);
+  stopWorld = leanField(stop, 1);
+  startFloat = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
+    _runtime,
+    startValue,
+  );
+  stopFloat: LeanValue = LeanErased();
+  if (useHeartbeats) {
+    !stopFloat = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
+      _runtime,
+      stopValue,
+    )
+  } else {
+    nanosecondsPerSecond = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
+      _runtime,
+      LeanNatLiterals.n1000000000,
+    );
+    !startFloat = L4_Init_Data_Float_Float.f_Float_div_d042bd12c0(
+      _runtime,
+      startFloat,
+      nanosecondsPerSecond,
+    );
+    !stopFloat = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(
+      _runtime,
+      stopValue,
+    );
+    !stopFloat = L4_Init_Data_Float_Float.f_Float_div_d042bd12c0(
+      _runtime,
+      stopFloat,
+      nanosecondsPerSecond,
+    )
+  };
+  timedOutcome = f_equalityWave_pair(
+    outcome,
+    f_equalityWave_pair(startFloat, stopFloat),
+  );
+  f_Meta_checkTypesAndAssign_spec_3_6f7a18c46c(
+    _runtime,
+    traceClass,
+    enabled,
+    LeanText(""),
+    options,
+    traceEnabled,
+    savedTraces,
+    syntaxRef,
+    contextualPayload,
+    timedOutcome,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    stopWorld,
+  )
+}
+
+module end;

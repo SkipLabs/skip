@@ -1,0 +1,665 @@
+module L4_Lean_Meta_Tactic_Simp_Rewrite;
+
+// Validate the same constructor projections as the original, including discarded fields.
+fun f_rewriteWave_theorem_fields(
+  value: LeanValue,
+  tag: LeanTag.Value,
+  count: Int,
+): Array<LeanValue> {
+  if (leanTag(value) != tag) return leanFail("non-exhaustive Lean case");
+  for (index in Range(0, count)) {
+    _ = leanField(value, index)
+  };
+  value match {
+  | LeanCtor(_, fields) -> fields
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_theorem_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Preserve error payload and returned world, rather than converting failure to no-match.
+fun f_rewriteWave_theorem_ok(output: LeanValue): Bool {
+  leanTag(output) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_theorem_none(world: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  )
+}
+
+fun f_rewriteWave_theorem_infallible(output: LeanValue): Array<LeanValue> {
+  if (!f_rewriteWave_theorem_ok(output)) {
+    return leanFail(
+      "unreachable: _private.Lean.Meta.Tactic.Simp.Rewrite.0.Lean.Meta.Simp.tryTheoremCore.go",
+    )
+  };
+  Array[leanField(output, 0), leanField(output, 1)]
+}
+
+fun f_rewriteWave_theorem_text(
+  runtime: mutable LeanExecution,
+  text: String,
+): LeanValue {
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText(text))
+}
+
+fun f_rewriteWave_theorem_compose(
+  left: LeanValue,
+  right: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.MessageData_compose, Array[left, right])
+}
+
+// Each call corresponds to one old trace branch. MessageData remains left-associated;
+// theorem rendering is deferred until both the global and named trace gates pass.
+fun f_rewriteWave_theorem_trace(
+  runtime: mutable LeanExecution,
+  reason: String,
+  debugClass: LeanValue,
+  theorem: LeanValue,
+  expression: LeanValue,
+  lhs: LeanValue,
+  type: LeanValue,
+  rhs: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  core = f_rewriteWave_theorem_fields(coreContext, LeanTag.Core_Context_mk, 8);
+  cold = f_rewriteWave_theorem_fields(
+    core[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  options = f_rewriteWave_theorem_fields(
+    cold[2],
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
+    2,
+  );
+  if (!f_rewriteWave_theorem_bool(options[1])) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world],
+    )
+  };
+  traceClass = debugClass;
+  if (reason != "trying" && reason != "unchanged") {
+    suffix = if (reason == "unify") "unify" else "rewrite";
+    !traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+      runtime,
+      LeanText("Meta"),
+      LeanText("Tactic"),
+      LeanText("simp"),
+      LeanText(suffix),
+    )
+  };
+  tracePrefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("trace"),
+  );
+  optionName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+    runtime,
+    tracePrefix,
+    traceClass,
+  );
+  enabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(
+    runtime,
+    cold[11],
+    cold[2],
+    optionName,
+  );
+  if (!f_rewriteWave_theorem_bool(enabled)) {
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world],
+    )
+  };
+  rendered = f_rewriteWave_theorem_infallible(
+    f_tryTheoremCore_go_spec_0_1ba57450a8(runtime, theorem, world),
+  );
+  message = rendered[0];
+  reason match {
+  | "trying" ->
+    tryingPrefix = f_rewriteWave_theorem_text(runtime, "trying ");
+    !message = f_rewriteWave_theorem_compose(tryingPrefix, message);
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, " to rewrite"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, expression),
+    )
+  | "unify" ->
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, ", failed to unify"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, lhs),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, "\nwith"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, expression),
+    )
+  | "unassigned" ->
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(
+        runtime,
+        ", has unassigned metavariables after unification",
+      ),
+    )
+  | "unchanged" ->
+    unchangedPrefix = f_rewriteWave_theorem_text(runtime, "Not applying ");
+    !message = f_rewriteWave_theorem_compose(unchangedPrefix, message);
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, " with type"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, type),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, "\nto"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, expression),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(
+        runtime,
+        "\nas the result is structurally equal to the original expression",
+      ),
+    )
+  | "permutation" ->
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, ", perm rejected "),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, expression),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, " ==> "),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, rhs),
+    )
+  | "rewrite" ->
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, ":"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, expression),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      f_rewriteWave_theorem_text(runtime, "\n==>"),
+    );
+    !message = f_rewriteWave_theorem_compose(
+      message,
+      L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, rhs),
+    )
+  | _ -> return leanFail("unknown rewrite-wave trace reason")
+  };
+  f_synthesizeArgs_synthesizeInstance_spec_0_62b88d54be(
+    runtime,
+    traceClass,
+    message,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    rendered[1],
+  )
+}
+
+// "_private.Lean.Meta.Tactic.Simp.Rewrite.0.Lean.Meta.Simp.tryTheoremCore.go"
+fun f_Simp_tryTheoremCore_go_eda42a565c(
+  _runtime: mutable LeanExecution,
+  _lhs_0_input: LeanValue,
+  _xs_1_input: LeanValue,
+  _bis_2_input: LeanValue,
+  _val_3_input: LeanValue,
+  _type_4_input: LeanValue,
+  _thm_5_input: LeanValue,
+  _e_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_8_input: LeanValue,
+  _a_9_input: LeanValue,
+  _a_10_input: LeanValue,
+  _a_11_input: LeanValue,
+  _a_12_input: LeanValue,
+  _a_13_input: LeanValue,
+  _a_1_14_input: LeanValue,
+): LeanValue {
+  lhs = _lhs_0_input;
+  arguments = _xs_1_input;
+  binderInfos = _bis_2_input;
+  value = _val_3_input;
+  type = _type_4_input;
+  theorem = _thm_5_input;
+  expression = _e_6_input;
+  methods = _a_7_input;
+  simpContext = _a_8_input;
+  simpState = _a_9_input;
+  metaContext = _a_10_input;
+  metaState = _a_11_input;
+  coreContext = _a_12_input;
+  coreState = _a_13_input;
+  world = _a_1_14_input;
+  // The initial trace class is constructed even when hasTrace is false.
+  core = f_rewriteWave_theorem_fields(coreContext, LeanTag.Core_Context_mk, 8);
+  cold = f_rewriteWave_theorem_fields(
+    core[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  _validatedTraceOptions = f_rewriteWave_theorem_fields(
+    cold[2],
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
+    2,
+  );
+  debugClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    _runtime,
+    LeanText("Debug"),
+    LeanText("Meta"),
+    LeanText("Tactic"),
+    LeanText("simp"),
+  );
+  initialTrace = f_rewriteWave_theorem_trace(
+    _runtime,
+    "trying",
+    debugClass,
+    theorem,
+    expression,
+    lhs,
+    type,
+    expression,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_theorem_ok(initialTrace)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(initialTrace, 0), leanField(initialTrace, 1)],
+    )
+  };
+  !world = leanField(initialTrace, 1);
+  simp = f_rewriteWave_theorem_fields(
+    simpContext,
+    LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk,
+    13,
+  );
+  unificationConfig = f_rewriteWave_theorem_fields(
+    simp[4],
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    2,
+  )[0];
+  meta = f_rewriteWave_theorem_fields(metaContext, LeanTag.Meta_Context_mk, 11);
+  configKey = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(
+    _runtime,
+    unificationConfig,
+  );
+  keyedConfig = LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    Array[unificationConfig, configKey],
+  );
+  unificationContext = LeanCtor(
+    LeanTag.Meta_Context_mk,
+    Array[
+      keyedConfig,
+      meta[1],
+      meta[2],
+      meta[3],
+      meta[4],
+      meta[5],
+      meta[6],
+      meta[7],
+      meta[8],
+      meta[9],
+      meta[10],
+    ],
+  );
+  unified = L4_Lean_Meta_Basic.f_Lean_Meta_isExprDefEq_fd77ff0762(
+    _runtime,
+    lhs,
+    expression,
+    unificationContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_theorem_ok(unified)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(unified, 0), leanField(unified, 1)],
+    )
+  };
+  !world = leanField(unified, 1);
+  if (!f_rewriteWave_theorem_bool(leanField(unified, 0))) {
+    // A metavariable lhs suppresses only the unification-failure trace.
+    if (
+      !f_rewriteWave_theorem_bool(
+        L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(_runtime, lhs),
+      )
+    ) {
+      unifyTrace = f_rewriteWave_theorem_trace(
+        _runtime,
+        "unify",
+        debugClass,
+        theorem,
+        expression,
+        lhs,
+        type,
+        expression,
+        metaContext,
+        metaState,
+        coreContext,
+        coreState,
+        world,
+      );
+      if (!f_rewriteWave_theorem_ok(unifyTrace)) {
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(unifyTrace, 0), leanField(unifyTrace, 1)],
+        )
+      };
+      !world = leanField(unifyTrace, 1)
+    };
+    return f_rewriteWave_theorem_none(world)
+  };
+  theoremFields = f_rewriteWave_theorem_fields(
+    theorem,
+    LeanTag.Meta_SimpTheorem_mk,
+    9,
+  );
+  permutation = theoremFields[5];
+  origin = theoremFields[6];
+  cacheable = LeanCtor(LeanTag.Bool_true, Array[]);
+  // Synthesis includes discharge and instance synthesis; it must not be replaced by a shape test.
+  synthesized = f_Meta_Simp_synthesizeArgs_90b51d5f19(
+    _runtime,
+    origin,
+    binderInfos,
+    arguments,
+    methods,
+    simpContext,
+    simpState,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_theorem_ok(synthesized)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(synthesized, 0), leanField(synthesized, 1)],
+    )
+  };
+  !world = leanField(synthesized, 1);
+  if (!f_rewriteWave_theorem_bool(leanField(synthesized, 0))) {
+    return f_rewriteWave_theorem_none(world)
+  };
+  implicitPolicy = f_rewriteWave_theorem_infallible(
+    f_Meta_Simp_useImplicitDefEqProof_d14778fc57(
+      _runtime,
+      theorem,
+      simpContext,
+      coreContext,
+      world,
+    ),
+  );
+  !world = implicitPolicy[1];
+  proof = LeanCtor(LeanTag.Option_none, Array[]);
+  if (!f_rewriteWave_theorem_bool(implicitPolicy[0])) {
+    applied = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(_runtime, value, arguments);
+    instantiated = f_rewriteWave_theorem_infallible(
+      f_Simp_synthesizeArgs_spec_0_3671ba3076(
+        _runtime,
+        applied,
+        metaState,
+        world,
+      ),
+    );
+    !world = instantiated[1];
+    hasAssignable = L4_Lean_Meta_HasAssignableMVar.f_Lean_Meta_hasAssignableMVar_ec9fff8315(
+      _runtime,
+      instantiated[0],
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!f_rewriteWave_theorem_ok(hasAssignable)) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(hasAssignable, 0), leanField(hasAssignable, 1)],
+      )
+    };
+    !world = leanField(hasAssignable, 1);
+    if (f_rewriteWave_theorem_bool(leanField(hasAssignable, 0))) {
+      unassignedTrace = f_rewriteWave_theorem_trace(
+        _runtime,
+        "unassigned",
+        debugClass,
+        theorem,
+        expression,
+        lhs,
+        type,
+        expression,
+        metaContext,
+        metaState,
+        coreContext,
+        coreState,
+        world,
+      );
+      if (!f_rewriteWave_theorem_ok(unassignedTrace)) {
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(unassignedTrace, 0), leanField(unassignedTrace, 1)],
+        )
+      };
+      return f_rewriteWave_theorem_none(leanField(unassignedTrace, 1))
+    };
+    !proof = LeanCtor(LeanTag.Option_some, Array[instantiated[0]])
+  };
+  instantiatedType = f_rewriteWave_theorem_infallible(
+    f_Simp_synthesizeArgs_spec_0_3671ba3076(_runtime, type, metaState, world),
+  );
+  rhs = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(
+    _runtime,
+    instantiatedType[0],
+  );
+  instantiatedExpr = f_rewriteWave_theorem_infallible(
+    f_Simp_synthesizeArgs_spec_0_3671ba3076(
+      _runtime,
+      expression,
+      metaState,
+      instantiatedType[1],
+    ),
+  );
+  !world = instantiatedExpr[1];
+  same = L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(
+    _runtime,
+    instantiatedExpr[0],
+    rhs,
+  );
+  if (f_rewriteWave_theorem_bool(same)) {
+    unchangedTrace = f_rewriteWave_theorem_trace(
+      _runtime,
+      "unchanged",
+      debugClass,
+      theorem,
+      expression,
+      lhs,
+      type,
+      rhs,
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!f_rewriteWave_theorem_ok(unchangedTrace)) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(unchangedTrace, 0), leanField(unchangedTrace, 1)],
+      )
+    };
+    return f_rewriteWave_theorem_none(leanField(unchangedTrace, 1))
+  };
+  if (f_rewriteWave_theorem_bool(permutation)) {
+    order = L4_Lean_Meta_ACLt.f_Lean_Meta_acLt_abc2aa8553(
+      _runtime,
+      rhs,
+      expression,
+      LeanCtor(LeanTag.Meta_ACLt_ReduceMode_reduceSimpleOnly, Array[]),
+      metaContext,
+      metaState,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!f_rewriteWave_theorem_ok(order)) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(order, 0), leanField(order, 1)],
+      )
+    };
+    !world = leanField(order, 1);
+    if (!f_rewriteWave_theorem_bool(leanField(order, 0))) {
+      permutationTrace = f_rewriteWave_theorem_trace(
+        _runtime,
+        "permutation",
+        debugClass,
+        theorem,
+        expression,
+        lhs,
+        type,
+        rhs,
+        metaContext,
+        metaState,
+        coreContext,
+        coreState,
+        world,
+      );
+      if (!f_rewriteWave_theorem_ok(permutationTrace)) {
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(permutationTrace, 0), leanField(permutationTrace, 1)],
+        )
+      };
+      return f_rewriteWave_theorem_none(leanField(permutationTrace, 1))
+    }
+  };
+  rewriteTrace = f_rewriteWave_theorem_trace(
+    _runtime,
+    "rewrite",
+    debugClass,
+    theorem,
+    expression,
+    lhs,
+    type,
+    rhs,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_theorem_ok(rewriteTrace)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(rewriteTrace, 0), leanField(rewriteTrace, 1)],
+    )
+  };
+  !world = leanField(rewriteTrace, 1);
+  if (
+    f_rewriteWave_theorem_bool(
+      L4_Lean_Meta_BinderNameHint.f_Lean_Expr_hasBinderNameHint_986b3d1a1e(
+        _runtime,
+        type,
+      ),
+    )
+  ) {
+    resolved = L4_Lean_Meta_BinderNameHint.f_Lean_Expr_resolveBinderNameHint_1afc5dc5e3(
+      _runtime,
+      rhs,
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!f_rewriteWave_theorem_ok(resolved)) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(resolved, 0), leanField(resolved, 1)],
+      )
+    };
+    !rhs = leanField(resolved, 0);
+    !world = leanField(resolved, 1)
+  };
+  recorded = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_recordSimpTheorem_aa5c92accb(
+    _runtime,
+    origin,
+    simpState,
+    coreContext,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_theorem_ok(recorded)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(recorded, 0), leanField(recorded, 1)],
+    )
+  };
+  result = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[rhs, proof, cacheable]);
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[result]), leanField(recorded, 1)],
+  )
+}
+
+module end;

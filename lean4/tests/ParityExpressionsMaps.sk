@@ -1,0 +1,155 @@
+fun f_expressionsProbe_insert(
+  runtime: mutable LeanExecution, family: Int, fallback: Bool,
+  node: LeanValue, hash: LeanValue, depth: LeanValue,
+  key: LeanValue, value: LeanValue,
+): LeanValue {
+  family match {
+  | 0 ->
+    call = if (fallback) L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c_fallback else L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c;
+    call(runtime, node, hash, depth, key, value)
+  | 1 ->
+    call = if (fallback) L4_Lean_MetavarContext.f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a_fallback else L4_Lean_MetavarContext.f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a;
+    call(runtime, node, hash, depth, key, value)
+  | 2 ->
+    call = if (fallback) L4_Lean_MetavarContext.f_assignLevelMVarExp_spec_0_spec_0_c459d88a74_fallback else L4_Lean_MetavarContext.f_assignLevelMVarExp_spec_0_spec_0_c459d88a74;
+    call(runtime, node, hash, depth, key, value)
+  | 3 ->
+    call = if (fallback) L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_eab4f1c354_fallback else L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_eab4f1c354;
+    call(runtime, node, hash, depth, key, value)
+  | _ -> leanFail("invalid map probe family")
+  }
+}
+
+fun f_expressionsProbe_entry(key: LeanValue, value: LeanValue): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+}
+fun f_expressionsProbe_entries(items: Array<LeanValue>): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(items)])
+}
+fun f_expressionsProbe_collision(keys: Array<LeanValue>, values: Array<LeanValue>): LeanValue {
+  LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[LeanArray(keys), LeanArray(values), LeanErased()])
+}
+
+// Independent semantic model: visit every stored entry, without hashing,
+// insertion, or production lookup. Match the expected finite association list.
+fun f_expressionsProbe_pairs(node: LeanValue): Array<(LeanValue, LeanValue)> {
+  leanTag(node) match {
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanArray(leanField(node, 0));
+    values = leanArray(leanField(node, 1));
+    assert(keys.size() == values.size());
+    Array::fillBy(keys.size(), i -> (keys[i], values[i]))
+  | LeanTag.PersistentHashMap_Node_entries ->
+    result: Array<(LeanValue, LeanValue)> = Array[];
+    for (entry in leanArray(leanField(node, 0))) {
+      leanTag(entry) match {
+      | LeanTag.PersistentHashMap_Entry_null -> void
+      | LeanTag.PersistentHashMap_Entry_entry ->
+        !result = result.concat(Array[(leanField(entry, 0), leanField(entry, 1))])
+      | LeanTag.PersistentHashMap_Entry_ref ->
+        !result = result.concat(f_expressionsProbe_pairs(leanField(entry, 0)))
+      | _ -> leanFail("invalid stored entry")
+      }
+    };
+    result
+  | _ -> leanFail("invalid stored map node")
+  }
+}
+
+fun f_expressionsProbe_mapCase(
+  saved: LeanExecutionCheckpoint, family: Int, label: String,
+  node: LeanValue, hash: LeanValue, depth: LeanValue,
+  key: LeanValue, value: LeanValue,
+  expectedPairs: Array<(LeanValue, LeanValue)>, expected: ?LeanValue = None(),
+): LeanValue {
+  snapshot = rewriteProbeCopyInput(node);
+  // Keep the root in a real checkpoint reference as well as a lexical alias.
+  // A mutation would then corrupt both the old checkpoint and the other run.
+  holder = saved.restoreRaw();
+  rootRef = holder.newRef(node);
+  rooted = holder.checkpoint();
+  result = f_expressionsProbe_compare(label, rooted,
+    r ~> f_expressionsProbe_insert(r, family, true, node, hash, depth, key, value),
+    r ~> f_expressionsProbe_insert(r, family, false, node, hash, depth, key, value), expected);
+  assert(rewriteProbeSameInput(snapshot, node));
+  assert(leanSameObject(rooted.restoreRaw().readRef(rootRef), node) != 0);
+  pairs = f_expressionsProbe_pairs(result);
+  assert(pairs.size() == expectedPairs.size());
+  for ((wantedKey, wantedValue) in expectedPairs) {
+    found = 0;
+    for ((actualKey, actualValue) in pairs) {
+      if (native_eq(wantedKey, actualKey) == 0) {
+        !found = found + 1;
+        assert(native_eq(wantedValue, actualValue) == 0);
+        // Values are opaque to insertion and must not be copied/rebuilt.
+        assert(leanSameObject(wantedValue, actualValue) != 0)
+      }
+    };
+    assert(found == 1)
+  };
+  result
+}
+
+fun main(): void {
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{profileRuntime => profile};
+    _sentinel = builder.newRef(LeanText("persistent map checkpoint"));
+    keys = Array["a", "b", "c", "d", "e"].map(s -> f_expressionsProbe_name(builder, s));
+    // The specializations never inspect values; real Expr/Level/decl values
+    // are exercised by the binding driver and existing MVarProbe.
+    values: Array<LeanValue> = Array[LeanText("a-value"), LeanText("b-value"), LeanText("c-value"), LeanText("d-value"), LeanText("updated")];
+    saved = builder.checkpoint();
+    nullEntry = LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[]);
+    for (family in Range(0, 4)) {
+      empty = f_expressionsProbe_entries(Array[]);
+      noChange = f_expressionsProbe_mapCase(saved, family, "out of bounds", empty,
+        LeanWord("usize", 31), LeanWord("usize", 1), keys[0], values[0], Array[], Some(empty));
+      assert(leanSameObject(noChange, empty) != 0);
+      leaf = f_expressionsProbe_entries(Array[nullEntry]);
+      insertedExpected = f_expressionsProbe_entries(Array[f_expressionsProbe_entry(keys[0], values[0])]);
+      inserted = f_expressionsProbe_mapCase(saved, family, "null slot / word modulo", leaf,
+        LeanScalar("usize", "18446744073709551616"), LeanWord("usize", 1), keys[0], values[0], Array[(keys[0], values[0])], Some(insertedExpected));
+      replacedExpected = f_expressionsProbe_entries(Array[f_expressionsProbe_entry(keys[0], values[4])]);
+      replaced = f_expressionsProbe_mapCase(saved, family, "equal key", inserted,
+        LeanWord("usize", 0), LeanWord("usize", 1), keys[0], values[4], Array[(keys[0], values[4])], Some(replacedExpected));
+      assert(leanSameObject(leanField(leanArray(leanField(replaced, 0))[0], 0), keys[0]) != 0);
+      two = f_expressionsProbe_collision(Array[keys[0], keys[1]], Array[values[0], values[1]]);
+      _ = f_expressionsProbe_mapCase(saved, family, "distinct leaf collision", inserted,
+        LeanWord("usize", 0), LeanWord("usize", 1), keys[1], values[1], Array[(keys[0], values[0]), (keys[1], values[1])],
+        Some(f_expressionsProbe_entries(Array[LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[two])])));
+      sibling = f_expressionsProbe_entry(keys[4], values[4]);
+      nested = f_expressionsProbe_entries(Array[LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[leaf]), sibling]);
+      nestedResult = f_expressionsProbe_mapCase(saved, family, "ref descent / depth wrap", nested,
+        LeanWord("usize", 0), LeanScalar("usize", "18446744073709551615"), keys[0], values[0], Array[(keys[0], values[0]), (keys[4], values[4])],
+        Some(f_expressionsProbe_entries(Array[LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[insertedExpected]), sibling])));
+      assert(leanSameObject(leanArray(leanField(nestedResult, 0))[1], sibling) != 0);
+      // Low slot 1, then slot 0 after >> 5; also a nonzero child slot.
+      childSlots = f_expressionsProbe_entries(Array[nullEntry, nullEntry]);
+      shifted = f_expressionsProbe_entries(Array[sibling, LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[childSlots])]);
+      _ = f_expressionsProbe_mapCase(saved, family, "hash suffix shift", shifted,
+        LeanWord("usize", 33), LeanWord("usize", 1), keys[0], values[0], Array[(keys[4], values[4]), (keys[0], values[0])]);
+      fullHashRoot = f_expressionsProbe_entries(Array::fill(32, (nullEntry : LeanValue)));
+      fullHashResult = f_expressionsProbe_mapCase(saved, family, "full unsigned hash selects slot 31", fullHashRoot,
+        LeanScalar("usize", "18446744073709551615"), LeanWord("usize", 1), keys[0], values[0], Array[(keys[0], values[0])]);
+      fullEntries = leanArray(leanField(fullHashResult, 0));
+      assert(leanTag(fullEntries[31]) == LeanTag.PersistentHashMap_Entry_entry);
+      for (slot in Range(0, 31)) assert(leanSameObject(fullEntries[slot], nullEntry) != 0);
+      for (depth in Array[1, 6, 7, 8]) {
+        three = f_expressionsProbe_collision(Array[keys[0], keys[1], keys[2]], Array[values[0], values[1], values[2]]);
+        _ = f_expressionsProbe_mapCase(saved, family, "collision append size 3", two,
+          LeanWord("usize", 0), LeanWord("usize", depth), keys[2], values[2], Array[(keys[0], values[0]), (keys[1], values[1]), (keys[2], values[2])], Some(three));
+        _ = f_expressionsProbe_mapCase(saved, family, "collision overwrite", three,
+          LeanWord("usize", 0), LeanWord("usize", depth), keys[1], values[4], Array[(keys[0], values[0]), (keys[1], values[4]), (keys[2], values[2])]);
+        four = f_expressionsProbe_mapCase(saved, family, "collision threshold 4", three,
+          LeanWord("usize", 0), LeanWord("usize", depth), keys[3], values[3], Array[(keys[0], values[0]), (keys[1], values[1]), (keys[2], values[2]), (keys[3], values[3])]);
+        assert(leanTag(four) == (if (depth < 7) LeanTag.PersistentHashMap_Node_entries else LeanTag.PersistentHashMap_Node_collision));
+        // Even overwrite triggers expansion if an oversized collision is supplied.
+        oversized = f_expressionsProbe_collision(keys.take(4), values.take(4));
+        _ = f_expressionsProbe_mapCase(saved, family, "size 4 overwrite threshold", oversized,
+          LeanWord("usize", 0), LeanWord("usize", depth), keys[0], values[4], Array[(keys[0], values[4]), (keys[1], values[1]), (keys[2], values[2]), (keys[3], values[3])])
+      };
+      f_expressionsProbe_stateEqual(saved, saved.restoreRaw().checkpoint())
+    }
+  };
+  print_string("expressions persistent maps passed")
+}

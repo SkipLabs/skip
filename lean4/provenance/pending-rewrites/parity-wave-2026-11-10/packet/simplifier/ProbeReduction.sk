@@ -1,0 +1,244 @@
+class ParitySimplifierFixture(
+  saved: LeanExecutionCheckpoint, meta: LeanValue, metaRef: LeanValue,
+  core: LeanValue, coreRef: LeanValue, context: LeanValue, stateRef: LeanValue,
+  methods: LeanValue,
+)
+
+fun f_paritySimplifierReductionCheck(label: String, fixture: ParitySimplifierFixture,
+  kind: Int, expression: LeanValue, world: LeanValue, expected: ?LeanValue,
+): (LeanValue, LeanExecutionCheckpoint) {
+  originalInputs = LeanArray(Array[expression, fixture.context, fixture.meta, fixture.core]);
+  oldInputs = rewriteProbeCopyInput(originalInputs);
+  newInputs = rewriteProbeCopyInput(originalInputs);
+  comparison = rewriteProbeCompare(label, fixture.saved,
+    (runtime: mutable LeanExecution) ~> {
+      input = leanArray(oldInputs);
+      output = kind match {
+      | 0 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceStep_e0a2562bfe_fallback(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 1 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduce_2d4439ae62_fallback(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 2 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69_fallback(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 3 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpImpl_d6934cdfe0_fallback(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | _ ->
+        config = leanField(input[1], 0);
+        head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, input[0]);
+        L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b_fallback(runtime,
+          head, leanBool(true), leanBool(false), input[0], leanField(config, 21), leanField(config, 23),
+          leanField(config, 5), leanField(config, 9), leanField(config, 10), LeanCtor(LeanTag.PUnit_unit, Array[]),
+          fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      };
+      assert(rewriteProbeSameInput(oldInputs, originalInputs));
+      output
+    },
+    (runtime: mutable LeanExecution) ~> {
+      input = leanArray(newInputs);
+      output = kind match {
+      | 0 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceStep_e0a2562bfe(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 1 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduce_2d4439ae62(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 2 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | 3 -> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpImpl_d6934cdfe0(runtime,
+        input[0], fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      | _ ->
+        config = leanField(input[1], 0);
+        head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, input[0]);
+        L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b(runtime,
+          head, leanBool(true), leanBool(false), input[0], leanField(config, 21), leanField(config, 23),
+          leanField(config, 5), leanField(config, 9), leanField(config, 10), LeanCtor(LeanTag.PUnit_unit, Array[]),
+          fixture.methods, input[1], fixture.stateRef, input[2], fixture.metaRef, input[3], fixture.coreRef, world)
+      };
+      assert(rewriteProbeSameInput(newInputs, originalInputs));
+      output
+    }, expected);
+  (outcome, _) = comparison;
+  if (expected.isNone()) assert(leanTag(outcome) == LeanTag.EST_Out_error);
+  comparison
+}
+
+// Captures logRef, isPost, fail; followed by the nine DSimproc ABI arguments.
+fun f_paritySimplifierObserveDsimp(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  assert(leanIsTrue(leanField(args[5], 12)));
+  label = if (leanIsTrue(args[1])) LeanText("post") else LeanText("pre");
+  log = leanArray(runtime.readRef(args[0]));
+  runtime.writeRef(args[0], Some(LeanArray(log.append(label))));
+  state = runtime.readRef(args[6]);
+  runtime.writeRef(args[6], Some(leanReplaceField(state, 2, LeanUnavailable("callback cache marker"))));
+  nextWorld = leanBoxNat(leanNat(args[11]).add(LeanNat::fromInt(1)));
+  if (leanIsTrue(args[2])) {
+    message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText("parity dsimp callback error"));
+    error = LeanCtor(LeanTag.Exception_error, Array[leanField(args[9], 2), message]);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, nextWorld])
+  };
+  step: LeanValue = if (leanIsTrue(args[1])) {
+    LeanCtor(LeanTag.TransformStep_done, Array[args[3]])
+  } else LeanCtor(LeanTag.TransformStep_continue, Array[LeanCtor(LeanTag.Option_none, Array[])]);
+  LeanCtor(LeanTag.EST_Out_ok, Array[step, nextWorld])
+}
+
+fun main(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero));
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name, binder, type, bound);
+    beta = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, prop);
+    nested = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(runtime, name, type, prop, beta, leanBool(false));
+    constants: Map<String, LeanConstantFile> = Map[];
+    state = rewriteProbeState(runtime, rewriteProbeEnvironment(runtime, constants),
+      L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime), "<parity-simplifier-reduction>");
+    config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime);
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(runtime, config, LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(runtime),
+      leanField(leanField(state.coreContext, 0), 2), state.metaContext, state.metaStateRef,
+      state.coreContext, state.coreStateRef, LeanNatLiterals.n0);
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    context = leanField(contextResult, 0);
+    initialState = leanSimpInitialState(runtime);
+    stateRef = runtime.newRef(initialState);
+    methods = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(runtime, LeanArray(Array[]));
+    saved = runtime.checkpoint();
+    fixture = ParitySimplifierFixture(saved, state.metaContext, state.metaStateRef, state.coreContext,
+      state.coreStateRef, context, stateRef, methods);
+    world = leanBoxNat(LeanNat::parse("18446744073709551623"));
+    ok = (expr: LeanValue) ~> (LeanCtor(LeanTag.EST_Out_ok, Array[expr, world]) : LeanValue);
+    for (kind in Array[0, 1, 4]) {
+      _ = f_paritySimplifierReductionCheck("fixed sort", fixture, kind, prop, world, Some(ok(prop)));
+      !cases = cases + 1
+    };
+    for (enabled in Array[false, true]) {
+      betaContext = leanReplaceField(context, 0, leanReplaceField(config, 6, leanBool(enabled)));
+      betaFixture = ParitySimplifierFixture(saved, state.metaContext, state.metaStateRef, state.coreContext,
+        state.coreStateRef, betaContext, stateRef, methods);
+      for (kind in Array[0, 1]) {
+        _ = f_paritySimplifierReductionCheck("beta flag", betaFixture, kind, beta, world, Some(ok(if (enabled) prop else beta)));
+        !cases = cases + 1
+      }
+    };
+    _ = f_paritySimplifierReductionCheck("multistep let then beta", fixture, 1, nested, world, Some(ok(prop)));
+    !cases = cases + 1;
+    for (zeta in Array[false, true]) {
+      for (zetaHave in Array[false, true]) {
+        for (zetaUnused in Array[false, true]) {
+          for (nondep in Array[false, true]) {
+            for (used in Array[false, true]) {
+              letExpr = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(runtime, name, type, prop,
+                if (used) bound else prop, leanBool(nondep));
+              letConfig = leanReplaceField(leanReplaceField(leanReplaceField(config, 5, leanBool(zeta)),
+                23, leanBool(zetaHave)), 21, leanBool(zetaUnused));
+              !letConfig = leanReplaceField(leanReplaceField(letConfig, 9, leanBool(false)), 10, leanBool(false));
+              letFixture = ParitySimplifierFixture(saved, state.metaContext, state.metaStateRef, state.coreContext,
+                state.coreStateRef, leanReplaceField(context, 0, letConfig), stateRef, methods);
+              reduced = (zeta && (!nondep || zetaHave)) || (zetaUnused && !used);
+              for (kind in Array[0, 4]) {
+                _ = f_paritySimplifierReductionCheck("let flag matrix", letFixture, kind, letExpr, world,
+                  Some(ok(if (reduced) prop else letExpr)));
+                !cases = cases + 1
+              }
+            }
+          }
+        }
+      }
+    };
+    unused = LeanUnavailable("fast path tail must stay unused");
+    fastFixture = ParitySimplifierFixture(saved, unused, state.metaStateRef, unused, unused, unused, unused, unused);
+    _ = f_paritySimplifierReductionCheck("projection nonconstant fast path", fastFixture, 2, prop, world,
+      Some(ok(LeanCtor(LeanTag.Option_none, Array[]))));
+    unknown = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name, LeanCtor(LeanTag.List_nil, Array[]));
+    _ = f_paritySimplifierReductionCheck("projection unknown constant", fixture, 2, unknown, world,
+      Some(ok(LeanCtor(LeanTag.Option_none, Array[]))));
+    disabledContext = leanReplaceField(context, 0, leanReplaceField(config, 14, leanBool(false)));
+    disabledFixture = ParitySimplifierFixture(saved, unused, unused, unused, unused, disabledContext, unused, unused);
+    _ = f_paritySimplifierReductionCheck("dsimp disabled no methods/state", disabledFixture, 3, beta, world, Some(ok(beta)));
+    !cases = cases + 3;
+    depth = leanBoxNat(LeanNat::parse("18446744073709551623"));
+    limitedCold = leanReplaceField(leanField(state.coreContext, 0), 3, depth);
+    limitedCore = leanReplaceField(leanReplaceField(state.coreContext, 0, limitedCold), 1, depth);
+    limited = ParitySimplifierFixture(saved, unused, unused, limitedCore, unused, unused, unused, unused);
+    (depthError, _) = f_paritySimplifierReductionCheck("large Nat exact recursion limit", limited, 1, beta, world, None());
+    assert(leanTag(leanField(depthError, 0)) == LeanTag.Exception_error);
+    assert(rewriteProbeSameInput(leanField(depthError, 1), world));
+    !cases = cases + 1;
+
+    // Head metavariables bypass all Simp and Meta reader-context inspection.
+    metaRuntime = saved.restoreRaw();
+    metaState = metaRuntime.readRef(state.metaStateRef);
+    mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(metaRuntime,
+      leanField(metaState, 0), name, name, leanField(state.metaContext, 3), LeanArray(Array[]), type,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    mvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(metaRuntime, name);
+    for (assigned in Array[false, true]) {
+      currentMctx = if (assigned) L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(metaRuntime, mctx, name, prop) else mctx;
+      metaRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(metaState, 0, currentMctx)));
+      mvarFixture = ParitySimplifierFixture(metaRuntime.checkpoint(), unused, state.metaStateRef, unused, unused, unused, unused, unused);
+      _ = f_paritySimplifierReductionCheck("head mvar context short circuit", mvarFixture, 0, mvar, world, Some(ok(if (assigned) prop else mvar)));
+      !cases = cases + 1
+    };
+    // The raw numeral tail preserves arbitrary-precision Nat and folds into OfNat syntax.
+    numeral = leanBoxNat(LeanNat::parse("18446744073709551623"));
+    raw = L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, numeral);
+    folded = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(runtime, numeral);
+    for (kind in Array[0, 4]) {
+      _ = f_paritySimplifierReductionCheck("large raw numeral folding", fixture, kind, raw, world, Some(ok(folded)));
+      !cases = cases + 1
+    };
+    // Changed reduction emits a trace before the next fixed-point iteration.
+    traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(runtime,
+      LeanText("Debug"), LeanText("Meta"), LeanText("Tactic"), LeanText("simp"));
+    tracePrefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("trace"));
+    traceName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(runtime, tracePrefix, traceClass);
+    traceOptions = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(runtime,
+      L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime), leanField(leanField(state.coreContext, 0), 2), traceName, leanBool(true));
+    traceCore = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(runtime, state.coreContext, traceOptions);
+    traceFixture = ParitySimplifierFixture(saved, state.metaContext, state.metaStateRef, traceCore, state.coreStateRef, context, stateRef, methods);
+    (_, traceAfter) = f_paritySimplifierReductionCheck("reduction tracing", traceFixture, 1, beta, world, Some(ok(prop)));
+    tracedRuntime = traceAfter.restoreRaw();
+    beforeRuntime = saved.restoreRaw();
+    assert(!rewriteProbeSameInput(leanField(tracedRuntime.readRef(state.coreStateRef), 4),
+      leanField(beforeRuntime.readRef(state.coreStateRef), 4)));
+    !cases = cases + 1;
+
+    // After one changing reduction the recursive call sees depth 1, so maxDepth 1 fails.
+    oneCold = leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1);
+    oneCore = leanReplaceField(leanReplaceField(state.coreContext, 0, oneCold), 1, LeanNatLiterals.n0);
+    oneFixture = ParitySimplifierFixture(saved, state.metaContext, state.metaStateRef, oneCore,
+      state.coreStateRef, context, stateRef, methods);
+    _ = f_paritySimplifierReductionCheck("recursive depth accumulates", oneFixture, 1, beta, world, None());
+    !cases = cases + 1;
+    for (failure in Array[0, 1, 2]) {
+      callbackRuntime = saved.restoreRaw();
+      logRef = callbackRuntime.newRef(LeanArray(Array[]));
+      observedMethods = leanReplaceField(methods, 2, LeanClosure(f_paritySimplifierObserveDsimp, 12,
+        Array[logRef, leanBool(false), leanBool(failure == 1)]));
+      !observedMethods = leanReplaceField(observedMethods, 3, LeanClosure(f_paritySimplifierObserveDsimp, 12,
+        Array[logRef, leanBool(true), leanBool(failure == 2)]));
+      observedConfig = leanReplaceField(config, 14, leanBool(true));
+      observedFixture = ParitySimplifierFixture(callbackRuntime.checkpoint(), state.metaContext,
+        state.metaStateRef, state.coreContext, state.coreStateRef, leanReplaceField(context, 0, observedConfig), stateRef, observedMethods);
+      expectedWorld = leanBoxNat(leanNat(world).add(LeanNat::fromInt(if (failure == 1) 1 else 2)));
+      expected: ?LeanValue = if (failure == 0) Some(LeanCtor(LeanTag.EST_Out_ok, Array[prop, expectedWorld])) else None();
+      (result, after) = f_paritySimplifierReductionCheck("dsimp callback cache/error order", observedFixture, 3, prop, world, expected);
+      assert(rewriteProbeSameInput(leanField(result, 1), expectedWorld));
+      restored = after.restoreRaw();
+      expectedLog: LeanValue = LeanArray(if (failure == 1) Array[LeanText("pre")] else Array[LeanText("pre"), LeanText("post")]);
+      assert(rewriteProbeSameInput(restored.readRef(logRef), expectedLog));
+      finalCache = leanField(restored.readRef(stateRef), 2);
+      if (failure == 0) assert(leanTag(finalCache) == LeanTag.Std_DHashMap_Raw_mk)
+      else assert(rewriteProbeSameInput(finalCache, LeanUnavailable("callback cache marker")));
+      assert(rewriteProbeSameInput(leanField(callbackRuntime.readRef(stateRef), 2), leanField(initialState, 2)));
+      !cases = cases + 1
+    }
+  };
+  assert(cases == 170);
+  print_string("simplifier reduction: " + cases.toString() + " differential cases")
+}

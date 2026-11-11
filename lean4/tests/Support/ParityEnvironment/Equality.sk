@@ -1,0 +1,81 @@
+// Lane-local semantic harness comparison. native_eq == 0 is sufficient;
+// a nonzero answer only asks us to inspect values, never proves inequality.
+// Like rewriteProbeSameInput, constructors/arrays keep exact shape and order,
+// without comparing concrete Skip field-array/element-array specializations.
+fun f_parity_environment_sameValues(left: Array<LeanValue>, right: Array<LeanValue>): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.size() != right.size()) return false;
+  for (index in Range(0, left.size())) {
+    if (!f_parity_environment_sameValue(left[index], right[index])) return false
+  };
+  true
+}
+
+fun f_parity_environment_sameValue(left: LeanValue, right: LeanValue): Bool {
+  if (native_eq(left, right) == 0) return true;
+  (left, right) match {
+  | (LeanCtor(leftTag, leftFields), LeanCtor(rightTag, rightFields)) ->
+    leftTag == rightTag && f_parity_environment_sameValues(leftFields, rightFields)
+  | (LeanArray(leftValues), LeanArray(rightValues)) ->
+    f_parity_environment_sameValues(leftValues, rightValues)
+  | (LeanArray(_), LeanPersistentArray(_))
+  | (LeanPersistentArray(_), LeanArray(_))
+  | (LeanPersistentArray(_), LeanPersistentArray(_)) ->
+    // Pure materialized array representations have the same ordered contents.
+    f_parity_environment_sameValues(leanArray(left), leanArray(right))
+  | (LeanCompletedTask(leftResult), LeanCompletedTask(rightResult)) ->
+    f_parity_environment_sameValue(leftResult, rightResult)
+  | (LeanArrayOverride(leftBase, leftIndex, leftReplacement), LeanArrayOverride(rightBase, rightIndex, rightReplacement)) ->
+    // This packet explicitly checks sparse tracked update storage; do not
+    // materialize tracked inputs or add Context/dependency reads in the oracle.
+    leftIndex == rightIndex &&
+      f_parity_environment_sameValue(leftBase, rightBase) &&
+      f_parity_environment_sameValue(leftReplacement, rightReplacement)
+  | (LeanNatural(leftNat), LeanNatural(rightNat)) -> leftNat == rightNat
+  | (LeanScalar("nat", _), LeanNatural(_))
+  | (LeanNatural(_), LeanScalar("nat", _))
+  | (LeanScalar("nat", _), LeanScalar("nat", _)) -> leanNat(left) == leanNat(right)
+  | (LeanScalar(leftKind, leftDecimal), LeanScalar(rightKind, rightDecimal)) ->
+    leftKind == rightKind && leftDecimal == rightDecimal
+  | (LeanWord(leftWordKind, leftBits), LeanWord(rightWordKind, rightBits)) ->
+    leftWordKind == rightWordKind && leftBits == rightBits
+  | (LeanText(leftText), LeanText(rightText)) -> leftText == rightText
+  | (LeanUnavailable(leftDescription), LeanUnavailable(rightDescription)) ->
+    leftDescription == rightDescription
+  | (LeanReference(leftSlot), LeanReference(rightSlot)) -> leftSlot == rightSlot
+  | (LeanErased(), LeanErased()) -> true
+  | (LeanClosure(_, _, _), LeanClosure(_, _, _)) ->
+    // Passed-in callbacks are preserved, not synthesized by these targets.
+    // Same closure object proves that contract; never infer extensional equality
+    // from matching arity/captures or execute a callback just to compare it.
+    if (leanSameObject(left, right) != 0) true else {
+      leanFail("environment harness: closure equality inconclusive; require preserved callback evidence")
+    }
+  | (LeanTrackedExtensionArray(_), LeanTrackedExtensionArray(_))
+  | (LeanTrackedConstants(_), LeanTrackedConstants(_)) ->
+    // Opaque input storage views must be retained by these operations. Their
+    // semantic reads are checked separately using the real Context/store probe.
+    if (leanSameObject(left, right) != 0) true else {
+      leanFail("environment harness: opaque storage equality inconclusive; require retained input view")
+    }
+  | _ -> false
+  }
+}
+
+// Reference snapshots compare logical allocation count and ordered optional
+// slots, not concrete page-array specialization or checkpoint page identity.
+fun f_parity_environment_sameRefs(left: LeanReferenceSnapshot, right: LeanReferenceSnapshot): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.count != right.count) return false;
+  leftTable = left.restore();
+  rightTable = right.restore();
+  for (slot in Range(0, left.count)) {
+    (leftTable.get(slot), rightTable.get(slot)) match {
+    | (None(), None()) -> void
+    | (Some(leftValue), Some(rightValue)) ->
+      if (!f_parity_environment_sameValue(leftValue, rightValue)) return false
+    | _ -> return false
+    }
+  };
+  true
+}

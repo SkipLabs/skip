@@ -1,0 +1,250 @@
+module L4_Lean_Meta_Offset;
+
+// Lean.Meta.isDefEqOffset: ordered offset/numeral cases, guarded by the ORIGINAL s type.
+fun f_Lean_Meta_isDefEqOffset_4916547658(
+  _runtime: mutable LeanExecution,
+  _s_0_input: LeanValue,
+  _t_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_1_6_input: LeanValue,
+): LeanValue {
+  left = _s_0_input;
+  right = _t_1_input;
+  metaContext = _a_2_input;
+  metaState = _a_3_input;
+  coreContext = _a_4_input;
+  coreState = _a_5_input;
+  world = _a_1_6_input;
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(_runtime, metaContext);
+  if (leanTag(config) != LeanTag.Meta_Config_mk) return leanFail("non-exhaustive Lean case");
+  if (!f_offsets_wave_bool(leanField(config, 8))) return f_offsets_wave_undefined(world);
+
+  leftOffsetResult = f_Lean_Meta_isOffset_cecda6b311(
+    _runtime, left, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(leftOffsetResult)) return leftOffsetResult;
+  leftOffset = leanField(leftOffsetResult, 0);
+  afterLeftOffset = leanField(leftOffsetResult, 1);
+  if (f_offsets_wave_hasValue(leftOffset)) {
+    leftPair = f_offsets_wave_offsetPair(leanField(leftOffset, 0));
+    rightOffsetResult = f_Lean_Meta_isOffset_cecda6b311(
+      _runtime, right, metaContext, metaState, coreContext, coreState, afterLeftOffset,
+    );
+    if (!f_offsets_wave_isOk(rightOffsetResult)) return rightOffsetResult;
+    rightOffset = leanField(rightOffsetResult, 0);
+    afterRightOffset = leanField(rightOffsetResult, 1);
+    if (f_offsets_wave_hasValue(rightOffset)) {
+      rightPair = f_offsets_wave_offsetPair(leanField(rightOffset, 0));
+      return f_offsets_wave_compareOffsets(
+        _runtime, left, leftPair, rightPair,
+        metaContext, metaState, coreContext, coreState, afterRightOffset,
+      )
+    };
+    rightNumeralResult = f_Lean_Meta_evalNat_6bfbb6a56e(
+      _runtime, right, metaContext, metaState, coreContext, coreState, afterRightOffset,
+    );
+    if (!f_offsets_wave_isOk(rightNumeralResult)) return rightNumeralResult;
+    rightNumeral = leanField(rightNumeralResult, 0);
+    afterRightNumeral = leanField(rightNumeralResult, 1);
+    if (!f_offsets_wave_hasValue(rightNumeral)) return f_offsets_wave_undefined(afterRightNumeral);
+    return f_offsets_wave_compareOffsetNumeral(
+      _runtime, left, leftPair, leanField(rightNumeral, 0), true,
+      metaContext, metaState, coreContext, coreState, afterRightNumeral,
+    )
+  };
+
+  // If the left side is neither offset nor numeral, never inspect the right side.
+  leftNumeralResult = f_Lean_Meta_evalNat_6bfbb6a56e(
+    _runtime, left, metaContext, metaState, coreContext, coreState, afterLeftOffset,
+  );
+  if (!f_offsets_wave_isOk(leftNumeralResult)) return leftNumeralResult;
+  leftNumeral = leanField(leftNumeralResult, 0);
+  afterLeftNumeral = leanField(leftNumeralResult, 1);
+  if (!f_offsets_wave_hasValue(leftNumeral)) return f_offsets_wave_undefined(afterLeftNumeral);
+  leftValue = leanField(leftNumeral, 0);
+  rightOffsetResult = f_Lean_Meta_isOffset_cecda6b311(
+    _runtime, right, metaContext, metaState, coreContext, coreState, afterLeftNumeral,
+  );
+  if (!f_offsets_wave_isOk(rightOffsetResult)) return rightOffsetResult;
+  rightOffset = leanField(rightOffsetResult, 0);
+  afterRightOffset = leanField(rightOffsetResult, 1);
+  if (f_offsets_wave_hasValue(rightOffset)) {
+    rightPair = f_offsets_wave_offsetPair(leanField(rightOffset, 0));
+    return f_offsets_wave_compareOffsetNumeral(
+      _runtime, left, rightPair, leftValue, false,
+      metaContext, metaState, coreContext, coreState, afterRightOffset,
+    )
+  };
+  rightNumeralResult = f_Lean_Meta_evalNat_6bfbb6a56e(
+    _runtime, right, metaContext, metaState, coreContext, coreState, afterRightOffset,
+  );
+  if (!f_offsets_wave_isOk(rightNumeralResult)) return rightNumeralResult;
+  rightNumeral = leanField(rightNumeralResult, 0);
+  afterRightNumeral = leanField(rightNumeralResult, 1);
+  if (!f_offsets_wave_hasValue(rightNumeral)) return f_offsets_wave_undefined(afterRightNumeral);
+  equal = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, leftValue, leanField(rightNumeral, 0));
+  value = L4_Lean_Data_LBool.f_Lean_Bool_toLBool_b192e84fda(_runtime, equal);
+  f_offsets_wave_ifNatValue(
+    _runtime, left, value, metaContext, metaState, coreContext, coreState, afterRightNumeral,
+  )
+}
+
+fun f_offsets_wave_undefined(world: LeanValue): LeanValue {
+  LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.LBool_undef, Array[]), world])
+}
+
+fun f_offsets_wave_offsetPair(value: LeanValue): LeanValue {
+  leanTag(value) match {
+  | LeanTag.Prod_mk -> value
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_offsets_wave_compareOffsets(
+  runtime: mutable LeanExecution,
+  originalLeft: LeanValue,
+  leftPair: LeanValue,
+  rightPair: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  leftBase = leanField(leftPair, 0);
+  leftOffset = leanField(leftPair, 1);
+  rightBase = leanField(rightPair, 0);
+  rightOffset = leanField(rightPair, 1);
+  if (f_offsets_wave_bool(L4_Init_Prelude.f_Nat_decEq_3e841b85bb(runtime, leftOffset, rightOffset))) {
+    return f_offsets_wave_compareNat(
+      runtime, originalLeft, leftBase, rightBase,
+      metaContext, metaState, coreContext, coreState, world,
+    )
+  };
+  if (f_offsets_wave_bool(L4_Init_Prelude.f_Nat_decLt_b34d01d051(runtime, leftOffset, rightOffset))) {
+    difference = L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, rightOffset, leftOffset);
+    shifted = f_Lean_Meta_mkOffset_02c44d4985(
+      runtime, rightBase, difference, metaContext, metaState, coreContext, coreState, world,
+    );
+    if (!f_offsets_wave_isOk(shifted)) return shifted;
+    return f_offsets_wave_compareNat(
+      runtime, originalLeft, leftBase, leanField(shifted, 0),
+      metaContext, metaState, coreContext, coreState, leanField(shifted, 1),
+    )
+  };
+  difference = L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, leftOffset, rightOffset);
+  shifted = f_Lean_Meta_mkOffset_02c44d4985(
+    runtime, leftBase, difference, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(shifted)) return shifted;
+  f_offsets_wave_compareNat(
+    runtime, originalLeft, leanField(shifted, 0), rightBase,
+    metaContext, metaState, coreContext, coreState, leanField(shifted, 1),
+  )
+}
+
+fun f_offsets_wave_compareOffsetNumeral(
+  runtime: mutable LeanExecution,
+  originalLeft: LeanValue,
+  pair: LeanValue,
+  numeral: LeanValue,
+  offsetOnLeft: Bool,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  base = leanField(pair, 0);
+  offset = leanField(pair, 1);
+  if (!f_offsets_wave_bool(L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(runtime, offset, numeral))) {
+    return f_offsets_wave_ifNatValue(
+      runtime, originalLeft, LeanCtor(LeanTag.LBool_false, Array[]),
+      metaContext, metaState, coreContext, coreState, world,
+    )
+  };
+  difference = L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, numeral, offset);
+  literal = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(runtime, difference);
+  f_offsets_wave_compareNat(
+    runtime, originalLeft, if (offsetOnLeft) base else literal,
+    if (offsetOnLeft) literal else base,
+    metaContext, metaState, coreContext, coreState, world,
+  )
+}
+
+// Keep this protected type check, even for unequal literals or impossible offsets.
+// Assignments are forbidden at its new mctx depth, but normal comparison below is
+// outside that scope. The original left expression is not replaced by a stripped base.
+fun f_offsets_wave_checkNatType(
+  runtime: mutable LeanExecution,
+  originalLeft: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  inferred = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    runtime, originalLeft, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(inferred)) return inferred;
+  natName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("Nat"));
+  natType = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime, natName, LeanCtor(LeanTag.List_nil, Array[]),
+  );
+  check = LeanClosure(
+    L4_Lean_Meta_Basic.apply_f_Lean_Meta_isExprDefEqAux_34c5c35f5e,
+    7, Array[leanField(inferred, 0), natType],
+  );
+  f_Meta_matchesInstance_spec_0_4b55788272(
+    runtime, check, LeanCtor(LeanTag.Bool_false, Array[]),
+    metaContext, metaState, coreContext, coreState, leanField(inferred, 1),
+  )
+}
+
+fun f_offsets_wave_ifNatValue(
+  runtime: mutable LeanExecution,
+  originalLeft: LeanValue,
+  value: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  checked = f_offsets_wave_checkNatType(
+    runtime, originalLeft, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(checked)) return checked;
+  checkedWorld = leanField(checked, 1);
+  if (!f_offsets_wave_bool(leanField(checked, 0))) return f_offsets_wave_undefined(checkedWorld);
+  LeanCtor(LeanTag.EST_Out_ok, Array[value, checkedWorld])
+}
+
+fun f_offsets_wave_compareNat(
+  runtime: mutable LeanExecution,
+  originalLeft: LeanValue,
+  left: LeanValue,
+  right: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  checked = f_offsets_wave_checkNatType(
+    runtime, originalLeft, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(checked)) return checked;
+  checkedWorld = leanField(checked, 1);
+  if (!f_offsets_wave_bool(leanField(checked, 0))) return f_offsets_wave_undefined(checkedWorld);
+  // Existing lambda body performs the real isExprDefEqAux call and Bool-to-LBool map.
+  f_Meta_isDefEqOffset_lam_0_ece028d8f0(
+    runtime, left, right, metaContext, metaState, coreContext, coreState, checkedWorld,
+  )
+}
+
+module end;

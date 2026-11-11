@@ -1,0 +1,221 @@
+module L4_Lean_Meta_ExprDefEq;
+
+// "_private.Lean.Meta.ExprDefEq.0.Lean.Meta.isDefEqArgs"
+fun f_Lean_Meta_isDefEqArgs_5347aadf73(
+  _runtime: mutable LeanExecution,
+  _f_0_input: LeanValue,
+  _args_1_input: LeanValue,
+  _args_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  leftArguments = _args_1_input;
+  rightArguments = _args_2_input;
+  context = _a_3_input;
+  stateRef = _a_4_input;
+  coreContext = _a_5_input;
+  coreStateRef = _a_6_input;
+  leftSize = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
+    LeanErased(),
+    leftArguments,
+  );
+  rightSize = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
+    LeanErased(),
+    rightArguments,
+  );
+  sameSize = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(
+    _runtime,
+    leftSize,
+    rightSize,
+  );
+  if (!f_equalityWave_bool(sameSize)) {
+    return f_equalityWave_ok(sameSize, _a_1_7_input)
+  };
+  functionInfoResult = L4_Lean_Meta_FunInfo.f_Lean_Meta_getFunInfoNArgs_67bc938efe(
+    _runtime,
+    _f_0_input,
+    leftSize,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    _a_1_7_input,
+  );
+  if (f_equalityWave_isError(functionInfoResult)) {
+    return f_equalityWave_error(functionInfoResult)
+  };
+  functionInfo = leanField(functionInfoResult, 0);
+  functionInfoWorld = leanField(functionInfoResult, 1);
+  functionInfoFields = f_equalityWave_fields(
+    functionInfo,
+    LeanTag.Meta_FunInfo_mk,
+    2,
+  );
+  parameterInfo = functionInfoFields[0];
+  firstPass = f_Lean_Meta_isDefEqArgsFirstPass_b2085e9c21(
+    _runtime,
+    parameterInfo,
+    leftArguments,
+    rightArguments,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    functionInfoWorld,
+  );
+  if (f_equalityWave_isError(firstPass)) return f_equalityWave_error(firstPass);
+  classification = leanField(firstPass, 0);
+  world = leanField(firstPass, 1);
+  if (leanTag(classification) != LeanTag.Meta_DefEqArgsFirstPassResult_ok) {
+    return f_equalityWave_ok(leanBool(false), world)
+  };
+  postponedIndices = leanField(classification, 0);
+  messy = leanField(classification, 1);
+  parameterCount = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
+    LeanErased(),
+    parameterInfo,
+  );
+  initial = f_equalityWave_pair(
+    LeanCtor(LeanTag.Option_none, Array[]),
+    LeanCtor(LeanTag.PUnit_unit, Array[]),
+  );
+  // Compare arguments beyond FunInfo before revisiting either postponed queue.
+  extra = f_Meta_isDefEqArgs_spec_2_0af4b29950(
+    _runtime,
+    leftSize,
+    leftArguments,
+    rightArguments,
+    parameterCount,
+    initial,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (f_equalityWave_isError(extra)) return f_equalityWave_error(extra);
+  extraResult = leanField(extra, 0);
+  !world = leanField(extra, 1);
+  extraResultFields = f_equalityWave_fields(extraResult, LeanTag.Prod_mk, 2);
+  extraStop = extraResultFields[0];
+  leanTag(extraStop) match {
+  | LeanTag.Option_some ->
+    return f_equalityWave_ok(leanField(extraStop, 0), world)
+  | LeanTag.Option_none -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  coreFields = f_equalityWave_fields(coreContext, LeanTag.Core_Context_mk, 8);
+  flags = coreFields[3];
+  firstMask = L4_Init_Data_UInt_Basic.f_UInt16_land_01cb154555(
+    _runtime,
+    flags,
+    LeanWord("uint16", 1),
+  );
+  firstFlag = leanBool(
+    !f_equalityWave_bool(
+      L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(
+        _runtime,
+        firstMask,
+        LeanWord("uint16", 0),
+      ),
+    ),
+  );
+  secondMask = L4_Init_Data_UInt_Basic.f_UInt16_land_01cb154555(
+    _runtime,
+    flags,
+    LeanWord("uint16", 8),
+  );
+  secondFlag = leanBool(
+    !f_equalityWave_bool(
+      L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(
+        _runtime,
+        secondMask,
+        LeanWord("uint16", 0),
+      ),
+    ),
+  );
+  deferredSize = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+    _runtime,
+    LeanErased(),
+    postponedIndices,
+  );
+  zero = LeanWord("usize", 0);
+  deferredPass = f_Meta_isDefEqArgs_spec_0_ab10670c66(
+    _runtime,
+    leftArguments,
+    rightArguments,
+    leftSize,
+    rightSize,
+    parameterInfo,
+    firstFlag,
+    secondFlag,
+    postponedIndices,
+    deferredSize,
+    zero,
+    initial,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (f_equalityWave_isError(deferredPass)) {
+    return f_equalityWave_error(deferredPass)
+  };
+  deferredResult = leanField(deferredPass, 0);
+  !world = leanField(deferredPass, 1);
+  deferredResultFields = f_equalityWave_fields(
+    deferredResult,
+    LeanTag.Prod_mk,
+    2,
+  );
+  deferredStop = deferredResultFields[0];
+  leanTag(deferredStop) match {
+  | LeanTag.Option_some ->
+    return f_equalityWave_ok(leanField(deferredStop, 0), world)
+  | LeanTag.Option_none -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  messySize = L4_Init_Data_Array_Basic.f_Array_usize_3065e2d82a(
+    _runtime,
+    LeanErased(),
+    messy,
+  );
+  messyPass = f_Meta_isDefEqArgs_spec_1_8eb660ca90(
+    _runtime,
+    leftArguments,
+    rightArguments,
+    parameterInfo,
+    firstFlag,
+    secondFlag,
+    leftSize,
+    rightSize,
+    messy,
+    messySize,
+    zero,
+    initial,
+    context,
+    stateRef,
+    coreContext,
+    coreStateRef,
+    world,
+  );
+  if (f_equalityWave_isError(messyPass)) return f_equalityWave_error(messyPass);
+  messyResult = leanField(messyPass, 0);
+  !world = leanField(messyPass, 1);
+  messyResultFields = f_equalityWave_fields(messyResult, LeanTag.Prod_mk, 2);
+  messyStop = messyResultFields[0];
+  leanTag(messyStop) match {
+  | LeanTag.Option_none -> f_equalityWave_ok(sameSize, world)
+  | LeanTag.Option_some -> f_equalityWave_ok(leanField(messyStop, 0), world)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

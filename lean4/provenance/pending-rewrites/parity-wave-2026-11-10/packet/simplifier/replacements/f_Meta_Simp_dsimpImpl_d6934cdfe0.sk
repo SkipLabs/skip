@@ -1,0 +1,99 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// "_private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.dsimpImpl"
+fun f_Meta_Simp_dsimpImpl_d6934cdfe0(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+): LeanValue {
+  if (leanTag(_a_2_input) != LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  config = leanField(_a_2_input, 0);
+  if (leanTag(config) != LeanTag.Meta_Simp_Config_mk) return leanFail("non-exhaustive Lean case");
+  zeta = leanField(config, 5);
+  dsimp = leanField(config, 14);
+  zetaUnused = leanField(config, 21);
+  instances = leanField(config, 31);
+  leanTag(dsimp) match {
+  | LeanTag.Bool_false -> return LeanCtor(LeanTag.EST_Out_ok, Array[_e_0_input, _a_1_8_input])
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  if (leanTag(_a_1_input) != LeanTag.Meta_Simp_Methods_mk) return leanFail("non-exhaustive Lean case");
+  dpre = leanField(_a_1_input, 2);
+  dpost = leanField(_a_1_input, 3);
+  guards = LeanClosure(L4_Lean_Meta_Tactic_Simp_Main.apply_f_Simp_dsimpImpl_lam_1_eb68bf34c2, 10, Array[]);
+  post = LeanClosure(L4_Lean_Meta_Tactic_Simp_Main.apply_f_Simp_dsimpImpl_lam_2_1a4baa6c27, 10, Array[dpost]);
+  pre = LeanClosure(L4_Lean_Meta_Tactic_Simp_Main.apply_f_Simp_dsimpImpl_lam_3_6f69d5606b, 11, Array[dpre, guards]);
+  taken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(_runtime, LeanErased(), LeanErased(), _a_3_input, _a_1_8_input);
+  if (leanTag(taken) != LeanTag.ST_Out_mk) return leanFail("non-exhaustive Lean case");
+  state = leanField(taken, 0);
+  if (leanTag(state) != LeanTag.Meta_Simp_State_mk) return leanFail("non-exhaustive Lean case");
+  savedCache = leanField(state, 2);
+  buckets = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(_runtime, LeanErased(), LeanNatLiterals.n16,
+    LeanCtor(LeanTag.Std_DHashMap_Internal_AssocList_nil, Array[]));
+  emptyCache = LeanCtor(LeanTag.Std_DHashMap_Raw_mk, Array[LeanNatLiterals.n0, buckets]);
+  detachedState = leanReplaceField(state, 2, emptyCache);
+  detached = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+    _runtime, LeanErased(), LeanErased(), _a_3_input, detachedState, leanField(taken, 1));
+  if (leanTag(detached) != LeanTag.ST_Out_mk) return leanFail("non-exhaustive Lean case");
+  inDsimp = leanReplaceField(_a_2_input, 12, dsimp);
+  usedLetOnly = leanTag(zeta) match {
+  | LeanTag.Bool_false -> zetaUnused
+  | LeanTag.Bool_true -> dsimp
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  disabled: LeanValue = LeanCtor(LeanTag.Bool_false, Array[]);
+  skipInstances = leanTag(instances) match {
+  | LeanTag.Bool_false -> dsimp
+  | LeanTag.Bool_true -> disabled
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  allocateCache = LeanClosure(L4_Init_System_ST.apply_f_ST_Prim_mkRef_23b2310680,
+    4, Array[LeanErased(), LeanErased(), savedCache]);
+  allocated = f_Simp_dsimpImpl_lam_0_eb246a4cad(_runtime, LeanErased(), allocateCache,
+    _a_1_input, inDsimp, _a_3_input, _a_4_input, _a_5_input, _a_6_input, _a_7_input, leanField(detached, 1));
+  leanTag(allocated) match {
+  | LeanTag.EST_Out_ok -> void
+  | LeanTag.EST_Out_error -> return leanFail("unreachable: _private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.dsimpImpl")
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  cacheRef = leanField(allocated, 0);
+  transformed = f_Simp_dsimpImpl_spec_0_47922990f3(_runtime,
+    pre, post, usedLetOnly, disabled, skipInstances, _e_0_input, cacheRef,
+    _a_1_input, inDsimp, _a_3_input, _a_4_input, _a_5_input, _a_6_input, _a_7_input, leanField(allocated, 1));
+  leanTag(transformed) match {
+  | LeanTag.EST_Out_error -> return transformed // Do not restore the detached cache on failure.
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  readCache = LeanClosure(L4_Init_System_ST.apply_f_Prim_Ref_get_ab668afddb,
+    4, Array[LeanErased(), LeanErased(), cacheRef]);
+  cached = f_Simp_dsimpImpl_lam_0_eb246a4cad(_runtime, LeanErased(), readCache,
+    _a_1_input, inDsimp, _a_3_input, _a_4_input, _a_5_input, _a_6_input, _a_7_input, leanField(transformed, 1));
+  leanTag(cached) match {
+  | LeanTag.EST_Out_ok -> void
+  | LeanTag.EST_Out_error -> return leanFail("unreachable: _private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.dsimpImpl")
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  finalTaken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime, LeanErased(), LeanErased(), _a_3_input, leanField(cached, 1));
+  if (leanTag(finalTaken) != LeanTag.ST_Out_mk) return leanFail("non-exhaustive Lean case");
+  finalState = leanField(finalTaken, 0);
+  if (leanTag(finalState) != LeanTag.Meta_Simp_State_mk) return leanFail("non-exhaustive Lean case");
+  restored = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(_runtime, LeanErased(), LeanErased(),
+    _a_3_input, leanReplaceField(finalState, 2, leanField(cached, 0)), leanField(finalTaken, 1));
+  if (leanTag(restored) != LeanTag.ST_Out_mk) return leanFail("non-exhaustive Lean case");
+  LeanCtor(LeanTag.EST_Out_ok, Array[leanField(transformed, 0), leanField(restored, 1)])
+}
+
+
+module end;

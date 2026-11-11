@@ -1,0 +1,46 @@
+// Shared by this lane's three executable drivers. Include with --rewrite-harness.
+fun f_expressionsProbe_name(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun f_expressionsProbe_stateEqual(left: LeanExecutionCheckpoint, right: LeanExecutionCheckpoint): void {
+  assert(native_eq(left.refs, right.refs) == 0);
+  assert(native_eq(left.initializers, right.initializers) == 0);
+  assert(native_eq(left.immutableIdentities, right.immutableIdentities) == 0);
+  assert(left.initializing == right.initializing);
+  assert(left.unboundedHeartbeats == right.unboundedHeartbeats);
+  assert(left.sharedValueRealizations == right.sharedValueRealizations);
+  assert(left.profileRuntime == right.profileRuntime);
+  assert(left.collectSimpRegions == right.collectSimpRegions);
+  assert(left.denseSimpRegions == right.denseSimpRegions);
+  assert(left.memoizeSimp == right.memoizeSimp);
+  assert(left.simpQueryMask == right.simpQueryMask);
+  assert(native_eq(left.simpHook, right.simpHook) == 0);
+  assert(native_eq(left.simpOlderQueryKeys, right.simpOlderQueryKeys) == 0);
+  assert(left.profileSimpPhases == right.profileSimpPhases);
+  assert(native_eq(left.simpPhaseNs, right.simpPhaseNs) == 0);
+  assert(left.metrics.size() == right.metrics.size());
+  for (i in Range(0, left.metrics.size())) {
+    // Wall-clock primitive nanoseconds are deliberately not compared.
+    if (i != 7 || !left.profileRuntime) assert(left.metrics[i] == right.metrics[i])
+  }
+}
+
+fun f_expressionsProbe_compare(
+  label: String, saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): LeanValue {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  if (native_eq(oldResult, newResult) != 0) leanFail("expressions parity: " + label);
+  f_expressionsProbe_stateEqual(oldRuntime.checkpoint(), newRuntime.checkpoint());
+  expected match {
+  | Some(value) -> if (!rewriteProbeSameInput(newResult, value)) leanFail("expressions expectation: " + label)
+  | None() -> void
+  };
+  newResult
+}

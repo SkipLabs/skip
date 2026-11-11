@@ -1,0 +1,132 @@
+fun f_Meta_CheckAssignment_checkAssignmentAux_2245c9869d(
+  _runtime: mutable LeanExecution,
+  _mvarId_0_input: LeanValue,
+  _fvars_1_input: LeanValue,
+  _hasCtxLocals_2_input: LeanValue,
+  _v_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+): LeanValue {
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    49,
+    (LeanErased() : LeanValue),
+  );
+  v0 = _mvarId_0_input;
+  v1 = _fvars_1_input;
+  v2 = _hasCtxLocals_2_input;
+  v3 = _v_3_input;
+  v4 = _a_4_input;
+  v5 = _a_5_input;
+  v6 = _a_6_input;
+  v7 = _a_7_input;
+  v8 = _a_1_8_input;
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      v9 = L4_Lean_Meta_Basic.f_Lean_MVarId_getDecl_df7b85dc66( _runtime, v0, v4, v5, v6, v7, v8, );
+      leanTag(v9) match {
+      | LeanTag.EST_Out_ok ->
+        v10 = leanField(v9, 0);
+        v11 = leanField(v9, 1);
+        v14 = LeanCtor( LeanTag.Meta_CheckAssignment_Context_mk, Array[v0, v10, v1, v2, v3], );
+        v15 = leanReadInitializer( _runtime, "Lean.Meta.CheckAssignment.outOfScopeExceptionId", );
+        v16 = leanReadInitializer( _runtime, "Lean.Meta.CheckAssignment.checkAssignmentExceptionId", );
+        v17 = LeanCtor(LeanTag.List_nil, Array[]);
+        v18 = LeanCtor(LeanTag.List_cons, Array[v16, v17]);
+        v19 = LeanCtor(LeanTag.List_cons, Array[v15, v18]);
+        v20 = LeanNatLiterals.n0;
+        v21 = LeanNatLiterals.n16;
+        v22 = LeanCtor( LeanTag.Std_DHashMap_Internal_AssocList_nil, Array[], );
+        v23 = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2( _runtime, LeanErased(), v21, v22, );
+        v24 = LeanCtor( LeanTag.Std_DHashMap_Raw_mk, Array[v20, v23], );
+        v25 = L4_Init_System_ST.f_ST_Prim_mkRef_23b2310680( _runtime, LeanErased(), LeanErased(), v24, v11, );
+        leanTag(v25) match {
+        | LeanTag.ST_Out_mk ->
+          v26 = leanField(v25, 0);
+          v27 = leanField(v25, 1);
+          v33 = f_Meta_CheckAssignment_check_f94f9aeff1( _runtime, v3, v14, v26, v4, v5, v6, v7, v27, );
+          leanTag(v33) match {
+          | LeanTag.EST_Out_ok ->
+            v34 = leanField(v33, 0);
+            v35 = leanField(v33, 1);
+            v38 = LeanCtor(LeanTag.Option_some, Array[v34]);
+            _jump0 = v38;
+            _jump1 = v35;
+            v28 = _jump0;
+            v29 = _jump1;
+            !pc = 1;
+            void
+          | LeanTag.EST_Out_error ->
+            v36 = leanField(v33, 0);
+            v37 = leanField(v33, 1);
+            v39 = L4_Lean_Exception.f_Lean_Exception_isInterrupt_eb68b9cc5e( _runtime, v36, );
+            leanTag(v39) match {
+            | LeanTag.Bool_false ->
+              v40 = L4_Lean_CoreM.f_Lean_Exception_isRuntime_7532163bc2( _runtime, v36, );
+              leanTag(v40) match {
+              | LeanTag.Bool_false ->
+                leanTag(v36) match {
+                | LeanTag.Exception_error ->
+                  _ = leanField(v36, 0);
+                  _ = leanField(v36, 1);
+                  v42 = LeanCtor( LeanTag.EST_Out_error, Array[v36, v37], );
+                  return v42
+                | LeanTag.Exception_internal ->
+                  v41 = leanField(v36, 0);
+                  _ = leanField(v36, 1);
+                  v43 = f_CheckAssignment_checkAssignmentAux_spec_11_1340425f54( _runtime, v41, v19, );
+                  leanTag(v43) match {
+                  | LeanTag.Bool_false ->
+                    v44 = LeanCtor( LeanTag.EST_Out_error, Array[v36, v37], );
+                    return v44
+                  | LeanTag.Bool_true ->
+                    v45 = LeanCtor(LeanTag.Option_none, Array[]);
+                    _jump0 = v45;
+                    _jump1 = v37;
+                    v28 = _jump0;
+                    v29 = _jump1;
+                    !pc = 1;
+                    void
+                  | _ -> return leanFail("non-exhaustive Lean case")
+                  }
+                | _ -> return leanFail("non-exhaustive Lean case")
+                }
+              | LeanTag.Bool_true ->
+                v46 = LeanCtor( LeanTag.EST_Out_error, Array[v36, v37], );
+                return v46
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | LeanTag.Bool_true ->
+              v47 = LeanCtor( LeanTag.EST_Out_error, Array[v36, v37], );
+              return v47
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | LeanTag.EST_Out_error ->
+        v12 = leanField(v9, 0);
+        v13 = leanField(v9, 1);
+        v48 = LeanCtor( LeanTag.EST_Out_error, Array[v12, v13], );
+        return v48
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 1 ->
+      v30 = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb( _runtime, LeanErased(), LeanErased(), v26, v29, );
+      leanTag(v30) match {
+      | LeanTag.ST_Out_mk ->
+        _ = leanField(v30, 0);
+        v31 = leanField(v30, 1);
+        v32 = LeanCtor(LeanTag.EST_Out_ok, Array[v28, v31]);
+        return v32
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}

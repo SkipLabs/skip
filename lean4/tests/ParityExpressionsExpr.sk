@@ -1,0 +1,102 @@
+// Fixed words below were derived independently with unsigned big-integer
+// mixHash32 arithmetic and the documented 32/8/4/20-bit metadata layout.
+// They are expectations, not a second call into the production hash helper.
+fun f_expressionsProbe_word(digits: String, scalar: Bool): LeanValue {
+  if (scalar) LeanScalar("uint64", "000" + digits)
+  else LeanWord("uint64", leanWordBits(LeanScalar("uint64", digits)))
+}
+
+fun f_expressionsProbe_constructor(
+  saved: LeanExecutionCheckpoint, lambda: Bool, name: LeanValue,
+  type: LeanValue, body: LeanValue, info: LeanValue, bits: String,
+): void {
+  oldCall = if (lambda) L4_Lean_Expr.f_Expr_lam_override_5bc80605de_fallback
+    else L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660_fallback;
+  newCall = if (lambda) L4_Lean_Expr.f_Expr_lam_override_5bc80605de
+    else L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660;
+  tag = if (lambda) LeanTag.Expr_lam__impl else LeanTag.Expr_forallE__impl;
+  typeCopy = rewriteProbeCopyInput(type);
+  bodyCopy = rewriteProbeCopyInput(body);
+  expected = LeanCtor(tag, Array[f_expressionsProbe_word(bits, false), name, type, body, info]);
+  result = f_expressionsProbe_compare("binder constructor", saved,
+    r ~> oldCall(r, name, type, body, info),
+    r ~> newCall(r, name, type, body, info), Some(expected));
+  for ((i, field) in Array[(1, name), (2, type), (3, body), (4, info)]) {
+    assert(leanSameObject(leanField(result, i), field) != 0)
+  };
+  assert(rewriteProbeSameInput(type, typeCopy));
+  assert(rewriteProbeSameInput(body, bodyCopy))
+}
+
+fun main(): void {
+  vectors = Array[
+    ("0", "0", "8547171168", "7607647072"),
+    ("4294967295", "4294967295", "8026424849", "5744723473"),
+    ("17592186044416", "17592186044416", "17600733215584", "17599793691488"),
+    ("17592186044416", "87960930222080", "70377291348832", "70376351824736"),
+    ("87960930222080", "17592186044416", "87969477393248", "87968537869152"),
+    ("1095216660480", "1090921693184", "1099468864352", "1098529340256"),
+    ("18446744073709551615", "0", "18446744071699159928", "18446744070759635832"),
+    ("0", "18446744073709551615", "18446726481333768361", "18446726479052066985"),
+    ("5497558139003", "10995116278216", "16498754633645", "16501036335021"),
+    ("1099511627776", "0", "1108058798944", "1107119274848"),
+    ("0", "1099511627776", "1108058798944", "1107119274848"),
+    ("2199023255552", "0", "2207570426720", "2206630902624"),
+    ("0", "2199023255552", "2207570426720", "2206630902624"),
+    ("4398046511104", "0", "4406593682272", "4405654158176"),
+    ("0", "4398046511104", "4406593682272", "4405654158176"),
+    ("8796093022208", "0", "8804640193376", "8803700669280"),
+    ("0", "8796093022208", "8804640193376", "8803700669280"),
+    ("1090921693184", "0", "1099468864352", "1098529340256"),
+    ("0", "1090921693184", "1099468864352", "1098529340256"),
+  ];
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{profileRuntime => profile};
+    _sentinel = builder.newRef(LeanText("expression checkpoint"));
+    name = f_expressionsProbe_name(builder, "x");
+    renamed = f_expressionsProbe_name(builder, "renamed");
+    saved = builder.checkpoint();
+    for ((typeBits, bodyBits, lambdaBits, forallBits) in vectors) {
+      for (scalarType in Array[false, true]) {
+        for (scalarBody in Array[false, true]) {
+          type = LeanCtor(LeanTag.Expr_bvar__impl, Array[f_expressionsProbe_word(typeBits, scalarType), LeanNatLiterals.n0]);
+          body = LeanCtor(LeanTag.Expr_bvar__impl, Array[f_expressionsProbe_word(bodyBits, scalarBody), LeanNatLiterals.n0]);
+          for (info in Array[
+            LeanCtor(LeanTag.BinderInfo_default, Array[]),
+            LeanCtor(LeanTag.BinderInfo_implicit, Array[]),
+            LeanCtor(LeanTag.BinderInfo_strictImplicit, Array[]),
+            LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]),
+          ]) {
+            f_expressionsProbe_constructor(saved, true, name, type, body, info, lambdaBits);
+            f_expressionsProbe_constructor(saved, false, renamed, type, body, info, forallBits)
+          }
+        }
+      }
+    };
+    // Native vector: tests/ExprReference.lean, first group's unchanged final
+    // lambda (liftLooseBVars by 10^100). Existing build/expr-native.log agrees.
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n0);
+    b2 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n2);
+    app = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, b0, b2);
+    f_expressionsProbe_constructor(builder.checkpoint(), true, name, b0, app,
+      LeanCtor(LeanTag.BinderInfo_implicit, Array[]), "35193678269718");
+    // The same native group's forall.instantiate1 case has body app b0 b1.
+    // Instantiate removes the free bvar slot, so old bvar2 becomes bvar1.
+    b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(builder, LeanNatLiterals.n1);
+    forallBody = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, b0, b1);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    f_expressionsProbe_constructor(builder.checkpoint(), false, name, prop, forallBody,
+      LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), "17602979302435");
+    // Reusing the same child must preserve that alias in both output fields.
+    zeroData = LeanCtor(LeanTag.Expr_bvar__impl, Array[LeanWord("uint64", 0), LeanNatLiterals.n0]);
+    f_expressionsProbe_constructor(saved, true, name, zeroData, zeroData,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]), "8547171168");
+    // Binder names/info are retained but never inspected or hashed.
+    poisonName = LeanUnavailable("unused binder name");
+    poisonInfo = LeanUnavailable("unused binder info");
+    f_expressionsProbe_constructor(saved, true, poisonName, zeroData, zeroData, poisonInfo, "8547171168");
+    f_expressionsProbe_constructor(saved, false, poisonName, zeroData, zeroData, poisonInfo, "7607647072");
+    f_expressionsProbe_stateEqual(saved, saved.restoreRaw().checkpoint())
+  };
+  print_string("expressions constructors passed")
+}

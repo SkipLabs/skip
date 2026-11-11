@@ -1,0 +1,552 @@
+// Compile with src/Support/*.sk plus ProbeBaseline.sk, not the elaborator corpus.
+// Like tests/Support/RewriteProbe.sk, restore independent executions and compare
+// results/references; every family also has an independent element/state oracle.
+
+@cpp_extern("SKIP_physEq")
+native fun f_allocationProbeSameArray(
+  a: Array<LeanValue>,
+  b: Array<LeanValue>,
+): UInt32;
+
+@cpp_extern("SKIP_physEq")
+native fun f_allocationProbeSameSlots(
+  a: Array<?LeanValue>,
+  b: Array<?LeanValue>,
+): UInt32;
+
+// A named function used as a value at two source sites can produce distinct
+// nominal callback-wrapper classes. Preserve the callback from the INPUT when
+// constructing the independent expected partial closure, never from the result.
+@cpp_extern("SKIP_physEq")
+native fun f_allocationProbeSameCallback(
+  a: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+  b: (mutable LeanExecution, Array<LeanValue>) ~> LeanValue,
+): UInt32;
+
+fun f_allocationProbeExpectedPartial(
+  source: LeanValue,
+  expectedArity: Int,
+  expectedCaptured: Array<LeanValue>,
+): LeanValue {
+  source match {
+  | LeanClosure(invoke, _, _) ->
+    LeanClosure(invoke, expectedArity, expectedCaptured)
+  | _ -> leanFail("partial oracle requires an input closure")
+  }
+}
+
+fun f_allocationProbeClosureFields(
+  label: String,
+  value: LeanValue,
+  expected: LeanValue,
+): void {
+  expected match {
+  | LeanClosure(expectedInvoke, expectedArity, expectedCaptured) ->
+    value match {
+    | LeanClosure(invoke, arity, captured) ->
+      invariant(arity == expectedArity, label + " | partial arity");
+      invariant(
+        f_allocationProbeSameCallback(invoke, expectedInvoke) != 0,
+        label + " | partial preserves exact INPUT callback identity",
+      );
+      invariant(native_eq(invoke, expectedInvoke) == 0, label + " | partial callback representation");
+      invariant(captured.size() == expectedCaptured.size(), label + " | partial capture count");
+      invariant(native_eq(captured, expectedCaptured) == 0, label + " | partial capture concrete representation/content");
+      for (i in Range(0, expectedCaptured.size())) {
+        invariant(
+          leanSameObject(captured[i], expectedCaptured[i]) != 0,
+          label + " | partial capture element identity at " + i.toString(),
+        )
+      }
+    | _ -> leanFail(label + " | partial result must be LeanClosure")
+    }
+  | _ -> void
+  }
+}
+
+// Keep exact whole-value equality below. These field diagnostics distinguish
+// nominal array-storage mistakes in an expected fixture from element mistakes.
+fun f_allocationProbeArrayFields(
+  label: String,
+  value: LeanValue,
+  expected: LeanValue,
+): void {
+  expected match {
+  | LeanArray(expectedValues) ->
+    value match {
+    | LeanArray(values) ->
+      invariant(values.size() == expectedValues.size(), label + " | array result size");
+      for (i in Range(0, expectedValues.size())) {
+        invariant(
+          native_eq(values[i], expectedValues[i]) == 0,
+          label + " | array result element at " + i.toString(),
+        )
+      };
+      invariant(native_eq(values, expectedValues) == 0, label + " | array concrete representation/content")
+    | _ -> leanFail(label + " | result must be LeanArray")
+    }
+  | _ -> void
+  }
+}
+
+fun f_allocationProbeCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: LeanValue,
+): LeanValue {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  invariant(native_eq(oldResult, newResult) == 0, label + " | allocation Probe.sk:27 f_allocationProbeCompare expected native_eq(oldResult, newResult) == 0");
+  f_allocationProbeClosureFields(label, newResult, expected);
+  f_allocationProbeArrayFields(label, newResult, expected);
+  invariant(native_eq(newResult, expected) == 0, label + " | allocation Probe.sk:28 f_allocationProbeCompare expected native_eq(newResult, expected) == 0");
+  before = oldRuntime.checkpoint();
+  after = newRuntime.checkpoint();
+  invariant(native_eq(before.refs, after.refs) == 0, label + " | allocation Probe.sk:31 f_allocationProbeCompare expected native_eq(before.refs, after.refs) == 0");
+  invariant(native_eq(before.initializers, after.initializers) == 0, label + " | allocation Probe.sk:32 f_allocationProbeCompare expected native_eq(before.initializers, after.initializers) == 0");
+  invariant(before.initializing == after.initializing, label + " | allocation Probe.sk:33 f_allocationProbeCompare expected before.initializing == after.initializing");
+  invariant(native_eq(before.immutableIdentities, after.immutableIdentities) == 0, label + " | allocation Probe.sk:34 f_allocationProbeCompare expected native_eq(before.immutableIdentities, after.immutableIdentities) == 0");
+  invariant(native_eq(before.metrics.take(7), after.metrics.take(7)) == 0, label + " | allocation Probe.sk:35 f_allocationProbeCompare expected native_eq(before.metrics.take(7), after.metrics.take(7)) == 0");
+  // Inclusive nanoseconds are deliberately not compared between two runs.
+  invariant(native_eq(before.metrics.drop(8), after.metrics.drop(8)) == 0, label + " | allocation Probe.sk:37 f_allocationProbeCompare expected native_eq(before.metrics.drop(8), after.metrics.drop(8)) == 0");
+  newResult
+}
+
+fun f_allocationProbeReturnArgs(
+  _runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  LeanArray(args)
+}
+
+fun f_allocationProbeZeroArgs(
+  _runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  invariant(args.isEmpty(), "allocation Probe.sk:52 f_allocationProbeZeroArgs expected args.isEmpty()");
+  LeanClosure(f_allocationProbeReturnArgs, 2, Array[])
+}
+
+fun f_allocationProbeSecond(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  invariant(args.size() == 3, "allocation Probe.sk:60 f_allocationProbeSecond expected args.size() == 3");
+  invariant(leanNat(runtime.readRef(args[0])).toInt() == 1, "allocation Probe.sk:61 f_allocationProbeSecond expected leanNat(runtime.readRef(args[0])).toInt() == 1");
+  runtime.writeRef(args[0], Some(leanNatValue(2)));
+  leanSTResult(args[2], args[1])
+}
+
+fun f_allocationProbeFirst(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  invariant(args.size() == 2, "allocation Probe.sk:70 f_allocationProbeFirst expected args.size() == 2");
+  invariant(leanNat(runtime.readRef(args[0])).toInt() == 0, "allocation Probe.sk:71 f_allocationProbeFirst expected leanNat(runtime.readRef(args[0])).toInt() == 0");
+  runtime.writeRef(args[0], Some(leanNatValue(1)));
+  LeanClosure(f_allocationProbeSecond, 3, Array[args[0], args[1]])
+}
+
+fun f_allocationProbeThrow(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  runtime.writeRef(args[0], Some(leanNatValue(9)));
+  throw RuntimeError("allocation callback throws before surplus")
+}
+
+fun f_allocationProbeCatchApply(
+  runtime: mutable LeanExecution,
+  closure: LeanValue,
+  args: Array<LeanValue>,
+  old: Bool,
+): LeanValue {
+  try {
+    if (old) f_allocationProbeOriginalApply(runtime, closure, args) else {
+      leanApply(runtime, closure, args)
+    }
+  } catch {
+  | RuntimeError(message) -> LeanText(message)
+  | error -> throw error
+  }
+}
+
+fun f_allocationProbeProfiledTaskFailure(old: Bool): void {
+  runtime = mutable LeanExecution{profileRuntime => true};
+  reference = runtime.newRef(leanNatValue(0));
+  callback = LeanClosure(f_allocationProbeThrow, 2, Array[reference]);
+  args = Array[LeanErased(), LeanErased(), callback, LeanCompletedTask(LeanUnavailable("dormant task payload")), LeanErased(), leanBool(true)];
+  caught = try {
+    _ = if (old) f_allocationProbeInvoke(runtime, "probe", "lean_task_map", args) else {
+      leanInvokePrimitive(runtime, "probe", "lean_task_map", args)
+    };
+    false
+  } catch {
+  | RuntimeError(message) -> message == "allocation callback throws before surplus"
+  | error -> throw error
+  };
+  invariant(caught, "allocation Probe.sk:114 f_allocationProbeProfiledTaskFailure expected caught");
+  invariant(leanNat(runtime.readRef(reference)).toInt() == 9, "allocation Probe.sk:115 f_allocationProbeProfiledTaskFailure expected leanNat(runtime.readRef(reference)).toInt() == 9");
+  invariant(runtime.primitiveCount == 0 && runtime.primitiveInclusiveNs == 0, "allocation Probe.sk:116 f_allocationProbeProfiledTaskFailure expected runtime.primitiveCount == 0 && runtime.primitiveInclusiveNs == 0")
+}
+
+fun f_allocationProbeOnce(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  invariant(args.size() == 2, "allocation Probe.sk:123 f_allocationProbeOnce expected args.size() == 2");
+  invariant(leanNat(runtime.readRef(args[0])).toInt() == 0, "allocation Probe.sk:124 f_allocationProbeOnce expected leanNat(runtime.readRef(args[0])).toInt() == 0");
+  runtime.writeRef(args[0], Some(leanNatValue(1)));
+  args[1]
+}
+
+fun f_allocationProbeApplications(): void {
+  runtime = mutable LeanExecution{};
+  reference = runtime.newRef(leanNatValue(0));
+  saved = runtime.checkpoint();
+  dormant: LeanValue = LeanUnavailable("dormant callback world");
+  for (value in Array[dormant, LeanText("not a closure"),
+    LeanClosure(f_allocationProbeThrow, 0, Array[reference])]) {
+    // Empty application must not inspect or invoke any value, including arity 0.
+    invariant(leanSameObject(leanApply(runtime, value, Array[]), value) != 0, "allocation Probe.sk:137 f_allocationProbeApplications expected leanSameObject(leanApply(runtime, value, Array[]), value) != 0");
+    invariant(leanSameObject(f_allocationProbeOriginalApply(runtime, value, Array[]), value) != 0, "allocation Probe.sk:138 f_allocationProbeApplications expected leanSameObject(f_allocationProbeOriginalApply(runtime, value, Array[]), value) != 0")
+  };
+  invariant(leanNat(runtime.readRef(reference)).toInt() == 0, "allocation Probe.sk:140 f_allocationProbeApplications expected leanNat(runtime.readRef(reference)).toInt() == 0");
+  texts: Array<LeanText> = Array[LeanText("left"), LeanText("right")];
+  ctors: Array<LeanCtor> = Array[
+    LeanCtor(LeanTag.Option_none, Array[]),
+    LeanCtor(LeanTag.Option_some, Array[dormant]),
+  ];
+  naturals: Array<LeanNatural> = Array[
+    LeanNatural(LeanNat::fromInt(7)),
+    LeanNatural(LeanNat::parse("18446744073709551616")),
+  ];
+  mixed: Array<LeanValue> = Array[dormant, LeanWord("usize", -1)];
+  for (incoming in Array[texts, ctors, naturals, mixed]) {
+    for (captured in Array[(Array[] : Array<LeanValue>), Array[dormant]]) {
+      expectedArgs: Array<LeanValue> = Array::fillBy(
+        captured.size() + incoming.size(),
+        i -> if (i < captured.size()) captured[i] else incoming[i - captured.size()],
+      );
+      closure = LeanClosure(f_allocationProbeReturnArgs, expectedArgs.size(), captured);
+      actual = f_allocationProbeCompare(
+        "exact-saturation captures=" + captured.size().toString(),
+        saved,
+        current ~> f_allocationProbeOriginalApply(current, closure, incoming),
+        current ~> leanApply(current, closure, incoming),
+        LeanArray(expectedArgs),
+      );
+      // Check both concrete/boxed storage and physical non-aliasing with inputs.
+      observed = leanArray(actual);
+      invariant(native_eq(observed, expectedArgs) == 0, "allocation Probe.sk:166 f_allocationProbeApplications expected native_eq(observed, expectedArgs) == 0");
+      invariant(f_allocationProbeSameArray(observed, incoming) == 0, "allocation Probe.sk:167 f_allocationProbeApplications expected f_allocationProbeSameArray(observed, incoming) == 0");
+      invariant(f_allocationProbeSameArray(observed, captured) == 0, "allocation Probe.sk:168 f_allocationProbeApplications expected f_allocationProbeSameArray(observed, captured) == 0");
+      for (i in Range(0, expectedArgs.size())) {
+        invariant(leanSameObject(observed[i], expectedArgs[i]) != 0, "allocation Probe.sk:170 f_allocationProbeApplications expected leanSameObject(observed[i], expectedArgs[i]) != 0")
+      };
+      partial = LeanClosure(f_allocationProbeReturnArgs, expectedArgs.size() + 1, captured);
+      expectedPartial = f_allocationProbeExpectedPartial(
+        partial,
+        expectedArgs.size() + 1,
+        expectedArgs,
+      );
+      partialResult = f_allocationProbeCompare(
+        "underapplication captures=" + captured.size().toString(),
+        saved,
+        current ~> f_allocationProbeOriginalApply(current, partial, incoming),
+        current ~> leanApply(current, partial, incoming),
+        expectedPartial,
+      );
+      partialResult match {
+      | LeanClosure(_, _, resultCaptured) ->
+        invariant(
+          f_allocationProbeSameArray(resultCaptured, incoming) == 0,
+          "underapplication capture array must not alias incoming args",
+        );
+        invariant(
+          f_allocationProbeSameArray(resultCaptured, captured) == 0,
+          "underapplication capture array must not alias source captures",
+        )
+      | _ -> leanFail("underapplication result must be LeanClosure")
+      };
+      completed = leanApply(runtime, partialResult, Array[leanNatValue(99)]);
+      completedArgs = leanArray(completed);
+      invariant(completedArgs.size() == expectedArgs.size() + 1, "allocation Probe.sk:181 f_allocationProbeApplications expected completedArgs.size() == expectedArgs.size() + 1");
+      for (i in Range(0, expectedArgs.size())) {
+        invariant(leanSameObject(completedArgs[i], expectedArgs[i]) != 0, "allocation Probe.sk:183 f_allocationProbeApplications expected leanSameObject(completedArgs[i], expectedArgs[i]) != 0")
+      };
+      invariant(leanNat(completedArgs[expectedArgs.size()]).toInt() == 99, "allocation Probe.sk:185 f_allocationProbeApplications expected leanNat(completedArgs[expectedArgs.size()]).toInt() == 99");
+      // Completing a partial must not change its captures or the source closure.
+      f_allocationProbeClosureFields("partial retained after completion", partialResult, expectedPartial);
+      invariant(native_eq(partialResult, expectedPartial) == 0, "allocation Probe.sk:187 partial must remain equal to input-callback/independent-captures oracle after completion")
+    }
+  };
+  // Malformed negative arity intentionally retains take(negative)/drop(negative).
+  for (arity in Array[0, -1]) {
+    closure = LeanClosure(f_allocationProbeZeroArgs, arity, Array[]);
+    // A covariant annotation on Array[LeanText(...)] does not change its
+    // concrete class. The callbacks' empty Array<LeanValue> captures produce
+    // base-class arrays; use invariant mutable storage for that exact oracle.
+    expected: mutable Array<LeanValue> = Array::mfill(2, (LeanErased() : LeanValue));
+    expected.set(0, texts[0]);
+    expected.set(1, texts[1]);
+    expectedValues = expected.chill();
+    clampedResult = f_allocationProbeCompare(
+      "clamped-arity=" + arity.toString(),
+      saved,
+      current ~> f_allocationProbeOriginalApply(current, closure, texts),
+      current ~> leanApply(current, closure, texts),
+      LeanArray(expectedValues),
+    );
+    resultValues = leanArray(clampedResult);
+    invariant(resultValues.size() == 2, "clamped callback must return exactly two arguments");
+    invariant(leanText(resultValues[0]) == "left", "clamped callback first independent value");
+    invariant(leanText(resultValues[1]) == "right", "clamped callback second independent value");
+    invariant(leanSameObject(resultValues[0], texts[0]) != 0, "clamped callback first input identity");
+    invariant(leanSameObject(resultValues[1], texts[1]) != 0, "clamped callback second input identity");
+    invariant(f_allocationProbeSameArray(resultValues, texts) == 0, "clamped callback must not borrow concrete incoming array")
+  };
+  once = LeanClosure(f_allocationProbeOnce, 2, Array[reference]);
+  for (taskMap in Array[false, true]) {
+    current = saved.restoreRaw();
+    if (taskMap) {
+      args = Array[LeanErased(), LeanErased(), once, LeanCompletedTask(dormant), LeanErased(), leanBool(true)];
+      result = leanInvokePrimitive(current, "probe", "lean_task_map", args);
+      result match {
+      | LeanCompletedTask(value) -> invariant(leanSameObject(value, dormant) != 0, "allocation Probe.sk:208 f_allocationProbeApplications expected leanSameObject(value, dormant) != 0")
+      | _ -> invariant(false, "allocation Probe.sk:209 f_allocationProbeApplications expected false")
+      }
+    } else {
+      result = leanApply(current, once, Array[dormant]);
+      invariant(leanSameObject(result, dormant) != 0, "allocation Probe.sk:213 f_allocationProbeApplications expected leanSameObject(result, dormant) != 0")
+    };
+    invariant(leanNat(current.readRef(reference)).toInt() == 1, "allocation Probe.sk:215 f_allocationProbeApplications expected leanNat(current.readRef(reference)).toInt() == 1")
+  };
+  chained = LeanClosure(f_allocationProbeFirst, 2, Array[reference]);
+  _ = f_allocationProbeCompare(
+    "overapplication state 0->1->2",
+    saved,
+    current ~> f_allocationProbeOriginalApply(current, chained, Array[dormant, leanNatValue(42)]),
+    current ~> leanApply(current, chained, Array[dormant, leanNatValue(42)]),
+    leanSTResult(leanNatValue(42), dormant),
+  );
+  executed = saved.restoreRaw();
+  _ = leanApply(executed, chained, Array[dormant, leanNatValue(42)]);
+  invariant(leanNat(executed.readRef(reference)).toInt() == 2, "allocation Probe.sk:226 f_allocationProbeApplications expected leanNat(executed.readRef(reference)).toInt() == 2");
+  throwing = LeanClosure(f_allocationProbeThrow, 1, Array[reference]);
+  _ = f_allocationProbeCompare(
+    "throw-before-surplus",
+    saved,
+    current ~> f_allocationProbeCatchApply(current, throwing, Array[dormant], true),
+    current ~> f_allocationProbeCatchApply(current, throwing, Array[dormant], false),
+    LeanText("allocation callback throws before surplus"),
+  );
+  changed = saved.restoreRaw();
+  _ = f_allocationProbeCatchApply(changed, throwing, Array[dormant], false);
+  invariant(leanNat(changed.readRef(reference)).toInt() == 9, "allocation Probe.sk:236 f_allocationProbeApplications expected leanNat(changed.readRef(reference)).toInt() == 9");
+  f_allocationProbeProfiledTaskFailure(true);
+  f_allocationProbeProfiledTaskFailure(false)
+}
+
+fun f_allocationProbeSwapCase(fields: Array<LeanValue>, persistent: Bool): void {
+  // Copy the oracle before any call; root/fields may alias, the oracle must not.
+  before: Array<LeanValue> = Array::fillBy(fields.size(), i -> fields[i]);
+  root: LeanValue = if (persistent) {
+    LeanPersistentArray(Persistent.RadixTreeVector::mcreateFromItems(fields).chill())
+  } else {
+    LeanArray(fields)
+  };
+  for (pair in Array[(0, 0), (0, fields.size() - 1), (fields.size() - 1, 0)]) {
+    for (word in Array[false, true]) {
+      runtime = mutable LeanExecution{profileRuntime => true};
+      reference = runtime.newRef(root);
+      saved = runtime.checkpoint();
+      firstAt = if (word) {
+        // Independent modulo oracle: 2^64 + i wraps to i, unlike Nat indexing.
+        LeanNatural(LeanNat::parse("18446744073709551616").add(LeanNat::fromInt(pair.i0)))
+      } else leanNatValue(pair.i0);
+      secondAt = if (word) LeanWord("usize", pair.i1) else leanNatValue(pair.i1);
+      args = Array[LeanUnavailable("erased array type"), root, firstAt, secondAt];
+      foreign = if (word) "lean_array_uswap" else "lean_array_fswap";
+      oldRuntime = saved.restoreRaw();
+      newRuntime = saved.restoreRaw();
+      prior = f_allocationProbeInvoke(oldRuntime, "allocation probe", foreign, args);
+      actual = leanInvokePrimitive(newRuntime, "allocation probe", foreign, args);
+      invariant(native_eq(prior, actual) == 0, "allocation Probe.sk:265 f_allocationProbeSwapCase expected native_eq(prior, actual) == 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      // Equal indices still promote an ordinary array when its size is >128.
+      actual match {
+      | LeanPersistentArray(_) -> invariant(persistent || fields.size() > 128, "allocation Probe.sk:268 f_allocationProbeSwapCase expected persistent || fields.size() > 128" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+      | LeanArray(_) -> invariant(!persistent && fields.size() <= 128, "allocation Probe.sk:269 f_allocationProbeSwapCase expected !persistent && fields.size() <= 128" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+      | _ -> invariant(false, "allocation Probe.sk:270 f_allocationProbeSwapCase expected false" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+      };
+      for (i in Range(0, fields.size())) {
+        expected = if (i == pair.i0) before[pair.i1] else if (i == pair.i1) {
+          before[pair.i0]
+        } else before[i];
+        invariant(leanSameObject(leanArrayRead(newRuntime, actual, leanNatValue(i), false), expected) != 0, "allocation Probe.sk:276 f_allocationProbeSwapCase expected leanSameObject(leanArrayRead(newRuntime, actual, leanNatValue(i), false), expected) != 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+        invariant(leanSameObject(leanArrayRead(newRuntime, root, leanNatValue(i), false), before[i]) != 0, "allocation Probe.sk:277 f_allocationProbeSwapCase expected leanSameObject(leanArrayRead(newRuntime, root, leanNatValue(i), false), before[i]) != 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+      };
+      invariant(oldRuntime.primitiveCount == 1 && newRuntime.primitiveCount == 1, "allocation Probe.sk:279 f_allocationProbeSwapCase expected oldRuntime.primitiveCount == 1 && newRuntime.primitiveCount == 1" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      // Swap did not record array writes before this change; do not add them.
+      invariant(oldRuntime.arrayWriteCount == 0 && newRuntime.arrayWriteCount == 0, "allocation Probe.sk:281 f_allocationProbeSwapCase expected oldRuntime.arrayWriteCount == 0 && newRuntime.arrayWriteCount == 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      invariant(newRuntime.arrayWriteElements == 0 && newRuntime.largestArrayWrite == 0, "allocation Probe.sk:282 f_allocationProbeSwapCase expected newRuntime.arrayWriteElements == 0 && newRuntime.largestArrayWrite == 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      replacement: LeanValue = LeanText("later write");
+      later = leanArrayWrite(actual, leanNatValue(0), replacement, false);
+      invariant(leanSameObject(leanArrayRead(newRuntime, later, leanNatValue(0), false), replacement) != 0, "allocation Probe.sk:285 f_allocationProbeSwapCase expected leanSameObject(leanArrayRead(newRuntime, later, leanNatValue(0), false), replacement) != 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      firstExpected = if (pair.i0 == 0) before[pair.i1] else if (pair.i1 == 0) before[pair.i0] else before[0];
+      invariant(leanSameObject(leanArrayRead(newRuntime, actual, leanNatValue(0), false), firstExpected) != 0, "allocation Probe.sk:287 f_allocationProbeSwapCase expected leanSameObject(leanArrayRead(newRuntime, actual, leanNatValue(0), false), firstExpected) != 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      appended = leanArrayPush(actual, replacement);
+      invariant(leanValueArraySize(appended) == fields.size() + 1, "allocation Probe.sk:289 f_allocationProbeSwapCase expected leanValueArraySize(appended) == fields.size() + 1" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      popped = leanArrayPop(appended);
+      invariant(leanValueArraySize(popped) == fields.size(), "allocation Probe.sk:291 f_allocationProbeSwapCase expected leanValueArraySize(popped) == fields.size()" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString());
+      for (i in Range(0, fields.size())) {
+        invariant(leanSameObject(leanArrayRead(newRuntime, popped, leanNatValue(i), false), leanArrayRead(newRuntime, actual, leanNatValue(i), false)) != 0, "allocation Probe.sk:293 f_allocationProbeSwapCase expected leanSameObject(leanArrayRead(newRuntime, popped, leanNatValue(i), false), leanArrayRead(newRuntime, actual, leanNatValue(i), false)) != 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+      };
+      newRuntime.writeRef(reference, Some(actual));
+      restored = saved.restoreRaw();
+      invariant(native_eq(restored.readRef(reference), root) == 0, "allocation Probe.sk:297 f_allocationProbeSwapCase expected native_eq(restored.readRef(reference), root) == 0" + " size=" + fields.size().toString() + " persistent=" + persistent.toString() + " first=" + pair.i0.toString() + " second=" + pair.i1.toString() + " word=" + word.toString())
+    }
+  }
+}
+
+fun f_allocationProbeArrays(): void {
+  for (size in Array[1, 2, 32, 127, 128, 129, 256, 1025]) {
+    mixed: Array<LeanValue> = Array::fillBy(size, i ->
+      if (i % 3 == 0) LeanUnavailable("dormant element") else leanNatValue(i)
+    );
+    texts: Array<LeanText> = Array::fillBy(size, i -> LeanText(i.toString()));
+    ctors: Array<LeanCtor> = Array::fillBy(size, i ->
+      LeanCtor(LeanTag.Option_some, Array[leanNatValue(i)])
+    );
+    for (fields in Array[mixed, texts, ctors]) {
+      for (persistent in Array[false, true]) f_allocationProbeSwapCase(fields, persistent)
+    }
+  };
+  runtime = mutable LeanExecution{};
+  for (size in Array[0, 1, 32, 127, 128, 129, 1025]) {
+    fields: Array<LeanValue> = Array::fillBy(size, i ->
+      if (i % 2 == 0) LeanUnavailable("dormant list element") else leanNatValue(i)
+    );
+    for (persistent in Array[false, true]) {
+      root: LeanValue = if (persistent) {
+        LeanPersistentArray(Persistent.RadixTreeVector::mcreateFromItems(fields).chill())
+      } else LeanArray(fields);
+      args = Array[LeanUnavailable("erased list type"), root];
+      prior = f_allocationProbeOriginalPrimitiveCore(runtime, "probe", "lean_array_to_list", args);
+      actual = leanInvokePrimitiveCore(runtime, "probe", "lean_array_to_list", args);
+      invariant(native_eq(prior, actual) == 0, "allocation Probe.sk:327 f_allocationProbeArrays expected native_eq(prior, actual) == 0");
+      cursor = actual;
+      for (i in Range(0, size)) {
+        invariant(leanTag(cursor) == LeanTag.List_cons, "allocation Probe.sk:330 f_allocationProbeArrays expected leanTag(cursor) == LeanTag.List_cons");
+        invariant(leanSameObject(leanField(cursor, 0), fields[i]) != 0, "allocation Probe.sk:331 f_allocationProbeArrays expected leanSameObject(leanField(cursor, 0), fields[i]) != 0");
+        !cursor = leanField(cursor, 1);
+        invariant(leanSameObject(leanArrayRead(runtime, root, leanNatValue(i), false), fields[i]) != 0, "allocation Probe.sk:333 f_allocationProbeArrays expected leanSameObject(leanArrayRead(runtime, root, leanNatValue(i), false), fields[i]) != 0")
+      };
+      invariant(leanTag(cursor) == LeanTag.List_nil, "allocation Probe.sk:335 f_allocationProbeArrays expected leanTag(cursor) == LeanTag.List_nil")
+    }
+  }
+}
+
+fun f_allocationProbeReferencePages(): void {
+  // Independent checkpoints at both sides of the first page boundary.
+  for (size in Array[0, 1, 255, 256, 257]) {
+    runtime = mutable LeanExecution{};
+    for (i in Range(0, size)) _ = runtime.newRef(leanNatValue(i));
+    saved = runtime.checkpoint();
+    left = saved.restoreRaw();
+    right = saved.restoreRaw();
+    next = left.newRef(LeanUnavailable("new fork slot"));
+    invariant(native_eq(next, LeanReference(size)) == 0, "allocation Probe.sk:349 f_allocationProbeReferencePages expected native_eq(next, LeanReference(size)) == 0");
+    invariant(left.refs.size() == size + 1, "allocation Probe.sk:350 f_allocationProbeReferencePages expected left.refs.size() == size + 1");
+    invariant(right.refs.size() == size && runtime.refs.size() == size, "allocation Probe.sk:351 f_allocationProbeReferencePages expected right.refs.size() == size && runtime.refs.size() == size");
+    for (i in Range(0, size)) {
+      invariant(leanNat(right.readRef(LeanReference(i))).toInt() == i, "allocation Probe.sk:353 f_allocationProbeReferencePages expected leanNat(right.readRef(LeanReference(i))).toInt() == i")
+    }
+  };
+  current = mutable LeanReferenceTable{};
+  original = mutable AllocationProbeOriginalReferenceTable{};
+  for (i in Range(0, 769)) {
+    item: ?LeanValue = if (i % 5 == 0) None() else Some(leanNatValue(i));
+    current.push(item);
+    original.push(item)
+  };
+  for (page in Range(1, 4)) {
+    invariant(f_allocationProbeSameSlots(current.pages[0].saved, current.pages[page].saved) != 0, "allocation Probe.sk:364 f_allocationProbeReferencePages expected f_allocationProbeSameSlots(current.pages[0].saved, current.pages[page].saved) != 0")
+  };
+  for (i in Range(0, leanReferencePageSize)) invariant(current.pages[0].saved[i].isNone(), "allocation Probe.sk:366 f_allocationProbeReferencePages expected current.pages[0].saved[i].isNone()");
+  saved = current.snapshot();
+  oldSaved = original.snapshot();
+  invariant(saved.count == 769 && saved.pages.size() == 4, "allocation Probe.sk:369 f_allocationProbeReferencePages expected saved.count == 769 && saved.pages.size() == 4");
+  invariant(native_eq(saved.pages, oldSaved.pages) == 0, "allocation Probe.sk:370 f_allocationProbeReferencePages expected native_eq(saved.pages, oldSaved.pages) == 0");
+  for (i in Range(0, 769)) {
+    if (i % 5 == 0) invariant(current[i].isNone(), "allocation Probe.sk:372 f_allocationProbeReferencePages expected current[i].isNone()") else {
+      invariant(leanNat(current[i].fromSome()).toInt() == i, "allocation Probe.sk:373 f_allocationProbeReferencePages expected leanNat(current[i].fromSome()).toInt() == i")
+    }
+  };
+  // All unused tail slots must still be None; sharing the blank saved image
+  // cannot let one page's writes appear in another page or in a restored fork.
+  for (i in Range(1, leanReferencePageSize)) invariant(saved.pages[3][i].isNone(), "allocation Probe.sk:378 f_allocationProbeReferencePages expected saved.pages[3][i].isNone()");
+  forkA = saved.restore();
+  forkB = saved.restore();
+  oldForkA = oldSaved.restore();
+  for (i in Array[0, 255, 256, 511, 512, 767, 768]) {
+    forkA.set(i, Some(leanNatValue(10000 + i)));
+    oldForkA.set(i, Some(leanNatValue(10000 + i)))
+  };
+  for (i in Range(769, 1025)) {
+    forkA.push(Some(leanNatValue(i)));
+    oldForkA.push(Some(leanNatValue(i)))
+  };
+  after = forkA.snapshot();
+  oldAfter = oldForkA.snapshot();
+  invariant(after.count == 1025 && after.pages.size() == 5, "allocation Probe.sk:392 f_allocationProbeReferencePages expected after.count == 1025 && after.pages.size() == 5");
+  invariant(native_eq(after.pages, oldAfter.pages) == 0, "allocation Probe.sk:393 f_allocationProbeReferencePages expected native_eq(after.pages, oldAfter.pages) == 0");
+  invariant(native_eq(saved.pages, forkB.snapshot().pages) == 0, "allocation Probe.sk:394 f_allocationProbeReferencePages expected native_eq(saved.pages, forkB.snapshot().pages) == 0");
+  invariant(native_eq(saved.pages, current.snapshot().pages) == 0, "allocation Probe.sk:395 f_allocationProbeReferencePages expected native_eq(saved.pages, current.snapshot().pages) == 0");
+  forkA.set(256, None());
+  forkB.set(512, None());
+  forkC = after.restore();
+  invariant(forkA[256].isNone(), "allocation Probe.sk:399 f_allocationProbeReferencePages expected forkA[256].isNone()");
+  invariant(leanNat(forkC[256].fromSome()).toInt() == 10256, "allocation Probe.sk:400 f_allocationProbeReferencePages expected leanNat(forkC[256].fromSome()).toInt() == 10256");
+  invariant(leanNat(forkC[512].fromSome()).toInt() == 10512, "allocation Probe.sk:401 f_allocationProbeReferencePages expected leanNat(forkC[512].fromSome()).toInt() == 10512");
+  invariant(leanNat(current[512].fromSome()).toInt() == 512, "allocation Probe.sk:402 f_allocationProbeReferencePages expected leanNat(current[512].fromSome()).toInt() == 512");
+  invariant(leanNat(forkC[1024].fromSome()).toInt() == 1024, "allocation Probe.sk:403 f_allocationProbeReferencePages expected leanNat(forkC[1024].fromSome()).toInt() == 1024");
+  // Snapshot immediately after each page boundary, then append on both forks.
+  boundary = mutable LeanReferenceTable{};
+  for (i in Range(0, 512)) boundary.push(Some(leanNatValue(i)));
+  boundarySaved = boundary.snapshot();
+  one = boundarySaved.restore();
+  two = boundarySaved.restore();
+  one.push(Some(LeanUnavailable("first fork only")));
+  two.push(None());
+  invariant(!one[512].isNone() && two[512].isNone(), "allocation Probe.sk:412 f_allocationProbeReferencePages expected !one[512].isNone() && two[512].isNone()");
+  invariant(boundary.size() == 512 && boundarySaved.count == 512, "allocation Probe.sk:413 f_allocationProbeReferencePages expected boundary.size() == 512 && boundarySaved.count == 512")
+}
+
+fun main(): void {
+  args = Environ.args().collect(Array);
+  // Diagnostic-only phase selection lets the parent locate all positive-suite
+  // failures with the same binary instead of repeatedly stopping at the first.
+  if (args.size() == 2) {
+    args[1] match {
+    | "callbacks" -> f_allocationProbeApplications()
+    | "arrays" -> f_allocationProbeArrays()
+    | "effects" -> f_allocationProbeTracked()
+    | "references" -> f_allocationProbeReferencePages()
+    | _ -> leanFail("unknown allocation positive phase: " + args[1])
+    };
+    print_string("allocation phase passed: " + args[1]);
+    return void
+  };
+  if (args.size() == 3) return f_allocationProbeFailure(args[1] == "old", args[2]);
+  invariant(args.size() == 1, "allocation Probe.sk:419 main expected args.size() == 1");
+  f_allocationProbeApplications();
+  f_allocationProbeArrays();
+  f_allocationProbeTracked();
+  f_allocationProbeReferencePages();
+  print_string("allocation probe: callback/array/reference independent expectations passed")
+}

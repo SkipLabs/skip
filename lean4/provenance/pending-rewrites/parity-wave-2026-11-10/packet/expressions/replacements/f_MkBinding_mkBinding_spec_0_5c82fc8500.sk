@@ -1,0 +1,395 @@
+module L4_Lean_MetavarContext;
+
+// One ordinary local binder (also used for a generalized nondependent let).
+fun f_expressionsWave_bindLocal(
+  runtime: mutable LeanExecution,
+  variables: LeanValue, isLambda: LeanValue, etaReduce: LeanValue,
+  usedOnly: LeanValue, index: LeanValue, body: LeanValue,
+  name: LeanValue, type: LeanValue, binderInfo: LeanValue,
+  context: LeanValue, state: LeanValue,
+): LeanValue {
+  leanTag(usedOnly) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    used = L4_Lean_Expr.f_Lean_Expr_hasLooseBVar_56901adcc1(runtime, body, LeanNatLiterals.n0);
+    leanTag(used) match {
+    | LeanTag.Bool_false ->
+      lowered = L4_Lean_Expr.f_Lean_Expr_lowerLooseBVars_8ab690f5d0(
+        runtime,
+        body,
+        LeanNatLiterals.n1,
+        LeanNatLiterals.n1,
+      );
+      return LeanCtor(LeanTag.EStateM_Result_ok, Array[lowered, state])
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  reducedType = L4_Lean_Expr.f_Lean_Expr_headBeta_d2d563c891(runtime, type);
+  eliminated = f_MetavarContext_MkBinding_elimMVarDeps_6d1bd7cdba(
+    runtime,
+    variables,
+    reducedType,
+    context,
+    state,
+  );
+  leanTag(eliminated) match {
+  | LeanTag.EStateM_Result_error ->
+    _ = leanField(eliminated, 0);
+    _ = leanField(eliminated, 1);
+    eliminated
+  | LeanTag.EStateM_Result_ok ->
+    cleanType = leanField(eliminated, 0);
+    nextState = leanField(eliminated, 1);
+    abstractType = L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+      runtime,
+      cleanType,
+      index,
+      variables,
+    );
+    binding = leanTag(isLambda) match {
+    | LeanTag.Bool_false -> L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+        runtime,
+        name,
+        binderInfo,
+        abstractType,
+        body,
+      )
+    | LeanTag.Bool_true -> f_MetavarContext_MkBinding_mkLambda_4c7a10d5e6(
+        runtime,
+        name,
+        binderInfo,
+        abstractType,
+        body,
+        etaReduce,
+      )
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    LeanCtor(LeanTag.EStateM_Result_ok, Array[binding, nextState])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// A retained let eliminates dependencies in type then value, without headBeta.
+fun f_expressionsWave_bindLet(
+  runtime: mutable LeanExecution,
+  variables: LeanValue, usedLetOnly: LeanValue, index: LeanValue,
+  body: LeanValue, name: LeanValue, type: LeanValue, value: LeanValue,
+  nondep: LeanValue, context: LeanValue, state: LeanValue,
+): LeanValue {
+  leanTag(usedLetOnly) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    used = L4_Lean_Expr.f_Lean_Expr_hasLooseBVar_56901adcc1(runtime, body, LeanNatLiterals.n0);
+    leanTag(used) match {
+    | LeanTag.Bool_false ->
+      lowered = L4_Lean_Expr.f_Lean_Expr_lowerLooseBVars_8ab690f5d0(
+        runtime,
+        body,
+        LeanNatLiterals.n1,
+        LeanNatLiterals.n1,
+      );
+      return LeanCtor(LeanTag.EStateM_Result_ok, Array[lowered, state])
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  typeResult = f_MetavarContext_MkBinding_elimMVarDeps_6d1bd7cdba(
+    runtime,
+    variables,
+    type,
+    context,
+    state,
+  );
+  leanTag(typeResult) match {
+  | LeanTag.EStateM_Result_error ->
+    _ = leanField(typeResult, 0);
+    _ = leanField(typeResult, 1);
+    typeResult
+  | LeanTag.EStateM_Result_ok ->
+    cleanType = leanField(typeResult, 0);
+    typeState = leanField(typeResult, 1);
+    valueResult = f_MetavarContext_MkBinding_elimMVarDeps_6d1bd7cdba(
+      runtime,
+      variables,
+      value,
+      context,
+      typeState,
+    );
+    leanTag(valueResult) match {
+    | LeanTag.EStateM_Result_error ->
+      _ = leanField(valueResult, 0);
+      _ = leanField(valueResult, 1);
+      valueResult
+    | LeanTag.EStateM_Result_ok ->
+      cleanValue = leanField(valueResult, 0);
+      valueState = leanField(valueResult, 1);
+      abstractType = L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+        runtime,
+        cleanType,
+        index,
+        variables,
+      );
+      abstractValue = L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(
+        runtime,
+        cleanValue,
+        index,
+        variables,
+      );
+      binding = L4_Lean_Expr.f_Expr_letE_override_53a36b789f(
+        runtime,
+        name,
+        abstractType,
+        abstractValue,
+        body,
+        nondep,
+      );
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[binding, valueState])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Metavariables are always bound: usedOnly applies only to local declarations.
+fun f_expressionsWave_bindMVar(
+  runtime: mutable LeanExecution,
+  variables: LeanValue, isLambda: LeanValue, etaReduce: LeanValue,
+  variable: LeanValue, index: LeanValue, body: LeanValue,
+  context: LeanValue, state: LeanValue,
+): LeanValue {
+  leanTag(state) match {
+  | LeanTag.MetavarContext_MkBinding_State_mk -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  mctx = leanField(state, 0);
+  _ = leanField(state, 1);
+  _ = leanField(state, 2);
+  _ = leanField(state, 3);
+  id = L4_Lean_Expr.f_Lean_Expr_mvarId_9d4431c33a(runtime, variable);
+  decl = f_Lean_MetavarContext_getDecl_22100e60b6(runtime, mctx, id);
+  leanTag(decl) match {
+  | LeanTag.MetavarDecl_mk -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  name = leanField(decl, 0);
+  _ = leanField(decl, 1);
+  type = leanField(decl, 2);
+  _ = leanField(decl, 3);
+  _ = leanField(decl, 4);
+  _ = leanField(decl, 5);
+  _ = leanField(decl, 6);
+  _ = leanField(decl, 7);
+  reducedType = L4_Lean_Expr.f_Lean_Expr_headBeta_d2d563c891(runtime, type);
+  typeResult = f_MetavarContext_MkBinding_elimMVarDeps_6d1bd7cdba(
+    runtime,
+    variables,
+    reducedType,
+    context,
+    state,
+  );
+  leanTag(typeResult) match {
+  | LeanTag.EStateM_Result_error ->
+    _ = leanField(typeResult, 0);
+    _ = leanField(typeResult, 1);
+    return typeResult
+  | LeanTag.EStateM_Result_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  cleanType = leanField(typeResult, 0);
+  nextState = leanField(typeResult, 1);
+  abstractType = L4_Lean_Expr.f_Lean_Expr_abstractRange_6ddf7c6c71(runtime, cleanType, index, variables);
+  anonymous = L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(runtime, name);
+  leanTag(anonymous) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    baseName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+    fresh = f_MetavarContext_MkBinding_mkFreshBinderName_ce64156ebd(
+      runtime,
+      baseName,
+      context,
+      nextState,
+    );
+    leanTag(fresh) match {
+    | LeanTag.EStateM_Result_ok ->
+      !name = leanField(fresh, 0);
+      !nextState = leanField(fresh, 1)
+    | LeanTag.EStateM_Result_error ->
+      _ = leanField(fresh, 0);
+      _ = leanField(fresh, 1);
+      return leanFail("unreachable: _private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_.Lean.MetavarContext.MkBinding.mkBinding.spec_0._redArg")
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // The original tests isLambda before projecting the context, even on error.
+  lambda = leanTag(isLambda) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(context) match {
+  | LeanTag.MetavarContext_MkBinding_Context_mk -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  _ = leanField(context, 0);
+  _ = leanField(context, 1);
+  binderInfo = leanField(context, 2);
+  _ = leanField(context, 3);
+  binding = if (lambda) {
+    f_MetavarContext_MkBinding_mkLambda_4c7a10d5e6(
+      runtime,
+      name,
+      binderInfo,
+      abstractType,
+      body,
+      etaReduce,
+    )
+  } else {
+    L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name, binderInfo, abstractType, body)
+  };
+  LeanCtor(LeanTag.EStateM_Result_ok, Array[binding, nextState])
+}
+
+// Fold right over the variables, threading the real expression and MkBinding
+// state. Nat remains arbitrary precision; no machine-sized loop count is used.
+fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+  _runtime: mutable LeanExecution,
+  _xs_0_input: LeanValue,
+  _isLambda_1_input: LeanValue,
+  _etaReduce_2_input: LeanValue,
+  _usedOnly_3_input: LeanValue,
+  _lctx_4_input: LeanValue,
+  _usedLetOnly_5_input: LeanValue,
+  _generalizeNondepLet_6_input: LeanValue,
+  _i_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+  _y_2_9_input: LeanValue,
+  _y_3_10_input: LeanValue,
+): LeanValue {
+  remaining = _i_7_input;
+  body = _a_1_8_input;
+  state = _y_3_10_input;
+  loop {
+    done = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, remaining, LeanNatLiterals.n0);
+    leanTag(done) match {
+    | LeanTag.Bool_true -> return LeanCtor(LeanTag.EStateM_Result_ok, Array[body, state])
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    index = L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, remaining, LeanNatLiterals.n1);
+    variable = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
+      LeanErased(),
+      _xs_0_input,
+      index,
+      LeanErased(),
+    );
+    isFVar = L4_Lean_Expr.f_Lean_Expr_isFVar_e287a25d26(_runtime, variable);
+    step = leanTag(isFVar) match {
+    | LeanTag.Bool_false ->
+      f_expressionsWave_bindMVar(
+        _runtime,
+        _xs_0_input,
+        _isLambda_1_input,
+        _etaReduce_2_input,
+        variable,
+        index,
+        body,
+        _y_2_9_input,
+        state,
+      )
+    | LeanTag.Bool_true ->
+      decl = L4_Lean_LocalContext.f_Lean_LocalContext_getFVar_c6ddcb2945(
+        _runtime,
+        _lctx_4_input,
+        variable,
+      );
+      leanTag(decl) match {
+      | LeanTag.LocalDecl_cdecl ->
+        _ = leanField(decl, 0);
+        _ = leanField(decl, 1);
+        name = leanField(decl, 2);
+        type = leanField(decl, 3);
+        binderInfo = leanField(decl, 4);
+        _ = leanField(decl, 5);
+        f_expressionsWave_bindLocal(
+          _runtime,
+          _xs_0_input,
+          _isLambda_1_input,
+          _etaReduce_2_input,
+          _usedOnly_3_input,
+          index,
+          body,
+          name,
+          type,
+          binderInfo,
+          _y_2_9_input,
+          state,
+        )
+      | LeanTag.LocalDecl_ldecl ->
+        _ = leanField(decl, 0);
+        _ = leanField(decl, 1);
+        name = leanField(decl, 2);
+        type = leanField(decl, 3);
+        value = leanField(decl, 4);
+        nondep = leanField(decl, 5);
+        _ = leanField(decl, 6);
+        generalize = leanTag(_generalizeNondepLet_6_input) match {
+        | LeanTag.Bool_false -> false
+        | LeanTag.Bool_true -> leanTag(nondep) match {
+          | LeanTag.Bool_false -> false
+          | LeanTag.Bool_true -> true
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        };
+        if (generalize) {
+          f_expressionsWave_bindLocal(
+            _runtime,
+            _xs_0_input,
+            _isLambda_1_input,
+            _etaReduce_2_input,
+            _usedOnly_3_input,
+            index,
+            body,
+            name,
+            type,
+            LeanCtor(LeanTag.BinderInfo_default, Array[]),
+            _y_2_9_input,
+            state,
+          )
+        } else {
+          // The old join's generalization flag is necessarily false here.
+          f_expressionsWave_bindLet(
+            _runtime,
+            _xs_0_input,
+            _usedLetOnly_5_input,
+            index,
+            body,
+            name,
+            type,
+            value,
+            nondep,
+            _y_2_9_input,
+            state,
+          )
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    leanTag(step) match {
+    | LeanTag.EStateM_Result_error -> return step
+    | LeanTag.EStateM_Result_ok ->
+      !body = leanField(step, 0);
+      !state = leanField(step, 1);
+      !remaining = index
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  }
+}
+
+module end;

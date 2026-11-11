@@ -1,0 +1,108 @@
+module L4_Lean_Meta_Basic;
+
+// "_private.Lean.Meta.Basic.0.Lean.Meta.forallMetaTelescopeReducingAux.process"
+fun f_Meta_forallMetaTelescopeReducingAux_process_ae3c4fa1ca(
+  _runtime: mutable LeanExecution,
+  _reducing_0_input: LeanValue,
+  _maxMVars_1_input: LeanValue,
+  _kind_2_input: LeanValue,
+  _mvars_3_input: LeanValue,
+  _bis_4_input: LeanValue,
+  _j_5_input: LeanValue,
+  _type_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_8_input: LeanValue,
+  _a_9_input: LeanValue,
+  _a_10_input: LeanValue,
+  _a_1_11_input: LeanValue,
+): LeanValue {
+  reducing = _reducing_0_input;
+  maxMVars = _maxMVars_1_input;
+  kind = _kind_2_input;
+  initialMVars = _mvars_3_input;
+  initialBinderInfos = _bis_4_input;
+  initialStart = _j_5_input;
+  initialType = _type_6_input;
+  metaContext = _a_7_input;
+  metaStateRef = _a_8_input;
+  coreContext = _a_9_input;
+  coreStateRef = _a_10_input;
+  initialWorld = _a_1_11_input;
+
+  mvars = initialMVars;
+  binderInfos = initialBinderInfos;
+  instantiationStart = initialStart;
+  type = initialType;
+  world = initialWorld;
+  loop {
+    size = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), mvars);
+    limitReached = leanTag(maxMVars) match {
+    | LeanTag.Option_none -> false
+    | LeanTag.Option_some -> f_inference_metaTelescope_bool(L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, leanField(maxMVars, 0), size))
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    if (limitReached) {
+      body = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, type, instantiationStart, size, mvars);
+      return f_inference_metaTelescope_result(mvars, binderInfos, body, world)
+    };
+    if (leanTag(type) == LeanTag.Expr_forallE__impl) {
+      _ = leanField(type, 0);
+      binderName = leanField(type, 1);
+      binderType = leanField(type, 2);
+      body = leanField(type, 3);
+      binderInfo = leanField(type, 4);
+      domain = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, binderType, instantiationStart, size, mvars);
+      isInstance = L4_Lean_Expr.f_Lean_BinderInfo_isInstImplicit_7dced4c108(_runtime, binderInfo);
+      binderKind = if (f_inference_metaTelescope_bool(isInstance)) LeanCtor(LeanTag.MetavarKind_synthetic, Array[]) else kind;
+      domainOption = LeanCtor(LeanTag.Option_some, Array[domain]);
+      fresh = f_Lean_Meta_mkFreshExprMVarImpl_4af903d5a4(_runtime, domainOption, binderKind, binderName, metaContext, metaStateRef, coreContext, coreStateRef, world);
+      if (!f_inference_metaTelescope_ok(fresh)) return LeanCtor(LeanTag.EST_Out_error, Array[leanField(fresh, 0), leanField(fresh, 1)]);
+      mvar = leanField(fresh, 0);
+      !world = leanField(fresh, 1);
+      !mvars = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(_runtime, LeanErased(), mvars, mvar);
+      !binderInfos = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(_runtime, LeanErased(), binderInfos, binderInfo);
+      !type = body;
+      continue
+    };
+    body = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, type, instantiationStart, size, mvars);
+    if (!f_inference_metaTelescope_bool(reducing)) return f_inference_metaTelescope_result(mvars, binderInfos, body, world);
+    reduced = f_Lean_Meta_whnf_6493600863(_runtime, body, metaContext, metaStateRef, coreContext, coreStateRef, world);
+    if (!f_inference_metaTelescope_ok(reduced)) return LeanCtor(LeanTag.EST_Out_error, Array[leanField(reduced, 0), leanField(reduced, 1)]);
+    reducedType = leanField(reduced, 0);
+    !world = leanField(reduced, 1);
+    isForall = L4_Lean_Expr.f_Lean_Expr_isForall_0f74a3f027(_runtime, reducedType);
+    // When WHNF exposes no binder, return the instantiated ORIGINAL body.
+    if (!f_inference_metaTelescope_bool(isForall)) return f_inference_metaTelescope_result(mvars, binderInfos, body, world);
+    !instantiationStart = size;
+    !type = reducedType
+  }
+}
+
+fun f_inference_metaTelescope_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inference_metaTelescope_ok(result: LeanValue): Bool {
+  leanTag(result) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inference_metaTelescope_result(mvars: LeanValue, binderInfos: LeanValue, body: LeanValue, world: LeanValue): LeanValue {
+  tail = LeanCtor(LeanTag.Prod_mk, Array[binderInfos, body]);
+  LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Prod_mk, Array[mvars, tail]), world])
+}
+
+module end;

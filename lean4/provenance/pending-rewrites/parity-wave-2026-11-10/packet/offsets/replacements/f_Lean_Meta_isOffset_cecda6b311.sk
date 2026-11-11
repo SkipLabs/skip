@@ -1,0 +1,143 @@
+module L4_Lean_Meta_Offset;
+
+// Lean.Meta.isOffset?: recognize only successor and the three addition forms.
+fun f_Lean_Meta_isOffset_cecda6b311(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_1_5_input: LeanValue,
+): LeanValue {
+  metaContext = _a_1_input;
+  metaState = _a_2_input;
+  coreContext = _a_3_input;
+  coreState = _a_4_input;
+  instantiated = L4_Lean_Meta_Basic.f_Lean_Meta_instantiateMVarsIfMVarApp_05888c8640(
+    _runtime, _e_0_input, metaState, _a_1_5_input,
+  );
+  if (!f_offsets_wave_isOk(instantiated)) return instantiated;
+  world = leanField(instantiated, 1);
+  expression = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(
+    _runtime, leanField(instantiated, 0),
+  );
+  if (!f_offsets_wave_isApp(_runtime, expression)) return f_offsets_wave_none(world);
+  right = f_offsets_wave_offsetArgument(expression);
+  unaryHead = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, expression);
+  if (f_offsets_wave_isConst(_runtime, unaryHead, "Nat", "succ")) {
+    baseResult = f_Lean_Meta_getOffset_94d3d2e9f8(
+      _runtime, right, metaContext, metaState, coreContext, coreState, world,
+    );
+    return f_offsets_wave_extendOffset(_runtime, baseResult, LeanNatLiterals.n1)
+  };
+
+  if (!f_offsets_wave_isApp(_runtime, unaryHead)) return f_offsets_wave_none(world);
+  left = f_offsets_wave_offsetArgument(unaryHead);
+  binaryHead = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, unaryHead);
+  if (f_offsets_wave_isConst(_runtime, binaryHead, "Nat", "add")) {
+    return f_offsets_wave_addOffset(
+      _runtime, left, right, metaContext, metaState, coreContext, coreState, world,
+    )
+  };
+
+  if (!f_offsets_wave_isApp(_runtime, binaryHead)) return f_offsets_wave_none(world);
+  typeApplication = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, binaryHead);
+  if (!f_offsets_wave_isApp(_runtime, typeApplication)) return f_offsets_wave_none(world);
+  instance = f_offsets_wave_offsetArgument(binaryHead);
+  homogeneousHead = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, typeApplication);
+  if (f_offsets_wave_isConst(_runtime, homogeneousHead, "Add", "add")) {
+    expectedInstance = L4_Lean_Expr.f_Lean_Nat_mkInstAdd_956da9f92e(_runtime);
+    return f_offsets_wave_matchAddOffset(
+      _runtime, instance, expectedInstance, left, right,
+      metaContext, metaState, coreContext, coreState, world,
+    )
+  };
+
+  if (!f_offsets_wave_isApp(_runtime, homogeneousHead)) return f_offsets_wave_none(world);
+  remainingType = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, homogeneousHead);
+  if (!f_offsets_wave_isApp(_runtime, remainingType)) return f_offsets_wave_none(world);
+  heterogeneousHead = L4_Lean_Expr.f_Lean_Expr_appFnCleanup_f18bdcb337(_runtime, remainingType);
+  if (f_offsets_wave_isConst(_runtime, heterogeneousHead, "HAdd", "hAdd")) {
+    expectedInstance = L4_Lean_Expr.f_Lean_Nat_mkInstHAdd_59bd5878d4(_runtime);
+    return f_offsets_wave_matchAddOffset(
+      _runtime, instance, expectedInstance, left, right,
+      metaContext, metaState, coreContext, coreState, world,
+    )
+  };
+  f_offsets_wave_none(world)
+}
+
+fun f_offsets_wave_offsetArgument(expression: LeanValue): LeanValue {
+  leanTag(expression) match {
+  | LeanTag.Expr_app__impl -> leanField(expression, 2)
+  | _ -> leanFail("unreachable: Lean.Meta.isOffset?")
+  }
+}
+
+fun f_offsets_wave_extendOffset(
+  runtime: mutable LeanExecution,
+  baseResult: LeanValue,
+  increment: LeanValue,
+): LeanValue {
+  if (!f_offsets_wave_isOk(baseResult)) return baseResult;
+  pair = leanField(baseResult, 0);
+  leanTag(pair) match {
+  | LeanTag.Prod_mk ->
+    offset = L4_Init_Prelude.f_Nat_add_86990f4822(runtime, leanField(pair, 1), increment);
+    f_offsets_wave_some(
+      LeanCtor(LeanTag.Prod_mk, Array[leanField(pair, 0), offset]),
+      leanField(baseResult, 1),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_offsets_wave_addOffset(
+  runtime: mutable LeanExecution,
+  left: LeanValue,
+  right: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  // Unlike binary evalNat, offsets evaluate the RIGHT numeral before the LEFT base.
+  numeralResult = f_Lean_Meta_evalNat_6bfbb6a56e(
+    runtime, right, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(numeralResult)) return numeralResult;
+  numeral = leanField(numeralResult, 0);
+  if (!f_offsets_wave_hasValue(numeral)) return numeralResult;
+  baseResult = f_Lean_Meta_getOffset_94d3d2e9f8(
+    runtime, left, metaContext, metaState, coreContext, coreState, leanField(numeralResult, 1),
+  );
+  f_offsets_wave_extendOffset(runtime, baseResult, leanField(numeral, 0))
+}
+
+fun f_offsets_wave_matchAddOffset(
+  runtime: mutable LeanExecution,
+  instance: LeanValue,
+  expectedInstance: LeanValue,
+  left: LeanValue,
+  right: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  // Preserve definitional instance matching at a new mctx depth, not structural testing.
+  instanceResult = f_Lean_Meta_matchesInstance_d803c98e48(
+    runtime, instance, expectedInstance, metaContext, metaState, coreContext, coreState, world,
+  );
+  if (!f_offsets_wave_isOk(instanceResult)) return instanceResult;
+  instanceWorld = leanField(instanceResult, 1);
+  if (!f_offsets_wave_bool(leanField(instanceResult, 0))) return f_offsets_wave_none(instanceWorld);
+  f_offsets_wave_addOffset(
+    runtime, left, right, metaContext, metaState, coreContext, coreState, instanceWorld,
+  )
+}
+
+module end;

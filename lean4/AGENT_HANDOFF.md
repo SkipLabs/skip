@@ -1,5 +1,7 @@
 # Lean in Skip: detailed agent handoff
 
+> **Resumed wave status (2026-11-11): read [PARITY_REWRITE_PLAN.md](PARITY_REWRITE_PLAN.md) first.** All 46 rewrites and lane gates are complete; repaired release validation passed and the final benchmark reduced elapsed elaboration by 24.21% (still 2.532× native). The next requested step is profiling. The user resumed work and selected GLM-5.3 implementation/review agents, with stronger-model escalation only for stuck repairs. This supersedes the historical pause instructions below; [PARITY_PAUSE.md](PARITY_PAUSE.md) preserves the immutable pause snapshot.
+
 Prepared on 2026-11-10. The last implementation checkpoint is **`fa9550dfc`**.
 This handoff and its supporting archive are documentation work performed after
 the user paused optimization. They do not resume that work.

@@ -1,0 +1,740 @@
+// Parent-run only after reviewed integration retains canonical_fallback bodies.
+// Default: result/ref/input parity + independent semantic assertions.
+// Optional stdin modes: app-old-nanos, app-new-nanos, app-old-heartbeats,
+// app-new-heartbeats, postponed-old-nanos, postponed-new-nanos,
+// postponed-old-heartbeats, postponed-new-heartbeats. These MUST fail explicitly
+// at the unsupported timing primitive; they are not ordinary parity successes.
+
+// Target numbers follow manifest.json order. Arguments retain each canonical ABI.
+fun f_inference_probe_call(runtime: mutable LeanExecution, fallback: Bool, target: Int, args: Array<LeanValue>): LeanValue {
+  target match {
+  | 0 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Meta_forallTelescopeReducingAuxAux_process_0ca40475ce_fallback else L4_Lean_Meta_Basic.f_Meta_forallTelescopeReducingAuxAux_process_0ca40475ce;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13])
+  | 1 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Meta_forallMetaTelescopeReducingAux_process_ae3c4fa1ca_fallback else L4_Lean_Meta_Basic.f_Meta_forallMetaTelescopeReducingAux_process_ae3c4fa1ca;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+  | 2 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Lean_Meta_forallTelescopeReducingAux_49d009dc47_fallback else L4_Lean_Meta_Basic.f_Lean_Meta_forallTelescopeReducingAux_49d009dc47;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9])
+  | 3 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Meta_isExprDefEq_spec_0_bfe54879ba_fallback else L4_Lean_Meta_Basic.f_Meta_isExprDefEq_spec_0_bfe54879ba;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+  | 4 ->
+    method = if (fallback) L4_Lean_Meta_AppBuilder.f_Meta_mkAppMArgs_loop_42adf6c397_fallback else L4_Lean_Meta_AppBuilder.f_Meta_mkAppMArgs_loop_42adf6c397;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11])
+  | 5 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Lean_Meta_processPostponed_f8ab161000_fallback else L4_Lean_Meta_Basic.f_Lean_Meta_processPostponed_f8ab161000;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6])
+  | 6 ->
+    method = if (fallback) L4_Lean_Meta_Basic.f_Meta_lambdaTelescopeImp_process_ee1adca301_fallback else L4_Lean_Meta_Basic.f_Meta_lambdaTelescopeImp_process_ee1adca301;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12], args[13], args[14])
+  | 7 ->
+    method = if (fallback) L4_Lean_Meta_AppBuilder.f_Meta_mkAppM_spec_1_f44548f5b2_fallback else L4_Lean_Meta_AppBuilder.f_Meta_mkAppM_spec_1_f44548f5b2;
+    method(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
+  | _ -> leanFail("unknown inference probe target")
+  }
+}
+
+fun f_inference_probe_name(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun f_inference_probe_ok(value: LeanValue, world: LeanValue): LeanValue {
+  LeanCtor(LeanTag.EST_Out_ok, Array[value, world])
+}
+
+fun f_inference_probe_compare(
+  label: String, saved: LeanExecutionCheckpoint, target: Int,
+  args: Array<LeanValue>, expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldArgs = args.map(rewriteProbeCopyInput);
+  oldMetrics: mutable Vector<Array<Int>> = mutable Vector[];
+  newArgs = args.map(rewriteProbeCopyInput);
+  (result, after) = rewriteProbeCompare(label, saved,
+    (runtime: mutable LeanExecution) ~> {
+      result = f_inference_probe_call(runtime, true, target, oldArgs);
+      for (i in Range(0, args.size())) assert(rewriteProbeSameInput(args[i], oldArgs[i]));
+      oldMetrics.push(runtime.checkpoint().metrics);
+      result
+    },
+    (runtime: mutable LeanExecution) ~> {
+      result = f_inference_probe_call(runtime, false, target, newArgs);
+      for (i in Range(0, args.size())) assert(rewriteProbeSameInput(args[i], newArgs[i]));
+      result
+    }, expected);
+  assert(oldMetrics.size() == 1);
+  for (i in Range(0, after.metrics.size())) {
+    if (i != 4 && i != 7) assert(oldMetrics[0][i] == after.metrics[i])
+  };
+  // Verify an old checkpoint is still a usable root after both executions.
+  restored = saved.restoreRaw();
+  assert(native_eq(restored.checkpoint().refs, saved.refs) == 0);
+  (result, after)
+}
+
+// Capture two arguments, then accept fvars/body and the five Meta/Core/world args.
+fun f_inference_probe_telescopeContinuation(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  calls = runtime.readRef(args[0]);
+  runtime.writeRef(args[0], Some(L4_Init_Prelude.f_Nat_add_86990f4822(runtime, calls, LeanNatLiterals.n1)));
+  payload = LeanCtor(LeanTag.Prod_mk, Array[args[2], LeanCtor(LeanTag.Prod_mk, Array[args[3], args[4]])]);
+  if (leanIsTrue(args[1])) return LeanCtor(LeanTag.EST_Out_error, Array[LeanText("inference continuation sentinel"), args[8]]);
+  f_inference_probe_ok(payload, args[8])
+}
+
+// Capture counter/success/value and accept the five Meta/Core/world arguments.
+fun f_inference_probe_traceContinuation(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  calls = runtime.readRef(args[0]);
+  runtime.writeRef(args[0], Some(L4_Init_Prelude.f_Nat_add_86990f4822(runtime, calls, LeanNatLiterals.n1)));
+  LeanCtor(if (leanIsTrue(args[1])) LeanTag.EST_Out_ok else LeanTag.EST_Out_error, Array[args[2], args[7]])
+}
+
+fun f_inference_probe_traceOption(runtime: mutable LeanExecution, core: LeanValue, suffix: String): LeanValue {
+  trace = f_inference_probe_name(runtime, "trace");
+  name = if (suffix == "postponed") {
+    L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("Meta"), LeanText("isLevelDefEq"), LeanText("postponed"))
+  } else if (suffix == "appBuilder") {
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText("Meta"), LeanText("appBuilder"))
+  } else {
+    L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("Meta"), LeanText("appBuilder"), LeanText(suffix))
+  };
+  option = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(runtime, trace, name);
+  cold = leanField(core, 0);
+  options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(runtime, L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime), leanField(cold, 2), option, leanBool(true));
+  leanReplaceField(core, 0, leanReplaceField(cold, 2, options))
+}
+
+fun f_inference_probe_checkNames(before: LeanExecutionCheckpoint, after: LeanExecutionCheckpoint, coreRef: LeanValue, count: Int): void {
+  original = before.restoreRaw();
+  updated = after.restoreRaw();
+  oldGenerator = leanField(original.readRef(coreRef), 2);
+  newGenerator = leanField(updated.readRef(coreRef), 2);
+  assert(rewriteProbeSameInput(leanField(oldGenerator, 0), leanField(newGenerator, 0)));
+  assert(leanNat(leanField(newGenerator, 1)) == leanNat(leanField(oldGenerator, 1)).add(LeanNat::fromInt(count)))
+}
+
+fun f_inference_probe_localDecl(runtime: mutable LeanExecution, context: LeanValue, fvar: LeanValue): LeanValue {
+  found = L4_Lean_LocalContext.f_Lean_LocalContext_find_001c4a7be2(runtime, leanField(context, 3), leanField(fvar, 1));
+  assert(leanTag(found) == LeanTag.Option_some);
+  leanField(found, 0)
+}
+
+fun f_inference_probe_postponed(runtime: mutable LeanExecution, state: RewriteProbeState, left: LeanValue, right: LeanValue): LeanExecutionCheckpoint {
+  initial = runtime.readRef(state.metaStateRef);
+  entry = LeanCtor(LeanTag.Meta_PostponedEntry_mk, Array[leanField(state.coreContext, 2), left, right, leanField(state.metaContext, 5)]);
+  pending = L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_push_8ec9d2434c(runtime, leanField(initial, 3), entry);
+  runtime.writeRef(state.metaStateRef, Some(leanReplaceField(initial, 3, pending)));
+  runtime.checkpoint()
+}
+
+// Used only by expected-failure projection-order modes. Its marker must NOT run.
+fun f_inference_probe_projectionMarker(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  print_error("UNEXPECTED callback reached before constructor projection");
+  leanFail("projection-order callback executed")
+}
+
+fun main(): void {
+  mode = read_to_end().trim();
+  runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => mode == "profile"};
+  leanInitializeSimp(runtime);
+  zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+  one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+  aName = f_inference_probe_name(runtime, "InferenceA");
+  xName = f_inference_probe_name(runtime, "inferenceX");
+  functionName = f_inference_probe_name(runtime, "inferenceFunction");
+  alphaName = f_inference_probe_name(runtime, "alpha");
+  binderName = f_inference_probe_name(runtime, "boundX");
+  a = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, aName);
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+  function = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, functionName);
+  binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  natural: LeanValue = LeanCtor(LeanTag.MetavarKind_natural, Array[]);
+  bvar0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+  bvar1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+  arrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, a, a);
+  dependentTail = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, bvar0, bvar1);
+  dependent = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, binder, type, dependentTail);
+  annotatedA = L4_Lean_Expr.f_Lean_mkAnnotation_fe98cbf276(runtime, f_inference_probe_name(runtime, "inference.annotation"), a);
+  annotatedArrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, annotatedA, a);
+  annotatedDependent = L4_Lean_Expr.f_Lean_mkAnnotation_fe98cbf276(runtime, f_inference_probe_name(runtime, "inference.head"), dependent);
+  locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  for ((id, localType) in Array[(aName, type), (xName, a), (functionName, arrow)]) {
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, id, id, localType, binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]))
+  };
+  environment = rewriteProbeEnvironment(runtime, (Map[] : Map<String, LeanConstantFile>));
+  state = rewriteProbeState(runtime, environment, locals, "<inference-parity-wave>");
+  calls = runtime.newRef(LeanNatLiterals.n0);
+  saved = runtime.checkpoint();
+  world = leanNatValue(73);
+  empty: LeanValue = LeanArray(Array[]);
+  none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  huge = leanBoxNat(LeanNat::parse("184467440737095516170"));
+  limits = Array[none, LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n0]), LeanCtor(LeanTag.Option_some, Array[LeanNatLiterals.n1]), LeanCtor(LeanTag.Option_some, Array[leanNatValue(2)]), LeanCtor(LeanTag.Option_some, Array[huge])];
+  contextArgs = Array[state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world];
+  continuation = LeanClosure(f_inference_probe_telescopeContinuation, 9, Array[calls, leanBool(false)]);
+  checks = 0;
+
+  if (mode.contains("-short-context")) {
+    shortened = LeanCtor(LeanTag.Meta_Context_mk, Array[
+      leanField(state.metaContext, 0), leanField(state.metaContext, 1),
+      leanField(state.metaContext, 2), leanField(state.metaContext, 3),
+      leanField(state.metaContext, 4), leanField(state.metaContext, 5),
+      leanField(state.metaContext, 6), leanField(state.metaContext, 7),
+      leanField(state.metaContext, 8), leanField(state.metaContext, 9)]);
+    marker = LeanClosure(f_inference_probe_projectionMarker, 2, Array[]);
+    old = mode.contains("-old-");
+    if (mode.contains("lambda-")) {
+      _ = f_inference_probe_call(runtime, old, 6, Array[leanBool(false), leanBool(false), none, marker, leanBool(false), leanBool(true), LeanUnavailable("unused consumeLet"), locals, empty, prop, shortened, state.metaStateRef, state.coreContext, state.coreStateRef, world])
+    } else {
+      _ = f_inference_probe_call(runtime, old, 0, Array[leanBool(false), limits[1], marker, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, dependent, shortened, state.metaStateRef, state.coreContext, state.coreStateRef, world])
+    };
+    leanFail("short context unexpectedly accepted")
+  };
+  if (!mode.isEmpty() && mode != "profile") {
+    isApp = mode.contains("app-");
+    isOld = mode.contains("-old-");
+    heartbeats = mode.contains("heartbeats");
+    core = f_inference_probe_traceOption(runtime, state.coreContext, if (isApp) "appBuilder" else "postponed");
+    cold = leanField(core, 0);
+    hbName = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("trace"), LeanText("profiler"), LeanText("useHeartbeats"));
+    options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(runtime, L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime), leanField(cold, 2), hbName, leanBool(heartbeats));
+    !core = leanReplaceField(core, 0, leanReplaceField(cold, 2, options));
+    if (isApp) {
+      action = LeanClosure(f_inference_probe_traceContinuation, 8, Array[calls, leanBool(true), x]);
+      _ = f_inference_probe_call(runtime, isOld, 7, Array[function, empty, action, state.metaContext, state.metaStateRef, core, state.coreStateRef, world])
+    } else {
+      _ = f_inference_probe_postponed(runtime, state, zero, zero);
+      _ = f_inference_probe_call(runtime, isOld, 5, Array[leanBool(false), leanBool(false), state.metaContext, state.metaStateRef, core, state.coreStateRef, world])
+    };
+    leanFail("unsupported timing mode unexpectedly returned")
+  };
+
+  // I-1: lambda-enabled nonbinders do NOT inspect consumeLet. Also exercise
+  // lambda-disabled/let-disabled dispatch without touching the irrelevant flags.
+  poison = LeanUnavailable("unused telescope flag must remain uninspected");
+  for ((label, input, consumeLambda, consumeLet) in Array[
+    ("I-1 nonbinder", prop, leanBool(true), poison),
+    ("both consumption flags off", prop, leanBool(false), leanBool(false)),
+  ]) {
+    expectedPayload = LeanCtor(LeanTag.Prod_mk, Array[empty, LeanCtor(LeanTag.Prod_mk, Array[input, state.metaContext])]);
+    (result, after) = f_inference_probe_compare(label, saved, 6,
+      Array[poison, poison, none, continuation, poison, consumeLambda, consumeLet, locals, empty, input].concat(contextArgs), Some(f_inference_probe_ok(expectedPayload, world)));
+    afterRuntime = after.restoreRaw();
+    assert(leanNat(afterRuntime.readRef(calls)) == LeanNat::fromInt(1));
+    f_inference_probe_checkNames(saved, after, state.coreStateRef, 0);
+    !checks = checks + 1
+  };
+
+  // Direct forall worker, including the reduction-to-forall continuation path.
+  for (reducing in Array[false, true]) {
+    for (cleanup in Array[false, true]) {
+      for (limitIndex in Range(0, limits.size())) {
+        for ((label, input, total) in Array[("dependent", dependent, 2), ("annotated-domain", annotatedArrow, 1)]) {
+          count = if (limitIndex == 1) 0 else if (limitIndex == 2) 1 else total;
+          args = Array[leanBool(reducing), limits[limitIndex], continuation, leanBool(cleanup), leanBool(false), locals, empty, LeanNatLiterals.n0, input].concat(contextArgs);
+          (result, after) = f_inference_probe_compare("forall worker " + label, saved, 0, args);
+          assert(leanTag(result) == LeanTag.EST_Out_ok);
+          assert(rewriteProbeSameInput(leanField(result, 1), world));
+          payload = leanField(result, 0);
+          fvars = leanArray(leanField(payload, 0));
+          tail = leanField(payload, 1);
+          openedBody = leanField(tail, 0);
+          openedContext = leanField(tail, 1);
+          assert(fvars.size() == count);
+          afterRuntime = after.restoreRaw();
+          assert(leanNat(afterRuntime.readRef(calls)) == LeanNat::fromInt(1));
+          f_inference_probe_checkNames(saved, after, state.coreStateRef, count);
+          if (count == 0) assert(rewriteProbeSameInput(openedBody, input));
+          if (label == "dependent" && count > 0) {
+            firstDecl = f_inference_probe_localDecl(afterRuntime, openedContext, fvars[0]);
+            assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(afterRuntime, firstDecl), type));
+            expectedBody = if (count == 1) L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(afterRuntime, binderName, binder, fvars[0], fvars[0]) else fvars[0];
+            assert(rewriteProbeSameInput(openedBody, expectedBody));
+            if (count == 2) {
+              secondDecl = f_inference_probe_localDecl(afterRuntime, openedContext, fvars[1]);
+              assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(afterRuntime, secondDecl), fvars[0]))
+            }
+          };
+          if (label == "annotated-domain" && count == 1) {
+            decl = f_inference_probe_localDecl(afterRuntime, openedContext, fvars[0]);
+            assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(afterRuntime, decl), if (cleanup) a else annotatedA));
+            assert(rewriteProbeSameInput(openedBody, a))
+          };
+          !checks = checks + 1
+        }
+      }
+    }
+  };
+  // Existing prefix is not re-instantiated: j=1 applies only the newly opened suffix.
+  prefix: LeanValue = LeanArray(Array[x]);
+  (prefixResult, prefixAfter) = f_inference_probe_compare("forall nonzero j", saved, 0,
+    Array[leanBool(false), none, continuation, leanBool(false), leanBool(false), locals, prefix, LeanNatLiterals.n1, dependent].concat(contextArgs));
+  prefixPayload = leanField(prefixResult, 0);
+  prefixVars = leanArray(leanField(prefixPayload, 0));
+  assert(prefixVars.size() == 3 && rewriteProbeSameInput(prefixVars[0], x));
+  assert(rewriteProbeSameInput(leanField(leanField(prefixPayload, 1), 0), prefixVars[1]));
+  f_inference_probe_checkNames(saved, prefixAfter, state.coreStateRef, 2);
+  !checks = checks + 1;
+
+  // Entry chooses original vs WHNF result and skips WHNF at limit zero.
+  for (whnfBody in Array[false, true]) {
+    for (limit in Array[limits[1], none]) {
+      for ((label, input) in Array[("plain", annotatedA), ("head forall", annotatedDependent)]) {
+        (result, after) = f_inference_probe_compare("forall entry " + label, saved, 2,
+          Array[input, limit, continuation, leanBool(false), leanBool(whnfBody)].concat(contextArgs));
+        payload = leanField(result, 0);
+        fvars = leanArray(leanField(payload, 0));
+        body = leanField(leanField(payload, 1), 0);
+        zeroLimit = leanTag(limit) == LeanTag.Option_some;
+        if (label == "plain") {
+          assert(fvars.size() == 0);
+          assert(rewriteProbeSameInput(body, if (whnfBody) a else annotatedA))
+        } else if (zeroLimit) {
+          assert(fvars.size() == 0);
+          assert(rewriteProbeSameInput(body, if (whnfBody) dependent else annotatedDependent))
+        } else {
+          assert(fvars.size() == 2);
+          assert(rewriteProbeSameInput(body, fvars[0]))
+        };
+        afterRuntime = after.restoreRaw();
+        assert(leanNat(afterRuntime.readRef(calls)) == LeanNat::fromInt(1));
+        !checks = checks + 1
+      }
+    }
+  };
+  failureContinuation = LeanClosure(f_inference_probe_telescopeContinuation, 9, Array[calls, leanBool(true)]);
+  (failed, failedAfter) = f_inference_probe_compare("continuation error keeps fresh names", saved, 0,
+    Array[leanBool(false), none, failureContinuation, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, dependent].concat(contextArgs),
+    Some(LeanCtor(LeanTag.EST_Out_error, Array[LeanText("inference continuation sentinel"), world])));
+  f_inference_probe_checkNames(saved, failedAfter, state.coreStateRef, 2);
+  !checks = checks + 1;
+
+  poisonLambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, a, bvar0);
+  (poisonLambdaResult, poisonLambdaAfter) = f_inference_probe_compare("lambda leaves let flags unused", saved, 6,
+    Array[poison, poison, none, continuation, leanBool(false), leanBool(true), poison, locals, empty, poisonLambda].concat(contextArgs));
+  poisonPayload = leanField(poisonLambdaResult, 0);
+  assert(leanArray(leanField(poisonPayload, 0)).size() == 1);
+  assert(rewriteProbeSameInput(leanField(leanField(poisonPayload, 1), 0), leanArray(leanField(poisonPayload, 0))[0]));
+  f_inference_probe_checkNames(saved, poisonLambdaAfter, state.coreStateRef, 1);
+  !checks = checks + 1;
+
+  // Metavariable telescope preserves binder order, dependent domains and kinds.
+  for (binderInfo in Array[binder, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), LeanCtor(LeanTag.BinderInfo_strictImplicit, Array[]), LeanCtor(LeanTag.BinderInfo_instImplicit, Array[])]) {
+    input = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, binderInfo, type, dependentTail);
+    for (reducing in Array[false, true]) {
+      for (limitIndex in Range(0, limits.size())) {
+        count = if (limitIndex == 1) 0 else if (limitIndex == 2) 1 else 2;
+        (result, after) = f_inference_probe_compare("meta telescope", saved, 1,
+          Array[leanBool(reducing), limits[limitIndex], natural, empty, empty, LeanNatLiterals.n0, input].concat(contextArgs));
+        assert(leanTag(result) == LeanTag.EST_Out_ok);
+        payload = leanField(result, 0);
+        mvars = leanArray(leanField(payload, 0));
+        tail = leanField(payload, 1);
+        infos = leanArray(leanField(tail, 0));
+        body = leanField(tail, 1);
+        assert(mvars.size() == count && infos.size() == count);
+        afterRuntime = after.restoreRaw();
+        mctx = leanField(afterRuntime.readRef(state.metaStateRef), 0);
+        if (count == 0) assert(rewriteProbeSameInput(body, input));
+        if (count > 0) {
+          first = L4_Lean_MetavarContext.f_Lean_MetavarContext_getDecl_22100e60b6(afterRuntime, mctx, leanField(mvars[0], 1));
+          assert(rewriteProbeSameInput(leanField(first, 0), alphaName));
+          assert(rewriteProbeSameInput(leanField(first, 2), type));
+          assert(rewriteProbeSameInput(leanField(first, 3), leanField(mctx, 0)));
+          expectedKind = if (leanTag(binderInfo) == LeanTag.BinderInfo_instImplicit) LeanTag.MetavarKind_synthetic else LeanTag.MetavarKind_natural;
+          assert(leanTag(leanField(first, 5)) == expectedKind);
+          assert(rewriteProbeSameInput(infos[0], binderInfo));
+          expectedBody = if (count == 1) L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(afterRuntime, binderName, binder, mvars[0], mvars[0]) else mvars[0];
+          assert(rewriteProbeSameInput(body, expectedBody));
+          if (count == 2) {
+            second = L4_Lean_MetavarContext.f_Lean_MetavarContext_getDecl_22100e60b6(afterRuntime, mctx, leanField(mvars[1], 1));
+            assert(rewriteProbeSameInput(leanField(second, 2), mvars[0]));
+            assert(rewriteProbeSameInput(leanField(second, 3), leanField(mctx, 0)));
+            assert(leanTag(leanField(second, 5)) == LeanTag.MetavarKind_natural);
+            assert(rewriteProbeSameInput(infos[1], binder))
+          }
+        };
+        !checks = checks + 1
+      }
+    }
+  };
+  for (reducing in Array[false, true]) {
+    (result, _) = f_inference_probe_compare("meta unreduced residual", saved, 1,
+      Array[leanBool(reducing), none, natural, empty, empty, LeanNatLiterals.n0, annotatedA].concat(contextArgs));
+    assert(rewriteProbeSameInput(leanField(leanField(leanField(result, 0), 1), 1), annotatedA));
+    !checks = checks + 1
+  };
+
+  // Lambda and let declaration policy: all flag combinations, zero/one/unbounded.
+  lambda = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, annotatedA, bvar0);
+  dependentLet = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(runtime, binderName, annotatedA, x, bvar0, leanBool(false));
+  nondependentLet = L4_Lean_Expr.f_Lean_mkLet_82f97eecaa(runtime, binderName, annotatedA, x, x, leanBool(true));
+  for (preserve in Array[false, true]) {
+    for (nondepOnly in Array[false, true]) {
+      for (consumeLambda in Array[false, true]) {
+        for (consumeLet in Array[false, true]) {
+          for (cleanup in Array[false, true]) {
+            for (limit in Array[limits[1], limits[2], none]) {
+              for ((label, input) in Array[("lambda", lambda), ("dependent let", dependentLet), ("nondependent let", nondependentLet)]) {
+                opens = leanTag(limit) != LeanTag.Option_some || leanNat(leanField(limit, 0)) != LeanNat::fromInt(0);
+                !opens = opens && (if (label == "lambda") consumeLambda else consumeLet && (label == "nondependent let" || !nondepOnly));
+                (result, after) = f_inference_probe_compare("lambda/let " + label, saved, 6,
+                  Array[leanBool(preserve), leanBool(nondepOnly), limit, continuation, leanBool(cleanup), leanBool(consumeLambda), leanBool(consumeLet), locals, empty, input].concat(contextArgs));
+                payload = leanField(result, 0);
+                fvars = leanArray(leanField(payload, 0));
+                tail = leanField(payload, 1);
+                assert(fvars.size() == (if (opens) 1 else 0));
+                afterRuntime = after.restoreRaw();
+                assert(leanNat(afterRuntime.readRef(calls)) == LeanNat::fromInt(1));
+                f_inference_probe_checkNames(saved, after, state.coreStateRef, if (opens) 1 else 0);
+                if (!opens) {
+                  assert(rewriteProbeSameInput(leanField(tail, 0), input))
+                } else {
+                  declaration = f_inference_probe_localDecl(afterRuntime, leanField(tail, 1), fvars[0]);
+                  assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(afterRuntime, declaration), if (cleanup) a else annotatedA));
+                  assert(rewriteProbeSameInput(leanField(tail, 0), if (label == "nondependent let") x else fvars[0]));
+                  assert(leanIsTrue(L4_Lean_LocalContext.f_Lean_LocalDecl_isLet_4c3866c755(afterRuntime, declaration, leanBool(true))) == (label != "lambda"));
+                  if (label != "lambda") {
+                    assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_value_febb4b7b89(afterRuntime, declaration, leanBool(true)), x));
+                    assert(leanIsTrue(L4_Lean_LocalContext.f_Lean_LocalDecl_isNondep_90fa3a238c(afterRuntime, declaration)) == (label == "nondependent let" && preserve))
+                  }
+                };
+                !checks = checks + 1
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // Transactional equality: successful/false comparison, beta, assignment, and
+  // pre-existing postponed entries retained outside the inner transaction.
+  identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, a, bvar0);
+  beta = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, x);
+  for ((label, left, right, expected) in Array[("reflexive", a, a, true), ("different sorts", prop, type, false), ("beta", beta, x, true)]) {
+    for (postpone in Array[false, true]) {
+      (result, after) = f_inference_probe_compare("defeq " + label, saved, 3, Array[left, right, leanBool(postpone)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(expected), world)));
+      beforeRuntime = saved.restoreRaw();
+      afterRuntime = after.restoreRaw();
+      assert(rewriteProbeSameInput(leanField(beforeRuntime.readRef(state.metaStateRef), 0), leanField(afterRuntime.readRef(state.metaStateRef), 0)));
+      !checks = checks + 1
+    }
+  };
+  assignmentRuntime = saved.restoreRaw();
+  fresh = L4_Lean_Meta_Basic.f_Lean_Meta_mkFreshExprMVarImpl_4af903d5a4(assignmentRuntime, LeanCtor(LeanTag.Option_some, Array[a]), natural, binderName, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world);
+  assert(leanTag(fresh) == LeanTag.EST_Out_ok);
+  mvar = leanField(fresh, 0);
+  (assigned, assignmentAfter) = f_inference_probe_compare("defeq commits assignment", assignmentRuntime.checkpoint(), 3, Array[mvar, x, leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+  assignedRuntime = assignmentAfter.restoreRaw();
+  assignedValue = L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(assignedRuntime, leanField(assignedRuntime.readRef(state.metaStateRef), 0), leanField(mvar, 1));
+  assert(rewriteProbeSameInput(assignedValue, LeanCtor(LeanTag.Option_some, Array[x])));
+  !checks = checks + 1;
+  pendingRuntime = saved.restoreRaw();
+  pendingSaved = f_inference_probe_postponed(pendingRuntime, state, zero, zero);
+  (equalWithPending, equalityAfter) = f_inference_probe_compare("defeq preserves outer postponed queue", pendingSaved, 3, Array[a, a, leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+  equalityRuntime = equalityAfter.restoreRaw();
+  assert(rewriteProbeSameInput(leanField(pendingRuntime.readRef(state.metaStateRef), 3), leanField(equalityRuntime.readRef(state.metaStateRef), 3)));
+  !checks = checks + 1;
+
+  for (postpone in Array[false, true]) {
+    for (exceptionOnFailure in Array[false, true]) {
+      (emptyResult, emptyAfter) = f_inference_probe_compare("empty postponed", saved, 5, Array[leanBool(postpone), leanBool(exceptionOnFailure)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+      assert(native_eq(emptyAfter.refs, saved.refs) == 0);
+      !checks = checks + 1;
+      for (same in Array[false, true]) {
+        pending = saved.restoreRaw();
+        before = f_inference_probe_postponed(pending, state, zero, if (same) zero else one);
+        (result, after) = f_inference_probe_compare("nonempty postponed", before, 5, Array[leanBool(postpone), leanBool(exceptionOnFailure)].concat(contextArgs));
+        if (same || !exceptionOnFailure) {
+          assert(rewriteProbeSameInput(result, f_inference_probe_ok(leanBool(same), world)))
+        } else assert(leanTag(result) == LeanTag.EST_Out_error);
+        if (same) {
+          afterRuntime = after.restoreRaw();
+          original = saved.restoreRaw();
+          assert(rewriteProbeSameInput(leanField(afterRuntime.readRef(state.metaStateRef), 3), leanField(original.readRef(state.metaStateRef), 3)))
+        };
+        !checks = checks + 1
+      }
+    }
+  };
+
+  // Application builder: explicit/implicit/strict/trailing binders and real WHNF.
+  expectedApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, function, x);
+  for ((label, inputType, explicitArgs, index, expected) in Array[
+    ("explicit", arrow, LeanArray(Array[x]), LeanNatLiterals.n0, expectedApp),
+    ("zero explicit", LeanUnavailable("exhaustion must not inspect type"), empty, LeanNatLiterals.n0, function),
+    ("huge exhausted index", LeanUnavailable("large Nat index must not wrap"), LeanArray(Array[x]), huge, function),
+    ("too-large ordinary index", arrow, LeanArray(Array[x]), leanNatValue(2), function),
+    ("whnf head", L4_Lean_Expr.f_Lean_mkAnnotation_fe98cbf276(runtime, alphaName, arrow), LeanArray(Array[x]), LeanNatLiterals.n0, expectedApp),
+  ]) {
+    (result, _) = f_inference_probe_compare("app args " + label, saved, 4, Array[function, explicitArgs, inputType, index, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(expected, world)));
+    !checks = checks + 1
+  };
+  for (implicit in Array[LeanCtor(LeanTag.BinderInfo_implicit, Array[]), LeanCtor(LeanTag.BinderInfo_strictImplicit, Array[])]) {
+    inputType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, implicit, type, dependentTail);
+    polyFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, implicit, type, L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, bvar0, bvar0));
+    expected = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, polyFunction, LeanArray(Array[a, x]));
+    (result, _) = f_inference_probe_compare("app inserts inferred implicit", saved, 4, Array[polyFunction, LeanArray(Array[x]), inputType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(expected, world)));
+    !checks = checks + 1
+  };
+  trailing = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, a);
+  trailingType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, a, trailing);
+  trailingFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, a, L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, bvar1));
+  trailingExpected = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, trailingFunction, x);
+  (trailingResult, _) = f_inference_probe_compare("app stops before trailing implicit", saved, 4, Array[trailingFunction, LeanArray(Array[x]), trailingType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(trailingExpected, world)));
+  !checks = checks + 1;
+  for ((label, inputType, explicitArgs) in Array[("too many", arrow, LeanArray(Array[x, x])), ("type mismatch", arrow, LeanArray(Array[prop]))]) {
+    (result, _) = f_inference_probe_compare("app error " + label, saved, 4, Array[function, explicitArgs, inputType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs));
+    assert(leanTag(result) == LeanTag.EST_Out_error);
+    assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error);
+    assert(rewriteProbeSameInput(leanField(result, 1), world));
+    !checks = checks + 1
+  };
+
+  // Global trace off, quiet global trace on, and leaf-only result/error traces.
+  quietCold = leanField(state.coreContext, 0);
+  quietOptions = leanReplaceField(leanField(quietCold, 2), 1, leanBool(true));
+  quietCore = leanReplaceField(state.coreContext, 0, leanReplaceField(quietCold, 2, quietOptions));
+  ordinaryError = LeanCtor(LeanTag.Exception_error, Array[leanField(state.coreContext, 2), L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText("inference sentinel"))]);
+  for ((label, core) in Array[("disabled", state.coreContext), ("quiet", quietCore), ("result leaf", f_inference_probe_traceOption(runtime, state.coreContext, "result")), ("error leaf", f_inference_probe_traceOption(runtime, state.coreContext, "error"))]) {
+    for (success in Array[false, true]) {
+      value = if (success) x else ordinaryError;
+      action = LeanClosure(f_inference_probe_traceContinuation, 8, Array[calls, leanBool(success), value]);
+      expected = LeanCtor(if (success) LeanTag.EST_Out_ok else LeanTag.EST_Out_error, Array[value, world]);
+      (result, after) = f_inference_probe_compare("app trace " + label, saved, 7, Array[function, LeanArray(Array[x]), action, state.metaContext, state.metaStateRef, core, state.coreStateRef, world], Some(expected));
+      afterRuntime = after.restoreRaw();
+      assert(leanNat(afterRuntime.readRef(calls)) == LeanNat::fromInt(1));
+      !checks = checks + 1
+    }
+  };
+  // A genuine beta-reduction boundary after the first dependent binder.
+  delayedTail = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime,
+    L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, binder, type,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, bvar0, bvar1)), bvar0);
+  acrossReduction = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, binder, type, delayedTail);
+  for (target in Array[0, 1]) {
+    args = if (target == 0) Array[leanBool(true), none, continuation, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, acrossReduction].concat(contextArgs)
+      else Array[leanBool(true), none, natural, empty, empty, LeanNatLiterals.n0, acrossReduction].concat(contextArgs);
+    (result, after) = f_inference_probe_compare("dependent reduction boundary", saved, target, args);
+    payload = leanField(result, 0);
+    variables = leanArray(leanField(payload, 0));
+    assert(variables.size() == 2);
+    body = if (target == 0) leanField(leanField(payload, 1), 0) else leanField(leanField(payload, 1), 1);
+    assert(rewriteProbeSameInput(body, variables[0]));
+    afterRuntime = after.restoreRaw();
+    if (target == 0) {
+      secondDecl = f_inference_probe_localDecl(afterRuntime, leanField(leanField(payload, 1), 1), variables[1]);
+      assert(rewriteProbeSameInput(L4_Lean_LocalContext.f_Lean_LocalDecl_type_813f33525c(afterRuntime, secondDecl), variables[0]))
+    } else {
+      secondDecl = L4_Lean_MetavarContext.f_Lean_MetavarContext_getDecl_22100e60b6(afterRuntime, leanField(afterRuntime.readRef(state.metaStateRef), 0), leanField(variables[1], 1));
+      assert(rewriteProbeSameInput(leanField(secondDecl, 2), variables[0]))
+    };
+    !checks = checks + 1
+  };
+  // some0, whnf=false cannot inspect even the type or state references.
+  unused = LeanUnavailable("zero telescope must not inspect this value");
+  (zeroResult, zeroAfter) = f_inference_probe_compare("zero telescope poison", saved, 2,
+    Array[unused, limits[1], continuation, unused, leanBool(false), state.metaContext, unused, unused, unused, world]);
+  assert(rewriteProbeSameInput(leanField(leanField(leanField(zeroResult, 0), 1), 0), unused));
+  !checks = checks + 1;
+
+  // Class-typed locals must be registered BEFORE the telescope callback.
+  classRuntime = saved.restoreRaw();
+  className = f_inference_probe_name(classRuntime, "InferenceClass");
+  classConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(classRuntime, className, LeanCtor(LeanTag.List_nil, Array[]));
+  classInfo = LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[className, LeanCtor(LeanTag.List_nil, Array[]), prop]), leanBool(false)])]);
+  classConstants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  classConstants.set(leanNameKey(className), LeanConstantFile(classInfo, None()));
+  classEnvironment = rewriteProbeEnvironment(classRuntime, classConstants.chill());
+  registered = L4_Lean_Class.f_Lean_addClass_11966bcd77(classRuntime, classEnvironment, className);
+  assert(leanTag(registered) == LeanTag.Except_ok);
+  classRuntime.writeRef(state.coreStateRef, Some(leanReplaceField(classRuntime.readRef(state.coreStateRef), 0, leanField(registered, 0))));
+  classSaved = classRuntime.checkpoint();
+  classBinder = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), classConst, a);
+  (classResult, classAfter) = f_inference_probe_compare("class local visible in callback", classSaved, 0,
+    Array[leanBool(false), none, continuation, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, classBinder].concat(contextArgs));
+  classPayload = leanField(classResult, 0);
+  classVariables = leanArray(leanField(classPayload, 0));
+  classContext = leanField(leanField(classPayload, 1), 1);
+  classInstances = leanArray(leanField(classContext, 4));
+  assert(classVariables.size() == 1 && classInstances.size() == 1);
+  assert(rewriteProbeSameInput(classInstances[0], LeanCtor(LeanTag.LocalInstance_mk, Array[className, classVariables[0]])));
+  assert(leanArray(leanField(state.metaContext, 4)).size() == 0);
+  !checks = checks + 1;
+
+  // Synthesis succeeds with a real local instance, and fails without one.
+  classLocalName = f_inference_probe_name(runtime, "inferenceInstance");
+  classLocal = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, classLocalName);
+  classLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, classLocalName, classLocalName, classConst, LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), LeanCtor(LeanTag.LocalDeclKind_default, Array[]));
+  classMeta = leanReplaceField(state.metaContext, 3, classLocals);
+  !classMeta = leanReplaceField(classMeta, 4, LeanArray(Array[LeanCtor(LeanTag.LocalInstance_mk, Array[className, classLocal])]));
+  instanceFunctionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, classLocalName, LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), classConst, arrow);
+  instanceFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, classLocalName, LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), classConst, identity);
+  for (available in Array[false, true]) {
+    meta = if (available) classMeta else state.metaContext;
+    (result, after) = f_inference_probe_compare("application instance synthesis", classSaved, 4,
+      Array[instanceFunction, LeanArray(Array[x]), instanceFunctionType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty, meta, state.metaStateRef, state.coreContext, state.coreStateRef, world]);
+    if (available) {
+      expected = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, instanceFunction, LeanArray(Array[classLocal, x]));
+      assert(rewriteProbeSameInput(result, f_inference_probe_ok(expected, world)))
+    } else assert(leanTag(result) == LeanTag.EST_Out_error);
+    !checks = checks + 1
+  };
+  // Nondependent implicit parameter cannot be solved from the explicit argument.
+  unresolvedType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, arrow);
+  unresolvedFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, identity);
+  (unresolved, _) = f_inference_probe_compare("application unresolved implicit", saved, 4,
+    Array[unresolvedFunction, LeanArray(Array[x]), unresolvedType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs));
+  assert(leanTag(unresolved) == LeanTag.EST_Out_error);
+  !checks = checks + 1;
+  // Explicit binder exposed only after consuming an implicit and beta-reducing.
+  reducingAppType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, delayedTail);
+  reducingFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, bvar0, bvar0));
+  (reducingApp, _) = f_inference_probe_compare("application dependent reduction boundary", saved, 4,
+    Array[reducingFunction, LeanArray(Array[x]), reducingAppType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs));
+  expectedReducingApp = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, reducingFunction, LeanArray(Array[a, x]));
+  assert(rewriteProbeSameInput(reducingApp, f_inference_probe_ok(expectedReducingApp, world)));
+  !checks = checks + 1;
+
+  // The first explicit argument is assignable; a later explicit mismatch
+  // forces rollback. A prefix-only control independently proves assignability.
+  rollbackRuntime = assignmentRuntime.checkpoint().restoreRaw();
+  pairName = f_inference_probe_name(runtime, "inferencePair");
+  pairTail = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, alphaName, binder, type, a);
+  pairType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, binder, a, pairTail);
+  pairLocal = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, pairName);
+  pairLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, pairName, pairName, pairType, binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]));
+  pairMeta = leanReplaceField(state.metaContext, 3, pairLocals);
+  leftPair = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, pairLocal, LeanArray(Array[mvar, a]));
+  rightPair = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, pairLocal, LeanArray(Array[x, prop]));
+  rollbackSaved = rollbackRuntime.checkpoint();
+  prefixLeft = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, pairLocal, mvar);
+  prefixRight = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, pairLocal, x);
+  (prefixEqual, prefixAssignmentAfter) = f_inference_probe_compare("defeq assignment prefix control", rollbackSaved, 3,
+    Array[prefixLeft, prefixRight, leanBool(false), pairMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(true), world)));
+  prefixAssignmentRuntime = prefixAssignmentAfter.restoreRaw();
+  prefixAssignment = L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(prefixAssignmentRuntime, leanField(prefixAssignmentRuntime.readRef(state.metaStateRef), 0), leanField(mvar, 1));
+  assert(rewriteProbeSameInput(prefixAssignment, LeanCtor(LeanTag.Option_some, Array[x])));
+  !checks = checks + 1;
+  (rollbackResult, rollbackAfter) = f_inference_probe_compare("defeq false restores assignment", rollbackSaved, 3,
+    Array[leftPair, rightPair, leanBool(false), pairMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(false), world)));
+  rollbackAfterRuntime = rollbackAfter.restoreRaw();
+  assert(rewriteProbeSameInput(leanField(rollbackAfterRuntime.readRef(state.metaStateRef), 0), leanField(rollbackRuntime.readRef(state.metaStateRef), 0)));
+  !checks = checks + 1;
+
+  // Genuine no-progress universe constraint ?m = imax ?m u. mayPostpone=true
+  // must retain it instead of treating a successful step as an empty queue.
+  levelRuntime = saved.restoreRaw();
+  levelName = f_inference_probe_name(runtime, "inferenceLevelM");
+  paramName = f_inference_probe_name(runtime, "inferenceLevelU");
+  levelM = L4_Lean_Level.f_Lean_mkLevelMVar_a2479655d3(runtime, levelName);
+  levelU = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, paramName);
+  blocked = L4_Lean_Level.f_Lean_mkLevelIMax_bf6ea94d24(runtime, levelM, levelU);
+  levelState = levelRuntime.readRef(state.metaStateRef);
+  levelMctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addLevelMVarDecl_fd66df8a2a(levelRuntime, leanField(levelState, 0), levelName);
+  levelRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(levelState, 0, levelMctx)));
+  noProgressSaved = f_inference_probe_postponed(levelRuntime, state, levelM, blocked);
+  (noProgress, noProgressAfter) = f_inference_probe_compare("postponed no progress retains constraint", noProgressSaved, 5,
+    Array[leanBool(true), leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+  noProgressRuntime = noProgressAfter.restoreRaw();
+  pendingValues = leanArray(L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_toArray_35eebe4fe9(noProgressRuntime, leanField(noProgressRuntime.readRef(state.metaStateRef), 3)));
+  assert(pendingValues.size() == 1);
+  assert(rewriteProbeSameInput(leanField(pendingValues[0], 1), levelM));
+  assert(rewriteProbeSameInput(leanField(pendingValues[0], 2), blocked));
+  !checks = checks + 1;
+
+  // Refusing further postponement without universe approximation returns false
+  // and keeps the unsolved entry (the helper did not throw).
+  noApproxConfig = leanReplaceField(L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, state.metaContext), 11, leanBool(false));
+  noApproxKey = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, noApproxConfig);
+  noApproxMeta = leanReplaceField(state.metaContext, 0, LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[noApproxConfig, noApproxKey]));
+  (refused, refusedAfter) = f_inference_probe_compare("postponed no progress refused", noProgressSaved, 5,
+    Array[leanBool(false), leanBool(false), noApproxMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(false), world)));
+  refusedRuntime = refusedAfter.restoreRaw();
+  assert(rewriteProbeSameInput(leanField(refusedRuntime.readRef(state.metaStateRef), 3), leanField(levelRuntime.readRef(state.metaStateRef), 3)));
+  !checks = checks + 1;
+
+  // Check old ++ new ordering with a new, genuinely postponed sort equality.
+  mergeRuntime = saved.restoreRaw();
+  mergeState = mergeRuntime.readRef(state.metaStateRef);
+  mergeRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(mergeState, 0, levelMctx)));
+  mergeSaved = f_inference_probe_postponed(mergeRuntime, state, zero, zero);
+  leftSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelM);
+  rightSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, blocked);
+  (merged, mergedAfter) = f_inference_probe_compare("defeq old postponed before new", mergeSaved, 3,
+    Array[leftSort, rightSort, leanBool(true)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+  mergedRuntime = mergedAfter.restoreRaw();
+  mergedEntries = leanArray(L4_Lean_Data_PersistentArray.f_Lean_PersistentArray_toArray_35eebe4fe9(mergedRuntime, leanField(mergedRuntime.readRef(state.metaStateRef), 3)));
+  assert(mergedEntries.size() >= 2);
+  assert(rewriteProbeSameInput(leanField(mergedEntries[0], 1), zero));
+  assert(rewriteProbeSameInput(leanField(mergedEntries[0], 2), zero));
+  assert(rewriteProbeSameInput(leanField(mergedEntries[1], 1), levelM));
+  assert(rewriteProbeSameInput(leanField(mergedEntries[1], 2), blocked));
+  !checks = checks + 1;
+
+  // Real runtime exception: recursion limit fires after clearing the transient
+  // cache and resetting postponed entries. Runtime errors do NOT restore them.
+  limitedCore = leanReplaceField(state.coreContext, 0, leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1));
+  !limitedCore = leanReplaceField(limitedCore, 1, LeanNatLiterals.n1);
+  (depthError, depthAfter) = f_inference_probe_compare("defeq runtime exception retains reset", pendingSaved, 3,
+    Array[a, a, leanBool(false), state.metaContext, state.metaStateRef, limitedCore, state.coreStateRef, world]);
+  assert(leanTag(depthError) == LeanTag.EST_Out_error);
+  assert(leanIsTrue(L4_Lean_CoreM.f_Lean_Exception_isRuntime_7532163bc2(runtime, leanField(depthError, 0))));
+  assert(rewriteProbeSameInput(leanField(depthError, 1), world));
+  depthRuntime = depthAfter.restoreRaw();
+  baselineRuntime = saved.restoreRaw();
+  assert(rewriteProbeSameInput(leanField(depthRuntime.readRef(state.metaStateRef), 3), leanField(baselineRuntime.readRef(state.metaStateRef), 3)));
+  !checks = checks + 1;
+  // Populate a real stale transient cache and an unrelated permanent cache.
+  // Early runtime failure makes the cleared/retained fields directly observable.
+  cacheRuntime = saved.restoreRaw();
+  cacheState = cacheRuntime.readRef(state.metaStateRef);
+  cacheBefore = leanField(cacheState, 1);
+  cacheKeyResult = L4_Lean_Meta_Basic.f_Lean_Meta_mkDefEqCacheKey_32603aaacd(cacheRuntime, a, a, state.metaContext, world);
+  assert(leanTag(cacheKeyResult) == LeanTag.EST_Out_ok);
+  staleTrans = L4_Lean_Meta_ExprDefEq.f_Meta_cacheResult_spec_0_3db025d4e6(cacheRuntime, leanField(cacheBefore, 4), leanField(cacheKeyResult, 0), leanBool(false));
+  permanent = L4_Lean_Meta_ExprDefEq.f_Meta_cacheResult_spec_0_3db025d4e6(cacheRuntime, leanField(cacheBefore, 5), leanField(cacheKeyResult, 0), leanBool(true));
+  cached = leanReplaceField(leanReplaceField(cacheBefore, 4, staleTrans), 5, permanent);
+  cacheRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(cacheState, 1, cached)));
+  (cacheFailure, cacheAfter) = f_inference_probe_compare("defeq resets only transient cache", cacheRuntime.checkpoint(), 3,
+    Array[a, a, leanBool(false), state.metaContext, state.metaStateRef, limitedCore, state.coreStateRef, world]);
+  assert(leanTag(cacheFailure) == LeanTag.EST_Out_error);
+  cacheAfterRuntime = cacheAfter.restoreRaw();
+  finalCache = leanField(cacheAfterRuntime.readRef(state.metaStateRef), 1);
+  assert(rewriteProbeSameInput(leanField(finalCache, 4), leanField(cacheBefore, 4)));
+  assert(rewriteProbeSameInput(leanField(finalCache, 5), permanent));
+  for (i in Array[0, 1, 2, 3, 6, 7]) assert(rewriteProbeSameInput(leanField(finalCache, i), leanField(cacheBefore, i)));
+  !checks = checks + 1;
+
+  // Ordinary missing-constant error restores the original pending queue.
+  missing = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, f_inference_probe_name(runtime, "inferenceMissing"), LeanCtor(LeanTag.List_nil, Array[]));
+  (ordinaryFailure, ordinaryAfter) = f_inference_probe_compare("defeq ordinary exception restores", pendingSaved, 3,
+    Array[missing, x, leanBool(false)].concat(contextArgs));
+  assert(leanTag(ordinaryFailure) == LeanTag.EST_Out_error);
+  assert(!leanIsTrue(L4_Lean_CoreM.f_Lean_Exception_isRuntime_7532163bc2(runtime, leanField(ordinaryFailure, 0))));
+  ordinaryRuntime = ordinaryAfter.restoreRaw();
+  assert(rewriteProbeSameInput(leanField(ordinaryRuntime.readRef(state.metaStateRef), 0), leanField(pendingRuntime.readRef(state.metaStateRef), 0)));
+  assert(rewriteProbeSameInput(leanField(ordinaryRuntime.readRef(state.metaStateRef), 3), leanField(pendingRuntime.readRef(state.metaStateRef), 3)));
+  !checks = checks + 1;
+
+  // Interrupt and runtime-tagged exceptions bypass error-leaf tracing.
+  interrupt = LeanCtor(LeanTag.Exception_internal, Array[leanReadInitializer(runtime, "Lean.interruptExceptionId"), LeanCtor(LeanTag.List_nil, Array[])]);
+  runtimeKind = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText("runtime"), LeanText("maxRecDepth"));
+  runtimeMessage = LeanCtor(LeanTag.MessageData_tagged, Array[runtimeKind, L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText("inference depth sentinel"))]);
+  runtimeException = LeanCtor(LeanTag.Exception_error, Array[leanField(state.coreContext, 2), runtimeMessage]);
+  for (exception in Array[interrupt, runtimeException]) {
+    action = LeanClosure(f_inference_probe_traceContinuation, 8, Array[calls, leanBool(false), exception]);
+    core = f_inference_probe_traceOption(runtime, state.coreContext, "error");
+    (result, after) = f_inference_probe_compare("trace exception bypass", saved, 7,
+      Array[function, empty, action, state.metaContext, state.metaStateRef, core, state.coreStateRef, world], Some(LeanCtor(LeanTag.EST_Out_error, Array[exception, world])));
+    beforeRuntime = saved.restoreRaw();
+    afterRuntime = after.restoreRaw();
+    assert(rewriteProbeSameInput(beforeRuntime.readRef(state.coreStateRef), afterRuntime.readRef(state.coreStateRef)));
+    !checks = checks + 1
+  };
+  print_string(checks.toString() + " inference comparisons completed (timing modes are separate expected failures)")
+}

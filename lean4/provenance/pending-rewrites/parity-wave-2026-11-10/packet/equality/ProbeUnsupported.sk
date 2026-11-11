@@ -1,0 +1,53 @@
+// Each mode is a separate negative run: explicit unsupported errors must remain visible.
+fun main(): void {
+  runtime = mutable LeanExecution{unboundedHeartbeats => true};
+  fixture = f_equalityProbe_fixture(runtime);
+  state = fixture.state;
+  mode = Environ.varOpt("LEAN_SKIP_EQUALITY_FAILURE").default("new-trace");
+  old = mode == "old-trace" || mode == "old-delayed" || mode == "old-profiler";
+  trace = mode == "old-trace" || mode == "new-trace";
+  delayed = mode == "old-delayed" || mode == "new-delayed";
+  profiler = mode == "old-profiler" || mode == "new-profiler";
+  if (!trace && !delayed && !profiler) leanFail("unknown equality failure mode");
+  world = leanNatValue(37);
+  if (delayed) {
+    mctx = L4_Lean_MetavarContext.f_Lean_assignDelayedMVar_lam_0_21c1d3cc9b(
+      runtime, LeanArray(Array[]), fixture.nId,
+      LeanClosure(L4_Lean_Expr.apply_f_Lean_instBEqMVarId_beq_fc799f33a5, 2, Array[]),
+      LeanClosure(L4_Lean_Expr.apply_f_Lean_instHashableMVarId_hash_524addd803, 1, Array[]),
+      fixture.mId, fixture.metavariables,
+    );
+    runtime.writeRef(state.metaStateRef, Some(leanReplaceField(fixture.metaState, 0, mctx)));
+    if (old) {
+      _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe_fallback(runtime, fixture.nId, LeanArray(Array[]), fixture.m, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world)
+    } else {
+      _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkAssignment_8abdc549fe(runtime, fixture.nId, LeanArray(Array[]), fixture.m, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world)
+    }
+  } else {
+    core = state.coreContext;
+    options = leanField(leanField(core, 0), 2);
+    if (trace) {
+      traceName = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("trace"), LeanText("Meta"), LeanText("isDefEq"));
+      !options = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(runtime, options, traceName, leanBool(true));
+      !core = leanReplaceField(core, 0, leanReplaceField(leanField(core, 0), 2, options));
+      parameter = f_equalityProbe_parameter(runtime, LeanTag.BinderInfo_default, false, true);
+      if (old) {
+        _ = L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6_fallback(runtime, LeanNatLiterals.n1, LeanArray(Array[parameter]), LeanArray(Array[fixture.x]), LeanArray(Array[fixture.y]), leanBool(false), leanBool(false), LeanNatLiterals.n0, f_equalityProbe_queues(Array[], Array[]), state.metaContext, state.metaStateRef, core, state.coreStateRef, world)
+      } else {
+        _ = L4_Lean_Meta_ExprDefEq.f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6(runtime, LeanNatLiterals.n1, LeanArray(Array[parameter]), LeanArray(Array[fixture.x]), LeanArray(Array[fixture.y]), leanBool(false), leanBool(false), LeanNatLiterals.n0, f_equalityProbe_queues(Array[], Array[]), state.metaContext, state.metaStateRef, core, state.coreStateRef, world)
+      }
+    } else {
+      profilerName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText("trace"), LeanText("profiler"));
+      heartbeatName = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, LeanText("trace"), LeanText("profiler"), LeanText("useHeartbeats"));
+      !options = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(runtime, options, profilerName, leanBool(true));
+      !options = L4_Lean_Data_Options.f_Lean_Options_setBool_50e660af42(runtime, options, heartbeatName, leanBool(true));
+      !core = leanReplaceField(core, 0, leanReplaceField(leanField(core, 0), 2, options));
+      if (old) {
+        _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25_fallback(runtime, fixture.m, fixture.x, state.metaContext, state.metaStateRef, core, state.coreStateRef, world)
+      } else {
+        _ = L4_Lean_Meta_ExprDefEq.f_Lean_Meta_checkTypesAndAssign_592ac0ae25(runtime, fixture.m, fixture.x, state.metaContext, state.metaStateRef, core, state.coreStateRef, world)
+      }
+    }
+  };
+  leanFail("unsupported equality fixture unexpectedly returned: " + mode)
+}

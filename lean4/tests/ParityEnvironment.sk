@@ -1,0 +1,674 @@
+// Bounded failure-only summaries: never walk a whole environment, invoke a
+// closure, force a task, or query a tracked store merely to print a diagnostic.
+fun f_parity_environment_probeSummary(value: LeanValue): String {
+  value match {
+  | LeanCtor(tag, fields) -> tag.toString().take(96) + " fields=" + fields.size().toString()
+  | LeanArray(arrayValues) -> "LeanArray length=" + arrayValues.size().toString()
+  | LeanPersistentArray(persistentValues) -> "LeanPersistentArray length=" + persistentValues.size().toString()
+  | LeanCompletedTask(_) -> "LeanCompletedTask"
+  | LeanArrayOverride(_, index, _) -> "LeanArrayOverride index=" + index.toString()
+  | LeanNatural(n) -> n match {
+    | LeanSmallNat(small) -> "Nat=" + small.toString()
+    | LeanLargeNat(_) -> "Nat=<arbitrary precision>"
+    }
+  | LeanScalar(kind, decimal) -> kind.take(16) + "=" + decimal.take(48)
+  | LeanWord(wordKind, bits) -> wordKind.take(16) + " bits=" + bits.toString()
+  | LeanText(text) -> "Text=" + text.take(48)
+  | LeanUnavailable(description) -> "Unavailable=" + description.take(48)
+  | LeanReference(slot) -> "Reference=" + slot.toString()
+  | LeanErased() -> "Erased"
+  | LeanClosure(_, arity, _) -> "Closure arity=" + arity.toString()
+  | LeanTrackedConstants(_) -> "LeanTrackedConstants"
+  | LeanTrackedExtensionArray(_) -> "LeanTrackedExtensionArray"
+  }
+}
+
+fun f_parity_environment_probeMismatch(label: String, phase: String, actual: LeanValue, expected: LeanValue): void {
+  leanFail("environment parity phase=" + phase + " case=" + label.take(160) +
+    " actual={" + f_parity_environment_probeSummary(actual) +
+    "} expected={" + f_parity_environment_probeSummary(expected) + "}")
+}
+
+// Same isolated-restore pattern as tests/Support/RewriteProbe.sk, plus exact
+// primitive/array-write counts. Wall-clock timing is deliberately not compared.
+fun f_parity_environment_probeCompare(
+  label: String, saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  if (!f_parity_environment_sameValue(oldResult, newResult)) f_parity_environment_probeMismatch(label, "old/new-result", newResult, oldResult);
+  if (!f_parity_environment_sameRefs(oldRuntime.checkpoint().refs, newRuntime.checkpoint().refs)) leanFail("environment parity phase=old/new-refs case=" + label.take(160));
+  if (oldRuntime.primitiveCount != newRuntime.primitiveCount) leanFail("environment parity phase=primitive-count case=" + label.take(160) + " actual=" + newRuntime.primitiveCount.toString() + " expected=" + oldRuntime.primitiveCount.toString());
+  if (oldRuntime.arrayWriteCount != newRuntime.arrayWriteCount) leanFail("environment parity phase=array-write-count case=" + label.take(160) + " actual=" + newRuntime.arrayWriteCount.toString() + " expected=" + oldRuntime.arrayWriteCount.toString());
+  if (oldRuntime.arrayWriteElements != newRuntime.arrayWriteElements) leanFail("environment parity phase=array-write-elements case=" + label.take(160) + " actual=" + newRuntime.arrayWriteElements.toString() + " expected=" + oldRuntime.arrayWriteElements.toString());
+  expected match {
+  | Some(value) -> if (!f_parity_environment_sameValue(newResult, value)) f_parity_environment_probeMismatch(label, "independent-expectation", newResult, value)
+  | None() -> void
+  };
+  (newResult, newRuntime.checkpoint())
+}
+
+// Run only after the parent integrates all seven canonical/fallback pairs.
+// Shared harness compares independent restored executions, results and references.
+fun f_parity_environment_probeName(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun f_parity_environment_probeExtension(index: LeanValue, generation: LeanValue, name: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk, Array[
+    index, LeanErased(), LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]),
+    LeanCtor(LeanTag.Option_none, Array[]), name, generation, leanBool(false),
+  ])
+}
+
+fun f_parity_environment_probeKernel(environment: LeanValue): LeanValue {
+  leanField(leanField(environment, 0), 0)
+}
+
+fun f_parity_environment_probePrivate(environment: LeanValue, kernel: LeanValue): LeanValue {
+  leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, kernel))
+}
+
+fun f_parity_environment_probeAxiom(runtime: mutable LeanExecution, name: LeanValue): LeanValue {
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+  LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[
+    LeanCtor(LeanTag.AxiomVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[name, LeanCtor(LeanTag.List_nil, Array[]), type]),
+      leanBool(false),
+    ]),
+  ])
+}
+
+fun f_parity_environment_probeAsyncConstant(
+  runtime: mutable LeanExecution, info: LeanValue, extensions: LeanValue,
+  childConstants: LeanValue, realized: Bool,
+): LeanValue {
+  dynamicChildren = LeanCtor(LeanTag.Prod_mk, Array[
+    L4_Lean_Environment.f_Environment_hygCtx_hyg_c3a82b0238(runtime), childConstants,
+  ]);
+  LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk, Array[
+    info, extensions, LeanCompletedTask(dynamicChildren), leanBool(realized),
+  ])
+}
+
+fun f_parity_environment_probeAsyncMap(environment: LeanValue, constants: LeanValue): LeanValue {
+  leanReplaceField(environment, 3, LeanCtor(
+    LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[constants, constants],
+  ))
+}
+
+fun f_parity_environment_probeRead(
+  runtime: mutable LeanExecution, old: Bool, extension: LeanValue,
+  environment: LeanValue, mode: LeanValue, declaration: LeanValue, recorded: LeanValue,
+): LeanValue {
+  if (old) {
+    L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820_fallback(
+      runtime, leanNatValue(0), extension, environment, mode, declaration, recorded,
+    )
+  } else {
+    L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820(
+      runtime, leanNatValue(0), extension, environment, mode, declaration, recorded,
+    )
+  }
+}
+
+fun f_parity_environment_probeReadCase(
+  saved: LeanExecutionCheckpoint, label: String, extension: LeanValue,
+  environment: LeanValue, mode: LeanValue, declaration: LeanValue,
+  expected: LeanValue, recorded: LeanValue = leanBool(false),
+): void {
+  retained = rewriteProbeCopyInput(environment);
+  _ = f_parity_environment_probeCompare(label, saved,
+    runtime ~> f_parity_environment_probeRead(runtime, true, extension, environment, mode, declaration, recorded),
+    runtime ~> f_parity_environment_probeRead(runtime, false, extension, environment, mode, declaration, recorded),
+    Some(expected),
+  );
+  assert(f_parity_environment_sameValue(environment, retained))
+}
+
+fun f_parity_environment_probeFindCase(
+  saved: LeanExecutionCheckpoint, environment: LeanValue, name: LeanValue, expected: LeanValue,
+): void {
+  for (skip in Array[false, true]) {
+    _ = f_parity_environment_probeCompare("async constant lookup", saved,
+      runtime ~> L4_Lean_Environment.f_Lean_Environment_findAsyncCore_a05524f0d0_fallback(runtime, environment, name, leanBool(skip)),
+      runtime ~> L4_Lean_Environment.f_Lean_Environment_findAsyncCore_a05524f0d0(runtime, environment, name, leanBool(skip)),
+      Some(expected),
+    )
+  }
+}
+
+// Observable callback: order and number of state transformations are recorded.
+fun f_parity_environment_probeTransform(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  log = runtime.readRef(args[0]);
+  runtime.writeRef(args[0], Some(leanArrayPush(log, args[1])));
+  L4_Init_Prelude.f_Nat_add_86990f4822(runtime, args[1], leanNatValue(1))
+}
+
+fun f_parity_environment_probeModify(
+  runtime: mutable LeanExecution, old: Bool, extension: LeanValue, environment: LeanValue,
+  transform: LeanValue, mode: LeanValue, declaration: LeanValue, bump: LeanValue,
+): LeanValue {
+  if (old) {
+    L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88_fallback(runtime, extension, environment, transform, mode, declaration, bump)
+  } else {
+    L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88(runtime, extension, environment, transform, mode, declaration, bump)
+  }
+}
+
+fun f_parity_environment_probeRecord(
+  runtime: mutable LeanExecution, old: Bool, extension: LeanValue,
+  context: LeanValue, state: LeanValue, world: LeanValue,
+): LeanValue {
+  if (old) L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401_fallback(runtime, extension, context, state, world)
+  else L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401(runtime, extension, context, state, world)
+}
+
+fun f_parity_environment_probe(profile: Bool): void {
+  builder = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+  leanInitializeMetaExtensions(builder);
+  none = LeanCtor(LeanTag.Option_none, Array[]);
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  present = f_parity_environment_probeName(builder, "present");
+  missing = f_parity_environment_probeName(builder, "missing");
+  info = f_parity_environment_probeAxiom(builder, present);
+  asyncInfo = L4_Lean_Environment.f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(builder, info);
+  constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+  constants.set(leanNameKey(present), LeanConstantFile(info, None()));
+  initialEnvironment = rewriteProbeEnvironment(builder, constants.chill());
+  kernel = f_parity_environment_probeKernel(initialEnvironment);
+  huge = LeanScalar("nat", "18446744073709551616");
+  privateKernel = leanReplaceField(leanReplaceField(leanReplaceField(kernel, 4, LeanArray(Array[leanNatValue(11), leanNatValue(12)])), 6, LeanArray(Array[huge, leanNatValue(7)])), 7, huge);
+  publicKernel = leanReplaceField(kernel, 4, LeanArray(Array[leanNatValue(21), leanNatValue(22)]));
+  checkedKernel = leanReplaceField(kernel, 4, LeanArray(Array[leanNatValue(31), leanNatValue(32)]));
+  environment = leanReplaceField(leanReplaceField(initialEnvironment, 0, LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[privateKernel, publicKernel])), 2, LeanCompletedTask(checkedKernel));
+  extension = f_parity_environment_probeExtension(leanNatValue(0), none, present);
+  trackedExtension = leanReplaceField(extension, 5, LeanCtor(LeanTag.Option_some, Array[leanNatValue(0)]));
+  local = LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]);
+  mainOnly = LeanCtor(LeanTag.EnvExtension_AsyncMode_mainOnly, Array[]);
+  sync = LeanCtor(LeanTag.EnvExtension_AsyncMode_sync, Array[]);
+  mainBranch = LeanCtor(LeanTag.EnvExtension_AsyncMode_async, Array[LeanCtor(LeanTag.AsyncBranch_mainEnv, Array[])]);
+  asyncBranch = LeanCtor(LeanTag.EnvExtension_AsyncMode_async, Array[LeanCtor(LeanTag.AsyncBranch_asyncEnv, Array[])]);
+  saved = builder.checkpoint();
+  for ((mode, expected) in Array[(local, 11), (mainOnly, 11), (sync, 31), (mainBranch, 11), (asyncBranch, 11)]) {
+    f_parity_environment_probeReadCase(saved, "snapshot choice", extension, environment, mode, missing, leanNatValue(expected))
+  };
+  f_parity_environment_probeReadCase(saved, "local never waits on checked", extension, leanReplaceField(environment, 2, LeanUnavailable("checked task must stay dormant")), local, missing, leanNatValue(11));
+  unusedFields = leanReplaceField(leanReplaceField(extension, 5, LeanUnavailable("not recording: genIdx unused")), 6, LeanUnavailable("not recording: logWrites unused"));
+  f_parity_environment_probeReadCase(saved, "disabled recording ignores permission fields", unusedFields, environment, local, missing, leanNatValue(11), LeanUnavailable("genRecorded unused"));
+  recordingEnvironment = leanReplaceField(environment, 9, leanBool(true));
+  f_parity_environment_probeReadCase(saved, "recorded generation permits read", trackedExtension, recordingEnvironment, sync, missing, leanNatValue(31), leanBool(true));
+  f_parity_environment_probeReadCase(saved, "logged writes permit untracked read", leanReplaceField(extension, 6, leanBool(true)), recordingEnvironment, local, missing, leanNatValue(11));
+  emptyAsync = L4_Lean_Environment.f_Lean_instInhabitedAsyncConsts_default_13eda108e4(builder);
+  directName = f_parity_environment_probeName(builder, "direct");
+  directInfo = L4_Lean_Environment.f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(builder, f_parity_environment_probeAxiom(builder, directName));
+  for (realized in Array[false, true]) {
+    for (hasExtensions in Array[false, true]) {
+      exts = if (hasExtensions) LeanCtor(LeanTag.Option_some, Array[LeanCompletedTask(LeanArray(Array[leanNatValue(51)]))]) else none;
+      constant = f_parity_environment_probeAsyncConstant(builder, directInfo, exts, emptyAsync, realized);
+      directMap = L4_Lean_Environment.f_Lean_AsyncConsts_add_198e798bf1(builder, emptyAsync, constant);
+      directEnvironment = f_parity_environment_probeAsyncMap(environment, directMap);
+      f_parity_environment_probeFindCase(builder.checkpoint(), leanReplaceField(directEnvironment, 0, LeanUnavailable("async hit must not inspect fallback base")), directName, LeanCtor(LeanTag.Option_some, Array[directInfo]));
+      for ((mode, visible) in Array[(mainBranch, realized && hasExtensions), (asyncBranch, hasExtensions)]) {
+        f_parity_environment_probeReadCase(builder.checkpoint(), "direct async snapshot", extension, directEnvironment, mode, directName, leanNatValue(if (visible) 51 else 11))
+      }
+    }
+  };
+  parentName = f_parity_environment_probeName(builder, "parent");
+  childName = L4_Init_Prelude.f_Name_str_override_fde29b60d1(builder, parentName, LeanText("child"));
+  parentInfo = L4_Lean_Environment.f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(builder, f_parity_environment_probeAxiom(builder, parentName));
+  childInfo = L4_Lean_Environment.f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(builder, f_parity_environment_probeAxiom(builder, childName));
+  for (parentHasExtensions in Array[false, true]) {
+    for (childHasExtensions in Array[false, true]) {
+      for (realized in Array[false, true]) {
+        parentExts = if (parentHasExtensions) LeanCtor(LeanTag.Option_some, Array[LeanCompletedTask(LeanArray(Array[leanNatValue(61)]))]) else none;
+        childExts = if (childHasExtensions) LeanCtor(LeanTag.Option_some, Array[LeanCompletedTask(LeanArray(Array[leanNatValue(71)]))]) else none;
+        child = f_parity_environment_probeAsyncConstant(builder, childInfo, childExts, emptyAsync, realized);
+        childConstants = L4_Lean_Environment.f_Lean_AsyncConsts_add_198e798bf1(builder, emptyAsync, child);
+        parent = f_parity_environment_probeAsyncConstant(builder, parentInfo, parentExts, childConstants, false);
+        parents = L4_Lean_Environment.f_Lean_AsyncConsts_add_198e798bf1(builder, emptyAsync, parent);
+        nested = leanReplaceField(f_parity_environment_probeAsyncMap(environment, parents), 7, LeanUnavailable("recursive hit must not inspect allRealizations"));
+        inherited = if (parentHasExtensions) 61 else 11;
+        mainExpected = if (realized) { if (childHasExtensions) 71 else 11 } else inherited;
+        asyncExpected = if (childHasExtensions) 71 else inherited;
+        f_parity_environment_probeReadCase(builder.checkpoint(), "recursive main child/parent", extension, nested, mainBranch, childName, leanNatValue(mainExpected));
+        f_parity_environment_probeReadCase(builder.checkpoint(), "recursive async child/parent", extension, nested, asyncBranch, childName, leanNatValue(asyncExpected));
+        f_parity_environment_probeFindCase(builder.checkpoint(), nested, childName, LeanCtor(LeanTag.Option_some, Array[childInfo]))
+      }
+    }
+  };
+  realizedConstant = f_parity_environment_probeAsyncConstant(builder, directInfo, LeanCtor(LeanTag.Option_some, Array[LeanCompletedTask(LeanArray(Array[leanNatValue(81)]))]), emptyAsync, true);
+  realizationMap = L4_Lean_Data_NameMap_Basic.f_NameMap_insert_spec_0_aaae6c2a87(builder, directName, realizedConstant, LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]));
+  realizedEnvironment = leanReplaceField(environment, 7, LeanCompletedTask(realizationMap));
+  f_parity_environment_probeReadCase(builder.checkpoint(), "realization snapshot", extension, realizedEnvironment, mainBranch, directName, leanNatValue(81));
+  f_parity_environment_probeFindCase(builder.checkpoint(), environment, present, LeanCtor(LeanTag.Option_some, Array[asyncInfo]));
+  f_parity_environment_probeFindCase(builder.checkpoint(), environment, missing, none);
+
+  // Persistent entries select exported/private versus server storage, not checked.
+  exportedEntries = LeanArray(Array[leanNatValue(101), leanNatValue(102)]);
+  serverEntries = LeanArray(Array[leanNatValue(201)]);
+  exportedState = LeanCtor(LeanTag.PersistentEnvExtensionState_mk, Array[LeanArray(Array[LeanArray(Array[]), exportedEntries]), leanNatValue(0)]);
+  serverState = LeanCtor(LeanTag.PersistentEnvExtensionState_mk, Array[LeanArray(Array[LeanArray(Array[]), serverEntries]), leanNatValue(0)]);
+  privateModuleEnvironment = f_parity_environment_probePrivate(environment, leanReplaceField(privateKernel, 4, LeanArray(Array[exportedState])));
+  moduleEnvironment = leanReplaceField(privateModuleEnvironment, 1, LeanArray(Array[serverState]));
+  persistentExtension = LeanCtor(LeanTag.PersistentEnvExtension_mk, Array[extension, LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased()]);
+  for ((level, expected) in Array[(LeanCtor(LeanTag.OLeanLevel_exported, Array[]), exportedEntries), (LeanCtor(LeanTag.OLeanLevel_server, Array[]), serverEntries)]) {
+    _ = f_parity_environment_probeCompare("module entry source", builder.checkpoint(),
+      runtime ~> L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2_fallback(runtime, leanNatValue(0), persistentExtension, moduleEnvironment, leanNatValue(1), level),
+      runtime ~> L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2(runtime, leanNatValue(0), persistentExtension, moduleEnvironment, leanNatValue(1), level),
+      Some(expected),
+    )
+  };
+
+  // Callback order, generation precision, unrelated fields and retained roots.
+  logRef = builder.newRef(LeanArray(Array[]));
+  transform = LeanClosure(f_parity_environment_probeTransform, 2, Array[logRef]);
+  for (bump in Array[false, true]) {
+    for (mode in Array[local, mainOnly, sync, mainBranch, asyncBranch]) {
+      before = rewriteProbeCopyInput(environment);
+      (updated, after) = f_parity_environment_probeCompare("modify snapshots", builder.checkpoint(),
+        runtime ~> f_parity_environment_probeModify(runtime, true, trackedExtension, environment, transform, mode, directName, leanBool(bump)),
+        runtime ~> f_parity_environment_probeModify(runtime, false, trackedExtension, environment, transform, mode, directName, leanBool(bump)),
+      );
+      both = leanTag(mode) != LeanTag.EnvExtension_AsyncMode_local && leanTag(mode) != LeanTag.EnvExtension_AsyncMode_mainOnly;
+      expectedKernel = leanReplaceField(privateKernel, 4, LeanArray(Array[leanNatValue(12), leanNatValue(12)]));
+      if (bump) {
+        next = leanBoxNat(LeanNat::parse("18446744073709551617"));
+        !expectedKernel = leanReplaceField(leanReplaceField(expectedKernel, 6, LeanArray(Array[next, leanNatValue(7)])), 7, next)
+      };
+      expectedEnvironment = f_parity_environment_probePrivate(environment, expectedKernel);
+      if (both) {
+        !expectedEnvironment = leanReplaceField(expectedEnvironment, 2, LeanCompletedTask(leanReplaceField(checkedKernel, 4, LeanArray(Array[leanNatValue(32), leanNatValue(32)]))))
+      };
+      assert(f_parity_environment_sameValue(updated, expectedEnvironment));
+      expectedLog = if (both) LeanArray(Array[leanNatValue(11), leanNatValue(31)]) else LeanArray(Array[leanNatValue(11)]);
+      assert(f_parity_environment_sameValue(after.restoreRaw().readRef(logRef), expectedLog));
+      assert(f_parity_environment_sameValue(environment, before))
+    }
+  };
+
+  // Untracked extension must ignore bumpGen entirely, including an unusable flag.
+  equalSnapshots = leanReplaceField(environment, 2, LeanCompletedTask(privateKernel));
+  (_, equalAfter) = f_parity_environment_probeCompare("equal snapshots still invoke transform twice", builder.checkpoint(),
+    runtime ~> f_parity_environment_probeModify(runtime, true, extension, equalSnapshots, transform, sync, anonymous, LeanUnavailable("untracked bumpGen unused")),
+    runtime ~> f_parity_environment_probeModify(runtime, false, extension, equalSnapshots, transform, sync, anonymous, LeanUnavailable("untracked bumpGen unused")));
+  assert(f_parity_environment_sameValue(equalAfter.restoreRaw().readRef(logRef), LeanArray(Array[leanNatValue(11), leanNatValue(11)])));
+
+  state = rewriteProbeState(builder, environment, L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder), "<environment-wave>");
+  recordingContext = leanReplaceField(state.coreContext, 7, leanBool(true));
+  for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+    expectedResult = LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world]);
+    _ = f_parity_environment_probeCompare("disabled recording does not inspect extension/ref", state.saved,
+      runtime ~> f_parity_environment_probeRecord(runtime, true, LeanUnavailable("extension"), state.coreContext, LeanUnavailable("state ref"), world),
+      runtime ~> f_parity_environment_probeRecord(runtime, false, LeanUnavailable("extension"), state.coreContext, LeanUnavailable("state ref"), world), Some(expectedResult));
+    (_, afterFirst) = f_parity_environment_probeCompare("first generation access", state.saved,
+      runtime ~> f_parity_environment_probeRecord(runtime, true, trackedExtension, recordingContext, state.coreStateRef, world),
+      runtime ~> f_parity_environment_probeRecord(runtime, false, trackedExtension, recordingContext, state.coreStateRef, world), Some(expectedResult));
+    afterRuntime = afterFirst.restoreRaw();
+    afterState = afterRuntime.readRef(state.coreStateRef);
+    expectedDeps = LeanArray(Array[LeanCtor(LeanTag.Prod_mk, Array[leanNatValue(0), huge])]);
+    assert(f_parity_environment_sameValue(leanField(leanField(afterState, 6), 2), expectedDeps));
+    originalState = state.saved.restoreRaw().readRef(state.coreStateRef);
+    expectedState = leanReplaceField(originalState, 6, leanReplaceField(leanField(originalState, 6), 2, expectedDeps));
+    assert(f_parity_environment_sameValue(afterState, expectedState));
+    nextExtension = leanReplaceField(trackedExtension, 5, LeanCtor(LeanTag.Option_some, Array[leanNatValue(1)]));
+    (_, afterSecond) = f_parity_environment_probeCompare("nonempty distinct generation appends", afterFirst,
+      runtime ~> f_parity_environment_probeRecord(runtime, true, nextExtension, recordingContext, state.coreStateRef, world),
+      runtime ~> f_parity_environment_probeRecord(runtime, false, nextExtension, recordingContext, state.coreStateRef, world), Some(expectedResult));
+    expectedSecond = LeanArray(Array[LeanCtor(LeanTag.Prod_mk, Array[leanNatValue(0), huge]), LeanCtor(LeanTag.Prod_mk, Array[leanNatValue(1), leanNatValue(7)])]);
+    secondRuntime = afterSecond.restoreRaw();
+    assert(f_parity_environment_sameValue(leanField(leanField(secondRuntime.readRef(state.coreStateRef), 6), 2), expectedSecond));
+    changedKernel = leanReplaceField(privateKernel, 6, LeanArray(Array[leanNatValue(99), leanNatValue(7)]));
+    changedEnvironment = f_parity_environment_probePrivate(environment, changedKernel);
+    afterRuntime.writeRef(state.coreStateRef, Some(leanReplaceField(afterState, 0, changedEnvironment)));
+    (_, afterChanged) = f_parity_environment_probeCompare("duplicate after generation changes keeps first", afterRuntime.checkpoint(),
+      runtime ~> f_parity_environment_probeRecord(runtime, true, trackedExtension, recordingContext, state.coreStateRef, world),
+      runtime ~> f_parity_environment_probeRecord(runtime, false, trackedExtension, recordingContext, state.coreStateRef, world), Some(expectedResult));
+    assert(f_parity_environment_sameRefs(afterRuntime.checkpoint().refs, afterChanged.refs));
+    // A duplicate must neither refresh its saved generation nor touch env.
+    afterRuntime.writeRef(state.coreStateRef, Some(leanReplaceField(afterState, 0, LeanUnavailable("duplicate must not read generation"))));
+    (_, afterDuplicate) = f_parity_environment_probeCompare("duplicate preserves first generation", afterRuntime.checkpoint(),
+      runtime ~> f_parity_environment_probeRecord(runtime, true, trackedExtension, recordingContext, state.coreStateRef, world),
+      runtime ~> f_parity_environment_probeRecord(runtime, false, trackedExtension, recordingContext, state.coreStateRef, world), Some(expectedResult));
+    assert(f_parity_environment_sameRefs(afterRuntime.checkpoint().refs, afterDuplicate.refs))
+  };
+
+  // Name classifier: _elambda has EIGHT ASCII bytes. All prefix comparison
+  // counts equal their literal lengths; none of these fixtures is a range error.
+  // Former misclassified negative cases are asserted here with concrete results.
+  for ((text, expected) in Array[("", false), ("x", false), ("_", false), ("_boxed", true), ("_boxedX", false), ("_redArg", true), ("_redArgX", false), ("_closed_", true), ("_closed_é", true), ("_lam_", true), ("_elambda", true), ("_elambda0", true), ("_cstage", true), ("_cstageλ", true), ("λ_boxed", false)]) {
+    terminalName = f_parity_environment_probeName(builder, text);
+    _ = f_parity_environment_probeCompare("codegen terminal name " + text, builder.checkpoint(),
+      runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85_fallback(runtime, terminalName),
+      runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85(runtime, terminalName), Some(leanBool(expected)));
+  };
+  // Stored parent/hash are deliberately unusable; only terminal string matters.
+  terminalOnly = LeanCtor(LeanTag.Name_str__impl, Array[LeanUnavailable("hash"), LeanUnavailable("parent"), LeanText("_boxed")]);
+  _ = f_parity_environment_probeCompare("name parent stays dormant", builder.checkpoint(),
+    runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85_fallback(runtime, terminalOnly),
+    runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85(runtime, terminalOnly), Some(leanBool(true)));
+  numericName = L4_Init_Prelude.f_Name_num_override_ca591eddf2(builder, f_parity_environment_probeName(builder, "_boxed"), huge);
+  for (name in Array[anonymous, numericName]) {
+    _ = f_parity_environment_probeCompare("non-string terminal", builder.checkpoint(),
+      runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85_fallback(runtime, name),
+      runtime ~> L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85(runtime, name), Some(leanBool(false)))
+  };
+  // Exporting selects the public constant map, but extension state remains private.
+  emptyEnvironment = rewriteProbeEnvironment(builder, (Map[] : Map<String, LeanConstantFile>));
+  emptyKernel = f_parity_environment_probeKernel(emptyEnvironment);
+  privateOnly = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 1, emptyKernel));
+  f_parity_environment_probeFindCase(builder.checkpoint(), leanReplaceField(privateOnly, 8, leanBool(true)), present, none);
+  publicOnly = leanReplaceField(environment, 0, LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[leanReplaceField(privateKernel, 0, leanField(emptyKernel, 0)), publicKernel]));
+  !publicOnly = leanReplaceField(publicOnly, 8, leanBool(true));
+  f_parity_environment_probeFindCase(builder.checkpoint(), publicOnly, present, LeanCtor(LeanTag.Option_some, Array[asyncInfo]));
+  f_parity_environment_probeReadCase(builder.checkpoint(), "visible public declaration reads private extension", extension, publicOnly, asyncBranch, present, leanNatValue(11));
+
+  // No parent + realized direct entry with absent extensions reaches recursive
+  // lookup, manufactures Task.pure(private extensions), then falls back private.
+  // Covered above; this case also proves an in-base declaration ignores tasks.
+  dormantAsync = leanReplaceField(environment, 3, LeanUnavailable("base hit must not read async map"));
+  f_parity_environment_probeReadCase(builder.checkpoint(), "base declaration short circuit", extension, dormantAsync, mainBranch, present, leanNatValue(11));
+
+  // Non-anonymous async modification inside its own async branch is valid.
+  rawContext = LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_AsyncContext_mkRaw, Array[directName, LeanCtor(LeanTag.List_nil, Array[])]);
+  contextEnvironment = leanReplaceField(environment, 4, LeanCtor(LeanTag.Option_some, Array[rawContext]));
+  (_, insideAfter) = f_parity_environment_probeCompare("async context accepted", builder.checkpoint(),
+    runtime ~> f_parity_environment_probeModify(runtime, true, extension, contextEnvironment, transform, asyncBranch, directName, leanBool(false)),
+    runtime ~> f_parity_environment_probeModify(runtime, false, extension, contextEnvironment, transform, asyncBranch, directName, leanBool(false)));
+  assert(f_parity_environment_sameValue(insideAfter.restoreRaw().readRef(logRef), LeanArray(Array[leanNatValue(11), leanNatValue(31)])));
+  // replay? is only a permission flag here; its payload must stay dormant.
+  replayExtension = leanReplaceField(extension, 3, LeanCtor(LeanTag.Option_some, Array[LeanUnavailable("replay payload is not invoked by modifyStateCore")]));
+  realizingContext = leanReplaceField(rawContext, 1, LeanCtor(LeanTag.List_cons, Array[directName, LeanCtor(LeanTag.List_nil, Array[])]));
+  realizingEnvironment = leanReplaceField(environment, 4, LeanCtor(LeanTag.Option_some, Array[realizingContext]));
+  _ = f_parity_environment_probeCompare("replay permits realization", builder.checkpoint(),
+    runtime ~> f_parity_environment_probeModify(runtime, true, replayExtension, realizingEnvironment, transform, sync, anonymous, leanBool(false)),
+    runtime ~> f_parity_environment_probeModify(runtime, false, replayExtension, realizingEnvironment, transform, sync, anonymous, leanBool(false)));
+
+  f_parity_environment_probeLayoutModify(builder, environment, trackedExtension, checkedKernel);
+  f_parity_environment_probeLayoutRecord(state, trackedExtension, huge);
+  f_parity_environment_probeHash(builder);
+  f_parity_environment_probeHashExpansion(builder);
+  print_string("environment parity wave: all named assertions passed")
+}
+
+fun f_parity_environment_probeHash(runtime: mutable LeanExecution): void {
+  key = f_parity_environment_probeName(runtime, "key");
+  other = f_parity_environment_probeName(runtime, "other");
+  nullEntry = LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[]);
+  empty = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(Array::fill(32, nullEntry))]);
+  value = LeanCtor(LeanTag.Prod_mk, Array[LeanCtor(LeanTag.List_nil, Array[]), leanNatValue(5)]);
+  for (bucket in Array[0, 31]) {
+    expectedEntries = leanArrayWrite(leanField(empty, 0), leanNatValue(bucket), LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value]), false);
+    expected = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[expectedEntries]);
+    (inserted, _) = f_parity_environment_probeCompare("hash empty bucket", runtime.checkpoint(),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, empty, LeanWord("usize", bucket), LeanWord("usize", 0), key, value),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, empty, LeanWord("usize", bucket), LeanWord("usize", 0), key, value), Some(expected));
+    for (newKey in Array[key, other]) {
+      newValue = leanNatValue(9);
+      replacement = if (f_parity_environment_sameValue(key, newKey)) LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[newKey, newValue]) else LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[LeanArray(Array[key, newKey]), LeanArray(Array[value, newValue]), LeanErased()])]);
+      expectedRoot = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[leanArrayWrite(expectedEntries, leanNatValue(bucket), replacement, false)]);
+      _ = f_parity_environment_probeCompare("hash replace or collide", runtime.checkpoint(),
+        r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, inserted, LeanWord("usize", bucket), LeanWord("usize", 0), newKey, newValue),
+        r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, inserted, LeanWord("usize", bucket), LeanWord("usize", 0), newKey, newValue), Some(expectedRoot));
+      assert(f_parity_environment_sameValue(inserted, expected))
+    }
+  };
+  short = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(Array[])]);
+  _ = f_parity_environment_probeCompare("hash out of range unchanged", runtime.checkpoint(),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, short, LeanWord("usize", -1), LeanWord("usize", -1), key, value),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, short, LeanWord("usize", -1), LeanWord("usize", -1), key, value), Some(short));
+  // Explicit ref recursion with modulo depth increment (-1 + 1 = 0).
+  childRoot = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(Array::fill(32, nullEntry))]);
+  parentRoot = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[leanArrayWrite(leanField(empty, 0), leanNatValue(31), LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[childRoot]), false)]);
+  childExpected = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[leanArrayWrite(leanField(childRoot, 0), leanNatValue(31), LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value]), false)]);
+  parentExpected = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[leanArrayWrite(leanField(empty, 0), leanNatValue(31), LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[childExpected]), false)]);
+  _ = f_parity_environment_probeCompare("hash recursive word wrapping", runtime.checkpoint(),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, parentRoot, LeanWord("usize", -1), LeanWord("usize", -1), key, value),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, parentRoot, LeanWord("usize", -1), LeanWord("usize", -1), key, value), Some(parentExpected));
+  collision = LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[LeanArray(Array[key]), LeanArray(Array[value]), LeanErased()]);
+  for (depth in Array[0, 7, -1]) {
+    expectedCollision = LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[LeanArray(Array[key, other]), LeanArray(Array[value, value]), LeanErased()]);
+    _ = f_parity_environment_probeCompare("hash collision append", runtime.checkpoint(),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, collision, LeanWord("usize", 0), LeanWord("usize", depth), other, value),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, collision, LeanWord("usize", 0), LeanWord("usize", depth), other, value), Some(expectedCollision))
+  }
+}
+
+// Independent semantic oracle: flatten the map without hashing or insert helpers.
+fun f_parity_environment_probeHashPairs(node: LeanValue): Array<LeanValue> {
+  pairs: mutable Vector<LeanValue> = mutable Vector[];
+  leanTag(node) match {
+  | LeanTag.PersistentHashMap_Node_entries ->
+    for (entry in leanArray(leanField(node, 0))) {
+      leanTag(entry) match {
+      | LeanTag.PersistentHashMap_Entry_null -> void
+      | LeanTag.PersistentHashMap_Entry_entry -> pairs.push(LeanCtor(LeanTag.Prod_mk, Array[leanField(entry, 0), leanField(entry, 1)]))
+      | LeanTag.PersistentHashMap_Entry_ref ->
+        for (pair in f_parity_environment_probeHashPairs(leanField(entry, 0))) pairs.push(pair)
+      | _ -> leanFail("invalid hash entry in independent oracle")
+      }
+    }
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanArray(leanField(node, 0));
+    values = leanArray(leanField(node, 1));
+    assert(keys.size() == values.size());
+    for (i in Range(0, keys.size())) pairs.push(LeanCtor(LeanTag.Prod_mk, Array[keys[i], values[i]]))
+  | _ -> leanFail("invalid hash node in independent oracle")
+  };
+  pairs.toArray()
+}
+
+fun f_parity_environment_probeHashExpansion(runtime: mutable LeanExecution): void {
+  keys = Array["expandA", "expandB", "expandC", "expandD"].map(text -> f_parity_environment_probeName(runtime, text));
+  initial = LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[
+    LeanArray(Array[keys[0], keys[1], keys[2]]),
+    LeanArray(Array[leanNatValue(10), leanNatValue(11), leanNatValue(12)]), LeanErased(),
+  ]);
+  retained = rewriteProbeCopyInput(initial);
+  for (depth in Array[1, 6, 7]) {
+    (inserted, _) = f_parity_environment_probeCompare("collision size-four threshold", runtime.checkpoint(),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, initial, LeanWord("usize", 0), LeanWord("usize", depth), keys[3], leanNatValue(13)),
+      r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, initial, LeanWord("usize", 0), LeanWord("usize", depth), keys[3], leanNatValue(13)));
+    assert(leanTag(inserted) == (if (depth < 7) LeanTag.PersistentHashMap_Node_entries else LeanTag.PersistentHashMap_Node_collision));
+    pairs = f_parity_environment_probeHashPairs(inserted);
+    assert(pairs.size() == 4);
+    for (i in Range(0, 4)) {
+      matches = pairs.filter(pair -> leanNameKey(leanField(pair, 0)) == leanNameKey(keys[i]));
+      assert(matches.size() == 1);
+      assert(f_parity_environment_sameValue(leanField(matches[0], 1), leanNatValue(10 + i)))
+    };
+    assert(f_parity_environment_sameValue(initial, retained))
+  };
+  // Replace within a collision, rather than appending a duplicate key.
+  expected = leanReplaceField(initial, 1, LeanArray(Array[leanNatValue(10), leanNatValue(99), leanNatValue(12)]));
+  _ = f_parity_environment_probeCompare("collision existing-key replacement", runtime.checkpoint(),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(r, initial, LeanWord("usize", 0), LeanWord("usize", 1), keys[1], leanNatValue(99)),
+    r ~> L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(r, initial, LeanWord("usize", 0), LeanWord("usize", 1), keys[1], leanNatValue(99)), Some(expected))
+}
+
+// E-2 oracle constructors spell out the fixed output layouts independently.
+// leanReplaceField is allowed for adversarial INPUTS, never to normalize an
+// overlong expected output. No helper here calls a production rewrite helper.
+fun f_parity_environment_probeLayoutKernel(
+  template: LeanValue, extensionStates: LeanValue,
+  generations: LeanValue, trackedGeneration: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk, Array[
+    leanField(template, 0), leanField(template, 1), leanField(template, 2),
+    leanField(template, 3), extensionStates, leanField(template, 5),
+    generations, trackedGeneration, leanField(template, 8),
+  ])
+}
+
+fun f_parity_environment_probeLayoutEnvironment(
+  template: LeanValue, privateKernel: LeanValue, checked: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_Environment_mk, Array[
+    LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[
+      privateKernel, leanField(leanField(template, 0), 1),
+    ]),
+    leanField(template, 1), checked,
+    leanField(template, 3), leanField(template, 4), leanField(template, 5),
+    leanField(template, 6), leanField(template, 7), leanField(template, 8),
+    leanField(template, 9), leanField(template, 10), leanField(template, 11),
+    leanField(template, 12), leanField(template, 13), leanField(template, 14),
+  ])
+}
+
+fun f_parity_environment_probeLayoutDependencies(template: LeanValue, generations: LeanValue): LeanValue {
+  LeanCtor(LeanTag.RecordedDeps_mk, Array[
+    leanField(template, 0), leanField(template, 1), generations,
+    leanField(template, 3), leanField(template, 4), leanField(template, 5),
+  ])
+}
+
+fun f_parity_environment_probeLayoutState(template: LeanValue, dependencies: LeanValue): LeanValue {
+  LeanCtor(LeanTag.Core_State_mk, Array[
+    leanField(template, 0), leanField(template, 1), leanField(template, 2),
+    leanField(template, 3), leanField(template, 4), leanField(template, 5),
+    dependencies, leanField(template, 7), leanField(template, 8), leanField(template, 9),
+  ])
+}
+
+fun f_parity_environment_probeLayoutSurplus(value: LeanValue): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.concat(Array[(LeanUnavailable("E-2 surplus must stay dormant") : LeanValue)]))
+  | _ -> leanFail("E-2 fixture must be a constructor")
+  }
+}
+
+fun f_parity_environment_probeLayoutArity(value: LeanValue, expected: Int): void {
+  value match {
+  | LeanCtor(_, fields) -> assert(fields.size() == expected)
+  | _ -> assert(false)
+  }
+}
+
+// Identity transform records the callback argument and retained input root.
+// Neither the bump nor the later reconstruction may mutate that captured root.
+fun f_parity_environment_probeLayoutTransform(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  assert(f_parity_environment_sameValue(args[1], args[2]));
+  observed = LeanCtor(LeanTag.Prod_mk, Array[args[1], args[3]]);
+  previousLog = runtime.readRef(args[0]);
+  runtime.writeRef(args[0], Some(leanArrayPush(previousLog, observed)));
+  args[3]
+}
+
+fun f_parity_environment_probeLayoutModify(
+  builder: mutable LeanExecution, environment: LeanValue,
+  trackedExtension: LeanValue, checkedKernel: LeanValue,
+): void {
+  privateKernel = f_parity_environment_probeKernel(environment);
+  nextGeneration = leanBoxNat(LeanNat::parse("18446744073709551617"));
+  localMode = LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]);
+  mainOnlyMode = LeanCtor(LeanTag.EnvExtension_AsyncMode_mainOnly, Array[]);
+  syncMode = LeanCtor(LeanTag.EnvExtension_AsyncMode_sync, Array[]);
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  for (site in Array["environment", "visibility", "kernel", "all"]) {
+    kernelSurplus = site == "kernel" || site == "all";
+    visibilitySurplus = site == "visibility" || site == "all";
+    environmentSurplus = site == "environment" || site == "all";
+    inputKernel = if (kernelSurplus) f_parity_environment_probeLayoutSurplus(privateKernel) else privateKernel;
+    inputVisibility = LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[inputKernel, leanField(leanField(environment, 0), 1)]);
+    inputWithVisibility = leanReplaceField(environment, 0, if (visibilitySurplus) f_parity_environment_probeLayoutSurplus(inputVisibility) else inputVisibility);
+    inputEnvironment = if (environmentSurplus) f_parity_environment_probeLayoutSurplus(inputWithVisibility) else inputWithVisibility;
+    retained = rewriteProbeCopyInput(inputEnvironment);
+    f_parity_environment_probeLayoutArity(inputEnvironment, if (environmentSurplus) 16 else 15);
+    f_parity_environment_probeLayoutArity(leanField(inputEnvironment, 0), if (visibilitySurplus) 3 else 2);
+    f_parity_environment_probeLayoutArity(inputKernel, if (kernelSurplus) 10 else 9);
+    logRef = builder.newRef(LeanArray(Array[]));
+    identityTransform = LeanClosure(f_parity_environment_probeLayoutTransform, 4, Array[logRef, inputEnvironment, retained]);
+    for (bump in Array[false, true]) {
+      expectedGenerations = if (bump) LeanArray(Array[nextGeneration, leanNatValue(7)]) else leanField(privateKernel, 6);
+      expectedTracked = if (bump) nextGeneration else leanField(privateKernel, 7);
+      expectedKernel = f_parity_environment_probeLayoutKernel(privateKernel, leanField(privateKernel, 4), expectedGenerations, expectedTracked);
+      expectedEnvironment = f_parity_environment_probeLayoutEnvironment(environment, expectedKernel, LeanCompletedTask(checkedKernel));
+      if (bump) {
+        // Observe the new bump helper directly BEFORE any transform. Otherwise
+        // a correct final reconstruction could mask a surplus-preserving bump.
+        bumpRuntime = builder.checkpoint().restoreRaw();
+        beforeCallback = L4_Lean_Environment.f_parity_environment_bumpGeneration(bumpRuntime, inputEnvironment, leanNatValue(0));
+        assert(f_parity_environment_sameValue(beforeCallback, expectedEnvironment));
+        f_parity_environment_probeLayoutArity(beforeCallback, 15);
+        f_parity_environment_probeLayoutArity(leanField(beforeCallback, 0), 2);
+        f_parity_environment_probeLayoutArity(f_parity_environment_probeKernel(beforeCallback), 9);
+        assert(f_parity_environment_sameValue(bumpRuntime.readRef(logRef), LeanArray(Array[])));
+        assert(f_parity_environment_sameValue(inputEnvironment, retained))
+      };
+      for (mode in Array[localMode, mainOnlyMode, syncMode]) {
+        (updated, after) = f_parity_environment_probeCompare("E-2 modify surplus " + site, builder.checkpoint(),
+          oldRuntime ~> f_parity_environment_probeModify(oldRuntime, true, trackedExtension, inputEnvironment, identityTransform, mode, anonymous, leanBool(bump)),
+          newRuntime ~> f_parity_environment_probeModify(newRuntime, false, trackedExtension, inputEnvironment, identityTransform, mode, anonymous, leanBool(bump)),
+          Some(expectedEnvironment));
+        f_parity_environment_probeLayoutArity(updated, 15);
+        f_parity_environment_probeLayoutArity(leanField(updated, 0), 2);
+        f_parity_environment_probeLayoutArity(f_parity_environment_probeKernel(updated), 9);
+        privateObservation: LeanValue = LeanCtor(LeanTag.Prod_mk, Array[inputEnvironment, leanNatValue(11)]);
+        checkedObservation: LeanValue = LeanCtor(LeanTag.Prod_mk, Array[inputEnvironment, leanNatValue(31)]);
+        expectedLog = if (leanTag(mode) == LeanTag.EnvExtension_AsyncMode_sync) LeanArray(Array[privateObservation, checkedObservation]) else LeanArray(Array[privateObservation]);
+        assert(f_parity_environment_sameValue(after.restoreRaw().readRef(logRef), expectedLog));
+        assert(f_parity_environment_sameValue(inputEnvironment, retained))
+      }
+    }
+  }
+}
+
+fun f_parity_environment_probeLayoutRecord(state: RewriteProbeState, trackedExtension: LeanValue, huge: LeanValue): void {
+  initialState = state.saved.restoreRaw().readRef(state.coreStateRef);
+  initialDependencies = leanField(initialState, 6);
+  recordingContext = leanReplaceField(state.coreContext, 7, leanBool(true));
+  firstEntry: LeanValue = LeanCtor(LeanTag.Prod_mk, Array[leanNatValue(0), huge]);
+  differentEntry: LeanValue = LeanCtor(LeanTag.Prod_mk, Array[leanNatValue(1), leanNatValue(7)]);
+  for (site in Array["state", "dependencies", "both"]) {
+    stateSurplus = site == "state" || site == "both";
+    dependencySurplus = site == "dependencies" || site == "both";
+    for (branch in Array["append-empty", "append-nonempty", "duplicate", "disabled"]) {
+      earlyReturn = branch == "duplicate" || branch == "disabled";
+      priorGenerations = if (branch == "duplicate") LeanArray(Array[firstEntry]) else if (branch == "append-nonempty") LeanArray(Array[differentEntry]) else LeanArray(Array[]);
+      fixedDependencies = f_parity_environment_probeLayoutDependencies(initialDependencies, priorGenerations);
+      inputDependencies = if (dependencySurplus) f_parity_environment_probeLayoutSurplus(fixedDependencies) else fixedDependencies;
+      templateState = if (earlyReturn) leanReplaceField(initialState, 0, LeanUnavailable("E-2 early return must not read generation")) else initialState;
+      fixedInputState = f_parity_environment_probeLayoutState(templateState, inputDependencies);
+      inputState = if (stateSurplus) f_parity_environment_probeLayoutSurplus(fixedInputState) else fixedInputState;
+      retained = rewriteProbeCopyInput(inputState);
+      f_parity_environment_probeLayoutArity(inputState, if (stateSurplus) 11 else 10);
+      f_parity_environment_probeLayoutArity(inputDependencies, if (dependencySurplus) 7 else 6);
+      fixtureRuntime = state.saved.restoreRaw();
+      fixtureRuntime.writeRef(state.coreStateRef, Some(inputState));
+      fixtureCheckpoint = fixtureRuntime.checkpoint();
+      for (world in Array[(LeanErased() : LeanValue), leanNatValue(37)]) {
+        context = if (branch == "disabled") state.coreContext else recordingContext;
+        expectedResult = LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world]);
+        (_, after) = f_parity_environment_probeCompare("E-2 recording surplus " + site + " " + branch, fixtureCheckpoint,
+          oldRuntime ~> f_parity_environment_probeRecord(oldRuntime, true, trackedExtension, context, state.coreStateRef, world),
+          newRuntime ~> f_parity_environment_probeRecord(newRuntime, false, trackedExtension, context, state.coreStateRef, world), Some(expectedResult));
+        stored = after.restoreRaw().readRef(state.coreStateRef);
+        if (earlyReturn) {
+          // No eager normalization, no generation read, and no reference write.
+          assert(f_parity_environment_sameRefs(after.refs, fixtureCheckpoint.refs));
+          assert(f_parity_environment_sameValue(stored, inputState));
+          f_parity_environment_probeLayoutArity(stored, if (stateSurplus) 11 else 10);
+          f_parity_environment_probeLayoutArity(leanField(stored, 6), if (dependencySurplus) 7 else 6)
+        } else {
+          expectedGenerations = if (branch == "append-nonempty") LeanArray(Array[differentEntry, firstEntry]) else LeanArray(Array[firstEntry]);
+          expectedDependencies = f_parity_environment_probeLayoutDependencies(initialDependencies, expectedGenerations);
+          expectedState = f_parity_environment_probeLayoutState(initialState, expectedDependencies);
+          assert(f_parity_environment_sameValue(stored, expectedState));
+          f_parity_environment_probeLayoutArity(stored, 10);
+          f_parity_environment_probeLayoutArity(leanField(stored, 6), 6)
+        };
+        assert(f_parity_environment_sameValue(inputState, retained));
+        assert(f_parity_environment_sameValue(fixtureCheckpoint.restoreRaw().readRef(state.coreStateRef), inputState))
+      }
+    }
+  }
+}
+
+fun main(): void {
+  for (profile in Array[false, true]) f_parity_environment_probe(profile)
+}

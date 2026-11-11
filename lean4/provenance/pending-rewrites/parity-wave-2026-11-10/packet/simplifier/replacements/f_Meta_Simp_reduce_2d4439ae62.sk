@@ -1,0 +1,97 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// "_private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.reduce"
+fun f_Meta_Simp_reduce_2d4439ae62(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+): LeanValue {
+  expression = _e_0_input;
+  coreContext = _a_6_input;
+  world = _a_1_8_input;
+  // Each iteration models another withIncRecDepth call, not a depth-resetting loop.
+  loop {
+    if (leanTag(coreContext) != LeanTag.Core_Context_mk) return leanFail("non-exhaustive Lean case");
+    cold = leanField(coreContext, 0);
+    depth = leanField(coreContext, 1);
+    syntaxRef = leanField(coreContext, 2);
+    if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) return leanFail("non-exhaustive Lean case");
+    options = leanField(cold, 2);
+    maxDepth = leanField(cold, 3);
+    traceOptions = leanField(cold, 11);
+    unlimited = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, maxDepth, LeanNatLiterals.n0);
+    leanTag(unlimited) match {
+    | LeanTag.Bool_true -> void
+    | LeanTag.Bool_false ->
+      atLimit = L4_Init_Prelude.f_Nat_decEq_3e841b85bb(_runtime, depth, maxDepth);
+      leanTag(atLimit) match {
+      | LeanTag.Bool_true -> return f_Simp_reduce_spec_0_f30ff62012(_runtime, syntaxRef, world)
+      | LeanTag.Bool_false -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    nextDepth = L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, depth, LeanNatLiterals.n1);
+    !coreContext = LeanCtor(LeanTag.Core_Context_mk, Array[
+      cold, nextDepth, syntaxRef, leanField(coreContext, 3), LeanErased(),
+      leanField(coreContext, 5), leanField(coreContext, 6), leanField(coreContext, 7)]);
+    step = f_Meta_Simp_reduceStep_e0a2562bfe(_runtime, expression,
+      _a_1_input, _a_2_input, _a_3_input, _a_4_input, _a_5_input, coreContext, _a_7_input, world);
+    leanTag(step) match {
+    | LeanTag.EST_Out_error -> return step
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    reduced = leanField(step, 0);
+    !world = leanField(step, 1);
+    unchanged = L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(_runtime, reduced, expression);
+    leanTag(unchanged) match {
+    | LeanTag.Bool_true -> return step
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    leanTag(leanField(options, 1)) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+        _runtime, LeanText("Debug"), LeanText("Meta"), LeanText("Tactic"), LeanText("simp"));
+      tracePrefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, LeanText("trace"));
+      traceName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(_runtime, tracePrefix, traceClass);
+      enabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(_runtime, traceOptions, options, traceName);
+      leanTag(enabled) match {
+      | LeanTag.Bool_false -> void
+      | LeanTag.Bool_true ->
+        prefix = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, LeanText("reduce "));
+        before = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, expression);
+        start = LeanCtor(LeanTag.MessageData_compose, Array[prefix, before]);
+        arrow = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(_runtime, LeanText(" => "));
+        middle = LeanCtor(LeanTag.MessageData_compose, Array[start, arrow]);
+        after = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, reduced);
+        message = LeanCtor(LeanTag.MessageData_compose, Array[middle, after]);
+        traced = f_Simp_reduceStep_spec_0_e9dbf36525(
+          _runtime, traceClass, message, _a_4_input, _a_5_input, coreContext, _a_7_input, world);
+        leanTag(traced) match {
+        | LeanTag.EST_Out_error -> return traced
+        | LeanTag.EST_Out_ok -> !world = leanField(traced, 1)
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    !expression = reduced
+  }
+}
+
+
+module end;

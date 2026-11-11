@@ -1,0 +1,149 @@
+module L4_Lean_MetavarContext;
+
+// Persistent insertion: copy the visited path, never mutate a published root.
+fun f_assignExp_spec_0_spec_0_12353c570c(
+  _runtime: mutable LeanExecution,
+  _x_1_0_input: LeanValue,
+  _x_2_1_input: LeanValue,
+  _x_3_2_input: LeanValue,
+  _x_4_3_input: LeanValue,
+  _x_5_4_input: LeanValue,
+): LeanValue {
+  node = _x_1_0_input;
+  hashSuffix = _x_2_1_input;
+  depth = _x_3_2_input;
+  key = _x_4_3_input;
+  value = _x_5_4_input;
+  leanTag(node) match {
+  | LeanTag.PersistentHashMap_Node_entries ->
+    entries = leanField(node, 0);
+    slotWord = L4_Init_Data_UInt_Basic.f_USize_land_9e95e03ccb(
+      _runtime,
+      hashSuffix,
+      LeanWord("usize", 31),
+    );
+    slot = L4_Init_Data_UInt_BasicAux.f_USize_toNat_ad7bf5ecf2(_runtime, slotWord);
+    size = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), entries);
+    inBounds = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, slot, size);
+    leanTag(inBounds) match {
+    | LeanTag.Bool_false -> return node
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    oldEntry = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      _runtime,
+      LeanErased(),
+      entries,
+      slot,
+      LeanErased(),
+    );
+    // Retain the original temporary clear and its instrumentation. Array.set
+    // publishes a new immutable array; the input entries remain a snapshot.
+    cleared = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      _runtime, LeanErased(), entries, slot,
+      LeanCtor(LeanTag.PUnit_unit, Array[]), LeanErased(),
+    );
+    newEntry = leanTag(oldEntry) match {
+    | LeanTag.PersistentHashMap_Entry_entry ->
+      oldKey = leanField(oldEntry, 0);
+      oldValue = leanField(oldEntry, 1);
+      sameKey = L4_Lean_Expr.f_Lean_instBEqMVarId_beq_fc799f33a5(_runtime, key, oldKey);
+      leanTag(sameKey) match {
+      | LeanTag.Bool_false ->
+        child = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkCollisionNode_6a9ae0c1b1(
+          _runtime,
+          oldKey,
+          oldValue,
+          key,
+          value,
+        );
+        LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[child])
+      | LeanTag.Bool_true -> LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.PersistentHashMap_Entry_ref ->
+      child = leanField(oldEntry, 0);
+      childHash = L4_Init_Data_UInt_Basic.f_USize_shiftRight_dbd7e8f695(
+        _runtime,
+        hashSuffix,
+        LeanWord("usize", 5),
+      );
+      childDepth = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+        _runtime,
+        depth,
+        LeanWord("usize", 1),
+      );
+      updatedChild = f_assignExp_spec_0_spec_0_12353c570c(
+        _runtime,
+        child,
+        childHash,
+        childDepth,
+        key,
+        value,
+      );
+      LeanCtor(LeanTag.PersistentHashMap_Entry_ref, Array[updatedChild])
+    | LeanTag.PersistentHashMap_Entry_null -> LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[key, value])
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    updatedEntries = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      _runtime,
+      LeanErased(),
+      cleared,
+      slot,
+      newEntry,
+      LeanErased(),
+    );
+    LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[updatedEntries])
+  | LeanTag.PersistentHashMap_Node_collision ->
+    keys = leanField(node, 0);
+    values = leanField(node, 1);
+    _ = leanField(node, 2);
+    collisionNode = LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[keys, values, LeanErased()]);
+    updated = f_spec_0_spec_0_spec_1_b6d825e9a9(_runtime, collisionNode, key, value);
+    atMaxDepth = L4_Init_Data_UInt_BasicAux.f_USize_decLe_6ddbd478b6(
+      _runtime,
+      LeanWord("usize", 7),
+      depth,
+    );
+    leanTag(atMaxDepth) match {
+    | LeanTag.Bool_true -> return updated
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    collisionSize = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_getCollisionNodeSize_4ef93619b3(
+      _runtime,
+      updated,
+    );
+    keepCollision = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, collisionSize, LeanNatLiterals.n4);
+    leanTag(keepCollision) match {
+    | LeanTag.Bool_true -> return updated
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    leanTag(updated) match {
+    | LeanTag.PersistentHashMap_Node_entries ->
+      _ = leanField(updated, 0);
+      leanFail("unreachable: Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignExp.spec_0.spec_0._redArg")
+    | LeanTag.PersistentHashMap_Node_collision ->
+      updatedKeys = leanField(updated, 0);
+      updatedValues = leanField(updated, 1);
+      _ = leanField(updated, 2);
+      emptyEntries = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntries_8e6ec2b40b(
+        _runtime,
+        LeanErased(),
+      );
+      f_spec_0_spec_0_spec_2_00fea488e7(
+        _runtime,
+        depth,
+        updatedKeys,
+        updatedValues,
+        LeanNatLiterals.n0,
+        emptyEntries,
+      )
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

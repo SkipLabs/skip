@@ -1,0 +1,449 @@
+module L4_Lean_Environment;
+
+// Replay the original discarded projections without decoding their payloads.
+// This keeps short/malformed constructor failures and dormant sentinel fields.
+fun f_parity_environment_modifyShape(value: LeanValue, fieldCount: Int): void {
+  for (index in Range(0, fieldCount)) {
+    _ = leanField(value, index)
+  }
+}
+
+fun f_parity_environment_modifyPanic(
+  runtime: mutable LeanExecution,
+  originalEnvironment: LeanValue,
+  line: LeanValue,
+  column: LeanValue,
+  detail: LeanValue,
+): LeanValue {
+  message = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+    runtime,
+    LeanText("Lean.Environment"),
+    LeanText("_private.Lean.Environment.0.Lean.EnvExtension.modifyStateCore"),
+    line,
+    column,
+    detail,
+  );
+  L4_Init_Prelude.f_panicCore_3292f922f8(
+    runtime,
+    LeanErased(),
+    originalEnvironment,
+    message,
+  )
+}
+
+fun f_parity_environment_bumpGeneration(
+  runtime: mutable LeanExecution,
+  environment: LeanValue,
+  generationIndex: LeanValue,
+): LeanValue {
+  if (
+    leanTag(environment) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(environment, 15);
+  base = leanField(environment, 0);
+  if (
+    leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(base, 2);
+  privateKernel = leanField(base, 0);
+  if (
+    leanTag(privateKernel) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(privateKernel, 9);
+  generations = leanField(privateKernel, 6);
+  trackedGeneration = leanField(privateKernel, 7);
+  size = L4_Init_Prelude.f_Array_size_3866d4555a(
+    runtime,
+    LeanErased(),
+    generations,
+  );
+  valid = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    runtime,
+    generationIndex,
+    size,
+  );
+  leanTag(valid) match {
+  | LeanTag.Bool_false ->
+    f_parity_environment_modifyPanic(
+      runtime,
+      environment,
+      LeanNatLiterals.n1687,
+      LeanNatLiterals.n8,
+      LeanText("invalid environment extension has been accessed"),
+    )
+  | LeanTag.Bool_true ->
+    generation = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      runtime,
+      LeanErased(),
+      generations,
+      generationIndex,
+      LeanErased(),
+    );
+    cleared = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      runtime,
+      LeanErased(),
+      generations,
+      generationIndex,
+      LeanCtor(LeanTag.PUnit_unit, Array[]),
+      LeanErased(),
+    );
+    nextGeneration = L4_Init_Prelude.f_Nat_add_86990f4822(
+      runtime,
+      generation,
+      LeanNatLiterals.n1,
+    );
+    updated = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(
+      runtime,
+      LeanErased(),
+      cleared,
+      generationIndex,
+      nextGeneration,
+      LeanErased(),
+    );
+    nextTracked = L4_Init_Prelude.f_Nat_add_86990f4822(
+      runtime,
+      trackedGeneration,
+      LeanNatLiterals.n1,
+    );
+    // The original publishes fixed-layout records, dropping accepted surplus
+    // fields. The branch-local projections above still precede all effects.
+    kernel = LeanCtor(
+      LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk,
+      Array[
+        leanField(privateKernel, 0),
+        leanField(privateKernel, 1),
+        leanField(privateKernel, 2),
+        leanField(privateKernel, 3),
+        leanField(privateKernel, 4),
+        leanField(privateKernel, 5),
+        updated,
+        nextTracked,
+        leanField(privateKernel, 8),
+      ],
+    );
+    visibility = LeanCtor(
+      LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk,
+      Array[kernel, leanField(base, 1)],
+    );
+    LeanCtor(
+      LeanTag.Private_Lean_Environment_0_Lean_Environment_mk,
+      Array[
+        visibility,
+        leanField(environment, 1),
+        leanField(environment, 2),
+        leanField(environment, 3),
+        leanField(environment, 4),
+        leanField(environment, 5),
+        leanField(environment, 6),
+        leanField(environment, 7),
+        leanField(environment, 8),
+        leanField(environment, 9),
+        leanField(environment, 10),
+        leanField(environment, 11),
+        leanField(environment, 12),
+        leanField(environment, 13),
+        leanField(environment, 14),
+      ],
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_parity_environment_modifyPrivate(
+  runtime: mutable LeanExecution,
+  extension: LeanValue,
+  environment: LeanValue,
+  transform: LeanValue,
+): LeanValue {
+  if (
+    leanTag(environment) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(environment, 15);
+  base = leanField(environment, 0);
+  if (
+    leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(base, 2);
+  kernel = leanField(base, 0);
+  if (
+    leanTag(kernel) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(kernel, 9);
+  updated = f_Lean_EnvExtension_modifyStateImpl_4b3353a6d0(
+    runtime,
+    extension,
+    leanField(kernel, 4),
+    transform,
+  );
+  // Reconstruct after the callback with exactly kernel9/visibility2/env15.
+  updatedKernel = LeanCtor(
+    LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk,
+    Array[
+      leanField(kernel, 0),
+      leanField(kernel, 1),
+      leanField(kernel, 2),
+      leanField(kernel, 3),
+      updated,
+      leanField(kernel, 5),
+      leanField(kernel, 6),
+      leanField(kernel, 7),
+      leanField(kernel, 8),
+    ],
+  );
+  updatedVisibility = LeanCtor(
+    LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk,
+    Array[updatedKernel, leanField(base, 1)],
+  );
+  LeanCtor(
+    LeanTag.Private_Lean_Environment_0_Lean_Environment_mk,
+    Array[
+      updatedVisibility,
+      leanField(environment, 1),
+      leanField(environment, 2),
+      leanField(environment, 3),
+      leanField(environment, 4),
+      leanField(environment, 5),
+      leanField(environment, 6),
+      leanField(environment, 7),
+      leanField(environment, 8),
+      leanField(environment, 9),
+      leanField(environment, 10),
+      leanField(environment, 11),
+      leanField(environment, 12),
+      leanField(environment, 13),
+      leanField(environment, 14),
+    ],
+  )
+}
+
+// "_private.Lean.Environment.0.Lean.EnvExtension.modifyStateCore._redArg"
+fun f_Lean_EnvExtension_modifyStateCore_4449449a88(
+  _runtime: mutable LeanExecution,
+  _ext_0_input: LeanValue,
+  _env_1_input: LeanValue,
+  _f_2_input: LeanValue,
+  _asyncMode_3_input: LeanValue,
+  _asyncDecl_4_input: LeanValue,
+  _bumpGen_5_input: LeanValue,
+): LeanValue {
+  if (
+    leanTag(_ext_0_input) !=
+    LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_modifyShape(_ext_0_input, 7);
+  replay = leanField(_ext_0_input, 3);
+  generationIndex = leanField(_ext_0_input, 5);
+  updateKernel = LeanClosure(
+    L4_Lean_Environment.apply_f_EnvExtension_modifyStateCore_lam_0_78149622f2,
+    3,
+    Array[_ext_0_input, _f_2_input],
+  );
+  environment = leanTag(generationIndex) match {
+  | LeanTag.Option_none -> _env_1_input
+  | LeanTag.Option_some ->
+    index = leanField(generationIndex, 0);
+    leanTag(_bumpGen_5_input) match {
+    | LeanTag.Bool_false -> _env_1_input
+    | LeanTag.Bool_true ->
+      f_parity_environment_bumpGeneration(_runtime, _env_1_input, index)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Generation changes precede mode validation. All diagnostics still use the
+  // original environment as panicCore's default, not this tentative root.
+  leanTag(_asyncMode_3_input) match {
+  | LeanTag.EnvExtension_AsyncMode_mainOnly ->
+    if (
+      leanTag(environment) !=
+      LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+    ) return leanFail("non-exhaustive Lean case");
+    f_parity_environment_modifyShape(environment, 15);
+    mainOnlyContext = leanField(environment, 4);
+    leanTag(mainOnlyContext) match {
+    | LeanTag.Option_some ->
+      description = f_Lean_AsyncContext_descr_23956438ec(
+        _runtime,
+        leanField(mainOnlyContext, 0),
+      );
+      mainOnlyDetail = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+        _runtime,
+        LeanText("environment extension is marked as `mainOnly` but used in "),
+        description,
+      );
+      return f_parity_environment_modifyPanic(
+        _runtime,
+        _env_1_input,
+        LeanNatLiterals.n1693,
+        LeanNatLiterals.n13,
+        mainOnlyDetail,
+      )
+    | _ ->
+      return f_parity_environment_modifyPrivate(
+        _runtime,
+        _ext_0_input,
+        environment,
+        _f_2_input,
+      )
+    }
+  | LeanTag.EnvExtension_AsyncMode_local ->
+    return f_parity_environment_modifyPrivate(
+      _runtime,
+      _ext_0_input,
+      environment,
+      _f_2_input,
+    )
+  | _ -> void
+  };
+  leanTag(_asyncMode_3_input) match {
+  | LeanTag.EnvExtension_AsyncMode_async ->
+    _ = leanField(_asyncMode_3_input, 0);
+    anonymous = L4_Lean_Data_Name.f_Lean_Name_isAnonymous_6fce118087(
+      _runtime,
+      _asyncDecl_4_input,
+    );
+    leanTag(anonymous) match {
+    | LeanTag.Bool_true ->
+      return f_parity_environment_modifyPanic(
+        _runtime,
+        _env_1_input,
+        LeanNatLiterals.n1700,
+        LeanNatLiterals.n15,
+        LeanText(
+          "called on `async` extension, must set `asyncDecl` in that case",
+        ),
+      )
+    | LeanTag.Bool_false ->
+      if (
+        leanTag(environment) !=
+        LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+      ) return leanFail("non-exhaustive Lean case");
+      f_parity_environment_modifyShape(environment, 15);
+      asyncContext = leanField(environment, 4);
+      leanTag(asyncContext) match {
+      | LeanTag.Option_some ->
+        rawAsyncContext = leanField(asyncContext, 0);
+        allowed = f_Lean_EnvExtension_asyncMayModify_91fb88f46f(
+          _runtime,
+          environment,
+          _asyncDecl_4_input,
+          _asyncMode_3_input,
+        );
+        leanTag(allowed) match {
+        | LeanTag.Bool_false ->
+          if (
+            leanTag(rawAsyncContext) !=
+            LeanTag.Private_Lean_Environment_0_Lean_AsyncContext_mkRaw
+          ) return leanFail("non-exhaustive Lean case");
+          f_parity_environment_modifyShape(rawAsyncContext, 2);
+          prefix = leanField(rawAsyncContext, 0);
+          declarationText = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+            _runtime,
+            _asyncDecl_4_input,
+            leanBool(true),
+          );
+          declarationOpening = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _runtime,
+            LeanText("`asyncDecl` `"),
+            declarationText,
+          );
+          middle = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _runtime,
+            declarationOpening,
+            LeanText("` is outside current context "),
+          );
+          prefixText = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+            _runtime,
+            prefix,
+            leanBool(true),
+          );
+          outsideContextDetail = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+            _runtime,
+            middle,
+            prefixText,
+          );
+          return f_parity_environment_modifyPanic(
+            _runtime,
+            _env_1_input,
+            LeanNatLiterals.n1704,
+            LeanNatLiterals.n17,
+            outsideContextDetail,
+          )
+        | LeanTag.Bool_true -> void
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> void
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> void
+  };
+  leanTag(replay) match {
+  | LeanTag.Option_some ->
+    _ = leanField(replay, 0);
+    void
+  | LeanTag.Option_none ->
+    if (
+      leanTag(environment) !=
+      LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+    ) return leanFail("non-exhaustive Lean case");
+    f_parity_environment_modifyShape(environment, 15);
+    replayContext = leanField(environment, 4);
+    leanTag(replayContext) match {
+    | LeanTag.Option_none -> void
+    | LeanTag.Option_some ->
+      rawReplayContext = leanField(replayContext, 0);
+      if (
+        leanTag(rawReplayContext) !=
+        LeanTag.Private_Lean_Environment_0_Lean_AsyncContext_mkRaw
+      ) return leanFail("non-exhaustive Lean case");
+      f_parity_environment_modifyShape(rawReplayContext, 2);
+      stack = leanField(rawReplayContext, 1);
+      leanTag(stack) match {
+      | LeanTag.List_cons ->
+        head = leanField(stack, 0);
+        _ = leanField(stack, 1);
+        realizing = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+          _runtime,
+          head,
+          leanBool(true),
+        );
+        replayOpening = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _runtime,
+          LeanText(
+            "environment extension must set `replay?` field to be used in realization context '",
+          ),
+          realizing,
+        );
+        replayDetail = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+          _runtime,
+          replayOpening,
+          LeanText("'"),
+        );
+        return f_parity_environment_modifyPanic(
+          _runtime,
+          _env_1_input,
+          LeanNatLiterals.n1708,
+          LeanNatLiterals.n15,
+          replayDetail,
+        )
+      | _ -> void
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Keep the existing closure and Task.map path: it invokes the transform on
+  // private and checked snapshots in that order, and leaves public state alone.
+  f_Lean_Environment_modifyCheckedAsync_4fb8fbfad3(
+    _runtime,
+    environment,
+    updateKernel,
+  )
+}
+
+module end;

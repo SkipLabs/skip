@@ -3,6 +3,13 @@
 // arrays are a separate abstraction and keep their value semantics.
 const leanReferencePageSize: Int = 256;
 
+// Every new page has the same immutable saved image. Sharing that image avoids
+// filling a private saved array only to clone it for the first write.
+const leanAllocationEmptyReferenceSlots: Array<?LeanValue> = Array::fill(
+  leanReferencePageSize,
+  None(),
+);
+
 mutable class LeanReferencePage{
   mutable saved: Array<?LeanValue>,
   mutable working: ?(mutable Array<?LeanValue>) = None(),
@@ -68,7 +75,8 @@ mutable class LeanReferenceTable{
     if (offset == 0) {
       this.pages.push(
         mutable LeanReferencePage{
-          saved => Array::fill(leanReferencePageSize, None()),
+          saved => leanAllocationEmptyReferenceSlots,
+          working => Some(Array::mfill(leanReferencePageSize, (None() : ?LeanValue))),
         },
       )
     };

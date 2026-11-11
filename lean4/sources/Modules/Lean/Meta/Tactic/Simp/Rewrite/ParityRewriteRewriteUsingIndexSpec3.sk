@@ -1,0 +1,688 @@
+module L4_Lean_Meta_Tactic_Simp_Rewrite;
+
+// Validate the same constructor projections as the original, including discarded fields.
+fun f_rewriteWave_candidates_fields(
+  value: LeanValue,
+  tag: LeanTag.Value,
+  count: Int,
+): Array<LeanValue> {
+  if (leanTag(value) != tag) return leanFail("non-exhaustive Lean case");
+  for (index in Range(0, count)) {
+    _ = leanField(value, index)
+  };
+  value match {
+  | LeanCtor(_, fields) -> fields
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_candidates_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Preserve error payload and returned world, rather than converting failure to no-match.
+fun f_rewriteWave_candidates_ok(output: LeanValue): Bool {
+  leanTag(output) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_candidates_unit(world: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.PUnit_unit, Array[]), world],
+  )
+}
+
+fun f_rewriteWave_candidates_text(
+  runtime: mutable LeanExecution,
+  text: String,
+): LeanValue {
+  L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText(text))
+}
+
+fun f_rewriteWave_candidates_compose(
+  left: LeanValue,
+  right: LeanValue,
+): LeanValue {
+  LeanCtor(LeanTag.MessageData_compose, Array[left, right])
+}
+
+fun f_rewriteWave_candidates_enabled(
+  runtime: mutable LeanExecution,
+  traceClass: LeanValue,
+  options: LeanValue,
+  inherited: LeanValue,
+): Bool {
+  prefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    runtime,
+    LeanText("trace"),
+  );
+  optionName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+    runtime,
+    prefix,
+    traceClass,
+  );
+  f_rewriteWave_candidates_bool(
+    L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(
+      runtime,
+      inherited,
+      options,
+      optionName,
+    ),
+  )
+}
+
+fun f_rewriteWave_candidates_traceSuccess(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  theorem: LeanValue,
+  rflOnly: LeanValue,
+  result: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  core = f_rewriteWave_candidates_fields(
+    coreContext,
+    LeanTag.Core_Context_mk,
+    8,
+  );
+  cold = f_rewriteWave_candidates_fields(
+    core[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  options = f_rewriteWave_candidates_fields(
+    cold[2],
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
+    2,
+  );
+  if (f_rewriteWave_candidates_bool(options[1])) {
+    debugTraceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+      runtime,
+      LeanText("Debug"),
+      LeanText("Meta"),
+      LeanText("Tactic"),
+      LeanText("simp"),
+    );
+    if (
+      f_rewriteWave_candidates_enabled(
+        runtime,
+        debugTraceClass,
+        cold[2],
+        cold[11],
+      )
+    ) {
+      resultFields = f_rewriteWave_candidates_fields(
+        result,
+        LeanTag.Meta_Simp_Result_mk,
+        3,
+      );
+      debugMessage = f_rewriteWave_candidates_text(runtime, "rewrite result ");
+      !debugMessage = f_rewriteWave_candidates_compose(
+        debugMessage,
+        L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+          runtime,
+          expression,
+        ),
+      );
+      !debugMessage = f_rewriteWave_candidates_compose(
+        debugMessage,
+        f_rewriteWave_candidates_text(runtime, " => "),
+      );
+      !debugMessage = f_rewriteWave_candidates_compose(
+        debugMessage,
+        L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+          runtime,
+          resultFields[0],
+        ),
+      );
+      traced = f_synthesizeArgs_synthesizeInstance_spec_0_62b88d54be(
+        runtime,
+        debugTraceClass,
+        debugMessage,
+        metaContext,
+        metaState,
+        coreContext,
+        coreState,
+        world,
+      );
+      if (!f_rewriteWave_candidates_ok(traced)) {
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(traced, 0), leanField(traced, 1)],
+        )
+      };
+      !world = leanField(traced, 1)
+    }
+  };
+  if (!f_rewriteWave_candidates_bool(rflOnly)) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  theoremFields = f_rewriteWave_candidates_fields(
+    theorem,
+    LeanTag.Meta_SimpTheorem_mk,
+    9,
+  );
+  if (f_rewriteWave_candidates_bool(theoremFields[7])) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  if (!f_rewriteWave_candidates_bool(theoremFields[8])) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  // The backward-defeq trace is gated independently, after the debug-result trace.
+  backwardCore = f_rewriteWave_candidates_fields(
+    coreContext,
+    LeanTag.Core_Context_mk,
+    8,
+  );
+  backwardCold = f_rewriteWave_candidates_fields(
+    backwardCore[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  backwardOptions = f_rewriteWave_candidates_fields(
+    backwardCold[2],
+    LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk,
+    2,
+  );
+  if (!f_rewriteWave_candidates_bool(backwardOptions[1])) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  backwardTraceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+    runtime,
+    LeanText("Meta"),
+    LeanText("Tactic"),
+    LeanText("simp"),
+    LeanText("backwardDefEq"),
+  );
+  if (
+    !f_rewriteWave_candidates_enabled(
+      runtime,
+      backwardTraceClass,
+      backwardCold[2],
+      backwardCold[11],
+    )
+  ) return f_rewriteWave_candidates_unit(world);
+  origin = f_Simp_discharge_spec_1_731cb7245e(runtime, theoremFields[6], world);
+  if (!f_rewriteWave_candidates_ok(origin)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(origin, 0), leanField(origin, 1)],
+    )
+  };
+  backwardMessage = f_rewriteWave_candidates_text(
+    runtime,
+    "used `[backward_defeq]` theorem ",
+  );
+  !backwardMessage = f_rewriteWave_candidates_compose(
+    backwardMessage,
+    leanField(origin, 0),
+  );
+  !backwardMessage = f_rewriteWave_candidates_compose(
+    backwardMessage,
+    f_rewriteWave_candidates_text(runtime, " to rewrite"),
+  );
+  !backwardMessage = f_rewriteWave_candidates_compose(
+    backwardMessage,
+    L4_Lean_Message.f_Lean_indentExpr_f484b447e1(runtime, expression),
+  );
+  f_synthesizeArgs_synthesizeInstance_spec_0_62b88d54be(
+    runtime,
+    backwardTraceClass,
+    backwardMessage,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    leanField(origin, 1),
+  )
+}
+
+// Debug-only validation of a theorem rejected by the rfl eligibility gate.
+// Diagnostics changes intentionally invalidate the core cache, exactly as before.
+fun f_rewriteWave_candidates_checkRejectedRfl(
+  runtime: mutable LeanExecution,
+  proof: LeanValue,
+  rejected: LeanValue,
+  methods: LeanValue,
+  simpContext: LeanValue,
+  simpState: LeanValue,
+  metaContext: LeanValue,
+  metaState: LeanValue,
+  coreContext: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  checkedOptions = L4_Lean_CoreM.f_Core_instMonadOptionsCoreM_checkedOptions_735ae7dbd5(
+    runtime,
+    coreContext,
+  );
+  checkOption = leanReadInitializer(
+    runtime,
+    "Lean.Meta.debug.tactic.simp.checkDefEqAttr",
+  );
+  check = f_Simp_discharge_spec_3_b456dc217a(
+    runtime,
+    checkedOptions,
+    checkOption,
+  );
+  if (!f_rewriteWave_candidates_bool(check)) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  backwardOption = leanReadInitializer(
+    runtime,
+    "Lean.Meta.backward.dsimp.useDefEqAttr",
+  );
+  useDefEq = f_Simp_discharge_spec_3_b456dc217a(
+    runtime,
+    checkedOptions,
+    backwardOption,
+  );
+  if (!f_rewriteWave_candidates_bool(useDefEq)) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  core = f_rewriteWave_candidates_fields(
+    coreContext,
+    LeanTag.Core_Context_mk,
+    8,
+  );
+  cold = f_rewriteWave_candidates_fields(
+    core[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  options = if (f_rewriteWave_candidates_bool(core[7])) {
+    L4_Lean_CoreM.f_Core_instMonadWithOptionsCoreM_reportViolation_9ed8088e54(
+      runtime,
+      cold[2],
+    )
+  } else {
+    f_rewrite_rewriteUsingIndex_spec_2_9139d84220(
+      runtime,
+      cold[2],
+      backwardOption,
+      rejected,
+    )
+  };
+  flags = L4_Lean_CoreM.f_Lean_OptionFlags_ofOptions_967f79be9b(
+    runtime,
+    options,
+  );
+  gotState = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    runtime,
+    LeanErased(),
+    LeanErased(),
+    coreState,
+    world,
+  );
+  stateAndWorld = f_rewriteWave_candidates_fields(
+    gotState,
+    LeanTag.ST_Out_mk,
+    2,
+  );
+  state = f_rewriteWave_candidates_fields(
+    stateAndWorld[0],
+    LeanTag.Core_State_mk,
+    10,
+  );
+  diagnostics = L4_Lean_Environment.f_Lean_Kernel_isDiagnosticsEnabled_10ba9363d2(
+    runtime,
+    state[0],
+  );
+  diagnosticBits = L4_Init_Data_UInt_Basic.f_UInt16_land_01cb154555(
+    runtime,
+    flags,
+    LeanWord("uint16", 512),
+  );
+  noDiagnostics = L4_Init_Prelude.f_UInt16_decEq_ea67bbfbf0(
+    runtime,
+    diagnosticBits,
+    LeanWord("uint16", 0),
+  );
+  desired = if (f_rewriteWave_candidates_bool(noDiagnostics)) rejected else {
+    useDefEq
+  };
+  desiredBool = f_rewriteWave_candidates_bool(desired);
+  currentBool = f_rewriteWave_candidates_bool(diagnostics);
+  !world = stateAndWorld[1];
+  if (desiredBool != currentBool) {
+    taken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      coreState,
+      world,
+    );
+    takenFields = f_rewriteWave_candidates_fields(taken, LeanTag.ST_Out_mk, 2);
+    old = f_rewriteWave_candidates_fields(
+      takenFields[0],
+      LeanTag.Core_State_mk,
+      10,
+    );
+    environment = L4_Lean_Environment.f_Lean_Kernel_enableDiag_e3bba134be(
+      runtime,
+      old[0],
+      desired,
+    );
+    entries = L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_mkEmptyEntriesArray_f2d99b9b8c(
+      runtime,
+      LeanErased(),
+    );
+    node = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[entries]);
+    cache = LeanCtor(LeanTag.Core_Cache_mk, Array[node, node]);
+    updated = LeanCtor(
+      LeanTag.Core_State_mk,
+      Array[
+        environment,
+        old[1],
+        old[2],
+        old[3],
+        old[4],
+        cache,
+        old[6],
+        old[7],
+        old[8],
+        old[9],
+      ],
+    );
+    put = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+      runtime,
+      LeanErased(),
+      LeanErased(),
+      coreState,
+      updated,
+      takenFields[1],
+    );
+    putFields = f_rewriteWave_candidates_fields(put, LeanTag.ST_Out_mk, 2);
+    !world = putFields[1]
+  };
+  // Rebuild local Core context with the new options, flags and maxRecDepth.
+  localCore = f_rewriteWave_candidates_fields(
+    coreContext,
+    LeanTag.Core_Context_mk,
+    8,
+  );
+  localCold = f_rewriteWave_candidates_fields(
+    localCore[0],
+    LeanTag.Core_Context_Cold_mk,
+    12,
+  );
+  maxDepthOption = leanReadInitializer(runtime, "Lean.maxRecDepth");
+  maxDepth = f_discharge_spec_4_spec_7_a8c33d81c1(
+    runtime,
+    options,
+    maxDepthOption,
+  );
+  newCold = LeanCtor(
+    LeanTag.Core_Context_Cold_mk,
+    Array[
+      localCold[0],
+      localCold[1],
+      options,
+      maxDepth,
+      localCold[4],
+      localCold[5],
+      localCold[6],
+      localCold[7],
+      localCold[8],
+      localCold[9],
+      localCold[10],
+      localCold[11],
+    ],
+  );
+  newCore = LeanCtor(
+    LeanTag.Core_Context_mk,
+    Array[
+      newCold,
+      localCore[1],
+      localCore[2],
+      flags,
+      LeanErased(),
+      localCore[5],
+      localCore[6],
+      localCore[7],
+    ],
+  );
+  isRfl = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Lean_Meta_isRflProof_3dd1ef279b(
+    runtime,
+    proof,
+    metaContext,
+    metaState,
+    newCore,
+    coreState,
+    world,
+  );
+  if (!f_rewriteWave_candidates_ok(isRfl)) {
+    return LeanCtor(
+      LeanTag.EST_Out_error,
+      Array[leanField(isRfl, 0), leanField(isRfl, 1)],
+    )
+  };
+  !world = leanField(isRfl, 1);
+  if (!f_rewriteWave_candidates_bool(leanField(isRfl, 0))) {
+    return f_rewriteWave_candidates_unit(world)
+  };
+  message = f_rewriteWave_candidates_text(runtime, "theorem ");
+  !message = f_rewriteWave_candidates_compose(
+    message,
+    L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, proof),
+  );
+  !message = f_rewriteWave_candidates_compose(
+    message,
+    f_rewriteWave_candidates_text(runtime, " is no longer rfl"),
+  );
+  f_rewrite_rewriteUsingIndex_spec_1_a1a3bc080b(
+    runtime,
+    message,
+    methods,
+    simpContext,
+    simpState,
+    metaContext,
+    metaState,
+    coreContext,
+    coreState,
+    world,
+  )
+}
+
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_._private.Lean.Meta.Tactic.Simp.Rewrite.0.Lean.Meta.Simp.rewrite?.rewriteUsingIndex?.spec_3"
+fun f_rewrite_rewriteUsingIndex_spec_3_266ff70323(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _rflOnly_1_input: LeanValue,
+  _erased_2_input: LeanValue,
+  _x_1_3_input: LeanValue,
+  _as_4_input: LeanValue,
+  _sz_5_input: LeanValue,
+  _i_6_input: LeanValue,
+  _b_7_input: LeanValue,
+  _y_2_8_input: LeanValue,
+  _y_3_9_input: LeanValue,
+  _y_4_10_input: LeanValue,
+  _y_5_11_input: LeanValue,
+  _y_6_12_input: LeanValue,
+  _y_7_13_input: LeanValue,
+  _y_8_14_input: LeanValue,
+  _y_9_15_input: LeanValue,
+): LeanValue {
+  expression = _e_0_input;
+  rflOnly = _rflOnly_1_input;
+  erased = _erased_2_input;
+  backward = _x_1_3_input;
+  candidates = _as_4_input;
+  size = _sz_5_input;
+  index = _i_6_input;
+  accumulator = _b_7_input;
+  methods = _y_2_8_input;
+  simpContext = _y_3_9_input;
+  simpState = _y_4_10_input;
+  metaContext = _y_5_11_input;
+  metaState = _y_6_12_input;
+  coreContext = _y_7_13_input;
+  coreState = _y_8_14_input;
+  world = _y_9_15_input;
+  loop {
+    inBounds = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(
+      _runtime,
+      index,
+      size,
+    );
+    if (!f_rewriteWave_candidates_bool(inBounds)) {
+      return LeanCtor(LeanTag.EST_Out_ok, Array[accumulator, world])
+    };
+    entry = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
+      LeanErased(),
+      candidates,
+      index,
+      LeanErased(),
+    );
+    candidate = f_rewriteWave_candidates_fields(entry, LeanTag.Prod_mk, 2);
+    theorem = candidate[0];
+    extraArguments = candidate[1];
+    none = LeanCtor(LeanTag.Option_none, Array[]);
+    unit = LeanCtor(LeanTag.PUnit_unit, Array[]);
+    emptyAccumulator = LeanCtor(LeanTag.Prod_mk, Array[none, unit]);
+    checked = L4_Lean_CoreM.f_Lean_Core_checkSystem_ccc29ea7a7(
+      _runtime,
+      LeanText("simp"),
+      coreContext,
+      coreState,
+      world,
+    );
+    if (!f_rewriteWave_candidates_ok(checked)) {
+      return LeanCtor(
+        LeanTag.EST_Out_error,
+        Array[leanField(checked, 0), leanField(checked, 1)],
+      )
+    };
+    !world = leanField(checked, 1);
+    isErased = f_Simp_rewrite_inErasedSet_6828aed7bc(_runtime, erased, theorem);
+    eligible = false;
+    if (!f_rewriteWave_candidates_bool(isErased)) {
+      if (!f_rewriteWave_candidates_bool(rflOnly)) {
+        !eligible = true
+      } else {
+        fields = f_rewriteWave_candidates_fields(
+          theorem,
+          LeanTag.Meta_SimpTheorem_mk,
+          9,
+        );
+        if (f_rewriteWave_candidates_bool(fields[7])) {
+          !eligible = true
+        } else {
+          // backwardRfl is not inspected when useBackward is false.
+          rejection = isErased;
+          if (f_rewriteWave_candidates_bool(backward)) {
+            if (f_rewriteWave_candidates_bool(fields[8])) {
+              !eligible = true
+            } else {
+              !rejection = fields[8]
+            }
+          };
+          if (!eligible) {
+            diagnosed = f_rewriteWave_candidates_checkRejectedRfl(
+              _runtime,
+              fields[2],
+              rejection,
+              methods,
+              simpContext,
+              simpState,
+              metaContext,
+              metaState,
+              coreContext,
+              coreState,
+              world,
+            );
+            if (!f_rewriteWave_candidates_ok(diagnosed)) {
+              return LeanCtor(
+                LeanTag.EST_Out_error,
+                Array[leanField(diagnosed, 0), leanField(diagnosed, 1)],
+              )
+            };
+            !world = leanField(diagnosed, 1)
+          }
+        }
+      }
+    };
+    if (eligible) {
+      // Keep the depth/rollback wrapper, not just tryTheoremCore.go.
+      attempted = f_Meta_Simp_tryTheoremWithExtraArgs_be8330f005(
+        _runtime,
+        expression,
+        theorem,
+        extraArguments,
+        methods,
+        simpContext,
+        simpState,
+        metaContext,
+        metaState,
+        coreContext,
+        coreState,
+        world,
+      );
+      if (!f_rewriteWave_candidates_ok(attempted)) {
+        return LeanCtor(
+          LeanTag.EST_Out_error,
+          Array[leanField(attempted, 0), leanField(attempted, 1)],
+        )
+      };
+      optionalResult = leanField(attempted, 0);
+      !world = leanField(attempted, 1);
+      // The original intentionally treats any non-some tag as a failed attempt.
+      leanTag(optionalResult) match {
+      | LeanTag.Option_some ->
+        result = leanField(optionalResult, 0);
+        traced = f_rewriteWave_candidates_traceSuccess(
+          _runtime,
+          expression,
+          theorem,
+          rflOnly,
+          result,
+          metaContext,
+          metaState,
+          coreContext,
+          coreState,
+          world,
+        );
+        if (!f_rewriteWave_candidates_ok(traced)) {
+          return LeanCtor(
+            LeanTag.EST_Out_error,
+            Array[leanField(traced, 0), leanField(traced, 1)],
+          )
+        };
+        found = LeanCtor(LeanTag.Option_some, Array[optionalResult]);
+        returned = LeanCtor(LeanTag.Prod_mk, Array[found, unit]);
+        return LeanCtor(
+          LeanTag.EST_Out_ok,
+          Array[returned, leanField(traced, 1)],
+        )
+      | _ -> void
+      }
+    };
+    !accumulator = emptyAccumulator;
+    !index = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+      _runtime,
+      index,
+      LeanWord("usize", 1),
+    )
+  }
+}
+
+module end;

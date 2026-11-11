@@ -1,0 +1,48 @@
+module L4_Lean_MetavarContext;
+
+// Collect only top-level metavariable IDs in the half-open USize interval.
+fun f_MetavarContext_mkBinding_spec_0_4115d2aad9(
+  _runtime: mutable LeanExecution,
+  _as_0_input: LeanValue,
+  _i_1_input: LeanValue,
+  _stop_2_input: LeanValue,
+  _b_3_input: LeanValue,
+): LeanValue {
+  index = _i_1_input;
+  ids = _b_3_input;
+  loop {
+    atEnd = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+      _runtime,
+      index,
+      _stop_2_input,
+    );
+    leanTag(atEnd) match {
+    | LeanTag.Bool_true -> return ids
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    expr = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(
+      _runtime,
+      LeanErased(),
+      _as_0_input,
+      index,
+      LeanErased(),
+    );
+    isMVar = L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(_runtime, expr);
+    leanTag(isMVar) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      id = L4_Lean_Expr.f_Lean_Expr_mvarId_9d4431c33a(_runtime, expr);
+      !ids = L4_Lean_Expr.f_Lean_MVarIdSet_insert_1292a5ee47(_runtime, ids, id)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    // Preserve fixed-width wraparound, and equality rather than a < stop test.
+    !index = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(
+      _runtime,
+      index,
+      LeanWord("usize", 1),
+    )
+  }
+}
+
+module end;

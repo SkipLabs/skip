@@ -1,0 +1,79 @@
+// Run only after canonical integration retains the eight *_fallback functions.
+fun f_paritySimplifierProbeResult(expr: LeanValue, proof: LeanValue, cache: Bool): LeanValue {
+  LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[expr, proof, leanBool(cache)])
+}
+
+fun main(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+    unused = LeanUnavailable("proof-free congruence must not inspect Meta/Core arguments");
+    world = leanBoxNat(LeanNat::parse("18446744073709551623"));
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime,
+      L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[])));
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("x"));
+    bound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]), type, bound);
+    app = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, prop);
+    saved = runtime.checkpoint();
+    for (cache in Array[false, true]) {
+      fr = f_paritySimplifierProbeResult(identity, none, cache);
+      ar = f_paritySimplifierProbeResult(prop, none, cache);
+      expected = LeanCtor(LeanTag.EST_Out_ok,
+        Array[f_paritySimplifierProbeResult(app, none, true), world]);
+      _ = rewriteProbeCompare("mkCongr no proofs/cache resets", saved,
+        (old: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327_fallback(
+          old, app, fr, ar, unused, unused, unused, unused, world),
+        (fresh: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327(
+          fresh, app, fr, ar, unused, unused, unused, unused, world), Some(expected));
+      _ = rewriteProbeCompare("mkCongrFun no proof/cache resets", saved,
+        (old: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24_fallback(
+          old, app, fr, prop, unused, unused, unused, unused, world),
+        (fresh: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24(
+          fresh, app, fr, prop, unused, unused, unused, unused, world), Some(expected));
+      !cases = cases + 2;
+      for (priorCache in Array[false, true]) {
+        for (hasPrior in Array[false, true]) {
+          // Opaque proof is safe here: this path carries it, never constructs/transforms it.
+          prior: LeanValue = if (hasPrior) LeanCtor(LeanTag.Option_some, Array[unused]) else none;
+          expectedProof = if (hasPrior) prior else none;
+          expectedResult = f_paritySimplifierProbeResult(prop, expectedProof, priorCache && cache);
+          _ = rewriteProbeCompare("optional trans/cache conjunction", saved,
+            (old: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295_fallback(
+              old, prior, leanBool(priorCache), ar, unused, unused, unused, unused, world),
+            (fresh: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(
+              fresh, prior, leanBool(priorCache), ar, unused, unused, unused, unused, world),
+            Some(LeanCtor(LeanTag.EST_Out_ok, Array[expectedResult, world])));
+          !cases = cases + 1
+        }
+      }
+    };
+
+    for (priorCache in Array[false, true]) {
+      for (resultCache in Array[false, true]) {
+        carriedProof: LeanValue = LeanCtor(LeanTag.Option_some, Array[unused]);
+        result = f_paritySimplifierProbeResult(prop, carriedProof, resultCache);
+        _ = rewriteProbeCompare("absent prior preserves existing proof", saved,
+          (old: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295_fallback(
+            old, none, leanBool(priorCache), result, unused, unused, unused, unused, world),
+          (fresh: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(
+            fresh, none, leanBool(priorCache), result, unused, unused, unused, unused, world),
+          Some(LeanCtor(LeanTag.EST_Out_ok, Array[f_paritySimplifierProbeResult(prop, carriedProof, priorCache && resultCache), world])));
+        !cases = cases + 1
+      }
+    };
+    _ = rewriteProbeCompare("none/true does not inspect result", saved,
+      (old: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295_fallback(
+        old, none, leanBool(true), unused, unused, unused, unused, unused, world),
+      (fresh: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(
+        fresh, none, leanBool(true), unused, unused, unused, unused, unused, world),
+      Some(LeanCtor(LeanTag.EST_Out_ok, Array[unused, world])));
+    !cases = cases + 1
+  };
+  assert(cases == 34);
+  print_string("simplifier congruence: " + cases.toString() + " differential cases")
+}

@@ -1,0 +1,277 @@
+module L4_Lean_Environment;
+
+// Replay the original discarded projections without decoding their payloads.
+// This keeps short/malformed constructor failures and dormant sentinel fields.
+fun f_parity_environment_readShape(value: LeanValue, fieldCount: Int): void {
+  for (index in Range(0, fieldCount)) { _ = leanField(value, index) }
+}
+
+// One bounds check and the original diagnostic, regardless of the chosen snapshot.
+fun f_parity_environment_readAt(
+  runtime: mutable LeanExecution, inhabited: LeanValue,
+  extensions: LeanValue, index: LeanValue,
+): LeanValue {
+  size = L4_Init_Prelude.f_Array_size_3866d4555a(runtime, LeanErased(), extensions);
+  inBounds = L4_Init_Prelude.f_Nat_decLt_b34d01d051(runtime, index, size);
+  leanTag(inBounds) match {
+  | LeanTag.Bool_true ->
+    L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+      runtime, LeanErased(), extensions, index, LeanErased(),
+    )
+  | LeanTag.Bool_false ->
+    message = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      runtime, LeanText("Lean.Environment"),
+      LeanText("_private.Lean.Environment.0.Lean.EnvExtension.getStateImpl"),
+      LeanNatLiterals.n1634, LeanNatLiterals.n4,
+      LeanText("invalid environment extension has been accessed"),
+    );
+    L4_Init_Prelude.f_panic_105135c0b4(runtime, inhabited, message)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_parity_environment_readArray(
+  runtime: mutable LeanExecution, inhabited: LeanValue,
+  extension: LeanValue, extensions: LeanValue,
+): LeanValue {
+  leanTag(extension) match {
+  | LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk ->
+    f_parity_environment_readShape(extension, 7);
+    f_parity_environment_readAt(runtime, inhabited, extensions, leanField(extension, 0))
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_parity_environment_readTask(
+  runtime: mutable LeanExecution, inhabited: LeanValue,
+  extension: LeanValue, extensionsTask: LeanValue,
+): LeanValue {
+  // Validate/project the extension before waiting, as in the original task paths.
+  leanTag(extension) match {
+  | LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk ->
+    f_parity_environment_readShape(extension, 7);
+    index = leanField(extension, 0);
+    extensions = L4_Init_Core.f_Task_get_c7ebb314a7(runtime, LeanErased(), extensionsTask);
+    f_parity_environment_readAt(runtime, inhabited, extensions, index)
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_parity_environment_privateExtensions(base: LeanValue): LeanValue {
+  leanTag(base) match {
+  | LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk ->
+    f_parity_environment_readShape(base, 2);
+    privateKernel = leanField(base, 0);
+    leanTag(privateKernel) match {
+    | LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk ->
+      f_parity_environment_readShape(privateKernel, 9);
+      leanField(privateKernel, 4)
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_parity_environment_readPrivate(
+  runtime: mutable LeanExecution, inhabited: LeanValue,
+  extension: LeanValue, base: LeanValue,
+): LeanValue {
+  extensions = f_parity_environment_privateExtensions(base);
+  f_parity_environment_readArray(runtime, inhabited, extension, extensions)
+}
+
+fun f_parity_environment_readOptionalTask(
+  runtime: mutable LeanExecution, inhabited: LeanValue,
+  extension: LeanValue, base: LeanValue, optionalTask: LeanValue,
+): LeanValue {
+  leanTag(optionalTask) match {
+  | LeanTag.Option_some ->
+    f_parity_environment_readTask(runtime, inhabited, extension, leanField(optionalTask, 0))
+  | _ -> f_parity_environment_readPrivate(runtime, inhabited, extension, base)
+  }
+}
+
+// Recursive declaration lookup has a distinct parent-snapshot policy from a
+// direct hit. In particular an unrealized main-branch child reads its parent.
+fun f_parity_environment_readRecursive(
+  runtime: mutable LeanExecution, inhabited: LeanValue, extension: LeanValue,
+  environment: LeanValue, base: LeanValue, realizationsTask: LeanValue,
+  declaration: LeanValue, branch: LeanValue,
+): LeanValue {
+  asyncConstants = f_Lean_Environment_asyncConsts_8678482b11(runtime, environment);
+  found = f_Lean_AsyncConsts_findRecAndParent_d45f5deff8(runtime, asyncConstants, declaration);
+  leanTag(found) match {
+  | LeanTag.Option_some ->
+    pair = leanField(found, 0);
+    if (leanTag(pair) != LeanTag.Prod_mk) return leanFail("non-exhaustive Lean case");
+    child = leanField(pair, 0);
+    parent = leanField(pair, 1);
+    parentExtensions = leanTag(parent) match {
+    | LeanTag.Option_none ->
+      extensions = f_parity_environment_privateExtensions(base);
+      task = L4_Init_Core.f_Task_pure_8e8af46293(runtime, LeanErased(), extensions);
+      LeanCtor(LeanTag.Option_some, Array[task])
+    | LeanTag.Option_some ->
+      parentConstant = leanField(parent, 0);
+      if (leanTag(parentConstant) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      f_parity_environment_readShape(parentConstant, 4);
+      leanField(parentConstant, 1)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    leanTag(branch) match {
+    | LeanTag.AsyncBranch_mainEnv ->
+      if (leanTag(child) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      f_parity_environment_readShape(child, 4);
+      childExtensions = leanField(child, 1);
+      leanTag(leanField(child, 3)) match {
+      | LeanTag.Bool_false ->
+        f_parity_environment_readOptionalTask(runtime, inhabited, extension, base, parentExtensions)
+      | LeanTag.Bool_true ->
+        f_parity_environment_readOptionalTask(runtime, inhabited, extension, base, childExtensions)
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | LeanTag.AsyncBranch_asyncEnv ->
+      if (leanTag(child) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      f_parity_environment_readShape(child, 4);
+      asyncChildExtensions = leanField(child, 1);
+      leanTag(asyncChildExtensions) match {
+      | LeanTag.Option_none ->
+        f_parity_environment_readOptionalTask(runtime, inhabited, extension, base, parentExtensions)
+      | LeanTag.Option_some ->
+        f_parity_environment_readTask(runtime, inhabited, extension, leanField(asyncChildExtensions, 0))
+      | _ -> leanFail("non-exhaustive Lean case")
+      }
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | _ ->
+    realizations = L4_Init_Core.f_Task_get_c7ebb314a7(runtime, LeanErased(), realizationsTask);
+    realized = L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(runtime, realizations, declaration);
+    leanTag(realized) match {
+    | LeanTag.Option_some ->
+      constant = leanField(realized, 0);
+      if (leanTag(constant) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      f_parity_environment_readShape(constant, 4);
+      f_parity_environment_readOptionalTask(runtime, inhabited, extension, base, leanField(constant, 1))
+    | _ -> f_parity_environment_readPrivate(runtime, inhabited, extension, base)
+    }
+  }
+}
+
+// "_private.Lean.Environment.0.Lean.EnvExtension.getStateUnsafe._redArg"
+fun f_Lean_EnvExtension_getStateUnsafe_d1099d3820(
+  _runtime: mutable LeanExecution,
+  _inst_1_0_input: LeanValue,
+  _ext_1_input: LeanValue,
+  _env_2_input: LeanValue,
+  _asyncMode_3_input: LeanValue,
+  _asyncDecl_4_input: LeanValue,
+  _genRecorded_5_input: LeanValue,
+): LeanValue {
+  if (leanTag(_env_2_input) != LeanTag.Private_Lean_Environment_0_Lean_Environment_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_readShape(_env_2_input, 15);
+  base = leanField(_env_2_input, 0);
+  checked = leanField(_env_2_input, 2);
+  realizations = leanField(_env_2_input, 7);
+  exporting = leanField(_env_2_input, 8);
+  recording = leanField(_env_2_input, 9);
+  // A raw/local read does not exempt the caller from the dependency guard.
+  leanTag(recording) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    tracked = f_Lean_EnvExtension_isGenTracked_a7a739acb7(_runtime, _ext_1_input);
+    permission = leanTag(tracked) match {
+    | LeanTag.Bool_false ->
+      if (leanTag(_ext_1_input) != LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      f_parity_environment_readShape(_ext_1_input, 7);
+      leanField(_ext_1_input, 6)
+    | LeanTag.Bool_true -> _genRecorded_5_input
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    leanTag(permission) match {
+    | LeanTag.Bool_false ->
+      return f_Lean_EnvExtension_panicUnrecordedRead_5e06f4c433(_runtime, _inst_1_0_input, _ext_1_input)
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(_asyncMode_3_input) match {
+  | LeanTag.EnvExtension_AsyncMode_sync ->
+    kernel = L4_Init_Core.f_Task_get_c7ebb314a7(_runtime, LeanErased(), checked);
+    if (leanTag(kernel) != LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    f_parity_environment_readShape(kernel, 9);
+    f_parity_environment_readArray(_runtime, _inst_1_0_input, _ext_1_input, leanField(kernel, 4))
+  | LeanTag.EnvExtension_AsyncMode_async ->
+    branch = leanField(_asyncMode_3_input, 0);
+    visibleKernel = leanTag(exporting) match {
+    | LeanTag.Bool_false ->
+      if (leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk) return leanFail("non-exhaustive Lean case");
+      f_parity_environment_readShape(base, 2);
+      leanField(base, 0)
+    | LeanTag.Bool_true ->
+      if (leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk) return leanFail("non-exhaustive Lean case");
+      f_parity_environment_readShape(base, 2);
+      leanField(base, 1)
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    if (leanTag(visibleKernel) != LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk) return leanFail("non-exhaustive Lean case");
+    f_parity_environment_readShape(visibleKernel, 9);
+    inBase = L4_Lean_ConstMap.f_Lean_ConstMap_contains_8206aa56b0(_runtime, leanField(visibleKernel, 0), _asyncDecl_4_input);
+    leanTag(inBase) match {
+    | LeanTag.Bool_true ->
+      return f_parity_environment_readPrivate(_runtime, _inst_1_0_input, _ext_1_input, base)
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    asyncConstants = f_Lean_Environment_asyncConsts_8678482b11(_runtime, _env_2_input);
+    direct = f_Lean_AsyncConsts_find_6a6f5aa7de(_runtime, asyncConstants, _asyncDecl_4_input);
+    leanTag(direct) match {
+    | LeanTag.Option_some ->
+      constant = leanField(direct, 0);
+      leanTag(branch) match {
+      | LeanTag.AsyncBranch_mainEnv ->
+        if (leanTag(constant) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) return leanFail("non-exhaustive Lean case");
+        f_parity_environment_readShape(constant, 4);
+        extensions = leanField(constant, 1);
+        leanTag(leanField(constant, 3)) match {
+        | LeanTag.Bool_false ->
+          return f_parity_environment_readPrivate(_runtime, _inst_1_0_input, _ext_1_input, base)
+        | LeanTag.Bool_true ->
+          leanTag(extensions) match {
+          | LeanTag.Option_some ->
+            return f_parity_environment_readTask(_runtime, _inst_1_0_input, _ext_1_input, leanField(extensions, 0))
+          | _ -> void
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | LeanTag.AsyncBranch_asyncEnv ->
+        if (leanTag(constant) != LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk) return leanFail("non-exhaustive Lean case");
+        f_parity_environment_readShape(constant, 4);
+        return f_parity_environment_readOptionalTask(_runtime, _inst_1_0_input, _ext_1_input, base, leanField(constant, 1))
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> void
+    };
+    f_parity_environment_readRecursive(
+      _runtime, _inst_1_0_input, _ext_1_input, _env_2_input,
+      base, realizations, _asyncDecl_4_input, branch,
+    )
+  | _ -> f_parity_environment_readPrivate(_runtime, _inst_1_0_input, _ext_1_input, base)
+  }
+}
+
+module end;

@@ -1,0 +1,152 @@
+// Every selected case must terminate with exit 86. No recovery/default is faked.
+// Invoke: build/probes/parity-environment-failures/probe old|new CASE
+fun f_parity_environment_failureTransform(_runtime: mutable LeanExecution, _args: Array<LeanValue>): LeanValue {
+  leanFail("failure guard invoked transform too early")
+}
+
+fun f_parity_environment_failureShort(value: LeanValue, size: Int): LeanValue {
+  value match {
+  | LeanCtor(tag, fields) -> LeanCtor(tag, fields.take(size))
+  | _ -> leanFail("malformed fixture requires constructor")
+  }
+}
+
+fun f_parity_environment_failure(old: Bool, mode: String): void {
+  context = SKStore.Context::create{}.mclone();
+  builder = mutable LeanExecution{store => Some(context), unboundedHeartbeats => true};
+  leanInitializeMetaExtensions(builder);
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("parityFailure"));
+  otherName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("unrelated"));
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  none = LeanCtor(LeanTag.Option_none, Array[]);
+  local = LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]);
+  asyncMode = LeanCtor(LeanTag.EnvExtension_AsyncMode_async, Array[LeanCtor(LeanTag.AsyncBranch_mainEnv, Array[])]);
+  extension = LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk, Array[
+    leanNatValue(0), LeanErased(), local, none, name, none, leanBool(false),
+  ]);
+  environment = rewriteProbeEnvironment(builder, (Map[] : Map<String, LeanConstantFile>));
+  kernel = leanField(leanField(environment, 0), 0);
+  !kernel = leanReplaceField(leanReplaceField(kernel, 4, LeanArray(Array[leanNatValue(11)])), 6, LeanArray(Array[leanNatValue(1)]));
+  !environment = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, kernel));
+  selected = builder;
+  if (mode == "raw-tracked" || mode == "missing-entry" || mode == "missing-generation") {
+    key = LeanExtensionKey("fixture", "missing-entry");
+    files: Array<(LeanExtensionKey, LeanExtensionFile)> = if (mode == "missing-entry") Array[] else Array[(key, LeanExtensionFile(leanNatValue(11), None()))];
+    entries = context.mkdir(LeanExtensionKey::keyType, LeanExtensionFile::type, SKStore.DirName::create("/parity-environment/failure/"), files);
+    tracked = LeanTrackedExtensionArray(LeanExtensionArray(Array[key], entries, mode == "missing-generation"));
+    if (mode == "missing-generation") {
+      !extension = leanReplaceField(extension, 5, LeanCtor(LeanTag.Option_some, Array[leanNatValue(0)]));
+      !kernel = leanReplaceField(kernel, 6, tracked)
+    } else !kernel = leanReplaceField(kernel, 4, tracked);
+    !environment = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, kernel));
+    context.initPre();
+    if (mode == "raw-tracked") !selected = builder.checkpoint().restoreRaw()
+  };
+  if (mode == "record-untracked" || mode == "missing-generation") {
+    state = selected.newRef(leanCoreState(selected, environment));
+    coreContext = leanReplaceField(leanUnboundedCoreContext(selected, "<failure>", ""), 7, leanBool(true));
+    _ = if (old) L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401_fallback(selected, extension, coreContext, state, leanNatValue(37))
+        else L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401(selected, extension, coreContext, state, leanNatValue(37));
+    leanFail("unexpected generation failure success")
+  };
+  if (mode == "malformed-collision") {
+    node = LeanCtor(LeanTag.PersistentHashMap_Node_collision, Array[LeanArray(Array[name]), LeanArray(Array[leanNatValue(1)])]);
+    _ = if (old) L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338_fallback(selected, node, LeanWord("usize", 0), LeanWord("usize", 0), otherName, leanNatValue(2))
+        else L4_Lean_CoreM.f_instantiateTypeLevelParams_spec_0_spec_0_9445ddb338(selected, node, LeanWord("usize", 0), LeanWord("usize", 0), otherName, leanNatValue(2));
+    leanFail("unexpected malformed collision success")
+  };
+  if (mode == "malformed-modify" || mode == "malformed-modify-env") {
+    if (mode == "malformed-modify") !kernel = f_parity_environment_failureShort(kernel, 5);
+    !environment = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, kernel));
+    if (mode == "malformed-modify-env") !environment = f_parity_environment_failureShort(environment, 10);
+    malformedTransform = LeanClosure(f_parity_environment_failureTransform, 1, Array[]);
+    _ = if (old) L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88_fallback(selected, extension, environment, malformedTransform, local, anonymous, leanBool(false))
+        else L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88(selected, extension, environment, malformedTransform, local, anonymous, leanBool(false));
+    leanFail("unexpected malformed modify success")
+  };
+  if (mode == "malformed-record-state" || mode == "malformed-record-deps" || mode == "malformed-record-context") {
+    !extension = leanReplaceField(extension, 5, LeanCtor(LeanTag.Option_some, Array[leanNatValue(0)]));
+    stateValue = leanCoreState(selected, environment);
+    if (mode == "malformed-record-state") !stateValue = f_parity_environment_failureShort(stateValue, 7);
+    if (mode == "malformed-record-deps") !stateValue = leanReplaceField(stateValue, 6, f_parity_environment_failureShort(leanField(stateValue, 6), 3));
+    malformedStateRef = selected.newRef(stateValue);
+    malformedCoreContext = leanReplaceField(leanUnboundedCoreContext(selected, "<malformed>", ""), 7, leanBool(true));
+    if (mode == "malformed-record-context") !malformedCoreContext = f_parity_environment_failureShort(malformedCoreContext, 7);
+    _ = if (old) L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401_fallback(selected, extension, malformedCoreContext, malformedStateRef, leanNatValue(37))
+        else L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401(selected, extension, malformedCoreContext, malformedStateRef, leanNatValue(37));
+    leanFail("unexpected malformed record success")
+  };
+  if (mode == "malformed-read-env") !environment = f_parity_environment_failureShort(environment, 10);
+  if (mode == "malformed-read-extension" || mode == "malformed-read-task") !extension = f_parity_environment_failureShort(extension, 1);
+  if (mode == "malformed-read-kernel") {
+    !environment = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, f_parity_environment_failureShort(kernel, 5)))
+  };
+  if (mode == "malformed-read-task") {
+    // The short extension must fail at field 1 before waiting on this task.
+    info = LeanCtor(LeanTag.AsyncConstantInfo_mk, Array[name, LeanErased(), LeanErased(), LeanErased()]);
+    constant = LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk, Array[info, LeanCtor(LeanTag.Option_some, Array[LeanUnavailable("task must not be forced")]), LeanErased(), leanBool(true)]);
+    asyncMap = L4_Lean_Environment.f_Lean_AsyncConsts_add_198e798bf1(selected, L4_Lean_Environment.f_Lean_instInhabitedAsyncConsts_default_13eda108e4(selected), constant);
+    !environment = leanReplaceField(environment, 3, LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk, Array[asyncMap, asyncMap]))
+  };
+  if (mode == "codegen-elambda" || mode == "codegen-redarg" || mode == "codegen-cstage-long") {
+    text = if (mode == "codegen-elambda") "_elambda0" else if (mode == "codegen-redarg") "_redArgX" else "_cstageλ";
+    candidate = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(selected, LeanText(text));
+    _ = if (old) L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85_fallback(selected, candidate)
+        else L4_Lean_Environment.f_Kernel_Environment_looksLikeCodegenName_331cc9bb85(selected, candidate);
+    leanFail("unexpected codegen range success")
+  };
+  if (mode == "reserved-unsupported") {
+    // Nonempty completed map avoids findAsyncCore's empty-map shortcut; the
+    // unsupported reserved-name predicate must still be reached before base.
+    nonempty = L4_Lean_Data_NameMap_Basic.f_NameMap_insert_spec_0_aaae6c2a87(selected, name, LeanErased(), LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]));
+    !environment = leanReplaceField(environment, 7, LeanCompletedTask(nonempty));
+    _ = if (old) L4_Lean_Environment.f_Lean_Environment_findAsyncCore_a05524f0d0_fallback(selected, environment, otherName, leanBool(false))
+        else L4_Lean_Environment.f_Lean_Environment_findAsyncCore_a05524f0d0(selected, environment, otherName, leanBool(false));
+    leanFail("unexpected reserved-name success")
+  };
+  if (mode == "read-bounds") !extension = leanReplaceField(extension, 0, LeanScalar("nat", "18446744073709551616"));
+  if (mode == "read-unrecorded" || mode == "read-unlogged" || mode == "read-tracked-logwrites") {
+    !environment = leanReplaceField(environment, 9, leanBool(true));
+    if (mode == "read-tracked-logwrites") !extension = leanReplaceField(extension, 6, leanBool(true));
+    if (mode == "read-unrecorded" || mode == "read-tracked-logwrites") !extension = leanReplaceField(extension, 5, LeanCtor(LeanTag.Option_some, Array[leanNatValue(0)]))
+  };
+  if (mode == "module-bounds" || mode == "module-missing" || mode == "module-huge" || mode == "server-unavailable") {
+    persistentState = LeanCtor(LeanTag.PersistentEnvExtensionState_mk, Array[LeanArray(Array[]), leanNatValue(0)]);
+    !kernel = leanReplaceField(kernel, 4, LeanArray(Array[persistentState]));
+    !environment = leanReplaceField(environment, 0, leanReplaceField(leanField(environment, 0), 0, kernel));
+    if (mode == "module-missing") !extension = leanReplaceField(extension, 0, leanNatValue(1));
+    persistent = LeanCtor(LeanTag.PersistentEnvExtension_mk, Array[extension, LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased()]);
+    level = if (mode == "server-unavailable") LeanCtor(LeanTag.OLeanLevel_server, Array[]) else LeanCtor(LeanTag.OLeanLevel_exported, Array[]);
+    moduleIndex = if (mode == "module-huge") LeanScalar("nat", "18446744073709551616") else leanNatValue(0);
+    _ = if (old) L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2_fallback(selected, leanNatValue(0), persistent, environment, moduleIndex, level)
+        else L4_Lean_Environment.f_Lean_PersistentEnvExtension_getModuleEntries_85004b8be2(selected, leanNatValue(0), persistent, environment, moduleIndex, level);
+    leanFail("unexpected module failure success")
+  };
+  if (mode == "modify-mainOnly" || mode == "modify-anonymous" || mode == "modify-outside" || mode == "modify-replay" || mode == "modify-generation-bounds") {
+    nil = LeanCtor(LeanTag.List_nil, Array[]);
+    stack = if (mode == "modify-replay") LeanCtor(LeanTag.List_cons, Array[name, nil]) else nil;
+    rawContext = LeanCtor(LeanTag.Private_Lean_Environment_0_Lean_AsyncContext_mkRaw, Array[name, stack]);
+    !environment = leanReplaceField(environment, 4, LeanCtor(LeanTag.Option_some, Array[rawContext]));
+    updateMode = if (mode == "modify-mainOnly") LeanCtor(LeanTag.EnvExtension_AsyncMode_mainOnly, Array[]) else if (mode == "modify-replay") LeanCtor(LeanTag.EnvExtension_AsyncMode_sync, Array[]) else asyncMode;
+    if (mode == "modify-generation-bounds") !extension = leanReplaceField(extension, 5, LeanCtor(LeanTag.Option_some, Array[LeanScalar("nat", "18446744073709551616")]));
+    declaration = if (mode == "modify-anonymous" || mode == "modify-generation-bounds") anonymous else otherName;
+    transform = LeanClosure(f_parity_environment_failureTransform, 1, Array[]);
+    _ = if (old) L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88_fallback(selected, extension, environment, transform, updateMode, declaration, leanBool(true))
+        else L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88(selected, extension, environment, transform, updateMode, declaration, leanBool(true));
+    leanFail("unexpected modify failure success")
+  };
+  readMode = if (mode == "malformed-read-task") asyncMode else if (mode == "checked-unavailable") LeanCtor(LeanTag.EnvExtension_AsyncMode_sync, Array[]) else local;
+  if (mode == "checked-unavailable") !environment = leanReplaceField(environment, 2, LeanUnavailable("checked snapshot unavailable"));
+  readDeclaration = if (mode == "malformed-read-task") name else anonymous;
+  _ = if (old) L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820_fallback(selected, leanNatValue(0), extension, environment, readMode, readDeclaration, leanBool(false))
+      else L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820(selected, leanNatValue(0), extension, environment, readMode, readDeclaration, leanBool(false));
+  leanFail("unexpected read failure success")
+}
+
+fun main(): void {
+  args = Environ.args().collect(Array);
+  // tools/probe.py executes the binary without arguments after compilation.
+  if (args.size() == 1) { print_string("failure driver compiled; select old|new and a case"); return };
+  assert(args.size() == 3 && (args[1] == "old" || args[1] == "new"));
+  SKStore.withRegionVoid(() ~> f_parity_environment_failure(args[1] == "old", args[2]))
+}

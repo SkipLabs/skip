@@ -1,0 +1,385 @@
+from pathlib import Path
+import re, json
+root=Path(__file__).resolve().parent
+manifest=json.loads((root/'manifest.json').read_text())
+body='''// Executable after parent integration retains the exact *_fallback identities.
+// No build or execution was performed by this lane. Shared-wrapper limitations: REVIEW.md.
+
+fun f_rewriteWave_probe_dispatch(runtime: mutable LeanExecution, target: Int, old: Bool, args: Array<LeanValue>): LeanValue {
+  target match {
+'''
+for i,t in enumerate(manifest['targets']):
+ s=(root/'originals'/(t['name'].split('.')[-1]+'.sk')).read_text()
+ header=s[:s.index('  // Frame slots:')]
+ n=len(re.findall(r': LeanValue',header))
+ # return type is written ): LeanValue and is included in this count; exclude it.
+ n-=1
+ args=', '.join('args[%s]'%i for i in range(n))
+ body+=f'  | {i} ->\n    if (old) {{ {t["name"]}_fallback(runtime, {args}) }}\n    else {{ {t["name"]}(runtime, {args}) }}\n'
+body+='''  | 5 -> L4_Lean_Meta_Tactic_Simp_Simproc.f_Meta_Simp_simprocArrayCore_90779dbc46(runtime, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10])
+  | _ -> leanFail("bad rewrite-wave probe target")
+  }
+}
+
+fun f_rewriteWave_probe_compare(
+  label: String, saved: LeanExecutionCheckpoint, target: Int, args: Array<LeanValue>, expected: LeanValue,
+): LeanExecutionCheckpoint {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldArgs = args.map(rewriteProbeCopyInput);
+  newArgs = args.map(rewriteProbeCopyInput);
+  oldResult = f_rewriteWave_probe_dispatch(oldRuntime, target, true, oldArgs);
+  newResult = f_rewriteWave_probe_dispatch(newRuntime, target, false, newArgs);
+  if (native_eq(oldResult, newResult) != 0) leanFail("result mismatch: " + label);
+  if (native_eq(newResult, expected) != 0) leanFail("unexpected result: " + label);
+  oldAfter = oldRuntime.checkpoint();
+  newAfter = newRuntime.checkpoint();
+  if (native_eq(oldAfter.refs, newAfter.refs) != 0) leanFail("reference mismatch: " + label);
+  assert(native_eq(oldAfter.initializers, newAfter.initializers) == 0);
+  assert(native_eq(oldAfter.immutableIdentities, newAfter.immutableIdentities) == 0);
+  // Wall-clock nanoseconds are intentionally not compared. Counter effects are.
+  for (metricIndex in Array[0, 1, 2, 3, 5, 6, 8, 9, 10]) {
+    if (oldAfter.metrics[metricIndex] != newAfter.metrics[metricIndex]) leanFail("metric mismatch: " + label)
+  };
+  assert(native_eq(oldAfter.simpOlderQueryKeys, newAfter.simpOlderQueryKeys) == 0);
+  for (argumentIndex in Range(0, args.size())) {
+    assert(rewriteProbeSameInput(oldArgs[argumentIndex], args[argumentIndex]));
+    assert(rewriteProbeSameInput(newArgs[argumentIndex], args[argumentIndex]))
+  };
+  // The checkpoint itself remains reusable after writes in either restored runtime.
+  pristine = saved.restoreRaw();
+  assert(native_eq(pristine.checkpoint().refs, saved.refs) == 0);
+  newAfter
+}
+
+fun f_rewriteWave_probe_name(runtime: mutable LeanExecution, text: String): LeanValue {
+  name: LeanValue = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  for (part in text.split(".")) {
+    !name = L4_Init_Prelude.f_Name_str_override_fde29b60d1(runtime, name, LeanText(part))
+  };
+  name
+}
+
+fun f_rewriteWave_probe_some(value: LeanValue): LeanValue { LeanCtor(LeanTag.Option_some, Array[value]) }
+fun f_rewriteWave_probe_pair(a: LeanValue, b: LeanValue): LeanValue { LeanCtor(LeanTag.Prod_mk, Array[a, b]) }
+fun f_rewriteWave_probe_ok(value: LeanValue, world: LeanValue): LeanValue { LeanCtor(LeanTag.EST_Out_ok, Array[value, world]) }
+fun f_rewriteWave_probe_result(expr: LeanValue, proof: LeanValue, cache: Bool): LeanValue { LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[expr, proof, leanBool(cache)]) }
+fun f_rewriteWave_probe_carry(step: LeanValue, changed: Bool, expr: LeanValue, proof: LeanValue, cache: Bool): LeanValue {
+  f_rewriteWave_probe_pair(step, f_rewriteWave_probe_pair(leanBool(changed), f_rewriteWave_probe_pair(expr, f_rewriteWave_probe_pair(proof, leanBool(cache)))))
+}
+
+fun f_rewriteWave_probe_axiom(name: LeanValue, levels: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[LeanCtor(LeanTag.ConstantVal_mk, Array[name, levels, type]), leanBool(false)])])
+}
+
+fun f_rewriteWave_probe_theorem(proof: LeanValue, origin: LeanValue, priority: Int, permutation: Bool): LeanValue {
+  LeanCtor(LeanTag.Meta_SimpTheorem_mk, Array[LeanArray(Array[]), LeanArray(Array[]), proof, leanNatValue(priority), leanBool(false), leanBool(permutation), origin, leanBool(false), leanBool(false)])
+}
+
+// Real persistent-map insertion, one star-key trie containing the supplied ordered payload.
+fun f_rewriteWave_probe_tree(runtime: mutable LeanExecution, values: Array<LeanValue>): LeanValue {
+  empty = L4_Lean_Meta_DiscrTree_Basic.f_Meta_DiscrTree_empty_b109d1b88b(runtime, LeanErased());
+  key = LeanCtor(LeanTag.Meta_DiscrTree_Key_star, Array[]);
+  trie = LeanCtor(LeanTag.Meta_DiscrTree_Trie_node, Array[LeanArray(values), LeanArray(Array[])]);
+  equality = LeanClosure(L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_instBEqKey_beq_5d3d2e2dd7, 2, Array[]);
+  hash = LeanClosure(L4_Lean_Meta_DiscrTree_Types.apply_f_DiscrTree_Key_hash_d0f27b96fa, 1, Array[]);
+  L4_Lean_Data_PersistentHashMap.f_Lean_PersistentHashMap_insert_a28a89c88c(runtime, equality, hash, empty, key, trie)
+}
+
+// Procedure scripts verify ordering and update an execution-local log reference.
+// Captures: returned Step, expected expression, log ref, numeric marker, fail flag.
+fun f_rewriteWave_probe_procedure(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+  assert(rewriteProbeSameInput(args[1], args[5]));
+  previous = runtime.readRef(args[2]);
+  next = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(runtime, LeanErased(), previous, args[3]);
+  runtime.writeRef(args[2], Some(next));
+  world = L4_Init_Prelude.f_Nat_add_86990f4822(runtime, args[13], LeanNatLiterals.n1);
+  if (leanIsTrue(args[4])) {
+    return LeanCtor(LeanTag.EST_Out_error, Array[args[0], world])
+  };
+  f_rewriteWave_probe_ok(args[0], world)
+}
+
+fun f_rewriteWave_probe_simprocs(runtime: mutable LeanExecution, base: LeanValue, step: LeanValue, expectedExpr: LeanValue, log: LeanValue, marker: Int, post: Bool, fail: Bool): LeanValue {
+  decl = f_rewriteWave_probe_name(runtime, "rewriteWave.proc" + marker.toString());
+  description = LeanCtor(LeanTag.Meta_Simp_SimprocOLeanEntry_mk, Array[decl, leanBool(post), LeanArray(Array[])]);
+  closure = LeanClosure(f_rewriteWave_probe_procedure, 14, Array[step, expectedExpr, log, leanNatValue(marker), leanBool(fail)]);
+  entry = LeanCtor(LeanTag.Meta_Simp_SimprocEntry_mk, Array[description, LeanCtor(LeanTag.Sum_inl, Array[closure])]);
+  tree = f_rewriteWave_probe_tree(runtime, Array[entry]);
+  leanReplaceField(base, if (post) 1 else 0, tree)
+}
+
+fun f_rewriteWave_probe_trace(runtime: mutable LeanExecution, core: LeanValue, enabled: Bool): LeanValue {
+  cold = leanField(core, 0);
+  options = leanField(cold, 2);
+  if (enabled) {
+    instance = L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime);
+    for (key in Array["trace.Debug.Meta.Tactic.simp", "trace.Meta.Tactic.simp.rewrite", "trace.Meta.Tactic.simp.unify"]) {
+      !options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(runtime, instance, options, f_rewriteWave_probe_name(runtime, key), leanBool(true))
+    }
+  };
+  leanReplaceField(core, 0, leanReplaceField(cold, 2, options))
+}
+
+fun main(): void {
+  count = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+    unit: LeanValue = LeanCtor(LeanTag.PUnit_unit, Array[]);
+    poison: LeanValue = LeanUnavailable("rewrite-wave demand sentinel");
+    zeroLevel: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    oneLevel = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zeroLevel);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zeroLevel);
+    sortOne = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, oneLevel);
+    uName = f_rewriteWave_probe_name(runtime, "u");
+    u = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, uName);
+    sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, u);
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    implicit: LeanValue = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+    ordinary: LeanValue = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+    eqName = f_rewriteWave_probe_name(runtime, "Eq");
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+    rhsBinder = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, f_rewriteWave_probe_name(runtime, "rhs"), binder, b1, prop);
+    lhsBinder = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, f_rewriteWave_probe_name(runtime, "lhs"), binder, b0, rhsBinder);
+    eqType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, f_rewriteWave_probe_name(runtime, "alpha"), implicit, sortU, lhsBinder);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    constants.set(leanNameKey(eqName), LeanConstantFile(f_rewriteWave_probe_axiom(eqName, LeanCtor(LeanTag.List_cons, Array[uName, nil]), eqType), None()));
+    environment = rewriteProbeEnvironment(runtime, constants.chill());
+    aName = f_rewriteWave_probe_name(runtime, "A");
+    xName = f_rewriteWave_probe_name(runtime, "x");
+    yName = f_rewriteWave_probe_name(runtime, "y");
+    zName = f_rewriteWave_probe_name(runtime, "z");
+    a = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, aName);
+    x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+    y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, yName);
+    z = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, zName);
+    eqConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, eqName, LeanCtor(LeanTag.List_cons, Array[oneLevel, nil]));
+    eq = (left: LeanValue, right: LeanValue) -> L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, eqConst, LeanArray(Array[a, left, right]));
+    xyType = eq(x, y);
+    xzType = eq(x, z);
+    xxType = eq(x, x);
+    yzType = eq(y, z);
+    hxyName = f_rewriteWave_probe_name(runtime, "hxy");
+    hxzName = f_rewriteWave_probe_name(runtime, "hxz");
+    hxxName = f_rewriteWave_probe_name(runtime, "hxx");
+    hyzName = f_rewriteWave_probe_name(runtime, "hyz");
+    hxy = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, hxyName);
+    hxz = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, hxzName);
+    hxx = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, hxxName);
+    hyz = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, hyzName);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+    for ((localName, localType) in Array[(aName, sortOne), (xName, a), (yName, a), (zName, a), (hxyName, xyType), (hxzName, xzType), (hxxName, xxType), (hyzName, yzType)]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, localName, localName, localType, binder, ordinary)
+    };
+    state = rewriteProbeState(runtime, environment, locals, "<rewrite-wave-probe>");
+    config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime);
+    // Force explicit proof production in the successful theorem fixtures.
+    !config = leanReplaceField(config, 20, leanBool(false));
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(runtime, config, LeanArray(Array[]), L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(runtime), leanField(leanField(state.coreContext, 0), 2), state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, LeanNatLiterals.n0);
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    simp = leanField(contextResult, 0);
+    simpState = runtime.newRef(leanSimpInitialState(runtime));
+    methods = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(runtime, LeanArray(Array[]));
+    log = runtime.newRef(LeanArray(Array[]));
+    world = leanNatValue(71);
+    ctx = Array[methods, simp, simpState, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world];
+    emptyTree = L4_Lean_Meta_DiscrTree_Basic.f_Meta_DiscrTree_empty_b109d1b88b(runtime, LeanErased());
+    erased = leanField(L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_instInhabitedSimpTheorems_default_e7dd612eb4(runtime), 4);
+    simprocs = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_instInhabitedSimprocs_default_45a4dfe014(runtime);
+    originXY = LeanCtor(LeanTag.Meta_Origin_fvar, Array[hxyName]);
+    originXZ = LeanCtor(LeanTag.Meta_Origin_fvar, Array[hxzName]);
+    originXX = LeanCtor(LeanTag.Meta_Origin_fvar, Array[hxxName]);
+    thmXY = f_rewriteWave_probe_theorem(hxy, originXY, 1000, false);
+    thmXZ = f_rewriteWave_probe_theorem(hxz, originXZ, 2000, false);
+    thmXX = f_rewriteWave_probe_theorem(hxx, originXX, 1000, false);
+    xyResult = f_rewriteWave_probe_result(y, f_rewriteWave_probe_some(hxy), true);
+    xzResult = f_rewriteWave_probe_result(z, f_rewriteWave_probe_some(hxz), true);
+    emptyAccumulator = f_rewriteWave_probe_pair(none, unit);
+    saved = runtime.checkpoint();
+    // Internal exhaustion must not inspect phase, candidates, carry or contexts.
+    for (exhaustedIndex in Array[LeanWord("usize", 0), LeanWord("usize", -1)]) {
+      for (exhaustedTarget in Array[1, 2]) {
+        exhaustionArgs = if (exhaustedTarget == 1) Array[poison, poison, poison, poison, poison, LeanWord("usize", 0), exhaustedIndex, poison, poison, poison, poison, poison, poison, poison, poison, world]
+          else Array[poison, poison, LeanWord("usize", 0), exhaustedIndex, poison, poison, poison, poison, poison, poison, poison, poison, world];
+        exhaustionAfter = f_rewriteWave_probe_compare("exhausted-poison", saved, exhaustedTarget, exhaustionArgs, f_rewriteWave_probe_ok(poison, world));
+        assert(native_eq(exhaustionAfter.refs, saved.refs) == 0);
+        !count = count + 1
+      }
+    };
+    // Direct go: real local equality proof, unchanged RHS, failed lhs unification.
+    for (trace in Array[false, true]) {
+      core = f_rewriteWave_probe_trace(runtime, state.coreContext, trace);
+      tracedCtx = Array[methods, simp, simpState, state.metaContext, state.metaStateRef, core, state.coreStateRef, world];
+      snapshot = runtime.checkpoint();
+      for ((theoremCaseLabel, theoremLhs, theoremValue, theoremType, theoremFixture, theoremExpected) in Array[
+        ("go-explicit-proof", x, hxy, xyType, thmXY, f_rewriteWave_probe_some(xyResult)),
+        ("go-noop", x, hxx, xxType, thmXX, none),
+        ("go-permutation-rejected", x, hxy, xyType, leanReplaceField(thmXY, 5, leanBool(true)), none),
+        ("go-unify-miss", y, hxy, xyType, thmXY, none),
+      ]) {
+        theoremArgs = Array[theoremLhs, LeanArray(Array[]), LeanArray(Array[]), theoremValue, theoremType, theoremFixture, x].concat(tracedCtx);
+        theoremAfter = f_rewriteWave_probe_compare(theoremCaseLabel, snapshot, 4, theoremArgs, f_rewriteWave_probe_ok(theoremExpected, world));
+        beforeRuntime = snapshot.restoreRaw();
+        afterRuntime = theoremAfter.restoreRaw();
+        beforeUsed = leanField(beforeRuntime.readRef(simpState), 3);
+        afterUsed = leanField(afterRuntime.readRef(simpState), 3);
+        if (theoremCaseLabel == "go-explicit-proof") assert(native_eq(beforeUsed, afterUsed) != 0)
+        else assert(native_eq(beforeUsed, afterUsed) == 0);
+        if (trace) {
+          assert(native_eq(leanField(beforeRuntime.readRef(state.coreStateRef), 4), leanField(afterRuntime.readRef(state.coreStateRef), 4)) != 0)
+        };
+        !count = count + 1
+      };
+      // Empty-index trace path; no theorem construction is reachable.
+      emptyIndexArgs = Array[x, emptyTree, erased, LeanText("pre"), leanBool(false)].concat(tracedCtx);
+      _ = f_rewriteWave_probe_compare("empty-index", snapshot, 0, emptyIndexArgs, f_rewriteWave_probe_ok(none, world));
+      !count = count + 1
+    };
+    // The existing implicit policy may omit a proof only for an rfl theorem with config enabled.
+    identity = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, f_rewriteWave_probe_name(runtime, "v"), binder, a, b0);
+    redex = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, identity, x);
+    redexType = eq(redex, x);
+    rflTheorem = leanReplaceField(thmXX, 7, leanBool(true));
+    implicitConfig = leanReplaceField(leanField(simp, 0), 20, leanBool(true));
+    implicitSimp = leanReplaceField(simp, 0, implicitConfig);
+    implicitCtx = Array[methods, implicitSimp, simpState, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world];
+    implicitArgs = Array[redex, LeanArray(Array[]), LeanArray(Array[]), hxx, redexType, rflTheorem, redex].concat(implicitCtx);
+    _ = f_rewriteWave_probe_compare("go-authorized-implicit-proof", runtime.checkpoint(), 4, implicitArgs, f_rewriteWave_probe_ok(f_rewriteWave_probe_some(f_rewriteWave_probe_result(x, none, true)), world));
+    !count = count + 1;
+    // Selection after a failed/no-op attempt, resume index, and first-success short circuit.
+    for ((selectionCaseLabel, selectionEntries, selectionStart, selectionResult) in Array[
+      ("failed-then-success", Array[f_rewriteWave_probe_pair(thmXX, LeanNatLiterals.n0), f_rewriteWave_probe_pair(thmXY, LeanNatLiterals.n0), poison], 0, xyResult),
+      ("resumed-index", Array[poison, f_rewriteWave_probe_pair(thmXZ, LeanNatLiterals.n0), poison], 1, xzResult),
+      ("first-success", Array[f_rewriteWave_probe_pair(thmXY, LeanNatLiterals.n0), f_rewriteWave_probe_pair(thmXZ, LeanNatLiterals.n0)], 0, xyResult),
+    ]) {
+      selectionArgs = Array[x, leanBool(false), erased, leanBool(false), LeanArray(selectionEntries), LeanWord("usize", selectionEntries.size()), LeanWord("usize", selectionStart), emptyAccumulator].concat(ctx);
+      selectionExpected = f_rewriteWave_probe_pair(f_rewriteWave_probe_some(f_rewriteWave_probe_some(selectionResult)), unit);
+      _ = f_rewriteWave_probe_compare(selectionCaseLabel, saved, 1, selectionArgs, f_rewriteWave_probe_ok(selectionExpected, world));
+      !count = count + 1
+    };
+    // System checking must precede even erased/rfl filtering and invalid theorem inspection.
+    cancelRef = runtime.newRef(leanBool(true));
+    cancelToken = LeanCtor(LeanTag.Private_Init_System_CancelToken_0_IO_CancelToken_mk, Array[poison, cancelRef]);
+    cancelledCold = leanReplaceField(leanField(state.coreContext, 0), 10, f_rewriteWave_probe_some(cancelToken));
+    cancelledCore = leanReplaceField(state.coreContext, 0, cancelledCold);
+    cancelledCtx = Array[methods, simp, simpState, state.metaContext, state.metaStateRef, cancelledCore, state.coreStateRef, world];
+    interrupt = LeanCtor(LeanTag.Exception_internal, Array[leanReadInitializer(runtime, "Lean.interruptExceptionId"), nil]);
+    cancelledArgs = Array[poison, poison, poison, poison, LeanArray(Array[f_rewriteWave_probe_pair(poison, poison)]), LeanWord("usize", 1), LeanWord("usize", 0), emptyAccumulator].concat(cancelledCtx);
+    _ = f_rewriteWave_probe_compare("check-system-before-filter", runtime.checkpoint(), 1, cancelledArgs, LeanCtor(LeanTag.EST_Out_error, Array[interrupt, world]));
+    !count = count + 1;
+    // Both are real theorems; rfl-only must skip without attempting proof construction.
+    reject = leanReplaceField(thmXY, 2, poison);
+    for (backward in Array[false, true]) {
+      rflPolicyArgs = Array[x, leanBool(true), erased, leanBool(backward), LeanArray(Array[f_rewriteWave_probe_pair(reject, LeanNatLiterals.n0)]), LeanWord("usize", 1), LeanWord("usize", 0), emptyAccumulator].concat(ctx);
+      _ = f_rewriteWave_probe_compare("rfl-policy-skip", saved, 1, rflPolicyArgs, f_rewriteWave_probe_ok(emptyAccumulator, world));
+      !count = count + 1
+    };
+    // A real hash-trie entry erases hxy; the following hxz is selected. The rejected proof is poison.
+    hashBits = leanWordBits(leanField(hxyName, 0));
+    bucket = hashBits.and(31);
+    erasedEntry = LeanCtor(LeanTag.PersistentHashMap_Entry_entry, Array[originXY, unit]);
+    erasedEntries = Array::fillBy(32, (erasedBucketIndex: Int) -> if (erasedBucketIndex == bucket) (erasedEntry : LeanValue) else LeanCtor(LeanTag.PersistentHashMap_Entry_null, Array[]));
+    erasedXY = LeanCtor(LeanTag.PersistentHashMap_Node_entries, Array[LeanArray(erasedEntries)]);
+    erasedArgs = Array[x, leanBool(false), erasedXY, leanBool(false), LeanArray(Array[f_rewriteWave_probe_pair(reject, LeanNatLiterals.n0), f_rewriteWave_probe_pair(thmXZ, LeanNatLiterals.n0)]), LeanWord("usize", 2), LeanWord("usize", 0), emptyAccumulator].concat(ctx);
+    erasedExpected = f_rewriteWave_probe_pair(f_rewriteWave_probe_some(f_rewriteWave_probe_some(xzResult)), unit);
+    _ = f_rewriteWave_probe_compare("erased-before-attempt", runtime.checkpoint(), 1, erasedArgs, f_rewriteWave_probe_ok(erasedExpected, world));
+    !count = count + 1;
+    // A wildcard index with different priorities must prefer hxz despite insertion order.
+    priorityTree = f_rewriteWave_probe_tree(runtime, Array[thmXY, thmXZ]);
+    priorityArgs = Array[x, priorityTree, erased, LeanText("pre"), leanBool(false)].concat(ctx);
+    _ = f_rewriteWave_probe_compare("priority-order", runtime.checkpoint(), 0, priorityArgs, f_rewriteWave_probe_ok(f_rewriteWave_probe_some(xzResult), world));
+    !count = count + 1;
+    tied = leanReplaceField(thmXZ, 3, leanNatValue(1000));
+    tieTree = f_rewriteWave_probe_tree(runtime, Array[thmXY, tied]);
+    tieArgs = Array[x, tieTree, erased, LeanText("pre"), leanBool(false)].concat(ctx);
+    _ = f_rewriteWave_probe_compare("priority-stable-tie", runtime.checkpoint(), 0, tieArgs, f_rewriteWave_probe_ok(f_rewriteWave_probe_some(xyResult), world));
+    !count = count + 1;
+    // An assignable proof mvar must reject instead of publishing an incomplete proof.
+    mvarName = f_rewriteWave_probe_name(runtime, "unfinishedProof");
+    metaValue = runtime.readRef(state.metaStateRef);
+    mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, leanField(metaValue, 0), mvarName, mvarName, locals, LeanArray(Array[]), xyType, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    mvarState = runtime.newRef(leanReplaceField(metaValue, 0, mctx));
+    proofMvar = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mvarName);
+    mvarCtx = Array[methods, simp, simpState, state.metaContext, mvarState, state.coreContext, state.coreStateRef, world];
+    mvarArgs = Array[x, LeanArray(Array[]), LeanArray(Array[]), proofMvar, xyType, thmXY, x].concat(mvarCtx);
+    _ = f_rewriteWave_probe_compare("go-unassigned-proof", runtime.checkpoint(), 4, mvarArgs, f_rewriteWave_probe_ok(none, world));
+    !count = count + 1;
+    // Decide guards are exact no-ops even with unused method/callback sentinels.
+    for (enabled in Array[false, true]) {
+      decideConfig = leanReplaceField(leanField(simp, 0), 11, leanBool(enabled));
+      decideContext = leanReplaceField(simp, 0, decideConfig);
+      expressions = if (enabled) Array[x, L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, f_rewriteWave_probe_name(runtime, "True"), nil), L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, f_rewriteWave_probe_name(runtime, "False"), nil), L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, f_rewriteWave_probe_name(runtime, "guardMvar"))] else Array[poison];
+      for (guardExpression in expressions) {
+        decideGuardArgs = Array[poison, guardExpression, poison, decideContext, poison, state.metaContext, state.metaStateRef, state.coreContext, state.coreStateRef, world];
+        decideGuardExpected = LeanCtor(LeanTag.Meta_Simp_Step_continue, Array[none]);
+        _ = f_rewriteWave_probe_compare("decide-guard", runtime.checkpoint(), 3, decideGuardArgs, f_rewriteWave_probe_ok(decideGuardExpected, world));
+        !count = count + 1
+      }
+    };
+    // Build the expected Eq.trans application directly, not through either composition helper.
+    transConst = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, f_rewriteWave_probe_name(runtime, "Eq.trans"), LeanCtor(LeanTag.List_cons, Array[oneLevel, nil]));
+    transProof = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, transConst, LeanArray(Array[a, x, y, z, hxy, hyz]));
+    // Simproc scripts exercise all four Step shapes and both default-cache wrappers.
+    // Result.addExtraArgs resets returned cache to true even with no extra args.
+    // Seed the INTERNAL accumulator false to exercise conjunction independently.
+    for (post in Array[false, true]) {
+      carry = f_rewriteWave_probe_carry(none, false, x, none, false);
+      continuingResult = f_rewriteWave_probe_result(x, none, false); // definitional identity, explicitly uncacheable
+      continuing = LeanCtor(LeanTag.Meta_Simp_Step_continue, Array[f_rewriteWave_probe_some(continuingResult)]);
+      first = f_rewriteWave_probe_simprocs(runtime, simprocs, continuing, x, log, 1, post, false);
+      for (terminalTag in Array[LeanTag.Meta_Simp_Step_done, LeanTag.Meta_Simp_Step_visit]) {
+        terminal = LeanCtor(terminalTag, Array[xyResult]);
+        second = f_rewriteWave_probe_simprocs(runtime, simprocs, terminal, x, log, 2, post, false);
+        terminalEntries = LeanArray(Array[first, second, poison]);
+        terminalArgs = Array[leanBool(post), terminalEntries, LeanWord("usize", 3), LeanWord("usize", 0), carry].concat(ctx);
+        combined = LeanCtor(terminalTag, Array[f_rewriteWave_probe_result(y, f_rewriteWave_probe_some(hxy), false)]);
+        terminalExpected = f_rewriteWave_probe_carry(f_rewriteWave_probe_some(combined), true, x, none, false);
+        terminalAfter = f_rewriteWave_probe_compare("continue-then-terminal", runtime.checkpoint(), 2, terminalArgs, f_rewriteWave_probe_ok(terminalExpected, leanNatValue(73)));
+        terminalRuntime = terminalAfter.restoreRaw();
+        assert(native_eq(terminalRuntime.readRef(log), LeanArray(Array[LeanNatLiterals.n1, LeanNatLiterals.n2])) == 0);
+        !count = count + 1
+      };
+      // Internal carry remembers its false SEED; Result.addExtraArgs resets the callback flag,
+      // and the unchanged public wrapper also intentionally defaults its result to true.
+      exhaustedEntries = LeanArray(Array[first]);
+      carryExhaustionArgs = Array[leanBool(post), exhaustedEntries, LeanWord("usize", 1), LeanWord("usize", 0), carry].concat(ctx);
+      carryExhaustionExpected = f_rewriteWave_probe_carry(none, true, x, none, false);
+      _ = f_rewriteWave_probe_compare("continue-exhaustion-carry", runtime.checkpoint(), 2, carryExhaustionArgs, f_rewriteWave_probe_ok(carryExhaustionExpected, leanNatValue(72)));
+      wrapperArgs = Array[leanBool(post), exhaustedEntries, x].concat(ctx);
+      wrappedResult = f_rewriteWave_probe_result(x, none, true);
+      wrapperExpected = LeanCtor(LeanTag.Meta_Simp_Step_continue, Array[f_rewriteWave_probe_some(wrappedResult)]);
+      _ = f_rewriteWave_probe_compare("wrapper-default-cache", runtime.checkpoint(), 5, wrapperArgs, f_rewriteWave_probe_ok(wrapperExpected, leanNatValue(72)));
+      !count = count + 2;
+      // A resumed prefix with a real proof composes in left-to-right order.
+      seeded = f_rewriteWave_probe_carry(none, true, y, f_rewriteWave_probe_some(hxy), false);
+      yzResult = f_rewriteWave_probe_result(z, f_rewriteWave_probe_some(hyz), false);
+      for (tag in Array[LeanTag.Meta_Simp_Step_continue, LeanTag.Meta_Simp_Step_done, LeanTag.Meta_Simp_Step_visit]) {
+        step = if (tag == LeanTag.Meta_Simp_Step_continue) LeanCtor(tag, Array[f_rewriteWave_probe_some(yzResult)]) else LeanCtor(tag, Array[yzResult]);
+        proc = f_rewriteWave_probe_simprocs(runtime, simprocs, step, y, log, 5, post, false);
+        proofArgs = Array[leanBool(post), LeanArray(Array[poison, proc]), LeanWord("usize", 2), LeanWord("usize", 1), seeded].concat(ctx);
+        expectedProof = f_rewriteWave_probe_some(transProof);
+        proofExpected = if (tag == LeanTag.Meta_Simp_Step_continue) f_rewriteWave_probe_carry(none, true, z, expectedProof, false)
+          else f_rewriteWave_probe_carry(f_rewriteWave_probe_some(LeanCtor(tag, Array[f_rewriteWave_probe_result(z, expectedProof, false)])), true, y, f_rewriteWave_probe_some(hxy), false);
+        _ = f_rewriteWave_probe_compare("resumed-proof-chain", runtime.checkpoint(), 2, proofArgs, f_rewriteWave_probe_ok(proofExpected, leanNatValue(72)));
+        !count = count + 1
+      };
+      noChange = LeanCtor(LeanTag.Meta_Simp_Step_continue, Array[none]);
+      inert = f_rewriteWave_probe_simprocs(runtime, simprocs, noChange, x, log, 3, post, false);
+      argsNone = Array[leanBool(post), LeanArray(Array[inert, simprocs]), LeanWord("usize", 2), LeanWord("usize", 0), carry].concat(ctx);
+      _ = f_rewriteWave_probe_compare("continue-none", runtime.checkpoint(), 2, argsNone, f_rewriteWave_probe_ok(carry, leanNatValue(72)));
+      !count = count + 1;
+      error = LeanCtor(LeanTag.Exception_error, Array[LeanCtor(LeanTag.Syntax_missing, Array[]), L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(runtime, LeanText("scripted simproc failure"))]);
+      failing = f_rewriteWave_probe_simprocs(runtime, simprocs, error, x, log, 4, post, true);
+      argsError = Array[leanBool(post), LeanArray(Array[first, failing, poison]), LeanWord("usize", 3), LeanWord("usize", 0), carry].concat(ctx);
+      _ = f_rewriteWave_probe_compare("continue-then-error", runtime.checkpoint(), 2, argsError, LeanCtor(LeanTag.EST_Out_error, Array[error, leanNatValue(73)]));
+      !count = count + 1
+    }
+  };
+  print_string("rewrite-wave cases: " + count.toString())
+}
+'''
+(root/'Probe.sk').write_text(body)

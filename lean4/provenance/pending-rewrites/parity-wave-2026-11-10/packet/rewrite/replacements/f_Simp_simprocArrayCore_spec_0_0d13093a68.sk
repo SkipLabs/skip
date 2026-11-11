@@ -1,0 +1,135 @@
+module L4_Lean_Meta_Tactic_Simp_Simproc;
+
+// Validate the same constructor projections as the original, including discarded fields.
+fun f_rewriteWave_simproc_fields(value: LeanValue, tag: LeanTag.Value, count: Int): Array<LeanValue> {
+  if (leanTag(value) != tag) return leanFail("non-exhaustive Lean case");
+  for (index in Range(0, count)) { _ = leanField(value, index) };
+  value match {
+  | LeanCtor(_, fields) -> fields
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_simproc_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Preserve error payload and returned world, rather than converting failure to no-match.
+fun f_rewriteWave_simproc_ok(output: LeanValue): Bool {
+  leanTag(output) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(output, 0);
+    _ = leanField(output, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_rewriteWave_simproc_accumulator(step: LeanValue, changed: LeanValue, expression: LeanValue, proof: LeanValue, cache: LeanValue): LeanValue {
+  proofAndCache = LeanCtor(LeanTag.Prod_mk, Array[proof, cache]);
+  expressionAndProof = LeanCtor(LeanTag.Prod_mk, Array[expression, proofAndCache]);
+  progress = LeanCtor(LeanTag.Prod_mk, Array[changed, expressionAndProof]);
+  LeanCtor(LeanTag.Prod_mk, Array[step, progress])
+}
+
+// "_private.Init.Data.Array.Basic.0.Array.forIn'Unsafe.loop._at_.Lean.Meta.Simp.simprocArrayCore.spec_0"
+fun f_Simp_simprocArrayCore_spec_0_0d13093a68(
+  _runtime: mutable LeanExecution,
+  _post_0_input: LeanValue,
+  _as_1_input: LeanValue,
+  _sz_2_input: LeanValue,
+  _i_3_input: LeanValue,
+  _b_4_input: LeanValue,
+  _y_1_5_input: LeanValue,
+  _y_2_6_input: LeanValue,
+  _y_3_7_input: LeanValue,
+  _y_4_8_input: LeanValue,
+  _y_5_9_input: LeanValue,
+  _y_6_10_input: LeanValue,
+  _y_7_11_input: LeanValue,
+  _y_8_12_input: LeanValue,
+): LeanValue {
+  post = _post_0_input;
+  simprocs = _as_1_input;
+  size = _sz_2_input;
+  index = _i_3_input;
+  accumulator = _b_4_input;
+  methods = _y_1_5_input;
+  simpContext = _y_2_6_input;
+  simpState = _y_3_7_input;
+  metaContext = _y_4_8_input;
+  metaState = _y_5_9_input;
+  coreContext = _y_6_10_input;
+  coreState = _y_7_11_input;
+  world = _y_8_12_input;
+  loop {
+    inBounds = L4_Init_Data_UInt_BasicAux.f_USize_decLt_ed49caa57a(_runtime, index, size);
+    if (!f_rewriteWave_simproc_bool(inBounds)) {
+      return LeanCtor(LeanTag.EST_Out_ok, Array[accumulator, world])
+    };
+    outer = f_rewriteWave_simproc_fields(accumulator, LeanTag.Prod_mk, 2);
+    progress = f_rewriteWave_simproc_fields(outer[1], LeanTag.Prod_mk, 2);
+    expressionAndProof = f_rewriteWave_simproc_fields(progress[1], LeanTag.Prod_mk, 2);
+    proofAndCache = f_rewriteWave_simproc_fields(expressionAndProof[1], LeanTag.Prod_mk, 2);
+    changed = progress[0];
+    expression = expressionAndProof[0];
+    proof = proofAndCache[0];
+    cache = proofAndCache[1];
+    noStep = LeanCtor(LeanTag.Option_none, Array[]);
+    entry = L4_Init_Data_Array_Basic.f_Array_uget_c7e0af4dc5(_runtime, LeanErased(), simprocs, index, LeanErased());
+    // The phase discriminator is checked before the Simprocs record, as before.
+    isPost = f_rewriteWave_simproc_bool(post);
+    trees = f_rewriteWave_simproc_fields(entry, LeanTag.Meta_Simp_Simprocs_mk, 4);
+    tree = if (isPost) trees[1] else trees[0];
+    entryFields = f_rewriteWave_simproc_fields(entry, LeanTag.Meta_Simp_Simprocs_mk, 4);
+    outcome = f_Meta_Simp_simprocCore_1e0ec177be(
+      _runtime, post, tree, entryFields[3], expression, methods, simpContext, simpState,
+      metaContext, metaState, coreContext, coreState, world,
+    );
+    if (!f_rewriteWave_simproc_ok(outcome)) return outcome;
+    step = leanField(outcome, 0);
+    !world = leanField(outcome, 1);
+    leanTag(step) match {
+    | LeanTag.Meta_Simp_Step_done | LeanTag.Meta_Simp_Step_visit ->
+      terminalComposition = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(
+        _runtime, proof, cache, leanField(step, 0), metaContext, metaState,
+        coreContext, coreState, world,
+      );
+      if (!f_rewriteWave_simproc_ok(terminalComposition)) return terminalComposition;
+      terminal = LeanCtor(leanTag(step), Array[leanField(terminalComposition, 0)]);
+      // A terminal result does not replace the accumulated progress fields.
+      terminalAccumulator = f_rewriteWave_simproc_accumulator(LeanCtor(LeanTag.Option_some, Array[terminal]), changed, expression, proof, cache);
+      return LeanCtor(LeanTag.EST_Out_ok, Array[terminalAccumulator, leanField(terminalComposition, 1)])
+    | LeanTag.Meta_Simp_Step_continue ->
+      optionalResult = leanField(step, 0);
+      leanTag(optionalResult) match {
+      | LeanTag.Option_none ->
+        !accumulator = f_rewriteWave_simproc_accumulator(noStep, changed, expression, proof, cache)
+      | LeanTag.Option_some ->
+        continuationFields = f_rewriteWave_simproc_fields(leanField(optionalResult, 0), LeanTag.Meta_Simp_Result_mk, 3);
+        continuationComposition = L4_Lean_Meta_AppBuilder.f_Lean_Meta_mkEqTrans_0b2fd7caf3(
+          _runtime, proof, continuationFields[1], metaContext, metaState, coreContext, coreState, world,
+        );
+        if (!f_rewriteWave_simproc_ok(continuationComposition)) return continuationComposition;
+        // Cacheability is a short-circuit conjunction, never an eager read of result[2]'s tag.
+        nextCache = if (f_rewriteWave_simproc_bool(cache)) continuationFields[2] else LeanCtor(LeanTag.Bool_false, Array[]);
+        !accumulator = f_rewriteWave_simproc_accumulator(noStep, inBounds, continuationFields[0], leanField(continuationComposition, 0), nextCache);
+        !world = leanField(continuationComposition, 1)
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    // Keep USize modulo arithmetic instead of a host signed counter.
+    !index = L4_Init_Data_UInt_BasicAux.f_USize_add_559d423481(_runtime, index, LeanWord("usize", 1))
+  }
+}
+
+module end;

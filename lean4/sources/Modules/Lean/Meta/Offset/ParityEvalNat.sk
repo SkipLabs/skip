@@ -1,0 +1,178 @@
+module L4_Lean_Meta_Offset;
+
+// Lean.Meta.evalNat: only these syntactic forms enter the application visitor.
+// All EST_out and expression field demands follow the original frame order.
+fun f_Lean_Meta_evalNat_6bfbb6a56e(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_1_5_input: LeanValue,
+): LeanValue {
+  expression = _e_0_input;
+  world = _a_1_5_input;
+  leanTag(expression) match {
+  | LeanTag.Expr_lit__impl ->
+    // Original pc0 (lit) demands field 0 before payload field 1.
+    _ = leanField(expression, 0);
+    literal = leanField(expression, 1);
+    leanTag(literal) match {
+    | LeanTag.Literal_natVal ->
+      f_offsets_wave_some(leanField(literal, 0), world)
+    | _ -> f_offsets_wave_none(world)
+    }
+  | LeanTag.Expr_mdata__impl ->
+    // Original pc0 (mdata) demands fields 0 and 1 before field 2 (meta expression).
+    _ = leanField(expression, 0);
+    _ = leanField(expression, 1);
+    _ = leanField(expression, 2);
+    f_Lean_Meta_evalNat_6bfbb6a56e(
+      _runtime,
+      leanField(expression, 2),
+      _a_1_input,
+      _a_2_input,
+      _a_3_input,
+      _a_4_input,
+      world,
+    )
+  | LeanTag.Expr_const__impl ->
+    // Original pc0 (const) demands fields 0..2, then each matched Name component
+    // header/fields before any member string; module field 2 stays discarded.
+    _ = leanField(expression, 0);
+    name = leanField(expression, 1);
+    _ = leanField(expression, 2);
+    leanTag(name) match {
+    | LeanTag.Name_str__impl ->
+      _ = leanField(name, 0);
+      namespaceName = leanField(name, 1);
+      memberName = leanField(name, 2);
+      leanTag(namespaceName) match {
+      | LeanTag.Name_str__impl ->
+        _ = leanField(namespaceName, 0);
+        parentName = leanField(namespaceName, 1);
+        namespaceString = leanField(namespaceName, 2);
+        leanTag(parentName) match {
+        | LeanTag.Name_anonymous__impl ->
+          if (
+            !f_offsets_wave_bool(
+              L4_Init_Prelude.f_String_decEq_88c69973f8(
+                _runtime,
+                namespaceString,
+                LeanText("Nat"),
+              ),
+            )
+          ) return f_offsets_wave_none(world);
+          if (
+            !f_offsets_wave_bool(
+              L4_Init_Prelude.f_String_decEq_88c69973f8(
+                _runtime,
+                memberName,
+                LeanText("zero"),
+              ),
+            )
+          ) return f_offsets_wave_none(world);
+          f_offsets_wave_some(LeanNatLiterals.n0, world)
+        | _ -> f_offsets_wave_none(world)
+        }
+      | _ -> f_offsets_wave_none(world)
+      }
+    | _ -> f_offsets_wave_none(world)
+    }
+  | LeanTag.Expr_app__impl ->
+    // Original pc0 (app) demands all three app fields before the visitor.
+    _ = leanField(expression, 0);
+    _ = leanField(expression, 1);
+    _ = leanField(expression, 2);
+    f_Meta_evalNat_visit_be1fb46d98(
+      _runtime,
+      expression,
+      _a_1_input,
+      _a_2_input,
+      _a_3_input,
+      _a_4_input,
+      world,
+    )
+  | LeanTag.Expr_mvar__impl ->
+    // Original pc0 (mvar) demands both mvar fields before the visitor.
+    _ = leanField(expression, 0);
+    _ = leanField(expression, 1);
+    f_Meta_evalNat_visit_be1fb46d98(
+      _runtime,
+      expression,
+      _a_1_input,
+      _a_2_input,
+      _a_3_input,
+      _a_4_input,
+      world,
+    )
+  | _ -> f_offsets_wave_none(world)
+  }
+}
+
+// Shared by this lane's four routines; malformed sum tags still fail explicitly.
+fun f_offsets_wave_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_offsets_wave_isOk(result: LeanValue): Bool {
+  leanTag(result) match {
+  | LeanTag.EST_Out_ok -> true
+  | LeanTag.EST_Out_error -> false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_offsets_wave_hasValue(option: LeanValue): Bool {
+  leanTag(option) match {
+  | LeanTag.Option_none -> false
+  | LeanTag.Option_some -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_offsets_wave_none(world: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_none, Array[]), world],
+  )
+}
+
+fun f_offsets_wave_some(value: LeanValue, world: LeanValue): LeanValue {
+  LeanCtor(
+    LeanTag.EST_Out_ok,
+    Array[LeanCtor(LeanTag.Option_some, Array[value]), world],
+  )
+}
+
+fun f_offsets_wave_isApp(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+): Bool {
+  f_offsets_wave_bool(
+    L4_Lean_Expr.f_Lean_Expr_isApp_fb8c2f295a(runtime, expression),
+  )
+}
+
+fun f_offsets_wave_isConst(
+  runtime: mutable LeanExecution,
+  expression: LeanValue,
+  namespaceName: String,
+  memberName: String,
+): Bool {
+  name = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+    runtime,
+    LeanText(namespaceName),
+    LeanText(memberName),
+  );
+  f_offsets_wave_bool(
+    L4_Lean_Expr.f_Lean_Expr_isConstOf_4f5ae73265(runtime, expression, name),
+  )
+}
+
+module end;

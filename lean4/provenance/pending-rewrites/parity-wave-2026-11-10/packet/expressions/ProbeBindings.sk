@@ -1,0 +1,250 @@
+fun f_expressionsProbe_bindingCall(
+  runtime: mutable LeanExecution, fallback: Bool, variables: LeanValue,
+  lambda: Bool, eta: Bool, usedOnly: Bool, locals: LeanValue,
+  usedLetOnly: Bool, generalize: Bool, count: LeanValue,
+  body: LeanValue, context: LeanValue, state: LeanValue,
+): LeanValue {
+  call = if (fallback) L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback
+    else L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500;
+  call(runtime, variables, leanBool(lambda), leanBool(eta), leanBool(usedOnly),
+    locals, leanBool(usedLetOnly), leanBool(generalize), count, body, context, state)
+}
+
+fun f_expressionsProbe_bindingCase(
+  saved: LeanExecutionCheckpoint, label: String, variables: LeanValue,
+  lambda: Bool, eta: Bool, usedOnly: Bool, locals: LeanValue,
+  usedLetOnly: Bool, generalize: Bool, count: LeanValue,
+  body: LeanValue, context: LeanValue, state: LeanValue, expected: LeanValue,
+): LeanValue {
+  localCopy = rewriteProbeCopyInput(locals);
+  stateCopy = rewriteProbeCopyInput(state);
+  bodyCopy = rewriteProbeCopyInput(body);
+  result = f_expressionsProbe_compare(label, saved,
+    r ~> f_expressionsProbe_bindingCall(r, true, variables, lambda, eta, usedOnly, locals, usedLetOnly, generalize, count, body, context, state),
+    r ~> f_expressionsProbe_bindingCall(r, false, variables, lambda, eta, usedOnly, locals, usedLetOnly, generalize, count, body, context, state), Some(expected));
+  assert(rewriteProbeSameInput(locals, localCopy));
+  assert(rewriteProbeSameInput(state, stateCopy));
+  assert(rewriteProbeSameInput(body, bodyCopy));
+  result
+}
+
+// Constructors are tested separately against independent packed-word vectors.
+// Here the expected binder choice, omission, abstraction and state are explicit.
+fun f_expressionsProbe_expectedBinder(
+  runtime: mutable LeanExecution, lambda: Bool, name: LeanValue,
+  info: LeanValue, type: LeanValue, body: LeanValue,
+): LeanValue {
+  if (lambda) L4_Lean_Expr.f_Expr_lam_override_5bc80605de_fallback(runtime, name, type, body, info)
+  else L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660_fallback(runtime, name, type, body, info)
+}
+
+fun f_expressionsProbe_setKeys(set: LeanValue): Array<LeanValue> {
+  leanTag(set) match {
+  | LeanTag.Std_DTreeMap_Internal_Impl_leaf -> Array[]
+  | LeanTag.Std_DTreeMap_Internal_Impl_inner ->
+    f_expressionsProbe_setKeys(leanField(set, 3)).concat(Array[leanField(set, 1)]).concat(f_expressionsProbe_setKeys(leanField(set, 4)))
+  | _ -> leanFail("invalid ID set")
+  }
+}
+
+fun f_expressionsProbe_collectCase(
+  saved: LeanExecutionCheckpoint, values: LeanValue, start: LeanValue,
+  stop: LeanValue, initial: LeanValue, wanted: Array<LeanValue>,
+): LeanValue {
+  snapshot = rewriteProbeCopyInput(initial);
+  result = f_expressionsProbe_compare("collect top-level mvars", saved,
+    r ~> L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9_fallback(r, values, start, stop, initial),
+    r ~> L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9(r, values, start, stop, initial));
+  keys = f_expressionsProbe_setKeys(result);
+  assert(keys.size() == wanted.size());
+  for (key in wanted) {
+    count = 0;
+    for (actual in keys) if (native_eq(actual, key) == 0) !count = count + 1;
+    assert(count == 1)
+  };
+  assert(rewriteProbeSameInput(initial, snapshot));
+  result
+}
+
+fun main(): void {
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{profileRuntime => profile};
+    _sentinel = runtime.newRef(LeanText("binding checkpoint"));
+    xName = f_expressionsProbe_name(runtime, "x");
+    yName = f_expressionsProbe_name(runtime, "y");
+    zName = f_expressionsProbe_name(runtime, "z");
+    mName = f_expressionsProbe_name(runtime, "m");
+    nName = f_expressionsProbe_name(runtime, "n");
+    scopeName = f_expressionsProbe_name(runtime, "Probe");
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    b0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    b1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+    x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xName);
+    y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, yName);
+    z = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, zName);
+    m = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mName);
+    n = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, nName);
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    implicit = LeanCtor(LeanTag.BinderInfo_implicit, Array[]);
+    kind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+    emptyLocals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, emptyLocals, xName, xName, prop, implicit, kind);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, locals, yName, yName, prop, prop, leanBool(false), kind);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, locals, zName, zName, prop, prop, leanBool(true), kind);
+    mctx = L4_Lean_MetavarContext.f_Lean_instInhabitedMetavarContext_060bbe8809(runtime);
+    for ((id, userName) in Array[(mName, mName), (nName, LeanCtor(LeanTag.Name_anonymous__impl, Array[]))]) {
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, mctx, id, userName, emptyLocals, LeanArray(Array[]), prop, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0)
+    };
+    emptySet = LeanCtor(LeanTag.Std_DTreeMap_Internal_Impl_leaf, Array[]);
+    context = LeanCtor(LeanTag.MetavarContext_MkBinding_Context_mk, Array[scopeName, leanBool(false), implicit, emptySet]);
+    cache = LeanCtor(LeanTag.Std_DHashMap_Raw_mk, Array[LeanNatLiterals.n0,
+      LeanArray(Array::fill(16, (LeanCtor(LeanTag.Std_DHashMap_Internal_AssocList_nil, Array[]) : LeanValue)))]);
+    generator = LeanCtor(LeanTag.NameGenerator_mk, Array[scopeName, LeanNatLiterals.n0]);
+    state = LeanCtor(LeanTag.MetavarContext_MkBinding_State_mk, Array[mctx, leanNatValue(7), generator, cache]);
+    saved = runtime.checkpoint();
+    // Empty fold must not inspect any other argument, and must retain objects.
+    emptyResult = f_expressionsProbe_compare("empty fold skips invalid unused arguments", saved,
+      r ~> L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(r, LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanScalar("nat", "0000"), b0, LeanErased(), state),
+      r ~> L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500(r, LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanScalar("nat", "0000"), b0, LeanErased(), state),
+      Some(LeanCtor(LeanTag.EStateM_Result_ok, Array[b0, state])));
+    assert(leanSameObject(leanField(emptyResult, 0), b0) != 0);
+    assert(leanSameObject(leanField(emptyResult, 1), state) != 0);
+    for (lambda in Array[false, true]) {
+      for (eta in Array[false, true]) {
+        for (usedOnly in Array[false, true]) {
+          for (usedLetOnly in Array[false, true]) {
+            for (generalize in Array[false, true]) {
+              for ((variable, name, isLet, nondep) in Array[(x, xName, false, false), (y, yName, true, false), (z, zName, true, true)]) {
+                for (used in Array[false, true]) {
+                  body = if (used) b0 else b1;
+                  retainedLet = isLet && !(generalize && nondep);
+                  omit = !used && (if (retainedLet) usedLetOnly else usedOnly);
+                  expectedBody = if (omit) b0 else if (retainedLet) {
+                    L4_Lean_Expr.f_Expr_letE_override_53a36b789f(runtime, name, prop, prop, body, leanBool(nondep))
+                  } else {
+                    f_expressionsProbe_expectedBinder(runtime, lambda, name, if (isLet) binder else implicit, prop, body)
+                  };
+                  result = f_expressionsProbe_bindingCase(saved, "local flag matrix", LeanArray(Array[variable]), lambda, eta, usedOnly, locals, usedLetOnly, generalize, LeanNatLiterals.n1, body, context, state, LeanCtor(LeanTag.EStateM_Result_ok, Array[expectedBody, state]));
+                  assert(leanSameObject(leanField(result, 1), state) != 0)
+                }
+              }
+            }
+          }
+        }
+      };
+      // headBeta occurs on ordinary binder types, not retained let types.
+      betaType = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime,
+        f_expressionsProbe_expectedBinder(runtime, true, xName, binder, prop, b0), prop);
+      betaLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, emptyLocals, xName, xName, betaType, implicit, kind);
+      _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "head beta local type", LeanArray(Array[x]), lambda, false, false, betaLocals, false, false, LeanNatLiterals.n1, b0, context, state,
+        LeanCtor(LeanTag.EStateM_Result_ok, Array[f_expressionsProbe_expectedBinder(runtime, lambda, xName, implicit, prop, b0), state]));
+      assignedMctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(runtime, mctx, mName, prop);
+      assignedState = leanReplaceField(state, 0, assignedMctx);
+      assignedLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, emptyLocals, xName, xName, m, implicit, kind);
+      _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eliminate assigned mvar type", LeanArray(Array[x]), lambda, false, false, assignedLocals, false, false, LeanNatLiterals.n1, b0, context, assignedState,
+        LeanCtor(LeanTag.EStateM_Result_ok, Array[f_expressionsProbe_expectedBinder(runtime, lambda, xName, implicit, prop, b0), assignedState]));
+      assignedLetLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, emptyLocals, yName, yName, m, m, leanBool(false), kind);
+      _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eliminate type then value", LeanArray(Array[y]), lambda, false, false, assignedLetLocals, false, false, LeanNatLiterals.n1, b0, context, assignedState,
+        LeanCtor(LeanTag.EStateM_Result_ok, Array[L4_Lean_Expr.f_Expr_letE_override_53a36b789f(runtime, yName, prop, prop, b0, leanBool(false)), assignedState]));
+      betaLetLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, emptyLocals, yName, yName, betaType, betaType, leanBool(false), kind);
+      _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "retained let skips head beta", LeanArray(Array[y]), lambda, false, false, betaLetLocals, false, false, LeanNatLiterals.n1, b0, context, state,
+        LeanCtor(LeanTag.EStateM_Result_ok, Array[L4_Lean_Expr.f_Expr_letE_override_53a36b789f(runtime, yName, betaType, betaType, b0, leanBool(false)), state]));
+      dependentLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, yName, yName, x, binder, kind);
+      inner = f_expressionsProbe_expectedBinder(runtime, lambda, yName, binder, b0, b0);
+      expected = f_expressionsProbe_expectedBinder(runtime, lambda, xName, implicit, prop, inner);
+      _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "reverse dependent abstraction", LeanArray(Array[x, y]), lambda, false, false, dependentLocals, false, false, LeanNatLiterals.n2, b0, context, state, LeanCtor(LeanTag.EStateM_Result_ok, Array[expected, state]));
+      // MVar branch ignores usedOnly even when b0 is absent from the body.
+      namedExpected = f_expressionsProbe_expectedBinder(runtime, lambda, mName, implicit, prop, prop);
+      named = f_expressionsProbe_bindingCase(runtime.checkpoint(), "named mvar always bound", LeanArray(Array[m]), lambda, false, true, locals, true, true, LeanNatLiterals.n1, prop, context, state, LeanCtor(LeanTag.EStateM_Result_ok, Array[namedExpected, state]));
+      assert(leanSameObject(leanField(named, 1), state) != 0);
+      // Independently spell out the hygienic name; do not call mkFreshBinderName.
+      freshPrefix = f_expressionsProbe_name(runtime, "x");
+      for (part in Array["_@", "Probe", "_hyg"]) {
+        !freshPrefix = L4_Init_Prelude.f_Name_str_override_fde29b60d1(runtime, freshPrefix, LeanText(part))
+      };
+      for ((scope, nextScope) in Array[("7", "8"), ("184467440737095516160000000000", "184467440737095516160000000001")]) {
+        scopeValue = leanBoxNat(LeanNat::parse(scope));
+        scopedState = leanReplaceField(state, 1, scopeValue);
+        freshName = L4_Init_Prelude.f_Name_num_override_ca591eddf2(runtime, freshPrefix, scopeValue);
+        freshState = leanReplaceField(scopedState, 1, leanBoxNat(LeanNat::parse(nextScope)));
+        expectedFresh = f_expressionsProbe_expectedBinder(runtime, lambda, freshName, implicit, prop, b0);
+        fresh = f_expressionsProbe_bindingCase(runtime.checkpoint(), "anonymous mvar fresh Nat scope", LeanArray(Array[n]), lambda, false, true, locals, true, true, LeanNatLiterals.n1, b0, context, scopedState, LeanCtor(LeanTag.EStateM_Result_ok, Array[expectedFresh, freshState]));
+        afterState = leanField(fresh, 1);
+        for (field in Array[0, 2, 3]) assert(leanSameObject(leanField(afterState, field), leanField(scopedState, field)) != 0)
+      }
+    };
+    // X-1: a real dependency-elimination error, not an injected callback.
+    // The mvar context has x : Prop then y : x. Reverting [y, x] while
+    // preserveOrder=true must report y's dependency on the later x.
+    dependencyLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, emptyLocals, xName, xName, prop, binder, kind);
+    !dependencyLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, dependencyLocals, yName, yName, x, binder, kind);
+    errorMctx = L4_Lean_MetavarContext.f_Lean_instInhabitedMetavarContext_060bbe8809(runtime);
+    !errorMctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, errorMctx, mName, mName, dependencyLocals, LeanArray(Array[]), prop, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    !errorMctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, errorMctx, nName, LeanCtor(LeanTag.Name_anonymous__impl, Array[]), emptyLocals, LeanArray(Array[]), m, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+    errorContext = leanReplaceField(context, 1, leanBool(true));
+    // withFreshCache restores the old cache only on success, NOT on error.
+    // Start with a valid, nonempty cache to make this observable.
+    oldCache = L4_Lean_MetavarContext.f_MkBinding_visit_spec_17_f304a05a0e(runtime, cache, prop, prop);
+    errorState = LeanCtor(LeanTag.MetavarContext_MkBinding_State_mk, Array[errorMctx, leanNatValue(7), generator, oldCache]);
+    expectedErrorState = leanReplaceField(errorState, 3, cache);
+    toRevert = LeanArray(Array[y, x]);
+    expectedError = LeanCtor(LeanTag.EStateM_Result_error, Array[
+      LeanCtor(LeanTag.MetavarContext_MkBinding_Exception_revertFailure,
+        Array[errorMctx, dependencyLocals, toRevert, LeanText("y")]),
+      expectedErrorState,
+    ]);
+    errorLocal = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, dependencyLocals, zName, zName, m, binder, kind);
+    errorLetType = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, dependencyLocals, zName, zName, m, LeanUnavailable("let value after type error"), leanBool(false), kind);
+    errorLetValue = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, dependencyLocals, zName, zName, prop, m, leanBool(false), kind);
+    for ((errorLabel, errorLocals, variables) in Array[
+      ("local type EStateM error", errorLocal, LeanArray(Array[y, x, z])),
+      ("let type EStateM error skips value", errorLetType, LeanArray(Array[y, x, z])),
+      ("let value EStateM error", errorLetValue, LeanArray(Array[y, x, z])),
+      ("mvar type EStateM error skips fresh name", dependencyLocals, LeanArray(Array[y, x, n])),
+    ]) {
+      failure = f_expressionsProbe_bindingCase(runtime.checkpoint(), errorLabel, variables, true, true, false, errorLocals, false, false, LeanNatLiterals.n3, b0, errorContext, errorState, expectedError);
+      assert(leanTag(failure) == LeanTag.EStateM_Result_error);
+      exception = leanField(failure, 0);
+      assert(leanTag(exception) == LeanTag.MetavarContext_MkBinding_Exception_revertFailure);
+      assert(leanText(leanField(exception, 3)) == "y");
+      failedState = leanField(failure, 1);
+      assert(rewriteProbeSameInput(failedState, expectedErrorState));
+      assert(!rewriteProbeSameInput(failedState, errorState));
+      assert(leanSameObject(leanField(failedState, 0), errorMctx) != 0);
+      assert(leanSameObject(leanField(failedState, 2), generator) != 0);
+      assert(rewriteProbeSameInput(leanField(failedState, 3), cache))
+    };
+    // Unused ordinary locals must skip type normalization and state/context use.
+    // A poisoned type would fail if the omission branch evaluated it eagerly.
+    poisonedLocals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, emptyLocals, xName, xName, LeanErased(), implicit, kind);
+    _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "unused local skips poisoned type", LeanArray(Array[x]), false, false, true, poisonedLocals, false, false, LeanNatLiterals.n1, b1, LeanErased(), LeanErased(),
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[b0, LeanErased()]));
+    poisonedLet = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, emptyLocals, yName, yName, LeanErased(), LeanErased(), leanBool(false), kind);
+    _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "unused let skips poisoned type/value", LeanArray(Array[y]), false, false, false, poisonedLet, true, true, LeanNatLiterals.n1, b1, LeanErased(), LeanErased(),
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[b0, LeanErased()]));
+    etaBody = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, y, b0);
+    etaResult = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eta reduction shares function", LeanArray(Array[x]), true, true, false, locals, false, false, LeanNatLiterals.n1, etaBody, context, state, LeanCtor(LeanTag.EStateM_Result_ok, Array[y, state]));
+    assert(leanSameObject(leanField(etaResult, 0), y) != 0);
+    // Eta must not fire when the function itself depends on the removed binder.
+    dependentEtaBody = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, b0, b0);
+    blockedEta = f_expressionsProbe_expectedBinder(runtime, true, xName, implicit, prop, dependentEtaBody);
+    _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eta blocked by function dependency", LeanArray(Array[x]), true, true, false, locals, false, false, LeanNatLiterals.n1, dependentEtaBody, context, state,
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[blockedEta, state]));
+    wrongArgument = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, y, b1);
+    _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eta blocked by nonzero argument", LeanArray(Array[x]), true, true, false, locals, false, false, LeanNatLiterals.n1, wrongArgument, context, state,
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[f_expressionsProbe_expectedBinder(runtime, true, xName, implicit, prop, wrongArgument), state]));
+    _ = f_expressionsProbe_bindingCase(runtime.checkpoint(), "eta explicitly disabled", LeanArray(Array[x]), true, false, false, locals, false, false, LeanNatLiterals.n1, etaBody, context, state,
+      LeanCtor(LeanTag.EStateM_Result_ok, Array[f_expressionsProbe_expectedBinder(runtime, true, xName, implicit, prop, etaBody), state]));
+    // Collection: no descent into apps, duplicate IDs, subrange, and empty range.
+    appM = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, m, prop);
+    values = LeanArray(Array[x, m, m, appM, n, prop]);
+    _ = f_expressionsProbe_collectCase(runtime.checkpoint(), values, LeanWord("usize", 0), LeanWord("usize", 6), emptySet, Array[mName, nName]);
+    oneSet = f_expressionsProbe_collectCase(runtime.checkpoint(), values, LeanScalar("usize", "0001"), LeanWord("usize", 4), emptySet, Array[mName]);
+    sameSet = f_expressionsProbe_collectCase(runtime.checkpoint(), values, LeanWord("usize", 1), LeanWord("usize", 3), oneSet, Array[mName]);
+    assert(leanSameObject(sameSet, oneSet) != 0);
+    emptyRange = f_expressionsProbe_collectCase(runtime.checkpoint(), LeanErased(), LeanScalar("usize", "18446744073709551615"), LeanScalar("usize", "18446744073709551615"), oneSet, Array[mName]);
+    assert(leanSameObject(emptyRange, oneSet) != 0);
+    f_expressionsProbe_stateEqual(saved, saved.restoreRaw().checkpoint())
+  };
+  print_string("expressions bindings passed")
+}

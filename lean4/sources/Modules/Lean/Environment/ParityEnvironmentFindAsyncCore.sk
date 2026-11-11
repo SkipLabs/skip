@@ -1,0 +1,144 @@
+module L4_Lean_Environment;
+
+// Replay the original discarded projections without decoding their payloads.
+// This keeps short/malformed constructor failures and dormant sentinel fields.
+fun f_parity_environment_findShape(value: LeanValue, fieldCount: Int): void {
+  for (index in Range(0, fieldCount)) {
+    _ = leanField(value, index)
+  }
+}
+
+fun f_parity_environment_asyncInfo(constant: LeanValue): LeanValue {
+  leanTag(constant) match {
+  | LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk ->
+    f_parity_environment_findShape(constant, 4);
+    LeanCtor(LeanTag.Option_some, Array[leanField(constant, 0)])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// "_private.Lean.Environment.0.Lean.Environment.findAsyncCore?"
+fun f_Lean_Environment_findAsyncCore_a05524f0d0(
+  _runtime: mutable LeanExecution,
+  _env_0_input: LeanValue,
+  _n_1_input: LeanValue,
+  _skipRealize_2_input: LeanValue,
+): LeanValue {
+  skipRealize = _skipRealize_2_input;
+  // Retain the baseline's per-value empty-completed-map shortcut.
+  leanField(_env_0_input, 7) match {
+  | LeanCompletedTask(LeanCtor(tag, fields)) ->
+    if (tag == LeanTag.Std_DTreeMap_Internal_Impl_leaf && fields.isEmpty()) {
+      !skipRealize = leanBool(true)
+    }
+  | _ -> void
+  };
+  asyncConstants = f_Lean_Environment_asyncConsts_8678482b11(
+    _runtime,
+    _env_0_input,
+  );
+  direct = f_Lean_AsyncConsts_find_6a6f5aa7de(
+    _runtime,
+    asyncConstants,
+    _n_1_input,
+  );
+  leanTag(direct) match {
+  | LeanTag.Option_some ->
+    return f_parity_environment_asyncInfo(leanField(direct, 0))
+  | _ -> void
+  };
+  recursive = f_Lean_AsyncConsts_findRec_2bdbbaf37d(
+    _runtime,
+    asyncConstants,
+    _n_1_input,
+  );
+  leanTag(recursive) match {
+  | LeanTag.Option_some ->
+    return f_parity_environment_asyncInfo(leanField(recursive, 0))
+  | _ -> void
+  };
+  leanTag(skipRealize) match {
+  | LeanTag.Bool_true -> void
+  | LeanTag.Bool_false ->
+    reserved = f_Lean_Environment_isReservedName_8eaede454e(
+      _runtime,
+      _env_0_input,
+      _n_1_input,
+    );
+    leanTag(reserved) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      if (
+        leanTag(_env_0_input) !=
+        LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+      ) return leanFail("non-exhaustive Lean case");
+      f_parity_environment_findShape(_env_0_input, 15);
+      realizations = L4_Init_Core.f_Task_get_c7ebb314a7(
+        _runtime,
+        LeanErased(),
+        leanField(_env_0_input, 7),
+      );
+      realized = L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+        _runtime,
+        realizations,
+        _n_1_input,
+      );
+      leanTag(realized) match {
+      | LeanTag.Option_some ->
+        return f_parity_environment_asyncInfo(leanField(realized, 0))
+      | _ -> void
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  if (
+    leanTag(_env_0_input) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_findShape(_env_0_input, 15);
+  base = leanField(_env_0_input, 0);
+  exporting = leanField(_env_0_input, 8);
+  kernel = leanTag(exporting) match {
+  | LeanTag.Bool_false ->
+    if (
+      leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk
+    ) return leanFail("non-exhaustive Lean case");
+    f_parity_environment_findShape(base, 2);
+    leanField(base, 0)
+  | LeanTag.Bool_true ->
+    if (
+      leanTag(base) != LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk
+    ) return leanFail("non-exhaustive Lean case");
+    f_parity_environment_findShape(base, 2);
+    leanField(base, 1)
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  if (
+    leanTag(kernel) !=
+    LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_findShape(kernel, 9);
+  constants = leanField(kernel, 0);
+  if (leanTag(constants) != LeanTag.ConstMap_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_findShape(constants, 2);
+  found = f_Diagnostics_recordUnfold_spec_1_a9210252d9(
+    _runtime,
+    leanField(constants, 1),
+    _n_1_input,
+  );
+  leanTag(found) match {
+  | LeanTag.Option_none -> LeanCtor(LeanTag.Option_none, Array[])
+  | LeanTag.Option_some ->
+    info = f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(
+      _runtime,
+      leanField(found, 0),
+    );
+    LeanCtor(LeanTag.Option_some, Array[info])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

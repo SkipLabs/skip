@@ -1,0 +1,416 @@
+// Test-only baseline bodies copied from lane originals (41bb486d9).
+// Only symbols/self-recursion are renamed; never install this as support code.
+
+fun f_allocationProbeOriginalApply(
+  runtime: mutable LeanExecution,
+  v: LeanValue,
+  args: Array<LeanValue>,
+): LeanValue {
+  if (args.isEmpty()) return v;
+  v match {
+  | LeanClosure(invoke, arity, captured) ->
+    all = captured.concat(args);
+    if (all.size() < arity) {
+      LeanClosure(invoke, arity, all)
+    } else {
+      result = invoke(runtime, all.take(arity));
+      if (all.size() == arity) result else {
+        f_allocationProbeOriginalApply(runtime, result, all.drop(arity))
+      }
+    }
+  | _ -> leanFail("application of non-closure")
+  }
+}
+
+fun f_allocationProbeOriginalPrimitiveCore(
+  runtime: mutable LeanExecution,
+  name: String,
+  foreign: String,
+  args: Array<LeanValue>,
+): LeanValue {
+  foreign match {
+  // Lean's lean_void_mk discards its input and returns the opaque ST world
+  // token. Mutable state itself lives in this execution's reference table.
+  | "lean_void_mk" -> return LeanErased()
+  | "lean_nat_to_int" -> return leanIntegerValue(false, leanNat(args[0]))
+  | "lean_int_neg_succ_of_nat" ->
+    return leanIntegerValue(true, leanNat(args[0]).add(LeanNat::fromInt(1)))
+  | "lean_int_add" -> return leanIntegerAdd(args[0], args[1])
+  | "lean_int_neg" -> return leanIntegerNegate(args[0])
+  | "lean_int_sub" -> return leanIntegerAdd(args[0], leanIntegerNegate(args[1]))
+  | "lean_int_mul" ->
+    (negativeA, magnitudeA) = leanInteger(args[0]);
+    (negativeB, magnitudeB) = leanInteger(args[1]);
+    return leanIntegerValue(negativeA != negativeB, magnitudeA.mul(magnitudeB))
+  | "lean_nat_abs" -> return leanBoxNat(leanInteger(args[0]).i1)
+  | "lean_int_dec_nonneg" -> return leanBool(!leanInteger(args[0]).i0)
+  | "lean_int_dec_eq" ->
+    return leanBool(leanIntegerCompare(args[0], args[1]) == 0)
+  | "lean_int_dec_lt" ->
+    return leanBool(leanIntegerCompare(args[0], args[1]) < 0)
+  | "lean_int_dec_le" ->
+    return leanBool(leanIntegerCompare(args[0], args[1]) <= 0)
+  | "lean_string_get_byte_fast" ->
+    bytes = leanText(args[0]).bytes();
+    position = leanNat(args[1]);
+    if (position >= LeanNat::fromInt(bytes.size())) {
+      return leanFail("Lean UTF-8 byte position out of bounds")
+    };
+    return leanWordValue("uint8", bytes[position.toInt()].toInt())
+  | "lean_string_contains" ->
+    return leanBool(
+      leanText(args[0]).contains(leanUnicodeCharacter(args[1]).toString()),
+    )
+  | "lean_string_of_usize" ->
+    return LeanText(LeanNat::fromWord(leanWordBits(args[0])).toString())
+  | "lean_string_push" ->
+    return LeanText(
+      leanText(args[0]) + leanUnicodeCharacter(args[1]).toString(),
+    )
+  | "lean_string_mk" ->
+    pieces: mutable Vector<String> = mutable Vector[];
+    list = args[0];
+    while (leanTag(list) == LeanTag.List_cons) {
+      pieces.push(leanUnicodeCharacter(leanField(list, 0)).toString());
+      !list = leanField(list, 1)
+    };
+    if (leanTag(list) != LeanTag.List_nil) {
+      return leanFail("invalid Lean character list")
+    };
+    return LeanText(pieces.chill().join(""))
+  | "lean_string_utf8_at_end" ->
+    return leanBool(
+      leanNat(args[1]) >= LeanNat::fromInt(leanText(args[0]).bytes().size()),
+    )
+  | "lean_string_utf8_get" ->
+    return leanWordValue(
+      "uint32",
+      leanStringGet(leanText(args[0]), leanNat(args[1])),
+    )
+  | "lean_string_utf8_next" ->
+    return leanBoxNat(leanStringNext(leanText(args[0]), leanNat(args[1])))
+  | "lean_string_utf8_prev" ->
+    return leanBoxNat(leanStringPrevious(leanText(args[0]), leanNat(args[1])))
+  | "lean_string_is_valid_pos" ->
+    return leanBool(
+      leanStringValidPosition(leanText(args[0]), leanNat(args[1])),
+    )
+  | "lean_string_utf8_extract" ->
+    return LeanText(
+      leanStringExtractTotal(
+        leanText(args[0]),
+        leanNat(args[1]),
+        leanNat(args[2]),
+      ),
+    )
+  | "lean_string_utf8_extract_fast" ->
+    return LeanText(
+      leanStringExtract(leanText(args[0]), leanNat(args[1]), leanNat(args[2])),
+    )
+  | "lean_string_utf8_next_fast" ->
+    position = leanNat(args[1]);
+    code = leanStringDecodeChar(leanText(args[0]), position);
+    width = if (code < 128) 1 else if (code < 2048) 2 else if (code < 65536) {
+      3
+    } else {
+      4
+    };
+    return leanBoxNat(position.add(LeanNat::fromInt(width)))
+  | "lean_string_utf8_get_fast" ->
+    return LeanWord(
+      "uint32",
+      leanStringDecodeChar(leanText(args[0]), leanNat(args[1])),
+    )
+  | "lean_io_initializing" ->
+    return leanSTResult(leanBool(runtime.initializing), args[0])
+  | "lean_level_eq" -> return leanBool(leanLevelEqual(args[0], args[1]))
+  | "lean_task_pure" -> return LeanCompletedTask(args[1])
+  | "lean_task_map" ->
+    if (!leanIsTrue(args[5])) {
+      leanFail("asynchronous task mapping is not implemented")
+    };
+    args[3] match {
+    | LeanCompletedTask(value) ->
+      return LeanCompletedTask(f_allocationProbeOriginalApply(runtime, args[2], Array[value]))
+    | _ -> return leanFail("mapping a pending Lean task is not implemented")
+    }
+  | "lean_task_get_own" ->
+    args[1] match {
+    | LeanCompletedTask(value) -> return value
+    | _ ->
+      return leanFail("waiting for asynchronous Lean tasks is not implemented")
+    }
+  | "lean_imported_consts_find_entry_cached" ->
+    return leanImportedConstantLookup(runtime, args[1], args[2], false)
+  | "lean_imported_consts_find_mod_idx_cached"
+  | "lean_imported_extra_consts_find_mod_idx_cached" ->
+    return leanImportedConstantLookup(runtime, args[1], args[2], true)
+  | "lean_obj_tag_nat" ->
+    args[1] match {
+    | LeanCtor(ctor, _) -> return leanNatValue(leanConstructorOrdinal(ctor))
+    | _ -> return leanFail("getObjTagNat on non-constructor is not implemented")
+    }
+  | "lean_expr_data" -> return LeanWord("uint64", leanExprData(args[0]))
+  | "lean_expr_mk_data" -> return leanExprMakeData(args)
+  | "lean_expr_mk_app_data" ->
+    return leanExprMakeAppData(leanWordBits(args[0]), leanWordBits(args[1]))
+  | "lean_level_mk_data" -> return leanLevelMakeData(args)
+  | "lean_bool_to_uint8" ->
+    return leanWordValue("uint8", if (leanIsTrue(args[0])) 1 else 0)
+  | "lean_bool_to_uint16" ->
+    return leanWordValue("uint16", if (leanIsTrue(args[0])) 1 else 0)
+  | "lean_bool_to_uint32" ->
+    return leanWordValue("uint32", if (leanIsTrue(args[0])) 1 else 0)
+  | "lean_bool_to_uint64" ->
+    return leanWordValue("uint64", if (leanIsTrue(args[0])) 1 else 0)
+  | "lean_bool_to_usize" ->
+    return leanWordValue("usize", if (leanIsTrue(args[0])) 1 else 0)
+  | "lean_nat_add" -> return leanBoxNat(leanNat(args[0]).add(leanNat(args[1])))
+  | "lean_nat_sub" -> return leanBoxNat(leanNat(args[0]).sub(leanNat(args[1])))
+  | "lean_nat_mul" -> return leanBoxNat(leanNat(args[0]).mul(leanNat(args[1])))
+  | "lean_nat_pow" -> return leanBoxNat(leanNat(args[0]).pow(leanNat(args[1])))
+  | "lean_nat_gcd" -> return leanBoxNat(leanNat(args[0]).gcd(leanNat(args[1])))
+  | "lean_nat_div" ->
+    return leanBoxNat(leanNat(args[0]).divMod(leanNat(args[1])).i0)
+  | "lean_nat_mod" ->
+    return leanBoxNat(leanNat(args[0]).divMod(leanNat(args[1])).i1)
+  | "lean_nat_shiftr" ->
+    return leanBoxNat(leanNat(args[0]).shiftRight(leanNat(args[1])))
+  | "lean_nat_pred" ->
+    return leanBoxNat(leanNat(args[0]).sub(LeanNat::fromInt(1)))
+  // Mono erasure represents Decidable as Bool, including functions named decEq.
+  | "lean_nat_dec_eq" -> return leanBool(leanNat(args[0]) == leanNat(args[1]))
+  | "lean_nat_dec_lt" -> return leanBool(leanNat(args[0]) < leanNat(args[1]))
+  | "lean_nat_dec_le" -> return leanBool(leanNat(args[0]) <= leanNat(args[1]))
+  | "lean_mk_empty_array_with_capacity" -> return LeanArray(Array[])
+  // Lean's definition returns ys. The foreign implementation only propagates
+  // reference-count sharing marks; Skip owns the memory of these tracked values.
+  | "lean_array_propagate_mark" -> return args[3]
+  | "lean_mk_array" ->
+    return LeanArray(Array::fill(leanNat(args[1]).toInt(), args[2]))
+  | "lean_array_get_size" -> return leanNatValue(leanValueArraySize(args[1]))
+  | "lean_array_size" -> return LeanWord("usize", leanValueArraySize(args[1]))
+  | "lean_array_push" -> return leanArrayPush(args[1], args[2])
+  | "lean_array_fget" | "lean_array_fget_borrowed" ->
+    return leanArrayRead(runtime, args[1], args[2], false)
+  | "lean_array_uget" | "lean_array_uget_borrowed" ->
+    return leanArrayRead(runtime, args[1], args[2], true)
+  | "lean_array_get" | "lean_array_get_borrowed" ->
+    return leanArrayRead(runtime, args[2], args[3], false)
+  | "lean_array_fset" | "lean_array_set" ->
+    runtime.recordArrayWrite(args[1]);
+    return leanArrayWrite(args[1], args[2], args[3], false)
+  | "lean_array_uset" ->
+    runtime.recordArrayWrite(args[1]);
+    return leanArrayWrite(args[1], args[2], args[3], true)
+  | "lean_array_fswap" | "lean_array_uswap" ->
+    word = foreign == "lean_array_uswap";
+    first = leanArrayRead(runtime, args[1], args[2], word);
+    second = leanArrayRead(runtime, args[1], args[3], word);
+    return leanArrayWrite(
+      leanArrayWrite(args[1], args[2], second, word),
+      args[3],
+      first,
+      word,
+    )
+  | "lean_array_pop" -> return leanArrayPop(args[1])
+  | "lean_array_mk" ->
+    values = mutable Vector[];
+    list = args[1];
+    while (leanTag(list) != LeanTag.List_nil) {
+      invariant(leanTag(list) == LeanTag.List_cons, "Invalid Lean list");
+      values.push(leanField(list, 0));
+      !list = leanField(list, 1)
+    };
+    return LeanArray(values.toArray())
+  | "lean_array_to_list" ->
+    values = leanArray(args[1]);
+    list: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    i = values.size();
+    while (i > 0) {
+      !i = i - 1;
+      !list = LeanCtor(LeanTag.List_cons, Array[values[i], list])
+    };
+    return list
+  | "lean_st_mk_ref" -> return leanSTResult(runtime.newRef(args[2]), args[3])
+  | "lean_st_ref_get" -> return leanSTResult(runtime.readRef(args[2]), args[3])
+  | "lean_st_ref_take" ->
+    value = runtime.readRef(args[2]);
+    runtime.writeRef(args[2], None());
+    return leanSTResult(value, args[3])
+  | "lean_st_ref_put" ->
+    runtime.writeRef(args[2], Some(args[3]));
+    return leanSTResult(LeanCtor(LeanTag.PUnit_unit, Array[]), args[4])
+  | "lean_st_ref_swap" ->
+    value = runtime.readRef(args[2]);
+    runtime.writeRef(args[2], Some(args[3]));
+    return leanSTResult(value, args[4])
+  | "lean_st_ref_ptr_eq" ->
+    return leanSTResult(leanBool(native_eq(args[2], args[3]) == 0), args[4])
+  | "lean_ptr_addr" ->
+    return LeanWord("usize", runtime.immutableIdentity(args[1]))
+  | "lean_string_hash" ->
+    return LeanWord("uint64", leanStringHash(leanText(args[0])))
+  | "lean_string_compare" ->
+    left = leanText(args[0]);
+    right = leanText(args[1]);
+    return LeanCtor(
+      if (left < right) LeanTag.Ordering_lt else if (right < left) {
+        LeanTag.Ordering_gt
+      } else {
+        LeanTag.Ordering_eq
+      },
+      Array[],
+    )
+  | "lean_string_memcmp" -> return leanBool(leanStringMemcmp(args) == 0)
+  | "lean_string_memcmp_lt" -> return leanBool(leanStringMemcmp(args) < 0)
+  | "lean_string_memcmp_compare" ->
+    cmp = leanStringMemcmp(args);
+    return LeanCtor(
+      if (cmp < 0) LeanTag.Ordering_lt else if (cmp > 0) {
+        LeanTag.Ordering_gt
+      } else {
+        LeanTag.Ordering_eq
+      },
+      Array[],
+    )
+  | "lean_uint64_mix_hash" ->
+    return LeanWord(
+      "uint64",
+      leanMixHash(leanWordBits(args[0]), leanWordBits(args[1])),
+    )
+  | "lean_uint32_mix_hash" ->
+    return LeanWord(
+      "uint32",
+      leanMixHash32(leanWordBits(args[0]), leanWordBits(args[1])),
+    )
+  | "lean_name_eq" -> return leanBool(leanNameEqual(args[0], args[1]))
+  | "lean_string_dec_eq" ->
+    return leanBool(leanText(args[0]) == leanText(args[1]))
+  | "lean_string_dec_lt" ->
+    return leanBool(leanText(args[0]) < leanText(args[1]))
+  | "lean_string_append" ->
+    return LeanText(leanText(args[0]) + leanText(args[1]))
+  | "lean_string_utf8_byte_size" ->
+    return leanNatValue(leanText(args[0]).bytes().size())
+  | "lean_string_length" -> return leanNatValue(leanText(args[0]).length())
+  | "lean_string_isempty" -> return leanBool(leanText(args[0]).isEmpty())
+  | "lean_strict_and" ->
+    return leanBool(leanIsTrue(args[0]) && leanIsTrue(args[1]))
+  | "lean_strict_or" ->
+    return leanBool(leanIsTrue(args[0]) || leanIsTrue(args[1]))
+  | _ -> void
+  };
+  leanInvokeWordPrimitive(name, foreign, args)
+}
+
+
+mutable class AllocationProbeOriginalReferencePage{
+  mutable saved: Array<?LeanValue>,
+  mutable working: ?(mutable Array<?LeanValue>) = None(),
+} {
+  readonly fun get(index: Int): ?LeanValue {
+    this.working match {
+    | Some(values) -> values[index]
+    | None() -> this.saved[index]
+    }
+  }
+
+  mutable fun set(index: Int, value: ?LeanValue): void {
+    values = this.working match {
+    | Some(values) -> values
+    | None() ->
+      copy = this.saved.clone();
+      this.!working = Some(copy);
+      copy
+    };
+    values.set(index, value)
+  }
+
+  mutable fun snapshot(): Array<?LeanValue> {
+    this.working match {
+    | Some(values) ->
+      this.!saved = values.chill();
+      this.!working = None()
+    | None() -> void
+    };
+    this.saved
+  }
+}
+
+mutable class AllocationProbeOriginalReferenceTable{
+  mutable pages: mutable Vector<mutable AllocationProbeOriginalReferencePage> = mutable Vector[],
+  mutable count: Int = 0,
+} {
+  readonly fun size(): Int {
+    this.count
+  }
+
+  readonly fun get(index: Int): ?LeanValue {
+    invariant(
+      index >= 0 && index < this.count,
+      "Lean reference index out of bounds",
+    );
+    this.pages[index / leanReferencePageSize].get(index % leanReferencePageSize)
+  }
+
+  mutable fun set(index: Int, value: ?LeanValue): void {
+    invariant(
+      index >= 0 && index < this.count,
+      "Lean reference index out of bounds",
+    );
+    this.pages[index / leanReferencePageSize].set(
+      index % leanReferencePageSize,
+      value,
+    )
+  }
+
+  mutable fun push(value: ?LeanValue): void {
+    offset = this.count % leanReferencePageSize;
+    if (offset == 0) {
+      this.pages.push(
+        mutable AllocationProbeOriginalReferencePage{
+          saved => Array::fill(leanReferencePageSize, None()),
+        },
+      )
+    };
+    this.pages.last().set(offset, value);
+    this.!count = this.count + 1
+  }
+
+  mutable fun snapshot(): AllocationProbeOriginalReferenceSnapshot {
+    AllocationProbeOriginalReferenceSnapshot(
+      Array::fillBy(this.pages.size(), i -> this.pages[i].snapshot()),
+      this.count,
+    )
+  }
+}
+
+class AllocationProbeOriginalReferenceSnapshot(pages: Array<Array<?LeanValue>>, count: Int) {
+  fun restore(): mutable AllocationProbeOriginalReferenceTable {
+    table = mutable AllocationProbeOriginalReferenceTable{count => this.count};
+    for (page in this.pages) {
+      table.pages.push(mutable AllocationProbeOriginalReferencePage{saved => page})
+    };
+    table
+  }
+}
+
+fun f_allocationProbeInvoke(
+  runtime: mutable LeanExecution,
+  name: String,
+  foreign: String,
+  args: Array<LeanValue>,
+): LeanValue {
+  start = if (runtime.profileRuntime) Time.time_ns() else 0;
+  result = f_allocationProbeOriginalPrimitiveCore(runtime, name, foreign, args);
+  if (runtime.profileRuntime) {
+    runtime.!primitiveCount = runtime.primitiveCount + 1;
+    runtime.!primitiveInclusiveNs =
+      runtime.primitiveInclusiveNs +
+      Time.time_ns() -
+      start
+  };
+  result
+}
+

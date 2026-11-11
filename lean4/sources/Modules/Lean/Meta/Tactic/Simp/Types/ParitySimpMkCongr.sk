@@ -1,0 +1,145 @@
+module L4_Lean_Meta_Tactic_Simp_Types;
+
+// "_private.Lean.Meta.Tactic.Simp.Types.0.Lean.Meta.Simp.mkCongr'"
+fun f_Meta_Simp_mkCongr_4039f18327(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _r_1_input: LeanValue,
+  _r_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  if (leanTag(_r_1_input) != LeanTag.Meta_Simp_Result_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  function = leanField(_r_1_input, 0);
+  functionProof = leanField(_r_1_input, 1);
+  _ = leanField(_r_1_input, 2);
+  if (leanTag(_r_2_input) != LeanTag.Meta_Simp_Result_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  argument = leanField(_r_2_input, 0);
+  argumentProof = leanField(_r_2_input, 1);
+  _ = leanField(_r_2_input, 2);
+  expression = f_paritySimplifierUpdateApp_congruence(
+    _runtime,
+    _e_0_input,
+    function,
+    argument,
+  );
+  theorem: String = "";
+  functionEvidence: LeanValue = LeanErased();
+  argumentEvidence: LeanValue = LeanErased();
+  // Pick the exact nondependent congruence lemma before doing any inference.
+  leanTag(functionProof) match {
+  | LeanTag.Option_none ->
+    leanTag(argumentProof) match {
+    | LeanTag.Option_none ->
+      result = LeanCtor(
+        LeanTag.Meta_Simp_Result_mk,
+        Array[expression, argumentProof, LeanCtor(LeanTag.Bool_true, Array[])],
+      );
+      return LeanCtor(LeanTag.EST_Out_ok, Array[result, _a_1_7_input])
+    | LeanTag.Option_some ->
+      !argumentEvidence = leanField(argumentProof, 0);
+      !theorem = "congrArg"
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | LeanTag.Option_some ->
+    !functionEvidence = leanField(functionProof, 0);
+    leanTag(argumentProof) match {
+    | LeanTag.Option_none -> !theorem = "congrFun'"
+    | LeanTag.Option_some ->
+      !argumentEvidence = leanField(argumentProof, 0);
+      !theorem = "congr"
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  theoremName = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+    _runtime,
+    LeanText(theorem),
+  );
+  prefixResult = f_Meta_Simp_mkCongrPrefix_8e0850cfff(
+    _runtime,
+    theoremName,
+    _e_0_input,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    _a_1_7_input,
+  );
+  leanTag(prefixResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(prefixResult, 0);
+    errorWorld = leanField(prefixResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  prefix = leanField(prefixResult, 0);
+  world = leanField(prefixResult, 1);
+  proof = leanTag(functionProof) match {
+  | LeanTag.Option_none ->
+    oldArgument = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(
+      _runtime,
+      _e_0_input,
+    );
+    L4_Lean_Expr.f_Lean_mkApp4_7fe03b78a6(
+      _runtime,
+      prefix,
+      oldArgument,
+      argument,
+      function,
+      argumentEvidence,
+    )
+  | LeanTag.Option_some ->
+    oldFunction = L4_Lean_Expr.f_Lean_Expr_appFn_e8931bd2a0(
+      _runtime,
+      _e_0_input,
+    );
+    leanTag(argumentProof) match {
+    | LeanTag.Option_none ->
+      L4_Lean_Expr.f_Lean_mkApp4_7fe03b78a6(
+        _runtime,
+        prefix,
+        oldFunction,
+        function,
+        functionEvidence,
+        argument,
+      )
+    | LeanTag.Option_some ->
+      oldArgument = L4_Lean_Expr.f_Lean_Expr_appArg_751e777947(
+        _runtime,
+        _e_0_input,
+      );
+      L4_Lean_Expr.f_Lean_mkApp6_dbfe46ef91(
+        _runtime,
+        prefix,
+        oldFunction,
+        function,
+        oldArgument,
+        argument,
+        functionEvidence,
+        argumentEvidence,
+      )
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  result = LeanCtor(
+    LeanTag.Meta_Simp_Result_mk,
+    Array[
+      expression,
+      LeanCtor(LeanTag.Option_some, Array[proof]),
+      LeanCtor(LeanTag.Bool_true, Array[]),
+    ],
+  );
+  LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+}
+
+module end;

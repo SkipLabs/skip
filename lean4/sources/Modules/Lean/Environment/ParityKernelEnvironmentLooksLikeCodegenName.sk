@@ -1,0 +1,146 @@
+module L4_Lean_Environment;
+
+fun f_parity_environment_codegenPrefix(
+  runtime: mutable LeanExecution,
+  text: LeanValue,
+  prefix: LeanValue,
+  byteCount: LeanValue,
+): LeanValue {
+  byteSize = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(runtime, text);
+  enoughBytes = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    runtime,
+    byteCount,
+    byteSize,
+  );
+  leanTag(enoughBytes) match {
+  | LeanTag.Bool_false -> enoughBytes
+  | LeanTag.Bool_true ->
+    L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+      runtime,
+      text,
+      prefix,
+      LeanNatLiterals.n0,
+      LeanNatLiterals.n0,
+      byteCount,
+      LeanErased(),
+      LeanErased(),
+    )
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// "_private.Lean.Environment.0.Lean.Kernel.Environment.looksLikeCodegenName"
+fun f_Kernel_Environment_looksLikeCodegenName_331cc9bb85(
+  _runtime: mutable LeanExecution,
+  _x_1_0_input: LeanValue,
+): LeanValue {
+  leanTag(_x_1_0_input) match {
+  | LeanTag.Name_str__impl ->
+    _ = leanField(_x_1_0_input, 0);
+    _ = leanField(_x_1_0_input, 1);
+    text = leanField(_x_1_0_input, 2);
+    byteSize = L4_Init_Prelude.f_String_utf8ByteSize_13277c3d6f(_runtime, text);
+    nonempty = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      LeanNatLiterals.n1,
+      byteSize,
+    );
+    leanTag(nonempty) match {
+    | LeanTag.Bool_false -> return nonempty
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    underscore = L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+      _runtime,
+      text,
+      LeanText("_"),
+      LeanNatLiterals.n0,
+      LeanNatLiterals.n0,
+      LeanNatLiterals.n1,
+      LeanErased(),
+      LeanErased(),
+    );
+    leanTag(underscore) match {
+    | LeanTag.Bool_false -> return underscore
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    boxed = L4_Init_Prelude.f_String_decEq_88c69973f8(
+      _runtime,
+      text,
+      LeanText("_boxed"),
+    );
+    leanTag(boxed) match {
+    | LeanTag.Bool_true -> return boxed
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    reducedArgument = L4_Init_Prelude.f_String_decEq_88c69973f8(
+      _runtime,
+      text,
+      LeanText("_redArg"),
+    );
+    leanTag(reducedArgument) match {
+    | LeanTag.Bool_true -> return reducedArgument
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    // This first length test reuses the initial byte size, as in the original.
+    enoughForClosed = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+      _runtime,
+      LeanNatLiterals.n8,
+      byteSize,
+    );
+    leanTag(enoughForClosed) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      closed = L4_Init_Data_String_Pattern_Memcmp.f_Pattern_Internal_memcmpStr_4cea523dfd(
+        _runtime,
+        text,
+        LeanText("_closed_"),
+        LeanNatLiterals.n0,
+        LeanNatLiterals.n0,
+        LeanNatLiterals.n8,
+        LeanErased(),
+        LeanErased(),
+      );
+      leanTag(closed) match {
+      | LeanTag.Bool_true -> return closed
+      | LeanTag.Bool_false -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    lambda = f_parity_environment_codegenPrefix(
+      _runtime,
+      text,
+      LeanText("_lam_"),
+      LeanNatLiterals.n5,
+    );
+    leanTag(lambda) match {
+    | LeanTag.Bool_true -> return lambda
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    erasedLambda = f_parity_environment_codegenPrefix(
+      _runtime,
+      text,
+      LeanText("_elambda"),
+      LeanNatLiterals.n8,
+    );
+    leanTag(erasedLambda) match {
+    | LeanTag.Bool_true -> return erasedLambda
+    | LeanTag.Bool_false -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    f_parity_environment_codegenPrefix(
+      _runtime,
+      text,
+      LeanText("_cstage"),
+      LeanNatLiterals.n7,
+    )
+  | _ -> leanBool(false)
+  }
+}
+
+module end;

@@ -1,0 +1,53 @@
+// Lane-local semantic comparison. native_eq == 0 proves equality; nonzero
+// is inconclusive and must not reject only an Array element specialization.
+// Keep exact snapshot shape/slot presence, then use the maintained LeanCtor /
+// LeanArray structural fallback (tags, arities, lengths, ordered children).
+fun f_paritySimplifierProbeSameReferences(left: LeanReferenceSnapshot, right: LeanReferenceSnapshot): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.count != right.count || left.pages.size() != right.pages.size()) return false;
+  for (pageIndex in Range(0, left.pages.size())) {
+    leftPage = left.pages[pageIndex];
+    rightPage = right.pages[pageIndex];
+    if (leftPage.size() != rightPage.size()) return false;
+    for (slotIndex in Range(0, leftPage.size())) {
+      (leftPage[slotIndex], rightPage[slotIndex]) match {
+      | (Some(leftValue), Some(rightValue)) ->
+        if (!rewriteProbeSameInput(leftValue, rightValue)) return false
+      | (None(), None()) -> void
+      | _ -> return false
+      }
+    }
+  };
+  true
+}
+
+// Do not synthesize extensional closure equality. Input callbacks are preserved
+// and their arity/captures/order/world/cache behavior is checked by the existing
+// dsimp fixture. Fresh unrelated closures are not declared equivalent here.
+fun f_paritySimplifierProbeCompare(
+  label: String,
+  saved: LeanExecutionCheckpoint,
+  original: (mutable LeanExecution) ~> LeanValue,
+  replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  newResult = replacement(newRuntime);
+  after = newRuntime.checkpoint();
+  if (!rewriteProbeSameInput(oldResult, newResult)) {
+    leanFail("rewrite result mismatch: " + label)
+  };
+  if (!f_paritySimplifierProbeSameReferences(oldRuntime.checkpoint().refs, after.refs)) {
+    leanFail("rewrite reference mismatch: " + label)
+  };
+  expected match {
+  | Some(value) ->
+    if (!rewriteProbeSameInput(newResult, value)) {
+      leanFail("rewrite unexpected outcome: " + label)
+    }
+  | None() -> void
+  };
+  (newResult, after)
+}

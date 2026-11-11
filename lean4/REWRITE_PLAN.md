@@ -1,5 +1,20 @@
 # Rewrite the measured example in parallel
 
+**Latest status (2026-11-11): all 46 wave functions are integrated; full release
+check/build and 36-case proof matrix passed. The paired benchmark improved by
+24.21%, still 2.532× native; all lane gates passed after the offsets repair.** See
+[PARITY_REWRITE_PLAN.md](PARITY_REWRITE_PLAN.md) for current evidence. The active strategy is GLM-5.3 implementation plus independent GLM-5.3
+review, with stronger-model escalation only when stuck. Agent counts and status
+in the historical sections below are superseded.
+
+**Original user direction: one broad wave with eight implementers and two reviewers.**
+[PARITY_REWRITE_PLAN.md](PARITY_REWRITE_PLAN.md) supersedes the small-batch gate:
+46 initial frame routines (30,555 original lines), shared port allocation work,
+and a complete 152-entry remaining-frame roadmap. Readability rewrites are in
+scope even without certain timing gains. Ten agents are launched; correctness
+checks remain serialized and benchmarking waits for wave integration. Historical
+notes below describe earlier runs, not additional currently active worker pools.
+
 **Resumed at the user's request (2026-11-10), with up to ten subagents authorized.**
 The [handoff](AGENT_HANDOFF.md) and [pause checkpoint](PAUSE_CHECKPOINT.md) preserve
 historical evidence: depth-6 Skip elaboration at 638.291 ms versus native Lean

@@ -1,0 +1,173 @@
+File "build/probes/parity-inference-draft/Driver.sk", line 58, characters 7-16:
+You cannot capture this variable
+56 |       result = f_inference_probe_call(runtime, true, target, oldArgs);
+57 |       for (i in Range(0, args.size())) assert(rewriteProbeSameInput(args[i], oldArgs[i]));
+58 |       oldMetrics.push(runtime.checkpoint().metrics);
+   |       ^^^^^^^^^^
+59 |       result
+
+File "build/probes/parity-inference-draft/Driver.sk", line 52, characters 15-40:
+Mutable because of this position
+50 | ): (LeanValue, LeanExecutionCheckpoint) {
+51 |   oldArgs = args.map(rewriteProbeCopyInput);
+52 |   oldMetrics: mutable Vector<Array<Int>> = mutable Vector[];
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 |   newArgs = args.map(rewriteProbeCopyInput);
+
+File "build/probes/parity-inference-draft/Driver.sk", line 55, characters 5-5:
+Because this closure was declared as pure (~>)
+Try '->' instead
+53 |   newArgs = args.map(rewriteProbeCopyInput);
+54 |   (result, after) = rewriteProbeCompare(label, saved,
+55 |     (runtime: mutable LeanExecution) ~> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+56 |       result = f_inference_probe_call(runtime, true, target, oldArgs);
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "build/probes/parity-inference-draft/Driver.sk", line 131, characters 72-75:
+Local variable 'args' was not used. Prefix it with an underscore to silence the error: '_args'
+129 |
+130 | // Used only by expected-failure projection-order modes. Its marker must NOT run.
+131 | fun f_inference_probe_projectionMarker(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+    |                                                                        ^^^^
+132 |   print_error("UNEXPECTED callback reached before constructor projection");
+File "build/probes/parity-inference-draft/Driver.sk", line 131, characters 40-46:
+Local variable 'runtime' was not used. Prefix it with an underscore to silence the error: '_runtime'
+129 |
+130 | // Used only by expected-failure projection-order modes. Its marker must NOT run.
+131 | fun f_inference_probe_projectionMarker(runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue {
+    |                                        ^^^^^^^
+132 |   print_error("UNEXPECTED callback reached before constructor projection");
+File "build/probes/parity-inference-draft/Driver.sk", line 222, characters 6-11:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+220 |   ]) {
+221 |     expectedPayload = LeanCtor(LeanTag.Prod_mk, Array[empty, LeanCtor(LeanTag.Prod_mk, Array[input, state.metaContext])]);
+222 |     (result, after) = f_inference_probe_compare(label, saved, 6,
+    |      ^^^^^^
+223 |       Array[poison, poison, none, continuation, poison, consumeLambda, consumeLet, locals, empty, input].concat(contextArgs), Some(f_inference_probe_ok(expectedPayload, world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 308, characters 4-9:
+Local variable 'failed' was not used. Prefix it with an underscore to silence the error: '_failed'
+306 |   };
+307 |   failureContinuation = LeanClosure(f_inference_probe_telescopeContinuation, 9, Array[calls, leanBool(true)]);
+308 |   (failed, failedAfter) = f_inference_probe_compare("continuation error keeps fresh names", saved, 0,
+    |    ^^^^^^
+309 |     Array[leanBool(false), none, failureContinuation, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, dependent].concat(contextArgs),
+File "build/probes/parity-inference-draft/Driver.sk", line 419, characters 8-13:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+417 |   for ((label, left, right, expected) in Array[("reflexive", a, a, true), ("different sorts", prop, type, false), ("beta", beta, x, true)]) {
+418 |     for (postpone in Array[false, true]) {
+419 |       (result, after) = f_inference_probe_compare("defeq " + label, saved, 3, Array[left, right, leanBool(postpone)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(expected), world)));
+    |        ^^^^^^
+420 |       beforeRuntime = saved.restoreRaw();
+File "build/probes/parity-inference-draft/Driver.sk", line 430, characters 4-11:
+Local variable 'assigned' was not used. Prefix it with an underscore to silence the error: '_assigned'
+428 |   assert(leanTag(fresh) == LeanTag.EST_Out_ok);
+429 |   mvar = leanField(fresh, 0);
+430 |   (assigned, assignmentAfter) = f_inference_probe_compare("defeq commits assignment", assignmentRuntime.checkpoint(), 3, Array[mvar, x, leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+    |    ^^^^^^^^
+431 |   assignedRuntime = assignmentAfter.restoreRaw();
+File "build/probes/parity-inference-draft/Driver.sk", line 437, characters 4-19:
+Local variable 'equalWithPending' was not used. Prefix it with an underscore to silence the error: '_equalWithPending'
+435 |   pendingRuntime = saved.restoreRaw();
+436 |   pendingSaved = f_inference_probe_postponed(pendingRuntime, state, zero, zero);
+437 |   (equalWithPending, equalityAfter) = f_inference_probe_compare("defeq preserves outer postponed queue", pendingSaved, 3, Array[a, a, leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+    |    ^^^^^^^^^^^^^^^^
+438 |   equalityRuntime = equalityAfter.restoreRaw();
+File "build/probes/parity-inference-draft/Driver.sk", line 444, characters 8-18:
+Local variable 'emptyResult' was not used. Prefix it with an underscore to silence the error: '_emptyResult'
+442 |   for (postpone in Array[false, true]) {
+443 |     for (exceptionOnFailure in Array[false, true]) {
+444 |       (emptyResult, emptyAfter) = f_inference_probe_compare("empty postponed", saved, 5, Array[leanBool(postpone), leanBool(exceptionOnFailure)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+    |        ^^^^^^^^^^^
+445 |       assert(native_eq(emptyAfter.refs, saved.refs) == 0);
+File "build/probes/parity-inference-draft/Driver.sk", line 473, characters 6-11:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+471 |     ("whnf head", L4_Lean_Expr.f_Lean_mkAnnotation_fe98cbf276(runtime, alphaName, arrow), LeanArray(Array[x]), LeanNatLiterals.n0, expectedApp),
+472 |   ]) {
+473 |     (result, _) = f_inference_probe_compare("app args " + label, saved, 4, Array[function, explicitArgs, inputType, index, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(expected, world)));
+    |      ^^^^^^
+474 |     !checks = checks + 1
+File "build/probes/parity-inference-draft/Driver.sk", line 480, characters 6-11:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+478 |     polyFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, implicit, type, L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, bvar0, bvar0));
+479 |     expected = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, polyFunction, LeanArray(Array[a, x]));
+480 |     (result, _) = f_inference_probe_compare("app inserts inferred implicit", saved, 4, Array[polyFunction, LeanArray(Array[x]), inputType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(expected, world)));
+    |      ^^^^^^
+481 |     !checks = checks + 1
+File "build/probes/parity-inference-draft/Driver.sk", line 487, characters 4-17:
+Local variable 'trailingResult' was not used. Prefix it with an underscore to silence the error: '_trailingResult'
+485 |   trailingFunction = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, binderName, binder, a, L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, alphaName, LeanCtor(LeanTag.BinderInfo_implicit, Array[]), type, bvar1));
+486 |   trailingExpected = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, trailingFunction, x);
+487 |   (trailingResult, _) = f_inference_probe_compare("app stops before trailing implicit", saved, 4, Array[trailingFunction, LeanArray(Array[x]), trailingType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty].concat(contextArgs), Some(f_inference_probe_ok(trailingExpected, world)));
+    |    ^^^^^^^^^^^^^^
+488 |   !checks = checks + 1;
+File "build/probes/parity-inference-draft/Driver.sk", line 507, characters 8-13:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+505 |       action = LeanClosure(f_inference_probe_traceContinuation, 8, Array[calls, leanBool(success), value]);
+506 |       expected = LeanCtor(if (success) LeanTag.EST_Out_ok else LeanTag.EST_Out_error, Array[value, world]);
+507 |       (result, after) = f_inference_probe_compare("app trace " + label, saved, 7, Array[function, LeanArray(Array[x]), action, state.metaContext, state.metaStateRef, core, state.coreStateRef, world], Some(expected));
+    |        ^^^^^^
+508 |       afterRuntime = after.restoreRaw();
+File "build/probes/parity-inference-draft/Driver.sk", line 539, characters 16-24:
+Local variable 'zeroAfter' was not used. Prefix it with an underscore to silence the error: '_zeroAfter'
+537 |   // some0, whnf=false cannot inspect even the type or state references.
+538 |   unused = LeanUnavailable("zero telescope must not inspect this value");
+539 |   (zeroResult, zeroAfter) = f_inference_probe_compare("zero telescope poison", saved, 2,
+    |                ^^^^^^^^^
+540 |     Array[unused, limits[1], continuation, unused, leanBool(false), state.metaContext, unused, unused, unused, world]);
+File "build/probes/parity-inference-draft/Driver.sk", line 558, characters 17-26:
+Local variable 'classAfter' was not used. Prefix it with an underscore to silence the error: '_classAfter'
+556 |   classSaved = classRuntime.checkpoint();
+557 |   classBinder = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, binderName, LeanCtor(LeanTag.BinderInfo_instImplicit, Array[]), classConst, a);
+558 |   (classResult, classAfter) = f_inference_probe_compare("class local visible in callback", classSaved, 0,
+    |                 ^^^^^^^^^^
+559 |     Array[leanBool(false), none, continuation, leanBool(false), leanBool(false), locals, empty, LeanNatLiterals.n0, classBinder].concat(contextArgs));
+File "build/probes/parity-inference-draft/Driver.sk", line 579, characters 14-18:
+Local variable 'after' was not used. Prefix it with an underscore to silence the error: '_after'
+577 |   for (available in Array[false, true]) {
+578 |     meta = if (available) classMeta else state.metaContext;
+579 |     (result, after) = f_inference_probe_compare("application instance synthesis", classSaved, 4,
+    |              ^^^^^
+580 |       Array[instanceFunction, LeanArray(Array[x]), instanceFunctionType, LeanNatLiterals.n0, LeanNatLiterals.n0, empty, empty, meta, state.metaStateRef, state.coreContext, state.coreStateRef, world]);
+File "build/probes/parity-inference-draft/Driver.sk", line 617, characters 4-14:
+Local variable 'prefixEqual' was not used. Prefix it with an underscore to silence the error: '_prefixEqual'
+615 |   prefixLeft = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, pairLocal, mvar);
+616 |   prefixRight = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, pairLocal, x);
+617 |   (prefixEqual, prefixAssignmentAfter) = f_inference_probe_compare("defeq assignment prefix control", rollbackSaved, 3,
+    |    ^^^^^^^^^^^
+618 |     Array[prefixLeft, prefixRight, leanBool(false), pairMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(true), world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 623, characters 4-17:
+Local variable 'rollbackResult' was not used. Prefix it with an underscore to silence the error: '_rollbackResult'
+621 |   assert(rewriteProbeSameInput(prefixAssignment, LeanCtor(LeanTag.Option_some, Array[x])));
+622 |   !checks = checks + 1;
+623 |   (rollbackResult, rollbackAfter) = f_inference_probe_compare("defeq false restores assignment", rollbackSaved, 3,
+    |    ^^^^^^^^^^^^^^
+624 |     Array[leftPair, rightPair, leanBool(false), pairMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(false), world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 641, characters 4-13:
+Local variable 'noProgress' was not used. Prefix it with an underscore to silence the error: '_noProgress'
+639 |   levelRuntime.writeRef(state.metaStateRef, Some(leanReplaceField(levelState, 0, levelMctx)));
+640 |   noProgressSaved = f_inference_probe_postponed(levelRuntime, state, levelM, blocked);
+641 |   (noProgress, noProgressAfter) = f_inference_probe_compare("postponed no progress retains constraint", noProgressSaved, 5,
+    |    ^^^^^^^^^^
+642 |     Array[leanBool(true), leanBool(false)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 655, characters 4-10:
+Local variable 'refused' was not used. Prefix it with an underscore to silence the error: '_refused'
+653 |   noApproxKey = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, noApproxConfig);
+654 |   noApproxMeta = leanReplaceField(state.metaContext, 0, LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[noApproxConfig, noApproxKey]));
+655 |   (refused, refusedAfter) = f_inference_probe_compare("postponed no progress refused", noProgressSaved, 5,
+    |    ^^^^^^^
+656 |     Array[leanBool(false), leanBool(false), noApproxMeta, state.metaStateRef, state.coreContext, state.coreStateRef, world], Some(f_inference_probe_ok(leanBool(false), world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 668, characters 4-9:
+Local variable 'merged' was not used. Prefix it with an underscore to silence the error: '_merged'
+666 |   leftSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, levelM);
+667 |   rightSort = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, blocked);
+668 |   (merged, mergedAfter) = f_inference_probe_compare("defeq old postponed before new", mergeSaved, 3,
+    |    ^^^^^^
+669 |     Array[leftSort, rightSort, leanBool(true)].concat(contextArgs), Some(f_inference_probe_ok(leanBool(true), world)));
+File "build/probes/parity-inference-draft/Driver.sk", line 732, characters 6-11:
+Local variable 'result' was not used. Prefix it with an underscore to silence the error: '_result'
+730 |     action = LeanClosure(f_inference_probe_traceContinuation, 8, Array[calls, leanBool(false), exception]);
+731 |     core = f_inference_probe_traceOption(runtime, state.coreContext, "error");
+732 |     (result, after) = f_inference_probe_compare("trace exception bypass", saved, 7,
+    |      ^^^^^^
+733 |       Array[function, empty, action, state.metaContext, state.metaStateRef, core, state.coreStateRef, world], Some(LeanCtor(LeanTag.EST_Out_error, Array[exception, world])));
+

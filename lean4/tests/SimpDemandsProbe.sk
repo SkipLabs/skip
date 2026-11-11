@@ -1,0 +1,123 @@
+// Separate-process demand checks: parent CheckNegative.py supplies each mode.
+// Default invocation only confirms the driver built; it does not count a test.
+fun f_paritySimplifierDemandFields(size: Int, value: LeanValue): Array<LeanValue> {
+  fields: Array<LeanValue> = Array[];
+  for (_ in Range(0, size)) { !fields = fields.append(value) };
+  fields
+}
+fun main(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 1) {
+    print_string("simplifier demands: built only; run CheckNegative.py for classified cases");
+    return void
+  };
+  assert(args.size() == 4);
+  assert(args[1] == "old" || args[1] == "new");
+  assert(args[2] == "off" || args[2] == "on");
+  old = args[1] == "old";
+  mode = args[3];
+  runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => args[2] == "on"};
+  poison: LeanValue = LeanUnavailable("demand fixture poison reached before required projection");
+  none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+  someEmpty: LeanValue = LeanCtor(LeanTag.Option_some, Array[]);
+  world = leanBoxNat(LeanNat::parse("18446744073709551623"));
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+  app: LeanValue = LeanCtor(LeanTag.Expr_app__impl, Array[poison, prop, prop]);
+  fr: LeanValue = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, none, poison]);
+  ar = fr;
+  kind = 0;
+  if (mode == "trans-result") {
+    !kind = 2;
+    !fr = leanBool(false);
+    !app = none;
+    !ar = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, none])
+  } else if (mode == "congr-result" || mode == "congrfun-result") {
+    !kind = if (mode == "congr-result") 0 else 1;
+    !fr = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, none])
+  } else if (mode == "congr-app" || mode == "congrfun-app") {
+    !kind = if (mode == "congr-app") 0 else 1;
+    !app = LeanCtor(LeanTag.Expr_app__impl, Array[poison, prop])
+  } else if (mode == "congr-function-proof" || mode == "congrfun-function-proof") {
+    !kind = if (mode == "congr-function-proof") 0 else 1;
+    !fr = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, someEmpty, poison]);
+    // First proof payload must be demanded before second proof tag or Meta inference.
+    !ar = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, poison, poison])
+  } else if (mode == "congr-argument-proof") {
+    !ar = LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[prop, someEmpty, poison])
+  } else {
+    expression = prop;
+    context = poison;
+    methods = poison;
+    core = poison;
+    coreRef = poison;
+    target = 0;
+    if (mode == "step-context" || mode == "dsimp-context") {
+      !target = if (mode == "step-context") 0 else 3;
+      !context = LeanCtor(LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk, Array[poison])
+    } else if (mode == "step-config" || mode == "dsimp-config" || mode == "dsimp-methods") {
+      !target = if (mode == "step-config") 0 else 3;
+      configFields: Array<LeanValue> = Array[];
+      for (i in Range(0, if (mode == "dsimp-methods") 32 else 15)) {
+        !configFields = configFields.append(if (i == 14) leanBool(mode == "dsimp-methods") else poison)
+      };
+      config: LeanValue = LeanCtor(LeanTag.Meta_Simp_Config_mk, configFields);
+      !context = LeanCtor(LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk,
+        Array[config].concat(f_paritySimplifierDemandFields(12, poison)));
+      !methods = LeanCtor(LeanTag.Meta_Simp_Methods_mk, f_paritySimplifierDemandFields(4, poison))
+    } else if (mode == "reduce-core" || mode == "reduce-cold") {
+      !target = 1;
+      cold: LeanValue = LeanCtor(LeanTag.Core_Context_Cold_mk, Array[poison, poison, poison, LeanNatLiterals.n0]);
+      !core = LeanCtor(LeanTag.Core_Context_mk,
+        if (mode == "reduce-core") Array[poison, LeanNatLiterals.n0, poison]
+        else Array[cold, LeanNatLiterals.n0, poison, poison, poison, poison, poison, poison])
+    } else if (mode == "continuation-let") {
+      !target = 4;
+      !expression = LeanCtor(LeanTag.Expr_letE__impl, Array[poison, poison, poison, prop, prop])
+    } else if (mode == "projection-const" || mode == "projection-state") {
+      !target = 2;
+      !expression = LeanCtor(LeanTag.Expr_const__impl,
+        if (mode == "projection-const") Array[poison, poison] else Array[poison, poison, poison]);
+      !coreRef = runtime.newRef(LeanCtor(LeanTag.Core_State_mk, Array[poison]))
+    } else { leanFail("unknown simplifier demand mode") };
+    if (target == 0) {
+      if (old) { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceStep_e0a2562bfe_fallback(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+      else { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceStep_e0a2562bfe(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+    } else if (target == 1) {
+      if (old) { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduce_2d4439ae62_fallback(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+      else { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduce_2d4439ae62(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+    } else if (target == 2) {
+      if (old) { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69_fallback(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+      else { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+    } else if (target == 3) {
+      if (old) { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpImpl_d6934cdfe0_fallback(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+      else { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_dsimpImpl_d6934cdfe0(runtime,
+        expression, methods, context, poison, poison, poison, core, coreRef, world) }
+    } else {
+      if (old) { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b_fallback(runtime,
+        poison, poison, poison, expression, poison, poison, poison, leanBool(false), leanBool(false), poison,
+        methods, context, poison, poison, poison, core, coreRef, world) }
+      else { _ = L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b(runtime,
+        poison, poison, poison, expression, poison, poison, poison, leanBool(false), leanBool(false), poison,
+        methods, context, poison, poison, poison, core, coreRef, world) }
+    };
+    leanFail("unexpected simplifier demand success")
+  };
+  if (kind == 0) {
+    if (old) { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327_fallback(runtime, app, fr, ar, poison, poison, poison, poison, world) }
+    else { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327(runtime, app, fr, ar, poison, poison, poison, poison, world) }
+  } else if (kind == 1) {
+    if (old) { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24_fallback(runtime, app, fr, prop, poison, poison, poison, poison, world) }
+    else { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24(runtime, app, fr, prop, poison, poison, poison, poison, world) }
+  } else {
+    if (old) { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295_fallback(runtime, app, fr, ar, poison, poison, poison, poison, world) }
+    else { _ = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(runtime, app, fr, ar, poison, poison, poison, poison, world) }
+  };
+  leanFail("unexpected simplifier demand success")
+}

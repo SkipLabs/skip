@@ -1,0 +1,129 @@
+module L4_Lean_Meta_Basic;
+
+// "_private.Lean.Meta.Basic.0.Lean.Meta.forallTelescopeReducingAuxAux.process._redArg"
+fun f_Meta_forallTelescopeReducingAuxAux_process_0ca40475ce(
+  _runtime: mutable LeanExecution,
+  _reducing_0_input: LeanValue,
+  _maxFVars_1_input: LeanValue,
+  _k_2_input: LeanValue,
+  _cleanupAnnotations_3_input: LeanValue,
+  _whnfTypeIfReducing_4_input: LeanValue,
+  _lctx_5_input: LeanValue,
+  _fvars_6_input: LeanValue,
+  _j_7_input: LeanValue,
+  _type_8_input: LeanValue,
+  _a_9_input: LeanValue,
+  _a_10_input: LeanValue,
+  _a_11_input: LeanValue,
+  _a_12_input: LeanValue,
+  _a_1_13_input: LeanValue,
+): LeanValue {
+  reducing = _reducing_0_input;
+  maxFVars = _maxFVars_1_input;
+  continuation = _k_2_input;
+  cleanupAnnotations = _cleanupAnnotations_3_input;
+  whnfTypeIfReducing = _whnfTypeIfReducing_4_input;
+  initialLocalContext = _lctx_5_input;
+  initialFVars = _fvars_6_input;
+  instantiationStart = _j_7_input;
+  initialType = _type_8_input;
+  metaContext = _a_9_input;
+  metaStateRef = _a_10_input;
+  coreContext = _a_11_input;
+  coreStateRef = _a_12_input;
+  initialWorld = _a_1_13_input;
+
+  localContext = initialLocalContext;
+  fvars = initialFVars;
+  type = initialType;
+  world = initialWorld;
+  loop {
+    if (leanTag(type) == LeanTag.Expr_forallE__impl) {
+      _ = leanField(type, 0);
+      binderName = leanField(type, 1);
+      binderType = leanField(type, 2);
+      body = leanField(type, 3);
+      binderInfo = leanField(type, 4);
+      room = f_Lean_Meta_fvarsSizeLtMaxFVars_652f1539d8(_runtime, fvars, maxFVars);
+      if (!f_inference_forallProcess_bool(room)) {
+        f_inference_forallProcess_projectMeta_Context_mk(metaContext);
+        size = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), fvars);
+        instantiated = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, type, instantiationStart, size, fvars);
+        // Partial application must precede installing the extended local context.
+        action = leanApply(_runtime, continuation, Array[fvars, instantiated]);
+        extendedContext = LeanCtor(LeanTag.Meta_Context_mk, Array[leanField(metaContext, 0), leanField(metaContext, 1), leanField(metaContext, 2), localContext, leanField(metaContext, 4), leanField(metaContext, 5), leanField(metaContext, 6), leanField(metaContext, 7), leanField(metaContext, 8), leanField(metaContext, 9), leanField(metaContext, 10)]);
+        return f_Lean_Meta_withNewLocalInstancesImp_88b4382583(_runtime, fvars, instantiationStart, action, extendedContext, metaStateRef, coreContext, coreStateRef, world)
+      };
+      size = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), fvars);
+      domain = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, binderType, instantiationStart, size, fvars);
+      if (f_inference_forallProcess_bool(cleanupAnnotations)) {
+        !domain = L4_Lean_Expr.f_Lean_Expr_cleanupAnnotations_72ebbfac43(_runtime, domain)
+      };
+      fresh = f_forallTelescopeReducingAuxAux_process_spec_0_3fbd8ad252(_runtime, coreStateRef, world);
+      if (!f_inference_forallProcess_ok(fresh)) return LeanCtor(LeanTag.EST_Out_error, Array[leanField(fresh, 0), leanField(fresh, 1)]);
+      fvarId = leanField(fresh, 0);
+      nextWorld = leanField(fresh, 1);
+      declarationKind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+      nextLocalContext = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(_runtime, localContext, fvarId, binderName, domain, binderInfo, declarationKind);
+      fvar = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(_runtime, fvarId);
+      !fvars = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(_runtime, LeanErased(), fvars, fvar);
+      !localContext = nextLocalContext;
+      !type = body;
+      !world = nextWorld;
+      continue
+    };
+    size = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), fvars);
+    instantiated = L4_Lean_Expr.f_Lean_Expr_instantiateRevRange_2c62aa071a(_runtime, type, instantiationStart, size, fvars);
+    shouldReduce = reducing;
+    if (f_inference_forallProcess_bool(reducing)) {
+      !shouldReduce = f_Lean_Meta_fvarsSizeLtMaxFVars_652f1539d8(_runtime, fvars, maxFVars)
+    };
+    f_inference_forallProcess_projectMeta_Context_mk(metaContext);
+    // Keep the production continuation: it reduces only after registering locals,
+    // resets the instantiation boundary, and preserves the unreduced body policy.
+    action = LeanClosure(L4_Lean_Meta_Basic.apply_f_forallTelescopeReducingAuxAux_process_lam_0_30cae2ab9c, 15,
+      Array[shouldReduce, continuation, fvars, instantiated, whnfTypeIfReducing, reducing, maxFVars, cleanupAnnotations, localContext, size]);
+    extendedContext = LeanCtor(LeanTag.Meta_Context_mk, Array[leanField(metaContext, 0), leanField(metaContext, 1), leanField(metaContext, 2), localContext, leanField(metaContext, 4), leanField(metaContext, 5), leanField(metaContext, 6), leanField(metaContext, 7), leanField(metaContext, 8), leanField(metaContext, 9), leanField(metaContext, 10)]);
+    return f_Lean_Meta_withNewLocalInstancesImp_88b4382583(_runtime, fvars, instantiationStart, action, extendedContext, metaStateRef, coreContext, coreStateRef, world)
+  }
+}
+
+fun f_inference_forallProcess_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inference_forallProcess_ok(result: LeanValue): Bool {
+  leanTag(result) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Project, but do not decode, every field consumed by the frozen constructor case.
+fun f_inference_forallProcess_projectMeta_Context_mk(value: LeanValue): void {
+  if (leanTag(value) != LeanTag.Meta_Context_mk) leanFail("non-exhaustive Lean case");
+  _ = leanField(value, 0);
+  _ = leanField(value, 1);
+  _ = leanField(value, 2);
+  _ = leanField(value, 3);
+  _ = leanField(value, 4);
+  _ = leanField(value, 5);
+  _ = leanField(value, 6);
+  _ = leanField(value, 7);
+  _ = leanField(value, 8);
+  _ = leanField(value, 9);
+  _ = leanField(value, 10)
+}
+
+module end;

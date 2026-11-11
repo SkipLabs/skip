@@ -1,0 +1,663 @@
+// Execute after all four replacements and *_fallback entries are integrated.
+// Each branch runs from an immutable checkpoint, with disjoint copied input roots.
+
+fun f_offsets_probe_nat(decimal: String): LeanValue {
+  leanBoxNat(leanNat(LeanScalar("nat", decimal)))
+}
+
+fun f_offsets_probe_literal(runtime: mutable LeanExecution, decimal: String): LeanValue {
+  L4_Lean_Expr.f_Lean_mkRawNatLit_73e4087d7e(runtime, f_offsets_probe_nat(decimal))
+}
+
+fun f_offsets_probe_name(runtime: mutable LeanExecution, namespaceName: String, member: String): LeanValue {
+  if (namespaceName == "") {
+    L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(member))
+  } else {
+    L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText(namespaceName), LeanText(member))
+  }
+}
+
+fun f_offsets_probe_app(
+  runtime: mutable LeanExecution,
+  namespaceName: String,
+  member: String,
+  arguments: Array<LeanValue>,
+): LeanValue {
+  expression = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(
+    runtime, f_offsets_probe_name(runtime, namespaceName, member), LeanCtor(LeanTag.List_nil, Array[]),
+  );
+  for (argument in arguments) {
+    !expression = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, expression, argument)
+  };
+  expression
+}
+
+fun f_offsets_probe_context(runtime: mutable LeanExecution, context: LeanValue, enabled: Bool): LeanValue {
+  config = leanReplaceField(
+    L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context), 8, leanBool(enabled),
+  );
+  leanReplaceField(context, 0, LeanCtor(
+    LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk,
+    Array[config, L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config)],
+  ))
+}
+
+fun f_offsets_probe_ok(value: LeanValue, world: LeanValue): LeanValue {
+  LeanCtor(LeanTag.EST_Out_ok, Array[value, world])
+}
+
+fun f_offsets_probe_some(decimal: String): LeanValue {
+  LeanCtor(LeanTag.Option_some, Array[f_offsets_probe_nat(decimal)])
+}
+
+fun f_offsets_probe_offset(base: LeanValue, decimal: String): LeanValue {
+  LeanCtor(LeanTag.Option_some, Array[LeanCtor(LeanTag.Prod_mk, Array[base, f_offsets_probe_nat(decimal)])])
+}
+
+fun f_offsets_probe_call(
+  runtime: mutable LeanExecution,
+  target: String,
+  original: Bool,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  metaState: LeanValue,
+  core: LeanValue,
+  coreState: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  useCanonicalFallback = Environ.varOpt("LEAN_SKIP_OFFSETS_CANONICAL_FALLBACK").isSome();
+  if (original && !useCanonicalFallback) {
+    target match {
+    | "eval" -> return f_offsets_oracle_Lean_Meta_evalNat_6bfbb6a56e(runtime, left, context, metaState, core, coreState, world)
+    | "visit" -> return f_offsets_oracle_Meta_evalNat_visit_be1fb46d98(runtime, left, context, metaState, core, coreState, world)
+    | "offset" -> return f_offsets_oracle_Lean_Meta_isOffset_cecda6b311(runtime, left, context, metaState, core, coreState, world)
+    | "defeq" -> return f_offsets_oracle_Lean_Meta_isDefEqOffset_4916547658(runtime, left, right, context, metaState, core, coreState, world)
+    | _ -> return leanFail("unknown offsets probe target")
+    }
+  };
+  target match {
+  | "eval" ->
+    if (original) {
+      L4_Lean_Meta_Offset.f_Lean_Meta_evalNat_6bfbb6a56e_fallback(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    } else {
+      L4_Lean_Meta_Offset.f_Lean_Meta_evalNat_6bfbb6a56e(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    }
+  | "visit" ->
+    if (original) {
+      L4_Lean_Meta_Offset.f_Meta_evalNat_visit_be1fb46d98_fallback(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    } else {
+      L4_Lean_Meta_Offset.f_Meta_evalNat_visit_be1fb46d98(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    }
+  | "offset" ->
+    if (original) {
+      L4_Lean_Meta_Offset.f_Lean_Meta_isOffset_cecda6b311_fallback(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    } else {
+      L4_Lean_Meta_Offset.f_Lean_Meta_isOffset_cecda6b311(
+        runtime, left, context, metaState, core, coreState, world,
+      )
+    }
+  | "defeq" ->
+    if (original) {
+      L4_Lean_Meta_Offset.f_Lean_Meta_isDefEqOffset_4916547658_fallback(
+        runtime, left, right, context, metaState, core, coreState, world,
+      )
+    } else {
+      L4_Lean_Meta_Offset.f_Lean_Meta_isDefEqOffset_4916547658(
+        runtime, left, right, context, metaState, core, coreState, world,
+      )
+    }
+  | _ -> leanFail("unknown offsets probe target")
+  }
+}
+
+fun f_offsets_probe_check(
+  label: String,
+  target: String,
+  saved: LeanExecutionCheckpoint,
+  state: RewriteProbeState,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  core: LeanValue,
+  world: LeanValue,
+  expected: LeanValue,
+  unchanged: Bool,
+): LeanExecutionCheckpoint {
+  // Bounded phase label emitted before any callback runs, so an unlabeled
+  // non-exhaustive crash still localizes to the old/new compare of this case.
+  // Pure stderr marker; no fixture, expectation, count, or callback change.
+  print_error("offset phase begin: " + target + "/" + label);
+  oldLeft = rewriteProbeCopyInput(left);
+  newLeft = rewriteProbeCopyInput(left);
+  oldRight = rewriteProbeCopyInput(right);
+  newRight = rewriteProbeCopyInput(right);
+  oldContext = rewriteProbeCopyInput(context);
+  newContext = rewriteProbeCopyInput(context);
+  oldCore = rewriteProbeCopyInput(core);
+  newCore = rewriteProbeCopyInput(core);
+  retainedRefs = saved.refs;
+  (result, after) = f_offsets_probe_compare(
+    label, saved,
+    (originalExecution: mutable LeanExecution) ~> f_offsets_probe_call(
+      originalExecution, target, true, oldLeft, oldRight, oldContext, state.metaStateRef,
+      oldCore, state.coreStateRef, world,
+    ),
+    (replacementExecution: mutable LeanExecution) ~> f_offsets_probe_call(
+      replacementExecution, target, false, newLeft, newRight, newContext, state.metaStateRef,
+      newCore, state.coreStateRef, world,
+    ),
+  );
+  if (!rewriteProbeSameInput(result, expected)) {
+    // Reached only after exact old/new result AND reference-state parity passed.
+    // Render data without invoking Lean pretty printers, forcing closures, or rerunning calls.
+    print_error("offset diagnostic: " + target + "/" + label + "; old/new result and refs matched");
+    print_error("  actual: " + f_offsets_probe_diagnosticShape(result, 16));
+    print_error("  expected: " + f_offsets_probe_diagnosticShape(expected, 16));
+    print_error("  left fixture: " + f_offsets_probe_diagnosticShape(left, 10));
+    leanFail("offset expected result: " + label)
+  };
+  for ((input, oldInput, newInput) in Array[
+    (left, oldLeft, newLeft), (right, oldRight, newRight),
+    (context, oldContext, newContext), (core, oldCore, newCore),
+  ]) {
+    assert(rewriteProbeSameInput(input, oldInput));
+    assert(rewriteProbeSameInput(input, newInput))
+  };
+  assert(f_offsets_probe_sameRefs(retainedRefs, saved.refs));
+  if (unchanged) assert(f_offsets_probe_sameRefs(saved.refs, after.refs));
+  after
+}
+
+fun f_offsets_probe_axiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[name, LeanCtor(LeanTag.List_nil, Array[]), type]),
+    leanBool(false),
+  ])])
+}
+
+fun f_offsets_probe_depthError(runtime: mutable LeanExecution, source: LeanValue, world: LeanValue): LeanValue {
+  tag = f_offsets_probe_name(runtime, "runtime", "maxRecDepth");
+  message = L4_Lean_Message.f_Lean_MessageData_ofFormat_9fc6d2a204(
+    runtime, LeanCtor(LeanTag.Std_Format_text, Array[LeanText(
+      "maximum recursion depth has been reached\nuse `set_option maxRecDepth <num>` to increase limit\nuse `set_option diagnostics true` to get diagnostic information",
+    )]),
+  );
+  LeanCtor(LeanTag.EST_Out_error, Array[
+    LeanCtor(LeanTag.Exception_error, Array[source, LeanCtor(LeanTag.MessageData_tagged, Array[tag, message])]),
+    world,
+  ])
+}
+
+fun main(): void {
+  checks = 0;
+  for (profile in Array[false, true]) {
+    builder = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(builder);
+    nil = (LeanCtor(LeanTag.List_nil, Array[]) : LeanValue);
+    none = (LeanCtor(LeanTag.Option_none, Array[]) : LeanValue);
+    world = (LeanText("offset-world") : LeanValue);
+    literal = (numeralDecimal: String) -> f_offsets_probe_literal(builder, numeralDecimal);
+    app = (appNamespace: String, appMember: String, appArguments: Array<LeanValue>) -> f_offsets_probe_app(builder, appNamespace, appMember, appArguments);
+    nat = app("", "Nat", Array[]);
+    binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    xName = f_offsets_probe_name(builder, "", "offsetX");
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(
+      builder, L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(builder, LeanCtor(LeanTag.Level_zero__impl, Array[])),
+    );
+    unaryType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat, nat);
+    binaryType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat, unaryType);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    // Only declarations needed by the genuine inference/defeq checks are installed.
+    // Add is declared with the real class shape (a type former) but with no
+    // instance declarations, so instance resolution for the blocked-instance
+    // metavariable's declared `Add Nat` type fails normally instead of an
+    // unknown-constant error before reaching the read-only blocked behavior.
+    addClassType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(
+      builder, xName, binder, type, type,
+    );
+    for ((declarationNamespace, declarationMember, declarationType) in Array[
+      ("", "Nat", type), ("Nat", "zero", nat), ("Nat", "succ", unaryType),
+      ("Nat", "add", binaryType), ("", "Add", addClassType),
+    ]) {
+      declarationName = f_offsets_probe_name(builder, declarationNamespace, declarationMember);
+      constants.set(leanNameKey(declarationName), LeanConstantFile(f_offsets_probe_axiom(declarationName, declarationType), None()))
+    };
+    environment = rewriteProbeEnvironment(builder, constants.chill());
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(builder);
+    !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(
+      builder, locals, xName, xName, nat, binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]),
+    );
+    free = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(builder, xName);
+    state = rewriteProbeState(builder, environment, locals, "<offset-wave>");
+    context = f_offsets_probe_context(builder, state.metaContext, true);
+    disabled = f_offsets_probe_context(builder, state.metaContext, false);
+    zero = literal("0");
+    two = literal("2");
+    three = literal("3");
+    seven = literal("7");
+    succFree = app("Nat", "succ", Array[free]);
+    addFree = app("Nat", "add", Array[free, three]);
+    metadata = LeanCtor(LeanTag.List_cons, Array[
+      LeanCtor(LeanTag.Prod_mk, Array[xName, LeanCtor(LeanTag.DataValue_ofNat, Array[LeanNatLiterals.n1])]), nil,
+    ]);
+    annotate = (annotatedExpression: LeanValue) -> L4_Lean_Expr.f_Lean_mkMData_3cfcde81b2(builder, metadata, annotatedExpression);
+
+    initialMeta = builder.readRef(state.metaStateRef);
+    mctx = leanField(initialMeta, 0);
+    mvars: mutable Vector<LeanValue> = mutable Vector[];
+    for ((metavariableLabel, initialAssignment) in Array[
+      ("blocked", none),
+      ("literal", LeanCtor(LeanTag.Option_some, Array[seven])),
+      ("successor", LeanCtor(LeanTag.Option_some, Array[app("Nat", "succ", Array[two])])),
+      ("function", LeanCtor(LeanTag.Option_some, Array[app("Nat", "succ", Array[])])),
+    ]) {
+      metavariableName = f_offsets_probe_name(builder, "offsetMVar", metavariableLabel);
+      !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+        builder, mctx, metavariableName, metavariableName, locals, LeanArray(Array[]),
+        if (metavariableLabel == "function") unaryType else nat,
+        LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0,
+      );
+      if (leanTag(initialAssignment) == LeanTag.Option_some) {
+        !mctx = L4_Lean_MetavarContext.f_Lean_assignExp_5e8f394bd8(builder, mctx, metavariableName, leanField(initialAssignment, 0))
+      };
+      mvars.push(L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, metavariableName))
+    };
+    blockedInstanceName = f_offsets_probe_name(builder, "offsetMVar", "instance");
+    blockedInstanceType = app("", "Add", Array[nat]);
+    !mctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+      builder, mctx, blockedInstanceName, blockedInstanceName, locals, LeanArray(Array[]), blockedInstanceType,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0,
+    );
+    blockedInstance = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, blockedInstanceName);
+    builder.writeRef(state.metaStateRef, Some(leanReplaceField(initialMeta, 0, mctx)));
+    blocked = mvars[0];
+    thresholdName = f_offsets_probe_name(builder, "exponentiation", "threshold");
+    thresholdOptions = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+      builder, L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(builder),
+      leanField(leanField(state.coreContext, 0), 2), thresholdName, f_offsets_probe_nat("4"),
+    );
+    thresholdCore = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(builder, state.coreContext, thresholdOptions);
+    saved = builder.checkpoint();
+
+    // Separate processes select the explicit unsupported Nat.pow exponent boundary.
+    failureMode = Environ.varOpt("LEAN_SKIP_OFFSETS_FAILURE") match {
+    | Some(failureSetting) -> failureSetting
+    | None() -> ""
+    };
+    if (failureMode != "") {
+      assert(failureMode == "old-pow-limit" || failureMode == "new-pow-limit");
+      overflowOptions = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(
+        builder, L4_Lean_Data_KVMap.f_Lean_KVMap_instValueNat_65031dac70(builder),
+        leanField(leanField(state.coreContext, 0), 2), thresholdName, f_offsets_probe_nat("4294967296"),
+      );
+      overflowCore = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(builder, state.coreContext, overflowOptions);
+      overflowExpression = app("Nat", "pow", Array[two, literal("4294967296")]);
+      overflowRuntime = saved.restoreRaw();
+      _overflowResult = f_offsets_probe_call(
+        overflowRuntime, "visit", failureMode == "old-pow-limit", overflowExpression, zero,
+        context, state.metaStateRef, overflowCore, state.coreStateRef, world,
+      );
+      leanFail("expected Nat.pow exponent is too big")
+    };
+
+    for ((evalLabel, evalExpression, evalExpected) in Array[
+      ("raw literal", seven, f_offsets_probe_some("7")),
+      ("string literal", L4_Lean_Expr.f_Lean_mkStrLit_82d7115ae4(builder, LeanText("7")), none),
+      ("sort", type, none),
+      ("big literal", literal("18446744073709551616"), f_offsets_probe_some("18446744073709551616")),
+      ("Nat.zero", app("Nat", "zero", Array[]), f_offsets_probe_some("0")),
+      ("wrong zero namespace", app("Other", "zero", Array[]), none),
+      ("unknown constant", app("Nat", "mystery", Array[]), none),
+      ("free variable", free, none),
+      ("metadata literal", annotate(seven), f_offsets_probe_some("7")),
+      ("metadata successor", annotate(app("Nat", "succ", Array[two])), f_offsets_probe_some("3")),
+      ("stuck metavariable", blocked, none),
+      ("assigned literal remains visitor-none", mvars[1], none),
+      ("assigned successor", mvars[2], f_offsets_probe_some("3")),
+      ("assigned function", L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, mvars[3], two), f_offsets_probe_some("3")),
+      ("successor blocked", app("Nat", "succ", Array[blocked]), none),
+      ("annotated head", L4_Lean_Expr.f_Lean_mkApp_4478491ddb(builder, annotate(app("Nat", "succ", Array[])), two), f_offsets_probe_some("3")),
+      ("no zero-multiplication shortcut", app("Nat", "mul", Array[zero, blocked]), none),
+      ("no base-one shortcut", app("Nat", "pow", Array[literal("1"), blocked]), none),
+      ("no exponent-zero shortcut", app("Nat", "pow", Array[blocked, zero]), none),
+    ]) {
+      _evalAfter = f_offsets_probe_check(evalLabel, "eval", saved, state, evalExpression, zero, context,
+        state.coreContext, world, f_offsets_probe_ok(evalExpected, world), false);
+      !checks = checks + 1
+    };
+
+    for ((binaryOperator, leftDecimal, rightDecimal, binaryExpectedDecimal) in Array[
+      ("add", "7", "3", "10"), ("sub", "7", "3", "4"), ("sub", "3", "7", "0"),
+      ("mul", "7", "3", "21"), ("div", "7", "3", "2"), ("mod", "7", "3", "1"),
+      ("div", "7", "0", "0"), ("mod", "7", "0", "7"), ("pow", "2", "3", "8"),
+      ("pow", "0", "0", "1"), ("add", "18446744073709551615", "1", "18446744073709551616"),
+      ("add", "18446744073709551615", "2", "18446744073709551617"),
+      ("mul", "18446744073709551616", "3", "55340232221128654848"),
+      ("sub", "18446744073709551616", "1", "18446744073709551615"),
+      ("div", "18446744073709551616", "3", "6148914691236517205"),
+      ("mod", "18446744073709551616", "3", "1"), ("pow", "2", "64", "18446744073709551616"),
+    ]) {
+      binaryExpression = app("Nat", binaryOperator, Array[literal(leftDecimal), literal(rightDecimal)]);
+      for (binaryTarget in Array["eval", "visit"]) {
+        _binaryAfter = f_offsets_probe_check(binaryOperator + leftDecimal + rightDecimal, binaryTarget, saved, state, binaryExpression, zero, context,
+          state.coreContext, world, f_offsets_probe_ok(f_offsets_probe_some(binaryExpectedDecimal), world), false);
+        !checks = checks + 1
+      }
+    };
+
+    // All homogeneous/heterogeneous operators; types are syntactically ignored,
+    // but the exact canonical instance tester must run before visiting operands.
+    for ((familyNamespace, familyMember, canonicalInstanceNamespace, canonicalInstanceMember, familyExpectedDecimal) in Array[
+      ("Add", "add", "", "instAddNat", "10"), ("Sub", "sub", "", "instSubNat", "4"),
+      ("Mul", "mul", "", "instMulNat", "21"), ("Div", "div", "Nat", "instDiv", "2"),
+      ("Mod", "mod", "Nat", "instMod", "1"), ("NatPow", "pow", "", "instNatPowNat", "343"),
+    ]) {
+      canonicalInstanceExpression = app(canonicalInstanceNamespace, canonicalInstanceMember, Array[]);
+      homogeneousExpression = app(familyNamespace, familyMember, Array[nat, canonicalInstanceExpression, seven, three]);
+      isPowerFamily = familyNamespace == "NatPow";
+      heterogeneousNamespace = if (isPowerFamily) "HPow" else "H" + familyNamespace;
+      heterogeneousMember = if (isPowerFamily) "hPow" else "h" + familyNamespace;
+      heterogeneousInstance = if (isPowerFamily) {
+        app("", "instHPow", Array[nat, nat, app("", "instPowNat", Array[nat, canonicalInstanceExpression])])
+      } else {
+        app("", "inst" + heterogeneousNamespace, Array[nat, canonicalInstanceExpression])
+      };
+      heterogeneousExpression = app(heterogeneousNamespace, heterogeneousMember, Array[nat, nat, nat, heterogeneousInstance, seven, three]);
+      for (acceptedExpression in Array[homogeneousExpression, heterogeneousExpression]) {
+        _acceptedAfter = f_offsets_probe_check(familyNamespace + " accepted", "visit", saved, state, acceptedExpression, zero, context,
+          state.coreContext, world, f_offsets_probe_ok(f_offsets_probe_some(familyExpectedDecimal), world), false);
+        !checks = checks + 1
+      };
+      for (rejectedExpression in Array[
+        app(familyNamespace, familyMember, Array[nat, blocked, seven, three]),
+        app(heterogeneousNamespace, heterogeneousMember, Array[nat, nat, nat, blocked, seven, three]),
+        app(familyNamespace, familyMember, Array[nat, canonicalInstanceExpression, blocked, three]),
+        app(heterogeneousNamespace, heterogeneousMember, Array[nat, nat, nat, heterogeneousInstance, seven, blocked]),
+      ]) {
+        _rejectedAfter = f_offsets_probe_check(familyNamespace + " blocked", "visit", saved, state, rejectedExpression, zero, context,
+          state.coreContext, world, f_offsets_probe_ok(none, world), false);
+        !checks = checks + 1
+      }
+    };
+    powInstance = app("", "instPowNat", Array[nat, app("", "instNatPowNat", Array[])]);
+    for ((specialExpression, specialExpected) in Array[
+      (app("Pow", "pow", Array[nat, nat, powInstance, two, three]), f_offsets_probe_some("8")),
+      (app("Pow", "pow", Array[nat, nat, blocked, two, three]), none),
+      (app("OfNat", "ofNat", Array[nat, seven, app("", "instOfNatNat", Array[seven])]), f_offsets_probe_some("7")),
+      (app("OfNat", "ofNat", Array[nat, seven, blocked]), none),
+      (app("OfNat", "ofNat", Array[nat, blocked, app("", "instOfNatNat", Array[seven])]), none),
+      (seven, none), (app("Nat", "zero", Array[]), none),
+    ]) {
+      _specialAfter = f_offsets_probe_check("Pow/OfNat/direct visitor", "visit", saved, state, specialExpression, zero,
+        context, state.coreContext, world, f_offsets_probe_ok(specialExpected, world), false);
+      !checks = checks + 1
+    };
+    for (arityOperator in Array["succ", "add", "sub", "mul", "div", "mod", "pow"]) {
+      partialArguments = if (arityOperator == "succ") Array[] else Array[seven];
+      extraArguments = if (arityOperator == "succ") Array[seven, three] else Array[seven, three, two];
+      for (arityArguments in Array[partialArguments, extraArguments]) {
+        _arityAfter = f_offsets_probe_check("arity " + arityOperator, "visit", saved, state, app("Nat", arityOperator, arityArguments), zero,
+          context, state.coreContext, world, f_offsets_probe_ok(none, world), true);
+        !checks = checks + 1
+      }
+    };
+
+    natAddInstance = L4_Lean_Expr.f_Lean_Nat_mkInstAdd_956da9f92e(builder);
+    natHAddInstance = L4_Lean_Expr.f_Lean_Nat_mkInstHAdd_59bd5878d4(builder);
+    for ((offsetLabel, offsetExpression, offsetExpected) in Array[
+      ("no literal offset", seven, none), ("no variable offset", free, none),
+      ("succ", succFree, f_offsets_probe_offset(free, "1")),
+      ("add", addFree, f_offsets_probe_offset(free, "3")),
+      ("zero offset still some", app("Nat", "add", Array[free, zero]), f_offsets_probe_offset(free, "0")),
+      ("nested", app("Nat", "succ", Array[addFree]), f_offsets_probe_offset(free, "4")),
+      ("literal base stays expression", app("Nat", "add", Array[seven, three]), f_offsets_probe_offset(seven, "3")),
+      ("large offset", app("Nat", "succ", Array[app("Nat", "add", Array[free, literal("18446744073709551615")])]), f_offsets_probe_offset(free, "18446744073709551616")),
+      ("right is evaluated", app("Nat", "add", Array[free, app("Nat", "mul", Array[two, three])]), f_offsets_probe_offset(free, "6")),
+      ("not commuted", app("Nat", "add", Array[three, free]), none),
+      ("unknown right", app("Nat", "add", Array[free, blocked]), none),
+      ("Add matching", app("Add", "add", Array[nat, natAddInstance, free, three]), f_offsets_probe_offset(free, "3")),
+      ("HAdd matching", app("HAdd", "hAdd", Array[nat, nat, nat, natHAddInstance, free, three]), f_offsets_probe_offset(free, "3")),
+      ("blocked instance", app("Add", "add", Array[nat, blockedInstance, free, three]), none),
+      ("original metadata base retained", app("Nat", "add", Array[annotate(free), three]), f_offsets_probe_offset(annotate(free), "3")),
+      ("right metadata evaluated", app("Nat", "add", Array[free, annotate(three)]), f_offsets_probe_offset(free, "3")),
+      ("nested metadata base", app("Nat", "succ", Array[annotate(addFree)]), f_offsets_probe_offset(free, "4")),
+      ("unsupported subtraction", app("Nat", "sub", Array[free, three]), none),
+      ("metadata", annotate(addFree), f_offsets_probe_offset(free, "3")),
+      ("assigned app", mvars[2], f_offsets_probe_offset(two, "1")),
+      ("assigned literal", mvars[1], none),
+    ]) {
+      offsetAfter = f_offsets_probe_check(offsetLabel, "offset", saved, state, offsetExpression, zero, context,
+        state.coreContext, world, f_offsets_probe_ok(offsetExpected, world), false);
+      if (offsetLabel == "blocked instance") {
+        offsetRuntime = offsetAfter.restoreRaw();
+        offsetMctx = leanField(offsetRuntime.readRef(state.metaStateRef), 0);
+        remainingInstanceAssignment = L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(
+          offsetRuntime, offsetMctx, blockedInstanceName,
+        );
+        assert(leanTag(remainingInstanceAssignment) == LeanTag.Option_none);
+        assert(rewriteProbeSameInput(leanField(offsetMctx, 0), leanField(mctx, 0)))
+      };
+      !checks = checks + 1
+    };
+
+    // mkOffset/mkNatLit construct OfNat expressions, not raw literals. Make the
+    // compared residuals identical so these fixtures need no imported OfNat declaration.
+    natTwo = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(builder, f_offsets_probe_nat("2"));
+    natThree = L4_Lean_Expr.f_Lean_mkNatLit_5439e473a5(builder, f_offsets_probe_nat("3"));
+    // Independent LBool results; these run the actual inferType/isExprDefEqAux path.
+    for ((equalityLabel, equalityLeft, equalityRight, equalityExpectedTag) in Array[
+      ("literal equal", seven, seven, LeanTag.LBool_true),
+      ("literal unequal", seven, three, LeanTag.LBool_false),
+      ("equal offsets", addFree, addFree, LeanTag.LBool_true),
+      ("less offset", app("Nat", "add", Array[natThree, zero]), app("Nat", "add", Array[zero, three]), LeanTag.LBool_true),
+      ("greater offset", app("Nat", "add", Array[zero, three]), app("Nat", "add", Array[natThree, zero]), LeanTag.LBool_true),
+      ("offset/numeral", app("Nat", "add", Array[natTwo, three]), literal("5"), LeanTag.LBool_true),
+      ("numeral/offset", literal("5"), app("Nat", "add", Array[natTwo, three]), LeanTag.LBool_true),
+      ("too-small right", addFree, two, LeanTag.LBool_false),
+      ("too-small left", two, addFree, LeanTag.LBool_false),
+      ("left unknown", free, addFree, LeanTag.LBool_undef),
+      ("right unknown", seven, free, LeanTag.LBool_undef),
+      ("offset/right unknown", addFree, free, LeanTag.LBool_undef),
+      ("same big numeral", literal("18446744073709551616"), literal("18446744073709551616"), LeanTag.LBool_true),
+    ]) {
+      _equalityAfter = f_offsets_probe_check(equalityLabel, "defeq", saved, state, equalityLeft, equalityRight, context,
+        state.coreContext, world, f_offsets_probe_ok(LeanCtor(equalityExpectedTag, Array[]), world), false);
+      !checks = checks + 1
+    };
+    _disabledAfter = f_offsets_probe_check("config disabled", "defeq", saved, state, addFree, addFree,
+      disabled, state.coreContext, world, f_offsets_probe_ok(LeanCtor(LeanTag.LBool_undef, Array[]), world), true);
+    !checks = checks + 1;
+
+    // Syntactic offset/numeral recognition alone is not evidence that s has type Nat.
+    // Give the original Nat.add constant a deliberately non-Nat result type in this
+    // isolated environment. A numeric contradiction must still answer undef.
+    nonNatType = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(builder, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    wrongAddType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat, nonNatType));
+    addName = f_offsets_probe_name(builder, "Nat", "add");
+    constants.set(leanNameKey(addName), LeanConstantFile(f_offsets_probe_axiom(addName, wrongAddType), None()));
+    wrongEnvironment = rewriteProbeEnvironment(builder, constants.chill());
+    wrongState = rewriteProbeState(builder, wrongEnvironment, locals, "<offset-non-nat>");
+    _nonNatAfter = f_offsets_probe_check("contradiction still checks original type", "defeq", wrongState.saved,
+      wrongState, addFree, two, wrongState.metaContext, wrongState.coreContext, world,
+      f_offsets_probe_ok(LeanCtor(LeanTag.LBool_undef, Array[]), world), false);
+    !checks = checks + 1;
+
+    // The protected type test must not assign an older metavariable to Nat.
+    typeVariableName = f_offsets_probe_name(builder, "offsetMVar", "type");
+    typeVariable = L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(builder, typeVariableName);
+    variableAddType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(builder, xName, binder, nat, typeVariable));
+    constants.set(leanNameKey(addName), LeanConstantFile(f_offsets_probe_axiom(addName, variableAddType), None()));
+    variableEnvironment = rewriteProbeEnvironment(builder, constants.chill());
+    variableState = rewriteProbeState(builder, variableEnvironment, locals, "<offset-type-depth>");
+    variableMeta = builder.readRef(variableState.metaStateRef);
+    variableMctx = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(
+      builder, leanField(variableMeta, 0), typeVariableName, typeVariableName, locals, LeanArray(Array[]), type,
+      LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0,
+    );
+    builder.writeRef(variableState.metaStateRef, Some(leanReplaceField(variableMeta, 0, variableMctx)));
+    typeChecked = f_offsets_probe_check("type metavariable not assigned", "defeq", builder.checkpoint(),
+      variableState, addFree, two, variableState.metaContext, variableState.coreContext, world,
+      f_offsets_probe_ok(LeanCtor(LeanTag.LBool_undef, Array[]), world), false);
+    protectedRuntime = typeChecked.restoreRaw();
+    remainingTypeAssignment = L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(
+      protectedRuntime, leanField(protectedRuntime.readRef(variableState.metaStateRef), 0), typeVariableName,
+    );
+    assert(leanTag(remainingTypeAssignment) == LeanTag.Option_none);
+    !checks = checks + 1;
+
+    // InferType at the protected final guard must preserve the exact error/world.
+    limitCore = leanReplaceField(leanReplaceField(state.coreContext, 1, LeanNatLiterals.n1), 0,
+      leanReplaceField(leanField(state.coreContext, 0), 3, LeanNatLiterals.n1));
+    _typeDepthAfter = f_offsets_probe_check("type guard depth error", "defeq", saved, state, seven, seven, context,
+      limitCore, world, f_offsets_probe_depthError(builder, leanField(limitCore, 2), world), true);
+    !checks = checks + 1;
+    _instanceDepthAfter = f_offsets_probe_check("instance check depth error", "offset", saved, state,
+      app("Add", "add", Array[nat, natAddInstance, free, three]), zero, context, limitCore, world,
+      f_offsets_probe_depthError(builder, leanField(limitCore, 2), world), false);
+    !checks = checks + 1;
+
+    // Trace-aware dependency path without enabling a nondeterministic timed trace.
+    cold = leanField(state.coreContext, 0);
+    traceCore = leanReplaceField(state.coreContext, 0,
+      leanReplaceField(cold, 2, leanReplaceField(leanField(cold, 2), 1, leanBool(true))));
+    _traceAfter = f_offsets_probe_check("trace-aware type guard", "defeq", saved, state, seven, seven,
+      context, traceCore, world, f_offsets_probe_ok(LeanCtor(LeanTag.LBool_true, Array[]), world), false);
+    !checks = checks + 1;
+
+    // Threshold checks happen before the base, and ordinary arithmetic short-circuits left-to-right.
+    tooLarge = app("Nat", "pow", Array[blocked, literal("5")]);
+    for ((shortCircuitTarget, shortCircuitExpression) in Array[
+      ("eval", app("Nat", "add", Array[free, tooLarge])),
+      ("eval", app("Nat", "mul", Array[free, tooLarge])),
+      ("offset", app("Nat", "add", Array[tooLarge, free])),
+      ("visit", app("Add", "add", Array[nat, blocked, tooLarge, tooLarge])),
+    ]) {
+      _shortCircuitAfter = f_offsets_probe_check("short circuit avoids warning", shortCircuitTarget, saved, state, shortCircuitExpression, zero,
+        context, thresholdCore, world, f_offsets_probe_ok(none, world), true);
+      !checks = checks + 1
+    };
+    warned = f_offsets_probe_check("exponent checked before blocked base", "visit", saved, state, tooLarge, zero,
+      context, thresholdCore, world, f_offsets_probe_ok(none, world), false);
+    beforeRuntime = saved.restoreRaw();
+    warnedRuntime = warned.restoreRaw();
+    beforeMessages = leanField(beforeRuntime.readRef(state.coreStateRef), 7);
+    afterMessages = leanField(warnedRuntime.readRef(state.coreStateRef), 7);
+    // MessageLog.unreported is PersistentArray; its field 2 is exact Nat size.
+    // A native_eq miss alone cannot establish that the first warning was added.
+    assert(leanNat(leanField(leanField(beforeMessages, 1), 2)) == LeanNat::fromInt(0));
+    assert(leanNat(leanField(leanField(afterMessages, 1), 2)) == LeanNat::fromInt(1));
+    repeated = f_offsets_probe_check("warning deduplicated", "visit", warned, state, tooLarge, zero,
+      context, thresholdCore, world, f_offsets_probe_ok(none, world), false);
+    repeatedRuntime = repeated.restoreRaw();
+    assert(rewriteProbeSameInput(afterMessages, leanField(repeatedRuntime.readRef(state.coreStateRef), 7)));
+    !checks = checks + 2
+  };
+  assert(checks == 312);
+  print_string("offset parity checks: " + checks.toString())
+}
+
+// Lane-local equivalent of rewriteProbeCompare with semantic LeanValue fallback.
+// Callbacks run exactly once, old then new, from separate immutable restores.
+fun f_offsets_probe_compare(
+  comparisonLabel: String,
+  comparisonSaved: LeanExecutionCheckpoint,
+  comparisonOriginal: (mutable LeanExecution) ~> LeanValue,
+  comparisonReplacement: (mutable LeanExecution) ~> LeanValue,
+): (LeanValue, LeanExecutionCheckpoint) {
+  comparisonOldRuntime = comparisonSaved.restoreRaw();
+  comparisonNewRuntime = comparisonSaved.restoreRaw();
+  comparisonOldResult = comparisonOriginal(comparisonOldRuntime);
+  comparisonNewResult = comparisonReplacement(comparisonNewRuntime);
+  comparisonAfter = comparisonNewRuntime.checkpoint();
+  if (!rewriteProbeSameInput(comparisonOldResult, comparisonNewResult)) {
+    print_error("  old: " + f_offsets_probe_diagnosticShape(comparisonOldResult, 16));
+    print_error("  new: " + f_offsets_probe_diagnosticShape(comparisonNewResult, 16));
+    leanFail("offset result mismatch or unproved opaque equality: " + comparisonLabel)
+  };
+  if (!f_offsets_probe_sameRefs(comparisonOldRuntime.checkpoint().refs, comparisonAfter.refs)) {
+    leanFail("offset reference mismatch or unproved opaque equality: " + comparisonLabel)
+  };
+  (comparisonNewResult, comparisonAfter)
+}
+
+// Reference identity is the allocated slot index, not the page's concrete Array
+// subclass. Preserve exact counts, page lengths, taken slots and ordered values.
+fun f_offsets_probe_sameRefs(refLeft: LeanReferenceSnapshot, refRight: LeanReferenceSnapshot): Bool {
+  if (native_eq(refLeft, refRight) == 0) return true;
+  if (refLeft.count != refRight.count || refLeft.pages.size() != refRight.pages.size()) return false;
+  for (refPageIndex in Range(0, refLeft.pages.size())) {
+    refLeftPage = refLeft.pages[refPageIndex];
+    refRightPage = refRight.pages[refPageIndex];
+    if (refLeftPage.size() != refRightPage.size()) return false;
+    for (refSlotIndex in Range(0, refLeftPage.size())) {
+      (refLeftPage[refSlotIndex], refRightPage[refSlotIndex]) match {
+      | (None(), None()) -> void
+      | (Some(refLeftValue), Some(refRightValue)) ->
+        if (!rewriteProbeSameInput(refLeftValue, refRightValue)) return false
+      | _ -> return false
+      }
+    }
+  };
+  true
+}
+
+// Failure-only structural rendering. Preserve representation kinds and arities;
+// do not project LeanUnavailable, force lazy messages, or read execution refs.
+// Depth/width elision is explicit; this renderer is NOT an equality predicate.
+fun f_offsets_probe_diagnosticShape(diagnosticValue: LeanValue, diagnosticDepth: Int): String {
+  diagnosticValue match {
+  | LeanCtor(diagnosticTag, diagnosticFields) ->
+    diagnosticPrefix = diagnosticTag.toString() + "#" + diagnosticFields.size().toString();
+    if (diagnosticDepth <= 0) return diagnosticPrefix + "(...)";
+    // Message contexts can contain an entire environment. Keep their shape but
+    // spend the diagnostic depth on the message, including unknown-name tags.
+    if (diagnosticTag == LeanTag.MessageData_withContext && diagnosticFields.size() == 2) {
+      return diagnosticPrefix + "(context=" + f_offsets_probe_diagnosticShape(diagnosticFields[0], 0) +
+        ",message=" + f_offsets_probe_diagnosticShape(diagnosticFields[1], diagnosticDepth - 1) + ")"
+    };
+    diagnosticBody = "";
+    for (diagnosticFieldIndex in Range(0, if (diagnosticFields.size() < 6) diagnosticFields.size() else 6)) {
+      if (diagnosticFieldIndex != 0) !diagnosticBody = diagnosticBody + ",";
+      !diagnosticBody = diagnosticBody + f_offsets_probe_diagnosticShape(
+        diagnosticFields[diagnosticFieldIndex], diagnosticDepth - 1,
+      )
+    };
+    if (diagnosticFields.size() > 6) !diagnosticBody = diagnosticBody + ",...";
+    diagnosticPrefix + "(" + diagnosticBody + ")"
+  | LeanArray(diagnosticElements) ->
+    diagnosticArrayPrefix = "LeanArray#" + diagnosticElements.size().toString();
+    if (diagnosticDepth <= 0) return diagnosticArrayPrefix + "[...]";
+    diagnosticArrayBody = "";
+    for (diagnosticElementIndex in Range(0, if (diagnosticElements.size() < 6) diagnosticElements.size() else 6)) {
+      if (diagnosticElementIndex != 0) !diagnosticArrayBody = diagnosticArrayBody + ",";
+      !diagnosticArrayBody = diagnosticArrayBody + f_offsets_probe_diagnosticShape(
+        diagnosticElements[diagnosticElementIndex], diagnosticDepth - 1,
+      )
+    };
+    if (diagnosticElements.size() > 6) !diagnosticArrayBody = diagnosticArrayBody + ",...";
+    diagnosticArrayPrefix + "[" + diagnosticArrayBody + "]"
+  | LeanText(diagnosticText) -> "LeanText(" + diagnosticText + ")"
+  | LeanScalar(diagnosticScalarKind, diagnosticDecimal) ->
+    "LeanScalar(" + diagnosticScalarKind + "," + diagnosticDecimal + ")"
+  | LeanNatural(diagnosticNat) -> "LeanNatural(" + diagnosticNat.toString() + ")"
+  | LeanWord(diagnosticWordKind, diagnosticBits) ->
+    "LeanWord(" + diagnosticWordKind + "," + diagnosticBits.toString() + ")"
+  | LeanReference(diagnosticRef) -> "LeanReference(" + diagnosticRef.toString() + ")"
+  | LeanUnavailable(diagnosticUnavailable) -> "LeanUnavailable(" + diagnosticUnavailable + ")"
+  | LeanErased() -> "LeanErased"
+  | _ -> "<opaque runtime value; not forced>"
+  }
+}

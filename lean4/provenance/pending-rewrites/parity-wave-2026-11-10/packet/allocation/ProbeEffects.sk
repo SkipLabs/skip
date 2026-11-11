@@ -1,0 +1,217 @@
+// Tracked-array/effect coverage and isolated explicit-failure entry points.
+fun f_allocationProbeTrackedFixture(runtime: mutable LeanExecution): LeanValue {
+  keys = Array[
+    LeanExtensionKey("allocation", "first"),
+    LeanExtensionKey("allocation", "second"),
+    LeanExtensionKey("allocation", "missing"),
+  ];
+  entries = runtime.context().mkdir(
+    LeanExtensionKey::keyType,
+    LeanExtensionFile::type,
+    SKStore.DirName::create("/allocation-probe/extensions/"),
+    Array[
+      (keys[0], LeanExtensionFile(LeanText("first state"), Some(leanNatValue(7)))),
+      (keys[1], LeanExtensionFile(LeanText("second state"), None())),
+    ],
+  );
+  LeanTrackedExtensionArray(LeanExtensionArray(keys, entries, false))
+}
+
+fun f_allocationProbeRegionAction(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+): LeanValue {
+  runtime.writeRef(args[0], Some(leanNatValue(71)));
+  added = runtime.newRef(leanNatValue(72));
+  runtime.!initializers = runtime.initializers.set("allocation-region", added);
+  if (leanIsTrue(args[1])) throw RuntimeError("allocation region failure");
+  LeanClosure(f_allocationProbeReturnArgs, 2, Array[added])
+}
+
+fun f_allocationProbeTracked(): void {
+  runtime = mutable LeanExecution{store => Some(SKStore.Context::create{}.mclone())};
+  root = f_allocationProbeTrackedFixture(runtime);
+  for (indices in Array[(0, 1), (1, 0), (0, 0)]) {
+    for (word in Array[false, true]) {
+      first = if (word) LeanWord("usize", indices.i0) else leanNatValue(indices.i0);
+      second = if (word) LeanWord("usize", indices.i1) else leanNatValue(indices.i1);
+      args = Array[LeanUnavailable("erased tracked type"), root, first, second];
+      foreign = if (word) "lean_array_uswap" else "lean_array_fswap";
+      prior = f_allocationProbeOriginalPrimitiveCore(runtime, "probe", foreign, args);
+      actual = leanInvokePrimitiveCore(runtime, "probe", foreign, args);
+      invariant(native_eq(prior, actual) == 0, "allocation ProbeEffects.sk:42 f_allocationProbeTracked expected native_eq(prior, actual) == 0");
+      // Reading swapped slots through a raw execution must not demand a store:
+      // each override supplies its own value, and the missing slot stays dormant.
+      raw = mutable LeanExecution{};
+      for (i in Array[indices.i0, indices.i1]) {
+        expected = if (indices.i0 == indices.i1) LeanText("first state") else {
+          if (i == 0) LeanText("second state") else LeanText("first state")
+        };
+        invariant(native_eq(leanArrayRead(raw, actual, leanNatValue(i), false), expected) == 0, "allocation ProbeEffects.sk:50 f_allocationProbeTracked expected native_eq(leanArrayRead(raw, actual, leanNatValue(i), false), expected) == 0")
+      };
+      invariant(leanText(leanArrayRead(runtime, root, leanNatValue(0), false)) == "first state", "allocation ProbeEffects.sk:52 f_allocationProbeTracked expected leanText(leanArrayRead(runtime, root, leanNatValue(0), false)) == \"first state\"");
+      invariant(leanText(leanArrayRead(runtime, root, leanNatValue(1), false)) == "second state", "allocation ProbeEffects.sk:53 f_allocationProbeTracked expected leanText(leanArrayRead(runtime, root, leanNatValue(1), false)) == \"second state\"")
+    }
+  };
+  plain: LeanValue = LeanArray(Array[LeanText("zero"), LeanText("one"), LeanText("two")]);
+  overridden = LeanArrayOverride(LeanArrayOverride(plain, 0, LeanUnavailable("hidden inner")), 0, LeanText("outer"));
+  distinctArgs = Array[LeanErased(), overridden, leanNatValue(0), leanNatValue(2)];
+  rawOverrides = mutable LeanExecution{};
+  distinctSwap = leanInvokePrimitiveCore(rawOverrides, "probe", "lean_array_fswap", distinctArgs);
+  oldDistinct = f_allocationProbeOriginalPrimitiveCore(rawOverrides, "probe", "lean_array_fswap", distinctArgs);
+  invariant(native_eq(distinctSwap, oldDistinct) == 0, "allocation ProbeEffects.sk:62 f_allocationProbeTracked expected native_eq(distinctSwap, oldDistinct) == 0");
+  for ((index, expected) in Array[(0, "two"), (1, "one"), (2, "outer")]) {
+    invariant(leanText(leanArrayRead(rawOverrides, distinctSwap, leanNatValue(index), false)) == expected, "allocation ProbeEffects.sk:64 f_allocationProbeTracked expected leanText(leanArrayRead(rawOverrides, distinctSwap, leanNatValue(index), false)) == expected")
+  };
+  invariant(leanText(leanArrayRead(rawOverrides, overridden, leanNatValue(0), false)) == "outer", "allocation ProbeEffects.sk:66 f_allocationProbeTracked expected leanText(leanArrayRead(rawOverrides, overridden, leanNatValue(0), false)) == \"outer\"");
+  masked = LeanArrayOverride(root, 2, LeanUnavailable("dormant missing replacement"));
+  args = Array[LeanErased(), masked, leanNatValue(2), leanNatValue(2)];
+  raw = mutable LeanExecution{};
+  actual = leanInvokePrimitiveCore(raw, "probe", "lean_array_fswap", args);
+  prior = f_allocationProbeOriginalPrimitiveCore(raw, "probe", "lean_array_fswap", args);
+  invariant(native_eq(prior, actual) == 0, "allocation ProbeEffects.sk:72 f_allocationProbeTracked expected native_eq(prior, actual) == 0");
+  invariant(leanSameObject(
+    leanArrayRead(raw, actual, leanNatValue(2), false),
+    leanArrayRead(raw, masked, leanNatValue(2), false),
+  ) != 0, "allocation ProbeEffects.sk:73 f_allocationProbeTracked expected leanSameObject( leanArrayRead(raw, actual, leanNatValue(2), false), leanArrayRead(raw, masked, leanNatValue(2), false), ) != 0");
+  // Test real execution checkpoints across several pages, reference aliases,
+  // taken slots, and exact world-token pass-through in ST primitive results.
+  refs = mutable LeanExecution{};
+  for (i in Range(0, 513)) _ = refs.newRef(leanNatValue(i));
+  reference: LeanValue = LeanReference(256);
+  world: LeanValue = LeanUnavailable("opaque ST world");
+  saved = refs.checkpoint();
+  for (throwing in Array[false, true]) {
+    regionRuntime = saved.restoreRaw();
+    result = try {
+      regionRuntime.inRegion(f_allocationProbeRegionAction, Array[reference, leanBool(throwing)])
+    } catch {
+    | RuntimeError(message) -> LeanText(message)
+    | error -> throw error
+    };
+    invariant(leanNat(regionRuntime.readRef(reference)).toInt() == 71, "allocation ProbeEffects.sk:92 f_allocationProbeTracked expected leanNat(regionRuntime.readRef(reference)).toInt() == 71");
+    added = leanReadInitializer(regionRuntime, "allocation-region");
+    invariant(native_eq(added, LeanReference(513)) == 0, "allocation ProbeEffects.sk:94 f_allocationProbeTracked expected native_eq(added, LeanReference(513)) == 0");
+    invariant(leanNat(regionRuntime.readRef(added)).toInt() == 72, "allocation ProbeEffects.sk:95 f_allocationProbeTracked expected leanNat(regionRuntime.readRef(added)).toInt() == 72");
+    invariant(regionRuntime.regionCount == 1, "allocation ProbeEffects.sk:96 f_allocationProbeTracked expected regionRuntime.regionCount == 1");
+    if (throwing) invariant(leanText(result) == "allocation region failure", "allocation ProbeEffects.sk:97 f_allocationProbeTracked expected leanText(result) == \"allocation region failure\"") else {
+      applied = leanApply(regionRuntime, result, Array[world]);
+      invariant(native_eq(leanArray(applied)[0], added) == 0, "allocation ProbeEffects.sk:99 f_allocationProbeTracked expected native_eq(leanArray(applied)[0], added) == 0");
+      invariant(leanSameObject(leanArray(applied)[1], world) != 0, "allocation ProbeEffects.sk:100 f_allocationProbeTracked expected leanSameObject(leanArray(applied)[1], world) != 0")
+    };
+    invariant(leanNat(saved.restoreRaw().readRef(reference)).toInt() == 256, "allocation ProbeEffects.sk:102 f_allocationProbeTracked expected leanNat(saved.restoreRaw().readRef(reference)).toInt() == 256")
+  };
+  for (foreign in Array["lean_st_ref_get", "lean_st_ref_take", "lean_st_ref_swap", "lean_st_ref_put"]) {
+    writing = foreign == "lean_st_ref_swap" || foreign == "lean_st_ref_put";
+    callArgs = if (writing) {
+      Array[LeanErased(), LeanErased(), reference, leanNatValue(99), world]
+    } else Array[LeanErased(), LeanErased(), reference, world];
+    expectedValue = if (foreign == "lean_st_ref_put") {
+      LeanCtor(LeanTag.PUnit_unit, Array[])
+    } else leanNatValue(256);
+    result = f_allocationProbeCompare(
+      "ST primitive " + foreign,
+      saved,
+      current ~> f_allocationProbeInvoke(current, "probe", foreign, callArgs),
+      current ~> leanInvokePrimitive(current, "probe", foreign, callArgs),
+      leanSTResult(expectedValue, world),
+    );
+    invariant(leanSameObject(leanField(result, 1), world) != 0, "allocation ProbeEffects.sk:118 f_allocationProbeTracked expected leanSameObject(leanField(result, 1), world) != 0");
+    changed = saved.restoreRaw();
+    _ = leanInvokePrimitive(changed, "probe", foreign, callArgs);
+    if (foreign == "lean_st_ref_take") invariant(changed.refs[256].isNone(), "allocation ProbeEffects.sk:121 f_allocationProbeTracked expected changed.refs[256].isNone()") else {
+      expectedRefValue = if (writing) 99 else 256;
+      invariant(leanNat(changed.readRef(reference)).toInt() == expectedRefValue, "allocation ProbeEffects.sk:123 f_allocationProbeTracked expected leanNat(changed.readRef(reference)).toInt() == expectedRefValue")
+    };
+    invariant(leanNat(saved.restoreRaw().readRef(reference)).toInt() == 256, "allocation ProbeEffects.sk:125 f_allocationProbeTracked expected leanNat(saved.restoreRaw().readRef(reference)).toInt() == 256")
+  }
+}
+
+fun f_allocationProbeNonClosureResult(
+  runtime: mutable LeanExecution,
+  _args: Array<LeanValue>,
+): LeanValue {
+  runtime.!initializing = true;
+  // Independent observable order marker: the caller runs before surplus fails.
+  print_string("callback ran before surplus");
+  LeanUnavailable("returned non-closure must not be inspected")
+}
+
+fun f_allocationProbeFailure(old: Bool, mode: String): void {
+  runtime = mutable LeanExecution{};
+  dormant: LeanValue = LeanUnavailable("surplus must stay dormant");
+  if (mode == "apply-nonclosure") {
+    _ = if (old) f_allocationProbeOriginalApply(runtime, dormant, Array[LeanErased()]) else {
+      leanApply(runtime, dormant, Array[LeanErased()])
+    };
+    leanFail("unexpected nonclosure success")
+  };
+  if (mode == "apply-over" || mode == "apply-zero" || mode == "apply-negative") {
+    arity = if (mode == "apply-over") 1 else if (mode == "apply-zero") 0 else -1;
+    closure = LeanClosure(f_allocationProbeNonClosureResult, arity, Array[]);
+    args = Array[dormant, LeanErased()];
+    _ = if (old) f_allocationProbeOriginalApply(runtime, closure, args) else leanApply(runtime, closure, args);
+    leanFail("unexpected overapplication success")
+  };
+  if (mode == "publish-capture-ref" || mode == "publish-task-unavailable" || mode == "publish-array-ref") {
+    reference = runtime.newRef(LeanErased());
+    input: LeanValue = if (mode == "publish-capture-ref") {
+      partial = LeanClosure(f_allocationProbeReturnArgs, 3, Array[reference]);
+      if (old) f_allocationProbeOriginalApply(runtime, partial, Array[dormant]) else {
+        leanApply(runtime, partial, Array[dormant])
+      }
+    } else if (mode == "publish-task-unavailable") LeanCompletedTask(dormant) else {
+      LeanPersistentArray(Persistent.RadixTreeVector::mcreateFromItems(Array[reference]).chill())
+    };
+    leanCheckPublishable(input);
+    leanFail("unexpected publication success")
+  };
+  ordinary: LeanValue = LeanArray(Array[LeanText("zero"), LeanText("one")]);
+  persistent: LeanValue = LeanPersistentArray(
+    Persistent.RadixTreeVector::mcreateFromItems(leanArray(ordinary)).chill(),
+  );
+  (foreign, args) = mode match {
+  | "swap-first-nat" -> ("lean_array_fswap", Array[LeanErased(), ordinary, LeanUnavailable("first index"), LeanUnavailable("second index")])
+  | "swap-first-short" -> ("lean_array_fswap", Array[LeanErased(), ordinary, LeanUnavailable("first index")])
+  | "swap-first-word" -> ("lean_array_uswap", Array[LeanErased(), persistent, LeanUnavailable("first index"), LeanUnavailable("second index")])
+  | "swap-second" -> ("lean_array_fswap", Array[LeanErased(), ordinary, leanNatValue(0), LeanUnavailable("second index")])
+  | "swap-empty" -> ("lean_array_fswap", Array[LeanErased(), LeanArray(Array[]), leanNatValue(0), dormant])
+  | "swap-big-nat" -> ("lean_array_fswap", Array[LeanErased(), persistent, LeanScalar("nat", "18446744073709551616"), dormant])
+  | "swap-negative-word" -> ("lean_array_uswap", Array[LeanErased(), ordinary, LeanWord("usize", -1), dormant])
+  | "swap-bad-nat" -> ("lean_array_fswap", Array[LeanErased(), ordinary, LeanText("bad index"), dormant])
+  | "swap-bad-word" -> ("lean_array_uswap", Array[LeanErased(), persistent, LeanText("bad index"), dormant])
+  | "swap-bad-array" -> ("lean_array_fswap", Array[LeanErased(), LeanText("not array"), dormant, dormant])
+  | "swap-unavailable-array" -> ("lean_array_fswap", Array[LeanErased(), LeanUnavailable("array sentinel"), dormant, dormant])
+  | "list-unavailable" -> ("lean_array_to_list", Array[LeanErased(), LeanUnavailable("list sentinel")])
+  | "list-non-array" -> ("lean_array_to_list", Array[LeanErased(), LeanText("not array")])
+  | "list-override" -> ("lean_array_to_list", Array[LeanErased(), LeanArrayOverride(ordinary, 0, dormant)])
+  | "list-tracked" | "swap-tracked-missing" | "swap-tracked-raw" | "swap-tracked-generation" ->
+    trackedRuntime = mutable LeanExecution{store => Some(SKStore.Context::create{}.mclone())};
+    tracked = f_allocationProbeTrackedFixture(trackedRuntime);
+    if (mode == "list-tracked") {
+      ("lean_array_to_list", Array[LeanErased(), tracked])
+    } else {
+      if (mode != "swap-tracked-raw") !runtime = trackedRuntime;
+      value = if (mode == "swap-tracked-generation") {
+        tracked match {
+        | LeanTrackedExtensionArray(view) -> LeanTrackedExtensionArray(
+          LeanExtensionArray(view.slots, view.entries, true),
+        )
+        | _ -> leanFail("invalid tracked fixture")
+        }
+      } else tracked;
+      at = if (mode == "swap-tracked-generation") 1 else if (mode == "swap-tracked-missing") 2 else 0;
+      ("lean_array_fswap", Array[LeanErased(), value, leanNatValue(at), dormant])
+    }
+  | "ref-taken" ->
+    reference = runtime.newRef(LeanErased());
+    runtime.writeRef(reference, None());
+    ("lean_st_ref_get", Array[LeanErased(), LeanErased(), reference, dormant])
+  | "unknown" -> ("allocation_not_implemented", Array[dormant])
+  | _ -> leanFail("unknown allocation failure mode: " + mode)
+  };
+  _ = if (old) f_allocationProbeInvoke(runtime, "allocation failure", foreign, args) else {
+    leanInvokePrimitive(runtime, "allocation failure", foreign, args)
+  };
+  leanFail("unexpected failure-case success: " + mode)
+}

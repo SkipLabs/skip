@@ -1,0 +1,209 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// "_private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.reduceProjFn?"
+fun f_Meta_Simp_reduceProjFn_80df12aa69(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+): LeanValue {
+  expression = _e_0_input;
+  context = _a_2_input;
+  stateRef = _a_3_input;
+  meta = _a_4_input;
+  metaRef = _a_5_input;
+  core = _a_6_input;
+  coreRef = _a_7_input;
+  world = _a_1_8_input;
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_runtime, expression);
+  leanTag(head) match {
+  | LeanTag.Expr_const__impl -> void
+  | _ -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  };
+  name = leanField(head, 1);
+  coreRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(_runtime, LeanErased(), LeanErased(), coreRef, world);
+  if (leanTag(coreRead) != LeanTag.ST_Out_mk) return leanFail("non-exhaustive Lean case");
+  coreState = leanField(coreRead, 0);
+  !world = leanField(coreRead, 1);
+  if (leanTag(coreState) != LeanTag.Core_State_mk) return leanFail("non-exhaustive Lean case");
+  disabled: LeanValue = LeanCtor(LeanTag.Bool_false, Array[]);
+  found = L4_Lean_Environment.f_Lean_Environment_find_fb82f2d64f(_runtime, leanField(coreState, 0), name, disabled);
+  leanTag(found) match {
+  | LeanTag.Option_none -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  | LeanTag.Option_some -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  declaration = L4_Lean_Declaration.f_Lean_ConstantInfo_name_42ee85d973(_runtime, leanField(found, 0));
+  infoResult = f_Simp_reduceProjFn_spec_0_3c33306213(_runtime, declaration, coreRef, world);
+  leanTag(infoResult) match {
+  | LeanTag.EST_Out_ok -> void
+  | LeanTag.EST_Out_error -> return leanFail("unreachable: _private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.reduceProjFn?")
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  infoOption = leanField(infoResult, 0);
+  !world = leanField(infoResult, 1);
+  leanTag(infoOption) match {
+  | LeanTag.Option_none -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  | LeanTag.Option_some -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  info = leanField(infoOption, 0);
+  if (leanTag(info) != LeanTag.ProjectionFunctionInfo_mk) return leanFail("non-exhaustive Lean case");
+  parameterCount = leanField(info, 1);
+  fromClass = leanField(info, 3);
+  leanTag(fromClass) match {
+  | LeanTag.Bool_false ->
+    unfolded = L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013(
+      _runtime, expression, fromClass, meta, metaRef, core, coreRef, world);
+    leanTag(unfolded) match {
+    | LeanTag.EST_Out_error -> return unfolded
+    | LeanTag.EST_Out_ok ->
+      return f_paritySimplifierReduceProjectionHead(_runtime, leanField(unfolded, 0),
+        context, meta, metaRef, core, coreRef, leanField(unfolded, 1))
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  requested = L4_Lean_Meta_Tactic_Simp_Types.f_Simp_Context_isDeclToUnfold_29b02ac183(_runtime, context, declaration);
+  leanTag(requested) match {
+  | LeanTag.Bool_true ->
+    // Explicit class unfolding uses instances transparency and returns even a stuck .proj.
+    metaConfig = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(_runtime, meta);
+    if (leanTag(metaConfig) != LeanTag.Meta_Config_mk) return leanFail("non-exhaustive Lean case");
+    transparency = leanField(metaConfig, 9);
+    instances: LeanValue = LeanCtor(LeanTag.Meta_TransparencyMode_instances, Array[]);
+    alreadyInstances = L4_Init_MetaTypes.f_Meta_instBEqTransparencyMode_beq_1ac79fc3aa(_runtime, transparency, instances);
+    unfoldingMeta = meta;
+    leanTag(alreadyInstances) match {
+    | LeanTag.Bool_false ->
+      if (leanTag(meta) != LeanTag.Meta_Context_mk) return leanFail("non-exhaustive Lean case");
+      key = L4_Lean_Meta_Basic.f_Meta_ConfigWithKey_setTransparency_d2874c92d7(_runtime, instances, leanField(meta, 0));
+      !unfoldingMeta = leanReplaceField(meta, 0, key)
+    | LeanTag.Bool_true -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    unfolded = L4_Lean_Meta_WHNF.f_Lean_Meta_unfoldDefinition_1936145013(
+      _runtime, expression, disabled, unfoldingMeta, metaRef, core, coreRef, world);
+    leanTag(unfolded) match {
+    | LeanTag.EST_Out_error -> return unfolded
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    option = leanField(unfolded, 0);
+    !world = leanField(unfolded, 1);
+    leanTag(option) match {
+    | LeanTag.Option_none -> return unfolded
+    | LeanTag.Option_some -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    origin = LeanCtor(LeanTag.Meta_Origin_decl, Array[declaration, requested, disabled]);
+    recorded = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_recordSimpTheorem_aa5c92accb(
+      _runtime, origin, stateRef, core, coreRef, world);
+    leanTag(recorded) match {
+    | LeanTag.EST_Out_error -> return recorded
+    | LeanTag.EST_Out_ok -> return LeanCtor(LeanTag.EST_Out_ok, Array[option, leanField(recorded, 1)])
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  argumentCount = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(_runtime, expression);
+  hasMajor = L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, parameterCount, argumentCount);
+  leanTag(hasMajor) match {
+  | LeanTag.Bool_false -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Nat subtraction stays arbitrary precision, with the original saturation/order.
+  afterParameters = L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, argumentCount, parameterCount);
+  reverseIndex = L4_Init_Prelude.f_Nat_sub_8647441ee5(_runtime, afterParameters, LeanNatLiterals.n1);
+  major = L4_Lean_Expr.f_Lean_Expr_getRevArg_587d3ee448(_runtime, expression, reverseIndex);
+  constructorResult = L4_Lean_Meta_CtorRecognizer.f_Lean_Meta_isConstructorApp_8e10b02a8e(
+    _runtime, major, meta, metaRef, core, coreRef, world);
+  leanTag(constructorResult) match {
+  | LeanTag.EST_Out_error -> return constructorResult
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  !world = leanField(constructorResult, 1);
+  leanTag(leanField(constructorResult, 0)) match {
+  | LeanTag.Bool_false -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  options = L4_Lean_CoreM.f_Core_instMonadOptionsCoreM_checkedOptions_735ae7dbd5(_runtime, core);
+  optionDeclaration = leanReadInitializer(_runtime, "Lean.Meta.backward.whnf.reducibleClassField");
+  compatibility = f_Simp_reduceProjFn_spec_1_dd51af4b8c(_runtime, options, optionDeclaration);
+  leanTag(compatibility) match {
+  | LeanTag.Bool_true ->
+    // WHNF already reduced the class field: do not discard its non-projection result.
+    return f_Meta_Simp_unfoldDefinitionAny_5ed2cdcbc1(_runtime, expression, meta, metaRef, core, coreRef, world)
+  | LeanTag.Bool_false ->
+    unfolded = f_Meta_Simp_unfoldDefinitionAny_5ed2cdcbc1(_runtime, expression, meta, metaRef, core, coreRef, world);
+    leanTag(unfolded) match {
+    | LeanTag.EST_Out_error -> return unfolded
+    | LeanTag.EST_Out_ok ->
+      return f_paritySimplifierReduceProjectionHead(_runtime, leanField(unfolded, 0),
+        context, meta, metaRef, core, coreRef, leanField(unfolded, 1))
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  }
+}
+
+// Original reduceProjCont?: reduce only the unfolded head, then reapply all arguments.
+fun f_paritySimplifierReduceProjectionHead(
+  runtime: mutable LeanExecution, unfolded: LeanValue, context: LeanValue,
+  meta: LeanValue, metaRef: LeanValue, core: LeanValue, coreRef: LeanValue, world: LeanValue,
+): LeanValue {
+  leanTag(unfolded) match {
+  | LeanTag.Option_none -> return LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), world])
+  | LeanTag.Option_some -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  expression = leanField(unfolded, 0);
+  if (leanTag(context) != LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  configWithKey = leanField(context, 4);
+  if (leanTag(configWithKey) != LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  config = leanField(configWithKey, 0);
+  if (leanTag(meta) != LeanTag.Meta_Context_mk) return leanFail("non-exhaustive Lean case");
+  key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config);
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(runtime, expression);
+  configuredMeta = leanReplaceField(meta, 0,
+    LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[config, key]));
+  projection = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceProj_8a3cb50ccc(
+    runtime, head, configuredMeta, metaRef, core, coreRef, world);
+  leanTag(projection) match {
+  | LeanTag.EST_Out_error -> return projection
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  option = leanField(projection, 0);
+  nextWorld = leanField(projection, 1);
+  leanTag(option) match {
+  | LeanTag.Option_none -> LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_none, Array[]), nextWorld])
+  | LeanTag.Option_some ->
+    function = leanField(option, 0);
+    placeholder = L4_Lean_Expr.f_Expr_sort_override_0fbd5e3fc5(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+    count = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(runtime, expression);
+    slots = L4_Init_Data_Array_Basic.f_Array_replicate_b5e060f7a2(runtime, LeanErased(), count, placeholder);
+    lastIndex = L4_Init_Prelude.f_Nat_sub_8647441ee5(runtime, count, LeanNatLiterals.n1);
+    arguments = L4_Lean_Expr.f_Lean_Expr_getAppArgsAux_6cd9877715(runtime, expression, slots, lastIndex);
+    result = L4_Lean_Expr.f_Lean_mkAppN_941bfcfa8e(runtime, function, arguments);
+    LeanCtor(LeanTag.EST_Out_ok, Array[LeanCtor(LeanTag.Option_some, Array[result]), nextWorld])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

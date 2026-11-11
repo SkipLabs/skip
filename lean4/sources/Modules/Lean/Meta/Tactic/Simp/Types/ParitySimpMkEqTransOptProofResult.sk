@@ -1,0 +1,88 @@
+module L4_Lean_Meta_Tactic_Simp_Types;
+
+// "Lean.Meta.Simp.mkEqTransOptProofResult"
+fun f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(
+  _runtime: mutable LeanExecution,
+  _h_0_input: LeanValue,
+  _cache_1_input: LeanValue,
+  _r_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  priorProof = _h_0_input;
+  priorCache = _cache_1_input;
+  result = _r_2_input;
+  world = _a_1_7_input;
+  leanTag(priorProof) match {
+  | LeanTag.Option_none ->
+    // The true branch must not inspect the result at all.
+    leanTag(priorCache) match {
+    | LeanTag.Bool_true -> LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+    | LeanTag.Bool_false ->
+      if (leanTag(result) != LeanTag.Meta_Simp_Result_mk) {
+        return leanFail("non-exhaustive Lean case")
+      };
+      expression = leanField(result, 0);
+      proof = leanField(result, 1);
+      _ = leanField(result, 2);
+      uncached = LeanCtor(
+        LeanTag.Meta_Simp_Result_mk,
+        Array[expression, proof, priorCache],
+      );
+      LeanCtor(LeanTag.EST_Out_ok, Array[uncached, world])
+    | _ -> leanFail("non-exhaustive Lean case")
+    }
+  | LeanTag.Option_some ->
+    firstProof = leanField(priorProof, 0);
+    if (leanTag(result) != LeanTag.Meta_Simp_Result_mk) {
+      return leanFail("non-exhaustive Lean case")
+    };
+    expression = leanField(result, 0);
+    resultProof = leanField(result, 1);
+    resultCache = leanField(result, 2);
+    proof = priorProof;
+    leanTag(resultProof) match {
+    | LeanTag.Option_none -> void
+    | LeanTag.Option_some ->
+      trans = L4_Lean_Meta_AppBuilder.f_Lean_Meta_mkEqTrans_b1a6ad4467(
+        _runtime,
+        firstProof,
+        leanField(resultProof, 0),
+        _a_3_input,
+        _a_4_input,
+        _a_5_input,
+        _a_6_input,
+        world,
+      );
+      leanTag(trans) match {
+      | LeanTag.EST_Out_error ->
+        error = leanField(trans, 0);
+        errorWorld = leanField(trans, 1);
+        return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+      | LeanTag.EST_Out_ok ->
+        transProof = leanField(trans, 0);
+        !world = leanField(trans, 1);
+        !proof = LeanCtor(LeanTag.Option_some, Array[transProof])
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    // Cache conjunction is deliberately after the effectful proof builder.
+    cache = leanTag(priorCache) match {
+    | LeanTag.Bool_false -> priorCache
+    | LeanTag.Bool_true -> resultCache
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    combined = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[expression, proof, cache],
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[combined, world])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

@@ -1,0 +1,290 @@
+module L4_Lean_Meta_Tactic_Simp_Types;
+
+// "_private.Lean.Meta.Tactic.Simp.Types.0.Lean.Meta.Simp.mkCongrFun'"
+fun f_Meta_Simp_mkCongrFun_a5bd26ab24(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _r_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  if (leanTag(_r_1_input) != LeanTag.Meta_Simp_Result_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  function = leanField(_r_1_input, 0);
+  functionProof = leanField(_r_1_input, 1);
+  _ = leanField(_r_1_input, 2);
+  argument = _a_2_input;
+  expression = f_paritySimplifierUpdateApp_congruence(
+    _runtime,
+    _e_0_input,
+    function,
+    argument,
+  );
+  functionEvidence: LeanValue = LeanErased();
+  leanTag(functionProof) match {
+  | LeanTag.Option_none ->
+    result = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[expression, functionProof, LeanCtor(LeanTag.Bool_true, Array[])],
+    );
+    return LeanCtor(LeanTag.EST_Out_ok, Array[result, _a_1_7_input])
+  | LeanTag.Option_some -> !functionEvidence = leanField(functionProof, 0)
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Infer a, its universe, e, its universe, then the old function, in that order.
+  argumentTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    _runtime,
+    argument,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    _a_1_7_input,
+  );
+  leanTag(argumentTypeResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(argumentTypeResult, 0);
+    errorWorld = leanField(argumentTypeResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  argumentType = leanField(argumentTypeResult, 0);
+  argumentTypeWorld = leanField(argumentTypeResult, 1);
+  domainLevelResult = L4_Lean_Meta_InferType.f_Lean_Meta_getLevel_054267357a(
+    _runtime,
+    argumentType,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    argumentTypeWorld,
+  );
+  leanTag(domainLevelResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(domainLevelResult, 0);
+    errorWorld = leanField(domainLevelResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  domainLevel = leanField(domainLevelResult, 0);
+  domainLevelWorld = leanField(domainLevelResult, 1);
+  expressionTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    _runtime,
+    _e_0_input,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    domainLevelWorld,
+  );
+  leanTag(expressionTypeResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(expressionTypeResult, 0);
+    errorWorld = leanField(expressionTypeResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  expressionType = leanField(expressionTypeResult, 0);
+  expressionTypeWorld = leanField(expressionTypeResult, 1);
+  rangeLevelResult = L4_Lean_Meta_InferType.f_Lean_Meta_getLevel_054267357a(
+    _runtime,
+    expressionType,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    expressionTypeWorld,
+  );
+  leanTag(rangeLevelResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(rangeLevelResult, 0);
+    errorWorld = leanField(rangeLevelResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  rangeLevel = leanField(rangeLevelResult, 0);
+  rangeLevelWorld = leanField(rangeLevelResult, 1);
+  oldFunction = L4_Lean_Expr.f_Lean_Expr_appFn_e8931bd2a0(_runtime, _e_0_input);
+  functionTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_inferType_bec006b56a(
+    _runtime,
+    oldFunction,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    rangeLevelWorld,
+  );
+  leanTag(functionTypeResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(functionTypeResult, 0);
+    errorWorld = leanField(functionTypeResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  functionType = leanField(functionTypeResult, 0);
+  functionTypeWorld = leanField(functionTypeResult, 1);
+  normalizedTypeResult = L4_Lean_Meta_Basic.f_Lean_Meta_whnfD_9c173fd0ba(
+    _runtime,
+    functionType,
+    _a_3_input,
+    _a_4_input,
+    _a_5_input,
+    _a_6_input,
+    functionTypeWorld,
+  );
+  leanTag(normalizedTypeResult) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(normalizedTypeResult, 0);
+    errorWorld = leanField(normalizedTypeResult, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  normalizedType = leanField(normalizedTypeResult, 0);
+  world = leanField(normalizedTypeResult, 1);
+  leanTag(normalizedType) match {
+  | LeanTag.Expr_forallE__impl ->
+    _ = leanField(normalizedType, 0);
+    binderName = leanField(normalizedType, 1);
+    _ = leanField(normalizedType, 2);
+    familyBody = leanField(normalizedType, 3);
+    _ = leanField(normalizedType, 4);
+    family = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(
+      _runtime,
+      binderName,
+      LeanCtor(LeanTag.BinderInfo_default, Array[]),
+      argumentType,
+      familyBody,
+    );
+    name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      _runtime,
+      LeanText("congrFun"),
+    );
+    levels = LeanCtor(
+      LeanTag.List_cons,
+      Array[
+        domainLevel,
+        LeanCtor(
+          LeanTag.List_cons,
+          Array[rangeLevel, LeanCtor(LeanTag.List_nil, Array[])],
+        ),
+      ],
+    );
+    theorem = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(_runtime, name, levels);
+    proof = L4_Lean_Expr.f_Lean_mkApp6_dbfe46ef91(
+      _runtime,
+      theorem,
+      argumentType,
+      family,
+      oldFunction,
+      function,
+      functionEvidence,
+      argument,
+    );
+    result = LeanCtor(
+      LeanTag.Meta_Simp_Result_mk,
+      Array[
+        expression,
+        LeanCtor(LeanTag.Option_some, Array[proof]),
+        LeanCtor(LeanTag.Bool_true, Array[]),
+      ],
+    );
+    LeanCtor(LeanTag.EST_Out_ok, Array[result, world])
+  | _ ->
+    message = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+      _runtime,
+      LeanText("failed to build congruence proof, function expected"),
+    );
+    detail = L4_Lean_Message.f_Lean_indentExpr_f484b447e1(
+      _runtime,
+      oldFunction,
+    );
+    f_Simp_mkCongrFun_spec_0_247477e6ee(
+      _runtime,
+      LeanCtor(LeanTag.MessageData_compose, Array[message, detail]),
+      _a_3_input,
+      _a_4_input,
+      _a_5_input,
+      _a_6_input,
+      world,
+    )
+  }
+}
+
+// Preserve updateApp!'s pointer short circuit and panic, without mutating the root.
+fun f_paritySimplifierUpdateApp_congruence(
+  runtime: mutable LeanExecution,
+  original: LeanValue,
+  function: LeanValue,
+  argument: LeanValue,
+): LeanValue {
+  leanTag(original) match {
+  | LeanTag.Expr_app__impl ->
+    _ = leanField(original, 0);
+    oldFunction = leanField(original, 1);
+    oldArgument = leanField(original, 2);
+    oldFunctionAddress = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      runtime,
+      LeanErased(),
+      oldFunction,
+    );
+    newFunctionAddress = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+      runtime,
+      LeanErased(),
+      function,
+    );
+    sameFunction = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+      runtime,
+      oldFunctionAddress,
+      newFunctionAddress,
+    );
+    leanTag(sameFunction) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      oldArgumentAddress = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+        runtime,
+        LeanErased(),
+        oldArgument,
+      );
+      newArgumentAddress = L4_Init_Util.f_ptrAddrUnsafe_e81d71e7bd(
+        runtime,
+        LeanErased(),
+        argument,
+      );
+      sameArgument = L4_Init_Prelude.f_USize_decEq_0a1f5bb887(
+        runtime,
+        oldArgumentAddress,
+        newArgumentAddress,
+      );
+      leanTag(sameArgument) match {
+      | LeanTag.Bool_true -> return original
+      | LeanTag.Bool_false -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    L4_Lean_Expr.f_Expr_app_override_84f3f08ede(runtime, function, argument)
+  | _ ->
+    message = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      runtime,
+      LeanText("Lean.Expr"),
+      LeanText("_private.Lean.Expr.0.Lean.Expr.updateApp!Impl"),
+      LeanNatLiterals.n1906,
+      LeanNatLiterals.n18,
+      LeanText("application expected"),
+    );
+    f_Simp_mkImpCongr_spec_0_58341226d3(runtime, message)
+  }
+}
+
+module end;

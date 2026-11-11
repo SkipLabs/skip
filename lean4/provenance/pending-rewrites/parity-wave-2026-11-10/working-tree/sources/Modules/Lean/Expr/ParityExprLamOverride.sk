@@ -1,0 +1,131 @@
+module L4_Lean_Expr;
+
+// Binding metadata ignores the binder name/info in the hash, but retains both
+// objects in the node. Keep the original primitive calls (including profiling).
+fun f_Expr_lam_override_5bc80605de(
+  _runtime: mutable LeanExecution,
+  _binderName_0_input: LeanValue,
+  _binderType_1_input: LeanValue,
+  _body_2_input: LeanValue,
+  _binderInfo_3_input: LeanValue,
+): LeanValue {
+  typeData = f_Lean_Expr_data_8b4646e8ed(_runtime, _binderType_1_input);
+  typeHash = L4_Init_Data_UInt_BasicAux.f_UInt64_toUInt32_cb6253b322(
+    _runtime,
+    typeData,
+  );
+  seededHash = L4_Init_Prelude.f_mixHash32_b14966a097(
+    _runtime,
+    LeanWord("uint32", 29),
+    typeHash,
+  );
+  bodyData = f_Lean_Expr_data_8b4646e8ed(_runtime, _body_2_input);
+  bodyHash = L4_Init_Data_UInt_BasicAux.f_UInt64_toUInt32_cb6253b322(
+    _runtime,
+    bodyData,
+  );
+  hash = L4_Init_Prelude.f_mixHash32_b14966a097(_runtime, seededHash, bodyHash);
+
+  typeRangeWord = f_Expr_Data_looseBVarRange_8e964b131d(_runtime, typeData);
+  typeRange = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+    _runtime,
+    typeRangeWord,
+  );
+  bodyRangeWord = f_Expr_Data_looseBVarRange_8e964b131d(_runtime, bodyData);
+  bodyRange = L4_Init_Prelude.f_UInt32_toNat_7ef49e117f(
+    _runtime,
+    bodyRangeWord,
+  );
+  unboundBodyRange = L4_Init_Prelude.f_Nat_sub_8647441ee5(
+    _runtime,
+    bodyRange,
+    LeanNatLiterals.n1,
+  );
+  // Nat subtraction saturates at zero; do not use wrapping word subtraction.
+  rangeOrder = L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(
+    _runtime,
+    typeRange,
+    unboundBodyRange,
+  );
+  looseRange = leanTag(rangeOrder) match {
+  | LeanTag.Bool_false -> typeRange
+  | LeanTag.Bool_true -> unboundBodyRange
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+
+  typeDepthByte = f_Expr_Data_approxDepth_8b0943e63e(_runtime, typeData);
+  typeDepth = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+    _runtime,
+    typeDepthByte,
+  );
+  bodyDepthByte = f_Expr_Data_approxDepth_8b0943e63e(_runtime, bodyData);
+  bodyDepth = L4_Init_Data_UInt_BasicAux.f_UInt8_toUInt32_0d525414a9(
+    _runtime,
+    bodyDepthByte,
+  );
+  depthOrder = L4_Init_Prelude.f_UInt32_decLe_205a0f3e76(
+    _runtime,
+    typeDepth,
+    bodyDepth,
+  );
+  childDepth = leanTag(depthOrder) match {
+  | LeanTag.Bool_false -> typeDepth
+  | LeanTag.Bool_true -> bodyDepth
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  depth = L4_Init_Data_UInt_BasicAux.f_UInt32_add_89bff4a85f(
+    _runtime,
+    childDepth,
+    LeanWord("uint32", 1),
+  );
+
+  // Each disjunction is left-biased: read the body flag only if needed.
+  typeHasFVar = f_Expr_Data_hasFVar_58a5cf3330(_runtime, typeData);
+  hasFVar = leanTag(typeHasFVar) match {
+  | LeanTag.Bool_false -> f_Expr_Data_hasFVar_58a5cf3330(_runtime, bodyData)
+  | LeanTag.Bool_true -> typeHasFVar
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  typeHasExprMVar = f_Expr_Data_hasExprMVar_eccaaffcb0(_runtime, typeData);
+  hasExprMVar = leanTag(typeHasExprMVar) match {
+  | LeanTag.Bool_false -> f_Expr_Data_hasExprMVar_eccaaffcb0(_runtime, bodyData)
+  | LeanTag.Bool_true -> typeHasExprMVar
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  typeHasLevelMVar = f_Expr_Data_hasLevelMVar_4409fbfa06(_runtime, typeData);
+  hasLevelMVar = leanTag(typeHasLevelMVar) match {
+  | LeanTag.Bool_false ->
+    f_Expr_Data_hasLevelMVar_4409fbfa06(_runtime, bodyData)
+  | LeanTag.Bool_true -> typeHasLevelMVar
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  typeHasLevelParam = f_Expr_Data_hasLevelParam_48aa3fc148(_runtime, typeData);
+  hasLevelParam = leanTag(typeHasLevelParam) match {
+  | LeanTag.Bool_false ->
+    f_Expr_Data_hasLevelParam_48aa3fc148(_runtime, bodyData)
+  | LeanTag.Bool_true -> typeHasLevelParam
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  data = f_Lean_Expr_mkData_9e4edaf0b9(
+    _runtime,
+    hash,
+    looseRange,
+    depth,
+    hasFVar,
+    hasExprMVar,
+    hasLevelMVar,
+    hasLevelParam,
+  );
+  LeanCtor(
+    LeanTag.Expr_lam__impl,
+    Array[
+      data,
+      _binderName_0_input,
+      _binderType_1_input,
+      _body_2_input,
+      _binderInfo_3_input,
+    ],
+  )
+}
+
+module end;

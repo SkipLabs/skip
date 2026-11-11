@@ -1,0 +1,247 @@
+module L4_Lean_Environment;
+
+// "_private.Lean.Environment.0.Lean.Environment.findAsyncCore?"
+fun f_Lean_Environment_findAsyncCore_a05524f0d0(
+  _runtime: mutable LeanExecution,
+  _env_0_input: LeanValue,
+  _n_1_input: LeanValue,
+  _skipRealize_2_input: LeanValue,
+): LeanValue {
+  // Frame slots: 0=_env_0, 1=_n_1, 2=_skipRealize_2, 3=_val_2_3, 4=_constInfo_4, 5=_x_3_8, 6=_y_5_9, 7=_constants_10, 8=_map_20, 9=_x_6_21, 10=_val_8_22, 11=_x_7_23, 12=_x_9_24, 13=_x_10_25, 14=_base_26, 15=_isExporting_34, 16=_private_41, 17=_public_44, 18=_x_12_45, 19=_x_13_46, 20=_val_14_47, 21=_x_15_48, 22=_val_16_49, 23=_x_17_50, 24=_allRealizations_58, 25=_x_18_66, 26=_x_19_67, 27=_val_20_68
+  _frame: mutable Array<LeanValue> = Array::mfill(
+    28,
+    (LeanErased() : LeanValue),
+  );
+  _frame.set(0, _env_0_input);
+  _frame.set(1, _n_1_input);
+  // A completed empty realization map cannot satisfy this lookup. Preserve
+  // both async-constant searches, but omit the reserved-name predicate in this
+  // case. This is checked on each environment value, never assumed globally.
+  skipRealize = _skipRealize_2_input;
+  leanField(_env_0_input, 7) match {
+  | LeanCompletedTask(LeanCtor(tag, fields)) ->
+    if (
+      tag == LeanTag.Std_DTreeMap_Internal_Impl_leaf &&
+      fields.isEmpty()
+    ) {
+      !skipRealize = leanBool(true)
+    }
+  | _ -> void
+  };
+  _frame.set(2, skipRealize);
+  pc = 0;
+  loop {
+    pc match {
+    | 0 ->
+      _frame.set(
+        18,
+        f_Lean_Environment_asyncConsts_8678482b11(_runtime, _frame[0]),
+      );
+      _frame.set(
+        19,
+        f_Lean_AsyncConsts_find_6a6f5aa7de(_runtime, _frame[18], _frame[1]),
+      );
+      leanTag(_frame[19]) match {
+      | LeanTag.Option_some ->
+        _frame.set(20, leanField(_frame[19], 0));
+        _jump0 = _frame[20];
+        _frame.set(3, _jump0);
+        !pc = 1;
+        void
+      | _ ->
+        _frame.set(
+          21,
+          f_Lean_AsyncConsts_findRec_2bdbbaf37d(
+            _runtime,
+            _frame[18],
+            _frame[1],
+          ),
+        );
+        leanTag(_frame[21]) match {
+        | LeanTag.Option_some ->
+          _frame.set(22, leanField(_frame[21], 0));
+          _jump0 = _frame[22];
+          _frame.set(3, _jump0);
+          !pc = 1;
+          void
+        | _ ->
+          leanTag(_frame[2]) match {
+          | LeanTag.Bool_false ->
+            _frame.set(
+              23,
+              f_Lean_Environment_isReservedName_8eaede454e(
+                _runtime,
+                _frame[0],
+                _frame[1],
+              ),
+            );
+            leanTag(_frame[23]) match {
+            | LeanTag.Bool_false ->
+              !pc = 3;
+              void
+            | LeanTag.Bool_true ->
+              leanTag(_frame[0]) match {
+              | LeanTag.Private_Lean_Environment_0_Lean_Environment_mk ->
+                _ = leanField(_frame[0], 0);
+                _ = leanField(_frame[0], 1);
+                _ = leanField(_frame[0], 2);
+                _ = leanField(_frame[0], 3);
+                _ = leanField(_frame[0], 4);
+                _ = leanField(_frame[0], 5);
+                _ = leanField(_frame[0], 6);
+                _frame.set(24, leanField(_frame[0], 7));
+                _ = leanField(_frame[0], 8);
+                _ = leanField(_frame[0], 9);
+                _ = leanField(_frame[0], 10);
+                _ = leanField(_frame[0], 11);
+                _ = leanField(_frame[0], 12);
+                _ = leanField(_frame[0], 13);
+                _ = leanField(_frame[0], 14);
+                _frame.set(
+                  25,
+                  L4_Init_Core.f_Task_get_c7ebb314a7(
+                    _runtime,
+                    LeanErased(),
+                    _frame[24],
+                  ),
+                );
+                _frame.set(
+                  26,
+                  L4_Lean_Data_NameMap_Basic.f_NameMap_find_spec_0_da0ebb7ac9(
+                    _runtime,
+                    _frame[25],
+                    _frame[1],
+                  ),
+                );
+                leanTag(_frame[26]) match {
+                | LeanTag.Option_some ->
+                  _frame.set(27, leanField(_frame[26], 0));
+                  _jump0 = _frame[27];
+                  _frame.set(3, _jump0);
+                  !pc = 1;
+                  void
+                | _ ->
+                  !pc = 3;
+                  void
+                }
+              | _ -> return leanFail("non-exhaustive Lean case")
+              }
+            | _ -> return leanFail("non-exhaustive Lean case")
+            }
+          | LeanTag.Bool_true ->
+            !pc = 3;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        }
+      }
+    | 1 ->
+      leanTag(_frame[3]) match {
+      | LeanTag.Private_Lean_Environment_0_Lean_AsyncConst_mk ->
+        _frame.set(4, leanField(_frame[3], 0));
+        _ = leanField(_frame[3], 1);
+        _ = leanField(_frame[3], 2);
+        _ = leanField(_frame[3], 3);
+        _frame.set(5, LeanCtor(LeanTag.Option_some, Array[_frame[4]]));
+        return _frame[5]
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 2 ->
+      leanTag(_frame[6]) match {
+      | LeanTag.Private_Lean_Environment_0_Lean_Kernel_Environment_mk ->
+        _frame.set(7, leanField(_frame[6], 0));
+        _ = leanField(_frame[6], 1);
+        _ = leanField(_frame[6], 2);
+        _ = leanField(_frame[6], 3);
+        _ = leanField(_frame[6], 4);
+        _ = leanField(_frame[6], 5);
+        _ = leanField(_frame[6], 6);
+        _ = leanField(_frame[6], 7);
+        _ = leanField(_frame[6], 8);
+        leanTag(_frame[7]) match {
+        | LeanTag.ConstMap_mk ->
+          _ = leanField(_frame[7], 0);
+          _frame.set(8, leanField(_frame[7], 1));
+          _frame.set(
+            9,
+            f_Diagnostics_recordUnfold_spec_1_a9210252d9(
+              _runtime,
+              _frame[8],
+              _frame[1],
+            ),
+          );
+          leanTag(_frame[9]) match {
+          | LeanTag.Option_none ->
+            _frame.set(11, LeanCtor(LeanTag.Option_none, Array[]));
+            return _frame[11]
+          | LeanTag.Option_some ->
+            _frame.set(10, leanField(_frame[9], 0));
+            _frame.set(
+              12,
+              f_Lean_AsyncConstantInfo_ofConstantInfo_3394f3bfcd(
+                _runtime,
+                _frame[10],
+              ),
+            );
+            _frame.set(
+              13,
+              LeanCtor(LeanTag.Option_some, Array[_frame[12]]),
+            );
+            return _frame[13]
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | 3 ->
+      leanTag(_frame[0]) match {
+      | LeanTag.Private_Lean_Environment_0_Lean_Environment_mk ->
+        _frame.set(14, leanField(_frame[0], 0));
+        _ = leanField(_frame[0], 1);
+        _ = leanField(_frame[0], 2);
+        _ = leanField(_frame[0], 3);
+        _ = leanField(_frame[0], 4);
+        _ = leanField(_frame[0], 5);
+        _ = leanField(_frame[0], 6);
+        _ = leanField(_frame[0], 7);
+        _frame.set(15, leanField(_frame[0], 8));
+        _ = leanField(_frame[0], 9);
+        _ = leanField(_frame[0], 10);
+        _ = leanField(_frame[0], 11);
+        _ = leanField(_frame[0], 12);
+        _ = leanField(_frame[0], 13);
+        _ = leanField(_frame[0], 14);
+        leanTag(_frame[15]) match {
+        | LeanTag.Bool_false ->
+          leanTag(_frame[14]) match {
+          | LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk ->
+            _frame.set(16, leanField(_frame[14], 0));
+            _ = leanField(_frame[14], 1);
+            _jump0 = _frame[16];
+            _frame.set(6, _jump0);
+            !pc = 2;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | LeanTag.Bool_true ->
+          leanTag(_frame[14]) match {
+          | LeanTag.Private_Lean_Environment_0_Lean_VisibilityMap_mk ->
+            _ = leanField(_frame[14], 0);
+            _frame.set(17, leanField(_frame[14], 1));
+            _jump0 = _frame[17];
+            _frame.set(6, _jump0);
+            !pc = 2;
+            void
+          | _ -> return leanFail("non-exhaustive Lean case")
+          }
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("invalid join point")
+    }
+  }
+}
+
+module end;

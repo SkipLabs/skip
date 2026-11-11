@@ -1,0 +1,237 @@
+// Lane-local fixtures; include alongside Probe.sk or ProbeUnsupported.sk.
+class EqualityWaveProbeFixture(
+  state: RewriteProbeState,
+  metaState: LeanValue,
+  metavariables: LeanValue,
+  emptyContext: LeanValue,
+  locals: LeanValue,
+  prop: LeanValue,
+  type: LeanValue,
+  x: LeanValue,
+  y: LeanValue,
+  z: LeanValue,
+  m: LeanValue,
+  n: LeanValue,
+  functionMVar: LeanValue,
+  missing: LeanValue,
+  mId: LeanValue,
+  nId: LeanValue,
+  functionId: LeanValue,
+  xId: LeanValue,
+)
+
+fun f_equalityProbe_name(runtime: mutable LeanExecution, text: String): LeanValue {
+  L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text))
+}
+
+fun f_equalityProbe_fixture(runtime: mutable LeanExecution): EqualityWaveProbeFixture {
+  leanInitializeSimp(runtime);
+  empty = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+  xId = f_equalityProbe_name(runtime, "x");
+  yId = f_equalityProbe_name(runtime, "y");
+  zId = f_equalityProbe_name(runtime, "z");
+  mId = f_equalityProbe_name(runtime, "m");
+  nId = f_equalityProbe_name(runtime, "n");
+  functionId = f_equalityProbe_name(runtime, "functionMVar");
+  prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[]));
+  type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, LeanCtor(LeanTag.Level_zero__impl, Array[])));
+  binder = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+  kind = LeanCtor(LeanTag.LocalDeclKind_default, Array[]);
+  x = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, xId);
+  y = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, yId);
+  z = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, zId);
+  locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, empty, xId, xId, prop, binder, kind);
+  !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLetDecl_253fda64a7(runtime, locals, zId, zId, prop, x, leanBool(false), kind);
+  !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime, locals, yId, yId, prop, binder, kind);
+  environment = rewriteProbeEnvironment(runtime, (Map[] : Map<String, LeanConstantFile>));
+  state = rewriteProbeState(runtime, environment, locals, "<equality-wave>");
+  initial = runtime.readRef(state.metaStateRef);
+  metavariables = leanField(initial, 0);
+  for ((id, scope, valueType) in Array[(mId, locals, prop), (nId, empty, prop)]) {
+    !metavariables = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, metavariables, id, id, scope, LeanArray(Array[]), valueType, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0)
+  };
+  functionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, xId, binder, prop, prop);
+  !metavariables = L4_Lean_MetavarContext.f_Lean_MetavarContext_addExprMVarDecl_da6770b970(runtime, metavariables, functionId, functionId, empty, LeanArray(Array[]), functionType, LeanCtor(LeanTag.MetavarKind_natural, Array[]), LeanNatLiterals.n0);
+  metaState = leanReplaceField(initial, 0, metavariables);
+  runtime.writeRef(state.metaStateRef, Some(metaState));
+  EqualityWaveProbeFixture(state, metaState, metavariables, empty, locals, prop, type, x, y, z,
+    L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, mId),
+    L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, nId),
+    L4_Lean_Expr.f_Lean_mkMVar_5925a7099d(runtime, functionId),
+    L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, f_equalityProbe_name(runtime, "missing")),
+    mId, nId, functionId, xId)
+}
+
+fun f_equalityProbe_ok(value: LeanValue, world: LeanValue): LeanValue {
+  LeanCtor(LeanTag.EST_Out_ok, Array[value, world])
+}
+
+fun f_equalityProbe_queues(postponedIndices: Array<LeanValue>, messy: Array<LeanValue>, failed: Bool = false): LeanValue {
+  LeanCtor(LeanTag.Prod_mk, Array[
+    if (failed) LeanCtor(LeanTag.Option_some, Array[LeanCtor(LeanTag.Meta_DefEqArgsFirstPassResult_failed, Array[])]) else LeanCtor(LeanTag.Option_none, Array[]),
+    LeanCtor(LeanTag.Prod_mk, Array[LeanArray(postponedIndices), LeanArray(messy)]),
+  ])
+}
+
+fun f_equalityProbe_loopResult(failed: Bool): LeanValue {
+  LeanCtor(LeanTag.Prod_mk, Array[
+    if (failed) LeanCtor(LeanTag.Option_some, Array[leanBool(false)]) else LeanCtor(LeanTag.Option_none, Array[]),
+    LeanCtor(LeanTag.PUnit_unit, Array[]),
+  ])
+}
+
+fun f_equalityProbe_parameter(runtime: mutable LeanExecution, binder: LeanTag.Value, proposition: Bool = false, higherOrder: Bool = false, depends: Bool = false, instance: Bool = false): LeanValue {
+  parameter = L4_Lean_Meta_Basic.f_Meta_instInhabitedParamInfo_default_947daea60c(runtime);
+  !parameter = leanReplaceField(parameter, 0, LeanCtor(binder, Array[]));
+  !parameter = leanReplaceField(parameter, 3, leanBool(proposition));
+  !parameter = leanReplaceField(parameter, 5, leanBool(instance));
+  !parameter = leanReplaceField(parameter, 6, leanBool(higherOrder));
+  leanReplaceField(parameter, 7, leanBool(depends))
+}
+
+fun f_equalityProbe_configure(runtime: mutable LeanExecution, context: LeanValue, transparency: LeanTag.Value, approximations: Bool): LeanValue {
+  config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context);
+  for (index in Array[0, 1, 2, 3]) !config = leanReplaceField(config, index, leanBool(approximations));
+  !config = leanReplaceField(config, 9, LeanCtor(transparency, Array[]));
+  key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(runtime, config);
+  leanReplaceField(context, 0, LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[config, key]))
+}
+
+// Failure-only structural rendering: no execution, reference reads or lazy forcing.
+// Bound depth/width explicitly; scalar kinds and empty constructor/array shapes matter.
+fun f_equalityProbe_describeValue(value: LeanValue, depth: Int): String {
+  if (depth == 0) return "<depth-limit>";
+  value match {
+  | LeanCtor(tag, fields) ->
+    tag.toString() + "(" +
+      fields.take(8).map(child -> f_equalityProbe_describeValue(child, depth - 1)).join(", ") +
+      (if (fields.size() > 8) ", <more-fields>" else "") + ")"
+  | LeanArray(values) ->
+    "Array[" +
+      values.take(8).map(child -> f_equalityProbe_describeValue(child, depth - 1)).join(", ") +
+      (if (values.size() > 8) ", <more-elements>" else "") + "]"
+  | LeanText(text) -> "Text(" + JSON.String(text).encode() + ")"
+  | LeanNatural(number) -> "Nat(" + number.toString() + ")"
+  | LeanScalar(kind, decimal) -> "Scalar(" + kind + ", " + decimal + ")"
+  | LeanWord(kind, bits) -> "Word(" + kind + ", " + LeanNat::fromWord(bits).toString() + ")"
+  | LeanReference(index) -> "Ref(" + index.toString() + ")"
+  | LeanClosure(_, arity, captured) ->
+    "Closure(arity=" + arity.toString() + ", captures=" + captured.size().toString() + ")"
+  | LeanErased() -> "Erased"
+  | LeanUnavailable(description) -> "Unavailable(" + JSON.String(description).encode() + ")"
+  | LeanCompletedTask(completed) -> "CompletedTask(" + f_equalityProbe_describeValue(completed, depth - 1) + ")"
+  | LeanPersistentArray(_) -> "<persistent-array: not expanded>"
+  | LeanArrayOverride(_, _, _) -> "<array-override: not expanded>"
+  | LeanTrackedConstants(_) -> "<tracked-constants: not read>"
+  | LeanTrackedExtensionArray(_) -> "<tracked-extensions: not read>"
+  }
+}
+
+// Native equality is sufficient, not necessary: both semantic differential
+// results and independent expectations use the existing constructor/array fallback.
+// Tags, arities, lengths and ordered contents remain exact. No closure extensional
+// equality is inferred; an unresolved opaque/callback comparison is not accepted.
+fun f_equalityProbe_matchesExpected(actual: LeanValue, expected: LeanValue): Bool {
+  rewriteProbeSameInput(actual, expected)
+}
+
+// Preserve allocation count, slot presence/order and every saved page entry while
+// allowing incidental concrete array classes inside Lean values to differ.
+fun f_equalityProbe_sameReferences(left: LeanReferenceSnapshot, right: LeanReferenceSnapshot): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.count != right.count || left.pages.size() != right.pages.size()) return false;
+  for (pageIndex in Range(0, left.pages.size())) {
+    leftPage = left.pages[pageIndex];
+    rightPage = right.pages[pageIndex];
+    if (leftPage.size() != rightPage.size()) return false;
+    for (slotIndex in Range(0, leftPage.size())) {
+      (leftPage[slotIndex], rightPage[slotIndex]) match {
+      | (None(), None()) -> void
+      | (Some(leftValue), Some(rightValue)) ->
+        if (!rewriteProbeSameInput(leftValue, rightValue)) return false
+      | _ -> return false
+      }
+    }
+  };
+  true
+}
+
+fun f_equalityProbe_sameInitializers(left: SortedMap<String, LeanValue>, right: SortedMap<String, LeanValue>): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.size() != right.size()) return false;
+  for ((name, leftValue) in left.items()) {
+    right.maybeGet(name) match {
+    | Some(rightValue) -> if (!rewriteProbeSameInput(leftValue, rightValue)) return false
+    | None() -> return false
+    }
+  };
+  true
+}
+
+// IDs and bucket/entry order remain exact; compare stored expressions as values,
+// not incidental field-array classes or balanced-map node layout.
+fun f_equalityProbe_sameIdentities(left: LeanIdentityTable, right: LeanIdentityTable): Bool {
+  if (native_eq(left, right) == 0) return true;
+  if (left.count != right.count || left.buckets.size() != right.buckets.size()) return false;
+  for ((hash, leftBucket) in left.buckets.items()) {
+    right.buckets.maybeGet(hash) match {
+    | Some(rightBucket) ->
+      if (leftBucket.size() != rightBucket.size()) return false;
+      for (entryIndex in Range(0, leftBucket.size())) {
+        leftEntry = leftBucket[entryIndex];
+        rightEntry = rightBucket[entryIndex];
+        if (leftEntry.i1 != rightEntry.i1 || !rewriteProbeSameInput(leftEntry.i0, rightEntry.i0)) return false
+      }
+    | None() -> return false
+    }
+  };
+  true
+}
+
+// Optional crash locality: print phase labels to stderr only when the parent
+// sets LEAN_SKIP_EQUALITY_TRACE=1. Default off keeps output identical.
+fun f_equalityProbe_tracePhase(): Bool {
+  Environ.varOpt("LEAN_SKIP_EQUALITY_TRACE").default("0") == "1"
+}
+
+fun f_equalityProbe_compare(
+  label: String, saved: LeanExecutionCheckpoint, inputs: Array<LeanValue>,
+  original: (mutable LeanExecution) ~> LeanValue, replacement: (mutable LeanExecution) ~> LeanValue,
+  expected: ?LeanValue = None(),
+): (LeanValue, LeanExecutionCheckpoint) {
+  if (f_equalityProbe_tracePhase()) print_error("equality phase OLD: " + label);
+  copies = inputs.map(rewriteProbeCopyInput);
+  oldRuntime = saved.restoreRaw();
+  newRuntime = saved.restoreRaw();
+  oldResult = original(oldRuntime);
+  if (f_equalityProbe_tracePhase()) print_error("equality phase OLD checked: " + label);
+  for (i in Range(0, inputs.size())) assert(rewriteProbeSameInput(inputs[i], copies[i]));
+  if (f_equalityProbe_tracePhase()) print_error("equality phase NEW: " + label);
+  newResult = replacement(newRuntime);
+  if (f_equalityProbe_tracePhase()) print_error("equality phase NEW checked: " + label);
+  for (i in Range(0, inputs.size())) assert(rewriteProbeSameInput(inputs[i], copies[i]));
+  if (!rewriteProbeSameInput(oldResult, newResult)) leanFail("equality result mismatch: " + label);
+  oldAfter = oldRuntime.checkpoint();
+  newAfter = newRuntime.checkpoint();
+  if (!f_equalityProbe_sameReferences(oldAfter.refs, newAfter.refs)) leanFail("equality refs mismatch: " + label);
+  assert(f_equalityProbe_sameInitializers(oldAfter.initializers, newAfter.initializers));
+  assert(f_equalityProbe_sameIdentities(oldAfter.immutableIdentities, newAfter.immutableIdentities));
+  // Restore the retained snapshot again after both calls; published roots remain usable.
+  retained = saved.restoreRaw();
+  assert(f_equalityProbe_sameReferences(retained.checkpoint().refs, saved.refs));
+  expected match {
+  | Some(value) -> if (!f_equalityProbe_matchesExpected(newResult, value)) {
+      print_error("equality expected diagnostic: " + label + " (preceding old/new result and state checks passed)");
+      print_error("  old actual: " + f_equalityProbe_describeValue(oldResult, 8));
+      print_error("  new actual: " + f_equalityProbe_describeValue(newResult, 8));
+      print_error("  expected:   " + f_equalityProbe_describeValue(value, 8));
+      leanFail("equality expected outcome mismatch: " + label)
+    }
+  | None() -> void
+  };
+  (newResult, newAfter)
+}
+
+fun f_equalityProbe_assignment(runtime: mutable LeanExecution, stateRef: LeanValue, id: LeanValue): LeanValue {
+  L4_Lean_MetavarContext.f_Lean_MetavarContext_getExprAssignmentCore_7080b00ff2(runtime, leanField(runtime.readRef(stateRef), 0), id)
+}

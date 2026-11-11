@@ -1,0 +1,25 @@
+// Run separately for each failure mode, with and without the "old-" prefix.
+// Default mode is the replacement's malformed-node branch (expected exit 86).
+fun main(): void {
+  mode = read_to_end().trim();
+  runtime = mutable LeanExecution{};
+  if (mode == "expr" || mode == "old-expr") {
+    call = if (mode == "old-expr") L4_Lean_Expr.f_Expr_lam_override_5bc80605de_fallback
+      else L4_Lean_Expr.f_Expr_lam_override_5bc80605de;
+    _ = call(runtime, LeanErased(), LeanCtor(LeanTag.PUnit_unit, Array[]), LeanErased(), LeanErased())
+  } else if (mode == "fold-index" || mode == "old-fold-index") {
+    call = if (mode == "old-fold-index") L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback
+      else L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500;
+    _ = call(runtime, LeanArray(Array[]), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(), LeanErased(),
+      LeanScalar("nat", "184467440737095516160000000000"), LeanErased(), LeanErased(), LeanErased())
+  } else if (mode == "collect-index" || mode == "old-collect-index") {
+    call = if (mode == "old-collect-index") L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9_fallback
+      else L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9;
+    _ = call(runtime, LeanArray(Array[]), LeanWord("usize", 1), LeanWord("usize", 0), LeanErased())
+  } else {
+    call = if (mode == "old-node") L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c_fallback
+      else L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c;
+    _ = call(runtime, LeanCtor(LeanTag.PUnit_unit, Array[]), LeanErased(), LeanErased(), LeanErased(), LeanErased())
+  };
+  leanFail("failure probe unexpectedly returned")
+}

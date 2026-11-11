@@ -1,0 +1,44 @@
+// Each named old/new case exits 86 with the same explicit diagnostic.
+// tools/probe.py first runs with no case: that only prints invocation guidance.
+fun main(): void {
+  args = Environ.args().collect(Array);
+  if (args.size() == 1) {
+    print_string("rewrite failure driver: old|new index|candidate|simproc|decide|theorem|unavailable");
+    return
+  };
+  assert(args.size() == 3);
+  old = args[1] == "old";
+  mode = args[2];
+  runtime = mutable LeanExecution{};
+  poison: LeanValue = LeanUnavailable("rewrite-wave failure sentinel");
+  wrong: LeanValue = LeanCtor(LeanTag.PUnit_unit, Array[]);
+  world: LeanValue = LeanNatLiterals.n0;
+  if (mode == "index" || mode == "unavailable") {
+    context = if (mode == "unavailable") poison else wrong;
+    _ = if (old) L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_rewrite_rewriteUsingIndex_2de5b683e1_fallback(runtime, poison, poison, poison, poison, poison, poison, context, poison, poison, poison, poison, poison, world)
+      else L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_rewrite_rewriteUsingIndex_2de5b683e1(runtime, poison, poison, poison, poison, poison, poison, context, poison, poison, poison, poison, poison, world);
+    leanFail("unexpected index success")
+  };
+  if (mode == "candidate") {
+    entries = LeanArray(Array[wrong]);
+    _ = if (old) L4_Lean_Meta_Tactic_Simp_Rewrite.f_rewrite_rewriteUsingIndex_spec_3_266ff70323_fallback(runtime, poison, poison, poison, poison, entries, LeanWord("usize", 1), LeanWord("usize", 0), poison, poison, poison, poison, poison, poison, poison, poison, world)
+      else L4_Lean_Meta_Tactic_Simp_Rewrite.f_rewrite_rewriteUsingIndex_spec_3_266ff70323(runtime, poison, poison, poison, poison, entries, LeanWord("usize", 1), LeanWord("usize", 0), poison, poison, poison, poison, poison, poison, poison, poison, world);
+    leanFail("unexpected candidate success")
+  };
+  if (mode == "simproc") {
+    _ = if (old) L4_Lean_Meta_Tactic_Simp_Simproc.f_Simp_simprocArrayCore_spec_0_0d13093a68_fallback(runtime, poison, poison, LeanWord("usize", 1), LeanWord("usize", 0), wrong, poison, poison, poison, poison, poison, poison, poison, world)
+      else L4_Lean_Meta_Tactic_Simp_Simproc.f_Simp_simprocArrayCore_spec_0_0d13093a68(runtime, poison, poison, LeanWord("usize", 1), LeanWord("usize", 0), wrong, poison, poison, poison, poison, poison, poison, poison, world);
+    leanFail("unexpected simproc success")
+  };
+  if (mode == "decide") {
+    _ = if (old) L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_preDefault_lam_0_da18db3c18_fallback(runtime, poison, poison, poison, wrong, poison, poison, poison, poison, poison, world)
+      else L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_preDefault_lam_0_da18db3c18(runtime, poison, poison, poison, wrong, poison, poison, poison, poison, poison, world);
+    leanFail("unexpected decide success")
+  };
+  if (mode == "theorem") {
+    _ = if (old) L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_tryTheoremCore_go_eda42a565c_fallback(runtime, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, wrong, poison, world)
+      else L4_Lean_Meta_Tactic_Simp_Rewrite.f_Simp_tryTheoremCore_go_eda42a565c(runtime, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, poison, wrong, poison, world);
+    leanFail("unexpected theorem success")
+  };
+  leanFail("unknown rewrite failure case")
+}

@@ -1,0 +1,76 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// "_private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.reduceStep"
+fun f_Meta_Simp_reduceStep_e0a2562bfe(
+  _runtime: mutable LeanExecution,
+  _e_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_1_8_input: LeanValue,
+): LeanValue {
+  expression = _e_0_input;
+  head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_runtime, expression);
+  isMetaVariable = L4_Lean_Expr.f_Lean_Expr_isMVar_9292d40ab6(_runtime, head);
+  leanTag(isMetaVariable) match {
+  | LeanTag.Bool_true ->
+    // Do not inspect Simp/Meta contexts on the metavariable fast path.
+    return f_Simp_reduceStep_spec_1_4c71881c01(_runtime, expression, _a_5_input, _a_1_8_input)
+  | LeanTag.Bool_false -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  if (leanTag(_a_2_input) != LeanTag.Private_Lean_Meta_Tactic_Simp_Types_0_Lean_Meta_Simp_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  config = leanField(_a_2_input, 0);
+  configWithKey = leanField(_a_2_input, 4);
+  if (leanTag(config) != LeanTag.Meta_Simp_Config_mk) return leanFail("non-exhaustive Lean case");
+  zeta = leanField(config, 5);
+  beta = leanField(config, 6);
+  iota = leanField(config, 9);
+  projection = leanField(config, 10);
+  zetaUnused = leanField(config, 21);
+  zetaHave = leanField(config, 23);
+  if (leanTag(configWithKey) != LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  metaConfig = leanField(configWithKey, 0);
+  if (leanTag(_a_4_input) != LeanTag.Meta_Context_mk) return leanFail("non-exhaustive Lean case");
+  // withSimpMetaConfig recomputes the key, even when beta will return immediately.
+  key = L4_Lean_Meta_Basic.f_Meta_Config_toKey_993126c67a(_runtime, metaConfig);
+  configuredMeta = leanReplaceField(_a_4_input, 0,
+    LeanCtor(LeanTag.Private_Lean_Meta_Basic_0_Lean_Meta_ConfigWithKey_mk, Array[metaConfig, key]));
+  leanTag(beta) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    betaTarget = L4_Lean_Expr.f_Lean_Expr_isHeadBetaTargetFn_f767ced258(_runtime, isMetaVariable, head);
+    leanTag(betaTarget) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      argumentCount = L4_Lean_Expr.f_Lean_Expr_getAppNumArgs_a3ecdae05c(_runtime, expression);
+      emptyArgs = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(_runtime, LeanErased(), argumentCount);
+      reverseArgs = L4_Lean_Expr.f_Lean_Expr_getAppRevArgsAux_45acc94c99(_runtime, expression, emptyArgs);
+      reduced = L4_Lean_Expr.f_Lean_Expr_betaRev_7cc33c698c(_runtime, head, reverseArgs, isMetaVariable, isMetaVariable);
+      return LeanCtor(LeanTag.EST_Out_ok, Array[reduced, _a_1_8_input])
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  continuation = f_Simp_reduceStep_lam_0_382ac6986b(
+    _runtime, head, LeanCtor(LeanTag.Bool_true, Array[]), isMetaVariable, expression,
+    zetaUnused, zetaHave, zeta, iota, projection, LeanCtor(LeanTag.PUnit_unit, Array[]),
+    _a_1_input, _a_2_input, _a_3_input, configuredMeta, _a_5_input, _a_6_input, _a_7_input, _a_1_8_input);
+  leanTag(continuation) match {
+  | LeanTag.EST_Out_ok ->
+    LeanCtor(LeanTag.EST_Out_ok, Array[leanField(continuation, 0), leanField(continuation, 1)])
+  | LeanTag.EST_Out_error -> continuation
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+
+module end;

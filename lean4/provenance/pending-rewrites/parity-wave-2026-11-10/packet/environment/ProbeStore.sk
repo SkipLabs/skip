@@ -1,0 +1,135 @@
+// Real imported extension registrations + store dependency invalidation.
+// Intentionally independent of restoreRaw: every tracked call gets its Context.
+class ParityEnvironmentWork(environment: LeanValue, extension: LeanValue, old: Bool, record: Bool) extends SKStore.File
+class ParityEnvironmentResult(value: LeanValue, tick: Int) extends SKStore.File
+
+fun f_parity_environment_storeCall(
+  runtime: mutable LeanExecution, work: ParityEnvironmentWork,
+): LeanValue {
+  if (work.record) {
+    state = runtime.newRef(leanCoreState(runtime, work.environment));
+    context = leanReplaceField(leanUnboundedCoreContext(runtime, "<environment-store>", ""), 7, leanBool(true));
+    world = leanNatValue(37);
+    result = if (work.old) {
+      L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401_fallback(runtime, work.extension, context, state, world)
+    } else {
+      L4_Lean_CoreM.f_Lean_recordExtGenAccess_5d4ca21401(runtime, work.extension, context, state, world)
+    };
+    assert(leanTag(result) == LeanTag.EST_Out_ok && native_eq(leanField(result, 1), world) == 0);
+    return leanField(leanField(runtime.readRef(state), 6), 2)
+  };
+  mode = LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]);
+  declaration = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  if (work.old) {
+    L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820_fallback(runtime, LeanErased(), work.extension, work.environment, mode, declaration, leanBool(false))
+  } else {
+    L4_Lean_Environment.f_Lean_EnvExtension_getStateUnsafe_d1099d3820(runtime, LeanErased(), work.extension, work.environment, mode, declaration, leanBool(false))
+  }
+}
+
+fun f_parity_environment_storeProbe(): void {
+  data = leanDecodeImportData(FileSystem.readTextFile("build/init-extensions.jsonl"));
+  context = SKStore.Context::create{}.mclone();
+  builder = mutable LeanExecution{store => Some(context), unboundedHeartbeats => true};
+  leanInitializeMetaExtensions(builder);
+  tracked = leanInstallImportedExtensions(builder, "Init", SKStore.DirName::create("/parity-environment/states/"), data.extensions);
+  direct = leanInstallImportedExtensions(builder, "Init", SKStore.DirName::create("/parity-environment/direct-unused/"), data.extensions, true);
+  classImport = data.extensions.filter(entry -> entry.binding == "Lean.classExtension")[0];
+  instanceImport = data.extensions.filter(entry -> entry.binding == "Lean.Meta.instanceExtension")[0];
+  registry = leanArray(builder.readRef(leanReadInitializer(builder, "_private.Lean.Environment.0.Lean.EnvExtension.envExtensionsRef")));
+  classExtension = registry.filter(entry -> leanNameKey(leanField(entry, 4)) == leanNameKey(classImport.name))[0];
+  instanceExtension = registry.filter(entry -> leanNameKey(leanField(entry, 4)) == leanNameKey(instanceImport.name))[0];
+  empty = LeanConstantMap((Map[] : Map<String, LeanConstantFile>));
+  environment = leanEnvironment(builder, LeanConstantsView("imports", empty), LeanConstantsView("locals", empty), leanEmptyEnvironmentHeader(), tracked.i0, tracked.i1, true, data.trackedGeneration);
+  rawEnvironment = leanEnvironment(builder, LeanConstantsView("imports", empty), LeanConstantsView("locals", empty), leanEmptyEnvironmentHeader(), direct.i0, direct.i1, true, data.trackedGeneration);
+  entries = tracked.i0 match {
+  | LeanTrackedExtensionArray(view) -> view.entries
+  | _ -> leanFail("expected imported tracked states")
+  };
+  workItems: mutable Vector<(SKStore.SID, ParityEnvironmentWork)> = mutable Vector[];
+  for ((suffix, old) in Array[("old", true), ("new", false)]) {
+    workItems.push((SKStore.SID("class-" + suffix), ParityEnvironmentWork(environment, classExtension, old, false)));
+    workItems.push((SKStore.SID("instance-" + suffix), ParityEnvironmentWork(environment, instanceExtension, old, false)));
+    workItems.push((SKStore.SID("generation-" + suffix), ParityEnvironmentWork(environment, instanceExtension, old, true)));
+    // Raw execution is supported only with explicitly materialized imported data.
+    raw = builder.checkpoint().restoreRaw();
+    assert(rewriteProbeSameInput(f_parity_environment_storeCall(raw, ParityEnvironmentWork(rawEnvironment, classExtension, old, false)), classImport.state))
+  };
+  inputs = context.mkdir(SKStore.SID::keyType, ParityEnvironmentWork::type, SKStore.DirName::create("/parity-environment/inputs/"), workItems.toArray());
+  results = inputs.map(SKStore.SID::keyType, ParityEnvironmentResult::type, context, SKStore.DirName::create("/parity-environment/results/"),
+    (queryContext, writer, key, queryValues) ~> {
+      runtime = mutable LeanExecution{store => Some(queryContext), unboundedHeartbeats => true};
+      leanInitializeMetaExtensions(runtime);
+      result = f_parity_environment_storeCall(runtime, queryValues.first);
+      leanCheckPublishable(result);
+      writer.set(key, ParityEnvironmentResult(result, queryContext.getTick().value))
+    });
+  context.initPre();
+  context.update();
+  // Tracked updates must retain an override rather than materializing or
+  // mutating imported storage. The real state remains the unchanged old root.
+  saved = builder.checkpoint();
+  oldRuntime = saved.restore(context);
+  newRuntime = saved.restore(context);
+  change = LeanClosure(f_parity_environment_storeTransform, 1, Array[]);
+  mode = LeanCtor(LeanTag.EnvExtension_AsyncMode_local, Array[]);
+  anonymous = LeanCtor(LeanTag.Name_anonymous__impl, Array[]);
+  oldEnvironment = L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88_fallback(oldRuntime, classExtension, environment, change, mode, anonymous, leanBool(false));
+  newEnvironment = L4_Lean_Environment.f_Lean_EnvExtension_modifyStateCore_4449449a88(newRuntime, classExtension, environment, change, mode, anonymous, leanBool(false));
+  assert(rewriteProbeSameInput(oldEnvironment, newEnvironment));
+  assert(native_eq(oldRuntime.checkpoint().refs, newRuntime.checkpoint().refs) == 0);
+  newExtensions = leanField(leanField(leanField(newEnvironment, 0), 0), 4);
+  newExtensions match {
+  | LeanArrayOverride(_, _, replacement) -> assert(rewriteProbeSameInput(replacement, classImport.state))
+  | _ -> leanFail("tracked update must remain a sparse override")
+  };
+  assert(rewriteProbeSameInput(f_parity_environment_storeCall(builder, ParityEnvironmentWork(environment, classExtension, false, false)), classImport.state));
+  index = leanField(leanField(instanceExtension, 5), 0);
+  initialGeneration = instanceImport.generation.fromSome();
+  expectedGeneration = LeanArray(Array[LeanCtor(LeanTag.Prod_mk, Array[index, initialGeneration])]);
+  for (suffix in Array["old", "new"]) {
+    assert(rewriteProbeSameInput(results.get(context, SKStore.SID("class-" + suffix)).value, classImport.state));
+    assert(rewriteProbeSameInput(results.get(context, SKStore.SID("instance-" + suffix)).value, instanceImport.state));
+    assert(rewriteProbeSameInput(results.get(context, SKStore.SID("generation-" + suffix)).value, expectedGeneration))
+  };
+  classOldTick = results.get(context, SKStore.SID("class-old")).tick;
+  classNewTick = results.get(context, SKStore.SID("class-new")).tick;
+  genOldTick = results.get(context, SKStore.SID("generation-old")).tick;
+  genNewTick = results.get(context, SKStore.SID("generation-new")).tick;
+  nextGeneration = L4_Init_Prelude.f_Nat_add_86990f4822(builder, initialGeneration, leanNatValue(1));
+  instanceKey = LeanExtensionKey("Init", leanNameKey(instanceImport.name));
+  entries.writeArray(context, instanceKey, Array[LeanExtensionFile(instanceImport.state, Some(nextGeneration))]);
+  context.update();
+  assert(results.get(context, SKStore.SID("class-old")).tick == classOldTick);
+  assert(results.get(context, SKStore.SID("class-new")).tick == classNewTick);
+  assert(results.get(context, SKStore.SID("generation-old")).tick != genOldTick);
+  assert(results.get(context, SKStore.SID("generation-new")).tick != genNewTick);
+  nextExpected = LeanArray(Array[LeanCtor(LeanTag.Prod_mk, Array[index, nextGeneration])]);
+  for (suffix in Array["old", "new"]) {
+    assert(rewriteProbeSameInput(results.get(context, SKStore.SID("generation-" + suffix)).value, nextExpected))
+  };
+  // A real class-state edit, then restoration; no synthetic replacement state.
+  name = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(builder, LeanText("ParityEnvironmentNewClass"));
+  newClass = LeanCtor(LeanTag.ClassEntry_mk, Array[name, LeanArray(Array[]), LeanArray(Array[])]);
+  pair = leanField(classImport.state, 1);
+  classState = L4_Lean_Class.f_Lean_ClassState_addEntry_3f7479c40a(builder, leanField(pair, 1), newClass);
+  added = leanReplaceField(classImport.state, 1, leanReplaceField(pair, 1, classState));
+  classKey = LeanExtensionKey("Init", leanNameKey(classImport.name));
+  entries.writeArray(context, classKey, Array[LeanExtensionFile(added, classImport.generation)]);
+  context.update();
+  assert(results.get(context, SKStore.SID("class-old")).tick != classOldTick);
+  assert(results.get(context, SKStore.SID("class-new")).tick != classNewTick);
+  for (suffix in Array["old", "new"]) assert(rewriteProbeSameInput(results.get(context, SKStore.SID("class-" + suffix)).value, added));
+  entries.writeArray(context, classKey, Array[LeanExtensionFile(classImport.state, classImport.generation)]);
+  context.update();
+  for (suffix in Array["old", "new"]) assert(rewriteProbeSameInput(results.get(context, SKStore.SID("class-" + suffix)).value, classImport.state));
+  restoredTick = results.get(context, SKStore.SID("class-new")).tick;
+  entries.writeArray(context, LeanExtensionKey("later", classKey.name), Array[LeanExtensionFile(added, classImport.generation)]);
+  context.update();
+  assert(results.get(context, SKStore.SID("class-new")).tick == restoredTick);
+  print_string("environment store parity: imported raw/tracked values, generations, invalidation, restore and scope isolation passed")
+}
+
+fun f_parity_environment_storeTransform(_runtime: mutable LeanExecution, args: Array<LeanValue>): LeanValue { args[0] }
+
+fun main(): void { SKStore.withRegionVoid(() ~> f_parity_environment_storeProbe()) }

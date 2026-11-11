@@ -1,0 +1,234 @@
+module L4_Lean_CoreM;
+
+// Replay the original discarded projections without decoding their payloads.
+// This keeps short/malformed constructor failures and dormant sentinel fields.
+fun f_parity_environment_recordShape(value: LeanValue, fieldCount: Int): void {
+  for (index in Range(0, fieldCount)) {
+    _ = leanField(value, index)
+  }
+}
+
+// "Lean.recordExtGenAccess._redArg"
+fun f_Lean_recordExtGenAccess_5d4ca21401(
+  _runtime: mutable LeanExecution,
+  _ext_0_input: LeanValue,
+  _a_1_input: LeanValue,
+  _a_2_input: LeanValue,
+  _a_1_3_input: LeanValue,
+): LeanValue {
+  if (leanTag(_a_1_input) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(_a_1_input, 8);
+  recording = leanField(_a_1_input, 7);
+  leanTag(recording) match {
+  | LeanTag.Bool_false ->
+    return LeanCtor(
+      LeanTag.EST_Out_ok,
+      Array[LeanCtor(LeanTag.PUnit_unit, Array[]), _a_1_3_input],
+    )
+  | LeanTag.Bool_true -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Keep the first get even for an untracked extension: its world precedes
+  // that diagnostic. A duplicate needs no generation read, take, or put.
+  firstRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
+    LeanErased(),
+    LeanErased(),
+    _a_2_input,
+    _a_1_3_input,
+  );
+  if (leanTag(firstRead) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  firstState = leanField(firstRead, 0);
+  afterFirstRead = leanField(firstRead, 1);
+  if (
+    leanTag(_ext_0_input) !=
+    LeanTag.Private_Lean_Environment_0_Lean_EnvExtension_mk
+  ) return leanFail("non-exhaustive Lean case");
+  f_parity_environment_recordShape(_ext_0_input, 7);
+  extensionIndex = leanField(_ext_0_input, 0);
+  extensionName = leanField(_ext_0_input, 4);
+  generationIndex = leanField(_ext_0_input, 5);
+  index = leanTag(generationIndex) match {
+  | LeanTag.Option_some -> leanField(generationIndex, 0)
+  | _ ->
+    nameText = L4_Init_Data_ToString_Name.f_Name_toString_spec_0_fda1800611(
+      _runtime,
+      extensionName,
+      recording,
+    );
+    opening = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      LeanText("environment extension `"),
+      nameText,
+    );
+    middle = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      opening,
+      LeanText("` (index "),
+    );
+    indexText = L4_Init_Data_Repr.f_Nat_reprFast_1812f02c06(
+      _runtime,
+      extensionIndex,
+    );
+    withIndex = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      middle,
+      indexText,
+    );
+    detail = L4_Init_Data_String_Defs.f_String_append_61d243de93(
+      _runtime,
+      withIndex,
+      LeanText(") is not generation-tracked"),
+    );
+    message = L4_Init_Util.f_mkPanicMessageWithDecl_c4fc2d6e79(
+      _runtime,
+      LeanText("Lean.CoreM"),
+      LeanText("Lean.recordExtGenAccess"),
+      LeanNatLiterals.n994,
+      LeanNatLiterals.n13,
+      detail,
+    );
+    result = f_Lean_recordExtGenAccess_spec_1_72e50bdb6c(_runtime, message);
+    return LeanCtor(LeanTag.EST_Out_ok, Array[result, afterFirstRead])
+  };
+  if (leanTag(firstState) != LeanTag.Core_State_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(firstState, 10);
+  firstDependencies = leanField(firstState, 6);
+  if (leanTag(firstDependencies) != LeanTag.RecordedDeps_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(firstDependencies, 6);
+  recordedGenerations = leanField(firstDependencies, 2);
+  size = L4_Init_Prelude.f_Array_size_3866d4555a(
+    _runtime,
+    LeanErased(),
+    recordedGenerations,
+  );
+  nonempty = L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+    _runtime,
+    LeanNatLiterals.n0,
+    size,
+  );
+  leanTag(nonempty) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    stop = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_runtime, size);
+    duplicate = f_Lean_recordExtGenAccess_spec_0_1653551969(
+      _runtime,
+      index,
+      recordedGenerations,
+      LeanWord("usize", 0),
+      stop,
+    );
+    leanTag(duplicate) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[LeanCtor(LeanTag.PUnit_unit, Array[]), afterFirstRead],
+      )
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  environmentRead = L4_Init_System_ST.f_Prim_Ref_get_ab668afddb(
+    _runtime,
+    LeanErased(),
+    LeanErased(),
+    _a_2_input,
+    afterFirstRead,
+  );
+  if (leanTag(environmentRead) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  environmentState = leanField(environmentRead, 0);
+  afterEnvironmentRead = leanField(environmentRead, 1);
+  if (leanTag(environmentState) != LeanTag.Core_State_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(environmentState, 10);
+  generation = L4_Lean_Environment.f_Lean_EnvExtension_getGenAt_ac1ff195d1(
+    _runtime,
+    leanField(environmentState, 0),
+    index,
+  );
+  taken = L4_Init_System_ST.f_Prim_Ref_take_7505bf778c(
+    _runtime,
+    LeanErased(),
+    LeanErased(),
+    _a_2_input,
+    afterEnvironmentRead,
+  );
+  if (leanTag(taken) != LeanTag.ST_Out_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  currentState = leanField(taken, 0);
+  afterTake = leanField(taken, 1);
+  if (leanTag(currentState) != LeanTag.Core_State_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(currentState, 10);
+  dependencies = leanField(currentState, 6);
+  if (leanTag(dependencies) != LeanTag.RecordedDeps_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  f_parity_environment_recordShape(dependencies, 6);
+  unit = LeanCtor(LeanTag.PUnit_unit, Array[]);
+  entry = LeanCtor(LeanTag.Prod_mk, Array[index, generation]);
+  appended = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+    _runtime,
+    LeanErased(),
+    leanField(dependencies, 2),
+    entry,
+  );
+  // Only the append branch reconstructs: publish the original fixed arities,
+  // rather than retaining surplus fields or the input field-array class.
+  updatedDependencies = LeanCtor(
+    LeanTag.RecordedDeps_mk,
+    Array[
+      leanField(dependencies, 0),
+      leanField(dependencies, 1),
+      appended,
+      leanField(dependencies, 3),
+      leanField(dependencies, 4),
+      leanField(dependencies, 5),
+    ],
+  );
+  updated = LeanCtor(
+    LeanTag.Core_State_mk,
+    Array[
+      leanField(currentState, 0),
+      leanField(currentState, 1),
+      leanField(currentState, 2),
+      leanField(currentState, 3),
+      leanField(currentState, 4),
+      leanField(currentState, 5),
+      updatedDependencies,
+      leanField(currentState, 7),
+      leanField(currentState, 8),
+      leanField(currentState, 9),
+    ],
+  );
+  written = L4_Init_System_ST.f_Prim_Ref_put_334aaf25b1(
+    _runtime,
+    LeanErased(),
+    LeanErased(),
+    _a_2_input,
+    updated,
+    afterTake,
+  );
+  leanTag(written) match {
+  | LeanTag.ST_Out_mk ->
+    _ = leanField(written, 0);
+    LeanCtor(LeanTag.EST_Out_ok, Array[unit, leanField(written, 1)])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

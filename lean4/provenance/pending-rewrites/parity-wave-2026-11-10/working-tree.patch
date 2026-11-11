@@ -1,0 +1,311 @@
+diff --git a/lean4/AGENT_HANDOFF.md b/lean4/AGENT_HANDOFF.md
+index 54c31d6aa..c78028276 100644
+--- a/lean4/AGENT_HANDOFF.md
++++ b/lean4/AGENT_HANDOFF.md
+@@ -1,5 +1,7 @@
+ # Lean in Skip: detailed agent handoff
+ 
++> **Latest pause (2026-11-10, broad rewrite wave): read [PARITY_PAUSE.md](PARITY_PAUSE.md) first.** It supersedes this historical status: eight expression rewrites are integrated but uncommitted; the other lane packets, review blockers and validation evidence are preserved. Do not resume work without the user's instruction.
++
+ Prepared on 2026-11-10. The last implementation checkpoint is **`fa9550dfc`**.
+ This handoff and its supporting archive are documentation work performed after
+ the user paused optimization. They do not resume that work.
+diff --git a/lean4/REWRITE_PLAN.md b/lean4/REWRITE_PLAN.md
+index ef3b85473..6b6ca5cfa 100644
+--- a/lean4/REWRITE_PLAN.md
++++ b/lean4/REWRITE_PLAN.md
+@@ -1,5 +1,13 @@
+ # Rewrite the measured example in parallel
+ 
++**Current user direction: one broad wave with eight implementers and two reviewers.**
++[PARITY_REWRITE_PLAN.md](PARITY_REWRITE_PLAN.md) supersedes the small-batch gate:
++46 initial frame routines (30,555 original lines), shared port allocation work,
++and a complete 152-entry remaining-frame roadmap. Readability rewrites are in
++scope even without certain timing gains. Ten agents are launched; correctness
++checks remain serialized and benchmarking waits for wave integration. Historical
++notes below describe earlier runs, not additional currently active worker pools.
++
+ **Resumed at the user's request (2026-11-10), with up to ten subagents authorized.**
+ The [handoff](AGENT_HANDOFF.md) and [pause checkpoint](PAUSE_CHECKPOINT.md) preserve
+ historical evidence: depth-6 Skip elaboration at 638.291 ms versus native Lean
+diff --git a/lean4/provenance/symbols.tsv b/lean4/provenance/symbols.tsv
+index d382acc95..dbaaa73d0 100644
+--- a/lean4/provenance/symbols.tsv
++++ b/lean4/provenance/symbols.tsv
+@@ -128804,7 +128804,7 @@ L4_Lean_Expr.f_Expr_foldlM_lam_1_b37aa0b46c	Lean.Expr.foldlM._redArg._lam_1	sour
+ L4_Lean_Expr.f_Expr_foldlM_lam_2_9d6b480a42	Lean.Expr.foldlM._redArg._lam_2	sources/Additional/Lean/Expr/Part002.sk
+ L4_Lean_Expr.f_Expr_forallE_elim_48c5aecf1d	Lean.Expr.forallE.elim	sources/Additional/Lean/Expr/Part001.sk
+ L4_Lean_Expr.f_Expr_forallE_elim_eb4e419110	Lean.Expr.forallE.elim._redArg	sources/Additional/Lean/Expr/Part000.sk
+-L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660	Lean.Expr.forallE._override	sources/Modules/Lean/Expr/Part000.sk
++L4_Lean_Expr.f_Expr_forallE_override_b21c7ca660	Lean.Expr.forallE._override	sources/Modules/Lean/Expr/ParityExprForallEOverride.sk
+ L4_Lean_Expr.f_Expr_fvarId_closed_0_649ef6ba26	Lean.Expr.fvarId!._closed_0	sources/Additional/Lean/Expr/Part001.sk
+ L4_Lean_Expr.f_Expr_fvarId_closed_1_66b8a63c92	Lean.Expr.fvarId!._closed_1	sources/Additional/Lean/Expr/Part000.sk
+ L4_Lean_Expr.f_Expr_fvarId_closed_2_afac569dce	Lean.Expr.fvarId!._closed_2	sources/Additional/Lean/Expr/Part000.sk
+@@ -128849,7 +128849,7 @@ L4_Lean_Expr.f_Expr_isTrue_closed_0_d161416e9b	Lean.Expr.isTrue._closed_0	source
+ L4_Lean_Expr.f_Expr_isTrue_closed_1_ec8766656c	Lean.Expr.isTrue._closed_1	sources/Additional/Lean/Expr/Part001.sk
+ L4_Lean_Expr.f_Expr_lam_elim_4c22da0a73	Lean.Expr.lam.elim._redArg	sources/Additional/Lean/Expr/Part001.sk
+ L4_Lean_Expr.f_Expr_lam_elim_509deb2b62	Lean.Expr.lam.elim	sources/Additional/Lean/Expr/Part001.sk
+-L4_Lean_Expr.f_Expr_lam_override_5bc80605de	Lean.Expr.lam._override	sources/Modules/Lean/Expr/Part002.sk
++L4_Lean_Expr.f_Expr_lam_override_5bc80605de	Lean.Expr.lam._override	sources/Modules/Lean/Expr/ParityExprLamOverride.sk
+ L4_Lean_Expr.f_Expr_letBody_closed_0_5c1880a0cf	Lean.Expr.letBody!._closed_0	sources/Additional/Lean/Expr/Part001.sk
+ L4_Lean_Expr.f_Expr_letBody_closed_1_fe0dd02bfd	Lean.Expr.letBody!._closed_1	sources/Additional/Lean/Expr/Part000.sk
+ L4_Lean_Expr.f_Expr_letE_elim_bfd64351e7	Lean.Expr.letE.elim	sources/Additional/Lean/Expr/Part000.sk
+@@ -134185,7 +134185,7 @@ L4_Lean_LocalContext.f_mkBinding_lam_0_closed_1_e3e8830681	Lean.LocalContext.mkB
+ L4_Lean_LocalContext.f_mkForall_spec_0_spec_0_fd0a0d3f1b	Nat.foldRev._at_.Nat.foldRev._at_.Lean.LocalContext.mkForall.spec_0.spec_0	sources/Modules/Lean/LocalContext/Part000.sk
+ L4_Lean_LocalContext.f_mkLambda_spec_0_spec_0_bdfc1defcd	Nat.foldRev._at_.Nat.foldRev._at_.Lean.LocalContext.mkLambda.spec_0.spec_0	sources/Modules/Lean/LocalContext/Part000.sk
+ L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_97c23a04bf	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.LocalContext.mkLocalDecl.spec_0.spec_0	sources/Additional/Lean/LocalContext/Part000.sk
+-L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_eab4f1c354	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.LocalContext.mkLocalDecl.spec_0.spec_0._redArg	sources/Modules/Lean/LocalContext/Part000.sk
++L4_Lean_LocalContext.f_mkLocalDecl_spec_0_spec_0_eab4f1c354	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.LocalContext.mkLocalDecl.spec_0.spec_0._redArg	sources/Modules/Lean/LocalContext/ParityMkLocalDeclSpec0Spec0.sk
+ L4_Lean_LocalContext.f_modifyLocalDecls_spec_0_spec_0_4bd0a89829	_private.Lean.Data.PersistentArray.0.Lean.PersistentArray.foldlFromMAux._at_.Lean.PersistentArray.foldlM._at_.Lean.LocalContext.modifyLocalDecls.spec_0.spec_0	sources/Modules/Lean/LocalContext/Part000.sk
+ L4_Lean_LocalContext.f_modifyLocalDecls_spec_0_spec_1_b30752a1e1	_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.PersistentArray.foldlM._at_.Lean.LocalContext.modifyLocalDecls.spec_0.spec_1	sources/Modules/Lean/LocalContext/Part000.sk
+ L4_Lean_LocalContext.f_modifyLocalDecls_spec_0_spec_2_1544cd63fa	_private.Lean.Data.PersistentArray.0.Lean.PersistentArray.foldlMAux._at_.Lean.PersistentArray.foldlM._at_.Lean.LocalContext.modifyLocalDecls.spec_0.spec_2	sources/Modules/Lean/LocalContext/Part000.sk
+@@ -212849,7 +212849,7 @@ L4_Lean_MetavarContext.f_MetavarContext_isWellFormed_lam_5_42a1e35408	Lean.Metav
+ L4_Lean_MetavarContext.f_MetavarContext_isWellFormed_lam_6_da8bcee7bc	Lean.MetavarContext.isWellFormed._redArg._lam_6	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MetavarContext_isWellFormed_lam_9_d54c15a306	Lean.MetavarContext.isWellFormed._redArg._lam_9	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MetavarContext_levelMVarToParam_closed_0_347a7bc092	Lean.MetavarContext.levelMVarToParam._closed_0	sources/Additional/Lean/MetavarContext/Part000.sk
+-L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9	_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.MetavarContext.mkBinding.spec_0	sources/Modules/Lean/MetavarContext/Part000.sk
++L4_Lean_MetavarContext.f_MetavarContext_mkBinding_spec_0_4115d2aad9	_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.MetavarContext.mkBinding.spec_0	sources/Modules/Lean/MetavarContext/ParityMetavarContextMkBindingSpec0.sk
+ L4_Lean_MetavarContext.f_MetavarContext_modifyExprMVarLCtx_lam_0_fcad4a993f	Lean.MetavarContext.modifyExprMVarLCtx._lam_0	sources/Modules/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MetavarContext_setFVarBinderInfo_lam_0_76628dd20b	Lean.MetavarContext.setFVarBinderInfo._lam_0	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MetavarContext_setFVarKind_lam_0_b8d406d0cb	Lean.MetavarContext.setFVarKind._lam_0	sources/Additional/Lean/MetavarContext/Part001.sk
+@@ -212926,7 +212926,7 @@ L4_Lean_MetavarContext.f_MkBinding_instToStringException_lam_1_ed80c0302b	Lean.M
+ L4_Lean_MetavarContext.f_MkBinding_mkAuxMVarType_abstractRangeAux_9203faa2f9	_private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.mkAuxMVarType.abstractRangeAux	sources/Modules/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_mkAuxMVarType_spec_14_0d16940e18	_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.mkAuxMVarType.spec_14	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_mkAuxMVarType_spec_14_46a08eec09	_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.mkAuxMVarType.spec_14._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
+-L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500	_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_.Lean.MetavarContext.MkBinding.mkBinding.spec_0._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
++L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_5c82fc8500	_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_.Lean.MetavarContext.MkBinding.mkBinding.spec_0._redArg	sources/Modules/Lean/MetavarContext/ParityMkBindingMkBindingSpec0.sk
+ L4_Lean_MetavarContext.f_MkBinding_mkBinding_spec_0_c7eb05dc2d	_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_.Lean.MetavarContext.MkBinding.mkBinding.spec_0	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_mkMVarApp_spec_0_e1c593b75f	_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.mkMVarApp.spec_0	sources/Modules/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_reduceLocalContext_spec_0_04437c9bf3	_private.Init.Data.Array.Basic.0.Array.foldrMUnsafe.fold._at_.Lean.MetavarContext.MkBinding.reduceLocalContext.spec_0	sources/Modules/Lean/MetavarContext/Part000.sk
+@@ -212934,12 +212934,12 @@ L4_Lean_MetavarContext.f_MkBinding_visit_spec_16_01181e40b5	Std.DHashMap.Interna
+ L4_Lean_MetavarContext.f_MkBinding_visit_spec_16_bffaef1a1b	Std.DHashMap.Internal.Raw₀.Const.get?._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.visit.spec_16._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_visit_spec_17_8c0e5c8bff	Std.DHashMap.Internal.Raw₀.insert._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.visit.spec_17	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_MkBinding_visit_spec_17_f304a05a0e	Std.DHashMap.Internal.Raw₀.insert._at_._private.Lean.MetavarContext.0.Lean.MetavarContext.MkBinding.visit.spec_17._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
+-L4_Lean_MetavarContext.f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MetavarContext.addExprMVarDecl.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/Part001.sk
++L4_Lean_MetavarContext.f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MetavarContext.addExprMVarDecl.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/ParityAddExprMVarDeclSpec0Spec0.sk
+ L4_Lean_MetavarContext.f_addExprMVarDecl_spec_0_spec_0_b204b8b648	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MetavarContext.addExprMVarDecl.spec_0.spec_0	sources/Additional/Lean/MetavarContext/Part000.sk
+-L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignExp.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
++L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_12353c570c	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignExp.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/ParityAssignExpSpec0Spec0.sk
+ L4_Lean_MetavarContext.f_assignExp_spec_0_spec_0_c847528e4a	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignExp.spec_0.spec_0	sources/Additional/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_assignLevelMVarExp_spec_0_spec_0_4089d14de7	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignLevelMVarExp.spec_0.spec_0	sources/Additional/Lean/MetavarContext/Part000.sk
+-L4_Lean_MetavarContext.f_assignLevelMVarExp_spec_0_spec_0_c459d88a74	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignLevelMVarExp.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/Part000.sk
++L4_Lean_MetavarContext.f_assignLevelMVarExp_spec_0_spec_0_c459d88a74	Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignLevelMVarExp.spec_0.spec_0._redArg	sources/Modules/Lean/MetavarContext/ParityAssignLevelMVarExpSpec0Spec0.sk
+ L4_Lean_MetavarContext.f_collectForwardDeps_spec_3_spec_3_520afd91d5	Lean.PersistentArray.foldlM._at_.Lean.LocalContext.foldlM._at_.Lean.MetavarContext.MkBinding.collectForwardDeps.spec_3.spec_3	sources/Modules/Lean/MetavarContext/Part001.sk
+ L4_Lean_MetavarContext.f_dep_visitMain_spec_1_7ef47008e5	Lean.instantiateMVars._at_._private.Lean.MetavarContext.0.Lean.DependsOn.dep.visitMain.spec_1	sources/Modules/Lean/MetavarContext/Part000.sk
+ L4_Lean_MetavarContext.f_dep_visitMain_spec_2_b5fec1af2f	Lean.getExprMVarAssignment?._at_._private.Lean.MetavarContext.0.Lean.DependsOn.dep.visitMain.spec_2	sources/Modules/Lean/MetavarContext/Part000.sk
+diff --git a/lean4/sources/Modules/Lean/Expr/Part000.sk b/lean4/sources/Modules/Lean/Expr/Part000.sk
+index 4af72100f..b92948870 100644
+--- a/lean4/sources/Modules/Lean/Expr/Part000.sk
++++ b/lean4/sources/Modules/Lean/Expr/Part000.sk
+@@ -4124,7 +4124,7 @@ fun apply_f_Lean_instBEqLiteral_beq_dea54cb2f4(
+   f_Lean_instBEqLiteral_beq_dea54cb2f4(_runtime, _args[0], _args[1])
+ }
+ // "Lean.Expr.forallE._override"
+-fun f_Expr_forallE_override_b21c7ca660(
++fun f_Expr_forallE_override_b21c7ca660_fallback(
+   _runtime: mutable LeanExecution,
+   _binderName_0_input: LeanValue,
+   _binderType_1_input: LeanValue,
+diff --git a/lean4/sources/Modules/Lean/Expr/Part002.sk b/lean4/sources/Modules/Lean/Expr/Part002.sk
+index 064f7685f..8ad65bab8 100644
+--- a/lean4/sources/Modules/Lean/Expr/Part002.sk
++++ b/lean4/sources/Modules/Lean/Expr/Part002.sk
+@@ -21,7 +21,7 @@ fun apply_f_Lean_Expr_isConst_c54d56be4f(
+   f_Lean_Expr_isConst_c54d56be4f(_runtime, _args[0])
+ }
+ // "Lean.Expr.lam._override"
+-fun f_Expr_lam_override_5bc80605de(
++fun f_Expr_lam_override_5bc80605de_fallback(
+   _runtime: mutable LeanExecution,
+   _binderName_0_input: LeanValue,
+   _binderType_1_input: LeanValue,
+diff --git a/lean4/sources/Modules/Lean/LocalContext/Part000.sk b/lean4/sources/Modules/Lean/LocalContext/Part000.sk
+index 24a862d07..5368629b0 100644
+--- a/lean4/sources/Modules/Lean/LocalContext/Part000.sk
++++ b/lean4/sources/Modules/Lean/LocalContext/Part000.sk
+@@ -9258,7 +9258,7 @@ fun f_modifyLocalDecls_spec_0_spec_1_b30752a1e1(
+   }
+ }
+ // "Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.LocalContext.mkLocalDecl.spec_0.spec_0._redArg"
+-fun f_mkLocalDecl_spec_0_spec_0_eab4f1c354(
++fun f_mkLocalDecl_spec_0_spec_0_eab4f1c354_fallback(
+   _runtime: mutable LeanExecution,
+   _x_1_0_input: LeanValue,
+   _x_2_1_input: LeanValue,
+@@ -9411,7 +9411,7 @@ fun f_mkLocalDecl_spec_0_spec_0_eab4f1c354(
+             );
+             _frame.set(
+               30,
+-              f_mkLocalDecl_spec_0_spec_0_eab4f1c354(
++              f_mkLocalDecl_spec_0_spec_0_eab4f1c354_fallback(
+                 _runtime,
+                 _frame[21],
+                 _frame[27],
+diff --git a/lean4/sources/Modules/Lean/MetavarContext/Part000.sk b/lean4/sources/Modules/Lean/MetavarContext/Part000.sk
+index 7dbe992e6..79168cc10 100644
+--- a/lean4/sources/Modules/Lean/MetavarContext/Part000.sk
++++ b/lean4/sources/Modules/Lean/MetavarContext/Part000.sk
+@@ -477,7 +477,7 @@ fun f_shouldVisit_spec_1_spec_2_929ae8fea1(
+   )
+ }
+ // "Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignExp.spec_0.spec_0._redArg"
+-fun f_assignExp_spec_0_spec_0_12353c570c(
++fun f_assignExp_spec_0_spec_0_12353c570c_fallback(
+   _runtime: mutable LeanExecution,
+   _x_1_0_input: LeanValue,
+   _x_2_1_input: LeanValue,
+@@ -630,7 +630,7 @@ fun f_assignExp_spec_0_spec_0_12353c570c(
+             );
+             _frame.set(
+               30,
+-              f_assignExp_spec_0_spec_0_12353c570c(
++              f_assignExp_spec_0_spec_0_12353c570c_fallback(
+                 _runtime,
+                 _frame[21],
+                 _frame[27],
+@@ -6451,7 +6451,7 @@ fun f_MetavarContext_getExprAssignmentCore_spec_0_421b1dce90(
+   )
+ }
+ // "_private.Init.Data.Nat.Control.0.Nat.foldRevM.loop._at_.Lean.MetavarContext.MkBinding.mkBinding.spec_0._redArg"
+-fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
++fun f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+   _runtime: mutable LeanExecution,
+   _xs_0_input: LeanValue,
+   _isLambda_1_input: LeanValue,
+@@ -6766,7 +6766,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             27,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -6796,7 +6796,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             29,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -6857,7 +6857,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             37,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -6911,7 +6911,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             55,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -6949,7 +6949,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             58,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -7029,7 +7029,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+           );
+           _frame.set(
+             82,
+-            f_MkBinding_mkBinding_spec_0_5c82fc8500(
++            f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+               _runtime,
+               _frame[0],
+               _frame[1],
+@@ -7086,7 +7086,7 @@ fun f_MkBinding_mkBinding_spec_0_5c82fc8500(
+             );
+             _frame.set(
+               86,
+-              f_MkBinding_mkBinding_spec_0_5c82fc8500(
++              f_MkBinding_mkBinding_spec_0_5c82fc8500_fallback(
+                 _runtime,
+                 _frame[0],
+                 _frame[1],
+@@ -7181,7 +7181,7 @@ fun f_Lean_MetavarContext_levelMVarToParam_a45310cb1b(
+   }
+ }
+ // "Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.assignLevelMVarExp.spec_0.spec_0._redArg"
+-fun f_assignLevelMVarExp_spec_0_spec_0_c459d88a74(
++fun f_assignLevelMVarExp_spec_0_spec_0_c459d88a74_fallback(
+   _runtime: mutable LeanExecution,
+   _x_1_0_input: LeanValue,
+   _x_2_1_input: LeanValue,
+@@ -7334,7 +7334,7 @@ fun f_assignLevelMVarExp_spec_0_spec_0_c459d88a74(
+             );
+             _frame.set(
+               30,
+-              f_assignLevelMVarExp_spec_0_spec_0_c459d88a74(
++              f_assignLevelMVarExp_spec_0_spec_0_c459d88a74_fallback(
+                 _runtime,
+                 _frame[21],
+                 _frame[27],
+@@ -8440,7 +8440,7 @@ fun f_MetavarContext_MkBinding_preserveOrder_b4b76d5a15(
+   }
+ }
+ // "_private.Init.Data.Array.Basic.0.Array.foldlMUnsafe.fold._at_.Lean.MetavarContext.mkBinding.spec_0"
+-fun f_MetavarContext_mkBinding_spec_0_4115d2aad9(
++fun f_MetavarContext_mkBinding_spec_0_4115d2aad9_fallback(
+   _runtime: mutable LeanExecution,
+   _as_0_input: LeanValue,
+   _i_1_input: LeanValue,
+@@ -8524,7 +8524,7 @@ fun f_MetavarContext_mkBinding_spec_0_4115d2aad9(
+       );
+       _frame.set(
+         7,
+-        f_MetavarContext_mkBinding_spec_0_4115d2aad9(
++        f_MetavarContext_mkBinding_spec_0_4115d2aad9_fallback(
+           _runtime,
+           _frame[0],
+           _frame[6],
+diff --git a/lean4/sources/Modules/Lean/MetavarContext/Part001.sk b/lean4/sources/Modules/Lean/MetavarContext/Part001.sk
+index 1d020e937..5198bab4e 100644
+--- a/lean4/sources/Modules/Lean/MetavarContext/Part001.sk
++++ b/lean4/sources/Modules/Lean/MetavarContext/Part001.sk
+@@ -1687,7 +1687,7 @@ fun f_MkBinding_collectForwardDeps_spec_2_4c83279a6f(
+   }
+ }
+ // "Lean.PersistentHashMap.insertAux._at_.Lean.PersistentHashMap.insert._at_.Lean.MetavarContext.addExprMVarDecl.spec_0.spec_0._redArg"
+-fun f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a(
++fun f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a_fallback(
+   _runtime: mutable LeanExecution,
+   _x_1_0_input: LeanValue,
+   _x_2_1_input: LeanValue,
+@@ -1840,7 +1840,7 @@ fun f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a(
+             );
+             _frame.set(
+               30,
+-              f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a(
++              f_addExprMVarDecl_spec_0_spec_0_0c9fc4045a_fallback(
+                 _runtime,
+                 _frame[21],
+                 _frame[27],
+diff --git a/lean4/sources/build.txt b/lean4/sources/build.txt
+index 4673a89e9..ba2387a90 100644
+--- a/lean4/sources/build.txt
++++ b/lean4/sources/build.txt
+@@ -1443,3 +1443,11 @@ sources/Modules/Init/Prelude/NaturalDivision.sk
+ sources/Modules/Lean/Expr/Applications.sk
+ sources/Modules/Lean/Meta/InferType/Cache.sk
+ sources/Modules/Lean/Meta/ExprDefEq/QuickOther.sk
++sources/Modules/Lean/Expr/ParityExprForallEOverride.sk
++sources/Modules/Lean/MetavarContext/ParityAddExprMVarDeclSpec0Spec0.sk
++sources/Modules/Lean/MetavarContext/ParityAssignExpSpec0Spec0.sk
++sources/Modules/Lean/LocalContext/ParityMkLocalDeclSpec0Spec0.sk
++sources/Modules/Lean/Expr/ParityExprLamOverride.sk
++sources/Modules/Lean/MetavarContext/ParityAssignLevelMVarExpSpec0Spec0.sk
++sources/Modules/Lean/MetavarContext/ParityMkBindingMkBindingSpec0.sk
++sources/Modules/Lean/MetavarContext/ParityMetavarContextMkBindingSpec0.sk

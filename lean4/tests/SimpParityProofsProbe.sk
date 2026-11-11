@@ -1,0 +1,173 @@
+// Independent proof AST expectations, not calls to another congruence builder.
+fun f_paritySimplifierProofApps(runtime: mutable LeanExecution, head: LeanValue, args: Array<LeanValue>): LeanValue {
+  result = head;
+  for (arg in args) { !result = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, result, arg) };
+  result
+}
+fun f_paritySimplifierProofResult(expr: LeanValue, proof: LeanValue, cache: Bool): LeanValue {
+  LeanCtor(LeanTag.Meta_Simp_Result_mk, Array[expr, proof, leanBool(cache)])
+}
+fun f_paritySimplifierProofCheck(label: String, state: RewriteProbeState,
+  kind: Int, expr: LeanValue, first: LeanValue, second: LeanValue, world: LeanValue,
+  expected: ?LeanValue,
+): Int {
+  oldInputs = rewriteProbeCopyInput(LeanArray(Array[expr, first, second, state.metaContext, state.coreContext]));
+  newInputs = rewriteProbeCopyInput(oldInputs);
+  (result, _) = f_paritySimplifierProbeCompare(label, state.saved,
+    (old: mutable LeanExecution) ~> {
+      inputs = leanArray(oldInputs);
+      output = if (kind == 0) {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327_fallback(old,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      } else if (kind == 1) {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24_fallback(old,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      } else {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295_fallback(old,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      };
+      assert(rewriteProbeSameInput(oldInputs, newInputs));
+      output
+    },
+    (fresh: mutable LeanExecution) ~> {
+      inputs = leanArray(newInputs);
+      output = if (kind == 0) {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongr_4039f18327(fresh,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      } else if (kind == 1) {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkCongrFun_a5bd26ab24(fresh,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      } else {
+        L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkEqTransOptProofResult_36f2da1295(fresh,
+          inputs[0], inputs[1], inputs[2], inputs[3], state.metaStateRef, inputs[4], state.coreStateRef, world)
+      };
+      assert(rewriteProbeSameInput(newInputs, oldInputs));
+      output
+    }, expected);
+  if (expected.isNone()) {
+    assert(leanTag(result) == LeanTag.EST_Out_error);
+    assert(leanTag(leanField(result, 0)) == LeanTag.Exception_error);
+    assert(rewriteProbeSameInput(leanField(result, 1), world))
+  };
+  1
+}
+fun main(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    name = (text: String) -> L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text));
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    one = L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, one);
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    levels: LeanValue = LeanCtor(LeanTag.List_cons, Array[one, LeanCtor(LeanTag.List_cons, Array[one, nil])]);
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    fvar = (text: String) -> L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name(text));
+    aType = fvar("A");
+    a = fvar("a"); b = fvar("b"); c = fvar("c");
+    f = fvar("f"); g = fvar("g"); hf = fvar("hf"); ha = fvar("ha"); hb = fvar("hb");
+    arrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("x"), binder, aType, aType);
+    eq = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name("Eq"), LeanCtor(LeanTag.List_cons, Array[one, nil]));
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime);
+    for ((text, declType) in Array[
+      ("A", type), ("a", aType), ("b", aType), ("c", aType), ("f", arrow), ("g", arrow),
+      ("hf", f_paritySimplifierProofApps(runtime, eq, Array[arrow, f, g])),
+      ("ha", f_paritySimplifierProofApps(runtime, eq, Array[aType, a, b])),
+      ("hb", f_paritySimplifierProofApps(runtime, eq, Array[aType, b, c])),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime,
+        locals, name(text), name(text), declType, binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]))
+    };
+
+    familyFunction = fvar("B");
+    domainBound = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    dependentBody = f_paritySimplifierProofApps(runtime, familyFunction, Array[domainBound]);
+    dependentArrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("x"), binder, aType, dependentBody);
+    df = fvar("df"); dg = fvar("dg"); dh = fvar("dh");
+    for ((text, declType) in Array[
+      ("B", L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("x"), binder, aType, type)),
+      ("df", dependentArrow), ("dg", dependentArrow),
+      ("dh", f_paritySimplifierProofApps(runtime, eq, Array[dependentArrow, df, dg])),
+    ]) {
+      !locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime,
+        locals, name(text), name(text), declType, binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]))
+    };
+    // A real polymorphic Eq declaration keeps WHNF of local proof types supported.
+    universeName = name("u");
+    universe = L4_Lean_Level.f_Lean_mkLevelParam_810abd49d1(runtime, universeName);
+    sortU = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, universe);
+    prop = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, zero);
+    bound0 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0);
+    bound1 = L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n1);
+    eqType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("alpha"), binder, sortU,
+      L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("lhs"), binder, bound0,
+        L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("rhs"), binder, bound1, prop)));
+    eqInfo = LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[name("Eq"), LeanCtor(LeanTag.List_cons, Array[universeName, nil]), eqType]),
+      leanBool(false)])]);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    constants.set(leanNameKey(name("Eq")), LeanConstantFile(eqInfo, None()));
+    state = rewriteProbeState(runtime, rewriteProbeEnvironment(runtime, constants.chill()), locals, "<parity-simplifier-proofs>");
+    world = leanNatValue(91);
+    none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+    some = (proof: LeanValue) ~> (LeanCtor(LeanTag.Option_some, Array[proof]) : LeanValue);
+    oldApp = f_paritySimplifierProofApps(runtime, f, Array[a]);
+    for (functionChanges in Array[false, true]) {
+      for (argumentChanges in Array[false, true]) {
+        newFunction = if (functionChanges) g else f;
+        newArgument = if (argumentChanges) b else a;
+        newApp = f_paritySimplifierProofApps(runtime, newFunction, Array[newArgument]);
+        fr = f_paritySimplifierProofResult(newFunction, if (functionChanges) some(hf) else none, false);
+        ar = f_paritySimplifierProofResult(newArgument, if (argumentChanges) some(ha) else none, false);
+        proof = none;
+        if (functionChanges || argumentChanges) {
+          theoremName = if (functionChanges) { if (argumentChanges) "congr" else "congrFun'" } else "congrArg";
+          theorem = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name(theoremName), levels);
+          args = if (functionChanges) {
+            if (argumentChanges) Array[aType, aType, f, g, a, b, hf, ha]
+            else Array[aType, aType, f, g, hf, a]
+          } else Array[aType, aType, a, b, f, ha];
+          !proof = some(f_paritySimplifierProofApps(runtime, theorem, args))
+        };
+        expected: LeanValue = LeanCtor(LeanTag.EST_Out_ok,
+          Array[f_paritySimplifierProofResult(newApp, proof, true), world]);
+        !cases = cases + f_paritySimplifierProofCheck("four congruence proof branches", state, 0, oldApp, fr, ar, world, Some(expected))
+      }
+    };
+    family = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name("x"), binder, aType, aType);
+    congrFun = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name("congrFun"), levels);
+    dependentProof = f_paritySimplifierProofApps(runtime, congrFun, Array[aType, family, f, g, hf, a]);
+    !cases = cases + f_paritySimplifierProofCheck("congrFun explicit family", state, 1, oldApp,
+      f_paritySimplifierProofResult(g, some(hf), false), a, world,
+      Some(LeanCtor(LeanTag.EST_Out_ok, Array[f_paritySimplifierProofResult(
+        f_paritySimplifierProofApps(runtime, g, Array[a]), some(dependentProof), true), world])));
+
+    dependentFamily = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name("x"), binder, aType, dependentBody);
+    realDependentProof = f_paritySimplifierProofApps(runtime, congrFun, Array[aType, dependentFamily, df, dg, dh, a]);
+    !cases = cases + f_paritySimplifierProofCheck("dependent congrFun B x", state, 1,
+      f_paritySimplifierProofApps(runtime, df, Array[a]), f_paritySimplifierProofResult(dg, some(dh), false), a, world,
+      Some(LeanCtor(LeanTag.EST_Out_ok, Array[f_paritySimplifierProofResult(
+        f_paritySimplifierProofApps(runtime, dg, Array[a]), some(realDependentProof), true), world])));
+    transName = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(runtime, LeanText("Eq"), LeanText("trans"));
+    trans = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, transName, LeanCtor(LeanTag.List_cons, Array[one, nil]));
+    transProof = f_paritySimplifierProofApps(runtime, trans, Array[aType, a, b, c, ha, hb]);
+    for (leftCache in Array[false, true]) {
+      for (rightCache in Array[false, true]) {
+        !cases = cases + f_paritySimplifierProofCheck("ordered real Eq.trans", state, 2, some(ha), leanBool(leftCache),
+          f_paritySimplifierProofResult(c, some(hb), rightCache), world,
+          Some(LeanCtor(LeanTag.EST_Out_ok, Array[f_paritySimplifierProofResult(c, some(transProof), leftCache && rightCache), world])))
+      }
+    };
+    unknown = fvar("unknown");
+    badApp = f_paritySimplifierProofApps(runtime, f, Array[unknown]);
+    !cases = cases + f_paritySimplifierProofCheck("congr prefix inference failure", state, 0, badApp,
+      f_paritySimplifierProofResult(g, some(hf), false), f_paritySimplifierProofResult(a, none, false), world, None());
+    !cases = cases + f_paritySimplifierProofCheck("congrFun argument inference failure", state, 1, oldApp,
+      f_paritySimplifierProofResult(g, some(hf), false), unknown, world, None());
+    !cases = cases + f_paritySimplifierProofCheck("trans proof inference failure", state, 2, some(unknown), leanBool(false),
+      f_paritySimplifierProofResult(c, some(hb), false), world, None())
+  };
+  assert(cases == 26);
+  print_string("simplifier proof construction: " + cases.toString() + " differential cases")
+}

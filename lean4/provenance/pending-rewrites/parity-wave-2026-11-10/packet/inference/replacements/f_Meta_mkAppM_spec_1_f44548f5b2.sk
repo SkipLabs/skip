@@ -1,0 +1,205 @@
+module L4_Lean_Meta_AppBuilder;
+
+// "_private.Lean.Meta.AppBuilder.0.Lean.Meta.withAppBuilderTrace._at_.Lean.Meta.mkAppM.spec_1"
+fun f_Meta_mkAppM_spec_1_f44548f5b2(
+  _runtime: mutable LeanExecution,
+  _f_0_input: LeanValue,
+  _xs_1_input: LeanValue,
+  _k_2_input: LeanValue,
+  _a_3_input: LeanValue,
+  _a_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_1_7_input: LeanValue,
+): LeanValue {
+  functionExpr = _f_0_input;
+  explicitArgs = _xs_1_input;
+  continuation = _k_2_input;
+  metaContext = _a_3_input;
+  metaStateRef = _a_4_input;
+  coreContext = _a_5_input;
+  coreStateRef = _a_6_input;
+  world = _a_1_7_input;
+  f_inference_appTrace_projectCore_Context_mk(coreContext);
+  coldContext = leanField(coreContext, 0);
+  f_inference_appTrace_projectCore_Context_Cold_mk(coldContext);
+  options = leanField(coldContext, 2);
+  inheritedTraceOptions = leanField(coldContext, 11);
+  f_inference_appTrace_projectPrivate_Lean_Data_Options_0_Lean_Options_mk(options);
+  traceEnabled = leanField(options, 1);
+  if (!f_inference_appTrace_bool(traceEnabled)) {
+    // No result/error tracing and no timing when the global trace bit is off.
+    return leanApply(_runtime, continuation, Array[metaContext, metaStateRef, coreContext, coreStateRef, world])
+  };
+  message = LeanClosure(L4_Lean_Meta_AppBuilder.apply_f_mkAppM_spec_1_lam_0_a0cd4169cd, 8, Array[functionExpr, explicitArgs]);
+  metaName = LeanText("Meta");
+  builderName = LeanText("appBuilder");
+  traceClass = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(_runtime, metaName, builderName);
+  traceLabel = LeanText("");
+  tracePrefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(_runtime, LeanText("trace"));
+  traceOption = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(_runtime, tracePrefix, traceClass);
+  classEnabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(_runtime, inheritedTraceOptions, options, traceOption);
+  measured = f_inference_appTrace_bool(classEnabled);
+  if (!measured) {
+    profilerOption = leanReadInitializer(_runtime, "Lean.trace.profiler");
+    profilerEnabled = f_mkAppM_spec_1_spec_4_2c38582afc(_runtime, options, profilerOption);
+    !measured = f_inference_appTrace_bool(profilerEnabled)
+  };
+  if (!measured) {
+    result = leanApply(_runtime, continuation, Array[metaContext, metaStateRef, coreContext, coreStateRef, world]);
+    return f_inference_appTrace_result(_runtime, result, metaName, builderName, tracePrefix, inheritedTraceOptions, options, metaContext, metaStateRef, coreContext, coreStateRef, true)
+  };
+  savedTrace = f_mkAppM_spec_1_spec_3_2474ea0742(_runtime, coreStateRef, world);
+  if (!f_inference_appTrace_ok(savedTrace)) return leanFail("unreachable: _private.Lean.Meta.AppBuilder.0.Lean.Meta.withAppBuilderTrace._at_.Lean.Meta.mkAppM.spec_1");
+  useHeartbeatsOption = leanReadInitializer(_runtime, "Lean.trace.profiler.useHeartbeats");
+  useHeartbeats = f_mkAppM_spec_1_spec_4_2c38582afc(_runtime, options, useHeartbeatsOption);
+  heartbeats = f_inference_appTrace_bool(useHeartbeats);
+  start = if (heartbeats) {
+    L4_Init_System_IO.f_IO_getNumHeartbeats_2b32cd415d(_runtime, leanField(savedTrace, 1))
+  } else {
+    L4_Init_System_IO.f_IO_monoNanosNow_f8df510195(_runtime, leanField(savedTrace, 1))
+  };
+  f_inference_appTrace_requireST(start);
+  result = leanApply(_runtime, continuation, Array[metaContext, metaStateRef, coreContext, coreStateRef, leanField(start, 1)]);
+  // Result/error trace work belongs INSIDE the measured region, even on errors.
+  traced = f_inference_appTrace_result(_runtime, result, metaName, builderName, tracePrefix, inheritedTraceOptions, options, metaContext, metaStateRef, coreContext, coreStateRef, false);
+  outcome = if (f_inference_appTrace_ok(traced)) {
+    LeanCtor(LeanTag.Except_ok, Array[leanField(traced, 0)])
+  } else {
+    LeanCtor(LeanTag.Except_error, Array[leanField(traced, 0)])
+  };
+  finish = if (heartbeats) {
+    L4_Init_System_IO.f_IO_getNumHeartbeats_2b32cd415d(_runtime, leanField(traced, 1))
+  } else {
+    L4_Init_System_IO.f_IO_monoNanosNow_f8df510195(_runtime, leanField(traced, 1))
+  };
+  f_inference_appTrace_requireST(finish);
+  startFloat = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(_runtime, leanField(start, 0));
+  endFloat: LeanValue = LeanErased();
+  if (heartbeats) {
+    !endFloat = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(_runtime, leanField(finish, 0))
+  } else {
+    nanosPerSecond = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(_runtime, LeanNatLiterals.n1000000000);
+    !startFloat = L4_Init_Data_Float_Float.f_Float_div_d042bd12c0(_runtime, startFloat, nanosPerSecond);
+    endNanos = L4_Init_Data_OfScientific.f_Float_ofNat_bc5d54eaed(_runtime, leanField(finish, 0));
+    !endFloat = L4_Init_Data_Float_Float.f_Float_div_d042bd12c0(_runtime, endNanos, nanosPerSecond)
+  };
+  interval = LeanCtor(LeanTag.Prod_mk, Array[startFloat, endFloat]);
+  timedOutcome = LeanCtor(LeanTag.Prod_mk, Array[outcome, interval]);
+  f_mkAppM_spec_1_spec_5_a474302097(_runtime, traceClass, traceEnabled, traceLabel, options, classEnabled, leanField(savedTrace, 0), message, timedOutcome, metaContext, metaStateRef, coreContext, coreStateRef, leanField(finish, 1))
+}
+
+fun f_inference_appTrace_bool(value: LeanValue): Bool {
+  leanTag(value) match {
+  | LeanTag.Bool_false -> false
+  | LeanTag.Bool_true -> true
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inference_appTrace_ok(result: LeanValue): Bool {
+  leanTag(result) match {
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    true
+  | LeanTag.EST_Out_error ->
+    _ = leanField(result, 0);
+    _ = leanField(result, 1);
+    false
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+fun f_inference_appTrace_requireST(result: LeanValue): void {
+  if (leanTag(result) != LeanTag.ST_Out_mk) leanFail("non-exhaustive Lean case");
+  _ = leanField(result, 0);
+  _ = leanField(result, 1)
+}
+
+fun f_inference_appTrace_result(
+  runtime: mutable LeanExecution, result: LeanValue, metaName: LeanValue,
+  builderName: LeanValue, tracePrefix: LeanValue, inheritedTraceOptions: LeanValue,
+  options: LeanValue, metaContext: LeanValue, metaStateRef: LeanValue,
+  coreContext: LeanValue, coreStateRef: LeanValue, rebuildErrorPrefix: Bool,
+): LeanValue {
+  if (!f_inference_appTrace_ok(result)) return f_inference_appTrace_error(runtime, result, metaName, builderName, tracePrefix, inheritedTraceOptions, options, metaContext, metaStateRef, coreContext, coreStateRef, rebuildErrorPrefix);
+  value = leanField(result, 0);
+  world = leanField(result, 1);
+  resultClass = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, metaName, builderName, LeanText("result"));
+  resultOption = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(runtime, tracePrefix, resultClass);
+  resultEnabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(runtime, inheritedTraceOptions, options, resultOption);
+  if (!f_inference_appTrace_bool(resultEnabled)) return result;
+  message = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(runtime, value);
+  traced = f_mkAppM_spec_1_spec_2_9ba89bdb24(runtime, resultClass, message, metaContext, metaStateRef, coreContext, coreStateRef, world);
+  if (!f_inference_appTrace_ok(traced)) {
+    failure = LeanCtor(LeanTag.EST_Out_error, Array[leanField(traced, 0), leanField(traced, 1)]);
+    return f_inference_appTrace_error(runtime, failure, metaName, builderName, tracePrefix, inheritedTraceOptions, options, metaContext, metaStateRef, coreContext, coreStateRef, rebuildErrorPrefix)
+  };
+  LeanCtor(LeanTag.EST_Out_ok, Array[value, leanField(traced, 1)])
+}
+
+fun f_inference_appTrace_error(
+  runtime: mutable LeanExecution, result: LeanValue, metaName: LeanValue,
+  builderName: LeanValue, tracePrefix: LeanValue, inheritedTraceOptions: LeanValue,
+  options: LeanValue, metaContext: LeanValue, metaStateRef: LeanValue,
+  coreContext: LeanValue, coreStateRef: LeanValue, rebuildErrorPrefix: Bool,
+): LeanValue {
+  exception = leanField(result, 0);
+  world = leanField(result, 1);
+  isInterrupt = L4_Lean_Exception.f_Lean_Exception_isInterrupt_eb68b9cc5e(runtime, exception);
+  if (f_inference_appTrace_bool(isInterrupt)) return result;
+  isRuntime = L4_Lean_CoreM.f_Lean_Exception_isRuntime_7532163bc2(runtime, exception);
+  if (f_inference_appTrace_bool(isRuntime)) return result;
+  errorClass = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(runtime, metaName, builderName, LeanText("error"));
+  // The unmeasured error join constructs the prefix anew; retain that helper
+  // call and its primitive/profiling effects, while measured joins reuse it.
+  errorPrefix = if (rebuildErrorPrefix) L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText("trace")) else tracePrefix;
+  errorOption = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(runtime, errorPrefix, errorClass);
+  errorEnabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(runtime, inheritedTraceOptions, options, errorOption);
+  if (!f_inference_appTrace_bool(errorEnabled)) return LeanCtor(LeanTag.EST_Out_error, Array[exception, world]);
+  message = L4_Lean_Exception.f_Lean_Exception_toMessageData_4d31baf79d(runtime, exception);
+  traced = f_mkAppM_spec_1_spec_2_9ba89bdb24(runtime, errorClass, message, metaContext, metaStateRef, coreContext, coreStateRef, world);
+  // Errors while emitting the error trace replace the original error; no retry.
+  if (!f_inference_appTrace_ok(traced)) return LeanCtor(LeanTag.EST_Out_error, Array[leanField(traced, 0), leanField(traced, 1)]);
+  LeanCtor(LeanTag.EST_Out_error, Array[exception, leanField(traced, 1)])
+}
+
+// Project, but do not decode, every field consumed by the frozen constructor case.
+fun f_inference_appTrace_projectCore_Context_mk(value: LeanValue): void {
+  if (leanTag(value) != LeanTag.Core_Context_mk) leanFail("non-exhaustive Lean case");
+  _ = leanField(value, 0);
+  _ = leanField(value, 1);
+  _ = leanField(value, 2);
+  _ = leanField(value, 3);
+  _ = leanField(value, 4);
+  _ = leanField(value, 5);
+  _ = leanField(value, 6);
+  _ = leanField(value, 7)
+}
+
+// Project, but do not decode, every field consumed by the frozen constructor case.
+fun f_inference_appTrace_projectCore_Context_Cold_mk(value: LeanValue): void {
+  if (leanTag(value) != LeanTag.Core_Context_Cold_mk) leanFail("non-exhaustive Lean case");
+  _ = leanField(value, 0);
+  _ = leanField(value, 1);
+  _ = leanField(value, 2);
+  _ = leanField(value, 3);
+  _ = leanField(value, 4);
+  _ = leanField(value, 5);
+  _ = leanField(value, 6);
+  _ = leanField(value, 7);
+  _ = leanField(value, 8);
+  _ = leanField(value, 9);
+  _ = leanField(value, 10);
+  _ = leanField(value, 11)
+}
+
+// Project, but do not decode, every field consumed by the frozen constructor case.
+fun f_inference_appTrace_projectPrivate_Lean_Data_Options_0_Lean_Options_mk(value: LeanValue): void {
+  if (leanTag(value) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) leanFail("non-exhaustive Lean case");
+  _ = leanField(value, 0);
+  _ = leanField(value, 1)
+}
+
+module end;

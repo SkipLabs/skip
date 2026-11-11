@@ -245,14 +245,10 @@ fun leanInvokePrimitiveCore(
     runtime.recordArrayWrite(args[1]);
     return leanArrayWrite(args[1], args[2], args[3], true)
   | "lean_array_fswap" | "lean_array_uswap" ->
-    word = foreign == "lean_array_uswap";
-    first = leanArrayRead(runtime, args[1], args[2], word);
-    second = leanArrayRead(runtime, args[1], args[3], word);
-    return leanArrayWrite(
-      leanArrayWrite(args[1], args[2], second, word),
-      args[3],
-      first,
-      word,
+    return leanArraySwap(
+      runtime,
+      args,
+      foreign == "lean_array_uswap",
     )
   | "lean_array_pop" -> return leanArrayPop(args[1])
   | "lean_array_mk" ->
@@ -265,14 +261,7 @@ fun leanInvokePrimitiveCore(
     };
     return LeanArray(values.toArray())
   | "lean_array_to_list" ->
-    values = leanArray(args[1]);
-    list: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
-    i = values.size();
-    while (i > 0) {
-      !i = i - 1;
-      !list = LeanCtor(LeanTag.List_cons, Array[values[i], list])
-    };
-    return list
+    return leanArrayToList(args[1])
   | "lean_st_mk_ref" -> return leanSTResult(runtime.newRef(args[2]), args[3])
   | "lean_st_ref_get" -> return leanSTResult(runtime.readRef(args[2]), args[3])
   | "lean_st_ref_take" ->
@@ -363,4 +352,78 @@ fun leanArrayWordIndex(values: Array<LeanValue>, value: LeanValue): Int {
     leanFail("Lean Array USize index out of bounds")
   };
   index
+}
+
+// Swap is one immutable update at this port call site. Ordinary and persistent
+// arrays need only one working copy; both source reads still precede the writes.
+fun leanArraySwap(
+  runtime: mutable LeanExecution,
+  args: Array<LeanValue>,
+  word: Bool,
+): LeanValue {
+  value = args[1];
+  value match {
+  | LeanArray(values) ->
+    firstIndex = leanArrayReadIndex(values.size(), args[2], word);
+    firstValue = values[firstIndex];
+    secondIndex = leanArrayReadIndex(values.size(), args[3], word);
+    secondValue = values[secondIndex];
+    if (values.size() > 128) {
+      // Preserve the ordinary-write promotion threshold, including equal indices.
+      updated = Persistent.RadixTreeVector::mcreateFromItems(values);
+      updated.set(firstIndex, secondValue);
+      updated.set(secondIndex, firstValue);
+      LeanPersistentArray(updated.chill())
+    } else {
+      updated = values.clone();
+      updated.set(firstIndex, secondValue);
+      updated.set(secondIndex, firstValue);
+      // This fresh working copy has no mutable aliases outside the function.
+      LeanArray(unsafe_chill_trust_me(updated))
+    }
+  | LeanPersistentArray(values) ->
+    firstIndex = leanArrayReadIndex(values.size(), args[2], word);
+    firstValue = values[firstIndex];
+    secondIndex = leanArrayReadIndex(values.size(), args[3], word);
+    secondValue = values[secondIndex];
+    updated = values.clone();
+    updated.set(firstIndex, secondValue);
+    updated.set(secondIndex, firstValue);
+    LeanPersistentArray(updated.chill())
+  | _ ->
+    // Tracked reads carry dependencies and can fail. Retain their exact order,
+    // and retain override structure rather than materializing a tracked root.
+    firstValue = leanArrayRead(runtime, value, args[2], word);
+    secondValue = leanArrayRead(runtime, value, args[3], word);
+    leanArrayWrite(
+      leanArrayWrite(value, args[2], secondValue, word),
+      args[3],
+      firstValue,
+      word,
+    )
+  }
+}
+
+fun leanArrayToList(value: LeanValue): LeanValue {
+  value match {
+  | LeanPersistentArray(values) ->
+    // The list requires cons cells, not a temporary flat copy of the vector.
+    list: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    remaining = values.size();
+    while (remaining > 0) {
+      !remaining = remaining - 1;
+      !list = LeanCtor(LeanTag.List_cons, Array[values[remaining], list])
+    };
+    list
+  | _ ->
+    // leanArray remains the authority for unavailable/unsupported diagnostics.
+    values = leanArray(value);
+    list: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    remaining = values.size();
+    while (remaining > 0) {
+      !remaining = remaining - 1;
+      !list = LeanCtor(LeanTag.List_cons, Array[values[remaining], list])
+    };
+    list
+  }
 }

@@ -1,0 +1,160 @@
+// A well-typed one-field structure/class fixture with a function-valued field.
+fun f_paritySimplifierProjectionAxiom(name: LeanValue, type: LeanValue): LeanValue {
+  LeanCtor(LeanTag.ConstantInfo_axiomInfo, Array[LeanCtor(LeanTag.AxiomVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[name, LeanCtor(LeanTag.List_nil, Array[]), type]), leanBool(false)])])
+}
+fun f_paritySimplifierProjectionDefinition(name: LeanValue, type: LeanValue, value: LeanValue): LeanValue {
+  nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+  LeanCtor(LeanTag.ConstantInfo_defnInfo, Array[LeanCtor(LeanTag.DefinitionVal_mk, Array[
+    LeanCtor(LeanTag.ConstantVal_mk, Array[name, nil, type]), value,
+    LeanCtor(LeanTag.ReducibilityHints_abbrev, Array[]), LeanCtor(LeanTag.DefinitionSafety_safe, Array[]),
+    LeanCtor(LeanTag.List_cons, Array[name, nil])])])
+}
+fun main(): void {
+  cases = 0;
+  for (profile in Array[false, true]) {
+    runtime = mutable LeanExecution{unboundedHeartbeats => true, profileRuntime => profile};
+    leanInitializeSimp(runtime);
+    name = (text: String) -> L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(runtime, LeanText(text));
+    nil: LeanValue = LeanCtor(LeanTag.List_nil, Array[]);
+    constant = (text: String) -> L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, name(text), nil);
+    binder: LeanValue = LeanCtor(LeanTag.BinderInfo_default, Array[]);
+    zero: LeanValue = LeanCtor(LeanTag.Level_zero__impl, Array[]);
+    type = L4_Lean_Expr.f_Lean_mkSort_ccbb836181(runtime, L4_Lean_Level.f_Lean_mkLevelSucc_2631235517(runtime, zero));
+    aType = constant("A"); a = constant("a"); g = constant("g"); box = constant("Box");
+    arrow = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("x"), binder, aType, aType);
+    constructorType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("field"), binder, arrow, box);
+    projectionType = L4_Lean_Expr.f_Lean_mkForall_fc2281f2c3(runtime, name("self"), binder, box, arrow);
+    projectionBody = L4_Lean_Expr.f_Lean_mkLambda_fa85a512c1(runtime, name("self"), binder, box,
+      L4_Lean_Expr.f_Lean_mkProj_3b27598f19(runtime, name("Box"), LeanNatLiterals.n0,
+        L4_Lean_Expr.f_Lean_mkBVar_eb2781ad2d(runtime, LeanNatLiterals.n0)));
+    boxInfo = LeanCtor(LeanTag.ConstantInfo_inductInfo, Array[LeanCtor(LeanTag.InductiveVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[name("Box"), nil, type]), LeanNatLiterals.n0, LeanNatLiterals.n0,
+      LeanCtor(LeanTag.List_cons, Array[name("Box"), nil]), LeanCtor(LeanTag.List_cons, Array[name("Box.mk"), nil]),
+      LeanNatLiterals.n0, leanBool(false), leanBool(false), leanBool(false)])]);
+    constructorInfo = LeanCtor(LeanTag.ConstantInfo_ctorInfo, Array[LeanCtor(LeanTag.ConstructorVal_mk, Array[
+      LeanCtor(LeanTag.ConstantVal_mk, Array[name("Box.mk"), nil, constructorType]), name("Box"),
+      LeanNatLiterals.n0, LeanNatLiterals.n0, LeanNatLiterals.n1, leanBool(false)])]);
+    constants: mutable Map<String, LeanConstantFile> = mutable Map[];
+    for ((text, info) in Array[
+      ("A", f_paritySimplifierProjectionAxiom(name("A"), type)),
+      ("a", f_paritySimplifierProjectionAxiom(name("a"), aType)),
+      ("g", f_paritySimplifierProjectionAxiom(name("g"), arrow)),
+      ("Box", boxInfo), ("Box.mk", constructorInfo),
+      ("structureField", f_paritySimplifierProjectionDefinition(name("structureField"), projectionType, projectionBody)),
+      ("classField", f_paritySimplifierProjectionDefinition(name("classField"), projectionType, projectionBody)),
+    ]) { constants.set(leanNameKey(name(text)), LeanConstantFile(info, None())) };
+    environment = rewriteProbeEnvironment(runtime, constants.chill());
+    !environment = L4_Lean_ProjFns.f_Lean_addProjectionFnInfo_c5dc832838(runtime, environment,
+      name("structureField"), name("Box.mk"), LeanNatLiterals.n0, LeanNatLiterals.n0, leanBool(false));
+    !environment = L4_Lean_ProjFns.f_Lean_addProjectionFnInfo_c5dc832838(runtime, environment,
+      name("classField"), name("Box.mk"), LeanNatLiterals.n0, LeanNatLiterals.n0, leanBool(true));
+    // Reducible transparency consults the environment attribute table, not
+    // DefinitionVal's reduction hint. Register these hand-built projections.
+    for (projectionName in Array[name("structureField"), name("classField")]) {
+      !environment = L4_Lean_ReducibilityAttrs.f_ReducibilityAttrs_Lean_setReducibilityStatusCore_cefc6fe313(
+        runtime, environment, projectionName, LeanCtor(LeanTag.ReducibilityStatus_reducible, Array[]),
+        LeanCtor(LeanTag.AttributeKind_global, Array[]), LeanCtor(LeanTag.Name_anonymous__impl, Array[]))
+    };
+    locals = L4_Lean_LocalContext.f_Lean_LocalContext_mkLocalDecl_741af88ec8(runtime,
+      L4_Lean_LocalContext.f_Lean_LocalContext_empty_68c9cb2aed(runtime), name("major"), name("major"), box,
+      binder, LeanCtor(LeanTag.LocalDeclKind_default, Array[]));
+    major = L4_Lean_Expr.f_Lean_mkFVar_3175adace5(runtime, name("major"));
+    state = rewriteProbeState(runtime, environment, locals, "<parity-simplifier-projection>");
+    config = L4_Init_MetaTypes.f_Meta_Simp_instInhabitedConfig_75238ac17c(runtime);
+    contextResult = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_mkContext_55582b0c79(runtime, config, LeanArray(Array[]),
+      L4_Lean_Meta_Tactic_Simp_SimpCongrTheorems.f_Meta_instInhabitedSimpCongrTheorems_default_8524b7bcc3(runtime),
+      leanField(leanField(state.coreContext, 0), 2), state.metaContext, state.metaStateRef,
+      state.coreContext, state.coreStateRef, LeanNatLiterals.n0);
+    assert(leanTag(contextResult) == LeanTag.EST_Out_ok);
+    context = leanField(contextResult, 0);
+    // reduceStep enters this routine with the Simp Meta configuration (reducible).
+    simpMeta = leanReplaceField(state.metaContext, 0, leanField(context, 4));
+    stateRef = runtime.newRef(leanSimpInitialState(runtime));
+    methods = L4_Lean_Meta_Tactic_Simp_Rewrite.f_Meta_Simp_mkDefaultMethodsCore_ea5d1d0241(runtime, LeanArray(Array[]));
+    boxed = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, constant("Box.mk"), g);
+    resultApp = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, g, a);
+    none: LeanValue = LeanCtor(LeanTag.Option_none, Array[]);
+    some = (expr: LeanValue) ~> (LeanCtor(LeanTag.Option_some, Array[expr]) : LeanValue);
+    world = leanNatValue(27);
+    for (compatibility in Array[false, true]) {
+      optionName = leanField(leanReadInitializer(runtime, "Lean.Meta.backward.whnf.reducibleClassField"), 0);
+      options = L4_Lean_Data_Options.f_Lean_Options_set_314ab34d9b(runtime,
+        L4_Lean_Data_KVMap.f_Lean_KVMap_instValueBool_0fa99278c1(runtime),
+        leanField(leanField(state.coreContext, 0), 2), optionName, leanBool(compatibility));
+      core = L4_Lean_CoreM.f_Core_Context_setOptions_5be13cf7e5(runtime, state.coreContext, options);
+      for (classField in Array[false, true]) {
+        projectionName = name(if (classField) "classField" else "structureField");
+        projection = L4_Lean_Expr.f_Lean_mkConst_b40a363b86(runtime, projectionName, nil);
+        applied = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, projection, boxed);
+        overapplied = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, applied, a);
+        stuck = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, projection, major);
+        for ((label, expr, expectedOption) in Array[
+          ("partial projection", projection, none),
+          ("constructor projection", applied, some(g)),
+          ("overapplied function field", overapplied, some(resultApp)),
+          ("nonconstructor major", stuck, none),
+        ]) {
+          inputsSnapshot = LeanArray(Array[expr, context, simpMeta, core]);
+          old = rewriteProbeCopyInput(inputsSnapshot); fresh = rewriteProbeCopyInput(inputsSnapshot);
+          saved = runtime.checkpoint();
+          _ = f_paritySimplifierProbeCompare(label, saved,
+            (r: mutable LeanExecution) ~> {
+              inputs = leanArray(old);
+              result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69_fallback(r,
+                inputs[0], methods, inputs[1], stateRef, inputs[2], state.metaStateRef, inputs[3], state.coreStateRef, world);
+              assert(rewriteProbeSameInput(old, inputsSnapshot)); result
+            },
+            (r: mutable LeanExecution) ~> {
+              inputs = leanArray(fresh);
+              result = L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69(r,
+                inputs[0], methods, inputs[1], stateRef, inputs[2], state.metaStateRef, inputs[3], state.coreStateRef, world);
+              assert(rewriteProbeSameInput(fresh, inputsSnapshot)); result
+            }, Some(LeanCtor(LeanTag.EST_Out_ok, Array[expectedOption, world])));
+          !cases = cases + 1
+        }
+
+      };
+
+      // A direct projection must return before reading any lower-priority flags.
+      direct = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(runtime, name("Box"), LeanNatLiterals.n0, boxed);
+      unused = LeanUnavailable("projection success must short circuit remaining reduction flags");
+      _ = f_paritySimplifierProbeCompare("projection before iota/zeta/unfold", runtime.checkpoint(),
+        (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b_fallback(r,
+          unused, unused, unused, direct, unused, unused, unused, unused, leanBool(true), unused,
+          unused, unused, unused, simpMeta, state.metaStateRef, core, state.coreStateRef, world),
+        (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Simp_reduceStep_lam_0_382ac6986b(r,
+          unused, unused, unused, direct, unused, unused, unused, unused, leanBool(true), unused,
+          unused, unused, unused, simpMeta, state.metaStateRef, core, state.coreStateRef, world),
+        Some(LeanCtor(LeanTag.EST_Out_ok, Array[g, world])));
+      _ = f_paritySimplifierProbeCompare("known nonprojection declaration", runtime.checkpoint(),
+        (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69_fallback(r,
+          g, unused, unused, unused, unused, unused, unused, state.coreStateRef, world),
+        (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69(r,
+          g, unused, unused, unused, unused, unused, unused, state.coreStateRef, world),
+        Some(LeanCtor(LeanTag.EST_Out_ok, Array[none, world])));
+      !cases = cases + 2;
+      // Explicitly requested class unfolding returns the raw projection, even stuck.
+      theoremSet = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_instInhabitedSimpTheorems_default_e7dd612eb4(runtime);
+      !theoremSet = L4_Lean_Meta_Tactic_Simp_SimpTheorems.f_Meta_SimpTheorems_addDeclToUnfoldCore_2626e6babd(
+        runtime, theoremSet, name("classField"));
+      requestedContext = leanReplaceField(context, 7, LeanArray(Array[theoremSet]));
+      for (value in Array[boxed, major]) {
+        expr = L4_Lean_Expr.f_Lean_mkApp_4478491ddb(runtime, constant("classField"), value);
+        expectedExpr = L4_Lean_Expr.f_Lean_mkProj_3b27598f19(runtime, name("Box"), LeanNatLiterals.n0, value);
+        saved = runtime.checkpoint();
+        (_, after) = f_paritySimplifierProbeCompare("explicit class projection records use", saved,
+          (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69_fallback(r,
+            expr, methods, requestedContext, stateRef, simpMeta, state.metaStateRef, core, state.coreStateRef, world),
+          (r: mutable LeanExecution) ~> L4_Lean_Meta_Tactic_Simp_Main.f_Meta_Simp_reduceProjFn_80df12aa69(r,
+            expr, methods, requestedContext, stateRef, simpMeta, state.metaStateRef, core, state.coreStateRef, world),
+          Some(LeanCtor(LeanTag.EST_Out_ok, Array[some(expectedExpr), world])));
+        afterRuntime = after.restoreRaw();
+        assert(!rewriteProbeSameInput(leanField(afterRuntime.readRef(stateRef), 3), leanField(runtime.readRef(stateRef), 3)));
+        !cases = cases + 1
+      }
+    }
+  };
+  assert(cases == 48);
+  print_string("simplifier projection: " + cases.toString() + " differential cases")
+}

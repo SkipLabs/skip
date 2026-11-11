@@ -1,0 +1,457 @@
+module L4_Lean_Meta_ExprDefEq;
+
+// "WellFounded.opaqueFix₃._at_._private.Lean.Meta.ExprDefEq.0.Lean.Meta.isDefEqArgsFirstPass.spec_0._redArg"
+fun f_Meta_isDefEqArgsFirstPass_spec_0_ad4075ddc6(
+  _runtime: mutable LeanExecution,
+  _upperBound_1_0_input: LeanValue,
+  _paramInfo_1_input: LeanValue,
+  _args_2_input: LeanValue,
+  _args_3_input: LeanValue,
+  _y_2_4_input: LeanValue,
+  _y_3_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _b_7_input: LeanValue,
+  _y_4_8_input: LeanValue,
+  _y_5_9_input: LeanValue,
+  _y_6_10_input: LeanValue,
+  _y_7_11_input: LeanValue,
+  _y_8_12_input: LeanValue,
+): LeanValue {
+  parameterInfo = _paramInfo_1_input;
+  leftArguments = _args_2_input;
+  rightArguments = _args_3_input;
+  context = _y_4_8_input;
+  stateRef = _y_5_9_input;
+  coreContext = _y_6_10_input;
+  coreStateRef = _y_7_11_input;
+  index = _a_6_input;
+  accumulated = _b_7_input;
+  world = _y_8_12_input;
+  loop {
+    if (
+      !f_equalityWave_bool(
+        L4_Init_Prelude.f_Nat_decLt_b34d01d051(
+          _runtime,
+          index,
+          _upperBound_1_0_input,
+        ),
+      )
+    ) {
+      return f_equalityWave_ok(accumulated, world)
+    };
+    accumulatedFields = f_equalityWave_fields(accumulated, LeanTag.Prod_mk, 2);
+    queueFields = f_equalityWave_fields(
+      accumulatedFields[1],
+      LeanTag.Prod_mk,
+      2,
+    );
+    postponedIndices = queueFields[0];
+    messy = queueFields[1];
+    parameter = f_equalityWave_expect(
+      L4_Init_Prelude.f_Array_getInternal_3b1463d18e(
+        _runtime,
+        LeanErased(),
+        parameterInfo,
+        index,
+        LeanErased(),
+      ),
+      LeanTag.Meta_ParamInfo_mk,
+    );
+    _ = f_equalityWave_fields(parameter, LeanTag.Meta_ParamInfo_mk, 8);
+    noFailure = LeanCtor(LeanTag.Option_none, Array[]);
+    defaultExpression = L4_Lean_Expr.f_Lean_instInhabitedExpr_ed9f456de4(
+      _runtime,
+    );
+    left = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      _runtime,
+      LeanErased(),
+      defaultExpression,
+      leftArguments,
+      index,
+    );
+    right = L4_Init_Prelude.f_Array_get_Internal_8ea9a060dc(
+      _runtime,
+      LeanErased(),
+      defaultExpression,
+      rightArguments,
+      index,
+    );
+    // Higher-order output dependencies are postponed in their original encounter order.
+    isMessy = f_equalityWave_bool(leanField(parameter, 7));
+    if (!isMessy) !isMessy = f_equalityWave_bool(leanField(parameter, 6));
+    step: LeanValue = LeanErased();
+    if (isMessy) {
+      options = f_equalityWave_options(coreContext);
+      traceUnit: LeanValue = LeanCtor(LeanTag.PUnit_unit, Array[]);
+      if (f_equalityWave_bool(leanField(options, 1))) {
+        traceClass = L4_Init_Prelude.f_Lean_Name_mkStr2_ed89eae6ad(
+          _runtime,
+          LeanText("Meta"),
+          LeanText("isDefEq"),
+        );
+        if (f_equalityWave_traceEnabled(_runtime, coreContext, traceClass)) {
+          prefix = f_equalityWave_message(_runtime, "found messy ");
+          leftMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+            _runtime,
+            left,
+          );
+          first = f_equalityWave_compose(prefix, leftMessage);
+          separator = f_equalityWave_message(_runtime, " =?= ");
+          second = f_equalityWave_compose(first, separator);
+          rightMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+            _runtime,
+            right,
+          );
+          trace = f_isDefEqEtaStruct_go_spec_1_241494c927(
+            _runtime,
+            traceClass,
+            f_equalityWave_compose(second, rightMessage),
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          );
+          if (f_equalityWave_isError(trace)) return f_equalityWave_error(trace);
+          !traceUnit = leanField(trace, 0);
+          !world = leanField(trace, 1)
+        }
+      };
+      !step = f_isDefEqArgsFirstPass_spec_0_lam_0_94f23cea7d(
+        _runtime,
+        messy,
+        index,
+        postponedIndices,
+        noFailure,
+        traceUnit,
+        context,
+        stateRef,
+        coreContext,
+        coreStateRef,
+        world,
+      )
+    } else {
+      explicit = f_equalityWave_bool(
+        L4_Lean_Meta_Basic.f_Meta_ParamInfo_isExplicit_3d4224414c(
+          _runtime,
+          parameter,
+        ),
+      );
+      etaUnassigned = false;
+      if (!explicit) {
+        etaResult = f_equalityWave_eitherUnassigned(
+          _runtime,
+          false,
+          left,
+          right,
+          context,
+          stateRef,
+          coreContext,
+          coreStateRef,
+          world,
+        );
+        if (f_equalityWave_isError(etaResult)) {
+          return f_equalityWave_error(etaResult)
+        };
+        !etaUnassigned = f_equalityWave_bool(leanField(etaResult, 0));
+        !world = leanField(etaResult, 1)
+      };
+      if (etaUnassigned) {
+        // Only implicit eta-unassigned arguments use this transparency policy.
+        useImplicit = false;
+        if (f_equalityWave_bool(_y_2_4_input)) {
+          instanceBinder = L4_Lean_Expr.f_Lean_BinderInfo_isInstImplicit_7dced4c108(
+            _runtime,
+            leanField(parameter, 0),
+          );
+          !useImplicit = f_equalityWave_bool(instanceBinder);
+          if (!useImplicit) !useImplicit = f_equalityWave_bool(_y_3_5_input)
+        };
+        equality = if (useImplicit) {
+          f_equalityWave_implicitArgument(
+            _runtime,
+            leanBool(true),
+            left,
+            right,
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          )
+        } else {
+          L4_Lean_Meta_Basic.f_Lean_Meta_isExprDefEqAux_34c5c35f5e(
+            _runtime,
+            left,
+            right,
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          )
+        };
+        if (f_equalityWave_isError(equality)) {
+          return f_equalityWave_error(equality)
+        };
+        !world = leanField(equality, 1);
+        if (!f_equalityWave_bool(leanField(equality, 0))) {
+          failed = LeanCtor(
+            LeanTag.Option_some,
+            Array[
+              LeanCtor(LeanTag.Meta_DefEqArgsFirstPassResult_failed, Array[]),
+            ],
+          );
+          return f_equalityWave_ok(
+            f_equalityWave_pair(
+              failed,
+              f_equalityWave_pair(postponedIndices, messy),
+            ),
+            world,
+          )
+        };
+        !accumulated = f_equalityWave_pair(
+          noFailure,
+          f_equalityWave_pair(postponedIndices, messy),
+        )
+      } else {
+        proofIrrelevant = false;
+        if (f_equalityWave_bool(leanField(parameter, 3))) {
+          abstracted = f_equalityWave_eitherUnassigned(
+            _runtime,
+            true,
+            left,
+            right,
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          );
+          if (f_equalityWave_isError(abstracted)) {
+            return f_equalityWave_error(abstracted)
+          };
+          !proofIrrelevant = !f_equalityWave_bool(leanField(abstracted, 0));
+          !world = leanField(abstracted, 1)
+        };
+        if (proofIrrelevant) {
+          !accumulated = f_equalityWave_pair(
+            noFailure,
+            f_equalityWave_pair(postponedIndices, messy),
+          )
+        } else if (explicit) {
+          !step = f_isDefEqArgsFirstPass_spec_0_lam_3_b8575108b7(
+            _runtime,
+            left,
+            right,
+            postponedIndices,
+            messy,
+            noFailure,
+            LeanCtor(LeanTag.PUnit_unit, Array[]),
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          )
+        } else {
+          !step = f_isDefEqArgsFirstPass_spec_0_lam_1_e191dc1cd7(
+            _runtime,
+            postponedIndices,
+            index,
+            messy,
+            noFailure,
+            LeanCtor(LeanTag.PUnit_unit, Array[]),
+            context,
+            stateRef,
+            coreContext,
+            coreStateRef,
+            world,
+          )
+        }
+      }
+    };
+    step match {
+    | LeanErased() -> void
+    | _ ->
+      if (f_equalityWave_isError(step)) return f_equalityWave_error(step);
+      iteration = leanField(step, 0);
+      !world = leanField(step, 1);
+      leanTag(iteration) match {
+      | LeanTag.ForInStep_done ->
+        return f_equalityWave_ok(leanField(iteration, 0), world)
+      | LeanTag.ForInStep_yield -> !accumulated = leanField(iteration, 0)
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    };
+    // Keep the arbitrary-precision Nat index; never narrow it to a host integer.
+    !index = L4_Init_Prelude.f_Nat_add_86990f4822(
+      _runtime,
+      index,
+      LeanNatLiterals.n1,
+    )
+  }
+}
+
+// Check left first and do not touch right on success or error.
+fun f_equalityWave_eitherUnassigned(
+  runtime: mutable LeanExecution,
+  abstracted: Bool,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  stateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  world: LeanValue,
+): LeanValue {
+  first = if (abstracted) {
+    f_Lean_Meta_isAbstractedUnassignedMVar_3b12e2796d(
+      runtime,
+      left,
+      context,
+      stateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  } else {
+    f_Lean_Meta_isEtaUnassignedMVar_92258418df(
+      runtime,
+      left,
+      context,
+      stateRef,
+      coreContext,
+      coreStateRef,
+      world,
+    )
+  };
+  if (f_equalityWave_isError(first)) return f_equalityWave_error(first);
+  if (f_equalityWave_bool(leanField(first, 0))) return first;
+  if (abstracted) {
+    f_Lean_Meta_isAbstractedUnassignedMVar_3b12e2796d(
+      runtime,
+      right,
+      context,
+      stateRef,
+      coreContext,
+      coreStateRef,
+      leanField(first, 1),
+    )
+  } else {
+    f_Lean_Meta_isEtaUnassignedMVar_92258418df(
+      runtime,
+      right,
+      context,
+      stateRef,
+      coreContext,
+      coreStateRef,
+      leanField(first, 1),
+    )
+  }
+}
+
+// Shared by both argument passes. The trace precedes the second config read and
+// the local transparency update, just as in the original join-point sequence.
+fun f_equalityWave_implicitArgument(
+  runtime: mutable LeanExecution,
+  configFlag: LeanValue,
+  left: LeanValue,
+  right: LeanValue,
+  context: LeanValue,
+  stateRef: LeanValue,
+  coreContext: LeanValue,
+  coreStateRef: LeanValue,
+  initialWorld: LeanValue,
+): LeanValue {
+  config = f_equalityWave_expect(
+    L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context),
+    LeanTag.Meta_Config_mk,
+  );
+  configFields = f_equalityWave_fields(config, LeanTag.Meta_Config_mk, 20);
+  transparency = configFields[9];
+  action = LeanClosure(
+    L4_Lean_Meta_ExprDefEq.apply_f_isDefEqArgsFirstPass_spec_0_lam_2_c22303d708,
+    8,
+    Array[configFlag, left, right],
+  );
+  implicitMode = LeanCtor(LeanTag.Meta_TransparencyMode_implicit, Array[]);
+  world = initialWorld;
+  if (
+    f_equalityWave_bool(
+      L4_Lean_Meta_TransparencyMode.f_Meta_TransparencyMode_lt_41b30b8fe8(
+        runtime,
+        transparency,
+        implicitMode,
+      ),
+    )
+  ) {
+    options = f_equalityWave_options(coreContext);
+    if (f_equalityWave_bool(leanField(options, 1))) {
+      traceClass = L4_Init_Prelude.f_Lean_Name_mkStr3_2a3962ce81(
+        runtime,
+        LeanText("Meta"),
+        LeanText("isDefEq"),
+        LeanText("transparency"),
+      );
+      if (f_equalityWave_traceEnabled(runtime, coreContext, traceClass)) {
+        prefix = f_equalityWave_message(runtime, "raising transparency ");
+        modeText = L4_Lean_Meta_TransparencyMode.f_Meta_TransparencyMode_toString_af15411f9d(
+          runtime,
+          transparency,
+        );
+        modeMessage = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+          runtime,
+          modeText,
+        );
+        first = f_equalityWave_compose(prefix, modeMessage);
+        suffix = f_equalityWave_message(runtime, " → implicit");
+        trace = f_isDefEqEtaStruct_go_spec_1_241494c927(
+          runtime,
+          traceClass,
+          f_equalityWave_compose(first, suffix),
+          context,
+          stateRef,
+          coreContext,
+          coreStateRef,
+          world,
+        );
+        if (f_equalityWave_isError(trace)) return f_equalityWave_error(trace);
+        _ = leanField(trace, 0);
+        !world = leanField(trace, 1)
+      }
+    }
+  };
+  currentConfig = f_equalityWave_expect(
+    L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(runtime, context),
+    LeanTag.Meta_Config_mk,
+  );
+  currentConfigFields = f_equalityWave_fields(
+    currentConfig,
+    LeanTag.Meta_Config_mk,
+    20,
+  );
+  callContext = context;
+  if (
+    f_equalityWave_bool(
+      L4_Lean_Meta_TransparencyMode.f_Meta_TransparencyMode_lt_41b30b8fe8(
+        runtime,
+        currentConfigFields[9],
+        implicitMode,
+      ),
+    )
+  ) {
+    !callContext = f_equalityWave_withTransparency(
+      runtime,
+      context,
+      implicitMode,
+    )
+  };
+  leanApply(
+    runtime,
+    action,
+    Array[callContext, stateRef, coreContext, coreStateRef, world],
+  )
+}
+
+module end;

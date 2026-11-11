@@ -1,0 +1,372 @@
+module L4_Lean_Meta_Tactic_Simp_Main;
+
+// "_private.Lean.Meta.Tactic.Simp.Main.0.Lean.Meta.Simp.reduceStep._lam_0"
+fun f_Simp_reduceStep_lam_0_382ac6986b(
+  _runtime: mutable LeanExecution,
+  _x_1_0_input: LeanValue,
+  _x_2_1_input: LeanValue,
+  _x_3_2_input: LeanValue,
+  _e_3_input: LeanValue,
+  _zetaUnused_4_input: LeanValue,
+  _zetaHave_5_input: LeanValue,
+  _zeta_6_input: LeanValue,
+  _iota_7_input: LeanValue,
+  _proj_8_input: LeanValue,
+  _r_4_9_input: LeanValue,
+  _y_5_10_input: LeanValue,
+  _y_6_11_input: LeanValue,
+  _y_7_12_input: LeanValue,
+  _y_8_13_input: LeanValue,
+  _y_9_14_input: LeanValue,
+  _y_10_15_input: LeanValue,
+  _y_11_16_input: LeanValue,
+  _y_12_17_input: LeanValue,
+): LeanValue {
+  head = _x_1_0_input;
+  originPost = _x_2_1_input;
+  originInv = _x_3_2_input;
+  expression = _e_3_input;
+  methods = _y_5_10_input;
+  context = _y_6_11_input;
+  stateRef = _y_7_12_input;
+  meta = _y_8_13_input;
+  metaRef = _y_9_14_input;
+  core = _y_10_15_input;
+  coreRef = _y_11_16_input;
+  world = _y_12_17_input;
+  // Projections have priority over recursors, lets, unfolding, and literal folding.
+  leanTag(_proj_8_input) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    projection = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceProj_8a3cb50ccc(
+      _runtime,
+      expression,
+      meta,
+      metaRef,
+      core,
+      coreRef,
+      world,
+    );
+    leanTag(projection) match {
+    | LeanTag.EST_Out_error ->
+      error = leanField(projection, 0);
+      errorWorld = leanField(projection, 1);
+      return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    projectionOption = leanField(projection, 0);
+    !world = leanField(projection, 1);
+    leanTag(projectionOption) match {
+    | LeanTag.Option_some ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanField(projectionOption, 0), world],
+      )
+    | LeanTag.Option_none -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    projectionFunction = f_Meta_Simp_reduceProjFn_80df12aa69(
+      _runtime,
+      expression,
+      methods,
+      context,
+      stateRef,
+      meta,
+      metaRef,
+      core,
+      coreRef,
+      world,
+    );
+    leanTag(projectionFunction) match {
+    | LeanTag.EST_Out_error ->
+      error = leanField(projectionFunction, 0);
+      errorWorld = leanField(projectionFunction, 1);
+      return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    projectionFunctionOption = leanField(projectionFunction, 0);
+    !world = leanField(projectionFunction, 1);
+    leanTag(projectionFunctionOption) match {
+    | LeanTag.Option_some ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanField(projectionFunctionOption, 0), world],
+      )
+    | LeanTag.Option_none -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(_iota_7_input) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    recursor = L4_Lean_Meta_WHNF.f_Lean_Meta_reduceRecMatcher_93c2f3d1f4(
+      _runtime,
+      expression,
+      meta,
+      metaRef,
+      core,
+      coreRef,
+      world,
+    );
+    leanTag(recursor) match {
+    | LeanTag.EST_Out_error ->
+      error = leanField(recursor, 0);
+      errorWorld = leanField(recursor, 1);
+      return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+    | LeanTag.EST_Out_ok -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    recursorOption = leanField(recursor, 0);
+    !world = leanField(recursor, 1);
+    leanTag(recursorOption) match {
+    | LeanTag.Option_some ->
+      return LeanCtor(
+        LeanTag.EST_Out_ok,
+        Array[leanField(recursorOption, 0), world],
+      )
+    | LeanTag.Option_none -> void
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  leanTag(expression) match {
+  | LeanTag.Expr_letE__impl ->
+    _ = leanField(expression, 0);
+    _ = leanField(expression, 1);
+    _ = leanField(expression, 2);
+    value = leanField(expression, 3);
+    body = leanField(expression, 4);
+    nondependent = leanField(expression, 5);
+    expand = false;
+    consumeFlag = originInv;
+    leanTag(_zeta_6_input) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      leanTag(nondependent) match {
+      | LeanTag.Bool_false -> !expand = true
+      | LeanTag.Bool_true ->
+        leanTag(_zetaHave_5_input) match {
+        | LeanTag.Bool_false -> !consumeFlag = _zetaHave_5_input
+        | LeanTag.Bool_true -> !expand = true
+        | _ -> return leanFail("non-exhaustive Lean case")
+        }
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    };
+    if (expand) {
+      emptyValues = L4_Init_Prelude.f_Array_mkEmpty_c33c0c30cd(
+        _runtime,
+        LeanErased(),
+        LeanNatLiterals.n1,
+      );
+      values = L4_Init_Prelude.f_Array_push_9cb6e9b3cb(
+        _runtime,
+        LeanErased(),
+        emptyValues,
+        value,
+      );
+      expanded = L4_Lean_Meta_WHNF.f_Lean_Meta_expandLet_8cc6fa255d(
+        _runtime,
+        body,
+        values,
+        _zetaHave_5_input,
+      );
+      return LeanCtor(LeanTag.EST_Out_ok, Array[expanded, world])
+    };
+    leanTag(_zetaUnused_4_input) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      loose = L4_Lean_Expr.f_Lean_Expr_hasLooseBVars_25b8fd0e1a(_runtime, body);
+      leanTag(loose) match {
+      | LeanTag.Bool_false ->
+        consumed = L4_Lean_Meta_WHNF.f_Lean_Meta_consumeUnusedLet_d1bfc80f26(
+          _runtime,
+          body,
+          consumeFlag,
+        );
+        return LeanCtor(LeanTag.EST_Out_ok, Array[consumed, world])
+      | LeanTag.Bool_true -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> void
+  };
+  unfolded = f_Meta_Simp_unfold_d3b0ead1b4(
+    _runtime,
+    expression,
+    methods,
+    context,
+    stateRef,
+    meta,
+    metaRef,
+    core,
+    coreRef,
+    world,
+  );
+  leanTag(unfolded) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(unfolded, 0);
+    errorWorld = leanField(unfolded, 1);
+    return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  option = leanField(unfolded, 0);
+  !world = leanField(unfolded, 1);
+  leanTag(option) match {
+  | LeanTag.Option_none ->
+    return f_Meta_Simp_foldRawNatLit_f7a3ccfe4d(
+      _runtime,
+      expression,
+      context,
+      world,
+    )
+  | LeanTag.Option_some -> void
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  reduced = leanField(option, 0);
+  if (leanTag(core) != LeanTag.Core_Context_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  cold = leanField(core, 0);
+  _ = leanField(core, 1);
+  _ = leanField(core, 2);
+  _ = leanField(core, 3);
+  _ = leanField(core, 4);
+  _ = leanField(core, 5);
+  _ = leanField(core, 6);
+  _ = leanField(core, 7);
+  if (leanTag(cold) != LeanTag.Core_Context_Cold_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  _ = leanField(cold, 0);
+  _ = leanField(cold, 1);
+  options = leanField(cold, 2);
+  _ = leanField(cold, 3);
+  _ = leanField(cold, 4);
+  _ = leanField(cold, 5);
+  _ = leanField(cold, 6);
+  _ = leanField(cold, 7);
+  _ = leanField(cold, 8);
+  _ = leanField(cold, 9);
+  _ = leanField(cold, 10);
+  traceOptions = leanField(cold, 11);
+  if (leanTag(options) != LeanTag.Private_Lean_Data_Options_0_Lean_Options_mk) {
+    return leanFail("non-exhaustive Lean case")
+  };
+  _ = leanField(options, 0);
+  traceEnabled = leanField(options, 1);
+  leanTag(traceEnabled) match {
+  | LeanTag.Bool_false -> void
+  | LeanTag.Bool_true ->
+    traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(
+      _runtime,
+      LeanText("Meta"),
+      LeanText("Tactic"),
+      LeanText("simp"),
+      LeanText("rewrite"),
+    );
+    tracePrefix = L4_Init_Prelude.f_Lean_Name_mkStr1_4962bb4b4e(
+      _runtime,
+      LeanText("trace"),
+    );
+    traceName = L4_Init_Prelude.f_Lean_Name_append_54ec01d162(
+      _runtime,
+      tracePrefix,
+      traceClass,
+    );
+    enabled = L4_Lean_Util_Trace.f_Lean_checkTraceOption_go_8ac1958e84(
+      _runtime,
+      traceOptions,
+      options,
+      traceName,
+    );
+    leanTag(enabled) match {
+    | LeanTag.Bool_false -> void
+    | LeanTag.Bool_true ->
+      prefix = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+        _runtime,
+        LeanText("unfold "),
+      );
+      constant = L4_Lean_PrettyPrinter.f_Lean_MessageData_ofConst_475cf140d5(
+        _runtime,
+        head,
+      );
+      start = LeanCtor(LeanTag.MessageData_compose, Array[prefix, constant]);
+      comma = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+        _runtime,
+        LeanText(", "),
+      );
+      named = LeanCtor(LeanTag.MessageData_compose, Array[start, comma]);
+      before = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+        _runtime,
+        expression,
+      );
+      source = LeanCtor(LeanTag.MessageData_compose, Array[named, before]);
+      arrow = L4_Lean_Message.f_Lean_stringToMessageData_1e55fa4f40(
+        _runtime,
+        LeanText(" ==> "),
+      );
+      middle = LeanCtor(LeanTag.MessageData_compose, Array[source, arrow]);
+      after = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(
+        _runtime,
+        reduced,
+      );
+      message = LeanCtor(LeanTag.MessageData_compose, Array[middle, after]);
+      traced = f_Simp_reduceStep_spec_0_e9dbf36525(
+        _runtime,
+        traceClass,
+        message,
+        meta,
+        metaRef,
+        core,
+        coreRef,
+        world,
+      );
+      leanTag(traced) match {
+      | LeanTag.EST_Out_error ->
+        error = leanField(traced, 0);
+        errorWorld = leanField(traced, 1);
+        return LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+      | LeanTag.EST_Out_ok ->
+        _ = leanField(traced, 0);
+        !world = leanField(traced, 1)
+      | _ -> return leanFail("non-exhaustive Lean case")
+      }
+    | _ -> return leanFail("non-exhaustive Lean case")
+    }
+  | _ -> return leanFail("non-exhaustive Lean case")
+  };
+  // Record only after successful tracing; captured origin flags are ABI inputs.
+  declaration = L4_Lean_Expr.f_Lean_Expr_constName_a0c6339167(_runtime, head);
+  origin = LeanCtor(
+    LeanTag.Meta_Origin_decl,
+    Array[declaration, originPost, originInv],
+  );
+  recorded = L4_Lean_Meta_Tactic_Simp_Types.f_Meta_Simp_recordSimpTheorem_aa5c92accb(
+    _runtime,
+    origin,
+    stateRef,
+    core,
+    coreRef,
+    world,
+  );
+  leanTag(recorded) match {
+  | LeanTag.EST_Out_error ->
+    error = leanField(recorded, 0);
+    errorWorld = leanField(recorded, 1);
+    LeanCtor(LeanTag.EST_Out_error, Array[error, errorWorld])
+  | LeanTag.EST_Out_ok ->
+    _ = leanField(recorded, 0);
+    recordedWorld = leanField(recorded, 1);
+    LeanCtor(LeanTag.EST_Out_ok, Array[reduced, recordedWorld])
+  | _ -> leanFail("non-exhaustive Lean case")
+  }
+}
+
+module end;

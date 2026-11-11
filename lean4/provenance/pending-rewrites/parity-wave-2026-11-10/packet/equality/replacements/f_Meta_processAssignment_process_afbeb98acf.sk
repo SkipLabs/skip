@@ -1,0 +1,158 @@
+module L4_Lean_Meta_ExprDefEq;
+
+// "_private.Lean.Meta.ExprDefEq.0.Lean.Meta.processAssignment.process"
+fun f_Meta_processAssignment_process_afbeb98acf(
+  _runtime: mutable LeanExecution,
+  _mvar_0_input: LeanValue,
+  _mvarDecl_1_input: LeanValue,
+  _i_2_input: LeanValue,
+  _args_3_input: LeanValue,
+  _v_4_input: LeanValue,
+  _a_5_input: LeanValue,
+  _a_6_input: LeanValue,
+  _a_7_input: LeanValue,
+  _a_8_input: LeanValue,
+  _a_1_9_input: LeanValue,
+): LeanValue {
+  metavariable = _mvar_0_input;
+  declaration = _mvarDecl_1_input;
+  candidate = _v_4_input;
+  context = _a_5_input;
+  stateRef = _a_6_input;
+  coreContext = _a_7_input;
+  coreStateRef = _a_8_input;
+  index = _i_2_input;
+  arguments = _args_3_input;
+  world = _a_1_9_input;
+  loop {
+    argumentCount = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), arguments);
+    if (f_equalityWave_bool(L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, index, argumentCount))) {
+      // Read config before simplifying. Simplification may update metavariable state.
+      config = L4_Lean_Meta_Basic.f_Meta_Context_config_2f4f6fdcbe(_runtime, context);
+      argument = L4_Init_Prelude.f_Array_getInternal_3b1463d18e(_runtime, LeanErased(), arguments, index, LeanErased());
+      simplified = f_Lean_Meta_simpAssignmentArg_d13828114a(_runtime, argument, context, stateRef, coreContext, coreStateRef, world);
+      if (f_equalityWave_isError(simplified)) return simplified;
+      simplifiedArgument = leanField(simplified, 0);
+      !world = leanField(simplified, 1);
+      !arguments = L4_Init_Data_Array_Set.f_Array_set_465d35ad3a(_runtime, LeanErased(), arguments, index, simplifiedArgument, LeanErased());
+      if (leanTag(simplifiedArgument) != LeanTag.Expr_fvar__impl) {
+        return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+      };
+      variableId = leanField(simplifiedArgument, 1);
+      prefix = f_equalityWave_expect(L4_Init_Data_Array_Subarray.f_Array_toSubarray_0ba25fcf44(_runtime, arguments, LeanNatLiterals.n0, index), LeanTag.Std_Slice_Internal_SubarrayData_mk);
+      prefixArray = leanField(prefix, 0);
+      prefixStart = leanField(prefix, 1);
+      prefixStop = leanField(prefix, 2);
+      if (f_equalityWave_bool(L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, prefixStart, prefixStop))) {
+        prefixSize = L4_Init_Prelude.f_Array_size_3866d4555a(_runtime, LeanErased(), prefixArray);
+        boundedStop = if (f_equalityWave_bool(L4_Init_Prelude.f_Nat_decLe_2f4affd9a0(_runtime, prefixStop, prefixSize))) prefixStop else prefixSize;
+        if (f_equalityWave_bool(L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, prefixStart, boundedStop))) {
+          startWord = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_runtime, prefixStart);
+          stopWord = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_runtime, boundedStop);
+          duplicate = f_processAssignment_process_spec_0_d5894e67b8(_runtime, simplifiedArgument, prefixArray, startWord, stopWord);
+          if (f_equalityWave_bool(duplicate)) {
+            return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+          }
+        }
+      };
+      scope = leanField(f_equalityWave_expect(declaration, LeanTag.MetavarDecl_mk), 1);
+      inScope = L4_Lean_LocalContext.f_Lean_LocalContext_contains_2d192664ca(_runtime, scope, variableId);
+      if (f_equalityWave_bool(inScope)) {
+        if (!f_equalityWave_bool(leanField(f_equalityWave_expect(config, LeanTag.Meta_Config_mk), 2))) {
+          return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+        }
+      };
+      !index = L4_Init_Prelude.f_Nat_add_86990f4822(_runtime, index, LeanNatLiterals.n1)
+    } else {
+      instantiated = f_Meta_synthInstanceTypedMVarAndUnify_spec_0_ba8275ee71(_runtime, candidate, stateRef, world);
+      if (f_equalityWave_isError(instantiated)) return instantiated;
+      instantiatedCandidate = leanField(instantiated, 0);
+      !world = leanField(instantiated, 1);
+      head = L4_Lean_Expr.f_Lean_Expr_getAppFn_05707344ce(_runtime, instantiatedCandidate);
+      selfHead = L4_Lean_Expr.f_Lean_Expr_eqv_4957d9ddda(_runtime, head, metavariable);
+      if (f_equalityWave_bool(selfHead)) {
+        return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+      };
+      metavariableId = L4_Lean_Expr.f_Lean_Expr_mvarId_9d4431c33a(_runtime, metavariable);
+      checked = f_Lean_Meta_checkAssignment_8abdc549fe(_runtime, metavariableId, arguments, instantiatedCandidate, context, stateRef, coreContext, coreStateRef, world);
+      if (f_equalityWave_isError(checked)) return checked;
+      admissible = leanField(checked, 0);
+      !world = leanField(checked, 1);
+      leanTag(admissible) match {
+      | LeanTag.Option_none ->
+        return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+      | LeanTag.Option_some -> void
+      | _ -> return leanFail("non-exhaustive Lean case")
+      };
+      checkedCandidate = leanField(admissible, 0);
+      options = f_equalityWave_options(coreContext);
+      if (f_equalityWave_bool(leanField(options, 1))) {
+        traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(_runtime, LeanText("Meta"), LeanText("isDefEq"), LeanText("assign"), LeanText("beforeMkLambda"));
+        if (f_equalityWave_traceEnabled(_runtime, coreContext, traceClass)) {
+          metavariableMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, metavariable);
+          space = f_equalityWave_message(_runtime, " ");
+          message = f_equalityWave_compose(metavariableMessage, space);
+          argumentList = L4_Init_Prelude.f_Array_toList_2f8b2ba454(_runtime, LeanErased(), arguments);
+          argumentMessages = f_CheckAssignment_addAssignmentInfo_spec_0_464f6b6dda(_runtime, argumentList, LeanCtor(LeanTag.List_nil, Array[]));
+          listMessage = L4_Lean_Message.f_Lean_MessageData_ofList_5112e9255f(_runtime, argumentMessages);
+          !message = f_equalityWave_compose(message, listMessage);
+          assignment = f_equalityWave_message(_runtime, " := ");
+          !message = f_equalityWave_compose(message, assignment);
+          candidateMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, checkedCandidate);
+          !message = f_equalityWave_compose(message, candidateMessage);
+          trace = f_isDefEqEtaStruct_go_spec_1_241494c927(_runtime, traceClass, message, context, stateRef, coreContext, coreStateRef, world);
+          if (f_equalityWave_isError(trace)) return trace;
+          !world = leanField(trace, 1)
+        }
+      };
+      // Keep let dependency construction, including its rejection result, intact.
+      lambdaResult = f_Lean_Meta_mkLambdaFVarsWithLetDeps_03f0783d9f(_runtime, arguments, checkedCandidate, context, stateRef, coreContext, coreStateRef, world);
+      if (f_equalityWave_isError(lambdaResult)) return lambdaResult;
+      lambdaOption = leanField(lambdaResult, 0);
+      !world = leanField(lambdaResult, 1);
+      if (leanTag(lambdaOption) != LeanTag.Option_some) return f_equalityWave_ok(selfHead, world);
+      assignmentValue = leanField(lambdaOption, 0);
+      if (f_equalityWave_bool(L4_Init_Prelude.f_Nat_decLt_b34d01d051(_runtime, LeanNatLiterals.n0, argumentCount))) {
+        stopWord = L4_Init_Data_UInt_BasicAux.f_USize_ofNat_56686aa4c6(_runtime, argumentCount);
+        hasContextArguments = f_Meta_checkAssignment_spec_2_f93740cf91(_runtime, declaration, arguments, LeanWord("usize", 0), stopWord);
+        if (f_equalityWave_bool(hasContextArguments)) {
+          typeCorrect = L4_Lean_Meta_Check.f_Lean_Meta_isTypeCorrect_00ca8562e8(_runtime, assignmentValue, context, stateRef, coreContext, coreStateRef, world);
+          if (f_equalityWave_isError(typeCorrect)) return typeCorrect;
+          !world = leanField(typeCorrect, 1);
+          if (!f_equalityWave_bool(leanField(typeCorrect, 0))) {
+            errorOptions = f_equalityWave_options(coreContext);
+            if (f_equalityWave_bool(leanField(errorOptions, 1))) {
+              traceClass = L4_Init_Prelude.f_Lean_Name_mkStr4_cfa3e36682(_runtime, LeanText("Meta"), LeanText("isDefEq"), LeanText("assign"), LeanText("typeError"));
+              if (f_equalityWave_traceEnabled(_runtime, coreContext, traceClass)) {
+                metavariableMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, metavariable);
+                assignment = f_equalityWave_message(_runtime, " := ");
+                first = f_equalityWave_compose(metavariableMessage, assignment);
+                valueMessage = L4_Lean_Message.f_Lean_MessageData_ofExpr_19c924d486(_runtime, assignmentValue);
+                trace = f_isDefEqEtaStruct_go_spec_1_241494c927(_runtime, traceClass, f_equalityWave_compose(first, valueMessage), context, stateRef, coreContext, coreStateRef, world);
+                if (f_equalityWave_isError(trace)) return trace;
+                !world = leanField(trace, 1)
+              }
+            };
+            return f_equalityWave_assignmentApproximation(_runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, world)
+          }
+        }
+      };
+      return f_Lean_Meta_checkTypesAndAssign_592ac0ae25(_runtime, metavariable, assignmentValue, context, stateRef, coreContext, coreStateRef, world)
+    }
+  }
+}
+
+// Preserve the fallback boundary: FO may change state even when it returns false.
+// Const approximation receives that resulting world, the current argument array,
+// the current index, and the original (not instantiated/abstracted) candidate.
+fun f_equalityWave_assignmentApproximation(
+  runtime: mutable LeanExecution, metavariable: LeanValue, arguments: LeanValue, index: LeanValue, candidate: LeanValue,
+  context: LeanValue, stateRef: LeanValue, coreContext: LeanValue, coreStateRef: LeanValue, world: LeanValue,
+): LeanValue {
+  firstOrder = f_Meta_processAssignmentFOApprox_loop_eb4cd04803(runtime, metavariable, arguments, candidate, context, stateRef, coreContext, coreStateRef, world);
+  if (f_equalityWave_isError(firstOrder)) return firstOrder;
+  if (f_equalityWave_bool(leanField(firstOrder, 0))) return firstOrder;
+  f_Lean_Meta_processConstApprox_150f04568c(runtime, metavariable, arguments, index, candidate, context, stateRef, coreContext, coreStateRef, leanField(firstOrder, 1))
+}
+
+module end;
