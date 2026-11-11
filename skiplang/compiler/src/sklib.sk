@@ -448,10 +448,15 @@ mutable class .SklibBuilder(
 
   readonly fun hash(): Int {
     // TODO: Digest everything, including compiler version.
+    // The archive's identity depends on source paths and contents, not their
+    // modification times: a fresh checkout gives every file a new mtime, and
+    // dependents keep this hash in their backend option row, so including it
+    // would rerun every dependent's backend with unchanged inputs (#1607).
+    // The metadata still records mtimes as the frontend's change hint.
     (
       this.name,
       this.target,
-      this.sources.sortedBy(s ~> s.i0).collect(Array),
+      this.sources.sortedBy(s ~> s.i0).map(s -> (s.i0, s.i2)).collect(Array),
       this.env.sorted(),
       // FIXME: Bytes should implement Hashable. For now, we convert to String.
       this.files.sortedBy(f ~> Path.basename(f.i0)).map(f ->

@@ -47,9 +47,11 @@ class ArchiveIndexTests(unittest.TestCase):
             timeout=120,
         )
 
-    def build(self, name, source, dependency=None):
+    def build(self, name, source, dependency=None, mtime=None):
         path = self.root / f"{name}.sk"
         path.write_text(source)
+        if mtime is not None:
+            os.utime(path, (mtime, mtime))
         args = [
             path,
             "--sklib-name",
@@ -93,6 +95,22 @@ class ArchiveIndexTests(unittest.TestCase):
         self.assertEqual(
             subprocess.check_output([self.binary], text=True), expected
         )
+
+    def test_identity_ignores_source_mtimes(self):
+        # A fresh checkout gives unchanged sources new mtimes. The archive hash
+        # is kept in every dependent's backend option row, so it must depend on
+        # source contents, not timestamps (#1607).
+        archive = self.libs / "libleft.sklib"
+        source = (self.root / "left.sk").read_text()
+
+        def identity(text, mtime):
+            archive.unlink()
+            self.build("left", text, mtime=mtime)
+            return json.loads(self.member(archive, "lib.skmeta"))["hash"]
+
+        old = identity(source, 946684800)
+        self.assertEqual(identity(source, 978307200), old)
+        self.assertNotEqual(identity(source.replace("7", "8"), 946684800), old)
 
     def test_transitive_legacy_and_forward_compatibility(self):
         left, right = self.libs / "libleft.sklib", self.libs / "libright.sklib"
