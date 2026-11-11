@@ -125,7 +125,16 @@ class Build(
   }
 
   private fun get_ar(): Result<mutable ProcessBuilder, Error> {
-    Success(mutable ProcessBuilder("ar"))
+    if (this.get_target()?.contains("apple")) {
+      // skc bundles these archives into .sklib files, and skc builds that
+      // predate the arparser fix for BSD-format member names (such as the
+      // bootstrap compiler) would drop every object from Apple's archives.
+      cmd = mutable ProcessBuilder("llvm-ar");
+      cmd.arg("--format=gnu");
+      Success(cmd)
+    } else {
+      Success(mutable ProcessBuilder("ar"))
+    }
   }
 
   private fun getenv(v: String): Result<String, Error> {

@@ -51,8 +51,17 @@ palloc.o: alloc_size_classes.h
 %.bc: %.c
 	clang $(CC32FLAGS) -o $@ -c $<
 
+# skc bundles this archive into libstd.sklib, and the bootstrap skc predates
+# the arparser fix for the member names of Apple's BSD-format archives, so
+# build a GNU-format one on macOS.
+ifeq ($(shell uname -s),Darwin)
+libskip_runtime64.a: $(OFILES) runtime64_specific.o parallel_map.o $(ONATIVE_FILES)
+	rm -f $@
+	llvm-ar --format=gnu rcs $@ $^
+else
 libskip_runtime64.a: $(OFILES) runtime64_specific.o parallel_map.o $(ONATIVE_FILES)
 	$(AR) rcs $@ $^
+endif
 
 runtime64_specific.o parallel_map.o: %.o: %.cpp runtime64_support.h
 	clang++ -std=c++11 $(CC64FLAGS) -o $@ -c $<

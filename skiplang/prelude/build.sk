@@ -59,6 +59,7 @@ fun main(): void {
       Path.join(out_dir, "libbacktrace"),
       host == target,
       pic,
+      target.contains("apple"),
     );
 
     native_srcs = Array[
@@ -84,7 +85,12 @@ fun main(): void {
       .include(libbacktrace_include)
       .compile("skip_runtime64");
     print_string("skargo:skc-preamble=preamble/preamble64.ll");
-    print_string("skargo:rerun-if-changed=preamble/preamble64.ll")
+    print_string("skargo:rerun-if-changed=preamble/preamble64.ll");
+    if (target.contains("apple")) {
+      // ld64 rejects the non-object members (metadata, sources) of .sklib
+      // archives; lld skips them.
+      print_string("skargo:skc-link-arg=-fuse-ld=lld")
+    }
   }
 }
 
@@ -92,6 +98,7 @@ fun build_libbacktrace(
   out_dir: String,
   host_is_target: Bool,
   pic: Bool,
+  apple: Bool,
 ): String {
   if (host_is_target && !pic) {
     // Try using system installed libbacktrace.
@@ -127,7 +134,16 @@ fun build_libbacktrace(
       Path.join(source_dir, "configure"),
       "--prefix",
       out_dir,
-    ].concat(if (pic) Array["--with-pic"] else Array[]),
+    ].concat(if (pic) Array["--with-pic"] else Array[]).concat(
+      // skc bundles libbacktrace.a into the std .sklib, and the bootstrap
+      // skc predates the arparser fix for the member names of the
+      // BSD-format archives that Apple's ar and ranlib produce.
+      if (apple) {
+        Array["AR=llvm-ar --format=gnu", "RANLIB=llvm-ranlib"]
+      } else {
+        Array[]
+      },
+    ),
     stdout => print_error_raw,
     stderr => print_error_raw,
     cwd => Some(out_dir),

@@ -20,12 +20,23 @@ LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 
 SKIP_SRC=$(shell find src/ -name '*.sk')
 
+# On macOS, the bootstrap skc needs GNU-format archives (it predates the
+# arparser fix for the member names of Apple's BSD-format ones), and
+# executables must link with lld: ld64 rejects the non-object members
+# (metadata, sources) of .sklib archives.
+ifeq ($(shell uname -s),Darwin)
+TO_GNU_AR = llvm-ar --format=gnu qcL
+STD_LINK_ARGS = -lpthread -fuse-ld=lld
+else
+STD_LINK_ARGS = -lpthread
+endif
+
 .PHONY: default
 default: $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a preamble/preamble64.ll
 	@echo "skargo:skc-preamble=preamble/preamble64.ll"
 	@echo "skargo:skc-link-lib=$(OUT_DIR)/libskip_runtime64.a"
 	@echo "skargo:skc-link-lib=$(OUT_DIR)/libbacktrace.a"
-	@echo "skargo:skc-link-arg=-lpthread"
+	@echo "skargo:skc-link-arg=$(STD_LINK_ARGS)"
 
 .PHONY: wasm
 wasm: $(OUT_DIR)/libskip_runtime32.a preamble/preamble32.ll
@@ -40,6 +51,7 @@ ifeq ($(LBT_EXISTS), 1)
 $(OUT_DIR)/libbacktrace.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	cp $(LIB_DIR)/libbacktrace.a $@
+	$(if $(TO_GNU_AR),rm -f $@ && $(TO_GNU_AR) $@ $(LIB_DIR)/libbacktrace.a)
 else
 LBT_SOURCE=$(realpath libbacktrace)
 LBT_BUILD=$(OUT_DIR)/libbacktrace-build
@@ -56,6 +68,7 @@ $(OUT_DIR)/libbacktrace.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	$(MAKE) -C $(LBT_BUILD)
 	cp $(LBT_BUILD)/.libs/libbacktrace.a $@
+	$(if $(TO_GNU_AR),rm -f $@ && $(TO_GNU_AR) $@ $(LBT_BUILD)/.libs/libbacktrace.a)
 endif
 
 .PHONY: $(OUT_DIR)/libskip_runtime64.a
@@ -79,7 +92,7 @@ $(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
 	llvm-ar crs $@ $^
 
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
-	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '-lpthread' $^
+	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '$(STD_LINK_ARGS)' $^
 
 .PHONY: libbacktrace
 libbacktrace: $(OUT_DIR)/libbacktrace.a
