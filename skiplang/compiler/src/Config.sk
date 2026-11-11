@@ -229,9 +229,10 @@ class Config{
     check = results.getBool("check");
     no_link = !results.getBool("link");
     stopAfterSpecialization = results.getBool("stop-after-specialization");
-    // Release builds use sequential specialization, including persisted builds.
+    // The specialization mode is an execution control, independent of release
+    // mode: persisted builds opt into the incremental (parallel-capable)
+    // backend via --incremental-backend, whether or not --release is set.
     incrementalSpecialization =
-      !release &&
       results.getBool("incremental-backend") &&
       (results.maybeGetString("init").isSome() ||
         results.maybeGetString("data").isSome());

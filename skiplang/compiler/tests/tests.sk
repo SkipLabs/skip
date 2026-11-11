@@ -1438,30 +1438,19 @@ private fun incrementalOptimization(): void {
         .collect(Array);
       T.expectEq(optimizerWrites.size(), 0, optimizerWrites.join("\n"));
     };
+    // Switching the persisted cache to release mode keeps the incremental
+    // graph: release no longer forces the sequential pipeline.
     for (release in Array[true, false]) {
       mode = if (release) Array["--release"] else Array[];
       switched = System.subprocess(
-        args
-          .concat(Array["--data", data])
-          .concat(mode)
-          .concat(if (release) Array["--debug-skstore"] else Array[]),
+        args.concat(Array["--data", data]).concat(mode),
       ).fromSuccess();
       T.expectTrue(switched.success(), switched.stderr);
       T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "20");
-      if (release) {
-        // The common output adapter also publishes sequential metadata.
-        // Release must bypass incremental optimization work and rounds.
-        T.expectFalse(switched.stdout.contains("OPTIMIZE_FUNCTION:"));
-        T.expectFalse(
-          switched.stdout.contains("WRITTEN:  /optimizer/initial/"),
-        );
-        T.expectFalse(
-          switched.stdout.contains("WRITTEN:  /optimizer/before-const/"),
-        );
-        T.expectFalse(
-          switched.stdout.contains("WRITTEN:  /optimizer/after-const/"),
-        );
-      };
+      T.expectFalse(
+        switched.stderr.contains("Sequential specialization complete"),
+        switched.stderr,
+      );
     };
   } catch {
   | exn ->
@@ -1636,7 +1625,8 @@ private fun incrementalNativeLowering(): void {
         expected,
       );
     };
-    // Persisted mode switches must retire and recreate the incremental graph.
+    // Persisted mode switches must retire and recreate the incremental graph,
+    // whichever way release mode is set: release no longer forces sequential.
     for (release in Array[true, false]) {
       switched = System.subprocess(
         args
@@ -1645,9 +1635,13 @@ private fun incrementalNativeLowering(): void {
       ).fromSuccess();
       T.expectTrue(switched.success(), switched.stderr);
       T.expectEq(System.subprocess(Array[output]).fromSuccess().stdout, "16");
-      T.expectEq(
+      T.expectFalse(
         switched.stderr.contains("Sequential specialization complete"),
-        release,
+        switched.stderr,
+      );
+      T.expectTrue(
+        switched.stderr.contains("Incremental specialization:"),
+        switched.stderr,
       );
     };
   } catch {
@@ -2449,8 +2443,8 @@ private fun incrementalConstructorPositions(): void {
   );
 }
 
-// Ordinary and release invocations discover sequentially; non-release
-// persistence opts into the incremental graph, including config-only updates.
+// Ordinary invocations discover sequentially; persistence opts into the
+// incremental graph regardless of release mode, including config-only updates.
 private fun specializationModeSelection(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
   T.expectTrue(temp.success(), temp.stderr);
@@ -2488,28 +2482,33 @@ private fun specializationModeSelection(): void {
       T.expectTrue(compiled.success(), compiled.stderr);
       T.expectEq(
         compiled.stderr.contains("Sequential specialization complete"),
-        release || !persistent || !incremental,
+        !persistent || !incremental,
       );
       T.expectEq(
         compiled.stderr.contains("Incremental specialization:"),
-        persistent && !release && incremental,
+        persistent && incremental,
       );
       result = System.subprocess(Array[output]).fromSuccess();
       T.expectTrue(result.success(), result.stderr);
       T.expectEq(result.stdout, "41");
-      if (release && persistent) {
+      if (persistent) {
         resumed = System.subprocess(
-          args.concat(
-            Array["--release", "--data", selectedData, "--emit=llvm-ir"],
-          ),
+          args
+            .concat(if (release) Array["--release"] else Array[])
+            .concat(
+              if (!incremental) Array["--no-incremental-backend"] else Array[],
+            )
+            .concat(Array["--data", selectedData, "--emit=llvm-ir"]),
         ).fromSuccess();
         T.expectTrue(resumed.success(), resumed.stderr);
-        T.expectTrue(
+        T.expectEq(
           resumed.stderr.contains("Sequential specialization complete"),
+          !incremental,
           resumed.stderr,
         );
-        T.expectFalse(
+        T.expectEq(
           resumed.stderr.contains("Incremental specialization:"),
+          incremental,
           resumed.stderr,
         );
       };

@@ -12,8 +12,9 @@ separate.
 `SKC_NATIVE_ARTIFACT_WORKERS=4` selects four workers for collection-based native
 artifact materialization. The default remains one. Worker count is an immutable
 pipeline policy: changing it requires a fresh `--init` cache, and the compiler
-checks the persisted policy before native side effects. Sequential/release
-artifact generation retains its existing execution path.
+checks the persisted policy before native side effects. Sequential
+(non-persisted or `--no-incremental-backend`) artifact generation retains its
+existing execution path; `--release` alone no longer selects it.
 
 The existing `EHandle.parallelMap` preparation hook performs tracked reads of
 the build plan, tool version and module/global recovery inputs on the main

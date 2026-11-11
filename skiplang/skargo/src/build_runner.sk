@@ -1236,8 +1236,9 @@ const kHeavyUnitSources: Int = 100;
 // TODO: Proper Profile class.
 private fun skc_profile_options(profile: String): Array<String> {
   profile match {
-  // -O2 selects optimizations; --release also selects the sequential compiler
-  // algorithms when skargo supplies a persistent database.
+  // -O2 selects optimizations. --release only toggles release emission
+  // details; the specialization mode stays with the persistent-database
+  // controls, independent of the profile.
   | "release" -> Array["--release", "-O2"]
   // Development builds favor incremental compilation over interprocedural
   // optimization (inlining and IPA), just as
