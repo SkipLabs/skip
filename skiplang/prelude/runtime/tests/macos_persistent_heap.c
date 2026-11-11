@@ -10,6 +10,10 @@
 
 #include "../palloc.c"
 
+__attribute__((noreturn)) void SKIP_throw_cruntime(int32_t code) {
+  exit(code);
+}
+
 static char path[] = "/tmp/test-palloc-macos-XXXXXX";
 
 static int wait_child(pid_t child) {
@@ -55,6 +59,34 @@ static int child_main(char** argv) {
     alarm(5);  // A lock left by a dead holder would block forever.
     sk_global_lock();
     sk_global_unlock();
+    return 0;
+  }
+  if (strcmp(step, "mutex") == 0) {
+    // A Skip Mutex object is 5 words, smaller than Darwin's pthread_mutex_t.
+    // Init must stay inside it, with or without the global lock held, and
+    // leave a mutex that is still usable from another process.
+    for (int locked = 0; locked < 2; locked++) {
+      SkipInt object[6] = {0, 0, 0, 0, 0, 0x5a5a};
+      if (locked) sk_global_lock();
+      SKIP_mutex_init((void*)object);
+      if (locked) sk_global_unlock();
+      if (object[5] != 0x5a5a) return 22;
+      pthread_mutex_t* lock = SKIP_unfreeze_lock(object);
+      if (sk_is_static(lock)) return 23;
+      SKIP_mutex_lock(lock);
+      SKIP_mutex_unlock(lock);
+      if (!locked) {
+        sk_global_lock();
+        ginfo->contexts = (Contexts)lock;
+        sk_global_unlock();
+      }
+    }
+    return 0;
+  }
+  if (strcmp(step, "mutex-check") == 0) {
+    alarm(5);
+    SKIP_mutex_lock((pthread_mutex_t*)ginfo->contexts);
+    SKIP_mutex_unlock((pthread_mutex_t*)ginfo->contexts);
     return 0;
   }
   return 21;
@@ -113,6 +145,10 @@ int main(int argc, char** argv) {
   // A holder dying with the global lock held does not block later users.
   if (!result && (rv = run(self, "die-locked")) != 0) result = 50 + rv;
   if (!result && (rv = run(self, "lock")) != 0) result = 70 + rv;
+
+  // Skip mutexes fit their object and are shared with other processes.
+  if (!result && (rv = run(self, "mutex")) != 0) result = 80 + rv;
+  if (!result && (rv = run(self, "mutex-check")) != 0) result = 90 + rv;
 
   // A live holder does block others until it unlocks.
   if (!result) {
