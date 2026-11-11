@@ -325,7 +325,12 @@ jobs:
   skdb:
     docker:
       - image: skiplabs/skdb-base:latest
-    resource_class: large.gen2
+    # xlarge (16 vCPU) rather than large (8): the suite's parallel sections
+    # (the SQL tests, the diff cases) scale with core count, so the extra
+    # cores shorten the job. The skdb release build itself stays serial --
+    # release builds use sequential specialization, so
+    # SKC_NATIVE_ARTIFACT_WORKERS does not apply to them (measured).
+    resource_class: xlarge.gen2
     environment:
       SKIP_CAPACITY: 6G
     parameters:
@@ -352,7 +357,9 @@ jobs:
   skdb-wasm:
     docker:
       - image: skiplabs/skdb-base:latest
-    resource_class: large.gen2
+    # xlarge (16 vCPU) so the playwright suite runs 8 workers instead of 4
+    # (sql/ts/tests/playwright.config.ts).
+    resource_class: xlarge.gen2
     environment:
       SKIP_CAPACITY: 6G
     parameters:
