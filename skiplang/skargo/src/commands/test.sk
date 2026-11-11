@@ -36,6 +36,14 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
           .about("Number of parallel jobs, defaults to # of CPUs"),
       )
       .arg(
+        Cli.Arg::int("build-jobs")
+          .long("build-jobs")
+          .value_name("N")
+          .about(
+            "Number of units to compile in parallel, defaults to min(--jobs, 4)",
+          ),
+      )
+      .arg(
         Cli.Arg::string("target")
           .value_name("TRIPLE")
           .about("Check for the target triple"),
@@ -67,12 +75,15 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
   };
   bctx = create_bctx(gctx, ws, opts);
   jobs = args.getInt("jobs");
+  // Cap compilation parallelism by default: a single skc self-build already
+  // peaks near the CI compiler job's memory guard. --build-jobs overrides it,
+  // e.g. --build-jobs 1 compiles serially while the tests still run in
+  // parallel.
+  build_jobs = args.maybeGetInt("build-jobs", false).default(min(jobs, 4));
   withTimer(
     () -> {
       build_runner = BuildRunner::create(bctx);
-      // Cap compilation parallelism: a single skc self-build already peaks
-      // near the CI compiler job's memory guard.
-      build_runner.compile(/* check = */ false, /* jobs = */ min(jobs, 4))
+      build_runner.compile(/* check = */ false, /* jobs = */ build_jobs)
     },
     t ->
       gctx.console.status(

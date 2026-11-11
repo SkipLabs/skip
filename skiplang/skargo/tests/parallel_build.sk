@@ -311,4 +311,69 @@ fun test_redirect_argv_does_not_interpret_paths(): void {
   T.expectEq(FileSystem.readTextFile(dir + "/stderr"), "err\n")
 }
 
+// `skargo test` compiles min(--jobs, 4) units at a time by default;
+// --build-jobs overrides that without changing the test runner's --jobs.
+@test
+fun test_skargo_test_build_jobs(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-build-jobs");
+  (dir, tools) = write_two_bins(root);
+  sktest = Path.join(Path.dirname(kManifestDir), "sktest");
+  write_file(
+    dir + "/Skargo.toml",
+    FileSystem.readTextFile(dir + "/Skargo.toml") +
+      `[dev-dependencies]\nsktest = { path = "${sktest}" }\n`,
+  );
+  write_file(
+    dir + "/tests/probe.sk",
+    "module TwoTests; @test fun probe(): void { void } module end;\n",
+  );
+  // The `two` and `sktest` libs are independent. Each one's compile waits
+  // (up to 10s) for the other's to start, so the build only succeeds when
+  // both are in flight together.
+  real_skc = which("skc");
+  write_script(
+    tools + "/skc",
+    `for lib in two sktest; do case " $* " in *" --sklib-name=$lib "*) touch "${root}/started-$lib"; other=two; [ $lib = two ] && other=sktest; i=0; while [ ! -e "${root}/started-$other" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; [ -e "${root}/started-$other" ] || { echo "$lib never compiled alongside $other" >&2; exit 9; };; esac; done\nexec "${real_skc}" "$@"\n`,
+  );
+  test = (build_jobs: ?Int) -> {
+    T.expectTrue(
+      System.subprocess(
+        Array[
+          "rm",
+          "-rf",
+          dir + "/target",
+          root + "/started-two",
+          root + "/started-sktest",
+        ],
+      )
+        .fromSuccess()
+        .success(),
+    );
+    env = Map::mcreateFromItems(Array[("SKARGO_BIN", "skargo")]);
+    env.extend(tools_env(tools));
+    System.popen{
+      args => Array[skargo, "test", "--release", "--jobs", "2"].concat(
+        build_jobs match {
+        | Some(n) -> Array["--build-jobs", n.toString()]
+        | None() -> Array[]
+        },
+      ),
+      env => env.chill(),
+      cwd => Some(dir),
+    }.fromSuccess()
+  };
+  parallel = test(None());
+  T.expectTrue(parallel.success(), parallel.stderr);
+  serial = test(Some(1));
+  T.expectEq(serial.exitcode(), 3, serial.stderr);
+  T.expectTrue(
+    serial.stderr.contains("never compiled alongside"),
+    serial.stderr,
+  )
+}
+
 module end;
