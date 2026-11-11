@@ -5,6 +5,15 @@ runtime_test_sources=$(cd "$(dirname "$0")" && pwd)
 runtime_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/skip-runtime-tests.XXXXXXXX")
 trap 'rm -rf "$runtime_test_dir"' EXIT
 
+# The checks below are Linux-specific (glibc mutex internals, GNU ld flags).
+if [ "$(uname -s)" = Darwin ]; then
+  clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    -Wl,-dead_strip -pthread "$runtime_test_sources/macos_persistent_heap.c" \
+    -o "$runtime_test_dir/macos-persistent-heap"
+  "$runtime_test_dir/macos-persistent-heap"
+  exit 0
+fi
+
 clang -Wall -Wextra -Werror "$runtime_test_sources/alloc_size_classes.c" \
   -o "$runtime_test_dir/size-classes"
 "$runtime_test_dir/size-classes"

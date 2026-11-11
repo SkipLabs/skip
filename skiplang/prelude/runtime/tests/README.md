@@ -130,3 +130,22 @@ the real traversal routines; it is not an end-to-end allocator or Wasm test.
 [UBSan trap mode](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#usage)
 keeps the enabled checks and terminates on a failure without linking the optional
 compiler-rt diagnostic library. This also works in minimal LLVM installations.
+
+# Persistent heap on macOS
+
+A persistent heap holds absolute pointers into the executable. arm64 macOS
+cannot link non-PIE executables, so the runtime re-executes itself with ASLR
+disabled before mapping a heap, keys the heap on the executable's `LC_UUID`,
+and, lacking robust mutexes, takes the global lock with an `flock` on
+`<file>.lock`, which the kernel releases when its holder dies. This test checks
+that a stored code pointer survives a later run, that a dead lock holder does
+not block later users while a live one does, and that a heap from another
+executable is rejected. `run.sh` runs only this check on macOS.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,-dead_strip -pthread \
+  skiplang/prelude/runtime/tests/macos_persistent_heap.c \
+  -o /tmp/test-macos-persistent-heap
+/tmp/test-macos-persistent-heap
+```

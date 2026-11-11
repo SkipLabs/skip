@@ -17,12 +17,23 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <limits.h>
+#include <mach-o/dyld.h>
+#include <mach-o/loader.h>
+#include <spawn.h>
+#endif
 
 #include "alloc_size_classes.h"
 #include "runtime.h"
 
 #define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 64L)
+#ifdef __APPLE__
+// macOS refuses fixed mappings below 0x7000000000 with EPERM.
+#define BOTTOM_ADDR ((void*)0x0000010000000000)
+#else
 #define BOTTOM_ADDR ((void*)0x0000001000000000)
+#endif
 #define FTABLE_SIZE 512
 _Static_assert(SK_ALLOC_SLOT_COUNT <= FTABLE_SIZE,
                "persistent free table too small");
@@ -93,6 +104,66 @@ void sk_check_has_lock() {
   }
 }
 
+#ifdef __APPLE__
+// macOS has no robust process-shared mutexes: a process dying while holding
+// the global lock would block every other user of the file forever. Instead,
+// every user flocks a sidecar "<file>.lock", which the kernel releases when
+// its holder dies. It cannot be the mapping itself, whose flock is the users'
+// lease (see sk_load_mapping). An flock belongs to the open file description,
+// shared by all threads, so a process-local mutex serializes threads first.
+static int sk_global_lock_fd = -1;
+static pthread_mutex_t sk_global_thread_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int sk_flock(int fd, int operation);
+
+// The mutex in the mapping is unused on macOS.
+void sk_global_lock_init() {}
+
+static void sk_global_lock_open(const char* fileName) {
+  size_t length = strlen(fileName);
+  char* lockName = malloc(length + sizeof(".lock"));
+  if (lockName == NULL) {
+    perror("malloc");
+    exit(ERROR_LOCKING);
+  }
+  memcpy(lockName, fileName, length);
+  memcpy(lockName + length, ".lock", sizeof(".lock"));
+  sk_global_lock_fd = open(lockName, O_RDWR | O_CREAT | O_CLOEXEC, 0600);
+  if (sk_global_lock_fd == -1) {
+    perror("ERROR: could not open persistent lock file");
+    exit(ERROR_LOCKING);
+  }
+  free(lockName);
+}
+
+void sk_global_lock() {
+  if (ginfo->fileName == NULL) {
+    return;
+  }
+
+  if (pthread_mutex_lock(&sk_global_thread_lock) != 0 ||
+      sk_flock(sk_global_lock_fd, LOCK_EX) != 0) {
+    perror("Internal error: locking failed");
+    exit(ERROR_LOCKING);
+  }
+  sk_is_locked = 1;
+}
+
+void sk_global_unlock() {
+  if (ginfo->fileName == NULL) {
+    return;
+  }
+
+  sk_is_locked = 0;
+  if (sk_flock(sk_global_lock_fd, LOCK_UN) != 0 ||
+      pthread_mutex_unlock(&sk_global_thread_lock) != 0) {
+    perror("Internal error: global unlocking failed");
+    exit(ERROR_LOCKING);
+  }
+}
+
+#else  // __APPLE__
+
 void sk_global_lock_init() {
   memset(gmutex, 0, sizeof(*gmutex));
   pthread_mutexattr_init(gmutex_attr);
@@ -141,6 +212,7 @@ void sk_global_unlock() {
   perror("Internal error: global unlocking failed");
   exit(ERROR_LOCKING);
 }
+#endif  // __APPLE__
 
 /*****************************************************************************/
 /* Mutexes/Condition variables. */
@@ -584,6 +656,29 @@ static uint32_t sk_read_build_id(unsigned char* out, uint32_t max) {
   }
   return 0;
 }
+#elif defined(__APPLE__)
+// Mach-O has no GNU build-id; ld64 always records an LC_UUID derived from the
+// linked contents, which plays the same role.
+static uint32_t sk_read_build_id(unsigned char* out, uint32_t max) {
+  const struct mach_header_64* mh =
+      (const struct mach_header_64*)_dyld_get_image_header(0);
+  if (mh == NULL || mh->magic != MH_MAGIC_64) {
+    return 0;
+  }
+  const struct load_command* lc = (const struct load_command*)(mh + 1);
+  for (uint32_t i = 0; i < mh->ncmds; i++) {
+    if (lc->cmd == LC_UUID) {
+      const struct uuid_command* uc = (const struct uuid_command*)lc;
+      if (sizeof(uc->uuid) > max) {
+        return 0;
+      }
+      memcpy(out, uc->uuid, sizeof(uc->uuid));
+      return sizeof(uc->uuid);
+    }
+    lc = (const struct load_command*)((const char*)lc + lc->cmdsize);
+  }
+  return 0;
+}
 #else
 static uint32_t sk_read_build_id(unsigned char* out, uint32_t max) {
   (void)out;
@@ -803,31 +898,56 @@ void* sk_get_ftable(slot_t slot) {
 /* No file initialization (the memory is not backed by a file). */
 /*****************************************************************************/
 
-// Handy structure to allocate all those things at once
-typedef struct {
-  ginfo_t ginfo_data;
-  uint64_t gid;
-  void** pconsts;
-} no_file_t;
-
 #ifdef __APPLE__
-static void sk_init_no_file() {
-  no_file_t* no_file = malloc(sizeof(no_file_t));
-  if (no_file == NULL) {
-    perror("malloc");
-    exit(1);
+// A persistent heap holds absolute pointers into the executable, so it must
+// be loaded at the same address in every run. arm64 macOS cannot link
+// non-PIE executables, so when ASLR slid the executable, re-execute it in
+// place with ASLR disabled (the private posix_spawn flag lldb uses). The
+// environment variable stops a loop if the kernel ignores the flag; it is
+// removed so that subprocesses (e.g. skc run by skargo) re-execute too.
+#define SK_POSIX_SPAWN_DISABLE_ASLR 0x0100
+#define SK_NO_ASLR_ENV "SKIP_RUNTIME_NO_ASLR"
+
+extern char** environ;
+
+static void sk_disable_aslr(char** argv) {
+  int relaunched = getenv(SK_NO_ASLR_ENV) != NULL;
+  if (relaunched) {
+    unsetenv(SK_NO_ASLR_ENV);
   }
-  ginfo = &no_file->ginfo_data;
-  ginfo->total_palloc_size = 0;
-  ginfo->fileName = NULL;
-  ginfo->contexts = NULL;
-  gmutex = NULL;
-  gid = &no_file->gid;
-  pconsts = &no_file->pconsts;
-  *gid = 1;
-  *pconsts = NULL;
+  if (_dyld_get_image_vmaddr_slide(0) == 0) {
+    return;
+  }
+  if (relaunched) {
+    fprintf(stderr,
+            "Error: could not disable ASLR, which persistent files require\n");
+    exit(ERROR_MAPPING_FAILED);
+  }
+
+  char path[PATH_MAX];
+  uint32_t size = sizeof(path);
+  if (_NSGetExecutablePath(path, &size) != 0) {
+    fprintf(stderr, "Error: executable path too long\n");
+    exit(ERROR_MAPPING_FAILED);
+  }
+  posix_spawnattr_t attr;
+  int rv = posix_spawnattr_init(&attr);
+  if (rv == 0) {
+    rv = posix_spawnattr_setflags(
+        &attr, POSIX_SPAWN_SETEXEC | SK_POSIX_SPAWN_DISABLE_ASLR);
+  }
+  if (rv == 0 && setenv(SK_NO_ASLR_ENV, "1", 1) != 0) {
+    rv = errno;
+  }
+  if (rv == 0) {
+    // Only returns on failure.
+    rv = posix_spawn(NULL, path, NULL, &attr, argv, environ);
+  }
+  fprintf(stderr, "Error: could not re-execute %s without ASLR: %s\n", path,
+          strerror(rv));
+  exit(ERROR_MAPPING_FAILED);
 }
-#endif
+#endif  // __APPLE__
 
 int sk_is_nofile_mode() {
   return (ginfo->fileName == NULL);
@@ -845,17 +965,10 @@ void SKIP_memory_init(int argc, char** argv) {
 
 #ifdef __APPLE__
   if (fileName != NULL) {
-    fprintf(stderr,
-            "Persistent allocation not supported on this platform. "
-            "Disregarding %s.\n",
-            fileName);
+    sk_disable_aslr(argv);
   }
-  if (is_create) {
-    exit(EXIT_SUCCESS);
-  }
-  sk_init_no_file();
+#endif
 
-#else   // __APPLE__
   if (is_create || fileName == NULL) {
     size_t capacity = DEFAULT_CAPACITY;
     capacity = parse_capacity(argc, argv);
@@ -863,7 +976,12 @@ void SKIP_memory_init(int argc, char** argv) {
   } else {
     sk_load_mapping(fileName);
   }
-#endif  // __APPLE__
+
+#ifdef __APPLE__
+  if (fileName != NULL) {
+    sk_global_lock_open(fileName);
+  }
+#endif
 
   char* obj = sk_get_external_pointer();
   epointer_ty = get_gc_type(obj);
