@@ -359,7 +359,7 @@ mutable class BuildRunner(
     in_flight: mutable Vector<mutable InFlightUnit> = mutable Vector[];
     while (next < dirty.size() || !in_flight.isEmpty()) {
       // Spawn while a slot is free and the next unit's dependencies are
-      // complete. Heavy units (see unit_is_heavy) never share a slot.
+      // complete. Heavy units (see `unit_is_heavy`) never share a slot.
       while (next < dirty.size() && in_flight.size() < jobs) {
         unit = dirty[next];
         if (!this.deps_completed(unit, completed)) break void;
@@ -382,13 +382,19 @@ mutable class BuildRunner(
         } else {
           heavy_in_flight = false;
           for (inf in in_flight) {
-            if (unit_is_heavy(inf.unit)) !heavy_in_flight = true
+            if (this.unit_is_heavy(inf.unit)) !heavy_in_flight = true
           };
           if (
             heavy_in_flight ||
-            (unit_is_heavy(unit) && !in_flight.isEmpty())
+            (this.unit_is_heavy(unit) && !in_flight.isEmpty())
           ) {
             break void
+          };
+          if (this.unit_is_heavy(unit)) {
+            this.bctx.gctx.console.status_verbose(
+              "Heavy",
+              `${unit.pkg.name()} [${unit.target.name}] builds alone`,
+            )
           };
           this.spawn_unit(unit, check, in_flight);
           !next = next + 1
@@ -427,6 +433,28 @@ mutable class BuildRunner(
         Time.sleep_ms(10)
       }
     }
+  }
+
+  // Whether `unit` compiles enough of its package's code to be heavy (see
+  // `kHeavyUnitSources`). Bin, test and cdylib targets list no sources of
+  // their own: they compile their package's lib, so the compiler's `skc` and
+  // `skfmt` bins are as heavy as its lib. A merged lib also compiles the
+  // package's tests.
+  private readonly fun unit_is_heavy(unit: Unit): Bool {
+    merged_tests = if (
+      unit.target.kind is LibTarget(LibraryTypeSklib _) &&
+      should_merge_unit(unit, this.bctx.ws.package)
+    ) {
+      unit.pkg.manifest.test_target().map(t -> t.srcs.size()).default(0)
+    } else {
+      0
+    };
+    sources = unit.target.srcs.size() + merged_tests;
+    sources >= kHeavyUnitSources ||
+      (!unit.target.is_lib() &&
+        this.bctx.unit_graph[unit].any(dep ->
+          dep.pkg == unit.pkg && dep.target.is_lib() && this.unit_is_heavy(dep)
+        ))
   }
 
   private readonly fun deps_completed(
@@ -1116,12 +1144,10 @@ mutable class BuildRunner(
   }
 }
 
-// Units with at least this many sources can compile into a large heap (the
+// Units compiling at least this many sources can grow a large heap (the
 // compiler itself peaks near the CI job's memory guard), so in parallel mode
 // they never share a slot with another unit.
-private fun unit_is_heavy(unit: Unit): Bool {
-  unit.target.srcs.size() >= 100
-}
+const kHeavyUnitSources: Int = 100;
 
 // TODO: Proper Profile class.
 private fun skc_profile_options(profile: String): Array<String> {

@@ -1,0 +1,142 @@
+module alias T = SKTest;
+
+module SkargoParallelBuildTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, text: String): void {
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(path)])
+      .fromSuccess()
+      .success(),
+  );
+  FileSystem.writeTextFile(path, text)
+}
+
+@allow_tracked_call
+untracked fun build(
+  skargo: String,
+  dir: String,
+  extra: Array<String> = Array[],
+  env: Map<String, String> = Map[],
+): System.CompletedProcess {
+  full_env = Map::mcreateFromItems(Array[("SKARGO_BIN", "skargo")]);
+  full_env.extend(env);
+  System.popen{
+    args => Array[skargo, "build", "-v", "--jobs", "4"].concat(extra),
+    env => full_env.chill(),
+    cwd => Some(dir),
+  }.fromSuccess()
+}
+
+@allow_tracked_call
+untracked fun run(binary: String): String {
+  result = System.popen{
+    args => Array[binary],
+    env => Map["SKARGO_BIN" => Path.basename(binary)],
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result.stdout
+}
+
+// The skargo under test, or None() when this run cannot re-execute it.
+@allow_tracked_call
+untracked fun skargo_under_test(): ?String {
+  Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | some @ Some _ -> some
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string(
+        "skipping: merged-mode only, run `skargo test` in the dev profile",
+      );
+      None()
+    } else {
+      Some(Environ.current_exe())
+    }
+  }
+}
+
+// A workspace `app` with a bin, depending on two independent libs `pa` and
+// `pb`. `app_lib_files` extra source files make app's lib (and so its bin)
+// heavy for the parallel scheduler.
+@allow_tracked_call
+untracked fun write_workspace(root: String, app_lib_files: Int = 0): String {
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  for (name in Array["pa", "pb"]) {
+    write_file(
+      `${root}/${name}/Skargo.toml`,
+      `[package]\nname = "${name}"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+    );
+    write_file(
+      `${root}/${name}/src/lib.sk`,
+      `module ${name.uppercase()}; fun value(): Int { 1 } module end;\n`,
+    )
+  };
+  app = root + "/app";
+  write_file(
+    app + "/Skargo.toml",
+    `[package]\nname = "app"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\npa = { path = "../pa" }\npb = { path = "../pb" }\n[[bin]]\nname = "app"\nmain = "App.main"\n`,
+  );
+  write_app(app, 2);
+  for (i in Range(0, app_lib_files)) {
+    write_file(`${app}/src/filler${i}.sk`, `module Filler${i}; module end;\n`)
+  };
+  app
+}
+
+@allow_tracked_call
+untracked fun write_app(app: String, offset: Int): void {
+  write_file(
+    app + "/src/lib.sk",
+    `module App; untracked fun main(): void { print_raw((PA.value() + PB.value() + ${offset}).toString()) } module end;\n`,
+  )
+}
+
+// A bin target lists no sources: it compiles its package's lib. Its weight
+// must come from that lib, or the compiler's skc and skfmt bins would build
+// side by side under --jobs and exceed the memory budget.
+@test
+fun test_parallel_heavy_bin_builds_alone(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  app = write_workspace(
+    Path.join(kManifestDir, "target/it-parallel-heavy"),
+    100,
+  );
+  // Release keeps the bin a separate unit after its lib.
+  result = build(skargo, app, Array["--release"]);
+  T.expectTrue(result.success(), result.stderr);
+  T.expectTrue(
+    result.stderr.contains("Heavy: app [lib] builds alone"),
+    result.stderr,
+  );
+  T.expectTrue(
+    result.stderr.contains("Heavy: app [app] builds alone"),
+    result.stderr,
+  );
+  T.expectTrue(!result.stderr.contains("Heavy: pa"), result.stderr);
+  T.expectEq(run(app + "/target/host/release/app"), "4");
+
+  // Dev merges the bin into `__merged`, compiled from the same heavy lib.
+  dev = build(skargo, app);
+  T.expectTrue(dev.success(), dev.stderr);
+  T.expectTrue(
+    dev.stderr.contains("Heavy: app [__merged] builds alone"),
+    dev.stderr,
+  );
+  T.expectEq(run(app + "/target/host/dev/app"), "4");
+
+  light = write_workspace(Path.join(kManifestDir, "target/it-parallel-light"));
+  lightResult = build(skargo, light, Array["--release"]);
+  T.expectTrue(lightResult.success(), lightResult.stderr);
+  T.expectTrue(!lightResult.stderr.contains("Heavy: app"), lightResult.stderr);
+  T.expectEq(run(light + "/target/host/release/app"), "4")
+}
+
+module end;
