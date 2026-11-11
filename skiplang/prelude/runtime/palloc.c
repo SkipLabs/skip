@@ -820,7 +820,7 @@ static void sk_init_no_file() {
   ginfo = &no_file->ginfo_data;
   ginfo->total_palloc_size = 0;
   ginfo->fileName = NULL;
-  ginfo->context = NULL;
+  ginfo->contexts = NULL;
   gmutex = NULL;
   gid = &no_file->gid;
   pconsts = &no_file->pconsts;
