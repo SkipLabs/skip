@@ -23,8 +23,32 @@ $SKDB_CMD --init $DBCOPYFILE
 SKDB="$SKDB_CMD --data $DBFILE"
 SKDB_COPY="$SKDB_CMD --data $DBCOPYFILE"
 
-$SKDB < privacy/init.sql
-$SKDB_COPY < privacy/init.sql
+# Load privacy/init.sql and fail fast if the privacy layer did not come up:
+# every test below depends on it, and if it is missing they all fail with
+# "Privacy layer not initialized" and the wait loops at the end of this
+# script spin forever with no output until CI kills the job (#1638).
+init_privacy_layer() {
+    db_cmd="$1"
+    label="$2"
+    if ! $db_cmd < privacy/init.sql; then
+        fail "$label (privacy/init.sql exited non-zero)"
+        exit 1
+    fi
+    # init.sql can exit 0 without the privacy layer actually being live.
+    # Writing as a user goes through the privacy index lookup, which reports
+    # "Privacy layer not initialized" when the layer is missing.
+    echo "insert into skdb_users values('__privacy_probe__', 'x');" | $db_cmd
+    probe=$(printf '^skdb_users\n:0\n' | $db_cmd write-csv --user __privacy_probe__ 2>&1)
+    probe_status=$?
+    echo "delete from skdb_users where userID='__privacy_probe__';" | $db_cmd
+    if [ "$probe_status" -ne 0 ] || [ -n "$probe" ]; then
+        fail "$label (privacy probe failed: $probe)"
+        exit 1
+    fi
+}
+
+init_privacy_layer "$SKDB" "PRIVACY INIT"
+init_privacy_layer "$SKDB_COPY" "PRIVACY INIT COPY"
 
 echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB
 echo "create table t1 (id INTEGER primary key, skdb_access TEXT);" | $SKDB_COPY
@@ -283,34 +307,67 @@ fi
 
 $SKDB tail "$subt1" --format=csv --user ID3 --follow |
   $SKDB_COPY write-csv --enable-rebuilds > /dev/null &
+tailerID=$!
 
 # Just leaving enough time for the tailer to fill up with data. The
 # test is less interesting if it doesn't.
 
 sleep 1
 
+# Wait until the copy reaches the wanted state for a row pattern. The wait
+# is bounded: if the privacy layer is broken the update never kicks in and an
+# unbounded loop here hangs the job until the CI no-output timeout (#1638).
+wait_for_row() {
+    # $1: row pattern, $2: wanted state ("present"/"absent")
+    pattern="$1"
+    want="$2"
+    waited=0
+    while :; do
+        if echo "select * from t1" | $SKDB_COPY | grep -q "$pattern"; then
+            state=present
+        else
+            state=absent
+        fi
+        if [ "$state" = "$want" ]; then
+            return 0
+        fi
+        waited=$((waited + 1))
+        if [ "$waited" -ge 60 ]; then
+            return 1
+        fi
+        sleep 1
+    done
+}
+
+bail() {
+    if [ -n "${tailerID:-}" ]; then
+        kill "$tailerID" 2>/dev/null
+        wait "$tailerID" 2>/dev/null
+    fi
+    exit 1
+}
+
 # let's kick ID3 out of the group 22
 echo "delete from skdb_group_permissions where groupID='ID22' and userID='ID3';" | $SKDB
 
 # As long as the row (238,22) is still there, the update did not kick in
-while echo "select * from t1" | $SKDB_COPY | grep -q "238"; do
-    sleep 1
-done
-
-# The reset was successful
-pass "GROUP PERMISSION UPDATE"
+if wait_for_row "238" absent; then
+    pass "GROUP PERMISSION UPDATE"
+else
+    fail "GROUP PERMISSION UPDATE (no change after 60s)"
+    bail
+fi
 
 # let's block the ID3 all together
 echo "insert into skdb_user_permissions values('ID3', skdb_permission(''), 'root');" | $SKDB
 
 # As long as the row (240,22) is still there, the update did not kick in
-while echo "select * from t1" | $SKDB_COPY | grep -q "240"; do
-    echo "select * from t1" | $SKDB_COPY | grep -q "240"
-    sleep 1
-done
-
-# The reset was successful
-pass "GROUP PERMISSION UPDATE2"
+if wait_for_row "240" absent; then
+    pass "GROUP PERMISSION UPDATE2"
+else
+    fail "GROUP PERMISSION UPDATE2 (no change after 60s)"
+    bail
+fi
 
 # let's reset all the permissions and make sure all the data is back
 
@@ -329,16 +386,12 @@ tailerID=$!
 sleep 1
 
 # wait for the data to arrive
-until echo "select * from t1" | $SKDB_COPY | grep -q "240"; do
-    sleep 1
-done
-
-until echo "select * from t1" | $SKDB_COPY | grep -q "238"; do
-    sleep 1
-done
-
-# The reset was successful
-pass "GROUP PERMISSION UPDATE3"
+if wait_for_row "240" present && wait_for_row "238" present; then
+    pass "GROUP PERMISSION UPDATE3"
+else
+    fail "GROUP PERMISSION UPDATE3 (no change after 60s)"
+    bail
+fi
 
 kill "$tailerID"
 wait

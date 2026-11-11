@@ -307,6 +307,11 @@ jobs:
           enabled: << parameters.candidate_toolchain >>
       - run:
           name: Run native skdb tests
+          # The native suite streams test output continuously; if it ever
+          # goes silent something is hung (e.g. a failed privacy-layer init
+          # spinning a wait loop, #1638), so fail well before the default
+          # 10m no-output timeout.
+          no_output_timeout: 5m
           command: |
             make test-native
 
