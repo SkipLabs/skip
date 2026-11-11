@@ -631,21 +631,14 @@ mutable class BuildRunner(
   }
 
   // Run `cmd` with stdout/stderr redirected to files so several units can
-  // compile concurrently without pipe draining. The shell wrapper keeps the
-  // original argv intact via "$@".
+  // compile concurrently without pipe draining.
   private mutable fun spawn_process(
     cmd: mutable ProcessBuilder,
     stdout_path: String,
     stderr_path: String,
   ): mutable Posix.Popen {
-    argv = Array[
-      "sh",
-      "-c",
-      `exec "$@" > "${stdout_path}" 2> "${stderr_path}"`,
-      "sh",
-    ].concat(cmd.get_argv());
     Posix.Popen::create{
-      args => argv,
+      args => redirect_argv(cmd.get_argv(), stdout_path, stderr_path),
       env => cmd.get_env(),
       cwd => cmd.get_cwd(),
     }.fromSuccess()
@@ -1215,6 +1208,24 @@ mutable class BuildRunner(
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
   }
+}
+
+// An argv running `argv` with its stdout and stderr redirected to the given
+// files. The paths and the original argv are positional parameters of the
+// shell wrapper, never spliced into its script, so no path needs quoting.
+fun redirect_argv(
+  argv: Array<String>,
+  stdout_path: String,
+  stderr_path: String,
+): Array<String> {
+  Array[
+    "sh",
+    "-c",
+    "out=$1; err=$2; shift 2; exec \"$@\" > \"$out\" 2> \"$err\"",
+    "sh",
+    stdout_path,
+    stderr_path,
+  ].concat(argv)
 }
 
 // Units compiling at least this many sources can grow a large heap (the

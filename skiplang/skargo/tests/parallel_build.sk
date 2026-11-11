@@ -290,4 +290,25 @@ fun test_parallel_discards_foreign_state_db(): void {
   T.expectEq(run(app + "/target/host/release/app"), "31")
 }
 
+// Parallel units log to files under the target dir. The shell wrapper gets
+// those paths as arguments, so shell metacharacters in them are inert.
+@test
+fun test_redirect_argv_does_not_interpret_paths(): void {
+  root = Path.join(kManifestDir, "target/it-redirect-argv");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  dir = root + "/a \"$HOME\" `false` 'q'; exit 9";
+  write_file(dir + "/.keep", "");
+  argv = Skargo.redirect_argv(
+    Array["sh", "-c", "echo \"out $1\"; echo err >&2; exit 4", "sh", "arg $x"],
+    dir + "/stdout",
+    dir + "/stderr",
+  );
+  result = System.subprocess(argv).fromSuccess();
+  T.expectEq(result.exitcode(), 4, result.stderr);
+  T.expectEq(FileSystem.readTextFile(dir + "/stdout"), "out arg $x\n");
+  T.expectEq(FileSystem.readTextFile(dir + "/stderr"), "err\n")
+}
+
 module end;
