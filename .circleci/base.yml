@@ -211,17 +211,24 @@ jobs:
       - custom-checkout:
           submodules: true
       - run:
-          name: Run runtime regressions
-          command: bash skiplang/prelude/runtime/tests/run.sh
-      - run:
-          name: Build stage1
+          name: Build stage1 (runtime regressions run alongside)
           no_output_timeout: 30m
           command: |
+            # The runtime C/Wasm checks are independent of the compiler build;
+            # run them in the background so they overlap the build instead of
+            # serializing in front of it.
+            bash skiplang/prelude/runtime/tests/run.sh > /tmp/runtime-regressions.log 2>&1 &
+            runtime_pid=$!
             cd skiplang/compiler
+            # `make STAGE=1` builds in parallel (JOBS defaults to min(nproc, 8)):
+            # stage0's links run concurrently and the stage skargo builds are
+            # prerequisite-ordered, so they no longer race on the per-unit
+            # state.db files (#1581).
             python3 tools/incremental_profile.py run \
               --root "$PWD" --label ci-compiler-build \
               --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
-              -- make STAGE=1 || { tail -n 100 runs/ci-compiler-build/command.log; exit 1; }
+              -- make STAGE=1 || { tail -n 100 runs/ci-compiler-build/command.log; kill "$runtime_pid" 2>/dev/null; exit 1; }
+            wait "$runtime_pid" || { cat /tmp/runtime-regressions.log; exit 1; }
       - store_artifacts:
           path: skiplang/compiler/runs
           destination: compiler-resources
