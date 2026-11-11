@@ -12,8 +12,9 @@ export default defineConfig({
   forbidOnly: !!process.env["CI"],
   /* Retry on CI only */
   retries: process.env["CI"] ? 2 : 0,
-  /* CI workers have 4 CPUs */
-  workers: process.env["CI"] ? 4 : undefined,
+  /* The skdb-wasm job runs on xlarge.gen2 (16 vCPU); run 8 playwright workers
+     alongside the service containers. */
+  workers: process.env["CI"] ? 8 : undefined,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: "html",
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
