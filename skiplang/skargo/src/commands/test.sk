@@ -1,7 +1,11 @@
 module Skargo;
 
 fun nproc(): Int {
-  p = System.subprocess(Array["nproc"]).fromSuccess();
+  // macOS has no `nproc`.
+  p = System.subprocess(Array["nproc"]) match {
+  | Success(p) -> p
+  | Failure _ -> return 8
+  };
   p.exitstatus match {
   | Posix.WExited(0) ->
     p.stdout.trim().toIntOption() match {
