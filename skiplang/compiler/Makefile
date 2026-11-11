@@ -5,6 +5,12 @@ SKARGO_PROFILE ?= release
 # optional vtable image marks bootstraps that support it.
 SKC_ARGS ?= --canonize-paths $(if $(wildcard bootstrap/skc_vtables64.ll.gz),--split-support-module)
 SKARGO_ARGS ?= --profile $(SKARGO_PROFILE) $(foreach opt,$(SKC_ARGS),--skcopt $(opt))
+# Parallel skargo unit compilation for stage2+ builds. stage1's skargo
+# invocations run the stage0 bootstrap skargo, which predates --jobs, so they
+# stay serial. skargo never lets a heavy unit (>=100 sources, e.g. the
+# compiler self-build, which peaks near the CI job's memory guard) share a
+# slot with another unit.
+SKARGO_JOBS ?= 4
 STAGE    ?= 1
 
 # Parallel by default: stage0's links and prelude build are independent, and
@@ -106,19 +112,19 @@ stage1/bin/skargo: stage0 stage1/bin/skc
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
 stage2/bin/skc stage2/bin/skfmt &: stage1
-	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage2/bin --target-dir stage2/target
 stage2/lib/libstd.sklib: stage1 stage2/bin/skargo
-	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
 stage2/bin/skargo: stage1 stage2/bin/skc
-	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
 stage3/bin/skc stage3/bin/skfmt &: stage2
-	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
 stage3/lib/libstd.sklib: stage2 stage3/bin/skargo
-	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2 stage3/bin/skc
-	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
 
 # stageD is a "direct" build mode, where skc is built from current compiler
 # and runtime sources using the skc found in PATH, without using skargo or
