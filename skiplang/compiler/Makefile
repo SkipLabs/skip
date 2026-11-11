@@ -57,14 +57,23 @@ check-bootstrap:
 	fi
 
 # Grouped (&:) so the recipe runs once under -j, not once per target.
-.PHONY: build/libskip_runtime64.a build/libbacktrace.a
-build/libskip_runtime64.a build/libbacktrace.a &:
+# Real prerequisites (not .PHONY) so an unchanged prelude does not re-copy the
+# archives and force the stage0 links below to re-run on every invocation.
+PRELUDE_BUILD_SRCS=../prelude/Makefile ../prelude/runtime/Makefile \
+	$(filter-out ../prelude/runtime/magic.c,$(wildcard ../prelude/runtime/*.c)) \
+	$(wildcard ../prelude/runtime/*.h) $(wildcard ../prelude/runtime/*.cpp) \
+	$(wildcard ../prelude/libbacktrace/*.c) $(wildcard ../prelude/libbacktrace/*.h) \
+	../prelude/libbacktrace/configure
+build/libskip_runtime64.a build/libbacktrace.a &: $(PRELUDE_BUILD_SRCS)
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
 
-.PHONY: stage0/lib/libstd.sklib
+# Not .PHONY: the rule has real prerequisites and produces the file, so an
+# unchanged stage0 is not rebuilt on every invocation. The prelude sources
+# are prerequisites so a prelude edit re-runs the sub-make (which rebuilds
+# libstd.sklib via its own rules).
 # Needs stage0/bin/skc on PATH (built from the pinned bootstrap IR); under -j
 # the link must finish before the prelude sub-make looks for skc.
-stage0/lib/libstd.sklib: stage0/bin/skc
+stage0/lib/libstd.sklib: stage0/bin/skc $(shell find ../prelude/src -name '*.sk') ../prelude/preamble/preamble64.ll ../prelude/Makefile
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
