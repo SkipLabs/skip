@@ -2,6 +2,7 @@
 
 import gzip
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -70,6 +71,26 @@ class BootstrapModuleTests(unittest.TestCase):
         other.unlink()
         (self.deps / "skc-123.ll").unlink()
         self.assertNotEqual(self.promote().returncode, 0)
+
+    def test_stage_skargo_builds_are_serialized_under_j(self):
+        # #1581: the three stage skargo invocations share stageN/target, so
+        # under -j they must be ordered by prerequisites (bins, then skargo,
+        # then lib -- the order the serial build always used) -- concurrent
+        # skargo processes sharing a target dir race on the per-unit state.db
+        # files.
+        database = self.make("-pRrq", "-n", "STAGE=1").stdout
+
+        def prereqs(target):
+            match = re.search(
+                rf"^{re.escape(target)}: (.*)$", database, re.MULTILINE
+            )
+            self.assertIsNotNone(
+                match, f"no rule for {target} in make database"
+            )
+            return match.group(1).split()
+
+        self.assertIn("stage1/bin/skc", prereqs("stage1/bin/skargo"))
+        self.assertIn("stage1/bin/skargo", prereqs("stage1/lib/libstd.sklib"))
 
     def test_stage0_links_optional_table_and_preserves_legacy_build(self):
         build = self.root / "build"
