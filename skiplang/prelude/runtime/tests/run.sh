@@ -51,3 +51,11 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -c \
   --export=check_size_classes --export=check_overflow \
   "$runtime_test_dir/size-classes.o" -o "$runtime_test_dir/size-classes.wasm"
 node "$runtime_test_sources/alloc_size_classes.mjs" "$runtime_test_dir/size-classes.wasm"
+
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/string_to_float.c" \
+  -o "$runtime_test_dir/string-to-float.o"
+"$runtime_test_linker" --no-entry \
+  --export=input_buffer --export=parse --export=result \
+  "$runtime_test_dir/string-to-float.o" -o "$runtime_test_dir/string-to-float.wasm"
+node "$runtime_test_sources/string_to_float.mjs" "$runtime_test_dir/string-to-float.wasm"

@@ -130,3 +130,23 @@ the real traversal routines; it is not an end-to-end allocator or Wasm test.
 [UBSan trap mode](https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html#usage)
 keeps the enabled checks and terminates on a failure without linking the optional
 compiler-rt diagnostic library. This also works in minimal LLVM installations.
+
+# Wasm string-to-float
+
+Without libc, the Wasm runtime parses floats with Ryu's `s2d` (`ryu/s2d.c`)
+when it can, and otherwise falls back to an `atof` that is not correctly
+rounded. This test builds `s2d` with the Wasm runtime's flags and checks
+that it matches JavaScript's correctly rounded `Number()` bit for bit. It covers
+fixed cases (subnormals, `DBL_MAX`, overflow and underflow), 100,000 random
+decimal strings and the shortest representations of 100,000 random doubles. The
+test links without `--allow-undefined`, so the link fails if `s2d` needs
+compiler-rt helpers such as `__multi3` that the Wasm module cannot import.
+
+```sh
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Iskiplang/prelude/runtime -c skiplang/prelude/runtime/tests/string_to_float.c \
+  -o /tmp/string-to-float.o
+wasm-ld --no-entry --export=input_buffer --export=parse --export=result \
+  /tmp/string-to-float.o -o /tmp/string-to-float.wasm
+node skiplang/prelude/runtime/tests/string_to_float.mjs /tmp/string-to-float.wasm
+```
