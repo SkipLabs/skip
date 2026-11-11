@@ -98,7 +98,8 @@ export -f run_diff pass fail
 MAXIMUM_RESIDENT_SET_SIZE_MB=700
 LIMITING=(--memsuspend "${MAXIMUM_RESIDENT_SET_SIZE_MB}M" --memfree "${MAXIMUM_RESIDENT_SET_SIZE_MB}M")
 if ${CIRCLECI:-false}; then
-    LIMITING+=(--jobs 8)
+    # Scale with the runner's cores (the skdb job runs on xlarge.gen2 = 16).
+    LIMITING+=(--jobs "$(nproc)")
 fi
 
 parallel "${LIMITING[@]}" --colsep ' ' run_diff <<END
