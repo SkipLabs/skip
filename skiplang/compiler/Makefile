@@ -70,6 +70,11 @@ stage0/bin/skc: build/skc_out64.ll $(call bootstrap_vtable,skc) build/libskip_ru
 stage0/bin/skargo: build/skargo_out64.ll $(call bootstrap_vtable,skargo) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
 	clang++ $(STAGE0_LDFLAGS) $(CXXFLAGS) -o $@ $^ -lpthread -g3
+ifeq ($(shell uname -s),Darwin)
+# The bootstrap skargo crashes when nproc is missing, as on macOS.
+	printf '#!/bin/sh\nexec sysctl -n hw.ncpu\n' > $(@D)/nproc
+	chmod +x $(@D)/nproc
+endif
 
 stage0/bin/skfmt: build/skfmt_out64.ll $(call bootstrap_vtable,skfmt) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
