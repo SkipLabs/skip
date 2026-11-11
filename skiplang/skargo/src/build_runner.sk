@@ -70,6 +70,7 @@ private base class ReapResult {
 // link step, the external link that follows it (`linking` true).
 mutable class InFlightUnit(
   unit: Unit,
+  cmd: mutable ProcessBuilder,
   mutable argv: Array<String>,
   mutable popen: mutable Posix.Popen,
   stdout_path: String,
@@ -80,7 +81,7 @@ mutable class InFlightUnit(
 ) {
   static fun create(
     unit: Unit,
-    argv: Array<String>,
+    cmd: mutable ProcessBuilder,
     popen: mutable Posix.Popen,
     stdout_path: String,
     stderr_path: String,
@@ -89,7 +90,8 @@ mutable class InFlightUnit(
   ): mutable this {
     mutable InFlightUnit(
       unit,
-      argv,
+      cmd,
+      cmd.get_argv(),
       popen,
       stdout_path,
       stderr_path,
@@ -539,7 +541,7 @@ mutable class BuildRunner(
     in_flight.push(
       InFlightUnit::create(
         unit,
-        cmd.get_argv(),
+        cmd,
         popen,
         stdout_path,
         stderr_path,
@@ -550,7 +552,8 @@ mutable class BuildRunner(
   }
 
   // Handles the exit of `inf`'s current process. A finished skc may start the
-  // unit's external link, which keeps the unit in flight.
+  // unit's external link, and a stale database restarts skc with `--init`;
+  // both keep the unit in flight.
   private mutable fun reap_unit(
     inf: mutable InFlightUnit,
     status: Posix.WExitStatus,
@@ -567,6 +570,16 @@ mutable class BuildRunner(
       FileSystem.writeTextFile(this.link_status_file_for(inf.unit), "complete");
       this.finish_unit(inf.unit, check);
       return ReapDone()
+    };
+    if (
+      !inf.is_build_script &&
+      p.exitcode() == kSkcErrorMappingVersion &&
+      inf.argv.contains("--data")
+    ) {
+      // See `skc`: another skc's database is a stale cache (#1500, #1606).
+      this.discard_state_db(inf.unit, inf.cmd);
+      this.respawn(inf, inf.cmd, false);
+      return ReapRunning()
     };
     if (!p.success()) {
       this.bctx.gctx.console.error(subprocess_error_message(p));

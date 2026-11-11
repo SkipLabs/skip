@@ -246,4 +246,48 @@ fun test_parallel_link_failure_kills_in_flight_units(): void {
   T.expectEq(run(dir + "/target/host/release/slow"), "slow")
 }
 
+// A database written by another skc fails skc's build-id check with exit 43.
+// As in serial mode (#1500, #1606), the parallel scheduler discards it and
+// recompiles the unit with --init instead of failing the build.
+@test
+fun test_parallel_discards_foreign_state_db(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-foreign-db");
+  app = write_workspace(root);
+  first = build(skargo, app, Array["--release"]);
+  T.expectTrue(first.success(), first.stderr);
+  databases = FileSystem.readFilesRecursive(app + "/target/.fingerprints", f ->
+    Path.basename(f) == "state.db" &&
+      (f.contains("/pa-") || f.contains("/app-"))
+  ).toArray();
+  T.expectTrue(databases.size() >= 3, databases.join(" "));
+  // Corrupt one header byte inside each build-id, then dirty the units.
+  for (database in databases) {
+    T.expectTrue(
+      System.subprocess(
+        Array[
+          "sh",
+          "-c",
+          "printf '\\377' | dd of=\"$0\" bs=1 seek=20 conv=notrunc 2>/dev/null",
+          database,
+        ],
+      )
+        .fromSuccess()
+        .success(),
+    )
+  };
+  write_file(
+    root + "/pa/src/lib.sk",
+    "module PA; fun value(): Int { 10 } module end;\n",
+  );
+  write_app(app, 20);
+  result = build(skargo, app, Array["--release"]);
+  T.expectTrue(result.success(), result.stderr);
+  T.expectTrue(result.stderr.contains("Discarding"), result.stderr);
+  T.expectEq(run(app + "/target/host/release/app"), "31")
+}
+
 module end;
