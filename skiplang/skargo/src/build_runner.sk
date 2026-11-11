@@ -58,6 +58,36 @@ class BuildScriptOutput{
   }
 }
 
+mutable class InFlightUnit(
+  unit: Unit,
+  argv: Array<String>,
+  popen: mutable Posix.Popen,
+  stdout_path: String,
+  stderr_path: String,
+  is_build_script: Bool,
+  separate_link: Bool,
+) {
+  static fun create(
+    unit: Unit,
+    argv: Array<String>,
+    popen: mutable Posix.Popen,
+    stdout_path: String,
+    stderr_path: String,
+    is_build_script: Bool,
+    separate_link: Bool,
+  ): mutable this {
+    mutable InFlightUnit(
+      unit,
+      argv,
+      popen,
+      stdout_path,
+      stderr_path,
+      is_build_script,
+      separate_link,
+    )
+  }
+}
+
 mutable class BuildRunner(
   bctx: BuildContext,
   host_layout: Layout,
@@ -219,8 +249,16 @@ mutable class BuildRunner(
     this.fingerprints[unit]
   }
 
-  mutable fun compile(check: Bool = false): void {
-    for (unit in this.build_plan()) {
+  mutable fun compile(check: Bool = false, jobs: Int = 1): void {
+    if (jobs > 1) {
+      this.compile_parallel(this.build_plan(), check, jobs)
+    } else {
+      this.compile_serial(this.build_plan(), check)
+    }
+  }
+
+  private mutable fun compile_serial(plan: Array<Unit>, check: Bool): void {
+    for (unit in plan) {
       unit_name = `${unit.pkg.name()} v${unit.pkg.version()} [${
         unit.target.name
       }] (${unit.pkg.root()})`;
@@ -272,24 +310,257 @@ mutable class BuildRunner(
             this.fingerprint_for(unit).toStringHex(),
           )
         }
-      } else if (
-        unit.target.is_build_script() &&
-        unit.mode is CompileModeRunBuildScript _
-      ) {
-        // TODO: Properly serialize BuildScriptOutput instead of re-parsing.
-        this.build_script_outputs![unit] = BuildScriptOutput::create(
-          FileSystem.readTextFile(
-            Path.join(this.build_dir_for(unit), "stdout"),
-          ),
-        );
       } else {
-        // NOTE: While the unit is fresh, `skargo` may have been invoked with a
-        // custom `--out-dir`, where we should still copy final artifacts.
-        this.prepare_unit(unit);
-        this.link_targets(unit);
-        this.bctx.gctx.console.status("Fresh", unit_name)
+        this.complete_fresh_unit(unit, unit_name)
       }
     }
+  }
+
+  // Compile independent units concurrently. `plan` is a topological order, so
+  // the first unspawned unit whose dependencies are complete unlocks the rest.
+  private mutable fun compile_parallel(
+    plan: Array<Unit>,
+    check: Bool,
+    jobs: Int,
+  ): void {
+    dirty: mutable Vector<Unit> = mutable Vector[];
+    completed: mutable Map<Unit, Bool> = mutable Map[];
+    for (unit in plan) {
+      unit_name = `${unit.pkg.name()} v${unit.pkg.version()} [${
+        unit.target.name
+      }] (${unit.pkg.root()})`;
+
+      // Hardlink targets don't compile — just create the link, once their
+      // source binary exists.
+      if (unit.target.kind is HardlinkTarget _) {
+        dirty.push(unit);
+        continue
+      };
+
+      // In check mode, skip bin roots — the lib check covers all code.
+      if (
+        check &&
+        unit.target.kind is BinTarget _ &&
+        this.bctx.roots.contains(unit)
+      ) {
+        completed.set(unit, true);
+        continue
+      };
+
+      if (this.unit_is_dirty(unit)) {
+        dirty.push(unit)
+      } else {
+        this.complete_fresh_unit(unit, unit_name);
+        completed.set(unit, true)
+      }
+    };
+
+    next = 0;
+    in_flight: mutable Vector<mutable InFlightUnit> = mutable Vector[];
+    while (next < dirty.size() || !in_flight.isEmpty()) {
+      // Spawn while a slot is free and the next unit's dependencies are
+      // complete. Heavy units (see unit_is_heavy) never share a slot.
+      while (next < dirty.size() && in_flight.size() < jobs) {
+        unit = dirty[next];
+        if (!this.deps_completed(unit, completed)) break void;
+        if (unit.target.kind is HardlinkTarget _) {
+          // Hardlinks have no graph deps; the plan orders them after their
+          // source binary (e.g. __merged), so wait for all earlier units.
+          earlier_done = true;
+          k = 0;
+          while (k < next) {
+            if (!completed.containsKey(dirty[k])) !earlier_done = false;
+            !k = k + 1
+          };
+          if (!earlier_done) break void;
+          if (!check) {
+            this.prepare_unit(unit);
+            this.link_targets(unit)
+          };
+          completed.set(unit, true);
+          !next = next + 1
+        } else {
+          heavy_in_flight = false;
+          for (inf in in_flight) {
+            if (unit_is_heavy(inf.unit)) !heavy_in_flight = true
+          };
+          if (
+            heavy_in_flight ||
+            (unit_is_heavy(unit) && !in_flight.isEmpty())
+          ) {
+            break void
+          };
+          this.spawn_unit(unit, check, in_flight);
+          !next = next + 1
+        }
+      };
+
+      progressed = false;
+      remaining: mutable Vector<mutable InFlightUnit> = mutable Vector[];
+      i = 0;
+      while (i < in_flight.size()) {
+        inf = in_flight[i];
+        status_opt = inf.popen.poll();
+        if (status_opt.isSome()) {
+          if (!this.reap_unit(inf, status_opt.fromSome(), check)) {
+            // Kill the other in-flight units; the failed one is already dead.
+            // `poll()` guards against killing an exited-but-unreaped process:
+            // the native kill exits the whole process on ESRCH.
+            j = 0;
+            while (j < in_flight.size()) {
+              if (j != i && in_flight[j].popen.poll().isNone()) {
+                in_flight[j].popen.kill()
+              };
+              !j = j + 1
+            };
+            skipExit(3)
+          };
+          completed.set(inf.unit, true);
+          !progressed = true
+        } else {
+          remaining.push(inf)
+        };
+        !i = i + 1
+      };
+      !in_flight = remaining;
+      if (!progressed && !in_flight.isEmpty()) {
+        Time.sleep_ms(10)
+      }
+    }
+  }
+
+  private readonly fun deps_completed(
+    unit: Unit,
+    completed: mutable Map<Unit, Bool>,
+  ): Bool {
+    for (dep in this.bctx.unit_graph[unit]) {
+      if (!completed.containsKey(dep)) return false
+    };
+    true
+  }
+
+  private mutable fun complete_fresh_unit(unit: Unit, unit_name: String): void {
+    if (
+      unit.target.is_build_script() &&
+      unit.mode is CompileModeRunBuildScript _
+    ) {
+      // TODO: Properly serialize BuildScriptOutput instead of re-parsing.
+      this.build_script_outputs![unit] = BuildScriptOutput::create(
+        FileSystem.readTextFile(Path.join(this.build_dir_for(unit), "stdout")),
+      );
+    } else {
+      // NOTE: While the unit is fresh, `skargo` may have been invoked with a
+      // custom `--out-dir`, where we should still copy final artifacts.
+      this.prepare_unit(unit);
+      this.link_targets(unit);
+      this.bctx.gctx.console.status("Fresh", unit_name)
+    }
+  }
+
+  private mutable fun spawn_unit(
+    unit: Unit,
+    check: Bool,
+    in_flight: mutable Vector<mutable InFlightUnit>,
+  ): void {
+    unit_name = `${unit.pkg.name()} v${unit.pkg.version()} [${
+      unit.target.name
+    }] (${unit.pkg.root()})`;
+    this.prepare_unit(unit);
+    is_build_script =
+      unit.target.is_build_script() &&
+      unit.mode is CompileModeRunBuildScript _;
+    (cmd, separate_link, stdout_path, stderr_path) = if (is_build_script) {
+      this.bctx.gctx.console.status("Running", unit_name);
+      build_dir = FileSystem.realpath(this.build_dir_for(unit));
+      (
+        this.build_script_cmd(unit),
+        false,
+        // Keep the serial-mode stdout/stderr files so fresh loads keep working.
+        Path.join(build_dir, "stdout"),
+        Path.join(build_dir, "stderr"),
+      )
+    } else {
+      this.bctx.gctx.console.status("Compiling", unit_name);
+      // Only root units are checked; other units compile fully in check mode.
+      (skc_cmd, separate_link) = this.skc_cmd(
+        unit,
+        check && this.bctx.roots.contains(unit),
+      );
+      fingerprint_dir = FileSystem.realpath(this.fingerprint_dir_for(unit));
+      (
+        skc_cmd,
+        separate_link,
+        Path.join(fingerprint_dir, "parallel.stdout"),
+        Path.join(fingerprint_dir, "parallel.stderr"),
+      )
+    };
+    argv = cmd.get_argv();
+    popen = this.spawn_process(cmd, stdout_path, stderr_path);
+    in_flight.push(
+      InFlightUnit::create(
+        unit,
+        argv,
+        popen,
+        stdout_path,
+        stderr_path,
+        is_build_script,
+        separate_link,
+      ),
+    )
+  }
+
+  private mutable fun reap_unit(
+    inf: mutable InFlightUnit,
+    status: Posix.WExitStatus,
+    check: Bool,
+  ): Bool {
+    stdout = FileSystem.readTextFile(inf.stdout_path);
+    stderr = FileSystem.readTextFile(inf.stderr_path);
+    p = System.CompletedProcess(inf.argv, status, stdout, stderr);
+    if (!p.success()) {
+      this.bctx.gctx.console.error(subprocess_error_message(p));
+      return false
+    };
+    if (inf.is_build_script) {
+      bs_out = BuildScriptOutput::create(stdout);
+      this.build_script_outputs![inf.unit] = bs_out;
+      FileSystem.writeTextFile(
+        this.fingerprint_dep_file_for(inf.unit),
+        bs_out.rerun_if_changed.join("\n"),
+      )
+    } else {
+      this.post_skc(inf.unit, inf.separate_link, p);
+      // Check-mode roots only run `skc --check`: no link, no fingerprint.
+      if (!(check && this.bctx.roots.contains(inf.unit))) {
+        this.link_targets(inf.unit);
+        FileSystem.writeTextFile(
+          this.fingerprint_file_for(inf.unit),
+          this.fingerprint_for(inf.unit).toStringHex(),
+        )
+      }
+    };
+    true
+  }
+
+  // Run `cmd` with stdout/stderr redirected to files so several units can
+  // compile concurrently without pipe draining. The shell wrapper keeps the
+  // original argv intact via "$@".
+  private mutable fun spawn_process(
+    cmd: mutable ProcessBuilder,
+    stdout_path: String,
+    stderr_path: String,
+  ): mutable Posix.Popen {
+    argv = Array[
+      "sh",
+      "-c",
+      `exec "$@" > "${stdout_path}" 2> "${stderr_path}"`,
+      "sh",
+    ].concat(cmd.get_argv());
+    Posix.Popen::create{
+      args => argv,
+      env => cmd.get_env(),
+      cwd => cmd.get_cwd(),
+    }.fromSuccess()
   }
 
   private mutable fun link_targets(unit: Unit): void {
@@ -315,6 +586,22 @@ mutable class BuildRunner(
   }
 
   private mutable fun run_build_script(unit: Unit): BuildScriptOutput {
+    cmd = this.build_script_cmd(unit);
+    p = this.run_cmd(cmd);
+
+    FileSystem.writeTextFile(
+      Path.join(this.build_dir_for(unit), "stdout"),
+      p.stdout,
+    );
+    FileSystem.writeTextFile(
+      Path.join(this.build_dir_for(unit), "stderr"),
+      p.stderr,
+    );
+
+    BuildScriptOutput::create(p.stdout);
+  }
+
+  private mutable fun build_script_cmd(unit: Unit): mutable ProcessBuilder {
     assert(unit.target.kind is CustomBuildTarget _);
     assert(unit.mode is CompileModeRunBuildScript _);
     build_script_unit = this.bctx.unit_graph[unit].find(u ->
@@ -359,18 +646,7 @@ mutable class BuildRunner(
     );
     cmd.env("RELOCATION_MODEL", unit.build_opts.relocation_model);
 
-    p = this.run_cmd(cmd);
-
-    FileSystem.writeTextFile(
-      Path.join(this.build_dir_for(unit), "stdout"),
-      p.stdout,
-    );
-    FileSystem.writeTextFile(
-      Path.join(this.build_dir_for(unit), "stderr"),
-      p.stderr,
-    );
-
-    BuildScriptOutput::create(p.stdout);
+    cmd
   }
 
   private readonly fun layout_for(unit: Unit): Layout {
@@ -399,6 +675,43 @@ mutable class BuildRunner(
   }
 
   private mutable fun skc(unit: Unit, check: Bool = false): void {
+    (skc, separate_link) = this.skc_cmd(unit, check);
+    p = if (skc.get_argv().contains("--data")) {
+      // The runtime only reopens a database written by the same skc
+      // executable (it compares GNU build-ids). Another compiler's database,
+      // e.g. from a rebuilt or different skc pointed at this target dir, is a
+      // stale cache: discard it and rebuild instead of failing (#1500, #1606).
+      first = this.exec_cmd(skc);
+      if (first.exitcode() == kSkcErrorMappingVersion) {
+        this.discard_state_db(unit, skc);
+        this.run_cmd(skc)
+      } else {
+        this.check_cmd(first)
+      }
+    } else {
+      this.run_cmd(skc)
+    };
+    this.post_skc(unit, separate_link, p)
+  }
+
+  // Removes `unit`'s state.db and switches `skc` to create a fresh one.
+  private mutable fun discard_state_db(
+    unit: Unit,
+    skc: mutable ProcessBuilder,
+  ): void {
+    state_db_path = Path.join(this.fingerprint_dir_for(unit), "state.db");
+    this.bctx.gctx.console.status(
+      "Discarding",
+      `${state_db_path}, written by a different skc`,
+    );
+    _ = system(`rm -f ${state_db_path}`);
+    skc.replace_arg("--data", "--init")
+  }
+
+  private mutable fun skc_cmd(
+    unit: Unit,
+    check: Bool,
+  ): (mutable ProcessBuilder, Bool) {
     skc = this.bctx.target_data.skc.process();
 
     skc.cwd(unit.pkg.root());
@@ -466,7 +779,6 @@ mutable class BuildRunner(
       skc.arg(dispatcher_path)
     };
 
-    reuse_state_db = false;
     if (!unit.target.is_build_script()) {
       // A compiler database belongs to one compilation unit. Sharing it across
       // packages or targets replaces the cached source/config inputs each time
@@ -475,8 +787,12 @@ mutable class BuildRunner(
       state_dir = this.fingerprint_dir_for(unit);
       this.create_dir(state_dir);
       state_db_path = Path.join(state_dir, "state.db");
-      !reuse_state_db = FileSystem.exists(state_db_path);
-      skc.args(Array[if (reuse_state_db) "--data" else "--init", state_db_path])
+      skc.args(
+        Array[
+          if (FileSystem.exists(state_db_path)) "--data" else "--init",
+          state_db_path,
+        ],
+      )
     };
 
     unit.target.kind match {
@@ -515,28 +831,14 @@ mutable class BuildRunner(
       skc.arg("--no-link")
     };
 
-    p = if (reuse_state_db) {
-      // The runtime only reopens a database written by the same skc
-      // executable (it compares GNU build-ids). Another compiler's database,
-      // e.g. from a rebuilt or different skc pointed at this target dir, is a
-      // stale cache: discard it and rebuild instead of failing (#1500, #1606).
-      first = this.exec_cmd(skc);
-      if (first.exitcode() == kSkcErrorMappingVersion) {
-        state_db_path = Path.join(this.fingerprint_dir_for(unit), "state.db");
-        this.bctx.gctx.console.status(
-          "Discarding",
-          `${state_db_path}, written by a different skc`,
-        );
-        _ = system(`rm -f ${state_db_path}`);
-        skc.replace_arg("--data", "--init");
-        this.run_cmd(skc)
-      } else {
-        this.check_cmd(first)
-      }
-    } else {
-      this.run_cmd(skc)
-    };
+    (skc, separate_link)
+  }
 
+  private mutable fun post_skc(
+    unit: Unit,
+    separate_link: Bool,
+    p: System.CompletedProcess,
+  ): void {
     if (separate_link) {
       link_status_path = Path.join(
         this.fingerprint_dir_for(unit),
@@ -812,6 +1114,13 @@ mutable class BuildRunner(
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
   }
+}
+
+// Units with at least this many sources can compile into a large heap (the
+// compiler itself peaks near the CI job's memory guard), so in parallel mode
+// they never share a slot with another unit.
+private fun unit_is_heavy(unit: Unit): Bool {
+  unit.target.srcs.size() >= 100
 }
 
 // TODO: Proper Profile class.
