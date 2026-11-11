@@ -211,6 +211,51 @@ jobs:
       - custom-checkout:
           submodules: true
       - run:
+          name: Compute the stage0 cache key
+          command: |
+            # stage0 + build/ depend only on the pinned bootstrap IR, the
+            # prelude runtime/libbacktrace sources, the two Makefiles and the
+            # image's clang. `git ls-files -s` covers the submodule gitlinks.
+            {
+              clang++ --version
+              git ls-files -s \
+                skiplang/compiler/bootstrap \
+                skiplang/compiler/Makefile \
+                skiplang/prelude/libbacktrace \
+                skiplang/prelude/runtime \
+                skiplang/prelude/preamble \
+                skiplang/prelude/Makefile \
+                skiplang/prelude/build.sk
+            } | sha256sum | cut -d' ' -f1 > /tmp/stage0-cache-key
+      - restore_cache:
+          keys:
+            - stage0-v1-{{ checksum "/tmp/stage0-cache-key" }}
+      - run:
+          name: Refresh restored stage0 mtimes
+          command: |
+            # Make the restored artifacts newer than the fresh checkout, in
+            # dependency order (each pass runs after the previous one), so
+            # make does not rebuild stage0: runtime sources, runtime build
+            # outputs, build/ (build dirs, then top-level archives), then the
+            # stage0 links in dependency order.
+            cd skiplang/prelude/runtime
+            find . -type f \( -name '*.c' -o -name '*.h' -o -name '*.cpp' -o -name Makefile \) -exec touch {} +
+            find . -type f ! -name '*.c' ! -name '*.h' ! -name '*.cpp' ! -name Makefile -exec touch {} +
+            cd ../../compiler
+            if [ -d build ]; then
+              find build -type f -exec touch {} +
+              find build -maxdepth 1 -name '*.a' -exec touch {} +
+            fi
+            if [ -f stage0/bin/skc ]; then touch stage0/bin/skc; fi
+            if [ -d stage0/lib ]; then
+              find stage0/lib -type f -exec touch {} +
+              find stage0/lib -maxdepth 1 -name '*.a' -exec touch {} +
+              if [ -f stage0/lib/libstd.sklib ]; then touch stage0/lib/libstd.sklib; fi
+            fi
+            for b in skargo skfmt; do
+              if [ -f "stage0/bin/$b" ]; then touch "stage0/bin/$b"; fi
+            done
+      - run:
           name: Build stage1 (runtime regressions run alongside)
           no_output_timeout: 30m
           command: |
@@ -229,6 +274,12 @@ jobs:
               --disk-gib 20 --reserve-gib 8 --rss-gib 14 --timeout 5400 \
               -- make STAGE=1 || { tail -n 100 runs/ci-compiler-build/command.log; kill "$runtime_pid" 2>/dev/null; exit 1; }
             wait "$runtime_pid" || { cat /tmp/runtime-regressions.log; exit 1; }
+      - save_cache:
+          key: stage0-v1-{{ checksum "/tmp/stage0-cache-key" }}
+          paths:
+            - skiplang/compiler/build
+            - skiplang/compiler/stage0
+            - skiplang/prelude/runtime
       - store_artifacts:
           path: skiplang/compiler/runs
           destination: compiler-resources
