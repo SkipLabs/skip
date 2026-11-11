@@ -7,6 +7,20 @@ SKC_ARGS ?= --canonize-paths $(if $(wildcard bootstrap/skc_vtables64.ll.gz),--sp
 SKARGO_ARGS ?= --profile $(SKARGO_PROFILE) $(foreach opt,$(SKC_ARGS),--skcopt $(opt))
 STAGE    ?= 1
 
+# Parallel by default: stage0's links and prelude build are independent, and
+# the stageN skargo invocations are ordered by prerequisites so that no two
+# ever share a target dir concurrently (they would race on the per-unit
+# state.db files, #1581); the prelude Makefile also flocks its in-source-tree
+# compiles. Default to -j unless the caller already passed one; JOBS=1 forces
+# the old fully serial build. Only the top-level make adds -j: sub-makes
+# inherit it through the jobserver.
+JOBS ?= $(shell n=$$(nproc 2>/dev/null || echo 4); echo $$(( n > 8 ? 8 : n )))
+ifeq ($(MAKELEVEL),0)
+ifeq ($(findstring j,$(MAKEFLAGS)),)
+MAKEFLAGS += -j$(JOBS)
+endif
+endif
+
 prefix   ?= /usr/local
 exec_prefix ?= $(prefix)
 bindir   ?= $(exec_prefix)/bin
@@ -42,12 +56,15 @@ check-bootstrap:
 	  exit 1; \
 	fi
 
+# Grouped (&:) so the recipe runs once under -j, not once per target.
 .PHONY: build/libskip_runtime64.a build/libbacktrace.a
-build/libskip_runtime64.a build/libbacktrace.a:
+build/libskip_runtime64.a build/libbacktrace.a &:
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
 
 .PHONY: stage0/lib/libstd.sklib
-stage0/lib/libstd.sklib:
+# Needs stage0/bin/skc on PATH (built from the pinned bootstrap IR); under -j
+# the link must finish before the prelude sub-make looks for skc.
+stage0/lib/libstd.sklib: stage0/bin/skc
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
@@ -65,26 +82,33 @@ stage0/bin/skfmt: build/skfmt_out64.ll $(call bootstrap_vtable,skfmt) stage0/lib
 	mkdir -p $(@D)
 	clang++ -no-pie -Wl,--build-id $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
-stage1/bin/skc stage1/bin/skfmt: stage0
+# skc+skfmt are one grouped (&:) target: a single `skargo build --bins` run.
+# The three stage skargo invocations share stageN/target, so under -j they are
+# ordered by prerequisites (bins, then skargo, then lib): concurrent skargo
+# processes sharing a target dir race on the per-unit state.db files (#1581).
+# Ordered this way the later builds find the bins build's units fresh and only
+# compile their own. The bins build's self-compile also peaks near the CI
+# job's memory guard, so it must not overlap the other builds.
+stage1/bin/skc stage1/bin/skfmt &: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target
-stage1/lib/libstd.sklib: stage0
+stage1/lib/libstd.sklib: stage0 stage1/bin/skargo
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
-stage1/bin/skargo: stage0
+stage1/bin/skargo: stage0 stage1/bin/skc
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
-stage2/bin/skc stage2/bin/skfmt: stage1
+stage2/bin/skc stage2/bin/skfmt &: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target
-stage2/lib/libstd.sklib: stage1
+stage2/lib/libstd.sklib: stage1 stage2/bin/skargo
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
-stage2/bin/skargo: stage1
+stage2/bin/skargo: stage1 stage2/bin/skc
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
-stage3/bin/skc stage3/bin/skfmt: stage2
+stage3/bin/skc stage3/bin/skfmt &: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
-stage3/lib/libstd.sklib: stage2
+stage3/lib/libstd.sklib: stage2 stage3/bin/skargo
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
-stage3/bin/skargo: stage2
+stage3/bin/skargo: stage2 stage3/bin/skc
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
 
 # stageD is a "direct" build mode, where skc is built from current compiler
@@ -106,8 +130,10 @@ stageD/lib/libstd.sklib: stageD/bin/skc
 stageD/bin/skargo: stageD/bin/skc stageD/lib/libstd.sklib
 	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --bin skargo --out-dir stageD/bin --target-dir stageD/target --manifest-path ../skargo/Skargo.toml
 
+# skfmt gets its own target dir so it can build in parallel with skargo under
+# -j (they would otherwise share stageD/target, #1581).
 stageD/bin/skfmt: stageD/bin/skc stageD/lib/libstd.sklib
-	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --bin skfmt --out-dir stageD/bin --target-dir stageD/target
+	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --bin skfmt --out-dir stageD/bin --target-dir stageD/target-skfmt
 
 .PHONY: promote
 promote: stage$(STAGE)
