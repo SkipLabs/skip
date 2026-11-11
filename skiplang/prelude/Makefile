@@ -20,6 +20,13 @@ LBT_EXISTS=$(shell [ -e $(LIB_DIR)/libbacktrace.a ] && echo 1 || echo 0 )
 
 SKIP_SRC=$(shell find src/ -name '*.sk')
 
+# `make -C runtime` compiles into the source tree (runtime/*.o, magic.c), so
+# concurrent prelude builds with different OUT_DIRs (e.g. `make -j` in
+# skiplang/compiler, which builds build/ and stage0/lib at once) must
+# serialize on this lock. flock releases it even if a build is killed, and
+# locking an existing file creates nothing new in the tree.
+RUNTIME_LOCK = runtime/Makefile
+
 .PHONY: default
 default: $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a preamble/preamble64.ll
 	@echo "skargo:skc-preamble=preamble/preamble64.ll"
@@ -61,13 +68,13 @@ endif
 .PHONY: $(OUT_DIR)/libskip_runtime64.a
 $(OUT_DIR)/libskip_runtime64.a:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
-	CFLAGS="$(CFLAGS)" $(MAKE) -C runtime/ libskip_runtime64.a
+	CFLAGS="$(CFLAGS)" flock $(RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime64.a
 	cp runtime/libskip_runtime64.a $@
 
 .PHONY: $(OUT_DIR)/libskip_runtime32.bc
 $(OUT_DIR)/libskip_runtime32.bc:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
-	CFLAGS="$(CFLAGS)" $(MAKE) -C runtime/ libskip_runtime32.bc
+	CFLAGS="$(CFLAGS)" flock $(RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime32.bc
 	cp runtime/libskip_runtime32.bc $@
 
 $(OUT_DIR)/libskip_runtime32.o: $(OUT_DIR)/libskip_runtime32.bc
