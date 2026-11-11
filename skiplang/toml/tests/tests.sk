@@ -87,8 +87,37 @@ fun runInvalidTest(tomlFile: String): void {
   }
 }
 
+// Each float must decode to the nearest double, bit for bit. The JSON fixtures
+// can't check this: Float.toString prints at most 9 decimal digits, so a value
+// that is one ulp off prints the same. The expected bits come from a correctly
+// rounded parser (Python's float()).
+fun runFloatBitsTest(): void {
+  for ((literal, bits) in Array[
+    ("3.14", 0x40091eb851eb851f),
+    ("-3.14", -0x3ff6e147ae147ae1),
+    ("+2.5e-3", 0x3f647ae147ae147b),
+    ("0.1", 0x3fb999999999999a),
+    ("0.3", 0x3fd3333333333333),
+    ("3.141592653589793", 0x400921fb54442d18),
+    ("1.5e-7", 0x3e8421f5f40d8376),
+    ("6.02214076e23", 0x44dfe185ca57c517),
+    ("1_000.000_1", 0x408f4000346dc5d6),
+    ("5e-324", 0x1),
+    ("1.7976931348623157e308", 0x7fefffffffffffff),
+  ]) {
+    value = TOML.decode(`x = ${literal}`).maybeGetFloat("x").fromSome();
+    T.expectEq(value.toBits(), bits, literal)
+  }
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
+  tests.set(
+    "float-bits",
+    mutable Vector[
+      T.Test{name => "nearest double", func => () ~> runFloatBitsTest()},
+    ],
+  );
 
   validTests = FileSystem.readFilesRecursive("./tests/valid", fn ->
     fn.endsWith(".toml")
