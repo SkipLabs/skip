@@ -113,6 +113,8 @@ void sk_check_has_lock() {
 // shared by all threads, so a process-local mutex serializes threads first.
 static int sk_global_lock_fd = -1;
 static pthread_mutex_t sk_global_thread_lock = PTHREAD_MUTEX_INITIALIZER;
+// sk_is_locked is process-wide; this says whether this thread is the holder.
+static __thread int sk_thread_has_lock = 0;
 
 static int sk_flock(int fd, int operation);
 
@@ -147,6 +149,7 @@ void sk_global_lock() {
     exit(ERROR_LOCKING);
   }
   sk_is_locked = 1;
+  sk_thread_has_lock = 1;
 }
 
 void sk_global_unlock() {
@@ -155,6 +158,7 @@ void sk_global_unlock() {
   }
 
   sk_is_locked = 0;
+  sk_thread_has_lock = 0;
   if (sk_flock(sk_global_lock_fd, LOCK_UN) != 0 ||
       pthread_mutex_unlock(&sk_global_thread_lock) != 0) {
     perror("Internal error: global unlocking failed");
@@ -218,10 +222,26 @@ void sk_global_unlock() {
 /* Mutexes/Condition variables. */
 /*****************************************************************************/
 
+#ifdef __APPLE__
+// Darwin's pthread_mutex_t (64 bytes) does not fit in a Skip Mutex object, so
+// the object holds a pointer to a mutex in the persistent heap, which
+// SKIP_unfreeze_lock follows. The mutex lives as long as the heap.
+void SKIP_mutex_init(pthread_mutex_t** handle) {
+  int was_locked = sk_thread_has_lock;
+  if (!was_locked) {
+    sk_global_lock();
+  }
+  pthread_mutex_t* lock = sk_palloc(sizeof(pthread_mutex_t));
+  if (!was_locked) {
+    sk_global_unlock();
+  }
+  *handle = lock;
+#else
 void SKIP_mutex_init(pthread_mutex_t* lock) {
   if (sizeof(pthread_mutex_t) > 48) {
     fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
+#endif
   pthread_mutexattr_t mutex_attr_holder;
   pthread_mutexattr_t* mutex_attr = &mutex_attr_holder;
   pthread_mutexattr_init(mutex_attr);
@@ -262,9 +282,14 @@ void SKIP_mutex_unlock(pthread_mutex_t* lock) {
 }
 
 void SKIP_cond_init(pthread_cond_t* cond) {
+#ifdef __APPLE__
+  _Static_assert(sizeof(pthread_cond_t) <= 48,
+                 "pthread_cond_t must fit in a Skip Condition object");
+#else
   if (sizeof(pthread_mutex_t) > 48) {
     fprintf(stderr, "Internal error: mutex object too large for this arch\n");
   }
+#endif
   pthread_condattr_t cond_attr_value;
   pthread_condattr_t* cond_attr = &cond_attr_value;
   pthread_condattr_init(cond_attr);
@@ -277,7 +302,11 @@ void* SKIP_freeze_lock(void* x) {
 }
 
 void* SKIP_unfreeze_lock(void* x) {
+#ifdef __APPLE__
+  return *(void**)x;
+#else
   return x;
+#endif
 }
 
 void* SKIP_freeze_cond(void* x) {
