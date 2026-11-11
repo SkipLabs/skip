@@ -72,6 +72,20 @@ declare -A TEST_ONLY_PATHS=(
   # C regression tests run by the compiler job's "Run runtime regressions"
   # step only; prelude's build.sk and runtime/Makefile do not compile them.
   [skiplang/prelude/runtime/tests]=skiplang/compiler
+  # skdb's native test driver and data, read only by the skdb job's
+  # `make test-native` (test_sql.sh and the scripts/SQL it runs) and by the
+  # local-only `make test-replication`/`test-tpc` targets. The skdb binary
+  # builds from sql/src, and the skdb-wasm job exercises sql/src through the
+  # wasm library plus the TS client in sql/ts, the Java server in sql/server
+  # and privacy/init.sql -- none of these paths reaches it, so a change
+  # confined to them schedules the skdb job alone (#1639).
+  [sql/test]=sql
+  [sql/tpch]=sql
+  [sql/test_*.sh]=sql
+  [sql/test_*.sql]=sql
+  [sql/unit.sql]=sql
+  [sql/unit_tests.sh]=sql
+  [sql/init_test_privacy.sql]=sql
 )
 narrow_tests=true
 grep -qE '^tests *=' -- **/Skargo.toml && narrow_tests=false

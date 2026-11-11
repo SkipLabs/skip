@@ -98,6 +98,38 @@ commands:
           paths:
             - ~/.npm
 
+  # Cache the skdb release binary (sql/target/host/release/skdb) across runs,
+  # keyed on a fingerprint of its build inputs computed by
+  # bin/ci_skdb_bin_cache.sh: the sources and Skargo.toml of sql and its
+  # transitive path dependencies, the toolchain in /usr/bin and /usr/lib, the
+  # native compiler versions, and the root Makefile. A PR that changes none of
+  # those (sql test scripts, sql/ts, sql/server, privacy SQL, ...) restores
+  # the binary and make skips the multi-minute `skargo build --release`; any
+  # input change is a new key and a full rebuild. The key is computed after
+  # use-candidate-toolchain, so image-toolchain and candidate-toolchain builds
+  # never share an entry. The save runs after the tests, so a broken binary is
+  # never cached. Used by the skdb and skdb-wasm jobs, which both build it.
+  skdb-bin-cache-restore:
+    description: "Restore the cached skdb release binary if its inputs are unchanged"
+    steps:
+      - run:
+          name: Compute the skdb binary cache key
+          command: bin/ci_skdb_bin_cache.sh key > /tmp/skdb-bin-key
+      - restore_cache:
+          keys:
+            - skdb-bin-v1-{{ checksum "/tmp/skdb-bin-key" }}
+      - run:
+          name: Bump the cached binary's mtime so make skips the rebuild
+          command: bin/ci_skdb_bin_cache.sh touch
+
+  skdb-bin-cache-save:
+    description: "Save the skdb release binary; pairs with skdb-bin-cache-restore"
+    steps:
+      - save_cache:
+          key: skdb-bin-v1-{{ checksum "/tmp/skdb-bin-key" }}
+          paths:
+            - sql/target/host/release/skdb
+
   # Replace the image's toolchain with the one the `compiler` job built from
   # this checkout. The images ship stage0 (skc, skargo, skfmt and their
   # libraries, built from the pinned bootstrap and this prelude runtime), so a
@@ -305,6 +337,7 @@ jobs:
           submodules: true
       - use-candidate-toolchain:
           enabled: << parameters.candidate_toolchain >>
+      - skdb-bin-cache-restore
       - run:
           name: Run native skdb tests
           # The native suite streams test output continuously; if it ever
@@ -314,6 +347,7 @@ jobs:
           no_output_timeout: 5m
           command: |
             make test-native
+      - skdb-bin-cache-save
 
   skdb-wasm:
     docker:
@@ -330,11 +364,15 @@ jobs:
           submodules: true
       - use-candidate-toolchain:
           enabled: << parameters.candidate_toolchain >>
+      # The wasm suite's server tests build the same native binary
+      # (sql/ts/tests/service_common.mk), so it shares the skdb job's cache.
+      - skdb-bin-cache-restore
       - npm-cache-restore
       - run:
           name: Run wasm skdb tests
           no_output_timeout: 15m
           command: make test-wasm
+      - skdb-bin-cache-save
       - npm-cache-save
       - store_test_results:
           path: ~/test-results
