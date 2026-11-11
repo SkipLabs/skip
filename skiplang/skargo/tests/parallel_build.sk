@@ -320,42 +320,38 @@ fun test_skargo_test_build_jobs(): void {
   | None() -> return void
   };
   root = Path.join(kManifestDir, "target/it-parallel-build-jobs");
-  (dir, tools) = write_two_bins(root);
+  app = write_workspace(root);
   sktest = Path.join(Path.dirname(kManifestDir), "sktest");
   write_file(
-    dir + "/Skargo.toml",
-    FileSystem.readTextFile(dir + "/Skargo.toml") +
+    app + "/Skargo.toml",
+    FileSystem.readTextFile(app + "/Skargo.toml") +
       `[dev-dependencies]\nsktest = { path = "${sktest}" }\n`,
   );
   write_file(
-    dir + "/tests/probe.sk",
-    "module TwoTests; @test fun probe(): void { void } module end;\n",
+    app + "/tests/probe.sk",
+    "module AppTests; @test fun probe(): void { void } module end;\n",
   );
-  // The `two` and `sktest` libs are independent. Each one's compile waits
-  // (up to 10s) for the other's to start, so the build only succeeds when
-  // both are in flight together.
+  // `pa` and `pb` depend only on std, so they become ready together. The skc
+  // wrapper logs when each starts and ends; pa's compile also waits (up to
+  // 10s) for pb's to start, so with two compile slots they always overlap.
+  // Overlap is read from the log order, not from the wait timing out.
+  events = root + "/events";
+  tools = root + "/tools";
   real_skc = which("skc");
   write_script(
     tools + "/skc",
-    `for lib in two sktest; do case " $* " in *" --sklib-name=$lib "*) touch "${root}/started-$lib"; other=two; [ $lib = two ] && other=sktest; i=0; while [ ! -e "${root}/started-$other" ] && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; [ -e "${root}/started-$other" ] || { echo "$lib never compiled alongside $other" >&2; exit 9; };; esac; done\nexec "${real_skc}" "$@"\n`,
+    `case " $* " in *" --sklib-name=pa "*) name=pa;; *" --sklib-name=pb "*) name=pb;; *) exec "${real_skc}" "$@";; esac\necho "start $name" >> "${events}"\nif [ $name = pa ]; then i=0; while ! grep -qx "start pb" "${events}" && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; fi\n"${real_skc}" "$@"; rc=$?\necho "end $name" >> "${events}"\nexit $rc\n`,
   );
-  test = (build_jobs: ?Int) -> {
+  // Whether the pa and pb compiles of a `skargo test` run overlapped.
+  overlapped = (build_jobs: ?Int) -> {
     T.expectTrue(
-      System.subprocess(
-        Array[
-          "rm",
-          "-rf",
-          dir + "/target",
-          root + "/started-two",
-          root + "/started-sktest",
-        ],
-      )
+      System.subprocess(Array["rm", "-rf", app + "/target", events])
         .fromSuccess()
         .success(),
     );
     env = Map::mcreateFromItems(Array[("SKARGO_BIN", "skargo")]);
-    env.extend(tools_env(tools));
-    System.popen{
+    env.extend(Map["SKC" => tools + "/skc"]);
+    result = System.popen{
       args => Array[skargo, "test", "--release", "--jobs", "2"].concat(
         build_jobs match {
         | Some(n) -> Array["--build-jobs", n.toString()]
@@ -363,17 +359,18 @@ fun test_skargo_test_build_jobs(): void {
         },
       ),
       env => env.chill(),
-      cwd => Some(dir),
-    }.fromSuccess()
+      cwd => Some(app),
+    }.fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    log = FileSystem.readTextFile(events)
+      .split("\n")
+      .filter(line -> !line.isEmpty())
+      .collect(Array);
+    T.expectEq(log.size(), 4, log.join(", "));
+    log[0].startsWith("start") && log[1].startsWith("start")
   };
-  parallel = test(None());
-  T.expectTrue(parallel.success(), parallel.stderr);
-  serial = test(Some(1));
-  T.expectEq(serial.exitcode(), 3, serial.stderr);
-  T.expectTrue(
-    serial.stderr.contains("never compiled alongside"),
-    serial.stderr,
-  )
+  T.expectTrue(overlapped(None()), "pa and pb compiled one at a time");
+  T.expectTrue(!overlapped(Some(1)), "--build-jobs 1 overlapped pa and pb")
 }
 
 module end;
