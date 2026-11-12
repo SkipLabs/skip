@@ -1295,6 +1295,73 @@ export function initTests(
   const it = (title: string, fn?: AsyncFunc) =>
     mit(`${title}[${category}]`, fn);
 
+  it("testLegacyInitialDataServiceRejected", async () => {
+    const legacyService = {
+      initialData: { input: [] },
+      resources: {},
+      createGraph: (inputCollections: NamedEagerCollections) =>
+        inputCollections,
+    } as unknown as AnySkipService;
+    try {
+      const service = await initService(legacyService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/`SkipService.initialData` has been replaced by `inputs`/),
+      );
+    }
+  });
+
+  it("testNonInputDefinitionInputRejected", async () => {
+    const invalidService: AnySkipService = {
+      // Type-checks: the brand field is structural, but only `InputDefinition`
+      // carries the initial data the runtime needs.
+      inputs: { input: { __sk_inputDefBrand: undefined } },
+      resources: {},
+      createGraph: (inputCollections: NamedEagerCollections) =>
+        inputCollections,
+    };
+    try {
+      const service = await initService(invalidService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/Input definition 'input' must be an `InputDefinition`/),
+      );
+    }
+  });
+
+  it("testForeignCollectionRejected", async () => {
+    // Type-checks: the brand field is structural, but only collections
+    // created by the runtime can be merged into the computation graph.
+    const forged = {
+      __sk_collectionBrand: undefined,
+    } as unknown as EagerCollection<Json, Json>;
+    const forgingService: AnySkipService = {
+      inputs: { input: new InputDefinition() },
+      resources: {},
+      createGraph: (inputCollections: {
+        input: EagerCollection<Json, Json>;
+      }) => ({
+        output: inputCollections.input.merge(forged),
+      }),
+    };
+    try {
+      const service = await initService(forgingService);
+      await service.close();
+      throw new Error("Error was not thrown");
+    } catch (e: unknown) {
+      expect(e).toBeA(Error);
+      expect((e as Error).message).toMatchRegex(
+        new RegExp(/Expected an eager collection created by the Skip runtime/),
+      );
+    }
+  });
+
   it("testMap1", async () => {
     const service = await initService(map1Service);
     try {
