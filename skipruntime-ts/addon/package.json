@@ -18,7 +18,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "install": "VERSION=$(./calculate_version.sh) node-gyp rebuild",
+    "install": "export VERSION=$(./calculate_version.sh); if [ -z \"$SKIP_NATIVE_BUILDS_IF_PRESENT\" ] || ! ls build/Release/*.node >/dev/null 2>&1; then node-gyp rebuild; else echo \"build/Release/*.node present; skipping node-gyp rebuild (SKIP_NATIVE_BUILDS_IF_PRESENT)\"; fi",
     "clean": "rm -rf dist tsconfig.tsbuildinfo && node-gyp clean",
     "lint": "eslint"
   },
