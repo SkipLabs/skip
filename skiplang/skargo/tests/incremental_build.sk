@@ -98,6 +98,13 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   T.expectEq(releaseCommands.size(), 1, release.stderr);
   T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
   T.expectTrue(releaseCommands[0].contains("--release"), release.stderr);
+  // Release builds opt out of the incremental backend explicitly: the retained
+  // specialization graph exceeds the CI memory budget, and --release alone no
+  // longer selects the sequential pipeline.
+  T.expectTrue(
+    releaseCommands[0].contains("--no-incremental-backend"),
+    release.stderr,
+  );
   T.expectTrue(!releaseCommands[0].contains("--no-inline"), release.stderr);
   T.expectTrue(!releaseCommands[0].contains("--no-ipa"), release.stderr);
   releaseProbe = System.popen{

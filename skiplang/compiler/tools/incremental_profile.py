@@ -562,14 +562,12 @@ def report_run(args):
             )
             raw_spans.append(spans[-1])
         if p["kind"] == "skc":
-            sequential = (
-                "--no-incremental-backend" in p["command"]
-                or "--release" in p["command"]
-                or not any(
-                    a == flag or a.startswith(flag + "=")
-                    for a in p["command"]
-                    for flag in ["--init", "--data"]
-                )
+            # --release no longer implies the sequential pipeline; only the
+            # incremental-backend control and persistence decide.
+            sequential = "--no-incremental-backend" in p["command"] or not any(
+                a == flag or a.startswith(flag + "=")
+                for a in p["command"]
+                for flag in ["--init", "--data"]
             )
             separate_discovery_span = False
             with open_evidence(p["stderr"]) as stream:

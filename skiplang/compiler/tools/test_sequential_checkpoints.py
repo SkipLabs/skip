@@ -124,7 +124,7 @@ fun makeCheckpoint(n: Int): CheckpointBase {
 fun readCheckpoint(n: Int): Int { makeCheckpoint(n).value() }
 """
         )
-        flags = [
+        release_flags = [
             "--release",
             "--split-support-module",
             "--no-inline",
@@ -135,8 +135,14 @@ fun readCheckpoint(n: Int): Int { makeCheckpoint(n).value() }
             (source.replace("{ 19 }", "{ 23 }"), 35),
             (source, 31),
         ]:
-            self.compile(text, flags, True)
+            self.compile(text, release_flags, True)
             self.check_program(expected)
+        # Release no longer selects the sequential backend: persisted release
+        # builds emit keyed modules under <binary>.llvm, not the
+        # <binary>.ll/<binary>.vtables.ll sidecars. Pin the sequential backend
+        # for the sidecar-file assertions below.
+        flags = release_flags + ["--no-incremental-backend"]
+        self.compile(source, flags, True)
         functions = Path(str(self.binary) + ".ll").read_text()
         tables = Path(str(self.binary) + ".vtables.ll").read_text()
         self.assertRegex(functions, r"@\.allVTables = external .*constant")
@@ -148,7 +154,7 @@ fun readCheckpoint(n: Int): Int { makeCheckpoint(n).value() }
         self.check_program(31)
         # Turning splitting off must remove the sidecar: bootstrap promotion
         # must not accidentally include a stale, second definition of the table.
-        self.compile(source, ["--release"], True)
+        self.compile(source, ["--release", "--no-incremental-backend"], True)
         self.check_program(31)
         self.assertFalse(Path(str(self.binary) + ".vtables.ll").exists())
         self.compile(source, flags, True)
