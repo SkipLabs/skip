@@ -134,8 +134,8 @@ compiler-rt diagnostic library. This also works in minimal LLVM installations.
 # Wasm string-to-float
 
 Without libc, the Wasm runtime parses floats with Ryu's `s2d` (`ryu/s2d.c`)
-when it can, and otherwise falls back to an `atof` that is not correctly
-rounded. This test builds `s2d` with the Wasm runtime's flags and checks
+when it can, and otherwise asks the JS host (see "Wasm String.toFloat" below).
+This test builds `s2d` with the Wasm runtime's flags and checks
 that it matches JavaScript's correctly rounded `Number()` bit for bit. It covers
 fixed cases (subnormals, `DBL_MAX`, overflow and underflow), 100,000 random
 decimal strings and the shortest representations of 100,000 random doubles. The
@@ -149,4 +149,27 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
 wasm-ld --no-entry --export=input_buffer --export=parse --export=result \
   /tmp/string-to-float.o -o /tmp/string-to-float.wasm
 node skiplang/prelude/runtime/tests/string_to_float.mjs /tmp/string-to-float.wasm
+```
+
+# Wasm String.toFloat
+
+`SKIP_String__toFloat_raw` parses with `s2d` when it can and otherwise calls the
+JS host's `SKIP_js_parse_float` (`Number()`). This test builds the real
+`string.c` for Wasm, provides that import as `sk_runtime.ts` does, and checks
+both paths against `Number()`: inputs `s2d` handles must not call the host, and
+longer ones (negative numbers, more than 17 significant digits) must be parsed
+exactly. The in-tree `atof` that the host call replaces returned `0` for
+negative numbers and was a few ulps off for long inputs.
+
+```sh
+printf 'SKIP_js_parse_float\n' > /tmp/to-float-raw.imports
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -Iskiplang/prelude/runtime -c skiplang/prelude/runtime/tests/to_float_raw.c \
+  -o /tmp/to-float-raw.o
+wasm-ld --no-entry --export-memory \
+  --allow-undefined-file=/tmp/to-float-raw.imports \
+  --export=input_string --export=SKIP_String__toFloat_raw \
+  /tmp/to-float-raw.o -o /tmp/to-float-raw.wasm
+node skiplang/prelude/runtime/tests/to_float_raw.mjs /tmp/to-float-raw.wasm
 ```

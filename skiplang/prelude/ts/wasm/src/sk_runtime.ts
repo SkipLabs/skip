@@ -46,6 +46,7 @@ class LinksImpl implements Links {
   ) => void;
   SKIP_js_time_ms_lo!: () => int;
   SKIP_js_time_ms_hi!: () => int;
+  SKIP_js_parse_float!: (str: ptr<Internal.String>) => float;
 
   SKIP_js_get_entropy = () => {
     const buf = new Uint8Array(4);
@@ -122,6 +123,11 @@ class LinksImpl implements Links {
       // coercing to 32-bit, thereby clearing the bits we want
       return Math.floor(this.lastTime / 2 ** 32);
     };
+
+    // The string was validated by String.toFloatOption, so Number() parses
+    // it (correctly rounded) and never returns NaN.
+    this.SKIP_js_parse_float = (str: ptr<Internal.String>) =>
+      Number(utils.importString(str));
 
     this.SKIP_js_get_argc = () => utils.args.length;
     this.SKIP_js_get_argn = (index: int) => {
@@ -267,6 +273,8 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_js_time_ms_lo = () => links.SKIP_js_time_ms_lo();
     toWasm.SKIP_js_time_ms_hi = () => links.SKIP_js_time_ms_hi();
     toWasm.SKIP_js_get_entropy = () => links.SKIP_js_get_entropy();
+    toWasm.SKIP_js_parse_float = (str: ptr<Internal.String>) =>
+      links.SKIP_js_parse_float(str);
     toWasm.SKIP_js_get_argc = () => links.SKIP_js_get_argc();
     toWasm.SKIP_js_get_argn = (index: int) => links.SKIP_js_get_argn(index);
     toWasm.SKIP_js_get_envc = () => links.SKIP_js_get_envc();
@@ -339,6 +347,7 @@ interface ToWasm {
   SKIP_js_time_ms_lo: () => int;
   SKIP_js_time_ms_hi: () => int;
   SKIP_js_get_entropy: () => int;
+  SKIP_js_parse_float: (str: ptr<Internal.String>) => float;
   SKIP_js_get_argc: () => int;
   SKIP_js_get_argn: (index: int) => ptr<Internal.String>;
   SKIP_js_get_envc: () => int;

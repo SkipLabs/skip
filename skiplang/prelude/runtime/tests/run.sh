@@ -59,3 +59,14 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
   --export=input_buffer --export=parse --export=result \
   "$runtime_test_dir/string-to-float.o" -o "$runtime_test_dir/string-to-float.wasm"
 node "$runtime_test_sources/string_to_float.mjs" "$runtime_test_dir/string-to-float.wasm"
+
+printf 'SKIP_js_parse_float\n' > "$runtime_test_dir/to-float-raw.imports"
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/to_float_raw.c" \
+  -o "$runtime_test_dir/to-float-raw.o"
+"$runtime_test_linker" --no-entry --export-memory \
+  --allow-undefined-file="$runtime_test_dir/to-float-raw.imports" \
+  --export=input_string --export=SKIP_String__toFloat_raw \
+  "$runtime_test_dir/to-float-raw.o" -o "$runtime_test_dir/to-float-raw.wasm"
+node "$runtime_test_sources/to_float_raw.mjs" "$runtime_test_dir/to-float-raw.wasm"

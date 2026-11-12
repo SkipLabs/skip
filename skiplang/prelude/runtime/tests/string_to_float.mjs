@@ -51,7 +51,7 @@ for (const str of [
   check(str);
 }
 
-// More than 17 significant digits is unsupported; the runtime falls back.
+// More than 17 significant digits is unsupported; the runtime asks the host.
 assert.notEqual(s2d("123456789012345678").status, SUCCESS);
 
 // xorshift64, so failures are reproducible.
