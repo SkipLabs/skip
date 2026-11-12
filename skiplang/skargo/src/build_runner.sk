@@ -1237,9 +1237,11 @@ const kHeavyUnitSources: Int = 100;
 private fun skc_profile_options(profile: String): Array<String> {
   profile match {
   // -O2 selects optimizations. --release only toggles release emission
-  // details; the specialization mode stays with the persistent-database
-  // controls, independent of the profile.
-  | "release" -> Array["--release", "-O2"]
+  // details. skc's specialization mode is independent of --release, so the
+  // release profile opts out of the incremental backend explicitly: the
+  // retained specialization graph exceeds the CI jobs' RSS guards (e.g.
+  // compiler-tests), while the sequential backend checkpoints its heaps.
+  | "release" -> Array["--release", "-O2", "--no-incremental-backend"]
   // Development builds favor incremental compilation over interprocedural
   // optimization (inlining and IPA), just as
   // their native code generation favors compile time over optimization.

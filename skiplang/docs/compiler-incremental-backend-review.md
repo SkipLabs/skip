@@ -14,8 +14,9 @@ specialization by default. `--no-incremental-backend` keeps frontend caching
 while selecting the sequential backend. `--release` only toggles release
 emission details (unreachable handling, vtable names); it no longer selects the
 specialization mode, so persisted release builds use the incremental backend
-too. Skargo's release profile passes `--release`; development builds disable
-inlining and IPA.
+too. Skargo's release profile passes `--release` plus an explicit
+`--no-incremental-backend` (the retained graph exceeds the CI jobs' RSS
+guards); development builds disable inlining and IPA.
 
 The collection-based backend and storage experiments remain explicit options.
 In particular, the benchmark configuration enables more options than ordinary
