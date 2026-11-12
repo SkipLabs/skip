@@ -130,6 +130,55 @@ commands:
           paths:
             - sql/target/host/release/skdb
 
+  # Cache the native build products of the skipruntime jobs, so a PR that only
+  # changes TypeScript (e.g. #1482) does not rebuild them from scratch:
+  #   kind native     build/skipruntime/libskipruntime.so (host build),
+  #                   skipruntime-ts/wasm/dist/src/libskipruntime.wasm (wasm
+  #                   build) and skipruntime-ts/addon/build (node-gyp addon)
+  #   kind docker-so  build/libskipruntime.so-linux-<arch>, built by
+  #                   bin/build_runtime.sh inside the skipruntime-ts/Dockerfile
+  #                   bake (the native-addon-unreleased release rehearsal)
+  #
+  # Key: skipruntime-<kind>-v1-<content hash of the build inputs>, computed by
+  # bin/native_artifacts_cache_key.sh from git blob ids, so it is independent of
+  # mtimes and changes exactly when an input changes. A hit therefore always
+  # means the cached artifact was built from these same inputs -- there is
+  # deliberately no fallback/prefix key, which could restore an artifact built
+  # from different inputs. The jobs set SKIP_NATIVE_BUILDS_IF_PRESENT=1 and the
+  # build scripts (skipruntime-ts/Makefile, wasm/package.json,
+  # addon/package.json, bin/build_runtime.sh) skip the build when the artifact
+  # file exists, so on a cache miss the real builds run unchanged. Both
+  # skipruntime jobs save the native key: concurrent runs of one pipeline
+  # check out the same SHA and so build identical artifacts, and CircleCI
+  # caches are immutable per key (first writer wins). Bump v1 to bust the cache.
+  native-cache-restore:
+    description: "Restore cached << parameters.kind >> native artifacts"
+    parameters:
+      kind:
+        type: enum
+        enum: [native, docker-so]
+    steps:
+      - run:
+          name: Hash the inputs of the << parameters.kind >> native artifacts
+          command: bin/native_artifacts_cache_key.sh << parameters.kind >> > /tmp/native-cache-key
+      - restore_cache:
+          keys:
+            - skipruntime-<< parameters.kind >>-v1-{{ checksum "/tmp/native-cache-key" }}
+
+  native-cache-save:
+    description: "Save the << parameters.kind >> native artifacts; pairs with native-cache-restore"
+    parameters:
+      kind:
+        type: enum
+        enum: [native, docker-so]
+    steps:
+      - save_cache:
+          key: skipruntime-<< parameters.kind >>-v1-{{ checksum "/tmp/native-cache-key" }}
+          paths:
+            - build
+            - skipruntime-ts/wasm/dist/src/libskipruntime.wasm
+            - skipruntime-ts/addon/build
+
   # Replace the image's toolchain with the one the `compiler` job built from
   # this checkout. The images ship stage0 (skc, skargo, skfmt and their
   # libraries, built from the pinned bootstrap and this prelude runtime), so a
@@ -546,6 +595,10 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+      # With the native artifacts restored from the caches below, skip
+      # rebuilding them; the guards key off artifact existence, so on a cache
+      # miss the real builds run unchanged.
+      SKIP_NATIVE_BUILDS_IF_PRESENT: "1"
     parameters:
       candidate_toolchain:
         type: boolean
@@ -557,6 +610,8 @@ jobs:
           enabled: << parameters.candidate_toolchain >>
       - setup_remote_docker
       - npm-cache-restore
+      - native-cache-restore:
+          kind: native
       - run:
           name: Run wasm skip runtime tests
           no_output_timeout: 10m
@@ -565,12 +620,18 @@ jobs:
             make test-skipruntime-ts
       # The next step's npm installs are up to date or run in its Docker build.
       - npm-cache-save
+      - native-cache-save:
+          kind: native
+      - native-cache-restore:
+          kind: docker-so
       - run:
           name: Run native addon unreleased test
           no_output_timeout: 10m
           command: |
             cd skipruntime-ts/tests/native_addon_unreleased
             ./run.sh
+      - native-cache-save:
+          kind: docker-so
       - store_test_results:
           path: ~/test-results
 
@@ -599,6 +660,10 @@ jobs:
     resource_class: large.gen2
     environment:
       SKIP_CAPACITY: 6G
+      # With the native artifacts restored from the cache below, skip
+      # rebuilding them; the guards key off artifact existence, so on a cache
+      # miss the real builds run unchanged.
+      SKIP_NATIVE_BUILDS_IF_PRESENT: "1"
     parameters:
       candidate_toolchain:
         type: boolean
@@ -610,6 +675,8 @@ jobs:
           enabled: << parameters.candidate_toolchain >>
       # Restored before installing Bun so the cache also holds its tarballs.
       - npm-cache-restore
+      - native-cache-restore:
+          kind: native
       - run:
           name: Install Bun
           command: npm install -g bun@1.3.14
@@ -619,6 +686,8 @@ jobs:
           command: |
             make test-skipruntime-ts-bun
       - npm-cache-save
+      - native-cache-save:
+          kind: native
 
   check-examples:
     docker:

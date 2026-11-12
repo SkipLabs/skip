@@ -25,8 +25,16 @@ define check_out
 endef
 
 .PHONY: libskipruntime
+# SKIP_NATIVE_BUILDS_IF_PRESENT (set by the CircleCI skipruntime jobs after
+# restoring the native-artifacts cache, keyed on these build inputs by
+# bin/native_artifacts_cache_key.sh) skips the build when the artifact is
+# already there; on a cache miss the build runs unchanged.
 libskipruntime:
-	skargo build --release --lib --manifest-path=skiplang/ffi/Skargo.toml --out-dir=../build/skipruntime/
+	@if [ -n "$$SKIP_NATIVE_BUILDS_IF_PRESENT" ] && [ -f ../build/skipruntime/libskipruntime.so ]; then \
+	  echo "../build/skipruntime/libskipruntime.so present; skipping build (SKIP_NATIVE_BUILDS_IF_PRESENT)"; \
+	else \
+	  skargo build --release --lib --manifest-path=skiplang/ffi/Skargo.toml --out-dir=../build/skipruntime/; \
+	fi
 
 .PHONY: install
 install: libskipruntime

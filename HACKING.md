@@ -50,6 +50,15 @@ encourages batching unrelated changes.
   `shards` parameter in `.circleci/base.yml`. See
   [`skiplang/compiler/tools/README.md`](skiplang/compiler/tools/README.md#sharding-in-ci)
   for how modules are balanced and how to refresh their expected durations.
+- The `skipruntime` and `skipruntime-bun` jobs cache the native build products
+  (`libskipruntime.so`, `libskipruntime.wasm`, the node-gyp addon, and the
+  Docker-built release `.so`) in CircleCI, keyed by
+  `bin/native_artifacts_cache_key.sh` on a content hash of their inputs, so
+  PRs that only change TypeScript do not rebuild them. The jobs set
+  `SKIP_NATIVE_BUILDS_IF_PRESENT=1`, which makes the build scripts skip the
+  build when the artifact is already present; a cache hit is only possible
+  when the inputs are unchanged. Bump the `v1` in the cache keys in
+  `.circleci/base.yml` to bust the caches.
 - Doc-only and `.gitignore`-only changes schedule no test jobs
   (`.circleci/generate_config.sh`); keep it that way for other paths that
   cannot affect a build.
