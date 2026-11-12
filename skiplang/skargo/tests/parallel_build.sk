@@ -1,0 +1,376 @@
+module alias T = SKTest;
+
+module SkargoParallelBuildTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, text: String): void {
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(path)])
+      .fromSuccess()
+      .success(),
+  );
+  FileSystem.writeTextFile(path, text)
+}
+
+@allow_tracked_call
+untracked fun build(
+  skargo: String,
+  dir: String,
+  extra: Array<String> = Array[],
+  env: Map<String, String> = Map[],
+): System.CompletedProcess {
+  full_env = Map::mcreateFromItems(Array[("SKARGO_BIN", "skargo")]);
+  full_env.extend(env);
+  System.popen{
+    args => Array[skargo, "build", "-v", "--jobs", "4"].concat(extra),
+    env => full_env.chill(),
+    cwd => Some(dir),
+  }.fromSuccess()
+}
+
+@allow_tracked_call
+untracked fun run(binary: String): String {
+  result = System.popen{
+    args => Array[binary],
+    env => Map["SKARGO_BIN" => Path.basename(binary)],
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  result.stdout
+}
+
+// The skargo under test, or None() when this run cannot re-execute it.
+@allow_tracked_call
+untracked fun skargo_under_test(): ?String {
+  Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | some @ Some _ -> some
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string(
+        "skipping: merged-mode only, run `skargo test` in the dev profile",
+      );
+      None()
+    } else {
+      Some(Environ.current_exe())
+    }
+  }
+}
+
+// An executable shell script at `path`.
+@allow_tracked_call
+untracked fun write_script(path: String, text: String): void {
+  write_file(path, "#!/bin/sh\n" + text);
+  T.expectTrue(
+    System.subprocess(Array["chmod", "+x", path]).fromSuccess().success(),
+  )
+}
+
+@allow_tracked_call
+untracked fun which(name: String): String {
+  System.subprocess(Array["sh", "-c", `command -v ${name}`])
+    .fromSuccess()
+    .stdout.trim()
+}
+
+// Whether the process recorded in `pid_file` still runs (zombies count as
+// gone: only their exit status is left).
+@allow_tracked_call
+untracked fun process_alive(pid_file: String): Bool {
+  pid = FileSystem.readTextFile(pid_file).trim();
+  state = System.subprocess(Array["ps", "-o", "stat=", "-p", pid])
+    .fromSuccess()
+    .stdout.trim();
+  !state.isEmpty() && !state.startsWith("Z")
+}
+
+// Waits up to ~5s for the process in `pid_file` to be gone.
+@allow_tracked_call
+untracked fun process_gone(pid_file: String): Bool {
+  for (_ in Range(0, 50)) {
+    if (!process_alive(pid_file)) return true;
+    Time.sleep_ms(100)
+  };
+  false
+}
+
+// A package with a lib and two bins, `app` and `slow`. Both bins depend only
+// on the lib, so the parallel scheduler builds them side by side. Returns the
+// directory and the tools dir holding `skc`/`clang++` wrappers: compiling
+// `slow` sleeps (recording its pid in `slow.pid`), linking `app` fails when
+// `fail_link` is set.
+@allow_tracked_call
+untracked fun write_two_bins(root: String): (String, String) {
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  dir = root + "/two";
+  write_file(
+    dir + "/Skargo.toml",
+    `[package]\nname = "two"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n[[bin]]\nname = "app"\nmain = "Two.app"\n[[bin]]\nname = "slow"\nmain = "Two.slow"\n`,
+  );
+  write_file(
+    dir + "/src/lib.sk",
+    "module Two; untracked fun app(): void { print_raw(\"app\") } untracked fun slow(): void { print_raw(\"slow\") } module end;\n",
+  );
+  tools = root + "/tools";
+  real_skc = which("skc");
+  real_clang = which("clang++");
+  write_script(
+    tools + "/skc",
+    `case " $* " in *" Two.slow=skip_main "*) if [ -e "${root}/slow" ]; then echo $$ > "${root}/slow.pid"; exec sleep 60; fi;; esac\nexec "${real_skc}" "$@"\n`,
+  );
+  write_script(
+    tools + "/clang++",
+    `case " $* " in *"/deps/app-"*) if [ -e "${root}/fail_link" ]; then echo "fake link failure" >&2; exit 7; fi;; esac\nexec "${real_clang}" "$@"\n`,
+  );
+  (dir, tools)
+}
+
+@allow_tracked_call
+untracked fun tools_env(tools: String): Map<String, String> {
+  Map["SKC" => tools + "/skc", "PATH" => tools + ":" + Environ.var("PATH")]
+}
+
+// A workspace `app` with a bin, depending on two independent libs `pa` and
+// `pb`. `app_lib_files` extra source files make app's lib (and so its bin)
+// heavy for the parallel scheduler.
+@allow_tracked_call
+untracked fun write_workspace(root: String, app_lib_files: Int = 0): String {
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  for (name in Array["pa", "pb"]) {
+    write_file(
+      `${root}/${name}/Skargo.toml`,
+      `[package]\nname = "${name}"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+    );
+    write_file(
+      `${root}/${name}/src/lib.sk`,
+      `module ${name.uppercase()}; fun value(): Int { 1 } module end;\n`,
+    )
+  };
+  app = root + "/app";
+  write_file(
+    app + "/Skargo.toml",
+    `[package]\nname = "app"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\npa = { path = "../pa" }\npb = { path = "../pb" }\n[[bin]]\nname = "app"\nmain = "App.main"\n`,
+  );
+  write_app(app, 2);
+  for (i in Range(0, app_lib_files)) {
+    write_file(`${app}/src/filler${i}.sk`, `module Filler${i}; module end;\n`)
+  };
+  app
+}
+
+@allow_tracked_call
+untracked fun write_app(app: String, offset: Int): void {
+  write_file(
+    app + "/src/lib.sk",
+    `module App; untracked fun main(): void { print_raw((PA.value() + PB.value() + ${offset}).toString()) } module end;\n`,
+  )
+}
+
+// A bin target lists no sources: it compiles its package's lib. Its weight
+// must come from that lib, or the compiler's skc and skfmt bins would build
+// side by side under --jobs and exceed the memory budget.
+@test
+fun test_parallel_heavy_bin_builds_alone(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  app = write_workspace(
+    Path.join(kManifestDir, "target/it-parallel-heavy"),
+    100,
+  );
+  // Release keeps the bin a separate unit after its lib.
+  result = build(skargo, app, Array["--release"]);
+  T.expectTrue(result.success(), result.stderr);
+  T.expectTrue(
+    result.stderr.contains("Heavy: app [lib] builds alone"),
+    result.stderr,
+  );
+  T.expectTrue(
+    result.stderr.contains("Heavy: app [app] builds alone"),
+    result.stderr,
+  );
+  T.expectTrue(!result.stderr.contains("Heavy: pa"), result.stderr);
+  T.expectEq(run(app + "/target/host/release/app"), "4");
+
+  // Dev merges the bin into `__merged`, compiled from the same heavy lib.
+  dev = build(skargo, app);
+  T.expectTrue(dev.success(), dev.stderr);
+  T.expectTrue(
+    dev.stderr.contains("Heavy: app [__merged] builds alone"),
+    dev.stderr,
+  );
+  T.expectEq(run(app + "/target/host/dev/app"), "4");
+
+  light = write_workspace(Path.join(kManifestDir, "target/it-parallel-light"));
+  lightResult = build(skargo, light, Array["--release"]);
+  T.expectTrue(lightResult.success(), lightResult.stderr);
+  T.expectTrue(!lightResult.stderr.contains("Heavy: app"), lightResult.stderr);
+  T.expectEq(run(light + "/target/host/release/app"), "4")
+}
+
+// A failed external link stops the build like a failed compile: the link is
+// an in-flight process, so on its failure the units still compiling are
+// killed and skargo exits 3, instead of exiting from inside the link step and
+// leaving them running (and writing to their state.db files).
+@test
+fun test_parallel_link_failure_kills_in_flight_units(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-link-failure");
+  (dir, tools) = write_two_bins(root);
+  write_file(root + "/slow", "");
+  write_file(root + "/fail_link", "");
+  result = build(skargo, dir, Array["--release"], tools_env(tools));
+  T.expectEq(result.exitcode(), 3, result.stderr);
+  T.expectTrue(result.stderr.contains("fake link failure"), result.stderr);
+  T.expectTrue(FileSystem.exists(root + "/slow.pid"), result.stderr);
+  T.expectTrue(process_gone(root + "/slow.pid"), "slow compile left running");
+  // The failed link is retried by the next build.
+  T.expectTrue(
+    System.subprocess(Array["rm", root + "/slow", root + "/fail_link"])
+      .fromSuccess()
+      .success(),
+  );
+  retry = build(skargo, dir, Array["--release"], tools_env(tools));
+  T.expectTrue(retry.success(), retry.stderr);
+  T.expectEq(run(dir + "/target/host/release/app"), "app");
+  T.expectEq(run(dir + "/target/host/release/slow"), "slow")
+}
+
+// A database written by another skc fails skc's build-id check with exit 43.
+// As in serial mode (#1500, #1606), the parallel scheduler discards it and
+// recompiles the unit with --init instead of failing the build.
+@test
+fun test_parallel_discards_foreign_state_db(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-foreign-db");
+  app = write_workspace(root);
+  first = build(skargo, app, Array["--release"]);
+  T.expectTrue(first.success(), first.stderr);
+  databases = FileSystem.readFilesRecursive(app + "/target/.fingerprints", f ->
+    Path.basename(f) == "state.db" &&
+      (f.contains("/pa-") || f.contains("/app-"))
+  ).toArray();
+  T.expectTrue(databases.size() >= 3, databases.join(" "));
+  // Corrupt one header byte inside each build-id, then dirty the units.
+  for (database in databases) {
+    T.expectTrue(
+      System.subprocess(
+        Array[
+          "sh",
+          "-c",
+          "printf '\\377' | dd of=\"$0\" bs=1 seek=20 conv=notrunc 2>/dev/null",
+          database,
+        ],
+      )
+        .fromSuccess()
+        .success(),
+    )
+  };
+  write_file(
+    root + "/pa/src/lib.sk",
+    "module PA; fun value(): Int { 10 } module end;\n",
+  );
+  write_app(app, 20);
+  result = build(skargo, app, Array["--release"]);
+  T.expectTrue(result.success(), result.stderr);
+  T.expectTrue(result.stderr.contains("Discarding"), result.stderr);
+  T.expectEq(run(app + "/target/host/release/app"), "31")
+}
+
+// Parallel units log to files under the target dir. The shell wrapper gets
+// those paths as arguments, so shell metacharacters in them are inert.
+@test
+fun test_redirect_argv_does_not_interpret_paths(): void {
+  root = Path.join(kManifestDir, "target/it-redirect-argv");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  dir = root + "/a \"$HOME\" `false` 'q'; exit 9";
+  write_file(dir + "/.keep", "");
+  argv = Skargo.redirect_argv(
+    Array["sh", "-c", "echo \"out $1\"; echo err >&2; exit 4", "sh", "arg $x"],
+    dir + "/stdout",
+    dir + "/stderr",
+  );
+  result = System.subprocess(argv).fromSuccess();
+  T.expectEq(result.exitcode(), 4, result.stderr);
+  T.expectEq(FileSystem.readTextFile(dir + "/stdout"), "out arg $x\n");
+  T.expectEq(FileSystem.readTextFile(dir + "/stderr"), "err\n")
+}
+
+// `skargo test` compiles min(--jobs, 4) units at a time by default;
+// --build-jobs overrides that without changing the test runner's --jobs.
+@test
+fun test_skargo_test_build_jobs(): void {
+  skargo = skargo_under_test() match {
+  | Some(s) -> s
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target/it-parallel-build-jobs");
+  app = write_workspace(root);
+  sktest = Path.join(Path.dirname(kManifestDir), "sktest");
+  write_file(
+    app + "/Skargo.toml",
+    FileSystem.readTextFile(app + "/Skargo.toml") +
+      `[dev-dependencies]\nsktest = { path = "${sktest}" }\n`,
+  );
+  write_file(
+    app + "/tests/probe.sk",
+    "module AppTests; @test fun probe(): void { void } module end;\n",
+  );
+  // `pa` and `pb` depend only on std, so they become ready together. The skc
+  // wrapper logs when each starts and ends; pa's compile also waits (up to
+  // 10s) for pb's to start, so with two compile slots they always overlap.
+  // Overlap is read from the log order, not from the wait timing out.
+  events = root + "/events";
+  tools = root + "/tools";
+  real_skc = which("skc");
+  write_script(
+    tools + "/skc",
+    `case " $* " in *" --sklib-name=pa "*) name=pa;; *" --sklib-name=pb "*) name=pb;; *) exec "${real_skc}" "$@";; esac\necho "start $name" >> "${events}"\nif [ $name = pa ]; then i=0; while ! grep -qx "start pb" "${events}" && [ $i -lt 100 ]; do sleep 0.1; i=$((i+1)); done; fi\n"${real_skc}" "$@"; rc=$?\necho "end $name" >> "${events}"\nexit $rc\n`,
+  );
+  // Whether the pa and pb compiles of a `skargo test` run overlapped.
+  overlapped = (build_jobs: ?Int) -> {
+    T.expectTrue(
+      System.subprocess(Array["rm", "-rf", app + "/target", events])
+        .fromSuccess()
+        .success(),
+    );
+    env = Map::mcreateFromItems(Array[("SKARGO_BIN", "skargo")]);
+    env.extend(Map["SKC" => tools + "/skc"]);
+    result = System.popen{
+      args => Array[skargo, "test", "--release", "--jobs", "2"].concat(
+        build_jobs match {
+        | Some(n) -> Array["--build-jobs", n.toString()]
+        | None() -> Array[]
+        },
+      ),
+      env => env.chill(),
+      cwd => Some(app),
+    }.fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    log = FileSystem.readTextFile(events)
+      .split("\n")
+      .filter(line -> !line.isEmpty())
+      .collect(Array);
+    T.expectEq(log.size(), 4, log.join(", "));
+    log[0].startsWith("start") && log[1].startsWith("start")
+  };
+  T.expectTrue(overlapped(None()), "pa and pb compiled one at a time");
+  T.expectTrue(!overlapped(Some(1)), "--build-jobs 1 overlapped pa and pb")
+}
+
+module end;

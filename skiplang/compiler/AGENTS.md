@@ -5,10 +5,14 @@ the `bootstrap` submodule. The root [AGENTS.md](../../AGENTS.md) applies too.
 
 ## Build
 
-- `make STAGE=1` — **serial only** (no `-j`): parallel skargo processes sharing
-  `stage1/target` race on the per-unit `state.db` files (#1581). If the prelude
-  sub-make races under `-j`, build it first, serially:
-  `OUT_DIR=$PWD/build make -C ../prelude -j1`
+- `make STAGE=1` — parallel by default (`JOBS` = min(nproc, 8); `JOBS=1` forces
+  the old fully serial build). Safe under `-j`: stage0's links and prelude
+  build are independent, and the stageN skargo invocations are ordered by
+  prerequisites (bins, then skargo, then lib) so no two ever share a target
+  dir concurrently — concurrent skargo processes sharing one race on the
+  per-unit `state.db` files (#1581). The prelude Makefile also flocks its
+  in-source-tree runtime compiles. The bins build's self-compile peaks near
+  the CI job's 14 GiB memory guard, so it must not overlap the other builds.
 - `make` refuses to build when the `bootstrap` submodule is out of sync — run
   `git submodule update --init skiplang/compiler/bootstrap` first.
 - Never edit `bootstrap/*.ll.gz` by hand; bump the submodule via

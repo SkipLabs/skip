@@ -10,7 +10,7 @@ take precedence for their directory — the closest file to the edited code wins
 
 - `make fmt` then `make check-fmt` — format and verify (skfmt, clang-format, prettier)
 - `make test` — top-level tests; per package: `cd <pkg> && SKTEST_JOBS=8 ../../bin/run-sktest.sh` (e.g. `skiplang/compiler`, `skiplang/prelude`, `skiplang/skargo`)
-- Compiler bootstrap build: `cd skiplang/compiler && make STAGE=1` — **serial, no `-j`** (#1581)
+- Compiler bootstrap build: `cd skiplang/compiler && make STAGE=1` — parallel by default (`JOBS=min(nproc,8)`; `JOBS=1` for the old fully serial build). The stage skargo builds are prerequisite-ordered so `-j` no longer races on `state.db` (#1581)
 
 ## Do / don't
 

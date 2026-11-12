@@ -36,6 +36,16 @@ fun build(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
       .arg(Cli.Arg::bool("bins").about("Build all binaries"))
       .arg(Cli.Arg::bool("tests").about("Build all tests"))
       .arg(Cli.Arg::bool("all-targets").about("Build all targets"))
+      .arg(
+        Cli.Arg::int("jobs")
+          .long("jobs")
+          .short("j")
+          .default(1)
+          .value_name("N")
+          .about(
+            "Number of units to compile in parallel (higher values need more memory)",
+          ),
+      )
       .arg(kSkcOptArg),
     execBuild,
   )
@@ -51,7 +61,10 @@ fun execBuild(gctx: GlobalContext, args: Cli.ParseResults): void {
   withTimer(
     () -> {
       build_runner = BuildRunner::create(bctx);
-      build_runner.compile()
+      build_runner.compile(
+        /* check = */ false,
+        /* jobs = */ args.getInt("jobs"),
+      )
     },
     t ->
       gctx.console.status(
