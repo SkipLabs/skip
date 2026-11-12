@@ -392,8 +392,14 @@ mutable class Archive<R: mutable IO.Read & mutable IO.Seek> private (
     | Failure(err) -> return Failure(IOError(err))
     | Success _ -> void
     };
+    // BSD ar (e.g. Apple's and llvm-ar's darwin format) pads the name with
+    // NUL bytes up to an aligned length, which are not part of the name.
+    name_len = id_len;
+    while (name_len > 0 && id_buf[name_len - 1] == UInt8::truncate(0)) {
+      !name_len = name_len - 1
+    };
     // TODO: Explicit ASCII check.
-    identifier = String::fromUtf8(id_buf.collect(Array));
+    identifier = String::fromUtf8(id_buf.slice(0, name_len).collect(Array));
 
     Success((identifier, id_len))
   }

@@ -51,19 +51,34 @@ stage0/lib/libstd.sklib:
 	mkdir -p $(@D)
 	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
 
+# Persistent files are keyed on the executable's GNU build-id on ELF. Mach-O
+# executables always carry an LC_UUID instead, and ld64 rejects --build-id.
+# On macOS, link with lld: ld64 rejects the non-object members of .sklib
+# archives.
+ifeq ($(shell uname -s),Darwin)
+STAGE0_LDFLAGS ?= -fuse-ld=lld
+else
+STAGE0_LDFLAGS ?= -no-pie -Wl,--build-id
+endif
+
 bootstrap_vtable = $(patsubst bootstrap/%.gz,build/%,$(wildcard bootstrap/$(1)_vtables64.ll.gz))
 
 stage0/bin/skc: build/skc_out64.ll $(call bootstrap_vtable,skc) build/libskip_runtime64.a build/libbacktrace.a
 	mkdir -p $(@D)
-	clang++ -no-pie -Wl,--build-id $(CXXFLAGS) -o $@ $^ -lpthread -g3
+	clang++ $(STAGE0_LDFLAGS) $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage0/bin/skargo: build/skargo_out64.ll $(call bootstrap_vtable,skargo) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
-	clang++ -no-pie -Wl,--build-id $(CXXFLAGS) -o $@ $^ -lpthread -g3
+	clang++ $(STAGE0_LDFLAGS) $(CXXFLAGS) -o $@ $^ -lpthread -g3
+ifeq ($(shell uname -s),Darwin)
+# The bootstrap skargo crashes when nproc is missing, as on macOS.
+	printf '#!/bin/sh\nexec sysctl -n hw.ncpu\n' > $(@D)/nproc
+	chmod +x $(@D)/nproc
+endif
 
 stage0/bin/skfmt: build/skfmt_out64.ll $(call bootstrap_vtable,skfmt) stage0/lib/libstd.sklib
 	mkdir -p $(@D)
-	clang++ -no-pie -Wl,--build-id $(CXXFLAGS) -o $@ $^ -lpthread -g3
+	clang++ $(STAGE0_LDFLAGS) $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 stage1/bin/skc stage1/bin/skfmt: stage0
 	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target

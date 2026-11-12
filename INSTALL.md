@@ -12,6 +12,18 @@ You will need at least the following installed:
  * typescript 5.7 or later.
 
 On Debian/Ubuntu, you can use `./bin/apt-install.sh` to install these dependencies.
+
+On macOS (Apple silicon), install LLVM 20 and lld with Homebrew, and put LLVM's
+tools (`llvm-config`, `llvm-ar`, `llvm-ranlib`) on your `PATH` after the system
+ones, so that Apple's clang stays the compiler:
+
+```sh
+brew install llvm@20 lld
+export PATH="$PATH:$(brew --prefix llvm@20)/bin"
+```
+
+Executables are linked with lld because Apple's linker rejects the metadata
+stored in `.sklib` archives.
  
 ### Building the toolchain
 
