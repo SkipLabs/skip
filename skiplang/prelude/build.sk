@@ -18,12 +18,21 @@ fun main(): void {
     "runtime/stdlib.c",
     "runtime/stack.c",
     "runtime/string.c",
+    "runtime/ryu/d2s.c",
+    "runtime/ryu/s2d.c",
     "runtime/native_eq.c",
     "runtime/splitmix64.c",
     "runtime/xoroshiro128plus.c",
   ];
 
-  cfg = Cc.Build().pic(pic).flags(Cc.kRecommendedCflags).files(srcs);
+  cfg = Cc.Build()
+    .pic(pic)
+    .flags(Cc.kRecommendedCflags)
+    // Lets the vendored Ryu sources (runtime/ryu/*.c) and string.c resolve
+    // `#include "ryu/..."` (upstream builds with its repo root on the include
+    // path).
+    .include("runtime")
+    .files(srcs);
   srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
 
   // TODO: `skargo:rerun-if-changed` on sources.
