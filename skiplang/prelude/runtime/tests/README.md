@@ -173,3 +173,23 @@ wasm-ld --no-entry --export-memory \
   /tmp/to-float-raw.o -o /tmp/to-float-raw.wasm
 node skiplang/prelude/runtime/tests/to_float_raw.mjs /tmp/to-float-raw.wasm
 ```
+
+# Wasm Float.toString
+
+`Float.toString` formats with `SKIP_Float_toStringShortest` (`string.c`), which
+lays out Ryu's shortest round-trip digits in Skip's conventions: fixed notation
+for 1e-4 <= value < 1e15, `.0` for integers, and exponents `e+N`, `e-0N` and
+`e-NN`. This test builds it for Wasm and checks it against the digits of JS
+`Number.prototype.toString` laid out the same way, for fixed edge cases
+(boundaries, subnormals, `DBL_MAX`) and 200,000 random values. Each result must
+also round-trip through `Number()`.
+
+```sh
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -Iskiplang/prelude/runtime -c skiplang/prelude/runtime/tests/float_to_string.c \
+  -o /tmp/float-to-string.o
+wasm-ld --no-entry --export-memory --export=SKIP_Float_toStringShortest \
+  /tmp/float-to-string.o -o /tmp/float-to-string.wasm
+node skiplang/prelude/runtime/tests/float_to_string.mjs /tmp/float-to-string.wasm
+```
