@@ -1855,12 +1855,12 @@ private fun peepholeStringConcat(
 
 private fun peepholeFloatToString(
   peep: FloatToString,
-  s: mutable Peephole,
+  _s: mutable Peephole,
 ): Instr {
-  s.getInstr(peep.value) match {
-  | ConstantFloat{value} -> s.constantString(value.toString())
-  | _ -> peep
-  }
+  // Not folded: folding would use the compiler's own Float.toString, i.e.
+  // whatever prelude the compiler was built with (e.g. the bootstrap), so a
+  // constant could print differently from the same value at runtime.
+  peep
 }
 
 private fun peepholeIntToFloat(peep: IntToFloat, s: mutable Peephole): Instr {

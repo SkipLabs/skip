@@ -70,3 +70,12 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
   --export=input_string --export=SKIP_String__toFloat_raw \
   "$runtime_test_dir/to-float-raw.o" -o "$runtime_test_dir/to-float-raw.wasm"
 node "$runtime_test_sources/to_float_raw.mjs" "$runtime_test_dir/to-float-raw.wasm"
+
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/float_to_string.c" \
+  -o "$runtime_test_dir/float-to-string.o"
+"$runtime_test_linker" --no-entry --export-memory \
+  --export=SKIP_Float_toStringShortest \
+  "$runtime_test_dir/float-to-string.o" -o "$runtime_test_dir/float-to-string.wasm"
+node "$runtime_test_sources/float_to_string.mjs" "$runtime_test_dir/float-to-string.wasm"
