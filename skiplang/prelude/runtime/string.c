@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "ryu/ryu.h"
 #include "ryu/ryu_parse.h"
 
 #ifdef SKIP64
@@ -222,22 +223,20 @@ void* SKIP_String_unsafeSlice(unsigned char* str, SkipInt n1, SkipInt n2) {
  * Uses Ryu's d2s_buffered_n() which has no libc dependency, so this
  * works in both SKIP64 (native) and SKIP32 (WASM).
  */
-#include "ryu/ryu.h"
-int d2s_buffered_n(double f, char* result);
-
-char* SKIP_Float_format17(double value) {
+char* SKIP_Float_toStringShortest(double value) {
   if (value == 0.0) return sk_string_create("0.0", 3);
 
   /* Get Ryu's shortest representation.
    * Format: digit ['.' digits] 'E' ['-'] digits
-   * Examples: "1E0", "1E-1", "3141592653589793E-15", "1E20" */
+   * Examples: "1E0", "1E-1", "3141592653589793E-15", "1E20"
+   * At most 24 characters. */
   char ryu_buf[32];
   int ryu_len = d2s_buffered_n(value, ryu_buf);
   ryu_buf[ryu_len] = '\0';
 
   /* Parse: collect mantissa digits and exponent. */
   int pos = 0;
-  char digits[20];
+  char digits[20]; /* at most 17 significant digits */
   int nd = 0;
 
   while (ryu_buf[pos] != 'E') {
@@ -263,6 +262,7 @@ char* SKIP_Float_format17(double value) {
   /* dot_pos = ryu_exp + 1 = number of digits before decimal point */
   int dot_pos = ryu_exp + 1;
 
+  /* At most 23 characters: 17 digits, "." and "e-308" (scientific). */
   char out[64];
   int out_len = 0;
 

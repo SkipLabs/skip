@@ -129,11 +129,10 @@ native value class Float uses Number {
 }
 
 /** Formats a non-negative finite float as the shortest decimal string that
- * round-trips (via Ryu's d2s), in Skip's number-format conventions. The name
- * is historical; the output has up to 17 significant digits, not exactly 17.
+ * round-trips (via Ryu's d2s), in Skip's number-format conventions.
  */
-@cpp_extern("SKIP_Float_format17")
-native fun format17(value: Float): String;
+@cpp_extern("SKIP_Float_toStringShortest")
+native fun toStringShortest(value: Float): String;
 
 /** Converts a Float to its string representation.
  * Produces the shortest decimal string that round-trips through the IEEE 754
@@ -150,10 +149,10 @@ fun floatToString(value: Float): String {
     if (value == -Float::inf) {
       return "-inf";
     };
-    return "-" + format17(-value);
+    return "-" + toStringShortest(-value);
   };
   if (value == Float::inf) {
     return "inf";
   };
-  format17(value)
+  toStringShortest(value)
 }

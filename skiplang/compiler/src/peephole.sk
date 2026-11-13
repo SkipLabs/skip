@@ -1857,8 +1857,9 @@ private fun peepholeFloatToString(
   peep: FloatToString,
   _s: mutable Peephole,
 ): Instr {
-  // Don't fold at compile time — let the runtime handle Float.toString()
-  // to avoid precision differences between host and target compilers.
+  // Not folded: folding would use the compiler's own Float.toString, i.e.
+  // whatever prelude the compiler was built with (e.g. the bootstrap), so a
+  // constant could print differently from the same value at runtime.
   peep
 }
 
