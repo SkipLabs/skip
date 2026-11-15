@@ -257,7 +257,8 @@ fun test_parallel_discards_foreign_state_db(): void {
   };
   root = Path.join(kManifestDir, "target/it-parallel-foreign-db");
   app = write_workspace(root);
-  first = build(skargo, app, Array["--release"]);
+  // Development builds own persistent databases; release builds are one-shot.
+  first = build(skargo, app);
   T.expectTrue(first.success(), first.stderr);
   databases = FileSystem.readFilesRecursive(app + "/target/.fingerprints", f ->
     Path.basename(f) == "state.db" &&
@@ -284,10 +285,10 @@ fun test_parallel_discards_foreign_state_db(): void {
     "module PA; fun value(): Int { 10 } module end;\n",
   );
   write_app(app, 20);
-  result = build(skargo, app, Array["--release"]);
+  result = build(skargo, app);
   T.expectTrue(result.success(), result.stderr);
   T.expectTrue(result.stderr.contains("Discarding"), result.stderr);
-  T.expectEq(run(app + "/target/host/release/app"), "31")
+  T.expectEq(run(app + "/target/host/dev/app"), "31")
 }
 
 // Parallel units log to files under the target dir. The shell wrapper gets

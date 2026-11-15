@@ -109,6 +109,7 @@ mutable class BuildRunner(
   hashes: Map<Unit, Int>,
   fingerprints: mutable Map<Unit, Int> = mutable Map[],
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
+  mutable checking: Bool = false,
 ) {
   static fun create(bctx: BuildContext): mutable BuildRunner {
     host_layout = Layout::create(bctx, "host", "dev");
@@ -263,6 +264,7 @@ mutable class BuildRunner(
   }
 
   mutable fun compile(check: Bool = false, jobs: Int = 1): void {
+    this.!checking = check;
     if (jobs > 1) {
       this.compile_parallel(this.build_plan(), check, jobs)
     } else {
@@ -860,7 +862,10 @@ mutable class BuildRunner(
       skc.arg(dispatcher_path)
     };
 
-    if (!unit.target.is_build_script()) {
+    if (
+      !unit.target.is_build_script() &&
+      (this.checking || unit.profile != "release")
+    ) {
       // A compiler database belongs to one compilation unit. Sharing it across
       // packages or targets replaces the cached source/config inputs each time
       // the next unit builds. The artifact hash includes target, architecture,
@@ -888,7 +893,9 @@ mutable class BuildRunner(
       void
     };
 
-    skc.args(skc_profile_options(unit.profile));
+    // Dependencies are compiled to archives during check, but still benefit
+    // from their frontend caches when a dependency's sources change.
+    skc.args(skc_profile_options(unit.profile, this.checking));
 
     separate_link = if (check) {
       skc.arg("--check");
@@ -1234,14 +1241,25 @@ fun redirect_argv(
 const kHeavyUnitSources: Int = 100;
 
 // TODO: Proper Profile class.
-private fun skc_profile_options(profile: String): Array<String> {
+private fun skc_profile_options(
+  profile: String,
+  check: Bool = false,
+): Array<String> {
   profile match {
-  // -O2 selects optimizations. --release only toggles release emission
-  // details. skc's specialization mode is independent of --release, so the
-  // release profile opts out of the incremental backend explicitly: the
-  // retained specialization graph exceeds the CI jobs' RSS guards (e.g.
-  // compiler-tests), while the sequential backend checkpoints its heaps.
-  | "release" -> Array["--release", "-O2", "--no-incremental-backend"]
+  // Checks retain their frontend database. Builds own disposable phase state;
+  // ordinary artifact fingerprints still make an unchanged build a no-op.
+  | "release" ->
+    if (check) Array["--release", "-O2"] else {
+      // Keep vtable data out of LLVM's function module so its reference graph
+      // does not connect every generated function to every other function.
+      Array[
+        "--release",
+        "-O2",
+        "--one-shot",
+        "--no-incremental-backend",
+        "--split-support-module",
+      ]
+    }
   // Development builds favor incremental compilation over interprocedural
   // optimization (inlining and IPA), just as
   // their native code generation favors compile time over optimization.

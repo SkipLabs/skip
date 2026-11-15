@@ -64,6 +64,33 @@ Standalone native and Wasm runtime checks are documented in
 
 # Measurements
 
+`skargo check --release` keeps incremental frontend databases, including for
+dependencies. `skargo build --release` uses `skc --one-shot` and leaves those
+databases alone. Artifact fingerprints still skip unchanged builds. Release
+native builds also separate vtable data from the LLVM function module to avoid
+LLVM's large, densely connected reference graph.
+
+The one-shot compiler hands explicit state between disposable phases: archive
+decoding, type checking, archive writing or outer IR, specialization, IR
+assembly, optimization, lowering, LLVM graph construction, emission and linking.
+It releases the graph before invoking the native toolchain. Region checkpoints
+mark live pages, free dead pages, and evacuate sparse survivors one page at a
+time; dense pages stay in place. A compact forwarding table lets evacuation
+free old pages before fixing references, avoiding a second complete live graph.
+Archive escaping scratch is reclaimed separately for each source.
+
+Direct `skc --release` invocations retain their existing behavior. Use
+`--one-shot` explicitly for the disposable pipeline; it rejects `--init`,
+`--data` and `--batch`. `--check` takes precedence and stays incremental.
+The `test_release_pipeline` backend module checks code generation, archive
+environment preservation, errors, linking, and region lifetimes. Skargo's
+incremental integration tests cover checks interleaved with release builds.
+
+Measure a fresh target directory, and include native compiler/linker children
+in the peak RSS. A run terminated by a memory guard establishes a lower bound,
+not a completed build's peak. `SKSTORE_PROFILE=1` includes `region_collect`
+spans so collection time is separate from phase work.
+
 `incremental_profile.py` and `incremental_profile_wrap.c` record phase intervals,
 native compiler invocations, memory and disk use. Clang and linking are separate
 from Skip compiler phases. For parallel Clang, report wall-clock coverage and

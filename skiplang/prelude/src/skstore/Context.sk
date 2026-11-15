@@ -2352,6 +2352,10 @@ private native fun destroyObstack(Obstack): void;
 @cpp_extern("SKIP_destroy_Obstack_with_value")
 private native fun destroyObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
 
+@debug
+@cpp_extern("SKIP_collect_Obstack_with_value")
+private native fun collectObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
+
 @always_inline
 fun destroyObstackWithValue<T>(obstack: Obstack, value: T): T {
   destroyObstackWithValueRaw(obstack, Box(value)).unbox()
@@ -2448,6 +2452,11 @@ native fun gUnsafeIncrRefCount(Contexts): void;
 @debug
 @cpp_extern("SKIP_should_GC")
 native fun shouldGC(Obstack): UInt32;
+
+// Reserved bytes in this thread's transient heap, including parent regions.
+@debug
+@cpp_extern("SKIP_Obstack_allocated_bytes")
+native fun obstackAllocatedBytes(): Int;
 
 @debug
 @cpp_extern("SKIP_print_persistent_size")
@@ -2810,6 +2819,49 @@ fun withRegionValue<T>(f: () ~> T): T {
       replaceExn(cexn);
       throw cexn
     | None() -> throw exn
+    }
+  }
+}
+
+// A disposable computation with explicitly owned continuation state. Only the
+// value returned by step survives a checkpoint; replaced versions and scratch
+// allocations are reclaimed before the next step. None completes the work.
+// No context, dependency graph or persistent allocations are involved. Values
+// supplied by the caller (including initial and step's captures) remain owned
+// by the caller, so large inputs should be created by the first step instead.
+// A step must not publish region values through captured mutable state: every
+// region value needed by a later step must be reachable from the returned T.
+fun withRegionPipeline<T: frozen>(initial: T, step: T ~> ?T): void {
+  profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
+  state = initial;
+  saved = newObstack();
+  loop {
+    // Try/catch lowers to heap-allocated closures. Finish the protected call
+    // before collecting, so no live handler or completion cell is reclaimed.
+    // Capture an immutable snapshot, not state: capturing a mutable local
+    // boxes it, and that box must not outlive the region which contains it.
+    current = state;
+    result = try {
+      Success(step(current))
+    } catch {
+    | exn -> Failure(exn)
+    };
+    result match {
+    | Success(None()) ->
+      destroyObstack(saved);
+      return void
+    | Success(Some(next)) ->
+      start = if (profile) Time.time_ns() else 0;
+      !state = collectObstackWithValueRaw(saved, Box(next)).unbox();
+      if (profile) {
+        print_error(
+          `##SPAN## ${start} ${Time.time_ns()} store region_collect\n`,
+        )
+      }
+    | Failure(exn) ->
+      copied = destroyObstackWithValue(saved, exn);
+      replaceExn(copied);
+      throw copied
     }
   }
 }

@@ -131,6 +131,20 @@ the real traversal routines; it is not an end-to-end allocator or Wasm test.
 keeps the enabled checks and terminates on a failure without linking the optional
 compiler-rt diagnostic library. This also works in minimal LLVM installations.
 
+# Region checkpoints
+
+`region_checkpoint.c` exercises the real transient allocator and collector at
+`-O0` and `-O2` under UBSan. It checks repeated collection, parent references,
+sharing, cycles, strings, wide reference masks, dense-page retention and large
+objects. A sparse twelve-page graph must compact without allocating a second
+complete copy; the test bounds additional allocation to two pages. References
+from retained pages into evacuated pages must be rewritten as well.
+
+`region_checkpoint_wasm.c` runs the collector with four-byte pointers and small
+pages, checking array/string alignment and reuse of evacuated pages. Both tests
+run through `run.sh`; the Wasm test links without unresolved imports and runs
+in Node.
+
 # Wasm string-to-float
 
 Without libc, the Wasm runtime parses floats with Ryu's `s2d` (`ryu/s2d.c`)

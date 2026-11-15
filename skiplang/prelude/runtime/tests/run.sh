@@ -35,6 +35,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 "$runtime_test_dir/mapping-identity"
 
 for runtime_test_opt in -O0 -O2; do
+  clang -std=c2x "$runtime_test_opt" -g -Wall -Wextra -Werror \
+    -ffunction-sections -fdata-sections -Wl,--gc-sections \
+    -fsanitize=undefined -fsanitize-trap=all \
+    "$runtime_test_sources/region_checkpoint.c" -o "$runtime_test_dir/region-checkpoint"
+  "$runtime_test_dir/region-checkpoint"
   # Keep every UBSan check, using traps so the optional diagnostic runtime is
   # not required by minimal LLVM installations such as the CI image.
   clang -std=c2x "$runtime_test_opt" -g -Wall -Wextra -Werror \
@@ -45,6 +50,16 @@ for runtime_test_opt in -O0 -O2; do
 done
 
 runtime_test_linker=$(command -v wasm-ld || command -v wasm-ld-20)
+clang --target=wasm32 -std=c2x -O2 -nostdlib -nostdlibinc -fno-builtin \
+  -Wall -Wextra -Werror -I"$runtime_test_sources/.." \
+  -c "$runtime_test_sources/region_checkpoint_wasm.c" \
+  -o "$runtime_test_dir/region-checkpoint.o"
+"$runtime_test_linker" --no-entry --initial-memory=16777216 \
+  --export=check_regions "$runtime_test_dir/region-checkpoint.o" \
+  -o "$runtime_test_dir/region-checkpoint.wasm"
+node "$runtime_test_sources/region_checkpoint_wasm.mjs" \
+  "$runtime_test_dir/region-checkpoint.wasm"
+
 clang --target=wasm32 -DSKIP32 -O2 -nostdlib -c \
   "$runtime_test_sources/alloc_size_classes.c" -o "$runtime_test_dir/size-classes.o"
 "$runtime_test_linker" --no-entry --initial-memory=16777216 \

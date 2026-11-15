@@ -1,0 +1,246 @@
+{
+  "schema": "skip-release-memory-v1",
+  "date": "2026-11-14",
+  "machine": {
+    "architecture": "aarch64",
+    "os": "Linux",
+    "clang": "20.1.8"
+  },
+  "compiler": {
+    "base_commit": "5baa561d1f73c3ffda12a8cf19a43c8be315199e",
+    "baseline_built_using_installed_compiler_commit": "5ceb49e2",
+    "candidate_built_using": "source-built baseline compiler",
+    "baseline_sha256": "f0e7db608d86b6215df28c05066658268e81a5920c520286a71f1a1eeb0e6573",
+    "candidate_sha256": "9b8b174cd13976ff6f17a0cf7a39059cac78d612a6a187876f8c360f63032414",
+    "candidate_std_sha256": "9ed0c7b76cc398962017ebcb2abf6ae476b346b1369aae74462eabb45b635fba",
+    "candidate_skargo_sha256": "5cd3d6ea9974067bb8f6f88543fb761cc7ade402a76aab89e00afab741af24b4",
+    "bootstrap_refreshed": false
+  },
+  "workload": {
+    "project": "Mistigri",
+    "commit": "cbbd0d07384385b76a0bbf35d5d2169d1e3d7ea4",
+    "target": "lean4-simp",
+    "fresh_target_directory": true,
+    "module_manifest_entries": 1507,
+    "project_source_count": 1622,
+    "project_source_bytes": 315192640,
+    "source_inventory_sha256": "563aa977efcd095f960fede6ac96917bcc3098c56f80139eacd4edf781b43dd9",
+    "source_subset_selected": false,
+    "command": "skargo build --release --jobs 1 --bin lean4-simp --manifest-path SNAPSHOT/Skargo.toml --target-dir FRESH_TARGET -v",
+    "profiling_environment": {
+      "SKC_TIME_PHASES": "1",
+      "SKSTORE_PROFILE": "1"
+    },
+    "overlapping_heavy_workload": false
+  },
+  "measurement_notes": [
+    "GiB = 1073741824 bytes. RSS is resident memory, not virtual reservations.",
+    "Baseline was terminated at its 48 GiB guard; the sampled overshoot is a lower bound, not a completed peak.",
+    "Process-tree sampling includes skargo, compiler wrappers, skc and native toolchain children.",
+    "wait4 captures compiler/descendant high-water marks, including spikes between RSS samples.",
+    "The conservative sum combines per-process high-water marks for each observed concurrently live set; it may exceed actual simultaneous RSS.",
+    "Phase RSS values are samples, so they can miss short peaks. Phase times sum invocations; they are not the total build wall time.",
+    "The measurement covers lean4-simp with the full project source set, not all Mistigri executables."
+  ],
+  "baseline": {
+    "label": "baseline-build",
+    "returncode": -15,
+    "interrupted": "summed RSS limit",
+    "seconds": 222.227814935,
+    "sampled_peak_process_tree_rss_bytes": 53672980480,
+    "maximum_compiler_wait4_rss_bytes": null,
+    "conservative_live_process_highwater_sum_bytes": 53683687424,
+    "compiler_invocations": [],
+    "phase_samples": {}
+  },
+  "candidate": {
+    "label": "candidate-build-v8",
+    "returncode": 0,
+    "interrupted": null,
+    "seconds": 561.384548591,
+    "sampled_peak_process_tree_rss_bytes": 28722941952,
+    "maximum_compiler_wait4_rss_bytes": 29052030976,
+    "conservative_live_process_highwater_sum_bytes": 29183774720,
+    "compiler_invocations": [
+      {
+        "sklib": null,
+        "returncode": 0,
+        "seconds": 3.201213001,
+        "maxrss_bytes": 1001238528
+      },
+      {
+        "sklib": "cc",
+        "returncode": 0,
+        "seconds": 2.947663085,
+        "maxrss_bytes": 815419392
+      },
+      {
+        "sklib": "pkg-config",
+        "returncode": 0,
+        "seconds": 2.941555293,
+        "maxrss_bytes": 816836608
+      },
+      {
+        "sklib": null,
+        "returncode": 0,
+        "seconds": 3.39481121,
+        "maxrss_bytes": 822566912
+      },
+      {
+        "sklib": "std",
+        "returncode": 0,
+        "seconds": 2.448411834,
+        "maxrss_bytes": 728477696
+      },
+      {
+        "sklib": "lean4-skip",
+        "returncode": 0,
+        "seconds": 149.450905278,
+        "maxrss_bytes": 29052030976
+      },
+      {
+        "sklib": null,
+        "returncode": 0,
+        "seconds": 318.204154145,
+        "maxrss_bytes": 28950024192
+      }
+    ],
+    "phase_samples": {
+      "frontend/config_and_archives": {
+        "summed_seconds": 7.611764087,
+        "sampled_peak_process_tree_rss_bytes": 25343975424
+      },
+      "outer/makeOuter": {
+        "summed_seconds": 63.903597029000004,
+        "sampled_peak_process_tree_rss_bytes": 11062525952
+      },
+      "frontend/read_files": {
+        "summed_seconds": 0.005693292000000001,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "step": {
+        "summed_seconds": 11.836258006000003,
+        "sampled_peak_process_tree_rss_bytes": 855265280
+      },
+      "sync": {
+        "summed_seconds": 0.5416985039999999,
+        "sampled_peak_process_tree_rss_bytes": 660570112
+      },
+      "native/write_sklib": {
+        "summed_seconds": 18.577436049,
+        "sampled_peak_process_tree_rss_bytes": 2884530176
+      },
+      "release/read_files": {
+        "summed_seconds": 0.2964255,
+        "sampled_peak_process_tree_rss_bytes": 27719966720
+      },
+      "region_collect": {
+        "summed_seconds": 51.62956560500001,
+        "sampled_peak_process_tree_rss_bytes": 28247650304
+      },
+      "release/frontend": {
+        "summed_seconds": 230.755499273,
+        "sampled_peak_process_tree_rss_bytes": 28722941952
+      },
+      "release/outer": {
+        "summed_seconds": 63.90359678,
+        "sampled_peak_process_tree_rss_bytes": 11062525952
+      },
+      "release/specialize": {
+        "summed_seconds": 3.240182209,
+        "sampled_peak_process_tree_rss_bytes": 12896063488
+      },
+      "release/assemble": {
+        "summed_seconds": 2.208263876,
+        "sampled_peak_process_tree_rss_bytes": 15189188608
+      },
+      "release/optimize-0": {
+        "summed_seconds": 75.486060576,
+        "sampled_peak_process_tree_rss_bytes": 3824021504
+      },
+      "release/optimize-1": {
+        "summed_seconds": 0.081408625,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "release/optimize-2": {
+        "summed_seconds": 0.140659458,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "native/lower_functions": {
+        "summed_seconds": 2.216306585,
+        "sampled_peak_process_tree_rss_bytes": 7634120704
+      },
+      "native/layout_vtables": {
+        "summed_seconds": 0.440040625,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "native/create_asm_graph": {
+        "summed_seconds": 4.539245585,
+        "sampled_peak_process_tree_rss_bytes": 6366646272
+      },
+      "native/merge_asm_graph": {
+        "summed_seconds": 0.030070917,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "native/create_asm_symbols": {
+        "summed_seconds": 0.016377958999999997,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "native/write_asm_files": {
+        "summed_seconds": 8.424619045999998,
+        "sampled_peak_process_tree_rss_bytes": 11128020992
+      },
+      "native/link": {
+        "summed_seconds": 0.248205874,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "specialization/sequential": {
+        "summed_seconds": 0.15853345800000002,
+        "sampled_peak_process_tree_rss_bytes": 0
+      },
+      "native/compile": {
+        "summed_seconds": 0.082480166,
+        "sampled_peak_process_tree_rss_bytes": 343818240
+      }
+    }
+  },
+  "validation": {
+    "backend": {
+      "passed": 195,
+      "failed": 0,
+      "seconds": 204.160456094,
+      "sampled_peak_process_tree_rss_bytes": 7043506176,
+      "evidence": "skiplang/compiler/runs/release-memory/runs/full-backend-v8"
+    },
+    "compiler_language": {
+      "passed": 1766,
+      "failed": 0,
+      "seconds": 128.310354683,
+      "sampled_peak_process_tree_rss_bytes": 7865737216,
+      "evidence": "skiplang/compiler/runs/release-memory/runs/language-tests-v8"
+    },
+    "skargo_integration": {
+      "passed": 13,
+      "failed": 0,
+      "seconds": 255.116641449,
+      "sampled_peak_process_tree_rss_bytes": 2049867776,
+      "evidence": "skiplang/compiler/runs/release-memory/runs/skargo-tests-v8"
+    },
+    "runtime": {
+      "passed": true,
+      "checks": [
+        "native O0/O2 UBSan trap mode",
+        "bounded page evacuation",
+        "sharing, cycles, parent references, wide masks, dense and large pages",
+        "Wasm region evacuation and four-byte pointer alignment",
+        "existing native and Wasm runtime regressions"
+      ],
+      "evidence": "skiplang/compiler/runs/release-memory/runtime-tests-v8-wasm.log"
+    },
+    "mistigri_cli_usage": {
+      "passed": true,
+      "expected_returncode": 86
+    }
+  },
+  "raw_evidence": "skiplang/compiler/runs/release-memory (gitignored)"
+}

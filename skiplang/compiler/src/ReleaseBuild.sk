@@ -1,0 +1,317 @@
+// One-shot compilation owns one live phase at a time. Frontend collections
+// are temporary; the native backend passes ordinary values between phases.
+module alias O = OuterIstToIR;
+module ReleaseBuild;
+
+base class State {
+  children =
+  | Start(Config.Config, Bool)
+  | Frontend(Config.Config, SKStore.Context)
+  | Archive(Config.Config, SKStore.Context)
+  | Outer(Config.Config, SKStore.Context)
+  | Specialize(
+    Config.Config,
+    SKStore.Context,
+    O.Converter,
+    O.RootsIR,
+    Array<String>,
+  )
+  | Assemble(
+    Config.Config,
+    SKStore.Context,
+    O.RootsIR,
+    O.SpecializerState,
+    Array<String>,
+  )
+  | OptimizeIR(Config.Config, GlobalEnv, Int, Array<String>)
+  | LowerIR(Config.Config, GlobalEnv, Array<String>)
+  | Graph(Config.Config, GlobalEnv, Array<String>)
+  | Emit(
+    Config.Config,
+    Array<AsmOutput.AsmDef>,
+    SourcePositions.Table,
+    Array<String>,
+  )
+  | Link(Config.Config, Array<String>, Array<String>)
+}
+
+// Copy values, not the producing arrows, their old versions or dependencies.
+fun snapshot<K: SKStore.Key, V: SKStore.File>(
+  from: mutable SKStore.Context,
+  into: mutable SKStore.Context,
+  input: SKStore.EHandle<K, V>,
+): SKStore.EHandle<K, V> {
+  output = into.mkdir(input.keyType, input.type, input.dirName);
+  for ((key, values) in input.items(from)) {
+    output.writeArray(into, key, values.collect(Array))
+  };
+  output
+}
+
+fun throwErrors(context: mutable SKStore.Context): void {
+  context.getGlobal("ERRORS") match {
+  | Some(file) ->
+    errors = SkipError.ErrorsFile::type(file).value;
+    if (!errors.isEmpty()) {
+      throw SkipError.CompileFailureException{
+        message => SkipError.errorsToString(
+          errors.reversed().map(x -> x.errors).flatten().collect(Vector),
+          source -> FileCache.fileDir.unsafeGetArray(context, source)[0].value,
+        ),
+      }
+    }
+  | None() -> void
+  }
+}
+
+// Batch cheap frontend arrows, checkpointing after a substantial allocation
+// increase. Drain the final typing arrow so the next state can discard the
+// frontend graph instead of collecting another complete retained version.
+fun advance(context: mutable SKStore.Context): Bool {
+  limit = SKStore.obstackAllocatedBytes() + 256 * 1024 * 1024;
+  context
+    .updateUntilBoundary(
+      _ ~> false,
+      dir ~>
+        dir != SkipTyping.dirName && SKStore.obstackAllocatedBytes() >= limit
+      ,
+    )
+    .isNone()
+}
+
+fun step(state: State): ?State {
+  state match {
+  | Start(config, debugStore) ->
+    ensureCompatibleLLVMVersion();
+    if (!Array["sklib", "llvm-ir", "link", "cdylib"].contains(config.emit)) {
+      invariant_violation("Unsupported value for `--emit`: " + config.emit)
+    };
+    if (config.input_files.isEmpty() && config.dependencies.isEmpty()) {
+      print_error("fatal error: no input files\n");
+      skipExit(4)
+    };
+    context = SKStore.Context::mcreate{};
+    context.!debugMode = debugStore;
+    _ = context.mkdir(
+      FileCache.InputSource::keyType,
+      SKStore.StringFile::type,
+      FileCache.fileDirName,
+      Array[],
+      true,
+    );
+    _ = context.mkdir(
+      FileCache.InputPackageName::keyType,
+      FileCache.InputPackageFiles::type,
+      FileCache.packageDirName,
+      Array[],
+      true,
+    );
+    FileCache.scaffoldPackageEnvDirs(context);
+    _ = SkipMain.type_program(context);
+    runCompilerPhase("release/read_files", () -> {
+      FileCache.writeFiles(
+        context,
+        config.input_files,
+        config.dependencies,
+        config.lib_name,
+        (base, path) ~> {
+          full = Path.join(base, path);
+          if (config.canonize_paths) config.cwd.makeRelative(full) else full
+        },
+      )
+    });
+    Some(Frontend(config.backendConfig(), context.clone()))
+  | Frontend(config, saved) ->
+    context = saved.mclone();
+    finished = runCompilerPhase("release/frontend", () -> advance(context));
+    if (!finished) {
+      return Some(Frontend(config, context.clone()))
+    };
+    throwErrors(context);
+    next = SKStore.Context::mcreate{};
+    if (config.emit == "sklib") {
+      // Archives contain sources and packaging metadata. No typed tree needs
+      // to survive while those sources are encoded and written.
+      _ = snapshot(context, next, FileCache.packageDir);
+      _ = snapshot(context, next, FileCache.packageEnvAccessDir);
+      _ = snapshot(context, next, FileCache.packageEnvDir(config.lib_name));
+      return Some(Archive(config, next.clone()))
+    };
+    _ = snapshot(context, next, SkipTyping.dir);
+    _ = snapshot(context, next, SourcePositions.dir);
+    Some(Outer(config, next.clone()))
+  | Archive(config, saved) ->
+    compile_sklib(saved.mclone(), config);
+    None()
+  | Outer(config, saved) ->
+    context = saved.mclone();
+    // Eager maps run while they are registered. Start outer conversion only
+    // after the frontend handoff has reclaimed parser and naming state.
+    runCompilerPhase("release/outer", () -> {
+      _ = SkipMakeOuterIst.program(context, SkipTyping.dir);
+      context.update()
+    });
+    // Lowering reads typed definitions and source locations, never the parser,
+    // namer or type checker's retained versions. Drop that entire graph here.
+    next = SKStore.Context::mcreate{};
+    defs = snapshot(
+      context,
+      next,
+      SKStore.EHandle(
+        SKStore.SID::keyType,
+        OuterIst.DefFile::type,
+        SKStore.DirName::create("/outerDefs/"),
+      ),
+    );
+    _ = snapshot(context, next, SourcePositions.dir);
+    program = OuterIst.Program::create(next, defs);
+    funs = program.getFunsProj(next);
+    consts = program.getConstsProj(next);
+    converter = O.Converter::create(
+      next,
+      SKStore.DirName::create("/converter/"),
+      program,
+      false,
+    );
+    next.update();
+    roots = O.prepareCreateIR(
+      next,
+      funDef ~>
+        config.disasmFunctions.contains(funDef.origName) ||
+          (config.disasmAnnotated &&
+            annotationsContain(funDef.annotations, "@disasm", funDef.getPos())),
+      funDef ~>
+        AsmOutput.cppIsExported(
+          funDef.origName,
+          funDef.annotations,
+          funDef.getPos(),
+          config.exportedAsFunctions,
+          config.isWasm(),
+        ),
+      program,
+      converter,
+      consts,
+      funs,
+    );
+    exports = if (config.isWasm()) {
+      program
+        .getFuns(next, funs)
+        .filter(f ->
+          annotationsContainParam(
+            f.annotations,
+            "@wasm_export",
+            f.getPos(),
+          ).isSome() ||
+            annotationsContainParam(
+              f.annotations,
+              "@export",
+              f.getPos(),
+            ).isSome()
+        )
+        .map(exportName)
+    } else {
+      Array[]
+    };
+    Some(Specialize(config, next.clone(), converter, roots, exports))
+  | Specialize(config, saved, converter, roots, exports) ->
+    context = saved.mclone();
+    empty = context.mkdir(
+      x ~> x,
+      x ~> x,
+      SKStore.DirName::create("/specializer/empty/"),
+    );
+    specializer = runCompilerPhase("release/specialize", () -> {
+      sp = O.createSpecializer(context, config, converter, empty).mclone(
+        context,
+      );
+      for (root in roots.forceCompile) {
+        sp.requestFunction(root, Array[], Array[])
+      };
+      sp.specializePendingFuns();
+      sp.toFixed(context);
+      sp.chill()
+    });
+    if (config.stopAfterSpecialization) return None();
+    Some(Assemble(config, context.clone(), roots, specializer, exports))
+  | Assemble(config, saved, roots, specialized, exports) ->
+    context = saved.mclone();
+    specializer = specialized.mclone(context);
+    specializer.!canCreateNewSClasses = false;
+    env = runCompilerPhase("release/assemble", () ->
+      O.createIR(context, config, roots, specializer, None(), None())
+    );
+    // No frontend or specialization cache survives into the optimizer.
+    Some(OptimizeIR(config, env, 0, exports))
+  | OptimizeIR(config, env, phase, exports) ->
+    next = runCompilerPhase("release/optimize-" + phase, () -> {
+      if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
+        Optimize.optimizeAll(
+          SKStore.Context::mcreate{},
+          env,
+          config,
+          config.optConfig.all(),
+        )
+      }
+    });
+    if (phase == 2) {
+      Some(LowerIR(config, finishOptimizedFunctions(next, config), exports))
+    } else {
+      Some(OptimizeIR(config, next, phase + 1, exports))
+    }
+  | LowerIR(config, env, exports) ->
+    Some(Graph(config, Lower.lowerFunctions(env, config), exports))
+  | Graph(config, env, exports) ->
+    defs = runCompilerPhase("native/create_asm_graph", () ->
+      AsmOutput.createAsmDefGraph(env, config)
+    );
+    runCompilerPhase("native/merge_asm_graph", () ->
+      AsmOutput.mergeIdenticalAsmDefs(defs, config.debug)
+    );
+    runCompilerPhase("native/create_asm_symbols", () ->
+      AsmOutput.assignFinalSymbols(defs, false)
+    );
+    Some(
+      Emit(config, defs.values().collect(Array), env.sourcePositions, exports),
+    )
+  | Emit(config, definitions, positions, exports) ->
+    defs = mutable AsmOutput.AsmDefIDToAsmDef{pos => FileRange.builtin};
+    for (def in definitions) defs.set(def.id, def);
+    if (config.emit == "llvm-ir") {
+      compile_llvm_ir(defs, config, positions);
+      None()
+    } else {
+      inputs = runCompilerPhase("native/write_asm_files", () ->
+        AsmOutput.writeNativeOutputFiles(defs, config, positions)
+      );
+      Some(Link(config, inputs, exports))
+    }
+  | Link(config, inputs, exports) ->
+    runCompilerPhase("native/link", () -> {
+      getLinkArgs(config.output + ".ll", config, exports, Some(inputs)).each(
+        args -> {
+          if (config.no_link) {
+            print_string("---LINK_ARGS_BEGIN---");
+            args.each(print_string);
+            print_string("---LINK_ARGS_END---")
+          } else {
+            runShell(args, config.verbose)
+          }
+        },
+      )
+    });
+    None()
+  }
+}
+
+fun run(config: Config.Config, debugStore: Bool): void {
+  try {
+    initial: State = Start(config, debugStore);
+    SKStore.withRegionPipeline(initial, step)
+  } catch {
+  | exn ->
+    print_error(exn.getMessage());
+    skipExit(2)
+  }
+}
+
+module end;

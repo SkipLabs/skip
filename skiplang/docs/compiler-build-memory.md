@@ -135,3 +135,57 @@ the authority for the complete suite result.
 
 The margin below 14 GiB is small. These measurements do not establish a bound
 for arbitrary compiler workloads.
+
+## Disposable release builds (2026-11-14)
+
+Starting from compiler source `5baa561d`, `skargo build --release` now selects
+`skc --one-shot` for release compilation units. `skargo check --release` keeps
+its incremental frontend databases, including dependencies, and builds leave
+those release databases untouched. Ordinary artifact fingerprints still skip
+unchanged builds. Host build dependencies using the dev profile retain their
+existing behavior. Release native builds enable `--split-support-module`.
+
+The one-shot backend passes explicit state between phases. Frontend and
+conversion contexts are temporary; snapshots retain values rather than arrows,
+dependencies and old versions. Typed trees are released after outer conversion,
+and the remaining conversion context is released before optimization. Lowering,
+LLVM graph construction, emission and linking each receive only their required
+inputs. Archive decoding has a separate region, and archive encoding reclaims
+escaping scratch for each source file.
+
+The region collector marks live objects, frees empty pages and evacuates sparse
+pages one at a time. Bitmap ranks index forwarding tables, allowing each old
+page to be freed before all references have been rewritten. Dense and large
+pages stay in place. This avoids the temporary second copy of the live graph
+that raised earlier Mistigri attempts above 35 GiB. On glibc, freed arena pages
+are returned to the OS at checkpoints.
+
+The measured workload was a fresh `skargo build --release --jobs 1 --bin
+lean4-simp` of Mistigri `cbbd0d07`, with all 1,507 maintained modules and 115
+project source files (315,192,640 bytes). No source subset was selected.
+The unmodified compiler was stopped by its memory guard at **49.99 GiB sampled
+process-tree RSS**, before finishing the library; this is a lower bound, not a
+completed baseline peak.
+
+The changed compiler completed the library, executable and native link in
+**561.38 seconds**. The compiler's kernel high-water mark was **27.06 GiB**.
+The sampled process-tree peak was 26.75 GiB; the conservative sum of high-water
+marks for observed concurrently live processes was **27.18 GiB**. Use the latter
+when assessing memory headroom. Native compiler and linker children are included
+in the process-tree measurements. The executable also passed its CLI usage smoke
+check. This measures the `lean4-simp` target, not every Mistigri executable.
+
+The measurements ran on AArch64 Linux with Clang 20.1.8, with fresh target
+directories and no overlapping heavy workload. The baseline source was built
+using the installed `skc` at `5ceb49e2`; the changed compiler was built using
+that source-built baseline. These results do not claim a refreshed bootstrap.
+Exact identities, RSS bytes, phase samples and validation results are recorded in
+[`compiler-release-memory-results-20261114.json`](compiler-release-memory-results-20261114.json).
+
+The final compiler passed all 1,766 language tests, 195 backend checks (zero
+skipped), and 13 Skargo integration tests. The latter include release checks
+interleaved with builds and edits to both the root package and a dependency,
+verifying cache reuse and correct executable output. Native runtime tests pass
+at `-O0` and `-O2` with UBSan, including bounded page evacuation, sharing,
+cycles and retained-page references. The Wasm collector test also passes with
+four-byte pointer alignment and reused pages.
