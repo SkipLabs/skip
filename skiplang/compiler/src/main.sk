@@ -63,6 +63,11 @@ fun main(): void {
     .arg(Cli.Arg::bool("canonize-paths").negatable())
     .arg(Cli.Arg::bool("check").about("Run the front end only."))
     .arg(
+      Cli.Arg::bool("one-shot").about(
+        "Compile without a persistent backend, reclaiming completed phases.",
+      ),
+    )
+    .arg(
       Cli.Arg::bool("collection-emission").about(
         "Use keyed LLVM sharing and emission in incremental native builds.",
       ),
@@ -194,6 +199,18 @@ fun main(): void {
   };
 
   isInit = results.maybeGetString("init").isSome();
+  oneShot = results.getBool("one-shot") && !results.getBool("check");
+  if (
+    oneShot &&
+    (isInit ||
+      results.maybeGetString("data").isSome() ||
+      results.maybeGetString("batch").isSome())
+  ) {
+    print_error(
+      "--one-shot cannot be combined with --init, --data or --batch\n",
+    );
+    skipExit(2)
+  };
   cacheMetadata =
     Environ.varOpt("SKC_ARCHIVE_METADATA_CACHE").isSome() &&
     (isInit || results.maybeGetString("data").isSome());
@@ -210,6 +227,10 @@ fun main(): void {
       | Success(config) -> config
       | Failure(exn) -> throw exn
       }
+    } else if (oneShot) {
+      // Archive decoding has its own temporary trees and byte buffers. Only
+      // the resulting configuration belongs to the compilation's parent heap.
+      SKStore.withRegionValue(() ~> Config.Config::make(results))
     } else {
       Config.Config::make(results)
     }
@@ -217,6 +238,14 @@ fun main(): void {
   debugSKStore = results.getBool("debug-skstore");
 
   batchManifest = results.maybeGetString("batch");
+
+  if (oneShot) {
+    ReleaseBuild.run(
+      config with {incrementalSpecialization => false},
+      debugSKStore,
+    );
+    return void
+  };
 
   if (isInit && !cacheMetadata) {
     _ = SKStore.gContextInit(SKStore.Context::create{});

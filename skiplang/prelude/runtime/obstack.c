@@ -1,5 +1,9 @@
 #include "runtime.h"
 
+#if defined(SKIP64) && defined(__GLIBC__)
+#include <malloc.h>
+#endif
+
 /*****************************************************************************/
 /* Obstack. */
 /*****************************************************************************/
@@ -295,6 +299,274 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   sk_free_size(pages, sizeof(sk_cell_t) * nbr_pages);
 
   return result;
+}
+
+typedef struct {
+  unsigned char* seen;
+  size_t live;
+  void* large_object;
+  uint32_t* prefixes;
+  void** relocated;
+  size_t objects;
+} sk_region_page_t;
+
+// Mark in a bitmap, without modifying objects or retaining a second copy of
+// the live graph. One bit per pointer-aligned address costs 1/64 on 64-bit;
+// large pages contain just one allocation and need only one byte.
+static void sk_mark_region(void* root, sk_cell_t* pages, size_t count,
+                           sk_region_page_t* stats) {
+  sk_stack_t stack;
+  sk_stack_init(&stack, STACK_INIT_CAPACITY);
+  sk_stack_push(&stack, &root, NULL);
+  while (stack.head != 0) {
+    char* obj = *sk_stack_pop(&stack).value;
+    size_t index = sk_get_obstack_idx(obj, pages, count);
+    if (index >= count) continue;
+    sk_obstack_t* source = pages[index].key;
+    size_t bit =
+        sk_is_large_page(source) ? 0 : (obj - (char*)source) / sizeof(void*);
+    unsigned char mask = (unsigned char)(1u << (bit % 8));
+    if (stats[index].seen[bit / 8] & mask) continue;
+    stats[index].seen[bit / 8] |= mask;
+    if (sk_is_large_page(source)) stats[index].large_object = obj;
+    if (SKIP_is_string(obj)) {
+      size_t bytes = sk_string_header_size + get_sk_string(obj)->size + 1;
+      stats[index].live += (bytes + 8 + 7) & ~(size_t)7;
+      continue;
+    }
+    SKIP_gc_type_t* ty = get_gc_type(obj);
+    size_t bytes = ty->m_userByteSize * skip_object_len(ty, obj);
+    stats[index].live +=
+        (bytes + uninterned_metadata_byte_size(ty) + 8 + 7) & ~(size_t)7;
+    if ((ty->m_refsHintMask & 1) == 0) continue;
+    const size_t mask_bits = sizeof(ty->m_refMask[0]) * 8;
+    char* cursor = obj;
+    char* limit = obj + bytes;
+    while (cursor < limit) {
+      size_t remaining = ty->m_userByteSize;
+      size_t slot = 0;
+      while (remaining != 0) {
+        for (size_t bit = 0; bit < mask_bits && remaining != 0; bit++) {
+          if ((ty->m_refMask[slot] >> bit) & 1) {
+            void** child = (void**)cursor;
+            if (*child != NULL) sk_stack_push(&stack, child, NULL);
+          }
+          cursor += sizeof(void*);
+          remaining -= sizeof(void*);
+        }
+        slot++;
+      }
+    }
+  }
+  sk_stack_free(&stack);
+}
+
+// Ordinary pages have one mark bit per pointer-sized word. Prefix counts make
+// an object's rank in that bitmap an O(1) lookup into a compact forwarding
+// array. This table survives freeing the source page; no forwarding pointer
+// needs to be stored in an old object. Bitmap slices may be unaligned after
+// large pages.
+#define SK_REGION_BITMAP_WORDS \
+  ((PAGE_SIZE + sizeof(void*) * 64 - 1) / (sizeof(void*) * 64))
+static uint64_t sk_region_bits(sk_region_page_t* stats, size_t word) {
+  uint64_t bits;
+  memcpy(&bits, stats->seen + word * sizeof(bits), sizeof(bits));
+  return bits;
+}
+
+static void* sk_region_forward(void* value, sk_cell_t* pages, size_t count,
+                               sk_region_page_t* stats) {
+  if (value == NULL) return NULL;
+  size_t index = sk_get_obstack_idx(value, pages, count);
+  if (index >= count || stats[index].relocated == NULL) return value;
+  size_t bit = ((uintptr_t)value - (uintptr_t)pages[index].key) / sizeof(void*);
+  size_t word = bit / 64;
+  uint64_t preceding =
+      sk_region_bits(&stats[index], word) & ((UINT64_C(1) << (bit % 64)) - 1);
+  size_t rank = stats[index].prefixes[word] + __builtin_popcountll(preceding);
+  return stats[index].relocated[rank];
+}
+
+static void sk_region_rewrite(char* obj, sk_cell_t* pages, size_t count,
+                              sk_region_page_t* stats) {
+  if (SKIP_is_string(obj)) return;
+  SKIP_gc_type_t* ty = get_gc_type(obj);
+  if ((ty->m_refsHintMask & 1) == 0) return;
+  char* limit = obj + ty->m_userByteSize * skip_object_len(ty, obj);
+  const size_t mask_bits = sizeof(ty->m_refMask[0]) * 8;
+  for (char* cursor = obj; cursor < limit;) {
+    size_t remaining = ty->m_userByteSize;
+    size_t slot = 0;
+    while (remaining != 0) {
+      for (size_t bit = 0; bit < mask_bits && remaining != 0; bit++) {
+        if ((ty->m_refMask[slot] >> bit) & 1) {
+          void** field = (void**)cursor;
+          *field = sk_region_forward(*field, pages, count, stats);
+        }
+        cursor += sizeof(void*);
+        remaining -= sizeof(void*);
+      }
+      slot++;
+    }
+  }
+}
+
+// Evacuate sparse pages one at a time, freeing each immediately. Copying the
+// entire live graph before freeing its old pages would raise the very peak
+// this collector is meant to reduce. Dense and large pages keep their address.
+static void* sk_compact_region(sk_saved_obstack_t* saved, void* root,
+                               sk_cell_t* pages, size_t count,
+                               sk_region_page_t* stats) {
+  page = saved->page;
+  head = saved->head;
+  end = saved->end;
+  sk_new_page();
+  const size_t prefix_bytes = SK_REGION_BITMAP_WORDS * sizeof(uint32_t);
+  for (size_t i = 0; i < count; i++) {
+    sk_region_page_t* info = &stats[i];
+    if (info->live == 0) continue;
+    if (info->large_object != NULL || info->live >= PAGE_SIZE / 2) {
+      sk_obstack_attach_page(pages[i].key, NULL);
+      continue;
+    }
+    info->prefixes = sk_malloc(prefix_bytes);
+    for (size_t word = 0; word < SK_REGION_BITMAP_WORDS; word++) {
+      info->prefixes[word] = info->objects;
+      info->objects += __builtin_popcountll(sk_region_bits(info, word));
+    }
+    info->relocated = sk_malloc(info->objects * sizeof(void*));
+    size_t ordinal = 0;
+    for (size_t word = 0; word < SK_REGION_BITMAP_WORDS; word++) {
+      uint64_t bits = sk_region_bits(info, word);
+      while (bits != 0) {
+        size_t bit = word * 64 + __builtin_ctzll(bits);
+        char* obj = (char*)pages[i].key + bit * sizeof(void*);
+        size_t left;
+        size_t bytes;
+        if (SKIP_is_string(obj)) {
+          left = sk_string_header_size;
+          bytes = get_sk_string(obj)->size + 1;
+        } else {
+          SKIP_gc_type_t* ty = get_gc_type(obj);
+          left = uninterned_metadata_byte_size(ty);
+          bytes = ty->m_userByteSize * skip_object_len(ty, obj);
+        }
+        char* copy = SKIP_Obstack_alloc(left + bytes);
+        memcpy(copy, obj - left, left + bytes);
+        info->relocated[ordinal++] = copy + left;
+        bits &= bits - 1;
+      }
+    }
+    sk_free_page(pages[i].key);
+  }
+
+  // All object fields still contain their original addresses. Rewrite each
+  // exactly once, including fields in pages retained in place. A new page may
+  // reuse an old address, so do not follow rewritten pointers while walking.
+  root = sk_region_forward(root, pages, count, stats);
+  for (size_t i = 0; i < count; i++) {
+    sk_region_page_t* info = &stats[i];
+    if (info->live == 0) continue;
+    if (info->large_object != NULL) {
+      sk_region_rewrite(info->large_object, pages, count, stats);
+      continue;
+    }
+    size_t ordinal = 0;
+    for (size_t word = 0; word < SK_REGION_BITMAP_WORDS; word++) {
+      uint64_t bits = sk_region_bits(info, word);
+      while (bits != 0) {
+        size_t bit = word * 64 + __builtin_ctzll(bits);
+        char* obj = info->relocated != NULL
+                        ? info->relocated[ordinal++]
+                        : (char*)pages[i].key + bit * sizeof(void*);
+        sk_region_rewrite(obj, pages, count, stats);
+        bits &= bits - 1;
+      }
+    }
+  }
+  // Keep every forwarding table until all retained objects have been fixed.
+  for (size_t i = 0; i < count; i++) {
+    if (stats[i].relocated != NULL) {
+      sk_free_size(stats[i].relocated, stats[i].objects * sizeof(void*));
+      sk_free_size(stats[i].prefixes, prefix_bytes);
+    }
+  }
+  return root;
+}
+
+// Replace the current region with its live graph. Dense pages stay in place:
+// copying a large, mostly live compiler phase would itself double its peak.
+// Reclaim dead pages before compacting sparse survivors. The caller must pass
+// every live region pointer through root, retaining no other region pointers.
+void* SKIP_collect_Obstack_with_value(sk_saved_obstack_t* saved, void* root) {
+  size_t count = sk_get_nbr_pages(page, saved->page);
+  sk_cell_t* pages = sk_get_pages(page, count);
+  sk_region_page_t* stats = sk_malloc(count * sizeof(sk_region_page_t));
+  size_t bitmap_size = 0;
+  for (size_t i = 0; i < count; i++) {
+    bitmap_size += sk_is_large_page(pages[i].key)
+                       ? 1
+                       : SK_REGION_BITMAP_WORDS * sizeof(uint64_t);
+  }
+  unsigned char* bitmap = sk_malloc(bitmap_size);
+  memset(bitmap, 0, bitmap_size);
+  size_t offset = 0;
+  for (size_t i = 0; i < count; i++) {
+    stats[i] = (sk_region_page_t){.seen = bitmap + offset};
+    offset += sk_is_large_page(pages[i].key)
+                  ? 1
+                  : SK_REGION_BITMAP_WORDS * sizeof(uint64_t);
+  }
+  sk_mark_region(root, pages, count, stats);
+
+  sk_obstack_t* original = page;
+  sk_obstack_t* first = NULL;
+  sk_obstack_t* last = NULL;
+  size_t retained = 0;
+  size_t live = 0;
+  for (sk_obstack_t* cursor = page; cursor != saved->page;) {
+    sk_obstack_t* previous = cursor->previous;
+    size_t index = sk_get_obstack_idx((char*)cursor, pages, count);
+    if (stats[index].live != 0) {
+      if (last != NULL)
+        last->previous = cursor;
+      else
+        first = cursor;
+      last = cursor;
+      retained += cursor->size;
+      live += stats[index].live;
+    } else {
+      sk_free_page(cursor);
+    }
+    cursor = previous;
+  }
+  if (last != NULL) last->previous = saved->page;
+  page = first != NULL ? first : saved->page;
+
+  // Bound fragmentation without copying full, long-lived input graphs on
+  // every checkpoint. One partially occupied allocation page is unavoidable.
+  if (retained > PAGE_SIZE && live < retained / 2) {
+    root = sk_compact_region(saved, root, pages, count, stats);
+  } else if (first != original) {
+    sk_new_page();
+  }
+  sk_free_size(bitmap, bitmap_size);
+  sk_free_size(stats, count * sizeof(sk_region_page_t));
+  sk_free_size(pages, count * sizeof(sk_cell_t));
+#if defined(SKIP64) && defined(__GLIBC__)
+  // glibc may keep freed 8 MiB pages in its arena after adapting its mmap
+  // threshold. Return that physical memory before the next compiler phase.
+  malloc_trim(0);
+#endif
+  return root;
+}
+
+SkipInt SKIP_Obstack_allocated_bytes(void) {
+  SkipInt bytes = 0;
+  for (sk_obstack_t* cursor = page; cursor != NULL; cursor = cursor->previous) {
+    bytes += cursor->size;
+  }
+  return bytes;
 }
 
 sk_obstack_t* SKIP_switch_to_parent(sk_saved_obstack_t* saved) {

@@ -328,6 +328,7 @@ def span_category(kind, name):
     if kind == "store":
         return {
             "sync": "Shared synchronization/collection",
+            "region_collect": "Release region collection",
             "lazy_retention": "Lazy collection retention",
         }.get(name, "Unattributed compiler/store work")
     if kind == "phase":

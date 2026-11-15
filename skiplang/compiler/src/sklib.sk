@@ -4,16 +4,10 @@
 
 module Sklib;
 
-// The two paths produce identical UTF-8 bytes. The experimental path allocates
-// the final array once, avoiding an iterator and a growable intermediate vector.
-// Keep the control available for matched archive-loading measurements.
+// Allocate the final byte array once. Iterating a large archive through boxed
+// iterator results and a growable vector needlessly expands decoding scratch.
 private fun metadataText(bytes: readonly Bytes): String {
-  data = if (Environ.varOpt("SKC_ARCHIVE_DIRECT_BYTES").isSome()) {
-    Array::fillBy(bytes.size(), i -> bytes[i])
-  } else {
-    bytes.values().collect(Array)
-  };
-  String::fromUtf8(data)
+  String::fromUtf8(Array::fillBy(bytes.size(), i -> bytes[i]))
 }
 
 class Metadata{
@@ -77,16 +71,19 @@ class Metadata{
     sourceCache: ?mutable SourceEncodingCache = None(),
   ): readonly Bytes {
     json = this.toJSON();
-    sourceCache.each(cache -> {
-      !json = json.set(
-        "sources",
-        JSON.Array(
-          Vector::createFromItems(
-            this.sources.map(source -> cache.encode(source)),
+    !json = json.set(
+      "sources",
+      JSON.Array(
+        Vector::createFromItems(
+          this.sources.map(source ->
+            sourceCache match {
+            | Some(cache) -> cache.encode(source)
+            | None() -> EncodedSourceJSON(encodeSource(source))
+            }
           ),
         ),
-      )
-    });
+      ),
+    );
     json.toString().bytes()
   }
 
@@ -226,6 +223,20 @@ private class EncodedSourceJSON(text: String) extends JSON.Value {
   }
 }
 
+// JSON escaping constructs temporary strings for individual characters. Keep
+// those inside one source's region, rather than retaining every source's
+// escaping scratch until the whole archive has been written.
+private fun encodeSource(source: (String, Int, String)): String {
+  SKStore.withRegionValue(() ~> {
+    (path, mtime, contents) = source;
+    JSON.Object[
+      "path" => JSON.String(path),
+      "mtime" => JSON.IntNumber(mtime),
+      "contents" => JSON.String(contents),
+    ].toString()
+  })
+}
+
 mutable class SourceEncodingCache(
   previous: Map<String, EncodedSource>,
   used: mutable Map<String, EncodedSource> = mutable Map[],
@@ -241,15 +252,7 @@ mutable class SourceEncodingCache(
       if (Environ.varOpt("SKC_TRACE_ARCHIVE_CACHE").isSome()) {
         print_error(`ARCHIVE_ENCODING_MISS: ${source.i0}\n`)
       };
-      (path, mtime, contents) = source;
-      EncodedSource(
-        source,
-        JSON.Object[
-          "path" => JSON.String(path),
-          "mtime" => JSON.IntNumber(mtime),
-          "contents" => JSON.String(contents),
-        ].toString(),
-      )
+      EncodedSource(source, encodeSource(source))
     };
     this.used.set(source.i0, entry);
     EncodedSourceJSON(entry.text)

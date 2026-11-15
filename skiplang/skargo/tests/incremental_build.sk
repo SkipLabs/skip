@@ -98,9 +98,13 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   T.expectEq(releaseCommands.size(), 1, release.stderr);
   T.expectTrue(releaseCommands[0].contains("-O2"), release.stderr);
   T.expectTrue(releaseCommands[0].contains("--release"), release.stderr);
-  // Release builds opt out of the incremental backend explicitly: the retained
-  // specialization graph exceeds the CI memory budget, and --release alone no
-  // longer selects the sequential pipeline.
+  T.expectTrue(releaseCommands[0].contains("--one-shot"), release.stderr);
+  T.expectTrue(
+    releaseCommands[0].contains("--split-support-module"),
+    release.stderr,
+  );
+  T.expectTrue(!releaseCommands[0].contains("--init "), release.stderr);
+  T.expectTrue(!releaseCommands[0].contains("--data "), release.stderr);
   T.expectTrue(
     releaseCommands[0].contains("--no-incremental-backend"),
     release.stderr,
@@ -352,5 +356,88 @@ fun test_incremental_build_inputs_and_cached_link(): void {
   );
   _ = build(skargo, consumer);
   run_probe(consumer, "5");
+}
+@test
+fun test_release_check_cache_survives_one_shot_build(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) return void;
+    Environ.current_exe()
+  };
+  root = Path.join(kManifestDir, "target/it-release-check-build");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  dependency = root + "/dependency";
+  write_file(
+    dependency + "/Skargo.toml",
+    `[package]\nname = "release-check-dep"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+  );
+  dependencySource = dependency + "/src/lib.sk";
+  dependencyText = "module ReleaseCheckDep; fun value(): Int { VALUE } module end;\n";
+  write_file(dependencySource, dependencyText.replace("VALUE", "0"));
+  write_file(
+    root + "/Skargo.toml",
+    `[package]\nname = "release-check-probe"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\nrelease-check-dep = { path = "dependency" }\n[[bin]]\nname = "probe"\nmain = "ReleaseCheckProbe.main"\n`,
+  );
+  source = root + "/src/lib.sk";
+  text = "module ReleaseCheckProbe; untracked fun main(): void { print_raw((VALUE + ReleaseCheckDep.value()).toString()) } module end;\n";
+  write_file(source, text.replace("VALUE", "1"));
+  check = () -> {
+    result = System.popen{
+      args => Array[skargo, "check", "--release", "-v"],
+      env => Map["SKARGO_BIN" => "skargo"],
+      cwd => Some(root),
+    }.fromSuccess();
+    T.expectTrue(result.success(), result.stderr);
+    result
+  };
+  first = check();
+  checks = first.stderr
+    .split("\n")
+    .filter(line -> line.contains("--check"))
+    .collect(Array);
+  T.expectEq(checks.size(), 1, first.stderr);
+  T.expectTrue(checks[0].contains("--init "), first.stderr);
+  T.expectTrue(!checks[0].contains("--one-shot"), first.stderr);
+  dependencyCommand = first.stderr
+    .split("\n")
+    .filter(line -> line.contains("--sklib-name=release-check-dep"))
+    .collect(Array);
+  T.expectEq(dependencyCommand.size(), 1, first.stderr);
+  T.expectTrue(!dependencyCommand[0].contains("--one-shot"), first.stderr);
+  dependencyDatabase = dependencyCommand[0].split("--init ")[1].split(" ")[0];
+  database = checks[0].split("--init ")[1].split(" ")[0];
+  T.expectTrue(FileSystem.exists(database));
+  beforeBuild = mtime(database);
+  _ = build(skargo, root, false, Array["--release"]);
+  T.expectEq(mtime(database), beforeBuild);
+  same = build(skargo, root, false, Array["--release"]);
+  T.expectTrue(!same.stderr.contains("--one-shot"), same.stderr);
+  write_file(source, text.replace("VALUE", "2"));
+  changed = check();
+  T.expectTrue(changed.stderr.contains("--data " + database), changed.stderr);
+  _ = build(skargo, root, false, Array["--release"]);
+  result = System.popen{
+    args => Array[root + "/target/host/release/probe"],
+  }.fromSuccess();
+  T.expectTrue(result.success(), result.stderr);
+  T.expectEq(result.stdout, "2");
+  write_file(dependencySource, dependencyText.replace("VALUE", "3"));
+  changedDependency = check();
+  T.expectTrue(
+    changedDependency.stderr.contains("--data " + dependencyDatabase),
+    changedDependency.stderr,
+  );
+  dependencyTime = mtime(dependencyDatabase);
+  _ = build(skargo, root, false, Array["--release"]);
+  T.expectEq(mtime(dependencyDatabase), dependencyTime);
+  dependencyResult = System.popen{
+    args => Array[root + "/target/host/release/probe"],
+  }.fromSuccess();
+  T.expectTrue(dependencyResult.success(), dependencyResult.stderr);
+  T.expectEq(dependencyResult.stdout, "5");
 }
 module end;

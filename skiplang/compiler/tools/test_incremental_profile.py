@@ -97,6 +97,23 @@ class AttributionTests(unittest.TestCase):
         )
         self.assertEqual(sum(totals.values()), 100)
 
+    def test_release_collection_is_separate_from_compiler_phases(self):
+        totals, _ = exclusive_totals(
+            [
+                (0, 100, "Compiler"),
+                (0, 50, span_category("phase", "native/write_sklib")),
+                (50, 90, span_category("store", "region_collect")),
+            ]
+        )
+        self.assertEqual(
+            totals,
+            {
+                "Compiler": 10,
+                "Archive packaging": 50,
+                "Release region collection": 40,
+            },
+        )
+
     def test_class_construction_excludes_cache_and_coordination_work(self):
         spans = [
             (0, 100, span_category("arrow", "/specializer/reduced1/7/")),
