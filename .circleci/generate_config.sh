@@ -247,7 +247,7 @@ if ! changed \
   TS_CHANGED[sql]=true
 fi
 
-# The skipruntime job's native addon test builds libskipruntime in Docker
+# The native-addon-unreleased job's test builds libskipruntime in Docker
 # (skipruntime-ts/tests/native_addon_unreleased/run.sh -> bin/build_runtime.sh
 # -> the `skipruntime` bake target), which builds skiplang/Dockerfile and
 # skipruntime-ts/Dockerfile with the build contexts filtered by .dockerignore.
@@ -287,7 +287,7 @@ if ! changed .circleci/base.yml; then
       skdb) SK_CHANGED[sql]=true ;;
       skdb-wasm) TS_CHANGED[sql]=true ;;
       check-ts) check_ts=true ;;
-      skipruntime | skipruntime-bun) TS_CHANGED[skipruntime-ts]=true ;;
+      skipruntime | skipruntime-bun | native-addon-unreleased) TS_CHANGED[skipruntime-ts]=true ;;
       check-examples) examples=1 ;;
       all-checks) ;;
       # Every Skargo package except these three gets a skip-package-* job below.
@@ -406,7 +406,11 @@ then
             echo "      - $job"
         fi
     done
-    NAMES+=(skipruntime skipruntime-bun)
+    # The release rehearsal runs beside them, not inside `skipruntime` (see the
+    # job in base.yml): it builds its own toolchain in Docker, so it never
+    # waits for `compiler`.
+    echo "      - native-addon-unreleased"
+    NAMES+=(skipruntime skipruntime-bun native-addon-unreleased)
 fi
 
 if (( examples != 0 ))

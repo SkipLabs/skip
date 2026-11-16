@@ -1,4 +1,5 @@
 #include "runtime.h"
+#include "ryu/ryu.h"
 #include "ryu/ryu_parse.h"
 
 #ifdef SKIP64
@@ -209,6 +210,65 @@ void* SKIP_String_unsafeSlice(unsigned char* str, SkipInt n1, SkipInt n2) {
   memcpy(result, str + n1, size);
   sk_string_set_hash(result);
   return result;
+}
+
+/**
+ * Format a non-negative, finite double using Ryu shortest representation
+ * with Skip's formatting conventions:
+ *   - Fixed notation for exponents in [-4, 14]
+ *   - Scientific notation otherwise
+ *   - Integer-valued floats get ".0" suffix
+ *   - Exponent format: e+N, e-0N (single digit), e-NN (multi digit)
+ *
+ * Uses Ryu's d2s_buffered_n() which has no libc dependency, so this
+ * works in both SKIP64 (native) and SKIP32 (WASM).
+ */
+char* SKIP_Float_toStringShortest(double value) {
+  if (value == 0.0) return sk_string_create("0.0", 3);
+
+  /* Ryu writes d[.ddd]E[-]x, at most 24 characters, e.g. "1E20", "1.5E-7". */
+  char ryu[32];
+  int ryu_len = d2s_buffered_n(value, ryu);
+
+  /* Split it into its significant digits (at most 17) and decimal exponent:
+   * value = 0.d1d2... * 10^(exp + 1). */
+  char digits[20];
+  int nd = 0;
+  int pos = 0;
+  for (; ryu[pos] != 'E'; pos++) {
+    if (ryu[pos] != '.') digits[nd++] = ryu[pos];
+  }
+  int exp_neg = ryu[++pos] == '-';
+  int exp = 0;
+  for (pos += exp_neg; pos < ryu_len; pos++) exp = exp * 10 + ryu[pos] - '0';
+  if (exp_neg) exp = -exp;
+
+  /* At most 23 characters: 17 digits, "." and "e-308" (scientific). */
+  char out[64];
+  int len = 0;
+  if (exp >= -4 && exp <= 14) {
+    /* Fixed notation: emit the digit of weight 10^w for w from the highest
+     * (at least 10^0) down to the lowest (at least 10^-1), zero-padded. */
+    int lowest = exp - nd + 1 < -1 ? exp - nd + 1 : -1;
+    for (int w = exp > 0 ? exp : 0; w >= lowest; w--) {
+      int i = exp - w;
+      out[len++] = i >= 0 && i < nd ? digits[i] : '0';
+      if (w == 0) out[len++] = '.';
+    }
+  } else {
+    /* Scientific notation: d.ddd (or d.0) and e+N, e-0N or e-NN. */
+    out[len++] = digits[0];
+    out[len++] = '.';
+    for (int i = 1; i < nd; i++) out[len++] = digits[i];
+    if (nd == 1) out[len++] = '0';
+    out[len++] = 'e';
+    out[len++] = exp < 0 ? '-' : '+';
+    int e = exp < 0 ? -exp : exp;
+    if (e >= 100) out[len++] = (char)('0' + e / 100);
+    if (e >= 10 || exp < 0) out[len++] = (char)('0' + e / 10 % 10);
+    out[len++] = (char)('0' + e % 10);
+  }
+  return sk_string_create(out, len);
 }
 
 extern char* SKIP_floatToString(double origf);
