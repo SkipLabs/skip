@@ -204,4 +204,22 @@ fun read_bsd_archive(): void {
   );
 }
 
+@test
+fun read_bsd_archive_nul_padded_identifier(): void {
+  // llvm-ar's darwin format pads extended names with NUL bytes.
+  archive =
+    ARParser.kGLOBAL_HEADER +
+    member{
+      identifier => "#1/12",
+      data => "native.o\u0000\u0000\u0000\u0000obj",
+    };
+
+  ar = ARParser.Archive::read(Bytes.Cursor::create(archive.bytes())) match {
+  | Success(ar) -> ar
+  | Failure(err) -> T.fail(err.getMessage())
+  };
+  T.expectEq(ar.variant, ARParser.VariantBSD());
+  expectMemberEq(ar, "native.o", "obj", 0, 0, 0, 0o644);
+}
+
 module end;
