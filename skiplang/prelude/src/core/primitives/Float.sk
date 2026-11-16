@@ -92,9 +92,9 @@ native value class Float uses Number {
    * Special values are formatted as "inf", "-inf", and "nan".
    * Note: negative NaN is formatted as "nan" (sign is dropped), unlike C's
    * printf which outputs "-nan". This matches Rust's Display behavior.
-   * Integer values are formatted as Int::toString(), with a trailing ".0".
-   * All other values are formatted by the "%.17g" printf format.
-   * See http://pubs.opengroup.org/onlinepubs/009695399/functions/fprintf.html
+   * Other values are formatted as the shortest decimal string that converts
+   * back to the same float, in fixed notation for 1e-4 <= |value| < 1e15
+   * (with a trailing ".0" for integers) and scientific notation otherwise.
    */
   @intrinsic
   native fun toString(): String;
@@ -146,10 +146,7 @@ fun floatToString(value: Float): String {
     return "nan";
   };
   if (value.toBits().and(0x8000000000000000) != 0) {
-    if (value == -Float::inf) {
-      return "-inf";
-    };
-    return "-" + toStringShortest(-value);
+    return "-" + floatToString(-value);
   };
   if (value == Float::inf) {
     return "inf";
