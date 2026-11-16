@@ -24,15 +24,32 @@ SKIP_SRC=$(shell find src/ -name '*.sk')
 # concurrent prelude builds with different OUT_DIRs (e.g. `make -j` in
 # skiplang/compiler, which builds build/ and stage0/lib at once) must
 # serialize on this lock. flock releases it even if a build is killed, and
-# locking an existing file creates nothing new in the tree.
+# locking an existing file creates nothing new in the tree. macOS has no
+# flock(1); its lockf(1) takes the same flock(2) lock (-k keeps the file).
 RUNTIME_LOCK = runtime/Makefile
+ifeq ($(shell uname -s),Darwin)
+WITH_RUNTIME_LOCK = lockf -k $(RUNTIME_LOCK)
+else
+WITH_RUNTIME_LOCK = flock $(RUNTIME_LOCK)
+endif
+
+# On macOS, the bootstrap skc needs GNU-format archives (it predates the
+# arparser fix for the member names of Apple's BSD-format ones), and
+# executables must link with lld: ld64 rejects the non-object members
+# (metadata, sources) of .sklib archives.
+ifeq ($(shell uname -s),Darwin)
+TO_GNU_AR = llvm-ar --format=gnu qcL
+STD_LINK_ARGS = -lpthread -fuse-ld=lld
+else
+STD_LINK_ARGS = -lpthread
+endif
 
 .PHONY: default
 default: $(OUT_DIR)/libbacktrace.a $(OUT_DIR)/libskip_runtime64.a preamble/preamble64.ll
 	@echo "skargo:skc-preamble=preamble/preamble64.ll"
 	@echo "skargo:skc-link-lib=$(OUT_DIR)/libskip_runtime64.a"
 	@echo "skargo:skc-link-lib=$(OUT_DIR)/libbacktrace.a"
-	@echo "skargo:skc-link-arg=-lpthread"
+	@echo "skargo:skc-link-arg=$(STD_LINK_ARGS)"
 
 .PHONY: wasm
 wasm: $(OUT_DIR)/libskip_runtime32.a preamble/preamble32.ll
@@ -46,6 +63,7 @@ ifeq ($(LBT_EXISTS), 1)
 $(OUT_DIR)/libbacktrace.a: $(LIB_DIR)/libbacktrace.a
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	cp $< $@
+	$(if $(TO_GNU_AR),rm -f $@ && $(TO_GNU_AR) $@ $<)
 else
 LBT_SOURCE=$(realpath libbacktrace)
 LBT_BUILD=$(OUT_DIR)/libbacktrace-build
@@ -56,6 +74,7 @@ CFLAGS += -I$(LBT_SOURCE)
 $(OUT_DIR)/libbacktrace.a: $(LBT_BUILD)/.libs/libbacktrace.a
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	cp $< $@
+	$(if $(TO_GNU_AR),rm -f $@ && $(TO_GNU_AR) $@ $<)
 
 $(LBT_BUILD)/.libs/libbacktrace.a: $(LBT_SRCS)
 	test -f libbacktrace/configure || (echo "Warning: libbacktrace submodule not initialized" && false)
@@ -75,7 +94,7 @@ RUNTIME_SRCS=$(filter-out runtime/magic.c,$(wildcard runtime/*.c)) $(wildcard ru
 # then copied to OUT_DIR. Real prerequisites so an unchanged runtime is not
 # re-archived (and OUT_DIR copies not re-copied) on every invocation.
 runtime/libskip_runtime64.a: $(RUNTIME_SRCS)
-	CFLAGS="$(CFLAGS)" flock $(RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime64.a
+	CFLAGS="$(CFLAGS)" $(WITH_RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime64.a
 
 $(OUT_DIR)/libskip_runtime64.a: runtime/libskip_runtime64.a
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
@@ -84,7 +103,7 @@ $(OUT_DIR)/libskip_runtime64.a: runtime/libskip_runtime64.a
 .PHONY: $(OUT_DIR)/libskip_runtime32.bc
 $(OUT_DIR)/libskip_runtime32.bc:
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
-	CFLAGS="$(CFLAGS)" flock $(RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime32.bc
+	CFLAGS="$(CFLAGS)" $(WITH_RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime32.bc
 	cp runtime/libskip_runtime32.bc $@
 
 $(OUT_DIR)/libskip_runtime32.o: $(OUT_DIR)/libskip_runtime32.bc
@@ -96,7 +115,7 @@ $(OUT_DIR)/libskip_runtime32.a: $(OUT_DIR)/libskip_runtime32.o
 	llvm-ar crs $@ $^
 
 $(OUT_DIR)/libstd.sklib: $(OUT_DIR)/libskip_runtime64.a $(OUT_DIR)/libbacktrace.a $(SKIP_SRC)
-	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '-lpthread' $^
+	SKC_PREAMBLE=./preamble/preamble64.ll skc -o $@ --sklib-name std --no-std $(OLEVEL) --link-args '$(STD_LINK_ARGS)' $^
 
 .PHONY: libbacktrace
 libbacktrace: $(OUT_DIR)/libbacktrace.a
