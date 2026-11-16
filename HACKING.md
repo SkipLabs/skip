@@ -59,6 +59,9 @@ encourages batching unrelated changes.
   build when the artifact is already present; a cache hit is only possible
   when the inputs are unchanged. Bump the `v1` in the cache keys in
   `.circleci/base.yml` to bust the caches.
+- The native-addon release rehearsal is its own `native-addon-unreleased` job,
+  scheduled beside `skipruntime`, so its from-source Docker rebuild (on a
+  cache miss) runs in parallel with the runtime tests instead of after them.
 - Doc-only and `.gitignore`-only changes schedule no test jobs
   (`.circleci/generate_config.sh`); keep it that way for other paths that
   cannot affect a build.

@@ -547,7 +547,10 @@ void* SKIP_collect_Obstack_with_value(sk_saved_obstack_t* saved, void* root) {
   // every checkpoint. One partially occupied allocation page is unavoidable.
   if (retained > PAGE_SIZE && live < retained / 2) {
     root = sk_compact_region(saved, root, pages, count, stats);
-  } else if (first != original) {
+  } else if (count != 0 && first != original) {
+    // The head page was reclaimed, so head/end no longer name live memory and
+    // a fresh page is required. An empty region (count == 0) already has
+    // valid head/end on the saved page: allocate nothing.
     sk_new_page();
   }
   sk_free_size(bitmap, bitmap_size);
