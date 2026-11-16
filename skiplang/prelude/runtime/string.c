@@ -226,111 +226,49 @@ void* SKIP_String_unsafeSlice(unsigned char* str, SkipInt n1, SkipInt n2) {
 char* SKIP_Float_toStringShortest(double value) {
   if (value == 0.0) return sk_string_create("0.0", 3);
 
-  /* Get Ryu's shortest representation.
-   * Format: digit ['.' digits] 'E' ['-'] digits
-   * Examples: "1E0", "1E-1", "3141592653589793E-15", "1E20"
-   * At most 24 characters. */
-  char ryu_buf[32];
-  int ryu_len = d2s_buffered_n(value, ryu_buf);
-  ryu_buf[ryu_len] = '\0';
+  /* Ryu writes d[.ddd]E[-]x, at most 24 characters, e.g. "1E20", "1.5E-7". */
+  char ryu[32];
+  int ryu_len = d2s_buffered_n(value, ryu);
 
-  /* Parse: collect mantissa digits and exponent. */
-  int pos = 0;
-  char digits[20]; /* at most 17 significant digits */
+  /* Split it into its significant digits (at most 17) and decimal exponent:
+   * value = 0.d1d2... * 10^(exp + 1). */
+  char digits[20];
   int nd = 0;
-
-  while (ryu_buf[pos] != 'E') {
-    if (ryu_buf[pos] != '.') {
-      digits[nd++] = ryu_buf[pos];
-    }
-    pos++;
+  int pos = 0;
+  for (; ryu[pos] != 'E'; pos++) {
+    if (ryu[pos] != '.') digits[nd++] = ryu[pos];
   }
-  pos++; /* skip 'E' */
-
-  int exp_neg = 0;
-  if (ryu_buf[pos] == '-') {
-    exp_neg = 1;
-    pos++;
-  }
-  int ryu_exp = 0;
-  while (pos < ryu_len) {
-    ryu_exp = ryu_exp * 10 + (ryu_buf[pos] - '0');
-    pos++;
-  }
-  if (exp_neg) ryu_exp = -ryu_exp;
-
-  /* dot_pos = ryu_exp + 1 = number of digits before decimal point */
-  int dot_pos = ryu_exp + 1;
+  int exp_neg = ryu[++pos] == '-';
+  int exp = 0;
+  for (pos += exp_neg; pos < ryu_len; pos++) exp = exp * 10 + ryu[pos] - '0';
+  if (exp_neg) exp = -exp;
 
   /* At most 23 characters: 17 digits, "." and "e-308" (scientific). */
   char out[64];
-  int out_len = 0;
-
-  if (dot_pos >= 1 && dot_pos <= 15) {
-    /* Fixed notation, value >= 1 */
-    if (dot_pos <= nd) {
-      memcpy(out, digits, dot_pos);
-      out_len = dot_pos;
-      if (dot_pos < nd) {
-        out[out_len++] = '.';
-        memcpy(out + out_len, digits + dot_pos, nd - dot_pos);
-        out_len += nd - dot_pos;
-      } else {
-        out[out_len++] = '.';
-        out[out_len++] = '0';
-      }
-    } else {
-      /* All digits before decimal, pad with zeros */
-      memcpy(out, digits, nd);
-      out_len = nd;
-      int zeros = dot_pos - nd;
-      for (int i = 0; i < zeros; i++) out[out_len++] = '0';
-      out[out_len++] = '.';
-      out[out_len++] = '0';
+  int len = 0;
+  if (exp >= -4 && exp <= 14) {
+    /* Fixed notation: emit the digit of weight 10^w for w from the highest
+     * (at least 10^0) down to the lowest (at least 10^-1), zero-padded. */
+    int lowest = exp - nd + 1 < -1 ? exp - nd + 1 : -1;
+    for (int w = exp > 0 ? exp : 0; w >= lowest; w--) {
+      int i = exp - w;
+      out[len++] = i >= 0 && i < nd ? digits[i] : '0';
+      if (w == 0) out[len++] = '.';
     }
-  } else if (dot_pos <= 0 && dot_pos >= -3) {
-    /* Fixed notation, value < 1: "0." + leading zeros + digits */
-    out[out_len++] = '0';
-    out[out_len++] = '.';
-    for (int i = 0; i < -dot_pos; i++) out[out_len++] = '0';
-    memcpy(out + out_len, digits, nd);
-    out_len += nd;
   } else {
-    /* Scientific notation */
-    out[out_len++] = digits[0];
-    if (nd > 1) {
-      out[out_len++] = '.';
-      memcpy(out + out_len, digits + 1, nd - 1);
-      out_len += nd - 1;
-    } else {
-      out[out_len++] = '.';
-      out[out_len++] = '0';
-    }
-    /* Format exponent */
-    int e = ryu_exp;
-    if (e < 0) {
-      out[out_len++] = 'e';
-      out[out_len++] = '-';
-      e = -e;
-      if (e < 10) out[out_len++] = '0';
-    } else {
-      out[out_len++] = 'e';
-      out[out_len++] = '+';
-    }
-    if (e >= 100) {
-      out[out_len++] = (char)('0' + e / 100);
-      e %= 100;
-      out[out_len++] = (char)('0' + e / 10);
-      out[out_len++] = (char)('0' + e % 10);
-    } else if (e >= 10) {
-      out[out_len++] = (char)('0' + e / 10);
-      out[out_len++] = (char)('0' + e % 10);
-    } else {
-      out[out_len++] = (char)('0' + e);
-    }
+    /* Scientific notation: d.ddd (or d.0) and e+N, e-0N or e-NN. */
+    out[len++] = digits[0];
+    out[len++] = '.';
+    for (int i = 1; i < nd; i++) out[len++] = digits[i];
+    if (nd == 1) out[len++] = '0';
+    out[len++] = 'e';
+    out[len++] = exp < 0 ? '-' : '+';
+    int e = exp < 0 ? -exp : exp;
+    if (e >= 100) out[len++] = (char)('0' + e / 100);
+    if (e >= 10 || exp < 0) out[len++] = (char)('0' + e / 10 % 10);
+    out[len++] = (char)('0' + e % 10);
   }
-
-  return sk_string_create(out, out_len);
+  return sk_string_create(out, len);
 }
 
 extern char* SKIP_floatToString(double origf);
