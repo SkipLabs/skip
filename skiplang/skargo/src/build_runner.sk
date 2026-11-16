@@ -795,7 +795,8 @@ mutable class BuildRunner(
     unit: Unit,
     check: Bool,
   ): (mutable ProcessBuilder, Bool) {
-    skc = this.bctx.target_data.skc.process();
+    profile_options = skc_profile_options(unit.profile, this.checking);
+    skc = this.bctx.target_data.skc.process(profile_options);
 
     skc.cwd(unit.pkg.root());
 
@@ -895,7 +896,7 @@ mutable class BuildRunner(
 
     // Dependencies are compiled to archives during check, but still benefit
     // from their frontend caches when a dependency's sources change.
-    skc.args(skc_profile_options(unit.profile, this.checking));
+    skc.args(profile_options);
 
     separate_link = if (check) {
       skc.arg("--check");

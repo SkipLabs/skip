@@ -5,10 +5,15 @@ module Skargo;
 const kSkcErrorMappingVersion: Int = 43;
 
 class Skc(cmd: String, extra_options: Array<String>) {
-  fun process(): mutable ProcessBuilder {
+  // profile_options are the options skargo adds itself (skc_profile_options).
+  // skc rejects an option passed twice, so don't forward from extra_options
+  // (--skcopt) what the profile already sets.
+  fun process(
+    profile_options: Array<String> = Array[],
+  ): mutable ProcessBuilder {
     process = ProcessBuilder::create{
       cmd => this.cmd,
-      args => this.extra_options,
+      args => this.extra_options.filter(o -> !profile_options.contains(o)),
     };
     // Older bootstrap compilers default to 16 GiB, which is too small when
     // compiling the compiler itself. Match the runtime's 64 GiB sparse mapping

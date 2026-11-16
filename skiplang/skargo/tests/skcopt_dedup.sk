@@ -1,0 +1,27 @@
+module SkargoSkcoptDedupTests;
+
+// skc rejects an option passed twice ("Multiple values provided"), so an
+// --skcopt option that the profile already sets must not be forwarded again.
+// Regression test for the bootstrap rebuild: the compiler Makefile forwards
+// --split-support-module to the bootstrap skargo, and the current skargo's
+// release profile sets it itself.
+@test
+fun test_skcopt_deduplicated_against_profile(): void {
+  profile = Array["--release", "-O2", "--one-shot", "--split-support-module"];
+  skc = Skargo.Skc("skc", Array["--canonize-paths", "--split-support-module"]);
+  SKTest.expectEq(
+    skc.process(profile).get_argv(),
+    Array["skc", "--canonize-paths"],
+  )
+}
+
+@test
+fun test_skcopt_kept_when_profile_lacks_it(): void {
+  skc = Skargo.Skc("skc", Array["--canonize-paths", "--split-support-module"]);
+  SKTest.expectEq(
+    skc.process(Array["--release", "-O2"]).get_argv(),
+    Array["skc", "--canonize-paths", "--split-support-module"],
+  )
+}
+
+module end;
