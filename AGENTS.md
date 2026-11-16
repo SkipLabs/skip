@@ -23,6 +23,7 @@ take precedence for their directory — the closest file to the edited code wins
 ## PRs and AI disclosure
 
 - PRs need a summary + motivation. Changes under `skiplang/compiler/`, `skiplang/prelude/runtime/`, `skiplang/skargo/` and `.circleci/` touch sensitive paths — describe the validation you ran in the PR body.
+- PRs that change a published skip package (the npm workspaces listed in the root `package.json`, e.g. under `skipruntime-ts/`, `skiplang/*/ts/`, `packages/`) must bump that package's semver `version` in its `package.json` in the same PR, and update the pinned ranges of dependents (e.g. the `@skiplabs/skip` metapackage). `bin/release_npm.sh` refuses to publish an already-published version ("bump and commit before re-running"), so the bump has to land with the change, not after.
 - AI-assisted changes: add a `Co-Authored-By` trailer with provider, model and version, plus the effort/reasoning setting only when actually known; disclose AI assistance in the PR description too.
 
 ## CI
