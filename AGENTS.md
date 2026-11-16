@@ -23,6 +23,7 @@ take precedence for their directory — the closest file to the edited code wins
 ## PRs and AI disclosure
 
 - PRs need a summary + motivation. Changes under `skiplang/compiler/`, `skiplang/prelude/runtime/`, `skiplang/skargo/` and `.circleci/` touch sensitive paths — describe the validation you ran in the PR body.
+- PRs that change a skip package (a `Skargo.toml` package under `skiplang/`, `sql/` or `skipruntime-ts/skiplang/`) must bump its semver `version` in that `Skargo.toml` as part of the PR — minor for API/feature changes, patch for fixes — instead of leaving the bump to a later commit.
 - AI-assisted changes: add a `Co-Authored-By` trailer with provider, model and version, plus the effort/reasoning setting only when actually known; disclose AI assistance in the PR description too.
 
 ## CI
