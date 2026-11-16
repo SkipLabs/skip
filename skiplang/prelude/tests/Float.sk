@@ -198,21 +198,28 @@ fun testFromFloat(): void {
   T.expectEq(0.0.fromFloat(-Float::inf), -Float::inf);
 }
 
+// Formats the Float parsed from `literal` at runtime. A Float literal would
+// let the compiler fold `toString()` with its own Float.toString, i.e. that of
+// whatever prelude the compiler was built with, instead of the runtime's.
+private fun fmt(literal: String): String {
+  literal.toFloat().toString()
+}
+
 @test
 fun testToString(): void {
   // Normal values (Ryu shortest representation for round-trip safety)
-  T.expectEq(1.0.toString(), "1.0");
-  T.expectEq((-1.0).toString(), "-1.0");
-  T.expectEq(0.5.toString(), "0.5");
-  T.expectEq(0.1.toString(), "0.1");
-  T.expectEq((-0.1).toString(), "-0.1");
-  T.expectEq(123.456.toString(), "123.456");
+  T.expectEq(fmt("1.0"), "1.0");
+  T.expectEq(fmt("-1.0"), "-1.0");
+  T.expectEq(fmt("0.5"), "0.5");
+  T.expectEq(fmt("0.1"), "0.1");
+  T.expectEq(fmt("-0.1"), "-0.1");
+  T.expectEq(fmt("123.456"), "123.456");
   // Integer-valued floats get trailing .0
-  T.expectEq(100.0.toString(), "100.0");
-  T.expectEq((-100.0).toString(), "-100.0");
+  T.expectEq(fmt("100.0"), "100.0");
+  T.expectEq(fmt("-100.0"), "-100.0");
   // Zero
-  T.expectEq(0.0.toString(), "0.0");
-  T.expectEq((-0.0).toString(), "-0.0");
+  T.expectEq(fmt("0.0"), "0.0");
+  T.expectEq(fmt("-0.0"), "-0.0");
   // Infinity
   T.expectEq(Float::inf.toString(), "inf");
   T.expectEq((-Float::inf).toString(), "-inf");
@@ -220,54 +227,57 @@ fun testToString(): void {
   T.expectEq(Float::nan.toString(), "nan");
   T.expectEq((-Float::nan).toString(), "nan");
   // Very large values use scientific notation (integer-valued floats keep .0)
-  T.expectEq(1e20.toString(), "1.0e+20");
-  T.expectEq((-1e20).toString(), "-1.0e+20");
+  T.expectEq(fmt("1e20"), "1.0e+20");
+  T.expectEq(fmt("-1e20"), "-1.0e+20");
   // Very small values use scientific notation (integer-valued floats keep .0)
-  T.expectEq(1e-10.toString(), "1.0e-10");
-  T.expectEq((-1e-10).toString(), "-1.0e-10");
+  T.expectEq(fmt("1e-10"), "1.0e-10");
+  T.expectEq(fmt("-1e-10"), "-1.0e-10");
   // Values near scientific notation boundaries
-  T.expectEq(1e15.toString(), "1.0e+15");
-  T.expectEq(9999999999999.0.toString(), "9999999999999.0");
+  T.expectEq(fmt("1e15"), "1.0e+15");
+  T.expectEq(fmt("9999999999999.0"), "9999999999999.0");
 }
 
 @test
 fun testToStringEdgeCases(): void {
   // Subnormals (smallest representable doubles)
   // Smallest subnormal: 5e-324 (Ryu shortest: "5E-324")
-  T.expectEq(5e-324.toString(), "5.0e-324");
+  T.expectEq(fmt("5e-324"), "5.0e-324");
   // Smallest normal: 2.2250738585072014e-308
-  T.expectEq(2.2250738585072014e-308.toString(), "2.2250738585072014e-308");
+  T.expectEq(fmt("2.2250738585072014e-308"), "2.2250738585072014e-308");
   // Largest subnormal (just below smallest normal)
-  T.expectEq(2.225073858507201e-308.toString(), "2.225073858507201e-308");
+  T.expectEq(fmt("2.225073858507201e-308"), "2.225073858507201e-308");
 
   // Max double
-  T.expectEq(1.7976931348623157e308.toString(), "1.7976931348623157e+308");
+  T.expectEq(fmt("1.7976931348623157e308"), "1.7976931348623157e+308");
 
   // Values near scientific notation boundary (1e15 / 1e-4)
-  T.expectEq(999999999999999.0.toString(), "999999999999999.0");
-  T.expectEq(9999999999999999.0.toString(), "1.0e+16");
-  T.expectEq(0.0001.toString(), "0.0001");
-  T.expectEq(0.00001.toString(), "1.0e-05");
-  T.expectEq(0.00009999.toString(), "9.999e-05");
+  T.expectEq(fmt("999999999999999.0"), "999999999999999.0");
+  T.expectEq(fmt("9999999999999999.0"), "1.0e+16");
+  T.expectEq(fmt("0.0001"), "0.0001");
+  T.expectEq(fmt("0.00001"), "1.0e-05");
+  T.expectEq(fmt("0.00009999"), "9.999e-05");
 
   // Ryu shortest: 0.1+0.2 != 0.3 in string form (0.3 IS shortest for 0.3)
-  T.expectEq(0.1.toString(), "0.1");
-  T.expectEq(0.2.toString(), "0.2");
-  T.expectEq(0.3.toString(), "0.3");
-  T.expectEq((0.1 + 0.2).toString(), "0.30000000000000004");
+  T.expectEq(fmt("0.1"), "0.1");
+  T.expectEq(fmt("0.2"), "0.2");
+  T.expectEq(fmt("0.3"), "0.3");
+  T.expectEq(
+    ("0.1".toFloat() + "0.2".toFloat()).toString(),
+    "0.30000000000000004",
+  );
 
   // Powers of 2
-  T.expectEq(0.5.toString(), "0.5");
-  T.expectEq(0.25.toString(), "0.25");
-  T.expectEq(0.125.toString(), "0.125");
+  T.expectEq(fmt("0.5"), "0.5");
+  T.expectEq(fmt("0.25"), "0.25");
+  T.expectEq(fmt("0.125"), "0.125");
 
   // Large integers that are exact doubles
-  T.expectEq(9007199254740992.0.toString(), "9.007199254740992e+15"); // 2^53
-  T.expectEq(9007199254740991.0.toString(), "9.007199254740991e+15"); // 2^53-1
+  T.expectEq(fmt("9007199254740992.0"), "9.007199254740992e+15"); // 2^53
+  T.expectEq(fmt("9007199254740991.0"), "9.007199254740991e+15"); // 2^53-1
 
   // Negative edge cases
-  T.expectEq((-5e-324).toString(), "-5.0e-324");
-  T.expectEq((-1.7976931348623157e308).toString(), "-1.7976931348623157e+308");
+  T.expectEq(fmt("-5e-324"), "-5.0e-324");
+  T.expectEq(fmt("-1.7976931348623157e308"), "-1.7976931348623157e+308");
 }
 
 @test
