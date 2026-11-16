@@ -12,6 +12,20 @@ You will need at least the following installed:
  * typescript 5.7 or later.
 
 On Debian/Ubuntu, you can use `./bin/apt-install.sh` to install these dependencies.
+
+On macOS (Apple silicon), install LLVM 20, lld and GNU make with Homebrew. Put
+LLVM's tools (`llvm-config`, `llvm-ar`, `llvm-ranlib`) on your `PATH` after the
+system ones, so that Apple's clang stays the compiler, and GNU make before them:
+the Makefiles need GNU make 4.3 or later (grouped targets), and Apple's `make`
+is 3.81.
+
+```sh
+brew install llvm@20 lld make
+export PATH="$(brew --prefix make)/libexec/gnubin:$PATH:$(brew --prefix llvm@20)/bin"
+```
+
+Executables are linked with lld because Apple's linker rejects the metadata
+stored in `.sklib` archives.
  
 ### Building the toolchain
 
