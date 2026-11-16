@@ -2330,15 +2330,18 @@ class Contexts(main: Context, forks: SortedMap<String, Fork> = SortedMap[]) {
   }
 }
 
+// The handle of a disposable region, returned by newRegion and passed to
+// checkpointRegion/endRegion. Callers should treat it as opaque.
 @cpp_extern
-private native base class Obstack
+native base class Obstack
 
 @cpp_extern
 private native base class Page
 
 // The low-level region primitives, private because callers reach the region
-// through the public with* wrappers (withRegion, withRegionVoid,
-// withRegionValue, ...), which reclaim the region on both the normal and the
+// through the public wrappers (withRegion, withRegionVoid, withRegionValue,
+// withRegionPipeline, and newRegion/checkpointRegion/endRegion for
+// multi-phase regions), which reclaim the region on both the normal and the
 // exception path. Reach for these directly only to build another such wrapper.
 @debug
 @cpp_extern("SKIP_new_Obstack")
@@ -2359,6 +2362,31 @@ private native fun collectObstackWithValueRaw<T>(Obstack, Box<T>): Box<T>;
 @always_inline
 fun destroyObstackWithValue<T>(obstack: Obstack, value: T): T {
   destroyObstackWithValueRaw(obstack, Box(value)).unbox()
+}
+
+// A disposable region spanning several phases of one computation, reclaimed
+// incrementally with checkpointRegion instead of all at once on exit.
+// newRegion starts it and endRegion finishes it; values allocated before
+// newRegion (in the parent heap) are never reclaimed by checkpointRegion.
+@always_inline
+fun newRegion(): Obstack {
+  newObstack()
+}
+
+// Reclaim dead allocations in the region, keeping only the graph reachable
+// from root, and return root with every region value moved to its retained
+// address. The caller must pass every live region pointer through root;
+// values in the parent heap are returned unchanged. Must not run while a
+// try/catch handler allocated inside the region is still live.
+@always_inline
+fun checkpointRegion<T>(saved: Obstack, root: T): T {
+  collectObstackWithValueRaw(saved, Box(root)).unbox()
+}
+
+// Finish a region, freeing all its pages. No region value may be used after.
+@always_inline
+fun endRegion(saved: Obstack): void {
+  destroyObstack(saved)
 }
 
 @debug
@@ -2834,7 +2862,7 @@ fun withRegionValue<T>(f: () ~> T): T {
 fun withRegionPipeline<T: frozen>(initial: T, step: T ~> ?T): void {
   profile = Environ.varOpt("SKSTORE_PROFILE").isSome();
   state = initial;
-  saved = newObstack();
+  saved = newRegion();
   loop {
     // Try/catch lowers to heap-allocated closures. Finish the protected call
     // before collecting, so no live handler or completion cell is reclaimed.
@@ -2848,11 +2876,11 @@ fun withRegionPipeline<T: frozen>(initial: T, step: T ~> ?T): void {
     };
     result match {
     | Success(None()) ->
-      destroyObstack(saved);
+      endRegion(saved);
       return void
     | Success(Some(next)) ->
       start = if (profile) Time.time_ns() else 0;
-      !state = collectObstackWithValueRaw(saved, Box(next)).unbox();
+      !state = checkpointRegion(saved, next);
       if (profile) {
         print_error(
           `##SPAN## ${start} ${Time.time_ns()} store region_collect\n`,
