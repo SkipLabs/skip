@@ -608,7 +608,6 @@ jobs:
           submodules: true
       - use-candidate-toolchain:
           enabled: << parameters.candidate_toolchain >>
-      - setup_remote_docker
       - npm-cache-restore
       - native-cache-restore:
           kind: native
@@ -618,10 +617,35 @@ jobs:
           command: |
             mkdir -p ~/test-results
             make test-skipruntime-ts
-      # The next step's npm installs are up to date or run in its Docker build.
       - npm-cache-save
       - native-cache-save:
           kind: native
+      - store_test_results:
+          path: ~/test-results
+
+  # Release-fidelity rehearsal for the native addon, split out of the
+  # `skipruntime` job so it runs in parallel with the runtime tests instead of
+  # extending them (see the CI time budget in HACKING.md): on a docker-so cache
+  # miss it rebuilds the toolchain and libskipruntime.so inside remote Docker
+  # from scratch (~5 min, #1364). It needs no host native build -- run.sh
+  # installs with --ignore-scripts and the test container rebuilds the addon
+  # itself -- so it only restores the npm and docker-so caches, and never waits
+  # for `compiler` (the Docker build compiles the checkout's toolchain itself).
+  native-addon-unreleased:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: large.gen2
+    environment:
+      SKIP_CAPACITY: 6G
+      # With the docker-built .so restored from the cache below, skip the
+      # from-source Docker rebuild; on a cache miss the artifact is absent and
+      # the real build runs unchanged.
+      SKIP_NATIVE_BUILDS_IF_PRESENT: "1"
+    steps:
+      - custom-checkout:
+          submodules: true
+      - setup_remote_docker
+      - npm-cache-restore
       - native-cache-restore:
           kind: docker-so
       - run:
@@ -630,10 +654,9 @@ jobs:
           command: |
             cd skipruntime-ts/tests/native_addon_unreleased
             ./run.sh
+      - npm-cache-save
       - native-cache-save:
           kind: docker-so
-      - store_test_results:
-          path: ~/test-results
 
   skipruntime-bun:
     docker:
