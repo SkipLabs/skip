@@ -77,6 +77,22 @@ static void check_regions(void) {
   assert(SKIP_Obstack_allocated_bytes() == 0);
 }
 
+static void check_empty_region(void) {
+  sk_saved_obstack_t* outer = SKIP_new_Obstack();
+  Node* parent = node(NULL, NULL, 53);
+  size_t before = live_bytes;
+  // A region with no pages of its own: the current page is the saved page.
+  sk_saved_obstack_t saved = {.head = head, .page = page, .end = end};
+  Node* root = SKIP_collect_Obstack_with_value(&saved, parent);
+  // Nothing to reclaim, and no page may be allocated: head/end stay valid.
+  assert(root == parent && parent->value == 53);
+  assert(live_bytes == before);
+  assert(SKIP_Obstack_allocated_bytes() == before);
+  SKIP_destroy_Obstack(outer);
+  assert(live_bytes == 0);
+  assert(SKIP_Obstack_allocated_bytes() == 0);
+}
+
 static void check_large_pages(void) {
   sk_saved_obstack_t* outer = SKIP_new_Obstack();
   Node* parent = node(NULL, NULL, 23);
@@ -305,6 +321,7 @@ int main(void) {
   array_type.mask = node_type.mask;
   array_type.type.m_kind = kSkipGcKindArray;
   check_regions();
+  check_empty_region();
   check_large_pages();
   check_dense_pages();
   check_sparse_pages();
