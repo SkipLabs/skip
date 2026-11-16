@@ -12,6 +12,8 @@
 # enumerates the suites -- the JUnit `classname` CircleCI keys reruns on, since
 # sktest has no usable per-test source file.
 set -euo pipefail
+# Arrays expand as ${a[@]+"${a[@]}"}: macOS's bash 3.2 treats an empty
+# "${a[@]}" as unbound under set -u.
 
 self="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 
@@ -19,7 +21,7 @@ args=()
 build_args=()
 [ -n "${SKTEST_PROFILE:-}" ] && build_args+=(--profile "$SKTEST_PROFILE")
 [ -n "${SKTEST_SKCOPT:-}" ] && build_args+=(--skcopt "$SKTEST_SKCOPT")
-args+=("${build_args[@]}")
+args+=(${build_args[@]+"${build_args[@]}"})
 [ -n "${SKTEST_JOBS:-}" ] && args+=(--jobs "$SKTEST_JOBS")
 if [ -n "${SKTEST_JUNIT:-}" ]; then
     args+=(--junitxml "$SKTEST_JUNIT")
@@ -31,14 +33,14 @@ fi
 
 if [ -z "${CIRCLECI:-}" ]; then
     # Local: run the whole suite directly.
-    exec skargo test "${args[@]}"
+    exec skargo test ${args[@]+"${args[@]}"}
 fi
 
 if [ "$#" -eq 0 ]; then
     # Orchestrator: enumerate suites (this also builds the test target once);
     # `circleci tests run` picks which to run -- all of them normally, only the
     # previously-failed ones on a rerun -- and re-invokes us with them as args.
-    suites=$(skargo test "${build_args[@]}" --list)
+    suites=$(skargo test ${build_args[@]+"${build_args[@]}"} --list)
     [ -n "$suites" ] || { echo "run-sktest.sh: no test suites found" >&2; exit 1; }
     # -r: an empty rerun set is a no-op. -d '\n': split only on newlines (suite
     # names are safe today, but this stops xargs word-splitting/quote-processing
@@ -50,5 +52,5 @@ else
     # Inner: run only the given suites, passed to the harness via SKTEST_FILTERS.
     SKTEST_FILTERS=$(printf '%s\n' "$@")
     export SKTEST_FILTERS
-    exec skargo test "${args[@]}"
+    exec skargo test ${args[@]+"${args[@]}"}
 fi
