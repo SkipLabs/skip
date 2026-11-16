@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 import unittest
 
+import llvm_artifact_diff
+
 
 @unittest.skipUnless(
     os.environ.get("SKC_VTABLE_TEST_COMPILER"),
@@ -67,7 +69,12 @@ class VTableSlotTests(unittest.TestCase):
         self.assertRegex(
             matches[0], r"getelementptr inbounds i8, ptr .*i64 -?\d+"
         )
-        return matches[0]
+        # Debug metadata is numbered per LLVM module, so other functions in the
+        # same module renumber it without changing the dispatch code.
+        header, body = matches[0].encode().split(b"\n", 1)
+        return llvm_artifact_diff.without_dbg_attachments(
+            header, b"\n" + body
+        ).decode()
 
     def test_unchanged_dispatch_survives_other_request_growth(self):
         declarations = """
