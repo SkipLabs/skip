@@ -269,10 +269,28 @@ base class State {
     None()
 }
 
-// A pipeline phase declared once: its name and the coarse incremental stage it
-// belongs to. Behavior is the State variant's run() method; this list is the
+// A coarse pipeline stage shared by both execution modes. Each stage groups
+// fine-grained phases (see `phases` below). The one-shot driver runs the phases
+// as State::run arms; the incremental driver runs one graph-driven step per
+// stage — compile.sk infers compilerPipeline from the phases list by stage.
+base class Stage {
+  children =
+  | FrontendS()
+  | SpecializeS()
+  | OptimizeS()
+  | BackendS()
+
+  fun name(): String
+  | FrontendS() -> "frontend"
+  | SpecializeS() -> "specialize"
+  | OptimizeS() -> "optimize"
+  | BackendS() -> "backend"
+}
+
+// A pipeline phase declared once: its name and its coarse stage. The one-shot
+// behavior is the corresponding State variant's run() arm; this list is the
 // shared declaration (order, names, stages) both drivers align against.
-class Phase(name: String, stage: String) {}
+class Phase(name: String, stage: Stage) {}
 
 // Copy values, not the producing arrows, their old versions or dependencies.
 fun snapshot<K: SKStore.Key, V: SKStore.File>(
@@ -322,17 +340,17 @@ fun advance(context: mutable SKStore.Context): Bool {
 // coarse incremental step (compile.sk's compilerPipeline) covering the phase,
 // so both drivers can be aligned against this single list.
 const phases: Array<Phase> = Array[
-  Phase("read_files", "frontend"),
-  Phase("frontend", "frontend"),
-  Phase("archive", "frontend"),
-  Phase("outer", "specialize"),
-  Phase("specialize", "specialize"),
-  Phase("assemble", "specialize"),
-  Phase("optimize", "optimize"),
-  Phase("lower", "backend"),
-  Phase("graph", "backend"),
-  Phase("emit", "backend"),
-  Phase("link", "backend"),
+  Phase("read_files", FrontendS()),
+  Phase("frontend", FrontendS()),
+  Phase("archive", FrontendS()),
+  Phase("outer", SpecializeS()),
+  Phase("specialize", SpecializeS()),
+  Phase("assemble", SpecializeS()),
+  Phase("optimize", OptimizeS()),
+  Phase("lower", BackendS()),
+  Phase("graph", BackendS()),
+  Phase("emit", BackendS()),
+  Phase("link", BackendS()),
 ];
 
 fun run(config: Config.Config, debugStore: Bool): void {
