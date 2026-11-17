@@ -1,0 +1,41 @@
+name: docker-publish-on-label
+
+# Label a PR `docker-publish` and merging it to main republishes the CI images
+# (see HACKING.md, "Publishing CI Docker images"). GHA has no label trigger, so
+# this workflow watches for the merge and dispatches docker-publish.yml on
+# main, which already runs on workflow_dispatch.
+#
+# Both `closed` and `labeled` are needed: `closed` catches a PR merged with the
+# label already on it, `labeled` catches the label being added to an
+# already-merged PR. The `merged` condition makes the label-on-open-PR case a
+# no-op, so each merge dispatches exactly once.
+on:
+  pull_request:
+    types: [closed, labeled]
+
+permissions:
+  contents: read
+  # Creating the workflow_dispatch event below needs write access to actions.
+  actions: write
+
+jobs:
+  dispatch:
+    if: >-
+      github.repository == 'SkipLabs/skip' &&
+      github.event.pull_request.merged &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'docker-publish')
+    # Fork PRs run with a read-only token (excluded above), so for those the
+    # publish must still be triggered by hand after merging.
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Trigger docker-publish on main
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # No checkout needed; gh resolves the repo from GITHUB_REPOSITORY.
+        # docker-publish's own concurrency group (docker-publish-<main ref>,
+        # cancel-in-progress: false) serializes this run against scheduled and
+        # manual publishes, so a labeled merge queues behind a running one
+        # instead of interleaving.
+        run: gh workflow run docker-publish.yml --ref main -R "$GITHUB_REPOSITORY"

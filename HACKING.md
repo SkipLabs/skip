@@ -93,6 +93,12 @@ A change that meets only the first condition can wait for the weekly run. A PR's
 own CI always runs against the already-published images, so it cannot validate
 an image change; the publish after merge is the first real test.
 
+Instead of running the publish by hand, label the PR `docker-publish`: when it
+merges to `main`, the `docker-publish-on-label` workflow dispatches
+`docker-publish` on `main` automatically. PRs from forks cannot dispatch
+workflows (their token is read-only), so for those run it manually after
+merging.
+
 CircleCI never builds the images. The publish builds the compiler inside Docker
 on GitHub's 16 GiB runners, so a bootstrap or runtime change can pass CI and
 still break the publish (#1589). After merging one, run the publish promptly, or
