@@ -1,0 +1,20 @@
+module Runtime_StringConcatConst;
+// StringConcat folds when all arguments are constant strings (including
+// constants produced by other folds, e.g. Float.toString). A concat with a
+// non-constant argument is not folded but must still compute the right
+// string at runtime.
+
+@exptest
+fun main(): void {
+  runtimeStr = 123.toString();
+  print_raw(
+    "foo" +
+      "bar" +
+      "baz" +
+      "\n" +
+      (0.1.toString() + "!\n") +
+      ("" + "" + "x\n") +
+      ("a" + runtimeStr + "b\n"),
+  )
+}
+module end;
