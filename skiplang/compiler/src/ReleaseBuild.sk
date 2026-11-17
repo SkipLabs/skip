@@ -3,47 +3,47 @@
 module alias O = OuterIstToIR;
 module ReleaseBuild;
 
-// The pipeline phases, in execution order. The incremental driver (compile.sk)
-// runs the same phases as graph-driven context steps; this driver runs them as
-// disposable direct calls, reclaiming the region between phases. Declare new
-// phases here so both modes share one list.
-class Phase(name: String, run: PhaseState ~> ?PhaseState) {}
-
-// Continuation state handed from one phase to the next. Only the fields
-// relevant to the current phase are set.
-class PhaseState(
-  phaseIndex: Int,
-  config: Config.Config,
-  debugStore: Bool,
-  context: ?SKStore.Context,
-  converter: ?O.Converter,
-  roots: ?O.RootsIR,
-  specialized: ?O.SpecializerState,
-  exports: Array<String>,
-  env: ?GlobalEnv,
-  optPhase: Int,
-  definitions: ?Array<AsmOutput.AsmDef>,
-  positions: ?SourcePositions.Table,
-  inputs: ?Array<String>,
-) {
-  static fun start(config: Config.Config, debugStore: Bool): PhaseState {
-    PhaseState(
-      0,
-      config,
-      debugStore,
-      None(),
-      None(),
-      None(),
-      None(),
-      Array[],
-      None(),
-      0,
-      None(),
-      None(),
-      None(),
-    )
-  }
+// A typed edge between pipeline phases: the payload handed to the next phase.
+// Both execution modes share this edge vocabulary. The incremental driver
+// (compile.sk's compilerPipeline) carries the same information through typed
+// SKStore dir handles — each Phase below names its coarse `stage` so the two
+// drivers stay aligned; this driver threads typed values directly.
+base class PhaseEdge {
+  children =
+  | Start(Config.Config, Bool)
+  | Frontend(Config.Config, SKStore.Context)
+  | Archive(Config.Config, SKStore.Context)
+  | Outer(Config.Config, SKStore.Context)
+  | Specialize(
+    Config.Config,
+    SKStore.Context,
+    O.Converter,
+    O.RootsIR,
+    Array<String>,
+  )
+  | Assemble(
+    Config.Config,
+    SKStore.Context,
+    O.RootsIR,
+    O.SpecializerState,
+    Array<String>,
+  )
+  | OptimizeIR(Config.Config, GlobalEnv, Int, Array<String>)
+  | LowerIR(Config.Config, GlobalEnv, Array<String>)
+  | Graph(Config.Config, GlobalEnv, Array<String>)
+  | Emit(
+    Config.Config,
+    Array<AsmOutput.AsmDef>,
+    SourcePositions.Table,
+    Array<String>,
+  )
+  | Link(Config.Config, Array<String>, Array<String>)
 }
+
+// A pipeline phase declared once: its name, the coarse incremental stage it
+// belongs to, and its one-shot step. The step matches the incoming edge variant
+// (type-safe payload) and returns the next edge, or None to finish.
+class Phase(name: String, stage: String, run: PhaseEdge ~> ?PhaseEdge) {}
 
 // Copy values, not the producing arrows, their old versions or dependencies.
 fun snapshot<K: SKStore.Key, V: SKStore.File>(
@@ -89,9 +89,9 @@ fun advance(context: mutable SKStore.Context): Bool {
     .isNone()
 }
 
-const phases: Array<Phase> = Array[
-  Phase("read_files", state ~> {
-    config = state.config;
+fun runReadFiles(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Start(config, debugStore) ->
     ensureCompatibleLLVMVersion();
     if (!Array["sklib", "llvm-ir", "link", "cdylib"].contains(config.emit)) {
       invariant_violation("Unsupported value for `--emit`: " + config.emit)
@@ -101,7 +101,7 @@ const phases: Array<Phase> = Array[
       skipExit(4)
     };
     context = SKStore.Context::mcreate{};
-    context.!debugMode = state.debugStore;
+    context.!debugMode = debugStore;
     _ = context.mkdir(
       FileCache.InputSource::keyType,
       SKStore.StringFile::type,
@@ -130,20 +130,18 @@ const phases: Array<Phase> = Array[
         },
       )
     });
-    Some(
-      state with {
-        phaseIndex => 1,
-        config => config.backendConfig(),
-        context => Some(context.clone()),
-      },
-    )
-  }),
-  Phase("frontend", state ~> {
-    config = state.config;
-    context = state.context.fromSome().mclone();
+    Some(Frontend(config.backendConfig(), context.clone()))
+  | _ -> invariant_violation("read_files: unexpected phase edge")
+  }
+}
+
+fun runFrontend(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Frontend(config, saved) ->
+    context = saved.mclone();
     finished = runCompilerPhase("release/frontend", () -> advance(context));
     if (!finished) {
-      Some(state with {context => Some(context.clone())})
+      Some(Frontend(config, context.clone()))
     } else {
       throwErrors(context);
       next = SKStore.Context::mcreate{};
@@ -153,21 +151,30 @@ const phases: Array<Phase> = Array[
         _ = snapshot(context, next, FileCache.packageDir);
         _ = snapshot(context, next, FileCache.packageEnvAccessDir);
         _ = snapshot(context, next, FileCache.packageEnvDir(config.lib_name));
-        Some(state with {phaseIndex => 2, context => Some(next.clone())})
+        Some(Archive(config, next.clone()))
       } else {
         _ = snapshot(context, next, SkipTyping.dir);
         _ = snapshot(context, next, SourcePositions.dir);
-        Some(state with {phaseIndex => 3, context => Some(next.clone())})
+        Some(Outer(config, next.clone()))
       }
     }
-  }),
-  Phase("archive", state ~> {
-    compile_sklib(state.context.fromSome().mclone(), state.config);
+  | _ -> invariant_violation("frontend: unexpected phase edge")
+  }
+}
+
+fun runArchive(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Archive(config, saved) ->
+    compile_sklib(saved.mclone(), config);
     None()
-  }),
-  Phase("outer", state ~> {
-    config = state.config;
-    context = state.context.fromSome().mclone();
+  | _ -> invariant_violation("archive: unexpected phase edge")
+  }
+}
+
+fun runOuter(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Outer(config, saved) ->
+    context = saved.mclone();
     // Eager maps run while they are registered. Start outer conversion only
     // after the frontend handoff has reclaimed parser and naming state.
     runCompilerPhase("release/outer", () -> {
@@ -235,72 +242,56 @@ const phases: Array<Phase> = Array[
     } else {
       Array[]
     };
-    Some(
-      state with {
-        phaseIndex => 4,
-        context => Some(next.clone()),
-        converter => Some(converter),
-        roots => Some(roots),
-        exports => exports,
-      },
-    )
-  }),
-  Phase("specialize", state ~> {
-    config = state.config;
-    context = state.context.fromSome().mclone();
+    Some(Specialize(config, next.clone(), converter, roots, exports))
+  | _ -> invariant_violation("outer: unexpected phase edge")
+  }
+}
+
+fun runSpecialize(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Specialize(config, saved, converter, roots, exports) ->
+    context = saved.mclone();
     empty = context.mkdir(
       x ~> x,
       x ~> x,
       SKStore.DirName::create("/specializer/empty/"),
     );
     specializer = runCompilerPhase("release/specialize", () -> {
-      sp = O.createSpecializer(
+      sp = O.createSpecializer(context, config, converter, empty).mclone(
         context,
-        config,
-        state.converter.fromSome(),
-        empty,
-      ).mclone(context);
-      for (root in state.roots.fromSome().forceCompile) {
+      );
+      for (root in roots.forceCompile) {
         sp.requestFunction(root, Array[], Array[])
       };
       sp.specializePendingFuns();
       sp.toFixed(context);
       sp.chill()
     });
-    if (config.stopAfterSpecialization) {
-      None()
-    } else {
-      Some(
-        state with {
-          phaseIndex => 5,
-          context => Some(context.clone()),
-          specialized => Some(specializer),
-        },
-      )
+    if (config.stopAfterSpecialization) None() else {
+      Some(Assemble(config, context.clone(), roots, specializer, exports))
     }
-  }),
-  Phase("assemble", state ~> {
-    config = state.config;
-    context = state.context.fromSome().mclone();
-    specializer = state.specialized.fromSome().mclone(context);
+  | _ -> invariant_violation("specialize: unexpected phase edge")
+  }
+}
+
+fun runAssemble(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Assemble(config, saved, roots, specialized, exports) ->
+    context = saved.mclone();
+    specializer = specialized.mclone(context);
     specializer.!canCreateNewSClasses = false;
     env = runCompilerPhase("release/assemble", () ->
-      O.createIR(
-        context,
-        config,
-        state.roots.fromSome(),
-        specializer,
-        None(),
-        None(),
-      )
+      O.createIR(context, config, roots, specializer, None(), None())
     );
     // No frontend or specialization cache survives into the optimizer.
-    Some(state with {phaseIndex => 6, env => Some(env), optPhase => 0})
-  }),
-  Phase("optimize", state ~> {
-    config = state.config;
-    phase = state.optPhase;
-    env = state.env.fromSome();
+    Some(OptimizeIR(config, env, 0, exports))
+  | _ -> invariant_violation("assemble: unexpected phase edge")
+  }
+}
+
+fun runOptimize(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | OptimizeIR(config, env, phase, exports) ->
     next = runCompilerPhase("release/optimize-" + phase, () -> {
       if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
         Optimize.optimizeAll(
@@ -312,27 +303,25 @@ const phases: Array<Phase> = Array[
       }
     });
     if (phase == 2) {
-      Some(
-        state with {
-          phaseIndex => 7,
-          env => Some(finishOptimizedFunctions(next, config)),
-        },
-      )
+      Some(LowerIR(config, finishOptimizedFunctions(next, config), exports))
     } else {
-      Some(state with {env => Some(next), optPhase => phase + 1})
+      Some(OptimizeIR(config, next, phase + 1, exports))
     }
-  }),
-  Phase("lower", state ~> {
-    Some(
-      state with {
-        phaseIndex => 8,
-        env => Some(Lower.lowerFunctions(state.env.fromSome(), state.config)),
-      },
-    )
-  }),
-  Phase("graph", state ~> {
-    config = state.config;
-    env = state.env.fromSome();
+  | _ -> invariant_violation("optimize: unexpected phase edge")
+  }
+}
+
+fun runLower(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | LowerIR(config, env, exports) ->
+    Some(Graph(config, Lower.lowerFunctions(env, config), exports))
+  | _ -> invariant_violation("lower: unexpected phase edge")
+  }
+}
+
+fun runGraph(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Graph(config, env, exports) ->
     defs = runCompilerPhase("native/create_asm_graph", () ->
       AsmOutput.createAsmDefGraph(env, config)
     );
@@ -343,61 +332,88 @@ const phases: Array<Phase> = Array[
       AsmOutput.assignFinalSymbols(defs, false)
     );
     Some(
-      state with {
-        phaseIndex => 9,
-        definitions => Some(defs.values().collect(Array)),
-        positions => Some(env.sourcePositions),
-      },
+      Emit(config, defs.values().collect(Array), env.sourcePositions, exports),
     )
-  }),
-  Phase("emit", state ~> {
-    config = state.config;
+  | _ -> invariant_violation("graph: unexpected phase edge")
+  }
+}
+
+fun runEmit(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Emit(config, definitions, positions, exports) ->
     defs = mutable AsmOutput.AsmDefIDToAsmDef{pos => FileRange.builtin};
-    for (def in state.definitions.fromSome()) defs.set(def.id, def);
+    for (def in definitions) defs.set(def.id, def);
     if (config.emit == "llvm-ir") {
-      compile_llvm_ir(defs, config, state.positions.fromSome());
+      compile_llvm_ir(defs, config, positions);
       None()
     } else {
       inputs = runCompilerPhase("native/write_asm_files", () ->
-        AsmOutput.writeNativeOutputFiles(
-          defs,
-          config,
-          state.positions.fromSome(),
-        )
+        AsmOutput.writeNativeOutputFiles(defs, config, positions)
       );
-      Some(state with {phaseIndex => 10, inputs => Some(inputs)})
+      Some(Link(config, inputs, exports))
     }
-  }),
-  Phase("link", state ~> {
-    config = state.config;
+  | _ -> invariant_violation("emit: unexpected phase edge")
+  }
+}
+
+fun runLink(edge: PhaseEdge): ?PhaseEdge {
+  edge match {
+  | Link(config, inputs, exports) ->
     runCompilerPhase("native/link", () -> {
-      getLinkArgs(
-        config.output + ".ll",
-        config,
-        state.exports,
-        Some(state.inputs.fromSome()),
-      ).each(args -> {
-        if (config.no_link) {
-          print_string("---LINK_ARGS_BEGIN---");
-          args.each(print_string);
-          print_string("---LINK_ARGS_END---")
-        } else {
-          runShell(args, config.verbose)
-        }
-      })
+      getLinkArgs(config.output + ".ll", config, exports, Some(inputs)).each(
+        args -> {
+          if (config.no_link) {
+            print_string("---LINK_ARGS_BEGIN---");
+            args.each(print_string);
+            print_string("---LINK_ARGS_END---")
+          } else {
+            runShell(args, config.verbose)
+          }
+        },
+      )
     });
     None()
-  }),
+  | _ -> invariant_violation("link: unexpected phase edge")
+  }
+}
+
+// The pipeline phases, in execution order, declared once. `stage` names the
+// coarse incremental step (compile.sk's compilerPipeline) covering the phase,
+// so both drivers can be aligned against this single list.
+const phases: Array<Phase> = Array[
+  Phase("read_files", "frontend", runReadFiles),
+  Phase("frontend", "frontend", runFrontend),
+  Phase("archive", "frontend", runArchive),
+  Phase("outer", "specialize", runOuter),
+  Phase("specialize", "specialize", runSpecialize),
+  Phase("assemble", "specialize", runAssemble),
+  Phase("optimize", "optimize", runOptimize),
+  Phase("lower", "backend", runLower),
+  Phase("graph", "backend", runGraph),
+  Phase("emit", "backend", runEmit),
+  Phase("link", "backend", runLink),
 ];
 
-fun step(state: PhaseState): ?PhaseState {
-  invariant(state.phaseIndex < phases.size(), "Invalid phase index");
-  phases[state.phaseIndex].run(state)
+fun step(edge: PhaseEdge): ?PhaseEdge {
+  index = edge match {
+  | Start(_, _) -> 0
+  | Frontend(_, _) -> 1
+  | Archive(_, _) -> 2
+  | Outer(_, _) -> 3
+  | Specialize(_, _, _, _, _) -> 4
+  | Assemble(_, _, _, _, _) -> 5
+  | OptimizeIR(_, _, _, _) -> 6
+  | LowerIR(_, _, _) -> 7
+  | Graph(_, _, _) -> 8
+  | Emit(_, _, _, _) -> 9
+  | Link(_, _, _) -> 10
+  };
+  phases[index].run(edge)
 }
 
 fun run(config: Config.Config, debugStore: Bool): void {
   try {
-    SKStore.withRegionPipeline(PhaseState::start(config, debugStore), step)
+    SKStore.withRegionPipeline(Start(config, debugStore), step)
   } catch {
   | exn ->
     print_error(exn.getMessage());
