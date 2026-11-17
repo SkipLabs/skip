@@ -77,6 +77,7 @@ mutable class .Peephole{
     | v @ ArrayAlloc _ -> peepholeArrayAlloc(v, this)
     | v @ ArrayNew _ -> peepholeArrayNew(v, this)
     | v @ ArraySize _ -> peepholeArraySize(v, this)
+    | v @ ArrayUnsafeGet _ -> peepholeArrayUnsafeGet(v, this)
     | v @ With _ -> peepholeWith(v, this)
     | v @ ZeroExtend _ -> peepholeZeroExtend(v, this)
 
@@ -102,7 +103,6 @@ mutable class .Peephole{
     | Store _
     | Suspend _
     | ArrayClone _
-    | ArrayUnsafeGet _
     | ArrayUnsafeSet _
     | Yield _ ->
       x
@@ -1814,6 +1814,35 @@ private fun peepholeArraySize(peep: ArraySize, s: mutable Peephole): Instr {
   | ConstantArray{size}
   | ArrayNew{size} ->
     s.constantInt(size)
+  | _ -> peep
+  }
+}
+
+private fun peepholeArrayUnsafeGet(
+  peep: ArrayUnsafeGet,
+  s: mutable Peephole,
+): Instr {
+  s.getInstr(peep.index).constantInteger() match {
+  | Some(i) ->
+    s.getInstr(peep.obj) match {
+    | ConstantArray{typ, values} ->
+      if (i >= 0) {
+        sc = ClassInputs.exampleSClass(typ, s.env, s.classReader);
+        valsPerSlot = sc.getArraySlotInfo(peep.pos).types.size();
+        piece = if (peep.tupleIndex < 0) 0 else peep.tupleIndex;
+        slot = i * valsPerSlot + piece;
+        // Only fold when provably in bounds (unsafe get is UB otherwise, so
+        // out-of-bounds must keep the original instruction).
+        if (piece < valsPerSlot && slot < values.size()) {
+          s.getConstant(values[slot] with {id => s.iid()})
+        } else {
+          peep
+        }
+      } else {
+        peep
+      }
+    | _ -> peep
+    }
   | _ -> peep
   }
 }
