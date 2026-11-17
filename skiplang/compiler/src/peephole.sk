@@ -1849,7 +1849,20 @@ private fun peepholeStringConcat(
   args.size() match {
   | 0 -> s.constantString("")
   | 1 -> s.getInstr(args[0])
-  | _ -> peep
+  | _ ->
+    // Fold a concat of constant strings (e.g. a folded Float.toString
+    // concatenated with a literal). Collect the parts and bail out as soon
+    // as one argument is not a constant string.
+    parts = mutable Vector<UTF8String>[];
+    for (a in args) {
+      s.getInstr(a) match {
+      | ConstantString{value} -> parts.push(value)
+      | _ -> return peep
+      }
+    };
+    s.constantUTF8String(
+      parts.reduce((acc, p) -> acc + p, UTF8String::make("")),
+    )
   }
 }
 
