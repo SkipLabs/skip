@@ -214,6 +214,22 @@ class SingletonFixedDir protected {
     (key, file) = this.data.unsafe_get(i);
     FixedRow(key, Array[file], Path::create(this.sourceDir, key), this.tag)
   }
+
+  protected fun compareSourceKey<L: Orderable>[L: Key](
+    i: Int,
+    source: Path,
+    key: L,
+  ): Order {
+    rowKey = this.data.unsafe_get(i).i0;
+    key.compare(rowKey) match {
+    | EQ() ->
+      source.dirName.compare(this.sourceDir) match {
+      | EQ() -> source.baseName.compare(rowKey)
+      | order -> order
+      }
+    | order -> order
+    }
+  }
 }
 
 // Mixed ticks and nonidentity forwarding still share the directory and avoid
@@ -263,6 +279,22 @@ class SharedSingletonFixedDir protected {
       Path::create(this.sourceDir, row.sourceKey),
       row.tag,
     )
+  }
+
+  protected fun compareSourceKey<L: Orderable>[L: Key](
+    i: Int,
+    source: Path,
+    key: L,
+  ): Order {
+    row = this.data.unsafe_get(i);
+    key.compare(row.key) match {
+    | EQ() ->
+      source.dirName.compare(this.sourceDir) match {
+      | EQ() -> source.baseName.compare(row.sourceKey)
+      | order -> order
+      }
+    | order -> order
+    }
   }
 }
 
@@ -396,17 +428,23 @@ base class IFixedDir<
     findAll<K>(i ~> this.get(i).key, key, 0, this.size() - 1)
   }
 
+  // Compact representations can compare stored fields without rebuilding rows.
+  overridable protected fun compareSourceKey<L: Orderable>[L: K](
+    i: Int,
+    source: Path,
+    key: L,
+  ): Order {
+    entry = this.get(i);
+    c = key.compare(entry.key);
+    if (c != EQ()) return c;
+    source.compare(entry.source)
+  }
+
   fun getAllSourceKey<L: Orderable>[L: K](
     source: Path,
     key: L,
   ): mutable Iterator<Int> {
-    delta = i ~> {
-      entry = this.get(i);
-      c = key.compare(entry.key);
-      if (c != EQ()) return c;
-      source.compare(entry.source)
-    };
-    findAllBy(delta, 0, this.size() - 1)
+    findAllBy(i ~> this.compareSourceKey(i, source, key), 0, this.size() - 1)
   }
 
   fun getArray<L: Orderable>[L: K](key: L): Array<T> {
