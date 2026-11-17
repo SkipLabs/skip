@@ -3,6 +3,50 @@
 module alias O = OuterIstToIR;
 module ReleaseBuild;
 
+// Copy values, not the producing arrows, their old versions or dependencies.
+fun snapshot<K: SKStore.Key, V: SKStore.File>(
+  from: mutable SKStore.Context,
+  into: mutable SKStore.Context,
+  input: SKStore.EHandle<K, V>,
+): SKStore.EHandle<K, V> {
+  output = into.mkdir(input.keyType, input.type, input.dirName);
+  for ((key, values) in input.items(from)) {
+    output.writeArray(into, key, values.collect(Array))
+  };
+  output
+}
+
+fun throwErrors(context: mutable SKStore.Context): void {
+  context.getGlobal("ERRORS") match {
+  | Some(file) ->
+    errors = SkipError.ErrorsFile::type(file).value;
+    if (!errors.isEmpty()) {
+      throw SkipError.CompileFailureException{
+        message => SkipError.errorsToString(
+          errors.reversed().map(x -> x.errors).flatten().collect(Vector),
+          source -> FileCache.fileDir.unsafeGetArray(context, source)[0].value,
+        ),
+      }
+    }
+  | None() -> void
+  }
+}
+
+// Batch cheap frontend arrows, checkpointing after a substantial allocation
+// increase. Drain the final typing arrow so the next state can discard the
+// frontend graph instead of collecting another complete retained version.
+fun advance(context: mutable SKStore.Context): Bool {
+  limit = SKStore.obstackAllocatedBytes() + 256 * 1024 * 1024;
+  context
+    .updateUntilBoundary(
+      _ ~> false,
+      dir ~>
+        dir != SkipTyping.dirName && SKStore.obstackAllocatedBytes() >= limit
+      ,
+    )
+    .isNone()
+}
+
 // The pipeline's automaton state: the current phase (given by the variant) plus
 // its typed payload, handed from one phase to the next. In this linear pipeline
 // a state is also the edge into its phase, but the variant selects the next
@@ -72,7 +116,7 @@ base class State {
     );
     FileCache.scaffoldPackageEnvDirs(context);
     _ = SkipMain.type_program(context);
-    runCompilerPhase("release/read_files", () -> {
+    runCompilerPhase("release/" + phases[this.phaseIndex()], () -> {
       FileCache.writeFiles(
         context,
         config.input_files,
@@ -87,7 +131,9 @@ base class State {
     Some(Frontend(config.backendConfig(), context.clone()))
   | Frontend(config, saved) ->
     context = saved.mclone();
-    finished = runCompilerPhase("release/frontend", () -> advance(context));
+    finished = runCompilerPhase("release/" + phases[this.phaseIndex()], () ->
+      advance(context)
+    );
     if (!finished) {
       Some(Frontend(config, context.clone()))
     } else {
@@ -113,7 +159,7 @@ base class State {
     context = saved.mclone();
     // Eager maps run while they are registered. Start outer conversion only
     // after the frontend handoff has reclaimed parser and naming state.
-    runCompilerPhase("release/outer", () -> {
+    runCompilerPhase("release/" + phases[this.phaseIndex()], () -> {
       _ = SkipMakeOuterIst.program(context, SkipTyping.dir);
       context.update()
     });
@@ -186,17 +232,20 @@ base class State {
       x ~> x,
       SKStore.DirName::create("/specializer/empty/"),
     );
-    specializer = runCompilerPhase("release/specialize", () -> {
-      sp = O.createSpecializer(context, config, converter, empty).mclone(
-        context,
-      );
-      for (root in roots.forceCompile) {
-        sp.requestFunction(root, Array[], Array[])
-      };
-      sp.specializePendingFuns();
-      sp.toFixed(context);
-      sp.chill()
-    });
+    specializer = runCompilerPhase(
+      "release/" + phases[this.phaseIndex()],
+      () -> {
+        sp = O.createSpecializer(context, config, converter, empty).mclone(
+          context,
+        );
+        for (root in roots.forceCompile) {
+          sp.requestFunction(root, Array[], Array[])
+        };
+        sp.specializePendingFuns();
+        sp.toFixed(context);
+        sp.chill()
+      },
+    );
     if (config.stopAfterSpecialization) None() else {
       Some(Assemble(config, context.clone(), roots, specializer, exports))
     }
@@ -204,22 +253,25 @@ base class State {
     context = saved.mclone();
     specializer = specialized.mclone(context);
     specializer.!canCreateNewSClasses = false;
-    env = runCompilerPhase("release/assemble", () ->
+    env = runCompilerPhase("release/" + phases[this.phaseIndex()], () ->
       O.createIR(context, config, roots, specializer, None(), None())
     );
     // No frontend or specialization cache survives into the optimizer.
     Some(OptimizeIR(config, env, 0, exports))
   | OptimizeIR(config, env, phase, exports) ->
-    next = runCompilerPhase("release/optimize-" + phase, () -> {
-      if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
-        Optimize.optimizeAll(
-          SKStore.Context::mcreate{},
-          env,
-          config,
-          config.optConfig.all(),
-        )
-      }
-    });
+    next = runCompilerPhase(
+      "release/" + phases[this.phaseIndex()] + "-" + phase,
+      () -> {
+        if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
+          Optimize.optimizeAll(
+            SKStore.Context::mcreate{},
+            env,
+            config,
+            config.optConfig.all(),
+          )
+        }
+      },
+    );
     if (phase == 2) {
       Some(LowerIR(config, finishOptimizedFunctions(next, config), exports))
     } else {
@@ -267,91 +319,25 @@ base class State {
       )
     });
     None()
+  // Position of this state's phase in the shared phases list.
+  fun phaseIndex(): Int
+  | Start(_, _) -> 0
+  | Frontend(_, _) -> 1
+  | Archive(_, _) -> 2
+  | Outer(_, _) -> 3
+  | Specialize(_, _, _, _, _) -> 4
+  | Assemble(_, _, _, _, _) -> 5
+  | OptimizeIR(_, _, _, _) -> 6
+  | LowerIR(_, _, _) -> 7
+  | Graph(_, _, _) -> 8
+  | Emit(_, _, _, _) -> 9
+  | Link(_, _, _) -> 10
 }
 
-// A coarse pipeline stage shared by both execution modes. Each stage groups
-// fine-grained phases (see `phases` below). The one-shot driver runs the phases
-// as State::run arms; the incremental driver runs one graph-driven step per
-// stage — compile.sk infers compilerPipeline from the phases list by stage.
-base class Stage {
-  children =
-  | FrontendS()
-  | SpecializeS()
-  | OptimizeS()
-  | BackendS()
-
-  fun name(): String
-  | FrontendS() -> "frontend"
-  | SpecializeS() -> "specialize"
-  | OptimizeS() -> "optimize"
-  | BackendS() -> "backend"
-}
-
-// A pipeline phase declared once: its name and its coarse stage. The one-shot
-// behavior is the corresponding State variant's run() arm; this list is the
-// shared declaration (order, names, stages) both drivers align against.
-class Phase(name: String, stage: Stage) {}
-
-// Copy values, not the producing arrows, their old versions or dependencies.
-fun snapshot<K: SKStore.Key, V: SKStore.File>(
-  from: mutable SKStore.Context,
-  into: mutable SKStore.Context,
-  input: SKStore.EHandle<K, V>,
-): SKStore.EHandle<K, V> {
-  output = into.mkdir(input.keyType, input.type, input.dirName);
-  for ((key, values) in input.items(from)) {
-    output.writeArray(into, key, values.collect(Array))
-  };
-  output
-}
-
-fun throwErrors(context: mutable SKStore.Context): void {
-  context.getGlobal("ERRORS") match {
-  | Some(file) ->
-    errors = SkipError.ErrorsFile::type(file).value;
-    if (!errors.isEmpty()) {
-      throw SkipError.CompileFailureException{
-        message => SkipError.errorsToString(
-          errors.reversed().map(x -> x.errors).flatten().collect(Vector),
-          source -> FileCache.fileDir.unsafeGetArray(context, source)[0].value,
-        ),
-      }
-    }
-  | None() -> void
-  }
-}
-
-// Batch cheap frontend arrows, checkpointing after a substantial allocation
-// increase. Drain the final typing arrow so the next state can discard the
-// frontend graph instead of collecting another complete retained version.
-fun advance(context: mutable SKStore.Context): Bool {
-  limit = SKStore.obstackAllocatedBytes() + 256 * 1024 * 1024;
-  context
-    .updateUntilBoundary(
-      _ ~> false,
-      dir ~>
-        dir != SkipTyping.dirName && SKStore.obstackAllocatedBytes() >= limit
-      ,
-    )
-    .isNone()
-}
-
-// The pipeline phases, in execution order, declared once. `stage` names the
-// coarse incremental step (compile.sk's compilerPipeline) covering the phase,
-// so both drivers can be aligned against this single list.
-const phases: Array<Phase> = Array[
-  Phase("read_files", FrontendS()),
-  Phase("frontend", FrontendS()),
-  Phase("archive", FrontendS()),
-  Phase("outer", SpecializeS()),
-  Phase("specialize", SpecializeS()),
-  Phase("assemble", SpecializeS()),
-  Phase("optimize", OptimizeS()),
-  Phase("lower", BackendS()),
-  Phase("graph", BackendS()),
-  Phase("emit", BackendS()),
-  Phase("link", BackendS()),
-];
+// The one-shot phase names, in order, derived from the shared pipeline
+// declaration in compile.sk (pipelineStages). The State variants below align
+// with this list by position (phaseIndex()).
+const phases: Array<String> = pipelineStages.flatMap(stage -> stage.phases);
 
 fun run(config: Config.Config, debugStore: Bool): void {
   try {

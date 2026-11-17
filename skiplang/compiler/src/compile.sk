@@ -1928,18 +1928,21 @@ const sequentialPipelineKey: String = "COMPILER_SEQUENTIAL_PIPELINE";
 // synchronizes it and reclaims the callback's temporary heap before reentry.
 // Definitions are fixed for the whole compiler. Invocation options are backend
 // input data; reactive work captures handles, never invocation snapshots.
-// The incremental pipeline is inferred from the shared phase declaration
-// (ReleaseBuild.phases): one graph-driven step per distinct stage, in the order
-// the phases introduce them. Each callback leaves all continuation state in the
-// context. runPipeline synchronizes it and reclaims the callback's temporary
-// heap before reentry. Definitions are fixed for the whole compiler. Invocation
-// options are backend input data; reactive work captures handles, never
-// invocation snapshots.
-const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = distinctStages(
-  ReleaseBuild.phases,
-).map(stage ->
-  stage match {
-  | ReleaseBuild.FrontendS() ->
+// The compiler pipeline, declared once. Each stage lists its phases in
+// one-shot order (ReleaseBuild's State variants align by position) and carries
+// the incremental graph-driven step. The incremental driver below runs one
+// step per stage; the one-shot driver (ReleaseBuild) runs the phases as
+// disposable State::run arms and derives phase names/spans from this list.
+class PipelineStage(
+  name: String,
+  phases: Array<String>,
+  incrementalStep: mutable SKStore.Context ~> Bool,
+) {}
+
+const pipelineStages: Array<PipelineStage> = Array[
+  PipelineStage(
+    "frontend",
+    Array["read_files", "frontend", "archive"],
     context ~> {
       context.removeGlobal(specializationWorkKey);
       context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
@@ -1954,8 +1957,11 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = distinctStages(
       compile(config, context, config.input_files, true);
       context.removeGlobal(invocationConfigKey);
       true
-    }
-  | ReleaseBuild.SpecializeS() ->
+    },
+  ),
+  PipelineStage(
+    "specialize",
+    Array["outer", "specialize", "assemble"],
     context ~> {
       partitioned = context.getPersistent(classPartitionPolicyKey) match {
       | Some(SKStore.BoolFile(enabled)) -> enabled
@@ -2007,107 +2013,96 @@ const compilerPipeline: Array<mutable SKStore.Context ~> Bool> = distinctStages(
         false
       | _ -> boundary != Some(false)
       }
-    }
-  | ReleaseBuild.OptimizeS() ->
-    context ~> {
-      sequential = context.getGlobal(sequentialPipelineKey) match {
-      | Some(SKStore.BoolFile(value)) -> value
-      | _ -> false
-      };
-      (beforeLimit, afterLimit, afterConst) = context.getGlobal(
-        Optimize.progressKey,
-      ) match {
-      | Some(previousProgress @ Optimize.Progress _) ->
-        (
-          if (previousProgress.afterConst) previousProgress.beforeRound else {
-            previousProgress.round - 1
-          },
-          if (previousProgress.afterConst) previousProgress.round - 1 else -1,
-          previousProgress.afterConst,
-        )
-      // Body rows can invalidate existing rounds without changing the input
-      // header. Let those rounds reach the coordinator while its continuation
-      // phase is active; the final drain cannot resume an incomplete optimizer.
-      | _ -> (Int::max, Int::max, true)
-      };
-      boundary = context.updateUntilBoundary(
-        dir ~> dir == SKStore.DirName::create("/backendReachable/"),
-        dir ~>
-          dir == SKStore.DirName::create("/backendOptimize/") ||
-            (sequential && dir == SKStore.DirName::create("/backendPhase2/")),
-        dir ~> {
-          name = dir.toString();
-          if (compilerAfterOptimizer(dir)) {
-            false
-          } else if (name.startsWith("/optimizer/before-const/")) {
-            name.split("/")[3].toInt() <= beforeLimit
-          } else if (name.startsWith("/optimizer/after-const/")) {
-            name.split("/")[3].toInt() <= afterLimit
-          } else if (name == "/optimizer/lower-const/") {
-            afterConst
-          } else {
-            true
-          }
+    },
+  ),
+  PipelineStage("optimize", Array["optimize"], context ~> {
+    sequential = context.getGlobal(sequentialPipelineKey) match {
+    | Some(SKStore.BoolFile(value)) -> value
+    | _ -> false
+    };
+    (beforeLimit, afterLimit, afterConst) = context.getGlobal(
+      Optimize.progressKey,
+    ) match {
+    | Some(previousProgress @ Optimize.Progress _) ->
+      (
+        if (previousProgress.afterConst) previousProgress.beforeRound else {
+          previousProgress.round - 1
         },
-      );
-      throwIfFrontendErrors(context);
-      context.getGlobal(Optimize.progressKey) match {
-      | Some(
-        pendingProgress @ Optimize.Progress _,
-      ) if (!pendingProgress.complete) ->
-        key: SKStore.Key = SKStore.IID(0);
-        reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
-          parentName => SKStore.DirName::create("/backendPhase2/"),
-          childName => SKStore.DirName::create("/backendOptimize/"),
-          key,
-        };
-        context.invalidateReader(reader);
-        false
-      | _ -> boundary != Some(false)
-      }
-    }
-  | ReleaseBuild.BackendS() ->
-    context ~> {
-      sequential = context.getGlobal(sequentialPipelineKey) match {
-      | Some(SKStore.BoolFile(value)) -> value
-      | _ -> false
+        if (previousProgress.afterConst) previousProgress.round - 1 else -1,
+        previousProgress.afterConst,
+      )
+    // Body rows can invalidate existing rounds without changing the input
+    // header. Let those rounds reach the coordinator while its continuation
+    // phase is active; the final drain cannot resume an incomplete optimizer.
+    | _ -> (Int::max, Int::max, true)
+    };
+    boundary = context.updateUntilBoundary(
+      dir ~> dir == SKStore.DirName::create("/backendReachable/"),
+      dir ~>
+        dir == SKStore.DirName::create("/backendOptimize/") ||
+          (sequential && dir == SKStore.DirName::create("/backendPhase2/")),
+      dir ~> {
+        name = dir.toString();
+        if (compilerAfterOptimizer(dir)) {
+          false
+        } else if (name.startsWith("/optimizer/before-const/")) {
+          name.split("/")[3].toInt() <= beforeLimit
+        } else if (name.startsWith("/optimizer/after-const/")) {
+          name.split("/")[3].toInt() <= afterLimit
+        } else if (name == "/optimizer/lower-const/") {
+          afterConst
+        } else {
+          true
+        }
+      },
+    );
+    throwIfFrontendErrors(context);
+    context.getGlobal(Optimize.progressKey) match {
+    | Some(
+      pendingProgress @ Optimize.Progress _,
+    ) if (!pendingProgress.complete) ->
+      key: SKStore.Key = SKStore.IID(0);
+      reader: SKStore.TArrowKey<SKStore.Key> = SKStore.TArrowKey::create{
+        parentName => SKStore.DirName::create("/backendPhase2/"),
+        childName => SKStore.DirName::create("/backendOptimize/"),
+        key,
       };
-      fineBoundaries = Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome();
-      complete = if (sequential || fineBoundaries) {
-        context.updateUntilBoundary(
-          _ ~> false,
-          dir ~>
-            (sequential &&
-              sequentialBackendMemoryBoundaries.contains(dir.toString())) ||
-              (fineBoundaries &&
-                backendMemoryBoundaries.contains(dir.toString()))
-          ,
-        ) != Some(false)
-      } else {
-        context.update();
-        true
-      };
-      throwIfFrontendErrors(context);
-      complete
+      context.invalidateReader(reader);
+      false
+    | _ -> boundary != Some(false)
     }
-  }
-);
+  }),
+  PipelineStage("backend", Array["lower", "graph", "emit", "link"], context ~> {
+    sequential = context.getGlobal(sequentialPipelineKey) match {
+    | Some(SKStore.BoolFile(value)) -> value
+    | _ -> false
+    };
+    fineBoundaries = Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome();
+    complete = if (sequential || fineBoundaries) {
+      context.updateUntilBoundary(
+        _ ~> false,
+        dir ~>
+          (sequential &&
+            sequentialBackendMemoryBoundaries.contains(dir.toString())) ||
+            (fineBoundaries && backendMemoryBoundaries.contains(dir.toString()))
+        ,
+      ) != Some(false)
+    } else {
+      context.update();
+      true
+    };
+    throwIfFrontendErrors(context);
+    complete
+  }),
+];
 
-// The distinct stages of the shared phase list, in order of first appearance.
-fun distinctStages(
-  phases: Array<ReleaseBuild.Phase>,
-): Array<ReleaseBuild.Stage> {
-  stages = mutable Vector[];
-  seen = mutable Vector[];
-  for (phase in phases) {
-    name = phase.stage.name();
-    if (!seen.contains(name)) {
-      seen.push(name);
-      stages.push(phase.stage)
-    }
-  };
-  stages.collect(Array)
-}
+// Each callback leaves all continuation state in the context. runPipeline
+// synchronizes it and reclaims the callback's temporary heap before reentry.
+// Definitions are fixed for the whole compiler. Invocation options are backend
+// input data; reactive work captures handles, never invocation snapshots.
+const compilerPipeline: Array<
+  mutable SKStore.Context ~> Bool,
+> = pipelineStages.map(stage -> stage.incrementalStep);
 
 // Compiler policy only; SKStore owns checkpoint advancement, synchronization,
 // and temporary-memory reclamation between steps.
