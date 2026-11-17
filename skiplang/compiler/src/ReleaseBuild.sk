@@ -3,36 +3,46 @@
 module alias O = OuterIstToIR;
 module ReleaseBuild;
 
-base class State {
-  children =
-  | Start(Config.Config, Bool)
-  | Frontend(Config.Config, SKStore.Context)
-  | Archive(Config.Config, SKStore.Context)
-  | Outer(Config.Config, SKStore.Context)
-  | Specialize(
-    Config.Config,
-    SKStore.Context,
-    O.Converter,
-    O.RootsIR,
-    Array<String>,
-  )
-  | Assemble(
-    Config.Config,
-    SKStore.Context,
-    O.RootsIR,
-    O.SpecializerState,
-    Array<String>,
-  )
-  | OptimizeIR(Config.Config, GlobalEnv, Int, Array<String>)
-  | LowerIR(Config.Config, GlobalEnv, Array<String>)
-  | Graph(Config.Config, GlobalEnv, Array<String>)
-  | Emit(
-    Config.Config,
-    Array<AsmOutput.AsmDef>,
-    SourcePositions.Table,
-    Array<String>,
-  )
-  | Link(Config.Config, Array<String>, Array<String>)
+// The pipeline phases, in execution order. The incremental driver (compile.sk)
+// runs the same phases as graph-driven context steps; this driver runs them as
+// disposable direct calls, reclaiming the region between phases. Declare new
+// phases here so both modes share one list.
+class Phase(name: String, run: PhaseState ~> ?PhaseState) {}
+
+// Continuation state handed from one phase to the next. Only the fields
+// relevant to the current phase are set.
+class PhaseState(
+  phaseIndex: Int,
+  config: Config.Config,
+  debugStore: Bool,
+  context: ?SKStore.Context,
+  converter: ?O.Converter,
+  roots: ?O.RootsIR,
+  specialized: ?O.SpecializerState,
+  exports: Array<String>,
+  env: ?GlobalEnv,
+  optPhase: Int,
+  definitions: ?Array<AsmOutput.AsmDef>,
+  positions: ?SourcePositions.Table,
+  inputs: ?Array<String>,
+) {
+  static fun start(config: Config.Config, debugStore: Bool): PhaseState {
+    PhaseState(
+      0,
+      config,
+      debugStore,
+      None(),
+      None(),
+      None(),
+      None(),
+      Array[],
+      None(),
+      0,
+      None(),
+      None(),
+      None(),
+    )
+  }
 }
 
 // Copy values, not the producing arrows, their old versions or dependencies.
@@ -79,9 +89,9 @@ fun advance(context: mutable SKStore.Context): Bool {
     .isNone()
 }
 
-fun step(state: State): ?State {
-  state match {
-  | Start(config, debugStore) ->
+const phases: Array<Phase> = Array[
+  Phase("read_files", state ~> {
+    config = state.config;
     ensureCompatibleLLVMVersion();
     if (!Array["sklib", "llvm-ir", "link", "cdylib"].contains(config.emit)) {
       invariant_violation("Unsupported value for `--emit`: " + config.emit)
@@ -91,7 +101,7 @@ fun step(state: State): ?State {
       skipExit(4)
     };
     context = SKStore.Context::mcreate{};
-    context.!debugMode = debugStore;
+    context.!debugMode = state.debugStore;
     _ = context.mkdir(
       FileCache.InputSource::keyType,
       SKStore.StringFile::type,
@@ -120,31 +130,44 @@ fun step(state: State): ?State {
         },
       )
     });
-    Some(Frontend(config.backendConfig(), context.clone()))
-  | Frontend(config, saved) ->
-    context = saved.mclone();
+    Some(
+      state with {
+        phaseIndex => 1,
+        config => config.backendConfig(),
+        context => Some(context.clone()),
+      },
+    )
+  }),
+  Phase("frontend", state ~> {
+    config = state.config;
+    context = state.context.fromSome().mclone();
     finished = runCompilerPhase("release/frontend", () -> advance(context));
     if (!finished) {
-      return Some(Frontend(config, context.clone()))
-    };
-    throwErrors(context);
-    next = SKStore.Context::mcreate{};
-    if (config.emit == "sklib") {
-      // Archives contain sources and packaging metadata. No typed tree needs
-      // to survive while those sources are encoded and written.
-      _ = snapshot(context, next, FileCache.packageDir);
-      _ = snapshot(context, next, FileCache.packageEnvAccessDir);
-      _ = snapshot(context, next, FileCache.packageEnvDir(config.lib_name));
-      return Some(Archive(config, next.clone()))
-    };
-    _ = snapshot(context, next, SkipTyping.dir);
-    _ = snapshot(context, next, SourcePositions.dir);
-    Some(Outer(config, next.clone()))
-  | Archive(config, saved) ->
-    compile_sklib(saved.mclone(), config);
+      Some(state with {context => Some(context.clone())})
+    } else {
+      throwErrors(context);
+      next = SKStore.Context::mcreate{};
+      if (config.emit == "sklib") {
+        // Archives contain sources and packaging metadata. No typed tree needs
+        // to survive while those sources are encoded and written.
+        _ = snapshot(context, next, FileCache.packageDir);
+        _ = snapshot(context, next, FileCache.packageEnvAccessDir);
+        _ = snapshot(context, next, FileCache.packageEnvDir(config.lib_name));
+        Some(state with {phaseIndex => 2, context => Some(next.clone())})
+      } else {
+        _ = snapshot(context, next, SkipTyping.dir);
+        _ = snapshot(context, next, SourcePositions.dir);
+        Some(state with {phaseIndex => 3, context => Some(next.clone())})
+      }
+    }
+  }),
+  Phase("archive", state ~> {
+    compile_sklib(state.context.fromSome().mclone(), state.config);
     None()
-  | Outer(config, saved) ->
-    context = saved.mclone();
+  }),
+  Phase("outer", state ~> {
+    config = state.config;
+    context = state.context.fromSome().mclone();
     // Eager maps run while they are registered. Start outer conversion only
     // after the frontend handoff has reclaimed parser and naming state.
     runCompilerPhase("release/outer", () -> {
@@ -212,37 +235,72 @@ fun step(state: State): ?State {
     } else {
       Array[]
     };
-    Some(Specialize(config, next.clone(), converter, roots, exports))
-  | Specialize(config, saved, converter, roots, exports) ->
-    context = saved.mclone();
+    Some(
+      state with {
+        phaseIndex => 4,
+        context => Some(next.clone()),
+        converter => Some(converter),
+        roots => Some(roots),
+        exports => exports,
+      },
+    )
+  }),
+  Phase("specialize", state ~> {
+    config = state.config;
+    context = state.context.fromSome().mclone();
     empty = context.mkdir(
       x ~> x,
       x ~> x,
       SKStore.DirName::create("/specializer/empty/"),
     );
     specializer = runCompilerPhase("release/specialize", () -> {
-      sp = O.createSpecializer(context, config, converter, empty).mclone(
+      sp = O.createSpecializer(
         context,
-      );
-      for (root in roots.forceCompile) {
+        config,
+        state.converter.fromSome(),
+        empty,
+      ).mclone(context);
+      for (root in state.roots.fromSome().forceCompile) {
         sp.requestFunction(root, Array[], Array[])
       };
       sp.specializePendingFuns();
       sp.toFixed(context);
       sp.chill()
     });
-    if (config.stopAfterSpecialization) return None();
-    Some(Assemble(config, context.clone(), roots, specializer, exports))
-  | Assemble(config, saved, roots, specialized, exports) ->
-    context = saved.mclone();
-    specializer = specialized.mclone(context);
+    if (config.stopAfterSpecialization) {
+      None()
+    } else {
+      Some(
+        state with {
+          phaseIndex => 5,
+          context => Some(context.clone()),
+          specialized => Some(specializer),
+        },
+      )
+    }
+  }),
+  Phase("assemble", state ~> {
+    config = state.config;
+    context = state.context.fromSome().mclone();
+    specializer = state.specialized.fromSome().mclone(context);
     specializer.!canCreateNewSClasses = false;
     env = runCompilerPhase("release/assemble", () ->
-      O.createIR(context, config, roots, specializer, None(), None())
+      O.createIR(
+        context,
+        config,
+        state.roots.fromSome(),
+        specializer,
+        None(),
+        None(),
+      )
     );
     // No frontend or specialization cache survives into the optimizer.
-    Some(OptimizeIR(config, env, 0, exports))
-  | OptimizeIR(config, env, phase, exports) ->
+    Some(state with {phaseIndex => 6, env => Some(env), optPhase => 0})
+  }),
+  Phase("optimize", state ~> {
+    config = state.config;
+    phase = state.optPhase;
+    env = state.env.fromSome();
     next = runCompilerPhase("release/optimize-" + phase, () -> {
       if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
         Optimize.optimizeAll(
@@ -254,13 +312,27 @@ fun step(state: State): ?State {
       }
     });
     if (phase == 2) {
-      Some(LowerIR(config, finishOptimizedFunctions(next, config), exports))
+      Some(
+        state with {
+          phaseIndex => 7,
+          env => Some(finishOptimizedFunctions(next, config)),
+        },
+      )
     } else {
-      Some(OptimizeIR(config, next, phase + 1, exports))
+      Some(state with {env => Some(next), optPhase => phase + 1})
     }
-  | LowerIR(config, env, exports) ->
-    Some(Graph(config, Lower.lowerFunctions(env, config), exports))
-  | Graph(config, env, exports) ->
+  }),
+  Phase("lower", state ~> {
+    Some(
+      state with {
+        phaseIndex => 8,
+        env => Some(Lower.lowerFunctions(state.env.fromSome(), state.config)),
+      },
+    )
+  }),
+  Phase("graph", state ~> {
+    config = state.config;
+    env = state.env.fromSome();
     defs = runCompilerPhase("native/create_asm_graph", () ->
       AsmOutput.createAsmDefGraph(env, config)
     );
@@ -271,42 +343,61 @@ fun step(state: State): ?State {
       AsmOutput.assignFinalSymbols(defs, false)
     );
     Some(
-      Emit(config, defs.values().collect(Array), env.sourcePositions, exports),
+      state with {
+        phaseIndex => 9,
+        definitions => Some(defs.values().collect(Array)),
+        positions => Some(env.sourcePositions),
+      },
     )
-  | Emit(config, definitions, positions, exports) ->
+  }),
+  Phase("emit", state ~> {
+    config = state.config;
     defs = mutable AsmOutput.AsmDefIDToAsmDef{pos => FileRange.builtin};
-    for (def in definitions) defs.set(def.id, def);
+    for (def in state.definitions.fromSome()) defs.set(def.id, def);
     if (config.emit == "llvm-ir") {
-      compile_llvm_ir(defs, config, positions);
+      compile_llvm_ir(defs, config, state.positions.fromSome());
       None()
     } else {
       inputs = runCompilerPhase("native/write_asm_files", () ->
-        AsmOutput.writeNativeOutputFiles(defs, config, positions)
+        AsmOutput.writeNativeOutputFiles(
+          defs,
+          config,
+          state.positions.fromSome(),
+        )
       );
-      Some(Link(config, inputs, exports))
+      Some(state with {phaseIndex => 10, inputs => Some(inputs)})
     }
-  | Link(config, inputs, exports) ->
+  }),
+  Phase("link", state ~> {
+    config = state.config;
     runCompilerPhase("native/link", () -> {
-      getLinkArgs(config.output + ".ll", config, exports, Some(inputs)).each(
-        args -> {
-          if (config.no_link) {
-            print_string("---LINK_ARGS_BEGIN---");
-            args.each(print_string);
-            print_string("---LINK_ARGS_END---")
-          } else {
-            runShell(args, config.verbose)
-          }
-        },
-      )
+      getLinkArgs(
+        config.output + ".ll",
+        config,
+        state.exports,
+        Some(state.inputs.fromSome()),
+      ).each(args -> {
+        if (config.no_link) {
+          print_string("---LINK_ARGS_BEGIN---");
+          args.each(print_string);
+          print_string("---LINK_ARGS_END---")
+        } else {
+          runShell(args, config.verbose)
+        }
+      })
     });
     None()
-  }
+  }),
+];
+
+fun step(state: PhaseState): ?PhaseState {
+  invariant(state.phaseIndex < phases.size(), "Invalid phase index");
+  phases[state.phaseIndex].run(state)
 }
 
 fun run(config: Config.Config, debugStore: Bool): void {
   try {
-    initial: State = Start(config, debugStore);
-    SKStore.withRegionPipeline(initial, step)
+    SKStore.withRegionPipeline(PhaseState::start(config, debugStore), step)
   } catch {
   | exn ->
     print_error(exn.getMessage());
