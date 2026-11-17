@@ -258,16 +258,10 @@ class SharedSingletonFixedDir protected {
     IFixedDir::computeTags(vec);
     static{
       sourceDir => dir,
-      data => vec
-        .map(row ->
-          SharedSingletonRow(
-            row.key,
-            row.value[0],
-            row.source.baseName,
-            row.tag,
-          )
-        )
-        .toArray(),
+      data => Array::fillBy(vec.size(), i -> {
+        row = vec[i];
+        SharedSingletonRow(row.key, row.value[0], row.source.baseName, row.tag)
+      }),
     }
   }
 
