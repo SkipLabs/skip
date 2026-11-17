@@ -41,59 +41,10 @@ base class State {
     Array<String>,
   )
   | Link(Config.Config, Array<String>, Array<String>)
-}
 
-// A pipeline phase declared once: its name, the coarse incremental stage it
-// belongs to, and its one-shot step. The step matches the incoming state
-// variant (type-safe payload) and returns the next state, or None to finish.
-class Phase(name: String, stage: String, run: State ~> ?State) {}
-
-// Copy values, not the producing arrows, their old versions or dependencies.
-fun snapshot<K: SKStore.Key, V: SKStore.File>(
-  from: mutable SKStore.Context,
-  into: mutable SKStore.Context,
-  input: SKStore.EHandle<K, V>,
-): SKStore.EHandle<K, V> {
-  output = into.mkdir(input.keyType, input.type, input.dirName);
-  for ((key, values) in input.items(from)) {
-    output.writeArray(into, key, values.collect(Array))
-  };
-  output
-}
-
-fun throwErrors(context: mutable SKStore.Context): void {
-  context.getGlobal("ERRORS") match {
-  | Some(file) ->
-    errors = SkipError.ErrorsFile::type(file).value;
-    if (!errors.isEmpty()) {
-      throw SkipError.CompileFailureException{
-        message => SkipError.errorsToString(
-          errors.reversed().map(x -> x.errors).flatten().collect(Vector),
-          source -> FileCache.fileDir.unsafeGetArray(context, source)[0].value,
-        ),
-      }
-    }
-  | None() -> void
-  }
-}
-
-// Batch cheap frontend arrows, checkpointing after a substantial allocation
-// increase. Drain the final typing arrow so the next state can discard the
-// frontend graph instead of collecting another complete retained version.
-fun advance(context: mutable SKStore.Context): Bool {
-  limit = SKStore.obstackAllocatedBytes() + 256 * 1024 * 1024;
-  context
-    .updateUntilBoundary(
-      _ ~> false,
-      dir ~>
-        dir != SkipTyping.dirName && SKStore.obstackAllocatedBytes() >= limit
-      ,
-    )
-    .isNone()
-}
-
-fun runReadFiles(state: State): ?State {
-  state match {
+  // The one-shot step: each variant runs its phase and returns the next
+  // state, or None to finish. Dispatch is the sum type's virtual dispatch.
+  fun run(): ?State
   | Start(config, debugStore) ->
     ensureCompatibleLLVMVersion();
     if (!Array["sklib", "llvm-ir", "link", "cdylib"].contains(config.emit)) {
@@ -134,12 +85,6 @@ fun runReadFiles(state: State): ?State {
       )
     });
     Some(Frontend(config.backendConfig(), context.clone()))
-  | _ -> invariant_violation("read_files: unexpected phase state")
-  }
-}
-
-fun runFrontend(state: State): ?State {
-  state match {
   | Frontend(config, saved) ->
     context = saved.mclone();
     finished = runCompilerPhase("release/frontend", () -> advance(context));
@@ -161,21 +106,9 @@ fun runFrontend(state: State): ?State {
         Some(Outer(config, next.clone()))
       }
     }
-  | _ -> invariant_violation("frontend: unexpected phase state")
-  }
-}
-
-fun runArchive(state: State): ?State {
-  state match {
   | Archive(config, saved) ->
     compile_sklib(saved.mclone(), config);
     None()
-  | _ -> invariant_violation("archive: unexpected phase state")
-  }
-}
-
-fun runOuter(state: State): ?State {
-  state match {
   | Outer(config, saved) ->
     context = saved.mclone();
     // Eager maps run while they are registered. Start outer conversion only
@@ -246,12 +179,6 @@ fun runOuter(state: State): ?State {
       Array[]
     };
     Some(Specialize(config, next.clone(), converter, roots, exports))
-  | _ -> invariant_violation("outer: unexpected phase state")
-  }
-}
-
-fun runSpecialize(state: State): ?State {
-  state match {
   | Specialize(config, saved, converter, roots, exports) ->
     context = saved.mclone();
     empty = context.mkdir(
@@ -273,12 +200,6 @@ fun runSpecialize(state: State): ?State {
     if (config.stopAfterSpecialization) None() else {
       Some(Assemble(config, context.clone(), roots, specializer, exports))
     }
-  | _ -> invariant_violation("specialize: unexpected phase state")
-  }
-}
-
-fun runAssemble(state: State): ?State {
-  state match {
   | Assemble(config, saved, roots, specialized, exports) ->
     context = saved.mclone();
     specializer = specialized.mclone(context);
@@ -288,12 +209,6 @@ fun runAssemble(state: State): ?State {
     );
     // No frontend or specialization cache survives into the optimizer.
     Some(OptimizeIR(config, env, 0, exports))
-  | _ -> invariant_violation("assemble: unexpected phase state")
-  }
-}
-
-fun runOptimize(state: State): ?State {
-  state match {
   | OptimizeIR(config, env, phase, exports) ->
     next = runCompilerPhase("release/optimize-" + phase, () -> {
       if (phase == 1) LowerConst.lowerAllConsts(env, config) else {
@@ -310,20 +225,8 @@ fun runOptimize(state: State): ?State {
     } else {
       Some(OptimizeIR(config, next, phase + 1, exports))
     }
-  | _ -> invariant_violation("optimize: unexpected phase state")
-  }
-}
-
-fun runLower(state: State): ?State {
-  state match {
   | LowerIR(config, env, exports) ->
     Some(Graph(config, Lower.lowerFunctions(env, config), exports))
-  | _ -> invariant_violation("lower: unexpected phase state")
-  }
-}
-
-fun runGraph(state: State): ?State {
-  state match {
   | Graph(config, env, exports) ->
     defs = runCompilerPhase("native/create_asm_graph", () ->
       AsmOutput.createAsmDefGraph(env, config)
@@ -337,12 +240,6 @@ fun runGraph(state: State): ?State {
     Some(
       Emit(config, defs.values().collect(Array), env.sourcePositions, exports),
     )
-  | _ -> invariant_violation("graph: unexpected phase state")
-  }
-}
-
-fun runEmit(state: State): ?State {
-  state match {
   | Emit(config, definitions, positions, exports) ->
     defs = mutable AsmOutput.AsmDefIDToAsmDef{pos => FileRange.builtin};
     for (def in definitions) defs.set(def.id, def);
@@ -355,12 +252,6 @@ fun runEmit(state: State): ?State {
       );
       Some(Link(config, inputs, exports))
     }
-  | _ -> invariant_violation("emit: unexpected phase state")
-  }
-}
-
-fun runLink(state: State): ?State {
-  state match {
   | Link(config, inputs, exports) ->
     runCompilerPhase("native/link", () -> {
       getLinkArgs(config.output + ".ll", config, exports, Some(inputs)).each(
@@ -376,47 +267,79 @@ fun runLink(state: State): ?State {
       )
     });
     None()
-  | _ -> invariant_violation("link: unexpected phase state")
+}
+
+// A pipeline phase declared once: its name and the coarse incremental stage it
+// belongs to. Behavior is the State variant's run() method; this list is the
+// shared declaration (order, names, stages) both drivers align against.
+class Phase(name: String, stage: String) {}
+
+// Copy values, not the producing arrows, their old versions or dependencies.
+fun snapshot<K: SKStore.Key, V: SKStore.File>(
+  from: mutable SKStore.Context,
+  into: mutable SKStore.Context,
+  input: SKStore.EHandle<K, V>,
+): SKStore.EHandle<K, V> {
+  output = into.mkdir(input.keyType, input.type, input.dirName);
+  for ((key, values) in input.items(from)) {
+    output.writeArray(into, key, values.collect(Array))
+  };
+  output
+}
+
+fun throwErrors(context: mutable SKStore.Context): void {
+  context.getGlobal("ERRORS") match {
+  | Some(file) ->
+    errors = SkipError.ErrorsFile::type(file).value;
+    if (!errors.isEmpty()) {
+      throw SkipError.CompileFailureException{
+        message => SkipError.errorsToString(
+          errors.reversed().map(x -> x.errors).flatten().collect(Vector),
+          source -> FileCache.fileDir.unsafeGetArray(context, source)[0].value,
+        ),
+      }
+    }
+  | None() -> void
   }
+}
+
+// Batch cheap frontend arrows, checkpointing after a substantial allocation
+// increase. Drain the final typing arrow so the next state can discard the
+// frontend graph instead of collecting another complete retained version.
+fun advance(context: mutable SKStore.Context): Bool {
+  limit = SKStore.obstackAllocatedBytes() + 256 * 1024 * 1024;
+  context
+    .updateUntilBoundary(
+      _ ~> false,
+      dir ~>
+        dir != SkipTyping.dirName && SKStore.obstackAllocatedBytes() >= limit
+      ,
+    )
+    .isNone()
 }
 
 // The pipeline phases, in execution order, declared once. `stage` names the
 // coarse incremental step (compile.sk's compilerPipeline) covering the phase,
 // so both drivers can be aligned against this single list.
 const phases: Array<Phase> = Array[
-  Phase("read_files", "frontend", runReadFiles),
-  Phase("frontend", "frontend", runFrontend),
-  Phase("archive", "frontend", runArchive),
-  Phase("outer", "specialize", runOuter),
-  Phase("specialize", "specialize", runSpecialize),
-  Phase("assemble", "specialize", runAssemble),
-  Phase("optimize", "optimize", runOptimize),
-  Phase("lower", "backend", runLower),
-  Phase("graph", "backend", runGraph),
-  Phase("emit", "backend", runEmit),
-  Phase("link", "backend", runLink),
+  Phase("read_files", "frontend"),
+  Phase("frontend", "frontend"),
+  Phase("archive", "frontend"),
+  Phase("outer", "specialize"),
+  Phase("specialize", "specialize"),
+  Phase("assemble", "specialize"),
+  Phase("optimize", "optimize"),
+  Phase("lower", "backend"),
+  Phase("graph", "backend"),
+  Phase("emit", "backend"),
+  Phase("link", "backend"),
 ];
-
-fun step(state: State): ?State {
-  index = state match {
-  | Start(_, _) -> 0
-  | Frontend(_, _) -> 1
-  | Archive(_, _) -> 2
-  | Outer(_, _) -> 3
-  | Specialize(_, _, _, _, _) -> 4
-  | Assemble(_, _, _, _, _) -> 5
-  | OptimizeIR(_, _, _, _) -> 6
-  | LowerIR(_, _, _) -> 7
-  | Graph(_, _, _) -> 8
-  | Emit(_, _, _, _) -> 9
-  | Link(_, _, _) -> 10
-  };
-  phases[index].run(state)
-}
 
 fun run(config: Config.Config, debugStore: Bool): void {
   try {
-    SKStore.withRegionPipeline(Start(config, debugStore), step)
+    SKStore.withRegionPipeline(Start(config, debugStore), (state: State) ~>
+      state.run()
+    )
   } catch {
   | exn ->
     print_error(exn.getMessage());
