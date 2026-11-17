@@ -8,7 +8,10 @@ on:
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
-    runs-on: ubuntu-latest
+    # ubuntu-latest rolled to 26.04 (resolute), for which apt.llvm.org has no
+    # llvm-toolchain-<codename>-20 suite yet; the clang-20 install step 404s.
+    # Pin to 24.04 (noble), like every other workflow in this repo.
+    runs-on: ubuntu-24.04
     permissions:
       security-events: write
       packages: read
