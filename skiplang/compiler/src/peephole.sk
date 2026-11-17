@@ -57,6 +57,7 @@ mutable class .Peephole{
     | v @ FloatBits _ -> peepholeFloatBits(v, this)
     | v @ FloatNeg _ -> peepholeFloatNeg(v, this)
     | v @ FloatToInt _ -> peepholeFloatToInt(v, this)
+    | v @ FloatToString _ -> peepholeFloatToString(v, this)
     | v @ Freeze _ -> peepholeFreeze(v, this)
     | v @ GetField _ -> peepholeGetField(v, this)
     | v @ IntBinOp _ -> peepholeIntBinOp(v, this)
@@ -81,11 +82,6 @@ mutable class .Peephole{
 
     // These are handled by the control flow pass.
     | Terminator _
-
-    // Not folded: folding would use the compiler's own Float.toString, i.e.
-    // whatever prelude the compiler was built with (e.g. the bootstrap), so a
-    // constant could print differently from the same value at runtime.
-    | FloatToString _
 
     // TODO: Some of these could benefit from peepholes.
     | Alloca _
@@ -1853,6 +1849,20 @@ private fun peepholeStringConcat(
   args.size() match {
   | 0 -> s.constantString("")
   | 1 -> s.getInstr(args[0])
+  | _ -> peep
+  }
+}
+
+// Folded: the compiler's own Float.toString comes from the prelude it was
+// built with, and the bootstrap is only published after a compiler rebuilt
+// from it passes the full test suite (bin/bump_bootstrap.sh), so the folded
+// string matches what the target runtime prints.
+private fun peepholeFloatToString(
+  peep: FloatToString,
+  s: mutable Peephole,
+): Instr {
+  s.getInstr(peep.value) match {
+  | ConstantFloat{value} -> s.constantString(value.toString())
   | _ -> peep
   }
 }

@@ -1,0 +1,25 @@
+module Runtime_FloatToString;
+// Constant Float.toString is folded at compile time; the folded string must
+// match what the runtime prints (compiler and target share the same
+// Float.toString prelude once the bootstrap is current).
+
+@exptest
+fun main(): void {
+  print_raw(
+    0.1.toString() +
+      "\n" +
+      (-0.0).toString() +
+      "\n" +
+      99.25.toString() +
+      "\n" +
+      1e100.toString() +
+      "\n" +
+      (-1e-100).toString() +
+      "\n" +
+      Float::nan.toString() +
+      "\n" +
+      (-Float::inf).toString() +
+      "\n",
+  )
+}
+module end;
