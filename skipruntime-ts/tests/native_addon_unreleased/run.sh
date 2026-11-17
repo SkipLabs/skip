@@ -23,7 +23,12 @@ cp ../../../build/libskipruntime.so-* build/v"$VERSION"
 cp ../../../bin/install_runtime.sh build/
 
 # build and pack npm packages
-make -C ../.. install
+# install-all-no-native: the test container below rebuilds the addon itself
+# (npm install @skipruntime/native runs node-gyp inside the image) against the
+# Docker-built .so, so a local libskipruntime.so / node-gyp build is never
+# used -- --ignore-scripts skips it, which also keeps this step usable in the
+# parallel native-addon-unreleased CI job without a host native build.
+make -C ../.. install-all-no-native
 for pkg in core addon; do
     (cd ../../"$pkg" && npm run build && npm pack)
     mv ../../"$pkg"/skipruntime-*.tgz build/skipruntime-${pkg/addon/native}.tgz
