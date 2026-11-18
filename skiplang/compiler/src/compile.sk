@@ -1109,6 +1109,7 @@ fun getOrInitializeBackend(
                   specializationConfig,
                   converter,
                 );
+                specializer.!sequential = !config.incrementalSpecialization;
                 invariant(specializer.funStack is List.Nil());
                 invariant(specializer.classStack is List.Nil());
 
@@ -1919,7 +1920,6 @@ const sequentialBackendMemoryBoundaries: SortedSet<String> = SortedSet[
   "/backendGraph/",
   "/backendEmit/",
 ];
-const sequentialPipelineKey: String = "COMPILER_SEQUENTIAL_PIPELINE";
 
 // Each callback leaves all continuation state in the context. runPipeline
 // synchronizes it and reclaims the callback's temporary heap before reentry.
@@ -1934,10 +1934,6 @@ fun compilerPipeline(
       context.removeGlobal(specializationWorkKey);
       context.setGlobal(specializationProgressKey, SKStore.IntFile(0));
       context.setGlobal(Optimize.progressKey, SKStore.IntFile(0));
-      context.setGlobal(
-        sequentialPipelineKey,
-        SKStore.BoolFile(!config.incrementalSpecialization),
-      );
       compile(config, context, config.input_files, true);
       true
     },
@@ -1994,10 +1990,7 @@ fun compilerPipeline(
       }
     },
     context ~> {
-      sequential = context.getGlobal(sequentialPipelineKey) match {
-      | Some(SKStore.BoolFile(value)) -> value
-      | _ -> false
-      };
+      sequential = !config.incrementalSpecialization;
       (beforeLimit, afterLimit, afterConst) = context.getGlobal(
         Optimize.progressKey,
       ) match {
@@ -2051,10 +2044,7 @@ fun compilerPipeline(
       }
     },
     context ~> {
-      sequential = context.getGlobal(sequentialPipelineKey) match {
-      | Some(SKStore.BoolFile(value)) -> value
-      | _ -> false
-      };
+      sequential = !config.incrementalSpecialization;
       fineBoundaries = Environ.varOpt("SKC_CHECKPOINT_BACKEND_PHASES").isSome();
       complete = if (sequential || fineBoundaries) {
         context.updateUntilBoundary(
@@ -2095,8 +2085,7 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
     context ~> {
       context.removeGlobal(specializationWorkKey);
       context.removeGlobal(specializationProgressKey);
-      context.removeGlobal(Optimize.progressKey);
-      context.removeGlobal(sequentialPipelineKey)
+      context.removeGlobal(Optimize.progressKey)
     },
     exn ~> {
       print_error(exn.getMessage());

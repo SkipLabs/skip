@@ -794,6 +794,7 @@ class SpecializerState{
   classStack: List<CStackElement>,
   converter: Converter,
   config: Config.SpecializationConfig,
+  sequential: Bool,
   canCreateNewSClasses: Bool,
   verifyChanged: Bool,
   pauseOnSClassCreation: Bool,
@@ -862,6 +863,7 @@ class SpecializerState{
       classStack => this.classStack,
       converter => this.converter,
       config => this.config,
+      sequential => this.sequential,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
       pauseOnSClassCreation => this.pauseOnSClassCreation,
@@ -1061,6 +1063,10 @@ mutable class Specializer{
   converter: Converter,
 
   config: Config.SpecializationConfig,
+
+  // True when the sequential (non-incremental) pipeline drives this
+  // specializer; per-request collection regions are only needed then.
+  mutable sequential: Bool = false,
 
   // Once it's too late to make new SClasses we turn this off.
   mutable canCreateNewSClasses: Bool = true,
@@ -1598,6 +1604,7 @@ mutable class Specializer{
       classStack => this.classStack,
       converter => this.converter,
       config => this.config,
+      sequential => this.sequential,
       canCreateNewSClasses => this.canCreateNewSClasses,
       verifyChanged => this.verifyChanged,
       pauseOnSClassCreation => this.pauseOnSClassCreation,
@@ -1623,6 +1630,7 @@ mutable class Specializer{
     this.!canCreateNewSClasses = other.canCreateNewSClasses;
     this.!verifyChanged = other.verifyChanged;
     this.!pauseOnSClassCreation = other.pauseOnSClassCreation;
+    this.!sequential = other.sequential;
     this.!pos = other.pos;
   }
 
@@ -1871,10 +1879,7 @@ mutable class Specializer{
     // after synchronization. Nested collection would copy survivors twice.
     // Sequential discovery drains all requests in one callback, so it still
     // needs these per-request boundaries even when the outer pipeline is active.
-    sequential = context.getGlobal(.sequentialPipelineKey) match {
-    | Some(SKStore.BoolFile(value)) -> value
-    | _ -> false
-    };
+    sequential = this.sequential;
     if (!sequential && context.getGlobal(.pipelinePhaseKey).isSome()) {
       return f(context, this)
     };
