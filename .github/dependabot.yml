@@ -1,34 +1,25 @@
 version: 2
+# Security updates only.
+#
+# "Dependabot security updates" is enabled in the repo settings
+# (security_and_analysis.dependabot_security_updates = enabled) and opens PRs
+# for fixable vulnerabilities in every manifest, independent of this file.
+# Vulnerability alerts are always shown in the Security tab.
+#
+# Dependabot requires a nonempty `updates` list. Setting the version-update
+# PR limit to zero disables routine "bump to latest" PRs without disabling
+# security updates, which have a separate limit.
 updates:
   - package-ecosystem: npm
-    directory: /
+    directories:
+      - /
+      - /www
+      - /packages/dev
+      - /packages/react
+      - /examples/blogger/reactive_service
+      - /examples/blogger/www
+      - /examples/cache_invalidation/edge_service
+      - /examples/cache_invalidation/www
     schedule:
       interval: weekly
-  - package-ecosystem: npm
-    directory: /www
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /packages/dev
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /packages/react
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /examples/blogger/reactive_service
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /examples/blogger/www
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /examples/cache_invalidation/edge_service
-    schedule:
-      interval: weekly
-  - package-ecosystem: npm
-    directory: /examples/cache_invalidation/www
-    schedule:
-      interval: weekly
+    open-pull-requests-limit: 0
