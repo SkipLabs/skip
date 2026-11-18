@@ -371,4 +371,70 @@ fun testCompactFixedSourceLookupMatchesExpandedRows(): void {
   }
 }
 
+@test
+fun testCompactFixedConstructionOwnsArrays(): void {
+  dir = SKStore.DirName::create("/compact-owned/");
+  for (identity in Array[false, true]) {
+    for (size in Array[0, 1, 17]) {
+      rows = mutable Vector[];
+      for (i in Range(0, size)) {
+        n = size - i - 1;
+        key: SKStore.Key = SKStore.IID(n);
+        file: SKStore.File = SKStore.IntFile(n);
+        sourceKey: SKStore.Key = if (identity) key else StrictCompactKey(n);
+        rows.push(
+          SKStore.FixedRow(
+            key,
+            Array[file],
+            SKStore.Path::create(dir, sourceKey),
+            SKStore.TickRange::create(
+              SKStore.Tick(if (identity) 3 else n % 3 + 1),
+            ),
+          ),
+        )
+      };
+      compact = SKStore.CompactFixedDir::create(rows);
+      if (size > 0) {
+        if (identity) {
+          invariant(compact is SKStore.SingletonFixedDir _)
+        } else {
+          invariant(compact is SKStore.SharedSingletonFixedDir _)
+        }
+      };
+      expanded = SKStore.FixedDir::create(rows);
+      // Reuse the caller's storage after construction; the fixed data is frozen.
+      rows.clear();
+      rows.push(
+        SKStore.FixedRow(
+          (SKStore.IID(-1) : SKStore.Key),
+          Array[(SKStore.IntFile(-1) : SKStore.File)],
+          SKStore.Path::iid(dir, -1),
+          SKStore.TickRange::create(SKStore.Tick(99)),
+        ),
+      );
+      SKTest.expectEq(compact.size(), size);
+      for (i in Range(0, size)) {
+        expected = expanded.get(i);
+        actual = compact.get(i);
+        SKTest.expectTrue(native_eq(actual.key, expected.key) == 0);
+        SKTest.expectTrue(native_eq(actual.value, expected.value) == 0);
+        SKTest.expectEq(actual.source, expected.source);
+        SKTest.expectEq(actual.tag.current, expected.tag.current);
+        SKTest.expectTrue(
+          native_eq(
+            compact.getArraySourceKey(expected.source, expected.key),
+            expanded.getArraySourceKey(expected.source, expected.key),
+          ) == 0,
+        )
+      };
+      for (tick in Range(0, 5)) {
+        SKTest.expectEq(
+          compact.getChangesAfter(SKStore.Tick(tick)),
+          expanded.getChangesAfter(SKStore.Tick(tick)),
+        )
+      }
+    }
+  }
+}
+
 module end;
