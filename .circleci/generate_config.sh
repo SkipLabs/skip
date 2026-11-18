@@ -2,7 +2,16 @@
 
 # TODO: This is flaky as it relies on coarse directory-level diffs.
 
-BASE="$(git merge-base main HEAD)"
+# Diff against main. Fall back to origin/main for checkouts that have no
+# local main branch (e.g. a new worktree of a single-branch clone); fail loudly
+# rather than diffing against an empty base, which makes every `git diff` below
+# error out and every path look changed.
+BASE="$(git merge-base main HEAD 2>/dev/null || git merge-base origin/main HEAD 2>/dev/null)"
+if [ -z "$BASE" ]; then
+  echo "error: cannot compute merge-base with main (or origin/main); fetch main first:" >&2
+  echo "  git fetch origin +refs/heads/main:refs/remotes/origin/main" >&2
+  exit 1
+fi
 
 # Changes that cannot affect a build or test result must not trigger tests or
 # compilation, so every diff below excludes them: documentation (markdown
@@ -36,8 +45,8 @@ NO_CI_JOB_EXCLUDES=(
   ':(exclude)sql/server/dev/Dockerfile'
   # npm publishing, run only by the root Makefile's publish-* targets.
   ':(exclude)bin/release_npm.sh'
-  # Local developer tooling. The formatting gate (fast-checks) always runs and
-  # does not use these hooks.
+  # Local developer tooling. The formatting gate (fast-checks) does not execute
+  # these hooks, so they keep not triggering the test jobs below.
   ':(exclude)bin/claude_hooks/'
   ':(exclude)bin/git_hooks/'
   ':(exclude)bin/migrate-old-history-branches.sh'
@@ -257,13 +266,26 @@ then
   TS_CHANGED[skipruntime-ts]=true
 fi
 
+# fast-checks (`make check-fmt` + `make check-sh`) is scheduled only when the
+# diff touches a file those targets cover: the fmt-sk/fmt-c/fmt-js/fmt-py
+# formatters' extensions (see the Makefile and .prettierignore) or a shell
+# script (check-sh). NON_BUILD_EXCLUDES (docs, .gitignore) are covered by
+# neither, so e.g. a doc-only change runs no job beyond setup and all-checks.
+# NO_CI_JOB_EXCLUDES is deliberately not applied here: `make check-sh` lints
+# every *.sh, including the excluded bin/ scripts.
+fast_checks=false
+if git diff --name-only -z --diff-filter=d "$BASE" HEAD -- . "${NON_BUILD_EXCLUDES[@]}" \
+     | grep -zqE '\.(sk|sh|c|cc|cpp|h|hh|hpp|css|gyp|html|js|json|mjs|ts|tsx|py)$|(^|/)\.vscode/extensions\.json$'; then
+  fast_checks=true
+fi
+
 # A PR that edits a job's definition in base.yml must run that job, or the edit
 # goes untested until an unrelated PR triggers it (#1601). Split base.yml into
 # sections (each job under `jobs:`, every other top-level key) and print the
 # names of those that differ between BASE and HEAD, ignoring comment-only and
 # blank lines (a comment above a job would otherwise count towards the previous
-# one). config.yml and this script need no rule: every pipeline runs them in its
-# setup and fast-checks jobs.
+# one). config.yml and this script need no rule: every pipeline processes
+# config.yml as its entry config and runs this script in the setup job.
 changed_base_yml_sections() {
   awk '
     FNR == 1 { f = (FILENAME == ARGV[1]) ? 1 : 2; top = ""; key = "" }
@@ -287,6 +309,7 @@ if ! changed .circleci/base.yml; then
       skdb) SK_CHANGED[sql]=true ;;
       skdb-wasm) TS_CHANGED[sql]=true ;;
       check-ts) check_ts=true ;;
+      fast-checks) fast_checks=true ;;
       skipruntime | skipruntime-bun | native-addon-unreleased) TS_CHANGED[skipruntime-ts]=true ;;
       check-examples) examples=1 ;;
       all-checks) ;;
@@ -304,6 +327,7 @@ if ! changed .circleci/base.yml; then
       *)
         for dir in "${!SK_CHANGED[@]}"; do SK_CHANGED["$dir"]=true; done
         check_ts=true
+        fast_checks=true
         TS_CHANGED[sql]=true
         TS_CHANGED[skipruntime-ts]=true
         examples=1
@@ -323,6 +347,12 @@ NAMES=()
 # The brace group runs in the current shell (redirection does not fork it), so
 # NAMES accumulates across the blocks below.
 {
+if $fast_checks
+then
+    echo "      - fast-checks"
+    NAMES+=(fast-checks)
+fi
+
 if $check_ts
 then
     echo "      - check-ts"

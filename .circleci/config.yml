@@ -62,23 +62,11 @@ jobs:
       - continuation/continue:
           configuration_path: generated_config.yml
 
-  fast-checks:
-    docker:
-      - image: skiplabs/skip:latest
-    resource_class: small
-    steps:
-      - custom-checkout
-      - run:
-          name: Check code is formatted
-          command: |
-            make check-fmt
-      - run:
-          name: Check shell scripts
-          command: |
-            make check-sh
+# fast-checks is not scheduled here but by generate_config.sh (in base.yml),
+# so it runs only when the diff touches a file that make check-fmt or
+# make check-sh covers.
 
 workflows:
   setup:
     jobs:
       - setup
-      - fast-checks

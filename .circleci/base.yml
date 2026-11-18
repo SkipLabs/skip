@@ -781,6 +781,27 @@ jobs:
           working_directory: ~/project/examples/cache_invalidation
           command: docker compose down --volumes
 
+  # Formatting/shell gate (`make check-fmt` + `make check-sh`). Unlike the
+  # other jobs it is not tied to a package: generate_config.sh schedules it
+  # whenever the diff touches a file those targets cover, so e.g. doc-only
+  # changes run no pipeline job beyond setup and all-checks. It runs on the
+  # default image, which ships every check tool including skfmt, so nothing
+  # needs installing.
+  fast-checks:
+    docker:
+      - image: skiplabs/skip:latest
+    resource_class: small
+    steps:
+      - custom-checkout
+      - run:
+          name: Check code is formatted
+          command: |
+            make check-fmt
+      - run:
+          name: Check shell scripts
+          command: |
+            make check-sh
+
   # Aggregating gate: `generate_config.sh` makes this job depend on every other
   # job it schedules, so it is a single, always-present status context that only
   # passes once all triggered jobs pass. It is the required check that auto-merge
