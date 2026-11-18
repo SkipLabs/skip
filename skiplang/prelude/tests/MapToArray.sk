@@ -1,0 +1,37 @@
+module alias T = SKTest;
+
+module MapToArrayTest;
+
+fun seqMapToArray<S: readonly Sequence<Int>>(s: S): Array<Int> {
+  s.mapToArray(x -> x * 10)
+}
+
+@test
+fun testArrayMapToArray(): void {
+  arr = Array[1, 2, 3];
+  T.expectEq(arr.mapToArray(x -> x + 1), Array[2, 3, 4]);
+  T.expectEq(arr.mapToArray(x -> x.toString()), Array["1", "2", "3"]);
+  empty: Array<Int> = Array[];
+  T.expectEq(empty.mapToArray(x -> x + 1), Array[]);
+}
+
+@test
+fun testVectorMapToArray(): void {
+  vec = mutable Vector[1, 2, 3];
+  T.expectEq(vec.mapToArray(x -> x * 2), Array[2, 4, 6]);
+  T.expectEq(vec.mapToArray(x -> x.toString()), Array["1", "2", "3"]);
+  // mapping does not consume or modify the source vector
+  T.expectEq(vec.toArray(), Array[1, 2, 3]);
+  empty = mutable Vector<Int>[];
+  T.expectEq(empty.mapToArray(x -> x * 2), Array[]);
+}
+
+@test
+fun testSequenceBaseDefault(): void {
+  T.expectEq(seqMapToArray(List[1, 2, 3]), Array[10, 20, 30]);
+  T.expectEq(seqMapToArray(Range(1, 4)), Array[10, 20, 30]);
+  empty: List<Int> = List[];
+  T.expectEq(seqMapToArray(empty), Array[]);
+}
+
+module end;
