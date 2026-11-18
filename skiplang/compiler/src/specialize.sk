@@ -1871,10 +1871,7 @@ mutable class Specializer{
     // after synchronization. Nested collection would copy survivors twice.
     // Sequential discovery drains all requests in one callback, so it still
     // needs these per-request boundaries even when the outer pipeline is active.
-    sequential = context.getGlobal(.sequentialPipelineKey) match {
-    | Some(SKStore.BoolFile(value)) -> value
-    | _ -> false
-    };
+    sequential = this.config.sequential;
     if (!sequential && context.getGlobal(.pipelinePhaseKey).isSome()) {
       return f(context, this)
     };
