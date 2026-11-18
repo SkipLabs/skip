@@ -1817,8 +1817,6 @@ fun compile(
   // In batch mode the LLVM version is checked once, up front.
   if (!config.batch_mode) {
     ensureCompatibleLLVMVersion()
-  } else {
-    SkipError.setBatchMode(context)
   };
 
   (backendDir, tickDir) = getOrInitializeBackend(
@@ -2146,7 +2144,6 @@ fun compile_batch(
   manifest_path: String,
 ): void {
   ensureCompatibleLLVMVersion();
-  SkipError.setBatchMode(context);
   warm_stdlib(base_config, context);
   lines = FileSystem.readTextFile(manifest_path).split("\n");
   failures = 0;

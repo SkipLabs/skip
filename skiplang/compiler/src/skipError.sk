@@ -113,17 +113,6 @@ fun throwFlattenedErrors(errors: Vector<Vector<Error>>): void {
   throwErrors(errors.flatten());
 }
 
-fun printErrorsAndExit<T>(
-  errors: Array<SkipErrorException>,
-  get_file: FileCache.InputSource -> String,
-): T {
-  SkipError.printErrors(
-    errors.map(x -> x.errors).flatten().collect(Vector),
-    get_file,
-  );
-  skipExit(2)
-}
-
 class ErrorsFile(value: List<SkipErrorException>) extends SKStore.File
 
 // A rendered compilation failure. The command-line handler reports it and
@@ -135,40 +124,26 @@ class CompileFailureException{message: String} extends Exception {
   }
 }
 
-// In batch mode, frontend errors must be collected (not exit the process),
-// so many units can be compiled on one context. compile() sets this flag.
-fun setBatchMode(context: mutable SKStore.Context): void {
-  context.setGlobal("BATCH_MODE", SKStore.StringFile("1"))
-}
-
-fun isBatchMode(context: mutable SKStore.Context): Bool {
-  context.getGlobal("BATCH_MODE").isSome()
-}
-
-// Report errors that abort the current compile. In one-shot mode this prints
-// them and exits the process (the historical behavior). In batch mode we must
-// not exit — but we also must not carry on: the phases that reach here abort
-// the whole compile in one-shot mode, and the later phases rely on that, so
-// continuing runs them on inconsistent state and trips an invariant. Instead
-// we abort just this unit with a recoverable failure carrying the same
-// rendered errors; its throwaway forked context is torn down safely by
-// withForkedContext, leaving the shared base pristine for the remaining units.
-fun printErrorsOrRecover<T>(
+// Abort the current compile with a recoverable failure carrying the rendered
+// errors. The command-line handler reports the message and exits before
+// synchronization commits the failed update; in batch mode the per-unit
+// handler records it and continues with the remaining isolated units (the
+// unit's throwaway forked context is torn down safely by withForkedContext,
+// leaving the shared base pristine). Aborting must not carry on: the later
+// phases rely on the compile stopping, so continuing runs them on
+// inconsistent state and trips an invariant.
+fun throwRenderedErrors<T>(
   context: mutable SKStore.Context,
   errors: Array<SkipErrorException>,
 ): T {
   get_file = file -> {
     FileCache.fileDir.unsafeGetArray(context, file)[0].value
   };
-  if (isBatchMode(context)) {
-    throw CompileFailureException{
-      message => errorsToString(
-        errors.map(x -> x.errors).flatten().collect(Vector),
-        get_file,
-      ),
-    }
-  } else {
-    printErrorsAndExit(errors, get_file)
+  throw CompileFailureException{
+    message => errorsToString(
+      errors.map(x -> x.errors).flatten().collect(Vector),
+      get_file,
+    ),
   }
 }
 
@@ -191,6 +166,7 @@ fun keepErrors(
     };
     !errors = List.Cons(err, errors);
     context.setGlobal("ERRORS", ErrorsFile(errors))
+  | exn @ SkipError.CompileFailureException _ -> throw exn
   | exn ->
     debug(exn);
     throw exn
@@ -206,7 +182,8 @@ fun catchErrors(
     f()
   } catch {
   | err @ SkipError.SkipErrorException _ ->
-    printErrorsOrRecover(context, Array[err])
+    throwRenderedErrors(context, Array[err])
+  | exn @ SkipError.CompileFailureException _ -> throw exn
   | exn ->
     debug(exn);
     throw exn
@@ -444,10 +421,10 @@ fun fatalError<T>(
   msg: String,
   fix: ?Fix = None(),
 ): T {
-  // Like the `catchErrors` path, `fatalError` aborts the whole compile in
-  // one-shot mode; route it through `printErrorsOrRecover` so it becomes a
-  // recoverable per-unit failure in batch mode instead of exiting the process.
-  printErrorsOrRecover(
+  // Like the `catchErrors` path, `fatalError` aborts the compile with a
+  // recoverable failure carrying the rendered error; the command-line handler
+  // exits in one-shot mode, and the per-unit handler records it in batch mode.
+  throwRenderedErrors(
     context,
     Array[
       SkipErrorException{
