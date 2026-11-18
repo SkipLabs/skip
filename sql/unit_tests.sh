@@ -106,6 +106,16 @@ else
     fail "PARSE FLOAT"
 fi
 
+# High-precision doubles must survive the SQL text protocol (literal -> Float
+# -> stored -> Float.toString -> parseFloat -> print) with full round-trip
+# precision. The pre-Ryu 9-digit formatter lost digits on these.
+if cat test/unit_float_roundtrip.sql | $SKDB | tr '\n' S | grep -q '0.30000000000000004S0.30000000000000004S123456789.12345679S1.7976931348623157e+308S2.2250738585072014e-308S5.0e-324S1.0e+308S0.0001S1.0e-05S999999999999999.0S1.0e+15S-0.0S-0.0S5.0e-324S2.2250738585072014e-308S0.30000000000000004S1.7976931348623157e+308'
+then
+    pass "FLOAT ROUNDTRIP"
+else
+    fail "FLOAT ROUNDTRIP"
+fi
+
 clang test/unit/utf8_string/make_utf8_insert_select.c -o /tmp/make_utf8_insert_select
 /tmp/make_utf8_insert_select | $SKDB > /tmp/kk1
 
