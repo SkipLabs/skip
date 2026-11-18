@@ -302,4 +302,73 @@ fun testCompactFixedCollections(): void {
   };
 }
 
+@test
+fun testCompactFixedSourceLookupMatchesExpandedRows(): void {
+  dir = SKStore.DirName::create("/compact-lookup/source/");
+  other = SKStore.DirName::create("/compact-lookup/other/");
+  for (size in Array[0, 1, 17, 65]) {
+    for (identity in Array[false, true]) {
+      rows = mutable Vector[];
+      for (i in Range(0, size)) {
+        // Nonidentity rows include multiple producers of the same output key.
+        key: SKStore.Key = SKStore.IID(if (identity) i * 2 else (i / 3) * 2);
+        sourceKey: SKStore.Key = if (identity) key else StrictCompactKey(i * 2);
+        rows.push(
+          SKStore.FixedRow(
+            key,
+            Array[(SKStore.IntFile(i) : SKStore.File)],
+            SKStore.Path::create(dir, sourceKey),
+            SKStore.TickRange::create(SKStore.Tick(if (identity) 1 else i % 3)),
+          ),
+        )
+      };
+      compact = SKStore.CompactFixedDir::create(rows);
+      expanded = SKStore.FixedDir::create(rows);
+      if (size > 0) {
+        if (identity) {
+          invariant(compact is SKStore.SingletonFixedDir _)
+        } else {
+          invariant(compact is SKStore.SharedSingletonFixedDir _)
+        }
+      };
+      for (output in Range(-1, size * 2 + 2)) {
+        key = SKStore.IID(output);
+        for (source in Range(-1, size * 2 + 2)) {
+          sourceKey: SKStore.Key = if (identity) {
+            SKStore.IID(source)
+          } else {
+            StrictCompactKey(source)
+          };
+          path = SKStore.Path::create(dir, sourceKey);
+          SKTest.expectTrue(
+            native_eq(
+              compact.getArraySourceKey(path, key),
+              expanded.getArraySourceKey(path, key),
+            ) == 0,
+          );
+          SKTest.expectTrue(
+            native_eq(
+              compact.getIterSourceKey(path, key).collect(Array),
+              expanded.getIterSourceKey(path, key).collect(Array),
+            ) == 0,
+          )
+        };
+        // A different directory must compare before incompatible key classes.
+        otherKey: SKStore.Key = if (identity) {
+          StrictCompactKey(output)
+        } else {
+          SKStore.IID(output)
+        };
+        path = SKStore.Path::create(other, otherKey);
+        SKTest.expectTrue(
+          native_eq(
+            compact.getArraySourceKey(path, key),
+            expanded.getArraySourceKey(path, key),
+          ) == 0,
+        )
+      }
+    }
+  }
+}
+
 module end;
