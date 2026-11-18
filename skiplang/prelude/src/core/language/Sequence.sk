@@ -89,6 +89,13 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
     (acc, new)
   }
 
+  // Returns an Array with the results of calling the selection function on
+  // each element of this sequence, without building an intermediate
+  // collection.
+  overridable readonly fun mapToArray<U>(s: T -> U): Array<U> {
+    this.values().map(s).collect(Array)
+  }
+
   // Returns a new sequence representing the results of calling the selection
   // function on each element to map each element to a sequence, and
   // (conceptually) flattening the resulting sequences.

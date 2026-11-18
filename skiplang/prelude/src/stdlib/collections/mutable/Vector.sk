@@ -748,6 +748,13 @@ mutable class .Vector<+T> private (
     Vector(unsafe_chill_trust_me(inner), index)
   }
 
+  // Returns an Array with the results of calling the selection function on
+  // each item of this Vector, without building an intermediate Vector.
+  readonly fun mapToArray<U>(s: T -> U): Array<U> {
+    inner = this.inner;
+    Array::fillBy(this.sz, index -> s(unsafeGet(inner, index)))
+  }
+
   // Returns a new sequence representing the results of calling the selection
   // function on each element of this sequence.
   @synonym("select")

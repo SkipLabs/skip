@@ -206,7 +206,7 @@ class SingletonFixedDir protected {
     static{
       sourceDir => first.source.dirName,
       tag => TickRange::create(first.tag.current),
-      data => vec.map(row -> (row.key, row.value[0])).toArray(),
+      data => vec.mapToArray(row -> (row.key, row.value[0])),
     }
   }
 
@@ -258,16 +258,9 @@ class SharedSingletonFixedDir protected {
     IFixedDir::computeTags(vec);
     static{
       sourceDir => dir,
-      data => vec
-        .map(row ->
-          SharedSingletonRow(
-            row.key,
-            row.value[0],
-            row.source.baseName,
-            row.tag,
-          )
-        )
-        .toArray(),
+      data => vec.mapToArray(row ->
+        SharedSingletonRow(row.key, row.value[0], row.source.baseName, row.tag)
+      ),
     }
   }
 
@@ -362,10 +355,7 @@ class CompactFixedDir protected {
       data.sort();
     };
     IFixedDir::computeTags(data);
-    static{
-      data => data.map(static::stripMetadata).toArray(),
-      metadata => metadata,
-    }
+    static{data => data.mapToArray(static::stripMetadata), metadata => metadata}
   }
   protected static fun stripMetadata<V: File>(
     row: FixedRow<Key, Array<V>>,
@@ -761,7 +751,7 @@ private class IdentityFSMImpl(
     };
     data.sortBy(x ~> x.i0);
     if (!allowDuplicates) assertUnique(data, x ~> x.i0);
-    static(dir, data.map(x -> x.i0.baseName).toArray())
+    static(dir, data.mapToArray(x -> x.i0.baseName))
   }
 
   fun maybeGet(path: Path): ?MInfo {
