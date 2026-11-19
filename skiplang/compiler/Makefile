@@ -36,7 +36,24 @@ libdir   ?= $(exec_prefix)/lib
 .PHONY: default
 default: stage$(STAGE)
 
-stage%:
+# Each stage target names a *directory*, so as a file target with no
+# prerequisites make considers it up to date the moment the directory exists:
+# once you had built a stage, `make stageN` printed "'stageN' is up to date" and
+# recursed into nothing, leaving however stale a skc was already sitting there.
+# That is how a stage0 built weeks earlier survived a `git pull`, a bootstrap
+# submodule bump and a rebuild: nothing ever asked make to look inside the
+# directory again. They are aggregates, so make them phony and always recurse;
+# the rules they recurse into key off real inputs (stage0) or delegate freshness
+# to skargo (stage1+), so an up-to-date tree still does nothing.
+#
+# The stages have to be listed explicitly rather than matched with `stage%`:
+# make skips implicit-rule search for phony targets, so a phony target built by
+# a pattern rule gets "Nothing to be done" instead. Naming them also turns a
+# typo like `make stage7` into an error rather than a successful no-op. Nothing
+# in the tree uses a stage name outside 0-3 and D (Docker/CI use STAGE=0/1,
+# bin/bump_bootstrap.sh uses stage3 and promote).
+.PHONY: stage0 stage1 stage2 stage3 stageD
+stage0 stage1 stage2 stage3 stageD:
 	mkdir -p $@
 	$(MAKE) $@/bin/skc $@/bin/skfmt $@/bin/skargo $@/lib/libstd.sklib
 
@@ -147,11 +164,13 @@ stage3/bin/skargo: stage2 stage3/bin/skc
 # compiler; skargo and skfmt are built using the skargo found in PATH and the
 # stageD compiler
 
-stageD/bin/skc:
+STAGED_SRC := $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
+
+stageD/bin/skc: $(STAGED_SRC) $(PRELUDE_BUILD_SRCS)
 	mkdir -p $(@D)
 	OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude default
-	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(shell find ../prelude/src ../arparser/src ../cli/src src -name '*.sk')
-	mkdir -p stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/ && mv stage$(STAGE)/bin/skc.ll stage$(STAGE)/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
+	SKC_PREAMBLE=../prelude/preamble/preamble64.ll SKARGO_PKG_NAME=skc SKARGO_PKG_VERSION=stageD GIT_COMMIT_HASH=$(shell git rev-parse --short HEAD) skc $(SKC_ARGS) --link-args -lpthread --no-std --export-function-as main=skip_main -o stageD/bin/skc $(OLEVEL) stageD/lib/libskip_runtime64.a stageD/lib/libbacktrace.a $(STAGED_SRC)
+	mkdir -p stageD/target/host/$(SKARGO_PROFILE)/deps/ && mv stageD/bin/skc.ll stageD/target/host/$(SKARGO_PROFILE)/deps/skc-d.ll
 
 stageD/lib/libstd.sklib: stageD/bin/skc
 	mkdir -p $(@D)
