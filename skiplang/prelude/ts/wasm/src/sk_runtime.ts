@@ -241,6 +241,8 @@ class Manager implements ToWasmManager {
     toWasm.ceil = Math.ceil;
     toWasm.pow = Math.pow;
     toWasm.floor = Math.floor;
+    // JS `%` is the truncated remainder (sign of the dividend), matching C fmod
+    toWasm.fmod = (v: float, d: float) => v % d;
     toWasm.SKIP_Math_log = Math.log;
     toWasm.SKIP_Math_acos = Math.acos;
     toWasm.SKIP_Math_arcCos = Math.acos;
@@ -325,6 +327,7 @@ interface ToWasm {
   ceil: (v: float) => float;
   pow: (v: float, p: float) => float;
   floor: (v: float) => float;
+  fmod: (v: float, d: float) => float;
   SKIP_Math_log: (v: float) => float;
   SKIP_Math_acos: (v: float) => float;
   SKIP_Math_arcCos: (v: float) => float;

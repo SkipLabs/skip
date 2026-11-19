@@ -30,6 +30,12 @@ native fun sqrt(val: Float): Float;
 @cpp_extern("llvm.pow.f64")
 native fun pow(val: Float, power: Float): Float;
 
+// No `llvm.fmod.f64` intrinsic exists (fmod is the `frem` opcode, not an
+// intrinsic), so bind the libm symbol directly; on wasm it becomes an `fmod`
+// import provided by the JS runtime.
+@cpp_extern("fmod")
+native fun fmod(val: Float, divisor: Float): Float;
+
 fun abs<T: Number>(val: T): T {
   if (val < val.fromInt(0)) -val else val
 }

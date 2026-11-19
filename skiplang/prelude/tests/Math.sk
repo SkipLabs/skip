@@ -1,0 +1,40 @@
+module alias T = SKTest;
+
+module MathTest;
+
+@test
+fun testFmod(): void {
+  // Basic cases
+  T.expectEq(Math.fmod(5.5, 2.0), 1.5);
+  T.expectEq(Math.fmod(6.0, 3.0), 0.0);
+  T.expectEq(Math.fmod(7.0, 2.0), 1.0);
+  T.expectEq(Math.fmod(-7.0, 2.0), -1.0);
+  T.expectEq(Math.fmod(7.0, -2.0), 1.0);
+  T.expectEq(Math.fmod(-7.0, -2.0), -1.0);
+  // Result has the sign of the dividend
+  T.expectTrue(Math.fmod(-5.5, 2.0) < 0.0);
+  // Exact multiples give zero
+  T.expectEq(Math.fmod(0.0, 3.0), 0.0);
+  T.expectEq(Math.fmod(-0.0, 3.0), -0.0);
+  // |dividend| < |divisor| returns the dividend unchanged
+  T.expectEq(Math.fmod(1.5, 4.0), 1.5);
+  T.expectEq(Math.fmod(-1.5, 4.0), -1.5);
+  // Fractional divisor
+  T.expectEq(Math.fmod(5.0, 1.5), 0.5);
+  T.expectEq(Math.fmod(-5.0, 1.5), -0.5);
+}
+
+@test
+fun testFmodSpecialValues(): void {
+  // fmod(x, +/-inf) = x for finite x; fmod(inf, y) = NaN
+  T.expectEq(Math.fmod(3.0, Float::inf), 3.0);
+  T.expectEq(Math.fmod(-3.0, Float::inf), -3.0);
+  T.expectTrue(Math.fmod(Float::inf, 2.0).isNaN());
+  T.expectTrue(Math.fmod(-Float::inf, 2.0).isNaN());
+  // fmod(NaN, y) = NaN; fmod(x, 0) = NaN
+  T.expectTrue(Math.fmod(Float::nan, 2.0).isNaN());
+  T.expectTrue(Math.fmod(3.0, 0.0).isNaN());
+  T.expectTrue(Math.fmod(3.0, -0.0).isNaN());
+}
+
+module end;
