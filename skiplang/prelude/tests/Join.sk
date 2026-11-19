@@ -48,4 +48,15 @@ fun testJoinEmpty(): void {
   T.expectEq(seqJoin(emptyList, ","), "");
 }
 
+// The join works at the byte level (strings are natively UTF-8), so multibyte
+// elements and separators must round-trip correctly.
+@test
+fun testJoinMultibyte(): void {
+  T.expectEq(", ".join(Array["héllo", "wörld", "🎉"]), "héllo, wörld, 🎉");
+  T.expectEq("→".join(mutable Vector["α", "β", "γ"]), "α→β→γ");
+  T.expectEq("é".join(List["a", "b"]), "aéb");
+  T.expectEq("🎉".join(Array["x"]), "x");
+  T.expectEq("🎉".join(Array[]), "");
+}
+
 module end;
