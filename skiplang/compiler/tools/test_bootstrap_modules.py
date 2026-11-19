@@ -73,11 +73,14 @@ class BootstrapModuleTests(unittest.TestCase):
         self.assertNotEqual(self.promote().returncode, 0)
 
     def test_stage_skargo_builds_are_serialized_under_j(self):
-        # #1581: the three stage skargo invocations share stageN/target, so
-        # under -j they must be ordered by prerequisites (bins, then skargo,
-        # then lib -- the order the serial build always used) -- concurrent
-        # skargo processes sharing a target dir race on the per-unit state.db
-        # files.
+        # #1581: concurrent skargo processes sharing a target dir race on the
+        # per-unit state.db files, so any two rules that share stageN/target
+        # must be ordered by prerequisites. The bins build runs first and
+        # alone (its self-compile peaks near the CI memory guard), and the
+        # skargo build -- which shares stageN/target with it -- is ordered
+        # after it. The lib build is ordered after the bins build as well, but
+        # builds in its own stageN/target-lib, so it may run concurrently with
+        # the skargo build. Every stage skargo invocation passes --jobs.
         database = self.make("-pRrq", "-n", "STAGE=1").stdout
 
         def prereqs(target):
@@ -89,8 +92,35 @@ class BootstrapModuleTests(unittest.TestCase):
             )
             return match.group(1).split()
 
+        def recipe(target):
+            rule = re.search(
+                rf"^{re.escape(target)}: .*$", database, re.MULTILINE
+            )
+            self.assertIsNotNone(rule, f"no rule for {target} in make database")
+            marked = re.search(
+                r"^#  recipe to execute.*$\n((?:\t[^\n]*\n?)+)",
+                database[rule.end() :],
+                re.MULTILINE,
+            )
+            self.assertIsNotNone(
+                marked, f"no recipe for {target} in make database"
+            )
+            return marked.group(1)
+
         self.assertIn("stage1/bin/skc", prereqs("stage1/bin/skargo"))
-        self.assertIn("stage1/bin/skargo", prereqs("stage1/lib/libstd.sklib"))
+        self.assertIn("stage1/bin/skc", prereqs("stage1/lib/libstd.sklib"))
+        self.assertIn(
+            "--target-dir stage1/target ", recipe("stage1/bin/skargo")
+        )
+        self.assertIn(
+            "--target-dir stage1/target-lib", recipe("stage1/lib/libstd.sklib")
+        )
+        for target in (
+            "stage1/bin/skc",
+            "stage1/bin/skargo",
+            "stage1/lib/libstd.sklib",
+        ):
+            self.assertIn("--jobs", recipe(target))
 
     def test_stage0_links_optional_table_and_preserves_legacy_build(self):
         build = self.root / "build"
