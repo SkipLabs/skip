@@ -342,6 +342,10 @@ mutable native class .Array<+T>
     this.map(f)
   }
 
+  readonly fun toArray(): Array<T> {
+    Array::fillBy(this.size(), i -> this.unsafe_get(i))
+  }
+
   frozen fun parallelMap<T2>(f: T ~> T2): Array<T2> {
     unsafe_chill_trust_me(
       Parallel.tabulate(this.size(), i ~> f(this.unsafe_get(i))),

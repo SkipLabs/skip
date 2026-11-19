@@ -42,6 +42,12 @@ mutable base class .Bytes extends Sequence<UInt8> uses Show {
       None()
     }
   }
+
+  // Returns an Array with the bytes of this buffer, without going through an
+  // intermediate Vector.
+  readonly fun toArray(): Array<UInt8> {
+    Array::fillBy(this.size(), i -> this.get(i))
+  }
 }
 
 mutable base class .MutableBytes extends Bytes {
