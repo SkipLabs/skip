@@ -5,11 +5,11 @@ SKARGO_PROFILE ?= release
 # optional vtable image marks bootstraps that support it.
 SKC_ARGS ?= --canonize-paths $(if $(wildcard bootstrap/skc_vtables64.ll.gz),--split-support-module)
 SKARGO_ARGS ?= --profile $(SKARGO_PROFILE) $(foreach opt,$(SKC_ARGS),--skcopt $(opt))
-# Parallel skargo unit compilation for stage2+ builds. stage1's skargo
-# invocations run the stage0 bootstrap skargo, which predates --jobs, so they
-# stay serial. skargo never lets a heavy unit (>=100 sources, e.g. the
-# compiler self-build, which peaks near the CI job's memory guard) share a
-# slot with another unit.
+# Parallel skargo unit compilation. The pinned stage0 bootstrap skargo
+# supports --jobs, so the stage1 skargo invocations parallelize their units
+# too. skargo never lets a heavy unit (>=100 sources, e.g. the compiler
+# self-build, which peaks near the CI job's memory guard) share a slot with
+# another unit.
 SKARGO_JOBS ?= 4
 STAGE    ?= 1
 
@@ -130,31 +130,31 @@ stage0/bin/skfmt: build/skfmt_out64.ll $(call bootstrap_vtable,skfmt) stage0/lib
 	clang++ $(STAGE0_LDFLAGS) $(CXXFLAGS) -o $@ $^ -lpthread -g3
 
 # skc+skfmt are one grouped (&:) target: a single `skargo build --bins` run.
-# The three stage skargo invocations share stageN/target, so under -j they are
-# ordered by prerequisites (bins, then skargo, then lib): concurrent skargo
-# processes sharing a target dir race on the per-unit state.db files (#1581).
-# Ordered this way the later builds find the bins build's units fresh and only
-# compile their own. The bins build's self-compile also peaks near the CI
-# job's memory guard, so it must not overlap the other builds.
+# The bins build runs first and alone: its self-compile peaks near the CI
+# job's memory guard, so it must not overlap the other builds, and the other
+# builds share its target dir, where concurrent skargo processes would race
+# on the per-unit state.db files (#1581). Once the bins build is done, the
+# lib and skargo builds run concurrently under -j; the lib build gets its own
+# target dir (stageN/target-lib) so the two never share one.
 stage1/bin/skc stage1/bin/skfmt &: stage0
-	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target
-stage1/lib/libstd.sklib: stage0 stage1/bin/skargo
-	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --lib --out-dir stage1/lib --target-dir stage1/target --manifest-path ../prelude/Skargo.toml
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage1/bin --target-dir stage1/target
+stage1/lib/libstd.sklib: stage0 stage1/bin/skc
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage1/lib --target-dir stage1/target-lib --manifest-path ../prelude/Skargo.toml
 stage1/bin/skargo: stage0 stage1/bin/skc
-	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stage0/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage1/bin --target-dir stage1/target --manifest-path ../skargo/Skargo.toml
 
 stage2/bin/skc stage2/bin/skfmt &: stage1
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage2/bin --target-dir stage2/target
-stage2/lib/libstd.sklib: stage1 stage2/bin/skargo
-	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage2/lib --target-dir stage2/target --manifest-path ../prelude/Skargo.toml
+stage2/lib/libstd.sklib: stage1 stage2/bin/skc
+	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage2/lib --target-dir stage2/target-lib --manifest-path ../prelude/Skargo.toml
 stage2/bin/skargo: stage1 stage2/bin/skc
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
 stage3/bin/skc stage3/bin/skfmt &: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage3/bin --target-dir stage3/target
 	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
-stage3/lib/libstd.sklib: stage2 stage3/bin/skargo
-	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage3/lib --target-dir stage3/target --manifest-path ../prelude/Skargo.toml
+stage3/lib/libstd.sklib: stage2 stage3/bin/skc
+	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage3/lib --target-dir stage3/target-lib --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2 stage3/bin/skc
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage3/bin --target-dir stage3/target --manifest-path ../skargo/Skargo.toml
 
@@ -177,12 +177,12 @@ stageD/lib/libstd.sklib: stageD/bin/skc
 	PATH=$$(realpath stageD/bin):$(PATH) OUT_DIR=$$(realpath stageD/lib) $(MAKE) -C ../prelude bootstrap
 
 stageD/bin/skargo: stageD/bin/skc stageD/lib/libstd.sklib
-	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --bin skargo --out-dir stageD/bin --target-dir stageD/target --manifest-path ../skargo/Skargo.toml
+	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bin skargo --out-dir stageD/bin --target-dir stageD/target --manifest-path ../skargo/Skargo.toml
 
 # skfmt gets its own target dir so it can build in parallel with skargo under
 # -j (they would otherwise share stageD/target, #1581).
 stageD/bin/skfmt: stageD/bin/skc stageD/lib/libstd.sklib
-	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --bin skfmt --out-dir stageD/bin --target-dir stageD/target-skfmt
+	PATH=$$(realpath stageD/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bin skfmt --out-dir stageD/bin --target-dir stageD/target-skfmt
 
 .PHONY: promote
 promote: stage$(STAGE)
