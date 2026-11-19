@@ -253,10 +253,7 @@ fun popen{
         | Success(0) -> !eof = true
         | Success(nbytes) ->
           captured[i].extend(buf.slice(0, nbytes));
-          handlers[i](
-            // TODO: Get rid of `.collect(Array)`.
-            String::fromUtf8(buf.slice(0, nbytes).collect(Array)),
-          )
+          handlers[i](String::fromUtf8(buf.slice(0, nbytes).toArray()))
         }
       } else if (pfd.pollerr() || pfd.pollhup()) {
         !eof = true
