@@ -48,6 +48,7 @@ value class SpecializationConfig(
   streamClassConflicts: Bool = false,
   classGroupHints: Bool = false,
   sequential: Bool = false,
+  phased: Bool = false,
 )
 
 class Config{
@@ -82,6 +83,9 @@ class Config{
   stopAfterSpecialization: Bool,
   // Persistent invocations retain the incremental specialization graph.
   incrementalSpecialization: Bool = false,
+  // True when the phased SKStore.runPipeline driver runs this invocation;
+  // set by runCompilerPipeline, not by command-line options.
+  phased: Bool = false,
   collectionEmission: Bool = false,
   stableFunctionSymbols: Bool = false,
   stableFunctionDeclarations: Bool = false,
@@ -386,6 +390,7 @@ class Config{
         this.partitionClasses &&
         this.classGroupHints,
       !this.incrementalSpecialization,
+      this.phased,
     )
   }
 
