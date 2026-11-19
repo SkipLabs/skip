@@ -5,6 +5,13 @@ runtime_test_sources=$(cd "$(dirname "$0")" && pwd)
 runtime_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/skip-runtime-tests.XXXXXXXX")
 trap 'rm -rf "$runtime_test_dir"' EXIT
 
+# Portable native check: runs on every platform.
+clang -std=c2x -O2 -g -Wall -Wextra -Werror \
+  -I"$runtime_test_sources/.." \
+  -fsanitize=undefined -fsanitize-trap=all \
+  "$runtime_test_sources/to_float_raw_native.c" -o "$runtime_test_dir/to-float-raw-native"
+"$runtime_test_dir/to-float-raw-native"
+
 # The checks below are Linux-specific (glibc mutex internals, GNU ld flags).
 if [ "$(uname -s)" = Darwin ]; then
   clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \

@@ -47,12 +47,21 @@ for (const str of [
   "1.7976931348623158e308", // rounds down to DBL_MAX
   "1.8e308", // overflows to infinity
   "1e-400", // underflows to zero
+  // Edge forms the grammar in String.toFloatOption accepts.
+  "5.",
+  "0.",
+  "1e0",
+  "10e-1",
+  "-0.0e0",
 ]) {
   check(str);
 }
 
-// More than 17 significant digits is unsupported; the runtime asks the host.
+// More than 17 significant digits is unsupported; the runtime asks the host
+// (strtod with a locale-corrected '.' on native, JS Number() on Wasm) for those.
 assert.notEqual(s2d("123456789012345678").status, SUCCESS);
+assert.notEqual(s2d("0.1000000000000000000000000000001").status, SUCCESS);
+assert.notEqual(s2d("99999999999999999999").status, SUCCESS);
 
 // xorshift64, so failures are reproducible.
 let state = 0x9e3779b97f4a7c15n;

@@ -3,6 +3,7 @@
 #include "ryu/ryu_parse.h"
 
 #ifdef SKIP64
+#include <locale.h>
 #include <stdlib.h>
 #include <string.h>
 #endif
@@ -302,10 +303,28 @@ double SKIP_String__toFloat_raw(char* str) {
   }
   return SKIP_js_parse_float(str);
 #else
+  // Same primary path as Wasm: Ryu's s2d, which is correctly rounded and
+  // locale-independent. Inputs it rejects (more than 17 non-zero digits) go to
+  // strtod, which rounds identically, so native and Wasm agree bit for bit.
+  double parsed;
+  if (s2d_n(str, (int)size, &parsed) == SUCCESS) {
+    return parsed;
+  }
   char cstr[256];
   memcpy(cstr, str, size);
   cstr[size] = 0;
-  return atof(cstr);
+  // strtod is locale-dependent (a ',' locale would parse "1.5" as 1). The
+  // input grammar (validated in String.toFloatOption) uses '.' as the only
+  // decimal separator, so rewrite it to the locale's decimal point first.
+  char decimal_point = localeconv()->decimal_point[0];
+  if (decimal_point != '.') {
+    for (size_t i = 0; i < size; i++) {
+      if (cstr[i] == '.') {
+        cstr[i] = decimal_point;
+      }
+    }
+  }
+  return strtod(cstr, NULL);
 #endif
 }
 
