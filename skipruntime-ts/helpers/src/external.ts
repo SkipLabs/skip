@@ -48,7 +48,7 @@ export interface PolledHTTPResource {
    */
   encodeParams?: (params: Json) => string;
   /**
-   * Optional parameters: additional `headers` to add to request, and `timeout` for request, in milliseconds. (default 1000ms)
+   * Optional parameters: additional `headers` to add to request, and `timeout` for request, in milliseconds. (default 10000ms)
    */
   options?: { headers?: { [header: string]: string }; timeout?: number };
 }
