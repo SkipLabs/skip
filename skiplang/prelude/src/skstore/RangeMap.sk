@@ -308,7 +308,7 @@ class CompactRangeMap<+K: Orderable, +V: Orderable>(
   static fun fromRangeMap(rmap: RangeMap<K, V>): CompactRangeMap<K, V> {
     acc = Vector::mcreate(1200);
     rmap.valueAcc(acc);
-    CompactRangeMap(acc.map(x -> (x.i0, x.i1.toArray())).collect(Array))
+    CompactRangeMap(acc.mapToArray(x -> (x.i0, x.i1.toArray())))
   }
 
   fun get<K2: Orderable>[K: K2](key: K2): SortedSet<V> {

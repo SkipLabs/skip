@@ -22,7 +22,7 @@ class Concat(parts: Vector<Doc>) extends Doc {
     Concat(elements.collect(Vector))
   }
   fun inspect(): Inspect {
-    InspectVector("Doc.Concat", this.parts.map(inspect).toArray());
+    InspectVector("Doc.Concat", this.parts.mapToArray(inspect));
   }
 }
 class Indent(contents: Doc) extends Doc {
@@ -31,7 +31,7 @@ class Indent(contents: Doc) extends Doc {
   }
   fun inspect(): Inspect {
     this.contents match {
-    | Concat(parts) -> InspectVector("Doc.Indent", parts.map(inspect).toArray())
+    | Concat(parts) -> InspectVector("Doc.Indent", parts.mapToArray(inspect))
     | contents -> InspectCall("Doc.Indent", Array[inspect(contents)])
     }
   }

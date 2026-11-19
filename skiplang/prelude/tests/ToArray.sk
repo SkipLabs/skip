@@ -1,0 +1,39 @@
+module alias T = SKTest;
+
+module ToArrayTest;
+
+fun seqToArray<S: readonly Sequence<Int>>(s: S): Array<Int> {
+  s.toArray()
+}
+
+@test
+fun testArrayToArray(): void {
+  arr = Array[1, 2, 3];
+  T.expectEq(arr.toArray(), Array[1, 2, 3]);
+  empty: Array<Int> = Array[];
+  T.expectEq(empty.toArray(), Array[]);
+}
+
+@test
+fun testVectorToArray(): void {
+  vec = mutable Vector[1, 2, 3];
+  T.expectEq(vec.toArray(), Array[1, 2, 3]);
+  // the source vector is unchanged
+  T.expectEq(vec.size(), 3);
+}
+
+@test
+fun testSequenceBaseDefault(): void {
+  T.expectEq(seqToArray(List[1, 2, 3]), Array[1, 2, 3]);
+  T.expectEq(seqToArray(Range(1, 4)), Array[1, 2, 3]);
+  empty: List<Int> = List[];
+  T.expectEq(seqToArray(empty), Array[]);
+}
+
+@test
+fun testBytesToArray(): void {
+  T.expectEq("abc".bytes().toArray().map(b -> b.toInt()), Array[97, 98, 99]);
+  T.expectEq("".bytes().toArray(), Array[]);
+}
+
+module end;

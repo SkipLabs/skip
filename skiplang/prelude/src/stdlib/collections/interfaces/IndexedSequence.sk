@@ -92,6 +92,12 @@ mutable base class .IndexedSequence<+T> extends Sequence<T> {
     Array::fillBy(this.size(), i -> s(this.get(i)))
   }
 
+  // Returns an Array with the items of this sequence, without building an
+  // intermediate collection.
+  overridable readonly fun toArray(): Array<T> {
+    Array::fillBy(this.size(), i -> this.get(i))
+  }
+
   // # Selecting Portions of a Sequence
 
   // Returns the items of this container from the start index (inclusive) up to
