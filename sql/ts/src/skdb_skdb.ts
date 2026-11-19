@@ -1,4 +1,5 @@
 import type {
+  float,
   int,
   ptr,
   Environment,
@@ -74,7 +75,7 @@ interface ToWasm {
   SKIP_push_object_field_null: () => void;
   SKIP_push_object_field_int32: (field: int) => void;
   SKIP_push_object_field_int64: (field: ptr<Internal.String>) => void;
-  SKIP_push_object_field_float: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_float: (field: float) => void;
   SKIP_push_object_field_string: (field: ptr<Internal.String>) => void;
   SKIP_push_object_field_json: (field: ptr<InternalJ.CJSON>) => void;
   SKIP_push_object: () => void;
@@ -228,7 +229,7 @@ class LinksImpl implements Links, ToWasm {
   SKIP_push_object_field_null!: () => void;
   SKIP_push_object_field_int32!: (field: int) => void;
   SKIP_push_object_field_int64!: (field: ptr<Internal.String>) => void;
-  SKIP_push_object_field_float!: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_float!: (field: float) => void;
   SKIP_push_object_field_string!: (field: ptr<Internal.String>) => void;
   SKIP_push_object_field_json!: (field: ptr<InternalJ.CJSON>) => void;
   SKIP_push_object!: () => void;
@@ -350,11 +351,11 @@ class LinksImpl implements Links, ToWasm {
       this.object[field_name] = parseInt(utils.importString(skV), 10);
       this.objectIdx++;
     };
-    this.SKIP_push_object_field_float = (skV: ptr<Internal.String>) => {
+    this.SKIP_push_object_field_float = (v: float) => {
       const field_name = this.field_names[this.objectIdx];
       if (field_name === undefined)
         throw new Error(`Missing field name at index ${this.objectIdx}`);
-      this.object[field_name] = parseFloat(utils.importString(skV));
+      this.object[field_name] = v;
       this.objectIdx++;
     };
     this.SKIP_push_object_field_string = (skV: ptr<Internal.String>) => {
@@ -542,7 +543,7 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_push_object_field_int64 = (field: ptr<Internal.String>) => {
       links.SKIP_push_object_field_int64(field);
     };
-    toWasm.SKIP_push_object_field_float = (field: ptr<Internal.String>) => {
+    toWasm.SKIP_push_object_field_float = (field: float) => {
       links.SKIP_push_object_field_float(field);
     };
     toWasm.SKIP_push_object_field_string = (field: ptr<Internal.String>) => {
