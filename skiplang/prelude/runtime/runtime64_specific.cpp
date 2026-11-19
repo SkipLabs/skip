@@ -616,7 +616,7 @@ void SKIP_push_object_field_null() {
 void SKIP_push_object_field_int32(int32_t) {
   // Not implemented
 }
-void SKIP_push_object_field_int64(char*) {
+void SKIP_push_object_field_int64(int64_t) {
   // Not implemented
 }
 void SKIP_push_object_field_float(double) {
