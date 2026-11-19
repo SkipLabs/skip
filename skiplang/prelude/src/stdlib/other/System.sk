@@ -252,8 +252,9 @@ fun popen{
         | Failure(err) -> throw err
         | Success(0) -> !eof = true
         | Success(nbytes) ->
-          captured[i].extend(buf.slice(0, nbytes));
-          handlers[i](String::fromUtf8(buf.slice(0, nbytes).toArray()))
+          slice = buf.slice(0, nbytes);
+          captured[i].extend(slice);
+          handlers[i](String::fromUtf8(slice))
         }
       } else if (pfd.pollerr() || pfd.pollhup()) {
         !eof = true
