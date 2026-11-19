@@ -1872,7 +1872,7 @@ mutable class Specializer{
     // Sequential discovery drains all requests in one callback, so it still
     // needs these per-request boundaries even when the outer pipeline is active.
     sequential = this.config.sequential;
-    if (!sequential && context.getGlobal(.pipelinePhaseKey).isSome()) {
+    if (!sequential && this.config.phased) {
       return f(context, this)
     };
     frozenSpecializer = this.chill();

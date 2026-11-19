@@ -251,6 +251,8 @@ class SpecializerProgress(
   complete: Bool,
 ) extends SKStore.File
 
+// Resume key owned by SKStore.runPipeline itself (checkpoint counter); the
+// compiler reads the phased flag from Config instead of this global.
 const pipelinePhaseKey: String = "COMPILER_PIPELINE_PHASE";
 const specializationProgressKey: String = "COMPILER_SPECIALIZATION_PROGRESS";
 const discoveryStoragePolicyKey: String = "COMPILER_DISCOVERY_STORAGE_POLICY";
@@ -972,7 +974,7 @@ fun getOrInitializeBackend(
         Environ.varOpt("SKC_HIERARCHICAL_DISCOVERY").isSome();
       partitionClasses = config.partitionClasses;
       phaseNumber = 0;
-      phased = context.getGlobal(pipelinePhaseKey).isSome();
+      phased = config.phased;
       batchCached =
         phased &&
         Environ.varOpt("SKC_BATCH_CACHED_SPECIALIZATION").isSome();
@@ -2071,7 +2073,7 @@ fun runCompilerPipeline(config: Config.Config, debugSKStore: Bool): void {
   SKStore.runPipeline(
     SKStore.Context::create{},
     pipelinePhaseKey,
-    compilerPipeline(config),
+    compilerPipeline(config with {phased => true}),
     (context, phase) ~> {
       profileCompilerMemory(context, "before-" + phase);
       context.!debugMode = debugSKStore;
