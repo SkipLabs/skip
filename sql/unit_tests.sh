@@ -108,8 +108,10 @@ fi
 
 # High-precision doubles must survive the SQL text protocol (literal -> Float
 # -> stored -> Float.toString -> parseFloat -> print) with full round-trip
-# precision. The pre-Ryu 9-digit formatter lost digits on these.
-if cat test/unit_float_roundtrip.sql | $SKDB | tr '\n' S | grep -q '0.30000000000000004S0.30000000000000004S123456789.12345679S1.7976931348623157e+308S2.2250738585072014e-308S5.0e-324S1.0e+308S0.0001S1.0e-05S999999999999999.0S1.0e+15S-0.0S-0.0S5.0e-324S2.2250738585072014e-308S0.30000000000000004S1.7976931348623157e+308'
+# precision. The pre-Ryu 9-digit formatter lost digits on these. The SQL lives
+# under test/unit/ so test_sql.sh's test/*.sql glob (which diffs against
+# sqlite3, whose float formatting differs) does not pick it up.
+if cat test/unit/unit_float_roundtrip.sql | $SKDB | tr '\n' S | grep -q '0.30000000000000004S0.30000000000000004S123456789.12345679S1.7976931348623157e+308S2.2250738585072014e-308S5.0e-324S1.0e+308S0.0001S1.0e-05S999999999999999.0S1.0e+15S-0.0S-0.0S5.0e-324S2.2250738585072014e-308S0.30000000000000004S1.7976931348623157e+308'
 then
     pass "FLOAT ROUNDTRIP"
 else
