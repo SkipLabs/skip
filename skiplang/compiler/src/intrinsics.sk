@@ -232,6 +232,43 @@ mutable class .IntrinsicsInliner{
         StringConcat{id => call.id, typ => call.typ, pos, args => call.args},
       );
       this.jumpIfInvoke(call)
+    | "Sequence.copyStringBytesTo" ->
+      // Lower the block copy directly to an llvm.memcpy: a[0] is the source
+      // string (a String value points at its first UTF-8 byte), a[1] the
+      // destination Array<UInt8> (an Array value points at its first element)
+      // and a[2] the byte offset within it. The result is the string's byte
+      // size. The sk_string_t header stores the size as a u32 just before the
+      // data: at -4 on 64-bit (hash at -8), at -8 on wasm32 (size before hash).
+      // The @cpp_extern declaration remains as the fallback for compilers that
+      // don't know this intrinsic (e.g. the pinned stage0).
+      str = a[0];
+      sizeByteOffset = if (this.config.isWasm()) -8 else -4;
+      size32 = this.emitLoad{
+        addr => str,
+        bitOffset => 8 * sizeByteOffset,
+        addrByteAlignment => 4,
+        canCSE => true,
+        invariant => true, // The size of a string never changes.
+        typ => tInt32,
+        pos,
+      };
+      size = this.emitZeroExtend{value => size32.id, pos, typ => tInt};
+      destPtr = this.emitBytePointerAdd{
+        addr => this.emitCast{value => a[1], typ => tNonGCPointer, pos}.id,
+        offset => a[2],
+        typ => tNonGCPointer,
+        pos,
+      };
+      _ = this.emitNamedCall{
+        name => "llvm.memcpy.p0.p0.i64",
+        args => Array[destPtr.id, str, size.id, this.constantBool(false).id],
+        canThrow => false,
+        allocAmount => AllocNothing(),
+        typ => tVoid,
+        pos,
+      };
+      this.optinfo.idToInstr.set(call.id, size);
+      this.jumpIfInvoke(call)
     | "String::compare_raw" -> this.makeBinOp(StringCmp, call, a[0], a[1])
     | "String::==" -> this.makeBinOp(StringCmpEq, call, a[0], a[1])
     | "String::!=" ->
