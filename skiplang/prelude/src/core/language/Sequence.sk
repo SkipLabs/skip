@@ -390,24 +390,33 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
   // items.
   overridable readonly fun join[T: readonly Show](separator: String): String {
     // toString is called exactly once per element: the rendered strings are
-    // collected into a single Vector (with separators interleaved), which is
-    // then flattened into the output buffer.
-    strings = mutable Vector<String>[];
+    // collected (as zero-copy byte views) into a single Vector while counting
+    // the total output size in the same pass. Strings are natively UTF-8, so
+    // the join happens at the byte level: sizes are O(1) and fromUtf8 just
+    // memcpys the buffer, avoiding a per-char UTF-8 decode/encode.
+    parts = mutable Vector<readonly Bytes>[];
+    numBytes = 0;
     this.each(x -> {
-      if (!strings.isEmpty() && !separator.isEmpty()) strings.push(separator);
-      strings.push(x.toString())
+      b = x.toString().bytes();
+      parts.push(b);
+      !numBytes = numBytes + b.size()
     });
-    numChars = 0;
-    for (s in strings) !numChars = numChars + s.length();
-    buf = Array::mfill(numChars, '\0');
+    sep = separator.bytes();
+    sepLen = sep.size();
+    count = parts.size();
+    if (count > 1 && sepLen > 0) !numBytes = numBytes + sepLen * (count - 1);
+    buf = Array<UInt8>::mfill(numBytes, UInt8::truncate(0));
     out = 0;
-    for (s in strings) {
-      s.each(c -> {
-        buf.set(out, c);
-        !out = out + 1
-      })
-    };
-    String::fromChars(buf)
+    parts.eachWithIndex((i, b) -> {
+      if (i > 0 && sepLen > 0) {
+        for (j in Range(0, sepLen)) buf.set(out + j, sep.get(j));
+        !out = out + sepLen
+      };
+      size = b.size();
+      for (j in Range(0, size)) buf.set(out + j, b.get(j));
+      !out = out + size
+    });
+    String::fromUtf8(buf)
   }
 
   // # Extensions
