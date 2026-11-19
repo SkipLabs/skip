@@ -138,7 +138,7 @@ fmt: fmt-sk fmt-c fmt-js fmt-py # Keep in sync with bin/git_hooks/check_format.s
 
 .PHONY: check-fmt
 check-fmt:
-	PRETTIER_LOG_LEVEL=debug ${MAKE} fmt
+	${MAKE} fmt
 	if ! git diff --quiet --exit-code; then echo "make fmt changed some files:"; git status --porcelain; exit 1; fi
 
 # regenerate api docs served by docs-run from ts sources

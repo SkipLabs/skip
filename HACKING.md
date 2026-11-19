@@ -62,9 +62,10 @@ encourages batching unrelated changes.
 - The native-addon release rehearsal is its own `native-addon-unreleased` job,
   scheduled beside `skipruntime`, so its from-source Docker rebuild (on a
   cache miss) runs in parallel with the runtime tests instead of after them.
-- Doc-only and `.gitignore`-only changes schedule no test jobs
-  (`.circleci/generate_config.sh`); keep it that way for other paths that
-  cannot affect a build.
+- Doc-only and `.gitignore`-only changes schedule no jobs at all — not even
+  `fast-checks`, whose formatters and shellcheck cover neither — so only
+  `setup` and the no-op `all-checks` run (`.circleci/generate_config.sh`);
+  keep it that way for other paths that cannot affect a build or a check.
 
 ### Publishing CI Docker images
 
