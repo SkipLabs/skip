@@ -64,8 +64,7 @@ trait Read {
 
   mutable fun read_to_string(): Result<String, Error> {
     buf = mutable Vector[];
-    // TODO: Get rid of `.collect(Array)`.
-    this.read_to_end(buf).map(_ -> String::fromUtf8(buf.collect(Array)))
+    this.read_to_end(buf).map(_ -> String::fromUtf8(buf.toArray()))
   }
 
   mutable fun read_exact(buf: mutable MutableBytes): Result<void, Error> {
@@ -231,8 +230,7 @@ trait BufRead extends Read {
   mutable fun read_line(): Result<String, Error> {
     buf = mutable Vector<UInt8>[];
     this.read_until(UInt8::truncate(Chars.lineFeed.code()), buf).map(_ ->
-      // TODO: Get rid of `.collect(Array)`.
-      String::fromUtf8(buf.collect(Array))
+      String::fromUtf8(buf.toArray())
     )
   }
 }
