@@ -1,0 +1,51 @@
+module alias T = SKTest;
+
+module JoinTest;
+
+fun seqJoin<S: readonly Sequence<Int>>(s: S, sep: String): String {
+  s.join(sep)
+}
+
+@test
+fun testJoin(): void {
+  T.expectEq(Array[1, 2, 3].join(", "), "1, 2, 3");
+  T.expectEq(",".join(Array[1, 2, 3]), "1,2,3");
+  T.expectEq(",".join(mutable Vector[1, 2, 3]), "1,2,3");
+  T.expectEq(",".join(List[1, 2, 3]), "1,2,3");
+  T.expectEq("-".join(Range(1, 4)), "1-2-3");
+  T.expectEq(seqJoin(Range(1, 4), "|"), "1|2|3");
+  T.expectEq(seqJoin(List[1, 2, 3], "|"), "1|2|3");
+  T.expectEq("".join(Array[1, 2]), "12");
+  T.expectEq("".join(mutable Vector[1, 2, 3]), "123");
+  T.expectEq(",".join(Array[1]), "1");
+}
+
+// A Show-implementing class with a non-trivial toString.
+class Point(x: Int, y: Int) uses Show {
+  fun toString(): String {
+    `Point(${this.x}, ${this.y})`
+  }
+}
+
+@test
+fun testJoinUsesToStringOfElements(): void {
+  T.expectEq(
+    ";".join(Array[Point(1, 2), Point(3, 4)]),
+    "Point(1, 2);Point(3, 4)",
+  );
+  T.expectEq(",".join(mutable Vector[Point(0, 0)]), "Point(0, 0)");
+  T.expectEq("".join(List[Point(5, 6), Point(7, 8)]), "Point(5, 6)Point(7, 8)");
+}
+
+@test
+fun testJoinEmpty(): void {
+  emptyArr: Array<Int> = Array[];
+  emptyVec = mutable Vector<Int>[];
+  emptyList: List<Int> = List[];
+  T.expectEq(",".join(emptyArr), "");
+  T.expectEq(",".join(emptyVec), "");
+  T.expectEq(",".join(emptyList), "");
+  T.expectEq(seqJoin(emptyList, ","), "");
+}
+
+module end;
