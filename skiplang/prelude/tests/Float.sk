@@ -344,6 +344,32 @@ fun testStringToFloat(): void {
   T.expectEq("abc".toFloatOption(), None());
   T.expectEq("1.2.3".toFloatOption(), None());
   T.expectEq("1e".toFloatOption(), None());
+  // Grammar is decimal-only, no surrounding whitespace, no hex, no leading '+'
+  // (kept identical on native and Wasm; JS Number() would accept all of these).
+  T.expectEq(" 1".toFloatOption(), None());
+  T.expectEq("1 ".toFloatOption(), None());
+  T.expectEq("0x1p4".toFloatOption(), None());
+  T.expectEq("Infinity".toFloatOption(), None());
+  T.expectEq("INF".toFloatOption(), None());
+  T.expectEq("+1".toFloatOption(), None());
+  T.expectEq(".5".toFloatOption(), None());
+  T.expectEq("1,5".toFloatOption(), None());
+  T.expectEq("00".toFloatOption(), None());
+  T.expectEq("1e+".toFloatOption(), None());
+  T.expectEq("nan ".toFloatOption(), None());
+  // Accepted edge forms.
+  T.expectEq("5.".toFloat(), 5.0);
+  T.expectEq("0e0".toFloat(), 0.0);
+  T.expectEq("1E5".toFloat(), 100000.0);
+  T.expectEq("10e-1".toFloat(), 1.0);
+  // More than 17 significant digits: correctly rounded via the fallback
+  // (strtod with locale-corrected '.' on native, JS Number() on Wasm).
+  T.expectEq("0.1000000000000000000000000000001".toFloat(), 0.1);
+  T.expectEq("123456789012345678".toFloat(), 123456789012345680.0);
+  // Correctly rounds to the largest subnormal, not up to the smallest normal.
+  T.expectEq("2.2250738585072011e-308".toFloat(), 2.2250738585072009e-308);
+  // Round-trips through toString.
+  T.expectEq("0.30000000000000004".toFloat().toString(), "0.30000000000000004");
 }
 
 @test
