@@ -1,0 +1,17 @@
+name: "Skip CodeQL config"
+
+queries:
+  - uses: security-extended
+
+# The C runtime is a local CLI: the only cpp/path-injection hits are
+# sk_create_mapping/sk_load_mapping opening the state.db path passed via the
+# process's own --data/--init argv (skiplang/prelude/runtime/palloc.c). The
+# local user already controls the filesystem, so the rule is pure noise here.
+query-filters:
+  - exclude:
+      id: cpp/path-injection
+
+# The examples are localhost-only demos, not shipped services, so
+# js/missing-rate-limiting does not apply to them.
+paths-ignore:
+  - "skipruntime-ts/examples/database-server.ts"

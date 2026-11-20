@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           version: ${{ env.BUILDX_VERSION }}
       - name: Check the credentials can push skdb
@@ -64,10 +64,10 @@ jobs:
           # The compiler is built from source in the image, and its Makefile
           # needs the pinned bootstrap and libbacktrace submodules.
           submodules: true
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           version: ${{ env.BUILDX_VERSION }}
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -76,7 +76,7 @@ jobs:
         run: df -h /
       - name: Build and push by digest
         id: bake
-        uses: docker/bake-action@v7
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
           # v6+ defaults to the git context, which would pick up neither the
           # submodules checked out above nor .dockerignore.
@@ -129,13 +129,13 @@ jobs:
           path: /tmp/digests
           pattern: digest-*
           merge-multiple: true
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           # Load bearing: imagetools create runs from the CLI plugin this
           # installs, and it is what preserves or drops the per-platform
           # attestations.
           version: ${{ env.BUILDX_VERSION }}
-      - uses: docker/login-action@v4
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}

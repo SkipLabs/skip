@@ -49,6 +49,12 @@ const post = (message: any) => {
 };
 
 const onMessage = (message: MessageEvent) => {
+  // The worker is only ever created same-origin from the embedding page
+  // (browser.ts: new Worker(new URL("./skdb_worker.js", import.meta.url))),
+  // so anything else is not a legitimate caller.
+  if (message.origin !== self.location.origin) {
+    return;
+  }
   /* eslint-disable-next-line @typescript-eslint/no-unsafe-argument */
   onWorkerMessage(message.data, post, creator);
 };
