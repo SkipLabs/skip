@@ -1,8 +1,8 @@
 # skbigint
 
-Arbitrary-precision signed integers (`BigInt`) for skiplang, backed by the
-vendored [LibTomMath](https://github.com/libtom/libtommath) v1.3.0
-(`extern/libtommath/`, public domain — see its `LICENSE` and `README.md`).
+Arbitrary-precision signed integers (`BigInt`) for skiplang, backed by
+[LibTomMath](https://github.com/libtom/libtommath) v1.3.0, pulled in as a git
+submodule at `extern/libtommath/` (public domain — see `extern/README.md`).
 
 LibTomMath was chosen because it is a well-recognized, portable, pure-C
 multiple-precision integer library that is actively maintained (v1.3.0,
@@ -34,9 +34,9 @@ negative exponent throws `BigIntNegativeExponent`.
 
 ## Layout
 
-- `extern/libtommath/` — pristine upstream v1.3.0 sources (public domain);
-  excluded from `clang-format` (see the top-level `Makefile` and
-  `bin/git_hooks/check_format.sh`).
+- `extern/libtommath/` — git submodule pinned to upstream v1.3.0 (public
+  domain); excluded from `clang-format` (top-level `Makefile` and
+  `bin/git_hooks/check_format.sh`), like `skiplang/prelude/libbacktrace`.
 - `extern/src/skbigint.c` — `SKBIGINT_*` C bindings between the Skip runtime
   string representation (`char*` + `sk_string_create`) and libtommath's
   `mp_int`.
