@@ -273,6 +273,11 @@ class Handles {
 
   deleteHandle<T>(id: Handle<T>): T {
     const current = this.get(id);
+    /* Idempotent: a Skip-side ExternalPointer destructor can fire after the JS side
+       already deleted the handle (e.g. an aborted initService attempt whose pointer is
+       only freed by the next successful sync). Pushing the id to freeIDs twice would
+       hand the same id to two live objects. */
+    if (current === null || current === undefined) return current;
     this.objects[id] = null;
     this.freeIDs.push(id);
     return current;
@@ -1571,10 +1576,14 @@ export class ToBinding {
     try {
       this.initializing = true;
       this.setFork(uuid);
-      await this.runAsync(() => {
-        const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
-        return this.binding.SkipRuntime_initService(skservice);
-      });
+      /* Create the Skip-side service object once, outside the replay loop: each
+         SkipRuntime_createService call allocates an ExternalPointer whose destructor
+         deletes the handle, and aborted attempts never free theirs -- one per attempt
+         would pile up stale destructors on the global external-pointer list. */
+      const skservice = this.binding.SkipRuntime_createService(skservicehHdl);
+      await this.runAsync(() =>
+        this.binding.SkipRuntime_initService(skservice),
+      );
       this.setFork(uuid);
       this.merge();
       return new ServiceInstance(this, null, definition);
