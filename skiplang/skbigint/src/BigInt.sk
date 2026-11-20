@@ -1,0 +1,177 @@
+module SKBigInt;
+
+// Arbitrary-precision integers in pure Skip: no C, no FFI, nothing to free.
+//
+// Two `value class`es, both flattened by the compiler (no heap object or
+// vtable word per value — a BigInt's runtime layout is exactly
+// (Bool, limb-array pointer)):
+//
+//   UBigInt (UBigInt.sk) — the unsigned core: a canonical little-endian
+//                          array of 30-bit limbs in an unboxed Array<Int>,
+//                          plus all magnitude arithmetic.
+//   BigInt  (this file)  — sign + UBigInt; all sign handling lives here.
+//
+// 30-bit limbs: the largest size for which every intermediate fits in Int
+// (i64) — schoolbook needs limb*limb + limb + carry < 2^63 (B <= 31) and
+// Knuth D's quotient correction needs qhat*divisor < 2^63 with qhat up to
+// ~2B (B <= 30). Full-width 64-bit limbs would need emulated 128-bit
+// intermediates. Canonical form (no trailing zero limb; zero = []) makes
+// the structural equality/hash (Orderable/Hashable field macros) equal to
+// numeric equality/hash. Magnitude algorithms live in helpers.sk.
+
+value class BigInt private (
+  private negative: Bool,
+  private mag: UBigInt,
+) uses Show, Orderable, Hashable {
+  // Signed big integer: a sign and an unsigned magnitude. Zero is
+  // (false, UBigInt::zero()). The value-class layout flattens to
+  // (Bool, limb-array pointer) — same as a plain (Bool, Array<Int>) field.
+
+  static private fun make(negative: Bool, mag: UBigInt): BigInt {
+    if (mag.isZero()) {
+      BigInt(false, UBigInt::zero())
+    } else {
+      BigInt(negative, mag)
+    }
+  }
+
+  static fun zero(): BigInt {
+    BigInt(false, UBigInt::zero())
+  }
+
+  static fun fromInt(v: Int): BigInt {
+    if (v == 0) {
+      static::zero()
+    } else {
+      static::make(v < 0, UBigInt::make(UBigInt::limbsOfInt(v)))
+    }
+  }
+
+  // Parses "-?[0-9]+"; returns None() if invalid. Normalized ("007" -> "7",
+  // "-0" -> "0").
+  static fun fromString(s: String): ?BigInt {
+    bs = s.bytes();
+    n = bs.size();
+    if (n > 0 && bs.get(0).toInt() == 45) {
+      // '-'
+      parseDecimal(bs, 1, n) match {
+      | Some(limbs) -> Some(static::make(true, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    } else {
+      parseDecimal(bs, 0, n) match {
+      | Some(limbs) -> Some(static::make(false, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    }
+  }
+
+  fun toString(): String {
+    if (this.negative) {
+      "-" + this.mag.toString()
+    } else {
+      this.mag.toString()
+    }
+  }
+
+  // The unsigned magnitude of this value.
+  fun magnitude(): UBigInt {
+    this.mag
+  }
+
+  fun isZero(): Bool {
+    this.mag.isZero()
+  }
+
+  fun abs(): BigInt {
+    static::make(false, this.mag)
+  }
+
+  fun neg(): BigInt {
+    if (this.isZero()) {
+      this
+    } else {
+      static::make(!this.negative, this.mag)
+    }
+  }
+
+  fun add(other: BigInt): BigInt {
+    if (this.negative == other.negative) {
+      static::make(this.negative, this.mag.add(other.mag))
+    } else {
+      c = this.mag.compare(other.mag);
+      if (c == EQ()) {
+        static::zero()
+      } else if (c == GT()) {
+        static::make(this.negative, this.mag.sub(other.mag))
+      } else {
+        static::make(other.negative, other.mag.sub(this.mag))
+      }
+    }
+  }
+
+  fun sub(other: BigInt): BigInt {
+    this.add(other.neg())
+  }
+
+  fun mul(other: BigInt): BigInt {
+    static::make(this.negative != other.negative, this.mag.mul(other.mag))
+  }
+
+  // Truncated division: the quotient rounds toward zero and the remainder
+  // takes the sign of this dividend.
+  fun div(other: BigInt): BigInt {
+    this.divMod(other).i0
+  }
+
+  // Floored modulo: the result takes the sign of the divisor.
+  fun mod(other: BigInt): BigInt {
+    qr = this.divMod(other);
+    r = qr.i1;
+    if (!r.isZero() && (this.negative != other.negative)) {
+      r.add(other)
+    } else {
+      r
+    }
+  }
+
+  // Truncated (quotient, remainder).
+  private fun divMod(other: BigInt): (BigInt, BigInt) {
+    if (other.isZero()) {
+      throw BigIntDivisionByZero()
+    };
+    qr = this.mag.divMod(other.mag);
+    q = static::make(this.negative != other.negative, qr.i0);
+    r = static::make(this.negative, qr.i1);
+    (q, r)
+  }
+
+  // this^exp for exp >= 0.
+  fun pow(exp: Int): BigInt {
+    if (exp < 0) {
+      throw BigIntNegativeExponent()
+    };
+    static::make(this.negative && (exp % 2 == 1), this.mag.pow(exp))
+  }
+
+  // Greatest common divisor, always non-negative.
+  fun gcd(other: BigInt): BigInt {
+    static::make(false, this.mag.gcd(other.mag))
+  }
+
+  fun compare(other: BigInt): Order {
+    if (this.negative != other.negative) {
+      if (this.negative) {
+        LT()
+      } else {
+        GT()
+      }
+    } else if (this.negative) {
+      other.mag.compare(this.mag)
+    } else {
+      this.mag.compare(other.mag)
+    }
+  }
+}
+
+module end;
