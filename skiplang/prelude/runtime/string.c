@@ -213,6 +213,16 @@ void* SKIP_String_unsafeSlice(unsigned char* str, SkipInt n1, SkipInt n2) {
   return result;
 }
 
+// Copies the UTF-8 bytes of `str` into `dest` (the data pointer of a
+// mutable Array<UInt8>) starting at `offset`, as a single memcpy. No bounds
+// check: the caller must ensure offset + byteSize(str) <= the array's size.
+// Returns the number of bytes copied (the byte size of str).
+SkipInt SKIP_Sequence_copyStringBytesTo(char* str, char* dest, SkipInt offset) {
+  sk_string_t* s = get_sk_string(str);
+  memcpy(dest + offset, s->data, s->size);
+  return (SkipInt)s->size;
+}
+
 /**
  * Format a non-negative, finite double using Ryu shortest representation
  * with Skip's formatting conventions:

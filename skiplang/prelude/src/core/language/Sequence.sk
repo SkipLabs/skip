@@ -7,6 +7,17 @@
 
 module Sequence;
 
+// Copies the UTF-8 bytes of str into dest starting at offset, as a single
+// native memcpy (see runtime/string.c). Does not bounds-check: the caller must
+// ensure offset + the byte size of str <= dest.size(). Returns the number of
+// bytes copied.
+@cpp_extern
+native fun copyStringBytesTo(
+  str: String,
+  dest: mutable Array<UInt8>,
+  offset: Int,
+): Int;
+
 // A sequence of values that can be iterated any number of times (e.g. for
 // side-effects), transformed into a new sequence, queried, or aggregated.
 // A sequence may be concrete & finite (e.g. a Vector) or virtual and
@@ -390,31 +401,28 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
   // items.
   overridable readonly fun join[T: readonly Show](separator: String): String {
     // toString is called exactly once per element: the rendered strings are
-    // collected (as zero-copy byte views) into a single Vector while counting
-    // the total output size in the same pass. Strings are natively UTF-8, so
-    // the join happens at the byte level: sizes are O(1) and fromUtf8 just
-    // memcpys the buffer, avoiding a per-char UTF-8 decode/encode.
-    parts = mutable Vector<readonly Bytes>[];
+    // collected into a single Vector while counting the total output size in
+    // the same pass. Strings are natively UTF-8, so the join happens at the
+    // byte level: sizes are O(1) and each part is copied with a single native
+    // memcpy (copyStringBytesTo), then fromUtf8 memcpys the buffer into the
+    // result -- no per-char UTF-8 decode/encode anywhere.
+    parts = mutable Vector<String>[];
     numBytes = 0;
     this.each(x -> {
-      b = x.toString().bytes();
-      parts.push(b);
-      !numBytes = numBytes + b.size()
+      s = x.toString();
+      parts.push(s);
+      !numBytes = numBytes + s.bytes().size()
     });
-    sep = separator.bytes();
-    sepLen = sep.size();
+    sepLen = separator.bytes().size();
     count = parts.size();
     if (count > 1 && sepLen > 0) !numBytes = numBytes + sepLen * (count - 1);
     buf = Array<UInt8>::mfill(numBytes, UInt8::truncate(0));
     out = 0;
-    parts.eachWithIndex((i, b) -> {
+    parts.eachWithIndex((i, s) -> {
       if (i > 0 && sepLen > 0) {
-        for (j in Range(0, sepLen)) buf.set(out + j, sep.get(j));
-        !out = out + sepLen
+        !out = out + copyStringBytesTo(separator, buf, out)
       };
-      size = b.size();
-      for (j in Range(0, size)) buf.set(out + j, b.get(j));
-      !out = out + size
+      !out = out + copyStringBytesTo(s, buf, out)
     });
     String::fromUtf8(buf)
   }
