@@ -1,0 +1,169 @@
+module alias T = SKTest;
+
+module SKBigIntTests;
+
+fun bi(s: String): SKBigInt.BigInt {
+  SKBigInt.BigInt::fromString(s) match {
+  | Some(b) -> b
+  | None() -> T.fail(`invalid test BigInt literal: ${s}`)
+  }
+}
+
+@test
+fun parseValid(): void {
+  T.expectEq(bi("0").toString(), "0");
+  T.expectEq(bi("42").toString(), "42");
+  T.expectEq(bi("-42").toString(), "-42");
+  T.expectEq(bi("007").toString(), "7");
+  T.expectEq(bi("-0").toString(), "0");
+  T.expectEq(
+    bi("123456789012345678901234567890").toString(),
+    "123456789012345678901234567890",
+  );
+}
+
+@test
+fun parseInvalid(): void {
+  T.expectEq(SKBigInt.BigInt::fromString(""), None());
+  T.expectEq(SKBigInt.BigInt::fromString("-"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("+1"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1a"), None());
+  T.expectEq(SKBigInt.BigInt::fromString(" 1"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1 "), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1.5"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("--1"), None());
+}
+
+@test
+fun fromInt(): void {
+  T.expectEq(SKBigInt.BigInt::fromInt(0).toString(), "0");
+  T.expectEq(SKBigInt.BigInt::fromInt(-7).toString(), "-7");
+  T.expectEq(
+    SKBigInt.BigInt::fromInt(9223372036854775807).toString(),
+    "9223372036854775807",
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromInt(-9223372036854775807 - 1).toString(),
+    "-9223372036854775808",
+  );
+}
+
+@test
+fun add(): void {
+  T.expectEq(
+    bi("99999999999999999999").add(bi("1")).toString(),
+    "100000000000000000000",
+  );
+  T.expectEq(bi("-5").add(bi("3")).toString(), "-2");
+  T.expectEq(bi("-5").add(bi("-3")).toString(), "-8");
+  T.expectEq(bi("5").add(bi("-3")).toString(), "2");
+}
+
+@test
+fun sub(): void {
+  T.expectEq(bi("3").sub(bi("5")).toString(), "-2");
+  T.expectEq(
+    bi("100000000000000000000").sub(bi("1")).toString(),
+    "99999999999999999999",
+  );
+  T.expectEq(bi("5").sub(bi("5")).toString(), "0");
+}
+
+@test
+fun mul(): void {
+  T.expectEq(
+    bi("99999999999999999999").mul(bi("99999999999999999999")).toString(),
+    "9999999999999999999800000000000000000001",
+  );
+  T.expectEq(bi("-6").mul(bi("7")).toString(), "-42");
+  T.expectEq(bi("-6").mul(bi("-7")).toString(), "42");
+  T.expectEq(bi("123456789").mul(bi("0")).toString(), "0");
+}
+
+@test
+fun divTruncatesTowardZero(): void {
+  T.expectEq(bi("7").div(bi("2")).toString(), "3");
+  T.expectEq(bi("-7").div(bi("2")).toString(), "-3");
+  T.expectEq(bi("7").div(bi("-2")).toString(), "-3");
+  T.expectEq(bi("-7").div(bi("-2")).toString(), "3");
+  T.expectEq(bi("6").div(bi("3")).toString(), "2");
+}
+
+@test
+fun modIsFloored(): void {
+  T.expectEq(bi("7").mod(bi("3")).toString(), "1");
+  T.expectEq(bi("-7").mod(bi("3")).toString(), "2");
+  T.expectEq(bi("7").mod(bi("-3")).toString(), "-2");
+  T.expectEq(bi("-7").mod(bi("-3")).toString(), "-1");
+  T.expectEq(bi("6").mod(bi("3")).toString(), "0");
+}
+
+@test
+fun divByZeroThrows(): void {
+  T.expectThrow(() -> _ = bi("1").div(bi("0")));
+  T.expectThrow(() -> _ = bi("1").mod(bi("0")));
+}
+
+@test
+fun pow(): void {
+  T.expectEq(bi("2").pow(100).toString(), "1267650600228229401496703205376");
+  T.expectEq(bi("-3").pow(3).toString(), "-27");
+  T.expectEq(bi("-3").pow(2).toString(), "9");
+  T.expectEq(bi("5").pow(0).toString(), "1");
+  T.expectEq(bi("0").pow(5).toString(), "0");
+  T.expectThrow(() -> _ = bi("2").pow(-1));
+}
+
+@test
+fun gcd(): void {
+  T.expectEq(bi("54").gcd(bi("24")).toString(), "6");
+  T.expectEq(bi("-54").gcd(bi("24")).toString(), "6");
+  T.expectEq(bi("0").gcd(bi("5")).toString(), "5");
+  T.expectEq(
+    bi("123456789012345678901234567890").gcd(bi("987654321")).toString(),
+    "9",
+  );
+}
+
+@test
+fun absNeg(): void {
+  T.expectEq(bi("-123456789123456789").abs().toString(), "123456789123456789");
+  T.expectEq(bi("42").abs().toString(), "42");
+  T.expectEq(bi("0").neg().toString(), "0");
+  T.expectEq(bi("-17").neg().toString(), "17");
+  T.expectEq(bi("17").neg().toString(), "-17");
+}
+
+@test
+fun isZero(): void {
+  T.expectTrue(bi("0").isZero());
+  T.expectTrue(bi("-0").isZero());
+  T.expectFalse(bi("5").isZero());
+  T.expectFalse(bi("-5").isZero());
+}
+
+@test
+fun compare(): void {
+  T.expectTrue(bi("1").compare(bi("2")) == LT());
+  T.expectTrue(bi("2").compare(bi("2")) == EQ());
+  T.expectTrue(bi("10").compare(bi("9")) == GT());
+  T.expectTrue(bi("-10").compare(bi("-9")) == LT());
+  T.expectTrue(bi("-1").compare(bi("1")) == LT());
+  T.expectTrue(bi("5") < bi("6"));
+  T.expectTrue(bi("6") > bi("5"));
+  T.expectTrue(bi("5") <= bi("5"));
+  T.expectTrue(bi("5") >= bi("5"));
+  T.expectTrue(bi("007") == bi("7"));
+  T.expectTrue(bi("7") != bi("8"));
+}
+
+@test
+fun factorial(): void {
+  f = SKBigInt.BigInt::fromInt(1);
+  i = 2;
+  while (i <= 30) {
+    !f = f.mul(SKBigInt.BigInt::fromInt(i));
+    !i = i + 1;
+  };
+  T.expectEq(f.toString(), "265252859812191058636308480000000");
+}

@@ -1,0 +1,29 @@
+fun main(): void {
+  target = Environ.var("TARGET");
+  isWasm32 = target.startsWith("wasm32");
+
+  if (!isWasm32) {
+    // The skbigint wrapper archive is emitted before libtommath's so the
+    // linker resolves the wrapper's mp_* references left-to-right.
+    src = "extern/src/skbigint.c";
+    print_string(`skargo:rerun-if-changed=${src}`);
+    Cc.Build()
+      .flags(Cc.kRecommendedCflags)
+      .include("extern/libtommath")
+      .define("MP_NO_FILE")
+      .file(src)
+      .compile("skbigint");
+
+    // Vendored libtommath (public domain), see extern/libtommath/README.md.
+    // Compiled without -Werror: the files are pristine upstream v1.3.0.
+    ltm_srcs = FileSystem.readFilesRecursive(
+      "extern/libtommath",
+      f -> f.endsWith(".c"),
+    ).toArray();
+    ltm_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
+    Cc.Build()
+      .define("MP_NO_FILE")
+      .files(ltm_srcs)
+      .compile("tommath");
+  }
+}

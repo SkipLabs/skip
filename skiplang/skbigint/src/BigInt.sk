@@ -1,0 +1,155 @@
+module SKBigInt;
+
+// Arbitrary-precision signed integers, backed by the vendored libtommath
+// (extern/libtommath, public domain) through the SKBIGINT_* C functions in
+// extern/src/skbigint.c. A BigInt stores its canonical decimal string, so
+// every operation round-trips through libtommath; values are immutable.
+
+@cpp_extern("SKBIGINT_check_decimal")
+private native fun checkDecimal(s: String): Int;
+
+@cpp_extern("SKBIGINT_normalize")
+@may_alloc
+private native fun normalizeRaw(s: String): String;
+
+@cpp_extern("SKBIGINT_from_i64")
+@may_alloc
+private native fun fromI64Raw(v: Int): String;
+
+@cpp_extern("SKBIGINT_add")
+@may_alloc
+private native fun addRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_sub")
+@may_alloc
+private native fun subRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_mul")
+@may_alloc
+private native fun mulRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_div")
+@may_alloc
+private native fun divRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_mod")
+@may_alloc
+private native fun modRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_pow")
+@may_alloc
+private native fun powRaw(a: String, e: Int): String;
+
+@cpp_extern("SKBIGINT_gcd")
+@may_alloc
+private native fun gcdRaw(a: String, b: String): String;
+
+@cpp_extern("SKBIGINT_abs")
+@may_alloc
+private native fun absRaw(a: String): String;
+
+@cpp_extern("SKBIGINT_neg")
+@may_alloc
+private native fun negRaw(a: String): String;
+
+@cpp_extern("SKBIGINT_cmp")
+private native fun cmpRaw(a: String, b: String): Int;
+
+@cpp_extern("SKBIGINT_is_zero")
+private native fun isZeroRaw(a: String): Int;
+
+class BigIntDivisionByZero() extends Exception {
+  fun getMessage(): String {
+    "BigInt division by zero"
+  }
+}
+
+class BigIntNegativeExponent() extends Exception {
+  fun getMessage(): String {
+    "BigInt exponent must be non-negative"
+  }
+}
+
+class BigInt private (private digits: String) uses Show, Orderable, Hashable {
+  // Parses a decimal integer string ("-?[0-9]+"); returns None() if invalid.
+  // The result is normalized ("007" -> "7", "-0" -> "0").
+  static fun fromString(s: String): ?BigInt {
+    if (checkDecimal(s) == 0) {
+      None()
+    } else {
+      Some(BigInt(normalizeRaw(s)))
+    }
+  }
+
+  static fun fromInt(v: Int): BigInt {
+    BigInt(fromI64Raw(v))
+  }
+
+  fun toString(): String {
+    this.digits
+  }
+
+  fun isZero(): Bool {
+    isZeroRaw(this.digits) != 0
+  }
+
+  fun add(other: BigInt): BigInt {
+    BigInt(addRaw(this.digits, other.digits))
+  }
+
+  fun sub(other: BigInt): BigInt {
+    BigInt(subRaw(this.digits, other.digits))
+  }
+
+  fun mul(other: BigInt): BigInt {
+    BigInt(mulRaw(this.digits, other.digits))
+  }
+
+  // Truncated division (rounds toward zero).
+  fun div(other: BigInt): BigInt {
+    if (other.isZero()) {
+      throw BigIntDivisionByZero()
+    };
+    BigInt(divRaw(this.digits, other.digits))
+  }
+
+  // Floored modulo: the result takes the sign of the divisor.
+  fun mod(other: BigInt): BigInt {
+    if (other.isZero()) {
+      throw BigIntDivisionByZero()
+    };
+    BigInt(modRaw(this.digits, other.digits))
+  }
+
+  // this^exp for exp >= 0.
+  fun pow(exp: Int): BigInt {
+    if (exp < 0) {
+      throw BigIntNegativeExponent()
+    };
+    BigInt(powRaw(this.digits, exp))
+  }
+
+  // Greatest common divisor, always non-negative.
+  fun gcd(other: BigInt): BigInt {
+    BigInt(gcdRaw(this.digits, other.digits))
+  }
+
+  fun abs(): BigInt {
+    BigInt(absRaw(this.digits))
+  }
+
+  fun neg(): BigInt {
+    BigInt(negRaw(this.digits))
+  }
+
+  fun compare(other: BigInt): Order {
+    c = cmpRaw(this.digits, other.digits);
+    if (c < 0) {
+      LT()
+    } else if (c == 0) {
+      EQ()
+    } else {
+      GT()
+    }
+  }
+}

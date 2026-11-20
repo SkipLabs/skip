@@ -30,6 +30,11 @@ fi
 # check that a single staged file is well-formatted
 check-file () {
     file=$1
+    # Vendored third-party sources stay pristine; keep in sync with fmt-c in
+    # the Makefile (which excludes the same path).
+    case "$file" in
+        skiplang/skbigint/extern/*) exit 0;;
+    esac
     # select formatter based on filename extension, must transform stdin to stdout
     if [[ "$file" == *.sk ]]; then # keep in sync with fmt-sk in Makefile
         fmt="skfmt --assume-filename=$file"
