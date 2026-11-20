@@ -15,8 +15,10 @@ import { it as mit, type AsyncFunc } from "mocha";
 
 type Input_NN = { input: EagerCollection<number, number> };
 
-/** Counts how many times each (function, key) pair actually ran, so tests can check
-    that a resolved call is served from the cache on replay instead of running again. */
+/**
+ * Counts how many times each (function, key) pair actually ran, so tests can check
+ * that a resolved call is served from the cache on replay instead of running again.
+ */
 const asyncCallCounts = new Map<string, number>();
 
 function countAsyncCall(fn: string, key: number): void {
@@ -81,8 +83,10 @@ class MapDoubleAsync implements Mapper<number, number, number, number> {
   }
 }
 
-/** Calls async on the value produced upstream, so this call cannot even be known
-    until the first one has resolved and been written. */
+/**
+ * Calls async on the value produced upstream, so this call cannot even be known
+ * until the first one has resolved and been written.
+ */
 class MapPlusOneAsync implements Mapper<number, number, number, number> {
   mapEntry(
     key: number,
@@ -152,8 +156,10 @@ type DedupInputs = {
   viewB: EagerCollection<number, number>;
 };
 
-/** Two distinct mappers so Skip really builds two collections. The same mapper class
-    on the same input would be reused, and there would be nothing to deduplicate. */
+/**
+ * Two distinct mappers so Skip really builds two collections. The same mapper class
+ * on the same input would be reused, and there would be nothing to deduplicate.
+ */
 class MapDedupA implements Mapper<number, number, number, number> {
   mapEntry(
     key: number,
@@ -205,8 +211,10 @@ type TwoInputs = {
   inputB: EagerCollection<number, number>;
 };
 
-/** Two distinct mappers, one per graph: the same class on two collections would be
-    fine, but keeping them apart makes the two graphs obviously independent. */
+/**
+ * Two distinct mappers, one per graph: the same class on two collections would be
+ * fine, but keeping them apart makes the two graphs obviously independent.
+ */
 class MapIsoA implements Mapper<number, number, number, number> {
   mapEntry(
     key: number,
@@ -253,9 +261,11 @@ const asyncIsolationService: AnySkipService = {
 
 //// testAsyncSwallowed
 
-/** Swallows whatever the async call throws and writes a sentinel instead. The suspension
-    is already recorded on the Skip side, so the write still aborts and replays, and
-    on replay the cache answers, so the sentinel never survives. */
+/**
+ * Swallows whatever the async call throws and writes a sentinel instead. The suspension
+ * is already recorded on the Skip side, so the write still aborts and replays, and
+ * on replay the cache answers, so the sentinel never survives.
+ */
 class MapSwallowAsync implements Mapper<number, number, number, number> {
   mapEntry(
     key: number,
@@ -292,9 +302,11 @@ type TwoNumInputs = {
   input2: EagerCollection<number, number>;
 };
 
-/** Reads its own value and the matching one in a second collection, then calls async on
-    the sum. Reading input2 creates a dependency on it, so writing there re-runs this
-    mapper with a different sum -- and therefore a different CallId. */
+/**
+ * Reads its own value and the matching one in a second collection, then calls async on
+ * the sum. Reading input2 creates a dependency on it, so writing there re-runs this
+ * mapper with a different sum -- and therefore a different CallId.
+ */
 class MapMultiInputAsync implements Mapper<number, number, number, number> {
   constructor(private readonly other: EagerCollection<number, number>) {}
 
@@ -332,8 +344,10 @@ const asyncMultiInputService: AnySkipService = {
 
 //// testAsyncInResource
 
-/** The mapper is attached by the resource rather than in createGraph, so the cascade
-    that runs it starts from createResource, not from update -- a different write path. */
+/**
+ * The mapper is attached by the resource rather than in createGraph, so the cascade
+ * that runs it starts from createResource, not from update -- a different write path.
+ */
 class AsyncInResource implements Resource<Input_NN> {
   instantiate(collections: Input_NN): EagerCollection<number, number> {
     return collections.input.map(MapDoubleAsync);
@@ -351,8 +365,10 @@ const asyncInResourceService: AnySkipService = {
 
 //// testAsyncInitialData
 
-/** Non-empty initialData: the async mapper runs during initService itself, so the
-    suspension has to make it out of SkipRuntime_initService for the replay to happen. */
+/**
+ * Non-empty initialData: the async mapper runs during initService itself, so the
+ * suspension has to make it out of SkipRuntime_initService for the replay to happen.
+ */
 class AsyncInitialDataResource implements Resource<Input_NN> {
   instantiate(collections: Input_NN): EagerCollection<number, number> {
     return collections.input;
@@ -375,8 +391,10 @@ const asyncInitialDataService: AnySkipService = {
 
 //// testAsyncNonDeterministic
 
-/** Bumped on every mapper run, so each replay issues a call on a key never seen before:
-    the cache can never answer it and the write can only stop on the replay bound. */
+/**
+ * Bumped on every mapper run, so each replay issues a call on a key never seen before:
+ * the cache can never answer it and the write can only stop on the replay bound.
+ */
 let nonDeterministicRuns = 0;
 
 class MapNonDeterministicAsync
