@@ -425,6 +425,129 @@ const asyncNonDeterministicService: AnySkipService = {
   },
 };
 
+//// testAsyncDistinctConstructorsSameName
+
+// Two distinct constructors that share the class name "Lookup" (e.g. exported by
+// different modules). Async identity is derived from the constructor, so the two
+// must not share a cached result even though their names and params are identical.
+const LookupA = class Lookup implements AsyncFunction<number, number> {
+  async compute(key: number): Promise<number> {
+    countAsyncCall("LookupA", key);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    return key + 10;
+  }
+};
+
+const LookupB = class Lookup implements AsyncFunction<number, number> {
+  async compute(key: number): Promise<number> {
+    countAsyncCall("LookupB", key);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    return key + 100;
+  }
+};
+
+class MapSameNameAsync implements Mapper<number, number, number, number> {
+  mapEntry(
+    key: number,
+    _values: Values<number>,
+    ctx: Context,
+  ): Iterable<[number, number]> {
+    const a = ctx.asyncCall(LookupA, key);
+    const b = ctx.asyncCall(LookupB, key);
+    return Array([key, a + b]);
+  }
+}
+
+class SameNameResource implements Resource<Input_NN> {
+  instantiate(collections: Input_NN): EagerCollection<number, number> {
+    return collections.input;
+  }
+}
+
+const asyncSameNameService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { sameName: SameNameResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return { input: inputCollections.input.map(MapSameNameAsync) };
+  },
+};
+
+//// testAsyncConcurrentWriteIsolation
+
+type TwoBadInputs = {
+  input: EagerCollection<number, number>;
+  bad: EagerCollection<number, number>;
+};
+
+// Returns a different value on every run, so a lost cache entry is observable:
+// if a replay re-runs this call, the write's result changes.
+let firstRuns = 0;
+
+class FirstAsync implements AsyncFunction<number, number> {
+  async compute(key: number): Promise<number> {
+    countAsyncCall("First", key);
+    await new Promise((resolve) => setTimeout(resolve, 1));
+    firstRuns++;
+    return firstRuns * 10;
+  }
+}
+
+// Blocks on a gate, so a second write can complete while the first is parked
+// mid-replay with pending calls.
+let gateRelease: (() => void) | null = null;
+
+class GatedAsync implements AsyncFunction<number, number> {
+  async compute(key: number): Promise<number> {
+    countAsyncCall("Gated", key);
+    await new Promise<void>((resolve) => {
+      gateRelease = resolve;
+    });
+    return key + 1;
+  }
+}
+
+class MapChainedGatedAsync implements Mapper<number, number, number, number> {
+  mapEntry(
+    key: number,
+    _values: Values<number>,
+    ctx: Context,
+  ): Iterable<[number, number]> {
+    return Array([
+      key,
+      ctx.asyncCall(GatedAsync, ctx.asyncCall(FirstAsync, key)),
+    ]);
+  }
+}
+
+class MapBadAsync implements Mapper<number, number, number, number> {
+  mapEntry(
+    key: number,
+    _values: Values<number>,
+    ctx: Context,
+  ): Iterable<[number, number]> {
+    return Array([key, ctx.asyncCall(FailAsync, key)]);
+  }
+}
+
+class ConcurrentResource implements Resource<TwoBadInputs> {
+  instantiate(collections: TwoBadInputs): EagerCollection<number, number> {
+    return collections.input;
+  }
+}
+
+const asyncConcurrentService: AnySkipService = {
+  inputs: { input: new InputDefinition(), bad: new InputDefinition() },
+  resources: { concurrent: ConcurrentResource },
+
+  createGraph(inputCollections: TwoBadInputs) {
+    return {
+      input: inputCollections.input.map(MapChainedGatedAsync),
+      bad: inputCollections.bad.map(MapBadAsync),
+    };
+  },
+};
+
 export function initAsyncTests(
   category: string,
   initService: (service: AnySkipService) => Promise<ServiceInstance>,
@@ -609,6 +732,57 @@ export function initAsyncTests(
       }
       // The write never converged, so it was aborted and nothing landed for that key.
       expect(await service.getArray("nonDeterministic", 2)).toEqual([]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testAsyncDistinctConstructorsSameName", async () => {
+    asyncCallCounts.clear();
+    const service = await initService(asyncSameNameService);
+    try {
+      await service.update("input", [[1, [0]]]);
+      // LookupA(1) + LookupB(1) = 11 + 101. If the two same-named constructors
+      // shared a CallId, the second would be served from the first's cached
+      // result and the sum would be 22.
+      expect(await service.getArray("sameName", 1)).toEqual([112]);
+      expect(asyncCallCounts.get("LookupA:1")).toEqual(1);
+      expect(asyncCallCounts.get("LookupB:1")).toEqual(1);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testAsyncConcurrentWriteIsolation", async () => {
+    asyncCallCounts.clear();
+    firstRuns = 0;
+    gateRelease = null;
+    const service = await initService(asyncConcurrentService);
+    try {
+      // W1: input[1] -> First(1) -> Gated(10) -> 11. Gated blocks on the gate.
+      const w1 = service.update("input", [[1, [0]]]);
+      // Let W1 reach the gated pending call: First(1) resolved, Gated(10) started.
+      for (
+        let i = 0;
+        i < 100 && (asyncCallCounts.get("Gated:10") ?? 0) === 0;
+        i++
+      ) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      expect(asyncCallCounts.get("Gated:10")).toEqual(1);
+      // W2 fails (its async call rejects) and must not disturb W1's in-flight
+      // replay cache: W1 must converge on the value First(1) produced before.
+      await service.update("bad", [[2, [0]]]).then(
+        () => {
+          throw new Error("expected the second write to fail");
+        },
+        () => void 0,
+      );
+      gateRelease!();
+      await w1;
+      expect(await service.getArray("concurrent", 1)).toEqual([11]);
+      // First(1) ran exactly once: W1's cache survived the concurrent write.
+      expect(asyncCallCounts.get("First:1")).toEqual(1);
     } finally {
       await service.close();
     }

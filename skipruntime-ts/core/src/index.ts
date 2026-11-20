@@ -75,6 +75,20 @@ type PendingCall = {
   input: Json;
 };
 
+/* Per-write async state: resolved results and the async functions seen so far.
+    One instance per converging write (one runAsync call), so overlapping writes
+    never see or clear each other's state. */
+type AsyncWriteState = {
+  /* Resolved async results, keyed by "<fnHash>:<inputHash>" as Skip builds them.
+      Filled by the replay loop between two write attempts, read by Skip during a write. */
+  results: Map<string, JsonObject>;
+  /* Async functions seen during the write, by handle id. Skip returns those ids
+      in the pending list; the replay loop looks them up here. Kept separately from
+      `handles` because Skip frees its handle when the aborted transaction is torn down,
+      while we still need the object afterwards. */
+  functions: Map<number, AsyncFunction<Json, Json>>;
+};
+
 /* Upper bound on the attempts one write may take to converge. Each attempt only replays
     because a new call appeared, so this many means calls keep changing: the mapper is
     issuing a different call on every replay instead of the same one. */
@@ -1146,23 +1160,31 @@ export class ToBinding {
 
   // AsyncFunction
 
-  /* Resolved async results, keyed by "<fnHash>:<inputHash>" as Skip builds them.
-      Filled by the replay loop between two write attempts, read by Skip during a write. */
-  private readonly asyncResults = new Map<string, JsonObject>();
+  /* The async state of the write currently running a Skip attempt. Skip-side cache
+      reads and function registrations happen only inside those synchronous attempts,
+      so this pointer always names the write they belong to. Nested/reentrant writes
+      save and restore it around their own attempts. */
+  private currentAsync: AsyncWriteState | null = null;
 
-  /* Async functions seen during the current write, by handle id. Skip returns those ids
-      in the pending list; the replay loop looks them up here. Kept separately from
-      `handles` because Skip frees its handle when the aborted transaction is torn down,
-      while we still need the object afterwards. */
-  private readonly asyncFunctions = new Map<
-    number,
-    AsyncFunction<Json, Json>
-  >();
+  /* Stable per-runtime identity for AsyncFunction constructors. Two different
+      top-level classes may share a name (e.g. exported by different modules); the
+      class name alone would make their CallIds collide and silently share cached
+      results. Keyed by the constructor object, so repeated uses of the same class --
+      including across replays of one write -- get the same id. */
+  private readonly asyncFunctionCtorIds = new WeakMap<object, number>();
+  private nextAsyncFunctionCtorId = 1;
 
   SkipRuntime_AsyncFunction__getInfo(
     fn: Handle<HandlerInfo<AsyncFunction<Json, Json>>>,
   ): Pointer<Internal.CJObject> {
-    return this.getInfo(fn);
+    const object = this.handles.get(fn);
+    const ctor = object.object.constructor;
+    let ctorId = this.asyncFunctionCtorIds.get(ctor);
+    if (ctorId === undefined) {
+      ctorId = this.nextAsyncFunctionCtorId++;
+      this.asyncFunctionCtorIds.set(ctor, ctorId);
+    }
+    return this.getInfo(fn, { ctorId });
   }
 
   SkipRuntime_deleteAsyncFunction(
@@ -1174,7 +1196,7 @@ export class ToBinding {
   SkipRuntime_AsyncCache__get(
     callId: string,
   ): Nullable<Pointer<Internal.CJSON>> {
-    const entry = this.asyncResults.get(callId);
+    const entry = this.currentAsync?.results.get(callId);
     if (entry === undefined) return null;
     return this.getJsonConverter().exportJSON(entry);
   }
@@ -1186,26 +1208,41 @@ export class ToBinding {
     fn: AsyncFunction<Json, Json>,
   ): void {
     // Handle is an opaque number; the map only needs its numeric identity.
-    this.asyncFunctions.set(handle as unknown as number, fn);
+    // asyncCall only runs inside a write attempt, so there is always a current write.
+    if (this.currentAsync === null) {
+      throw new SkipError("asyncCall outside of a write.");
+    }
+    this.currentAsync.functions.set(handle as unknown as number, fn);
   }
 
   /* Run every pending call and store its result. One rejection fails the
       whole write, and nothing is cached for it. Same all-or-nothing rule as Skip. */
-  async runPendingCalls(pending: PendingCall[]): Promise<void> {
+  async runPendingCalls(
+    pending: PendingCall[],
+    state: AsyncWriteState,
+  ): Promise<void> {
+    /* Resolve every function handle before invoking any user code: compute() runs
+       synchronously until its first await and may reenter the runtime (starting
+       another write), and Handles recycles freed ids, so a later lookup could
+       otherwise find a different function under the same id. */
+    const resolved = pending.map((call) => {
+      const fn = state.functions.get(call.function);
+      if (fn === undefined) {
+        throw new Error(`Unknown async function handle ${call.function}.`);
+      }
+      return { callId: call.callId, input: call.input, fn };
+    });
     const settled = await Promise.allSettled(
-      pending.map(async (call) => {
-        const fn = this.asyncFunctions.get(call.function);
-        if (fn === undefined) {
-          throw new Error(`Unknown async function handle ${call.function}.`);
-        }
-        return { callId: call.callId, value: await fn.compute(call.input) };
-      }),
+      resolved.map(async ({ callId, input, fn }) => ({
+        callId,
+        value: await fn.compute(input),
+      })),
     );
     const failure = settled.find((s) => s.status === "rejected");
     if (failure !== undefined) throw failure.reason;
     for (const s of settled) {
       if (s.status === "fulfilled") {
-        this.asyncResults.set(s.value.callId, { ok: s.value.value });
+        state.results.set(s.value.callId, { ok: s.value.value });
       }
     }
   }
@@ -1594,6 +1631,12 @@ export class ToBinding {
        now and restore it before each attempt, so a replay never runs on someone else's
        fork. */
     const fork = this.forkName;
+    /* One async state per converging write: results only exist to make replays
+       terminate, and functions only to reach them from the pending list. Scoping
+       them to this write (instead of to the whole binding) keeps overlapping writes
+       from clearing each other's in-flight results. */
+    const state: AsyncWriteState = { results: new Map(), functions: new Map() };
+    const previousAsync = this.currentAsync;
     try {
       let pending: PendingCall[] | null = [];
       let attempts = 0;
@@ -1609,11 +1652,19 @@ export class ToBinding {
         }
         // Only await when there is something to run: the first attempt must stay
         // synchronous with the caller's setFork, like before the replay loop existed.
-        if (pending.length > 0) await this.runPendingCalls(pending);
+        if (pending.length > 0) await this.runPendingCalls(pending, state);
         this.setFork(fork);
-        const result = this.runWithGC(() => {
-          return this.json().importJSON(fn(), true);
-        });
+        // The Skip-side cache reads and function registrations happen only inside
+        // this synchronous attempt, so point at this write's state for its duration.
+        this.currentAsync = state;
+        let result;
+        try {
+          result = this.runWithGC(() => {
+            return this.json().importJSON(fn(), true);
+          });
+        } finally {
+          this.currentAsync = previousAsync;
+        }
         if (Array.isArray(result)) {
           const handles = result as Handle<Promise<void>>[];
           const promises = handles.map((h) => this.handles.deleteHandle(h));
@@ -1627,11 +1678,7 @@ export class ToBinding {
         }
       }
     } finally {
-      /* Both maps are scoped to one converging write: results are only there to make
-         replays terminate, and functions only to reach them from the pending list.
-         Keeping either past the write would grow without bound as keys renew. */
-      this.asyncResults.clear();
-      this.asyncFunctions.clear();
+      if (this.currentAsync === state) this.currentAsync = previousAsync;
     }
   }
 
@@ -1677,6 +1724,7 @@ export class ToBinding {
 
   private getInfo<T>(
     skmapper: Handle<HandlerInfo<T>>,
+    extraFields: Record<string, Json> = {},
   ): Pointer<Internal.CJObject> {
     const skjson = this.getJsonConverter();
     const object = this.handles.get(skmapper);
@@ -1696,7 +1744,7 @@ export class ToBinding {
       }
       return { type: "data", value: v as Json };
     });
-    return skjson.exportJSON({ name, parameters });
+    return skjson.exportJSON({ name, parameters, ...extraFields });
   }
 
   private isEquals<T extends JSONOperator>(
