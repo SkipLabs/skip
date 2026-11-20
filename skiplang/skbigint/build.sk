@@ -3,8 +3,15 @@ fun main(): void {
   isWasm32 = target.startsWith("wasm32");
 
   if (!isWasm32) {
-    // The skbigint wrapper archive is emitted before libtommath's so the
-    // linker resolves the wrapper's mp_* references left-to-right.
+    out_dir = Environ.var("OUT_DIR");
+
+    // The archives are handed to the linker with skc-link-arg (in this order,
+    // so the linker resolves the wrapper's mp_* references left-to-right)
+    // instead of being bundled into the package's sklib via skc-link-lib:
+    // skc writes the sklib in place while concurrently running units scan the
+    // deps dir for sklibs, and bundling libtommath's 154 objects makes that
+    // write window big enough to hit the race in CI ("Failed to read metadata
+    // for .../libskbigint-*.sklib: IO.Error(-1)").
     src = "extern/src/skbigint.c";
     print_string(`skargo:rerun-if-changed=${src}`);
     Cc.Build()
@@ -12,7 +19,9 @@ fun main(): void {
       .include("extern/libtommath")
       .define("MP_NO_FILE")
       .file(src)
+      .skargo_metadata(false)
       .compile("skbigint");
+    print_string(`skargo:skc-link-arg=${Path.join(out_dir, "libskbigint.a")}`);
 
     // Vendored libtommath (public domain), see extern/libtommath/README.md.
     // Compiled without -Werror: the files are pristine upstream v1.3.0.
@@ -20,6 +29,11 @@ fun main(): void {
       f.endsWith(".c")
     ).toArray();
     ltm_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
-    Cc.Build().define("MP_NO_FILE").files(ltm_srcs).compile("tommath");
+    Cc.Build()
+      .define("MP_NO_FILE")
+      .files(ltm_srcs)
+      .skargo_metadata(false)
+      .compile("tommath");
+    print_string(`skargo:skc-link-arg=${Path.join(out_dir, "libtommath.a")}`);
   }
 }
