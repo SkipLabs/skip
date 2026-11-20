@@ -1354,6 +1354,19 @@ mutable class Context private {
     false
   }
 
+  /* Transaction-boundary guard for async calls. update() throws AsyncCallsCollected
+     itself when it drains with calls pending, but a transaction can also stop
+     without draining (a paused updateUntil, or a transaction that never calls
+     update). Committing in that state would persist empty suspended rows AND the
+     pending calls themselves, so every later transaction would abort on the stale
+     calls. Throw here instead: runWithResult turns it into Failure, the delta is
+     discarded, and the calls leave through the exception. */
+  mutable fun throwIfAsyncCallsPending(): void {
+    if (!this.asyncData.calls.isEmpty()) {
+      throw AsyncCallsCollected(this.asyncData.calls)
+    }
+  }
+
   /* Entry point for an async call issued from a mapper. Returns the result if this exact
      call (same function, same input) already resolved; otherwise records it and unwinds
      through AsyncCallPending, letting the cascade carry on and collect the other calls. */
@@ -3424,6 +3437,11 @@ fun runWithResult<T>(
     current = contexts.get(fork);
     context = current.mclone();
     res = f(context);
+    /* A transaction that stops without draining (a paused updateUntil, or one that
+       never ran update) must not commit with async calls still pending: the suspended
+       rows would be empty and the stale calls would poison every later transaction.
+       Abort instead and hand the calls out through the exception. */
+    context.throwIfAsyncCallsPending();
     Success((current.getTick(), context.clone(), res))
   } catch {
   | exn -> Failure(exn)

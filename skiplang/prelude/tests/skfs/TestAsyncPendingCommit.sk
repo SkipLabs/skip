@@ -1,0 +1,110 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+// A transaction that runs a mapper (via map on non-empty initial data) without
+// calling update() must not COMMIT with an async call still pending: the suspended
+// row would be empty and the stale call would poison every later transaction.
+// runWithResult now aborts such transactions with AsyncCallsCollected.
+@test
+fun testAsyncPendingCallNeverCommits(): void {
+  inputsADirName = SK.DirName::create("/nocommit_inputsA/");
+  mappedADirName = SK.DirName::create("/nocommit_mappedA/");
+  inputsBDirName = SK.DirName::create("/nocommit_inputsB/");
+  mappedBDirName = SK.DirName::create("/nocommit_mappedB/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  mapper = (context, writer, k, _it) ~> {
+    context.asyncCall(DoubleAsyncFn(), k) match {
+    | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+    | SK.AError(_) -> void
+    }
+  };
+
+  // Graph A with an empty input: no async fires -> commits.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsADirName,
+      Array[],
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedADirName,
+      mapper,
+    )
+  });
+
+  // Graph B created WITH initial data and mapped in the same transaction, without
+  // update(): mapRow runs the mapper right away, the call is recorded and swallowed,
+  // and the transaction must abort instead of committing with the call pending.
+  result = asyncTestWrite(emptyCache, context ~> {
+    inputsB = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsBDirName,
+      Array[(SK.IID(2), SK.IntFile(2))],
+    );
+    _ = inputsB.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedBDirName,
+      mapper,
+    )
+  });
+  result match {
+  | Failure(SK.AsyncCallsCollected(calls)) ->
+    T.expectFalse(calls.isEmpty(), "expected the pending call to be collected")
+  | Success _ -> T.fail("BUG: committed with a pending async call")
+  | Failure(exn) -> T.fail(`unexpected failure: ${exn.getMessage()}`)
+  };
+
+  // The aborted transaction must not have poisoned the context: a later write on
+  // graph A still converges normally.
+  cache: TestAsyncCache = emptyCache;
+  done = false;
+  rounds = 0;
+  while (!done) {
+    !rounds = rounds + 1;
+    T.expectTrue(rounds < 10, `loop did not converge, rounds=${rounds}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsADirName);
+      inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+      context.update()
+    }) match {
+    | Success _ -> !done = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  r = SK.withContext(context ~> {
+    mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedADirName);
+    mapped.unsafeGet(context, SK.IID(2)).value
+  });
+  T.expectEq(r, 4, "value");
+  T.expectEq(rounds, 2, "rounds");
+  // Graph B was aborted, so nothing was committed for it.
+  bExists = SK.withContext(context ~> {
+    context.unsafeMaybeGetDir(mappedBDirName).isSome()
+  });
+  T.expectFalse(bExists, "aborted graph B must not be committed")
+}
+
+module end;
