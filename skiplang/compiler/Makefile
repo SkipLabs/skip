@@ -89,6 +89,15 @@ PRELUDE_BUILD_SRCS=../prelude/Makefile ../prelude/runtime/Makefile \
 	../prelude/libbacktrace/configure
 build/libskip_runtime64.a build/libbacktrace.a &: $(PRELUDE_BUILD_SRCS)
 	OUT_DIR=$$(realpath ./build) $(MAKE) -C ../prelude
+	# prelude/build.sk reuses a Makefile-built libbacktrace from
+	# ./build/libbacktrace.a (relative to the prelude package) instead of
+	# running configure+make itself; stage the fresh archive there so the
+	# skargo-driven prelude builds skip their own libbacktrace build. Keep
+	# this a side effect of this rule, not a prerequisite of the stageN
+	# rules: the stage aggregates recurse through sub-makes, and a prereq
+	# here would make several make levels run this recipe concurrently.
+	mkdir -p ../prelude/build
+	cp build/libbacktrace.a ../prelude/build/libbacktrace.a
 
 # Not .PHONY: the rule has real prerequisites and produces the file, so an
 # unchanged stage0 is not rebuilt on every invocation. The prelude sources
@@ -96,9 +105,11 @@ build/libskip_runtime64.a build/libbacktrace.a &: $(PRELUDE_BUILD_SRCS)
 # libstd.sklib via its own rules).
 # Needs stage0/bin/skc on PATH (built from the pinned bootstrap IR); under -j
 # the link must finish before the prelude sub-make looks for skc.
+# LIB_DIR points at the archive built for the stage0 links, so the prelude
+# Makefile copies it instead of running libbacktrace's configure again.
 stage0/lib/libstd.sklib: stage0/bin/skc $(shell find ../prelude/src -name '*.sk') ../prelude/preamble/preamble64.ll ../prelude/Makefile
 	mkdir -p $(@D)
-	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) $(MAKE) -C ../prelude bootstrap
+	PATH=$$(realpath stage0/bin):$(PATH) OUT_DIR=$$(realpath stage0/lib) LIB_DIR=$$(realpath build) $(MAKE) -C ../prelude bootstrap
 
 # Persistent files are keyed on the executable's GNU build-id on ELF. Mach-O
 # executables always carry an LC_UUID instead, and ld64 rejects --build-id.
