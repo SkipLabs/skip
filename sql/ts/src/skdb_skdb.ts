@@ -74,7 +74,7 @@ interface ToWasm {
   SKIP_clear_object: () => void;
   SKIP_push_object_field_null: () => void;
   SKIP_push_object_field_int32: (field: int) => void;
-  SKIP_push_object_field_int64: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_int64: (field: bigint) => void;
   SKIP_push_object_field_float: (field: float) => void;
   SKIP_push_object_field_string: (field: ptr<Internal.String>) => void;
   SKIP_push_object_field_json: (field: ptr<InternalJ.CJSON>) => void;
@@ -228,7 +228,7 @@ class LinksImpl implements Links, ToWasm {
   SKIP_clear_object!: () => void;
   SKIP_push_object_field_null!: () => void;
   SKIP_push_object_field_int32!: (field: int) => void;
-  SKIP_push_object_field_int64!: (field: ptr<Internal.String>) => void;
+  SKIP_push_object_field_int64!: (field: bigint) => void;
   SKIP_push_object_field_float!: (field: float) => void;
   SKIP_push_object_field_string!: (field: ptr<Internal.String>) => void;
   SKIP_push_object_field_json!: (field: ptr<InternalJ.CJSON>) => void;
@@ -344,11 +344,15 @@ class LinksImpl implements Links, ToWasm {
       this.object[field_name] = n;
       this.objectIdx++;
     };
-    this.SKIP_push_object_field_int64 = (skV: ptr<Internal.String>) => {
+    this.SKIP_push_object_field_int64 = (v: bigint) => {
       const field_name = this.field_names[this.objectIdx];
       if (field_name === undefined)
         throw new Error(`Missing field name at index ${this.objectIdx}`);
-      this.object[field_name] = parseInt(utils.importString(skV), 10);
+      // Keep `number` for values that round-trip exactly (as the old
+      // parseInt path produced); beyond 2^53-1 use `bigint`, which is exact
+      // where `number` silently lost precision.
+      this.object[field_name] =
+        v >= -9007199254740991n && v <= 9007199254740991n ? Number(v) : v;
       this.objectIdx++;
     };
     this.SKIP_push_object_field_float = (v: float) => {
@@ -540,7 +544,7 @@ class Manager implements ToWasmManager {
     toWasm.SKIP_push_object_field_int32 = (field: int) => {
       links.SKIP_push_object_field_int32(field);
     };
-    toWasm.SKIP_push_object_field_int64 = (field: ptr<Internal.String>) => {
+    toWasm.SKIP_push_object_field_int64 = (field: bigint) => {
       links.SKIP_push_object_field_int64(field);
     };
     toWasm.SKIP_push_object_field_float = (field: float) => {
