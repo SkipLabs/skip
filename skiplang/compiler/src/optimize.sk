@@ -14,6 +14,7 @@ module Optimize;
 mutable class Config private {
   mutable dce: Int,
   mutable peephole: Int,
+  mutable bounds: Int,
   mutable control: Int,
   mutable regpromote: Int,
   mutable inline: Int,
@@ -28,6 +29,7 @@ mutable class Config private {
   const kOptIntrinsics: Int = 0x02;
   private const kOptDCE: Int = 0x04;
   private const kOptPeephole: Int = 0x08;
+  private const kOptBounds: Int = 0x100;
   private const kOptControl: Int = 0x10;
   private const kOptRegPromote: Int = 0x20;
   private const kOptIPA: Int = 0x40;
@@ -43,6 +45,7 @@ mutable class Config private {
     static{
       dce => this.dce,
       peephole => this.peephole,
+      bounds => this.bounds,
       control => this.control,
       regpromote => this.regpromote,
       inline => this.inline,
@@ -55,6 +58,7 @@ mutable class Config private {
   static fun make(
     dce: Bool,
     peephole: Bool,
+    bounds: Bool,
     control: Bool,
     regpromote: Bool,
     inline: Bool,
@@ -65,6 +69,7 @@ mutable class Config private {
     Config{
       dce => if (dce) static::kOptDCE else 0,
       peephole => if (peephole) static::kOptPeephole else 0,
+      bounds => if (bounds) static::kOptBounds else 0,
       control => if (control) static::kOptControl else 0,
       regpromote => if (regpromote) static::kOptRegPromote else 0,
       inline => if (inline) static::kOptInline else 0,
@@ -77,6 +82,7 @@ mutable class Config private {
   fun local(): Int {
     static::kOptIntrinsics.or(this.dce)
       .or(this.peephole)
+      .or(this.bounds)
       .or(this.control)
       .or(this.regpromote)
   }
@@ -524,6 +530,7 @@ private fun optimizationPasses(
     ("intrinsics", Config::kOptIntrinsics, IntrinsicsInliner::run),
     ("dce", config.optConfig.dce, EliminateDeadCode::run),
     ("peephole", config.optConfig.peephole, Peephole::run),
+    ("bounds", config.optConfig.bounds, BoundsCheckElimination::run),
     ("control", config.optConfig.control, Control::run),
     ("regpromote", config.optConfig.regpromote, RegisterPromote::run),
     (
