@@ -9,22 +9,32 @@ compiles to Wasm unchanged.
 
 ## Representation
 
+Two `value class`es, both flattened by the compiler (no heap object or vtable
+word per value — a `BigInt`'s runtime layout is exactly `(Bool, limb-array
+pointer)`):
+
 ```skip
-value class BigInt private (private negative: Bool, private limbs: Array<Int>)
+value class UBigInt private (private limbs: Array<Int>)   // unsigned core
+value class BigInt private (private negative: Bool, private mag: UBigInt)
 ```
 
+- `UBigInt` holds the magnitude and all magnitude arithmetic (`add`, `sub`,
+  `mul`, `divMod`/`div`/`mod`, `pow`, `gcd`, `compare`); `BigInt` adds the
+  sign and implements the signed semantics (`div` truncated, `mod` floored)
+  by delegating to `mag`. `BigInt::magnitude()` exposes the `UBigInt`.
 - `limbs` is a little-endian array of **30-bit unsigned limbs** stored in an
   unboxed `Array<Int>` (Skip arrays of primitives are flat; `Int` is an
   immediate i64). 30 bits is the largest limb size for which every
-  schoolbook intermediate `limb*limb + limb + carry < 2^61` fits in `Int` —
-  32-bit limbs would overflow i64 on multiplication.
-- The form is **canonical**: no trailing zero limb, and zero is
-  `(false, [])`. Canonical form makes structural equality/hash (the
-  `Hashable`/`Orderable` defaults over the two fields) equal to numeric
+  intermediate fits in `Int` (i64): schoolbook needs
+  `limb*limb + limb + carry < 2^63` (B <= 31), and Knuth D's quotient
+  correction needs `qhat*divisor < 2^63` with `qhat` up to ~2B (B <= 30).
+  Full-width 64-bit limbs would need emulated 128-bit intermediates.
+- The form is **canonical**: no trailing zero limb, and zero is `[]`.
+  Canonical form makes structural equality/hash (the
+  `Hashable`/`Orderable` defaults over the fields) equal to numeric
   equality/hash.
-- The `value class` wrapper is flattened by the compiler (no heap object, no
-  vtable word per `BigInt`); the only indirection is the pointer to the
-  variable-length limb array, which is a GC object like any other array.
+- The only indirection is the pointer to the variable-length limb array,
+  which is a GC object like any other array.
 
 ## Operations
 
