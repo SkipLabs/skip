@@ -7,6 +7,7 @@ fun makeExn(): Int {
 }
 
 @cpp_extern("SKIP_SKStoreTest_Obstack")
+@no_alloc
 native fun testObstack<T: frozen>(T): void;
 
 value class Foo(X, X, Int)
@@ -37,9 +38,11 @@ fun makeT(x: Int): T {
 base class CObject
 
 @cpp_extern("SKIP_make_C_object")
+@may_alloc
 native fun makeCObject(): CObject;
 
 @cpp_extern("SKIP_is_C_object")
+@no_alloc
 native fun isCObject(CObject): UInt32;
 
 class CObjectContainer(i0: CObject, i1: Array<CObject>)
