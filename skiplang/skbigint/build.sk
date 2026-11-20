@@ -16,14 +16,10 @@ fun main(): void {
 
     // Vendored libtommath (public domain), see extern/libtommath/README.md.
     // Compiled without -Werror: the files are pristine upstream v1.3.0.
-    ltm_srcs = FileSystem.readFilesRecursive(
-      "extern/libtommath",
-      f -> f.endsWith(".c"),
+    ltm_srcs = FileSystem.readFilesRecursive("extern/libtommath", f ->
+      f.endsWith(".c")
     ).toArray();
     ltm_srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
-    Cc.Build()
-      .define("MP_NO_FILE")
-      .files(ltm_srcs)
-      .compile("tommath");
+    Cc.Build().define("MP_NO_FILE").files(ltm_srcs).compile("tommath");
   }
 }
