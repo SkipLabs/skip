@@ -7,6 +7,14 @@ Skip runtime has no finalizers for raw C pointers) and values persist
 naturally in skstore heaps. Because the package is pure `.sk`, it also
 compiles to Wasm unchanged.
 
+## Layout
+
+- `src/helpers.sk` — 30-bit limb arithmetic on canonical magnitude arrays
+  (add/sub/mul, Knuth D `divModMag`, shifts, decimal parse/print).
+- `src/UBigInt.sk` — the unsigned core (`value class UBigInt`).
+- `src/BigInt.sk` — `value class BigInt` (sign + `UBigInt`), the public API.
+- `tests/tests.sk` — sktest suite.
+
 ## Representation
 
 Two `value class`es, both flattened by the compiler (no heap object or vtable
