@@ -354,6 +354,28 @@ export interface LazyCompute<K extends Json, V extends Json> {
 }
 
 /**
+ * Asynchronous computation whose result is cached and replayed.
+ *
+ * `Context.asyncCall` accepts a constructor function of a top-level class that implements this `AsyncFunction` interface.
+ * Each implementation provides a `compute` function, which produces a value for some `key` — typically by reaching outside the reactive graph, for instance over the network.
+ *
+ * The runtime never runs `compute` inline: a call that has not resolved yet suspends the current computation, and the write is replayed once the result is available.
+ * `compute` may therefore run more than once for a given key, and must not have side effects that matter.
+ *
+ * @typeParam K - Type of keys / inputs.
+ * @typeParam V - Type of values / outputs.
+ */
+export interface AsyncFunction<K extends Json, V extends Json> {
+  /**
+   * Compute the value of the async function for a given `key`.
+   *
+   * @param key - The requested key / input.
+   * @returns The value of the async function for `key`.
+   */
+  compute(key: K): Promise<V>;
+}
+
+/**
  * Skip Runtime internal state.
  */
 export interface Context {
@@ -392,6 +414,29 @@ export interface Context {
     identifier: string;
     params?: Json;
   }): EagerCollection<K, V>;
+
+  /**
+   * Call an asynchronous function and get its result.
+   *
+   * If the call has already resolved, its value is returned. Otherwise the current computation is suspended: the write is aborted, the call is run, and the write is replayed.
+   * A suspension is not an error and must not be caught.
+   *
+   * Only supported from `Mapper.mapEntry`: that is the only place where the runtime catches the suspension and replays the write.
+   * Calling it from a `LazyCompute`, a `Resource`, or `createGraph` is not supported, and the suspension surfaces there as an error.
+   *
+   * @typeParam K - Type of keys / inputs.
+   * @typeParam V - Type of values / outputs.
+   * @typeParam Params - Types of additional parameters passed to the constructor.
+   * @param fn - Constructor of `AsyncFunction` class to compute the value.
+   * @param key - The requested key / input.
+   * @param params - Additional parameters to the constructor.
+   * @returns The value of the async function for `key`.
+   */
+  asyncCall<K extends Json, V extends Json, Params extends DepSafe[]>(
+    fn: new (...params: Params) => AsyncFunction<K, V>,
+    key: K,
+    ...params: Params
+  ): V;
 
   jsonExtract(value: JsonObject, pattern: string): Json[];
 }
