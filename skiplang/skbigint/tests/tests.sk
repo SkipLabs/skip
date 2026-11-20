@@ -286,4 +286,68 @@ fun bigDivKnownAnswers(): void {
   T.expectEq(e.div(f).toString(), "-9999999999999999999700000000000000000008");
 }
 
+fun ubi(s: String): SKBigInt.UBigInt {
+  SKBigInt.UBigInt::fromString(s) match {
+  | Some(u) -> u
+  | None() -> T.fail(`invalid test UBigInt literal: ${s}`)
+  }
+}
+
+@test
+fun ubigint(): void {
+  T.expectEq(ubi("0").toString(), "0");
+  T.expectEq(ubi("007").toString(), "7");
+  T.expectEq(
+    ubi("123456789012345678901234567890").toString(),
+    "123456789012345678901234567890",
+  );
+  T.expectEq(SKBigInt.UBigInt::fromString(""), None());
+  T.expectEq(SKBigInt.UBigInt::fromString("-1"), None());
+  T.expectEq(SKBigInt.UBigInt::fromString("1a"), None());
+  T.expectEq(SKBigInt.UBigInt::fromInt(42).toString(), "42");
+  T.expectEq(
+    SKBigInt.UBigInt::fromInt(9223372036854775807).toString(),
+    "9223372036854775807",
+  );
+  // unsigned ops agree with the signed API on non-negative values
+  T.expectEq(
+    ubi("99999999999999999999").add(ubi("1")).toString(),
+    "100000000000000000000",
+  );
+  T.expectEq(
+    ubi("99999999999999999999").mul(ubi("99999999999999999999")).toString(),
+    "9999999999999999999800000000000000000001",
+  );
+  T.expectEq(
+    ubi("100000000000000000000").div(ubi("7")).toString(),
+    "14285714285714285714",
+  );
+  T.expectEq(ubi("100000000000000000000").mod(ubi("7")).toString(), "2");
+  T.expectEq(ubi("2").pow(100).toString(), "1267650600228229401496703205376");
+  T.expectEq(ubi("54").gcd(ubi("24")).toString(), "6");
+  T.expectTrue(ubi("10") > ubi("9"));
+  T.expectTrue(ubi("007") == ubi("7"));
+  T.expectEq(ubi("5").sub(ubi("5")).toString(), "0");
+  // magnitude() round-trips through BigInt
+  T.expectEq(bi("-42").magnitude().toString(), "42");
+  T.expectEq(bi("42").magnitude().toString(), "42");
+}
+
+@test
+fun ubigintMatchesBigInt(): void {
+  k = 1;
+  while (k <= 40) {
+    u = SKBigInt.UBigInt::fromInt(k * 104729 + 3).pow(3);
+    b = SKBigInt.BigInt::fromInt(k * 104729 + 3).pow(3);
+    T.expectEq(u.toString(), b.toString());
+    T.expectEq(u.toString(), b.magnitude().toString());
+    d = SKBigInt.UBigInt::fromInt(k * 31 + 7);
+    T.expectEq(
+      u.div(d).toString(),
+      b.div(SKBigInt.BigInt::fromInt(k * 31 + 7)).toString(),
+    );
+    !k = k + 1;
+  };
+}
+
 module end;

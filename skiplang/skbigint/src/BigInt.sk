@@ -1,18 +1,23 @@
 module SKBigInt;
 
-// Arbitrary-precision signed integers in pure Skip: no C, no FFI, nothing to
-// free. A BigInt is a `value class` (flattened by the compiler: no heap object
-// or vtable word per value) holding a sign and a magnitude.
+// Arbitrary-precision integers in pure Skip: no C, no FFI, nothing to free.
 //
-// The magnitude is a little-endian array of 30-bit unsigned limbs in an
-// unboxed Array<Int> (Skip arrays of primitives are flat; Int is an immediate
-// i64). 30 bits is the largest limb size for which every schoolbook
-// intermediate limb*limb + limb + carry < 2^61 fits in Int; 32-bit limbs
-// would overflow i64 on multiplication.
+// Two `value class`es, both flattened by the compiler (no heap object or
+// vtable word per value — a BigInt's runtime layout is exactly
+// (Bool, limb-array pointer)):
 //
-// The form is canonical: limbs in [0, 2^30), no trailing zero limb, and zero
-// is (false, []). Canonical form makes the structural equality/hash (the
-// Orderable/Hashable defaults over the two fields) equal to numeric
+//   UBigInt — the unsigned core: a canonical little-endian array of 30-bit
+//             limbs in an unboxed Array<Int>, plus all magnitude arithmetic.
+//   BigInt  — sign + UBigInt; all sign handling lives here.
+//
+// 30 bits is the largest limb size for which every intermediate fits in Int
+// (i64): schoolbook needs limb*limb + limb + carry < 2^63 (B <= 31), and
+// Knuth D's quotient correction needs qhat*divisor < 2^63 with qhat up to
+// ~2B (B <= 30). Full-width 64-bit limbs would need emulated 128-bit
+// intermediates.
+//
+// Canonical form (no trailing zero limb; zero = []) makes the structural
+// equality/hash (the Orderable/Hashable field macros) equal to numeric
 // equality/hash.
 
 const kLimbBits: Int = 30;
@@ -33,7 +38,7 @@ class BigIntNegativeExponent() extends Exception {
 }
 
 // Magnitude helpers. A magnitude is a canonical little-endian limb array
-// (no trailing zero limb; the empty array is zero).
+// (limbs in [0, 2^30), no trailing zero limb; the empty array is zero).
 
 fun dropZeros(a: Array<Int>): Array<Int> {
   n = a.size();
@@ -357,93 +362,122 @@ fun gcdMag(a: Array<Int>, b: Array<Int>): Array<Int> {
   x
 }
 
-value class BigInt private (
-  private negative: Bool,
-  private limbs: Array<Int>,
-) uses Show, Orderable, Hashable {
-  // Canonical: limbs has no trailing zero limb; zero is (false, []).
-
-  static private fun make(negative: Bool, limbs: Array<Int>): BigInt {
-    l = dropZeros(limbs);
-    if (l.size() == 0) {
-      BigInt(false, Array[])
-    } else {
-      BigInt(negative, l)
-    }
-  }
-
-  static fun zero(): BigInt {
-    BigInt(false, Array[])
-  }
-
-  static fun fromInt(v: Int): BigInt {
-    if (v == 0) {
-      BigInt(false, Array[])
-    } else {
-      neg = v < 0;
-      r = mutable Vector[];
-      x = v;
-      while (x != 0) {
-        rem = x % kLimbBase; // sign of x; (x - rem) is exactly divisible
-        !x = (x - rem) / kLimbBase;
-        if (rem < 0) {
-          !rem = -rem;
-        };
-        r.push(rem);
-      };
-      static::make(neg, r.toArray())
-    }
-  }
-
-  // Parses "-?[0-9]+"; returns None() if invalid. The result is normalized
-  // ("007" -> "7", "-0" -> "0").
-  static fun fromString(s: String): ?BigInt {
-    bs = s.bytes();
-    n = bs.size();
-    neg = false;
-    i = 0;
-    if (n > 0 && bs.get(0).toInt() == 45) {
-      // '-'
-      !neg = true;
-      !i = 1;
+// Parses the decimal digits in bs[from..to) ("[0-9]+"); returns None() if
+// the range is empty or contains a non-digit. The result is normalized.
+fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<Int> {
+  if (from >= to) {
+    None()
+  } else {
+    valid = true;
+    j = from;
+    while (j < to && valid) {
+      c = bs.get(j).toInt();
+      if (c < 48 || c > 57) {
+        !valid = false;
+      } else {
+        !j = j + 1;
+      }
     };
-    if (i >= n) {
+    if (!valid) {
       None()
     } else {
-      valid = true;
-      j = i;
-      while (j < n && valid) {
-        c = bs.get(j).toInt();
-        if (c < 48 || c > 57) {
-          !valid = false;
-        } else {
-          !j = j + 1;
-        }
+      // Accumulate 9-digit chunks from the left (the first chunk may be
+      // short): acc = acc*10^9 + chunk.
+      acc = Array[];
+      pos = from;
+      firstLen = (to - from) % 9;
+      if (firstLen == 0) {
+        !firstLen = 9;
       };
-      if (!valid) {
-        None()
-      } else {
-        // Accumulate 9-digit chunks from the left (the first chunk may be
-        // short): acc = acc*10^9 + chunk.
-        acc = Array[];
-        pos = i;
-        firstLen = (n - i) % 9;
-        if (firstLen == 0) {
-          !firstLen = 9;
+      while (pos < to) {
+        take = if (pos == from) firstLen else 9;
+        chunk = 0;
+        k = pos;
+        while (k < pos + take) {
+          !chunk = chunk * 10 + (bs.get(k).toInt() - 48);
+          !k = k + 1;
         };
-        while (pos < n) {
-          take = if (pos == i) firstLen else 9;
-          chunk = 0;
-          k = pos;
-          while (k < pos + take) {
-            !chunk = chunk * 10 + (bs.get(k).toInt() - 48);
-            !k = k + 1;
-          };
-          !acc = addMagSmall(mulMagSmall(acc, kDecChunk), chunk);
-          !pos = pos + take;
-        };
-        Some(static::make(neg, acc))
-      }
+        !acc = addMagSmall(mulMagSmall(acc, kDecChunk), chunk);
+        !pos = pos + take;
+      };
+      Some(dropZeros(acc))
+    }
+  }
+}
+
+// The decimal digits of a magnitude, least significant 9-digit chunk first.
+fun decimalChunks(limbs: Array<Int>): Array<String> {
+  parts = mutable Vector[];
+  r = limbs;
+  while (r.size() > 0) {
+    qr = divModMagSmall(r, kDecChunk);
+    parts.push(qr.i1.toString());
+    !r = qr.i0;
+  };
+  parts.toArray()
+}
+
+// Joins decimal chunks (least significant first), padding all but the most
+// significant to 9 digits.
+fun joinDecimalChunks(parts: Array<String>): String {
+  out = "";
+  i = parts.size() - 1;
+  first = true;
+  while (i >= 0) {
+    p = parts[i];
+    if (!first) {
+      while (p.length() < 9) {
+        !p = "0" + p;
+      };
+    };
+    !out = out + p;
+    !first = false;
+    !i = i - 1;
+  };
+  out
+}
+
+value class UBigInt private (
+  private limbs: Array<Int>,
+) uses Show, Orderable, Hashable {
+  // Unsigned big integer: the magnitude core of BigInt. Canonical: limbs has
+  // no trailing zero limb; zero is [].
+
+  // Internal helper (normalizes); prefer fromInt/fromString.
+  static fun make(limbs: Array<Int>): UBigInt {
+    UBigInt(dropZeros(limbs))
+  }
+
+  static fun zero(): UBigInt {
+    UBigInt(Array[])
+  }
+
+  // Magnitude of v as limbs (v may be negative, including Int::min).
+  // Internal helper: magnitude limbs of v (v may be negative).
+  static fun limbsOfInt(v: Int): Array<Int> {
+    r = mutable Vector[];
+    x = v;
+    while (x != 0) {
+      rem = x % kLimbBase; // sign of x; (x - rem) is exactly divisible
+      !x = (x - rem) / kLimbBase;
+      if (rem < 0) {
+        !rem = -rem;
+      };
+      r.push(rem);
+    };
+    r.toArray()
+  }
+
+  static fun fromInt(v: Int): UBigInt {
+    invariant(v >= 0, "UBigInt::fromInt: expected a non-negative Int");
+    static::make(static::limbsOfInt(v))
+  }
+
+  // Parses "[0-9]+"; returns None() if invalid. Normalized ("007" -> "7").
+  static fun fromString(s: String): ?UBigInt {
+    parseDecimal(s.bytes(), 0, s.length()) match {
+    | Some(limbs) -> Some(static::make(limbs))
+    | None() -> None()
     }
   }
 
@@ -451,33 +485,7 @@ value class BigInt private (
     if (this.limbs.size() == 0) {
       "0"
     } else {
-      // Repeated single-limb division by 10^9, least significant chunk first.
-      parts = mutable Vector[];
-      r = this.limbs;
-      while (r.size() > 0) {
-        qr = divModMagSmall(r, kDecChunk);
-        parts.push(qr.i1.toString());
-        !r = qr.i0;
-      };
-      out = "";
-      i = parts.size() - 1;
-      first = true;
-      while (i >= 0) {
-        p = parts.get(i);
-        if (!first) {
-          while (p.length() < 9) {
-            !p = "0" + p;
-          };
-        };
-        !out = out + p;
-        !first = false;
-        !i = i - 1;
-      };
-      if (this.negative) {
-        "-" + out
-      } else {
-        out
-      }
+      joinDecimalChunks(decimalChunks(this.limbs))
     }
   }
 
@@ -485,29 +493,141 @@ value class BigInt private (
     this.limbs.size() == 0
   }
 
+  fun add(other: UBigInt): UBigInt {
+    static::make(addMag(this.limbs, other.limbs))
+  }
+
+  // this - other, requires this >= other.
+  fun sub(other: UBigInt): UBigInt {
+    invariant(
+      this.compare(other) != LT(),
+      "UBigInt::sub: underflow (this < other)",
+    );
+    static::make(subMag(this.limbs, other.limbs))
+  }
+
+  fun mul(other: UBigInt): UBigInt {
+    static::make(mulMag(this.limbs, other.limbs))
+  }
+
+  // this = q*other + r with 0 <= r < other.
+  fun divMod(other: UBigInt): (UBigInt, UBigInt) {
+    invariant(!other.isZero(), "UBigInt::divMod: division by zero");
+    qr = divModMag(this.limbs, other.limbs);
+    (static::make(qr.i0), static::make(qr.i1))
+  }
+
+  fun div(other: UBigInt): UBigInt {
+    this.divMod(other).i0
+  }
+
+  fun mod(other: UBigInt): UBigInt {
+    this.divMod(other).i1
+  }
+
+  // this^exp for exp >= 0.
+  fun pow(exp: Int): UBigInt {
+    invariant(exp >= 0, "UBigInt::pow: expected a non-negative exponent");
+    static::make(powMag(this.limbs, exp))
+  }
+
+  // Greatest common divisor, always non-negative.
+  fun gcd(other: UBigInt): UBigInt {
+    static::make(gcdMag(this.limbs, other.limbs))
+  }
+
+  fun compare(other: UBigInt): Order {
+    cmpMag(this.limbs, other.limbs)
+  }
+}
+
+value class BigInt private (
+  private negative: Bool,
+  private mag: UBigInt,
+) uses Show, Orderable, Hashable {
+  // Signed big integer: a sign and an unsigned magnitude. Zero is
+  // (false, UBigInt::zero()). The value-class layout flattens to
+  // (Bool, limb-array pointer) — same as a plain (Bool, Array<Int>) field.
+
+  static private fun make(negative: Bool, mag: UBigInt): BigInt {
+    if (mag.isZero()) {
+      BigInt(false, UBigInt::zero())
+    } else {
+      BigInt(negative, mag)
+    }
+  }
+
+  static fun zero(): BigInt {
+    BigInt(false, UBigInt::zero())
+  }
+
+  static fun fromInt(v: Int): BigInt {
+    if (v == 0) {
+      static::zero()
+    } else {
+      static::make(v < 0, UBigInt::make(UBigInt::limbsOfInt(v)))
+    }
+  }
+
+  // Parses "-?[0-9]+"; returns None() if invalid. Normalized ("007" -> "7",
+  // "-0" -> "0").
+  static fun fromString(s: String): ?BigInt {
+    bs = s.bytes();
+    n = bs.size();
+    if (n > 0 && bs.get(0).toInt() == 45) {
+      // '-'
+      parseDecimal(bs, 1, n) match {
+      | Some(limbs) -> Some(static::make(true, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    } else {
+      parseDecimal(bs, 0, n) match {
+      | Some(limbs) -> Some(static::make(false, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    }
+  }
+
+  fun toString(): String {
+    if (this.negative) {
+      "-" + this.mag.toString()
+    } else {
+      this.mag.toString()
+    }
+  }
+
+  // The unsigned magnitude of this value.
+  fun magnitude(): UBigInt {
+    this.mag
+  }
+
+  fun isZero(): Bool {
+    this.mag.isZero()
+  }
+
   fun abs(): BigInt {
-    static::make(false, this.limbs)
+    static::make(false, this.mag)
   }
 
   fun neg(): BigInt {
     if (this.isZero()) {
       this
     } else {
-      static::make(!this.negative, this.limbs)
+      static::make(!this.negative, this.mag)
     }
   }
 
   fun add(other: BigInt): BigInt {
     if (this.negative == other.negative) {
-      static::make(this.negative, addMag(this.limbs, other.limbs))
+      static::make(this.negative, this.mag.add(other.mag))
     } else {
-      c = cmpMag(this.limbs, other.limbs);
+      c = this.mag.compare(other.mag);
       if (c == EQ()) {
-        BigInt(false, Array[])
+        static::zero()
       } else if (c == GT()) {
-        static::make(this.negative, subMag(this.limbs, other.limbs))
+        static::make(this.negative, this.mag.sub(other.mag))
       } else {
-        static::make(other.negative, subMag(other.limbs, this.limbs))
+        static::make(other.negative, other.mag.sub(this.mag))
       }
     }
   }
@@ -517,10 +637,7 @@ value class BigInt private (
   }
 
   fun mul(other: BigInt): BigInt {
-    static::make(
-      this.negative != other.negative,
-      mulMag(this.limbs, other.limbs),
-    )
+    static::make(this.negative != other.negative, this.mag.mul(other.mag))
   }
 
   // Truncated division: the quotient rounds toward zero and the remainder
@@ -545,7 +662,7 @@ value class BigInt private (
     if (other.isZero()) {
       throw BigIntDivisionByZero()
     };
-    qr = divModMag(this.limbs, other.limbs);
+    qr = this.mag.divMod(other.mag);
     q = static::make(this.negative != other.negative, qr.i0);
     r = static::make(this.negative, qr.i1);
     (q, r)
@@ -556,12 +673,12 @@ value class BigInt private (
     if (exp < 0) {
       throw BigIntNegativeExponent()
     };
-    static::make(this.negative && (exp % 2 == 1), powMag(this.limbs, exp))
+    static::make(this.negative && (exp % 2 == 1), this.mag.pow(exp))
   }
 
   // Greatest common divisor, always non-negative.
   fun gcd(other: BigInt): BigInt {
-    static::make(false, gcdMag(this.limbs, other.limbs))
+    static::make(false, this.mag.gcd(other.mag))
   }
 
   fun compare(other: BigInt): Order {
@@ -572,9 +689,9 @@ value class BigInt private (
         GT()
       }
     } else if (this.negative) {
-      cmpMag(other.limbs, this.limbs)
+      other.mag.compare(this.mag)
     } else {
-      cmpMag(this.limbs, other.limbs)
+      this.mag.compare(other.mag)
     }
   }
 }
