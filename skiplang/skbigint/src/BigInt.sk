@@ -1,16 +1,24 @@
 module SKBigInt;
 
-// Arbitrary-precision signed integers, backed by the vendored libtommath
-// (extern/libtommath, public domain) through the SKBIGINT_* C functions in
-// extern/src/skbigint.c. A BigInt stores its canonical decimal string, so
-// every operation round-trips through libtommath; values are immutable.
+// Arbitrary-precision signed integers, backed by libtommath
+// (extern/libtommath, public domain, git submodule) through the SKBIGINT_* C
+// functions in extern/src/skbigint.c.
+//
+// A BigInt wraps a single GC-owned "encoded" string: a sign byte followed by
+// little-endian 64-bit magnitude words (see extern/src/skbigint.c). Each
+// operation marshals with O(n) mp_unpack/mp_pack; decimal conversion happens
+// only in fromString/toString. Values are immutable.
 
 @cpp_extern("SKBIGINT_check_decimal")
 private native fun checkDecimal(s: String): Int;
 
-@cpp_extern("SKBIGINT_normalize")
+@cpp_extern("SKBIGINT_from_decimal")
 @may_alloc
-private native fun normalizeRaw(s: String): String;
+private native fun fromDecimalRaw(s: String): String;
+
+@cpp_extern("SKBIGINT_to_decimal")
+@may_alloc
+private native fun toDecimalRaw(enc: String): String;
 
 @cpp_extern("SKBIGINT_from_i64")
 @may_alloc
@@ -70,14 +78,14 @@ class BigIntNegativeExponent() extends Exception {
   }
 }
 
-class BigInt private (private digits: String) uses Show, Orderable, Hashable {
+class BigInt private (private enc: String) uses Show, Orderable, Hashable {
   // Parses a decimal integer string ("-?[0-9]+"); returns None() if invalid.
   // The result is normalized ("007" -> "7", "-0" -> "0").
   static fun fromString(s: String): ?BigInt {
     if (checkDecimal(s) == 0) {
       None()
     } else {
-      Some(BigInt(normalizeRaw(s)))
+      Some(BigInt(fromDecimalRaw(s)))
     }
   }
 
@@ -86,23 +94,23 @@ class BigInt private (private digits: String) uses Show, Orderable, Hashable {
   }
 
   fun toString(): String {
-    this.digits
+    toDecimalRaw(this.enc)
   }
 
   fun isZero(): Bool {
-    isZeroRaw(this.digits) != 0
+    isZeroRaw(this.enc) != 0
   }
 
   fun add(other: BigInt): BigInt {
-    BigInt(addRaw(this.digits, other.digits))
+    BigInt(addRaw(this.enc, other.enc))
   }
 
   fun sub(other: BigInt): BigInt {
-    BigInt(subRaw(this.digits, other.digits))
+    BigInt(subRaw(this.enc, other.enc))
   }
 
   fun mul(other: BigInt): BigInt {
-    BigInt(mulRaw(this.digits, other.digits))
+    BigInt(mulRaw(this.enc, other.enc))
   }
 
   // Truncated division (rounds toward zero).
@@ -110,7 +118,7 @@ class BigInt private (private digits: String) uses Show, Orderable, Hashable {
     if (other.isZero()) {
       throw BigIntDivisionByZero()
     };
-    BigInt(divRaw(this.digits, other.digits))
+    BigInt(divRaw(this.enc, other.enc))
   }
 
   // Floored modulo: the result takes the sign of the divisor.
@@ -118,7 +126,7 @@ class BigInt private (private digits: String) uses Show, Orderable, Hashable {
     if (other.isZero()) {
       throw BigIntDivisionByZero()
     };
-    BigInt(modRaw(this.digits, other.digits))
+    BigInt(modRaw(this.enc, other.enc))
   }
 
   // this^exp for exp >= 0.
@@ -126,24 +134,24 @@ class BigInt private (private digits: String) uses Show, Orderable, Hashable {
     if (exp < 0) {
       throw BigIntNegativeExponent()
     };
-    BigInt(powRaw(this.digits, exp))
+    BigInt(powRaw(this.enc, exp))
   }
 
   // Greatest common divisor, always non-negative.
   fun gcd(other: BigInt): BigInt {
-    BigInt(gcdRaw(this.digits, other.digits))
+    BigInt(gcdRaw(this.enc, other.enc))
   }
 
   fun abs(): BigInt {
-    BigInt(absRaw(this.digits))
+    BigInt(absRaw(this.enc))
   }
 
   fun neg(): BigInt {
-    BigInt(negRaw(this.digits))
+    BigInt(negRaw(this.enc))
   }
 
   fun compare(other: BigInt): Order {
-    c = cmpRaw(this.digits, other.digits);
+    c = cmpRaw(this.enc, other.enc);
     if (c < 0) {
       LT()
     } else if (c == 0) {

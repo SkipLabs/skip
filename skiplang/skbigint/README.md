@@ -38,8 +38,10 @@ negative exponent throws `BigIntNegativeExponent`.
   domain); excluded from `clang-format` (top-level `Makefile` and
   `bin/git_hooks/check_format.sh`), like `skiplang/prelude/libbacktrace`.
 - `extern/src/skbigint.c` — `SKBIGINT_*` C bindings between the Skip runtime
-  string representation (`char*` + `sk_string_create`) and libtommath's
-  `mp_int`.
+  and libtommath's `mp_int`. A `BigInt` crosses the boundary as an encoded
+  skip `String` (sign byte + little-endian 64-bit magnitude words), so each
+  operation costs O(n) `mp_unpack`/`mp_pack` marshalling; decimal conversion
+  happens only in `fromString`/`toString`. All storage is GC-owned.
 - `src/BigInt.sk` — the `SKBigInt.BigInt` class.
 - `tests/tests.sk` — sktest suite (`../../bin/run-sktest.sh` from this
   directory).

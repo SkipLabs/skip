@@ -1,12 +1,20 @@
 /*
  * skbigint: Skip runtime bindings for arbitrary-precision integers.
  *
- * Wraps the vendored libtommath (extern/libtommath, public domain) so that
- * skiplang code can compute with big integers through plain decimal strings:
- * a skip `String` maps to `char*` here, and every SKBIGINT_* function takes
- * and/or returns such strings. Inputs to the arithmetic functions must be in
- * canonical form (as produced by SKBIGINT_normalize/SKBIGINT_from_i64), which
- * the skiplang BigInt class guarantees by construction.
+ * Wraps the vendored libtommath (extern/libtommath, public domain, pinned in
+ * .gitmodules). A big integer crosses the boundary as an "encoded" skip
+ * String:
+ *
+ *   byte 0    : sign (0 = non-negative, 1 = negative)
+ *   bytes 1.. : magnitude as little-endian 64-bit words, least significant
+ *               word first, no trailing zero words (zero => empty magnitude,
+ *               i.e. the encoding is the single byte 0x00)
+ *
+ * Arithmetic functions take and return encoded strings, so each call costs
+ * only O(n) marshalling (mp_unpack/mp_pack); decimal conversion happens
+ * exclusively in SKBIGINT_from_decimal/SKBIGINT_to_decimal. All memory is
+ * either stack, transient malloc/free within one call, or owned by the Skip
+ * GC (the returned strings), so there is nothing for the caller to free.
  */
 #include <stdint.h>
 #include <stdlib.h>
@@ -16,6 +24,8 @@
 
 uint32_t SKIP_String_byteSize(char*);
 char* sk_string_create(const char* buffer, uint32_t size);
+
+#define SKB_WORD_SIZE 8u
 
 /* Copy a skip string into a NUL-terminated heap buffer. */
 static char* dup_skip_string(char* s) {
@@ -29,53 +39,56 @@ static char* dup_skip_string(char* s) {
   return buf;
 }
 
-/* Parse a (canonical) decimal string into a fresh mp_int. */
-static mp_int* parse_decimal(char* s) {
-  char* buf = dup_skip_string(s);
+/* Decode an encoded string into a fresh mp_int. */
+static mp_int* decode(char* enc) {
+  uint32_t n = SKIP_String_byteSize(enc);
   mp_int* r;
-  if (buf == NULL) {
+  if (n == 0 || ((n - 1) % SKB_WORD_SIZE) != 0) {
     return NULL;
   }
   r = (mp_int*)malloc(sizeof(mp_int));
   if (r == NULL) {
-    free(buf);
     return NULL;
   }
   if (mp_init(r) != MP_OKAY) {
     free(r);
-    free(buf);
     return NULL;
   }
-  if (mp_read_radix(r, buf, 10) != MP_OKAY) {
-    mp_clear(r);
-    free(r);
-    free(buf);
-    return NULL;
+  if (n > 1) {
+    if (mp_unpack(r, (n - 1) / SKB_WORD_SIZE, MP_LSB_FIRST, SKB_WORD_SIZE,
+                  MP_LITTLE_ENDIAN, 0, enc + 1) != MP_OKAY) {
+      mp_clear(r);
+      free(r);
+      return NULL;
+    }
+    if (enc[0] != 0 && !mp_iszero(r)) {
+      r->sign = MP_NEG;
+    }
   }
-  free(buf);
   return r;
 }
 
-/* Render an mp_int as a freshly allocated skip string (canonical decimal). */
-static char* emit_decimal(mp_int* v) {
-  int size = 0;
-  char* buf;
+/* Encode an mp_int as a freshly allocated skip string. */
+static char* encode(mp_int* v) {
+  size_t count;
+  size_t total;
   size_t written = 0;
+  char* buf;
   char* res;
-  if (mp_radix_size(v, 10, &size) != MP_OKAY) {
-    return NULL;
-  }
-  /* mp_radix_size counts the NUL terminator. */
-  buf = (char*)malloc((size_t)size);
+  mp_clamp(v);
+  count = mp_pack_count(v, 0, SKB_WORD_SIZE);
+  total = 1 + count * SKB_WORD_SIZE;
+  buf = (char*)malloc(total);
   if (buf == NULL) {
     return NULL;
   }
-  if (mp_to_radix(v, buf, (size_t)size, &written, 10) != MP_OKAY) {
+  buf[0] = (mp_isneg(v) && !mp_iszero(v)) ? 1 : 0;
+  if (count > 0 && mp_pack(buf + 1, count, &written, MP_LSB_FIRST,
+                           SKB_WORD_SIZE, MP_LITTLE_ENDIAN, 0, v) != MP_OKAY) {
     free(buf);
     return NULL;
   }
-  /* mp_to_radix's `written` counts the NUL terminator. */
-  res = sk_string_create(buf, (uint32_t)(written - 1));
+  res = sk_string_create(buf, (uint32_t)total);
   free(buf);
   return res;
 }
@@ -107,15 +120,27 @@ int64_t SKBIGINT_check_decimal(char* s) {
   return 1;
 }
 
-/* Canonicalize a valid decimal string ("007" -> "7", "-0" -> "0"). */
-char* SKBIGINT_normalize(char* s) {
-  mp_int* v = parse_decimal(s);
+/* Canonical decimal string -> encoded. The input must pass
+ * SKBIGINT_check_decimal; the result is normalized ("-0" -> zero). */
+char* SKBIGINT_from_decimal(char* dec) {
+  char* buf = dup_skip_string(dec);
+  mp_int r;
   char* res;
-  if (v == NULL) {
+  if (buf == NULL) {
     return NULL;
   }
-  res = emit_decimal(v);
-  free_mp(v);
+  if (mp_init(&r) != MP_OKAY) {
+    free(buf);
+    return NULL;
+  }
+  if (mp_read_radix(&r, buf, 10) != MP_OKAY) {
+    mp_clear(&r);
+    free(buf);
+    return NULL;
+  }
+  free(buf);
+  res = encode(&r);
+  mp_clear(&r);
   return res;
 }
 
@@ -126,22 +151,54 @@ char* SKBIGINT_from_i64(int64_t v) {
     return NULL;
   }
   mp_set_i64(&r, v);
-  res = emit_decimal(&r);
+  res = encode(&r);
   mp_clear(&r);
+  return res;
+}
+
+/* Encoded -> canonical decimal string. */
+char* SKBIGINT_to_decimal(char* enc) {
+  mp_int* v = decode(enc);
+  int size = 0;
+  char* buf;
+  size_t written = 0;
+  char* res;
+  if (v == NULL) {
+    return NULL;
+  }
+  if (mp_radix_size(v, 10, &size) != MP_OKAY) {
+    free_mp(v);
+    return NULL;
+  }
+  /* mp_radix_size counts the NUL terminator. */
+  buf = (char*)malloc((size_t)size);
+  if (buf == NULL) {
+    free_mp(v);
+    return NULL;
+  }
+  if (mp_to_radix(v, buf, (size_t)size, &written, 10) != MP_OKAY) {
+    free(buf);
+    free_mp(v);
+    return NULL;
+  }
+  /* mp_to_radix's `written` counts the NUL terminator. */
+  res = sk_string_create(buf, (uint32_t)(written - 1));
+  free(buf);
+  free_mp(v);
   return res;
 }
 
 typedef mp_err (*binop_fn)(const mp_int*, const mp_int*, mp_int*);
 
 static char* compute_binop(char* a, char* b, binop_fn f) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   mp_int* y;
   mp_int r;
   char* res;
   if (x == NULL) {
     return NULL;
   }
-  y = parse_decimal(b);
+  y = decode(b);
   if (y == NULL) {
     free_mp(x);
     return NULL;
@@ -157,7 +214,7 @@ static char* compute_binop(char* a, char* b, binop_fn f) {
     free_mp(x);
     return NULL;
   }
-  res = emit_decimal(&r);
+  res = encode(&r);
   mp_clear(&r);
   free_mp(y);
   free_mp(x);
@@ -178,14 +235,14 @@ char* SKBIGINT_mul(char* a, char* b) {
 
 /* Truncated division; the skiplang side rejects a zero divisor. */
 char* SKBIGINT_div(char* a, char* b) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   mp_int* y;
   mp_int q;
   char* res;
   if (x == NULL) {
     return NULL;
   }
-  y = parse_decimal(b);
+  y = decode(b);
   if (y == NULL) {
     free_mp(x);
     return NULL;
@@ -201,7 +258,7 @@ char* SKBIGINT_div(char* a, char* b) {
     free_mp(x);
     return NULL;
   }
-  res = emit_decimal(&q);
+  res = encode(&q);
   mp_clear(&q);
   free_mp(y);
   free_mp(x);
@@ -216,7 +273,7 @@ char* SKBIGINT_mod(char* a, char* b) {
 
 /* a^e for e >= 0; the skiplang side rejects a negative exponent. */
 char* SKBIGINT_pow(char* a, int64_t e) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   mp_int r;
   char* res;
   if (x == NULL) {
@@ -231,7 +288,7 @@ char* SKBIGINT_pow(char* a, int64_t e) {
     free_mp(x);
     return NULL;
   }
-  res = emit_decimal(&r);
+  res = encode(&r);
   mp_clear(&r);
   free_mp(x);
   return res;
@@ -242,7 +299,7 @@ char* SKBIGINT_gcd(char* a, char* b) {
 }
 
 static char* compute_unop(char* a, mp_err (*f)(const mp_int*, mp_int*)) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   mp_int r;
   char* res;
   if (x == NULL) {
@@ -257,7 +314,7 @@ static char* compute_unop(char* a, mp_err (*f)(const mp_int*, mp_int*)) {
     free_mp(x);
     return NULL;
   }
-  res = emit_decimal(&r);
+  res = encode(&r);
   mp_clear(&r);
   free_mp(x);
   return res;
@@ -272,13 +329,13 @@ char* SKBIGINT_neg(char* a) {
 }
 
 int64_t SKBIGINT_cmp(char* a, char* b) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   mp_int* y;
   int64_t res;
   if (x == NULL) {
     return 0;
   }
-  y = parse_decimal(b);
+  y = decode(b);
   if (y == NULL) {
     free_mp(x);
     return 0;
@@ -290,7 +347,7 @@ int64_t SKBIGINT_cmp(char* a, char* b) {
 }
 
 int64_t SKBIGINT_is_zero(char* a) {
-  mp_int* x = parse_decimal(a);
+  mp_int* x = decode(a);
   int64_t res;
   if (x == NULL) {
     return 0;
