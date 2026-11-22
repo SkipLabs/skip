@@ -85,15 +85,22 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   void* result = obj;
   sk_stack_push(st, &obj, &result);
   sk_cell_t* large_page = NULL;
+  size_t last_idx = (size_t)-1;
 
   while (st->head > 0) {
     sk_value_t delayed = sk_stack_pop(st);
     void* toCopy = *delayed.value;
 
-    size_t obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
-
-    if (obstack_idx >= nbr_pages) {
-      continue;
+    // Consecutive objects are usually on the same page: try the last one hit
+    // before searching.
+    size_t obstack_idx = last_idx;
+    if (last_idx >= nbr_pages || (char*)toCopy < (char*)pages[last_idx].key ||
+        (char*)toCopy >= (char*)pages[last_idx].value) {
+      obstack_idx = sk_get_obstack_idx(toCopy, pages, nbr_pages);
+      if (obstack_idx >= nbr_pages) {
+        continue;
+      }
+      last_idx = obstack_idx;
     }
 
     large_page = NULL;

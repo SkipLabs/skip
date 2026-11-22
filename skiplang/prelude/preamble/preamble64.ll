@@ -49,8 +49,35 @@ define void @SKIP_awaitableThrow(ptr, ptr) {
 
 ; Obstack
 
-declare noalias align 8 ptr @SKIP_Obstack_alloc(i64) nofree
-declare noalias align 8 ptr @SKIP_Obstack_calloc(i64) nofree
+; Bump allocation inline; the runtime (obstack.c) takes over when the page is
+; full. Must stay in sync with SKIP_Obstack_alloc there: size rounded up to 8.
+@SKIP_obstack_head = external thread_local global ptr
+@SKIP_obstack_end = external thread_local global ptr
+declare noalias align 8 ptr @SKIP_Obstack_alloc_slow(i64) nofree
+
+define linkonce_odr noalias align 8 ptr @SKIP_Obstack_alloc(i64 %size) alwaysinline nofree {
+  %padded = add i64 %size, 7
+  %total = and i64 %padded, -8
+  %head = load ptr, ptr @SKIP_obstack_head, align 8
+  %end = load ptr, ptr @SKIP_obstack_end, align 8
+  %next = getelementptr i8, ptr %head, i64 %total
+  %full = icmp uge ptr %next, %end
+  br i1 %full, label %slow, label %fast
+
+fast:
+  store ptr %next, ptr @SKIP_obstack_head, align 8
+  ret ptr %head
+
+slow:
+  %slow_result = call ptr @SKIP_Obstack_alloc_slow(i64 %size)
+  ret ptr %slow_result
+}
+
+define linkonce_odr noalias align 8 ptr @SKIP_Obstack_calloc(i64 %size) alwaysinline nofree {
+  %result = call ptr @SKIP_Obstack_alloc(i64 %size)
+  call void @llvm.memset.p0.i64(ptr align 8 %result, i8 0, i64 %size, i1 false)
+  ret ptr %result
+}
 define linkonce_odr void @SKIP_Obstack_vectorUnsafeSet(ptr %arr, ptr %x) alwaysinline nounwind uwtable {
   store ptr %x, ptr %arr
   ret void

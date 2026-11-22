@@ -44,8 +44,11 @@
 // head: The current position in the page.
 // end: The end of the page.
 static __thread struct sk_obstack* page = NULL;
-static __thread char* head = NULL;
-static __thread char* end = NULL;
+// Exported: compiled Skip code bump-allocates inline (see the definition of
+// SKIP_Obstack_alloc in preamble64.ll) and only calls into this file when the
+// current page is full.
+__thread char* SKIP_obstack_head = NULL;
+__thread char* SKIP_obstack_end = NULL;
 
 #ifdef SKIP32
 static struct sk_obstack* free_list = NULL;
@@ -155,18 +158,19 @@ void sk_new_page() {
   saved->head = NULL;
   saved->end = NULL;
   saved->page = NULL;
-  end = (char*)page + block_size;
-  head = page->user_data;
+  SKIP_obstack_end = (char*)page + block_size;
+  SKIP_obstack_head = page->user_data;
 }
 
 char* SKIP_Obstack_alloc(size_t size) {
   char* result;
-  size += 8;
   size = (size + 7) & ~7;
 
-  if (head + size >= end) {
-    if (size + sizeof(sk_obstack_t) > PAGE_SIZE) {
-      result = sk_large_page(size);
+  if (SKIP_obstack_head + size >= SKIP_obstack_end) {
+    // Only large pages keep a spare word ahead of the object (they can be
+    // adopted by the persistent heap as they are, which needs a count there).
+    if (size + 8 + sizeof(sk_obstack_t) > PAGE_SIZE) {
+      result = sk_large_page(size + 8);
       result += 8;
       return result;
     } else {
@@ -174,11 +178,14 @@ char* SKIP_Obstack_alloc(size_t size) {
     }
   }
 
-  result = head;
-  head += size;
-
-  result += 8;
+  result = SKIP_obstack_head;
+  SKIP_obstack_head += size;
   return result;
+}
+
+// The out-of-line path of the inline allocator in preamble64.ll.
+char* SKIP_Obstack_alloc_slow(size_t size) {
+  return SKIP_Obstack_alloc(size);
 }
 
 void* SKIP_Obstack_calloc(size_t size) {
@@ -209,15 +216,15 @@ sk_saved_obstack_t* sk_saved_obstack(sk_obstack_t* page) {
 
 sk_saved_obstack_t* SKIP_new_Obstack() {
   sk_saved_obstack_t* saved;
-  if (head == NULL && page == NULL && end == NULL) {
+  if (SKIP_obstack_head == NULL && page == NULL && SKIP_obstack_end == NULL) {
     saved = &init_saved;
   } else {
     saved = sk_saved_obstack(page);
   }
 
-  saved->head = head;
+  saved->head = SKIP_obstack_head;
   saved->page = page;
-  saved->end = end;
+  saved->end = SKIP_obstack_end;
 
   sk_new_page();
 
@@ -245,9 +252,9 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     current = current->previous;
     sk_free_page(tofree);
   }
-  head = saved_head;
+  SKIP_obstack_head = saved_head;
   page = saved_page;
-  end = saved_end;
+  SKIP_obstack_end = saved_end;
 
   if (saved != NULL) {
     saved->page = NULL;
@@ -255,7 +262,7 @@ void SKIP_destroy_Obstack(sk_saved_obstack_t* saved) {
     saved->end = NULL;
   }
 #ifdef SKIP32
-  if (page == NULL && head == NULL && end == NULL) {
+  if (page == NULL && SKIP_obstack_head == NULL && SKIP_obstack_end == NULL) {
     free_list = NULL;
     reset_heap_end();
   }
@@ -275,8 +282,8 @@ void* SKIP_destroy_Obstack_with_value(sk_saved_obstack_t* saved, void* toCopy) {
   sk_cell_t* pages = sk_get_pages(page, nbr_pages);
 
   page = saved->page;
-  head = saved->head;
-  end = saved->end;
+  SKIP_obstack_head = saved->head;
+  SKIP_obstack_end = saved->end;
 
   saved->page = NULL;
   saved->head = NULL;
@@ -305,13 +312,13 @@ sk_obstack_t* SKIP_switch_to_parent(sk_saved_obstack_t* saved) {
   }
 
   sk_obstack_t* saved_page = page;
-  char* saved_head = head;
-  char* saved_end = end;
+  char* saved_head = SKIP_obstack_head;
+  char* saved_end = SKIP_obstack_end;
 
   // Switch to parent obstack
   page = saved->page;
-  head = saved->head;
-  end = saved->end;
+  SKIP_obstack_head = saved->head;
+  SKIP_obstack_end = saved->end;
 
   // Store obstack dat for restauration
   saved->head = saved_head;
@@ -331,13 +338,13 @@ void SKIP_restore_from_parent(sk_saved_obstack_t* saved,
   // Update the sub obstack with new parent obstack positions
   first_page->previous = page;
   saved->page = page;
-  saved->head = head;
-  saved->end = end;
+  saved->head = SKIP_obstack_head;
+  saved->end = SKIP_obstack_end;
 
   // Switch to sub obstack
   page = leading;
-  head = saved_head;
-  end = saved_end;
+  SKIP_obstack_head = saved_head;
+  SKIP_obstack_end = saved_end;
 }
 uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
   size_t nbr_page = 0;
@@ -346,7 +353,7 @@ uint32_t SKIP_should_GC(sk_saved_obstack_t* saved) {
     cursor = cursor->previous;
     nbr_page++;
     if (nbr_page > 3 ||
-        (nbr_page > 1 && (head - page->user_data > (2 * PAGE_SIZE / 3)))) {
+        (nbr_page > 1 && (SKIP_obstack_head - page->user_data > (2 * PAGE_SIZE / 3)))) {
       return 1;
     }
   }
@@ -462,8 +469,24 @@ size_t sk_get_obstack_idx(char* ptr, sk_cell_t* pages, size_t nbr_pages) {
   if (nbr_pages == 0 || pages == NULL) {
     return (size_t)-1;
   }
-  size_t result = binarySearch(pages, 0, nbr_pages - 1, ptr);
-  return result;
+  // Pages are sorted by address. Most pointers met while copying a region out
+  // refer to older data, outside the whole range: reject those at once.
+  if (ptr < (char*)pages[0].key || ptr >= (char*)pages[nbr_pages - 1].value) {
+    return (size_t)-1;
+  }
+  size_t low = 0;
+  size_t high = nbr_pages;
+  while (low < high) {
+    size_t mid = low + (high - low) / 2;
+    if (ptr < (char*)pages[mid].key) {
+      high = mid;
+    } else if (ptr >= (char*)pages[mid].value) {
+      low = mid + 1;
+    } else {
+      return mid;
+    }
+  }
+  return (size_t)-1;
 }
 
 #ifdef SKIP64
@@ -478,8 +501,8 @@ void* SKIP_detach_Obstack(void) {
   arena->count = sk_get_nbr_pages(page, NULL);
   arena->pages = arena->count ? sk_get_pages(page, arena->count) : NULL;
   page = NULL;
-  head = NULL;
-  end = NULL;
+  SKIP_obstack_head = NULL;
+  SKIP_obstack_end = NULL;
   init_saved = (sk_saved_obstack_t){NULL, NULL, NULL};
   return arena;
 }
