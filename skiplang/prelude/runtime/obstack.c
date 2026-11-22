@@ -49,6 +49,9 @@ static __thread struct sk_obstack* page = NULL;
 // current page is full.
 __thread char* SKIP_obstack_head = NULL;
 __thread char* SKIP_obstack_end = NULL;
+// Bytes of obstack pages handed out so far, never decreased: a host can tell
+// how much a computation has allocated since a point it noted.
+size_t SKIP_obstack_allocated = 0;
 
 #ifdef SKIP32
 static struct sk_obstack* free_list = NULL;
@@ -138,6 +141,7 @@ char* sk_large_page(size_t size) {
   // large pages are create directly on persistence side memory
   // to prevent persistence copy
   sk_obstack_t* lpage = (sk_obstack_t*)sk_malloc(block_size);
+  SKIP_obstack_allocated += block_size;
   sk_obstack_attach_page(lpage, NULL);
 
   lpage->size = block_size;
@@ -152,6 +156,7 @@ void sk_new_page() {
   size_t block_size = PAGE_SIZE;
   sk_obstack_t* previous_page = page;
   page = sk_malloc_page(block_size);
+  SKIP_obstack_allocated += block_size;
   page->previous = previous_page;
   page->size = block_size;
   sk_saved_obstack_t* saved = &page->saved;
