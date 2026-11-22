@@ -2,6 +2,8 @@ target datalayout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:
 target triple = "x86_64-pc-linux-gnu"
 
 declare void @SKIP_print_last_exception_stack_trace_and_exit(ptr) noreturn cold
+; Called by assertions that only a development build keeps.
+declare void @SKIP_print_stack_trace()
 declare void @SKIP_throw(ptr) noreturn cold
 declare void @SKIP_unreachableMethodCall(ptr, ptr) noreturn cold
 declare void @SKIP_unreachableWithExplanation(ptr) noreturn cold
