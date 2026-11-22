@@ -148,7 +148,7 @@ mutable class RadixTreeVector<+T> private {
       shift => this.shift,
       root => this.root,
       tailSize => this.tailSize,
-      tail => this.tail.clone(),
+      tail => copyNode(this.tail),
     }
   }
 
@@ -346,7 +346,7 @@ mutable class RadixTreeVector<+T> private {
     // iterate the root
     root match {
     | Some(node) ->
-      for (x in iterateNode(node, shift, rootSize)) {
+      for (x in iterateNode(node, shift, rootSize.i)) {
         yield x
       }
     | None() -> void
@@ -660,10 +660,7 @@ base class Node<+T> {
       }
     };
     // build a new internal node with updated elements
-    // todo: `nextElements = elements.clone()` should work...
-    nextElements = Array::mfillBy(branchFactor, i ->
-      (Unsafe.array_get(elements, i) : ?Node<T2>)
-    );
+    nextElements = copyNode((elements : Array<?Node<T2>>));
     nextElements![child] = Some(tailNode);
     Internal(unsafe_chill_trust_me(nextElements))
 
@@ -720,10 +717,7 @@ base class Node<+T> {
   ): Node<T2>
   | Leaf(elements) ->
     child = index.leafChild();
-    // todo: `nextElements = elements.clone()` should work...
-    nextElements = Array::mfillBy(branchFactor, i ->
-      (Unsafe.array_get(elements, i) : RawStorage<T2>)
-    );
+    nextElements = copyNode((elements : Array<RawStorage<T2>>));
     Unsafe.array_set(nextElements, child, unsafeMake(value));
     Leaf(unsafe_chill_trust_me(nextElements))
   | Internal(elements) ->
@@ -731,10 +725,7 @@ base class Node<+T> {
     Unsafe.array_get(elements, child) match {
     | Some(childNode) ->
       nextChildNode = childNode.set(shift.decrement(), index, value);
-      // todo: `nextElements = elements.clone()` should work...
-      nextElements = Array::mfillBy(branchFactor, i ->
-        (Unsafe.array_get(elements, i) : ?Node<T2>)
-      );
+      nextElements = copyNode((elements : Array<?Node<T2>>));
       Unsafe.array_set(nextElements, child, Some(nextChildNode));
       Internal(unsafe_chill_trust_me(nextElements))
     | None() ->
@@ -765,10 +756,24 @@ private fun unsafeUninitialized<T>(): RawStorage<T> {
   Unsafe.RawStorage::uninitialized()
 }
 
+// A mutable copy of a node's array. A loop, where `Array::mfillBy` or `clone`
+// would call a closure for every element: this runs for each level of every
+// `set` and `push`.
+private fun copyNode<T>(elements: readonly Array<T>): mutable Array<T> {
+  size = elements.size();
+  copy: mutable Array<T> = Unsafe.array_make(size);
+  for (i in Range(0, size)) {
+    Unsafe.array_set(copy, i, Unsafe.array_get(elements, i))
+  };
+  copy
+}
+
+// Yields the `size` elements below `node`, in order. A node at `shift` has
+// children of `2^shift` elements each; all are full except possibly the last.
 private fun iterateNode<T>(
   node: Node<T>,
   shift: Shift,
-  rootSize: Index,
+  size: Int,
 ): mutable Iterator<T> {
   node match {
   | Leaf(elements) ->
@@ -776,17 +781,23 @@ private fun iterateNode<T>(
       yield unsafeGet(x)
     }
   | Internal(elements) ->
-    for (i in Range(0, rootSize.child(shift))) {
+    perChild = branchFactor.shl(shift.i) / branchFactor;
+    remaining = size;
+    i = 0;
+    while (remaining > 0) {
+      below = min(remaining, perChild);
       Unsafe.array_get(elements, i) match {
       | Some(childNode) ->
-        for (x in iterateNode(childNode, shift.decrement(), rootSize)) {
+        for (x in iterateNode(childNode, shift.decrement(), below)) {
           yield x
         }
       | None() ->
         invariant_violation(
           `iterateNode: unexpected null node with shift=${shift.i}`,
         )
-      }
+      };
+      !remaining = remaining - below;
+      !i = i + 1
     }
   }
 }
