@@ -416,7 +416,9 @@ it means the body you see is not the code that runs.
 
 | Annotation | Effect | If absent |
 | --- | --- | --- |
-| `@no_alloc` / `@may_alloc` | The function allocates nothing / may allocate without bound. | **Error** on an external native; derived on an `@intrinsic` |
+| `@no_alloc` / `@alloc("none")` | The function allocates nothing. | **Error** on an external native; derived on an `@intrinsic` |
+| `@alloc("bounded")` | The function allocates one fixed-shape value per call (a string, an option, a small struct) — no GC safepoint after the call, but loops over it are still treated as unbounded. | (as above) |
+| `@may_alloc` / `@alloc("unbounded")` | The function may allocate an amount that scales with its input. | (as above) |
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
@@ -431,13 +433,17 @@ body instead.
 forgetting one costs an optimization, never correctness.
 
 **The allocation contract is not defaulted at all — it is mandatory.** Every
-external native (`@cpp_extern` / `@cpp_runtime`) must declare exactly one of
-`@no_alloc` or `@may_alloc`; declaring neither, or both, is an error:
+external native (`@cpp_extern` / `@cpp_runtime`) must declare exactly one
+allocation contract — `@no_alloc`, `@may_alloc`, or the parameterized
+`@alloc("none"|"bounded"|"unbounded")` which maps 1:1 onto the compiler's
+`AllocAmount` lattice (`AllocNothing` / `AllocBounded` / `AllocUnbounded`).
+Declaring neither, several, a bad `@alloc` parameter, or mixing the binary
+forms with `@alloc(...)` is an error:
 
 ```skip
 @cpp_extern("SKIP_some_native")
-native fun f(): Int;              // error: Native functions must declare
-                                  //        @no_alloc or @may_alloc
+native fun f(): Int;              // error: Native functions must declare its
+                                  //        allocation contract
 ```
 
 This one is mandatory rather than defaulted because it is the contract where
@@ -451,9 +457,15 @@ caller skip the GC safepoint it would otherwise insert after the call
 only go on a function that genuinely does not grow the obstack on the path that
 returns to its caller. Allocating *only* on an error path that throws or aborts
 (rather than returning) does not disqualify it, since that path never returns to
-the caller.
+the caller. `@alloc("bounded")` follows the same convention the IR already uses
+for `StringConcat`/`ArrayAlloc` — one allocation of input-dependent *length* but
+fixed *shape* per call; `funAllocAmount` still promotes loops over it to
+`AllocUnbounded`, so `bounded` only skips the safepoint, never a collection.
+Claiming `bounded` for something that allocates proportionally to its input in
+*structure* (a collection, a copied graph) is as wrong as claiming `none` — if
+in doubt, say `unbounded`.
 
-On an `@intrinsic`, both annotations are **rejected**: an intrinsic never runs as
+On an `@intrinsic`, all of these are **rejected**: an intrinsic never runs as
 a function — the inliner replaces every call with the IR it lowers to, so any
 allocation is attributed to the caller's own instructions — which means its
 allocation behaviour is *derived* from the lowering. Declaring it would be a

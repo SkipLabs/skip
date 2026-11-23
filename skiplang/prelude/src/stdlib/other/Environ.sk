@@ -42,7 +42,7 @@ fun current_exe(): String {
 
 @allow_tracked_call
 @cpp_extern("SKIP_getcwd")
-@may_alloc
+@alloc("bounded")
 untracked native fun current_dir(): String;
 
 fun temp_dir(): String {
@@ -59,7 +59,7 @@ untracked native fun set_current_dir(path: String): void;
 native fun internalGetArgc(): Int;
 
 @cpp_extern("SKIP_getArgN")
-@may_alloc
+@alloc("bounded")
 native fun internalGetArgN(n: Int): String;
 
 fun args(): mutable Iterator<String> {
@@ -76,7 +76,7 @@ untracked native fun internalGetEnvc(): Int;
 
 @allow_tracked_call
 @cpp_extern("SKIP_get_envN")
-@may_alloc
+@alloc("bounded")
 untracked native fun internalGetEnvN(n: Int): String;
 
 fun vars(): mutable Iterator<(String, String)> {
@@ -98,7 +98,7 @@ fun internalCreateNoneStringOption(): ?String {
 
 @allow_tracked_call
 @cpp_extern("SKIP_getenv")
-@may_alloc
+@alloc("bounded")
 untracked native fun varOpt(name: String): ?String;
 
 class VarError(name: String) extends Exception {

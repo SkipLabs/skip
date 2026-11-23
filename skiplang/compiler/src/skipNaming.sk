@@ -2540,10 +2540,12 @@ fun fun_def(
 /* Function checking that default values for parameters appear last in a
  * function with positional parameters. */
 // An external native's allocation behaviour cannot be derived — it has no body
-// to analyse — so it must be declared: exactly one of @no_alloc / @may_alloc.
-// An @intrinsic is the opposite case: the inliner replaces every call with the
-// IR it lowers to, so its allocation *is* derived and declaring it would be a
-// hand-maintained duplicate of the lowering, free to drift.
+// to analyse — so it must be declared: exactly one of @no_alloc / @may_alloc /
+// @alloc("none"|"bounded"|"unbounded"), the latter mapping 1:1 onto the
+// AllocAmount lattice. An @intrinsic is the opposite case: the inliner
+// replaces every call with the IR it lowers to, so its allocation *is*
+// derived and declaring it would be a hand-maintained duplicate of the
+// lowering, free to drift.
 fun check_alloc_contract(
   annotations: SSet,
   pos: FileRange,
@@ -2551,11 +2553,23 @@ fun check_alloc_contract(
 ): void {
   noAlloc = annotationsContain(annotations, "@no_alloc", pos);
   mayAlloc = annotationsContain(annotations, "@may_alloc", pos);
-  if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
-    if (noAlloc || mayAlloc) {
+  allocParams = getAnnotationParams(annotations, "@alloc", pos);
+  for (param in allocParams) {
+    if (!(param == "none" || param == "bounded" || param == "unbounded")) {
       SkipError.error(
         pos,
-        `@intrinsic ${what} must not declare @no_alloc or @may_alloc: the allocation behaviour is derived from the intrinsic's lowering`,
+        `@alloc parameter must be "none", "bounded", or "unbounded", not "${param}"`,
+      )
+    }
+  };
+  decls = (if (noAlloc) 1 else 0) +
+    (if (mayAlloc) 1 else 0) +
+    allocParams.size();
+  if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
+    if (decls != 0) {
+      SkipError.error(
+        pos,
+        `@intrinsic ${what} must not declare @no_alloc, @may_alloc, or @alloc(...): the allocation behaviour is derived from the intrinsic's lowering`,
       )
     }
   } else if (
@@ -2567,10 +2581,20 @@ fun check_alloc_contract(
         pos,
         `Native ${what} cannot declare both @no_alloc and @may_alloc`,
       )
-    } else if (!noAlloc && !mayAlloc) {
+    } else if ((noAlloc || mayAlloc) && !allocParams.isEmpty()) {
       SkipError.error(
         pos,
-        `Native ${what} must declare @no_alloc or @may_alloc`,
+        `Native ${what} cannot combine @no_alloc/@may_alloc with @alloc(...)`,
+      )
+    } else if (decls == 0) {
+      SkipError.error(
+        pos,
+        `Native ${what} must declare its allocation contract: @no_alloc, @may_alloc, or @alloc("none"|"bounded"|"unbounded")`,
+      )
+    } else if (decls > 1) {
+      SkipError.error(
+        pos,
+        `Native ${what} must declare exactly one allocation contract, found ${decls}`,
       )
     }
   }
