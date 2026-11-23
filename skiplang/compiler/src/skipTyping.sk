@@ -1879,7 +1879,9 @@ fun call_(
       invalid_arg_msg,
     )
   | (Mixed(pos_tyl, named_ty_map, _), Mixed(pos_args, named_args, _)) ->
-    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    pos_tyl1 = pos_tyl.map(cur1 ->
+      TUtils.contra_promote(context, env, acc, cur1)
+    );
     check_args_length(pos, fpos, pos_tyl1, pos_args);
     (!acc, pos_add_args) = join_args(
       context,
@@ -1904,7 +1906,9 @@ fun call_(
   | (Mixed(pos_tyl, named_ty_map, _), Positional(pos_args)) ->
     // Only positional arguments supplied: named parameters must all have
     // defaults (join_named_args reports the missing ones otherwise).
-    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    pos_tyl1 = pos_tyl.map(cur1 ->
+      TUtils.contra_promote(context, env, acc, cur1)
+    );
     check_args_length(pos, fpos, pos_tyl1, pos_args);
     (!acc, pos_add_args) = join_args(
       context,
@@ -1929,17 +1933,16 @@ fun call_(
   | (Mixed(pos_tyl, named_ty_map, _), Named(named_args)) ->
     // Only named arguments supplied: positional parameters must all have
     // defaults.
-    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    pos_tyl1 = pos_tyl.map(cur1 ->
+      TUtils.contra_promote(context, env, acc, cur1)
+    );
     pos_tyl1.each(param ->
       param match {
       | (_, N.Tdefault(_)) -> void
       | _ ->
         SkipError.errorl(
           List[
-            (
-              pos,
-              `Missing arguments, expected ${pos_tyl1.size()} but got 0`,
-            ),
+            (pos, `Missing arguments, expected ${pos_tyl1.size()} but got 0`),
             (fpos, "Definition is here"),
           ],
         )
@@ -2001,11 +2004,7 @@ fun merge_default_args(
     );
     args match {
     | Positional(pos_args) ->
-      Mixed(
-        pos_args.concat(pos_add),
-        UMap::createFromItems(named_add),
-        false,
-      )
+      Mixed(pos_args.concat(pos_add), UMap::createFromItems(named_add), false)
     | Named(named_args) ->
       Mixed(
         pos_add,
@@ -2464,8 +2463,10 @@ fun expr(
           ),
         );
         stack.push(NExpr{expr => e3})
-      | (pos, N.Call(mut, nbase, targs, args))
-        if (is_mixed_call_shape(nbase, args)) ->
+      | (
+        pos,
+        N.Call(mut, nbase, targs, args),
+      ) if (is_mixed_call_shape(nbase, args)) ->
         (inner_mut, inner_base, inner_targs, inner_args) = nbase match {
         | (_, N.Call(m, b, t, a)) -> (m, b, t, a)
         | _ -> invariant_violation("ICE is_mixed_call_shape")

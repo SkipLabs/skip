@@ -283,9 +283,7 @@ class Mixed<+T>(
         for (value in this.positional) {
           items.push(inspect(value))
         };
-        this.named.each((key, value) ->
-          items.push(inspect((key.i1, value)))
-        );
+        this.named.each((key, value) -> items.push(inspect((key.i1, value))));
         items.toArray();
       },
     );
@@ -298,10 +296,7 @@ class Mixed<+T>(
         this.positional.size() == y1.size(),
         "combine different length positional",
       );
-      invariant(
-        this.named.size() == y2.size(),
-        "combine different size named",
-      );
+      invariant(this.named.size() == y2.size(), "combine different size named");
       Mixed(
         this.positional.zip(y1),
         this.named.map((k, v1) -> (v1, y2[k])),
