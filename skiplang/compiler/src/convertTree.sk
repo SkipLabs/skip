@@ -1894,7 +1894,24 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       | Positional(args) -> args
       | _ -> invariant_violation("ICE positional params")
       };
-      Mixed(posArgs, this.convertNamedParameters(namedList), false)
+      // Number the parameters of the whole declaration with a single sequence
+      // of source ordinals (positional first, then named) so that sorting by
+      // `index` restores declaration order, e.g. when evaluating omitted
+      // default arguments.
+      numPos = posArgs.size();
+      namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
+        p with {index => p.index + numPos}
+      );
+      // A bare `_` is an anonymous placeholder and may repeat, but any other
+      // name must not appear in both groups. Inserting all names into a umap
+      // reports duplicates the same way as duplicate named parameters.
+      _ = UMap::createFromIterator(
+        posArgs
+          .filter(param ~> param.name.i1 != PredefinedName.underscore)
+          .map(param ~> (param.name, param.name))
+          .concat(namedArgs.items().map(p -> (p.i0, p.i0))),
+      );
+      Mixed(posArgs, namedArgs, false)
     | _ ->
       invariant_violation("Unexpected parameters: " + this.treeToString(tree))
     }

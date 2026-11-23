@@ -1239,7 +1239,11 @@ fun new_call(
     info = OU.const_binding_info;
     fixed_targs = targs.map(strip_tdefault_from_type_);
     fixed_ty_fun = O.Type(fpos, O.Tfun(fmods, fixed_targs, ty_ret));
-    params = targs.map(t ->
+    // Bind the closure parameters with the same default-free types as the
+    // closure signature: defaults are not available on indirect calls, and
+    // keeping Tdefault on the bindings would reorder mixed parameter groups
+    // when the callee flattens its parameters (optional ones go last).
+    params = fixed_targs.map(t ->
       O.Binding(t, O.Name(pos, new_tmp_sk(new_id)), info)
     );
     vars = params.map(t_var -> {
