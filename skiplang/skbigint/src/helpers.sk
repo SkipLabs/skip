@@ -71,7 +71,7 @@ fun cmpMag(a: Array<UInt32>, b: Array<UInt32>): Order {
 /** Magnitude addition: a + b. */
 fun addMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   n = if (a.size() > b.size()) a.size() else b.size();
-  r = Array::mfill(n + 1, UInt32::truncate(0));
+  r = Array::mfill(n + 1, UInt32::zero);
   carry = 0;
   i = 0;
   while (i < n) {
@@ -95,7 +95,7 @@ fun addMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
  * checks via cmpMag).
  */
 fun subMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
-  r = Array::mfill(a.size(), UInt32::truncate(0));
+  r = Array::mfill(a.size(), UInt32::zero);
   borrow = 0;
   i = 0;
   while (i < a.size()) {
@@ -123,7 +123,7 @@ fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   if (a.size() == 0 || b.size() == 0) {
     Array[]
   } else {
-    r = Array::mfill(a.size() + b.size(), UInt32::truncate(0));
+    r = Array::mfill(a.size() + b.size(), UInt32::zero);
     i = 0;
     while (i < a.size()) {
       ai = a[i].toInt();
@@ -155,7 +155,7 @@ fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0 || a.size() == 0) {
     Array[]
   } else {
-    r = Array::mfill(a.size() + 1, UInt32::truncate(0));
+    r = Array::mfill(a.size() + 1, UInt32::zero);
     carry = 0;
     i = 0;
     while (i < a.size()) {
@@ -174,7 +174,7 @@ fun addMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0) {
     a
   } else {
-    r = Array::mfill(a.size() + 1, UInt32::truncate(0));
+    r = Array::mfill(a.size() + 1, UInt32::zero);
     carry = m;
     i = 0;
     while (i < a.size() && carry != 0) {
@@ -199,7 +199,7 @@ fun shlMag(a: Array<UInt32>, s: Int): Array<UInt32> {
   } else {
     limbShift = s / kLimbBits;
     bitShift = s % kLimbBits;
-    r = Array::mfill(a.size() + limbShift + 1, UInt32::truncate(0));
+    r = Array::mfill(a.size() + limbShift + 1, UInt32::zero);
     carry = 0;
     i = 0;
     while (i < a.size()) {
@@ -221,7 +221,7 @@ fun shrMag(a: Array<UInt32>, s: Int): Array<UInt32> {
     Array[]
   } else {
     n = a.size() - limbShift;
-    r = Array::mfill(n, UInt32::truncate(0));
+    r = Array::mfill(n, UInt32::zero);
     i = 0;
     while (i < n) {
       v = a[i + limbShift].toInt().shr(bitShift);
@@ -244,7 +244,7 @@ fun shrMag(a: Array<UInt32>, s: Int): Array<UInt32> {
  * Requires b nonzero.
  */
 fun divModMagSmall(a: Array<UInt32>, d: Int): (Array<UInt32>, Int) {
-  q = Array::mfill(a.size(), UInt32::truncate(0));
+  q = Array::mfill(a.size(), UInt32::zero);
   rem = 0;
   i = a.size() - 1;
   while (i >= 0) {
@@ -278,10 +278,10 @@ fun divModMag(
     bn = shlMag(b, s); // still n limbs: top limb of b * 2^s is in [2^29, 2^30)
     un = shlMag(a, s); // m or m+1 limbs
     m = a.size();
-    q = Array::mfill(m - n + 1, UInt32::truncate(0));
+    q = Array::mfill(m - n + 1, UInt32::zero);
     // The remainder register always has m+1 limbs (the top one may stay 0);
     // the quotient estimate reads r[j+n], which can be index m.
-    r = Array::mfill(m + 1, UInt32::truncate(0));
+    r = Array::mfill(m + 1, UInt32::zero);
     i = 0;
     while (i < un.size()) {
       r.set(i, un[i]);
