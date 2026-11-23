@@ -168,6 +168,39 @@ private fun flattenParams<T>(
 
       (required.toArray(), optional.size(), true)
     }
+  | Mixed(funArgsPos, funArgsNamed, _) ->
+    params match {
+    | Mixed(pArgsPos, pArgsNamed, _) ->
+      invariant(funArgsPos.size() == pArgsPos.size(), "Arg count mismatch");
+      invariant(funArgsNamed.size() == pArgsNamed.size(), "Arg count mismatch");
+
+      // Required arguments come first (positional in order, then named sorted
+      // by name), then optional ones, so that optional arguments are trailing.
+      posRequired = mutable Vector<T>[];
+      posOptional = mutable Vector<T>[];
+      pArgsPos.zip(funArgsPos).each(p -> {
+        (arg, ty) = p;
+        (if (isTdefault(ty)) posOptional else posRequired).push(arg)
+      });
+
+      namedRequired = mutable Vector<T>[];
+      namedOptional = mutable Vector<T>[];
+      funArgsNamedVec = funArgsNamed.collect(Array);
+      pArgsNamedVec = pArgsNamed.collect(Array);
+      funArgsNamedVec.eachWithIndex((i, t) -> {
+        (if (isTdefault(t)) namedOptional else namedRequired).push(pArgsNamedVec[i])
+      });
+
+      numOpt = posOptional.size() + namedOptional.size();
+      flat = posRequired
+        .toArray()
+        .concat(namedRequired.toArray())
+        .concat(posOptional.toArray())
+        .concat(namedOptional.toArray());
+      (flat, numOpt, if (namedOptional.isEmpty()) numOpt <= 1 else true)
+    | Positional _ -> invariant_violation("Positional/named mismatch.")
+    | Named _ -> invariant_violation("Positional/named mismatch.")
+    }
   }
 }
 
@@ -881,6 +914,15 @@ class DefLazyGFun{defRef: CallableDefRef} extends BodyProvidingLazyGFun {
           m.maybeGetNoPos(p.name) match {
           | None() -> p.pos.die(`named param def not found`)
           | Some(defp) -> defp
+          }
+        | Mixed(l, m, _) ->
+          l.find(defp -> defp.name.id == p.name) match {
+          | Some(defp) -> defp
+          | None() ->
+            m.maybeGetNoPos(p.name) match {
+            | None() -> p.pos.die(`mixed param def not found`)
+            | Some(defp) -> defp
+            }
           }
         };
         p with {info => defp.frozen_, value => defp.value}

@@ -880,6 +880,12 @@ fun expr_(
     argArray = args1 match {
     | Positional(a) -> a
     | Named _ -> pos.die("Expected positional args for TemplateLiteral")
+    | Mixed(a, m, _) ->
+      if (m.isEmpty()) {
+        a
+      } else {
+        pos.die("Expected positional args for TemplateLiteral")
+      }
     };
     result = argArray.size() match {
     | 0 -> make_empty_string(pos)
@@ -1268,6 +1274,30 @@ fun call_args(
   | Named(em) ->
     (acc1, em1) = named_call_args(new_id, env, acc, em);
     (acc1, Named(em1))
+  | Mixed(el, em, namedFirst) ->
+    // Bind the argument groups in source order so that evaluation order
+    // matches the source order of the two groups.
+    if (namedFirst) {
+      (acc1, em1) = named_call_args(new_id, env, acc, em);
+      (acc2, el1) = el.mapAcc(
+        ((acc1, pos_e) -> {
+          (_, e) = pos_e;
+          bind_expr(new_id, env, acc1, e)
+        }),
+        acc1,
+      );
+      (acc2, Mixed(el1, em1, true))
+    } else {
+      (acc1, el1) = el.mapAcc(
+        ((acc1, pos_e) -> {
+          (_, e) = pos_e;
+          bind_expr(new_id, env, acc1, e)
+        }),
+        acc,
+      );
+      (acc2, em1) = named_call_args(new_id, env, acc1, em);
+      (acc2, Mixed(el1, em1, false))
+    }
   }
 }
 
@@ -1378,6 +1408,11 @@ fun bind_params(
     | (Positional(params1), Positional(args1)) ->
       (params1.values(), args1.values())
     | (Named(params1), Named(args1)) -> (params1.values(), args1.values())
+    | (Mixed(posP, namedP, _), Mixed(posA, namedA, _)) ->
+      (
+        posP.values().concat(namedP.values()),
+        posA.values().concat(namedA.values()),
+      )
     | _ -> invariant_violation("assert false")
     }
   };
