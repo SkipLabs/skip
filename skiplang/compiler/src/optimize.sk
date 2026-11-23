@@ -539,6 +539,46 @@ private fun optimizationPasses(
   ]
 }
 
+// Map a native's declared allocation contract onto the AllocAmount lattice.
+// An @intrinsic never runs as a function: IntrinsicsInliner (a
+// kOptPrerequisites pass, so it always runs) replaces every call with the IR
+// it lowers to, and any allocation is then attributed to the caller's own
+// instructions — so it reports AllocNothing() here and naming rejects a
+// declaration on it. An external native must declare its contract (naming
+// enforces it); anything undeclared falls to the safe AllocUnbounded().
+fun allocAmountFromAnnotations(annotations: SSet, pos: FileRange): AllocAmount {
+  allocParams = getAnnotationParams(annotations, "@alloc", pos);
+  if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
+    AllocNothing()
+  } else if (
+    annotationsContain(annotations, "@no_alloc", pos) ||
+    allocParams.any(param -> param == "none")
+  ) {
+    AllocNothing()
+  } else if (allocParams.any(param -> param == "bounded")) {
+    // One fixed-shape allocation per call (a string, an option, a small
+    // struct) — the same convention instrAllocAmount uses for StringConcat
+    // and ArrayAlloc. Loops over it are still promoted to AllocUnbounded by
+    // funAllocAmount, so this only skips the GC safepoint, never a collection.
+    AllocBounded()
+  } else {
+    AllocUnbounded()
+  }
+}
+
+// The default optimization status of a native function, derived from its
+// declared contract annotations (naming rejects an external native that
+// declares none; an @intrinsic never runs as a callable, so
+// allocAmountFromAnnotations reports AllocNothing for it).
+fun nativeFunOptDone(annotations: SSet, pos: FileRange): OptDone {
+  OptDone{
+    inlineComplexity => Int::max,
+    returns => !annotationsContain(annotations, "@no_return", pos),
+    canThrow => !annotationsContain(annotations, "@no_throw", pos),
+    allocAmount => allocAmountFromAnnotations(annotations, pos),
+  }
+}
+
 fun optimizeAll(
   context: mutable SKStore.Context,
   env: GlobalEnv,
@@ -564,32 +604,7 @@ fun optimizeAll(
       | OptDone _ -> void
       | OptPartial _ ->
         // Provide a default status for native functions based on annotations.
-        allFuns.insert(
-          f with {
-            status => OptDone{
-              inlineComplexity => Int::max,
-              returns => !annotationsContain(f.annotations, "@no_return", pos),
-              canThrow => !annotationsContain(f.annotations, "@no_throw", pos),
-              // An @intrinsic never runs as a function: IntrinsicsInliner
-              // (a kOptPrerequisites pass, so it always runs) replaces every
-              // call with the IR it lowers to, and any allocation is then
-              // attributed to the caller's own instructions. So its allocation
-              // is derived here rather than declared, and naming rejects an
-              // alloc annotation on it.
-              //
-              // An external native must declare @no_alloc or @may_alloc
-              // (naming enforces it). Anything else falls to the safe side.
-              allocAmount => if (
-                annotationsContain(f.annotations, "@intrinsic", pos) ||
-                annotationsContain(f.annotations, "@no_alloc", pos)
-              ) {
-                AllocNothing()
-              } else {
-                AllocUnbounded()
-              },
-            },
-          },
-        )
+        allFuns.insert(f with {status => nativeFunOptDone(f.annotations, pos)})
       }
     }
   };
@@ -1306,28 +1321,7 @@ private fun initializeRound(
           f.status match {
           | OptDone _ -> void
           | OptPartial _ ->
-            !f = f with {
-              status => OptDone{
-                inlineComplexity => Int::max,
-                returns => !annotationsContain(
-                  f.annotations,
-                  "@no_return",
-                  pos,
-                ),
-                canThrow => !annotationsContain(
-                  f.annotations,
-                  "@no_throw",
-                  pos,
-                ),
-                allocAmount => if (
-                  annotationsContain(f.annotations, "@may_alloc", pos)
-                ) {
-                  AllocUnbounded()
-                } else {
-                  AllocNothing()
-                },
-              },
-            }
+            !f = f with {status => nativeFunOptDone(f.annotations, pos)}
           }
         };
         writer.set(WorkKey(f.id), FunctionFile(f))

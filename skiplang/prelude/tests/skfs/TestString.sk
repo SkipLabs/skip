@@ -5,11 +5,11 @@ module SKStoreTest;
 const str: String = "123";
 
 @cpp_extern("SKIP_utf8_test_string")
-@may_alloc
+@alloc("bounded")
 native fun getUtf8(): String;
 
 @cpp_extern("SKIP_invalid_utf8_test_string")
-@may_alloc
+@alloc("bounded")
 native fun getInvalidUtf8(): String;
 
 @test
@@ -33,7 +33,7 @@ fun testString(): void {
 }
 
 @cpp_extern("SKIP_largest_string")
-@may_alloc
+@alloc("bounded")
 native fun largestString(): String;
 
 // largestString compares larger than any valid utf8, but by constructing

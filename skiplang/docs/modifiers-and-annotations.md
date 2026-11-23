@@ -7,9 +7,11 @@ differently:
   `native`, ...). They are part of the grammar and, in most cases, part of the
   type system. The compiler checks them and rejects what it does not understand.
 - **Annotations** are `@name` or `@name("param")`. They are stored as plain
-  strings and are mostly directives to the optimizer and the back end. The
-  compiler does **not** validate them: an annotation it does not recognize is
-  silently ignored.
+  strings and are mostly directives to the optimizer and the back end.
+  User-defined annotations (enumerated with `#forEachFunction`, e.g. sktest's
+  `@test`) are still allowed, but an unrecognized name that looks like a typo
+  of a compiler-known annotation (e.g. `@debbug` for `@debug`) is an error
+  with a "did you mean" suggestion — see #1345.
 
 This document lists both, and what each one actually does.
 
@@ -414,28 +416,34 @@ it means the body you see is not the code that runs.
 
 | Annotation | Effect | If absent |
 | --- | --- | --- |
-| `@no_alloc` / `@may_alloc` | The function allocates nothing / may allocate without bound. | **Error** on an external native; derived on an `@intrinsic` |
+| `@no_alloc` / `@alloc("none")` | The function allocates nothing on the path that returns to the caller. | **Error** on an external native; derived on an `@intrinsic` |
+| `@alloc("bounded")` | The function allocates **one value per call, of fixed shape** — its *length* may depend on the input, its *structure* may not (a built string, an option, a small struct). The caller skips the GC safepoint after the call. | (as above) |
+| `@may_alloc` / `@alloc("unbounded")` | The function may allocate **repeatedly or input-proportionally** per call (a collection, a copied graph, a loop inside the native). The caller keeps the GC safepoint. | (as above) |
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
-These are **only read for functions with no body** — that is, `native`,
-`@cpp_extern` or `@cpp_runtime` declarations. On a function with a body they are
-silently ignored, and the compiler derives the answer from the body instead. The
-prelude contains dead examples of exactly this: `print_string` carries `@no_throw`
-and `skipExit` carries `@no_return`, but both have bodies, so both annotations do
-nothing.
+These are **only read for native functions** — `native`, `@cpp_extern` or
+`@cpp_runtime` declarations (a `@cpp_extern`/`@cpp_runtime` function with a
+fallback body still counts as native: the native backend replaces the body).
+On any other function with a body they would be silently ignored, so the
+compiler **rejects** them there with an error: the answer is derived from the
+body instead.
 
 `@no_throw` and `@no_return` default to the safe answer when absent, so
 forgetting one costs an optimization, never correctness.
 
 **The allocation contract is not defaulted at all — it is mandatory.** Every
-external native (`@cpp_extern` / `@cpp_runtime`) must declare exactly one of
-`@no_alloc` or `@may_alloc`; declaring neither, or both, is an error:
+external native (`@cpp_extern` / `@cpp_runtime`) must declare exactly one
+allocation contract — `@no_alloc`, `@may_alloc`, or the parameterized
+`@alloc("none"|"bounded"|"unbounded")` which maps 1:1 onto the compiler's
+`AllocAmount` lattice (`AllocNothing` / `AllocBounded` / `AllocUnbounded`).
+Declaring neither, several, a bad `@alloc` parameter, or mixing the binary
+forms with `@alloc(...)` is an error:
 
 ```skip
 @cpp_extern("SKIP_some_native")
-native fun f(): Int;              // error: Native functions must declare
-                                  //        @no_alloc or @may_alloc
+native fun f(): Int;              // error: Native functions must declare its
+                                  //        allocation contract
 ```
 
 This one is mandatory rather than defaulted because it is the contract where
@@ -443,15 +451,39 @@ being wrong is a memory-safety miscompile rather than a missed optimization, so
 it is worth forcing the author to state an intent instead of letting silence
 pick an answer.
 
+**Choosing between `bounded` and `unbounded`.** `none` vs the other two is
+about *whether* the call allocates at all; `bounded` vs `unbounded` is about
+*how much*:
+
+- `bounded` — **one allocation per call, fixed shape.** The classic case is
+  building a single string, option, or small struct whose *length* may depend
+  on the input but whose *structure* does not. This is the same convention the
+  IR itself uses for `StringConcat`/`ArrayAlloc`. Loops or recursion over such
+  calls in the *caller* are still promoted to `AllocUnbounded` by
+  `funAllocAmount`, so `bounded` only ever skips a GC safepoint after the
+  call — it never suppresses a collection.
+- `unbounded` — anything that allocates **repeatedly inside the native**, or
+  proportionally to its input in *structure*: a collection, a copied graph, a
+  loop. The caller keeps the GC safepoint after the call. This is the safe
+  answer when in doubt.
+
+The asymmetry is deliberate: wrongly claiming `unbounded` only costs the
+caller a safepoint, while wrongly claiming `bounded` (or `none`) skips a
+safepoint the program needed — a memory-safety miscompile, not a missed
+optimization. Rule of thumb: *one value per call → `bounded`; many, or
+input-proportional → `unbounded`.*
+
 The optimizer consumes the value: `@no_alloc`'s `AllocNothing` is what lets a
 caller skip the GC safepoint it would otherwise insert after the call
 (`gc.sk`'s `shouldGC`, fed via `calleeAllocAmount`/`instrAllocAmount`), so it must
 only go on a function that genuinely does not grow the obstack on the path that
 returns to its caller. Allocating *only* on an error path that throws or aborts
 (rather than returning) does not disqualify it, since that path never returns to
-the caller.
+the caller. For when each of the three rungs applies — and why claiming a lower
+rung than the native actually needs is a miscompile — see “Choosing between
+`bounded` and `unbounded`” above.
 
-On an `@intrinsic`, both annotations are **rejected**: an intrinsic never runs as
+On an `@intrinsic`, all of these are **rejected**: an intrinsic never runs as
 a function — the inliner replaces every call with the IR it lowers to, so any
 allocation is attributed to the caller's own instructions — which means its
 allocation behaviour is *derived* from the lowering. Declaring it would be a

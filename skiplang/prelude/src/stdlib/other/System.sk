@@ -54,7 +54,6 @@ fun print_newline(): void {
 // Prints with a new line
 @debug
 @no_inline
-@no_throw
 fun print_string<T: readonly Show>(value: T): void {
   print_raw(value.toString());
   print_newline()
@@ -117,7 +116,6 @@ native fun print_stack_trace(): void;
 native fun print_last_exception_stack_trace_and_exit(Exception): void;
 
 @debug
-@no_return
 fun skipExit<T>(res: Int): T {
   exit(res);
   invariant_violation("never")
@@ -183,12 +181,12 @@ module end;
 
 @allow_tracked_call
 @cpp_extern
-@may_alloc
+@alloc("bounded")
 untracked native fun read_line(): ?String;
 
 @allow_tracked_call
 @cpp_extern
-@may_alloc
+@alloc("bounded")
 untracked native fun read_to_end(): String;
 
 @allow_tracked_call
@@ -198,7 +196,7 @@ untracked native fun flushStdout(): void;
 
 @allow_tracked_call
 @cpp_extern("SKIP_system")
-@may_alloc
+@no_alloc
 untracked native fun system(cmd: String): Int;
 
 module System;
