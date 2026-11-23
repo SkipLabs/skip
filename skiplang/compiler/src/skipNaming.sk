@@ -1999,10 +1999,23 @@ fun method_def(
     )
   };
   check_alloc_contract(met.annotations, met.name.i0, "methods");
-  metIsNativeKind = met.native_.isSome() ||
-    annotationsContainParam(met.annotations, "@cpp_extern", met.name.i0).isSome() ||
-    annotationsContainParam(met.annotations, "@cpp_runtime", met.name.i0).isSome() ||
-    annotationsContainParam(met.annotations, "@intrinsic", met.name.i0).isSome();
+  metIsNativeKind =
+    met.native_.isSome() ||
+    annotationsContainParam(
+      met.annotations,
+      "@cpp_extern",
+      met.name.i0,
+    ).isSome() ||
+    annotationsContainParam(
+      met.annotations,
+      "@cpp_runtime",
+      met.name.i0,
+    ).isSome() ||
+    annotationsContainParam(
+      met.annotations,
+      "@intrinsic",
+      met.name.i0,
+    ).isSome();
   check_no_dead_contract(
     met.annotations,
     met.body.i1 is A.Body _,
@@ -2476,9 +2489,18 @@ fun fun_def(
     )
   };
   check_alloc_contract(fd.annotations, fd.name.i0, "functions");
-  fdIsNativeKind = fd.native_.isSome() ||
-    annotationsContainParam(fd.annotations, "@cpp_extern", fd.name.i0).isSome() ||
-    annotationsContainParam(fd.annotations, "@cpp_runtime", fd.name.i0).isSome() ||
+  fdIsNativeKind =
+    fd.native_.isSome() ||
+    annotationsContainParam(
+      fd.annotations,
+      "@cpp_extern",
+      fd.name.i0,
+    ).isSome() ||
+    annotationsContainParam(
+      fd.annotations,
+      "@cpp_runtime",
+      fd.name.i0,
+    ).isSome() ||
     annotationsContainParam(fd.annotations, "@intrinsic", fd.name.i0).isSome();
   check_no_dead_contract(
     fd.annotations,
@@ -2544,8 +2566,8 @@ fun fun_def(
 /* Function checking that default values for parameters appear last in a
  * function with positional parameters. */
 // An external native's allocation behaviour cannot be derived — it has no body
-// to analyse — so it must be declared: exactly one of @no_alloc / @may_alloc /
-// @alloc("none"|"bounded"|"unbounded"), the latter mapping 1:1 onto the
+// to analyse — so it must be declared: exactly one of @no_alloc /
+// @may_alloc / @alloc("none"|"bounded"|"unbounded"), the latter mapping 1:1 onto the
 // AllocAmount lattice. An @intrinsic is the opposite case: the inliner
 // replaces every call with the IR it lowers to, so its allocation *is*
 // derived and declaring it would be a hand-maintained duplicate of the
@@ -2566,7 +2588,8 @@ fun check_alloc_contract(
       )
     }
   };
-  decls = (if (noAlloc) 1 else 0) +
+  decls =
+    (if (noAlloc) 1 else 0) +
     (if (mayAlloc) 1 else 0) +
     allocParams.size();
   if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
@@ -2616,10 +2639,26 @@ fun check_alloc_contract(
 // compiler-known one (e.g. @debbug for @debug) — see #1345.
 fun check_annotation_names(annotations: SSet, pos: FileRange): void {
   known = Array[
-    "@alloc", "@allow_tracked_call", "@always_inline", "@cpp_extern",
-    "@cpp_export", "@cpp_runtime", "@cpp_virtual", "@debug", "@disasm",
-    "@export", "@gc", "@intrinsic", "@may_alloc", "@no_alloc", "@no_gc",
-    "@no_inline", "@no_return", "@no_throw", "@synonym", "@wasm_export",
+    "@alloc",
+    "@allow_tracked_call",
+    "@always_inline",
+    "@cpp_extern",
+    "@cpp_export",
+    "@cpp_runtime",
+    "@cpp_virtual",
+    "@debug",
+    "@disasm",
+    "@export",
+    "@gc",
+    "@intrinsic",
+    "@may_alloc",
+    "@no_alloc",
+    "@no_gc",
+    "@no_inline",
+    "@no_return",
+    "@no_throw",
+    "@synonym",
+    "@wasm_export",
   ].map(name -> (name, name)).collect(Map);
   for (annotation in annotations) {
     base = if (annotation.contains("(")) {
