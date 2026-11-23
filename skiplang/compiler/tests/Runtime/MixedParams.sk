@@ -1,0 +1,36 @@
+module Runtime_MixedParams;
+// A function with both positional and named parameters.
+fun f(a: Int){b: String}: String {
+  b + a.toString()
+}
+
+// A positional parameter with a default, next to named parameters.
+fun g(a: Int = 5){b: Int}: Int {
+  a + b
+}
+
+class C() {
+  fun m(x: Int){y: String = "d"}: String {
+    y + x.toString()
+  }
+
+  static fun s(x: Int){y: Int}: Int {
+    x * y
+  }
+}
+
+@exptest
+fun main(): void {
+  c = C();
+  print_raw(
+    f(1){b => "a"} +
+    f{b => "b"}(2) +
+    g{b => 1}.toString() +
+    g(2){b => 3}.toString() +
+    c.m(3) +
+    c.m(4){y => "e"} +
+    (C::s(6){y => 7}).toString() +
+    "\n",
+  )
+}
+module end;
