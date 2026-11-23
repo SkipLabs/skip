@@ -53,6 +53,8 @@ fun emit_encode_class_params_(
   | Named(param_map) ->
     values = param_map.values() |> List::createFromIterator;
     BufferedPrinter.list(emit_param_encode, o, values)
+
+  | Mixed _ -> o.out("TODO: mixed class params")
   }
 }
 
@@ -79,6 +81,8 @@ fun emit_decode_class_params_(
   | Named(param_map) ->
     values = param_map.values() |> List::createFromIterator;
     BufferedPrinter.list(emit_param_decode, o, values)
+
+  | Mixed _ -> o.out("TODO: mixed class params")
   }
 }
 
@@ -112,6 +116,8 @@ fun type_params_str(x: Parameters<A.Type_>): String {
   x match {
   | Positional(tyl) -> "(" + type_array_str(tyl) + ")"
   | Named(m) -> "{" + type_map_str(m) + "}"
+  | Mixed(pos, m, _) ->
+    "(" + type_array_str(pos) + "){" + type_map_str(m) + "}"
   }
 }
 

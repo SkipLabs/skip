@@ -477,15 +477,7 @@ fun fun_params(
   acc: Acc<SSet>,
   x: Parameters<N.Type_>,
 ): Acc<SSet> {
-  x match {
-  | Positional(tyl) ->
-    tyl.foldl(((acc1, ty) -> type(context, flip(variance), env, acc1, ty)), acc)
-  | Named(tym) ->
-    tym.reduce(
-      ((acc1, _, ty) -> type(context, flip(variance), env, acc1, ty)),
-      acc,
-    )
-  }
+  x.foldl(((acc1, ty) -> type(context, flip(variance), env, acc1, ty)), acc)
 }
 
 fun type_parameter(

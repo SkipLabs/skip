@@ -1523,7 +1523,9 @@ fun merge_class_params(
         ],
       )
     | (Named _, Positional _)
-    | (Positional _, Named _) ->
+    | (Positional _, Named _)
+    | (Mixed _, _)
+    | (_, Mixed _) ->
       SkipError.errorl(
         List[
           (cp.pos, "Incompatible class parameters"),

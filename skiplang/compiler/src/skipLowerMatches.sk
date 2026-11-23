@@ -573,11 +573,15 @@ mutable class MatchCompiler(
       | None() -> UMap[]
       | Some(O.ClassParams{params => Named _}) ->
         invariant_violation("unexpected named class params")
+      | Some(O.ClassParams{params => Mixed _}) ->
+        invariant_violation("unexpected mixed class params")
       | Some(O.ClassParams{params => Positional(class_parameters)}) ->
         cpnames = class_parameters.map(p ~> (p.name.pos, p.name.id));
         UMap::createFromItems(cpnames.zip(plist))
       }
     | Some(Named(map)) -> map
+    | Some(Mixed _) ->
+      invariant_violation("unexpected mixed params in pattern")
     }
   }
 

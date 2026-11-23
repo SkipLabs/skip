@@ -361,6 +361,13 @@ fun type_params(
     o.out("{");
     type_map(o, m);
     o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(type, o, pos);
+    o.out(")");
+    o.out("{");
+    type_map(o, named);
+    o.out("}")
   }
 }
 
@@ -448,6 +455,14 @@ fun params(
   | Named(param_map) ->
     o.out("{");
     values = param_map.values().collect(Array);
+    array(fun_parameter, o, values);
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(fun_parameter, o, pos);
+    o.out(")");
+    o.out("{");
+    values = named.values().collect(Array);
     array(fun_parameter, o, values);
     o.out("}")
   }
@@ -981,6 +996,10 @@ fun lambda_params(
   | Named(m) ->
     l = m.values().collect(Array);
     lambda_param_array("{", "}", o, l)
+  | Mixed(pos, named, _) ->
+    lambda_param_array("(", ")", o, pos);
+    l = named.values().collect(Array);
+    lambda_param_array("{", "}", o, l)
   }
 }
 
@@ -1021,6 +1040,13 @@ fun let_obj_fields(
   | Named(map) ->
     o.out("{");
     array(pattern_fields, o, map.items().collect(Array));
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(pattern, o, pos);
+    o.out(")");
+    o.out("{");
+    array(pattern_fields, o, named.items().collect(Array));
     o.out("}")
   }
 }
@@ -1102,6 +1128,13 @@ fun object_args(o: mutable BufferedPrinter.Out, x: SkipAst.Call_args): void {
   | Named(l) ->
     o.out("{");
     field_list(o, l);
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(expr, o, pos.map(p -> p.i1));
+    o.out(")");
+    o.out("{");
+    field_list(o, named);
     o.out("}")
   }
 }

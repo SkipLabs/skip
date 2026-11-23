@@ -48,6 +48,7 @@ mutable class Emitter{
     params = fd.params match {
     | Positional(x) -> x
     | Named(y) -> y.collect(Array)
+    | Mixed(pos, named, _) -> pos.concat(named.collect(Array))
     };
     if (params.size() > 0) {
       for (i in Range(0, params.size() - 1)) {
@@ -196,6 +197,7 @@ mutable class Emitter{
     args = pargs match {
     | Positional(x) -> x
     | Named(x) -> x.collect(Array)
+    | Mixed(pos, named, _) -> pos.concat(named.collect(Array))
     };
     symArgs = args.map(x -> (x.ty, this.expr(x)));
     tmp = this.tmp();

@@ -193,6 +193,13 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<O.Type>): void {
     o.out("{");
     type_map(o, m);
     o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(type, o, pos);
+    o.out(")");
+    o.out("{");
+    type_map(o, named);
+    o.out("}")
   }
 }
 
@@ -254,6 +261,14 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<O.Parameter>): void {
   | Named(param_map) ->
     o.out("{");
     values = param_map.values() |> List::createFromIterator;
+    list(fun_parameter, o, values);
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(fun_parameter, o, pos);
+    o.out(")");
+    o.out("{");
+    values = named.values() |> List::createFromIterator;
     list(fun_parameter, o, values);
     o.out("}")
   }
@@ -668,6 +683,10 @@ fun lambda_params(
   | Named(m) ->
     l = m.values().collect(Array);
     lambda_param_array("{", "}", o, l)
+  | Mixed(pos, named, _) ->
+    lambda_param_array("(", ")", o, pos);
+    l = named.values().collect(Array);
+    lambda_param_array("{", "}", o, l)
   }
 }
 
@@ -809,6 +828,14 @@ fun match_pattern_(o: mutable BufferedPrinter.Out, x: O.Pattern_): void {
         o.out("{");
         array(pattern_fields, o, values);
         o.out("}")
+      | Mixed(pos, named, _) ->
+        o.out("(");
+        array(param_pattern, o, pos);
+        o.out(")");
+        values = named.items().map(nv -> (nv.i0.i1, nv.i1)).collect(Array);
+        o.out("{");
+        array(pattern_fields, o, values);
+        o.out("}")
       }
     }
   | O.Pat_all() -> o.out(" Pat_all ")
@@ -839,6 +866,13 @@ fun object_args(o: mutable BufferedPrinter.Out, x: Parameters<O.Expr>): void {
   | Named(l) ->
     o.out("{");
     field_list(o, l);
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(expr, o, pos);
+    o.out(")");
+    o.out("{");
+    field_list(o, named);
     o.out("}")
   }
 }
