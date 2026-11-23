@@ -566,6 +566,19 @@ fun allocAmountFromAnnotations(annotations: SSet, pos: FileRange): AllocAmount {
   }
 }
 
+// The default optimization status of a native function, derived from its
+// declared contract annotations (naming rejects an external native that
+// declares none; an @intrinsic never runs as a callable, so
+// allocAmountFromAnnotations reports AllocNothing for it).
+fun nativeFunOptDone(annotations: SSet, pos: FileRange): OptDone {
+  OptDone{
+    inlineComplexity => Int::max,
+    returns => !annotationsContain(annotations, "@no_return", pos),
+    canThrow => !annotationsContain(annotations, "@no_throw", pos),
+    allocAmount => allocAmountFromAnnotations(annotations, pos),
+  }
+}
+
 fun optimizeAll(
   context: mutable SKStore.Context,
   env: GlobalEnv,
@@ -591,16 +604,7 @@ fun optimizeAll(
       | OptDone _ -> void
       | OptPartial _ ->
         // Provide a default status for native functions based on annotations.
-        allFuns.insert(
-          f with {
-            status => OptDone{
-              inlineComplexity => Int::max,
-              returns => !annotationsContain(f.annotations, "@no_return", pos),
-              canThrow => !annotationsContain(f.annotations, "@no_throw", pos),
-              allocAmount => allocAmountFromAnnotations(f.annotations, pos),
-            },
-          },
-        )
+        allFuns.insert(f with {status => nativeFunOptDone(f.annotations, pos)})
       }
     }
   };
@@ -1317,22 +1321,7 @@ private fun initializeRound(
           f.status match {
           | OptDone _ -> void
           | OptPartial _ ->
-            !f = f with {
-              status => OptDone{
-                inlineComplexity => Int::max,
-                returns => !annotationsContain(
-                  f.annotations,
-                  "@no_return",
-                  pos,
-                ),
-                canThrow => !annotationsContain(
-                  f.annotations,
-                  "@no_throw",
-                  pos,
-                ),
-                allocAmount => allocAmountFromAnnotations(f.annotations, pos),
-              },
-            }
+            !f = f with {status => nativeFunOptDone(f.annotations, pos)}
           }
         };
         writer.set(WorkKey(f.id), FunctionFile(f))

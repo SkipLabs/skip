@@ -416,9 +416,9 @@ it means the body you see is not the code that runs.
 
 | Annotation | Effect | If absent |
 | --- | --- | --- |
-| `@no_alloc` / `@alloc("none")` | The function allocates nothing. | **Error** on an external native; derived on an `@intrinsic` |
-| `@alloc("bounded")` | The function allocates one fixed-shape value per call (a string, an option, a small struct) — no GC safepoint after the call, but loops over it are still treated as unbounded. | (as above) |
-| `@may_alloc` / `@alloc("unbounded")` | The function may allocate an amount that scales with its input. | (as above) |
+| `@no_alloc` / `@alloc("none")` | The function allocates nothing on the path that returns to the caller. | **Error** on an external native; derived on an `@intrinsic` |
+| `@alloc("bounded")` | The function allocates **one value per call, of fixed shape** — its *length* may depend on the input, its *structure* may not (a built string, an option, a small struct). The caller skips the GC safepoint after the call. | (as above) |
+| `@may_alloc` / `@alloc("unbounded")` | The function may allocate **repeatedly or input-proportionally** per call (a collection, a copied graph, a loop inside the native). The caller keeps the GC safepoint. | (as above) |
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
@@ -451,19 +451,37 @@ being wrong is a memory-safety miscompile rather than a missed optimization, so
 it is worth forcing the author to state an intent instead of letting silence
 pick an answer.
 
+**Choosing between `bounded` and `unbounded`.** `none` vs the other two is
+about *whether* the call allocates at all; `bounded` vs `unbounded` is about
+*how much*:
+
+- `bounded` — **one allocation per call, fixed shape.** The classic case is
+  building a single string, option, or small struct whose *length* may depend
+  on the input but whose *structure* does not. This is the same convention the
+  IR itself uses for `StringConcat`/`ArrayAlloc`. Loops or recursion over such
+  calls in the *caller* are still promoted to `AllocUnbounded` by
+  `funAllocAmount`, so `bounded` only ever skips a GC safepoint after the
+  call — it never suppresses a collection.
+- `unbounded` — anything that allocates **repeatedly inside the native**, or
+  proportionally to its input in *structure*: a collection, a copied graph, a
+  loop. The caller keeps the GC safepoint after the call. This is the safe
+  answer when in doubt.
+
+The asymmetry is deliberate: wrongly claiming `unbounded` only costs the
+caller a safepoint, while wrongly claiming `bounded` (or `none`) skips a
+safepoint the program needed — a memory-safety miscompile, not a missed
+optimization. Rule of thumb: *one value per call → `bounded`; many, or
+input-proportional → `unbounded`.*
+
 The optimizer consumes the value: `@no_alloc`'s `AllocNothing` is what lets a
 caller skip the GC safepoint it would otherwise insert after the call
 (`gc.sk`'s `shouldGC`, fed via `calleeAllocAmount`/`instrAllocAmount`), so it must
 only go on a function that genuinely does not grow the obstack on the path that
 returns to its caller. Allocating *only* on an error path that throws or aborts
 (rather than returning) does not disqualify it, since that path never returns to
-the caller. `@alloc("bounded")` follows the same convention the IR already uses
-for `StringConcat`/`ArrayAlloc` — one allocation of input-dependent *length* but
-fixed *shape* per call; `funAllocAmount` still promotes loops over it to
-`AllocUnbounded`, so `bounded` only skips the safepoint, never a collection.
-Claiming `bounded` for something that allocates proportionally to its input in
-*structure* (a collection, a copied graph) is as wrong as claiming `none` — if
-in doubt, say `unbounded`.
+the caller. For when each of the three rungs applies — and why claiming a lower
+rung than the native actually needs is a miscompile — see “Choosing between
+`bounded` and `unbounded`” above.
 
 On an `@intrinsic`, all of these are **rejected**: an intrinsic never runs as
 a function — the inliner replaces every call with the IR it lowers to, so any

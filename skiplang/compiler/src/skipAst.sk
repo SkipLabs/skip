@@ -162,6 +162,51 @@ class Child{
   chi_annotations: SSet,
 }
 
+// The annotations the compiler itself defines and reads. User-defined
+// annotations (enumerated with #forEachFunction, e.g. sktest's @test) stay
+// allowed; we only reject an unrecognized name that looks like a typo of a
+// compiler-known one (e.g. @debbug for @debug) — see #1345.
+fun checkAnnotationNames(annotations: SSet, pos: FileRange): void {
+  known = Array[
+    "@alloc",
+    "@allow_tracked_call",
+    "@always_inline",
+    "@cpp_extern",
+    "@cpp_export",
+    "@cpp_runtime",
+    "@cpp_virtual",
+    "@debug",
+    "@disasm",
+    "@export",
+    "@gc",
+    "@intrinsic",
+    "@may_alloc",
+    "@no_alloc",
+    "@no_gc",
+    "@no_inline",
+    "@no_return",
+    "@no_throw",
+    "@synonym",
+    "@wasm_export",
+  ].map(name -> (name, name)).collect(Map);
+  for (annotation in annotations) {
+    base = if (annotation.contains("(")) {
+      annotation.splitLast("(").i0
+    } else {
+      annotation
+    };
+    if (!known.containsKey(base)) {
+      typos = SkipDidYouMean.findTypos(known, base);
+      if (!typos.isEmpty()) {
+        SkipError.error(
+          pos,
+          `Unknown annotation ${base}${SkipDidYouMean.formatTypos(typos)}`,
+        )
+      }
+    }
+  }
+}
+
 base class Callable_def{
   annotations: SSet,
   async_: ?FileRange,
@@ -171,6 +216,139 @@ base class Callable_def{
   return_: Type_,
   tparams: Array<Type_parameter>,
   untracked_: ?FileRange,
+} {
+  /* True when this definition is lowered through a native annotation
+   * (@cpp_extern/@cpp_runtime/@intrinsic) rather than declared `native` — a
+   * body on such a definition is only a fallback that the native backend
+   * replaces. */
+  fun isLoweredNatively(): Bool {
+    annotationsContainParam(
+      this.annotations,
+      "@cpp_extern",
+      this.name.i0,
+    ).isSome() ||
+      annotationsContainParam(
+        this.annotations,
+        "@cpp_runtime",
+        this.name.i0,
+      ).isSome() ||
+      annotationsContainParam(
+        this.annotations,
+        "@intrinsic",
+        this.name.i0,
+      ).isSome()
+  }
+
+  /* True when the contract annotations are read: declared `native`, or
+   * lowered through @cpp_extern/@cpp_runtime/@intrinsic. */
+  fun isNativeKind(): Bool {
+    this.native_.isSome() || this.isLoweredNatively()
+  }
+
+  /* A `native` declaration must say how it is lowered. */
+  fun checkNativeDecl(what: String): void {
+    if (this.native_.isSome() && !this.isLoweredNatively()) {
+      SkipError.error(
+        this.name.i0,
+        `Native ${what} must be declared with @cpp_extern, @cpp_runtime, or @intrinsic`,
+      )
+    }
+  }
+
+  /* An external native's allocation behaviour cannot be derived — it has no
+   * body to analyse — so it must be declared: exactly one of @no_alloc /
+   * @may_alloc / @alloc("none"|"bounded"|"unbounded"), the latter mapping 1:1
+   * onto the AllocAmount lattice. An @intrinsic is the opposite case: the
+   * inliner replaces every call with the IR it lowers to, so its allocation
+   * *is* derived and declaring it would be a hand-maintained duplicate of the
+   * lowering, free to drift. */
+  fun checkAllocContract(what: String): void {
+    annotations = this.annotations;
+    pos = this.name.i0;
+    noAlloc = annotationsContain(annotations, "@no_alloc", pos);
+    mayAlloc = annotationsContain(annotations, "@may_alloc", pos);
+    allocParams = getAnnotationParams(annotations, "@alloc", pos);
+    for (param in allocParams) {
+      if (!(param == "none" || param == "bounded" || param == "unbounded")) {
+        SkipError.error(
+          pos,
+          `@alloc parameter must be "none", "bounded", or "unbounded", not "${param}"`,
+        )
+      }
+    };
+    decls =
+      (if (noAlloc) 1 else 0) +
+      (if (mayAlloc) 1 else 0) +
+      allocParams.size();
+    if (annotationsContainParam(annotations, "@intrinsic", pos).isSome()) {
+      if (decls != 0) {
+        SkipError.error(
+          pos,
+          `@intrinsic ${what} must not declare @no_alloc, @may_alloc, or @alloc(...): the allocation behaviour is derived from the intrinsic's lowering`,
+        )
+      }
+    } else if (
+      annotationsContainParam(annotations, "@cpp_extern", pos).isSome() ||
+      annotationsContainParam(annotations, "@cpp_runtime", pos).isSome()
+    ) {
+      if (noAlloc && mayAlloc) {
+        SkipError.error(
+          pos,
+          `Native ${what} cannot declare both @no_alloc and @may_alloc`,
+        )
+      } else if ((noAlloc || mayAlloc) && !allocParams.isEmpty()) {
+        SkipError.error(
+          pos,
+          `Native ${what} cannot combine @no_alloc/@may_alloc with @alloc(...)`,
+        )
+      } else if (decls == 0) {
+        SkipError.error(
+          pos,
+          `Native ${what} must declare its allocation contract: @no_alloc, @may_alloc, or @alloc("none"|"bounded"|"unbounded")`,
+        )
+      } else if (decls > 1) {
+        SkipError.error(
+          pos,
+          `Native ${what} must declare exactly one allocation contract, found ${decls}`,
+        )
+      }
+    }
+  }
+
+  /* The contract annotations (@no_alloc/@may_alloc/@alloc, @no_throw,
+   * @no_return) are only read on native functions, where there is no body to
+   * derive them from. On a function with a body they are silently ignored, so
+   * reject them rather than let them imply a contract nothing honours.
+   * @cpp_extern/@cpp_runtime functions with a fallback body count as native
+   * here: the native backend replaces the body and the contract applies
+   * there. */
+  fun checkNoDeadContract(hasBody: Bool): void {
+    if (hasBody && !this.isNativeKind()) {
+      for (annotation in this.annotations) {
+        if (
+          annotation == "@no_alloc" ||
+          annotation == "@may_alloc" ||
+          annotation.startsWith(`@alloc("`) ||
+          annotation == "@no_throw" ||
+          annotation == "@no_return"
+        ) {
+          SkipError.error(
+            this.name.i0,
+            `Contract annotation ${annotation} is only read on native functions; this function has a body, so it is ignored — remove it`,
+          )
+        }
+      }
+    }
+  }
+
+  /* All annotation checks that apply to every callable definition. `hasBody`
+   * is supplied by the caller because the body field's type differs between
+   * functions and methods. */
+  fun checkAnnotations(hasBody: Bool, what: String): void {
+    this.checkAllocContract(what);
+    this.checkNoDeadContract(hasBody);
+    checkAnnotationNames(this.annotations, this.name.i0);
+  }
 }
 
 class Method_def{
