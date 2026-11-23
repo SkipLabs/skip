@@ -1038,6 +1038,7 @@ fun check_type_alias(
   context: mutable SKStore.Context,
   ta: A.Type_alias_def,
 ): void {
+  check_annotation_names(ta.annotations, ta.name.i0);
   env = make_env();
   acc = mutable ClassAcc{};
   env1 = ta.tparams.foldl(type_alias_parameter, env);
@@ -1514,6 +1515,7 @@ fun class_def(
   inst = cd;
   sk_this = cd;
   (_class_position, class_name) = name;
+  check_annotation_names(cd.annotations, cd.name.i0);
   context_name = "<class>" + class_name + ":";
   this1 = Some(sk_this);
   inst1 = cd.kind match {
@@ -2007,6 +2009,7 @@ fun method_def(
     metIsNativeKind,
     met.name.i0,
   );
+  check_annotation_names(met.annotations, met.name.i0);
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2483,6 +2486,7 @@ fun fun_def(
     fdIsNativeKind,
     fd.name.i0,
   );
+  check_annotation_names(fd.annotations, fd.name.i0);
   if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
     if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
       SkipError.error(
@@ -2606,6 +2610,35 @@ fun check_alloc_contract(
 // reject them rather than let them imply a contract nothing honours.
 // @cpp_extern/@cpp_runtime functions with a fallback body count as native
 // here: the native backend replaces the body and the contract applies there.
+// The annotations the compiler itself defines and reads. User-defined
+// annotations (enumerated with #forEachFunction, e.g. sktest's @test) stay
+// allowed; we only reject an unrecognized name that looks like a typo of a
+// compiler-known one (e.g. @debbug for @debug) — see #1345.
+fun check_annotation_names(annotations: SSet, pos: FileRange): void {
+  known = Array[
+    "@alloc", "@allow_tracked_call", "@always_inline", "@cpp_extern",
+    "@cpp_export", "@cpp_runtime", "@cpp_virtual", "@debug", "@disasm",
+    "@export", "@gc", "@intrinsic", "@may_alloc", "@no_alloc", "@no_gc",
+    "@no_inline", "@no_return", "@no_throw", "@synonym", "@wasm_export",
+  ].map(name -> (name, name)).collect(Map);
+  for (annotation in annotations) {
+    base = if (annotation.contains("(")) {
+      annotation.splitLast("(").i0
+    } else {
+      annotation
+    };
+    if (!known.containsKey(base)) {
+      typos = SkipDidYouMean.findTypos(known, base);
+      if (!typos.isEmpty()) {
+        SkipError.error(
+          pos,
+          `Unknown annotation ${base}${SkipDidYouMean.formatTypos(typos)}`,
+        )
+      }
+    }
+  }
+}
+
 fun check_no_dead_contract(
   annotations: SSet,
   hasBody: Bool,
