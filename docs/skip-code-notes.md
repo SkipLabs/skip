@@ -48,4 +48,4 @@ genuinely correct for any future variant, and say why.
 
     // worse                    // better
     | Some(x) -> f(x)           | Some(x) -> f(x)
-    | _ -> default              | None -> default
+    | _ -> default              | None() -> default
