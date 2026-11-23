@@ -87,17 +87,19 @@ private mutable class FactSet(
   readonly fun transfer(toBlock: Block, args: Array<InstrID>): mutable FactSet {
     result = this.unionWith(FactSet::empty());
     toBlock.params.eachWithIndex((i, param) -> {
-      arg = args[i];
-      paramID = param.id;
-      result.lessU.maybeGet(arg) match {
-      | Some(bounds) -> bounds.each(b -> result.addLessU(paramID, b))
-      | None() -> void
-      };
-      result.lessS.maybeGet(arg) match {
-      | Some(bounds) -> bounds.each(b -> result.addLessS(paramID, b))
-      | None() -> void
-      };
-      if (result.nonneg.contains(arg)) result.addNonneg(paramID)
+      if (i < args.size()) {
+        arg = args[i];
+        paramID = param.id;
+        result.lessU.maybeGet(arg) match {
+        | Some(bounds) -> bounds.each(b -> result.addLessU(paramID, b))
+        | None() -> void
+        };
+        result.lessS.maybeGet(arg) match {
+        | Some(bounds) -> bounds.each(b -> result.addLessS(paramID, b))
+        | None() -> void
+        };
+        if (result.nonneg.contains(arg)) result.addNonneg(paramID)
+      }
     });
     result
   }
@@ -128,6 +130,24 @@ private mutable class FactSet(
       this.nonneg.contains(v) &&
       this.nonneg.contains(b);
     hasU || hasS
+  }
+
+  // Is there a bound B with v <u B and B >= 0? Then 0 <= v <= 2^63-2.
+  readonly fun hasUnsignedBound(v: InstrID): Bool {
+    found = false;
+    this.lessU.maybeGet(v) match {
+    | Some(bounds) ->
+      bounds.each(b -> if (this.nonneg.contains(b)) !found = true)
+    | None() -> void
+    };
+    if (!found && this.nonneg.contains(v)) {
+      this.lessS.maybeGet(v) match {
+      | Some(bounds) ->
+        bounds.each(b -> if (this.nonneg.contains(b)) !found = true)
+      | None() -> void
+      }
+    };
+    found
   }
 
   // Cheap change-detection signature.
@@ -273,6 +293,13 @@ mutable class .BoundsCheckElimination{
 
   // Facts that hold because of block b's own instructions (used to compute
   // the block's end facts from its start facts).
+  private readonly fun isSmallNonnegConst(id: InstrID): Bool {
+    this.optinfo.getInstr(id) match {
+    | ConstantInt{value => v} -> v >= 0 && v <= 1
+    | _ -> false
+    }
+  }
+
   private mutable fun localSeeds(b: Block, into: mutable FactSet): void {
     for (instr in b.instrs) {
       instr match {
@@ -280,7 +307,15 @@ mutable class .BoundsCheckElimination{
       | ArraySize _ ->
         into.addNonneg(instr.id)
       | IntAdd{lhs, rhs} ->
-        if (into.nonneg.contains(lhs) && into.nonneg.contains(rhs)) {
+        // IntAdd wraps modulo 2^64 (plain `add i64`), so nonneg(a) and
+        // nonneg(b) alone do not imply nonneg(a+b). But if one operand is a
+        // constant 0 or 1 and the other has an unsigned bound B with
+        // nonneg(B) (so it lies in [0, 2^63-2]), the sum is at most 2^63-1
+        // and cannot wrap.
+        if (
+          (this.isSmallNonnegConst(rhs) && into.hasUnsignedBound(lhs)) ||
+          (this.isSmallNonnegConst(lhs) && into.hasUnsignedBound(rhs))
+        ) {
           into.addNonneg(instr.id)
         }
       | _ -> void
@@ -374,9 +409,29 @@ mutable class .BoundsCheckElimination{
         qSuccIndex = succIndexOf(qBlock, p.id);
         if (qSuccIndex >= 0) {
           qSucc = qBlock.terminator().successors[qSuccIndex];
-          this.optinfo.getInstr(qSucc.args[paramIndex]) match {
-          | ConstantBool{value} ->
-            if (value == armIsTrue) {
+          if (paramIndex < qSucc.args.size()) {
+            this.optinfo.getInstr(qSucc.args[paramIndex]) match {
+            | ConstantBool{value} ->
+              if (value == armIsTrue) {
+                contrib = this.edgeFacts(qBlock, qSuccIndex, p.id, bf);
+                contrib match {
+                | None() -> void
+                | Some(cf) ->
+                  bSucc = term.successors[succIndex];
+                  crossed = cf.transfer(b, bSucc.args);
+                  seeds = FactSet::empty();
+                  this.edgeSeeds(p, succIndex, seeds);
+                  !acc = FactSet::intersect(
+                    acc,
+                    FactSet::union(
+                      Some((crossed : readonly FactSet)),
+                      Some((seeds : readonly FactSet)),
+                    ),
+                  )
+                }
+              }
+            | _ ->
+              // Non-constant argument: include conservatively.
               contrib = this.edgeFacts(qBlock, qSuccIndex, p.id, bf);
               contrib match {
               | None() -> void
@@ -393,24 +448,6 @@ mutable class .BoundsCheckElimination{
                   ),
                 )
               }
-            }
-          | _ ->
-            // Non-constant argument: include conservatively.
-            contrib = this.edgeFacts(qBlock, qSuccIndex, p.id, bf);
-            contrib match {
-            | None() -> void
-            | Some(cf) ->
-              bSucc = term.successors[succIndex];
-              crossed = cf.transfer(b, bSucc.args);
-              seeds = FactSet::empty();
-              this.edgeSeeds(p, succIndex, seeds);
-              !acc = FactSet::intersect(
-                acc,
-                FactSet::union(
-                  Some((crossed : readonly FactSet)),
-                  Some((seeds : readonly FactSet)),
-                ),
-              )
             }
           }
         }
@@ -452,10 +489,11 @@ mutable class .BoundsCheckElimination{
       Array::mfill(n, (FactSet::empty() : readonly FactSet)),
       Array::mfill(n, false),
     );
-    // Iterate to a fixpoint (facts only shrink at joins, so this terminates).
+    // Iterate to a fixpoint. Facts only ever shrink at joins (and the
+    // lattice is finite), so this terminates; the cap is only a safety net.
     iter = 0;
     changed = true;
-    while (changed && iter < 100) {
+    while (changed && iter < 1000) {
       !changed = false;
       !iter = iter + 1;
       for (bID in rpo) {
@@ -475,32 +513,36 @@ mutable class .BoundsCheckElimination{
         }
       }
     };
-    // Find bounds checks (an If with an Unreachable arm, i.e. a throw) whose
-    // comparison is provably false.
-    for (bID in rpo) {
-      b = optinfo.getBlock(bID);
-      facts = this.endFacts(b, bf.get(b.id.id));
-      facts match {
-      | None() -> void
-      | Some(fs) ->
-        hasThrowArm = false;
-        for (s in b.terminator().successors) {
-          if (optinfo.getBlock(s.target).terminator() is Unreachable _) {
-            !hasThrowArm = true
-          }
-        };
-        if (hasThrowArm) {
-          for (instr in b.instrs) {
-            instr match {
-            | If{predicate} ->
-              pred = optinfo.getInstr(predicate);
-              pred match {
-              // IntCmpUle(size, idx): false  <=>  idx <u size  <=>  rhs <u lhs
-              | IntCmpUle{lhs, rhs} ->
-                if (fs.lessThanU(rhs, lhs)) this.provenFalse.insert(pred.id)
+    // Only trust the facts if the fixpoint converged: until then they are an
+    // over-approximation, which would be unsound to kill checks on.
+    if (!changed) {
+      // Find bounds checks (an If with an Unreachable arm, i.e. a throw) whose
+      // comparison is provably false.
+      for (bID in rpo) {
+        b = optinfo.getBlock(bID);
+        facts = this.endFacts(b, bf.get(b.id.id));
+        facts match {
+        | None() -> void
+        | Some(fs) ->
+          hasThrowArm = false;
+          for (s in b.terminator().successors) {
+            if (optinfo.getBlock(s.target).terminator() is Unreachable _) {
+              !hasThrowArm = true
+            }
+          };
+          if (hasThrowArm) {
+            for (instr in b.instrs) {
+              instr match {
+              | If{predicate} ->
+                pred = optinfo.getInstr(predicate);
+                pred match {
+                // IntCmpUle(size, idx): false  <=>  idx <u size  <=>  rhs <u lhs
+                | IntCmpUle{lhs, rhs} ->
+                  if (fs.lessThanU(rhs, lhs)) this.provenFalse.insert(pred.id)
+                | _ -> void
+                }
               | _ -> void
               }
-            | _ -> void
             }
           }
         }
