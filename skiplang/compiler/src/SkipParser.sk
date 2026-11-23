@@ -2441,11 +2441,37 @@ mutable class SkipParser{
   // mandatory after the parameters, so a '{' directly following a
   // positional parameter list can only be a named parameter group (a
   // missing return type before a body is already an error).
+  // Lookahead: is the '{...}' at the current position a named parameter group
+  // (i.e. followed by the ':' that starts the mandatory return type annotation)
+  // rather than the body of a declaration that is missing its return type?
+  mutable fun namedParameterGroupFollowedByReturnType(): Bool {
+    depth = 0;
+    offset = 0;
+    while (true) {
+      kind = this.peekOffset(offset);
+      if (kind == TokenKind.OPEN_CURLY()) {
+        !depth = depth + 1
+      } else if (kind == TokenKind.CLOSE_CURLY()) {
+        !depth = depth - 1;
+        if (depth == 0) {
+          return this.peekKindOffset(TokenKind.COLON(), offset + 1)
+        }
+      } else if (kind == TokenKind.END_OF_FILE()) {
+        return false
+      };
+      !offset = offset + 1
+    };
+    false
+  }
+
   mutable fun parseParametersSpecifier(): ParseTree {
     this.peek() match {
     | TokenKind.OPEN_PAREN() ->
       positional = this.parsePositionalParameters(false);
-      if (this.peekKind(TokenKind.OPEN_CURLY())) {
+      if (
+        this.peekKind(TokenKind.OPEN_CURLY()) &&
+        this.namedParameterGroupFollowedByReturnType()
+      ) {
         named = this.parseNamedParameters(false);
         ParseTree.MixedParametersTree{
           range => Parser.createRangeOfTrees(positional, named),
