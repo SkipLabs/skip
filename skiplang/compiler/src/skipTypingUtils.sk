@@ -2907,9 +2907,9 @@ fun bind_params(
   | Named(fds) ->
     fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc))
   | Mixed(l, fds, _) ->
-    l.foldl(
-      (x, y) -> bind_param(context, x, y),
-      fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc)),
+    fds.reduce(
+      ((ea, _, p) -> bind_param(context, ea, p)),
+      l.foldl((x, y) -> bind_param(context, x, y), (env, acc)),
     )
   }
 }

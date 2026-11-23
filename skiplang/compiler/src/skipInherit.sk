@@ -1702,16 +1702,24 @@ fun merge_params(
     )
   | (Mixed _, _)
   | (_, Mixed _) ->
+    // Class constructor parameters cannot be mixed (the class-body parser
+    // does not produce them), so at most one side is Mixed here.
+    kind_str = p ->
+      p match {
+      | Positional _ -> "positional fields '(...)'"
+      | Named _ -> "named fields '{...}'"
+      | Mixed _ -> "mixed fields '(..){..}'"
+      };
     SkipError.errorl(
       List[
         (pos, "Incompatible kind of fields"),
         (
           parent.name.i0,
-          "'" + parent.name.i1 + "' has mixed fields '(..){..}'",
+          "'" + parent.name.i1 + "' has " + kind_str(parent_params),
         ),
         (
           child.name.i0,
-          "But '" + child.name.i1 + "' has mixed fields '(..){..}'",
+          "But '" + child.name.i1 + "' has " + kind_str(child_params),
         ),
       ],
     )
@@ -2093,7 +2101,7 @@ fun empty_met(met: A.Method_def): Bool {
     met.params match {
     | Positional(params) -> params.isEmpty()
     | Named(_) -> false
-    | Mixed(pos, _, _) -> pos.isEmpty()
+    | Mixed(pos, named, _) -> pos.isEmpty() && named.isEmpty()
     }
   };
   empty_ret = met.return_ match {

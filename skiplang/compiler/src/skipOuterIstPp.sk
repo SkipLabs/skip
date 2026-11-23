@@ -867,13 +867,24 @@ fun object_args(o: mutable BufferedPrinter.Out, x: Parameters<O.Expr>): void {
     o.out("{");
     field_list(o, l);
     o.out("}")
-  | Mixed(pos, named, _) ->
-    o.out("(");
-    array(expr, o, pos);
-    o.out(")");
-    o.out("{");
-    field_list(o, named);
-    o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    // Print the groups in their recorded source order so that a named-first
+    // call `f{b => x}(1)` does not print as the different `f(1){b => x}`.
+    if (namedFirst) {
+      o.out("{");
+      field_list(o, named);
+      o.out("}");
+      o.out("(");
+      array(expr, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(expr, o, pos);
+      o.out(")");
+      o.out("{");
+      field_list(o, named);
+      o.out("}")
+    }
   }
 }
 

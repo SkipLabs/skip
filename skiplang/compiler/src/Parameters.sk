@@ -215,6 +215,18 @@ class Named<+T>(args: UMap<T>) extends Parameters<T> {
  * (`f{b => "x"}(1)`), so that argument evaluation can stay in source order;
  * for declared parameters it is always false (positional group comes first).
  */
+/* A parameter list (or argument list) with both positional and named parts,
+ * e.g. `fun f(a: Int){b: String}` called as `f(1){b => "x"}`.
+ * `namedFirst` records the source order of the two groups at a call site
+ * (`f{b => "x"}(1)`), so that argument evaluation can stay in source order;
+ * for declared parameters it is always false (positional group comes first).
+ *
+ * Ordering contract: `foldl` and `map_foldl` honour `namedFirst` (source
+ * order at call sites) and must be used when evaluation order matters;
+ * `values`, `toArray`, `toList`, `each` and `inspect` are always
+ * declaration-ordered (positional group first, then named) and must not be
+ * used to decide evaluation order.
+ */
 class Mixed<+T>(
   positional: Array<T>,
   named: UMap<T>,
@@ -296,7 +308,11 @@ class Mixed<+T>(
         this.positional.size() == y1.size(),
         "combine different length positional",
       );
-      invariant(this.named.size() == y2.size(), "combine different size named");
+      invariant(
+        this.named.size() == y2.size() &&
+          this.named.all((k, _) -> y2.containsKey(k)),
+        "combine different named keys",
+      );
       Mixed(
         this.positional.zip(y1),
         this.named.map((k, v1) -> (v1, y2[k])),
