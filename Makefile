@@ -104,6 +104,7 @@ check-sh:
 	       -name libbacktrace -not -prune -or \
 		   -name tnt-tpch -not -prune -or \
 		   -name "*.sh" | xargs shellcheck --exclude SC2181 --exclude SC2002
+	bin/merge-bot.sh --selftest
 
 .PHONY: clean
 clean:

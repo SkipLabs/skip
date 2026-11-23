@@ -125,6 +125,36 @@ skargo, also test skjs against it: check out skjs next to this branch as
 publish that changes the toolchain, check that skjs's next CI run on `main` is
 still green.
 
+### Merge bot
+
+`bin/merge-bot.sh` (driven by the `.vibe/skills/merge-bot` skill) runs the merge
+queue. A PR is ready when **auto-merge is enabled and its CI is green**; PRs
+with red CI are never considered. Among ready PRs the bot acts on **one at a
+time**: green + up-to-date PRs are simply waited on until auto-merge lands them
+(and no rebase is scheduled until they have merged); green + not-up-to-date PRs
+(`BEHIND`/conflicting, i.e. `main` moved ahead) are rebased onto `main` —
+fastest expected CI first (the PR's last pipeline wall time, else a
+changed-paths heuristic) — then pushed with `--force-with-lease`. Run from a
+clone of this repo and the bot reuses that clone, doing the git work in
+`git worktree`s under `~/.cache/skip-merge-bot` (never in your checkout's
+working tree, no second clone); run from elsewhere and it keeps a dedicated
+clone under `~/.cache/skip-merge-bot`. Fork-headed
+PRs are included when they allow maintainer edits ("Allow edits from
+maintainers"), which lets maintainers push to the fork's branch; the bot then
+pushes the rebase to the fork. If `main` moves again while the bot waits on a
+rebased PR (strict required checks block merging a `BEHIND` PR), the bot
+re-rebases, up to `MERGE_BOT_REBASE_ATTEMPTS` (default 3) rounds. Rebase
+conflicts (and CI failures the rebase triggers) are handed to a sub-agent
+(`.vibe/skills/merge-bot/references/fix-conflicts.md` / `fix-ci.md`); if a fix
+is non-trivial, the bot comments on the PR, disables auto-merge, and skips it
+for now. Otherwise it waits until GitHub's auto-merge actually lands the PR
+before moving to the next one.
+
+Run it interactively through the `merge-bot` skill, or unattended with
+`bin/merge-bot.sh run` (see `bin/merge-bot.sh --help`; `--dry-run` previews
+without pushing). `bin/merge-bot.sh --selftest` unit-tests the
+readiness/CI-estimate logic and runs as part of `make check-sh`.
+
 ### Building skip client in Docker against unreleased skip packages
 
 Sometimes it is useful to be able to build a skip client against locally modified, unreleased, skip framework packages.
