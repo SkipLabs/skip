@@ -62,16 +62,26 @@ value class BigInt private (
    * The result is normalized ("007" -> 7, "-0" -> 0).
    */
   static fun fromString(s: String): ?BigInt {
+    static::fromStringRadix(s, 10)
+  }
+
+  /**
+   * Parses "-?digits" in the given base (2..36, digits 0-9 and a-z
+   * case-insensitive) into a BigInt — e.g. `fromStringRadix("-ff", 16)` is -255.
+   * Returns None() if the base is out of range or s is not a valid literal
+   * in it. The result is normalized ("007" -> 7, "-0" -> 0).
+   */
+  static fun fromStringRadix(s: String, base: Int): ?BigInt {
     bs = s.bytes();
     n = bs.size();
     if (n > 0 && bs.get(0).toInt() == 45) {
       // '-'
-      parseDecimal(bs, 1, n) match {
+      parse(bs, 1, n, base) match {
       | Some(limbs) -> Some(static::make(true, UBigInt::make(limbs)))
       | None() -> None()
       }
     } else {
-      parseDecimal(bs, 0, n) match {
+      parse(bs, 0, n, base) match {
       | Some(limbs) -> Some(static::make(false, UBigInt::make(limbs)))
       | None() -> None()
       }

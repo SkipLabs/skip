@@ -35,6 +35,98 @@ fun parseInvalid(): void {
 }
 
 @test
+fun parseRadix(): void {
+  // Known answers per base.
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("ff", 16).map(b -> b.toString()),
+    Some("255"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("-FF", 16).map(b -> b.toString()),
+    Some("-255"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("777", 8).map(b -> b.toString()),
+    Some("511"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("101", 2).map(b -> b.toString()),
+    Some("5"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("z", 36).map(b -> b.toString()),
+    Some("35"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("Z", 36).map(b -> b.toString()),
+    Some("35"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("ffffffffffffffff", 16).map(b ->
+      b.toString()
+    ),
+    Some("18446744073709551615"),
+  );
+  // Normalization: leading zeros and negative zero.
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("007", 10).map(b -> b.toString()),
+    Some("7"),
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromStringRadix("-0", 16).map(b -> b.toString()),
+    Some("0"),
+  );
+  // Invalid: bad base, empty, out-of-base digits, prefixes, signs beyond '-'.
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("10", 1), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("10", 37), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("-", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("8", 8), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("g", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("0x10", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("+1", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("1_0", 16), None());
+  T.expectEq(SKBigInt.BigInt::fromStringRadix("1 0", 10), None());
+  // UBigInt agrees.
+  T.expectEq(
+    SKBigInt.UBigInt::fromStringRadix("ff", 16).map(u -> u.toString()),
+    Some("255"),
+  );
+  T.expectEq(SKBigInt.UBigInt::fromStringRadix("8", 8), None());
+}
+
+// Every base parses to the same value a Horner reference over the library's
+// own add/mul computes, and base 10 agrees with the one-argument fromString.
+@test
+fun parseRadixMatchesHorner(): void {
+  chars = "0123456789abcdefghijklmnopqrstuvwxyz".chars();
+  base = 2;
+  while (base <= 36) {
+    // The first `base` digits, without the leading '0'.
+    s = String::fromChars(chars.slice(1, base).toArray());
+    ref = SKBigInt.BigInt::fromInt(0);
+    for (c in s) {
+      d = if (c >= 'a') {
+        c.code() - 87
+      } else if (c >= 'A') {
+        c.code() - 55
+      } else {
+        c.code() - 48
+      };
+      !ref = ref
+        .mul(SKBigInt.BigInt::fromInt(base))
+        .add(SKBigInt.BigInt::fromInt(d));
+    };
+    parsed = SKBigInt.BigInt::fromStringRadix(s, base);
+    T.expectEq(parsed, Some(ref));
+    if (base == 10) {
+      T.expectEq(parsed, SKBigInt.BigInt::fromString(s));
+    };
+    !base = base + 1;
+  };
+}
+
+@test
 fun fromInt(): void {
   T.expectEq(SKBigInt.BigInt::fromInt(0).toString(), "0");
   T.expectEq(SKBigInt.BigInt::fromInt(-7).toString(), "-7");

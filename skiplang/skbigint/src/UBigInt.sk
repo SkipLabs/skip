@@ -36,7 +36,17 @@ value class UBigInt private (
    * non-digit. The result is normalized ("007" -> 7).
    */
   static fun fromString(s: String): ?UBigInt {
-    parseDecimal(s.bytes(), 0, s.length()) match {
+    static::fromStringRadix(s, 10)
+  }
+
+  /**
+   * Parses digits in the given base (2..36, 0-9 and a-z case-insensitive) into
+   * a UBigInt — e.g. `fromString("ff", 16)` is 255. Returns None() if the
+   * base is out of range, s is empty, or s has a digit invalid for the base.
+   * The result is normalized ("007" -> 7).
+   */
+  static fun fromStringRadix(s: String, base: Int): ?UBigInt {
+    parse(s.bytes(), 0, s.length(), base) match {
     | Some(limbs) -> Some(static::make(limbs))
     | None() -> None()
     }
