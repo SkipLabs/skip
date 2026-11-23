@@ -1,7 +1,10 @@
 # skiplang/compiler — agent instructions
 
 The `skc` compiler: Skip sources in `src/`, tests in `tests/`, bootstrap IR in
-the `bootstrap` submodule. The root [AGENTS.md](../../AGENTS.md) applies too.
+the `bootstrap` submodule. The root [AGENTS.md](../../AGENTS.md) applies too. For a repo-wide living log of
+lessons about writing `.sk` code, see
+[docs/skip-code-notes.md](../../docs/skip-code-notes.md) — read it before
+writing `.sk` and append whenever you learn a lesson.
 
 ## Build
 
