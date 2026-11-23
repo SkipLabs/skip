@@ -54,28 +54,18 @@ fun dropZeros(a: Array<UInt32>): Array<UInt32> {
 /** Compares two magnitudes: LT/EQ/GT by numeric value. */
 fun cmpMag(a: Array<UInt32>, b: Array<UInt32>): Order {
   if (a.size() != b.size()) {
-    if (a.size() < b.size()) {
-      LT()
-    } else {
-      GT()
-    }
-  } else {
-    res: Order = EQ();
-    done = false;
-    i = a.size() - 1;
-    while (i >= 0 && !done) {
-      if (a[i].toInt() < b[i].toInt()) {
-        !res = LT();
-        !done = true;
-      } else if (a[i].toInt() > b[i].toInt()) {
-        !res = GT();
-        !done = true;
-      } else {
-        !i = i - 1;
-      }
+    return if (a.size() < b.size()) LT() else GT()
+  };
+  i = a.size() - 1;
+  while (i >= 0) {
+    if (a[i].toInt() < b[i].toInt()) {
+      return LT()
+    } else if (a[i].toInt() > b[i].toInt()) {
+      return GT()
     };
-    res
-  }
+    !i = i - 1;
+  };
+  EQ()
 }
 
 /** Magnitude addition: a + b. */
