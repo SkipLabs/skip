@@ -1805,6 +1805,52 @@ fun call(
   call_(context, next_id, pos, fpos, env, acc, params_ty, args, invalid_arg_msg)
 }
 
+fun join_named_args(
+  context: mutable SKStore.Context,
+  next_id: () -> Int,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  pos: FileRange,
+  ty_map: UMap<N.Type_>,
+  args1: UMap<(Int, N.Type_, FileRange)>,
+  invalid_arg_msg: String,
+): (TUtils.Acc, Array<(?N.Name, TAst.Ordered_expr)>) {
+  maxArg = args1.reduce((cur, _, i__) -> max(i__.i0, cur), 0);
+  argIdx = maxArg;
+  add_args = mutable Vector[];
+  for (name => param in ty_map) {
+    (namefr, namestr) = name;
+    args1.maybeGet(name) match {
+    | None() ->
+      param match {
+      | (parampos, N.Tdefault(ty)) ->
+        darg = (ty, (parampos, TAst.DefaultArg()));
+        add_args.push((Some((namefr, namestr)), (argIdx, darg)));
+        !argIdx = argIdx + 1
+      | _ ->
+        msg = `The parameter ${namestr} is missing`;
+        SkipError.errorl(List[(pos, "Invalid arguments"), (namefr, msg)])
+      }
+    | Some((_, arg, pos1)) ->
+      contraparam = TUtils.contra_promote(context, env, acc, param);
+      (!acc, _) = TUtils.join(
+        context,
+        next_id,
+        env,
+        pos1,
+        invalid_arg_msg,
+        acc,
+        contraparam,
+        arg,
+      )
+    }
+  };
+  args1.each((name, _) ->
+    if (!ty_map.containsKey(name)) SkipError.error(name.i0, "Undefined name")
+  );
+  (acc, add_args.collect(Array))
+}
+
 fun call_(
   context: mutable SKStore.Context,
   next_id: () -> Int,
@@ -1822,40 +1868,42 @@ fun call_(
     check_args_length(pos, fpos, tyl1, args1);
     join_args(context, next_id, env, acc, tyl1, args1, invalid_arg_msg)
   | (Named(ty_map), Named(args1)) ->
-    maxArg = args1.reduce((cur, _, i__) -> max(i__.i0, cur), 0);
-    argIdx = maxArg;
-    add_args = mutable Vector[];
-    for (name => param in ty_map) {
-      (namefr, namestr) = name;
-      args1.maybeGet(name) match {
-      | None() ->
-        param match {
-        | (parampos, N.Tdefault(ty)) ->
-          darg = (ty, (parampos, TAst.DefaultArg()));
-          add_args.push((Some((namefr, namestr)), (argIdx, darg)));
-          !argIdx = argIdx + 1
-        | _ ->
-          msg = `The parameter ${namestr} is missing`;
-          SkipError.errorl(List[(pos, "Invalid arguments"), (namefr, msg)])
-        }
-      | Some((_, arg, pos1)) ->
-        contraparam = TUtils.contra_promote(context, env, acc, param);
-        (!acc, _) = TUtils.join(
-          context,
-          next_id,
-          env,
-          pos1,
-          invalid_arg_msg,
-          acc,
-          contraparam,
-          arg,
-        )
-      }
-    };
-    args1.each((name, _) ->
-      if (!ty_map.containsKey(name)) SkipError.error(name.i0, "Undefined name")
+    join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      ty_map,
+      args1,
+      invalid_arg_msg,
+    )
+  | (Mixed(pos_tyl, named_ty_map, _), Mixed(pos_args, named_args, _)) ->
+    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    check_args_length(pos, fpos, pos_tyl1, pos_args);
+    (!acc, pos_add_args) = join_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos_tyl1,
+      pos_args,
+      invalid_arg_msg,
     );
-    (acc, add_args.collect(Array))
+    (!acc, named_add_args) = join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      named_ty_map,
+      named_args,
+      invalid_arg_msg,
+    );
+    (acc, pos_add_args.concat(named_add_args))
+  | (Mixed _, Positional _) -> SkipError.error(pos, "Expected named arguments")
+  | (Mixed _, Named _) ->
+    SkipError.error(pos, "Expected positional arguments")
   | (Named _, Positional _) -> SkipError.error(pos, "Expected named arguments")
   | (Positional _, Named _) ->
     SkipError.error(pos, "Expected positional arguments")
@@ -2214,6 +2262,18 @@ private base class ExprState {
     last_constraint: Int,
     last_tvar: Int,
   }
+  | MixedCallState{
+    pos: FileRange,
+    mut: ?FileRange,
+    inner_mut: ?FileRange,
+    inner_targs: Array<N.Type_>,
+    outer_targs: Array<N.Type_>,
+    inner_args: N.Call_args,
+    outer_args: N.Call_args,
+    last_lambda_id: Int,
+    last_constraint: Int,
+    last_tvar: Int,
+  }
 }
 
 fun expr(
@@ -2291,6 +2351,27 @@ fun expr(
           ),
         );
         stack.push(NExpr{expr => e3})
+      | (pos, N.Call(mut, nbase, targs, args))
+        if (is_mixed_call_shape(nbase, args)) ->
+        (inner_mut, inner_base, inner_targs, inner_args) = nbase match {
+        | (_, N.Call(m, b, t, a)) -> (m, b, t, a)
+        | _ -> invariant_violation("ICE is_mixed_call_shape")
+        };
+        stack.push(
+          MixedCallState{
+            pos,
+            mut,
+            inner_mut,
+            inner_targs,
+            outer_targs => targs,
+            inner_args,
+            outer_args => args,
+            last_lambda_id => acc.last_lambda_id(),
+            last_constraint => acc.constraints.typing_size(),
+            last_tvar => next_id(),
+          },
+        );
+        stack.push(NExpr{expr => inner_base})
       | (pos, N.Call(mut, nbase, targs, args)) ->
         last_lambda_id = acc.last_lambda_id();
         last_constraint = acc.constraints.typing_size();
@@ -2329,6 +2410,11 @@ fun expr(
     | c @ CallState _ ->
       base = res.fromSome();
       (!acc, call) = finish_call(context, next_id, env, acc, base, c);
+      ty = TUtils.promote(context, env, acc, call.i0);
+      !res = Some((ty, call.i1))
+    | mc @ MixedCallState _ ->
+      base = res.fromSome();
+      (!acc, call) = finish_mixed_call(context, next_id, env, acc, base, mc);
       ty = TUtils.promote(context, env, acc, call.i0);
       !res = Some((ty, call.i1))
     }
@@ -2380,6 +2466,114 @@ fun finish_call(
     acc.lambda_list,
   );
   (acc, call)
+}
+
+fun call_args_kind(x: N.Call_args): Int {
+  x match {
+  | Positional _ -> 0
+  | Named _ -> 1
+  | Mixed _ -> 2
+  }
+}
+
+/* Detects a chained call whose two argument groups have opposite kinds,
+ * e.g. `f(1){b => "x"}` or `f{b => "x"}(1)`. The parser reads both as
+ * nested N.Call nodes; the typer decides from the callee type whether this
+ * is a mixed call or the usual chained call. */
+fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
+  nbase match {
+  | (_, N.Call(_, _, _, inner_args)) ->
+    k1 = call_args_kind(inner_args);
+    k2 = call_args_kind(args);
+    (k1 == 0 && k2 == 1) || (k1 == 1 && k2 == 0)
+  | _ -> false
+  }
+}
+
+fun combine_mixed_call_args(
+  inner: N.Call_args,
+  outer: N.Call_args,
+): N.Call_args {
+  (inner, outer) match {
+  | (Positional(pos_args), Named(named_args)) ->
+    Mixed(pos_args, named_args, false)
+  | (Named(named_args), Positional(pos_args)) ->
+    Mixed(pos_args, named_args, true)
+  | _ -> invariant_violation("ICE combine_mixed_call_args")
+  }
+}
+
+fun callee_has_mixed_params(subst: IMap<N.Type_>, ty: N.Type_): Bool {
+  Types.unfold_type(subst, ty) match {
+  | (_, N.Tfun(_, _, _, Mixed _, _)) -> true
+  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(subst, t)
+  | _ -> false
+  }
+}
+
+/* Handles a chained call with opposite-kind argument groups (e.g.
+ * `f(1){b => "x"}`). If the callee takes mixed parameters, type it as a
+ * single mixed call; otherwise keep the usual chained-call behavior. */
+fun finish_mixed_call(
+  context: mutable SKStore.Context,
+  next_id: () -> Int,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  base: TAst.Expr,
+  mc: MixedCallState,
+): (TUtils.Acc, TAst.Expr) {
+  if (callee_has_mixed_params(acc.subst, TAstUtils.get_type(base))) {
+    combined = combine_mixed_call_args(mc.inner_args, mc.outer_args);
+    targs = if (mc.outer_targs.isEmpty()) mc.inner_targs else mc.outer_targs;
+    c = CallState{
+      pos => mc.pos,
+      mut => mc.mut,
+      targs,
+      args => combined,
+      last_lambda_id => mc.last_lambda_id,
+      last_constraint => mc.last_constraint,
+      last_tvar => mc.last_tvar,
+    };
+    finish_call(context, next_id, env, acc, base, c)
+  } else {
+    // Not a mixed function: keep the usual chained-call behavior.
+    (!acc, inner_call) = finish_call(
+      context,
+      next_id,
+      env,
+      acc,
+      base,
+      CallState{
+        pos => mc.pos,
+        mut => mc.inner_mut,
+        targs => mc.inner_targs,
+        args => mc.inner_args,
+        last_lambda_id => mc.last_lambda_id,
+        last_constraint => mc.last_constraint,
+        last_tvar => mc.last_tvar,
+      },
+    );
+    inner_base = (
+      TUtils.promote(context, env, acc, inner_call.i0),
+      inner_call.i1,
+    );
+    finish_call(
+      context,
+      next_id,
+      env,
+      acc,
+      inner_base,
+      CallState{
+        pos => mc.pos,
+        mut => mc.mut,
+        targs => mc.outer_targs,
+        args => mc.outer_args,
+        last_lambda_id => mc.last_lambda_id,
+        last_constraint => mc.last_constraint,
+        last_tvar => mc.last_tvar,
+      },
+    )
+  }
 }
 
 fun magic_call(
@@ -4193,6 +4387,9 @@ fun object_pattern_args(
           pos,
           "Expected named arguments in pattern. Found positional arguments.",
         )
+      | (Mixed _, _)
+      | (_, Mixed _) ->
+        SkipError.error(pos, "Mixed parameters are not supported in patterns")
       }
     };
     ((env1, acc1), result) = info_pats.map_foldl(
@@ -5850,6 +6047,14 @@ fun check_default_args(
         (parent, child) = x;
         check_default_arg(pos, name, parent, child)
       }
+    | (Mixed(parent_pos, parent_m, _), Mixed(child_pos, child_m, _)) ->
+      for (x in parent_pos.zip(child_pos)) {
+        (parent, child) = x;
+        check_default_arg(pos, name, parent, child)
+      };
+      parent_m.each((n, parent_arg) ->
+        check_default_arg(pos, name, parent_arg, child_m[n])
+      )
     | _ -> invariant_violation("ICE mismatched args check_default_args")
     }
   | ((_, N.Tfun _), _)

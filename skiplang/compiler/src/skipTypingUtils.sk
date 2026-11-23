@@ -1143,10 +1143,7 @@ value class Constraints(
       }
     | (_, N.Tfun(_, _, targs, ptypes, rtype)) ->
       targs.all(child) &&
-        (ptypes match {
-        | Positional(l) -> l.all(child)
-        | Named(m) -> m.all((_, t) -> child(t))
-        }) &&
+        ptypes.all(child) &&
         child(rtype)
     | (_, N.Tlambda(_, _, _, t))
     | (_, N.Tdefault(t)) ->
@@ -2857,6 +2854,20 @@ fun add_default_arguments<Ta>(
       (name, ordered_expr)
     });
     Named(add_args1.reduce((m, p) -> m.add(p.i0, p.i1), args))
+  | Mixed(pos_args, named_args, nf) ->
+    add_args.foldl(
+      (acc, p) -> {
+        (name_opt, ordered_expr) = p;
+        (pos_acc, named_acc) = acc;
+        name_opt match {
+        | None() -> (pos_acc.concat(Array[ordered_expr]), named_acc)
+        | Some(x1) -> (pos_acc, named_acc.add(x1, ordered_expr))
+        }
+      },
+      (pos_args, named_args),
+    ) match {
+    | (pos_args1, named_args1) -> Mixed(pos_args1, named_args1, nf)
+    }
   }
 }
 
@@ -2897,6 +2908,11 @@ fun bind_params(
   | Positional(l) -> l.foldl((x, y) -> bind_param(context, x, y), (env, acc))
   | Named(fds) ->
     fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc))
+  | Mixed(l, fds, _) ->
+    l.foldl(
+      (x, y) -> bind_param(context, x, y),
+      fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc)),
+    )
   }
 }
 
