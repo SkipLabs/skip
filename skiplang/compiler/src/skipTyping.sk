@@ -1930,8 +1930,8 @@ fun call_(
     // Only named arguments supplied: positional parameters must all have
     // defaults.
     pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
-    for (i in Range(0, pos_tyl1.size())) {
-      pos_tyl1[i] match {
+    pos_tyl1.each(param ->
+      param match {
       | (_, N.Tdefault(_)) -> void
       | _ ->
         SkipError.errorl(
@@ -1944,7 +1944,7 @@ fun call_(
           ],
         )
       }
-    }
+    );
     (!acc, pos_add_args) = join_args(
       context,
       next_id,
