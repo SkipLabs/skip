@@ -185,9 +185,13 @@ gha() { gh api "$@"; } # gh api takes no -R; endpoints carry repos/$REPO explici
 acquire_lock() {
     # Portable single-instance lock (flock is not available on macOS):
     # an atomic mkdir lockdir with the holder's pid; stale locks of dead pids
-    # are reclaimed.
+    # are reclaimed. Re-entrant within one process (subshells share $$), so
+    # run -> process -> prepare/push can all call it.
     mkdir -p "$STATE_DIR"
     local lockdir="$STATE_DIR/lock.d"
+    if [ -d "$lockdir" ] && [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$$" ]; then
+        return 0
+    fi
     if ! mkdir "$lockdir" 2>/dev/null; then
         local pid
         pid=$(cat "$lockdir/pid" 2>/dev/null || true)
@@ -421,10 +425,8 @@ cmd_prepare() {
     git -C "$CLONE" worktree add --detach "$work" "$ref" >>"$LOG_FILE" 2>&1
     local old new rc conflicted
     old=$(git -C "$work" rev-parse HEAD)
-    set +e
-    git "${GIT_SIGN_OPTS[@]}" -C "$work" rebase "origin/$PR_BASE" >>"$LOG_FILE" 2>&1
-    rc=$?
-    set -e
+    rc=0
+    git "${GIT_SIGN_OPTS[@]}" -C "$work" rebase "origin/$PR_BASE" >>"$LOG_FILE" 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
         conflicted=$(git -C "$work" diff --name-only --diff-filter=U | jq -R . | jq -s .)
         if [ "$conflicted" = "[]" ]; then
@@ -672,10 +674,8 @@ run_fixer() { # $1=template $2=pr $3=info json; returns 0 when verdict OK
     cmd=${cmd//__VERDICT__/$verdict}
     cmd=${cmd//__STATE_DIR__/$STATE_DIR}
     log "PR $n: spawning fixer ($template): $cmd"
-    set +e
-    bash -c "$cmd" >>"$LOG_FILE" 2>&1
-    arc=$?
-    set -e
+    arc=0
+    bash -c "$cmd" >>"$LOG_FILE" 2>&1 || arc=$?
     if [ -f "$verdict" ] && head -n 1 "$verdict" | grep -q '^OK'; then
         log "PR $n: fixer verdict OK"
         return 0
@@ -775,10 +775,8 @@ ci_fixer_info() { # $1=pr ; echoes info json for the fix-ci fixer
 PUSH_OUT=""
 do_push() { # $1=pr ; on success sets PUSH_OUT to cmd_push's JSON
     local n=$1 prc body
-    set +e
-    PUSH_OUT=$(cmd_push "$n")
-    prc=$?
-    set -e
+    prc=0
+    PUSH_OUT=$(cmd_push "$n") || prc=$?
     if [ "$prc" -ne 0 ]; then
         log "PR $n: push failed rc=$prc; commenting + disabling auto-merge"
         body=$(mktemp)
@@ -796,10 +794,8 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
     local n=$1 out=$2
     local attempts=0 wout wrc body cinfo
     while :; do
-        set +e
-        wout=$(cmd_wait "$n")
-        wrc=$?
-        set -e
+        wrc=0
+        wout=$(cmd_wait "$n") || wrc=$?
         case $wrc in
             0)
                 log "PR $n: merged"
@@ -857,10 +853,8 @@ cmd_process() {
     local rattempts=0 out rc wrc body
     while :; do
         rattempts=$((rattempts + 1))
-        set +e
-        out=$(cmd_prepare "$n")
-        rc=$?
-        set -e
+        rc=0
+        out=$(cmd_prepare "$n") || rc=$?
         case $rc in
             "$EXIT_NOT_READY")
                 log "PR $n: not processable, skipping"
@@ -891,10 +885,8 @@ cmd_process() {
             continue
         fi
         out=$PUSH_OUT
-        set +e
-        wait_phase "$n" "$out"
-        wrc=$?
-        set -e
+        wrc=0
+        wait_phase "$n" "$out" || wrc=$?
         if [ "$wrc" = "$EXIT_STALE" ]; then
             # main moved while we waited and CI on our head is green: with
             # strict required checks GitHub won't merge a BEHIND PR, so
@@ -934,10 +926,8 @@ cmd_run() {
                 # green+up-to-date PRs are merged by GitHub almost immediately,
                 # so only wait briefly before scheduling any rebase
                 log "PR $pr is green+auto-merge+up-to-date: waiting up to ${MERGE_WAIT}s for it to merge before scheduling any rebase"
-                set +e
-                cmd_wait "$pr" "$MERGE_WAIT"
-                rc=$?
-                set -e
+                rc=0
+                cmd_wait "$pr" "$MERGE_WAIT" || rc=$?
                 case $rc in
                     0) log "PR $pr merged" ;;
                     "$EXIT_STALE") log "PR $pr went BEHIND while waiting; it becomes a rebase candidate" ;;
@@ -956,10 +946,8 @@ cmd_run() {
             rebase)
                 pr=$(jq -r .pr <<<"$dec")
                 log "picked PR $pr (green+auto-merge but needs rebase; fastest expected CI)"
-                set +e
-                cmd_process "$pr"
-                rc=$?
-                set -e
+                rc=0
+                cmd_process "$pr" || rc=$?
                 log "PR $pr: process rc=$rc"
                 ;;
         esac
