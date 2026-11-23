@@ -1,7 +1,9 @@
 # Skip Code Notes (Living Log)
 
-A living collection of lessons about writing good **Skip** code in this repo,
-contributed by agent sessions (this one and others). It complements the root
+The **canonical** living collection of lessons about writing good **Skip** code
+across the SkipLabs repos — other repos (e.g. SkipLabs/skjs) link here instead
+of keeping their own copy. Contributed by agent sessions (this one and others).
+It complements the root
 [AGENTS.md](../AGENTS.md), [HACKING.md](../HACKING.md), and the nested
 `AGENTS.md` files (e.g. `skiplang/compiler/AGENTS.md`): those hold the stable
 rules; this file accumulates the specifics we learn by doing — `skargo`/`skc`
@@ -25,10 +27,10 @@ owner.
   entry instead of adding a near-copy. If an entry proves durable and general,
   promote it into the stable docs (root `AGENTS.md`, `HACKING.md`, or the
   relevant nested `AGENTS.md`) and leave a pointer here.
-- This file is for lessons about the Skip implementation in this repo (`.sk`
-  sources, build/test workflow gotchas). The SKJS typechecker (SkipLabs/skjs)
-  keeps its own separate log in its `docs/skip-code-notes.md` — do not record
-  SKJS lessons here.
+- This file is for lessons about writing Skip code (`.sk` sources, build/test
+  workflow gotchas) in any SkipLabs repo. Do not record SKJS-typechecker
+  specifics here — those belong to the SKJS project, not to Skip-the-language
+  lessons.
 
 Example entry:
 
