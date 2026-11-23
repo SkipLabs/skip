@@ -1,0 +1,489 @@
+module SKBigInt;
+
+// Internal helpers for SKBigInt: 31-bit limb arithmetic on canonical
+// little-endian magnitude arrays. Limbs are stored as UInt32 (4 bytes each
+// in the produced code — Array<UInt32> flattens to i32 elements) and widened
+// to Int (i64) for arithmetic; 31 bits keeps every intermediate < 2^63.
+// See UBigInt.sk / BigInt.sk for the design.
+
+/**
+ * Limb constants. Limbs are 31-bit unsigned values stored as UInt32 (4 bytes
+ * each in the produced code); arithmetic widens to Int (i64). 31 bits is the
+ * largest limb size for which every intermediate fits in i64: schoolbook
+ * needs limb*limb + limb + carry < 2^62, and Knuth D's quotient estimate
+ * qh < 2*B gives qh*divisor <= (2^32 - 1)(2^31 - 1) < 2^63.
+ */
+const kLimbBits: Int = 31;
+const kLimbBase: Int = 2147483648; // 2^31
+const kLimbMask: Int = 2147483647; // 2^31 - 1
+const kDecChunk: Int = 1000000000; // 10^9 < 2^31, decimal chunk for parsing
+
+/** Thrown by BigInt div/mod (and UBigInt divMod) when the divisor is zero. */
+class BigIntDivisionByZero() extends Exception {
+  fun getMessage(): String {
+    "BigInt division by zero"
+  }
+}
+
+/** Thrown by BigInt::pow (and UBigInt::pow) on a negative exponent. */
+class BigIntNegativeExponent() extends Exception {
+  fun getMessage(): String {
+    "BigInt exponent must be non-negative"
+  }
+}
+
+// Magnitude helpers. A magnitude is a canonical little-endian limb array
+// (limbs in [0, 2^31), no trailing zero limb; the empty array is zero).
+
+/**
+ * Magnitude limbs of v (v may be negative, including Int::min). |v| < 2^63
+ * fits in at most 3 limbs of 31 bits, so three variables and a right-sized
+ * array literal suffice.
+ */
+fun limbsOfInt(v: Int): Array<UInt32> {
+  if (v == 0) {
+    Array[]
+  } else if (v == Int::min) {
+    // |Int::min| = 2^63 = 2 * (2^31)^2 (Int::min cannot be negated as an Int)
+    Array[UInt32::zero, UInt32::zero, UInt32::truncate(2)]
+  } else {
+    x = if (v < 0) {
+      -v
+    } else {
+      v
+    };
+    l0 = x % kLimbBase;
+    !x = x / kLimbBase;
+    l1 = x % kLimbBase;
+    l2 = x / kLimbBase; // 0..1
+    if (l2 != 0) {
+      Array[UInt32::truncate(l0), UInt32::truncate(l1), UInt32::truncate(l2)]
+    } else if (l1 != 0) {
+      Array[UInt32::truncate(l0), UInt32::truncate(l1)]
+    } else {
+      Array[UInt32::truncate(l0)]
+    }
+  }
+}
+
+/**
+ * Returns `a` without trailing zero limbs (the canonical form). If nothing
+ * changes, returns `a` itself.
+ */
+fun dropZeros(a: Array<UInt32>): Array<UInt32> {
+  n = a.size();
+  while (n > 0 && a[n - 1].toInt() == 0) {
+    !n = n - 1;
+  };
+  if (n == a.size()) {
+    a
+  } else {
+    Array::fillBy(n, i -> a[i])
+  }
+}
+
+/** Compares two magnitudes: LT/EQ/GT by numeric value. */
+fun cmpMag(a: Array<UInt32>, b: Array<UInt32>): Order {
+  if (a.size() != b.size()) {
+    return if (a.size() < b.size()) LT() else GT()
+  };
+  i = a.size() - 1;
+  while (i >= 0) {
+    if (a[i].toInt() < b[i].toInt()) {
+      return LT()
+    } else if (a[i].toInt() > b[i].toInt()) {
+      return GT()
+    };
+    !i = i - 1;
+  };
+  EQ()
+}
+
+/** Magnitude addition: a + b. */
+fun addMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
+  n = if (a.size() > b.size()) a.size() else b.size();
+  r = Array::mfill(n + 1, UInt32::zero);
+  carry = 0;
+  i = 0;
+  while (i < n) {
+    s = carry;
+    if (i < a.size()) {
+      !s = s + a[i].toInt();
+    };
+    if (i < b.size()) {
+      !s = s + b[i].toInt();
+    };
+    r.set(i, UInt32::truncate(s.and(kLimbMask)));
+    !carry = s.shr(kLimbBits);
+    !i = i + 1;
+  };
+  r.set(n, UInt32::truncate(carry));
+  dropZeros(r.chill())
+}
+
+/**
+ * Magnitude subtraction: a - b. Requires a >= b (precondition; the caller
+ * checks via cmpMag).
+ */
+fun subMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
+  r = Array::mfill(a.size(), UInt32::zero);
+  borrow = 0;
+  i = 0;
+  while (i < a.size()) {
+    d = a[i].toInt() - borrow;
+    if (i < b.size()) {
+      !d = d - b[i].toInt();
+    };
+    if (d < 0) {
+      !d = d + kLimbBase;
+      !borrow = 1;
+    } else {
+      !borrow = 0;
+    };
+    r.set(i, UInt32::truncate(d));
+    !i = i + 1;
+  };
+  dropZeros(r.chill())
+}
+
+/**
+ * Magnitude multiplication (schoolbook/comba, O(n*m)). Every intermediate
+ * limb*limb + limb + carry < 2^62 fits in Int.
+ */
+fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
+  if (a.size() == 0 || b.size() == 0) {
+    Array[]
+  } else {
+    r = Array::mfill(a.size() + b.size(), UInt32::zero);
+    i = 0;
+    while (i < a.size()) {
+      ai = a[i].toInt();
+      if (ai != 0) {
+        carry = 0;
+        j = 0;
+        while (j < b.size()) {
+          t = ai * b[j].toInt() + r.get(i + j).toInt() + carry; // < 2^62
+          r.set(i + j, UInt32::truncate(t.and(kLimbMask)));
+          !carry = t.shr(kLimbBits);
+          !j = j + 1;
+        };
+        k = i + b.size();
+        while (carry != 0 && k < r.size()) {
+          t = r.get(k).toInt() + carry;
+          r.set(k, UInt32::truncate(t.and(kLimbMask)));
+          !carry = t.shr(kLimbBits);
+          !k = k + 1;
+        };
+      };
+      !i = i + 1;
+    };
+    dropZeros(r.chill())
+  }
+}
+
+/** Magnitude times a single limb m in [0, 2^31). */
+fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
+  if (m == 0 || a.size() == 0) {
+    Array[]
+  } else {
+    r = Array::mfill(a.size() + 1, UInt32::zero);
+    carry = 0;
+    i = 0;
+    while (i < a.size()) {
+      t = a[i].toInt() * m + carry; // < 2^62
+      r.set(i, UInt32::truncate(t.and(kLimbMask)));
+      !carry = t.shr(kLimbBits);
+      !i = i + 1;
+    };
+    r.set(a.size(), UInt32::truncate(carry));
+    dropZeros(r.chill())
+  }
+}
+
+/** Magnitude plus a single limb m in [0, 2^31). */
+fun addMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
+  if (m == 0) {
+    a
+  } else {
+    r = Array::mfill(a.size() + 1, UInt32::zero);
+    carry = m;
+    i = 0;
+    while (i < a.size() && carry != 0) {
+      t = a[i].toInt() + carry;
+      r.set(i, UInt32::truncate(t.and(kLimbMask)));
+      !carry = t.shr(kLimbBits);
+      !i = i + 1;
+    };
+    while (i < a.size()) {
+      r.set(i, a[i]);
+      !i = i + 1;
+    };
+    r.set(a.size(), UInt32::truncate(carry));
+    dropZeros(r.chill())
+  }
+}
+
+/** Magnitude times 2^s: a * 2^s. */
+fun shlMag(a: Array<UInt32>, s: Int): Array<UInt32> {
+  if (a.size() == 0 || s == 0) {
+    a
+  } else {
+    limbShift = s / kLimbBits;
+    bitShift = s % kLimbBits;
+    r = Array::mfill(a.size() + limbShift + 1, UInt32::zero);
+    carry = 0;
+    i = 0;
+    while (i < a.size()) {
+      v = a[i].toInt().shl(bitShift) + carry;
+      r.set(i + limbShift, UInt32::truncate(v.and(kLimbMask)));
+      !carry = v.shr(kLimbBits);
+      !i = i + 1;
+    };
+    r.set(a.size() + limbShift, UInt32::truncate(carry));
+    dropZeros(r.chill())
+  }
+}
+
+/** floor(a / 2^s) for a magnitude. */
+fun shrMag(a: Array<UInt32>, s: Int): Array<UInt32> {
+  limbShift = s / kLimbBits;
+  bitShift = s % kLimbBits;
+  if (limbShift >= a.size()) {
+    Array[]
+  } else {
+    n = a.size() - limbShift;
+    r = Array::mfill(n, UInt32::zero);
+    i = 0;
+    while (i < n) {
+      v = a[i + limbShift].toInt().shr(bitShift);
+      if (bitShift != 0 && i + limbShift + 1 < a.size()) {
+        !v = v.or(a[i + limbShift + 1].toInt().shl(kLimbBits - bitShift));
+      };
+      r.set(i, UInt32::truncate(v.and(kLimbMask)));
+      !i = i + 1;
+    };
+    dropZeros(r.chill())
+  }
+}
+
+/**
+ * Divides a magnitude by a single nonzero limb d, returning
+ * (quotient, remainder) with 0 <= remainder < d.
+ */
+/**
+ * Knuth's Algorithm D: returns (q, r) with a = q*b + r and 0 <= r < b.
+ * Requires b nonzero.
+ */
+fun divModMagSmall(a: Array<UInt32>, d: Int): (Array<UInt32>, Int) {
+  q = Array::mfill(a.size(), UInt32::zero);
+  rem = 0;
+  i = a.size() - 1;
+  while (i >= 0) {
+    cur = rem * kLimbBase + a[i].toInt(); // < 2^62
+    q.set(i, UInt32::truncate(cur / d));
+    !rem = cur % d;
+    !i = i - 1;
+  };
+  (dropZeros(q.chill()), rem)
+}
+
+// Knuth's Algorithm D: a = q*b + r with 0 <= r < b; b must be nonzero.
+fun divModMag(
+  a: Array<UInt32>,
+  b: Array<UInt32>,
+): (Array<UInt32>, Array<UInt32>) {
+  n = b.size();
+  if (cmpMag(a, b) == LT()) {
+    (Array[], a)
+  } else if (n == 1) {
+    (q, rem) = divModMagSmall(a, b[0].toInt());
+    (q, if (rem == 0) Array[] else Array[UInt32::truncate(rem)])
+  } else {
+    // Normalize so the divisor's top limb is >= 2^30 (then the quotient
+    // estimates and all intermediates below fit in i64).
+    top = b[n - 1].toInt();
+    s = 0;
+    while (top.shl(s + 1) < kLimbBase) {
+      !s = s + 1;
+    };
+    bn = shlMag(b, s); // still n limbs: top limb of b * 2^s is in [2^30, 2^31)
+    un = shlMag(a, s); // m or m+1 limbs
+    m = a.size();
+    q = Array::mfill(m - n + 1, UInt32::zero);
+    // The remainder register always has m+1 limbs (the top one may stay 0);
+    // the quotient estimate reads r[j+n], which can be index m.
+    r = Array::mfill(m + 1, UInt32::zero);
+    i = 0;
+    while (i < un.size()) {
+      r.set(i, un[i]);
+      !i = i + 1;
+    };
+    j = m - n;
+    while (j >= 0) {
+      // Estimate the quotient digit from the top two remainder limbs.
+      num = r.get(j + n).toInt() * kLimbBase + r.get(j + n - 1).toInt(); // < 2^63
+      qh = num / bn[n - 1].toInt();
+      rh = num % bn[n - 1].toInt();
+      correcting = true;
+      while (correcting) {
+        if (
+          qh >= kLimbBase ||
+          qh * bn[n - 2].toInt() > rh * kLimbBase + r.get(j + n - 2).toInt()
+        ) {
+          !qh = qh - 1;
+          !rh = rh + bn[n - 1].toInt();
+          if (rh >= kLimbBase) {
+            !correcting = false;
+          }
+        } else {
+          !correcting = false;
+        }
+      };
+      // r[j..j+n] -= qh * bn. Two's-complement limb arithmetic: on i64,
+      // u.and(mask) gives the correct low bits and u.shr gives floor(u / 2^31)
+      // even when u < 0.
+      k = 0;
+      !i = 0;
+      while (i < n) {
+        p = qh * bn[i].toInt(); // qh < 2^32, so p < 2^63
+        u = r.get(j + i).toInt() - k - p.and(kLimbMask);
+        r.set(j + i, UInt32::truncate(u.and(kLimbMask)));
+        !k = p.shr(kLimbBits) - u.shr(kLimbBits);
+        !i = i + 1;
+      };
+      u = r.get(j + n).toInt() - k;
+      r.set(j + n, UInt32::truncate(u.and(kLimbMask)));
+      q.set(j, UInt32::truncate(qh));
+      if (u < 0) {
+        // Rare add-back: qh was one too large.
+        q.set(j, UInt32::truncate(qh - 1));
+        carry = 0;
+        !i = 0;
+        while (i < n) {
+          t = r.get(j + i).toInt() + bn[i].toInt() + carry;
+          r.set(j + i, UInt32::truncate(t.and(kLimbMask)));
+          !carry = t.shr(kLimbBits);
+          !i = i + 1;
+        };
+        t = r.get(j + n).toInt() + carry;
+        r.set(j + n, UInt32::truncate(t.and(kLimbMask)));
+      };
+      !j = j - 1;
+    };
+    (dropZeros(q.chill()), shrMag(dropZeros(r.chill()), s))
+  }
+}
+
+/** Magnitude exponentiation: a^e for e >= 0 (square-and-multiply). */
+fun powMag(a: Array<UInt32>, e: Int): Array<UInt32> {
+  result = Array[UInt32::truncate(1)];
+  base = a;
+  exp = e;
+  while (exp > 0) {
+    if (exp % 2 == 1) {
+      !result = mulMag(result, base);
+    };
+    !exp = exp / 2;
+    if (exp > 0) {
+      !base = mulMag(base, base);
+    };
+  };
+  result
+}
+
+/** Greatest common divisor of two magnitudes (Euclid). */
+fun gcdMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
+  x = a;
+  y = b;
+  while (y.size() != 0) {
+    qr = divModMag(x, y);
+    !x = y;
+    !y = qr.i1;
+  };
+  x
+}
+
+/**
+ * Parses the decimal digits in bs[from..to) ("[0-9]+") into a canonical
+ * magnitude. Returns None() if the range is empty or has a non-digit.
+ */
+fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<UInt32> {
+  if (from >= to) {
+    None()
+  } else {
+    valid = true;
+    j = from;
+    while (j < to && valid) {
+      c = bs.get(j).toInt();
+      if (c < 48 || c > 57) {
+        !valid = false;
+      } else {
+        !j = j + 1;
+      }
+    };
+    if (!valid) {
+      None()
+    } else {
+      // Accumulate 9-digit chunks from the left (the first chunk may be
+      // short): acc = acc*10^9 + chunk.
+      acc = Array[];
+      pos = from;
+      firstLen = (to - from) % 9;
+      if (firstLen == 0) {
+        !firstLen = 9;
+      };
+      while (pos < to) {
+        take = if (pos == from) firstLen else 9;
+        chunk = 0;
+        k = pos;
+        while (k < pos + take) {
+          !chunk = chunk * 10 + (bs.get(k).toInt() - 48);
+          !k = k + 1;
+        };
+        !acc = addMagSmall(mulMagSmall(acc, kDecChunk), chunk);
+        !pos = pos + take;
+      };
+      Some(dropZeros(acc))
+    }
+  }
+}
+
+/**
+ * The decimal digits of a magnitude as 9-digit chunks (10^9 < 2^31),
+ * least significant chunk first.
+ */
+fun decimalChunks(limbs: Array<UInt32>): Array<String> {
+  parts = mutable Vector[];
+  r = limbs;
+  while (r.size() > 0) {
+    qr = divModMagSmall(r, kDecChunk);
+    parts.push(qr.i1.toString());
+    !r = qr.i0;
+  };
+  parts.toArray()
+}
+
+/**
+ * Joins decimal chunks (least significant first, as produced by
+ * decimalChunks) into a decimal string, padding all but the most
+ * significant chunk to 9 digits.
+ */
+fun joinDecimalChunks(parts: Array<String>): String {
+  out = "";
+  i = parts.size() - 1;
+  first = true;
+  while (i >= 0) {
+    p = parts[i];
+    if (!first) {
+      while (p.length() < 9) {
+        !p = "0" + p;
+      };
+    };
+    !out = out + p;
+    !first = false;
+    !i = i - 1;
+  };
+  out
+}
+
+module end;

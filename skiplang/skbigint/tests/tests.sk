@@ -1,0 +1,378 @@
+module alias T = SKTest;
+
+module SKBigIntTests;
+
+fun bi(s: String): SKBigInt.BigInt {
+  SKBigInt.BigInt::fromString(s) match {
+  | Some(b) -> b
+  | None() -> T.fail(`invalid test BigInt literal: ${s}`)
+  }
+}
+
+@test
+fun parseValid(): void {
+  T.expectEq(bi("0").toString(), "0");
+  T.expectEq(bi("42").toString(), "42");
+  T.expectEq(bi("-42").toString(), "-42");
+  T.expectEq(bi("007").toString(), "7");
+  T.expectEq(bi("-0").toString(), "0");
+  T.expectEq(
+    bi("123456789012345678901234567890").toString(),
+    "123456789012345678901234567890",
+  );
+}
+
+@test
+fun parseInvalid(): void {
+  T.expectEq(SKBigInt.BigInt::fromString(""), None());
+  T.expectEq(SKBigInt.BigInt::fromString("-"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("+1"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1a"), None());
+  T.expectEq(SKBigInt.BigInt::fromString(" 1"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1 "), None());
+  T.expectEq(SKBigInt.BigInt::fromString("1.5"), None());
+  T.expectEq(SKBigInt.BigInt::fromString("--1"), None());
+}
+
+@test
+fun fromInt(): void {
+  T.expectEq(SKBigInt.BigInt::fromInt(0).toString(), "0");
+  T.expectEq(SKBigInt.BigInt::fromInt(-7).toString(), "-7");
+  T.expectEq(
+    SKBigInt.BigInt::fromInt(9223372036854775807).toString(),
+    "9223372036854775807",
+  );
+  T.expectEq(
+    SKBigInt.BigInt::fromInt(-9223372036854775807 - 1).toString(),
+    "-9223372036854775808",
+  );
+}
+
+@test
+fun add(): void {
+  T.expectEq(
+    bi("99999999999999999999").add(bi("1")).toString(),
+    "100000000000000000000",
+  );
+  T.expectEq(bi("-5").add(bi("3")).toString(), "-2");
+  T.expectEq(bi("-5").add(bi("-3")).toString(), "-8");
+  T.expectEq(bi("5").add(bi("-3")).toString(), "2");
+  T.expectEq(bi("5").add(bi("-5")).toString(), "0");
+}
+
+@test
+fun sub(): void {
+  T.expectEq(bi("3").sub(bi("5")).toString(), "-2");
+  T.expectEq(
+    bi("100000000000000000000").sub(bi("1")).toString(),
+    "99999999999999999999",
+  );
+  T.expectEq(bi("5").sub(bi("5")).toString(), "0");
+  T.expectEq(bi("-5").sub(bi("-3")).toString(), "-2");
+}
+
+@test
+fun mul(): void {
+  T.expectEq(
+    bi("99999999999999999999").mul(bi("99999999999999999999")).toString(),
+    "9999999999999999999800000000000000000001",
+  );
+  T.expectEq(bi("-6").mul(bi("7")).toString(), "-42");
+  T.expectEq(bi("-6").mul(bi("-7")).toString(), "42");
+  T.expectEq(bi("123456789").mul(bi("0")).toString(), "0");
+}
+
+@test
+fun divTruncatesTowardZero(): void {
+  T.expectEq(bi("7").div(bi("2")).toString(), "3");
+  T.expectEq(bi("-7").div(bi("2")).toString(), "-3");
+  T.expectEq(bi("7").div(bi("-2")).toString(), "-3");
+  T.expectEq(bi("-7").div(bi("-2")).toString(), "3");
+  T.expectEq(bi("6").div(bi("3")).toString(), "2");
+  T.expectEq(
+    bi("100000000000000000000").div(bi("7")).toString(),
+    "14285714285714285714",
+  );
+}
+
+@test
+fun modIsFloored(): void {
+  T.expectEq(bi("7").mod(bi("3")).toString(), "1");
+  T.expectEq(bi("-7").mod(bi("3")).toString(), "2");
+  T.expectEq(bi("7").mod(bi("-3")).toString(), "-2");
+  T.expectEq(bi("-7").mod(bi("-3")).toString(), "-1");
+  T.expectEq(bi("6").mod(bi("3")).toString(), "0");
+  T.expectEq(bi("100000000000000000000").mod(bi("7")).toString(), "2");
+}
+
+@test
+fun divByZeroThrows(): void {
+  T.expectThrow(() -> _ = bi("1").div(bi("0")));
+  T.expectThrow(() -> _ = bi("1").mod(bi("0")));
+}
+
+@test
+fun pow(): void {
+  T.expectEq(bi("2").pow(100).toString(), "1267650600228229401496703205376");
+  T.expectEq(
+    bi("2").pow(1000).toString(),
+    "10715086071862673209484250490600018105614048117055336074437503883703510511249361224931983788156958581275946729175531468251871452856923140435984577574698574803934567774824230985421074605062371141877954182153046474983581941267398767559165543946077062914571196477686542167660429831652624386837205668069376",
+  );
+  T.expectEq(bi("-3").pow(3).toString(), "-27");
+  T.expectEq(bi("-3").pow(2).toString(), "9");
+  T.expectEq(bi("5").pow(0).toString(), "1");
+  T.expectEq(bi("0").pow(5).toString(), "0");
+  T.expectThrow(() -> _ = bi("2").pow(-1));
+}
+
+@test
+fun gcd(): void {
+  T.expectEq(bi("54").gcd(bi("24")).toString(), "6");
+  T.expectEq(bi("-54").gcd(bi("24")).toString(), "6");
+  T.expectEq(bi("0").gcd(bi("5")).toString(), "5");
+  T.expectEq(
+    bi("123456789012345678901234567890").gcd(bi("987654321")).toString(),
+    "9",
+  );
+}
+
+@test
+fun absNeg(): void {
+  T.expectEq(bi("42").abs().toString(), "42");
+  T.expectEq(bi("-42").abs().toString(), "42");
+  T.expectEq(bi("42").neg().toString(), "-42");
+  T.expectEq(bi("-42").neg().toString(), "42");
+  T.expectEq(bi("0").neg().toString(), "0");
+}
+
+@test
+fun isZero(): void {
+  T.expectTrue(bi("0").isZero());
+  T.expectTrue(bi("-0").isZero());
+  T.expectFalse(bi("5").isZero());
+  T.expectFalse(bi("-5").isZero());
+}
+
+@test
+fun compare(): void {
+  T.expectTrue(bi("1").compare(bi("2")) == LT());
+  T.expectTrue(bi("2").compare(bi("2")) == EQ());
+  T.expectTrue(bi("10").compare(bi("9")) == GT());
+  T.expectTrue(bi("-10").compare(bi("-9")) == LT());
+  T.expectTrue(bi("-1").compare(bi("1")) == LT());
+  T.expectTrue(bi("5") < bi("6"));
+  T.expectTrue(bi("6") > bi("5"));
+  T.expectTrue(bi("5") <= bi("5"));
+  T.expectTrue(bi("5") >= bi("5"));
+  T.expectTrue(bi("007") == bi("7"));
+  T.expectTrue(bi("7") != bi("8"));
+  T.expectTrue(bi("-9223372036854775808") < bi("0"));
+}
+
+@test
+fun factorial(): void {
+  f = SKBigInt.BigInt::fromInt(1);
+  i = 2;
+  while (i <= 30) {
+    !f = f.mul(SKBigInt.BigInt::fromInt(i));
+    !i = i + 1;
+  };
+  T.expectEq(f.toString(), "265252859812191058636308480000000");
+}
+
+@test
+fun roundtrip(): void {
+  vals = Array[
+    "0",
+    "7",
+    "-7",
+    "1000000000",
+    "999999999999999999999999",
+    "-123456789012345678901234567890",
+    "9223372036854775807",
+    "-9223372036854775808",
+  ];
+  vals.each(x ->
+    T.expectEq(SKBigInt.BigInt::fromString(bi(x).toString()), Some(bi(x)))
+  );
+}
+
+// Property checks over deterministic pseudo-varied operands:
+// truncated div: a == q*b + r, 0 <= |r| < |b|, sign(r) == sign(a) unless r == 0
+// floored mod:   a == qf*b + r, and r has the sign of b (or is zero)
+@test
+fun divModProperties(): void {
+  k = 1;
+  while (k <= 60) {
+    a = SKBigInt.BigInt::fromInt(k * 7919 - 123456)
+      .pow(3)
+      .add(SKBigInt.BigInt::fromInt(k * 104729 + 3));
+    b = SKBigInt.BigInt::fromInt(k * 31 + 7)
+      .pow(3)
+      .add(SKBigInt.BigInt::fromInt(101));
+    qt = a.div(b);
+    rt = a.sub(qt.mul(b));
+    T.expectTrue(a == qt.mul(b).add(rt));
+    T.expectTrue(rt.isZero() || rt.abs().compare(b.abs()) == LT());
+    if (!rt.isZero()) {
+      if (a.compare(SKBigInt.BigInt::zero) == LT()) {
+        T.expectTrue(rt.compare(SKBigInt.BigInt::zero) == LT());
+      } else {
+        T.expectTrue(rt.compare(SKBigInt.BigInt::zero) == GT());
+      }
+    };
+    rf = a.mod(b);
+    T.expectTrue(a == a.sub(rf).div(b).mul(b).add(rf));
+    T.expectTrue(
+      rf.isZero() ||
+        rf.compare(SKBigInt.BigInt::zero) == b.compare(SKBigInt.BigInt::zero),
+    );
+    T.expectTrue(rf.isZero() || rf.abs().compare(b.abs()) == LT());
+    !k = k + 1;
+  };
+}
+
+// Property checks with multi-limb operands (exercises Knuth D's quotient
+// correction and add-back paths at the 31-bit limb size):
+// truncated div: a == q*b + r, 0 <= |r| < |b|; floored mod: 0 <= |r| < |b|.
+@test
+fun divModBigProperties(): void {
+  k = 1;
+  while (k <= 60) {
+    a = SKBigInt.BigInt::fromInt(k * 104729 + 7).pow(9); // up to ~2^204
+    if (k % 2 == 0) {
+      !a = a.neg();
+    };
+    b = SKBigInt.BigInt::fromInt(k * 7919 + 3).pow(5); // up to ~2^94
+    if (k % 3 == 0) {
+      !b = b.neg();
+    };
+    qt = a.div(b);
+    rt = a.sub(qt.mul(b));
+    T.expectTrue(a == qt.mul(b).add(rt));
+    T.expectTrue(rt.isZero() || rt.abs().compare(b.abs()) == LT());
+    rf = a.mod(b);
+    T.expectTrue(a == a.sub(rf).div(b).mul(b).add(rf));
+    T.expectTrue(rf.isZero() || rf.abs().compare(b.abs()) == LT());
+    !k = k + 1;
+  };
+}
+
+@test
+fun mulDivProperties(): void {
+  k = 1;
+  while (k <= 40) {
+    a = SKBigInt.BigInt::fromInt(k * 104729 - 999983);
+    b = SKBigInt.BigInt::fromInt(k * 7919 + 13);
+    if (!b.isZero()) {
+      // (a*b)/b == a exactly (truncated division of a multiple)
+      T.expectTrue(a.mul(b).div(b) == a);
+      T.expectTrue(a.mul(b).mod(b).isZero());
+      // pow splits: x^(m+n) == x^m * x^n
+      x = SKBigInt.BigInt::fromInt(k + 2);
+      T.expectTrue(x.pow(k).mul(x.pow(3)) == x.pow(k + 3));
+    };
+    !k = k + 1;
+  };
+}
+
+@test
+fun bigPow(): void {
+  p = bi("2").pow(1000);
+  T.expectEq(p.toString().length(), 302);
+  T.expectTrue(p == bi("2").pow(500).mul(bi("2").pow(500)));
+  T.expectTrue(SKBigInt.BigInt::fromString(p.toString()) == Some(p));
+  T.expectEq(p.mod(bi("1000000000")).toString(), "668069376");
+}
+
+@test
+fun bigDivKnownAnswers(): void {
+  // 2^1000 div/mod (30 nines), computed independently
+  a = bi("2").pow(1000);
+  b = bi("999999999999999999999999999999");
+  T.expectEq(
+    a.div(b).toString(),
+    "10715086071862673209484250490610733191685910790264820324928114616895196422039626045256911902773853777697986355220788380154645306634621126791205365954853220110569188901615436351375927825172940330779569618504422402808754881598178337177669966348885817796169374814864212134009",
+  );
+  T.expectEq(
+    a.sub(a.div(b).mul(b)).toString(),
+    "315649448793761652069880203385",
+  );
+  T.expectEq(a.mod(b).toString(), "315649448793761652069880203385");
+  // (10^50 + 12345) div/mod 7^40
+  c = bi("100000000000000000000000000000000000000000000012345");
+  d = bi("7").pow(40);
+  T.expectEq(c.div(d).toString(), "15706463139488393");
+  T.expectEq(c.mod(d).toString(), "1443645088495778678497449833491952");
+  // negative dividend, positive divisor: floored mod is positive
+  e = bi("-1000000000000000000000000000000000000000000000000000000000007");
+  f = bi("100000000000000000003");
+  T.expectEq(e.mod(f).toString(), "20");
+  T.expectEq(e.div(f).toString(), "-9999999999999999999700000000000000000008");
+}
+
+fun ubi(s: String): SKBigInt.UBigInt {
+  SKBigInt.UBigInt::fromString(s) match {
+  | Some(u) -> u
+  | None() -> T.fail(`invalid test UBigInt literal: ${s}`)
+  }
+}
+
+@test
+fun ubigint(): void {
+  T.expectEq(ubi("0").toString(), "0");
+  T.expectEq(ubi("007").toString(), "7");
+  T.expectEq(
+    ubi("123456789012345678901234567890").toString(),
+    "123456789012345678901234567890",
+  );
+  T.expectEq(SKBigInt.UBigInt::fromString(""), None());
+  T.expectEq(SKBigInt.UBigInt::fromString("-1"), None());
+  T.expectEq(SKBigInt.UBigInt::fromString("1a"), None());
+  T.expectEq(SKBigInt.UBigInt::fromInt(42).toString(), "42");
+  T.expectEq(
+    SKBigInt.UBigInt::fromInt(9223372036854775807).toString(),
+    "9223372036854775807",
+  );
+  // unsigned ops agree with the signed API on non-negative values
+  T.expectEq(
+    ubi("99999999999999999999").add(ubi("1")).toString(),
+    "100000000000000000000",
+  );
+  T.expectEq(
+    ubi("99999999999999999999").mul(ubi("99999999999999999999")).toString(),
+    "9999999999999999999800000000000000000001",
+  );
+  T.expectEq(
+    ubi("100000000000000000000").div(ubi("7")).toString(),
+    "14285714285714285714",
+  );
+  T.expectEq(ubi("100000000000000000000").mod(ubi("7")).toString(), "2");
+  T.expectEq(ubi("2").pow(100).toString(), "1267650600228229401496703205376");
+  T.expectEq(ubi("54").gcd(ubi("24")).toString(), "6");
+  T.expectTrue(ubi("10") > ubi("9"));
+  T.expectTrue(ubi("007") == ubi("7"));
+  T.expectEq(ubi("5").sub(ubi("5")).toString(), "0");
+  // magnitude() round-trips through BigInt
+  T.expectEq(bi("-42").magnitude().toString(), "42");
+  T.expectEq(bi("42").magnitude().toString(), "42");
+}
+
+@test
+fun ubigintMatchesBigInt(): void {
+  k = 1;
+  while (k <= 40) {
+    u = SKBigInt.UBigInt::fromInt(k * 104729 + 3).pow(3);
+    b = SKBigInt.BigInt::fromInt(k * 104729 + 3).pow(3);
+    T.expectEq(u.toString(), b.toString());
+    T.expectEq(u.toString(), b.magnitude().toString());
+    d = SKBigInt.UBigInt::fromInt(k * 31 + 7);
+    T.expectEq(
+      u.div(d).toString(),
+      b.div(SKBigInt.BigInt::fromInt(k * 31 + 7)).toString(),
+    );
+    !k = k + 1;
+  };
+}
+
+module end;

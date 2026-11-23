@@ -1,0 +1,207 @@
+module SKBigInt;
+
+// Arbitrary-precision integers in pure Skip: no C, no FFI, nothing to free.
+//
+// Two `value class`es, both flattened by the compiler (no heap object or
+// vtable word per value — a BigInt's runtime layout is exactly
+// (Bool, limb-array pointer)):
+//
+//   UBigInt (UBigInt.sk) — the unsigned core: a canonical little-endian
+//                          array of 31-bit limbs in an unboxed Array<UInt32> (4 bytes/limb),
+//                          plus all magnitude arithmetic.
+//   BigInt  (this file)  — sign + UBigInt; all sign handling lives here.
+//
+// 31-bit limbs: the largest size for which every intermediate fits in Int
+// (i64) — schoolbook needs limb*limb + limb + carry < 2^62 and Knuth D's
+// quotient correction needs qhat*divisor <= (2^32 - 1)(2^31 - 1) < 2^63.
+// Full-width 64-bit limbs would need emulated 128-bit
+// intermediates. Canonical form (no trailing zero limb; zero = []) makes
+// the structural equality/hash (Orderable/Hashable field macros) equal to
+// numeric equality/hash. Magnitude algorithms live in helpers.sk.
+
+/**
+ * Signed arbitrary-precision integer: a sign and an unsigned magnitude
+ * (UBigInt). Zero is (false, UBigInt::zero). The value-class layout flattens
+ * to (Bool, limb-array pointer) — no per-value heap header. Canonical form
+ * makes structural equality/hash equal to numeric equality/hash.
+ *
+ * Division is truncated (quotient rounds toward zero, remainder takes the
+ * dividend's sign); mod is floored (result takes the divisor's sign).
+ */
+value class BigInt private (
+  private negative: Bool,
+  private mag: UBigInt,
+) uses Show, Orderable, Hashable {
+  // Signed big integer: a sign and an unsigned magnitude. Zero is
+  // (false, UBigInt::zero). The value-class layout flattens to
+  // (Bool, limb-array pointer) — same as a plain (Bool, Array<UInt32>) field.
+
+  /** Internal: builds a BigInt, canonicalizing zero to (false, zero). */
+  static private fun make(negative: Bool, mag: UBigInt): BigInt {
+    if (mag.isZero()) {
+      BigInt(false, UBigInt::zero)
+    } else {
+      BigInt(negative, mag)
+    }
+  }
+
+  /** The signed zero. */
+  const zero: BigInt = BigInt(false, UBigInt::zero);
+
+  /** The BigInt equal to the Int v (any i64, including Int::min). */
+  static fun fromInt(v: Int): BigInt {
+    if (v == 0) {
+      static::zero
+    } else {
+      static::make(v < 0, UBigInt::make(limbsOfInt(v)))
+    }
+  }
+
+  /**
+   * Parses "-?[0-9]+" into a BigInt. Returns None() if s is invalid.
+   * The result is normalized ("007" -> 7, "-0" -> 0).
+   */
+  static fun fromString(s: String): ?BigInt {
+    bs = s.bytes();
+    n = bs.size();
+    if (n > 0 && bs.get(0).toInt() == 45) {
+      // '-'
+      parseDecimal(bs, 1, n) match {
+      | Some(limbs) -> Some(static::make(true, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    } else {
+      parseDecimal(bs, 0, n) match {
+      | Some(limbs) -> Some(static::make(false, UBigInt::make(limbs)))
+      | None() -> None()
+      }
+    }
+  }
+
+  /** The decimal representation, with a leading '-' if negative (Show). */
+  fun toString(): String {
+    if (this.negative) {
+      "-" + this.mag.toString()
+    } else {
+      this.mag.toString()
+    }
+  }
+
+  /** The unsigned magnitude of this value as a UBigInt. */
+  fun magnitude(): UBigInt {
+    this.mag
+  }
+
+  /** True iff this value is zero. */
+  fun isZero(): Bool {
+    this.mag.isZero()
+  }
+
+  /** |this|. */
+  fun abs(): BigInt {
+    static::make(false, this.mag)
+  }
+
+  /** -this. */
+  fun neg(): BigInt {
+    if (this.isZero()) {
+      this
+    } else {
+      static::make(!this.negative, this.mag)
+    }
+  }
+
+  /** this + other. */
+  fun add(other: BigInt): BigInt {
+    if (this.negative == other.negative) {
+      static::make(this.negative, this.mag.add(other.mag))
+    } else {
+      c = this.mag.compare(other.mag);
+      if (c == EQ()) {
+        static::zero
+      } else if (c == GT()) {
+        static::make(this.negative, this.mag.sub(other.mag))
+      } else {
+        static::make(other.negative, other.mag.sub(this.mag))
+      }
+    }
+  }
+
+  /** this - other. */
+  fun sub(other: BigInt): BigInt {
+    this.add(other.neg())
+  }
+
+  /** this * other. */
+  fun mul(other: BigInt): BigInt {
+    static::make(this.negative != other.negative, this.mag.mul(other.mag))
+  }
+
+  /**
+   * Truncated division: the quotient rounds toward zero.
+   * Throws BigIntDivisionByZero if other is zero.
+   */
+  fun div(other: BigInt): BigInt {
+    this.divMod(other).i0
+  }
+
+  /**
+   * Floored modulo: the result takes the sign of the divisor.
+   * Throws BigIntDivisionByZero if other is zero.
+   */
+  fun mod(other: BigInt): BigInt {
+    qr = this.divMod(other);
+    r = qr.i1;
+    if (!r.isZero() && (this.negative != other.negative)) {
+      r.add(other)
+    } else {
+      r
+    }
+  }
+
+  /**
+   * Truncated (quotient, remainder): quotient rounds toward zero, remainder
+   * takes the sign of this dividend. Throws BigIntDivisionByZero if other is 0.
+   */
+  fun divMod(other: BigInt): (BigInt, BigInt) {
+    if (other.isZero()) {
+      throw BigIntDivisionByZero()
+    };
+    qr = this.mag.divMod(other.mag);
+    q = static::make(this.negative != other.negative, qr.i0);
+    r = static::make(this.negative, qr.i1);
+    (q, r)
+  }
+
+  /**
+   * this^exp. Throws BigIntNegativeExponent if exp < 0.
+   */
+  fun pow(exp: Int): BigInt {
+    if (exp < 0) {
+      throw BigIntNegativeExponent()
+    };
+    static::make(this.negative && (exp % 2 == 1), this.mag.pow(exp))
+  }
+
+  /** Greatest common divisor with other, always non-negative. */
+  fun gcd(other: BigInt): BigInt {
+    static::make(false, this.mag.gcd(other.mag))
+  }
+
+  /** Numeric comparison: LT/EQ/GT (Orderable). */
+  fun compare(other: BigInt): Order {
+    if (this.negative != other.negative) {
+      if (this.negative) {
+        LT()
+      } else {
+        GT()
+      }
+    } else if (this.negative) {
+      other.mag.compare(this.mag)
+    } else {
+      this.mag.compare(other.mag)
+    }
+  }
+}
+
+module end;
