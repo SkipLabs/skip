@@ -135,7 +135,7 @@ GIT_SIGN_OPTS=(-c commit.gpgsign=false -c tag.gpgsign=false)
 
 # Default fixer: headless Vibe run with the skill's brief (tokens substituted
 # by make_prompt/run_fixer).
-DEFAULT_AGENT_CMD='vibe --workdir __WORKTREE__ --prompt-file __PROMPT__ --output-dir __STATE_DIR__/agent-runs/pr-__PR__ --max-turns 60'
+DEFAULT_AGENT_CMD='vibe --workdir __WORKTREE__ --prompt-file __PROMPT__ --output-dir __STATE_DIR__/agent-runs/pr-__PR__ --max-turns 120 --time-limit 3600'
 
 die() { echo "error: $*" >&2; exit 1; }
 usage() { sed -n '3,/^set -euo pipefail/{/^set -euo pipefail/d;s/^#\{0,1\} \{0,1\}//;p;}' "$0"; }
@@ -832,7 +832,7 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
                 fi
                 body=$(mktemp)
                 comment_ci_failed "$n" "$(jq -r '.head // .new_head // "?"' <<<"$out")" \
-                    "${FIXER_REASON:-CI fix judged non-trivial}" >"$body"
+                    "$(jq -r .failed <<<"$wout") (fixer outcome: ${FIXER_REASON:-non-trivial})" >"$body"
                 cmd_comment "$n" "$body"
                 cmd_unauto "$n"
                 rm -f "$body"
