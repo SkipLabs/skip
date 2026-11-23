@@ -37,23 +37,33 @@ class BigIntNegativeExponent() extends Exception {
 
 /**
  * Magnitude limbs of v (v may be negative, including Int::min). |v| < 2^63
- * fits in at most 3 limbs of 30 bits, so a fixed-size buffer suffices — no
- * Vector needed.
+ * fits in at most 3 limbs of 30 bits, so three variables and a right-sized
+ * array literal suffice.
  */
 fun limbsOfInt(v: Int): Array<UInt32> {
-  buf = Array::mfill(3, UInt32::zero);
-  n = 0;
-  x = v;
-  while (x != 0) {
-    rem = x % kLimbBase; // sign of x; (x - rem) is exactly divisible
-    !x = (x - rem) / kLimbBase;
-    if (rem < 0) {
-      !rem = -rem;
+  if (v == 0) {
+    Array[]
+  } else if (v == Int::min) {
+    // |Int::min| = 2^63 = 8 * 2^60 (Int::min cannot be negated as an Int)
+    Array[UInt32::zero, UInt32::zero, UInt32::truncate(8)]
+  } else {
+    x = if (v < 0) {
+      -v
+    } else {
+      v
     };
-    buf.set(n, UInt32::truncate(rem));
-    !n = n + 1;
-  };
-  buf.slice(0, n)
+    l0 = x % kLimbBase;
+    !x = x / kLimbBase;
+    l1 = x % kLimbBase;
+    l2 = x / kLimbBase; // 0..7
+    if (l2 != 0) {
+      Array[UInt32::truncate(l0), UInt32::truncate(l1), UInt32::truncate(l2)]
+    } else if (l1 != 0) {
+      Array[UInt32::truncate(l0), UInt32::truncate(l1)]
+    } else {
+      Array[UInt32::truncate(l0)]
+    }
+  }
 }
 
 /**
