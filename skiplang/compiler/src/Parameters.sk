@@ -26,6 +26,7 @@ base class Parameters<+T> uses Hashable[T: Hashable], Equality[T: Equality] {
     (this, other) match {
     | (Positional(x), Positional(y)) -> x == y
     | (Named(x), Named(y)) -> x == y
+    | (Mixed(x1, x2, _), Mixed(y1, y2, _)) -> x1 == y1 && x2 == y2
     | _ -> false
     }
   }
@@ -203,6 +204,142 @@ class Named<+T>(args: UMap<T>) extends Parameters<T> {
   fun eqBy<U>[T: U](other: Parameters<U>, eq: (U, U) -> Bool): Bool {
     other match {
     | Named(args) -> this.args.eqBy(args, eq)
+    | _ -> false
+    }
+  }
+}
+
+/* A parameter list (or argument list) with both positional and named parts,
+ * e.g. `fun f(a: Int){b: String}` called as `f(1){b => "x"}`.
+ * `namedFirst` records the source order of the two groups at a call site
+ * (`f{b => "x"}(1)`), so that argument evaluation can stay in source order;
+ * for declared parameters it is always false (positional group comes first).
+ */
+class Mixed<+T>(
+  positional: Array<T>,
+  named: UMap<T>,
+  namedFirst: Bool,
+) extends Parameters<T> {
+  fun values(): mutable Iterator<T> {
+    this.positional.values().concat(this.named.values())
+  }
+
+  fun map<T2>(f: T -> T2): Mixed<T2> {
+    Mixed(
+      this.positional.map(f),
+      this.named.map((_, v) -> f(v)),
+      this.namedFirst,
+    )
+  }
+
+  fun foldl<R>(f: (R, T) -> R, init: R): R {
+    // At call sites `namedFirst` records the source order of the two groups,
+    // so fold in source order to keep argument evaluation order.
+    if (this.namedFirst) {
+      this.positional.foldl(f, this.named.reduce((r, _, v) -> f(r, v), init))
+    } else {
+      this.named.reduce((r, _, v) -> f(r, v), this.positional.foldl(f, init))
+    }
+  }
+
+  fun map_foldl<T2, R>(f: (R, T) -> (R, T2), init: R): (R, Mixed<T2>) {
+    if (this.namedFirst) {
+      (r1, m1) = this.named.mapAcc((r, _, v) -> f(r, v), init);
+      (r2, l2) = this.positional.mapAcc(f, r1);
+      (r2, Mixed(l2, m1, this.namedFirst))
+    } else {
+      (r1, l1) = this.positional.mapAcc(f, init);
+      (r2, m2) = this.named.mapAcc((r, _, v) -> f(r, v), r1);
+      (r2, Mixed(l1, m2, this.namedFirst))
+    }
+  }
+
+  fun size(): Int {
+    this.positional.size() + this.named.size()
+  }
+
+  fun isEmpty(): Bool {
+    this.positional.isEmpty() && this.named.isEmpty()
+  }
+
+  fun all(f: T -> Bool): Bool {
+    this.positional.all(f) && this.named.all((_, v) -> f(v))
+  }
+
+  fun any(f: T -> Bool): Bool {
+    this.positional.any(f) || this.named.any((_, v) -> f(v))
+  }
+
+  fun each(f: T -> void): void {
+    this.positional.each(f);
+    for (_key => value in this.named) f(value)
+  }
+
+  fun inspect(): Inspect {
+    InspectVector(
+      "Mixed",
+      {
+        items = mutable Vector[];
+        for (value in this.positional) {
+          items.push(inspect(value))
+        };
+        this.named.each((key, value) ->
+          items.push(inspect((key.i1, value)))
+        );
+        items.toArray();
+      },
+    );
+  }
+
+  fun combine<T2>(p2: Parameters<T2>): Mixed<(T, T2)> {
+    p2 match {
+    | Mixed(y1, y2, _) ->
+      invariant(
+        this.positional.size() == y1.size(),
+        "combine different length positional",
+      );
+      invariant(
+        this.named.size() == y2.size(),
+        "combine different size named",
+      );
+      Mixed(
+        this.positional.zip(y1),
+        this.named.map((k, v1) -> (v1, y2[k])),
+        this.namedFirst,
+      )
+    | _ -> invariant_violation("combine mixed with non-mixed")
+    }
+  }
+
+  fun toList(): List<T> {
+    List::createFromItems(
+      this.positional.concat(this.named.values().collect(Array)),
+    )
+  }
+
+  fun toArray(): Array<T> {
+    this.positional.concat(this.named.values().collect(Array))
+  }
+
+  fun filter(p: T -> Bool): this {
+    Mixed(
+      this.positional.filter(p),
+      this.named.filter((_, x) -> p(x)),
+      this.namedFirst,
+    )
+  }
+
+  fun find(p: T -> Bool): ?T {
+    this.positional.find(p) match {
+    | Some(x) -> Some(x)
+    | None() -> this.named.find((_, v) -> p(v))
+    }
+  }
+
+  fun eqBy<U>[T: U](other: Parameters<U>, eq: (U, U) -> Bool): Bool {
+    other match {
+    | Mixed(args1, args2, _) ->
+      this.positional.eqBy(args1, eq) && this.named.eqBy(args2, eq)
     | _ -> false
     }
   }
