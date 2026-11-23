@@ -1,13 +1,13 @@
 module SKBigInt;
 
 value class UBigInt private (
-  private limbs: Array<Int>,
+  private limbs: Array<UInt32>,
 ) uses Show, Orderable, Hashable {
   // Unsigned big integer: the magnitude core of BigInt. Canonical: limbs has
   // no trailing zero limb; zero is [].
 
   // Internal helper (normalizes); prefer fromInt/fromString.
-  static fun make(limbs: Array<Int>): UBigInt {
+  static fun make(limbs: Array<UInt32>): UBigInt {
     UBigInt(dropZeros(limbs))
   }
 
@@ -17,7 +17,7 @@ value class UBigInt private (
 
   // Magnitude of v as limbs (v may be negative, including Int::min).
   // Internal helper: magnitude limbs of v (v may be negative).
-  static fun limbsOfInt(v: Int): Array<Int> {
+  static fun limbsOfInt(v: Int): Array<UInt32> {
     r = mutable Vector[];
     x = v;
     while (x != 0) {
@@ -26,7 +26,7 @@ value class UBigInt private (
       if (rem < 0) {
         !rem = -rem;
       };
-      r.push(rem);
+      r.push(UInt32::truncate(rem));
     };
     r.toArray()
   }

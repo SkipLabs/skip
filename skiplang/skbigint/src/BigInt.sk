@@ -7,7 +7,7 @@ module SKBigInt;
 // (Bool, limb-array pointer)):
 //
 //   UBigInt (UBigInt.sk) — the unsigned core: a canonical little-endian
-//                          array of 30-bit limbs in an unboxed Array<Int>,
+//                          array of 30-bit limbs in an unboxed Array<UInt32> (4 bytes/limb),
 //                          plus all magnitude arithmetic.
 //   BigInt  (this file)  — sign + UBigInt; all sign handling lives here.
 //
@@ -25,7 +25,7 @@ value class BigInt private (
 ) uses Show, Orderable, Hashable {
   // Signed big integer: a sign and an unsigned magnitude. Zero is
   // (false, UBigInt::zero()). The value-class layout flattens to
-  // (Bool, limb-array pointer) — same as a plain (Bool, Array<Int>) field.
+  // (Bool, limb-array pointer) — same as a plain (Bool, Array<UInt32>) field.
 
   static private fun make(negative: Bool, mag: UBigInt): BigInt {
     if (mag.isZero()) {
