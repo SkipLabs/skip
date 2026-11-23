@@ -22,28 +22,13 @@ value class UBigInt private (
   /** The unsigned zero. */
   const zero: UBigInt = UBigInt(Array[]);
 
-  /** Internal: magnitude limbs of v (v may be negative, including Int::min). */
-  static fun limbsOfInt(v: Int): Array<UInt32> {
-    r = mutable Vector[];
-    x = v;
-    while (x != 0) {
-      rem = x % kLimbBase; // sign of x; (x - rem) is exactly divisible
-      !x = (x - rem) / kLimbBase;
-      if (rem < 0) {
-        !rem = -rem;
-      };
-      r.push(UInt32::truncate(rem));
-    };
-    r.toArray()
-  }
-
   /**
    * The UBigInt equal to the non-negative Int v.
    * Precondition: v >= 0.
    */
   static fun fromInt(v: Int): UBigInt {
     invariant(v >= 0, "UBigInt::fromInt: expected a non-negative Int");
-    static::make(static::limbsOfInt(v))
+    static::make(limbsOfInt(v))
   }
 
   /**

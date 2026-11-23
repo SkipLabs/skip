@@ -53,7 +53,7 @@ value class BigInt private (
     if (v == 0) {
       static::zero
     } else {
-      static::make(v < 0, UBigInt::make(UBigInt::limbsOfInt(v)))
+      static::make(v < 0, UBigInt::make(limbsOfInt(v)))
     }
   }
 
@@ -163,7 +163,7 @@ value class BigInt private (
    * Truncated (quotient, remainder): quotient rounds toward zero, remainder
    * takes the sign of this dividend. Throws BigIntDivisionByZero if other is 0.
    */
-  private fun divMod(other: BigInt): (BigInt, BigInt) {
+  fun divMod(other: BigInt): (BigInt, BigInt) {
     if (other.isZero()) {
       throw BigIntDivisionByZero()
     };

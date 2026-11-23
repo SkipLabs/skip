@@ -36,6 +36,27 @@ class BigIntNegativeExponent() extends Exception {
 // (limbs in [0, 2^30), no trailing zero limb; the empty array is zero).
 
 /**
+ * Magnitude limbs of v (v may be negative, including Int::min). |v| < 2^63
+ * fits in at most 3 limbs of 30 bits, so a fixed-size buffer suffices — no
+ * Vector needed.
+ */
+fun limbsOfInt(v: Int): Array<UInt32> {
+  buf = Array::mfill(3, UInt32::zero);
+  n = 0;
+  x = v;
+  while (x != 0) {
+    rem = x % kLimbBase; // sign of x; (x - rem) is exactly divisible
+    !x = (x - rem) / kLimbBase;
+    if (rem < 0) {
+      !rem = -rem;
+    };
+    buf.set(n, UInt32::truncate(rem));
+    !n = n + 1;
+  };
+  buf.slice(0, n)
+}
+
+/**
  * Returns `a` without trailing zero limbs (the canonical form). If nothing
  * changes, returns `a` itself.
  */
