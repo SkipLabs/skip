@@ -32,24 +32,20 @@ owner.
   specifics here — those belong to the SKJS project, not to Skip-the-language
   lessons.
 
-Example entry:
-
-```markdown
-### 2026-11-20 — Prefer exhaustive matches over a wildcard arm
-
-Source: user correction. When matching on a variant type, enumerate the arms
-explicitly instead of ending with `_`, so a new variant forces a decision at
-every match site; use `_` only when the default is genuinely correct for any
-future variant.
-
-    // worse                    // better
-    | Some(x) -> f(x)           | Some(x) -> f(x)
-    | _ -> default              | None -> default
-```
+Entry shape: `### <date> — <short title>`, then the rule in one or two
+sentences, a source tag, and a before/after snippet when it helps.
 
 ## Log
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
-_No entries yet — add the first one the next time you learn something, especially
-when the user corrects you._
+### 2026-11-23 — Prefer exhaustive matches over a wildcard arm
+
+Source: user correction. When matching on a variant type, enumerate the arms
+explicitly instead of ending with `_`, so that adding a new variant forces an
+explicit decision at every match site; use `_` only when the default is
+genuinely correct for any future variant, and say why.
+
+    // worse                    // better
+    | Some(x) -> f(x)           | Some(x) -> f(x)
+    | _ -> default              | None -> default
