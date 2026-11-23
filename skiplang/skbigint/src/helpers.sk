@@ -1,22 +1,22 @@
 module SKBigInt;
 
-// Internal helpers for SKBigInt: 30-bit limb arithmetic on canonical
+// Internal helpers for SKBigInt: 31-bit limb arithmetic on canonical
 // little-endian magnitude arrays. Limbs are stored as UInt32 (4 bytes each
 // in the produced code — Array<UInt32> flattens to i32 elements) and widened
-// to Int (i64) for arithmetic; 30 bits keeps every intermediate < 2^63.
+// to Int (i64) for arithmetic; 31 bits keeps every intermediate < 2^63.
 // See UBigInt.sk / BigInt.sk for the design.
 
 /**
- * Limb constants. Limbs are 30-bit unsigned values stored as UInt32 (4 bytes
- * each in the produced code); arithmetic widens to Int (i64). 30 bits keeps
- * every intermediate < 2^63: schoolbook needs limb*limb + limb + carry
- * < 2^63 (B <= 31) and Knuth D's quotient correction needs qhat*divisor
- * < 2^63 with qhat up to ~2B (B <= 30).
+ * Limb constants. Limbs are 31-bit unsigned values stored as UInt32 (4 bytes
+ * each in the produced code); arithmetic widens to Int (i64). 31 bits is the
+ * largest limb size for which every intermediate fits in i64: schoolbook
+ * needs limb*limb + limb + carry < 2^62, and Knuth D's quotient estimate
+ * qh < 2*B gives qh*divisor <= (2^32 - 1)(2^31 - 1) < 2^63.
  */
-const kLimbBits: Int = 30;
-const kLimbBase: Int = 1073741824; // 2^30
-const kLimbMask: Int = 1073741823; // 2^30 - 1
-const kDecChunk: Int = 1000000000; // 10^9 < 2^30, decimal chunk for parsing
+const kLimbBits: Int = 31;
+const kLimbBase: Int = 2147483648; // 2^31
+const kLimbMask: Int = 2147483647; // 2^31 - 1
+const kDecChunk: Int = 1000000000; // 10^9 < 2^31, decimal chunk for parsing
 
 /** Thrown by BigInt div/mod (and UBigInt divMod) when the divisor is zero. */
 class BigIntDivisionByZero() extends Exception {
@@ -33,19 +33,19 @@ class BigIntNegativeExponent() extends Exception {
 }
 
 // Magnitude helpers. A magnitude is a canonical little-endian limb array
-// (limbs in [0, 2^30), no trailing zero limb; the empty array is zero).
+// (limbs in [0, 2^31), no trailing zero limb; the empty array is zero).
 
 /**
  * Magnitude limbs of v (v may be negative, including Int::min). |v| < 2^63
- * fits in at most 3 limbs of 30 bits, so three variables and a right-sized
+ * fits in at most 3 limbs of 31 bits, so three variables and a right-sized
  * array literal suffice.
  */
 fun limbsOfInt(v: Int): Array<UInt32> {
   if (v == 0) {
     Array[]
   } else if (v == Int::min) {
-    // |Int::min| = 2^63 = 8 * 2^60 (Int::min cannot be negated as an Int)
-    Array[UInt32::zero, UInt32::zero, UInt32::truncate(8)]
+    // |Int::min| = 2^63 = 2 * (2^31)^2 (Int::min cannot be negated as an Int)
+    Array[UInt32::zero, UInt32::zero, UInt32::truncate(2)]
   } else {
     x = if (v < 0) {
       -v
@@ -55,7 +55,7 @@ fun limbsOfInt(v: Int): Array<UInt32> {
     l0 = x % kLimbBase;
     !x = x / kLimbBase;
     l1 = x % kLimbBase;
-    l2 = x / kLimbBase; // 0..7
+    l2 = x / kLimbBase; // 0..1
     if (l2 != 0) {
       Array[UInt32::truncate(l0), UInt32::truncate(l1), UInt32::truncate(l2)]
     } else if (l1 != 0) {
@@ -148,7 +148,7 @@ fun subMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
 
 /**
  * Magnitude multiplication (schoolbook/comba, O(n*m)). Every intermediate
- * limb*limb + limb + carry < 2^61 fits in Int.
+ * limb*limb + limb + carry < 2^62 fits in Int.
  */
 fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   if (a.size() == 0 || b.size() == 0) {
@@ -162,7 +162,7 @@ fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
         carry = 0;
         j = 0;
         while (j < b.size()) {
-          t = ai * b[j].toInt() + r.get(i + j).toInt() + carry; // < 2^61
+          t = ai * b[j].toInt() + r.get(i + j).toInt() + carry; // < 2^62
           r.set(i + j, UInt32::truncate(t.and(kLimbMask)));
           !carry = t.shr(kLimbBits);
           !j = j + 1;
@@ -181,7 +181,7 @@ fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   }
 }
 
-/** Magnitude times a single limb m in [0, 2^30). */
+/** Magnitude times a single limb m in [0, 2^31). */
 fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0 || a.size() == 0) {
     Array[]
@@ -190,7 +190,7 @@ fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
     carry = 0;
     i = 0;
     while (i < a.size()) {
-      t = a[i].toInt() * m + carry; // < 2^60
+      t = a[i].toInt() * m + carry; // < 2^62
       r.set(i, UInt32::truncate(t.and(kLimbMask)));
       !carry = t.shr(kLimbBits);
       !i = i + 1;
@@ -200,7 +200,7 @@ fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   }
 }
 
-/** Magnitude plus a single limb m in [0, 2^30). */
+/** Magnitude plus a single limb m in [0, 2^31). */
 fun addMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0) {
     a
@@ -279,7 +279,7 @@ fun divModMagSmall(a: Array<UInt32>, d: Int): (Array<UInt32>, Int) {
   rem = 0;
   i = a.size() - 1;
   while (i >= 0) {
-    cur = rem * kLimbBase + a[i].toInt(); // < 2^60
+    cur = rem * kLimbBase + a[i].toInt(); // < 2^62
     q.set(i, UInt32::truncate(cur / d));
     !rem = cur % d;
     !i = i - 1;
@@ -299,14 +299,14 @@ fun divModMag(
     (q, rem) = divModMagSmall(a, b[0].toInt());
     (q, if (rem == 0) Array[] else Array[UInt32::truncate(rem)])
   } else {
-    // Normalize so the divisor's top limb is >= 2^29 (then the quotient
+    // Normalize so the divisor's top limb is >= 2^30 (then the quotient
     // estimates and all intermediates below fit in i64).
     top = b[n - 1].toInt();
     s = 0;
     while (top.shl(s + 1) < kLimbBase) {
       !s = s + 1;
     };
-    bn = shlMag(b, s); // still n limbs: top limb of b * 2^s is in [2^29, 2^30)
+    bn = shlMag(b, s); // still n limbs: top limb of b * 2^s is in [2^30, 2^31)
     un = shlMag(a, s); // m or m+1 limbs
     m = a.size();
     q = Array::mfill(m - n + 1, UInt32::zero);
@@ -321,7 +321,7 @@ fun divModMag(
     j = m - n;
     while (j >= 0) {
       // Estimate the quotient digit from the top two remainder limbs.
-      num = r.get(j + n).toInt() * kLimbBase + r.get(j + n - 1).toInt(); // < 2^60
+      num = r.get(j + n).toInt() * kLimbBase + r.get(j + n - 1).toInt(); // < 2^63
       qh = num / bn[n - 1].toInt();
       rh = num % bn[n - 1].toInt();
       correcting = true;
@@ -340,12 +340,12 @@ fun divModMag(
         }
       };
       // r[j..j+n] -= qh * bn. Two's-complement limb arithmetic: on i64,
-      // u.and(mask) gives the correct low bits and u.shr gives floor(u / 2^30)
+      // u.and(mask) gives the correct low bits and u.shr gives floor(u / 2^31)
       // even when u < 0.
       k = 0;
       !i = 0;
       while (i < n) {
-        p = qh * bn[i].toInt(); // < 2^61
+        p = qh * bn[i].toInt(); // qh < 2^32, so p < 2^63
         u = r.get(j + i).toInt() - k - p.and(kLimbMask);
         r.set(j + i, UInt32::truncate(u.and(kLimbMask)));
         !k = p.shr(kLimbBits) - u.shr(kLimbBits);
@@ -449,7 +449,7 @@ fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<UInt32> {
 }
 
 /**
- * The decimal digits of a magnitude as 9-digit chunks (10^9 < 2^30),
+ * The decimal digits of a magnitude as 9-digit chunks (10^9 < 2^31),
  * least significant chunk first.
  */
 fun decimalChunks(limbs: Array<UInt32>): Array<String> {

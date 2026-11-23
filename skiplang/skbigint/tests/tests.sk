@@ -232,6 +232,32 @@ fun divModProperties(): void {
   };
 }
 
+// Property checks with multi-limb operands (exercises Knuth D's quotient
+// correction and add-back paths at the 31-bit limb size):
+// truncated div: a == q*b + r, 0 <= |r| < |b|; floored mod: 0 <= |r| < |b|.
+@test
+fun divModBigProperties(): void {
+  k = 1;
+  while (k <= 60) {
+    a = SKBigInt.BigInt::fromInt(k * 104729 + 7).pow(9); // up to ~2^204
+    if (k % 2 == 0) {
+      !a = a.neg();
+    };
+    b = SKBigInt.BigInt::fromInt(k * 7919 + 3).pow(5); // up to ~2^94
+    if (k % 3 == 0) {
+      !b = b.neg();
+    };
+    qt = a.div(b);
+    rt = a.sub(qt.mul(b));
+    T.expectTrue(a == qt.mul(b).add(rt));
+    T.expectTrue(rt.isZero() || rt.abs().compare(b.abs()) == LT());
+    rf = a.mod(b);
+    T.expectTrue(a == a.sub(rf).div(b).mul(b).add(rf));
+    T.expectTrue(rf.isZero() || rf.abs().compare(b.abs()) == LT());
+    !k = k + 1;
+  };
+}
+
 @test
 fun mulDivProperties(): void {
   k = 1;

@@ -7,14 +7,14 @@ module SKBigInt;
 // (Bool, limb-array pointer)):
 //
 //   UBigInt (UBigInt.sk) — the unsigned core: a canonical little-endian
-//                          array of 30-bit limbs in an unboxed Array<UInt32> (4 bytes/limb),
+//                          array of 31-bit limbs in an unboxed Array<UInt32> (4 bytes/limb),
 //                          plus all magnitude arithmetic.
 //   BigInt  (this file)  — sign + UBigInt; all sign handling lives here.
 //
-// 30-bit limbs: the largest size for which every intermediate fits in Int
-// (i64) — schoolbook needs limb*limb + limb + carry < 2^63 (B <= 31) and
-// Knuth D's quotient correction needs qhat*divisor < 2^63 with qhat up to
-// ~2B (B <= 30). Full-width 64-bit limbs would need emulated 128-bit
+// 31-bit limbs: the largest size for which every intermediate fits in Int
+// (i64) — schoolbook needs limb*limb + limb + carry < 2^62 and Knuth D's
+// quotient correction needs qhat*divisor <= (2^32 - 1)(2^31 - 1) < 2^63.
+// Full-width 64-bit limbs would need emulated 128-bit
 // intermediates. Canonical form (no trailing zero limb; zero = []) makes
 // the structural equality/hash (Orderable/Hashable field macros) equal to
 // numeric equality/hash. Magnitude algorithms live in helpers.sk.
