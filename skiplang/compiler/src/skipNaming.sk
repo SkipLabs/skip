@@ -1997,6 +1997,16 @@ fun method_def(
     )
   };
   check_alloc_contract(met.annotations, met.name.i0, "methods");
+  metIsNativeKind = met.native_.isSome() ||
+    annotationsContainParam(met.annotations, "@cpp_extern", met.name.i0).isSome() ||
+    annotationsContainParam(met.annotations, "@cpp_runtime", met.name.i0).isSome() ||
+    annotationsContainParam(met.annotations, "@intrinsic", met.name.i0).isSome();
+  check_no_dead_contract(
+    met.annotations,
+    met.body.i1 is A.Body _,
+    metIsNativeKind,
+    met.name.i0,
+  );
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2463,6 +2473,16 @@ fun fun_def(
     )
   };
   check_alloc_contract(fd.annotations, fd.name.i0, "functions");
+  fdIsNativeKind = fd.native_.isSome() ||
+    annotationsContainParam(fd.annotations, "@cpp_extern", fd.name.i0).isSome() ||
+    annotationsContainParam(fd.annotations, "@cpp_runtime", fd.name.i0).isSome() ||
+    annotationsContainParam(fd.annotations, "@intrinsic", fd.name.i0).isSome();
+  check_no_dead_contract(
+    fd.annotations,
+    fd.body.isSome(),
+    fdIsNativeKind,
+    fd.name.i0,
+  );
   if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
     if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
       SkipError.error(
@@ -2552,6 +2572,36 @@ fun check_alloc_contract(
         pos,
         `Native ${what} must declare @no_alloc or @may_alloc`,
       )
+    }
+  }
+}
+
+// The contract annotations (@no_alloc/@may_alloc/@alloc, @no_throw,
+// @no_return) are only read on native functions, where there is no body to
+// derive them from. On a function with a body they are silently ignored, so
+// reject them rather than let them imply a contract nothing honours.
+// @cpp_extern/@cpp_runtime functions with a fallback body count as native
+// here: the native backend replaces the body and the contract applies there.
+fun check_no_dead_contract(
+  annotations: SSet,
+  hasBody: Bool,
+  isNativeKind: Bool,
+  pos: FileRange,
+): void {
+  if (hasBody && !isNativeKind) {
+    for (annotation in annotations) {
+      if (
+        annotation == "@no_alloc" ||
+        annotation == "@may_alloc" ||
+        annotation.startsWith(`@alloc("`) ||
+        annotation == "@no_throw" ||
+        annotation == "@no_return"
+      ) {
+        SkipError.error(
+          pos,
+          `Contract annotation ${annotation} is only read on native functions; this function has a body, so it is ignored — remove it`,
+        )
+      }
     }
   }
 }

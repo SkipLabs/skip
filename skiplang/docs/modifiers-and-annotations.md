@@ -7,9 +7,11 @@ differently:
   `native`, ...). They are part of the grammar and, in most cases, part of the
   type system. The compiler checks them and rejects what it does not understand.
 - **Annotations** are `@name` or `@name("param")`. They are stored as plain
-  strings and are mostly directives to the optimizer and the back end. The
-  compiler does **not** validate them: an annotation it does not recognize is
-  silently ignored.
+  strings and are mostly directives to the optimizer and the back end.
+  User-defined annotations (enumerated with `#forEachFunction`, e.g. sktest's
+  `@test`) are still allowed, but an unrecognized name that looks like a typo
+  of a compiler-known annotation (e.g. `@debbug` for `@debug`) is an error
+  with a "did you mean" suggestion — see #1345.
 
 This document lists both, and what each one actually does.
 
@@ -418,12 +420,12 @@ it means the body you see is not the code that runs.
 | `@no_throw` | The function cannot throw. | May throw |
 | `@no_return` | The function never returns. | Returns |
 
-These are **only read for functions with no body** — that is, `native`,
-`@cpp_extern` or `@cpp_runtime` declarations. On a function with a body they are
-silently ignored, and the compiler derives the answer from the body instead. The
-prelude contains dead examples of exactly this: `print_string` carries `@no_throw`
-and `skipExit` carries `@no_return`, but both have bodies, so both annotations do
-nothing.
+These are **only read for native functions** — `native`, `@cpp_extern` or
+`@cpp_runtime` declarations (a `@cpp_extern`/`@cpp_runtime` function with a
+fallback body still counts as native: the native backend replaces the body).
+On any other function with a body they would be silently ignored, so the
+compiler **rejects** them there with an error: the answer is derived from the
+body instead.
 
 `@no_throw` and `@no_return` default to the safe answer when absent, so
 forgetting one costs an optimization, never correctness.
