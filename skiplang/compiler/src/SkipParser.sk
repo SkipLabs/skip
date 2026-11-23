@@ -2435,9 +2435,26 @@ mutable class SkipParser{
   // parameters-specifier:
   //    positional-parameters
   //    named-parameters
+  //    positional-parameters  named-parameters
+  //
+  // The mixed form is unambiguous here: the return type annotation is
+  // mandatory after the parameters, so a '{' directly following a
+  // positional parameter list can only be a named parameter group (a
+  // missing return type before a body is already an error).
   mutable fun parseParametersSpecifier(): ParseTree {
     this.peek() match {
-    | TokenKind.OPEN_PAREN() -> this.parsePositionalParameters(false)
+    | TokenKind.OPEN_PAREN() ->
+      positional = this.parsePositionalParameters(false);
+      if (this.peekKind(TokenKind.OPEN_CURLY())) {
+        named = this.parseNamedParameters(false);
+        ParseTree.MixedParametersTree{
+          range => Parser.createRangeOfTrees(positional, named),
+          positional,
+          named,
+        }
+      } else {
+        positional
+      }
     | TokenKind.OPEN_CURLY() -> this.parseNamedParameters(false)
     | _ -> this.errorResult(errorExpectedParameters, "Expected parameters")
     }

@@ -3242,6 +3242,43 @@ class NamedParametersTree{
   }
 }
 
+class MixedParametersTree{
+  positional: ParseTree.ParseTree,
+  named: ParseTree.ParseTree,
+} extends ParseTree.ParseTree {
+  fun getNamedFields(): List<(String, ParseTree.ParseTree)> {
+    List<(String, ParseTree.ParseTree)>[
+      ("positional", this.positional),
+      ("named", this.named),
+    ];
+  }
+
+  fun getKind(): String {
+    "MixedParameters";
+  }
+
+  fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
+    yield this.positional;
+    yield this.named;
+    yield break;
+  }
+
+  fun transform(
+    codemod: mutable CodeMod,
+  ): (ParseTree.ParseTree, Vector<Subst>) {
+    tx_positional = codemod.transform(this.positional);
+    tx_named = codemod.transform(this.named);
+    (
+      MixedParametersTree{
+        range => this.range,
+        positional => tx_positional.i0,
+        named => tx_named.i0,
+      },
+      Vector[tx_positional.i1, tx_named.i1].flatten(),
+    );
+  }
+}
+
 class NamedPatternArgumentsTree{
   arguments: ParseTree.ParseTree,
 } extends ParseTree.ParseTree {

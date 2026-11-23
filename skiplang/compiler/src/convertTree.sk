@@ -1875,6 +1875,26 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       Named(this.convertNamedParameters(parameters))
     | ParseTree.PositionalParametersTree{parameters} ->
       this.convertPositionalParameters(parameters.getList())
+    | ParseTree.MixedParametersTree{positional, named} ->
+      posList = positional match {
+        | ParseTree.PositionalParametersTree{parameters} -> parameters.getList()
+        | _ ->
+          invariant_violation(
+            "Unexpected positional parameters: " + this.treeToString(positional),
+          )
+      };
+      namedList = named match {
+        | ParseTree.NamedParametersTree{parameters} -> parameters
+        | _ ->
+          invariant_violation(
+            "Unexpected named parameters: " + this.treeToString(named),
+          )
+      };
+      posArgs = this.convertPositionalParameters(posList) match {
+        | Positional(args) -> args
+        | _ -> invariant_violation("ICE positional params")
+      };
+      Mixed(posArgs, this.convertNamedParameters(namedList), false)
     | _ ->
       invariant_violation("Unexpected parameters: " + this.treeToString(tree))
     }
