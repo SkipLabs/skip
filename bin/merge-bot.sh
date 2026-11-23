@@ -117,8 +117,10 @@ AGENT_CMD=${MERGE_BOT_AGENT_CMD:-}
 DRY_RUN=${MERGE_BOT_DRY_RUN:-0}
 SKIP_LABELS=${MERGE_BOT_SKIP_LABELS:-}
 BASE_BRANCH=main
-# Required status contexts on main (branch protection); see .circleci/base.yml
-REQUIRED_CONTEXTS="ci/circleci: setup ci/circleci: ci/all-checks"
+# Branch protection on main requires the `ci/circleci: setup` and
+# `ci/circleci: ci/all-checks` contexts (see .circleci/base.yml). Note the
+# aggregate all-checks context is a no-op job and may be absent from the
+# rollup, so red-CI detection looks at every `ci/circleci:*` context instead.
 
 EXIT_CONFLICT=10
 EXIT_NOT_READY=11
@@ -518,8 +520,6 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)]
     local timeout=${2:-$CI_TIMEOUT}
     resolve_repo
     local deadline=$((SECONDS + timeout))
-    local req_json
-    req_json=$(printf '%s' "$REQUIRED_CONTEXTS" | tr ' ' '\n' | jq -R . | jq -s .)
     while :; do
         local j state failed mss mergeable pending stale
         j=$(ghw pr view "$n" --json state,mergeStateStatus,mergeable,autoMergeRequest,statusCheckRollup,headRefOid)
@@ -541,14 +541,20 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)]
             printf '%s' "{\"pr\":$n,\"result\":\"auto-merge-off\"}"
             return "$EXIT_AUTO_OFF"
         fi
-        failed=$(jq -r --argjson req "$req_json" '
+        # Any red CI counts (not just the two required contexts): the
+        # aggregating `ci/all-checks` context is a no-op job that may be absent
+        # from the rollup while individual jobs already failed.
+        failed=$(jq -r '
             [.statusCheckRollup[]?
-              | select(.__typename == "StatusContext"
-                       and ((.context as $c | $req | index($c)) != null)
-                       and (.state | IN("FAILURE", "ERROR")))
-              | .context] | join(", ")' <<<"$j")
+              | select((.__typename == "StatusContext"
+                        and ((.context // "") | startswith("ci/circleci:"))
+                        and (.state | IN("FAILURE", "ERROR")))
+                       or (.__typename == "CheckRun"
+                           and ((.conclusion // "") | IN("FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STALE"))))
+              | (if .__typename == "StatusContext" then .context else .name end)]
+            | join(", ")' <<<"$j")
         if [ -n "$failed" ]; then
-            log "PR $n: required CI failed: $failed"
+            log "PR $n: CI failed on head: $failed"
             printf '%s' "{\"pr\":$n,\"result\":\"ci-failed\",\"failed\":\"$failed\"}"
             return "$EXIT_CI_FAILED"
         fi
@@ -759,8 +765,10 @@ ci_fixer_info() { # $1=pr ; echoes info json for the fix-ci fixer
     mkdir -p "$STATE_DIR/verdicts"
     rm -f "$verdict"
     failed_md=$(jq -r '[.statusCheckRollup[]?
-        | select(.__typename == "StatusContext" and (.state | IN("FAILURE", "ERROR")))
-        | "- \(.context): \(.targetUrl // "")"] | join("\n")' <<<"$j")
+        | select((.__typename == "StatusContext" and (.state | IN("FAILURE", "ERROR")))
+                 or (.__typename == "CheckRun" and ((.conclusion // "") | IN("FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STALE"))))
+        | "- \(if .__typename == "StatusContext" then .context else .name end): \(if .__typename == "StatusContext" then (.targetUrl // "") else (.detailsUrl // "") end)"]
+        | join("\n")' <<<"$j")
     jq -n --argjson pr "$n" --arg work "$work" \
         --arg branch "$(jq -r .headRefName <<<"$j")" \
         --arg base "$(jq -r .baseRefName <<<"$j")" \
