@@ -389,6 +389,11 @@ base class Handle<K: Key, +V: File>(
       invariant_violation(msg);
     };
     if (values.size() == 0) {
+      // A pending async call on this dir means a mapper suspended and left this entry
+      // empty; unwind like that mapper did instead of reporting a missing value.
+      if (context.hasPendingAsyncCalls(this.dirName)) {
+        throw AsyncCallPending()
+      };
       msg = `Error: No value for keys '${key}' in '${this.dirName}'`;
       print_error(msg);
       invariant_violation(msg);

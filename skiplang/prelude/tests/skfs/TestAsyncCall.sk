@@ -1,0 +1,74 @@
+module alias T = SKTest;
+module alias SK = SKStore;
+
+module SKStoreTest;
+
+@test
+fun testAsyncCallEndToEnd(): void {
+  // Dirs prefixed per test: the harness shares one global context across all @tests.
+  inputsDirName = SK.DirName::create("/asyncCall_inputs/");
+  mappedDirName = SK.DirName::create("/asyncCall_mapped/");
+  emptyCache: TestAsyncCache = TestAsyncCache();
+
+  // Build the graph: /mapped/ = /inputs/ through a mapper that asks for an async
+  //    result and writes value*2. Dir empty -> no async yet -> commits.
+  _ = asyncTestWrite(emptyCache, context ~> {
+    inputs = context.mkdir(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      inputsDirName,
+      Array[],
+    );
+    _ = inputs.map(
+      SK.IID::keyType,
+      SK.IntFile::type,
+      context,
+      mappedDirName,
+      (context, writer, k, _it) ~> {
+        context.asyncCall(DoubleAsyncFn(), k) match {
+        | SK.AOk(f) -> writer.set(k, SK.IntFile::type(f))
+        | SK.AError(_) -> void
+        }
+      },
+    )
+  });
+
+  // Replay loop. Round 1: Double(2) suspends. Round 2: cached -> converges.
+  cache: TestAsyncCache = emptyCache;
+  done = false;
+  rounds = 0;
+  while (!done) {
+    !rounds = rounds + 1;
+    T.expectTrue(rounds < 10, `loop did not converge, rounds=${rounds}`);
+    roundCache = cache;
+    asyncTestWrite(roundCache, context ~> {
+      inputs = SK.EHandle(SK.IID::keyType, SK.IntFile::type, inputsDirName);
+      inputs.writeArray(context, SK.IID(2), Array[SK.IntFile(2)]);
+      context.update()
+    }) match {
+    | Success _ -> !done = true
+    | Failure(SK.AsyncCallsCollected(calls)) ->
+      for (_arrow => callList in calls) {
+        for (call in callList) {
+          call match {
+          | SK.PendingCall(callId, f, input) ->
+            computeByName(f.getName(), input, res -> {
+              !cache = cache.with(callId, res)
+            })
+          }
+        }
+      }
+    | Failure(exn) -> throw exn
+    }
+  };
+
+  // /mapped/[2] must be 4, in exactly two rounds.
+  r = SK.withContext(context ~> {
+    mapped = SK.EHandle(SK.IID::keyType, SK.IntFile::type, mappedDirName);
+    mapped.unsafeGet(context, SK.IID(2)).value
+  });
+  T.expectEq(r, 4, "value");
+  T.expectEq(rounds, 2, "rounds")
+}
+
+module end;
