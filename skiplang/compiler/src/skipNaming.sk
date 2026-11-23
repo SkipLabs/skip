@@ -1979,8 +1979,8 @@ fun method_def(
       "@allow_tracked_call requires the method to be untracked",
     )
   };
-  met.checkNativeDecl("methods");
-  met.checkAnnotations(met.body.i1 is A.Body _, "methods");
+  met.checkNativeDecl();
+  met.checkAnnotations();
   tparam_context = context_name + "<method:tparam>" + method_name + ":";
   !env.in_deferred = met.deferred_.isSome();
   tunder_count = sk_create_counter();
@@ -2427,8 +2427,8 @@ fun fun_def(
       "@allow_tracked_call requires the function to be untracked",
     )
   };
-  fd.checkNativeDecl("functions");
-  fd.checkAnnotations(fd.body.isSome(), "functions");
+  fd.checkNativeDecl();
+  fd.checkAnnotations();
   if (annotationsContain(fd.annotations, "@always_inline", fd.name.i0)) {
     if (annotationsContain(fd.annotations, "@no_inline", fd.name.i0)) {
       SkipError.error(

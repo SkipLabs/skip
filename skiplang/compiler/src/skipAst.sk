@@ -217,6 +217,18 @@ base class Callable_def{
   tparams: Array<Type_parameter>,
   untracked_: ?FileRange,
 } {
+  /* Whether this definition has an implemented body. Deferred because the
+   * body field's type differs between Fun_def and Method_def. */
+  fun hasBody(): Bool;
+
+  /* What kind of callable this is, for error messages. */
+  fun what(): String {
+    this match {
+    | Fun_def _ -> "functions"
+    | _ -> "methods"
+    }
+  }
+
   /* True when this definition is lowered through a native annotation
    * (@cpp_extern/@cpp_runtime/@intrinsic) rather than declared `native` — a
    * body on such a definition is only a fallback that the native backend
@@ -246,11 +258,11 @@ base class Callable_def{
   }
 
   /* A `native` declaration must say how it is lowered. */
-  fun checkNativeDecl(what: String): void {
+  fun checkNativeDecl(): void {
     if (this.native_.isSome() && !this.isLoweredNatively()) {
       SkipError.error(
         this.name.i0,
-        `Native ${what} must be declared with @cpp_extern, @cpp_runtime, or @intrinsic`,
+        `Native ${this.what()} must be declared with @cpp_extern, @cpp_runtime, or @intrinsic`,
       )
     }
   }
@@ -262,9 +274,10 @@ base class Callable_def{
    * inliner replaces every call with the IR it lowers to, so its allocation
    * *is* derived and declaring it would be a hand-maintained duplicate of the
    * lowering, free to drift. */
-  fun checkAllocContract(what: String): void {
+  fun checkAllocContract(): void {
     annotations = this.annotations;
     pos = this.name.i0;
+    what = this.what();
     noAlloc = annotationsContain(annotations, "@no_alloc", pos);
     mayAlloc = annotationsContain(annotations, "@may_alloc", pos);
     allocParams = getAnnotationParams(annotations, "@alloc", pos);
@@ -322,8 +335,8 @@ base class Callable_def{
    * @cpp_extern/@cpp_runtime functions with a fallback body count as native
    * here: the native backend replaces the body and the contract applies
    * there. */
-  fun checkNoDeadContract(hasBody: Bool): void {
-    if (hasBody && !this.isNativeKind()) {
+  fun checkNoDeadContract(): void {
+    if (this.hasBody() && !this.isNativeKind()) {
       for (annotation in this.annotations) {
         if (
           annotation == "@no_alloc" ||
@@ -341,12 +354,10 @@ base class Callable_def{
     }
   }
 
-  /* All annotation checks that apply to every callable definition. `hasBody`
-   * is supplied by the caller because the body field's type differs between
-   * functions and methods. */
-  fun checkAnnotations(hasBody: Bool, what: String): void {
-    this.checkAllocContract(what);
-    this.checkNoDeadContract(hasBody);
+  /* All annotation checks that apply to every callable definition. */
+  fun checkAnnotations(): void {
+    this.checkAllocContract();
+    this.checkNoDeadContract();
     checkAnnotationNames(this.annotations, this.name.i0);
   }
 }
@@ -366,6 +377,10 @@ class Method_def{
 } extends Callable_def {
   fun isMacro(): Bool {
     this.macro_.isSome()
+  }
+
+  fun hasBody(): Bool {
+    this.body.i1 is Body _
   }
 }
 
@@ -421,6 +436,10 @@ class Fun_def{
 } extends Callable_def {
   fun isMacro(): Bool {
     this.macro_.isSome()
+  }
+
+  fun hasBody(): Bool {
+    this.body.isSome()
   }
 }
 
