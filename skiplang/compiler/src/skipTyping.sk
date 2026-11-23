@@ -1901,15 +1901,125 @@ fun call_(
       invalid_arg_msg,
     );
     (acc, pos_add_args.concat(named_add_args))
-  | (Mixed _, Positional _) -> SkipError.error(pos, "Expected named arguments")
-  | (Mixed _, Named _) ->
-    SkipError.error(pos, "Expected positional arguments")
+  | (Mixed(pos_tyl, named_ty_map, _), Positional(pos_args)) ->
+    // Only positional arguments supplied: named parameters must all have
+    // defaults (join_named_args reports the missing ones otherwise).
+    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    check_args_length(pos, fpos, pos_tyl1, pos_args);
+    (!acc, pos_add_args) = join_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos_tyl1,
+      pos_args,
+      invalid_arg_msg,
+    );
+    (!acc, named_add_args) = join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      named_ty_map,
+      UMap[],
+      invalid_arg_msg,
+    );
+    (acc, pos_add_args.concat(named_add_args))
+  | (Mixed(pos_tyl, named_ty_map, _), Named(named_args)) ->
+    // Only named arguments supplied: positional parameters must all have
+    // defaults.
+    pos_tyl1 = pos_tyl.map(cur1 -> TUtils.contra_promote(context, env, acc, cur1));
+    for (i in Range(0, pos_tyl1.size())) {
+      pos_tyl1[i] match {
+      | (_, N.Tdefault(_)) -> void
+      | _ ->
+        SkipError.errorl(
+          List[
+            (
+              pos,
+              `Missing arguments, expected ${pos_tyl1.size()} but got 0`,
+            ),
+            (fpos, "Definition is here"),
+          ],
+        )
+      }
+    }
+    (!acc, pos_add_args) = join_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos_tyl1,
+      (Array[] : Array<(Int, N.Type_, FileRange)>),
+      invalid_arg_msg,
+    );
+    (!acc, named_add_args) = join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      named_ty_map,
+      named_args,
+      invalid_arg_msg,
+    );
+    (acc, pos_add_args.concat(named_add_args))
   | (Named _, Mixed _) -> SkipError.error(pos, "Expected named arguments")
   | (Positional _, Mixed _) ->
     SkipError.error(pos, "Expected positional arguments")
   | (Named _, Positional _) -> SkipError.error(pos, "Expected named arguments")
   | (Positional _, Named _) ->
     SkipError.error(pos, "Expected positional arguments")
+  }
+}
+
+/* When the callee takes mixed parameters but only one argument group was
+ * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), the
+ * missing group is filled with default arguments, producing a Mixed
+ * argument list. */
+fun merge_default_args(
+  params_ty: Parameters<N.Type_>,
+  add_args: Array<(?N.Name, TAst.Ordered_expr)>,
+  args: TAst.Call_args,
+): TAst.Call_args {
+  params_ty match {
+  | Mixed _ ->
+    (pos_add, named_add) = add_args.foldl(
+      (acc, p) -> {
+        (name_opt, oe) = p;
+        (pos_acc, named_acc) = acc;
+        name_opt match {
+        | None() -> (pos_acc.concat(Array[oe]), named_acc)
+        | Some(n) -> (pos_acc, named_acc.concat(Array[(n, oe)]))
+        }
+      },
+      (
+        (Array[] : Array<TAst.Ordered_expr>),
+        (Array[] : Array<(N.Name, TAst.Ordered_expr)>),
+      ),
+    );
+    args match {
+    | Positional(pos_args) ->
+      Mixed(
+        pos_args.concat(pos_add),
+        UMap::createFromItems(named_add),
+        false,
+      )
+    | Named(named_args) ->
+      Mixed(
+        pos_add,
+        named_add.foldl((m, p) -> m.add(p.i0, p.i1), named_args),
+        false,
+      )
+    | Mixed(pos_args, named_args, nf) ->
+      Mixed(
+        pos_args.concat(pos_add),
+        named_add.foldl((m, p) -> m.add(p.i0, p.i1), named_args),
+        nf,
+      )
+    }
+  | _ -> TUtils.add_default_arguments(add_args, args)
   }
 }
 
@@ -1940,7 +2050,7 @@ fun tfun_call(
     args_ty,
     invalid_argument_message,
   );
-  args1 = TUtils.add_default_arguments(add_args, args);
+  args1 = merge_default_args(params_ty, add_args, args);
   e = (pos, TAst.Call(f, args1));
   check_tracking(pos, env, tracking);
   (acc1, (return_ty, e))
