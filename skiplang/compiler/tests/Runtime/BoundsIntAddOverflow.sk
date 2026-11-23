@@ -1,0 +1,39 @@
+module Runtime_BoundsIntAddOverflow;
+// Regression test for the bounds-check elimination pass: IntAdd wraps modulo
+// 2^64, so nonneg(a) and nonneg(b) do not imply nonneg(a + b). Here
+// 2^63-1 + size wraps to a negative index; the access must still throw
+// OutOfBounds. An unsound pass would conclude the index is in [0, size),
+// remove the bounds check, and read out of bounds instead.
+//
+// The helper is @no_inline and takes the array as a parameter so that
+// `arr.size()` does not constant-fold: the IntAdd of the huge constant and
+// the (non-constant) size is what the pass must reason about.
+
+@no_inline
+private fun checkWrapped(arr: readonly Array<Int>): String {
+  i = 9223372036854775807 + arr.size();
+  if (i < arr.size()) {
+    try {
+      _ = arr.get(i);
+      "FAIL: no exception\n"
+    } catch {
+    | OutOfBounds() -> "Pass\n"
+    | _ -> "FAIL: wrong exception\n"
+    }
+  } else {
+    "FAIL: signed comparison\n"
+  }
+}
+
+@exptest
+fun main(): void {
+  arr = Array[10, 20, 30];
+  // Sanity: ordinary loop over the array (checks may be eliminated here) must
+  // still compute the right value.
+  sum = 0;
+  for (i in Range(0, arr.size())) {
+    !sum = sum + arr.get(i)
+  };
+  print_raw(sum.toString() + "\n" + checkWrapped(arr))
+}
+module end;
