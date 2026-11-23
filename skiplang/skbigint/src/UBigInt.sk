@@ -1,22 +1,30 @@
 module SKBigInt;
 
+/**
+ * Unsigned arbitrary-precision integer: the magnitude core of BigInt.
+ *
+ * Canonical little-endian array of 30-bit limbs stored as UInt32 (4 bytes
+ * each); no trailing zero limb, and zero is []. The value class flattens,
+ * so there is no per-value heap header. Equality and hash are structural
+ * over the limbs, which canonical form makes equal to numeric equality.
+ */
 value class UBigInt private (
   private limbs: Array<UInt32>,
 ) uses Show, Orderable, Hashable {
   // Unsigned big integer: the magnitude core of BigInt. Canonical: limbs has
   // no trailing zero limb; zero is [].
 
-  // Internal helper (normalizes); prefer fromInt/fromString.
+  /** Internal: builds a UBigInt from raw limbs, normalizing to canonical form. */
   static fun make(limbs: Array<UInt32>): UBigInt {
     UBigInt(dropZeros(limbs))
   }
 
+  /** The unsigned zero. */
   static fun zero(): UBigInt {
     UBigInt(Array[])
   }
 
-  // Magnitude of v as limbs (v may be negative, including Int::min).
-  // Internal helper: magnitude limbs of v (v may be negative).
+  /** Internal: magnitude limbs of v (v may be negative, including Int::min). */
   static fun limbsOfInt(v: Int): Array<UInt32> {
     r = mutable Vector[];
     x = v;
@@ -31,12 +39,19 @@ value class UBigInt private (
     r.toArray()
   }
 
+  /**
+   * The UBigInt equal to the non-negative Int v.
+   * Precondition: v >= 0.
+   */
   static fun fromInt(v: Int): UBigInt {
     invariant(v >= 0, "UBigInt::fromInt: expected a non-negative Int");
     static::make(static::limbsOfInt(v))
   }
 
-  // Parses "[0-9]+"; returns None() if invalid. Normalized ("007" -> "7").
+  /**
+   * Parses "[0-9]+" into a UBigInt. Returns None() if s is empty or contains a
+   * non-digit. The result is normalized ("007" -> 7).
+   */
   static fun fromString(s: String): ?UBigInt {
     parseDecimal(s.bytes(), 0, s.length()) match {
     | Some(limbs) -> Some(static::make(limbs))
@@ -44,6 +59,7 @@ value class UBigInt private (
     }
   }
 
+  /** The decimal representation (Show). */
   fun toString(): String {
     if (this.limbs.size() == 0) {
       "0"
@@ -52,15 +68,20 @@ value class UBigInt private (
     }
   }
 
+  /** True iff this value is zero. */
   fun isZero(): Bool {
     this.limbs.size() == 0
   }
 
+  /** this + other. */
   fun add(other: UBigInt): UBigInt {
     static::make(addMag(this.limbs, other.limbs))
   }
 
-  // this - other, requires this >= other.
+  /**
+   * this - other. Precondition: this >= other (throws an invariant violation
+   * on underflow).
+   */
   fun sub(other: UBigInt): UBigInt {
     invariant(
       this.compare(other) != LT(),
@@ -69,36 +90,45 @@ value class UBigInt private (
     static::make(subMag(this.limbs, other.limbs))
   }
 
+  /** this * other (schoolbook). */
   fun mul(other: UBigInt): UBigInt {
     static::make(mulMag(this.limbs, other.limbs))
   }
 
-  // this = q*other + r with 0 <= r < other.
+  /**
+   * (q, r) with this = q*other + r and 0 <= r < other.
+   * Precondition: other != 0.
+   */
   fun divMod(other: UBigInt): (UBigInt, UBigInt) {
     invariant(!other.isZero(), "UBigInt::divMod: division by zero");
     qr = divModMag(this.limbs, other.limbs);
     (static::make(qr.i0), static::make(qr.i1))
   }
 
+  /** Quotient of this / other. Precondition: other != 0. */
   fun div(other: UBigInt): UBigInt {
     this.divMod(other).i0
   }
 
+  /** Remainder of this / other, 0 <= result < other. Precondition: other != 0. */
   fun mod(other: UBigInt): UBigInt {
     this.divMod(other).i1
   }
 
-  // this^exp for exp >= 0.
+  /**
+   * this^exp (square-and-multiply). Precondition: exp >= 0.
+   */
   fun pow(exp: Int): UBigInt {
     invariant(exp >= 0, "UBigInt::pow: expected a non-negative exponent");
     static::make(powMag(this.limbs, exp))
   }
 
-  // Greatest common divisor, always non-negative.
+  /** Greatest common divisor with other, always non-negative. */
   fun gcd(other: UBigInt): UBigInt {
     static::make(gcdMag(this.limbs, other.limbs))
   }
 
+  /** Numeric comparison: LT/EQ/GT (Orderable). */
   fun compare(other: UBigInt): Order {
     cmpMag(this.limbs, other.limbs)
   }

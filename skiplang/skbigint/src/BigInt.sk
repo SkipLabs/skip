@@ -19,6 +19,15 @@ module SKBigInt;
 // the structural equality/hash (Orderable/Hashable field macros) equal to
 // numeric equality/hash. Magnitude algorithms live in helpers.sk.
 
+/**
+ * Signed arbitrary-precision integer: a sign and an unsigned magnitude
+ * (UBigInt). Zero is (false, UBigInt::zero()). The value-class layout flattens
+ * to (Bool, limb-array pointer) — no per-value heap header. Canonical form
+ * makes structural equality/hash equal to numeric equality/hash.
+ *
+ * Division is truncated (quotient rounds toward zero, remainder takes the
+ * dividend's sign); mod is floored (result takes the divisor's sign).
+ */
 value class BigInt private (
   private negative: Bool,
   private mag: UBigInt,
@@ -27,6 +36,7 @@ value class BigInt private (
   // (false, UBigInt::zero()). The value-class layout flattens to
   // (Bool, limb-array pointer) — same as a plain (Bool, Array<UInt32>) field.
 
+  /** Internal: builds a BigInt, canonicalizing zero to (false, zero). */
   static private fun make(negative: Bool, mag: UBigInt): BigInt {
     if (mag.isZero()) {
       BigInt(false, UBigInt::zero())
@@ -35,10 +45,12 @@ value class BigInt private (
     }
   }
 
+  /** The signed zero. */
   static fun zero(): BigInt {
     BigInt(false, UBigInt::zero())
   }
 
+  /** The BigInt equal to the Int v (any i64, including Int::min). */
   static fun fromInt(v: Int): BigInt {
     if (v == 0) {
       static::zero()
@@ -47,8 +59,10 @@ value class BigInt private (
     }
   }
 
-  // Parses "-?[0-9]+"; returns None() if invalid. Normalized ("007" -> "7",
-  // "-0" -> "0").
+  /**
+   * Parses "-?[0-9]+" into a BigInt. Returns None() if s is invalid.
+   * The result is normalized ("007" -> 7, "-0" -> 0).
+   */
   static fun fromString(s: String): ?BigInt {
     bs = s.bytes();
     n = bs.size();
@@ -66,6 +80,7 @@ value class BigInt private (
     }
   }
 
+  /** The decimal representation, with a leading '-' if negative (Show). */
   fun toString(): String {
     if (this.negative) {
       "-" + this.mag.toString()
@@ -74,19 +89,22 @@ value class BigInt private (
     }
   }
 
-  // The unsigned magnitude of this value.
+  /** The unsigned magnitude of this value as a UBigInt. */
   fun magnitude(): UBigInt {
     this.mag
   }
 
+  /** True iff this value is zero. */
   fun isZero(): Bool {
     this.mag.isZero()
   }
 
+  /** |this|. */
   fun abs(): BigInt {
     static::make(false, this.mag)
   }
 
+  /** -this. */
   fun neg(): BigInt {
     if (this.isZero()) {
       this
@@ -95,6 +113,7 @@ value class BigInt private (
     }
   }
 
+  /** this + other. */
   fun add(other: BigInt): BigInt {
     if (this.negative == other.negative) {
       static::make(this.negative, this.mag.add(other.mag))
@@ -110,21 +129,28 @@ value class BigInt private (
     }
   }
 
+  /** this - other. */
   fun sub(other: BigInt): BigInt {
     this.add(other.neg())
   }
 
+  /** this * other. */
   fun mul(other: BigInt): BigInt {
     static::make(this.negative != other.negative, this.mag.mul(other.mag))
   }
 
-  // Truncated division: the quotient rounds toward zero and the remainder
-  // takes the sign of this dividend.
+  /**
+   * Truncated division: the quotient rounds toward zero.
+   * Throws BigIntDivisionByZero if other is zero.
+   */
   fun div(other: BigInt): BigInt {
     this.divMod(other).i0
   }
 
-  // Floored modulo: the result takes the sign of the divisor.
+  /**
+   * Floored modulo: the result takes the sign of the divisor.
+   * Throws BigIntDivisionByZero if other is zero.
+   */
   fun mod(other: BigInt): BigInt {
     qr = this.divMod(other);
     r = qr.i1;
@@ -135,7 +161,10 @@ value class BigInt private (
     }
   }
 
-  // Truncated (quotient, remainder).
+  /**
+   * Truncated (quotient, remainder): quotient rounds toward zero, remainder
+   * takes the sign of this dividend. Throws BigIntDivisionByZero if other is 0.
+   */
   private fun divMod(other: BigInt): (BigInt, BigInt) {
     if (other.isZero()) {
       throw BigIntDivisionByZero()
@@ -146,7 +175,9 @@ value class BigInt private (
     (q, r)
   }
 
-  // this^exp for exp >= 0.
+  /**
+   * this^exp. Throws BigIntNegativeExponent if exp < 0.
+   */
   fun pow(exp: Int): BigInt {
     if (exp < 0) {
       throw BigIntNegativeExponent()
@@ -154,11 +185,12 @@ value class BigInt private (
     static::make(this.negative && (exp % 2 == 1), this.mag.pow(exp))
   }
 
-  // Greatest common divisor, always non-negative.
+  /** Greatest common divisor with other, always non-negative. */
   fun gcd(other: BigInt): BigInt {
     static::make(false, this.mag.gcd(other.mag))
   }
 
+  /** Numeric comparison: LT/EQ/GT (Orderable). */
   fun compare(other: BigInt): Order {
     if (this.negative != other.negative) {
       if (this.negative) {

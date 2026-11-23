@@ -6,17 +6,26 @@ module SKBigInt;
 // to Int (i64) for arithmetic; 30 bits keeps every intermediate < 2^63.
 // See UBigInt.sk / BigInt.sk for the design.
 
+/**
+ * Limb constants. Limbs are 30-bit unsigned values stored as UInt32 (4 bytes
+ * each in the produced code); arithmetic widens to Int (i64). 30 bits keeps
+ * every intermediate < 2^63: schoolbook needs limb*limb + limb + carry
+ * < 2^63 (B <= 31) and Knuth D's quotient correction needs qhat*divisor
+ * < 2^63 with qhat up to ~2B (B <= 30).
+ */
 const kLimbBits: Int = 30;
 const kLimbBase: Int = 1073741824; // 2^30
 const kLimbMask: Int = 1073741823; // 2^30 - 1
 const kDecChunk: Int = 1000000000; // 10^9 < 2^30, decimal chunk for parsing
 
+/** Thrown by BigInt div/mod (and UBigInt divMod) when the divisor is zero. */
 class BigIntDivisionByZero() extends Exception {
   fun getMessage(): String {
     "BigInt division by zero"
   }
 }
 
+/** Thrown by BigInt::pow (and UBigInt::pow) on a negative exponent. */
 class BigIntNegativeExponent() extends Exception {
   fun getMessage(): String {
     "BigInt exponent must be non-negative"
@@ -26,6 +35,10 @@ class BigIntNegativeExponent() extends Exception {
 // Magnitude helpers. A magnitude is a canonical little-endian limb array
 // (limbs in [0, 2^30), no trailing zero limb; the empty array is zero).
 
+/**
+ * Returns `a` without trailing zero limbs (the canonical form). If nothing
+ * changes, returns `a` itself.
+ */
 fun dropZeros(a: Array<UInt32>): Array<UInt32> {
   n = a.size();
   while (n > 0 && a[n - 1].toInt() == 0) {
@@ -38,6 +51,7 @@ fun dropZeros(a: Array<UInt32>): Array<UInt32> {
   }
 }
 
+/** Compares two magnitudes: LT/EQ/GT by numeric value. */
 fun cmpMag(a: Array<UInt32>, b: Array<UInt32>): Order {
   if (a.size() != b.size()) {
     if (a.size() < b.size()) {
@@ -64,6 +78,7 @@ fun cmpMag(a: Array<UInt32>, b: Array<UInt32>): Order {
   }
 }
 
+/** Magnitude addition: a + b. */
 fun addMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   n = if (a.size() > b.size()) a.size() else b.size();
   r = Array::mfill(n + 1, UInt32::truncate(0));
@@ -85,7 +100,10 @@ fun addMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   dropZeros(r.chill())
 }
 
-// a - b, requires a >= b (magnitudes).
+/**
+ * Magnitude subtraction: a - b. Requires a >= b (precondition; the caller
+ * checks via cmpMag).
+ */
 fun subMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   r = Array::mfill(a.size(), UInt32::truncate(0));
   borrow = 0;
@@ -107,6 +125,10 @@ fun subMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   dropZeros(r.chill())
 }
 
+/**
+ * Magnitude multiplication (schoolbook/comba, O(n*m)). Every intermediate
+ * limb*limb + limb + carry < 2^61 fits in Int.
+ */
 fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   if (a.size() == 0 || b.size() == 0) {
     Array[]
@@ -138,7 +160,7 @@ fun mulMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   }
 }
 
-// a * m for a single limb m in [0, 2^30).
+/** Magnitude times a single limb m in [0, 2^30). */
 fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0 || a.size() == 0) {
     Array[]
@@ -157,7 +179,7 @@ fun mulMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   }
 }
 
-// a + m for a single limb m in [0, 2^30).
+/** Magnitude plus a single limb m in [0, 2^30). */
 fun addMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   if (m == 0) {
     a
@@ -180,7 +202,7 @@ fun addMagSmall(a: Array<UInt32>, m: Int): Array<UInt32> {
   }
 }
 
-// a * 2^s (magnitude).
+/** Magnitude times 2^s: a * 2^s. */
 fun shlMag(a: Array<UInt32>, s: Int): Array<UInt32> {
   if (a.size() == 0 || s == 0) {
     a
@@ -201,7 +223,7 @@ fun shlMag(a: Array<UInt32>, s: Int): Array<UInt32> {
   }
 }
 
-// floor(a / 2^s) (magnitude).
+/** floor(a / 2^s) for a magnitude. */
 fun shrMag(a: Array<UInt32>, s: Int): Array<UInt32> {
   limbShift = s / kLimbBits;
   bitShift = s % kLimbBits;
@@ -223,7 +245,14 @@ fun shrMag(a: Array<UInt32>, s: Int): Array<UInt32> {
   }
 }
 
-// a divided by a single nonzero limb d: (quotient, remainder), 0 <= rem < d.
+/**
+ * Divides a magnitude by a single nonzero limb d, returning
+ * (quotient, remainder) with 0 <= remainder < d.
+ */
+/**
+ * Knuth's Algorithm D: returns (q, r) with a = q*b + r and 0 <= r < b.
+ * Requires b nonzero.
+ */
 fun divModMagSmall(a: Array<UInt32>, d: Int): (Array<UInt32>, Int) {
   q = Array::mfill(a.size(), UInt32::truncate(0));
   rem = 0;
@@ -324,6 +353,7 @@ fun divModMag(
   }
 }
 
+/** Magnitude exponentiation: a^e for e >= 0 (square-and-multiply). */
 fun powMag(a: Array<UInt32>, e: Int): Array<UInt32> {
   result = Array[UInt32::truncate(1)];
   base = a;
@@ -340,6 +370,7 @@ fun powMag(a: Array<UInt32>, e: Int): Array<UInt32> {
   result
 }
 
+/** Greatest common divisor of two magnitudes (Euclid). */
 fun gcdMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   x = a;
   y = b;
@@ -351,8 +382,10 @@ fun gcdMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
   x
 }
 
-// Parses the decimal digits in bs[from..to) ("[0-9]+"); returns None() if
-// the range is empty or contains a non-digit. The result is normalized.
+/**
+ * Parses the decimal digits in bs[from..to) ("[0-9]+") into a canonical
+ * magnitude. Returns None() if the range is empty or has a non-digit.
+ */
 fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<UInt32> {
   if (from >= to) {
     None()
@@ -394,7 +427,10 @@ fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<UInt32> {
   }
 }
 
-// The decimal digits of a magnitude, least significant 9-digit chunk first.
+/**
+ * The decimal digits of a magnitude as 9-digit chunks (10^9 < 2^30),
+ * least significant chunk first.
+ */
 fun decimalChunks(limbs: Array<UInt32>): Array<String> {
   parts = mutable Vector[];
   r = limbs;
@@ -406,8 +442,11 @@ fun decimalChunks(limbs: Array<UInt32>): Array<String> {
   parts.toArray()
 }
 
-// Joins decimal chunks (least significant first), padding all but the most
-// significant to 9 digits.
+/**
+ * Joins decimal chunks (least significant first, as produced by
+ * decimalChunks) into a decimal string, padding all but the most
+ * significant chunk to 9 digits.
+ */
 fun joinDecimalChunks(parts: Array<String>): String {
   out = "";
   i = parts.size() - 1;
