@@ -602,6 +602,10 @@ fun normalize_positional_params(
       invariant_violation(
         "Internal error: encountered named parameters but was expecting positional",
       )
+    | N.HasParams(N.Class_params{params => Mixed _}) ->
+      invariant_violation(
+        "Internal error: encountered mixed parameters but was expecting positional",
+      )
     | N.HasParams(N.Class_params{params => Positional(class_params)}) ->
       class_params
     }

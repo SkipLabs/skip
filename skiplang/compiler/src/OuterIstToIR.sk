@@ -147,10 +147,12 @@ private fun flattenParams<T>(
       );
       (pArgs, numOpt, numOpt <= 1)
     | Named _ -> invariant_violation("Positional/named mismatch.")
+    | Mixed _ -> invariant_violation("Positional/named mismatch.")
     }
   | Named(funArgs) ->
     params match {
     | Positional _ -> invariant_violation("Positional/named mismatch.")
+    | Mixed _ -> invariant_violation("Positional/named mismatch.")
     | Named(pArgs) ->
       invariant(funArgs.size() == pArgs.size(), "Arg count mismatch");
 
@@ -2555,6 +2557,7 @@ class Converter private (
         constructorParametersNamed => fieldParams match {
         | Positional _ -> false
         | Named _ -> true
+        | Mixed _ -> true
         },
         kind,
         extends_,
