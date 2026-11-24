@@ -13,7 +13,7 @@ fun current_exe(): String {
   if (argv0.startsWith("/")) {
     path = argv0;
     if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
+      return FileSystem.realpath(path).default(path)
     } else {
       invariant_violation("Could not determine main executable.")
     }
@@ -23,7 +23,7 @@ fun current_exe(): String {
   if (argv0.contains("/")) {
     path = Path.join(current_dir(), argv0);
     if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
+      return FileSystem.realpath(path).default(path)
     } else {
       invariant_violation("Could not determine main executable.")
     }
@@ -33,7 +33,7 @@ fun current_exe(): String {
   for (p in var("PATH").split(":")) {
     path = Path.join(p, argv0);
     if (FileSystem.exists(path)) {
-      return FileSystem.realpath(path)
+      return FileSystem.realpath(path).default(path)
     }
   };
 
