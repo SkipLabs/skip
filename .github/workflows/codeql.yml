@@ -74,7 +74,9 @@ jobs:
       if: matrix.language == 'c-cpp'
       shell: bash
       working-directory: skiplang/prelude/runtime
-      run: make CFLAGS="-O2 -g3 -I../libbacktrace" libskip_runtime64.a
+      # A command-line CFLAGS overrides the Makefile's own `CFLAGS += -I. ...`,
+      # so -I. must be repeated here or ryu/*.c can't resolve #include "ryu/...".
+      run: make CFLAGS="-O2 -g3 -I. -I../libbacktrace" libskip_runtime64.a
 
     - name: Build Kotlin sources (manual java-kotlin)
       if: matrix.language == 'java-kotlin'
