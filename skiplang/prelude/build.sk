@@ -122,9 +122,9 @@ fun build_libbacktrace(
   // Try using Makefile-built libbacktrace (e.g. from `make libbacktrace`).
   prebuilt = "./build/libbacktrace.a";
   if (FileSystem.exists(prebuilt)) {
-    prebuilt_abs = FileSystem.realpath(prebuilt);
+    prebuilt_abs = FileSystem.realpath(prebuilt).default(prebuilt);
     print_string(`skargo:skc-link-lib=${prebuilt_abs}`);
-    return FileSystem.realpath("./libbacktrace")
+    return FileSystem.realpath("./libbacktrace").default("./libbacktrace")
   };
 
   // Resort to building libbacktrace from source.
@@ -136,7 +136,7 @@ fun build_libbacktrace(
     skipExit(1)
   };
   // Build out-of-tree to avoid races when multiple packages build concurrently.
-  source_dir = FileSystem.realpath("./libbacktrace");
+  source_dir = FileSystem.realpath("./libbacktrace").default("./libbacktrace");
   _ = System.popen{args => Array["mkdir", "-p", out_dir]}.fromSuccess();
   p = System.popen{
     args => Array[

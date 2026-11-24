@@ -516,7 +516,8 @@ mutable class BuildRunner(
       unit.mode is CompileModeRunBuildScript _;
     (cmd, separate_link, stdout_path, stderr_path) = if (is_build_script) {
       this.bctx.gctx.console.status("Running", unit_name);
-      build_dir = FileSystem.realpath(this.build_dir_for(unit));
+      build_dir_rel = this.build_dir_for(unit);
+      build_dir = FileSystem.realpath(build_dir_rel).default(build_dir_rel);
       (
         this.build_script_cmd(unit),
         false,
@@ -531,7 +532,10 @@ mutable class BuildRunner(
         unit,
         check && this.bctx.roots.contains(unit),
       );
-      fingerprint_dir = FileSystem.realpath(this.fingerprint_dir_for(unit));
+      fingerprint_dir_rel = this.fingerprint_dir_for(unit);
+      fingerprint_dir = FileSystem.realpath(fingerprint_dir_rel).default(
+        fingerprint_dir_rel,
+      );
       (
         skc_cmd,
         separate_link,
@@ -700,10 +704,8 @@ mutable class BuildRunner(
     cmd.cwd(unit.pkg.root());
 
     cmd.env("SKARGO_MANIFEST_DIR", unit.pkg.root());
-    cmd.env(
-      "OUT_DIR",
-      FileSystem.realpath(Path.join(this.build_dir_for(unit), "out")),
-    );
+    out_dir_rel = Path.join(this.build_dir_for(unit), "out");
+    cmd.env("OUT_DIR", FileSystem.realpath(out_dir_rel).default(out_dir_rel));
     cmd.env("NAME", unit.pkg.name());
     cmd.env("PROFILE", unit.profile);
     cmd.env(

@@ -572,12 +572,12 @@ char* SKIP_realpath(char* path) {
   char res[PATH_MAX];
   char* rv = realpath(path, res);
   if (rv == NULL) {
-    perror("realpath");
-    // TODO: Ideally, this function would return a ?String instead.
-    return sk_string_create("", 0);
+    // Failure is reported to the caller as None(), which keeps the original
+    // path available for diagnostics (#1491).
+    return sk_create_none_string_option();
   }
 
-  return sk_string_create(res, strlen(res));
+  return sk_create_string_option(sk_string_create(res, strlen(res)));
 }
 
 __attribute__((noreturn)) void SKIP_exit(uint64_t code) {

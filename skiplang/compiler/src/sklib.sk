@@ -533,13 +533,14 @@ mutable class Resolver(
         // TODO: Log it.
         continue
       };
-      !p = FileSystem.realpath(p);
+      !p = FileSystem.realpath(p).default(p);
       for (f in FileSystem.readDirectory(p)) {
         if (!f.endsWith(".sklib")) {
           continue
         };
 
-        path = FileSystem.realpath(Path.join(p, f));
+        joined = Path.join(p, f);
+        path = FileSystem.realpath(joined).default(joined);
         candidate = candidatesByPath.getOrAdd(path, () ->
           ArchiveCandidate::read(path, cache) match {
           | Success(candidate) -> candidate
@@ -577,7 +578,8 @@ mutable class Resolver(
     for (dep in dependencies) {
       (!dep, path, metadata) = if (dep.contains("=")) {
         (name, path) = dep.splitFirst("=");
-        !path = FileSystem.realpath(path);
+        // Keep the original path on failure so diagnostics can name it (#1491).
+        !path = FileSystem.realpath(path).default(path);
         // Reuse the scanned candidate and this invocation's decoded metadata.
         // A new invocation constructs a new Resolver and observes fresh files.
         metadata = this.candidatesByPath.maybeGet(path) match {
