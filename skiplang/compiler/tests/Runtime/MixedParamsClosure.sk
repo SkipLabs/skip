@@ -1,0 +1,26 @@
+module Runtime_MixedParamsClosure;
+// A mixed function used as a first-class value: the closure keeps the mixed
+// signature and arguments are not swapped.
+fun f(a: Int = 0){b: Int}: Int {
+  10 * a + b
+}
+
+class C() {
+  fun m(x: Int = 0){y: Int}: Int {
+    10 * x + y
+  }
+}
+
+@exptest
+fun main(): void {
+  h = f;
+  c = C();
+  g = c.m;
+  print_raw(
+    h(2){b => 3}.toString() +
+      h{b => 4}(5).toString() +
+      g(2){y => 3}.toString() +
+      "\n",
+  )
+}
+module end;

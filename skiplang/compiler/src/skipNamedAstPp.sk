@@ -324,16 +324,36 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<N.Type_>): void {
     o.out("{");
     type_map(o, m);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      type_map(o, named);
+      o.out("}");
+      o.out("(");
+      array(type, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(type, o, pos);
+      o.out(")");
+      o.out("{");
+      type_map(o, named);
+      o.out("}")
+    }
   }
 }
 
 fun type_map(o: mutable BufferedPrinter.Out, m: UMap<N.Type_>): void {
-  m.each((name, ty) -> {
-    o.out(name.i1);
-    o.out(": ");
-    type(o, ty);
-    o.out(", ")
-  })
+  list(
+    (o, p) -> {
+      (name, ty) = p;
+      o.out(name.i1);
+      o.out(": ");
+      type(o, ty)
+    },
+    o,
+    List::createFromIterator(m.items()),
+  )
 }
 
 fun type_args(o: mutable BufferedPrinter.Out, x: Array<N.Type_>): void {
@@ -391,6 +411,24 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<N.Parameter>): void {
     values = param_map.values() |> List::createFromIterator;
     list(fun_parameter, o, values);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      values = named.values() |> List::createFromIterator;
+      list(fun_parameter, o, values);
+      o.out("}");
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")");
+      o.out("{");
+      values = named.values() |> List::createFromIterator;
+      list(fun_parameter, o, values);
+      o.out("}")
+    }
   }
 }
 
@@ -781,6 +819,9 @@ fun lambda_params(
   x match {
   | Positional(l) -> lambda_param_array("(", ")", o, l)
   | Named(m) -> lambda_param_array("{", "}", o, m.values().collect(Array))
+  | Mixed(pos, named, _) ->
+    lambda_param_array("(", ")", o, pos);
+    lambda_param_array("{", "}", o, named.values().collect(Array))
   }
 }
 
@@ -836,6 +877,14 @@ fun let_obj_fields(
   | Named(map) ->
     values = map.items() |> List::createFromIterator;
     o.out("{");
+    list(pattern_fields, o, values);
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(match_pattern, o, pos);
+    o.out(")");
+    o.out("{");
+    values = named.items() |> List::createFromIterator;
     list(pattern_fields, o, values);
     o.out("}")
   }
@@ -924,6 +973,24 @@ fun object_args(o: mutable BufferedPrinter.Out, x: N.Call_args): void {
     o.out("{");
     field_list(o, l);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    // Print the groups in their recorded source order so that a named-first
+    // call `f{b => x}(1)` does not print as the different `f(1){b => x}`.
+    if (namedFirst) {
+      o.out("{");
+      field_list(o, named);
+      o.out("}");
+      o.out("(");
+      array(expr, o, pos.map(p -> p.i1));
+      o.out(")")
+    } else {
+      o.out("(");
+      array(expr, o, pos.map(p -> p.i1));
+      o.out(")");
+      o.out("{");
+      field_list(o, named);
+      o.out("}")
+    }
   }
 }
 

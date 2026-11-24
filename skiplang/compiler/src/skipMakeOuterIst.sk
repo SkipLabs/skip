@@ -880,6 +880,8 @@ fun expr_(
     argArray = args1 match {
     | Positional(a) -> a
     | Named _ -> pos.die("Expected positional args for TemplateLiteral")
+    // Template literals always desugar to positional call args.
+    | Mixed _ -> invariant_violation("ICE Mixed args for TemplateLiteral")
     };
     result = argArray.size() match {
     | 0 -> make_empty_string(pos)
@@ -1233,7 +1235,11 @@ fun new_call(
     info = OU.const_binding_info;
     fixed_targs = targs.map(strip_tdefault_from_type_);
     fixed_ty_fun = O.Type(fpos, O.Tfun(fmods, fixed_targs, ty_ret));
-    params = targs.map(t ->
+    // Bind the closure parameters with the same default-free types as the
+    // closure signature: defaults are not available on indirect calls, and
+    // keeping Tdefault on the bindings would reorder mixed parameter groups
+    // when the callee flattens its parameters (optional ones go last).
+    params = fixed_targs.map(t ->
       O.Binding(t, O.Name(pos, new_tmp_sk(new_id)), info)
     );
     vars = params.map(t_var -> {
@@ -1257,18 +1263,39 @@ fun call_args(
 ): (List<O.Stmt>, Parameters<O.Expr>) {
   x match {
   | Positional(el) ->
-    (acc1, el1) = el.mapAcc(
-      ((acc1, pos_e) -> {
-        (_, e) = pos_e;
-        bind_expr(new_id, env, acc1, e)
-      }),
-      acc,
-    );
+    (acc1, el1) = bind_positional_args(new_id, env, acc, el);
     (acc1, Positional(el1))
   | Named(em) ->
     (acc1, em1) = named_call_args(new_id, env, acc, em);
     (acc1, Named(em1))
+  | Mixed(el, em, namedFirst) ->
+    // Bind the argument groups in source order so that evaluation order
+    // matches the source order of the two groups.
+    if (namedFirst) {
+      (acc1, em1) = named_call_args(new_id, env, acc, em);
+      (acc2, el1) = bind_positional_args(new_id, env, acc1, el);
+      (acc2, Mixed(el1, em1, true))
+    } else {
+      (acc1, el1) = bind_positional_args(new_id, env, acc, el);
+      (acc2, em1) = named_call_args(new_id, env, acc1, em);
+      (acc2, Mixed(el1, em1, false))
+    }
   }
+}
+
+private fun bind_positional_args(
+  new_id: () -> Int,
+  env: Env,
+  acc: List<O.Stmt>,
+  el: Array<TAst.Ordered_expr>,
+): (List<O.Stmt>, Array<O.Expr>) {
+  el.mapAcc(
+    ((acc1, pos_e) -> {
+      (_, e) = pos_e;
+      bind_expr(new_id, env, acc1, e)
+    }),
+    acc,
+  )
 }
 
 fun named_call_args(
@@ -1378,6 +1405,11 @@ fun bind_params(
     | (Positional(params1), Positional(args1)) ->
       (params1.values(), args1.values())
     | (Named(params1), Named(args1)) -> (params1.values(), args1.values())
+    | (Mixed(posP, namedP, _), Mixed(posA, namedA, _)) ->
+      (
+        posP.values().concat(namedP.values()),
+        posA.values().concat(namedA.values()),
+      )
     | _ -> invariant_violation("assert false")
     }
   };

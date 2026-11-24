@@ -426,6 +426,7 @@ fun add_params<Ta>(
     };
     values.concat(acc.values()).collect(Array)
   | Positional(a) -> a.concat(acc)
+  | Mixed _ -> invariant_violation("Mixed parameters not supported in patterns")
   }
 }
 
@@ -601,6 +602,10 @@ fun normalize_positional_params(
       invariant_violation(
         "Internal error: encountered named parameters but was expecting positional",
       )
+    | N.HasParams(N.Class_params{params => Mixed _}) ->
+      invariant_violation(
+        "Internal error: encountered mixed parameters but was expecting positional",
+      )
     | N.HasParams(N.Class_params{params => Positional(class_params)}) ->
       class_params
     }
@@ -700,6 +705,8 @@ fun rebuild_constr(
         UMap[],
       );
       (ty, (pos, TAst.Pat_type(nm, castType, Some(Named(new_args)))))
+    | Mixed _ ->
+      invariant_violation("Mixed parameters not supported in patterns")
     }
   /* Since we remove Pat_as from our internal representation of patterns, we
    * should never encounter one here. */
@@ -860,6 +867,8 @@ fun print_pattern(
         });
 
         acc1 + "{" + pats.join(", ") + "}"
+      | Mixed _ ->
+        invariant_violation("Mixed parameters not supported in patterns")
       }
     }
   | TAst.Pat_var((_, x, _)) -> acc + AUtils.string_of_name(x)
@@ -1029,6 +1038,7 @@ fun normalize_param_patterns(
     Positional(
       normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
     )
+  | Mixed _ -> invariant_violation("Mixed parameters not supported in patterns")
   }
 }
 

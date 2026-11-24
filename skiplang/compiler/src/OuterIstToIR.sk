@@ -147,28 +147,58 @@ private fun flattenParams<T>(
       );
       (pArgs, numOpt, numOpt <= 1)
     | Named _ -> invariant_violation("Positional/named mismatch.")
+    | Mixed _ -> invariant_violation("Positional/named mismatch.")
     }
   | Named(funArgs) ->
     params match {
     | Positional _ -> invariant_violation("Positional/named mismatch.")
+    | Mixed _ -> invariant_violation("Positional/named mismatch.")
     | Named(pArgs) ->
       invariant(funArgs.size() == pArgs.size(), "Arg count mismatch");
-
-      required = mutable Vector<T>[];
-      optional = mutable Vector<T>[];
-
-      funArgsVec = funArgs.collect(Array);
-      pArgsVec = pArgs.collect(Array);
-      funArgsVec.eachWithIndex((i, t) -> {
-        (if (isTdefault(t)) optional else required).push(pArgsVec[i])
-      });
-
+      (required, optional) = splitRequiredOptional(
+        pArgs.collect(Array),
+        funArgs.collect(Array),
+      );
       // Append all the optionals after the required.
-      optional.each(required.push);
+      (required.concat(optional), optional.size(), true)
+    }
+  | Mixed(funArgsPos, funArgsNamed, _) ->
+    params match {
+    | Mixed(pArgsPos, pArgsNamed, _) ->
+      invariant(funArgsPos.size() == pArgsPos.size(), "Arg count mismatch");
+      invariant(funArgsNamed.size() == pArgsNamed.size(), "Arg count mismatch");
 
-      (required.toArray(), optional.size(), true)
+      // Required arguments come first (positional in order, then named sorted
+      // by name), then optional ones, so that optional arguments are trailing.
+      (posRequired, posOptional) = splitRequiredOptional(pArgsPos, funArgsPos);
+      (namedRequired, namedOptional) = splitRequiredOptional(
+        pArgsNamed.collect(Array),
+        funArgsNamed.collect(Array),
+      );
+      flat = posRequired
+        .concat(namedRequired)
+        .concat(posOptional)
+        .concat(namedOptional);
+      numOpt = posOptional.size() + namedOptional.size();
+      (flat, numOpt, if (namedOptional.isEmpty()) numOpt <= 1 else true)
+    | Positional _ -> invariant_violation("Positional/named mismatch.")
+    | Named _ -> invariant_violation("Positional/named mismatch.")
     }
   }
+}
+
+// Split args into required and optional (by the expected types), keeping the
+// declaration order within each half.
+private fun splitRequiredOptional<T>(
+  args: Array<T>,
+  types: Array<I.Type>,
+): (Array<T>, Array<T>) {
+  required = mutable Vector<T>[];
+  optional = mutable Vector<T>[];
+  types.eachWithIndex((i, t) -> {
+    (if (isTdefault(t)) optional else required).push(args[i])
+  });
+  (required.toArray(), optional.toArray())
 }
 
 private fun isMutableType(tt: I.Type): Bool {
@@ -881,6 +911,15 @@ class DefLazyGFun{defRef: CallableDefRef} extends BodyProvidingLazyGFun {
           m.maybeGetNoPos(p.name) match {
           | None() -> p.pos.die(`named param def not found`)
           | Some(defp) -> defp
+          }
+        | Mixed(l, m, _) ->
+          l.find(defp -> defp.name.id == p.name) match {
+          | Some(defp) -> defp
+          | None() ->
+            m.maybeGetNoPos(p.name) match {
+            | None() -> p.pos.die(`mixed param def not found`)
+            | Some(defp) -> defp
+            }
           }
         };
         p with {info => defp.frozen_, value => defp.value}
@@ -2513,6 +2552,9 @@ class Converter private (
         constructorParametersNamed => fieldParams match {
         | Positional _ -> false
         | Named _ -> true
+        // The parser never produces Mixed class constructor parameters.
+        | Mixed _ ->
+          invariant_violation("ICE Mixed class constructor parameters")
         },
         kind,
         extends_,

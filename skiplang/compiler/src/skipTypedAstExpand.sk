@@ -176,10 +176,7 @@ fun type__params(
   subst: IMap<N.Type_>,
   x: Parameters<N.Type_>,
 ): Parameters<N.Type_> {
-  x match {
-  | Positional(l) -> Positional(l.map(ty -> type(context, env, subst, ty)))
-  | Named(m) -> Named(m.map((_, ty) -> type(context, env, subst, ty)))
-  }
+  x.map(ty -> type(context, env, subst, ty))
 }
 
 fun filter_expanded_tparams(tparams: SMap<String>): SMap<String> {
@@ -520,12 +517,7 @@ fun expr_parameters(
   subst: IMap<N.Type_>,
   x: T.Call_args,
 ): T.Call_args {
-  x match {
-  | Positional(el) ->
-    Positional(el.map(oe -> ordered_expr(context, env, lambdas, subst, oe)))
-  | Named(em) ->
-    Named(em.map((_, oe) -> ordered_expr(context, env, lambdas, subst, oe)))
-  }
+  x.map(oe -> ordered_expr(context, env, lambdas, subst, oe))
 }
 
 fun add_source_cast(

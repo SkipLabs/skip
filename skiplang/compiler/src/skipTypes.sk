@@ -262,11 +262,27 @@ fun to_string_params(
   | Positional(l) -> `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})`
   | Named(m) ->
     "{" +
-      m.reduce(
-        (acc, name, ty) ->
-          name.i1 + ": " + to_string(nthis, subst, ty) + ", " + acc,
-        "}",
-      )
+      m
+        .items()
+        .map(p -> p.i0.i1 + ": " + to_string(nthis, subst, p.i1))
+        .collect(Vector)
+        .join(", ") +
+      "}"
+  | Mixed(l, m, namedFirst) ->
+    posStr = `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})`;
+    namedStr =
+      "{" +
+      m
+        .items()
+        .map(p -> p.i0.i1 + ": " + to_string(nthis, subst, p.i1))
+        .collect(Vector)
+        .join(", ") +
+      "}";
+    if (namedFirst) {
+      namedStr + posStr
+    } else {
+      posStr + namedStr
+    }
   }
 }
 
@@ -1288,6 +1304,9 @@ fun join_(
     (pos, N.Tfun(variance1, mods1, _, params1, rty1)),
     (_, N.Tfun(variance2, mods2, _, params2, rty2)),
   ) ->
+    if (!params_compatible(params1, params2)) {
+      throw Join(ty1, ty2)
+    };
     (!acc, params) = join_params(
       context,
       next_id,
@@ -2568,6 +2587,13 @@ fun join_funs(
 ): (Acc, Parameters<N.Type_>, N.Type_) {
   (fty_params1, fty_return1) = p1;
   (fty_params2, fty_return2) = p2;
+  if (!params_compatible(fty_params1, fty_params2)) {
+    mods = N.Tfun_modifiers{purity => N.Fpure(), tracking => N.Ftracked()};
+    throw Join(
+      (pos, N.Tfun(A.Vplus(), mods, Array[], fty_params1, fty_return1)),
+      (pos, N.Tfun(A.Vplus(), mods, Array[], fty_params2, fty_return2)),
+    )
+  };
   (!acc, fty_params) = join_params(
     context,
     next_id,
@@ -2588,6 +2614,20 @@ fun join_funs(
   (acc, fty_params, fty_return)
 }
 
+/* Two parameter lists can only be joined when they have the same kind and
+ * the same set of named parameter names. Positional arity mismatches are
+ * left to join_array, which reports them as TypeArityMismatch. */
+fun params_compatible(p1: Parameters<N.Type_>, p2: Parameters<N.Type_>): Bool {
+  (p1, p2) match {
+  | (Positional _, Positional _) -> true
+  | (Named(m1), Named(m2)) ->
+    m1.size() == m2.size() && m1.all((k, _) -> m2.containsKey(k))
+  | (Mixed(_, m1, _), Mixed(_, m2, _)) ->
+    m1.size() == m2.size() && m1.all((k, _) -> m2.containsKey(k))
+  | _ -> false
+  }
+}
+
 fun join_params(
   context: mutable SKStore.Context,
   next_id: () -> Int,
@@ -2602,50 +2642,31 @@ fun join_params(
     (!acc, tyl) = join_array(context, next_id, env, pos, acc, tyl1, tyl2);
     (acc, Positional(tyl))
   | (Named(m1), Named(m2)) ->
-    l1 = m1.reduce(
-      (acc: List<(N.Name, N.Type_)>, x: N.Name, y: N.Type_) ->
-        List.Cons((x, y), acc),
-      (List[] : List<(N.Name, N.Type_)>),
-    );
-    l2 = m2.reduce(
-      (acc: List<(N.Name, N.Type_)>, x: N.Name, y: N.Type_) ->
-        List.Cons((x, y), acc),
-      (List[] : List<(N.Name, N.Type_)>),
-    );
-    (!acc, l) = join_named_params(context, next_id, env, pos, acc, l1, l2);
-    m = l.foldl(
-      ((z, p) -> {
-        (x, y) = p;
-        z.add(x, y)
-      }),
-      UMap[],
+    // Join by name so that declaration order does not matter. The caller
+    // (join_) has already checked that both maps have the same key set.
+    (!acc, m) = m1.mapAcc(
+      (acc0, name, ty1) -> {
+        (acc1, ty) = join(context, next_id, env, acc0, ty1, m2[name]);
+        (acc1, ty)
+      },
+      acc,
     );
     (acc, Named(m))
-  | _ -> invariant_violation("TODO incompatible fun parameter kinds")
-  }
-}
-
-fun join_named_params(
-  context: mutable SKStore.Context,
-  next_id: () -> Int,
-  env: Env,
-  pos: FileRange,
-  acc: Acc,
-  l1: List<((FileRange, String), N.Type_)>,
-  l2: List<((FileRange, String), N.Type_)>,
-): (Acc, List<((FileRange, String), N.Type_)>) {
-  (l1, l2) match {
-  | (List.Nil(), List.Nil()) -> (acc, List[])
-  | (List.Cons((_, _), _), List.Nil())
-  | (List.Nil(), List.Cons((_, _), _)) ->
-    invariant_violation("TODO incompatible fun params")
-  | (List.Cons((name1, ty1), rl1), List.Cons((name2, ty2), rl2)) ->
-    if (name1.i1 != name2.i1) {
-      invariant_violation("TODO error incompatible fun params")
-    };
-    (!acc, ty) = join(context, next_id, env, acc, ty1, ty2);
-    (!acc, rl) = join_named_params(context, next_id, env, pos, acc, rl1, rl2);
-    (acc, List.Cons((name1, ty), rl))
+  | (Mixed(tyl1, m1, nf), Mixed(tyl2, m2, _)) ->
+    (!acc, joinedPos) = join_array(context, next_id, env, pos, acc, tyl1, tyl2);
+    (!acc, m) = m1.mapAcc(
+      (acc0, name, ty1) -> {
+        (acc1, ty) = join(context, next_id, env, acc0, ty1, m2[name]);
+        (acc1, ty)
+      },
+      acc,
+    );
+    (acc, Mixed(joinedPos, m, nf))
+  // Callers check params_compatible first; this is only a safety net.
+  | _ ->
+    invariant_violation(
+      "ICE join_params: incompatible parameter kinds (params_compatible)",
+    )
   }
 }
 
@@ -3113,10 +3134,7 @@ fun has_unresolved_parameters(
   subst: IMap<N.Type_>,
   x: Parameters<N.Type_>,
 ): Bool {
-  x match {
-  | Positional(tya) -> tya.any(ty -> has_unresolved(subst, ty))
-  | Named(tym) -> tym.any((_, ty) -> has_unresolved(subst, ty))
-  }
+  x.any(ty -> has_unresolved(subst, ty))
 }
 
 fun has_unresolved_inter(subst: IMap<N.Type_>, elt_l: Array<N.InterElt>): Bool {

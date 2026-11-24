@@ -2435,10 +2435,66 @@ mutable class SkipParser{
   // parameters-specifier:
   //    positional-parameters
   //    named-parameters
+  //    positional-parameters  named-parameters
+  //
+  // A '{' directly after a positional parameter list starts a named parameter
+  // group when it is followed by 'identifier :' — no statement can start that
+  // way, so this never misfires on a function body. The three-token peek
+  // commits to the group without a speculative parse (nested peekParse is
+  // exponential), so named parameter defaults — which may contain template
+  // literals or nested braces — are parsed exactly once and syntax errors
+  // inside them are reported where they occur. If no ':' follows the group,
+  // the caller's checkMissingReturnType reports the missing return type.
+  mutable fun namedParameterGroupStartsHere(): Bool {
+    // Match (not ==) on the identifier kind: NONTYPE_IDENTIFIER carries the
+    // identifier string, so an == comparison would never hold.
+    this.peekOffset(1) match {
+    | TokenKind.NONTYPE_IDENTIFIER() ->
+      this.peekKindOffset(TokenKind.COLON(), 2)
+    | _ -> false
+    }
+  }
+
   mutable fun parseParametersSpecifier(): ParseTree {
     this.peek() match {
-    | TokenKind.OPEN_PAREN() -> this.parsePositionalParameters(false)
-    | TokenKind.OPEN_CURLY() -> this.parseNamedParameters(false)
+    | TokenKind.OPEN_PAREN() ->
+      positional = this.parsePositionalParameters(false);
+      if (
+        this.peekKind(TokenKind.OPEN_CURLY()) &&
+        this.namedParameterGroupStartsHere()
+      ) {
+        named = this.parseNamedParameters(false);
+        ParseTree.MixedParametersTree{
+          range => Parser.createRangeOfTrees(positional, named),
+          positional,
+          named,
+          namedFirst => false,
+        }
+      } else {
+        positional
+      }
+    | TokenKind.OPEN_CURLY() ->
+      named = this.parseNamedParameters(false);
+      // A '(' directly after a non-empty named parameter group can only start
+      // the positional group of a named-first mixed declaration (the return
+      // type annotation needs a ':' first, so this never misfires on one).
+      // An empty named group stays a plain named declaration, so that
+      // `fun f{}(a: Int)` errors like the positional-first `fun f(a: Int){}`.
+      namedIsEmpty = named match {
+      | ParseTree.NamedParametersTree{parameters} -> parameters.isEmptyList()
+      | _ -> false
+      };
+      if (!namedIsEmpty && this.peekKind(TokenKind.OPEN_PAREN())) {
+        positional = this.parsePositionalParameters(false);
+        ParseTree.MixedParametersTree{
+          range => Parser.createRangeOfTrees(named, positional),
+          positional,
+          named,
+          namedFirst => true,
+        }
+      } else {
+        named
+      }
     | _ -> this.errorResult(errorExpectedParameters, "Expected parameters")
     }
   }

@@ -68,6 +68,15 @@ better.
 
 Only keep a manual flag when the loop body must do real work per element.
 
+### 2026-11-24 — Style rules don't apply to tests
+
+Source: user correction. The rules in this log (and in the stable docs) govern
+`.sk` sources; they do not apply to test files under `tests/` and
+`invalid_tests/` — e.g. building expected output with `+` concatenation is
+fine there, and test files are also excluded from `skfmt` (see the `fmt-sk`
+target in the Makefile). Don't rewrite tests or goldens to satisfy a style
+rule.
+
 ### 2026-11-23 — Prefer exhaustive matches over a wildcard arm
 
 Source: user correction. When matching on a variant type, enumerate the arms

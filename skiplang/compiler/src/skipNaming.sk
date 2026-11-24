@@ -1012,6 +1012,7 @@ fun close_local_scope_lambda_parameters(
   error = params match {
   | Positional _ -> true
   | Named _ -> false
+  | Mixed _ -> true
   };
   params.foldl((f, par) -> f.close(par.i0, error), free)
 }
@@ -1024,6 +1025,11 @@ fun close_local_scope_fun_parameters(
   | Named _ -> free
   | Positional _ ->
     params.each(par -> {
+      !free = free.close(par.name, true)
+    });
+    free
+  | Mixed(pos, _, _) ->
+    pos.each(par -> {
       !free = free.close(par.name, true)
     });
     free
@@ -1799,6 +1805,10 @@ fun make_param_fields_(
       }),
       fields,
     )
+  | Mixed _ ->
+    // Mixed constructor parameters are not supported yet; the parser does
+    // not produce them for class constructors.
+    invariant_violation("Mixed constructor parameters not supported")
   | Named(m) ->
     m.reduce(
       (fields, _, par) -> {
@@ -2489,6 +2499,7 @@ fun check_default_last(x: Parameters<A.Parameter>): void {
   x match {
   | Positional(args) -> check_default_last_array(args)
   | Named _ -> void
+  | Mixed(pos, _, _) -> check_default_last_array(pos)
   }
 }
 
@@ -2990,12 +3001,7 @@ fun fun_tparams(
   env: Env,
   x: Parameters<A.Type_>,
 ): Parameters<N.Type_> {
-  x match {
-  | Positional(tyl) ->
-    Positional(tyl.map(ty -> fun_param_type(context, acc, env, ty)))
-  | Named(tym) ->
-    Named(tym.map((_, ty) -> fun_param_type(context, acc, env, ty)))
-  }
+  x.map(ty -> fun_param_type(context, acc, env, ty))
 }
 
 fun fun_param_type(
@@ -3558,6 +3564,7 @@ fun appendPositionalArg<T>(
   args match {
   | Positional(pargs) -> Positional(pargs.concat(Array[(pargs.size(), arg)]))
   | Named _ -> invariant_violation("Unexpected Named args")
+  | Mixed _ -> invariant_violation("Unexpected Mixed args")
   };
 }
 

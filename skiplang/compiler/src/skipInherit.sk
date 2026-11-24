@@ -819,6 +819,9 @@ fun param_bindings(
       SkipError.error(pos, "Was expecting unnamed parameters")
     | (Named(_), Positional(_)) ->
       SkipError.error(pos, "Was expecting named parameters")
+    | (Mixed _, _)
+    | (_, Mixed _) ->
+      SkipError.error(pos, "Mixed parameters are not supported in patterns")
     }
   }
 }
@@ -1697,6 +1700,29 @@ fun merge_params(
         ).map(param ~> (param.name, param)),
       ),
     )
+  | (Mixed _, _)
+  | (_, Mixed _) ->
+    // Class constructor parameters cannot be mixed (the class-body parser
+    // does not produce them), so at most one side is Mixed here.
+    kind_str = p ->
+      p match {
+      | Positional _ -> "positional fields '(...)'"
+      | Named _ -> "named fields '{...}'"
+      | Mixed _ -> "mixed fields '(..){..}'"
+      };
+    SkipError.errorl(
+      List[
+        (pos, "Incompatible kind of fields"),
+        (
+          parent.name.i0,
+          "'" + parent.name.i1 + "' has " + kind_str(parent_params),
+        ),
+        (
+          child.name.i0,
+          "But '" + child.name.i1 + "' has " + kind_str(child_params),
+        ),
+      ],
+    )
   | (Positional(_), Named(_)) ->
     SkipError.errorl(
       List[
@@ -2075,6 +2101,7 @@ fun empty_met(met: A.Method_def): Bool {
     met.params match {
     | Positional(params) -> params.isEmpty()
     | Named(_) -> false
+    | Mixed(pos, named, _) -> pos.isEmpty() && named.isEmpty()
     }
   };
   empty_ret = met.return_ match {

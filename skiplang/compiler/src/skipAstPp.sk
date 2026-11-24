@@ -361,16 +361,36 @@ fun type_params(
     o.out("{");
     type_map(o, m);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      type_map(o, named);
+      o.out("}");
+      o.out("(");
+      array(type, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(type, o, pos);
+      o.out(")");
+      o.out("{");
+      type_map(o, named);
+      o.out("}")
+    }
   }
 }
 
 fun type_map(o: mutable BufferedPrinter.Out, m: UMap<SkipAst.Type_>): void {
-  m.each((name, ty) -> {
-    o.out(name.i1);
-    o.out(": ");
-    type(o, ty);
-    o.out(", ")
-  })
+  list(
+    (o, p) -> {
+      (name, ty) = p;
+      o.out(name.i1);
+      o.out(": ");
+      type(o, ty)
+    },
+    o,
+    List::createFromIterator(m.items()),
+  )
 }
 
 fun type_args(o: mutable BufferedPrinter.Out, x: Array<SkipAst.Type_>): void {
@@ -450,6 +470,24 @@ fun params(
     values = param_map.values().collect(Array);
     array(fun_parameter, o, values);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      values = named.values().collect(Array);
+      array(fun_parameter, o, values);
+      o.out("}");
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")");
+      o.out("{");
+      values = named.values().collect(Array);
+      array(fun_parameter, o, values);
+      o.out("}")
+    }
   }
 }
 
@@ -981,6 +1019,10 @@ fun lambda_params(
   | Named(m) ->
     l = m.values().collect(Array);
     lambda_param_array("{", "}", o, l)
+  | Mixed(pos, named, _) ->
+    lambda_param_array("(", ")", o, pos);
+    l = named.values().collect(Array);
+    lambda_param_array("{", "}", o, l)
   }
 }
 
@@ -1021,6 +1063,13 @@ fun let_obj_fields(
   | Named(map) ->
     o.out("{");
     array(pattern_fields, o, map.items().collect(Array));
+    o.out("}")
+  | Mixed(pos, named, _) ->
+    o.out("(");
+    array(pattern, o, pos);
+    o.out(")");
+    o.out("{");
+    array(pattern_fields, o, named.items().collect(Array));
     o.out("}")
   }
 }
@@ -1103,6 +1152,24 @@ fun object_args(o: mutable BufferedPrinter.Out, x: SkipAst.Call_args): void {
     o.out("{");
     field_list(o, l);
     o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    // Print the groups in their recorded source order so that a named-first
+    // call `f{b => x}(1)` does not print as the different `f(1){b => x}`.
+    if (namedFirst) {
+      o.out("{");
+      field_list(o, named);
+      o.out("}");
+      o.out("(");
+      array(expr, o, pos.map(p -> p.i1));
+      o.out(")")
+    } else {
+      o.out("(");
+      array(expr, o, pos.map(p -> p.i1));
+      o.out(")");
+      o.out("{");
+      field_list(o, named);
+      o.out("}")
+    }
   }
 }
 

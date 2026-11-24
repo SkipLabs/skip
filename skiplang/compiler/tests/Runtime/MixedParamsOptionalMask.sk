@@ -1,0 +1,18 @@
+module Runtime_MixedParamsOptionalMask;
+// Several optional parameters across both groups (optional-flags mask
+// path), including an empty positional group at the call site.
+fun f(a: Int = 1, b: Int = 2){x: Int = 3, y: Int = 4}: Int {
+  a * 1000 + b * 100 + x * 10 + y
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    f().toString() +
+      f(){x => 30}.toString() +
+      f(5){y => 40}.toString() +
+      f{y => 40}(5).toString() +
+      "\n",
+  )
+}
+module end;

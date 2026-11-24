@@ -1725,6 +1725,7 @@ fun check_args_length<T>(
   fpos: FileRange,
   param_tya: Array<N.Type_>,
   args_tya: Array<T>,
+  kind: String = "arguments",
 ): void {
   paramsz = param_tya.size();
   argssz = args_tya.size();
@@ -1733,7 +1734,7 @@ fun check_args_length<T>(
   | GT() ->
     SkipError.errorl(
       List[
-        (pos, `Too many arguments, expected ${paramsz} but got ${argssz}`),
+        (pos, `Too many ${kind}, expected ${paramsz} but got ${argssz}`),
         (fpos, "Definition is here"),
       ],
     )
@@ -1744,7 +1745,7 @@ fun check_args_length<T>(
       | _ ->
         SkipError.errorl(
           List[
-            (pos, `Missing arguments, expected ${paramsz} but got ${argssz}`),
+            (pos, `Missing ${kind}, expected ${paramsz} but got ${argssz}`),
             (fpos, "Definition is here"),
           ],
         )
@@ -1805,6 +1806,56 @@ fun call(
   call_(context, next_id, pos, fpos, env, acc, params_ty, args, invalid_arg_msg)
 }
 
+fun join_named_args(
+  context: mutable SKStore.Context,
+  next_id: () -> Int,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  pos: FileRange,
+  ty_map: UMap<N.Type_>,
+  args1: UMap<(Int, N.Type_, FileRange)>,
+  invalid_arg_msg: String,
+): (TUtils.Acc, Array<(?N.Name, TAst.Ordered_expr)>) {
+  // Report unknown argument names first, so that a typo is not masked by a
+  // "parameter is missing" error for the actually-declared parameters.
+  args1.each((name, _) ->
+    if (!ty_map.containsKey(name)) {
+      SkipError.error(name.i0, `Undefined name: ${name.i1}`)
+    }
+  );
+  maxArg = args1.reduce((cur, _, i__) -> max(i__.i0, cur), 0);
+  argIdx = maxArg;
+  add_args = mutable Vector[];
+  for (name => param in ty_map) {
+    (namefr, namestr) = name;
+    args1.maybeGet(name) match {
+    | None() ->
+      param match {
+      | (parampos, N.Tdefault(ty)) ->
+        darg = (ty, (parampos, TAst.DefaultArg()));
+        add_args.push((Some((namefr, namestr)), (argIdx, darg)));
+        !argIdx = argIdx + 1
+      | _ ->
+        msg = `The parameter ${namestr} is missing`;
+        SkipError.errorl(List[(pos, "Invalid arguments"), (namefr, msg)])
+      }
+    | Some((_, arg, pos1)) ->
+      contraparam = TUtils.contra_promote(context, env, acc, param);
+      (!acc, _) = TUtils.join(
+        context,
+        next_id,
+        env,
+        pos1,
+        invalid_arg_msg,
+        acc,
+        contraparam,
+        arg,
+      )
+    }
+  };
+  (acc, add_args.collect(Array))
+}
+
 fun call_(
   context: mutable SKStore.Context,
   next_id: () -> Int,
@@ -1822,44 +1873,105 @@ fun call_(
     check_args_length(pos, fpos, tyl1, args1);
     join_args(context, next_id, env, acc, tyl1, args1, invalid_arg_msg)
   | (Named(ty_map), Named(args1)) ->
-    maxArg = args1.reduce((cur, _, i__) -> max(i__.i0, cur), 0);
-    argIdx = maxArg;
-    add_args = mutable Vector[];
-    for (name => param in ty_map) {
-      (namefr, namestr) = name;
-      args1.maybeGet(name) match {
-      | None() ->
+    join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      ty_map,
+      args1,
+      invalid_arg_msg,
+    )
+  | (Mixed(pos_tyl, named_ty_map, _), args_m) ->
+    // A call on a mixed function may supply both groups or just one; normalize
+    // to Mixed so this single arm handles every shape. `f(1)` supplies only
+    // positional arguments (the named parameters must then all have defaults —
+    // join_named_args reports the missing ones); `g{b => 1}` supplies only
+    // named arguments (the positional parameters must then all have defaults).
+    (pos_args, named_args) = args_m match {
+    | Mixed(pos_args, named_args, _) -> (pos_args, named_args)
+    | Positional(pos_args) ->
+      (pos_args, (UMap[] : UMap<(Int, N.Type_, FileRange)>))
+    | Named(named_args) ->
+      pos_tyl.each(param ->
         param match {
-        | (parampos, N.Tdefault(ty)) ->
-          darg = (ty, (parampos, TAst.DefaultArg()));
-          add_args.push((Some((namefr, namestr)), (argIdx, darg)));
-          !argIdx = argIdx + 1
+        | (_, N.Tdefault(_)) -> void
         | _ ->
-          msg = `The parameter ${namestr} is missing`;
-          SkipError.errorl(List[(pos, "Invalid arguments"), (namefr, msg)])
+          SkipError.errorl(
+            List[
+              (
+                pos,
+                `Missing positional arguments, expected ${pos_tyl.size()} but got 0. ` +
+                  "A call that supplies only named arguments requires a default for every positional parameter",
+              ),
+              (fpos, "Definition is here"),
+            ],
+          )
         }
-      | Some((_, arg, pos1)) ->
-        contraparam = TUtils.contra_promote(context, env, acc, param);
-        (!acc, _) = TUtils.join(
-          context,
-          next_id,
-          env,
-          pos1,
-          invalid_arg_msg,
-          acc,
-          contraparam,
-          arg,
-        )
-      }
+      );
+      ((Array[] : Array<(Int, N.Type_, FileRange)>), named_args)
     };
-    args1.each((name, _) ->
-      if (!ty_map.containsKey(name)) SkipError.error(name.i0, "Undefined name")
+    pos_tyl1 = pos_tyl.map(cur1 ->
+      TUtils.contra_promote(context, env, acc, cur1)
     );
-    (acc, add_args.collect(Array))
+    check_args_length(pos, fpos, pos_tyl1, pos_args, "positional arguments");
+    (!acc, pos_add_args) = join_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos_tyl1,
+      pos_args,
+      invalid_arg_msg,
+    );
+    (!acc, named_add_args) = join_named_args(
+      context,
+      next_id,
+      env,
+      acc,
+      pos,
+      named_ty_map,
+      named_args,
+      invalid_arg_msg,
+    );
+    (acc, pos_add_args.concat(named_add_args))
+  // Defensive only: the mixed-call hook above fuses opposite-kind groups, so
+  // a Mixed argument list never reaches a single-group parameter list here.
+  | (Named _, Mixed _) -> SkipError.error(pos, "Expected named arguments")
+  | (Positional _, Mixed _) ->
+    SkipError.error(pos, "Expected positional arguments")
   | (Named _, Positional _) -> SkipError.error(pos, "Expected named arguments")
   | (Positional _, Named _) ->
     SkipError.error(pos, "Expected positional arguments")
   }
+}
+
+/* When the callee takes mixed parameters but only one argument group was
+ * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), the
+ * missing group is filled with default arguments, producing a Mixed
+ * argument list. */
+/* When the callee takes mixed parameters but only one argument group was
+ * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), promote
+ * the call to a Mixed argument list (a single-group call has no source order
+ * between the groups, so namedFirst is false) and share the default-argument
+ * implementation. */
+fun merge_default_args(
+  params_ty: Parameters<N.Type_>,
+  add_args: Array<(?N.Name, TAst.Ordered_expr)>,
+  args: TAst.Call_args,
+): TAst.Call_args {
+  args1 = params_ty match {
+  | Mixed _ ->
+    args match {
+    | Positional(pos_args) -> Mixed(pos_args, UMap::create(), false)
+    | Named(named_args) ->
+      Mixed((Array[] : Array<TAst.Ordered_expr>), named_args, false)
+    | Mixed _ -> args
+    }
+  | _ -> args
+  };
+  TUtils.add_default_arguments(add_args, args1)
 }
 
 fun tfun_call(
@@ -1889,7 +2001,7 @@ fun tfun_call(
     args_ty,
     invalid_argument_message,
   );
-  args1 = TUtils.add_default_arguments(add_args, args);
+  args1 = merge_default_args(params_ty, add_args, args);
   e = (pos, TAst.Call(f, args1));
   check_tracking(pos, env, tracking);
   (acc1, (return_ty, e))
@@ -2214,6 +2326,14 @@ private base class ExprState {
     last_constraint: Int,
     last_tvar: Int,
   }
+  | MixedCallState{
+    // The inner call, as the normal trampoline would have processed it.
+    inner: CallState,
+    outer_pos: FileRange,
+    outer_mut: ?FileRange,
+    outer_targs: Array<N.Type_>,
+    outer_args: N.Call_args,
+  }
 }
 
 fun expr(
@@ -2291,6 +2411,32 @@ fun expr(
           ),
         );
         stack.push(NExpr{expr => e3})
+      | (
+        pos,
+        N.Call(mut, nbase, targs, args),
+      ) if (is_mixed_call_shape(nbase, args)) ->
+        (inner_mut, inner_base, inner_targs, inner_args) = nbase match {
+        | (_, N.Call(m, b, t, a)) -> (m, b, t, a)
+        | _ -> invariant_violation("ICE is_mixed_call_shape")
+        };
+        stack.push(
+          MixedCallState{
+            inner => CallState{
+              pos => nbase.i0,
+              mut => inner_mut,
+              targs => inner_targs,
+              args => inner_args,
+              last_lambda_id => acc.last_lambda_id(),
+              last_constraint => acc.constraints.typing_size(),
+              last_tvar => next_id(),
+            },
+            outer_pos => pos,
+            outer_mut => mut,
+            outer_targs => targs,
+            outer_args => args,
+          },
+        );
+        stack.push(NExpr{expr => inner_base})
       | (pos, N.Call(mut, nbase, targs, args)) ->
         last_lambda_id = acc.last_lambda_id();
         last_constraint = acc.constraints.typing_size();
@@ -2329,6 +2475,11 @@ fun expr(
     | c @ CallState _ ->
       base = res.fromSome();
       (!acc, call) = finish_call(context, next_id, env, acc, base, c);
+      ty = TUtils.promote(context, env, acc, call.i0);
+      !res = Some((ty, call.i1))
+    | mc @ MixedCallState _ ->
+      base = res.fromSome();
+      (!acc, call) = finish_mixed_call(context, next_id, env, acc, base, mc);
       ty = TUtils.promote(context, env, acc, call.i0);
       !res = Some((ty, call.i1))
     }
@@ -2380,6 +2531,136 @@ fun finish_call(
     acc.lambda_list,
   );
   (acc, call)
+}
+
+/* Detects a chained call whose two argument groups have opposite kinds,
+ * e.g. `f(1){b => "x"}` or `f{b => "x"}(1)`. The parser reads both as
+ * nested N.Call nodes; the typer decides from the callee type whether this
+ * is a mixed call or the usual chained call.
+ *
+ * The hook only pairs the innermost two groups: if the inner call's base is
+ * itself a call, the outer suffix applies to the result of the whole inner
+ * chain (e.g. in `f(1){b => 2}(3)` the `(3)` calls the closure returned by
+ * the mixed call), so the normal path must handle it. Magic calls (`class`,
+ * `freeze`, `show`, `unsafe_chill_trust_me`) are dispatched by magic_call on
+ * the inner call, so they must not be intercepted either. */
+fun is_magic_call_name(name: String): Bool {
+  name == "class" ||
+    name == "freeze" ||
+    name == "show" ||
+    name == "unsafe_chill_trust_me"
+}
+
+fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
+  nbase match {
+  | (_, N.Call(_, (_, N.Call _), _, _)) -> false
+  | (_, N.Call(_, (_, N.Var((_, name))), _, _)) if (is_magic_call_name(name)) ->
+    false
+  | (_, N.Call(_, _, _, inner_args)) ->
+    (inner_args, args) match {
+    | (Positional _, Named _)
+    | (Named _, Positional _) ->
+      true
+    | _ -> false
+    }
+  | _ -> false
+  }
+}
+
+fun combine_mixed_call_args(
+  inner: N.Call_args,
+  outer: N.Call_args,
+): N.Call_args {
+  (inner, outer) match {
+  | (Positional(pos_args), Named(named_args)) ->
+    Mixed(pos_args, named_args, false)
+  | (Named(named_args), Positional(pos_args)) ->
+    Mixed(pos_args, named_args, true)
+  | _ -> invariant_violation("ICE combine_mixed_call_args")
+  }
+}
+
+fun callee_has_mixed_params(acc: TUtils.Acc, ty: N.Type_): Bool {
+  Types.unfold_type(acc.subst, ty) match {
+  | (_, N.Tfun(_, _, _, Mixed _, _)) -> true
+  | (_, N.Tdefault(t)) -> callee_has_mixed_params(acc, t)
+  | (_, N.Tparam(_, _, param_id, _)) ->
+    acc.tparam_constraints.findUppers(param_id).any(t ->
+      callee_has_mixed_params(acc, t)
+    )
+  // Lambdas can only declare a single parameter group, so a Tlambda never
+  // contains Mixed parameters; unwrap it anyway for indirect calls.
+  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(acc, t)
+  | _ -> false
+  }
+}
+
+/* Handles a chained call with opposite-kind argument groups (e.g.
+ * `f(1){b => "x"}`). If the callee takes mixed parameters, type it as a
+ * single mixed call; otherwise keep the usual chained-call behavior. */
+fun finish_mixed_call(
+  context: mutable SKStore.Context,
+  next_id: () -> Int,
+  env: TUtils.Env,
+  acc: TUtils.Acc,
+  base: TAst.Expr,
+  mc: MixedCallState,
+): (TUtils.Acc, TAst.Expr) {
+  if (callee_has_mixed_params(acc, TAstUtils.get_type(base))) {
+    if (!mc.inner.targs.isEmpty() && !mc.outer_targs.isEmpty()) {
+      SkipError.error(
+        mc.inner.pos,
+        "A mixed call takes a single type-argument list, but two were given",
+      )
+    };
+    check_no_mutable(mc.inner.mut, base.i1.i0);
+    combined = combine_mixed_call_args(mc.inner.args, mc.outer_args);
+    targs = if (mc.outer_targs.isEmpty()) mc.inner.targs else mc.outer_targs;
+    c = CallState{
+      pos => mc.outer_pos,
+      mut => mc.outer_mut,
+      targs,
+      args => combined,
+      last_lambda_id => mc.inner.last_lambda_id,
+      last_constraint => mc.inner.last_constraint,
+      last_tvar => mc.inner.last_tvar,
+    };
+    finish_call(context, next_id, env, acc, base, c)
+  } else {
+    // Not a mixed function: keep the usual chained-call behavior — two
+    // chained finish_call invocations, mirroring the trampoline's CallState
+    // pop in `expr`. This path consumes one fewer next_id() than the old
+    // two-arm trampoline, so tvar ids after a fallback shift by one; the
+    // solved tvar sets are identical, so this is semantically irrelevant.
+    (!acc, inner_call) = finish_call(
+      context,
+      next_id,
+      env,
+      acc,
+      base,
+      mc.inner,
+    );
+    inner_base = (
+      TUtils.promote(context, env, acc, inner_call.i0),
+      inner_call.i1,
+    );
+    finish_call(
+      context,
+      next_id,
+      env,
+      acc,
+      inner_base,
+      CallState{
+        pos => mc.outer_pos,
+        mut => mc.outer_mut,
+        targs => mc.outer_targs,
+        args => mc.outer_args,
+        last_lambda_id => mc.inner.last_lambda_id,
+        last_constraint => mc.inner.last_constraint,
+        last_tvar => mc.inner.last_tvar,
+      },
+    )
+  }
 }
 
 fun magic_call(
@@ -4193,6 +4474,9 @@ fun object_pattern_args(
           pos,
           "Expected named arguments in pattern. Found positional arguments.",
         )
+      | (Mixed _, _)
+      | (_, Mixed _) ->
+        SkipError.error(pos, "Mixed parameters are not supported in patterns")
       }
     };
     ((env1, acc1), result) = info_pats.map_foldl(
@@ -5850,7 +6134,34 @@ fun check_default_args(
         (parent, child) = x;
         check_default_arg(pos, name, parent, child)
       }
-    | _ -> invariant_violation("ICE mismatched args check_default_args")
+    | (Mixed(parent_pos, parent_m, _), Mixed(child_pos, child_m, _)) ->
+      if (parent_pos.size() != child_pos.size()) {
+        SkipError.error(
+          pos,
+          "The overriding method must have the same number of positional parameters as the method it overrides",
+        )
+      };
+      for (x in parent_pos.zip(child_pos)) {
+        (parent, child) = x;
+        check_default_arg(pos, name, parent, child)
+      };
+      parent_m.each((n, parent_arg) ->
+        child_m.maybeGet(n) match {
+        | None() ->
+          SkipError.error(
+            pos,
+            "The overriding method must keep the named parameter '" +
+              n.i1 +
+              "' of the method it overrides",
+          )
+        | Some(child_arg) -> check_default_arg(pos, name, parent_arg, child_arg)
+        }
+      )
+    | _ ->
+      SkipError.error(
+        pos,
+        "The overriding method must keep the same kind of parameters (positional, named, or mixed) as the method it overrides",
+      )
     }
   | ((_, N.Tfun _), _)
   | (_, (_, N.Tfun _)) ->

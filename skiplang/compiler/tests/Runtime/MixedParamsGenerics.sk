@@ -1,0 +1,16 @@
+module Runtime_MixedParamsGenerics;
+fun f<T>(_a: T){b: T}: T {
+  b
+}
+
+fun g<T: Show>(a: T){b: String}: String {
+  b + a.toString()
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    `${f(1){b => 2}}${f{b => 3}(4)}${f<Int>(5){b => 6}}${g(7){b => "y"}}\n`,
+  )
+}
+module end;

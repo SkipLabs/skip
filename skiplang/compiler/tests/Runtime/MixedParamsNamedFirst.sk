@@ -1,0 +1,39 @@
+module Runtime_MixedParamsNamedFirst;
+// Named-first mixed declarations: the named group comes before the positional
+// group in the declaration; calls may supply the two groups in either order.
+fun f{b: String}(a: Int): String {
+  b + a.toString()
+}
+
+fun eff(s: String): String {
+  print_raw(s);
+  s
+}
+
+// Omitted default arguments evaluate in declaration order across the two
+// groups (named group first here, then the positional group).
+fun d{z: String = `${eff("z")}Z`}(p: String = `${eff("p")}P`): String {
+  `${z}${p}`
+}
+
+class C() {
+  fun m{y: String}(x: Int): String {
+    y + x.toString()
+  }
+
+  static fun s{y: Int}(x: Int): Int {
+    x * y
+  }
+}
+
+@exptest
+fun main(): void {
+  c = C();
+  print_raw(
+    `${f{b => "a"}(1)}${f(2){b => "b"}}` +
+      `${d()}${d("q")}${d("q"){z => "Z"}}${d{z => "Z"}("q")}` +
+      `${c.m{y => "c"}(3)}${c.m(4){y => "d"}}` +
+      `${C::s{y => 6}(7)}${C::s(2){y => 9}}\n`,
+  )
+}
+module end;

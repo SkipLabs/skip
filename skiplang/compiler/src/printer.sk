@@ -1010,6 +1010,12 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
       ctx.getParent(1) is ParseTree.ClassConstructorDeclarationTree _
     );
     printCommaList(ctx, parameters, shouldGroup)
+  | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
+    if (namedFirst) {
+      Doc.Concat[print(ctx, named), print(ctx, positional)]
+    } else {
+      Doc.Concat[print(ctx, positional), print(ctx, named)]
+    }
   | ParseTree.GlobalConstantTree{
     modifiers,
     constKeyword,

@@ -1,0 +1,21 @@
+module Runtime_MixedParamsInherit;
+base class A() {
+  overridable fun m(x: Int){y: Int}: Int {
+    x + y
+  }
+}
+
+class B() extends A {
+  fun m(x: Int){y: Int}: Int {
+    x * y
+  }
+}
+
+class C() extends A {}
+
+@exptest
+fun main(): void {
+  a: A = B();
+  print_raw(`${a.m(3){y => 4}}${C().m(5){y => 6}}\n`)
+}
+module end;

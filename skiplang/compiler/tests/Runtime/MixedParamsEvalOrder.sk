@@ -1,0 +1,35 @@
+module Runtime_MixedParamsEvalOrder;
+// Arguments of a mixed call are evaluated in source order, across groups:
+// f(pos){named} evaluates the positional group first, f{named}(pos) the
+// named group first.
+class StringExn(msg: String) extends Exception {
+  fun getMessage(): String {
+    this.msg
+  }
+}
+
+fun f(_a: Int){b: Int}: void {
+  void
+}
+
+@exptest
+fun main(): void {
+  print_raw(
+    (try {
+      f(throw StringExn("P")){b => 1 / 0};
+      "Fail"
+    } catch {
+    | StringExn(s) -> s
+    | _ -> "Fail"
+    }) +
+      (try {
+        f{b => throw StringExn("N")}(1 / 0);
+        "Fail"
+      } catch {
+      | StringExn(s) -> s
+      | _ -> "Fail"
+      }) +
+      "\n",
+  )
+}
+module end;

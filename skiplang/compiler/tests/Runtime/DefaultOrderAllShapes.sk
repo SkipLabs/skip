@@ -1,0 +1,47 @@
+module Runtime_DefaultOrderAllShapes;
+// Omitted default values always evaluate left-to-right in declaration order,
+// for positional-only, named-only, and mixed parameters — regardless of the
+// order of the argument groups at the call site.
+fun e(s: String): Int {
+  print_raw(s);
+  0
+}
+
+// positional-only, several defaults
+fun p(a: Int = e("a"), b: Int = e("b"), c: Int = e("c")): Int {
+  a + b + c
+}
+
+// positional-only, a single default (counter path, not the optional mask)
+fun q(a: Int, b: Int = e("b")): Int {
+  a + b
+}
+
+// named-only, defaults declared in non-lexicographic order
+fun n{z: Int = e("z"), a: Int = e("a"), m: Int = e("m")}: Int {
+  z + a + m
+}
+
+// mixed, defaults in both groups
+fun g(a: Int = e("a"), b: Int = e("b")){z: Int = e("z"), y: Int = e("y")}: Int {
+  a + b + z + y
+}
+
+@exptest
+fun main(): void {
+  _ = p(); // abc
+  print_raw("|");
+  _ = p(0, 0); // c
+  print_raw("|");
+  _ = q(0); // b
+  print_raw("|");
+  _ = n{a => 0}; // zm (declaration order, not lexical amz...)
+  print_raw("|");
+  _ = g(5); // bzy (positional default b, then named z, y)
+  print_raw("|");
+  _ = g{z => 0, y => 1}(); // ab (named-first call, positional defaults in order)
+  print_raw("|");
+  _ = g{y => 0}(); // abz (named-first call, defaults still declaration order)
+  print_raw("|\n")
+}
+module end;
