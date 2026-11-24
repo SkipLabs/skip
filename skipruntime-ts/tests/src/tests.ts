@@ -625,7 +625,7 @@ class BoolObjMapper implements Mapper<string, number, string, BoolObj> {
 // corruption on the read side (ObjectHandle/proxy get) propagates here too.
 class BoolSpreadMapper implements Mapper<string, BoolObj, string, BoolObj> {
   mapEntry(key: string, values: Values<BoolObj>): Iterable<[string, BoolObj]> {
-    const v = values.getUnique();
+    const v = values.getUnique() as BoolObj;
     return [[key, { ...v, flag: Boolean(v.flag) }]];
   }
 }
