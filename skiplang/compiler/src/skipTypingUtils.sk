@@ -1727,7 +1727,14 @@ fun suggested_join_fix(
         ),
       ]
     } catch {
-    | _ -> List.Nil()
+    // Only the exceptions a speculative join is expected to raise mean "no
+    // suggestion"; anything else (fatal errors as CompileFailureException,
+    // invariant_violation) must propagate, as in the catch near line 1199
+    // (#1706).
+    | SkipError.SkipErrorException _
+    | Types.Exception _ ->
+      List.Nil()
+    | exn -> throw exn
     }
   // Annotate both types
   | (Some(Ast.Vnone()), Some(Ast.Vnone()))
@@ -1763,7 +1770,14 @@ fun suggested_join_fix(
         )
       }
     } catch {
-    | _ -> List.Nil()
+    // Only the exceptions a speculative join is expected to raise mean "no
+    // suggestion"; anything else (fatal errors as CompileFailureException,
+    // invariant_violation) must propagate, as in the catch near line 1199
+    // (#1706).
+    | SkipError.SkipErrorException _
+    | Types.Exception _ ->
+      List.Nil()
+    | exn -> throw exn
     }
   | (Some(Ast.Vnone()), _)
   | (Some(Ast.Vminus()), Some(Ast.Vplus())) ->
