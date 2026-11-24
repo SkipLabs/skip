@@ -6,7 +6,8 @@
  */
 
 // This module handles testing for various properties of Chars.
-// TODO: Currently is only correct for ASCII chars, update to include Unicode.
+// TODO: some predicates below are only correct for ASCII chars, update to
+// include Unicode where that matters (isWhitespace already does, #1488).
 
 module Chars;
 
@@ -22,9 +23,22 @@ const carriageReturn: Char = '\x0D';
 const escape: Char = '\x0E';
 const space: Char = ' ';
 
+// Unicode whitespace: General Category Z*, the C0 controls U+0009..U+000D,
+// and U+0085 (NEL). This is the same set String::trim* uses (#1488).
 fun isWhitespace(ch: Char): Bool {
   ch match {
-  | ' ' | '\x09' | '\x0A' | '\x0C' | '\x0D' -> true
+  // CHARACTER TABULATION
+  | '\u0009' | '\u000A' | '\u000B' | '\u000C' | '\u000D' | '\u0085' // LINE FEED // LINE TABULATION // FORM FEED // CARRIAGE RETURN // NEXT LINE
+  // LINE SEPARATOR
+  | '\u2028'  // http://www.fileformat.info/info/unicode/category/Zl/list.htm
+  // PARAGRAPH SEPARATOR
+  | '\u2029'  // http://www.fileformat.info/info/unicode/category/Zp/list.htm
+  // SPACE
+  | '\u0020' | '\u00A0' | '\u1680' | '\u2000' | '\u2001' | '\u2002' | '\u2003' // NO-BREAK SPACE // OGHAM SPACE MARK // EN QUAD // EM QUAD // EN SPACE // EM SPACE // THREE-PER-EM SPACE // http://www.fileformat.info/info/unicode/category/Zs/list.htm
+  | '\u2004' | '\u2005' | '\u2006' | '\u2007' | '\u2008' | '\u2009' | '\u200A' // FOUR-PER-EM SPACE // SIX-PER-EM SPACE // FIGURE SPACE // PUNCTUATION SPACE // THIN SPACE // HAIR SPACE // NARROW NO-BREAK SPACE
+  | '\u202F' | '\u205F' | '\u3000' -> // MEDIUM MATHEMATICAL SPACE // IDEOGRAPHIC SPACE
+    true
+
   | _ -> false
   }
 }
