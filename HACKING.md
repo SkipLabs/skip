@@ -73,16 +73,29 @@ CircleCI jobs run inside the `skiplabs/*:latest` images published from the
 `ci` group in `docker-bake.hcl`. Those images carry a prebuilt stage0 compiler
 (`skc`, `skargo`, `skfmt`) built from the pinned `skiplang/compiler/bootstrap`
 submodule, plus the apt/npm/pip tooling from `bin/apt-install.sh` and the
-Dockerfiles. `docker-publish` rebuilds them from `main` every Monday, so
-between runs CI uses the images from the last successful publish.
+Dockerfiles. `docker-publish` rebuilds them from `main` every Monday, and
+also on every push to `main` that changes an image input (see the `push` paths
+in `.github/workflows/docker-publish.yml`), so between runs CI uses the
+images from the last successful publish.
+
+The image's stage0 toolchain is built by `make STAGE=0` in the root
+`Dockerfile` from `skiplang/compiler` **and the prelude it builds**, so all of
+`skiplang/prelude/` — `src/`, `build.sk`, `Makefile`, `runtime/`,
+`libbacktrace/` — is an image input, not just the runtime. A std API change
+like #1743 lands green (its own jobs use the candidate toolchain) but leaves
+the published `libstd.sklib` stale, and every later PR whose jobs use the
+image's toolchain then fails compiling `prelude/build.sk` until a republish
+(#1373, #1749). That is why the push-triggered publish exists: it shrinks
+that window from up to a week to minutes.
 
 Run `docker-publish` manually on `main` (Actions → docker-publish → Run
 workflow) after merging a change that **both**:
 
-1. **changes what goes into an image**: a bootstrap bump, the prelude runtime
-   (`skiplang/prelude/runtime/`), `bin/apt-install.sh`, `requirements-dev.txt`,
-   a Dockerfile or `docker-bake.hcl`; **and**
-2. **is needed by CI before the next weekly publish**, in a job that uses the
+1. **changes what goes into an image**: anything under `skiplang/prelude/`,
+   a bootstrap bump (`skiplang/compiler/bootstrap/`), `skiplang/compiler/Makefile`,
+   `bin/apt-install.sh`, `requirements-dev.txt`, a Dockerfile or
+   `docker-bake.hcl`; **and**
+2. **is needed by CI before the next publish**, in a job that uses the
    image's toolchain rather than building its own. For example, Skip code that
    needs the newer compiler from a bootstrap bump, or a test that needs a newly
    added apt/npm/pip tool. The jobs that use the image's toolchain are
@@ -90,15 +103,16 @@ workflow) after merging a change that **both**:
    `skipruntime` and `skipruntime-bun`. `compiler` and `skargo` use the
    compiler built from the PR itself, so they never need a republish.
 
-A change that meets only the first condition can wait for the weekly run. A PR's
-own CI always runs against the already-published images, so it cannot validate
-an image change; the publish after merge is the first real test.
+A change that meets only the first condition is covered by the push trigger
+and the weekly run. A PR's own CI always runs against the already-published
+images, so it cannot validate an image change; the publish after merge is the
+first real test.
 
 Instead of running the publish by hand, label the PR `docker-publish`: when it
 merges to `main`, the `docker-publish-on-label` workflow dispatches
 `docker-publish` on `main` automatically. PRs from forks cannot dispatch
 workflows (their token is read-only), so for those run it manually after
-merging.
+merging. (The push trigger covers in-repo merges regardless of the label.)
 
 CircleCI never builds the images. The publish builds the compiler inside Docker
 on GitHub's 16 GiB runners, so a bootstrap or runtime change can pass CI and
