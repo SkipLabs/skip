@@ -3261,8 +3261,14 @@ class MixedParametersTree{
   }
 
   fun getChildren(): mutable Iterator<ParseTree.ParseTree> {
-    yield this.positional;
-    yield this.named;
+    // Children appear in source order: the named group first when namedFirst.
+    if (this.namedFirst) {
+      yield this.named;
+      yield this.positional;
+    } else {
+      yield this.positional;
+      yield this.named;
+    };
     yield break;
   }
 
