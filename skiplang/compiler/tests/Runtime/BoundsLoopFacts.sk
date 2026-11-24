@@ -1,0 +1,127 @@
+module Runtime_BoundsLoopFacts;
+// Regression tests for the bounds-check elimination pass: facts must not
+// leak around loop back edges. On a back edge, a block's parameters are
+// re-bound to new values and values defined in the loop header are
+// recomputed, so facts about the previous iteration must not survive into
+// the next one. With the unsound propagation, each case below read out of
+// bounds (garbage value or crash) instead of throwing OutOfBounds.
+
+// R1: pointer chase after a checked start. The entry edge proves
+// start <u size; the body's own check on the old index must not become a
+// fact about the newly loaded index.
+@no_inline
+fun chase(next: Array<Int>, start: Int, steps: Int): Int {
+  first = next.get(start);
+  i = start;
+  k = 0;
+  while (k < steps) {
+    !i = next.get(i);
+    !k = k + 1
+  };
+  i + first
+}
+
+// R2: off-by-one latch. The latch's `i <u size` describes the old i, not
+// i + 1.
+@no_inline
+fun sumFrom(arr: Array<Int>, start: Int): Int {
+  s = arr.get(start);
+  i = start;
+  loop {
+    !s = s + arr.get(i);
+    if (i.ult(arr.size())) !i = i + 1 else break void
+  };
+  s
+}
+
+// R3: decrementing index with a signed guard. A stale nonneg(i) must not
+// turn `i < size` into `i <u size` once i is negative.
+@no_inline
+fun walk(arr: Array<Int>, steps: Int): Int {
+  s = 0;
+  i = 0;
+  k = 0;
+  while (k < steps) {
+    if (i < arr.size()) {
+      !s = s + arr.get(i)
+    };
+    !i = i - 1;
+    !k = k + 1
+  };
+  s
+}
+
+// F2: loop header computes the index and a header-param flag selects the
+// body arm; the arm filter must not leak the previous iteration's `v <u n`
+// into the check on the new v.
+@no_inline
+fun nextIdx(keys: Array<Int>, k: Int): Int {
+  keys.get(k)
+}
+
+@no_inline
+fun firstFlag(arr: Array<Int>, keys: Array<Int>): Int {
+  n = arr.size();
+  s = 0;
+  k = 0;
+  first = true;
+  loop {
+    v = nextIdx(keys, k);
+    if (first) {
+      !first = false
+    } else {
+      !s = s + arr.get(v)
+    };
+    if (v.ult(n)) {
+      !k = k + 1
+    } else {
+      break s
+    }
+  }
+}
+
+// F3: one CSE'd comparison feeding both get and set must not be killed
+// globally; both checks must remain.
+@no_inline
+fun bump(a: mutable Array<Int>, i: Int): void {
+  a.set(i, a.get(i) + 1)
+}
+
+@no_inline
+fun bumpWrap(a: mutable Array<Int>, i: Int): Int {
+  bump(a, i);
+  0
+}
+
+// F4 sketch: two parallel edges into a join with different arguments; only
+// one arm's seed may become the join's facts.
+@no_inline
+fun parallelArms(arr: Array<Int>, i: Int): Int {
+  bonus = if (i.ult(arr.size())) 0 else 1;
+  arr.get(i) + bonus
+}
+
+private fun expectOob(f: () ~> Int): String {
+  try {
+    f().toString()
+  } catch {
+  | OutOfBounds() -> "Pass\n"
+  | _ -> "FAIL: wrong exception\n"
+  }
+}
+
+@exptest
+fun main(): void {
+  arr = Array[1, 2, 1000000];
+  small = Array[10, 20, 30];
+  keys = Array[0, 1000000000];
+  print_raw(
+    expectOob(() ~> chase(arr, 0, 4)) +
+      expectOob(() ~> sumFrom(small, 0)) +
+      expectOob(() ~> walk(small, 2)) +
+      expectOob(() ~> firstFlag(small, keys)) +
+      expectOob(() ~> bumpWrap(mutable Array[1, 2, 3], 7)) +
+      expectOob(() ~> parallelArms(small, 7)),
+  )
+}
+module end;

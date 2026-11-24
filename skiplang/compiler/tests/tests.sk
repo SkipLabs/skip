@@ -300,6 +300,53 @@ private fun incrementalFrontendErrors(): void {
   T.expectTrue(removed.success(), removed.stderr);
 }
 
+// The bounds pass (--bounds, default on) should remove the array bounds
+// check in a loop over Range(0, arr.size()). Compile a probe with the pass
+// enabled and with --no-bounds, and assert the emitted LLVM IR references
+// throwOutOfBounds strictly fewer times with the pass enabled — i.e. the
+// pass actually eliminates a check, not just that programs stay correct.
+private fun boundsPassEliminatesCheck(): void {
+  temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
+  T.expectTrue(temp.success(), temp.stderr);
+  dir = temp.stdout.trim();
+  source = dir + "/input.sk";
+  onLl = dir + "/on.ll";
+  offLl = dir + "/off.ll";
+  FileSystem.writeTextFile(
+    source,
+    "fun sumIt(arr: Array<Int>): Int {\n" +
+      "  s = 0;\n" +
+      "  for (i in Range(0, arr.size())) {\n" +
+      "    !s = s + arr.get(i)\n" +
+      "  };\n" +
+      "  s\n" +
+      "}\n" +
+      "untracked fun main(): void {\n" +
+      "  print_string(sumIt(Array[1, 2, 3]).toString())\n" +
+      "}\n",
+  );
+  compile = (output, extra) ~>
+    System.subprocess(
+      Array["skc", "--emit=llvm-ir", "-o", output].concat(extra).concat(
+        Array[source],
+      ),
+    ).fromSuccess();
+  on = compile(onLl, Array<String>[]);
+  T.expectTrue(on.success(), "compile with bounds: " + on.stderr);
+  off = compile(offLl, Array["--no-bounds"]);
+  T.expectTrue(off.success(), "compile with --no-bounds: " + off.stderr);
+  countRefs = (path) ~>
+    FileSystem.readTextFile(path).split("throwOutOfBounds").size() - 1;
+  onRefs = countRefs(onLl);
+  offRefs = countRefs(offLl);
+  T.expectTrue(
+    onRefs < offRefs,
+    `bounds pass eliminated nothing: ${onRefs} throwOutOfBounds refs with --bounds vs ${offRefs} with --no-bounds`,
+  );
+  removed = System.subprocess(Array["rm", "-r", dir]).fromSuccess();
+  T.expectTrue(removed.success(), removed.stderr);
+}
+
 // A field chain and an unfinished parent cross generic-name work rows.
 private fun incrementalClassContinuations(): void {
   temp = System.subprocess(Array["mktemp", "-d"]).fromSuccess();
@@ -2107,6 +2154,7 @@ private fun deferredVerifierPositions(): void {
       true,
       true,
       true,
+      true,
       false,
       true,
     ),
@@ -3244,6 +3292,10 @@ untracked fun main(): void {
       T.Test{
         name => "frontend_errors",
         func => () ~> incrementalFrontendErrors(),
+      },
+      T.Test{
+        name => "bounds_pass_eliminates_check",
+        func => () ~> boundsPassEliminatesCheck(),
       },
     ],
   );

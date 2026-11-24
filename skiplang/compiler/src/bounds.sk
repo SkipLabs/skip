@@ -1,0 +1,666 @@
+/**
+ * Copyright (c) Mistral.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+module BoundsCheckElimination;
+
+// Bounds-check elimination: prove that array bounds checks
+// (`if (i.uge(arr.size())) throwOutOfBounds()`) are redundant and remove
+// them, so the access compiles to the unchecked (unsafe) access.
+//
+// We run a small relational dataflow over the CFG tracking, per block, facts
+// of the form "value v is strictly below bound b" (unsigned, or signed when
+// both operands are known non-negative) plus "value v is non-negative".
+// Facts are seeded from comparison branches (an `If` fixes its predicate's
+// value on each outgoing edge) and propagate across block parameters (a
+// block parameter is congruent to the argument passed on each incoming
+// edge). When the branch to an arm of an `If` depends on a block parameter,
+// only the incoming edges that pass the arm's constant value can reach that
+// arm, which lets facts survive across the arm (this is what proves checks
+// inside `for (i in Range(0, arr.size()))` loops redundant).
+//
+// A bounds-check comparison that is provably false at its block is replaced
+// with constant `false`; the peephole and DCE passes (re-run afterwards by
+// the optimizer driver) then fold the branch and remove the throw block.
+
+private mutable class FactSet(
+  // v -> set of bounds b such that v <u b (unsigned) resp. v <s b (signed).
+  mutable lessU: mutable UnorderedMap<InstrID, mutable UnorderedSet<InstrID>>,
+  mutable lessS: mutable UnorderedMap<InstrID, mutable UnorderedSet<InstrID>>,
+  // Values known to be >= 0 as signed integers.
+  mutable nonneg: mutable UnorderedSet<InstrID>,
+) {
+  static fun empty(): mutable FactSet {
+    mutable FactSet(
+      mutable UnorderedMap[],
+      mutable UnorderedMap[],
+      mutable UnorderedSet[],
+    )
+  }
+
+  // Intersection (used at control-flow joins): a fact holds only if it holds
+  // on every incoming edge. None() is the top element (not yet computed).
+  static fun intersect(
+    a: ?readonly FactSet,
+    b: ?readonly FactSet,
+  ): ?readonly FactSet {
+    (a, b) match {
+    | (None(), _) -> b
+    | (_, None()) -> a
+    | (Some(x), Some(y)) -> Some(x.intersectWith(y))
+    }
+  }
+
+  // Union (used to add a block's local seeds to its start facts).
+  static fun union(
+    a: ?readonly FactSet,
+    b: ?readonly FactSet,
+  ): ?readonly FactSet {
+    (a, b) match {
+    | (None(), _) -> b
+    | (_, None()) -> a
+    | (Some(x), Some(y)) -> Some(x.unionWith(y))
+    }
+  }
+
+  readonly fun intersectWith(other: readonly FactSet): mutable FactSet {
+    mutable FactSet(
+      intersectMap(this.lessU, other.lessU),
+      intersectMap(this.lessS, other.lessS),
+      intersectSet(this.nonneg, other.nonneg),
+    )
+  }
+
+  readonly fun unionWith(other: readonly FactSet): mutable FactSet {
+    mutable FactSet(
+      unionMap(this.lessU, other.lessU),
+      unionMap(this.lessS, other.lessS),
+      unionSet(this.nonneg, other.nonneg),
+    )
+  }
+
+  // Copy with every fact that mentions an ID in `drop` removed (as a key, as
+  // a bound inside a relation, or in nonneg).
+  readonly fun withoutIDs(
+    drop: readonly UnorderedSet<InstrID>,
+  ): mutable FactSet {
+    result = FactSet::empty();
+    this.lessU.each((k, s) ->
+      if (!drop.contains(k)) {
+        kept = mutable UnorderedSet[];
+        s.each(b -> if (!drop.contains(b)) kept.insert(b));
+        if (!kept.isEmpty()) result.lessU.set(k, kept)
+      }
+    );
+    this.lessS.each((k, s) ->
+      if (!drop.contains(k)) {
+        kept = mutable UnorderedSet[];
+        s.each(b -> if (!drop.contains(b)) kept.insert(b));
+        if (!kept.isEmpty()) result.lessS.set(k, kept)
+      }
+    );
+    this.nonneg.each(x -> if (!drop.contains(x)) result.addNonneg(x));
+    result
+  }
+
+  // Copy, then alias the target block's parameters to the edge arguments:
+  // facts about an argument also hold for the corresponding parameter.
+  // Facts about the target's own parameters are first dropped: on this edge
+  // each parameter is re-bound to its argument, so facts about the previous
+  // value (e.g. carried around a loop back edge) must not survive. Bindings
+  // are computed from this (predecessor-edge) snapshot, not from the copy
+  // being built, so all parameters are bound simultaneously and one binding
+  // cannot feed another on the same edge.
+  readonly fun transfer(toBlock: Block, args: Array<InstrID>): mutable FactSet {
+    paramIDs = mutable UnorderedSet[];
+    toBlock.params.each(param -> paramIDs.insert(param.id));
+    result = this.withoutIDs(paramIDs);
+    toBlock.params.eachWithIndex((i, param) -> {
+      if (i < args.size()) {
+        arg = args[i];
+        paramID = param.id;
+        this.lessU.maybeGet(arg) match {
+        | Some(bounds) -> bounds.each(b -> result.addLessU(paramID, b))
+        | None() -> void
+        };
+        this.lessS.maybeGet(arg) match {
+        | Some(bounds) -> bounds.each(b -> result.addLessS(paramID, b))
+        | None() -> void
+        };
+        if (this.nonneg.contains(arg)) result.addNonneg(paramID)
+      }
+    });
+    result
+  }
+
+  mutable fun addLessU(v: InstrID, b: InstrID): void {
+    this.lessU.getOrAdd(v, () -> mutable UnorderedSet[]).insert(b)
+  }
+
+  mutable fun addLessS(v: InstrID, b: InstrID): void {
+    this.lessS.getOrAdd(v, () -> mutable UnorderedSet[]).insert(b)
+  }
+
+  mutable fun addNonneg(v: InstrID): void {
+    this.nonneg.insert(v)
+  }
+
+  // Is `v <u b` known?
+  readonly fun lessThanU(v: InstrID, b: InstrID): Bool {
+    hasU = this.lessU.maybeGet(v) match {
+    | Some(bounds) -> bounds.contains(b)
+    | None() -> false
+    };
+    hasS =
+      this.lessS.maybeGet(v) match {
+      | Some(bounds) -> bounds.contains(b)
+      | None() -> false
+      } &&
+      this.nonneg.contains(v) &&
+      this.nonneg.contains(b);
+    hasU || hasS
+  }
+
+  // Is there a bound B with v <u B and B >= 0? Then 0 <= v <= 2^63-2.
+  readonly fun hasUnsignedBound(v: InstrID): Bool {
+    hasU = this.lessU.maybeGet(v) match {
+    | Some(bounds) -> bounds.any(b -> this.nonneg.contains(b))
+    | None() -> false
+    };
+    if (!hasU && this.nonneg.contains(v)) {
+      this.lessS.maybeGet(v) match {
+      | Some(bounds) -> bounds.any(b -> this.nonneg.contains(b))
+      | None() -> false
+      }
+    } else {
+      hasU
+    }
+  }
+
+  // Exact content equality (used to detect fixpoint convergence). Counts
+  // alone would not do: two different fact sets can have the same size.
+  readonly fun equals(other: readonly FactSet): Bool {
+    setEquals(this.nonneg, other.nonneg) &&
+      mapEquals(this.lessU, other.lessU) &&
+      mapEquals(this.lessS, other.lessS)
+  }
+}
+
+private fun setEquals(
+  a: readonly UnorderedSet<InstrID>,
+  b: readonly UnorderedSet<InstrID>,
+): Bool {
+  a.size() == b.size() && a.all(x -> b.contains(x))
+}
+
+private fun mapEquals(
+  a: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+  b: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+): Bool {
+  a.size() == b.size() &&
+    a.keys().all(k ->
+      b.maybeGet(k) match {
+      | Some(sb) ->
+        a.maybeGet(k) match {
+        | Some(sa) -> setEquals(sa, sb)
+        | None() -> false
+        }
+      | None() -> false
+      }
+    )
+}
+
+private fun intersectMap(
+  a: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+  b: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+): mutable UnorderedMap<InstrID, mutable UnorderedSet<InstrID>> {
+  result = mutable UnorderedMap[];
+  a.each((k, sa) ->
+    b.maybeGet(k) match {
+    | Some(sb) ->
+      common = mutable UnorderedSet[];
+      sa.each(x -> if (sb.contains(x)) common.insert(x));
+      if (!common.isEmpty()) result.set(k, common)
+    | None() -> void
+    }
+  );
+  result
+}
+
+private fun unionMap(
+  a: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+  b: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
+): mutable UnorderedMap<InstrID, mutable UnorderedSet<InstrID>> {
+  result = mutable UnorderedMap[];
+  a.each((k, s) -> result.set(k, copySet(s)));
+  b.each((k, sb) ->
+    result.maybeGet(k) match {
+    | Some(sa) -> sb.each(x -> sa.insert(x))
+    | None() -> result.set(k, copySet(sb))
+    }
+  );
+  result
+}
+
+private fun copySet(
+  s: readonly UnorderedSet<InstrID>,
+): mutable UnorderedSet<InstrID> {
+  copy = mutable UnorderedSet[];
+  s.each(x -> copy.insert(x));
+  copy
+}
+
+private fun intersectSet(
+  a: readonly UnorderedSet<InstrID>,
+  b: readonly UnorderedSet<InstrID>,
+): mutable UnorderedSet<InstrID> {
+  result = mutable UnorderedSet[];
+  a.each(x -> if (b.contains(x)) result.insert(x));
+  result
+}
+
+private fun unionSet(
+  a: readonly UnorderedSet<InstrID>,
+  b: readonly UnorderedSet<InstrID>,
+): mutable UnorderedSet<InstrID> {
+  result = mutable UnorderedSet[];
+  a.each(x -> result.insert(x));
+  b.each(x -> result.insert(x));
+  result
+}
+
+// All successor indices of b's terminator targeting `target`. A terminator
+// may legally have several successors with the same target but different
+// arguments (parallel edges); each is a distinct CFG edge and must be
+// analyzed separately.
+private fun succIndicesOf(b: Block, target: BlockID): Array<Int> {
+  // Accumulate into a mutable Vector (amortized O(1) push), not an Array
+  // (append copies, quadratic in a loop).
+  result = mutable Vector<Int>[];
+  b.terminator().successors.eachWithIndex((i, s) ->
+    if (s.target == target) result.push(i)
+  );
+  result.collect(Array)
+}
+
+// Per-block fact storage: facts[id] is meaningful only when computed[id].
+private mutable class BlockFacts(
+  mutable facts: mutable Array<readonly FactSet>,
+  mutable computed: mutable Array<Bool>,
+) {
+  readonly fun get(id: Int): ?readonly FactSet {
+    if (this.computed[id]) Some(this.facts[id]) else None()
+  }
+
+  mutable fun set(id: Int, f: ?readonly FactSet): void {
+    f match {
+    | Some(fs) ->
+      this.facts.set(id, fs);
+      this.computed.set(id, true)
+    | None() -> this.computed.set(id, false)
+    }
+  }
+}
+
+mutable class .BoundsCheckElimination{
+  // Comparisons (bounds checks) proven false at their block.
+  provenFalse: mutable UnorderedSet<InstrID> = mutable UnorderedSet[],
+  // Function-wide facts: constants live in Function.constants (not in
+  // blocks), so their facts are seeded here and added to every block.
+  mutable globals: readonly FactSet = FactSet::empty(),
+} extends Rewrite {
+  static fun run(
+    f: Function,
+    env: GlobalEnv,
+    config: Config.Config,
+    classReader: ?mutable ClassInputs.Reader = None(),
+  ): (Function, PassResult) {
+    d = mutable static{
+      optinfo => OptimizerInfo::make(f),
+      env,
+      config,
+      classReader,
+      pos => f.pos,
+    };
+    d.analyze(f);
+    d.go("bounds", true)
+  }
+
+  protected mutable fun optimizeInstr(instr: Stmt): Bool {
+    instr match {
+    | c @ IntCmpUle _ -> this.maybeKill(c)
+    | _ -> false
+    }
+  }
+
+  private mutable fun maybeKill(c: Instr): Bool {
+    if (this.provenFalse.contains(c.id)) {
+      // Map the comparison's ID to a constant false; all its users are
+      // remapped to the constant. Control/DCE fold the branch and remove
+      // the throw block afterwards.
+      this.optinfo.idToInstr.set(c.id, this.constantBool(false));
+      true
+    } else {
+      false
+    }
+  }
+
+  // Facts that hold because of block b's own instructions (used to compute
+  // the block's end facts from its start facts).
+  private readonly fun isSmallNonnegConst(id: InstrID): Bool {
+    this.optinfo.getInstr(id) match {
+    | ConstantInt{value => v} -> v >= 0 && v <= 1
+    | _ -> false
+    }
+  }
+
+  private mutable fun localSeeds(b: Block, into: mutable FactSet): void {
+    for (instr in b.instrs) {
+      instr match {
+      | ZeroExtend _
+      | ArraySize _ ->
+        into.addNonneg(instr.id)
+      | IntAdd{lhs, rhs} ->
+        // IntAdd wraps modulo 2^64 (plain `add i64`), so nonneg(a) and
+        // nonneg(b) alone do not imply nonneg(a+b). But if one operand is a
+        // constant 0 or 1 and the other has an unsigned bound B with
+        // nonneg(B) (so it lies in [0, 2^63-2]), the sum is at most 2^63-1
+        // and cannot wrap.
+        if (
+          (this.isSmallNonnegConst(rhs) && into.hasUnsignedBound(lhs)) ||
+          (this.isSmallNonnegConst(lhs) && into.hasUnsignedBound(rhs))
+        ) {
+          into.addNonneg(instr.id)
+        }
+      | _ -> void
+      }
+    }
+  }
+
+  // Facts established by block p's terminator on the edge to successor
+  // number `succIndex` (0 = true arm of an If, 1 = false arm).
+  private mutable fun edgeSeeds(
+    p: Block,
+    succIndex: Int,
+    into: mutable FactSet,
+  ): void {
+    p.terminator() match {
+    | If{predicate} ->
+      this.optinfo.getInstr(predicate) match {
+      | IntCmpUlt{lhs, rhs} -> if (succIndex == 0) into.addLessU(lhs, rhs)
+      | IntCmpUle{lhs, rhs} ->
+        if (succIndex == 1) {
+          into.addLessU(rhs, lhs) // a >u b  =>  b <u a
+        }
+      | IntCmpLt{lhs, rhs} -> if (succIndex == 0) into.addLessS(lhs, rhs)
+      | IntCmpLe{lhs, rhs} -> if (succIndex == 1) into.addLessS(rhs, lhs)
+      | _ -> void
+      }
+    | _ -> void
+    }
+  }
+
+  private mutable fun endFacts(
+    b: Block,
+    start: ?readonly FactSet,
+  ): ?readonly FactSet {
+    start match {
+    | None() -> None()
+    | Some(s) ->
+      // Seed into a fresh copy of the incoming facts (which include the
+      // function-wide constant facts), so that local rules such as the
+      // IntAdd nonneg rule can use inequalities established on the
+      // incoming edges.
+      into = s.unionWith(FactSet::empty());
+      this.localSeeds(b, into);
+      Some((into : readonly FactSet))
+    }
+  }
+
+  // Facts on the edge p -> target (successor index succIndex of p). The
+  // edge seeds from p's terminator are applied BEFORE the transfer into the
+  // target, so that a seed about an argument is correctly re-keyed onto the
+  // corresponding block parameter (and a seed about a re-bound parameter is
+  // dropped by the transfer).
+  private mutable fun edgeFacts(
+    p: Block,
+    succIndex: Int,
+    target: BlockID,
+    bf: mutable BlockFacts,
+  ): ?readonly FactSet {
+    this.endFacts(p, bf.get(p.id.id)) match {
+    | None() -> None()
+    | Some(ef) ->
+      succ = p.terminator().successors[succIndex];
+      seeds = FactSet::empty();
+      this.edgeSeeds(p, succIndex, seeds);
+      combined = FactSet::union(
+        Some((ef : readonly FactSet)),
+        Some((seeds : readonly FactSet)),
+      );
+      combined match {
+      | None() -> None()
+      | Some(c) ->
+        Some(
+          (c.transfer(
+            this.optinfo.getBlock(target),
+            succ.args,
+          ) : readonly FactSet),
+        )
+      }
+    }
+  }
+
+  // The contribution to block b's start facts from the edge p -> b taken at
+  // successor index succIndex. If p's terminator is an If whose predicate is
+  // one of p's own block parameters and b is one of its arms, only the
+  // incoming edges of p that pass the arm's constant value can reach b, so
+  // intersect over just those.
+  private mutable fun predContribution(
+    p: Block,
+    succIndex: Int,
+    b: Block,
+    bf: mutable BlockFacts,
+  ): ?readonly FactSet {
+    term = p.terminator();
+    predParamIndex = term match {
+    | If{predicate} ->
+      this.optinfo.getInstr(predicate) match {
+      | BlockParam{index} ->
+        // Only filter on p's own parameter: check the index range and that
+        // the parameter at that index really is the predicate.
+        if (
+          index >= 0 &&
+          index < p.params.size() &&
+          p.params[index].id == predicate
+        ) {
+          Some(index)
+        } else {
+          None()
+        }
+      | _ -> None()
+      }
+    | _ -> None()
+    };
+    predParamIndex match {
+    | Some(paramIndex) ->
+      armIsTrue = succIndex == 0;
+      acc: ?readonly FactSet = None();
+      for (q in this.optinfo.getPredecessors(p.id)) {
+        qBlock = this.optinfo.getBlock(q);
+        // A terminator may have several edges to p (parallel edges with
+        // different arguments); consider each of them.
+        for (qSuccIndex in succIndicesOf(qBlock, p.id)) {
+          qSucc = qBlock.terminator().successors[qSuccIndex];
+          // An edge can reach this arm only if it passes the arm's constant
+          // for the predicate parameter. A non-constant (or missing, on
+          // malformed IR) argument is included conservatively.
+          canReach = true;
+          if (paramIndex < qSucc.args.size()) {
+            this.optinfo.getInstr(qSucc.args[paramIndex]) match {
+            | ConstantBool{value} -> !canReach = value == armIsTrue
+            | _ -> void
+            }
+          };
+          if (canReach) {
+            contrib = this.edgeFacts(qBlock, qSuccIndex, p.id, bf);
+            contrib match {
+            | None() -> void
+            | Some(cf) ->
+              bSucc = term.successors[succIndex];
+              // q may be dominated by p (loop back edge), so cf can carry
+              // facts about values that p itself defines — those describe
+              // the previous iteration and are stale once p redefines them.
+              // Drop them, then add p's own local seeds and the p -> b edge
+              // seeds before transferring into b.
+              pDefined = mutable UnorderedSet[];
+              for (instr in p.instrs) pDefined.insert(instr.id);
+              cleaned = cf.withoutIDs(pDefined);
+              localBase = cleaned.unionWith(FactSet::empty());
+              this.localSeeds(p, localBase);
+              seeds = FactSet::empty();
+              this.edgeSeeds(p, succIndex, seeds);
+              combined = FactSet::union(
+                Some((localBase : readonly FactSet)),
+                Some((seeds : readonly FactSet)),
+              );
+              combined match {
+              | None() -> void
+              | Some(c) ->
+                !acc = FactSet::intersect(
+                  acc,
+                  Some((c.transfer(b, bSucc.args) : readonly FactSet)),
+                )
+              }
+            }
+          }
+        }
+      };
+      acc
+    | None() -> this.edgeFacts(p, succIndex, b.id, bf)
+    }
+  }
+
+  private mutable fun computeStart(
+    b: Block,
+    bf: mutable BlockFacts,
+  ): ?readonly FactSet {
+    acc: ?readonly FactSet = None();
+    for (p in this.optinfo.getPredecessors(b.id)) {
+      pBlock = this.optinfo.getBlock(p);
+      // A terminator may have several edges to b (parallel edges with
+      // different arguments); each contributes separately to the join.
+      for (succIndex in succIndicesOf(pBlock, b.id)) {
+        contrib = this.predContribution(pBlock, succIndex, b, bf);
+        !acc = FactSet::intersect(acc, contrib)
+      }
+    };
+    FactSet::union(acc, Some(this.globals))
+  }
+
+  // Cheap pre-scan: a kill requires an IntCmpUle instruction feeding an If
+  // with a throw (Unreachable) arm. Skip the whole fixpoint for functions
+  // with no such candidate.
+  private readonly fun hasKillCandidate(func: Function): Bool {
+    optinfo = this.optinfo;
+    hasCmp = func.blocks.any(b -> b.instrs.any(instr -> instr is IntCmpUle _));
+    if (!hasCmp) {
+      false
+    } else {
+      func.blocks.any(b ->
+        b.terminator().successors.any(s ->
+          optinfo.getBlock(s.target).terminator() is Unreachable _
+        )
+      )
+    }
+  }
+
+  private mutable fun analyze(func: Function): void {
+    optinfo = this.optinfo;
+    g = FactSet::empty();
+    for (c in func.constants) {
+      c match {
+      | ConstantInt{value => v} -> if (v >= 0) g.addNonneg(c.id)
+      | _ -> void
+      }
+    };
+    !this.globals = g;
+    if (!this.hasKillCandidate(func)) {
+      void
+    } else {
+      rpo = optinfo.reversePostorder();
+      n = optinfo.idToBlock.size();
+      bf = mutable BlockFacts(
+        Array::mfill(n, (FactSet::empty() : readonly FactSet)),
+        Array::mfill(n, false),
+      );
+      // Iterate to a fixpoint. Facts only ever shrink at joins (and the
+      // lattice is finite), so this terminates; the cap is only a safety net.
+      iter = 0;
+      changed = true;
+      while (changed && iter < 1000) {
+        !changed = false;
+        !iter = iter + 1;
+        for (bID in rpo) {
+          b = optinfo.getBlock(bID);
+          newFacts = this.computeStart(b, bf);
+          same = (bf.get(b.id.id), newFacts) match {
+          | (None(), None()) -> true
+          | (Some(x), Some(y)) -> x.equals(y)
+          | _ -> false
+          };
+          if (!same) {
+            bf.set(b.id.id, newFacts);
+            !changed = true
+          }
+        }
+      };
+      // Only trust the facts if the fixpoint converged: until then they are an
+      // over-approximation, which would be unsound to kill checks on.
+      if (!changed) {
+        // Find bounds checks (an If with an Unreachable arm, i.e. a throw) whose
+        // comparison is provably false.
+        for (bID in rpo) {
+          b = optinfo.getBlock(bID);
+          facts = this.endFacts(b, bf.get(b.id.id));
+          facts match {
+          | None() -> void
+          | Some(fs) ->
+            hasThrowArm = b.terminator().successors.any(s ->
+              optinfo.getBlock(s.target).terminator() is Unreachable _
+            );
+            if (hasThrowArm) {
+              b.terminator() match {
+              | If{predicate} ->
+                pred = optinfo.getInstr(predicate);
+                pred match {
+                // IntCmpUle(size, idx): false  <=>  idx <u size  <=>  rhs <u lhs
+                | IntCmpUle{lhs, rhs} ->
+                  // Only kill a comparison defined in this block: the facts at
+                  // the end of b then hold at every use of the comparison (all
+                  // uses are dominated by b). A comparison defined in another
+                  // block could have uses on paths where the proof does not
+                  // hold, so replacing it globally would be unsound.
+                  sameBlock = optinfo.instrToBlock.maybeGet(pred.id) match {
+                  | Some(bid) -> bid.id == b.id.id
+                  | None() -> false
+                  };
+                  if (sameBlock && fs.lessThanU(rhs, lhs)) {
+                    this.provenFalse.insert(pred.id)
+                  }
+                | _ -> void
+                }
+              | _ -> void
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+module end;
