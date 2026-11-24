@@ -39,6 +39,35 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-24 — Never build an Array by `append` in a loop; use a mutable Vector
+
+Source: user correction. `Array.append` returns a copy, so appending n elements
+in a loop is O(n²). Accumulate into a `mutable Vector` (amortized O(1) `push`)
+and call `.collect(Array)` once at the end if an Array is needed.
+
+    // worse (quadratic)              // better
+    r = Array<Int>[];                r = mutable Vector<Int>[];
+    for (x in xs) {                  for (x in xs) {
+      !r = r.append(f(x))              r.push(f(x))
+    }                                }
+                                     r.collect(Array)
+
+### 2026-11-24 — Use `.any()` / `.all()` instead of flag-and-full-scan loops
+
+Source: user correction. Don't write `found = false; for (x in xs) { if (p(x))
+!found = true }; if (found) ...` — the loop always scans everything. `.any(p)`
+short-circuits on the first match and `.all(p)` on the first failure, and read
+better.
+
+    // worse                          // better
+    found = false;                   hasCmp = xs.any(x -> x is IntCmpUle _);
+    for (x in xs) {                  if (hasCmp) { ... }
+      if (p(x)) !found = true
+    };                               // or: xs.all(x -> p(x))
+    if (found) { ... }
+
+Only keep a manual flag when the loop body must do real work per element.
+
 ### 2026-11-23 — Prefer exhaustive matches over a wildcard arm
 
 Source: user correction. When matching on a variant type, enumerate the arms
