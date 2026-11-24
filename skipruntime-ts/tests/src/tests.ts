@@ -626,7 +626,7 @@ class BoolObjMapper implements Mapper<string, number, string, BoolObj> {
 class BoolSpreadMapper implements Mapper<string, BoolObj, string, BoolObj> {
   mapEntry(key: string, values: Values<BoolObj>): Iterable<[string, BoolObj]> {
     const v = values.getUnique() as BoolObj;
-    return [[key, { ...v, flag: Boolean(v.flag) }]];
+    return [[key, { ...v, flag: v.n > 0 }]];
   }
 }
 
