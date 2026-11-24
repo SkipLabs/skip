@@ -22,10 +22,9 @@ rebase conflicts. Read `AGENTS.md` at the repo root first and follow it.
 2. Resolve every conflict, preserving both sides' intent: the PR's change and
    whatever landed on `__BASE__`. Read the surrounding code and both versions
    (`git log -p` on the PR's commits and on `origin/__BASE__`) before choosing.
-3. If a resolution needs to build or test, init submodules lazily
-   (`git submodule update --init --filter=blob:none <path>`) and run only the
-   narrowest relevant check (e.g. `make check-sh`, `skfmt` on touched `.sk`
-   files, the matching `run-sktest.sh` suite). Do not run full CI locally.
+3. If a resolution needs to build or test, run only the narrowest relevant
+   check (e.g. `make check-sh`, the formatter on touched files, the matching
+   test suite — see this repo's contributor docs). Do not run full CI locally.
 4. `git add` the resolved files, then `GIT_EDITOR=true git rebase --continue`
    (repeat for each paused commit).
 5. When the rebase completes, verify `git status` is clean and

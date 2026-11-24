@@ -64,8 +64,9 @@
 # Options (also settable via env vars):
 #   --repo OWNER/REPO    Target repo (default: parsed from origin; MERGE_BOT_REPO)
 #   --state-dir DIR      Bot state (clone, worktrees, logs, lock)
-#                        (default: $XDG_CACHE_HOME/skip-merge-bot or
-#                        ~/.cache/skip-merge-bot; MERGE_BOT_STATE_DIR)
+#                        (default: $XDG_CACHE_HOME/<repo>-merge-bot, e.g.
+#                        ~/.cache/skip-merge-bot for SkipLabs/skip;
+#                        MERGE_BOT_STATE_DIR to override)
 #   --dry-run            Never push/comment/disable auto-merge (MERGE_BOT_DRY_RUN=1)
 #   --poll-seconds N     Poll interval (default 60; MERGE_BOT_POLL_SECONDS)
 #   --ci-timeout N       Max seconds to wait for CI/merge per wait (default 7200;
@@ -85,6 +86,13 @@
 #                        (MERGE_BOT_AGENT_CMD)
 #   --skip-labels A,B    Ignore PRs carrying any of these labels
 #                        (MERGE_BOT_SKIP_LABELS)
+#   MERGE_BOT_PATH_EST       jq body overriding the changed-paths CI heuristic
+#                            (path_est; $p = changed file paths -> seconds),
+#                            for repos reusing this script
+#   MERGE_BOT_REFERENCES_DIR dir with fixer briefs (fix-conflicts.md /
+#                            fix-ci.md) overriding the bundled
+#                            .vibe/skills/merge-bot/references/ (missing files
+#                            fall back to the bundled ones)
 #   -h, --help           Show this help
 #
 # Exit codes: 0 ok/merged, 1 usage error, 10 conflicts or non-trivial skip,
@@ -107,7 +115,9 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 REPO=${MERGE_BOT_REPO:-}
 REPO_DIR="" # set when cwd is already a checkout of REPO (reuse it via worktrees)
-STATE_DIR=${MERGE_BOT_STATE_DIR:-${XDG_CACHE_HOME:-$HOME/.cache}/skip-merge-bot}
+STATE_DIR=${MERGE_BOT_STATE_DIR:-} # empty -> derived from repo name in resolve_repo
+STATE_DIR_EXPLICIT=${MERGE_BOT_STATE_DIR:+1}
+REFERENCES_DIR=${MERGE_BOT_REFERENCES_DIR:-} # empty -> bundled .vibe/skills/merge-bot/references
 POLL_SECONDS=${MERGE_BOT_POLL_SECONDS:-60}
 CI_TIMEOUT=${MERGE_BOT_CI_TIMEOUT:-7200}
 MERGE_WAIT=${MERGE_BOT_MERGE_WAIT:-900} # green+up-to-date PRs merge almost immediately
@@ -163,6 +173,12 @@ resolve_repo() {
             *) die "cannot parse OWNER/REPO from origin url: $url" ;;
         esac
     fi
+    # Default state dir is per-repo: ~/.cache/<repo>-merge-bot (e.g.
+    # ~/.cache/skip-merge-bot for SkipLabs/skip, ~/.cache/skjs-merge-bot for
+    # SkipLabs/skjs) unless --state-dir / MERGE_BOT_STATE_DIR said otherwise.
+    if [ -z "$STATE_DIR_EXPLICIT" ] && [ -z "$STATE_DIR" ]; then
+        STATE_DIR=${XDG_CACHE_HOME:-$HOME/.cache}/$(printf '%s' "${REPO##*/}" | tr '[:upper:]' '[:lower:]')-merge-bot
+    fi
     # If the current directory is already a checkout of REPO, reuse it: the
     # bot then works in git worktrees (registered under .git/worktrees, never
     # touching the checkout's working tree) instead of making a second clone.
@@ -214,8 +230,23 @@ acquire_lock() {
 # the current head. Red CI -> never considered. Pending CI -> not ready yet.
 # ---------------------------------------------------------------------------
 
-# shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
-JQ_DEFS='
+# The changed-paths CI heuristic (path_est in the jq programs below) is the one
+# repo-specific knob: repos reusing this script (e.g. skjs through a thin
+# wrapper) can override just its body via MERGE_BOT_PATH_EST — a jq expression
+# with `$p` (the array of changed file paths) in scope, returning the expected
+# CI seconds.
+default_path_est_body() {
+    # shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
+    printf '%s' 'if ($p | length) == 0 then 600
+   elif ($p | all(test("\\.md$|^www/|^rfc/|^docs/|^\\.github/|^\\.circleci/|^CHANGELOG"))) then 120
+   elif ($p | any(test("^skiplang/compiler/"))) then 1500
+   elif ($p | any(test("^skiplang/|^skipruntime-ts/|^sql/|^packages/|^examples/|^Dockerfile|^docker-bake"))) then 900
+   else 300 end'
+}
+
+build_jq_defs() { # $1 = path_est body; sets JQ_DEFS
+    # shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
+    JQ_DEFS='
 def rollup: .statusCheckRollup // [];
 def failed_checks:
   [ rollup[]? | select(
@@ -243,16 +274,18 @@ def pipeline_wall:
    else null end);
 def path_est:
   ([.files[]?.path // empty] as $p |
-   if ($p | length) == 0 then 600
-   elif ($p | all(test("\\.md$|^www/|^rfc/|^docs/|^\\.github/|^\\.circleci/|^CHANGELOG"))) then 120
-   elif ($p | any(test("^skiplang/compiler/"))) then 1500
-   elif ($p | any(test("^skiplang/|^skipruntime-ts/|^sql/|^packages/|^examples/|^Dockerfile|^docker-bake"))) then 900
-   else 300 end);
+   '"$1"');
 def ci_est:
   (pipeline_wall as $w |
    if ($w // 0) > 0 then (if $w < 60 then 60 else $w end) else path_est end);
 '
+}
 
+PATH_EST_BODY=${MERGE_BOT_PATH_EST:-}
+[ -n "$PATH_EST_BODY" ] || PATH_EST_BODY=$(default_path_est_body)
+build_jq_defs "$PATH_EST_BODY"
+
+build_jq_programs() { # sets JQ_CLASSIFY/JQ_EST/JQ_SCAN/JQ_PICK from $JQ_DEFS
 # Input: one PR object. Output: classification
 # shellcheck disable=SC2016
 JQ_CLASSIFY="$JQ_DEFS"'
@@ -309,6 +342,9 @@ elif ([.[] | select(.needsRebase)] | length) > 0 then
 else
   {action: "idle"}
 end'
+}
+
+build_jq_programs
 
 # ---------------------------------------------------------------------------
 # read-only commands
@@ -621,7 +657,12 @@ cmd_unauto() {
 
 make_prompt() { # $1=template file name (references/*.md) $2=pr $3=info json; echoes prompt path
     local template=$1 n=$2 info=$3
-    local tmpl="$SCRIPT_DIR/../.vibe/skills/merge-bot/references/$template"
+    local tmpl
+    if [ -n "$REFERENCES_DIR" ] && [ -f "$REFERENCES_DIR/$template" ]; then
+        tmpl="$REFERENCES_DIR/$template" # repo-specific override (MERGE_BOT_REFERENCES_DIR)
+    else
+        tmpl="$SCRIPT_DIR/../.vibe/skills/merge-bot/references/$template"
+    fi
     local out="$STATE_DIR/prompts/${template%.md}-pr-$n.md"
     local work branch base conflicted failed verdict url
     work=$(jq -r '.worktree // ""' <<<"$info")
@@ -977,6 +1018,13 @@ cmd_selftest() {
         fi
     }
 
+    # Fixtures use the skip layout: run them against the DEFAULT heuristic,
+    # regardless of any MERGE_BOT_PATH_EST override in the environment.
+    local saved_body=$PATH_EST_BODY
+    PATH_EST_BODY=$(default_path_est_body)
+    build_jq_defs "$PATH_EST_BODY"
+    build_jq_programs
+
     local fx
     fx=$(jq -n '[
       # 0: green + auto-merge + up-to-date (wall 120s) -> ready, wait bucket
@@ -1114,6 +1162,19 @@ cmd_selftest() {
     check "pick: nothing ready -> idle" \
         '{"action":"idle"}' "$(jq -c "$JQ_PICK" <<<"[]")"
 
+    # MERGE_BOT_PATH_EST override: rebuild with a custom path_est body, check
+    # it is honored, then restore the environment-derived defs.
+    # shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
+    build_jq_defs 'if ($p | all(test("\\.md$"))) then 111 else 222 end'
+    build_jq_programs
+    check "est: MERGE_BOT_PATH_EST override honored (doc-only -> 111)" \
+        "111" "$(jq "$JQ_EST" <<<"$(jq '.[10]' <<<"$fx")")"
+    check "est: MERGE_BOT_PATH_EST override honored (non-doc -> 222)" \
+        "222" "$(jq "$JQ_EST" <<<"$(jq '.[11]' <<<"$fx")")"
+    PATH_EST_BODY=$saved_body
+    build_jq_defs "$PATH_EST_BODY"
+    build_jq_programs
+
     if [ "$fails" -gt 0 ]; then
         echo "selftest: $fails failure(s)"
         return 1
@@ -1130,7 +1191,7 @@ main() {
     while [ $# -gt 0 ]; do
         case "$1" in
             --repo) REPO=$2; shift 2 ;;
-            --state-dir) STATE_DIR=$2; shift 2 ;;
+            --state-dir) STATE_DIR=$2; STATE_DIR_EXPLICIT=1; shift 2 ;;
             --dry-run) DRY_RUN=1; shift ;;
             --poll-seconds) POLL_SECONDS=$2; shift 2 ;;
             --ci-timeout) CI_TIMEOUT=$2; shift 2 ;;
@@ -1144,6 +1205,7 @@ main() {
             *) break ;;
         esac
     done
+    resolve_repo # resolves REPO and derives the default per-repo STATE_DIR
     mkdir -p "$STATE_DIR"
     LOG_FILE="$STATE_DIR/merge-bot.log"
     local cmd=${1:-}

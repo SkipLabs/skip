@@ -169,6 +169,26 @@ Run it interactively through the `merge-bot` skill, or unattended with
 without pushing). `bin/merge-bot.sh --selftest` unit-tests the
 readiness/CI-estimate logic and runs as part of `make check-sh`.
 
+#### Reusing the bot from another repo
+
+Repos that keep a skip checkout next to them (e.g. skjs) should not copy this
+bot; a thin `bin/merge-bot.sh` wrapper that execs `../skip/bin/merge-bot.sh`
+is enough. The script is parameterized for that:
+
+- the state dir defaults to `~/.cache/<repo>-merge-bot` (repo name from
+  `--repo`/origin), so each repo gets its own clone/worktrees/lock;
+- `MERGE_BOT_PATH_EST` overrides the changed-paths CI heuristic body (jq, `$p`
+  = changed paths → expected CI seconds) with the other repo's layout;
+- `MERGE_BOT_REFERENCES_DIR` points at a dir with fixer briefs
+  (`fix-conflicts.md` / `fix-ci.md`); files missing there fall back to the
+  bundled `.vibe/skills/merge-bot/references/`;
+- the skill itself can be shared verbatim: symlink
+  `.vibe/skills/merge-bot/SKILL.md` to
+  `../../../../skip/.vibe/skills/merge-bot/SKILL.md` (from
+  `<repo>/.vibe/skills/merge-bot/` up to the parent dir that holds the skip
+  checkout) and keep only local overrides (e.g. a repo-specific
+  `references/fix-ci.md`) in `.vibe/skills/merge-bot/`.
+
 ### Building skip client in Docker against unreleased skip packages
 
 Sometimes it is useful to be able to build a skip client against locally modified, unreleased, skip framework packages.
