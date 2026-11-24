@@ -6,14 +6,6 @@ declare void @SKIP_throw(ptr) noreturn cold
 declare void @SKIP_unreachableMethodCall(ptr, ptr) noreturn cold
 declare void @SKIP_unreachableWithExplanation(ptr) noreturn cold
 declare ptr @SKIP_intern(ptr)
-define linkonce_odr ptr @SKIP_llvm_memcpy(ptr %dest, ptr %src, i64 %len) alwaysinline nounwind uwtable {
-  call void @llvm.memcpy.p0.p0.i64(ptr %dest, ptr %src, i64 %len, i1 false)
-  ret ptr %dest
-}
-define linkonce_odr void @SKIP_llvm_memset(ptr %dest, i8 %val, i64 %len) alwaysinline nounwind uwtable {
-  call void @llvm.memset.p0.i64(ptr %dest, i8 %val, i64 %len, i1 false)
-  ret void
-}
 
 ; LLVM intrinsics
 
