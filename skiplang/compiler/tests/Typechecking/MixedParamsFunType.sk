@@ -1,0 +1,16 @@
+module Typechecking_MixedParamsFunType;
+// Mixed function types: the type of a mixed function or lambda can be written
+// in either group order.
+fun f(a: Int){b: String}: String {
+  b + a.toString()
+}
+
+@exptest
+fun main(): void {
+  g: (Int){b: String} -> String = f;
+  h: {b: String}(Int) -> String = f;
+  lam = (a: Int){b: String} -> `${a}${b}`;
+  k: (Int){b: String} -> String = lam;
+  print_raw(`${g(1){b => "x"}}${h{b => "y"}(2)}${k(3){b => "z"}}${lam{b => "w"}(4)}\n`)
+}
+module end;

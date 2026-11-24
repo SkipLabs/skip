@@ -1,0 +1,22 @@
+module Runtime_MixedParamsLambda;
+// Mixed parameters on lambdas, in both declaration orders; calls accept both
+// group orders, and arguments evaluate in source order.
+fun eff(s: String): String {
+  print_raw(`<${s}>`);
+  s
+}
+
+@exptest
+fun main(): void {
+  f = (a: String){b: String} -> `${a}${b}`;
+  g = {b: String}(a: String) -> `${a}${b}`;
+  h = (a){b} -> `${a}${b}`;
+  print_raw(`[${f(eff("1")){b => eff("2")}}]\n`);
+  print_raw(`[${f{b => eff("4")}(eff("3"))}]\n`);
+  print_raw(`[${g{b => eff("6")}(eff("5"))}]\n`);
+  print_raw(`[${g(eff("7")){b => eff("8")}}]\n`);
+  print_raw(`[${h(eff("9")){b => eff("10")}}]\n`);
+  apply = (x: Int){f: Int -> String} -> f(x);
+  print_raw(`[${apply(42){f => n -> n.toString()}}]\n`);
+}
+module end;

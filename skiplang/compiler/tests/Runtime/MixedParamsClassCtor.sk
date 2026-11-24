@@ -1,0 +1,33 @@
+module Runtime_MixedParamsClassCtor;
+// Mixed constructor parameters, in both declaration orders. Omitted default
+// arguments evaluate in declaration order across the two groups.
+fun eff(s: String): String {
+  print_raw(`<${s}>`);
+  s
+}
+
+class C(a: Int, p: String = `${eff("p")}P`){
+  b: String = `${eff("b")}B`,
+  z: Int = 9,
+} {
+  fun get(): String {
+    `${this.a}${this.p}${this.b}${this.z}`
+  }
+}
+
+class D{z: Int = 7}(a: Int = 1, p: String = `${eff("p")}P`) {
+  fun get(): String {
+    `${this.a}${this.p}${this.z}`
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(`[${C(1).get()}]\n`);
+  print_raw(`[${C(2){b => "x"}.get()}]\n`);
+  print_raw(`[${C{b => "y"}(3).get()}]\n`);
+  print_raw(`[${D().get()}]\n`);
+  print_raw(`[${D{z => 5}(2).get()}]\n`);
+  print_raw(`[${D(3){z => 6}.get()}]\n`);
+}
+module end;
