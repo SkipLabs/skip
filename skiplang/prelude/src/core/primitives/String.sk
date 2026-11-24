@@ -216,14 +216,14 @@ native class .String uses Hashable, Show, Orderable, AsBytes {
   }
 
   fun trimLeft(): String {
-    this.search(ch ~> !isWhitespace(ch)) match {
+    this.search(ch ~> !Chars.isWhitespace(ch)) match {
     | Some(i) -> i.substring(this.getEndIter())
     | None() -> ""
     }
   }
 
   fun trimRight(): String {
-    this.searchRight(ch ~> !isWhitespace(ch)) match {
+    this.searchRight(ch ~> !Chars.isWhitespace(ch)) match {
     | Some(i) ->
       _ = i.next();
       this.getIter().substring(i)
@@ -535,25 +535,9 @@ private fun toIntOptionHelper(s: String): (Int, Int) {
   }
 }
 
-// A character set containing characters in Unicode General Category Z*,
-// U+0009, U+000A ~ U+000D, and U+0085.
-private fun isWhitespace(c: Char): Bool {
-  c match {
-  // CHARACTER TABULATION
-  | '\u0009' | '\u000A' | '\u000B' | '\u000C' | '\u000D' | '\u0085' // LINE FEED // LINE TABULATION // FORM FEED // CARRIAGE RETURN // NEXT LINE // http://www.fileformat.info/info/unicode/category/Zl/list.htm
-  // LINE SEPARATOR
-  | '\u2028'  // http://www.fileformat.info/info/unicode/category/Zp/list.htm
-  // PARAGRAPH SEPARATOR
-  | '\u2029'  // http://www.fileformat.info/info/unicode/category/Zs/list.htm
-  // SPACE
-  | '\u0020' | '\u00A0' | '\u1680' | '\u2000' | '\u2001' | '\u2002' | '\u2003' // NO-BREAK SPACE // OGHAM SPACE MARK // EN QUAD // EM QUAD // EN SPACE // EM SPACE // THREE-PER-EM SPACE
-  | '\u2004' | '\u2005' | '\u2006' | '\u2007' | '\u2008' | '\u2009' | '\u200A' // FOUR-PER-EM SPACE // SIX-PER-EM SPACE // FIGURE SPACE // PUNCTUATION SPACE // THIN SPACE // HAIR SPACE // NARROW NO-BREAK SPACE
-  | '\u202F' | '\u205F' | '\u3000' -> // MEDIUM MATHEMATICAL SPACE // IDEOGRAPHIC SPACE
-    true
-
-  | _ -> false
-  }
-}
+// Whitespace testing lives in Chars.isWhitespace (Unicode Z*, C0 controls
+// U+0009..U+000D, U+0085) so that Char.isWhitespace and String::trim* agree
+// (#1488).
 
 private class StringBytes(
   private str: String,

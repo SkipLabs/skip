@@ -56,4 +56,42 @@ fun testEmbeddedNul(): void {
   T.expectEq(s1.length(), s2.length(), "length of string with embedded nul");
 }
 
+@test
+fun testIsWhitespace(): void {
+  // Char.isWhitespace covers the full Unicode whitespace set (Z*, C0
+  // controls U+0009..U+000D, U+0085), the same set String::trim* uses (#1488).
+  T.expectTrue(Chars.isWhitespace(' '), "space");
+  T.expectTrue(Chars.isWhitespace('\u0009'), "tab");
+  T.expectTrue(Chars.isWhitespace('\u000A'), "line feed");
+  T.expectTrue(Chars.isWhitespace('\u000B'), "vertical tab");
+  T.expectTrue(Chars.isWhitespace('\u000C'), "form feed");
+  T.expectTrue(Chars.isWhitespace('\u000D'), "carriage return");
+  T.expectTrue(Chars.isWhitespace('\u0085'), "next line");
+  T.expectTrue(Chars.isWhitespace('\u00A0'), "no-break space");
+  T.expectTrue(Chars.isWhitespace('\u1680'), "ogham space mark");
+  T.expectTrue(Chars.isWhitespace('\u2028'), "line separator");
+  T.expectTrue(Chars.isWhitespace('\u2029'), "paragraph separator");
+  T.expectTrue(Chars.isWhitespace('\u202F'), "narrow no-break space");
+  T.expectTrue(Chars.isWhitespace('\u3000'), "ideographic space");
+  T.expectFalse(Chars.isWhitespace('a'), "letter is not whitespace");
+  T.expectFalse(Chars.isWhitespace('\u200B'), "zero-width space is not Zs");
+  // String::trim and Char.isWhitespace agree.
+  T.expectEq("abc".trim(), "abc", "trim with no surrounding whitespace");
+  T.expectEq(
+    "\u00A0\u2028abc\u2029\u3000".trim(),
+    "abc",
+    "trim removes Unicode whitespace",
+  );
+  T.expectEq(
+    "\t\u00A0abc \u2028".trimLeft(),
+    "abc \u2028",
+    "trimLeft removes Unicode whitespace",
+  );
+  T.expectEq(
+    "\u2029 abc\u3000".trimRight(),
+    "\u2029 abc",
+    "trimRight removes Unicode whitespace",
+  );
+}
+
 module end;
