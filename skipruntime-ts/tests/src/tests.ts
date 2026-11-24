@@ -608,6 +608,36 @@ const booleanRoundtripService: AnySkipService = {
   },
 };
 
+// testBooleanValueInObjectRoundtrip (#1540) - a boolean computed inside a
+// mapper and nested in an object value must stay a JSON boolean on both the
+// getAll read path and the subscription/notify (SSE) path, not become 0/1.
+
+type BoolObj = { flag: boolean; n: number };
+
+class BoolObjMapper implements Mapper<string, number, string, BoolObj> {
+  mapEntry(key: string, values: Values<number>): Iterable<[string, BoolObj]> {
+    const n = values.getUnique();
+    return [[key, { flag: n > 0, n }]];
+  }
+}
+
+type Input_BN = { input: EagerCollection<string, number> };
+
+class BoolObjResource implements Resource<Input_BN> {
+  instantiate(cs: Input_BN): EagerCollection<string, BoolObj> {
+    return cs.input.map(BoolObjMapper);
+  }
+}
+
+const boolObjService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { boolObj: BoolObjResource },
+
+  createGraph(inputCollections: Input_BN) {
+    return inputCollections;
+  },
+};
+
 //// testExternalService
 
 async function timeout(ms: number) {
@@ -1837,6 +1867,42 @@ export function initTests(
       }
     }
     await service.close();
+  });
+
+  it("testBooleanValueInObjectRoundtrip", async () => {
+    const service = await initService(boolObjService);
+    try {
+      await service.update("input", [
+        ["a", [1]],
+        ["b", [-1]],
+      ]);
+      // getAll (REST-style read) path
+      const entries = await service.getAll("boolObj");
+      expect(entries.length).toEqual(2);
+      for (const [, values] of entries) {
+        for (const v of values as BoolObj[]) {
+          expect(typeof v.flag).toEqual("boolean");
+        }
+      }
+      // subscription/notify (SSE) path
+      const instanceId = "boolObj.1";
+      await service.instantiateResource(instanceId, "boolObj", {});
+      const notifier = new Notifier(service, instanceId);
+      await notifier.waitNotification((updates) => updates.length > 0);
+      notifier.check((updates) => {
+        for (const update of updates) {
+          for (const [, values] of update.values as [Json, Json[]][]) {
+            for (const v of values as BoolObj[]) {
+              expect(typeof v.flag).toEqual("boolean");
+            }
+          }
+        }
+      });
+      notifier.close();
+      service.closeResourceInstance(instanceId);
+    } finally {
+      await service.close();
+    }
   });
 
   it("testExternal", async () => {
