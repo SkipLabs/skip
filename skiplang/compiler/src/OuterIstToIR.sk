@@ -155,20 +155,12 @@ private fun flattenParams<T>(
     | Mixed _ -> invariant_violation("Positional/named mismatch.")
     | Named(pArgs) ->
       invariant(funArgs.size() == pArgs.size(), "Arg count mismatch");
-
-      required = mutable Vector<T>[];
-      optional = mutable Vector<T>[];
-
-      funArgsVec = funArgs.collect(Array);
-      pArgsVec = pArgs.collect(Array);
-      funArgsVec.eachWithIndex((i, t) -> {
-        (if (isTdefault(t)) optional else required).push(pArgsVec[i])
-      });
-
+      (required, optional) = splitRequiredOptional(
+        pArgs.collect(Array),
+        funArgs.collect(Array),
+      );
       // Append all the optionals after the required.
-      optional.each(required.push);
-
-      (required.toArray(), optional.size(), true)
+      (required.concat(optional), optional.size(), true)
     }
   | Mixed(funArgsPos, funArgsNamed, _) ->
     params match {
@@ -178,34 +170,35 @@ private fun flattenParams<T>(
 
       // Required arguments come first (positional in order, then named sorted
       // by name), then optional ones, so that optional arguments are trailing.
-      posRequired = mutable Vector<T>[];
-      posOptional = mutable Vector<T>[];
-      pArgsPos.zip(funArgsPos).each(p -> {
-        (arg, ty) = p;
-        (if (isTdefault(ty)) posOptional else posRequired).push(arg)
-      });
-
-      namedRequired = mutable Vector<T>[];
-      namedOptional = mutable Vector<T>[];
-      funArgsNamedVec = funArgsNamed.collect(Array);
-      pArgsNamedVec = pArgsNamed.collect(Array);
-      funArgsNamedVec.eachWithIndex((i, t) -> {
-        (if (isTdefault(t)) namedOptional else namedRequired).push(
-          pArgsNamedVec[i],
-        )
-      });
-
-      numOpt = posOptional.size() + namedOptional.size();
+      (posRequired, posOptional) = splitRequiredOptional(pArgsPos, funArgsPos);
+      (namedRequired, namedOptional) = splitRequiredOptional(
+        pArgsNamed.collect(Array),
+        funArgsNamed.collect(Array),
+      );
       flat = posRequired
-        .toArray()
-        .concat(namedRequired.toArray())
-        .concat(posOptional.toArray())
-        .concat(namedOptional.toArray());
+        .concat(namedRequired)
+        .concat(posOptional)
+        .concat(namedOptional);
+      numOpt = posOptional.size() + namedOptional.size();
       (flat, numOpt, if (namedOptional.isEmpty()) numOpt <= 1 else true)
     | Positional _ -> invariant_violation("Positional/named mismatch.")
     | Named _ -> invariant_violation("Positional/named mismatch.")
     }
   }
+}
+
+// Split args into required and optional (by the expected types), keeping the
+// declaration order within each half.
+private fun splitRequiredOptional<T>(
+  args: Array<T>,
+  types: Array<I.Type>,
+): (Array<T>, Array<T>) {
+  required = mutable Vector<T>[];
+  optional = mutable Vector<T>[];
+  types.eachWithIndex((i, t) -> {
+    (if (isTdefault(t)) optional else required).push(args[i])
+  });
+  (required.toArray(), optional.toArray())
 }
 
 private fun isMutableType(tt: I.Type): Bool {

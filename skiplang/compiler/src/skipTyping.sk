@@ -1883,7 +1883,35 @@ fun call_(
       args1,
       invalid_arg_msg,
     )
-  | (Mixed(pos_tyl, named_ty_map, _), Mixed(pos_args, named_args, _)) ->
+  | (Mixed(pos_tyl, named_ty_map, _), args_m) ->
+    // A call on a mixed function may supply both groups or just one; normalize
+    // to Mixed so this single arm handles every shape. `f(1)` supplies only
+    // positional arguments (the named parameters must then all have defaults —
+    // join_named_args reports the missing ones); `g{b => 1}` supplies only
+    // named arguments (the positional parameters must then all have defaults).
+    (pos_args, named_args) = args_m match {
+    | Mixed(pos_args, named_args, _) -> (pos_args, named_args)
+    | Positional(pos_args) ->
+      (pos_args, (UMap[] : UMap<(Int, N.Type_, FileRange)>))
+    | Named(named_args) ->
+      pos_tyl.each(param ->
+        param match {
+        | (_, N.Tdefault(_)) -> void
+        | _ ->
+          SkipError.errorl(
+            List[
+              (
+                pos,
+                `Missing positional arguments, expected ${pos_tyl.size()} but got 0. ` +
+                  "A call that supplies only named arguments requires a default for every positional parameter",
+              ),
+              (fpos, "Definition is here"),
+            ],
+          )
+        }
+      );
+      ((Array[] : Array<(Int, N.Type_, FileRange)>), named_args)
+    };
     pos_tyl1 = pos_tyl.map(cur1 ->
       TUtils.contra_promote(context, env, acc, cur1)
     );
@@ -1895,75 +1923,6 @@ fun call_(
       acc,
       pos_tyl1,
       pos_args,
-      invalid_arg_msg,
-    );
-    (!acc, named_add_args) = join_named_args(
-      context,
-      next_id,
-      env,
-      acc,
-      pos,
-      named_ty_map,
-      named_args,
-      invalid_arg_msg,
-    );
-    (acc, pos_add_args.concat(named_add_args))
-  | (Mixed(pos_tyl, named_ty_map, _), Positional(pos_args)) ->
-    // Only positional arguments supplied: named parameters must all have
-    // defaults (join_named_args reports the missing ones otherwise).
-    pos_tyl1 = pos_tyl.map(cur1 ->
-      TUtils.contra_promote(context, env, acc, cur1)
-    );
-    check_args_length(pos, fpos, pos_tyl1, pos_args, "positional arguments");
-    (!acc, pos_add_args) = join_args(
-      context,
-      next_id,
-      env,
-      acc,
-      pos_tyl1,
-      pos_args,
-      invalid_arg_msg,
-    );
-    (!acc, named_add_args) = join_named_args(
-      context,
-      next_id,
-      env,
-      acc,
-      pos,
-      named_ty_map,
-      UMap[],
-      invalid_arg_msg,
-    );
-    (acc, pos_add_args.concat(named_add_args))
-  | (Mixed(pos_tyl, named_ty_map, _), Named(named_args)) ->
-    // Only named arguments supplied: positional parameters must all have
-    // defaults.
-    pos_tyl1 = pos_tyl.map(cur1 ->
-      TUtils.contra_promote(context, env, acc, cur1)
-    );
-    pos_tyl1.each(param ->
-      param match {
-      | (_, N.Tdefault(_)) -> void
-      | _ ->
-        SkipError.errorl(
-          List[
-            (
-              pos,
-              `Missing positional arguments, expected ${pos_tyl1.size()} but got 0. ` +
-                "A call that supplies only named arguments requires a default for every positional parameter",
-            ),
-            (fpos, "Definition is here"),
-          ],
-        )
-      }
-    );
-    (!acc, pos_add_args) = join_args(
-      context,
-      next_id,
-      env,
-      acc,
-      pos_tyl1,
-      (Array[] : Array<(Int, N.Type_, FileRange)>),
       invalid_arg_msg,
     );
     (!acc, named_add_args) = join_named_args(
@@ -1992,25 +1951,27 @@ fun call_(
  * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), the
  * missing group is filled with default arguments, producing a Mixed
  * argument list. */
+/* When the callee takes mixed parameters but only one argument group was
+ * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), promote
+ * the call to a Mixed argument list (a single-group call has no source order
+ * between the groups, so namedFirst is false) and share the default-argument
+ * implementation. */
 fun merge_default_args(
   params_ty: Parameters<N.Type_>,
   add_args: Array<(?N.Name, TAst.Ordered_expr)>,
   args: TAst.Call_args,
 ): TAst.Call_args {
-  params_ty match {
+  args1 = params_ty match {
   | Mixed _ ->
-    // Promote a single-group call to Mixed, then share the default-argument
-    // implementation so the two cannot drift apart. A single-group call has
-    // no source order between the groups, so namedFirst is false either way.
-    args_mixed = args match {
+    args match {
     | Positional(pos_args) -> Mixed(pos_args, UMap::create(), false)
     | Named(named_args) ->
       Mixed((Array[] : Array<TAst.Ordered_expr>), named_args, false)
     | Mixed _ -> args
-    };
-    TUtils.add_default_arguments(add_args, args_mixed)
-  | _ -> TUtils.add_default_arguments(add_args, args)
-  }
+    }
+  | _ -> args
+  };
+  TUtils.add_default_arguments(add_args, args1)
 }
 
 fun tfun_call(
@@ -2583,18 +2544,17 @@ fun finish_call(
  * the mixed call), so the normal path must handle it. Magic calls (`class`,
  * `freeze`, `show`, `unsafe_chill_trust_me`) are dispatched by magic_call on
  * the inner call, so they must not be intercepted either. */
-fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
-  nbase match {
-  | (_, N.Call(_, (_, N.Call _), _, _)) -> false
-  | (
-    _,
-    N.Call(_, (_, N.Var((_, name))), _, _),
-  ) if (
-    name == "class" ||
+fun is_magic_call_name(name: String): Bool {
+  name == "class" ||
     name == "freeze" ||
     name == "show" ||
     name == "unsafe_chill_trust_me"
-  ) ->
+}
+
+fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
+  nbase match {
+  | (_, N.Call(_, (_, N.Call _), _, _)) -> false
+  | (_, N.Call(_, (_, N.Var((_, name))), _, _)) if (is_magic_call_name(name)) ->
     false
   | (_, N.Call(_, _, _, inner_args)) ->
     (inner_args, args) match {
