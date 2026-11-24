@@ -1908,24 +1908,27 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       if (namedFirst) {
         numNamed = namedList.size();
         namedArgs = this.convertNamedParameters(namedList);
-        posArgs = posArgs.map((_, p) -> p with {index => p.index + numNamed});
+        numberedPosArgs = posArgs.map((_, p) ->
+          p with {index => p.index + numNamed}
+        );
       } else {
         numPos = posArgs.size();
         namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
           p with {index => p.index + numPos}
         );
+        numberedPosArgs = posArgs;
       };
       // A bare `_` is an anonymous placeholder and may repeat, but any other
       // name must not appear in both groups. Inserting all names into a umap
       // reports duplicates the same way as duplicate named parameters.
       _ = UMap::createFromIterator(
-        posArgs
+        numberedPosArgs
           .values()
           .filter(param ~> param.name.i1 != PredefinedName.underscore)
           .map(param ~> (param.name, param.name))
           .concat(namedArgs.items().map(p -> (p.i0, p.i0))),
       );
-      Mixed(posArgs, namedArgs, namedFirst)
+      Mixed(numberedPosArgs, namedArgs, namedFirst)
     | _ ->
       invariant_violation("Unexpected parameters: " + this.treeToString(tree))
     }
