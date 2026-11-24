@@ -2641,21 +2641,21 @@ fun join_params(
     // Join by name so that declaration order does not matter. The caller
     // (join_) has already checked that both maps have the same key set.
     (!acc, m) = m1.mapAcc(
-      (acc, name, ty1) -> {
-        (!acc, ty) = join(context, next_id, env, acc, ty1, m2[name]);
-        (acc, ty)
+      (acc0, name, ty1) -> {
+        (!acc1, ty) = join(context, next_id, env, acc0, ty1, m2[name]);
+        (acc1, ty)
       },
-      UMap[],
+      (UMap[] : UMap<N.Type_>),
     );
     (acc, Named(m))
   | (Mixed(tyl1, m1, nf), Mixed(tyl2, m2, _)) ->
     (!acc, joinedPos) = join_array(context, next_id, env, pos, acc, tyl1, tyl2);
     (!acc, m) = m1.mapAcc(
-      (acc, name, ty1) -> {
-        (!acc, ty) = join(context, next_id, env, acc, ty1, m2[name]);
-        (acc, ty)
+      (acc0, name, ty1) -> {
+        (!acc1, ty) = join(context, next_id, env, acc0, ty1, m2[name]);
+        (acc1, ty)
       },
-      UMap[],
+      (UMap[] : UMap<N.Type_>),
     );
     (acc, Mixed(joinedPos, m, nf))
   | _ -> invariant_violation("TODO incompatible fun parameter kinds")
