@@ -184,9 +184,10 @@ is enough. The script is parameterized for that:
   bundled `.vibe/skills/merge-bot/references/`;
 - the skill itself can be shared verbatim: symlink
   `.vibe/skills/merge-bot/SKILL.md` to
-  `../../../skip/.vibe/skills/merge-bot/SKILL.md` and keep only local
-  overrides (e.g. a repo-specific `references/fix-ci.md`) in
-  `.vibe/skills/merge-bot/`.
+  `../../../../skip/.vibe/skills/merge-bot/SKILL.md` (from
+  `<repo>/.vibe/skills/merge-bot/` up to the parent dir that holds the skip
+  checkout) and keep only local overrides (e.g. a repo-specific
+  `references/fix-ci.md`) in `.vibe/skills/merge-bot/`.
 
 ### Building skip client in Docker against unreleased skip packages
 
