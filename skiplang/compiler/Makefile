@@ -161,9 +161,20 @@ stage2/lib/libstd.sklib: stage1 stage2/bin/skc
 stage2/bin/skargo: stage1 stage2/bin/skc
 	PATH=$$(realpath stage1/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage2/bin --target-dir stage2/target --manifest-path ../skargo/Skargo.toml
 
+# skargo writes the self-hosted IR to stageN/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll,
+# not to stageN/bin/skc.ll, so the old `-diff stage2/bin/skc.ll stage3/bin/skc.ll` silently
+# no-op'd on missing files (#1498). Compare the real artifacts instead, report-only as
+# before: a byte difference has not been shown to imply a miscompile, and
+# bin/bump_bootstrap.sh performs the same check.
 stage3/bin/skc stage3/bin/skfmt &: stage2
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --bins --out-dir stage3/bin --target-dir stage3/target
-	-diff -q stage2/bin/skc.ll stage3/bin/skc.ll
+	-@s2=$$(ls stage2/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll 2>/dev/null | grep -v '\.vtables\.ll'); \
+	 s3=$$(ls stage3/target/host/$(SKARGO_PROFILE)/deps/skc-*.ll 2>/dev/null | grep -v '\.vtables\.ll'); \
+	 if [ "$$(printf '%s\n' "$$s2" | grep -c .)" -eq 1 ] && [ "$$(printf '%s\n' "$$s3" | grep -c .)" -eq 1 ] && diff -q $$s2 $$s3 > /dev/null; then \
+	   echo "Fixpoint OK: stage2 and stage3 skc IR are identical"; \
+	 else \
+	   echo "Fixpoint NOTE: stage2/stage3 skc IR not confirmed identical (skc-*.ll globs did not match exactly one file each side, or they differ); the test suite is the gate" >&2; \
+	 fi
 stage3/lib/libstd.sklib: stage2 stage3/bin/skc
 	PATH=$$(realpath stage2/bin):$(PATH) skargo build $(SKARGO_ARGS) --jobs $(SKARGO_JOBS) --lib --out-dir stage3/lib --target-dir stage3/target-lib --manifest-path ../prelude/Skargo.toml
 stage3/bin/skargo: stage2 stage3/bin/skc
