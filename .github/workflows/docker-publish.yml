@@ -168,11 +168,21 @@ jobs:
       - name: Collect pushed digests
         shell: bash
         env:
-          METADATA: ${{ steps.bake.outputs.metadata }}
           EXPECTED: ${{ steps.images.outputs.count }}
           ARCH: ${{ matrix.arch }}
         run: |
           mkdir -p /tmp/meta
+          # Never pass the bake metadata through `env:`: with provenance
+          # mode=max it embeds GITHUB_EVENT_PAYLOAD, which is large on push
+          # events, and a single env string over the kernel's MAX_ARG_STRLEN
+          # (128 KiB) makes the runner fail to exec bash with "Argument list
+          # too long" (E2BIG; run 45437358259 failed exactly here). Step
+          # expressions are substituted into the script file instead, which
+          # has no per-string exec limit, so materialize the metadata to a
+          # file first. The quoted heredoc delimiter keeps the JSON verbatim.
+          cat > /tmp/meta/bake.json <<'BAKE_METADATA_EOF'
+          ${{ steps.bake.outputs.metadata }}
+          BAKE_METADATA_EOF
           # Two things in the metadata are not pushed images and must not be
           # counted as such: buildx.build.warnings, which is not an object, and
           # targets reached only as a named context dependency, which carry a
@@ -182,7 +192,7 @@ jobs:
                         and has("containerimage.digest"))
                | {image: .value["image.name"],
                   digest: .value["containerimage.digest"]}]' \
-            <<< "$METADATA" > "/tmp/meta/$ARCH.json"
+            /tmp/meta/bake.json > "/tmp/meta/$ARCH.json"
           cat "/tmp/meta/$ARCH.json"
           count=$(jq 'length' "/tmp/meta/$ARCH.json")
           if [[ "$count" -ne "$EXPECTED" ]]; then
