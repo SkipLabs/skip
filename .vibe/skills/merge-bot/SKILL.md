@@ -1,7 +1,7 @@
 ---
 name: merge-bot
 description: >-
-  Operate the Skip merge queue with bin/merge-bot.sh: a PR is ready when
+  Operate this repo's merge queue with bin/merge-bot.sh: a PR is ready when
   auto-merge is enabled AND its CI is green; red-CI PRs are never touched.
   Green + up-to-date PRs are just waited on until auto-merge lands them; green
   + not-up-to-date PRs (BEHIND/conflicting) are rebased one at a time (fastest
@@ -69,7 +69,8 @@ action=$(jq -r .action <<<"$dec")
      follow it, with the template tokens bound to `prepare`'s JSON: `__PR__` =
      `N`, `__WORKTREE__` = `worktree`, `__VERDICT_FILE__` = `verdict_file`,
      `__BRANCH__` / `__BASE__` from the JSON, `__PR_URL__` =
-     `https://github.com/SkipLabs/skip/pull/N`, `__CONFLICTED_FILES__` =
+     `https://github.com/<owner>/<repo>/pull/N` (the repo the bot targets,
+     auto-detected from origin), `__CONFLICTED_FILES__` =
      `conflicted` joined with newlines. Wait for it, then read the verdict
      file:
      - first line `OK` → rebase complete, worktree clean. Go to step 3.
@@ -81,9 +82,9 @@ action=$(jq -r .action <<<"$dec")
      the PR's head branch (in the base repo, or in the fork when the PR allows
      maintainer edits; never anywhere else). This re-triggers CI.
   4. `wout=$(bin/merge-bot.sh wait N)`; `rc=$?`
-     - rc 0 → MERGED (auto-merge fired once the required
-       `ci/circleci: setup` + `ci/circleci: ci/all-checks` checks passed on the
-       new head). Back to `pick`.
+     - rc 0 → MERGED (auto-merge fired once the required checks configured
+       on `main` passed on the new head — see this repo's CI config). Back to
+       `pick`.
      - rc 15 → **staled**: `main` moved again while we waited and CI on our
        head finished green; strict required checks mean GitHub won't merge a
        `BEHIND` PR, so the PR needs another rebase. If you are driving manually,
@@ -119,7 +120,7 @@ one operating the queue.
 ## Where the bot works
 
 Run the script from any clone of this repo: it detects that the cwd is a
-checkout of `SkipLabs/skip` and reuses it, doing all git work in `git worktree`s
+checkout of the target repo and reuses it, doing all git work in `git worktree`s
 under the state dir (`~/.cache/<repo>-merge-bot/work`; here `~/.cache/skip-merge-bot/work`) — the checkout's working
 tree is never touched, and no second clone is made. Run from elsewhere and it
 keeps a dedicated clone under the state dir instead. All other state (lock,
@@ -146,4 +147,4 @@ logs, prompts, verdicts) also lives under the state dir, outside the repo.
   timeout, 14 auto-merge off).
 - `references/fix-conflicts.md` — conflict-fixer brief.
 - `references/fix-ci.md` — CI-fixer brief.
-- HACKING.md, "Merge bot" — the human overview.
+- this repo's contributor docs, "Merge bot" section (HACKING.md here).

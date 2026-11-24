@@ -1,5 +1,9 @@
 # CI-fixer brief — PR #__PR__ (__PR_URL__)
 
+(This is skip's brief: it maps skip's `ci/circleci:` jobs to local commands.
+Repos reusing this bot override it via `MERGE_BOT_REFERENCES_DIR` with their
+own CI mapping; files missing there fall back to this one.)
+
 You are a sub-agent spawned by the merge bot (`bin/merge-bot.sh`). The bot
 rebased PR #__PR__ (branch `__BRANCH__`) onto `origin/__BASE__` in repo
 `__REPO__` and pushed it; the required CI then failed on the new head. Your job
