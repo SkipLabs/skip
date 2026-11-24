@@ -621,11 +621,27 @@ class BoolObjMapper implements Mapper<string, number, string, BoolObj> {
   }
 }
 
+// Spreads an object read back from the input collection, so any bool→number
+// corruption on the read side (ObjectHandle/proxy get) propagates here too.
+class BoolSpreadMapper implements Mapper<string, BoolObj, string, BoolObj> {
+  mapEntry(key: string, values: Values<BoolObj>): Iterable<[string, BoolObj]> {
+    const v = values.getUnique();
+    return [[key, { ...v, flag: Boolean(v.flag) }]];
+  }
+}
+
 type Input_BN = { input: EagerCollection<string, number> };
+type Input_BO = { input: EagerCollection<string, BoolObj> };
 
 class BoolObjResource implements Resource<Input_BN> {
   instantiate(cs: Input_BN): EagerCollection<string, BoolObj> {
     return cs.input.map(BoolObjMapper);
+  }
+}
+
+class BoolSpreadResource implements Resource<Input_BO> {
+  instantiate(cs: Input_BO): EagerCollection<string, BoolObj> {
+    return cs.input.map(BoolSpreadMapper);
   }
 }
 
@@ -634,6 +650,15 @@ const boolObjService: AnySkipService = {
   resources: { boolObj: BoolObjResource },
 
   createGraph(inputCollections: Input_BN) {
+    return inputCollections;
+  },
+};
+
+const boolSpreadService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { boolSpread: BoolSpreadResource },
+
+  createGraph(inputCollections: Input_BO) {
     return inputCollections;
   },
 };
@@ -1887,6 +1912,40 @@ export function initTests(
       // subscription/notify (SSE) path
       const instanceId = "boolObj.1";
       await service.instantiateResource(instanceId, "boolObj", {});
+      const notifier = new Notifier(service, instanceId);
+      await notifier.waitNotification((updates) => updates.length > 0);
+      notifier.check((updates) => {
+        for (const update of updates) {
+          for (const [, values] of update.values as [Json, Json[]][]) {
+            for (const v of values as BoolObj[]) {
+              expect(typeof v.flag).toEqual("boolean");
+            }
+          }
+        }
+      });
+      notifier.close();
+      service.closeResourceInstance(instanceId);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testBooleanSpreadRoundtrip", async () => {
+    const service = await initService(boolSpreadService);
+    try {
+      await service.update("input", [
+        ["a", [{ flag: true, n: 1 }]],
+        ["b", [{ flag: false, n: -1 }]],
+      ]);
+      const entries = await service.getAll("boolSpread");
+      expect(entries.length).toEqual(2);
+      for (const [, values] of entries) {
+        for (const v of values as BoolObj[]) {
+          expect(typeof v.flag).toEqual("boolean");
+        }
+      }
+      const instanceId = "boolSpread.1";
+      await service.instantiateResource(instanceId, "boolSpread", {});
       const notifier = new Notifier(service, instanceId);
       await notifier.waitNotification((updates) => updates.length > 0);
       notifier.check((updates) => {
