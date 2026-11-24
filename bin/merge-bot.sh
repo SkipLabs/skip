@@ -551,9 +551,10 @@ cmd_abort() {
 # GitHub side: wait / comment / unauto
 # ---------------------------------------------------------------------------
 
-cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)]
+cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)] [$3=expected head sha]
     local n=$1
     local timeout=${2:-$CI_TIMEOUT}
+    local head=${3:-}
     resolve_repo
     local deadline=$((SECONDS + timeout))
     while :; do
@@ -603,7 +604,21 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)]
             | length' <<<"$j")
         stale=false
         if [ "$pending" = "0" ] && { [ "$mss" = "BEHIND" ] || [ "$mss" = "DIRTY" ] || [ "$mergeable" = "CONFLICTING" ]; }; then
-            stale=true
+            # Guard against false positives right after a push: the rollup
+            # may still show the previous head's completed checks (or be
+            # empty while the new pipeline's checks register), and GitHub may
+            # transiently report BEHIND. Only call it stale when the rollup
+            # is non-empty and, when an expected head was given, it is the
+            # current PR head.
+            local rollup_len head_ok
+            rollup_len=$(jq -r '(.statusCheckRollup // []) | length' <<<"$j")
+            head_ok=true
+            if [ -n "$head" ]; then
+                head_ok=$(jq -r --arg h "$head" '.headRefOid == $h' <<<"$j")
+            fi
+            if [ "$rollup_len" -gt 0 ] && [ "$head_ok" = true ]; then
+                stale=true
+            fi
         fi
         if [ "$stale" = true ]; then
             log "PR $n: staled while waiting (mergeStateStatus=$mss mergeable=$mergeable, CI complete)"
@@ -844,7 +859,9 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
     local attempts=0 wout wrc body cinfo
     while :; do
         wrc=0
-        wout=$(cmd_wait "$n") || wrc=$?
+        local head
+        head=$(jq -r '.head // .new_head // ""' <<<"$out")
+        wout=$(cmd_wait "$n" "" "$head") || wrc=$?
         case $wrc in
             0)
                 log "PR $n: merged"
