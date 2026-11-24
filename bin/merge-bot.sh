@@ -285,6 +285,7 @@ PATH_EST_BODY=${MERGE_BOT_PATH_EST:-}
 [ -n "$PATH_EST_BODY" ] || PATH_EST_BODY=$(default_path_est_body)
 build_jq_defs "$PATH_EST_BODY"
 
+build_jq_programs() { # sets JQ_CLASSIFY/JQ_EST/JQ_SCAN/JQ_PICK from $JQ_DEFS
 # Input: one PR object. Output: classification
 # shellcheck disable=SC2016
 JQ_CLASSIFY="$JQ_DEFS"'
@@ -341,6 +342,9 @@ elif ([.[] | select(.needsRebase)] | length) > 0 then
 else
   {action: "idle"}
 end'
+}
+
+build_jq_programs
 
 # ---------------------------------------------------------------------------
 # read-only commands
@@ -1014,6 +1018,13 @@ cmd_selftest() {
         fi
     }
 
+    # Fixtures use the skip layout: run them against the DEFAULT heuristic,
+    # regardless of any MERGE_BOT_PATH_EST override in the environment.
+    local saved_body=$PATH_EST_BODY
+    PATH_EST_BODY=$(default_path_est_body)
+    build_jq_defs "$PATH_EST_BODY"
+    build_jq_programs
+
     local fx
     fx=$(jq -n '[
       # 0: green + auto-merge + up-to-date (wall 120s) -> ready, wait bucket
@@ -1151,17 +1162,18 @@ cmd_selftest() {
     check "pick: nothing ready -> idle" \
         '{"action":"idle"}' "$(jq -c "$JQ_PICK" <<<"[]")"
 
-    # MERGE_BOT_PATH_EST override: rebuild the jq defs with a custom path_est
-    # body, check it is honored, then restore the default defs.
-    local saved_defs=$JQ_DEFS saved_est=$JQ_EST
+    # MERGE_BOT_PATH_EST override: rebuild with a custom path_est body, check
+    # it is honored, then restore the environment-derived defs.
     # shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
     build_jq_defs 'if ($p | all(test("\\.md$"))) then 111 else 222 end'
-    JQ_EST="$JQ_DEFS"'ci_est'
+    build_jq_programs
     check "est: MERGE_BOT_PATH_EST override honored (doc-only -> 111)" \
         "111" "$(jq "$JQ_EST" <<<"$(jq '.[10]' <<<"$fx")")"
     check "est: MERGE_BOT_PATH_EST override honored (non-doc -> 222)" \
         "222" "$(jq "$JQ_EST" <<<"$(jq '.[11]' <<<"$fx")")"
-    JQ_DEFS=$saved_defs JQ_EST=$saved_est
+    PATH_EST_BODY=$saved_body
+    build_jq_defs "$PATH_EST_BODY"
+    build_jq_programs
 
     if [ "$fails" -gt 0 ]; then
         echo "selftest: $fails failure(s)"
