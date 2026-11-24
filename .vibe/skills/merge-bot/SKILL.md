@@ -93,8 +93,8 @@ action=$(jq -r .action <<<"$dec")
      - rc 12 → required CI failed on the new head. Spawn a sub-agent with
        `.vibe/skills/merge-bot/references/fix-ci.md` (tokens: `__PR__`,
        `__WORKTREE__` = `$STATE/work/pr-N` (default
-       `~/.cache/skip-merge-bot/work/pr-N`), `__VERDICT_FILE__` =
-       `~/.cache/skip-merge-bot/verdicts/ci-pr-N`, `__FAILED_CHECKS__` = the
+       `~/.cache/<repo>-merge-bot/work/pr-N` (here `~/.cache/skip-merge-bot/work/pr-N`), `__VERDICT_FILE__` =
+       `~/.cache/<repo>-merge-bot/verdicts/ci-pr-N`, `__FAILED_CHECKS__` = the
        failing contexts with their CircleCI URLs, `__BRANCH__`/`__BASE__`).
        At most `MERGE_BOT_CI_FIX_ATTEMPTS` (default 2) attempts:
        - verdict `OK` → `bin/merge-bot.sh push N` again, back to `wait`.
@@ -120,7 +120,7 @@ one operating the queue.
 
 Run the script from any clone of this repo: it detects that the cwd is a
 checkout of `SkipLabs/skip` and reuses it, doing all git work in `git worktree`s
-under the state dir (`~/.cache/skip-merge-bot/work`) — the checkout's working
+under the state dir (`~/.cache/<repo>-merge-bot/work`; here `~/.cache/skip-merge-bot/work`) — the checkout's working
 tree is never touched, and no second clone is made. Run from elsewhere and it
 keeps a dedicated clone under the state dir instead. All other state (lock,
 logs, prompts, verdicts) also lives under the state dir, outside the repo.
@@ -136,7 +136,7 @@ logs, prompts, verdicts) also lives under the state dir, outside the repo.
   is a fork-headed PR without "Allow edits from maintainers".
 - After changing the bot itself, preview with `--dry-run` first.
 - All bot state (dedicated clone, worktrees, logs, lock) lives under
-  `${XDG_CACHE_HOME:-~/.cache}/skip-merge-bot` (`--state-dir` to override),
+  `${XDG_CACHE_HOME:-~/.cache}/<repo>-merge-bot` (e.g. `~/.cache/skip-merge-bot` here; `--state-dir` to override),
   never in your own checkout.
 
 ## Reference
