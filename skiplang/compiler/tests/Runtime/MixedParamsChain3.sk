@@ -1,0 +1,11 @@
+module Runtime_MixedParamsChain3;
+// A mixed call returning a closure: the trailing group calls the result.
+fun f(a: Int){b: Int}: Int ~> Int {
+  c ~> a + b + c
+}
+
+@exptest
+fun main(): void {
+  print_raw(f(1){b => 2}(3).toString() + f{b => 2}(1)(3).toString() + "\n")
+}
+module end;

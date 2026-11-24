@@ -1,0 +1,14 @@
+module Runtime_MixedParamsClass;
+// Regression: class(x){field => v} is dynamic construction, not a mixed
+// call, and must keep working.
+base class B final {x: Int}
+
+fun make(b: B): B {
+  class(b){x => 42}
+}
+
+@exptest
+fun main(): void {
+  print_raw(make(B{x => 1}).x.toString() + "\n")
+}
+module end;
