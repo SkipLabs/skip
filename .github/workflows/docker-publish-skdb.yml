@@ -97,11 +97,16 @@ jobs:
       - name: Export digest
         shell: bash
         env:
-          METADATA: ${{ steps.bake.outputs.metadata }}
           ARCH: ${{ matrix.arch }}
         run: |
           mkdir -p /tmp/digests
-          digest=$(jq -r '.skdb["containerimage.digest"] // empty' <<< "$METADATA")
+          # Same as docker-publish.yml: never pass the bake metadata via
+          # `env:` (a single env string over MAX_ARG_STRLEN makes the runner
+          # fail to exec bash with E2BIG); write it to a file from the script.
+          cat > /tmp/digests/bake.json <<'BAKE_METADATA_EOF'
+          ${{ steps.bake.outputs.metadata }}
+          BAKE_METADATA_EOF
+          digest=$(jq -r '.skdb["containerimage.digest"] // empty' /tmp/digests/bake.json)
           if [[ -z "$digest" ]]; then
             echo "::error::no digest for skdb in bake metadata"
             exit 1
