@@ -2608,18 +2608,15 @@ fun join_funs(
 
 /* Two parameter lists can only be joined when they have the same kind, the
  * same positional arity and the same set of named parameter names. */
-fun params_compatible(
-  p1: Parameters<N.Type_>,
-  p2: Parameters<N.Type_>,
-): Bool {
+fun params_compatible(p1: Parameters<N.Type_>, p2: Parameters<N.Type_>): Bool {
   (p1, p2) match {
   | (Positional(a1), Positional(a2)) -> a1.size() == a2.size()
   | (Named(m1), Named(m2)) ->
     m1.size() == m2.size() && m1.all((k, _) -> m2.containsKey(k))
   | (Mixed(a1, m1, _), Mixed(a2, m2, _)) ->
     a1.size() == a2.size() &&
-    m1.size() == m2.size() &&
-    m1.all((k, _) -> m2.containsKey(k))
+      m1.size() == m2.size() &&
+      m1.all((k, _) -> m2.containsKey(k))
   | _ -> false
   }
 }

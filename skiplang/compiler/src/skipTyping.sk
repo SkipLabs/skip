@@ -2619,7 +2619,8 @@ fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
   | (_, N.Call(_, _, _, inner_args)) ->
     (inner_args, args) match {
     | (Positional _, Named _)
-    | (Named _, Positional _) -> true
+    | (Named _, Positional _) ->
+      true
     | _ -> false
     }
   | _ -> false
@@ -2644,9 +2645,9 @@ fun callee_has_mixed_params(acc: TUtils.Acc, ty: N.Type_): Bool {
   | (_, N.Tfun(_, _, _, Mixed _, _)) -> true
   | (_, N.Tdefault(t)) -> callee_has_mixed_params(acc, t)
   | (_, N.Tparam(_, _, param_id, _)) ->
-    acc.tparam_constraints
-      .findUppers(param_id)
-      .any(t -> callee_has_mixed_params(acc, t))
+    acc.tparam_constraints.findUppers(param_id).any(t ->
+      callee_has_mixed_params(acc, t)
+    )
   // Lambdas can only declare a single parameter group, so a Tlambda never
   // contains Mixed parameters; unwrap it anyway for indirect calls.
   | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(acc, t)
@@ -2689,7 +2690,14 @@ fun finish_mixed_call(
     // Not a mixed function: keep the usual chained-call behavior — two
     // chained finish_call invocations, mirroring the trampoline's CallState
     // pop in `expr`.
-    (!acc, inner_call) = finish_call(context, next_id, env, acc, base, mc.inner);
+    (!acc, inner_call) = finish_call(
+      context,
+      next_id,
+      env,
+      acc,
+      base,
+      mc.inner,
+    );
     inner_base = (
       TUtils.promote(context, env, acc, inner_call.i0),
       inner_call.i1,
