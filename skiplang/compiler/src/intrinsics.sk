@@ -232,13 +232,14 @@ mutable class .IntrinsicsInliner{
         StringConcat{id => call.id, typ => call.typ, pos, args => call.args},
       );
       this.jumpIfInvoke(call)
-    | "Sequence.copyStringBytesTo" ->
-      // Lower the block copy directly to an llvm.memcpy: a[0] is the source
-      // string (a String value points at its first UTF-8 byte), a[1] the
-      // destination Array<UInt8> (an Array value points at its first element)
-      // and a[2] the byte offset within it. The result is the string's byte
-      // size. The sk_string_t header stores the size as a u32 just before the
-      // data: at -4 on 64-bit (hash at -8), at -8 on wasm32 (size before hash).
+    | "Sequence.unsafeCopyStringBytesTo" ->
+      // Lower the (unchecked, see Sequence.copyStringBytesTo) block copy
+      // directly to an llvm.memcpy: a[0] is the source string (a String value
+      // points at its first UTF-8 byte), a[1] the destination Array<UInt8>
+      // (an Array value points at its first element) and a[2] the byte offset
+      // within it. The result is the string's byte size. The sk_string_t
+      // header stores the size as a u32 just before the data: at -4 on 64-bit
+      // (hash at -8), at -8 on wasm32 (size before hash).
       // The @cpp_extern declaration remains as the fallback for compilers that
       // don't know this intrinsic (e.g. the pinned stage0).
       str = a[0];
