@@ -166,20 +166,18 @@ private mutable class FactSet(
 
   // Is there a bound B with v <u B and B >= 0? Then 0 <= v <= 2^63-2.
   readonly fun hasUnsignedBound(v: InstrID): Bool {
-    found = false;
-    this.lessU.maybeGet(v) match {
-    | Some(bounds) ->
-      bounds.each(b -> if (this.nonneg.contains(b)) !found = true)
-    | None() -> void
+    hasU = this.lessU.maybeGet(v) match {
+    | Some(bounds) -> bounds.any(b -> this.nonneg.contains(b))
+    | None() -> false
     };
-    if (!found && this.nonneg.contains(v)) {
+    if (!hasU && this.nonneg.contains(v)) {
       this.lessS.maybeGet(v) match {
-      | Some(bounds) ->
-        bounds.each(b -> if (this.nonneg.contains(b)) !found = true)
-      | None() -> void
+      | Some(bounds) -> bounds.any(b -> this.nonneg.contains(b))
+      | None() -> false
       }
-    };
-    found
+    } else {
+      hasU
+    }
   }
 
   // Exact content equality (used to detect fixpoint convergence). Counts
@@ -202,20 +200,17 @@ private fun mapEquals(
   a: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
   b: readonly UnorderedMap<InstrID, readonly UnorderedSet<InstrID>>,
 ): Bool {
-  if (a.size() != b.size()) {
-    false
-  } else {
-    eq = true;
-    a.each((k, sa) ->
-      if (eq) {
-        b.maybeGet(k) match {
-        | Some(sb) -> if (!setEquals(sa, sb)) !eq = false
-        | None() -> !eq = false
+  a.size() == b.size() &&
+    a.keys().all(k ->
+      b.maybeGet(k) match {
+      | Some(sb) ->
+        a.maybeGet(k) match {
+        | Some(sa) -> setEquals(sa, sb)
+        | None() -> false
         }
+      | None() -> false
       }
-    );
-    eq
-  }
+    )
 }
 
 private fun intersectMap(
@@ -571,24 +566,15 @@ mutable class .BoundsCheckElimination{
   // with no such candidate.
   private readonly fun hasKillCandidate(func: Function): Bool {
     optinfo = this.optinfo;
-    hasCmp = false;
-    for (b in func.blocks) {
-      for (instr in b.instrs) {
-        if (instr is IntCmpUle _) !hasCmp = true
-      }
-    };
+    hasCmp = func.blocks.any(b -> b.instrs.any(instr -> instr is IntCmpUle _));
     if (!hasCmp) {
       false
     } else {
-      hasThrowArm = false;
-      for (b in func.blocks) {
-        for (s in b.terminator().successors) {
-          if (optinfo.getBlock(s.target).terminator() is Unreachable _) {
-            !hasThrowArm = true
-          }
-        }
-      };
-      hasThrowArm
+      func.blocks.any(b ->
+        b.terminator().successors.any(s ->
+          optinfo.getBlock(s.target).terminator() is Unreachable _
+        )
+      )
     }
   }
 
@@ -643,12 +629,9 @@ mutable class .BoundsCheckElimination{
           facts match {
           | None() -> void
           | Some(fs) ->
-            hasThrowArm = false;
-            for (s in b.terminator().successors) {
-              if (optinfo.getBlock(s.target).terminator() is Unreachable _) {
-                !hasThrowArm = true
-              }
-            };
+            hasThrowArm = b.terminator().successors.any(s ->
+              optinfo.getBlock(s.target).terminator() is Unreachable _
+            );
             if (hasThrowArm) {
               b.terminator() match {
               | If{predicate} ->
