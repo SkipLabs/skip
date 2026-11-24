@@ -211,15 +211,15 @@ class Named<+T>(args: UMap<T>) extends Parameters<T> {
 
 /* A parameter list (or argument list) with both positional and named parts,
  * e.g. `fun f(a: Int){b: String}` called as `f(1){b => "x"}`.
- * `namedFirst` records the source order of the two groups at a call site
- * (`f{b => "x"}(1)`), so that argument evaluation can stay in source order;
- * for declared parameters it is always false (positional group comes first).
+ * `namedFirst` records the source order of the two groups: at a call site it
+ * distinguishes `f{b => "x"}(1)` from `f(1){b => "x"}`; in a declaration it
+ * distinguishes `fun f{b: String}(a: Int)` from `fun f(a: Int){b: String}`.
+ * Either way it lets argument/default evaluation stay in source order.
  *
  * Ordering contract: `foldl` and `map_foldl` honour `namedFirst` (source
- * order at call sites) and must be used when evaluation order matters;
- * `values`, `toArray`, `toList`, `each` and `inspect` are always
- * declaration-ordered (positional group first, then named) and must not be
- * used to decide evaluation order.
+ * order) and must be used when evaluation order matters; `values`, `toArray`,
+ * `toList`, `each` and `inspect` are always group-ordered (positional group
+ * first, then named) and must not be used to decide evaluation order.
  */
 class Mixed<+T>(
   positional: Array<T>,
@@ -239,8 +239,8 @@ class Mixed<+T>(
   }
 
   fun foldl<R>(f: (R, T) -> R, init: R): R {
-    // At call sites `namedFirst` records the source order of the two groups,
-    // so fold in source order to keep argument evaluation order.
+    // `namedFirst` records the source order of the two groups, so fold in
+    // source order to keep argument evaluation order.
     if (this.namedFirst) {
       this.positional.foldl(f, this.named.reduce((r, _, v) -> f(r, v), init))
     } else {

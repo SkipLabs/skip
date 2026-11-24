@@ -268,15 +268,21 @@ fun to_string_params(
         .collect(Vector)
         .join(", ") +
       "}"
-  | Mixed(l, m, _) ->
-    `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})` +
+  | Mixed(l, m, namedFirst) ->
+    posStr = `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})`;
+    namedStr =
       "{" +
       m
         .items()
         .map(p -> p.i0.i1 + ": " + to_string(nthis, subst, p.i1))
         .collect(Vector)
         .join(", ") +
-      "}"
+      "}";
+    if (namedFirst) {
+      namedStr + posStr
+    } else {
+      posStr + namedStr
+    }
   }
 }
 

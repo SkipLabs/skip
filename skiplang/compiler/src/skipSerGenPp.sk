@@ -116,7 +116,12 @@ fun type_params_str(x: Parameters<A.Type_>): String {
   x match {
   | Positional(tyl) -> "(" + type_array_str(tyl) + ")"
   | Named(m) -> "{" + type_map_str(m) + "}"
-  | Mixed(pos, m, _) -> "(" + type_array_str(pos) + "){" + type_map_str(m) + "}"
+  | Mixed(pos, m, namedFirst) ->
+    if (namedFirst) {
+      "{" + type_map_str(m) + "}(" + type_array_str(pos) + ")"
+    } else {
+      "(" + type_array_str(pos) + "){" + type_map_str(m) + "}"
+    }
   }
 }
 

@@ -2468,11 +2468,27 @@ mutable class SkipParser{
           range => Parser.createRangeOfTrees(positional, named),
           positional,
           named,
+          namedFirst => false,
         }
       } else {
         positional
       }
-    | TokenKind.OPEN_CURLY() -> this.parseNamedParameters(false)
+    | TokenKind.OPEN_CURLY() ->
+      named = this.parseNamedParameters(false);
+      // A '(' directly after a named parameter group can only start the
+      // positional group of a named-first mixed declaration (the return type
+      // annotation needs a ':' first, so this never misfires on one).
+      if (this.peekKind(TokenKind.OPEN_PAREN())) {
+        positional = this.parsePositionalParameters(false);
+        ParseTree.MixedParametersTree{
+          range => Parser.createRangeOfTrees(named, positional),
+          positional,
+          named,
+          namedFirst => true,
+        }
+      } else {
+        named
+      }
     | _ -> this.errorResult(errorExpectedParameters, "Expected parameters")
     }
   }

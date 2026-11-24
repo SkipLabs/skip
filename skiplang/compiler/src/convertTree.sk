@@ -1875,7 +1875,7 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       Named(this.convertNamedParameters(parameters))
     | ParseTree.PositionalParametersTree{parameters} ->
       this.convertPositionalParameters(parameters.getList())
-    | ParseTree.MixedParametersTree{positional, named} ->
+    | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
       posList = positional match {
       | ParseTree.PositionalParametersTree{parameters} -> parameters.getList()
       | _ ->
@@ -1895,8 +1895,9 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       | _ -> invariant_violation("ICE positional params")
       };
       // Number the parameters of the whole declaration with a single sequence
-      // of source ordinals (positional first, then named) so that sorting by
-      // `index` restores declaration order, e.g. when evaluating omitted
+      // of source ordinals in declaration order (positional first, then
+      // named — or the reverse for a named-first declaration) so that sorting
+      // by `index` restores declaration order, e.g. when evaluating omitted
       // default arguments.
       if (posArgs.isEmpty() || namedList.isEmpty()) {
         SkipError.error(
@@ -1904,10 +1905,16 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
           "A mixed parameter declaration cannot have an empty positional or named parameter group",
         )
       };
-      numPos = posArgs.size();
-      namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
-        p with {index => p.index + numPos}
-      );
+      if (namedFirst) {
+        numNamed = namedList.size();
+        namedArgs = this.convertNamedParameters(namedList);
+        posArgs = posArgs.map((_, p) -> p with {index => p.index + numNamed});
+      } else {
+        numPos = posArgs.size();
+        namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
+          p with {index => p.index + numPos}
+        );
+      };
       // A bare `_` is an anonymous placeholder and may repeat, but any other
       // name must not appear in both groups. Inserting all names into a umap
       // reports duplicates the same way as duplicate named parameters.
@@ -1918,7 +1925,7 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
           .map(param ~> (param.name, param.name))
           .concat(namedArgs.items().map(p -> (p.i0, p.i0))),
       );
-      Mixed(posArgs, namedArgs, false)
+      Mixed(posArgs, namedArgs, namedFirst)
     | _ ->
       invariant_violation("Unexpected parameters: " + this.treeToString(tree))
     }

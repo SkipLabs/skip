@@ -324,13 +324,22 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<N.Type_>): void {
     o.out("{");
     type_map(o, m);
     o.out("}")
-  | Mixed(pos, named, _) ->
-    o.out("(");
-    array(type, o, pos);
-    o.out(")");
-    o.out("{");
-    type_map(o, named);
-    o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      type_map(o, named);
+      o.out("}");
+      o.out("(");
+      array(type, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(type, o, pos);
+      o.out(")");
+      o.out("{");
+      type_map(o, named);
+      o.out("}")
+    }
   }
 }
 
@@ -402,14 +411,24 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<N.Parameter>): void {
     values = param_map.values() |> List::createFromIterator;
     list(fun_parameter, o, values);
     o.out("}")
-  | Mixed(pos, named, _) ->
-    o.out("(");
-    array(fun_parameter, o, pos);
-    o.out(")");
-    o.out("{");
-    values = named.values() |> List::createFromIterator;
-    list(fun_parameter, o, values);
-    o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      o.out("{");
+      values = named.values() |> List::createFromIterator;
+      list(fun_parameter, o, values);
+      o.out("}");
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")")
+    } else {
+      o.out("(");
+      array(fun_parameter, o, pos);
+      o.out(")");
+      o.out("{");
+      values = named.values() |> List::createFromIterator;
+      list(fun_parameter, o, values);
+      o.out("}")
+    }
   }
 }
 
