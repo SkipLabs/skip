@@ -1905,18 +1905,17 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
           "A mixed parameter declaration cannot have an empty positional or named parameter group",
         )
       };
-      if (namedFirst) {
-        namedArgs = this.convertNamedParameters(namedList);
-        numNamed = namedArgs.size();
-        numberedPosArgs = posArgs.map(p ->
-          p with {index => p.index + numNamed}
-        );
+      (numberedPosArgs, namedArgs) = if (namedFirst) {
+        namedArgs0 = this.convertNamedParameters(namedList);
+        (
+          posArgs.map(p -> p with {index => p.index + namedArgs0.size()}),
+          namedArgs0,
+        )
       } else {
-        numPos = posArgs.size();
-        namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
-          p with {index => p.index + numPos}
+        namedArgs0 = this.convertNamedParameters(namedList).map((_, p) ->
+          p with {index => p.index + posArgs.size()}
         );
-        numberedPosArgs = posArgs;
+        (posArgs, namedArgs0)
       };
       // A bare `_` is an anonymous placeholder and may repeat, but any other
       // name must not appear in both groups. Inserting all names into a umap
