@@ -372,12 +372,16 @@ fun type_params(
 }
 
 fun type_map(o: mutable BufferedPrinter.Out, m: UMap<SkipAst.Type_>): void {
-  m.each((name, ty) -> {
-    o.out(name.i1);
-    o.out(": ");
-    type(o, ty);
-    o.out(", ")
-  })
+  list(
+    (o, p) -> {
+      (name, ty) = p;
+      o.out(name.i1);
+      o.out(": ");
+      type(o, ty)
+    },
+    o,
+    List::createFromIterator(m.items()),
+  )
 }
 
 fun type_args(o: mutable BufferedPrinter.Out, x: Array<SkipAst.Type_>): void {

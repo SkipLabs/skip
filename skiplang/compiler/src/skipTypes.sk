@@ -262,19 +262,21 @@ fun to_string_params(
   | Positional(l) -> `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})`
   | Named(m) ->
     "{" +
-      m.reduce(
-        (acc, name, ty) ->
-          name.i1 + ": " + to_string(nthis, subst, ty) + ", " + acc,
-        "}",
-      )
+      m
+        .items()
+        .map(p -> p.i0.i1 + ": " + to_string(nthis, subst, p.i1))
+        .collect(Vector)
+        .join(", ") +
+      "}"
   | Mixed(l, m, _) ->
     `(${l.map(ty -> to_string(nthis, subst, ty)).join(", ")})` +
       "{" +
-      m.reduce(
-        (acc, name, ty) ->
-          name.i1 + ": " + to_string(nthis, subst, ty) + ", " + acc,
-        "}",
-      )
+      m
+        .items()
+        .map(p -> p.i0.i1 + ": " + to_string(nthis, subst, p.i1))
+        .collect(Vector)
+        .join(", ") +
+      "}"
   }
 }
 
