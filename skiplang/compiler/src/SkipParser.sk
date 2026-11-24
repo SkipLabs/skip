@@ -2446,8 +2446,12 @@ mutable class SkipParser{
   // inside them are reported where they occur. If no ':' follows the group,
   // the caller's checkMissingReturnType reports the missing return type.
   mutable fun namedParameterGroupStartsHere(): Bool {
-    this.peekKindOffset(TokenKind.NONTYPE_IDENTIFIER(), 1) &&
-      this.peekKindOffset(TokenKind.COLON(), 2)
+    // Match (not ==) on the identifier kind: NONTYPE_IDENTIFIER carries the
+    // identifier string, so an == comparison would never hold.
+    this.peekOffset(1) match {
+    | TokenKind.NONTYPE_IDENTIFIER() -> this.peekKindOffset(TokenKind.COLON(), 2)
+    | _ -> false
+    }
   }
 
   mutable fun parseParametersSpecifier(): ParseTree {
