@@ -169,7 +169,10 @@ fun testSleepMs(): void {
   after = Time.time_ns();
   elapsed = after - before;
   SKTest.expectTrue(elapsed > 1000000, "sleep_ms: slept at least 1ms");
-  SKTest.expectTrue(elapsed < 10000000, "sleep_ms: slept less than 10ms");
+  // No tight upper bound: an upper bound on wall time fails whenever the
+  // process is descheduled (flaky under load, #1636). 1s still catches a
+  // seconds-vs-milliseconds unit mix-up.
+  SKTest.expectTrue(elapsed < 1000000000, "sleep_ms: slept less than 1s");
 }
 
 module end;
