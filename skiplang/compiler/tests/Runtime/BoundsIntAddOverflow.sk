@@ -1,39 +1,57 @@
 module Runtime_BoundsIntAddOverflow;
-// Regression test for the bounds-check elimination pass: IntAdd wraps modulo
-// 2^64, so nonneg(a) and nonneg(b) do not imply nonneg(a + b). Here
-// 2^63-1 + size wraps to a negative index; the access must still throw
-// OutOfBounds. An unsound pass would conclude the index is in [0, size),
-// remove the bounds check, and read out of bounds instead.
+// Regression tests for the bounds-check elimination pass.
 //
-// The helper is @no_inline and takes the array as a parameter so that
-// `arr.size()` does not constant-fold: the IntAdd of the huge constant and
-// the (non-constant) size is what the pass must reason about.
-
-@no_inline
-private fun checkWrapped(arr: readonly Array<Int>): String {
-  i = 9223372036854775807 + arr.size();
-  if (i < arr.size()) {
-    try {
-      _ = arr.get(i);
-      "FAIL: no exception\n"
-    } catch {
-    | OutOfBounds() -> "Pass\n"
-    | _ -> "FAIL: wrong exception\n"
-    }
-  } else {
-    "FAIL: signed comparison\n"
-  }
-}
+// 1. IntAdd wraps modulo 2^64, so nonneg(a) and nonneg(b) do not imply
+//    nonneg(a + b). Here 2^63-1 + size wraps to a negative index; the access
+//    must still throw OutOfBounds. An unsound pass would conclude the index
+//    is in [0, size), remove the bounds check, and read out of bounds
+//    instead of throwing.
+// 2. Plain out-of-bounds accesses (negative index, index == size, set past
+//    the end) must still throw.
+//
+// `arr` is a clone() so that `arr.size()` does not constant-fold, and the
+// index computation lives inside the try body so that the IntAdd, the
+// signed comparison, and the bounds check all end up in the same function.
 
 @exptest
 fun main(): void {
-  arr = Array[10, 20, 30];
+  arr = Array[10, 20, 30].clone();
   // Sanity: ordinary loop over the array (checks may be eliminated here) must
   // still compute the right value.
   sum = 0;
-  for (i in Range(0, arr.size())) {
-    !sum = sum + arr.get(i)
+  for (j in Range(0, arr.size())) {
+    !sum = sum + arr.get(j)
   };
-  print_raw(sum.toString() + "\n" + checkWrapped(arr))
+  wrapped = try {
+    i = 9223372036854775807 + arr.size();
+    if (i < arr.size()) {
+      arr.get(i).toString()
+    } else {
+      "FAIL: signed comparison\n"
+    }
+  } catch {
+  | OutOfBounds() -> "Pass\n"
+  | _ -> "FAIL: wrong exception\n"
+  };
+  negIdx = try {
+    arr.get(-1).toString()
+  } catch {
+  | OutOfBounds() -> "Pass\n"
+  | _ -> "FAIL: wrong exception\n"
+  };
+  boundary = try {
+    arr.get(arr.size()).toString()
+  } catch {
+  | OutOfBounds() -> "Pass\n"
+  | _ -> "FAIL: wrong exception\n"
+  };
+  setOob = try {
+    _ = arr.set(arr.size(), 0);
+    "FAIL: no exception\n"
+  } catch {
+  | OutOfBounds() -> "Pass\n"
+  | _ -> "FAIL: wrong exception\n"
+  };
+  print_raw(sum.toString() + "\n" + wrapped + negIdx + boundary + setOob)
 }
 module end;
