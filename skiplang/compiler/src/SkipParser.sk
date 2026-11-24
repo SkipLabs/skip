@@ -2467,6 +2467,9 @@ mutable class SkipParser{
       positional = this.parsePositionalParameters(false);
       if (
         this.peekKind(TokenKind.OPEN_CURLY()) &&
+        // The speculative parse only runs when a '{' follows a positional
+        // list, which without mixed parameters was always the
+        // missing-return-type error path, so the common case pays nothing.
         this.namedParameterGroupFollowedByReturnType()
       ) {
         named = this.parseNamedParameters(false);

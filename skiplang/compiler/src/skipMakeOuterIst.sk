@@ -1267,13 +1267,7 @@ fun call_args(
 ): (List<O.Stmt>, Parameters<O.Expr>) {
   x match {
   | Positional(el) ->
-    (acc1, el1) = el.mapAcc(
-      ((acc1, pos_e) -> {
-        (_, e) = pos_e;
-        bind_expr(new_id, env, acc1, e)
-      }),
-      acc,
-    );
+    (acc1, el1) = bind_positional_args(new_id, env, acc, el);
     (acc1, Positional(el1))
   | Named(em) ->
     (acc1, em1) = named_call_args(new_id, env, acc, em);
@@ -1283,26 +1277,29 @@ fun call_args(
     // matches the source order of the two groups.
     if (namedFirst) {
       (acc1, em1) = named_call_args(new_id, env, acc, em);
-      (acc2, el1) = el.mapAcc(
-        ((acc1, pos_e) -> {
-          (_, e) = pos_e;
-          bind_expr(new_id, env, acc1, e)
-        }),
-        acc1,
-      );
+      (acc2, el1) = bind_positional_args(new_id, env, acc1, el);
       (acc2, Mixed(el1, em1, true))
     } else {
-      (acc1, el1) = el.mapAcc(
-        ((acc1, pos_e) -> {
-          (_, e) = pos_e;
-          bind_expr(new_id, env, acc1, e)
-        }),
-        acc,
-      );
+      (acc1, el1) = bind_positional_args(new_id, env, acc, el);
       (acc2, em1) = named_call_args(new_id, env, acc1, em);
       (acc2, Mixed(el1, em1, false))
     }
   }
+}
+
+private fun bind_positional_args(
+  new_id: () -> Int,
+  env: Env,
+  acc: List<O.Stmt>,
+  el: Array<TAst.Ordered_expr>,
+): (List<O.Stmt>, Array<O.Expr>) {
+  el.mapAcc(
+    ((acc1, pos_e) -> {
+      (_, e) = pos_e;
+      bind_expr(new_id, env, acc1, e)
+    }),
+    acc,
+  )
 }
 
 fun named_call_args(

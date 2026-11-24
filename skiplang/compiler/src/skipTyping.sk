@@ -1999,36 +1999,16 @@ fun merge_default_args(
 ): TAst.Call_args {
   params_ty match {
   | Mixed _ ->
-    (pos_add, named_add) = add_args.foldl(
-      (acc, p) -> {
-        (name_opt, oe) = p;
-        (pos_acc, named_acc) = acc;
-        name_opt match {
-        | None() -> (pos_acc.concat(Array[oe]), named_acc)
-        | Some(n) -> (pos_acc, named_acc.concat(Array[(n, oe)]))
-        }
-      },
-      (
-        (Array[] : Array<TAst.Ordered_expr>),
-        (Array[] : Array<(N.Name, TAst.Ordered_expr)>),
-      ),
-    );
-    args match {
-    | Positional(pos_args) ->
-      Mixed(pos_args.concat(pos_add), UMap::createFromItems(named_add), false)
+    // Promote a single-group call to Mixed, then share the default-argument
+    // implementation so the two cannot drift apart. A single-group call has
+    // no source order between the groups, so namedFirst is false either way.
+    args_mixed = args match {
+    | Positional(pos_args) -> Mixed(pos_args, UMap::create(), false)
     | Named(named_args) ->
-      Mixed(
-        pos_add,
-        named_add.foldl((m, p) -> m.add(p.i0, p.i1), named_args),
-        false,
-      )
-    | Mixed(pos_args, named_args, nf) ->
-      Mixed(
-        pos_args.concat(pos_add),
-        named_add.foldl((m, p) -> m.add(p.i0, p.i1), named_args),
-        nf,
-      )
-    }
+      Mixed((Array[] : Array<TAst.Ordered_expr>), named_args, false)
+    | Mixed _ -> args
+    };
+    TUtils.add_default_arguments(add_args, args_mixed)
   | _ -> TUtils.add_default_arguments(add_args, args)
   }
 }

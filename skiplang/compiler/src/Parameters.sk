@@ -290,14 +290,19 @@ class Mixed<+T>(
   fun inspect(): Inspect {
     InspectVector(
       "Mixed",
-      {
-        items = mutable Vector[];
-        for (value in this.positional) {
-          items.push(inspect(value))
-        };
-        this.named.each((key, value) -> items.push(inspect((key.i1, value))));
-        items.toArray();
-      },
+      Array[
+        InspectVector("positional", this.positional.map(v -> inspect(v))),
+        InspectMap(
+          "named",
+          {
+            items = Vector::mcreate(this.named.size());
+            this.named.each((key, value) ->
+              items.push((inspect(key.i1), inspect(value)))
+            );
+            items.toArray();
+          },
+        ),
+      ],
     );
   }
 
