@@ -282,11 +282,13 @@ private fun unionSet(
 // arguments (parallel edges); each is a distinct CFG edge and must be
 // analyzed separately.
 private fun succIndicesOf(b: Block, target: BlockID): Array<Int> {
-  result = Array<Int>[];
+  // Accumulate into a mutable Vector (amortized O(1) push), not an Array
+  // (append copies, quadratic in a loop).
+  result = mutable Vector<Int>[];
   b.terminator().successors.eachWithIndex((i, s) ->
-    if (s.target == target) !result = result.append(i)
+    if (s.target == target) result.push(i)
   );
-  result
+  result.collect(Array)
 }
 
 // Per-block fact storage: facts[id] is meaningful only when computed[id].
