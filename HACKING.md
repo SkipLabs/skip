@@ -66,6 +66,11 @@ encourages batching unrelated changes.
   `fast-checks`, whose formatters and shellcheck cover neither — so only
   `setup` and the no-op `all-checks` run (`.circleci/generate_config.sh`);
   keep it that way for other paths that cannot affect a build or a check.
+- Likewise, a `bin/` script triggers only the jobs that actually execute it:
+  the job-relevant scripts are listed in `BIN_*_SCRIPTS` at the top of
+  `.circleci/generate_config.sh` (e.g. `bin/merge-bot.sh` is covered by
+  `fast-checks` alone, since `make check-sh` runs its selftest). List a
+  script there only when a job's steps, Makefiles or Dockerfiles run it.
 
 ### Publishing CI Docker images
 

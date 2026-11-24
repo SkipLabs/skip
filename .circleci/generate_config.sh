@@ -57,6 +57,34 @@ NO_CI_JOB_EXCLUDES=(
   ':(exclude)sql/ts/vitejs/'
 )
 
+# The bin/ scripts that CI jobs execute, grouped by the job set that reads
+# them. A change to any other bin/ file (merge-bot.sh, release tooling, image
+# build scripts, hooks) triggers no job beyond fast-checks, whose `make
+# check-sh` lints and selftests every *.sh. List a script here only when a
+# job's steps, the Makefiles those steps run, or the Dockerfiles those jobs
+# build actually execute it.
+# Read by check-ts, skipruntime, skipruntime-bun, skdb-wasm and
+# native-addon-unreleased (directly, or via the root/skipruntime-ts/sql
+# Makefiles and the native-addon run.sh / skipruntime-ts Dockerfile).
+BIN_TS_JOB_SCRIPTS=(
+  bin/cd_sh
+  bin/check-ts.sh
+  bin/build_runtime.sh
+  bin/install_runtime.sh
+  bin/native_artifacts_cache_key.sh
+  # Only the npm-cache mark/prune steps; their failures just warn.
+  bin/ci_npm_cache.sh
+)
+# Wraps `skargo test` for the compiler-tests job and every skip-package-tests
+# job.
+BIN_PACKAGE_TEST_SCRIPTS=(
+  bin/run-sktest.sh
+)
+# Runs in the skdb job's cache steps, where a failure fails the step.
+BIN_SKDB_SCRIPTS=(
+  bin/ci_skdb_bin_cache.sh
+)
+
 # Exit 0 when the diff restricted to the given paths has no build-relevant change.
 changed() {
   git diff --quiet HEAD "$BASE" -- "$@" "${NON_BUILD_EXCLUDES[@]}" \
@@ -243,17 +271,29 @@ fi
 # the npm install + libskipruntime build shared by the TS jobs (check-ts,
 # skipruntime, skipruntime-bun, skdb-wasm): the root lockfile pins compile inputs
 # such as node-addon-api (linked by skipruntime-ts/addon/binding.gyp), and the
-# Makefiles/bin scripts drive those builds. Without this a change to e.g. the
-# lockfile or skipruntime-ts/Makefile runs no CI at all, even though it can break
-# those builds -- so route it to the TS job set.
+# Makefiles and the BIN_TS_JOB_SCRIPTS above drive those builds. Without this a
+# change to e.g. the lockfile or skipruntime-ts/Makefile runs no CI at all, even
+# though it can break those builds -- so route it to the TS job set.
 # prebuild.mjs links the Skip runtime TS sources into the workspaces whose
 # typecheck/build scripts run it.
 if ! changed \
-     Makefile package.json package-lock.json bin/ skipruntime-ts/Makefile \
-     prebuild.mjs; then
+     Makefile package.json package-lock.json "${BIN_TS_JOB_SCRIPTS[@]}" \
+     skipruntime-ts/Makefile prebuild.mjs; then
   check_ts=true
   TS_CHANGED[skipruntime-ts]=true
   TS_CHANGED[sql]=true
+fi
+
+# The other job-executed bin/ scripts, each routed to the jobs that read it:
+# run-sktest.sh wraps `skargo test` for compiler-tests and every
+# skip-package-tests job, and ci_skdb_bin_cache.sh runs in the skdb job's cache
+# steps. Any other bin/ change (e.g. bin/merge-bot.sh, #1752) triggers no job
+# beyond fast-checks.
+if ! changed "${BIN_PACKAGE_TEST_SCRIPTS[@]}"; then
+  for dir in "${!SK_CHANGED[@]}"; do SK_CHANGED["$dir"]=true; done
+fi
+if ! changed "${BIN_SKDB_SCRIPTS[@]}"; then
+  SK_CHANGED[sql]=true
 fi
 
 # The native-addon-unreleased job's test builds libskipruntime in Docker
