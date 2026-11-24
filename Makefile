@@ -13,6 +13,10 @@ SKARGO_PROFILE?=release
 SKDB_WASM=sql/target/wasm32-unknown-unknown/$(SKARGO_PROFILE)/skdb.wasm
 SKDB_BIN=sql/target/host/$(SKARGO_PROFILE)/skdb
 SDKMAN_DIR?=$(HOME)/.sdkman
+# `**` is not a make globstar (`src/**/*.sk` would match one level only),
+# so enumerate the prelude sources explicitly (#1494).
+PRELUDE_SRCS=$(shell find skiplang/prelude/src -name '*.sk')
+SKDB_CROSS_SRCS=$(PRELUDE_SRCS) skiplang/skdate/src/* skiplang/skjson/src/* skiplang/sqlparser/src/*
 
 .PHONY: skdb
 skdb: npm build/skdb build/init.sql
@@ -29,7 +33,7 @@ npm: $(SKDB_WASM) build/package/skdb build/package/package.json
 # `npm publish` from sql/ts/ would ship (dist/, package.json, README).
 # Consumed by `make check-vite` and `make test-bun` which cp it into a
 # scaffolded node_modules to smoke-test consumer installs.
-build/package/skdb: $(SKDB_WASM)
+build/package/skdb: $(SKDB_WASM) $(shell find sql/ts/src -type f) sql/ts/package.json sql/ts/tsconfig.json
 	cd sql/ts && npm run build
 	rm -rf $@
 	mkdir -p $@
@@ -43,23 +47,23 @@ build/package/package.json:
 	@echo "  }" >> build/package/package.json
 	@echo "}" >> build/package/package.json
 
-sql/target/wasm32-unknown-unknown/dev/skdb.wasm: sql/src/*
+sql/target/wasm32-unknown-unknown/dev/skdb.wasm: sql/src/* $(SKDB_CROSS_SRCS)
 	cd sql && skargo build --target wasm32-unknown-unknown --bin skdb
 
-sql/target/wasm32-unknown-unknown/release/skdb.wasm: sql/src/*
+sql/target/wasm32-unknown-unknown/release/skdb.wasm: sql/src/* $(SKDB_CROSS_SRCS)
 	cd sql && skargo build --release --target wasm32-unknown-unknown --bin skdb
 
 $(SDKMAN_DIR):
-	cd $(dirname $(SDKMAN_DIR)) && sh -c 'wget -q -O- "https://get.sdkman.io?rcupdate=false" | bash'
+	cd $(dir $(SDKMAN_DIR)) && sh -c 'wget -q -O- "https://get.sdkman.io?rcupdate=false" | bash'
 
 ################################################################################
 # skdb native binary
 ################################################################################
 
-sql/target/host/dev/skdb: sql/src/* skiplang/prelude/src/**/*.sk skiplang/skdate/src/* skiplang/skjson/src/* skiplang/sqlparser/src/*
+sql/target/host/dev/skdb: sql/src/* $(SKDB_CROSS_SRCS)
 	cd sql && skargo build
 
-sql/target/host/release/skdb: sql/src/* skiplang/prelude/src/**/*.sk skiplang/skdate/src/* skiplang/skjson/src/* skiplang/sqlparser/src/*
+sql/target/host/release/skdb: sql/src/* $(SKDB_CROSS_SRCS)
 	cd sql && skargo build --release --bin skdb
 
 # TODO: keeping this for now as nearly all test scripts refer to build/skdb
