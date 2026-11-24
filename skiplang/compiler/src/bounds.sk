@@ -82,13 +82,42 @@ private mutable class FactSet(
     )
   }
 
+  // Copy with every fact that mentions an ID in `drop` removed (as a key, as
+  // a bound inside a relation, or in nonneg).
+  readonly fun withoutIDs(
+    drop: readonly UnorderedSet<InstrID>,
+  ): mutable FactSet {
+    result = FactSet::empty();
+    this.lessU.each((k, s) ->
+      if (!drop.contains(k)) {
+        kept = mutable UnorderedSet[];
+        s.each(b -> if (!drop.contains(b)) kept.insert(b));
+        if (!kept.isEmpty()) result.lessU.set(k, kept)
+      }
+    );
+    this.lessS.each((k, s) ->
+      if (!drop.contains(k)) {
+        kept = mutable UnorderedSet[];
+        s.each(b -> if (!drop.contains(b)) kept.insert(b));
+        if (!kept.isEmpty()) result.lessS.set(k, kept)
+      }
+    );
+    this.nonneg.each(x -> if (!drop.contains(x)) result.addNonneg(x));
+    result
+  }
+
   // Copy, then alias the target block's parameters to the edge arguments:
   // facts about an argument also hold for the corresponding parameter.
-  // Bindings are computed from this (predecessor-edge) snapshot, not from
-  // the copy being built, so all parameters are bound simultaneously and
-  // one binding cannot feed another on the same edge.
+  // Facts about the target's own parameters are first dropped: on this edge
+  // each parameter is re-bound to its argument, so facts about the previous
+  // value (e.g. carried around a loop back edge) must not survive. Bindings
+  // are computed from this (predecessor-edge) snapshot, not from the copy
+  // being built, so all parameters are bound simultaneously and one binding
+  // cannot feed another on the same edge.
   readonly fun transfer(toBlock: Block, args: Array<InstrID>): mutable FactSet {
-    result = this.unionWith(FactSet::empty());
+    paramIDs = mutable UnorderedSet[];
+    toBlock.params.each(param -> paramIDs.insert(param.id));
+    result = this.withoutIDs(paramIDs);
     toBlock.params.eachWithIndex((i, param) -> {
       if (i < args.size()) {
         arg = args[i];
@@ -394,7 +423,11 @@ mutable class .BoundsCheckElimination{
     }
   }
 
-  // Facts on the edge p -> target (successor index succIndex of p).
+  // Facts on the edge p -> target (successor index succIndex of p). The
+  // edge seeds from p's terminator are applied BEFORE the transfer into the
+  // target, so that a seed about an argument is correctly re-keyed onto the
+  // corresponding block parameter (and a seed about a re-bound parameter is
+  // dropped by the transfer).
   private mutable fun edgeFacts(
     p: Block,
     succIndex: Int,
@@ -405,13 +438,22 @@ mutable class .BoundsCheckElimination{
     | None() -> None()
     | Some(ef) ->
       succ = p.terminator().successors[succIndex];
-      transferred = ef.transfer(this.optinfo.getBlock(target), succ.args);
       seeds = FactSet::empty();
       this.edgeSeeds(p, succIndex, seeds);
-      FactSet::union(
-        Some((transferred : readonly FactSet)),
+      combined = FactSet::union(
+        Some((ef : readonly FactSet)),
         Some((seeds : readonly FactSet)),
-      )
+      );
+      combined match {
+      | None() -> None()
+      | Some(c) ->
+        Some(
+          (c.transfer(
+            this.optinfo.getBlock(target),
+            succ.args,
+          ) : readonly FactSet),
+        )
+      }
     }
   }
 
@@ -472,16 +514,30 @@ mutable class .BoundsCheckElimination{
             | None() -> void
             | Some(cf) ->
               bSucc = term.successors[succIndex];
-              crossed = cf.transfer(b, bSucc.args);
+              // q may be dominated by p (loop back edge), so cf can carry
+              // facts about values that p itself defines — those describe
+              // the previous iteration and are stale once p redefines them.
+              // Drop them, then add p's own local seeds and the p -> b edge
+              // seeds before transferring into b.
+              pDefined = mutable UnorderedSet[];
+              for (instr in p.instrs) pDefined.insert(instr.id);
+              cleaned = cf.withoutIDs(pDefined);
+              localBase = cleaned.unionWith(FactSet::empty());
+              this.localSeeds(p, localBase);
               seeds = FactSet::empty();
               this.edgeSeeds(p, succIndex, seeds);
-              !acc = FactSet::intersect(
-                acc,
-                FactSet::union(
-                  Some((crossed : readonly FactSet)),
-                  Some((seeds : readonly FactSet)),
-                ),
-              )
+              combined = FactSet::union(
+                Some((localBase : readonly FactSet)),
+                Some((seeds : readonly FactSet)),
+              );
+              combined match {
+              | None() -> void
+              | Some(c) ->
+                !acc = FactSet::intersect(
+                  acc,
+                  Some((c.transfer(b, bSucc.args) : readonly FactSet)),
+                )
+              }
             }
           }
         }
