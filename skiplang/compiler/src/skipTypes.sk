@@ -2606,17 +2606,16 @@ fun join_funs(
   (acc, fty_params, fty_return)
 }
 
-/* Two parameter lists can only be joined when they have the same kind, the
- * same positional arity and the same set of named parameter names. */
+/* Two parameter lists can only be joined when they have the same kind and
+ * the same set of named parameter names. Positional arity mismatches are
+ * left to join_array, which reports them as TypeArityMismatch. */
 fun params_compatible(p1: Parameters<N.Type_>, p2: Parameters<N.Type_>): Bool {
   (p1, p2) match {
-  | (Positional(a1), Positional(a2)) -> a1.size() == a2.size()
+  | (Positional _, Positional _) -> true
   | (Named(m1), Named(m2)) ->
     m1.size() == m2.size() && m1.all((k, _) -> m2.containsKey(k))
-  | (Mixed(a1, m1, _), Mixed(a2, m2, _)) ->
-    a1.size() == a2.size() &&
-      m1.size() == m2.size() &&
-      m1.all((k, _) -> m2.containsKey(k))
+  | (Mixed(_, m1, _), Mixed(_, m2, _)) ->
+    m1.size() == m2.size() && m1.all((k, _) -> m2.containsKey(k))
   | _ -> false
   }
 }
