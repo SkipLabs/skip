@@ -2559,7 +2559,9 @@ class Converter private (
         constructorParametersNamed => fieldParams match {
         | Positional _ -> false
         | Named _ -> true
-        | Mixed _ -> true
+        // The parser never produces Mixed class constructor parameters.
+        | Mixed _ ->
+          invariant_violation("ICE Mixed class constructor parameters")
         },
         kind,
         extends_,

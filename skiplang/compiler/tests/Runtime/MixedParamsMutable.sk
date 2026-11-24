@@ -1,0 +1,15 @@
+module Runtime_MixedParamsMutable;
+class C() {
+  mutable fun bump(x: Int){by: Int}: Int {
+    x + by
+  }
+}
+
+@exptest
+fun main(): void {
+  m = C();
+  print_raw(
+    m.bump{by => 10}(3).toString() + m.bump(4){by => 100}.toString() + "\n",
+  )
+}
+module end;

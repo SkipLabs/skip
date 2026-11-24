@@ -880,12 +880,8 @@ fun expr_(
     argArray = args1 match {
     | Positional(a) -> a
     | Named _ -> pos.die("Expected positional args for TemplateLiteral")
-    | Mixed(a, m, _) ->
-      if (m.isEmpty()) {
-        a
-      } else {
-        pos.die("Expected positional args for TemplateLiteral")
-      }
+    // Template literals always desugar to positional call args.
+    | Mixed _ -> invariant_violation("ICE Mixed args for TemplateLiteral")
     };
     result = argArray.size() match {
     | 0 -> make_empty_string(pos)

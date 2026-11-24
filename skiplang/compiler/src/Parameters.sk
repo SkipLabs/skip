@@ -26,7 +26,7 @@ base class Parameters<+T> uses Hashable[T: Hashable], Equality[T: Equality] {
     (this, other) match {
     | (Positional(x), Positional(y)) -> x == y
     | (Named(x), Named(y)) -> x == y
-    | (Mixed(x1, x2, _), Mixed(y1, y2, _)) -> x1 == y1 && x2 == y2
+    | (Mixed(x1, x2, f1), Mixed(y1, y2, f2)) -> x1 == y1 && x2 == y2 && f1 == f2
     | _ -> false
     }
   }
@@ -209,12 +209,6 @@ class Named<+T>(args: UMap<T>) extends Parameters<T> {
   }
 }
 
-/* A parameter list (or argument list) with both positional and named parts,
- * e.g. `fun f(a: Int){b: String}` called as `f(1){b => "x"}`.
- * `namedFirst` records the source order of the two groups at a call site
- * (`f{b => "x"}(1)`), so that argument evaluation can stay in source order;
- * for declared parameters it is always false (positional group comes first).
- */
 /* A parameter list (or argument list) with both positional and named parts,
  * e.g. `fun f(a: Int){b: String}` called as `f(1){b => "x"}`.
  * `namedFirst` records the source order of the two groups at a call site

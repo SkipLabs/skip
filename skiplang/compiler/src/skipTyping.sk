@@ -2669,7 +2669,9 @@ fun finish_mixed_call(
   } else {
     // Not a mixed function: keep the usual chained-call behavior — two
     // chained finish_call invocations, mirroring the trampoline's CallState
-    // pop in `expr`.
+    // pop in `expr`. This path consumes one fewer next_id() than the old
+    // two-arm trampoline, so tvar ids after a fallback shift by one; the
+    // solved tvar sets are identical, so this is semantically irrelevant.
     (!acc, inner_call) = finish_call(
       context,
       next_id,

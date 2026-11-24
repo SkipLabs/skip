@@ -2654,7 +2654,11 @@ fun join_params(
       acc,
     );
     (acc, Mixed(joinedPos, m, nf))
-  | _ -> invariant_violation("TODO incompatible fun parameter kinds")
+  // Callers check params_compatible first; this is only a safety net.
+  | _ ->
+    invariant_violation(
+      "ICE join_params: incompatible parameter kinds (params_compatible)",
+    )
   }
 }
 

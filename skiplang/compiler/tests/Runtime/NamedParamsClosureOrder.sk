@@ -1,0 +1,27 @@
+module Runtime_NamedParamsClosureOrder;
+// Regression: a named-only function used as a first-class value must bind its
+// arguments in source order; an optional parameter that sorts before a
+// required one must not be swapped by the closure wrapper.
+fun f{a: Int = 1, b: Int}: Int {
+  a * 10 + b
+}
+
+class C() {
+  fun m{x: Int = 2, y: String}: String {
+    x.toString() + y
+  }
+}
+
+@exptest
+fun main(): void {
+  g = f;
+  c = C();
+  h = c.m;
+  print_raw(
+    g{a => 3, b => 4}.toString() +
+      g{b => 5}.toString() +
+      h{y => "z"}.toString() +
+      "\n",
+  )
+}
+module end;

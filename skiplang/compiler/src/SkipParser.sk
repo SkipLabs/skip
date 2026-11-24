@@ -2437,28 +2437,17 @@ mutable class SkipParser{
   //    named-parameters
   //    positional-parameters  named-parameters
   //
-  // The mixed form is unambiguous here: the return type annotation is
-  // mandatory after the parameters, so a '{' directly following a
-  // positional parameter list can only be a named parameter group (a
-  // missing return type before a body is already an error).
-  // Lookahead: is the '{...}' at the current position a named parameter group
-  // (i.e. it parses as one and is followed by the ':' that starts the
-  // mandatory return type annotation) rather than the body of a declaration
-  // that is missing its return type? Parsing speculatively — rather than
-  // scanning brace tokens — keeps default values containing template
-  // literals or nested braces correct.
-  mutable fun namedParameterGroupFollowedByReturnType(): Bool {
-    this.peekParse(parser -> {
-      named = parser.parseNamedParameters(false);
-      if (parser.peekKind(TokenKind.COLON())) {
-        named
-      } else {
-        parser.errorResult(
-          errorMissingReturnType,
-          "not a named parameter group",
-        )
-      }
-    })
+  // A '{' directly after a positional parameter list starts a named parameter
+  // group when it is followed by 'identifier :' — no statement can start that
+  // way, so this never misfires on a function body. The three-token peek
+  // commits to the group without a speculative parse (nested peekParse is
+  // exponential), so named parameter defaults — which may contain template
+  // literals or nested braces — are parsed exactly once and syntax errors
+  // inside them are reported where they occur. If no ':' follows the group,
+  // the caller's checkMissingReturnType reports the missing return type.
+  mutable fun namedParameterGroupStartsHere(): Bool {
+    this.peekKindOffset(TokenKind.NONTYPE_IDENTIFIER(), 1) &&
+      this.peekKindOffset(TokenKind.COLON(), 2)
   }
 
   mutable fun parseParametersSpecifier(): ParseTree {
@@ -2467,10 +2456,7 @@ mutable class SkipParser{
       positional = this.parsePositionalParameters(false);
       if (
         this.peekKind(TokenKind.OPEN_CURLY()) &&
-        // The speculative parse only runs when a '{' follows a positional
-        // list, which without mixed parameters was always the
-        // missing-return-type error path, so the common case pays nothing.
-        this.namedParameterGroupFollowedByReturnType()
+        this.namedParameterGroupStartsHere()
       ) {
         named = this.parseNamedParameters(false);
         ParseTree.MixedParametersTree{

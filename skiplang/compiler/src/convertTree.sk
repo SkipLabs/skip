@@ -1898,6 +1898,12 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       // of source ordinals (positional first, then named) so that sorting by
       // `index` restores declaration order, e.g. when evaluating omitted
       // default arguments.
+      if (posArgs.isEmpty() || namedList.isEmpty()) {
+        SkipError.error(
+          this.convertRange(tree.range),
+          "A mixed parameter declaration cannot have an empty positional or named parameter group",
+        )
+      };
       numPos = posArgs.size();
       namedArgs = this.convertNamedParameters(namedList).map((_, p) ->
         p with {index => p.index + numPos}
