@@ -1,7 +1,8 @@
 module Runtime_NamedParamsClosureOrder;
 // Regression: a named-only function used as a first-class value must bind its
 // arguments in source order; an optional parameter that sorts before a
-// required one must not be swapped by the closure wrapper.
+// required one must not be swapped by the closure wrapper. Closures have no
+// default arguments, so every parameter is passed explicitly here.
 fun f{a: Int = 1, b: Int}: Int {
   a * 10 + b
 }
@@ -19,8 +20,8 @@ fun main(): void {
   h = c.m;
   print_raw(
     g{a => 3, b => 4}.toString() +
-      g{b => 5}.toString() +
-      h{y => "z"}.toString() +
+      g{a => 5, b => 6}.toString() +
+      h{x => 7, y => "z"}.toString() +
       "\n",
   )
 }
