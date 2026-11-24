@@ -100,11 +100,17 @@ $(OUT_DIR)/libskip_runtime64.a: runtime/libskip_runtime64.a
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	cp $< $@
 
-.PHONY: $(OUT_DIR)/libskip_runtime32.bc
-$(OUT_DIR)/libskip_runtime32.bc:
+# Real file with real prerequisites (like runtime/libskip_runtime64.a
+# above), not .PHONY: a phony prerequisite of the .o rule forced llc/llvm-ar
+# to re-run on every no-op `make wasm` (#1495). The cmp-guarded copy keeps
+# the .bc's mtime stable when its content is unchanged, so the .o below
+# only rebuilds when the IR actually changed.
+RUNTIME32_SRCS=$(wildcard runtime/*.c) $(wildcard runtime/*.h) $(wildcard runtime/*.cpp) $(wildcard runtime/ryu/*.c) $(wildcard runtime/ryu/*.h) runtime/Makefile
+
+$(OUT_DIR)/libskip_runtime32.bc: $(RUNTIME32_SRCS)
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
 	CFLAGS="$(CFLAGS)" $(WITH_RUNTIME_LOCK) $(MAKE) -C runtime/ libskip_runtime32.bc
-	cp runtime/libskip_runtime32.bc $@
+	cmp -s runtime/libskip_runtime32.bc $@ || cp runtime/libskip_runtime32.bc $@
 
 $(OUT_DIR)/libskip_runtime32.o: $(OUT_DIR)/libskip_runtime32.bc
 	@[ -d $(OUT_DIR) ] || mkdir -p $(OUT_DIR)
