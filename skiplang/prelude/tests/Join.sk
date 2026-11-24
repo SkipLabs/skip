@@ -59,4 +59,37 @@ fun testJoinMultibyte(): void {
   T.expectEq("🎉".join(Array[]), "");
 }
 
+fun expectOutOfBounds(f: () -> void): void {
+  threw = false;
+  try {
+    f()
+  } catch {
+  | OutOfBounds _ -> !threw = true
+  | exn -> throw (exn)
+  };
+  T.expectTrue(threw, "expected OutOfBounds")
+}
+
+// Sequence.copyStringBytesTo bounds-checks: out-of-bounds, negative and
+// overflowing offsets throw OutOfBounds; exact fits succeed.
+@test
+fun testCopyStringBytesToBounds(): void {
+  buf = Array<UInt8>::mfill(4, UInt8::truncate(0));
+  T.expectEq(Sequence.copyStringBytesTo("ab", buf, 2), 2); // exact fit
+  T.expectEq(Sequence.copyStringBytesTo("", buf, 4), 0); // empty at the end
+  expectOutOfBounds(() -> {
+    _ = Sequence.copyStringBytesTo("ab", buf, 3)
+  });
+  expectOutOfBounds(() -> {
+    _ = Sequence.copyStringBytesTo("abcde", buf, 0)
+  });
+  expectOutOfBounds(() -> {
+    _ = Sequence.copyStringBytesTo("a", buf, -1)
+  });
+  // offset + size overflows: must still throw, not wrap into range.
+  expectOutOfBounds(() -> {
+    _ = Sequence.copyStringBytesTo("a", buf, 9223372036854775807)
+  })
+}
+
 module end;

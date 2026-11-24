@@ -7,12 +7,31 @@
 
 module Sequence;
 
-// Copies the UTF-8 bytes of str into dest starting at offset, as a single
-// native memcpy (see runtime/string.c). Does not bounds-check: the caller must
-// ensure offset + the byte size of str <= dest.size(). Returns the number of
-// bytes copied.
+// Copies the UTF-8 bytes of `str` into `dest` starting at `offset` as a
+// single block copy, and returns the number of bytes copied (the byte size of
+// `str`). Throws OutOfBounds unless
+// 0 <= offset and offset + byteSize(str) <= dest.size().
+fun copyStringBytesTo(
+  str: String,
+  dest: mutable Array<UInt8>,
+  offset: Int,
+): Int {
+  size = String.byteSize(str).toInt();
+  // The unsigned compare also catches an offset + size overflow (a huge
+  // offset wraps to a large u64); the explicit offset < 0 covers a negative
+  // offset that a large size would cancel out.
+  if (offset < 0 || (offset + size).ugt(dest.size())) throwOutOfBounds();
+  unsafeCopyStringBytesTo(str, dest, offset)
+}
+
+// Behavior is undefined unless 0 <= offset and
+// offset + byteSize(str) <= dest.size(); only called by the bounds-checked
+// copyStringBytesTo above. The compiler lowers this to a single llvm.memcpy
+// (see IntrinsicsInliner); the @cpp_extern C fallback in runtime/string.c
+// serves compilers that don't know the intrinsic (e.g. the pinned stage0).
 @cpp_extern
-native fun copyStringBytesTo(
+@no_alloc
+private native fun unsafeCopyStringBytesTo(
   str: String,
   dest: mutable Array<UInt8>,
   offset: Int,
@@ -403,9 +422,9 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
     // toString is called exactly once per element: the rendered strings are
     // collected into a single Vector while counting the total output size in
     // the same pass. Strings are natively UTF-8, so the join happens at the
-    // byte level: sizes are O(1) and each part is copied with a single native
-    // memcpy (copyStringBytesTo), then fromUtf8 memcpys the buffer into the
-    // result -- no per-char UTF-8 decode/encode anywhere.
+    // byte level: sizes are O(1) and each part is copied with a single
+    // bounds-checked block copy (copyStringBytesTo), then fromUtf8 memcpys
+    // the buffer into the result -- no per-char UTF-8 decode/encode anywhere.
     parts = mutable Vector<String>[];
     numBytes = 0;
     this.each(x -> {
