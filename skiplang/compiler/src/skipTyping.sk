@@ -2072,7 +2072,7 @@ fun constructor_call(
     args_ty,
     invalid_arg_msg,
   );
-  !args = TUtils.add_default_arguments(add_args, args);
+  !args = merge_default_args(params_ty.fromSome(), add_args, args);
   instance_ty_ = add_instantiation_mode(acc, mode, tvar);
   (
     acc,
@@ -2413,6 +2413,47 @@ fun expr(
         stack.push(NExpr{expr => e3})
       | (
         pos,
+        N.Call(
+          outer_mut,
+          (_, N.Object(obj_mut, obj_name, obj_targs, inner_args)),
+          outer_targs,
+          outer_args,
+        ),
+      ) if (is_opposite_kind_args(inner_args, outer_args)) ->
+        if (class_ctor_has_mixed_params(context, obj_name)) {
+          // 'C(1){b => "x"}' on a class with mixed constructor parameters:
+          // fuse the two argument groups into a single constructor call.
+          combined = combine_mixed_call_args(inner_args, outer_args);
+          fused_mut = outer_mut match {
+          | Some _ -> outer_mut
+          | None() -> obj_mut
+          };
+          stack.push(
+            NExpr{
+              expr => (pos, N.Object(fused_mut, obj_name, obj_targs, combined)),
+            },
+          )
+        } else {
+          // Not a mixed constructor: keep the usual chained-call behavior.
+          stack.push(
+            CallState{
+              pos,
+              mut => outer_mut,
+              targs => outer_targs,
+              args => outer_args,
+              last_lambda_id => acc.last_lambda_id(),
+              last_constraint => acc.constraints.typing_size(),
+              last_tvar => next_id(),
+            },
+          );
+          stack.push(
+            NExpr{
+              expr => (pos, N.Object(obj_mut, obj_name, obj_targs, inner_args)),
+            },
+          )
+        }
+      | (
+        pos,
         N.Call(mut, nbase, targs, args),
       ) if (is_mixed_call_shape(nbase, args)) ->
         (inner_mut, inner_base, inner_targs, inner_args) = nbase match {
@@ -2556,11 +2597,30 @@ fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
   | (_, N.Call(_, (_, N.Call _), _, _)) -> false
   | (_, N.Call(_, (_, N.Var((_, name))), _, _)) if (is_magic_call_name(name)) ->
     false
-  | (_, N.Call(_, _, _, inner_args)) ->
-    (inner_args, args) match {
-    | (Positional _, Named _)
-    | (Named _, Positional _) ->
-      true
+  | (_, N.Call(_, _, _, inner_args)) -> is_opposite_kind_args(inner_args, args)
+  | _ -> false
+  }
+}
+
+fun is_opposite_kind_args(a: N.Call_args, b: N.Call_args): Bool {
+  (a, b) match {
+  | (Positional _, Named _)
+  | (Named _, Positional _) ->
+    true
+  | _ -> false
+  }
+}
+
+// Whether a class constructor takes mixed positional+named parameters.
+fun class_ctor_has_mixed_params(
+  context: mutable SKStore.Context,
+  name: N.Name,
+): Bool {
+  cd = SkipNaming.getClass(context, name);
+  cd.params match {
+  | N.HasParams(cp) ->
+    cp.params match {
+    | Mixed _ -> true
     | _ -> false
     }
   | _ -> false
@@ -2588,8 +2648,7 @@ fun callee_has_mixed_params(acc: TUtils.Acc, ty: N.Type_): Bool {
     acc.tparam_constraints.findUppers(param_id).any(t ->
       callee_has_mixed_params(acc, t)
     )
-  // Lambdas can only declare a single parameter group, so a Tlambda never
-  // contains Mixed parameters; unwrap it anyway for indirect calls.
+  // Unwrap Tlambda for indirect calls (a mixed lambda stored in a variable).
   | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(acc, t)
   | _ -> false
   }
@@ -2927,7 +2986,7 @@ fun expr_(
       args_types,
       invalid_arg_msg,
     );
-    args2 = TUtils.add_default_arguments(add_args, args1);
+    args2 = merge_default_args(params_ty1, add_args, args1);
     invariant(cd.kind == Ast.KClass(), "Kind was checked in naming");
     check_constructor_call(context, env, pos, cd);
     e1 = (pos, TAst.Object(name, targs, args2));

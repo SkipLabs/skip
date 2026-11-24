@@ -706,10 +706,16 @@ fun lambda_params(
   | Named(m) ->
     l = m.values().collect(Array);
     lambda_param_array("{", "}", o, l)
-  | Mixed(pos, named, _) ->
-    lambda_param_array("(", ")", o, pos);
-    l = named.values().collect(Array);
-    lambda_param_array("{", "}", o, l)
+  | Mixed(pos, named, namedFirst) ->
+    if (namedFirst) {
+      l = named.values().collect(Array);
+      lambda_param_array("{", "}", o, l);
+      lambda_param_array("(", ")", o, pos)
+    } else {
+      lambda_param_array("(", ")", o, pos);
+      l = named.values().collect(Array);
+      lambda_param_array("{", "}", o, l)
+    }
   }
 }
 

@@ -134,6 +134,22 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       Named(this.convertNamedParameterTypes(parameters))
     | ParseTree.TupleTypeSpecifierTree{elements} ->
       Positional(this.convertTypeList(elements))
+    | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
+      posTypes = positional match {
+      | ParseTree.TupleTypeSpecifierTree{elements} ->
+        this.convertTypeList(elements)
+      | _ -> Array[this.convertType_(positional)]
+      };
+      namedTypes = named match {
+      | ParseTree.NamedParametersTree{parameters} ->
+        this.convertNamedParameterTypes(parameters)
+      | _ ->
+        invariant_violation(
+          "Unexpected named lambda parameter types: " +
+            this.treeToString(named),
+        )
+      };
+      Mixed(posTypes, namedTypes, namedFirst)
     | _ -> Positional(Array[this.convertType_(tree)])
     }
   }
@@ -1672,6 +1688,38 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
       positionalParams = elements.map(this.convertLambdaParameter);
       this.checkPositionalParamNames(positionalParams.map(p -> p.i0));
       Positional(positionalParams)
+    | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
+      posList = positional match {
+      | ParseTree.ParseTreeList{elements} -> elements
+      | _ ->
+        invariant_violation(
+          "Unexpected positional lambda parameters: " +
+            this.treeToString(positional),
+        )
+      };
+      namedList = named match {
+      | ParseTree.NamedParametersTree{parameters} -> parameters.getList()
+      | _ ->
+        invariant_violation(
+          "Unexpected named lambda parameters: " + this.treeToString(named),
+        )
+      };
+      positionalParams = posList.map(this.convertLambdaParameter);
+      this.checkPositionalParamNames(positionalParams.map(p -> p.i0));
+      namedParams = UMap::createFromItems(
+        namedList.map(parameter ~> {
+          param = this.convertLambdaParameter(parameter);
+          (param.i0, param)
+        }),
+      );
+      // Lambdas cannot have duplicate names across the two groups.
+      _ = UMap::createFromIterator(
+        positionalParams
+          .values()
+          .map(param -> (param.i0, param.i0))
+          .concat(namedParams.items().map(p -> (p.i0, p.i0))),
+      );
+      Mixed(positionalParams, namedParams, namedFirst)
     | _ -> Positional(Array[this.convertLambdaParameter(tree)])
     }
   }

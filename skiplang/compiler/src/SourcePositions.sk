@@ -200,6 +200,22 @@ mutable class Builder{
       | ParseTree.NamedParametersTree{parameters => entries}
       | ParseTree.PositionalParametersTree{parameters => entries} ->
         entries.getList()
+      | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
+        posEntries = positional match {
+        | ParseTree.PositionalParametersTree{parameters => entries} ->
+          entries.getList()
+        | _ -> invariant_violation("Unexpected constructor parameters")
+        };
+        namedEntries = named match {
+        | ParseTree.NamedParametersTree{parameters => entries} ->
+          entries.getList()
+        | _ -> invariant_violation("Unexpected constructor parameters")
+        };
+        if (namedFirst) {
+          namedEntries.concat(posEntries)
+        } else {
+          posEntries.concat(namedEntries)
+        }
       | _ -> invariant_violation("Unexpected constructor parameters")
       };
       fields.eachWithIndex((i, field) -> this.visit(field, constructor, i));
