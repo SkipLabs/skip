@@ -52,6 +52,7 @@ value class BigInt private (private negative: Bool, private mag: UBigInt)
 
 `add`, `sub`, `mul`, `div` (truncated), `mod` (floored), `pow`, `gcd`, `abs`,
 `neg`, `isZero`, `compare`, plus `fromString`/`fromInt`/`toString`.
+`fromStringRadix` takes a base (2..36): `BigInt::fromStringRadix("ff", 16)` is 255.
 Division is Knuth's Algorithm D; decimal conversion happens only at the
 `fromString`/`toString` boundary (9-digit chunks), so arithmetic never pays
 radix-conversion cost.

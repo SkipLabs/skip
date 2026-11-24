@@ -404,43 +404,74 @@ fun gcdMag(a: Array<UInt32>, b: Array<UInt32>): Array<UInt32> {
 }
 
 /**
- * Parses the decimal digits in bs[from..to) ("[0-9]+") into a canonical
- * magnitude. Returns None() if the range is empty or has a non-digit.
+ * The value of a digit character (0-9, a-z, A-Z — case-insensitive) in the
+ * given base, or None() when it is not a valid digit for that base.
  */
-fun parseDecimal(bs: readonly Bytes, from: Int, to: Int): ?Array<UInt32> {
-  if (from >= to) {
+fun digitValue(c: Int, base: Int): ?Int {
+  d = if (c >= 48 && c <= 57) {
+    c -
+      48 // '0'..'9'
+  } else if (c >= 97 && c <= 122) {
+    c -
+      97 +
+      10 // 'a'..'z'
+  } else if (c >= 65 && c <= 90) {
+    c -
+      65 +
+      10 // 'A'..'Z'
+  } else {
+    return None()
+  };
+  if (d >= base) None() else Some(d)
+}
+
+/**
+ * Parses the digits in bs[from..to) in the given base (2..36) into a
+ * canonical magnitude. Returns None() if the base is out of range, the range
+ * is empty, or a character is not a valid digit for the base.
+ */
+fun parse(bs: readonly Bytes, from: Int, to: Int, base: Int): ?Array<UInt32> {
+  if (base < 2 || base > 36 || from >= to) {
     None()
   } else {
     valid = true;
     j = from;
     while (j < to && valid) {
-      c = bs.get(j).toInt();
-      if (c < 48 || c > 57) {
-        !valid = false;
-      } else {
+      if (digitValue(bs.get(j).toInt(), base) is Some _) {
         !j = j + 1;
+      } else {
+        !valid = false;
       }
     };
     if (!valid) {
       None()
     } else {
-      // Accumulate 9-digit chunks from the left (the first chunk may be
-      // short): acc = acc*10^9 + chunk.
+      // Accumulate chunks from the left (the first chunk may be short):
+      // acc = acc*base^chunkLen + chunk. chunkLen is the largest k with
+      // base^k <= 2^31, so a chunk's value stays a single limb (< 2^31) for
+      // mulMagSmall/addMagSmall.
+      chunkLen = 0;
+      chunkPow = 1;
+      while (chunkPow * base <= kLimbBase) {
+        !chunkPow = chunkPow * base;
+        !chunkLen = chunkLen + 1;
+      };
       acc = Array[];
       pos = from;
-      firstLen = (to - from) % 9;
+      firstLen = (to - from) % chunkLen;
       if (firstLen == 0) {
-        !firstLen = 9;
+        !firstLen = chunkLen;
       };
       while (pos < to) {
-        take = if (pos == from) firstLen else 9;
+        take = if (pos == from) firstLen else chunkLen;
         chunk = 0;
         k = pos;
         while (k < pos + take) {
-          !chunk = chunk * 10 + (bs.get(k).toInt() - 48);
+          d = digitValue(bs.get(k).toInt(), base).fromSome();
+          !chunk = chunk * base + d;
           !k = k + 1;
         };
-        !acc = addMagSmall(mulMagSmall(acc, kDecChunk), chunk);
+        !acc = addMagSmall(mulMagSmall(acc, chunkPow), chunk);
         !pos = pos + take;
       };
       Some(dropZeros(acc))
