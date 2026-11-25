@@ -1,0 +1,66 @@
+module alias T = SKTest;
+
+module SkargoTestExtraArgsTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, contents: String): void {
+  _ = System.subprocess(Array["mkdir", "-p", Path.dirname(path)]).fromSuccess();
+  FileSystem.writeTextFile(path, contents)
+}
+
+@allow_tracked_call
+untracked fun skargo_test(
+  skargo: String,
+  root: String,
+  extra: Array<String>,
+): (Bool, String) {
+  result = System.popen{
+    args => Array[skargo, "test"].concat(extra),
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(root),
+  }.fromSuccess();
+  (result.success(), result.stdout + result.stderr)
+}
+
+// Regression test for #1328: arguments after `--` must reach the test binary,
+// not be rejected by skargo itself. `--verbose` is accepted by the sktest
+// harness but is not a skargo flag, so a successful run proves passthrough;
+// an unknown flag must be rejected by the harness instead.
+@test
+fun test_args_after_double_dash_reach_test_binary(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string("skipping: merged-mode only, run `skargo test` in dev");
+      return void
+    };
+    Environ.current_exe()
+  };
+  root = Path.join(kManifestDir, "target/it-test-extra-args");
+  _ = System.subprocess(Array["rm", "-rf", root]).fromSuccess();
+  skiplang = Path.dirname(kManifestDir);
+  prelude = Path.join(skiplang, "prelude");
+  sktest = Path.join(skiplang, "sktest");
+  write_file(
+    root + "/Skargo.toml",
+    `[package]\nname = "extraargs"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n[dev-dependencies]\nsktest = { path = "${sktest}" }\n`,
+  );
+  write_file(root + "/src/lib.sk", "module ExtraArgs;\nmodule end;\n");
+  write_file(
+    root + "/tests/t.sk",
+    "module alias TT = SKTest;\nmodule ExtraArgsT;\n@test\nfun t1(): void {\n  TT.expectEq(1, 1)\n}\nmodule end;\n",
+  );
+
+  (ok, out) = skargo_test(skargo, root, Array["--", "--verbose"]);
+  T.expectTrue(ok, `skargo test -- --verbose should succeed:\n${out}`);
+  (ok2, out2) = skargo_test(skargo, root, Array["--", "--not-a-real-flag"]);
+  T.expectFalse(
+    ok2,
+    `the test harness should reject the unknown flag itself:\n${out2}`,
+  );
+}
+
+module end;

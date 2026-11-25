@@ -64,7 +64,10 @@ fun test(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
           .value_name("PATH")
           .about("Generate a JUnit XML report"),
       )
-      .arg(kSkcOptArg),
+      .arg(kSkcOptArg)
+      // Arguments after `--` are passed through to the test binary
+      // (e.g. `skargo test -- --verbose`).
+      .extra("ARGS"),
     execTest,
   )
 }
@@ -97,7 +100,6 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
     ,
   );
 
-  // TODO: Pass args directly after --.
   filter = args.maybeGetString("filter");
   junitxml = args.maybeGetString("junitxml").map(f -> `--junitxml=${f}`);
   list = if (args.getBool("list")) Some("--list") else None();
@@ -143,7 +145,7 @@ fun execTest(gctx: GlobalContext, args: Cli.ParseResults): void {
     };
     cmd_args = Array[binary].concat(
       Array[junitxml, filter, list, Some(`-j${jobs}`)].filterNone(),
-    );
+    ).concat(args.extra);
     Posix.execvp(cmd_args)
   | _ -> void
   }
