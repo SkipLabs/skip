@@ -1948,10 +1948,6 @@ fun call_(
 }
 
 /* When the callee takes mixed parameters but only one argument group was
- * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), the
- * missing group is filled with default arguments, producing a Mixed
- * argument list. */
-/* When the callee takes mixed parameters but only one argument group was
  * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), promote
  * the call to a Mixed argument list (a single-group call has no source order
  * between the groups, so namedFirst is false) and share the default-argument
@@ -2072,7 +2068,7 @@ fun constructor_call(
     args_ty,
     invalid_arg_msg,
   );
-  !args = TUtils.add_default_arguments(add_args, args);
+  !args = merge_default_args(params_ty.fromSome(), add_args, args);
   instance_ty_ = add_instantiation_mode(acc, mode, tvar);
   (
     acc,
@@ -2413,6 +2409,51 @@ fun expr(
         stack.push(NExpr{expr => e3})
       | (
         pos,
+        N.Call(
+          outer_mut,
+          (_, N.Object(obj_mut, obj_name, obj_targs, inner_args)),
+          outer_targs,
+          outer_args,
+        ),
+      ) if (is_opposite_kind_args(inner_args, outer_args)) ->
+        if (class_ctor_has_mixed_params(context, obj_name)) {
+          // 'C(1){b => "x"}' on a class with mixed constructor parameters:
+          // fuse the two argument groups into a single constructor call.
+          if (!obj_targs.isEmpty() && !outer_targs.isEmpty()) {
+            SkipError.error(
+              pos,
+              "A mixed call takes a single type-argument list, but two were given",
+            )
+          };
+          check_no_mutable(obj_mut, pos);
+          combined = combine_mixed_call_args(inner_args, outer_args);
+          targs = if (outer_targs.isEmpty()) obj_targs else outer_targs;
+          stack.push(
+            NExpr{
+              expr => (pos, N.Object(outer_mut, obj_name, targs, combined)),
+            },
+          )
+        } else {
+          // Not a mixed constructor: keep the usual chained-call behavior.
+          stack.push(
+            CallState{
+              pos,
+              mut => outer_mut,
+              targs => outer_targs,
+              args => outer_args,
+              last_lambda_id => acc.last_lambda_id(),
+              last_constraint => acc.constraints.typing_size(),
+              last_tvar => next_id(),
+            },
+          );
+          stack.push(
+            NExpr{
+              expr => (pos, N.Object(obj_mut, obj_name, obj_targs, inner_args)),
+            },
+          )
+        }
+      | (
+        pos,
         N.Call(mut, nbase, targs, args),
       ) if (is_mixed_call_shape(nbase, args)) ->
         (inner_mut, inner_base, inner_targs, inner_args) = nbase match {
@@ -2553,14 +2594,40 @@ fun is_magic_call_name(name: String): Bool {
 
 fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
   nbase match {
-  | (_, N.Call(_, (_, N.Call _), _, _)) -> false
+  // In a chain of three or more calls, the innermost opposite-kind pair fuses
+  // first ('f(1){b => 2}(3)' chains '(3)' on the result of the mixed call), so
+  // an outer pair only fuses when the inner call is not itself a mixed pair.
+  // This also lets a mixed call sit directly on a call result:
+  // 'id(g)(2){b => 3}' fuses '(2){b => 3}' onto 'id(g)'.
+  | (_, N.Call(_, (_, N.Call(_, _, _, inner_inner_args)), _, inner_args)) ->
+    !is_opposite_kind_args(inner_inner_args, inner_args) &&
+      is_opposite_kind_args(inner_args, args)
   | (_, N.Call(_, (_, N.Var((_, name))), _, _)) if (is_magic_call_name(name)) ->
     false
-  | (_, N.Call(_, _, _, inner_args)) ->
-    (inner_args, args) match {
-    | (Positional _, Named _)
-    | (Named _, Positional _) ->
-      true
+  | (_, N.Call(_, _, _, inner_args)) -> is_opposite_kind_args(inner_args, args)
+  | _ -> false
+  }
+}
+
+fun is_opposite_kind_args(a: N.Call_args, b: N.Call_args): Bool {
+  (a, b) match {
+  | (Positional _, Named _)
+  | (Named _, Positional _) ->
+    true
+  | _ -> false
+  }
+}
+
+// Whether a class constructor takes mixed positional+named parameters.
+fun class_ctor_has_mixed_params(
+  context: mutable SKStore.Context,
+  name: N.Name,
+): Bool {
+  cd = SkipNaming.getClass(context, name);
+  cd.params match {
+  | N.HasParams(cp) ->
+    cp.params match {
+    | Mixed _ -> true
     | _ -> false
     }
   | _ -> false
@@ -2580,18 +2647,71 @@ fun combine_mixed_call_args(
   }
 }
 
-fun callee_has_mixed_params(acc: TUtils.Acc, ty: N.Type_): Bool {
+fun callee_has_mixed_params(
+  context: mutable SKStore.Context,
+  acc: TUtils.Acc,
+  ty: N.Type_,
+): Bool {
   Types.unfold_type(acc.subst, ty) match {
   | (_, N.Tfun(_, _, _, Mixed _, _)) -> true
-  | (_, N.Tdefault(t)) -> callee_has_mixed_params(acc, t)
+  | (_, N.Tdefault(t)) -> callee_has_mixed_params(context, acc, t)
   | (_, N.Tparam(_, _, param_id, _)) ->
     acc.tparam_constraints.findUppers(param_id).any(t ->
-      callee_has_mixed_params(acc, t)
+      callee_has_mixed_params(context, acc, t)
     )
-  // Lambdas can only declare a single parameter group, so a Tlambda never
-  // contains Mixed parameters; unwrap it anyway for indirect calls.
-  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(acc, t)
+  // Unwrap Tlambda for indirect calls (a mixed lambda stored in a variable).
+  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(context, acc, t)
+  | (_, N.Tnamed(_, t)) -> callee_has_mixed_params(context, acc, t)
+  // Class-object types (Concrete<C>, Class<C>, Base<C>): mixed iff the target
+  // class's constructor takes mixed parameters. A class-object type is a
+  // Tset whose first element is named Concrete/Class/Base and whose type
+  // argument is the target class type; a plain Tapply with such a name is
+  // the same thing before it is normalized to a set.
+  | (
+    _,
+    N.Tset(_, _, _, elts),
+  ) if (!elts.isEmpty() && TAstUtils.is_class_object(elts[0].name.i1)) ->
+    class_object_target_name(acc, elts[0].targs) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
+  | (_, N.Tapply(_, (_, s), targs)) if (TAstUtils.is_class_object(s)) ->
+    class_object_target_name(acc, targs) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
+  // Same for the promoted form of a class-object type (the type of an
+  // already-typed expression).
+  | (
+    _,
+    N.Tpromoted(_, _, _, _, (_, s), targs),
+  ) if (TAstUtils.is_class_object(s)) ->
+    class_object_target_name(acc, targs) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
   | _ -> false
+  }
+}
+
+// The target class name of a class-object type's type arguments.
+fun class_object_target_name(acc: TUtils.Acc, targs: Array<N.Type_>): ?N.Name {
+  if (targs.isEmpty()) {
+    None()
+  } else {
+    maybe_class_name_of_type(acc, targs[0])
+  }
+}
+
+// The class name of a class-object type's argument or of a plain class type.
+fun maybe_class_name_of_type(acc: TUtils.Acc, ty: N.Type_): ?N.Name {
+  Types.unfold_type(acc.subst, ty) match {
+  | (_, N.Tset(_, _, _, elts)) if (!elts.isEmpty()) -> Some(elts[0].name)
+  | (_, N.Tpromoted(_, _, _, _, n, _))
+  | (_, N.Tapply(_, n, _)) ->
+    Some(n)
+  | (_, N.Tnamed(_, t)) -> maybe_class_name_of_type(acc, t)
+  | _ -> None()
   }
 }
 
@@ -2606,7 +2726,7 @@ fun finish_mixed_call(
   base: TAst.Expr,
   mc: MixedCallState,
 ): (TUtils.Acc, TAst.Expr) {
-  if (callee_has_mixed_params(acc, TAstUtils.get_type(base))) {
+  if (callee_has_mixed_params(context, acc, TAstUtils.get_type(base))) {
     if (!mc.inner.targs.isEmpty() && !mc.outer_targs.isEmpty()) {
       SkipError.error(
         mc.inner.pos,
@@ -2927,7 +3047,7 @@ fun expr_(
       args_types,
       invalid_arg_msg,
     );
-    args2 = TUtils.add_default_arguments(add_args, args1);
+    args2 = merge_default_args(params_ty1, add_args, args1);
     invariant(cd.kind == Ast.KClass(), "Kind was checked in naming");
     check_constructor_call(context, env, pos, cd);
     e1 = (pos, TAst.Object(name, targs, args2));
@@ -4474,9 +4594,35 @@ fun object_pattern_args(
           pos,
           "Expected named arguments in pattern. Found positional arguments.",
         )
+      | (Mixed(params_pos, params_map, nf), Mixed(field_pos, field_map, _)) ->
+        expected = params_pos.size();
+        actual = field_pos.size();
+        if (expected != actual) {
+          msg =
+            "Incorrect number of positional arguments in pattern. Expected " +
+            expected +
+            " found " +
+            actual;
+          SkipError.error(pos, msg)
+        };
+        named_args = field_map.map((name, field_pat) ->
+          params_map.maybeGet(name) match {
+          | None() ->
+            SkipError.error(
+              pos,
+              "No field named '" + name.i1 + "' in " + obj_name.i1,
+            )
+          | Some(info) -> (info, field_pat)
+          }
+        );
+        Mixed(params_pos.zip(field_pos), named_args, nf)
       | (Mixed _, _)
       | (_, Mixed _) ->
-        SkipError.error(pos, "Mixed parameters are not supported in patterns")
+        SkipError.error(
+          pos,
+          "Expected both positional and named arguments in pattern for " +
+            obj_name.i1,
+        )
       }
     };
     ((env1, acc1), result) = info_pats.map_foldl(

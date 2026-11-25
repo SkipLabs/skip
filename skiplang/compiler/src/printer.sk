@@ -1011,10 +1011,18 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
     );
     printCommaList(ctx, parameters, shouldGroup)
   | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
-    if (namedFirst) {
-      Doc.Concat[print(ctx, named), print(ctx, positional)]
+    // Lambda expressions carry the positional group as a bare list; function
+    // and constructor declarations wrap it in a PositionalParametersTree.
+    posDoc = if (positional.isList()) {
+      printCommaList(ctx, positional)
     } else {
-      Doc.Concat[print(ctx, positional), print(ctx, named)]
+      print(ctx, positional)
+    };
+    namedDoc = print(ctx, named);
+    if (namedFirst) {
+      Doc.Concat[namedDoc, posDoc]
+    } else {
+      Doc.Concat[posDoc, namedDoc]
     }
   | ParseTree.GlobalConstantTree{
     modifiers,

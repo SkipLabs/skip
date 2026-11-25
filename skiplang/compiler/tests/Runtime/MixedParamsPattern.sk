@@ -1,0 +1,44 @@
+module Runtime_MixedParamsPattern;
+// Class patterns on mixed-constructor classes, in both group orders, plus
+// 'is' patterns. Exhaustiveness checking treats both groups.
+class C(a: Int){b: Int} {
+  fun get(): String {
+    `${this.a}-${this.b}`
+  }
+}
+
+fun f(c: C): String {
+  c match {
+  | C(1){b => 2} -> "one-two"
+  | C(x){b => y} -> `${x}-${y}`
+  }
+}
+
+fun g(c: C): String {
+  c match {
+  | C{b => 5}(a) -> `named-first-${a}`
+  | _ -> "other"
+  }
+}
+
+fun h(c: C): String {
+  c match {
+  | C(1){b => _} -> "one"
+  | _ -> "other"
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(`[${f(C(1){b => 2})}]\n`);
+  print_raw(`[${f(C(3){b => 4})}]\n`);
+  print_raw(`[${g(C(7){b => 5})}]\n`);
+  print_raw(`[${g(C(7){b => 6})}]\n`);
+  print_raw(`[${h(C(1){b => 99})}]\n`);
+  print_raw(`[${h(C(2){b => 99})}]\n`);
+  x = C(9){b => 10};
+  print_raw(`[${if (x is C(9){b => 10}) "is-ok" else "is-bad"}]\n`);
+  print_raw(`[${if (x is C{b => 10}(9)) "is-nf" else "is-nf-bad"}]\n`);
+  print_raw(`[${if (x is C(8){b => 10}) "is-bad" else "is-no"}]\n`);
+}
+module end;

@@ -54,8 +54,27 @@ fun emit_encode_class_params_(
     values = param_map.values() |> List::createFromIterator;
     BufferedPrinter.list(emit_param_encode, o, values)
 
-  | Mixed _ -> invariant_violation("Mixed class params are not supported")
+  | Mixed(pos, named, namedFirst) ->
+    emit_mixed_params(emit_param_encode, o, pos, named, namedFirst)
   }
+}
+
+// Debug printer only: emit both groups in their declared order.
+fun emit_mixed_params(
+  emit: (mutable BufferedPrinter.Out, A.Parameter) -> void,
+  o: mutable BufferedPrinter.Out,
+  pos: Array<A.Parameter>,
+  named: UMap<A.Parameter>,
+  namedFirst: Bool,
+): void {
+  groups = if (namedFirst) {
+    Array[named.values().collect(Array), pos]
+  } else {
+    Array[pos, named.values().collect(Array)]
+  };
+  groups.each(group ->
+    BufferedPrinter.list(emit, o, List::createFromIterator(group.values()))
+  )
 }
 
 fun emit_decode_class_params(
@@ -82,7 +101,8 @@ fun emit_decode_class_params_(
     values = param_map.values() |> List::createFromIterator;
     BufferedPrinter.list(emit_param_decode, o, values)
 
-  | Mixed _ -> invariant_violation("Mixed class params are not supported")
+  | Mixed(pos, named, namedFirst) ->
+    emit_mixed_params(emit_param_decode, o, pos, named, namedFirst)
   }
 }
 

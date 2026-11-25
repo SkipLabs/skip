@@ -1,0 +1,84 @@
+module Runtime_MixedParamsClassCtor;
+// Mixed constructor parameters, in both declaration orders. Omitted default
+// arguments evaluate in declaration order across the two groups (and within
+// the named group, not alphabetical order).
+fun eff(s: String): String {
+  print_raw(`<${s}>`);
+  s
+}
+
+class C(a: Int, p: String = `${eff("p")}P`){
+  b: String = `${eff("b")}B`,
+  z: Int = 9,
+} {
+  fun get(): String {
+    `${this.a}${this.p}${this.b}${this.z}`
+  }
+
+  static fun smake(): C {
+    static(1){b => "s"}
+  }
+
+  static fun smake2(): C {
+    static{b => "t"}(2)
+  }
+}
+
+class D{z: Int = 7}(a: Int = 1, p: String = `${eff("p")}P`) {
+  fun get(): String {
+    `${this.a}${this.p}${this.z}`
+  }
+}
+
+// Named-first with two effectful named defaults in reverse alphabetical order:
+// defaults must evaluate in declaration order (z before a), not sorted order.
+class E{z: String = `${eff("z")}Z`, a: String = `${eff("a")}A`}(x: Int) {
+  fun get(): String {
+    `${this.x}${this.z}${this.a}`
+  }
+}
+
+// Modifiers on named constructor parameters.
+class F(a: Int){private b: String} {
+  fun get(): String {
+    `${this.a}${this.b}`
+  }
+}
+
+// Generic mixed constructor.
+class Box<T>(a: T){b: T} {
+  fun get(): (T, T) {
+    (this.a, this.b)
+  }
+}
+
+@exptest
+fun main(): void {
+  print_raw(`[${C(1).get()}]\n`);
+  print_raw(`[${C(2){b => "x"}.get()}]\n`);
+  print_raw(`[${C{b => "y"}(3).get()}]\n`);
+  print_raw(`[${D().get()}]\n`);
+  print_raw(`[${D{z => 5}(2).get()}]\n`);
+  print_raw(`[${D(3){z => 6}.get()}]\n`);
+  print_raw(`[${E(1).get()}]\n`);
+  print_raw(`[${F(4){b => "f"}.get()}]\n`);
+  print_raw(
+    `[${Box<Int>(1){b => 2}.get().i0}-${Box<Int>(1){b => 2}.get().i1}]\n`,
+  );
+  p3 = Box(3){b => 4}.get();
+  print_raw(`[${p3.i0}-${p3.i1}]\n`);
+  box: Concrete<Box<Int>> = Box;
+  p5 = box(5){b => 6}.get();
+  print_raw(`[${p5.i0}-${p5.i1}]\n`);
+  p6 = box{b => 8}(7).get();
+  print_raw(`[${p6.i0}-${p6.i1}]\n`);
+  box2: Class<Box<Int>> = Box;
+  p7 = box2(9){b => 10}.get();
+  print_raw(`[${p7.i0}-${p7.i1}]\n`);
+  k = Box;
+  p8 = k(11){b => 12}.get();
+  print_raw(`[${p8.i0}-${p8.i1}]\n`);
+  print_raw(`[${C::smake().get()}]\n`);
+  print_raw(`[${C::smake2().get()}]\n`);
+}
+module end;

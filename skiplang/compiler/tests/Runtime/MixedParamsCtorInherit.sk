@@ -1,0 +1,32 @@
+module Runtime_MixedParamsCtorInherit;
+// Inheritance with a mixed constructor on either side: the positional and
+// named groups merge separately, and a single-kind child inherits the other
+// group's fields (its own constructor becomes mixed).
+base class C(a: Int){b: Int} {
+  fun get(): String {
+    `${this.a}-${this.b}`
+  }
+}
+
+class D(x: Int) extends C {
+  fun getD(): String {
+    `${this.x}-${this.b}`
+  }
+}
+
+class E(p: Int, q: Int){r: Int} extends C {}
+
+class F{c: Int}(x: Int) extends C {}
+
+@exptest
+fun main(): void {
+  d = D(1, 10){b => 2};
+  print_raw(`[${d.get()}/${d.getD()}]\n`);
+  e = E(3, 4, 5){b => 7, r => 6};
+  print_raw(`[${e.get()}]\n`);
+  f = F(8, 1){c => 9, b => 2};
+  print_raw(`[${f.get()}]\n`);
+  c: C = d;
+  print_raw(`[${c.get()}]\n`);
+}
+module end;

@@ -1009,12 +1009,17 @@ fun close_local_scope_lambda_parameters(
   free: Free,
   params: Parameters<N.Lam_parameter>,
 ): Free {
-  error = params match {
-  | Positional _ -> true
-  | Named _ -> false
-  | Mixed _ -> true
-  };
-  params.foldl((f, par) -> f.close(par.i0, error), free)
+  // Unused positional parameters are an error; unused named parameters are
+  // not (the label is part of the lambda's interface), as for named-only
+  // lambdas and named function parameters.
+  params match {
+  | Positional _ -> params.foldl((f, par) -> f.close(par.i0, true), free)
+  | Named _ -> params.foldl((f, par) -> f.close(par.i0, false), free)
+  | Mixed(pos, named, _) ->
+    pos.foldl((f, par) -> f.close(par.i0, true), free) match {
+    | f1 -> named.reduce((f, _, par) -> f.close(par.i0, false), f1)
+    }
+  }
 }
 
 fun close_local_scope_fun_parameters(
@@ -1781,52 +1786,37 @@ fun make_param_fields(
   }
 }
 
+fun param_field(par: N.Parameter): N.Field_type {
+  N.Field_type{
+    visibility => par.visibility,
+    eltk => N.EProperty(),
+    assignable => par.mutable_,
+    tparams => Array[],
+    kind => N.FKReadonly(par.name.i0),
+    type => par.type,
+    whenparams => Array[],
+    source => par.source.fromSome(),
+    deferred_ => par.deferred_,
+    abstract => None(),
+  }
+}
+
 fun make_param_fields_(
   params: Parameters<N.Parameter>,
   fields: UMap<N.Field_type>,
 ): UMap<N.Field_type> {
   params match {
   | Positional(l) ->
-    l.foldl(
-      ((fields, par) -> {
-        field_type = N.Field_type{
-          visibility => par.visibility,
-          eltk => N.EProperty(),
-          assignable => par.mutable_,
-          tparams => Array[],
-          kind => N.FKReadonly(par.name.i0),
-          type => par.type,
-          whenparams => Array[],
-          source => par.source.fromSome(),
-          deferred_ => par.deferred_,
-          abstract => None(),
-        };
-        fields.add(par.name, field_type)
-      }),
-      fields,
-    )
-  | Mixed _ ->
-    // Mixed constructor parameters are not supported yet; the parser does
-    // not produce them for class constructors.
-    invariant_violation("Mixed constructor parameters not supported")
+    l.foldl(((fields, par) -> fields.add(par.name, param_field(par))), fields)
   | Named(m) ->
-    m.reduce(
-      (fields, _, par) -> {
-        field_type = N.Field_type{
-          visibility => par.visibility,
-          eltk => N.EProperty(),
-          assignable => par.mutable_,
-          tparams => Array[],
-          kind => N.FKReadonly(par.name.i0),
-          type => par.type,
-          whenparams => Array[],
-          source => par.source.fromSome(),
-          deferred_ => par.deferred_,
-          abstract => None(),
-        };
-        fields.add(par.name, field_type)
-      },
-      fields,
+    m.reduce((fields, _, par) -> fields.add(par.name, param_field(par)), fields)
+  | Mixed(pos, named, _) ->
+    named.reduce(
+      (fields, _, par) -> fields.add(par.name, param_field(par)),
+      pos.foldl(
+        ((fields, par) -> fields.add(par.name, param_field(par))),
+        fields,
+      ),
     )
   }
 }
