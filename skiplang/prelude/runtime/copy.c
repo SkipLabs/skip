@@ -6,6 +6,24 @@
 
 extern size_t total_palloc_size;
 
+void sk_stack_grow(sk_stack_t* st);
+
+// sk_stack_push / sk_stack_pop (stack.c), inlined: the copy loop does one
+// push and one pop per object and per child.
+static inline void copy_push(sk_stack_t* st, void** value, void** slot) {
+  st->values[st->head].value = value;
+  st->values[st->head].slot = slot;
+  st->head++;
+  if (st->head >= st->capacity) {
+    sk_stack_grow(st);
+  }
+}
+
+static inline sk_value_t copy_pop(sk_stack_t* st) {
+  st->head--;
+  return st->values[st->head];
+}
+
 static char* shallow_copy(char* obj, size_t memsize, size_t leftsize,
                           sk_cell_t* large_page) {
   if (large_page != NULL) {
@@ -51,7 +69,7 @@ static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page,
           bits &= bits - 1;
           char* child = (char*)ohead[k];
           if (child >= low && child < high) {
-            sk_stack_push(st, ohead + k, rhead + k);
+            copy_push(st, ohead + k, rhead + k);
           }
         }
       }
@@ -86,12 +104,12 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   void* result = obj;
   char* low = nbr_pages == 0 ? NULL : (char*)pages[0].key;
   char* high = nbr_pages == 0 ? NULL : (char*)pages[nbr_pages - 1].value;
-  sk_stack_push(st, &obj, &result);
+  copy_push(st, &obj, &result);
   sk_cell_t* large_page = NULL;
   size_t last_idx = (size_t)-1;
 
   while (st->head > 0) {
-    sk_value_t delayed = sk_stack_pop(st);
+    sk_value_t delayed = copy_pop(st);
     void* toCopy = *delayed.value;
 
     // Consecutive objects are usually on the same page: try the last one hit
@@ -141,7 +159,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     // distinguish it from vtable pointers
     if (((uintptr_t)vtable_ptr & 1) == 0) {
       copied_ptr = SKIP_copy_obj(st, toCopy, large_page, low, high);
-      sk_stack_push(restore, (void**)addr_vtable_ptr, vtable_ptr);
+      copy_push(restore, (void**)addr_vtable_ptr, vtable_ptr);
       *addr_vtable_ptr = (void*)((uintptr_t)copied_ptr | 1);
     } else {
       copied_ptr = (void*)((uintptr_t)vtable_ptr & ~1);
@@ -151,7 +169,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   }
 
   while (restore->head > 0) {
-    sk_value_t cell = sk_stack_pop(restore);
+    sk_value_t cell = copy_pop(restore);
     *cell.value = cell.slot;
   }
 
