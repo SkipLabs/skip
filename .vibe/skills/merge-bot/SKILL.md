@@ -114,8 +114,12 @@ action=$(jq -r .action <<<"$dec")
 `bin/merge-bot.sh run` follows `pick`'s decision loop by itself, spawning the
 fixers through `MERGE_BOT_AGENT_CMD` (default: headless
 `vibe --prompt-file ...` over the `references/*.md` briefs with tokens
-substituted by the script). Prefer the interactive loop above when you are the
-one operating the queue.
+substituted by the script). The default fixer command runs the session with
+cwd in `$STATE_DIR/fixer-home` (a non-git scratch dir) and the PR worktree
+passed via `--add-dir`, so fixer sessions show up under their own folder in
+the Vibe sessions list instead of this repo's project; the brief tells the
+agent to `cd` into the worktree. Prefer the interactive loop above when you
+are the one operating the queue.
 
 ## Where the bot works
 

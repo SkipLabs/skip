@@ -85,9 +85,9 @@
 #                        rejected) (default 3; MERGE_BOT_REBASE_ATTEMPTS)
 #   --agent-cmd CMD      Fixer command template for `process`/`run`. Tokens
 #                        __WORKTREE__ __PROMPT__ __PR__ __VERDICT__ __STATE_DIR__
-#                        are substituted. Default: headless `vibe --prompt-file
-#                        ...` using the skill's references/*.md briefs
-#                        (MERGE_BOT_AGENT_CMD)
+#                        __FIXER_HOME__ are substituted. Default: headless
+#                        `vibe --prompt-file ...` using the skill's
+#                        references/*.md briefs (MERGE_BOT_AGENT_CMD)
 #   --skip-labels A,B    Ignore PRs carrying any of these labels
 #                        (MERGE_BOT_SKIP_LABELS)
 #   MERGE_BOT_PATH_EST       jq body overriding the changed-paths CI heuristic
@@ -148,8 +148,11 @@ EXIT_STALE=15 # PR went BEHIND again while we waited (main moved) -> re-rebase
 GIT_SIGN_OPTS=(-c commit.gpgsign=false -c tag.gpgsign=false)
 
 # Default fixer: headless Vibe run with the skill's brief (tokens substituted
-# by make_prompt/run_fixer).
-DEFAULT_AGENT_CMD='vibe --workdir __WORKTREE__ --prompt-file __PROMPT__ --output-dir __STATE_DIR__/agent-runs/pr-__PR__ --max-turns 120 --time-limit 3600'
+# by make_prompt/run_fixer). The session runs with cwd in FIXER_HOME (a
+# non-git scratch dir) and the PR worktree added via --add-dir, so the fixer
+# session is grouped under its own folder in the Vibe sessions list instead of
+# the repo's project; the prompt tells the agent to `cd __WORKTREE__`.
+DEFAULT_AGENT_CMD='vibe --workdir __FIXER_HOME__ --add-dir __WORKTREE__ --prompt-file __PROMPT__ --output-dir __STATE_DIR__/agent-runs/pr-__PR__ --max-turns 120 --time-limit 3600'
 
 die() { echo "error: $*" >&2; exit 1; }
 usage() { sed -n '3,/^set -euo pipefail/{/^set -euo pipefail/d;s/^#\{0,1\} \{0,1\}//;p;}' "$0"; }
@@ -837,6 +840,10 @@ run_fixer() { # $1=template $2=pr $3=info json; returns 0 when verdict OK
     cmd=${cmd//__PR__/$n}
     cmd=${cmd//__VERDICT__/$verdict}
     cmd=${cmd//__STATE_DIR__/$STATE_DIR}
+    # Scratch cwd for the fixer session (see DEFAULT_AGENT_CMD): keeps fixer
+    # sessions out of the repo's project group in the Vibe sessions list.
+    mkdir -p "$STATE_DIR/fixer-home"
+    cmd=${cmd//__FIXER_HOME__/$STATE_DIR/fixer-home}
     log "PR $n: spawning fixer ($template): $cmd"
     arc=0
     bash -c "$cmd" >>"$LOG_FILE" 2>&1 || arc=$?
