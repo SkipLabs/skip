@@ -109,6 +109,19 @@ native value class Float uses Number {
   @intrinsic
   native fun toInt(): Int;
 
+  /**
+    x.nextAfter(y) returns the next representable floating-point value
+    following x in the direction of y. More precisely, if y is greater (resp.
+    less) than x, it returns the smallest (resp. largest) representable number
+    greater (resp. less) than x. If x equals y, the function returns y. If x
+    or y is NaN, a NaN is returned. Note that
+    maxFloat.nextAfter(infinity) = infinity and that 0.0.nextAfter(infinity)
+    is the smallest denormalized positive number. If x is the smallest
+    denormalized positive number, x.nextAfter(0.0) = 0.0
+  */
+  @intrinsic
+  native fun nextAfter(towards: Float): Float;
+
   /** Returns an Inspect representation for debugging. */
   fun inspect(): Inspect {
     InspectLiteral(this.toString())

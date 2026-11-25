@@ -435,6 +435,7 @@ private fun canModifyExistingMemory(
   | FloatDiv _
   | FloatMul _
   | FloatNeg _
+  | FloatNextAfter _
   | FloatSub _
   | FloatToInt _
   | FloatToString _
@@ -546,6 +547,7 @@ private fun canCSE(
   | FloatDiv _
   | FloatMul _
   | FloatNeg _
+  | FloatNextAfter _
   | FloatSub _
   | FloatToInt _
   | FloatToString _
@@ -1251,6 +1253,7 @@ private fun peepholeBinOpSame(peep: BinOp, s: mutable Peephole): Instr {
   | IntXor _
   | StringCmp _ ->
     s.constantInt(0)
+  | FloatNextAfter _
   | IntAnd _
   | IntOr _ ->
     s.getInstr(peep.lhs)
@@ -1574,6 +1577,8 @@ private fun peepholeFloatBinOpConstConst(
   | FloatAdd _ -> s.constantFloat(l + r)
   | FloatSub _ -> s.constantFloat(l - r)
   | FloatMul _ -> s.constantFloat(l * r)
+  | FloatNextAfter _ ->
+    peep // TODO once bootstrapped: s.constantFloat(l.nextAfter(r))
   | FloatDiv _ -> s.constantFloat(l / r)
   }
 }
@@ -1598,6 +1603,7 @@ private fun peepholeFloatBinOpVarConst(
     | FloatAdd _
     | FloatDiv _
     | FloatMul _
+    | FloatNextAfter _
     | FloatSub _ ->
       s.getInstr(peep.rhs)
     }
@@ -1639,7 +1645,8 @@ private fun peepholeFloatBinOpVarConst(
       }
     | FloatCmpEq _
     | FloatCmpLe _
-    | FloatCmpNe _ ->
+    | FloatCmpNe _
+    | FloatNextAfter _ ->
       peep
     }
   }
@@ -1660,6 +1667,7 @@ private fun peepholeFloatBinOpConstVar(
     | FloatAdd _
     | FloatDiv _
     | FloatMul _
+    | FloatNextAfter _
     | FloatSub _ ->
       s.getInstr(peep.lhs)
     }
@@ -1677,6 +1685,7 @@ private fun peepholeFloatBinOpConstVar(
     | FloatAdd _
     | FloatDiv _
     | FloatMul _
+    | FloatNextAfter _
     | FloatSub _ ->
       peep
     }
