@@ -7,6 +7,12 @@ ARG TARGETARCH
 # sql/ts/tests/service_common.mk skip its SDKMAN install (Java here comes
 # from apt above). Its version string only has to match that Makefile — it
 # does not track the JDK version and is intentionally left at 20.0.2-tem.
+#
+# Gradle has no apt repository, so the distribution zip is downloaded over
+# the network: pin its SHA256 and verify before unpacking, so a compromised
+# mirror cannot feed the image a tampered archive. To update the pin when
+# bumping the Gradle version: ./bin/update_docker_checksums.sh --apply
+ARG GRADLE_SHA256=9c0f7faeeb306cb14e4279a3e084ca6b596894089a0638e68a07c945a32c9e14
 RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,id=apt-lists-$TARGETARCH,target=/var/lib/apt/lists,sharing=locked \
     --mount=type=cache,target=/root/.npm,sharing=locked \
@@ -19,6 +25,7 @@ RUN --mount=type=cache,id=apt-cache-$TARGETARCH,target=/var/cache/apt,sharing=lo
     npm install -g bun && \
     npx playwright install-deps && \
     curl -sL https://services.gradle.org/distributions/gradle-9.6.1-bin.zip -o /tmp/gradle.zip && \
+    echo "${GRADLE_SHA256}  /tmp/gradle.zip" | sha256sum -c - && \
     unzip -q /tmp/gradle.zip -d /opt && \
     rm /tmp/gradle.zip && \
     ln -s /opt/gradle-9.6.1/bin/gradle /usr/local/bin/gradle && \
