@@ -49,6 +49,37 @@ fun errorFromSyntaxError(
   }
 }
 
+// Dependency sources are read from the compiled `.sklib` snapshot, but their
+// `InputSource.path` is the original on-disk path. When that file exists and
+// differs from the snapshot, the rendered snippet contradicts the file it
+// names (#1499), so flag it explicitly instead of letting it read as a
+// compiler bug.
+private fun staleSnapshotNote(
+  file: FileCache.InputSource,
+  contents: String,
+): String {
+  disk_opt = if (FileSystem.exists(file.path)) {
+    try {
+      Some(FileSystem.readTextFile(file.path))
+    } catch {
+    | _ -> None()
+    }
+  } else {
+    None()
+  };
+  disk_opt match {
+  | Some(disk) if (disk != contents) ->
+    pkg = file.pkg_opt match {
+    | Some(name) -> ` (package ${name})`
+    | None() -> ""
+    };
+    `\n(note: ${
+      file.path
+    } on disk differs from the compiled .sklib snapshot shown above${pkg}; rebuild the library to refresh this diagnostic)`
+  | _ -> ""
+  }
+}
+
 fun errorsToString(
   errors: Vector<Error>,
   get_file: (FileCache.InputSource) -> String,
@@ -80,7 +111,8 @@ fun errorsToString(
         render_pos(file, range) +
           trace.i1 +
           "\n" +
-          get_context_of_pos(range, contents),
+          get_context_of_pos(range, contents) +
+          staleSnapshotNote(file, contents),
       );
     };
     strErrors.push(strTraces.join("\n"));
