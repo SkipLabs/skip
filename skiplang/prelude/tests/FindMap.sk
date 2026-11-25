@@ -1,0 +1,39 @@
+module alias T = SKTest;
+
+module FindMapTest;
+
+fun even(x: Int): ?Int {
+  if (x % 2 == 0) Some(x) else None()
+}
+
+fun seqFindMap<S: readonly Sequence<Int>>(s: S): ?Int {
+  s.findMap(even)
+}
+
+@test
+fun testArrayFindMap(): void {
+  T.expectEq(Array[1, 3, 4, 6].findMap(even), Some(4));
+  T.expectEq(Array[1, 3, 5].findMap(even), None());
+  empty: Array<Int> = Array[];
+  T.expectEq(empty.findMap(even), None());
+}
+
+@test
+fun testVectorFindMap(): void {
+  vec = mutable Vector[1, 3, 4, 6];
+  T.expectEq(vec.findMap(even), Some(4));
+  // the source vector is unchanged
+  T.expectEq(vec.size(), 4);
+  oddVec = mutable Vector[1, 3, 5];
+  T.expectEq(oddVec.findMap(even), None());
+}
+
+@test
+fun testSequenceDefault(): void {
+  T.expectEq(seqFindMap(List[1, 3, 4, 6]), Some(4));
+  T.expectEq(seqFindMap(Range(1, 4)), Some(2));
+  emptyList: List<Int> = List[];
+  T.expectEq(seqFindMap(emptyList), None());
+}
+
+module end;
