@@ -1678,6 +1678,18 @@ fun merge_ordered_params(
   newParams.toArray();
 }
 
+// Split a parameter list into its positional group, named group and
+// named-first flag; a single-kind list has an empty other group.
+fun split_params(
+  p: Parameters<A.Parameter>,
+): (Array<A.Parameter>, UMap<A.Parameter>, Bool) {
+  p match {
+  | Positional(l) -> (l, UMap[], false)
+  | Named(m) -> (Array[], m, false)
+  | Mixed(pos, named, namedFirst) -> (pos, named, namedFirst)
+  }
+}
+
 fun merge_params(
   pos: FileRange,
   child: A.Class_def,
@@ -1702,27 +1714,54 @@ fun merge_params(
     )
   | (Mixed _, _)
   | (_, Mixed _) ->
-    // Combining mixed constructor parameters with inheritance is not
-    // supported yet; at most one side is Mixed here.
-    kind_str = p ->
-      p match {
-      | Positional _ -> "positional fields '(...)'"
-      | Named _ -> "named fields '{...}'"
-      | Mixed _ -> "mixed fields '(..){..}'"
-      };
-    SkipError.errorl(
-      List[
-        (pos, "Incompatible kind of fields"),
-        (
-          parent.name.i0,
-          "'" + parent.name.i1 + "' has " + kind_str(parent_params),
+    // At least one side is mixed: merge the two groups separately. A side
+    // with a single kind contributes only to that group, so e.g. a
+    // positional-only child of a mixed parent inherits the parent's named
+    // fields and its constructor becomes mixed.
+    (child_pos, child_named, child_namedFirst) = split_params(child_params);
+    (parent_pos, parent_named, parent_namedFirst) = split_params(parent_params);
+    merged_pos = merge_ordered_params(child.name, child_pos, parent_pos);
+    merged_named = UMap::createFromItems(
+      merge_ordered_params(
+        child.name,
+        child_named
+          .items()
+          .map(p -> p.i1)
+          .collect(Array)
+          .sortedBy(param ~> param.index),
+        parent_named
+          .items()
+          .map(p -> p.i1)
+          .collect(Array)
+          .sortedBy(param ~> param.index),
+      ).map(param ~> (param.name, param)),
+    );
+    // Keep declaration-order indices across the two groups so omitted
+    // default arguments evaluate in declaration order.
+    namedFirst = if (child_params is Mixed _) {
+      child_namedFirst
+    } else {
+      parent_namedFirst
+    };
+    if (merged_pos.isEmpty()) {
+      Named(merged_named)
+    } else if (merged_named.isEmpty()) {
+      Positional(merged_pos)
+    } else if (namedFirst) {
+      Mixed(
+        merged_pos.map(p -> p with {index => p.index + merged_named.size()}),
+        merged_named,
+        true,
+      )
+    } else {
+      Mixed(
+        merged_pos,
+        merged_named.map((_, p) ->
+          p with {index => p.index + merged_pos.size()}
         ),
-        (
-          child.name.i0,
-          "But '" + child.name.i1 + "' has " + kind_str(child_params),
-        ),
-      ],
-    )
+        false,
+      )
+    }
   | (Positional(_), Named(_)) ->
     SkipError.errorl(
       List[
