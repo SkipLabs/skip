@@ -687,6 +687,19 @@ mutable class .Vector<+T> private (
     result
   }
 
+  // s.findMap(f) is Some(u) = f(t) for the first t in s where f is Some(_)
+  // Iterates via eachWhileImpl (not a raw loop over the inner array) so that
+  // a mutation of this vector during f is detected and throws
+  // ContainerChanged rather than reading out of bounds.
+  readonly fun findMap<U>(f: T -> ?U): ?U {
+    result: ?U = None();
+    this.eachWhileImpl(x -> {
+      !result = f(x);
+      result.isNone() // continue only while nothing was found
+    });
+    result
+  }
+
   readonly fun sumInt[T: Int](): Int {
     sum = 0;
     this.unsafeEach(x -> !sum = sum + x);

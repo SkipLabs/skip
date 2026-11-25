@@ -314,6 +314,11 @@ mutable base class .Sequence<+T> uses IntoIterator<T> {
     this.values().find(p)
   }
 
+  // s.findMap(f) is Some(u) = f(t) for the first t in s where f is Some(_)
+  overridable readonly fun findMap<U>(f: T -> ?U): ?U {
+    this.values().findMap(f)
+  }
+
   // Returns Some(index) for the index of the first item in this iterator that
   // matches the predicate, or None() if no items match.
   overridable readonly fun findIndex(p: T -> Bool): ?Int {
