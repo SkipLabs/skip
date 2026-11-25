@@ -39,19 +39,31 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
-### 2026-11-25 — `uses Equality` gives you `==` for free — usually don't write it
+### 2026-11-25 — Use the `Equality` trait for value comparison — `==` usually comes for free
 
 Source: user correction (skip#1765). The `Equality` trait
 (`skiplang/prelude/src/core/traits/Equality.sk`) supplies an overridable,
 field-wise structural `==` (and `!=`), so a class that `uses Equality` gets
 working equality without you writing any implementation — most of the time you
-don't write `==` at all. Override it only when structural comparison isn't what
-you mean; on a variant base class declare the override with the explicit base
-type (`fun ==(other: FieldAccess)`), not `other: this` (see the entry below).
+never write `==` at all. And never add a `kind(): String` (or reuse `toString`)
+just to compare two values; with `Equality` on the class, callers write `a == b`
+directly. Override `==` only when structural comparison isn't what you mean; on
+a variant base class declare the override in the base body with the explicit
+base type (`fun ==(other: FieldAccess)`), not `other: this` — children inherit
+the member and `this` does not typecheck there.
 
     // no == implementation needed — it comes from the trait:
     value class Money(cents: Int) uses Equality
     a == b   // true iff every field is equal
+
+    // worse: string conversion just to compare
+    prev.access.kind() != f.access.kind()
+
+    // better: custom == only when needed, declared with the explicit base type
+    base class FieldAccess uses Equality {
+      fun ==(other: FieldAccess): Bool { /* by kind, ignoring pos */ }
+    }
+    prev.access != f.access   // != also comes from the trait
 
 ### 2026-11-25 — Put variant classifiers on the value class, not as statics on an unrelated class
 
@@ -62,20 +74,6 @@ Source: user correction. A small helper that classifies, compares, or projects t
 
     // better: on FieldAccess itself
     //            fun ==(other: FieldAccess): Bool { ... }
-
-### 2026-11-25 — Compare values with the Equality trait, not by converting to String
-
-Source: user correction. Don't add a `kind(): String` (or reuse `toString`) just to compare two values — make the class `uses Equality` and override `==` so callers write `a == b` directly. When overriding `==` on a variant base class, declare it in the base body with the explicit base type (`fun ==(other: FieldAccess)`), not `other: this` — children inherit the member and `this` does not typecheck there.
-
-    // worse: string conversion just to compare
-    prev.access.kind() != f.access.kind()
-
-    // better: Equality on the class, callers compare values
-    base class FieldAccess uses Equality {
-      fun ==(other: FieldAccess): Bool { /* by kind, ignoring pos */ }
-      fun !=(other: FieldAccess): Bool { !(this == other) }
-    }
-    prev.access != f.access
 
 ### 2026-11-24 — Never build an Array by `append` in a loop; use a mutable Vector
 
