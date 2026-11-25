@@ -690,15 +690,15 @@ mutable class .Vector<+T> private (
   // s.findMap(f) is Some(u) = f(t) for the first t in s where f is Some(_)
   readonly fun findMap<U>(f: T -> ?U): ?U {
     result: ?U = None();
-    this.eachWhileImpl(x ->
-      f(x) match {
-      | some @ Some _ ->
-        !result = some;
+    this.eachWhileImpl(x -> {
+      u = f(x);
+      if (u.isSome()) {
+        !result = u;
         false // break
-      | None() ->
+      } else {
         true // continue
       }
-    );
+    });
     result
   }
 
