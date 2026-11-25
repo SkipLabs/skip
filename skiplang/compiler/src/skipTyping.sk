@@ -2655,18 +2655,44 @@ fun callee_has_mixed_params(
   // Unwrap Tlambda for indirect calls (a mixed lambda stored in a variable).
   | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(context, acc, t)
   | (_, N.Tnamed(_, t)) -> callee_has_mixed_params(context, acc, t)
-  // Class-object types (Concrete<C>, Class<C>, static): mixed iff the target
-  // class's constructor takes mixed parameters.
+  // Class-object types (Concrete<C>, Class<C>, Base<C>): mixed iff the target
+  // class's constructor takes mixed parameters. A class-object type is a
+  // Tset whose first element is named Concrete/Class/Base and whose type
+  // argument is the target class type; a plain Tapply with such a name is
+  // the same thing before it is normalized to a set.
+  | (
+    _,
+    N.Tset(_, _, _, elts),
+  ) if (!elts.isEmpty() && TAstUtils.is_class_object(elts[0].name.i1)) ->
+    class_object_target_name(acc, elts[0].targs) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
   | (_, N.Tapply(_, (_, s), targs)) if (TAstUtils.is_class_object(s)) ->
-    (if (targs.isEmpty()) {
-      None()
-    } else {
-      maybe_class_name_of_type(acc, targs[0])
-    }) match {
+    class_object_target_name(acc, targs) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
+  // Same for the promoted form of a class-object type (the type of an
+  // already-typed expression).
+  | (
+    _,
+    N.Tpromoted(_, _, _, _, (_, s), targs),
+  ) if (TAstUtils.is_class_object(s)) ->
+    class_object_target_name(acc, targs) match {
     | Some(name) -> class_ctor_has_mixed_params(context, name)
     | None() -> false
     }
   | _ -> false
+  }
+}
+
+// The target class name of a class-object type's type arguments.
+fun class_object_target_name(acc: TUtils.Acc, targs: Array<N.Type_>): ?N.Name {
+  if (targs.isEmpty()) {
+    None()
+  } else {
+    maybe_class_name_of_type(acc, targs[0])
   }
 }
 
