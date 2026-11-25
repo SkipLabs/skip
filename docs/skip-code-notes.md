@@ -57,6 +57,15 @@ Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_exter
       physEqRaw(t, u) != 0
     }
 
+### 2026-11-25 — `uses Orderable, Equality` together conflict on `==`; only `!=` comes for free
+
+Source: user correction (follow-up to skip#1765). Both traits define `==`, so a class using both fails with "Inheritance conflict needs resolution" until you write an explicit `fun ==(other: TheClass)` override in the class body — but `!=` needs nothing, since `Equality` supplies it as `!(this == other)`. Don't drop `Orderable` to dodge the conflict: a field of an `Orderable` class must itself be `Orderable` (its `compare` macro walks every field). And remember the default `==` is field-wise over *all* fields, including position-carrying ones like `Name`/`PosRange` — when position must not matter (e.g. two declarations of the same class at different positions), override `==` regardless.
+
+    base class FieldAccess uses XXHashable, Orderable, Equality {
+      fun ==(other: FieldAccess): Bool { /* by kind, ignoring pos */ }
+      // no != needed — inherited from Equality
+    }
+
 ### 2026-11-25 — Use the `Equality` trait for value comparison — `==` usually comes for free
 
 Source: user correction (skip#1765). The `Equality` trait
