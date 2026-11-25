@@ -39,6 +39,20 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-25 — `uses Equality` gives you `==` for free — usually don't write it
+
+Source: user correction (see skip#1765). The `Equality` trait
+(`skiplang/prelude/src/core/traits/Equality.sk`) supplies an overridable,
+field-wise structural `==` (and `!=`), so a class that `uses Equality` gets
+working equality without you writing any implementation — most of the time you
+don't write `==` at all. Override it only when structural comparison isn't what
+you mean; on a variant base class declare the override with the explicit base
+type (`fun ==(other: FieldAccess)`), not `other: this`.
+
+    // no == implementation needed — it comes from the trait:
+    value class Money(cents: Int) uses Equality
+    a == b   // true iff every field is equal
+
 ### 2026-11-24 — Never build an Array by `append` in a loop; use a mutable Vector
 
 Source: user correction. `Array.append` returns a copy, so appending n elements
