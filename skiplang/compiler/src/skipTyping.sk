@@ -4628,6 +4628,9 @@ fun object_pattern(
   FileRange,
   ?Parameters<TAst.ParamPattern>,
 ) {
+  if (class_ctor_has_mixed_params(context, obj_name)) {
+    SkipError.error(pos, "Mixed parameters are not supported in class patterns")
+  };
   (
     env1,
     acc1,
