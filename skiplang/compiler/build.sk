@@ -7,5 +7,12 @@ fun main(): void {
     print_string(`Error getting git commit hash: ${err}`);
     skipExit(1)
   };
-  print_string(`skargo:skc-env=GIT_COMMIT_HASH=${git_hash}`)
+  print_string(`skargo:skc-env=GIT_COMMIT_HASH=${git_hash}`);
+  // Re-stamp GIT_COMMIT_HASH whenever the compiler's own sources change, but
+  // not on unrelated commits: the build-script fingerprint watches exactly
+  // the files listed here, so a docs-only commit does not rebuild the
+  // compiler, while a src/ change re-runs this script and takes the current
+  // HEAD hash into account (#1431).
+  srcs = FileSystem.readFilesRecursive("src", f -> f.endsWith(".sk"));
+  srcs.each(f -> print_string(`skargo:rerun-if-changed=${f}`));
 }
