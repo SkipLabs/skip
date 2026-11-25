@@ -21,7 +21,11 @@ static char* shallow_copy(char* obj, size_t memsize, size_t leftsize,
   return mem;
 }
 
-static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page) {
+// Only children in [low, high), the address range of the pages being copied
+// out, are pushed: anything else is older data, which the copy keeps as is
+// (shallow_copy already wrote its address).
+static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page,
+                           char* low, char* high) {
   SKIP_gc_type_t* ty = get_gc_type(obj);
 
   size_t len = skip_object_len(ty, obj);
@@ -30,29 +34,26 @@ static char* SKIP_copy_obj(sk_stack_t* st, char* obj, sk_cell_t* large_page) {
   char* result = shallow_copy(obj, memsize, leftsize, large_page);
 
   if ((ty->m_refsHintMask & 1) != 0) {
-    const size_t refMaskWordBitSize = sizeof(ty->m_refMask[0]) * 8;
-    char* rhead = result;
-    char* ohead = obj;
-    char* end = obj + memsize;
-
-    while (ohead < end) {
-      size_t size = ty->m_userByteSize;
-      size_t mask_slot = 0;
-      while (size > 0) {
-        unsigned int i;
-        for (i = 0; i < refMaskWordBitSize && size > 0; i++) {
-          if ((ty->m_refMask[mask_slot] >> i) & 1) {
-            void** ptr = (void**)ohead;
-            if (*ptr != NULL) {
-              void** slot = (void**)rhead;
-              sk_stack_push(st, ptr, slot);
-            }
+    // The reference slots of each element: the set bits of its mask, one bit
+    // per word of the element, 64 to a mask word.
+    size_t words = (size_t)ty->m_userByteSize / sizeof(void*);
+    void** ohead = (void**)obj;
+    void** rhead = (void**)result;
+    size_t e;
+    for (e = 0; e < len; e++, ohead += words, rhead += words) {
+      size_t w;
+      for (w = 0; w * 64 < words; w++) {
+        uint64_t bits = (uint64_t)ty->m_refMask[w];
+        size_t rest = words - w * 64;
+        if (rest < 64) bits &= ((uint64_t)1 << rest) - 1;
+        while (bits != 0) {
+          size_t k = w * 64 + (size_t)__builtin_ctzll(bits);
+          bits &= bits - 1;
+          char* child = (char*)ohead[k];
+          if (child >= low && child < high) {
+            sk_stack_push(st, ohead + k, rhead + k);
           }
-          ohead += sizeof(void*);
-          rhead += sizeof(void*);
-          size -= sizeof(void*);
         }
-        mask_slot++;
       }
     }
   }
@@ -83,6 +84,8 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
   sk_stack3_init(st3, STACK_INIT_CAPACITY);
 
   void* result = obj;
+  char* low = nbr_pages == 0 ? NULL : (char*)pages[0].key;
+  char* high = nbr_pages == 0 ? NULL : (char*)pages[nbr_pages - 1].value;
   sk_stack_push(st, &obj, &result);
   sk_cell_t* large_page = NULL;
   size_t last_idx = (size_t)-1;
@@ -137,7 +140,7 @@ void* SKIP_copy_with_pages(void* obj, size_t nbr_pages, sk_cell_t* pages) {
     // forwarding pointer to the copied object, with the lsb set to
     // distinguish it from vtable pointers
     if (((uintptr_t)vtable_ptr & 1) == 0) {
-      copied_ptr = SKIP_copy_obj(st, toCopy, large_page);
+      copied_ptr = SKIP_copy_obj(st, toCopy, large_page, low, high);
       sk_stack_push(restore, (void**)addr_vtable_ptr, vtable_ptr);
       *addr_vtable_ptr = (void*)((uintptr_t)copied_ptr | 1);
     } else {

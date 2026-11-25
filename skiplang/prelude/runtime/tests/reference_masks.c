@@ -106,9 +106,17 @@ static void check_kind(int array) {
 
   puts("copy");
   fflush(stdout);
-  char* copy = SKIP_copy_obj(&stack, object, NULL);
+  char* copy = SKIP_copy_obj(&stack, object, NULL, (char*)0, (char*)UINTPTR_MAX);
   assert(!memcmp(copy, object, length * WORDS * sizeof(void*)));
   check_stack(&stack, object, length, 1);
+  free(last_allocation);
+  // A child outside the copied pages' range is older data: not pushed.
+  copy = SKIP_copy_obj(&stack, object, NULL, (char*)0x1000, (char*)(0x1000 + 32 * 16));
+  assert(!memcmp(copy, object, length * WORDS * sizeof(void*)));
+  assert(stack.head == 2);
+  assert(stack.values[0].value == (void**)object);
+  assert(stack.values[1].value == (void**)object + 31);
+  stack.head = 0;
   free(last_allocation);
   puts("intern");
   fflush(stdout);
