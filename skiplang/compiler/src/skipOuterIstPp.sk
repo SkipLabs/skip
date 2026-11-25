@@ -886,14 +886,21 @@ fun match_pattern_(o: mutable BufferedPrinter.Out, x: O.Pattern_): void {
         o.out("{");
         array(pattern_fields, o, values);
         o.out("}")
-      | Mixed(pos, named, _) ->
-        o.out("(");
-        array(param_pattern, o, pos);
-        o.out(")");
-        values = named.items().map(nv -> (nv.i0.i1, nv.i1)).collect(Array);
-        o.out("{");
-        array(pattern_fields, o, values);
-        o.out("}")
+      | Mixed(pos, named, namedFirst) ->
+        mixed_params(
+          namedFirst,
+          () -> {
+            o.out("(");
+            array(param_pattern, o, pos);
+            o.out(")")
+          },
+          () -> {
+            values = named.items().map(nv -> (nv.i0.i1, nv.i1)).collect(Array);
+            o.out("{");
+            array(pattern_fields, o, values);
+            o.out("}")
+          },
+        )
       }
     }
   | O.Pat_all() -> o.out(" Pat_all ")

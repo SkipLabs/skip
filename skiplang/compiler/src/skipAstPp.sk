@@ -1099,13 +1099,20 @@ fun let_obj_fields(
     o.out("{");
     array(pattern_fields, o, map.items().collect(Array));
     o.out("}")
-  | Mixed(pos, named, _) ->
-    o.out("(");
-    array(pattern, o, pos);
-    o.out(")");
-    o.out("{");
-    array(pattern_fields, o, named.items().collect(Array));
-    o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    mixed_params(
+      namedFirst,
+      () -> {
+        o.out("(");
+        array(pattern, o, pos);
+        o.out(")")
+      },
+      () -> {
+        o.out("{");
+        array(pattern_fields, o, named.items().collect(Array));
+        o.out("}")
+      },
+    )
   }
 }
 

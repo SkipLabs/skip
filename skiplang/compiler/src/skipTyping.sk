@@ -4594,9 +4594,35 @@ fun object_pattern_args(
           pos,
           "Expected named arguments in pattern. Found positional arguments.",
         )
+      | (Mixed(params_pos, params_map, nf), Mixed(field_pos, field_map, _)) ->
+        expected = params_pos.size();
+        actual = field_pos.size();
+        if (expected != actual) {
+          msg =
+            "Incorrect number of positional arguments in pattern. Expected " +
+            expected +
+            " found " +
+            actual;
+          SkipError.error(pos, msg)
+        };
+        named_args = field_map.map((name, field_pat) ->
+          params_map.maybeGet(name) match {
+          | None() ->
+            SkipError.error(
+              pos,
+              "No field named '" + name.i1 + "' in " + obj_name.i1,
+            )
+          | Some(info) -> (info, field_pat)
+          }
+        );
+        Mixed(params_pos.zip(field_pos), named_args, nf)
       | (Mixed _, _)
       | (_, Mixed _) ->
-        SkipError.error(pos, "Mixed parameters are not supported in patterns")
+        SkipError.error(
+          pos,
+          "Expected both positional and named arguments in pattern for " +
+            obj_name.i1,
+        )
       }
     };
     ((env1, acc1), result) = info_pats.map_foldl(
@@ -4661,9 +4687,6 @@ fun object_pattern(
   FileRange,
   ?Parameters<TAst.ParamPattern>,
 ) {
-  if (class_ctor_has_mixed_params(context, obj_name)) {
-    SkipError.error(pos, "Mixed parameters are not supported in class patterns")
-  };
   (
     env1,
     acc1,

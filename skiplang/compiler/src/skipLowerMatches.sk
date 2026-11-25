@@ -565,22 +565,28 @@ mutable class MatchCompiler(
     cls_name: O.Name,
     paramsOpt: ?Parameters<T>,
   ): UMap<T> {
+    // The positional parameter names of the class's constructor (empty for a
+    // named-only constructor).
+    classPositionalNames = () -> {
+      cd = this.program.getClass(context, cls_name.id);
+      cd.params match {
+      | None() -> Array[]
+      | Some(O.ClassParams{params => Named _}) -> Array[]
+      | Some(O.ClassParams{params => Positional(class_parameters)}) ->
+        class_parameters.map(p ~> (p.name.pos, p.name.id))
+      | Some(O.ClassParams{params => Mixed(class_parameters, _, _)}) ->
+        class_parameters.map(p ~> (p.name.pos, p.name.id))
+      }
+    };
     paramsOpt match {
     | None() -> UMap[]
     | Some(Positional(plist)) ->
-      cd = this.program.getClass(context, cls_name.id);
-      cd.params match {
-      | None() -> UMap[]
-      | Some(O.ClassParams{params => Named _}) ->
-        invariant_violation("unexpected named class params")
-      | Some(O.ClassParams{params => Mixed _}) ->
-        invariant_violation("unexpected mixed class params")
-      | Some(O.ClassParams{params => Positional(class_parameters)}) ->
-        cpnames = class_parameters.map(p ~> (p.name.pos, p.name.id));
-        UMap::createFromItems(cpnames.zip(plist))
-      }
+      UMap::createFromItems(classPositionalNames().zip(plist))
     | Some(Named(map)) -> map
-    | Some(Mixed _) -> invariant_violation("unexpected mixed params in pattern")
+    | Some(Mixed(plist, map, _)) ->
+      UMap::createFromItems(
+        classPositionalNames().zip(plist).concat(map.items().collect(Array)),
+      )
     }
   }
 

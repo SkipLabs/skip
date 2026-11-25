@@ -913,14 +913,21 @@ fun let_obj_fields(
     o.out("{");
     list(pattern_fields, o, values);
     o.out("}")
-  | Mixed(pos, named, _) ->
-    o.out("(");
-    array(match_pattern, o, pos);
-    o.out(")");
-    o.out("{");
-    values = named.items() |> List::createFromIterator;
-    list(pattern_fields, o, values);
-    o.out("}")
+  | Mixed(pos, named, namedFirst) ->
+    mixed_params(
+      namedFirst,
+      () -> {
+        o.out("(");
+        array(match_pattern, o, pos);
+        o.out(")")
+      },
+      () -> {
+        o.out("{");
+        values = named.items() |> List::createFromIterator;
+        list(pattern_fields, o, values);
+        o.out("}")
+      },
+    )
   }
 }
 

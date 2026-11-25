@@ -426,7 +426,13 @@ fun add_params<Ta>(
     };
     values.concat(acc.values()).collect(Array)
   | Positional(a) -> a.concat(acc)
-  | Mixed _ -> invariant_violation("Mixed parameters not supported in patterns")
+  | Mixed(a, m, _) ->
+    named_values = if (env.sort_named_params) {
+      canonicalize_params(context, env, tid, m).values().map(p -> p.i1)
+    } else {
+      m.values()
+    };
+    a.concat(named_values.concat(acc.values()).collect(Array))
   }
 }
 
@@ -549,13 +555,19 @@ fun normalize_params_if_named(
   params: Parameters<TAst.ParamPattern>,
 ): Parameters<TAst.ParamPattern> {
   params match {
+  | Mixed(pos_pats, named_pats, nf) ->
+    normalize_params_if_named(context, pos, tid, Named(named_pats)) match {
+    | Named(normalized) -> Mixed(pos_pats, normalized, nf)
+    | _ -> invariant_violation("ICE normalize mixed named params")
+    }
   | Named(our_params) ->
     nm = resolve_tid(tid);
     cd = SkipNaming.getClass(context, nm);
     cd.params match {
     | N.HasParams(class_params) ->
       class_params.params match {
-      | Named(class_params1) ->
+      | Named(class_params1)
+      | Mixed(_, class_params1, _) ->
         normalized_params = class_params1.reduce(
           (acc, key, _) -> {
             // Found a missing parameter name, so fill it in with a wildcard
@@ -602,10 +614,8 @@ fun normalize_positional_params(
       invariant_violation(
         "Internal error: encountered named parameters but was expecting positional",
       )
-    | N.HasParams(N.Class_params{params => Mixed _}) ->
-      invariant_violation(
-        "Internal error: encountered mixed parameters but was expecting positional",
-      )
+    | N.HasParams(N.Class_params{params => Mixed(class_params, _, _)}) ->
+      class_params
     | N.HasParams(N.Class_params{params => Positional(class_params)}) ->
       class_params
     }
@@ -705,8 +715,30 @@ fun rebuild_constr(
         UMap[],
       );
       (ty, (pos, TAst.Pat_type(nm, castType, Some(Named(new_args)))))
-    | Mixed _ ->
-      invariant_violation("Mixed parameters not supported in patterns")
+    | Mixed(param_pos, nom_map, nf) ->
+      npos = param_pos.size();
+      pos_args = Array::fillBy(npos, i -> args[i]);
+      named_args = args.drop(npos);
+      pos_pairs = param_pos.zipWith(pos_args, (pty, arg) -> (pty.i0, arg));
+      kvs = canonicalize_params(context, env, nm, nom_map);
+      nom_pairs = kvs.zipWith(named_args, (p, arg) -> {
+        (k, (pty, _)) = p;
+        (k, (pty, arg))
+      });
+      new_named = nom_pairs.reduce(
+        (mp, k_arg) -> {
+          (k, arg) = k_arg;
+          mp.add(k, arg)
+        },
+        UMap[],
+      );
+      (
+        ty,
+        (
+          pos,
+          TAst.Pat_type(nm, castType, Some(Mixed(pos_pairs, new_named, nf))),
+        ),
+      )
     }
   /* Since we remove Pat_as from our internal representation of patterns, we
    * should never encounter one here. */
@@ -867,8 +899,28 @@ fun print_pattern(
         });
 
         acc1 + "{" + pats.join(", ") + "}"
-      | Mixed _ ->
-        invariant_violation("Mixed parameters not supported in patterns")
+      | Mixed(pats, map, nf) ->
+        pos_str =
+          acc1 +
+          "(" +
+          pats
+            .map(cur1 -> print_pattern(context, env, "", cur1.i1))
+            .join(", ") +
+          ")";
+        named_values = canonicalize_params(context, env, tid, map);
+        named_str =
+          acc1 +
+          "{" +
+          named_values
+            .map(nm_pat -> {
+              (nm, pat1) = nm_pat;
+              snm = AUtils.string_of_name(nm);
+              spat1 = print_pattern(context, env, "", pat1.i1);
+              snm + " => " + spat1
+            })
+            .join(", ") +
+          "}";
+        if (nf) named_str + pos_str else pos_str + named_str
       }
     }
   | TAst.Pat_var((_, x, _)) -> acc + AUtils.string_of_name(x)
@@ -1038,7 +1090,16 @@ fun normalize_param_patterns(
     Positional(
       normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
     )
-  | Mixed _ -> invariant_violation("Mixed parameters not supported in patterns")
+  | Mixed(lpats, nmap, nf) ->
+    normalize_params_if_named(context, pos, child_tid, Named(nmap)) match {
+    | Named(normalized_named) ->
+      Mixed(
+        normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
+        normalized_named,
+        nf,
+      )
+    | _ -> invariant_violation("ICE normalize mixed named params")
+    }
   }
 }
 

@@ -2920,11 +2920,18 @@ fun bind_params(
   | Positional(l) -> l.foldl((x, y) -> bind_param(context, x, y), (env, acc))
   | Named(fds) ->
     fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), (env, acc))
-  | Mixed(l, fds, _) ->
-    fds.reduce(
+  | Mixed(l, fds, namedFirst) ->
+    bindPos = l.foldl((x, y) -> bind_param(context, x, y), (env, acc));
+    bindNamed = fds.reduce(
       ((ea, _, p) -> bind_param(context, ea, p)),
-      l.foldl((x, y) -> bind_param(context, x, y), (env, acc)),
-    )
+      (env, acc),
+    );
+    // Bind in declaration order (the group order of the declaration).
+    if (namedFirst) {
+      l.foldl((x, y) -> bind_param(context, x, y), bindNamed)
+    } else {
+      fds.reduce(((ea, _, p) -> bind_param(context, ea, p)), bindPos)
+    }
   }
 }
 

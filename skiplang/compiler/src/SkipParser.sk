@@ -4492,14 +4492,29 @@ mutable class SkipParser{
   mutable fun parseArgumentsPattern(typeName: ParseTree): ParseTree {
     this.peek() match {
     | TokenKind.OPEN_PAREN() ->
-      arguments = this.parsePositionalArgumentsPattern();
+      positional = this.parsePositionalArgumentsPattern();
+      // In pattern position a '{' can only be a named-argument group.
+      arguments = if (this.peekKind(TokenKind.OPEN_CURLY())) {
+        named = this.parseNamedArgumentsPattern();
+        this.mixedParametersTree(positional, named, false)
+      } else {
+        positional
+      };
       ParseTree.ClassPatternTree{
         range => Parser.createRangeOfTrees(typeName, arguments),
         typeName,
         arguments,
       }
     | TokenKind.OPEN_CURLY() ->
-      arguments = this.parseNamedArgumentsPattern();
+      named = this.parseNamedArgumentsPattern();
+      // A '(' directly after the named group starts the positional group of
+      // a named-first mixed class pattern ('C{b => x}(1)').
+      arguments = if (this.peekKind(TokenKind.OPEN_PAREN())) {
+        positional = this.parsePositionalArgumentsPattern();
+        this.mixedParametersTree(named, positional, true)
+      } else {
+        named
+      };
       ParseTree.ClassPatternTree{
         range => Parser.createRangeOfTrees(typeName, arguments),
         typeName,

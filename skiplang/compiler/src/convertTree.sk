@@ -447,6 +447,34 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
     | ParseTree.PositionalPatternArgumentsTree{arguments} ->
       converted = arguments.getList().map(this.convertPattern);
       Some(Positional(converted))
+    | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
+      posPats = positional match {
+      | ParseTree.PositionalPatternArgumentsTree{arguments} ->
+        arguments.getList().map(this.convertPattern)
+      | _ ->
+        invariant_violation(
+          "Unexpected positional pattern arguments: " +
+            this.treeToString(positional),
+        )
+      };
+      namedPats = named match {
+      | ParseTree.NamedPatternArgumentsTree{arguments} ->
+        UMap::createFromItems(
+          arguments.getList().map(this.convertNamedArgumentPattern),
+        )
+      | _ ->
+        invariant_violation(
+          "Unexpected named pattern arguments: " + this.treeToString(named),
+        )
+      };
+      // An empty group is degenerate: the pattern is just the other group.
+      if (posPats.isEmpty()) {
+        Some(Named(namedPats))
+      } else if (namedPats.isEmpty()) {
+        Some(Positional(posPats))
+      } else {
+        Some(Mixed(posPats, namedPats, namedFirst))
+      }
     | _ -> invariant_violation("unexpected class pattern arguments")
     }
   }

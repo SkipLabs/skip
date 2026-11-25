@@ -766,14 +766,21 @@ fun match_pattern_(o: mutable BufferedPrinter.Out, x: T.Pattern_): void {
         o.out("{");
         BufferedPrinter.list(param_pattern_fields, o, values);
         o.out("}")
-      | Mixed(pos, named, _) ->
-        o.out("(");
-        array(param_pattern, o, pos);
-        o.out(")");
-        o.out("{");
-        values = named.items() |> List::createFromIterator;
-        BufferedPrinter.list(param_pattern_fields, o, values);
-        o.out("}")
+      | Mixed(pos, named, namedFirst) ->
+        mixed_params(
+          namedFirst,
+          () -> {
+            o.out("(");
+            array(param_pattern, o, pos);
+            o.out(")")
+          },
+          () -> {
+            o.out("{");
+            values = named.items() |> List::createFromIterator;
+            BufferedPrinter.list(param_pattern_fields, o, values);
+            o.out("}")
+          },
+        )
       }
     }
   | (_, T.Pat_var(x1)) -> binding(o, x1)
