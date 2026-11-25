@@ -86,6 +86,10 @@ declare i64 @SKIP_String_cmp(ptr captures(none), ptr captures(none)) memory(argm
 declare i64 @SKIP_String_hash(ptr captures(none)) memory(argmem: read) willreturn nounwind
 declare align 8 ptr @SKIP_Float_toString(double) nofree
 
+; Physical equality (cf. runtime/native_eq.c); called by the Runtime.phys_eq intrinsic
+
+declare i32 @SKIP_physEq(ptr captures(none), ptr captures(none)) memory(none) willreturn nounwind
+
 define i1 @SKIP_String_eq(ptr captures(none) %0, ptr captures(none) %1) nounwind willreturn memory(argmem: read) {
   %3 = call i64 @SKIP_String_cmp(ptr %0, ptr %1)
   %4 = icmp eq i64 %3, 0
