@@ -2754,6 +2754,7 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | FloatCmpNe _
   | FloatDiv _
   | FloatMul _
+  | FloatNextAfter _
   | FloatSub _
   | FloatToInt _
   | FloatToString _
@@ -3830,6 +3831,14 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
   | FloatCmpNe _ -> llvmWriteDefault(instr, asm, "fcmp une double")
   | FloatDiv _ -> llvmWriteDefault(instr, asm, "fdiv double")
   | FloatMul _ -> llvmWriteDefault(instr, asm, "fmul double")
+  | FloatNextAfter{lhs, rhs} ->
+    asm.print(
+      "  %n = call double @nextafter(double %n, double %n), %D\n" %
+        instr %
+        lhs %
+        rhs %
+        instr,
+    )
   | FloatSub _ -> llvmWriteDefault(instr, asm, "fsub double")
   | x @ Load _ -> llvmWriteLoad(x, asm)
   | If _ -> llvmWriteDefault(instr, asm, "br i1")

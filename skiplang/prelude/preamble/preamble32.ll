@@ -20,6 +20,7 @@ declare i32 @llvm.eh.typeid.for(ptr)
 declare i64 @llvm.ctlz.i64(i64, i1)
 declare i64 @llvm.cttz.i64(i64, i1)
 declare i64 @llvm.ctpop.i64(i64)
+declare double @nextafter(double, double)
 
 declare i32 @__gxx_personality_v0(...)
 declare ptr @__cxa_begin_catch(ptr)
