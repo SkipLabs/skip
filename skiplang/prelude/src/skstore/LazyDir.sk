@@ -270,11 +270,26 @@ class TLazyDir{
                   key,
                 };
                 ctx.enter(arrowKey, dir.timeStack);
-                newResult = dir.doGet(ctx, key);
+                newResult = try {
+                  dir.doGet(ctx, key)
+                } catch {
+                | exn ->
+                  // Keep arrowStack balanced when compute throws (doGet has
+                  // already cached LAbsent, so the entry recomputes on demand).
+                  ctx.leave(arrowKey);
+                  throw exn
+                };
                 ctx.leave(arrowKey);
+                // newResult is LazyComputed, so only LDefined/LAbsent occur on
+                // the right; the `_` on oldValue is required (the guard above
+                // does not narrow ?LazyResult) and correct — every other
+                // variant means "changed".
                 (oldValue, newResult) match {
                 | (Some(LDefined(old, _)), LDefined(new_, _)) ->
-                  native_eq(old, new_) != 0
+                  // equalFileArrays rather than whole-array native_eq: the
+                  // latter rejects arrays of different concrete runtime types
+                  // even when their files are identical.
+                  !equalFileArrays(old, new_)
                 | (Some(LDefined _), LAbsent())
                 | (_, LDefined _) ->
                   true
@@ -286,9 +301,14 @@ class TLazyDir{
               if (changed) {
                 ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key))
               };
+              // The fold accumulator is the very object doGet mutated (setDir
+              // above stores it in the context and doGet re-fetches it), so
+              // returning dir threads the recomputed entry out correctly.
               dir
             } else {
-              // Default path: unconditionally propagate (current behavior).
+              // Default path: keep origin/main's exact operation order
+              // (data.remove -> updateDirtyReaders -> removeDeps) and
+              // unconditionally propagate.
               !dir.data = dir.data.remove(key);
               ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
               oldValue match {
@@ -435,7 +455,15 @@ class TLazyDir{
     | d @ Some _ -> d
     | _ -> context.unsafeMaybeGetLazyDir(dirName)
     }) match {
-    | Some(ldir) if (ldir.typed().compute == compute) ->
+    // Reuse only when the flags match too: compareOnUpdate changes update()
+    // behavior, so reusing a dir created with a different flag would silently
+    // keep the old behavior.
+    | Some(
+      ldir,
+    ) if (
+      ldir.typed().compute == compute &&
+      ldir.typed().compareOnUpdate == compareOnUpdate
+    ) ->
       if (context.debugMode) {
         print_string(`REUSING: ${dirName}`);
       };
