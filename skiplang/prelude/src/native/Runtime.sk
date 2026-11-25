@@ -71,17 +71,15 @@ private fun throwInvariantViolation(msg: String): void {
 // Physical equality: true only if the two arguments are the exact same
 // object. Definitely returns false for two different objects.
 // This function cannot be used as a replacement for equality.
-// Cf: runtime/native_eq.c (SKIP_physEq, declared in preamble{32,64}.ll)
 //
 // This is a compiler intrinsic (see IntrinsicsInliner in
-// skiplang/compiler/src/intrinsics.sk), which differentiates by argument
-// representation: pointer-represented arguments are compared by calling
-// SKIP_physEq on the two pointers, primitive arguments (Int, Bool, Float,
-// ...) are compared directly in LLVM IR, multi-slot value classes compare
-// slot by slot, and void folds to true. Routing value-class arguments
-// through the C extern would be wrong on wasm32, where such arguments are
-// erased from extern calls and the resulting signature mismatch traps at
-// link time.
+// skiplang/compiler/src/intrinsics.sk) lowered entirely to LLVM IR — no
+// runtime call: pointer-represented arguments are compared with a plain
+// pointer comparison (ptrtoint + icmp), primitive arguments (Int, Bool,
+// Float, ...) with a direct value comparison, multi-slot value classes slot
+// by slot, and void folds to true. Routing value-class arguments through a
+// C extern would be wrong on wasm32, where such arguments are erased from
+// extern calls and the resulting signature mismatch traps at link time.
 @intrinsic
 native fun phys_eq<T>(t: T, u: T): Bool;
 

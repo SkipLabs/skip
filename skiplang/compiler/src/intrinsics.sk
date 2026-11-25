@@ -362,12 +362,12 @@ mutable class .IntrinsicsInliner{
     | "Runtime.phys_eq" ->
       // Physical (pointer) equality, differentiated by argument
       // representation: pointer-represented arguments are compared with a
-      // call to SKIP_physEq (declared in the preamble; cf.
-      // skiplang/prelude/runtime/native_eq.c), while primitive arguments
-      // (Int, Bool, Float, ...) are compared directly in LLVM IR — routing
-      // value-class arguments through the C extern would erase them from
-      // the call on wasm32 and trap at link time (bitcast_invalid).
-      // Multi-slot value classes compare slot by slot; void folds to true.
+      // plain LLVM pointer comparison (ptrtoint + icmp), and primitive
+      // arguments (Int, Bool, Float, ...) are compared directly in LLVM IR
+      // as well — no C call at all, since routing value-class arguments
+      // through an extern erases them from the call on wasm32 and traps at
+      // link time (bitcast_invalid). Multi-slot value classes compare slot
+      // by slot; void folds to true.
       paramTypes = calledFunction.funType.params;
       pos.invariant(
         paramTypes.size() == a.size() && a.size() % 2 == 0,
@@ -431,24 +431,20 @@ mutable class .IntrinsicsInliner{
       st.kind match {
       | GCPointerScalarKind _
       | NonGCPointerScalarKind _ ->
-        l = this.emitCast{value => lhs, typ => tNonGCPointer, pos}.id;
-        r = this.emitCast{value => rhs, typ => tNonGCPointer, pos}.id;
-        raw = this.emitNamedCall{
-          name => "SKIP_physEq",
-          args => Array[l, r],
-          canThrow => false,
-          allocAmount => AllocNothing(),
-          typ => tInt32,
-          pos,
-        };
+        // Pointer identity: reinterpret both sides as integers (ptrtoint)
+        // and compare — pure LLVM IR, no runtime call. The integer type
+        // must match the pointer bit size (i64 on 64-bit, i32 on wasm32).
+        ptrIntTyp = if (this.config.ptrBitSize == 64) tInt else tInt32;
+        l = this.emitReinterpret{value => lhs, typ => ptrIntTyp, pos}.id;
+        r = this.emitReinterpret{value => rhs, typ => ptrIntTyp, pos}.id;
         this.emitInstr(
-          IntCmpNe{
+          IntCmpEq{
             id => this.iid(),
             typ => tBool,
             pos,
             prettyName => "phys_eq",
-            lhs => raw.id,
-            rhs => this.constantTypedInt(tInt32, 0).id,
+            lhs => l,
+            rhs => r,
           },
         ).id
       | IntegerScalarKind _ ->
