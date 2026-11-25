@@ -1273,11 +1273,18 @@ fun expand_no_params(
   cd = SkipNaming.getClass(context, resolve_tid(tid));
   (param_opt, cd.params) match {
   | (None(), N.HasParams(cp)) ->
-    wild_params = cp.params.map(_ -> {
-      wc_pat = make_wildcard_pat(pos);
-      (wc_pat.i0, wc_pat)
-    });
-    Some(wild_params)
+    if (cp.params is Mixed _) {
+      // A type-only pattern on a class with mixed constructor parameters
+      // matches opaquely: no fields are destructured (mixed patterns are
+      // rejected during typing).
+      Some((Positional(Array[]) : Parameters<TAst.ParamPattern>))
+    } else {
+      wild_params = cp.params.map(_ -> {
+        wc_pat = make_wildcard_pat(pos);
+        (wc_pat.i0, wc_pat)
+      });
+      Some(wild_params)
+    }
   | _ -> param_opt
   }
 }

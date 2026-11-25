@@ -1948,10 +1948,6 @@ fun call_(
 }
 
 /* When the callee takes mixed parameters but only one argument group was
- * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), the
- * missing group is filled with default arguments, producing a Mixed
- * argument list. */
-/* When the callee takes mixed parameters but only one argument group was
  * supplied (e.g. `f(1)` or `g{b => 1}` on `fun g(a: Int = 5){b: Int}`), promote
  * the call to a Mixed argument list (a single-group call has no source order
  * between the groups, so namedFirst is false) and share the default-argument
@@ -2423,14 +2419,18 @@ fun expr(
         if (class_ctor_has_mixed_params(context, obj_name)) {
           // 'C(1){b => "x"}' on a class with mixed constructor parameters:
           // fuse the two argument groups into a single constructor call.
-          combined = combine_mixed_call_args(inner_args, outer_args);
-          fused_mut = outer_mut match {
-          | Some _ -> outer_mut
-          | None() -> obj_mut
+          if (!obj_targs.isEmpty() && !outer_targs.isEmpty()) {
+            SkipError.error(
+              pos,
+              "A mixed call takes a single type-argument list, but two were given",
+            )
           };
+          check_no_mutable(obj_mut, pos);
+          combined = combine_mixed_call_args(inner_args, outer_args);
+          targs = if (outer_targs.isEmpty()) obj_targs else outer_targs;
           stack.push(
             NExpr{
-              expr => (pos, N.Object(fused_mut, obj_name, obj_targs, combined)),
+              expr => (pos, N.Object(outer_mut, obj_name, targs, combined)),
             },
           )
         } else {
@@ -2640,17 +2640,45 @@ fun combine_mixed_call_args(
   }
 }
 
-fun callee_has_mixed_params(acc: TUtils.Acc, ty: N.Type_): Bool {
+fun callee_has_mixed_params(
+  context: mutable SKStore.Context,
+  acc: TUtils.Acc,
+  ty: N.Type_,
+): Bool {
   Types.unfold_type(acc.subst, ty) match {
   | (_, N.Tfun(_, _, _, Mixed _, _)) -> true
-  | (_, N.Tdefault(t)) -> callee_has_mixed_params(acc, t)
+  | (_, N.Tdefault(t)) -> callee_has_mixed_params(context, acc, t)
   | (_, N.Tparam(_, _, param_id, _)) ->
     acc.tparam_constraints.findUppers(param_id).any(t ->
-      callee_has_mixed_params(acc, t)
+      callee_has_mixed_params(context, acc, t)
     )
   // Unwrap Tlambda for indirect calls (a mixed lambda stored in a variable).
-  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(acc, t)
+  | (_, N.Tlambda(_, _, _, t)) -> callee_has_mixed_params(context, acc, t)
+  | (_, N.Tnamed(_, t)) -> callee_has_mixed_params(context, acc, t)
+  // Class-object types (Concrete<C>, Class<C>, static): mixed iff the target
+  // class's constructor takes mixed parameters.
+  | (_, N.Tapply(_, (_, s), targs)) if (TAstUtils.is_class_object(s)) ->
+    (if (targs.isEmpty()) {
+      None()
+    } else {
+      maybe_class_name_of_type(acc, targs[0])
+    }) match {
+    | Some(name) -> class_ctor_has_mixed_params(context, name)
+    | None() -> false
+    }
   | _ -> false
+  }
+}
+
+// The class name of a class-object type's argument or of a plain class type.
+fun maybe_class_name_of_type(acc: TUtils.Acc, ty: N.Type_): ?N.Name {
+  Types.unfold_type(acc.subst, ty) match {
+  | (_, N.Tset(_, _, _, elts)) if (!elts.isEmpty()) -> Some(elts[0].name)
+  | (_, N.Tpromoted(_, _, _, _, n, _))
+  | (_, N.Tapply(_, n, _)) ->
+    Some(n)
+  | (_, N.Tnamed(_, t)) -> maybe_class_name_of_type(acc, t)
+  | _ -> None()
   }
 }
 
@@ -2665,7 +2693,7 @@ fun finish_mixed_call(
   base: TAst.Expr,
   mc: MixedCallState,
 ): (TUtils.Acc, TAst.Expr) {
-  if (callee_has_mixed_params(acc, TAstUtils.get_type(base))) {
+  if (callee_has_mixed_params(context, acc, TAstUtils.get_type(base))) {
     if (!mc.inner.targs.isEmpty() && !mc.outer_targs.isEmpty()) {
       SkipError.error(
         mc.inner.pos,

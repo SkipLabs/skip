@@ -1009,12 +1009,17 @@ fun close_local_scope_lambda_parameters(
   free: Free,
   params: Parameters<N.Lam_parameter>,
 ): Free {
-  error = params match {
-  | Positional _ -> true
-  | Named _ -> false
-  | Mixed _ -> true
-  };
-  params.foldl((f, par) -> f.close(par.i0, error), free)
+  // Unused positional parameters are an error; unused named parameters are
+  // not (the label is part of the lambda's interface), as for named-only
+  // lambdas and named function parameters.
+  params match {
+  | Positional _ -> params.foldl((f, par) -> f.close(par.i0, true), free)
+  | Named _ -> params.foldl((f, par) -> f.close(par.i0, false), free)
+  | Mixed(pos, named, _) ->
+    pos.foldl((f, par) -> f.close(par.i0, true), free) match {
+    | f1 -> named.reduce((f, _, par) -> f.close(par.i0, false), f1)
+    }
+  }
 }
 
 fun close_local_scope_fun_parameters(
