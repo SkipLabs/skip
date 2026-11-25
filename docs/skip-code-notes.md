@@ -39,6 +39,24 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-25 — Match extern return types to the C ABI; wrap an Int32-returning extern in an always-inlined Bool wrapper
+
+Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments.
+
+    // worse: i1 return mismatches the C i32 return -> traps on wasm32
+    @cpp_extern("SKIP_physEq")
+    native fun phys_eq<T>(T, T): Bool;
+
+    // better: raw extern matches the C ABI; small always-inlined Bool wrapper
+    @cpp_extern("SKIP_physEq")
+    @no_alloc
+    native fun physEqRaw<T>(T, T): Int32;
+
+    @always_inline
+    fun phys_eq<T>(t: T, u: T): Bool {
+      physEqRaw(t, u) != 0
+    }
+
 ### 2026-11-25 — Use the `Equality` trait for value comparison — `==` usually comes for free
 
 Source: user correction (skip#1765). The `Equality` trait
