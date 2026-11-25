@@ -39,6 +39,42 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-25 — Use the `Equality` trait for value comparison — `==` usually comes for free
+
+Source: user correction (skip#1765). The `Equality` trait
+(`skiplang/prelude/src/core/traits/Equality.sk`) supplies an overridable,
+field-wise structural `==` (and `!=`), so a class that `uses Equality` gets
+working equality without you writing any implementation — most of the time you
+never write `==` at all. And never add a `kind(): String` (or reuse `toString`)
+just to compare two values; with `Equality` on the class, callers write `a == b`
+directly. Override `==` only when structural comparison isn't what you mean; on
+a variant base class declare the override in the base body with the explicit
+base type (`fun ==(other: FieldAccess)`), not `other: this` — children inherit
+the member and `this` does not typecheck there.
+
+    // no == implementation needed — it comes from the trait:
+    value class Money(cents: Int) uses Equality
+    a == b   // true iff every field is equal
+
+    // worse: string conversion just to compare
+    prev.access.kind() != f.access.kind()
+
+    // better: custom == only when needed, declared with the explicit base type
+    base class FieldAccess uses Equality {
+      fun ==(other: FieldAccess): Bool { /* by kind, ignoring pos */ }
+    }
+    prev.access != f.access   // != also comes from the trait
+
+### 2026-11-25 — Put variant classifiers on the value class, not as statics on an unrelated class
+
+Source: user correction. A small helper that classifies, compares, or projects the variants of a value class belongs on that class itself — an instance method or a trait override in its body, where the exhaustive match over its `children` lives — not as a `static fun` on a distant class that happens to need it.
+
+    // worse: static helper on an unrelated class
+    // (on TEnv)  static fun accessKind(a: FieldAccess): String { ... }
+
+    // better: on FieldAccess itself
+    //            fun ==(other: FieldAccess): Bool { ... }
+
 ### 2026-11-24 — Never build an Array by `append` in a loop; use a mutable Vector
 
 Source: user correction. `Array.append` returns a copy, so appending n elements
