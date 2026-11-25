@@ -9,6 +9,14 @@ fun g(a: Int = 5){b: Int}: Int {
   a + b
 }
 
+fun idm<T>(x: T): T {
+  x
+}
+
+fun mk(a: Int){b: Int}: (Int) -> Int {
+  x -> x + a * 10 + b
+}
+
 class C() {
   fun m(x: Int){y: String = "d"}: String {
     y + x.toString()
@@ -25,7 +33,8 @@ fun main(): void {
   print_raw(
     `${f(1){b => "a"}}${f{b => "b"}(2)}${g{b => 1}}${g(2){b => 3}}` +
       `${c.m(3)}${c.m(4){y => "e"}}${c.m{y => "f"}(8)}` +
-      `${C::s(6){y => 7}}${C::s{y => 9}(2)}\n`,
+      `${C::s(6){y => 7}}${C::s{y => 9}(2)}` +
+      `${idm(g)(2){b => 3}}${mk(1){b => 2}(3)}\n`,
   )
 }
 module end;

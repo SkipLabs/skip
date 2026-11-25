@@ -18,5 +18,9 @@ fun main(): void {
   print_raw(`[${h(eff("9")){b => eff("10")}}]\n`);
   apply = (x: Int){f: Int -> String} -> f(x);
   print_raw(`[${apply(42){f => n -> n.toString()}}]\n`);
+  // Degenerate empty groups are just the other group.
+  e1 = (a: Int){} -> a + 1;
+  e2 = {}(a: Int) -> a + 2;
+  print_raw(`[${e1(1)}${e2(2)}]\n`);
 }
 module end;
