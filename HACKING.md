@@ -171,7 +171,10 @@ before moving to the next one.
 
 Run it interactively through the `merge-bot` skill, or unattended with
 `bin/merge-bot.sh run` (see `bin/merge-bot.sh --help`; `--dry-run` previews
-without pushing). `bin/merge-bot.sh --selftest` unit-tests the
+without pushing). `bin/merge-bot.sh board` prints a one-shot dashboard (bot
+alive?, scheduling decision, queue with per-PR buckets, in-flight worktrees,
+recent log); `bin/merge-bot.sh watch [seconds]` refreshes it live.
+`bin/merge-bot.sh --selftest` unit-tests the
 readiness/CI-estimate logic and runs as part of `make check-sh`.
 
 #### Reusing the bot from another repo
