@@ -314,6 +314,24 @@ fun tracking_modifier(
   }
 }
 
+// Print the two groups of a Mixed parameter/argument list in their recorded
+// source order, so a named-first form does not print as the different
+// positional-first form.
+fun mixed_params(
+  o: mutable BufferedPrinter.Out,
+  namedFirst: Bool,
+  printPos: () ~> void,
+  printNamed: () ~> void,
+): void {
+  if (namedFirst) {
+    printNamed();
+    printPos()
+  } else {
+    printPos();
+    printNamed()
+  }
+}
+
 fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<N.Type_>): void {
   x match {
   | Positional(tyl) ->
@@ -325,21 +343,26 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<N.Type_>): void {
     type_map(o, m);
     o.out("}")
   | Mixed(pos, named, namedFirst) ->
-    if (namedFirst) {
-      o.out("{");
-      type_map(o, named);
-      o.out("}");
-      o.out("(");
-      array(type, o, pos);
-      o.out(")")
-    } else {
-      o.out("(");
-      array(type, o, pos);
-      o.out(")");
-      o.out("{");
-      type_map(o, named);
-      o.out("}")
-    }
+    mixed_params(
+      o,
+      namedFirst,
+      () ~> {
+        o.out("(");
+        array(type, o, pos);
+        o.out(")");
+        o.out("{");
+        type_map(o, named);
+        o.out("}")
+      },
+      () ~> {
+        o.out("{");
+        type_map(o, named);
+        o.out("}");
+        o.out("(");
+        array(type, o, pos);
+        o.out(")")
+      },
+    )
   }
 }
 
@@ -412,23 +435,28 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<N.Parameter>): void {
     list(fun_parameter, o, values);
     o.out("}")
   | Mixed(pos, named, namedFirst) ->
-    if (namedFirst) {
-      o.out("{");
-      values = named.values() |> List::createFromIterator;
-      list(fun_parameter, o, values);
-      o.out("}");
-      o.out("(");
-      array(fun_parameter, o, pos);
-      o.out(")")
-    } else {
-      o.out("(");
-      array(fun_parameter, o, pos);
-      o.out(")");
-      o.out("{");
-      values = named.values() |> List::createFromIterator;
-      list(fun_parameter, o, values);
-      o.out("}")
-    }
+    mixed_params(
+      o,
+      namedFirst,
+      () ~> {
+        o.out("(");
+        array(fun_parameter, o, pos);
+        o.out(")");
+        o.out("{");
+        values = named.values() |> List::createFromIterator;
+        list(fun_parameter, o, values);
+        o.out("}")
+      },
+      () ~> {
+        o.out("{");
+        values = named.values() |> List::createFromIterator;
+        list(fun_parameter, o, values);
+        o.out("}");
+        o.out("(");
+        array(fun_parameter, o, pos);
+        o.out(")")
+      },
+    )
   }
 }
 
@@ -820,13 +848,18 @@ fun lambda_params(
   | Positional(l) -> lambda_param_array("(", ")", o, l)
   | Named(m) -> lambda_param_array("{", "}", o, m.values().collect(Array))
   | Mixed(pos, named, namedFirst) ->
-    if (namedFirst) {
-      lambda_param_array("{", "}", o, named.values().collect(Array));
-      lambda_param_array("(", ")", o, pos)
-    } else {
-      lambda_param_array("(", ")", o, pos);
-      lambda_param_array("{", "}", o, named.values().collect(Array))
-    }
+    mixed_params(
+      o,
+      namedFirst,
+      () ~> {
+        lambda_param_array("(", ")", o, pos);
+        lambda_param_array("{", "}", o, named.values().collect(Array))
+      },
+      () ~> {
+        lambda_param_array("{", "}", o, named.values().collect(Array));
+        lambda_param_array("(", ")", o, pos)
+      },
+    )
   }
 }
 
@@ -981,21 +1014,26 @@ fun object_args(o: mutable BufferedPrinter.Out, x: N.Call_args): void {
   | Mixed(pos, named, namedFirst) ->
     // Print the groups in their recorded source order so that a named-first
     // call `f{b => x}(1)` does not print as the different `f(1){b => x}`.
-    if (namedFirst) {
-      o.out("{");
-      field_list(o, named);
-      o.out("}");
-      o.out("(");
-      array(expr, o, pos.map(p -> p.i1));
-      o.out(")")
-    } else {
-      o.out("(");
-      array(expr, o, pos.map(p -> p.i1));
-      o.out(")");
-      o.out("{");
-      field_list(o, named);
-      o.out("}")
-    }
+    mixed_params(
+      o,
+      namedFirst,
+      () ~> {
+        o.out("(");
+        array(expr, o, pos.map(p -> p.i1));
+        o.out(")");
+        o.out("{");
+        field_list(o, named);
+        o.out("}")
+      },
+      () ~> {
+        o.out("{");
+        field_list(o, named);
+        o.out("}");
+        o.out("(");
+        array(expr, o, pos.map(p -> p.i1));
+        o.out(")")
+      },
+    )
   }
 }
 

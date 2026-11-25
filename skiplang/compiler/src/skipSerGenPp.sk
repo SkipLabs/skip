@@ -55,20 +55,26 @@ fun emit_encode_class_params_(
     BufferedPrinter.list(emit_param_encode, o, values)
 
   | Mixed(pos, named, namedFirst) ->
-    // Debug printer only: emit both groups in their declared order.
-    groups = if (namedFirst) {
-      Array[named.values().collect(Array), pos]
-    } else {
-      Array[pos, named.values().collect(Array)]
-    };
-    groups.each(group ->
-      BufferedPrinter.list(
-        emit_param_encode,
-        o,
-        List::createFromIterator(group.values()),
-      )
-    )
+    emit_mixed_params(emit_param_encode, o, pos, named, namedFirst)
   }
+}
+
+// Debug printer only: emit both groups in their declared order.
+fun emit_mixed_params(
+  emit: (mutable BufferedPrinter.Out, A.Parameter) -> void,
+  o: mutable BufferedPrinter.Out,
+  pos: Array<A.Parameter>,
+  named: UMap<A.Parameter>,
+  namedFirst: Bool,
+): void {
+  groups = if (namedFirst) {
+    Array[named.values().collect(Array), pos]
+  } else {
+    Array[pos, named.values().collect(Array)]
+  };
+  groups.each(group ->
+    BufferedPrinter.list(emit, o, List::createFromIterator(group.values()))
+  )
 }
 
 fun emit_decode_class_params(
@@ -96,19 +102,7 @@ fun emit_decode_class_params_(
     BufferedPrinter.list(emit_param_decode, o, values)
 
   | Mixed(pos, named, namedFirst) ->
-    // Debug printer only: emit both groups in their declared order.
-    groups = if (namedFirst) {
-      Array[named.values().collect(Array), pos]
-    } else {
-      Array[pos, named.values().collect(Array)]
-    };
-    groups.each(group ->
-      BufferedPrinter.list(
-        emit_param_decode,
-        o,
-        List::createFromIterator(group.values()),
-      )
-    )
+    emit_mixed_params(emit_param_decode, o, pos, named, namedFirst)
   }
 }
 

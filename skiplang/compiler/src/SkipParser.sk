@@ -688,12 +688,7 @@ mutable class SkipParser{
       this.delimiterGroupFollowedByArrow()
     ) {
       positional = this.parseTupleType();
-      mixed = ParseTree.MixedParametersTree{
-        range => Parser.createRangeOfTrees(named, positional),
-        positional,
-        named,
-        namedFirst => true,
-      };
+      mixed = this.mixedParametersTree(named, positional, true);
       this.parseLambdaTypeSuffix(mixed)
     } else {
       this.parseLambdaTypeSuffix(named)
@@ -855,12 +850,7 @@ mutable class SkipParser{
       // '(T1, ...){ n1: T1, ...} -> T' — the brace group is followed by an
       // arrow, so it is a named parameter type group.
       named = this.parseNamedLambdaTypeParameters();
-      mixed = ParseTree.MixedParametersTree{
-        range => Parser.createRangeOfTrees(primary, named),
-        positional => primary,
-        named,
-        namedFirst => false,
-      };
+      mixed = this.mixedParametersTree(primary, named, false);
       this.parseLambdaTypeSuffix(mixed)
     } else {
       this.checkParenTypes(primary);
@@ -1557,43 +1547,62 @@ mutable class SkipParser{
     }
   }
 
+  // Build a MixedParametersTree from the two groups given in source order.
+  fun mixedParametersTree(
+    first: ParseTree,
+    second: ParseTree,
+    namedFirst: Bool,
+  ): ParseTree {
+    ParseTree.MixedParametersTree{
+      range => Parser.createRangeOfTrees(first, second),
+      positional => if (namedFirst) second else first,
+      named => if (namedFirst) first else second,
+      namedFirst,
+    }
+  }
+
+  // The OPEN_PAREN arm shared by function and constructor parameter
+  // specifiers: positional parameters, then a named group when the following
+  // '{' is a parameter group rather than the body.
+  mutable fun parseMaybeMixedPositionalFirst(isCtor: Bool): ParseTree {
+    positional = this.parsePositionalParameters(isCtor);
+    namedGroupStartsHere = if (isCtor) {
+      // A '{' after positional constructor parameters starts a named ctor
+      // parameter group when it contains a named ctor parameter (possibly
+      // with modifiers/annotations), otherwise it is the class body.
+      this.ctorNamedGroupStartsHere()
+    } else {
+      this.namedParameterGroupStartsHere()
+    };
+    if (this.peekKind(TokenKind.OPEN_CURLY()) && namedGroupStartsHere) {
+      named = this.parseNamedParameters(isCtor);
+      this.mixedParametersTree(positional, named, false)
+    } else {
+      positional
+    }
+  }
+
+  // The OPEN_CURLY arm shared by function and constructor parameter
+  // specifiers: a '(' directly after a non-empty named group starts the
+  // positional group of a named-first mixed declaration.
+  mutable fun parseMaybeMixedNamedFirst(isCtor: Bool): ParseTree {
+    named = this.parseNamedParameters(isCtor);
+    namedIsEmpty = named match {
+    | ParseTree.NamedParametersTree{parameters} -> parameters.isEmptyList()
+    | _ -> false
+    };
+    if (!namedIsEmpty && this.peekKind(TokenKind.OPEN_PAREN())) {
+      positional = this.parsePositionalParameters(isCtor);
+      this.mixedParametersTree(named, positional, true)
+    } else {
+      named
+    }
+  }
+
   mutable fun parseConstructorParameters(): ParseTree {
     this.peek() match {
-    | TokenKind.OPEN_PAREN() ->
-      positional = this.parsePositionalParameters(true);
-      // A '{' after the positional constructor parameters starts a named
-      // constructor parameter group when it contains a named ctor parameter
-      // (possibly with modifiers/annotations), otherwise it is the class body.
-      if (this.ctorNamedGroupStartsHere()) {
-        named = this.parseNamedParameters(true);
-        ParseTree.MixedParametersTree{
-          range => Parser.createRangeOfTrees(positional, named),
-          positional,
-          named,
-          namedFirst => false,
-        }
-      } else {
-        positional
-      }
-    | TokenKind.OPEN_CURLY() ->
-      named = this.parseNamedParameters(true);
-      // A '(' directly after a non-empty named constructor parameter group can
-      // only start the positional group of a named-first mixed constructor.
-      namedIsEmpty = named match {
-      | ParseTree.NamedParametersTree{parameters} -> parameters.isEmptyList()
-      | _ -> false
-      };
-      if (!namedIsEmpty && this.peekKind(TokenKind.OPEN_PAREN())) {
-        positional = this.parsePositionalParameters(true);
-        ParseTree.MixedParametersTree{
-          range => Parser.createRangeOfTrees(named, positional),
-          positional,
-          named,
-          namedFirst => true,
-        }
-      } else {
-        named
-      }
+    | TokenKind.OPEN_PAREN() -> this.parseMaybeMixedPositionalFirst(true)
+    | TokenKind.OPEN_CURLY() -> this.parseMaybeMixedNamedFirst(true)
     // Class body checked before in parseConstructorDeclarationOpt
     | _ -> invariant_violation("Expected { or ( for constructor: ")
     }
@@ -2543,44 +2552,8 @@ mutable class SkipParser{
 
   mutable fun parseParametersSpecifier(): ParseTree {
     this.peek() match {
-    | TokenKind.OPEN_PAREN() ->
-      positional = this.parsePositionalParameters(false);
-      if (
-        this.peekKind(TokenKind.OPEN_CURLY()) &&
-        this.namedParameterGroupStartsHere()
-      ) {
-        named = this.parseNamedParameters(false);
-        ParseTree.MixedParametersTree{
-          range => Parser.createRangeOfTrees(positional, named),
-          positional,
-          named,
-          namedFirst => false,
-        }
-      } else {
-        positional
-      }
-    | TokenKind.OPEN_CURLY() ->
-      named = this.parseNamedParameters(false);
-      // A '(' directly after a non-empty named parameter group can only start
-      // the positional group of a named-first mixed declaration (the return
-      // type annotation needs a ':' first, so this never misfires on one).
-      // An empty named group stays a plain named declaration, so that
-      // `fun f{}(a: Int)` errors like the positional-first `fun f(a: Int){}`.
-      namedIsEmpty = named match {
-      | ParseTree.NamedParametersTree{parameters} -> parameters.isEmptyList()
-      | _ -> false
-      };
-      if (!namedIsEmpty && this.peekKind(TokenKind.OPEN_PAREN())) {
-        positional = this.parsePositionalParameters(false);
-        ParseTree.MixedParametersTree{
-          range => Parser.createRangeOfTrees(named, positional),
-          positional,
-          named,
-          namedFirst => true,
-        }
-      } else {
-        named
-      }
+    | TokenKind.OPEN_PAREN() -> this.parseMaybeMixedPositionalFirst(false)
+    | TokenKind.OPEN_CURLY() -> this.parseMaybeMixedNamedFirst(false)
     | _ -> this.errorResult(errorExpectedParameters, "Expected parameters")
     }
   }
@@ -2873,12 +2846,7 @@ mutable class SkipParser{
           "Expected typed lambda parameter. Lambda parameters must be consistent in including type annotations.",
         )
       };
-      ParseTree.MixedParametersTree{
-        range => Parser.createRangeOfTrees(named, positional),
-        positional,
-        named,
-        namedFirst => true,
-      }
+      this.mixedParametersTree(named, positional, true)
     } else {
       named
     };
@@ -3250,12 +3218,7 @@ mutable class SkipParser{
           "Expected typed lambda parameter. Lambda parameters must be consistent in including type annotations.",
         )
       };
-      mixed = ParseTree.MixedParametersTree{
-        range => Parser.createRangeOfTrees(parameters, named),
-        positional => parameters,
-        named,
-        namedFirst => false,
-      };
+      mixed = this.mixedParametersTree(parameters, named, false);
       this.parseLambdaExpressionSuffix(mixed, startToken)
     } else {
       listValues = parameters.getList();

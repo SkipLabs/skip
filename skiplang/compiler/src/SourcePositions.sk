@@ -196,29 +196,40 @@ mutable class Builder{
         tree.range.start,
         constructor.concat(Array["start"]),
       );
-      fields = parameters match {
-      | ParseTree.NamedParametersTree{parameters => entries}
+      (posEntries, namedEntries, namedFirst) = parameters match {
+      | ParseTree.NamedParametersTree{parameters => entries} ->
+        (Array[], entries.getList(), false)
       | ParseTree.PositionalParametersTree{parameters => entries} ->
-        entries.getList()
+        (entries.getList(), Array[], false)
       | ParseTree.MixedParametersTree{positional, named, namedFirst} ->
-        posEntries = positional match {
-        | ParseTree.PositionalParametersTree{parameters => entries} ->
-          entries.getList()
-        | _ -> invariant_violation("Unexpected constructor parameters")
-        };
-        namedEntries = named match {
-        | ParseTree.NamedParametersTree{parameters => entries} ->
-          entries.getList()
-        | _ -> invariant_violation("Unexpected constructor parameters")
-        };
-        if (namedFirst) {
-          namedEntries.concat(posEntries)
-        } else {
-          posEntries.concat(namedEntries)
-        }
+        (
+          (positional as ParseTree.PositionalParametersTree _).parameters.getList(),
+          (named as ParseTree.NamedParametersTree _).parameters.getList(),
+          namedFirst,
+        )
       | _ -> invariant_violation("Unexpected constructor parameters")
       };
-      fields.eachWithIndex((i, field) -> this.visit(field, constructor, i));
+      // Visit fields in source order, but anchor anonymous positional fields by
+      // their index within the positional group (matching the AST), so adding a
+      // named field does not move them.
+      fields = if (namedFirst) {
+        namedEntries.concat(posEntries)
+      } else {
+        posEntries.concat(namedEntries)
+      };
+      namedCount = namedEntries.size();
+      fields.eachWithIndex((i, field) -> {
+        idx = field match {
+        | ParseTree.PositionalParameterTree _ ->
+          if (namedFirst) {
+            i - namedCount
+          } else {
+            i
+          }
+        | _ -> -1
+        };
+        this.visit(field, constructor, idx)
+      });
       this.mark(
         tree.range.end,
         tree.range.end,
