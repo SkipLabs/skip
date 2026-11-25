@@ -122,6 +122,21 @@ Just like in any other cache, the values are automatically evicted if they are n
 The cache eviction policy is programmable (cf `Handle.sk`).
 Note that lazy directories are very handy to implement recursive definitions because they pass around a reference to themselves (the parameter `self` of the lambda above).
 
+A variant of `LHandle` is `MHandle::create`, a memoizing lazy handle. It behaves like `LHandle`, except that when a dependency changes, the entry is eagerly recomputed during the update and the new value is compared to the old one: downstream directories are only invalidated when the value actually changed.
+Use it when the compute function is cheap relative to the downstream work it gates (e.g. a `stat()` call that gates expensive file reads):
+
+```
+myMemoDir = MHandle::create(
+  IID::keyType,
+  IntFile::type,
+  context,
+  "/myMemoDirName/",
+  (context, self, key) ~> {
+    Array[/* some value */]
+  }
+)
+```
+
 # Guarantees
 
 SKStore is a simple yet powerful API to define reactive systems.
