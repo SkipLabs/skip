@@ -39,6 +39,30 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-25 — Put variant classifiers on the value class, not as statics on an unrelated class
+
+Source: user correction. A small helper that classifies, compares, or projects the variants of a value class belongs on that class itself — an instance method or a trait override in its body, where the exhaustive match over its `children` lives — not as a `static fun` on a distant class that happens to need it.
+
+    // worse: static helper on an unrelated class
+    // (on TEnv)  static fun accessKind(a: FieldAccess): String { ... }
+
+    // better: on FieldAccess itself
+    //            fun ==(other: FieldAccess): Bool { ... }
+
+### 2026-11-25 — Compare values with the Equality trait, not by converting to String
+
+Source: user correction. Don't add a `kind(): String` (or reuse `toString`) just to compare two values — make the class `uses Equality` and override `==` so callers write `a == b` directly. When overriding `==` on a variant base class, declare it in the base body with the explicit base type (`fun ==(other: FieldAccess)`), not `other: this` — children inherit the member and `this` does not typecheck there.
+
+    // worse: string conversion just to compare
+    prev.access.kind() != f.access.kind()
+
+    // better: Equality on the class, callers compare values
+    base class FieldAccess uses Equality {
+      fun ==(other: FieldAccess): Bool { /* by kind, ignoring pos */ }
+      fun !=(other: FieldAccess): Bool { !(this == other) }
+    }
+    prev.access != f.access
+
 ### 2026-11-24 — Never build an Array by `append` in a loop; use a mutable Vector
 
 Source: user correction. `Array.append` returns a copy, so appending n elements
