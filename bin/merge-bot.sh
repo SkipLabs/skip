@@ -692,21 +692,26 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)] [$3=expected head
             printf '%s' "{\"pr\":$n,\"result\":\"ci-failed\",\"failed\":\"$failed\"}"
             return "$EXIT_CI_FAILED"
         fi
-        # Stale race: main moved again while we were waiting and CI on the head
-        # is complete (nothing pending) — with strict required checks GitHub
-        # will not merge a BEHIND PR, so report STALE so the caller re-rebases.
+        # Stale/dirty detection, two cases:
+        #  - CONFLICTING / DIRTY: the head genuinely conflicts with main right
+        #    now, so CI can never make it mergeable — report STALE immediately,
+        #    even while CI is still pending and even if the head is not the one
+        #    we pushed (the branch may have been force-pushed back). Waiting
+        #    for CI here is pointless.
+        #  - BEHIND: main moved while we were waiting. Only report STALE once
+        #    CI on the head is complete (nothing pending), with guards against
+        #    the post-push recomputation lag (rollup may still show the
+        #    previous head's completed checks; GitHub may transiently report
+        #    BEHIND): require a non-empty rollup and, when an expected head
+        #    was given, that it is the current PR head.
         pending=$(jq -r '[.statusCheckRollup[]?
             | select((.__typename == "StatusContext" and ((.state // "") | IN("PENDING", "EXPECTED", "REQUESTED")))
                      or (.__typename == "CheckRun" and ((.status // "") | IN("QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED"))))]
             | length' <<<"$j")
         stale=false
-        if [ "$pending" = "0" ] && { [ "$mss" = "BEHIND" ] || [ "$mss" = "DIRTY" ] || [ "$mergeable" = "CONFLICTING" ]; }; then
-            # Guard against false positives right after a push: the rollup
-            # may still show the previous head's completed checks (or be
-            # empty while the new pipeline's checks register), and GitHub may
-            # transiently report BEHIND. Only call it stale when the rollup
-            # is non-empty and, when an expected head was given, it is the
-            # current PR head.
+        if [ "$mergeable" = "CONFLICTING" ] || [ "$mss" = "DIRTY" ]; then
+            stale=true
+        elif [ "$pending" = "0" ] && [ "$mss" = "BEHIND" ]; then
             local rollup_len head_ok
             rollup_len=$(jq -r '(.statusCheckRollup // []) | length' <<<"$j")
             head_ok=true
@@ -718,7 +723,7 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)] [$3=expected head
             fi
         fi
         if [ "$stale" = true ]; then
-            log "PR $n: staled while waiting (mergeStateStatus=$mss mergeable=$mergeable, CI complete)"
+            log "PR $n: staled/dirty while waiting (mergeStateStatus=$mss mergeable=$mergeable pending=$pending)"
             printf '%s' "{\"pr\":$n,\"result\":\"stale\"}"
             return "$EXIT_STALE"
         fi
