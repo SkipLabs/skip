@@ -122,10 +122,9 @@ fun type(o: mutable BufferedPrinter.Out, ty: T.Type_): void {
 // source order, so a named-first form does not print as the different
 // positional-first form.
 fun mixed_params(
-  o: mutable BufferedPrinter.Out,
   namedFirst: Bool,
-  printPos: () ~> void,
-  printNamed: () ~> void,
+  printPos: () -> void,
+  printNamed: () -> void,
 ): void {
   if (namedFirst) {
     printNamed();
@@ -148,9 +147,8 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<T.Type_>): void {
     o.out("}")
   | Mixed(pos, named, namedFirst) ->
     mixed_params(
-      o,
       namedFirst,
-      () ~> {
+      () -> {
         o.out("(");
         array(type, o, pos);
         o.out(")");
@@ -158,7 +156,7 @@ fun type_params(o: mutable BufferedPrinter.Out, x: Parameters<T.Type_>): void {
         type_map(o, named);
         o.out("}")
       },
-      () ~> {
+      () -> {
         o.out("{");
         type_map(o, named);
         o.out("}");
@@ -235,9 +233,8 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<T.Parameter>): void {
     o.out("}")
   | Mixed(pos, named, namedFirst) ->
     mixed_params(
-      o,
       namedFirst,
-      () ~> {
+      () -> {
         o.out("(");
         array(fun_parameter, o, pos);
         o.out(")");
@@ -246,7 +243,7 @@ fun params(o: mutable BufferedPrinter.Out, x: Parameters<T.Parameter>): void {
         BufferedPrinter.list(fun_parameter, o, values);
         o.out("}")
       },
-      () ~> {
+      () -> {
         o.out("{");
         values = named.values() |> List::createFromIterator;
         BufferedPrinter.list(fun_parameter, o, values);
@@ -639,13 +636,12 @@ fun lambda_params(
   | Named(m) -> lambda_param_array("{", "}", o, m.values().collect(Array))
   | Mixed(pos, named, namedFirst) ->
     mixed_params(
-      o,
       namedFirst,
-      () ~> {
+      () -> {
         lambda_param_array("(", ")", o, pos);
         lambda_param_array("{", "}", o, named.values().collect(Array))
       },
-      () ~> {
+      () -> {
         lambda_param_array("{", "}", o, named.values().collect(Array));
         lambda_param_array("(", ")", o, pos)
       },
@@ -823,9 +819,8 @@ fun object_args(o: mutable BufferedPrinter.Out, x: T.Call_args): void {
     // Print the groups in their recorded source order so that a named-first
     // call `f{b => x}(1)` does not print as the different `f(1){b => x}`.
     mixed_params(
-      o,
       namedFirst,
-      () ~> {
+      () -> {
         o.out("(");
         array(expr, o, pos.map(p -> p.i1));
         o.out(")");
@@ -833,7 +828,7 @@ fun object_args(o: mutable BufferedPrinter.Out, x: T.Call_args): void {
         field_list(o, named);
         o.out("}")
       },
-      () ~> {
+      () -> {
         o.out("{");
         field_list(o, named);
         o.out("}");
