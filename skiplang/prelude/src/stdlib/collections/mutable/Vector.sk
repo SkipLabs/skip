@@ -1644,6 +1644,23 @@ private mutable class ValuesIterator<V>
   protected readonly fun getItemValue(index: Int): V {
     unsafeGet(this.inner, index)
   }
+
+  mutable fun toArray(): Array<V> {
+    vector = this.vector;
+    index = this.indexMinusGeneration + vector.generation_PRIVATE;
+
+    if (index.uge(this.sz)) {
+      // See VectorIterator#next
+      if (index >= generationSkip) {
+        throwContainerChanged()
+      };
+      Array[]
+    } else {
+      sz = this.sz - index;
+      this.!indexMinusGeneration = this.indexMinusGeneration + sz;
+      Array::fillBy(sz, j -> unsafeGet(this.inner, index + j))
+    }
+  }
 }
 
 private mutable class ItemsIterator<V>

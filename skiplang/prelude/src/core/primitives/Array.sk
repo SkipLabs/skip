@@ -819,6 +819,17 @@ private mutable class ValuesIterator<V>
   protected readonly fun getItemValue(index: Int): V {
     Unsafe.array_get(this.v, index)
   }
+
+  mutable fun toArray(): Array<V> {
+    sz = this.sz - this.i;
+    if (sz > 0) {
+      base = this.i;
+      this.!i = this.sz;
+      Array::fillBy(sz, j -> this.v[base + j])
+    } else {
+      Array[]
+    }
+  }
 }
 
 private mutable class ItemsIterator<V>
