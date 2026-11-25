@@ -149,13 +149,15 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
             this.treeToString(named),
         )
       };
-      if (posTypes.isEmpty() || namedTypes.isEmpty()) {
-        SkipError.error(
-          this.convertRange(tree.range),
-          "A mixed function type cannot have an empty positional or named parameter group",
-        )
-      };
-      Mixed(posTypes, namedTypes, namedFirst)
+      // An empty group makes the mixed form degenerate: it is just the other
+      // group (`(Int){} -> T` is `(Int) -> T`).
+      if (posTypes.isEmpty()) {
+        Named(namedTypes)
+      } else if (namedTypes.isEmpty()) {
+        Positional(posTypes)
+      } else {
+        Mixed(posTypes, namedTypes, namedFirst)
+      }
     | _ -> Positional(Array[this.convertType_(tree)])
     }
   }
@@ -1710,20 +1712,23 @@ class Converter{file: FileCache.InputSource, positions: SourcePositions.Index} {
           "Unexpected named lambda parameters: " + this.treeToString(named),
         )
       };
-      if (posList.isEmpty() || namedList.isEmpty()) {
-        SkipError.error(
-          this.convertRange(tree.range),
-          "A mixed lambda parameter list cannot have an empty positional or named parameter group",
-        )
-      };
       positionalParams = posList.map(this.convertLambdaParameter);
-      this.checkPositionalParamNames(positionalParams.map(p -> p.i0));
       namedParams = UMap::createFromItems(
         namedList.map(parameter ~> {
           param = this.convertLambdaParameter(parameter);
           (param.i0, param)
         }),
       );
+      // An empty group makes the mixed form degenerate: it is just the other
+      // group (`(a){} -> b` is `(a) -> b`).
+      if (posList.isEmpty()) {
+        return Named(namedParams)
+      };
+      if (namedList.isEmpty()) {
+        this.checkPositionalParamNames(positionalParams.map(p -> p.i0));
+        return Positional(positionalParams)
+      };
+      this.checkPositionalParamNames(positionalParams.map(p -> p.i0));
       // Lambdas cannot have duplicate names across the two groups. Insert in
       // source order so duplicate spans point forward; a bare '_' is a
       // placeholder and may repeat.

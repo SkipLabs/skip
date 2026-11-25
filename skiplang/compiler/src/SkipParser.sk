@@ -2839,12 +2839,10 @@ mutable class SkipParser{
     start = this.mark();
     modifiers = ParseTree.EmptyTree{range => this.createRangeAfter()};
     named = this.parseNamedLambdaParameters(false);
-    // A '(' directly after a non-empty named parameter group starts the
-    // positional group of a named-first mixed lambda ('{b}(a) -> ...').
-    parameters = if (
-      this.peekKind(TokenKind.OPEN_PAREN()) &&
-      !this.namedParametersList(named).isEmpty()
-    ) {
+    // A '(' directly after a named parameter group starts the positional
+    // group of a named-first mixed lambda ('{b}(a) -> ...'); an empty named
+    // group is degenerate and is dropped during conversion.
+    parameters = if (this.peekKind(TokenKind.OPEN_PAREN())) {
       positional = this.parsePositionalLambdaParameters();
       this.ensureIsLambdaParameters(positional);
       if (
