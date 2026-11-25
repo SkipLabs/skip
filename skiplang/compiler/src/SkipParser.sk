@@ -2771,6 +2771,17 @@ mutable class SkipParser{
     start = this.mark();
     name = this.eatTree(TokenKind.NONTYPE_IDENTIFIER());
     colonTypeSpecifier = this.parseColonTypeSpecifierOpt();
+    if (this.peekKind(TokenKind.EQUAL())) {
+      // Lambda parameters cannot have default values (unlike function and
+      // constructor parameters); consume the initializer so the error is
+      // reported here instead of derailing the rest of the parse.
+      defaultValue = this.parseInitializer();
+      this.addErrorAtTree(
+        defaultValue,
+        errorNoLambdaParamDefaultValue,
+        "Lambda parameters may not have a default value",
+      )
+    };
     ParseTree.LambdaParameterTree{
       range => this.createRange(start),
       name,
@@ -5319,6 +5330,12 @@ mutable class SkipParser{
       this.ensureIsExpression(left);
       this.ensureIsExpression(right)
     | ParseTree.UnaryExpressionTree{operand} -> this.ensureIsExpression(operand)
+    | ParseTree.MixedParametersTree _ ->
+      this.addErrorAtTree(
+        orig_expression,
+        errorMissingExpression,
+        "Expression expected",
+      )
     | _ ->
       invariant_violation(
         "Unexpected expression or lvalue tree: " +
