@@ -41,6 +41,10 @@
 #                                                    fastest expected CI first
 #                        {"action":"idle"}         nothing ready
 #   status <pr>          Print the PR's current state as JSON
+#   board                One-shot dashboard: bot alive?, scheduling decision,
+#                        queue (per-PR bucket: rebase / wait-merge / ci-running /
+#                        ignored-red), in-flight worktrees, recent log lines
+#   watch [seconds]      Refreshing dashboard (default 15s); Ctrl-C to stop
 #   prepare <pr>         Rebase the PR onto origin/main in the bot's worktree.
 #                        Exit 0 = rebased cleanly (JSON on stdout);
 #                        exit 10 = conflicts, worktree left mid-rebase (JSON
@@ -342,6 +346,29 @@ elif ([.[] | select(.needsRebase)] | length) > 0 then
 else
   {action: "idle"}
 end'
+
+# Input: array of PR objects (gh pr list). Output: dashboard rows for all
+# auto-merge PRs: bucket = rebase | wait-merge | ci-running | ignored-red.
+# shellcheck disable=SC2016
+JQ_DASH="$JQ_DEFS"'
+[ .[]
+  | select(.autoMergeRequest != null and (.isDraft | not))
+  | . as $pr
+  | (ci_state) as $cs
+  | (needs_rebase) as $nr
+  | {
+      number, title,
+      branch: .headRefName,
+      mss: .mergeStateStatus,
+      ci: $cs,
+      failed: failed_checks,
+      est: ci_est,
+      bucket: (if $cs == "red" then "ignored-red"
+               elif $cs == "pending" then "ci-running"
+               elif ($nr | not) then "wait-merge"
+               else "rebase" end)
+    }
+] | sort_by((.bucket as $b | {"rebase": 0, "wait-merge": 1, "ci-running": 2, "ignored-red": 3}[$b]), .est, .number)'
 }
 
 build_jq_programs
@@ -377,6 +404,76 @@ cmd_pick() {
 cmd_status() {
     resolve_repo
     ghw pr view "$1" --json number,state,title,headRefName,headRefOid,mergeStateStatus,mergeable,isDraft,autoMergeRequest,statusCheckRollup
+}
+
+# ---------------------------------------------------------------------------
+# dashboard: board (one-shot) / watch (refreshing)
+# ---------------------------------------------------------------------------
+
+cmd_board() {
+    resolve_repo
+    local now lockdir pid alive dec prs dash w
+    now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    alive="not running (no lock)"
+    lockdir="$STATE_DIR/lock.d"
+    if [ -d "$lockdir" ]; then
+        pid=$(cat "$lockdir/pid" 2>/dev/null || true)
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            alive="RUNNING (pid $pid)"
+        else
+            alive="not running (stale lock, pid ${pid:-?})"
+        fi
+    fi
+    dec=$(cmd_pick 2>/dev/null || echo '{"action":"error"}')
+    echo "merge-bot board — $now  repo=$REPO"
+    echo "bot: $alive   state-dir: $STATE_DIR"
+    echo "decision: $(printf '%s' "$dec" | jq -c .)"
+    echo
+    echo "queue (open PRs with auto-merge):"
+    prs=$(ghw pr list --state open --limit 100 \
+        --json number,title,headRefName,autoMergeRequest,isDraft,mergeStateStatus,mergeable,statusCheckRollup,files)
+    dash=$(printf '%s' "$prs" | jq "$JQ_DASH")
+    if [ "$(jq 'length' <<<"$dash")" = "0" ]; then
+        echo "  (none)"
+    else
+        printf '%s' "$dash" | jq -r '.[] |
+            "  #\(.number)  \(.bucket)\t" +
+            (if .bucket == "ignored-red" then "failed: \(.failed | join(","))"
+             else "est-CI=\(.est)s" end) +
+            "\t\(.mss)\t\(.title)"'
+    fi
+    echo
+    echo "in-flight worktrees:"
+    if [ -d "$STATE_DIR/work" ] && [ -n "$(ls -A "$STATE_DIR/work" 2>/dev/null)" ]; then
+        for w in "$STATE_DIR/work"/*/; do
+            [ -d "$w" ] || continue
+            local head branch dirty
+            head=$(git -C "$w" rev-parse --short HEAD 2>/dev/null || echo '?')
+            branch=$(git -C "$w" branch --show-current 2>/dev/null || true)
+            dirty=no
+            if [ -n "$(git -C "$w" status --porcelain 2>/dev/null)" ]; then dirty=yes; fi
+            echo "  $(basename "$w")  head=$head  branch=${branch:-<detached>}  dirty=$dirty"
+        done
+    else
+        echo "  (none)"
+    fi
+    echo
+    echo "last log lines:"
+    if [ -f "$LOG_FILE" ]; then
+        tail -n 12 "$LOG_FILE" | sed 's/^/  /'
+    else
+        echo "  (no log yet)"
+    fi
+}
+
+cmd_watch() {
+    local interval=${1:-15}
+    trap 'echo; exit 0' INT TERM
+    while :; do
+        printf '\033[2J\033[H'
+        cmd_board
+        sleep "$interval"
+    done
 }
 
 # ---------------------------------------------------------------------------
@@ -1179,6 +1276,10 @@ cmd_selftest() {
     check "pick: nothing ready -> idle" \
         '{"action":"idle"}' "$(jq -c "$JQ_PICK" <<<"[]")"
 
+    check "board: buckets (rebase first by est, then wait-merge, ci-running, ignored-red)" \
+        "6,13,2,9,8,7,1,11,10,12,3|rebase,rebase,rebase,rebase,rebase,rebase,wait-merge,ci-running,ci-running,ci-running,ignored-red" \
+        "$(jq "$JQ_DASH" <<<"$fx" | jq -r '[.[] | {n: .number, b: .bucket}] | ([.[].n] | join(",")) + "|" + ([.[].b] | join(","))')"
+
     # MERGE_BOT_PATH_EST override: rebuild with a custom path_est body, check
     # it is honored, then restore the environment-derived defs.
     # shellcheck disable=SC2016 # single quotes intentional: jq program, not shell
@@ -1231,6 +1332,8 @@ main() {
         scan) cmd_scan "$@" ;;
         pick) cmd_pick "$@" ;;
         status) cmd_status "$@" ;;
+        board) cmd_board "$@" ;;
+        watch) cmd_watch "$@" ;;
         prepare) cmd_prepare "$@" ;;
         push) cmd_push "$@" ;;
         abort) cmd_abort "$@" ;;
