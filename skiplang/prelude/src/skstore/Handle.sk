@@ -448,6 +448,39 @@ class LHandle<K: Key, +V: File> extends Handle<K, V> {
 }
 
 /*****************************************************************************/
+/* A memoizing lazy handle. Like LHandle, entries are computed lazily. But
+ * when a dependency changes, the entry is eagerly recomputed during update
+ * and the result is compared with the old value using native_eq. Downstream
+ * dirs are only invalidated when the value actually changed.
+ *
+ * Use this when the compute function is cheap relative to downstream work
+ * (e.g., a stat() call that gates expensive file reads).
+ */
+/*****************************************************************************/
+
+class MHandle<K: Key, +V: File> extends Handle<K, V> {
+  static fun create(
+    keyType: Key ~> K,
+    type: File ~> V,
+    context: mutable Context,
+    dirName: DirName,
+    f: (mutable Context, MHandle<K, V>, K) ~> Array<V>,
+    collect: Bool = true,
+  ): MHandle<K, V> {
+    dir = TLazyDir::create(
+      context,
+      dirName,
+      (context, dirName, key) ~> {
+        Some(f(context, MHandle(keyType, type, dirName), keyType(key)));
+      },
+      collect,
+      true, // compareOnUpdate
+    );
+    MHandle(keyType, type, dir.getDirName())
+  }
+}
+
+/*****************************************************************************/
 /* Eager handles. */
 /*****************************************************************************/
 

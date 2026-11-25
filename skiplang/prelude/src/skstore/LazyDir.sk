@@ -17,6 +17,13 @@ base class LazyResult<F> {
   | LAbsent()
 }
 
+// doGet can only return LDefined or LAbsent, never LRemoved or LCycle.
+// LazyComputed<F> encodes this invariant in the type system.
+base class LazyComputed<F> extends LazyResult<F>
+
+extension class LDefined extends LazyComputed<F>
+extension class LAbsent extends LazyComputed<F>
+
 base class LazyCompute<K: frozen, F: frozen> uses Unsafe.Downcastable, Equality{
   fun compute(mutable Context, DirName, K): ?Array<F>;
 }
@@ -56,6 +63,9 @@ base class LazyDir protected {protected collect: Bool} extends Dir {
 class TLazyDir{
   protected data: SortedMap<Key, LazyResult<File>> = SortedMap[],
   protected compute: LazyCompute<Key, File>,
+  // When true, update() eagerly recomputes dirty entries and only propagates
+  // to downstream readers when the recomputed value actually changed.
+  protected compareOnUpdate: Bool = false,
   // Fixed with the directory, including snapshots. This changes only cache
   // maintenance, never the retention window or dependency invalidation.
   private deltaRetention: Bool = Environ.varOpt(
@@ -232,20 +242,88 @@ class TLazyDir{
               path = Path::create(dirtyReaderDirName, key);
               print_string(`INVALIDATED LAZY: ${path} (dependency changed)`)
             };
-            !dir.data = dir.data.remove(key);
-            ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
-            oldValue match {
-            | Some(LDefined(_, reads))
-            | Some(LRemoved(reads)) ->
-              arrow = TArrowKey::create{
-                parentName => dir.dirName,
-                childName => dir.dirName,
-                key,
+            if (dir.compareOnUpdate) {
+              // compareOnUpdate path: remove old deps before the eager
+              // recomputation below registers new deps (they must not be
+              // removed along with the old ones), then only propagate to
+              // downstream readers if the recomputed value actually changed.
+              oldValue match {
+              | Some(LDefined(_, reads))
+              | Some(LRemoved(reads)) ->
+                arrow = TArrowKey::create{
+                  parentName => dir.dirName,
+                  childName => dir.dirName,
+                  key,
+                };
+                ctx.removeDeps(arrow, reads.iterator())
+              | _ -> void
               };
-              ctx.removeDeps(arrow, reads.iterator())
-            | _ -> void
-            };
-            dir
+              !dir.data = dir.data.remove(key);
+              changed = if (oldValue is Some(LDefined _)) {
+                // Eagerly recompute and compare. Skip when the old value was
+                // LRemoved (GC'd) — no point recomputing an entry nobody is
+                // reading; it will be recomputed on demand.
+                ctx.setDir(dir);
+                arrowKey = TArrowKey::create{
+                  parentName => dir.dirName,
+                  childName => dir.dirName,
+                  key,
+                };
+                ctx.enter(arrowKey, dir.timeStack);
+                newResult = try {
+                  dir.doGet(ctx, key)
+                } catch {
+                | exn ->
+                  // Keep arrowStack balanced when compute throws (doGet has
+                  // already cached LAbsent, so the entry recomputes on demand).
+                  ctx.leave(arrowKey);
+                  throw exn
+                };
+                ctx.leave(arrowKey);
+                // newResult is LazyComputed, so only LDefined/LAbsent occur on
+                // the right; the `_` on oldValue is required (the guard above
+                // does not narrow ?LazyResult) and correct — every other
+                // variant means "changed".
+                (oldValue, newResult) match {
+                | (Some(LDefined(old, _)), LDefined(new_, _)) ->
+                  // equalFileArrays rather than whole-array native_eq: the
+                  // latter rejects arrays of different concrete runtime types
+                  // even when their files are identical.
+                  !equalFileArrays(old, new_)
+                | (Some(LDefined _), LAbsent())
+                | (_, LDefined _) ->
+                  true
+                | (_, LAbsent()) -> false
+                }
+              } else {
+                true
+              };
+              if (changed) {
+                ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key))
+              };
+              // The fold accumulator is the very object doGet mutated (setDir
+              // above stores it in the context and doGet re-fetches it), so
+              // returning dir threads the recomputed entry out correctly.
+              dir
+            } else {
+              // Default path: keep origin/main's exact operation order
+              // (data.remove -> updateDirtyReaders -> removeDeps) and
+              // unconditionally propagate.
+              !dir.data = dir.data.remove(key);
+              ctx.updateDirtyReaders(Path::create(dirtyReaderDirName, key));
+              oldValue match {
+              | Some(LDefined(_, reads))
+              | Some(LRemoved(reads)) ->
+                arrow = TArrowKey::create{
+                  parentName => dir.dirName,
+                  childName => dir.dirName,
+                  key,
+                };
+                ctx.removeDeps(arrow, reads.iterator())
+              | _ -> void
+              };
+              dir
+            }
           },
         )
       }
@@ -254,7 +332,7 @@ class TLazyDir{
     context.setDir(this);
   }
 
-  protected fun doGet(context: mutable Context, key: Key): LazyResult<File> {
+  protected fun doGet(context: mutable Context, key: Key): LazyComputed<File> {
     dirName = this.dirName;
 
     dir = context.unsafeGetLazyDir(dirName).typed();
@@ -352,8 +430,15 @@ class TLazyDir{
     dirName: DirName,
     lazyFun: (mutable Context, DirName, Key) ~> ?Array<File>,
     collect: Bool = true,
+    compareOnUpdate: Bool = false,
   ): Dir {
-    static::createFor(context, dirName, LambdaLazyCompute(lazyFun), collect)
+    static::createFor(
+      context,
+      dirName,
+      LambdaLazyCompute(lazyFun),
+      collect,
+      compareOnUpdate,
+    )
   }
 
   static fun createFor(
@@ -361,6 +446,7 @@ class TLazyDir{
     dirName: DirName,
     compute: LazyCompute<Key, File>,
     collect: Bool = true,
+    compareOnUpdate: Bool = false,
   ): Dir {
     context.addRead(Path::dirTag(dirName));
     (context.fromContext.flatMap(ctx ->
@@ -369,7 +455,15 @@ class TLazyDir{
     | d @ Some _ -> d
     | _ -> context.unsafeMaybeGetLazyDir(dirName)
     }) match {
-    | Some(ldir) if (ldir.typed().compute == compute) ->
+    // Reuse only when the flags match too: compareOnUpdate changes update()
+    // behavior, so reusing a dir created with a different flag would silently
+    // keep the old behavior.
+    | Some(
+      ldir,
+    ) if (
+      ldir.typed().compute == compute &&
+      ldir.typed().compareOnUpdate == compareOnUpdate
+    ) ->
       if (context.debugMode) {
         print_string(`REUSING: ${dirName}`);
       };
@@ -387,6 +481,7 @@ class TLazyDir{
         timeStack => TimeStack::create(context, time),
         dirName,
         compute,
+        compareOnUpdate,
         collect,
       };
       context.updateDirtyReaders(Path::dirTag(dirName));

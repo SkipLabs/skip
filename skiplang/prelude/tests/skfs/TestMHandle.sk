@@ -1,0 +1,453 @@
+module alias T = SKTest;
+
+module SKStoreTest;
+
+// Test that MHandle (compareOnUpdate lazy dir) does not propagate to
+// downstream dirs when the recomputed value is unchanged.
+@test
+fun testMHandleNoSpuriousPropagation(): void {
+  inputDirName = SKStore.DirName::create("/mh_input/");
+  outputDirName = SKStore.DirName::create("/mh_output/");
+
+  context = SKStore.run(context ~> {
+    // Eager input dir: a single counter value.
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+
+    // MHandle lazy dir: reads the input but always returns the constant 42.
+    // Even when the input changes, the output value stays the same.
+    memoDir = SKStore.MHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/mh_memo/"),
+      (context, _self, key) ~> {
+        // Read input to establish dependency
+        _ = inputDir.getArray(context, key);
+        // Always return the same value regardless of input
+        Array[SKStore.IntFile(42)]
+      },
+    );
+
+    // Eager output dir: maps from input keys through the memo dir.
+    _outputDir = inputDir.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputDirName,
+      (context, writer, key, _values) ~> {
+        writer.set(key, memoDir.get(context, key));
+      },
+    );
+  });
+
+  // Verify initial value
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[42],
+    "mhandle: initial output is 42",
+  );
+
+  // Advance tick past initial writes (getChangesAfter uses >= comparison)
+  context.update();
+
+  // Change input (memo dir will recompute but return same value 42)
+  tick = context.getTick();
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(1)]);
+  context.update();
+
+  // Verify output is still 42
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[42],
+    "mhandle: output unchanged after input change",
+  );
+
+  // No changes should have propagated to the output dir.
+  // The MHandle recomputed and found the same value (42), so it did not
+  // propagate. The output mapper still re-ran (because it maps from inputDir),
+  // but writeEntry's native_eq caught the identical value.
+  (isReset, changes) = context
+    .unsafeGetEagerDir(outputDirName)
+    .getChangesAfter(tick);
+  T.expectEq(isReset, false, "mhandle: not reset");
+  T.expectEq(changes, SortedSet[], "mhandle: no spurious output changes");
+}
+
+// Test that MHandle DOES propagate when the value actually changes.
+@test
+fun testMHandlePropagatesOnChange(): void {
+  inputDirName = SKStore.DirName::create("/mhc_input/");
+  outputDirName = SKStore.DirName::create("/mhc_output/");
+
+  context = SKStore.run(context ~> {
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(10))],
+    );
+
+    // MHandle that doubles the input value.
+    memoDir = SKStore.MHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/mhc_memo/"),
+      (context, _self, key) ~> {
+        v = inputDir.get(context, key).value;
+        Array[SKStore.IntFile(v * 2)]
+      },
+    );
+
+    _outputDir = inputDir.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputDirName,
+      (context, writer, key, _values) ~> {
+        writer.set(key, memoDir.get(context, key));
+      },
+    );
+  });
+
+  // Initial: input=10, memo=20, output=20
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[20],
+    "mhandle_change: initial output is 20",
+  );
+
+  // Advance tick past initial writes
+  context.update();
+
+  // Change input to 15 → memo becomes 30 → should propagate
+  tick = context.getTick();
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(15)]);
+  context.update();
+
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[30],
+    "mhandle_change: output updated to 30",
+  );
+
+  (isReset, changes) = context
+    .unsafeGetEagerDir(outputDirName)
+    .getChangesAfter(tick);
+  T.expectEq(isReset, false, "mhandle_change: not reset");
+  T.expectTrue(
+    changes.size() > 0,
+    "mhandle_change: changes detected when value differs",
+  );
+}
+
+// Test MHandle in a chain: input → MHandle A → LHandle B → eager output.
+// When A's value doesn't change, B should NOT recompute.
+// The output mapper maps from inputDir, so it still re-runs, but because
+// MHandle A prevents propagation to B, B returns its cached value.
+@test
+fun testMHandleChainPreventsDownstreamRecompute(): void {
+  inputDirName = SKStore.DirName::create("/mhch_input/");
+  outputDirName = SKStore.DirName::create("/mhch_output/");
+
+  context = SKStore.run(context ~> {
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+
+    // MHandle A: always returns 42 regardless of input
+    memoA = SKStore.MHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/mhch_memoA/"),
+      (context, _self, key) ~> {
+        _ = inputDir.getArray(context, key);
+        Array[SKStore.IntFile(42)]
+      },
+    );
+
+    // LHandle B: depends on A, doubles the value
+    lazyB = SKStore.LHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/mhch_lazyB/"),
+      (context, _self, key) ~> {
+        v = memoA.get(context, key).value;
+        Array[SKStore.IntFile(v * 2)]
+      },
+    );
+
+    // Eager output: maps from input keys through lazyB
+    _outputDir = inputDir.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputDirName,
+      (context, writer, key, _values) ~> {
+        writer.set(key, lazyB.get(context, key));
+      },
+    );
+  });
+
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[84],
+    "mhandle_chain: initial output is 84",
+  );
+
+  // Advance tick past initial writes
+  context.update();
+
+  // Change input: A recomputes → same 42 → B is NOT invalidated
+  tick = context.getTick();
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(99)]);
+  context.update();
+
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[84],
+    "mhandle_chain: output still 84",
+  );
+
+  (isReset, changes) = context
+    .unsafeGetEagerDir(outputDirName)
+    .getChangesAfter(tick);
+  T.expectEq(isReset, false, "mhandle_chain: not reset");
+  T.expectEq(changes, SortedSet[], "mhandle_chain: no spurious changes");
+}
+
+// Test that MHandle handles GC'd (LRemoved) entries correctly.
+// When an MHandle entry is garbage collected and then its dependency changes,
+// it should NOT eagerly recompute — just propagate like LHandle.
+// The entry gets recomputed on demand when accessed later.
+//
+// We verify timing by embedding Time.time_ns() in the computed value.
+// A 1ms sleep after update() ensures the on-demand recomputation timestamp
+// is strictly greater than any timestamp from during update().
+@test
+fun testMHandleWithGarbageCollection(): void {
+  inputDirName = SKStore.DirName::create("/mhgc_input/");
+  memoDirName = SKStore.DirName::create("/mhgc_memo/");
+
+  context = SKStore.run(context ~> {
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(10))],
+    );
+
+    // MHandle with collect=true (default): entries can be GC'd.
+    // The compute function embeds a nanosecond timestamp so we can tell
+    // WHEN recomputation happened.
+    _memoDir = SKStore.MHandle::create(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      memoDirName,
+      (context, _self, key) ~> {
+        _ = inputDir.get(context, key);
+        Array[SKStore.IntFile(Time.time_ns())]
+      },
+    );
+  });
+
+  // Access the entry to populate it
+  initialValue = getData(context, memoDirName, SKStore.IID(0)).map(x ->
+    SKStore.IntFile::type(x).value
+  )[0];
+  T.expectTrue(initialValue > 0, "mhandle_gc: initial timestamp is positive");
+
+  // Run 11 update cycles without accessing the MHandle entry.
+  // Assumes the default Context.lazyCapacity of 10, so after 11 cycles the
+  // entry should be GC'd.
+  for (_ in Range(0, 11)) {
+    context.update();
+  };
+
+  // Change the dependency and update.
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(20)]);
+  context.update();
+
+  // Wait until the clock advances past the update() boundary.
+  beforeSleep = Time.time_ns();
+  while (Time.time_ns() == beforeSleep) Time.sleep_ms(1);
+  afterUpdate = Time.time_ns();
+
+  // Access the entry — it should recompute on demand NOW, not during update().
+  recomputedValue = getData(context, memoDirName, SKStore.IID(0)).map(x ->
+    SKStore.IntFile::type(x).value
+  )[0];
+  T.expectTrue(
+    recomputedValue >= afterUpdate,
+    "mhandle_gc: recomputation happened on demand, not during update()",
+  );
+}
+
+// Test that a compareOnUpdate entry whose compute starts returning None()
+// (LAbsent) after being LDefined counts as changed and propagates.
+@test
+fun testMHandleAbsentTransitionPropagates(): void {
+  inputDirName = SKStore.DirName::create("/mha_input/");
+  memoDirName = SKStore.DirName::create("/mha_memo/");
+  outputDirName = SKStore.DirName::create("/mha_output/");
+
+  context = SKStore.run(context ~> {
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(1))],
+    );
+
+    // Lazy dir with compareOnUpdate=true whose compute returns None() once
+    // the input is no longer 1.
+    _memoDir = SKStore.TLazyDir::create(
+      context,
+      memoDirName,
+      (context, _dirName, key) ~> {
+        iid = SKStore.IID::keyType(key);
+        v = inputDir.get(context, iid).value;
+        if (v == 1) Some(Array[SKStore.IntFile(42)]) else None()
+      },
+      true, // collect
+      true, // compareOnUpdate
+    );
+
+    _outputDir = inputDir.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      outputDirName,
+      (context, writer, key, _values) ~> {
+        arr = context.getDir(memoDirName).typed().getArray(context, key);
+        if (arr.size() > 0) {
+          writer.set(key, SKStore.IntFile::type(arr[0]))
+        }
+      },
+    );
+  });
+
+  // Initial: input=1, memo=42, output=42
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[42],
+    "mhandle_absent: initial output is 42",
+  );
+
+  context.update();
+
+  // Change input to 2 -> memo recomputes to LAbsent -> must propagate
+  tick = context.getTick();
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(2)]);
+  context.update();
+
+  T.expectEq(
+    getData(context, outputDirName, SKStore.IID(0)).size(),
+    0,
+    "mhandle_absent: output entry removed after memo became absent",
+  );
+  (isReset, changes) = context
+    .unsafeGetEagerDir(outputDirName)
+    .getChangesAfter(tick);
+  T.expectEq(isReset, false, "mhandle_absent: not reset");
+  T.expectTrue(
+    changes.size() > 0,
+    "mhandle_absent: LAbsent transition propagated as a change",
+  );
+}
+
+// Test that a compute exception during a compareOnUpdate eager recompute
+// surfaces from update(), leaves the arrow stack balanced (a later update()
+// does not hit the currentArrow invariant), and that the entry recomputes
+// on demand afterwards.
+@test
+fun testMHandleComputeThrowDuringUpdate(): void {
+  inputDirName = SKStore.DirName::create("/mht_input/");
+  memoDirName = SKStore.DirName::create("/mht_memo/");
+
+  context = SKStore.run(context ~> {
+    inputDir = context.mkdir(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      inputDirName,
+      Array[(SKStore.IID(0), SKStore.IntFile(0))],
+    );
+
+    _memoDir = SKStore.TLazyDir::create(
+      context,
+      memoDirName,
+      (context, _dirName, key) ~> {
+        iid = SKStore.IID::keyType(key);
+        v = inputDir.get(context, iid).value;
+        if (v == 0) Some(Array[SKStore.IntFile(42)]) else {
+          throw SKStore.CyclicExn(key)
+        }
+      },
+      true, // collect
+      true, // compareOnUpdate
+    );
+  });
+
+  // Initial compute succeeds: 42
+  T.expectEq(
+    getData(context, memoDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[42],
+    "mhandle_throw: initial value is 42",
+  );
+
+  context.update();
+
+  // Change input to 1: the eager recompute during update() throws.
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(1)]);
+  threw = try {
+    context.update();
+    false
+  } catch {
+  | _exn -> true
+  };
+  T.expectTrue(
+    threw,
+    "mhandle_throw: compute exception surfaces from update()",
+  );
+
+  // The arrow stack must be balanced: reverting the input and updating again
+  // must not hit the currentArrow invariant, and the entry recomputes to 42.
+  write(context, inputDirName, SKStore.IID(0), Array[SKStore.IntFile(0)]);
+  context.update();
+  T.expectEq(
+    getData(context, memoDirName, SKStore.IID(0)).map(x ->
+      SKStore.IntFile::type(x).value
+    ),
+    Array[42],
+    "mhandle_throw: entry recomputes on demand after reverted input",
+  );
+}
+
+module end;
