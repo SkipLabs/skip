@@ -237,6 +237,10 @@ class Handles {
     return this.objects[id] as T;
   }
 
+  getOpt<T>(id: Handle<T>): T | null | undefined {
+    return this.objects[id] as T | null | undefined;
+  }
+
   apply<R, P extends any[]>(id: Handle<(..._: P) => R>, parameters: P): R {
     const fn = this.get(id);
     return fn.apply(null, parameters);
@@ -512,7 +516,11 @@ class CollectionWriter<K extends Json, V extends Json> {
       await fork.update_(values, isInit);
       fork.merge();
     } catch (ex: unknown) {
-      fork.abortFork();
+      try {
+        fork.abortFork();
+      } catch (_: unknown) {
+        // Ignore cleanup failure so the original exception propagates.
+      }
       throw ex;
     }
   }
@@ -807,7 +815,11 @@ export class ServiceInstance {
       await fork.update_(collection, entries);
       fork.merge([]);
     } catch (ex: unknown) {
-      fork.abortFork();
+      try {
+        fork.abortFork();
+      } catch (_: unknown) {
+        // Ignore cleanup failure so the original exception propagates.
+      }
       throw ex;
     }
   }
@@ -871,7 +883,13 @@ export class ServiceInstance {
       this.closeResourceStreams(streamsToClose);
       this.definition = definition;
     } catch (ex: unknown) {
-      if (!merged) fork.abortFork();
+      if (!merged) {
+        try {
+          fork.abortFork();
+        } catch (_: unknown) {
+          // Ignore cleanup failure so the original exception propagates.
+        }
+      }
       throw ex;
     }
   }
@@ -1276,14 +1294,16 @@ export class ToBinding {
     external: string,
     instance: string,
   ): void {
-    const service = this.handles.get(skservice);
+    const service = this.handles.getOpt(skservice);
+    if (service == null) return;
     service.unsubscribe(external, instance);
   }
 
   SkipRuntime_ServiceDefinition__shutdown(
     skservice: Handle<ServiceDefinition>,
   ): Handle<Promise<unknown>> {
-    const service = this.handles.get(skservice);
+    const service = this.handles.getOpt(skservice);
+    if (service == null) return this.handles.register(Promise.resolve());
     return this.handles.register(service.shutdown());
   }
 
@@ -1438,7 +1458,11 @@ export class ToBinding {
       return new ServiceInstance(this, null, definition);
     } catch (ex: unknown) {
       this.setFork(uuid);
-      this.abortFork();
+      try {
+        this.abortFork();
+      } catch (_: unknown) {
+        // Ignore cleanup failure so the original exception propagates.
+      }
       this.handles.deleteHandle(skservicehHdl);
       throw ex;
     } finally {
