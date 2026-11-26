@@ -61,16 +61,18 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # On-demand file growth and the capacity bound
 
-A persistent file starts at 1 GiB (`INITIAL_CAPACITY`) with the full
-`[BOTTOM_ADDR, BOTTOM_ADDR + capacity)` VA range reserved as `PROT_NONE`, and
-grows on demand — doubling, extending the sparse file with `ftruncate` and
-mapping only the newly grown tail with `MAP_FIXED` — up to the capacity bound
-(64 GiB by default). The anonymous heap has no file, so it is mapped at the
-full bound up front (sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` adjusts the
-bound per workload, with `--capacity` winning over the environment. This test
-pins the default bound and both override paths, checks that the file grows
-without losing contents, that reloading maps the grown size, that a second
-process catches up on its next lock, and that hitting the bound exits with
+A persistent file is truncated to 1 GiB (`INITIAL_CAPACITY`, or the requested
+capacity when smaller) while its virtual mapping spans the full capacity bound
+(64 GiB by default) up front with `MAP_SHARED | MAP_FIXED`. On demand, the
+runtime doubles the file size with `ftruncate` alone (up to the capacity
+bound); because POSIX `MAP_SHARED` allows mapping past EOF, newly backed pages
+become accessible in all processes immediately with no remap or per-lock sync.
+The anonymous heap has no file, so it is mapped at the full bound up front
+(sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` adjusts the bound per workload, with
+`--capacity` winning over the environment. This test pins the default bound and
+both override paths, checks that the file grows without losing contents, that
+reloading preserves the grown size and bound, that a peer process reads newly
+grown pages directly without syncing, and that hitting the bound exits with
 `ERROR_OUT_OF_MEMORY`.
 
 ```sh
