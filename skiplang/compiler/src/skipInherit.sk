@@ -819,9 +819,21 @@ fun param_bindings(
       SkipError.error(pos, "Was expecting unnamed parameters")
     | (Named(_), Positional(_)) ->
       SkipError.error(pos, "Was expecting named parameters")
+    | (Mixed(fpos, fnamed, _), Mixed(ppos, pnamed, _)) ->
+      n = fpos.size();
+      if (n != ppos.size()) {
+        SkipError.error(pos, "Expected " + n.toString() + " arguments")
+      };
+      body1 = add_named_bindings(pos, fpos, ppos, body);
+      (keyparams_names, valueparams) = pnamed.items().collect(Array).unzip();
+      msg = "Could not resolve named field in pattern";
+      keyparams = keyparams_names.map(pat_name ->
+        fnamed.getWithMsg(pat_name, pos, msg)
+      );
+      add_named_bindings(pos, keyparams, valueparams, body1)
     | (Mixed _, _)
     | (_, Mixed _) ->
-      SkipError.error(pos, "Mixed parameters are not supported in patterns")
+      SkipError.error(pos, "Mixed parameter groups must be matched together")
     }
   }
 }
@@ -1736,6 +1748,22 @@ fun merge_params(
           .sortedBy(param ~> param.index),
       ).map(param ~> (param.name, param)),
     );
+    // A name may not appear in both groups of the merged constructor.
+    merged_pos.find(param -> merged_named.containsKey(param.name)) match {
+    | Some(param) ->
+      SkipError.errorl(
+        List[
+          (
+            param.name.i0,
+            "Duplicate parameter name '" +
+              param.name.i1 +
+              "' across the positional and named constructor parameters",
+          ),
+          (merged_named[param.name].name.i0, "Previously here"),
+        ],
+      )
+    | None() -> void
+    };
     // Keep declaration-order indices across the two groups so omitted
     // default arguments evaluate in declaration order.
     namedFirst = if (child_params is Mixed _) {
