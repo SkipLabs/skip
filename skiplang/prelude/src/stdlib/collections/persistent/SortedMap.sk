@@ -332,12 +332,19 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     k: K2 = this.key;
     v: V2 = this.value;
     compare(key, this.key) match {
-    | LT() -> SortedMap::balance(k, v, l.setWith(key, value, f), r)
+    | LT() ->
+      newL = l.setWith(key, value, f);
+      if (Runtime.phys_eq(newL, l)) this else SortedMap::balance(k, v, newL, r)
     | EQ() ->
       newV = f(v, value);
       node: Node<K2, V2> = n;
-      node with {value => newV}
-    | GT() -> SortedMap::balance(k, v, l, r.setWith(key, value, f))
+      // phys_eq is an @intrinsic since #1776: pointer args compare by
+      // pointer, value classes (void, Int, ...) by value — safe on every
+      // target — so skip rebuilding the node when the value is unchanged.
+      if (Runtime.phys_eq(newV, v)) this else node with {value => newV}
+    | GT() ->
+      newR = r.setWith(key, value, f);
+      if (Runtime.phys_eq(newR, r)) this else SortedMap::balance(k, v, l, newR)
     }
 
   fun remove<K2: Orderable>[K: K2](key: K2): SortedMap<K, V>

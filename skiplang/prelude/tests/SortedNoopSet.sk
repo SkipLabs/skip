@@ -1,0 +1,82 @@
+module alias T = SKTest;
+
+module SortedNoopTest;
+
+// Setting an element/key whose computed value is physically unchanged must
+// return the same collection object instead of allocating a new one.
+
+@test
+fun testSortedSetSetUnchangedReturnsSameObject(): void {
+  s = SortedSet[1, 2, 3];
+  T.expectTrue(
+    Runtime.phys_eq(s.set(2), s),
+    "set of an existing element returns the same object",
+  );
+  s2 = s.set(4);
+  T.expectFalse(Runtime.phys_eq(s2, s), "set of a new element allocates");
+  T.expectEq(s.toArray(), Array[1, 2, 3]);
+  T.expectEq(s2.toArray(), Array[1, 2, 3, 4]);
+}
+
+@test
+fun testSortedMapSetUnchangedReturnsSameObject(): void {
+  m = SortedMap[1 => "a", 2 => "b"];
+  // Re-set a key with the very value object stored in the map: the EQ
+  // branch compares values with phys_eq, so this returns the same map.
+  v = m.maybeGet(2).fromSome();
+  mSame = m.set(2, v);
+  T.expectTrue(
+    Runtime.phys_eq(mSame, m),
+    "set with the same value object returns the same map",
+  );
+  T.expectEq(mSame.maybeGet(2), Some("b"));
+  T.expectEq(mSame.size(), 2);
+  m2 = m.set(2, "c");
+  T.expectFalse(Runtime.phys_eq(m2, m), "set with a different value allocates");
+  T.expectEq(m2.maybeGet(2), Some("c"));
+  T.expectEq(m.maybeGet(2), Some("b"));
+}
+
+@test
+fun testSortedMapSetWithUnchangedReturnsSameObject(): void {
+  m = SortedMap[1 => "a", 2 => "b"];
+  // f returns the old value object: phys_eq on the EQ branch makes this
+  // return the same map.
+  m2 = m.setWith(2, "x", (old, _new) -> old);
+  T.expectTrue(
+    Runtime.phys_eq(m2, m),
+    "setWith returning the old value object returns the same map",
+  );
+  T.expectEq(m2.maybeGet(2), Some("b"));
+  T.expectEq(m2.size(), 2);
+  // setWith on a missing key must insert.
+  m3 = m.setWith(9, "z", (_old, new) -> new);
+  T.expectFalse(Runtime.phys_eq(m3, m), "setWith on a new key allocates");
+  T.expectEq(m3.maybeGet(9), Some("z"));
+  T.expectEq(m3.maybeGet(2), Some("b"));
+}
+
+@test
+fun testSortedMapSetUnchangedOnVoidValuedMap(): void {
+  // A SortedMap<K, void> (e.g. the backing store of SortedSet) takes the EQ
+  // branch of setWith on an existing key; the intrinsic folds phys_eq on
+  // void to true, so this returns the same map — safe on every target.
+  m = SortedMap[1 => void, 2 => void];
+  mSame = m.set(2, void);
+  T.expectTrue(
+    Runtime.phys_eq(mSame, m),
+    "set of an existing key on a void-valued map returns the same map",
+  );
+  T.expectEq(mSame.size(), 2);
+  T.expectEq(mSame.containsKey(1), true);
+  T.expectEq(mSame.containsKey(2), true);
+  m2 = m.set(3, void);
+  T.expectFalse(
+    Runtime.phys_eq(m2, m),
+    "set of a new key on a void-valued map allocates",
+  );
+  T.expectEq(m2.size(), 3);
+  T.expectEq(m.size(), 2);
+}
+
+module end;
