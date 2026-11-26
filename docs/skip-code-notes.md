@@ -31,6 +31,9 @@ owner.
   workflow gotchas) in any SkipLabs repo. Do not record SKJS-typechecker
   specifics here — those belong to the SKJS project, not to Skip-the-language
   lessons.
+- **Bugs are not lessons.** This log is about how to _write_ Skip code, not
+  about things that go wrong. Report bugs as GitHub issues
+  (https://github.com/SkipLabs/skip/issues) — do not log them here.
 
 Entry shape: `### <date> — <short title>`, then the rule in one or two
 sentences, a source tag, and a before/after snippet when it helps.
