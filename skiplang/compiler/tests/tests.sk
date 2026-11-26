@@ -99,10 +99,21 @@ private fun runInvalidFromBatch(basename: String): void {
     // It produced an artifact — an invalid test must fail to compile.
     T.fail("Expected compile error")
   };
+  errFile = output + ".err";
+  if (!FileSystem.exists(errFile)) {
+    // Guard the read: FileSystem.readTextFile hard-exits the whole worker
+    // process (runtime ERROR_FILE_IO, exit code 45) when the file is missing,
+    // which the harness then reports as a SubprocessCrash for every unreported
+    // test of that worker (#1451). Fail this one test properly instead.
+    T.fail(
+      `Missing batch result ${errFile}: the batch compile did not produce ` +
+        `it (rerun the shard's \`skc --batch\` manifest by hand to see why)`,
+    )
+  };
   // NOTE: The `.trim()` is needed because error messages seem to currently
   // have an extra newline. The `.err` sidecar holds the same rendered errors a
   // one-shot `skc` writes to stderr, so this matches the old comparison.
-  actual = FileSystem.readTextFile(output + ".err").trim();
+  actual = FileSystem.readTextFile(errFile).trim();
   expected = FileSystem.readTextFile(basename + ".exp_err").trim();
 
   T.expectEq(actual, expected)
@@ -155,7 +166,31 @@ private fun batchCompileInvalid(
 
   if (!cmds.isEmpty()) {
     // Run the shards concurrently and wait for all of them.
-    _ = System.subprocess(Array["sh", "-c", cmds.join(" & ") + " & wait"])
+    _ = System.subprocess(Array["sh", "-c", cmds.join(" & ") + " & wait"]);
+    // Diagnose a batch that produced no results at all (e.g. the `skc` on PATH
+    // got dispatched to the wrong entry and exited immediately): the shard
+    // stderr is discarded above, so without this the cause is invisible and
+    // every invalid test just reports a missing batch result (#1451).
+    missing = 0;
+    for (b in basenames) {
+      (suite, name) = b.stripPrefix("invalid_tests/").splitLast("/");
+      if (!shouldRun(suite, name)) continue;
+      out = batchOutput(b);
+      if (!FileSystem.exists(out) && !FileSystem.exists(out + ".err")) {
+        !missing = missing + 1
+      }
+    };
+    if (missing > 0) {
+      print_error(
+        `batchCompileInvalid: ${missing} unit(s) have neither artifact nor ` +
+          `.err sidecar in ${outDir}; the batch compile itself failed — ` +
+          `rerun \`skc --batch '${Path.join(
+            outDir,
+            "shard_0.manifest",
+          )}' -O0 --no-inline\` ` +
+          `from the package directory to see the error\n`,
+      )
+    }
   }
 }
 
