@@ -60,9 +60,10 @@
 #   watch [seconds]      Refreshing dashboard (default 15s); Ctrl-C to stop
 #   prepare <pr>         Rebase the PR onto origin/main in the bot's worktree.
 #                        Conflicts that only touch `version = "..."` lines in
-#                        Skargo.toml files are resolved automatically (higher
-#                        semver wins) and the rebase is continued; anything
-#                        else is left for the conflict fixer
+#                        Skargo.toml files are resolved automatically (the PR's
+#                        intended bump kind vs the merge-base version is applied
+#                        on top of main's version) and the rebase is continued;
+#                        anything else is left for the conflict fixer
 #                        Exit 0 = rebased cleanly (JSON on stdout);
 #                        exit 10 = conflicts, worktree left mid-rebase (JSON
 #                        with worktree/conflicted/verdict_file on stdout);
@@ -611,12 +612,22 @@ pr_guard() { # $1 = pr json; sets PR_BRANCH/PR_BASE/PR_FORK/PR_HEAD_URL; exits N
 # A rebase commonly clashes on Skargo.toml `version = "..."` lines when both
 # sides bumped the same package's semver. When every conflicted file is a
 # Skargo.toml whose conflict blocks touch nothing but version lines, resolve
-# them in place (keeping the higher version) and continue the rebase without
+# them in place (applying the PR's intended bump kind — patch/minor/major vs
+# the merge-base version — on top of main's version) and continue the rebase without
 # spawning a fixer agent.
 
-skargo_version_resolve() { # $1 = conflicted Skargo.toml; rewrites in place; rc 0 = resolved
-    local f=$1 tmp
-    tmp="$f.mb-fastpath"
+skargo_version_resolve() { # $1 = worktree ("-" = no git, no base version) $2 = repo-relative conflicted Skargo.toml
+    # Rewrites in place; rc 0 = resolved. Resolution rule: the PR side
+    # ("theirs") intended some semver bump relative to the merge-base version
+    # (git stage 1); apply that same bump kind on top of main's ("ours")
+    # version. Without a base version, fall back to the higher version.
+    local work=$1 f=$2 tmp base
+    tmp="$work/$f.mb-fastpath"
+    base=""
+    if [ "$work" != "-" ]; then
+        base=$(git -C "$work" show ":1:$f" 2>/dev/null |
+            sed -n 's/^[ \t]*version[ \t]*=[ \t]*"\([^"]*\)".*/\1/p' | head -1)
+    fi
     # shellcheck disable=SC2016 # single quotes intentional: perl program
     perl -0777 -e '
         sub vcmp { # dotted-numeric compare (1.10.0 > 1.2.0)
@@ -636,7 +647,24 @@ skargo_version_resolve() { # $1 = conflicted Skargo.toml; rewrites in place; rc 
             }
             return 0;
         }
+        sub bump_kind { # "major"/"minor"/"patch" of $v relative to base $b
+            my ($b, $v) = @_;
+            my @b = split /\./, $b;
+            my @v = split /\./, $v;
+            return "major" if ($b[0] // 0) != ($v[0] // 0);
+            return "minor" if ($b[1] // 0) != ($v[1] // 0);
+            return "patch";
+        }
+        sub apply_bump { # apply bump kind $k to version $o
+            my ($o, $k) = @_;
+            my @o = split /\./, $o;
+            if ($k eq "major") { $o[0] = ($o[0] // 0) + 1; $o[1] = 0; $o[2] = 0; }
+            elsif ($k eq "minor") { $o[1] = ($o[1] // 0) + 1; $o[2] = 0; }
+            else { $o[2] = ($o[2] // 0) + 1; }
+            return join ".", map { defined $_ ? $_ : 0 } @o[0 .. 2];
+        }
         my $f = $ARGV[0];
+        my $base = $ARGV[1] // "";
         open my $fh, "<", $f or exit 1;
         my $c = do { local $/; <$fh> };
         close $fh;
@@ -658,7 +686,17 @@ skargo_version_resolve() { # $1 = conflicted Skargo.toml; rewrites in place; rc 
                 } else {
                     exit 1;
                 }
-                my $keep = vcmp($ov, $tv) >= 0 ? $ov : $tv;
+                my $keep;
+                if ($base ne "" && $ov =~ /^\d+\.\d+\.\d+$/ && $tv =~ /^\d+\.\d+\.\d+$/ && $base =~ /^\d+\.\d+\.\d+$/) {
+                    if (vcmp($tv, $base) <= 0) {
+                        $keep = $ov; # PR side did not bump: keep the ours version
+                    } else {
+                        # apply the intended bump kind of the PR side on top of the ours version
+                        $keep = apply_bump($ov, bump_kind($base, $tv));
+                    }
+                } else {
+                    $keep = vcmp($ov, $tv) >= 0 ? $ov : $tv; # no base: higher wins
+                }
                 $out .= "${ind}version = \"$keep\"$nl";
             } else {
                 $out .= $c;
@@ -666,8 +704,8 @@ skargo_version_resolve() { # $1 = conflicted Skargo.toml; rewrites in place; rc 
             }
         }
         print $out;
-    ' "$f" >"$tmp" || { rm -f "$tmp"; return 1; }
-    mv "$tmp" "$f"
+    ' "$work/$f" "$base" >"$tmp" || { rm -f "$tmp"; return 1; }
+    mv "$tmp" "$work/$f"
 }
 
 try_skargo_version_fastpath() { # $1 = worktree stopped mid-rebase; rc 0 = rebase completed
@@ -680,7 +718,7 @@ try_skargo_version_fastpath() { # $1 = worktree stopped mid-rebase; rc 0 = rebas
         bad=0
         while IFS= read -r f; do
             case "$f" in
-                Skargo.toml | */Skargo.toml) skargo_version_resolve "$work/$f" || { bad=1; break; } ;;
+                Skargo.toml | */Skargo.toml) skargo_version_resolve "$work" "$f" || { bad=1; break; } ;;
                 *) bad=1; break ;;
             esac
         done <<<"$conflicted"
@@ -1547,7 +1585,7 @@ version = "1.2.0"
 version = "1.10.0"
 >>>>>>> feat
 EOF
-    if skargo_version_resolve "$tdir/Skargo.toml"; then
+    if skargo_version_resolve "$tdir" Skargo.toml; then
         check "fastpath: version-only conflict resolved to higher semver (numeric, not lexical)" \
             "1.10.0" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/Skargo.toml")"
     else
@@ -1561,7 +1599,7 @@ name = "a"
 name = "b"
 >>>>>>> feat
 EOF
-    if skargo_version_resolve "$tdir/Skargo.toml"; then
+    if skargo_version_resolve "$tdir" Skargo.toml; then
         check "fastpath: non-version conflict is rejected" "rejected" "resolved"
     else
         check "fastpath: non-version conflict is rejected" "rejected" "rejected"
@@ -1587,6 +1625,27 @@ EOF
             "1.2.0" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/repo/Skargo.toml")"
     else
         check "fastpath: e2e rebase completed with higher version" "completed" "failed"
+    fi
+    # end-to-end bump-kind: base 1.0.0, main bumps minor (1.1.0), PR bumps patch
+    # (1.0.1) -> the PR's patch bump is applied on top of main's version (1.1.1),
+    # not dropped by a plain "higher wins" (which would give 1.1.0)
+    mkdir -p "$tdir/repo2"
+    git -C "$tdir/repo2" init -q -b main
+    printf '[package]\nname = "x"\nversion = "1.0.0"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" add . && $g -C "$tdir/repo2" commit -qm base
+    $g -C "$tdir/repo2" checkout -qb feat
+    printf '[package]\nname = "x"\nversion = "1.0.1"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" commit -qam bump-feat-patch
+    $g -C "$tdir/repo2" checkout -q main
+    printf '[package]\nname = "x"\nversion = "1.1.0"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" commit -qam bump-main-minor
+    $g -C "$tdir/repo2" checkout -q feat
+    $g -C "$tdir/repo2" rebase main >/dev/null 2>&1 || true
+    if try_skargo_version_fastpath "$tdir/repo2"; then
+        check "fastpath: PR's bump kind applied on top of main's version (patch over minor -> 1.1.1)" \
+            "1.1.1" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/repo2/Skargo.toml")"
+    else
+        check "fastpath: PR's bump kind applied on top of main's version (patch over minor -> 1.1.1)" "completed" "failed"
     fi
     # end-to-end negative: conflict on a non-Skargo.toml file -> not touched
     git -C "$tdir/repo" rebase --abort 2>/dev/null || true
