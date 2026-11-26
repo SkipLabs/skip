@@ -1,0 +1,33 @@
+module Native_GcAnnotation;
+
+// Regression test for #1355: @gc selects out-of-line collection entrypoints
+// SKIP_Obstack_collect0 / SKIP_Obstack_collect1 / SKIP_Obstack_collect
+// depending on the number of live GC roots at a safepoint.
+
+@no_inline
+@gc
+fun collect0(x: Int): Int {
+  x + 2
+}
+
+@no_inline
+@gc
+fun collect1(x: Int): Array<Int> {
+  Array[x]
+}
+
+@no_inline
+@gc
+fun collectMany(x: Int): (Array<Int>, Array<Bool>) {
+  (Array[x], Array[x != 0])
+}
+
+@exptest
+fun main(): void {
+  print_string("g0=" + collect0(1));
+  print_string("g1=" + collect1(42)[0]);
+  v = collectMany(7);
+  print_string("g2=" + v.i0[0] + " " + v.i1[0]);
+}
+
+module end;
