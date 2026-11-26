@@ -1,14 +1,14 @@
 // Standalone regression test: the anonymous heap created without a persistent
-// file must be mapped with MAP_NORESERVE. Its default capacity (16 GiB) is a
-// sparse bound; without the flag, heuristic overcommit refuses it on hosts
-// with less RAM plus swap. The kernel marks such mappings "nr" in smaps, which
-// holds regardless of the host's overcommit policy. Build with section GC so
-// only the exercised parts of palloc.c need runtime definitions.
+// file must be mapped with MAP_NORESERVE. The maximum default capacity (16 GiB)
+// is a sparse bound; without the flag, heuristic overcommit refuses it on
+// hosts with less RAM plus swap. The kernel marks such mappings "nr" in smaps,
+// which holds regardless of the host's overcommit policy. Build with section
+// GC so only the exercised parts of palloc.c need runtime definitions.
 #define SKIP64 1
 #include "../palloc.c"
 
 int main(void) {
-  sk_create_mapping(NULL, DEFAULT_CAPACITY);
+  sk_create_mapping(NULL, MAX_DEFAULT_CAPACITY);
   uintptr_t heap = (uintptr_t)ginfo;
 
   FILE* smaps = fopen("/proc/self/smaps", "r");

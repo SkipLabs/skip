@@ -22,12 +22,19 @@
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
 #include <spawn.h>
+#include <sys/sysctl.h>
+#else
+#include <sys/sysinfo.h>
 #endif
 
 #include "alloc_size_classes.h"
 #include "runtime.h"
 
-#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
+// The default mapping capacity adapts to the host (see default_capacity()),
+// bounded below and above by these. SKIP_CAPACITY / --capacity override the
+// default entirely when a workload needs more.
+#define MIN_DEFAULT_CAPACITY (1024L * 1024L * 1024L)
+#define MAX_DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #ifdef __APPLE__
 // macOS refuses fixed mappings below 0x7000000000 with EPERM.
 #define BOTTOM_ADDR ((void*)0x0000010000000000)
@@ -539,6 +546,63 @@ static size_t parse_capacity_value(const char* str, const char* source) {
   return value * multiplier;
 }
 
+#ifndef __APPLE__
+// Memory available to this process in bytes: the host's total RAM, lowered
+// to the cgroup limit when one applies (e.g. inside a container with a
+// memory limit). Returns 0 when the host's memory cannot be determined.
+static size_t available_memory_bytes(void) {
+  struct sysinfo info;
+  if (sysinfo(&info) != 0) return 0;
+  unsigned long long total =
+      (unsigned long long)info.totalram * (unsigned long long)info.mem_unit;
+  static const char* const limit_files[] = {
+      "/sys/fs/cgroup/memory.max",  // cgroup v2; "max" when unlimited
+      "/sys/fs/cgroup/memory/memory.limit_in_bytes",  // cgroup v1
+  };
+  for (size_t i = 0; i < sizeof(limit_files) / sizeof(limit_files[0]); i++) {
+    FILE* f = fopen(limit_files[i], "r");
+    if (f == NULL) continue;
+    char buf[64];
+    unsigned long long limit = 0;
+    int unlimited = 0;
+    if (fgets(buf, sizeof(buf), f) != NULL) {
+      if (strncmp(buf, "max", 3) == 0) {
+        unlimited = 1;
+      } else {
+        char* end = NULL;
+        errno = 0;
+        limit = strtoull(buf, &end, 10);
+        if (errno != 0 || end == buf) limit = 0;
+      }
+    }
+    fclose(f);
+    // A v1 "unlimited" sentinel is huge, so the `< total` check ignores it.
+    if (!unlimited && limit > 0 && limit < total) total = limit;
+  }
+  return (size_t)total;
+}
+#else
+// Memory available to this process in bytes, or 0 when undetectable.
+static size_t available_memory_bytes(void) {
+  uint64_t memsize = 0;
+  size_t len = sizeof(memsize);
+  if (sysctlbyname("hw.memsize", &memsize, &len, NULL, 0) != 0) return 0;
+  return (size_t)memsize;
+}
+#endif
+
+// Adaptive default capacity: the memory available to this process, clamped to
+// [MIN_DEFAULT_CAPACITY, MAX_DEFAULT_CAPACITY]. The mapping is sparse, so the
+// capacity is an upper bound, not memory committed up front. Falls back to
+// the cap when the host's memory cannot be determined.
+static size_t default_capacity(void) {
+  size_t available = available_memory_bytes();
+  if (available == 0) return MAX_DEFAULT_CAPACITY;
+  if (available < MIN_DEFAULT_CAPACITY) return MIN_DEFAULT_CAPACITY;
+  if (available > MAX_DEFAULT_CAPACITY) return MAX_DEFAULT_CAPACITY;
+  return available;
+}
+
 size_t parse_capacity(int argc, char** argv) {
   int i;
 
@@ -548,7 +612,7 @@ size_t parse_capacity(int argc, char** argv) {
         // Preserve the existing quirk: `--capacity -<something>` silently
         // falls back to the default.
         if (argv[i + 1][0] == '-') {
-          return DEFAULT_CAPACITY;
+          return default_capacity();
         }
         return parse_capacity_value(argv[i + 1], "--capacity");
       }
@@ -560,7 +624,7 @@ size_t parse_capacity(int argc, char** argv) {
     return parse_capacity_value(env, "SKIP_CAPACITY");
   }
 
-  return DEFAULT_CAPACITY;
+  return default_capacity();
 }
 
 /*****************************************************************************/
@@ -741,7 +805,8 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
   if (fileName == NULL) {
-    // The capacity is a sparse upper bound (16 GiB by default), not memory to
+    // The capacity is a sparse upper bound (the host's memory, at most 16 GiB,
+    // by default), not memory to
     // commit up front. Without MAP_NORESERVE, heuristic overcommit refuses a
     // private writable mapping larger than RAM plus swap.
     mapping = mmap(NULL, icapacity, prot,
@@ -999,8 +1064,7 @@ void SKIP_memory_init(int argc, char** argv) {
 #endif
 
   if (is_create || fileName == NULL) {
-    size_t capacity = DEFAULT_CAPACITY;
-    capacity = parse_capacity(argc, argv);
+    size_t capacity = parse_capacity(argc, argv);
     sk_create_mapping(fileName, capacity);
   } else {
     sk_load_mapping(fileName);

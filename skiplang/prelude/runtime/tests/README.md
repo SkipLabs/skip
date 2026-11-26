@@ -44,11 +44,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # Sparse heap without a persistent file
 
-Without a persistent file, the runtime reserves its whole capacity (16 GiB by
-default) as one anonymous mapping. It must use `MAP_NORESERVE`, or heuristic
-overcommit refuses it on hosts with less RAM plus swap (#1589). This test
-checks the kernel's `nr` flag on the mapping, which does not depend on the
-host's overcommit policy.
+Without a persistent file, the runtime reserves its whole capacity (the
+host's memory, at most 16 GiB, by default) as one anonymous mapping. It must
+use `MAP_NORESERVE`, or heuristic overcommit refuses it on hosts with less
+RAM plus swap (#1589). This test checks the kernel's `nr` flag on the
+mapping, which does not depend on the host's overcommit policy.
 
 ```sh
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
@@ -60,9 +60,10 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # Default capacity and its overrides
 
-The runtime's default mapping capacity is 16 GiB. `SKIP_CAPACITY` raises it
-when a workload needs more, and `--capacity` wins over the environment. This
-test pins the default value and both override paths.
+The runtime's default mapping capacity adapts to the host's available memory
+(clamped to [1 GiB, 16 GiB]; on Linux a cgroup memory limit lowers it). This
+test pins the clamp bounds and checks that `SKIP_CAPACITY` raises the default
+when a workload needs more, with `--capacity` winning over the environment.
 
 ```sh
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \

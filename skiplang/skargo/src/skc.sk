@@ -15,10 +15,10 @@ class Skc(cmd: String, extra_options: Array<String>) {
       cmd => this.cmd,
       args => this.extra_options.filter(o -> !profile_options.contains(o)),
     };
-    // Compiling the compiler itself needs more than the runtime's 16 GiB
-    // default capacity. Raise it to 64 GiB via SKIP_CAPACITY; the mapping is
-    // sparse, so nothing is allocated up front. Keep explicit user limits
-    // intact.
+    // Compiling the compiler itself needs more than the runtime's adaptive
+    // default capacity (the host's memory, capped at 16 GiB). Raise it to
+    // 64 GiB via SKIP_CAPACITY; the mapping is sparse, so nothing is
+    // allocated up front. Keep explicit user limits intact.
     if (Environ.varOpt("SKIP_CAPACITY").default("") == "") {
       process.env("SKIP_CAPACITY", "64G")
     };
