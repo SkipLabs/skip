@@ -1,0 +1,230 @@
+module alias T = SKTest;
+
+module SkargoCompilerFingerprintTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, contents: String): void {
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(path)])
+      .fromSuccess()
+      .success(),
+  );
+  FileSystem.writeTextFile(path, contents)
+}
+
+@allow_tracked_call
+untracked fun write_wrapper(
+  path: String,
+  real_skc: String,
+  version: String,
+): void {
+  write_file(
+    path,
+    "#!/bin/sh\n" +
+      "if [ \"$1\" = \"--version\" ]; then\n" +
+      `  echo "${version}"\n` +
+      "  exit 0\n" +
+      "fi\n" +
+      `exec "${real_skc}" "$@"\n`,
+  );
+  T.expectTrue(
+    System.subprocess(Array["chmod", "+x", path]).fromSuccess().success(),
+  )
+}
+
+@allow_tracked_call
+untracked fun build_with_skc(
+  skargo: String,
+  app_dir: String,
+  target_dir: String,
+  skc: String,
+): System.CompletedProcess {
+  System.popen{
+    args => Array[skargo, "build", "--lib", "--target-dir", target_dir],
+    env => Map["SKARGO_BIN" => "skargo", "SKC" => skc],
+    cwd => Some(app_dir),
+  }.fromSuccess()
+}
+
+@allow_tracked_call
+untracked fun resolve_skc(): String {
+  cmd = Environ.varOpt("SKC").default("skc");
+  p = System.subprocess(
+    Array["sh", "-c", "command -v \"$1\"", "sh", cmd],
+  ).fromSuccess();
+  T.expectTrue(p.success(), `could not resolve skc (${cmd}): ${p.stderr}`);
+  p.stdout.trim()
+}
+
+// `compute_skc_identity` must handle paths with spaces safely, follow symlinks
+// to the real executable (so two symlinks to the same binary share identity),
+// and change when the executable's version, path, mtime, or size changes.
+@test
+fun test_compute_skc_identity_tracks_compiler_changes(): void {
+  real_skc = resolve_skc();
+  root = Path.join(kManifestDir, "target", "it-compiler-identity");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+
+  // Path containing a space — must not break `command -v`.
+  spaced = Path.join(root, "dir with space", "skc");
+  write_wrapper(spaced, real_skc, "skc 0.1.0 (aaaaaaa)");
+  id_spaced = Skargo.compute_skc_identity(spaced);
+  T.expectTrue(id_spaced.startsWith("skc 0.1.0 (aaaaaaa)|"), id_spaced);
+  T.expectTrue(id_spaced.contains("/dir with space/skc|"), id_spaced);
+  T.expectTrue(!id_spaced.contains("unknown-path"), id_spaced);
+
+  // A symlink pointing at the same executable resolves to the same identity.
+  link = Path.join(root, "link-dir", "skc");
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(link)])
+      .fromSuccess()
+      .success(),
+  );
+  T.expectTrue(
+    System.subprocess(Array["ln", "-s", spaced, link]).fromSuccess().success(),
+  );
+  T.expectEq(Skargo.compute_skc_identity(link), id_spaced);
+
+  // Same path and mtime, different size (e.g. an in-place rebuild finishing in
+  // the same second) must still change the identity.
+  same_time = "202001010000.00";
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", same_time, spaced])
+      .fromSuccess()
+      .success(),
+  );
+  id_before_resize = Skargo.compute_skc_identity(spaced);
+  FileSystem.appendTextFile(spaced, "# extra comment to change file size\n");
+  T.expectTrue(
+    System.subprocess(Array["touch", "-t", same_time, spaced])
+      .fromSuccess()
+      .success(),
+  );
+  id_after_resize = Skargo.compute_skc_identity(spaced);
+  T.expectTrue(
+    id_before_resize != id_after_resize,
+    `expected size change to invalidate skc identity: ${id_before_resize}`,
+  );
+
+  // A different compiler path with a different version produces a different id.
+  other = Path.join(root, "other", "skc");
+  write_wrapper(other, real_skc, "skc 0.2.0 (bbbbbbb)");
+  T.expectTrue(Skargo.compute_skc_identity(other) != id_after_resize)
+}
+
+// Regression test for #1500: sharing a `--target-dir` across two different
+// `skc` binaries must invalidate fingerprints and rebuild instead of silently
+// reporting `Fresh`, and a foreign `state.db` left behind by the previous
+// compiler must be discarded and reinitialized cleanly instead of aborting.
+@test
+fun test_switching_compiler_rebuilds_and_recovers_foreign_state_db(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      print_string(
+        "skipping: merged-mode only, run `skargo test` in the dev profile",
+      );
+      return void
+    };
+    Environ.current_exe()
+  };
+
+  real_skc = resolve_skc();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-compiler-fingerprint");
+  T.expectTrue(
+    System.subprocess(Array["rm", "-rf", root]).fromSuccess().success(),
+  );
+
+  app_dir = Path.join(root, "app");
+  target_dir = Path.join(root, "shared-target");
+  skc_a = Path.join(root, "toolchain-a", "skc");
+  skc_b = Path.join(root, "toolchain-b", "skc");
+  write_wrapper(skc_a, real_skc, "skc 0.1.0 (compilerA)");
+  write_wrapper(skc_b, real_skc, "skc 0.2.0 (compilerB)");
+
+  write_file(
+    Path.join(app_dir, "Skargo.toml"),
+    `[package]\nname = "fp-probe"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+  );
+  write_file(
+    Path.join(app_dir, "src/lib.sk"),
+    "module FpProbe;\nfun value(): Int { 42 }\nmodule end;\n",
+  );
+
+  // 1. Initial build with compiler A compiles the package.
+  first = build_with_skc(skargo, app_dir, target_dir, skc_a);
+  T.expectTrue(first.success(), first.stderr);
+  T.expectTrue(
+    first.stderr.contains("Compiling: fp-probe"),
+    `expected initial build to compile fp-probe:\n${first.stderr}`,
+  );
+
+  // 2. Repeating with the same compiler A stays Fresh (no spurious rebuild).
+  same = build_with_skc(skargo, app_dir, target_dir, skc_a);
+  T.expectTrue(same.success(), same.stderr);
+  T.expectTrue(
+    same.stderr.contains("Fresh: fp-probe"),
+    `expected repeat build with same compiler to be Fresh:\n${same.stderr}`,
+  );
+  T.expectTrue(
+    !same.stderr.contains("Compiling: fp-probe"),
+    `unexpected rebuild with unchanged compiler:\n${same.stderr}`,
+  );
+
+  // 3. Simulate a foreign state.db written by compiler A (different build-id
+  //    in the persistent mapping header), then switch to compiler B on the
+  //    same target dir. Without touching any source file, compiler B must
+  //    invalidate the fingerprint, discard the foreign state.db, and rebuild.
+  databases = FileSystem.readFilesRecursive(
+    Path.join(target_dir, ".fingerprints"),
+    f -> Path.basename(f) == "state.db" && f.contains("/fp-probe-"),
+  ).toArray();
+  T.expectTrue(!databases.isEmpty(), "expected fp-probe state.db to exist");
+  for (db in databases) {
+    T.expectTrue(
+      System.subprocess(
+        Array[
+          "sh",
+          "-c",
+          "printf '\\377' | dd of=\"$0\" bs=1 seek=20 conv=notrunc 2>/dev/null",
+          db,
+        ],
+      )
+        .fromSuccess()
+        .success(),
+    )
+  };
+
+  switched = build_with_skc(skargo, app_dir, target_dir, skc_b);
+  T.expectTrue(switched.success(), switched.stderr);
+  T.expectTrue(
+    switched.stderr.contains("Compiling: fp-probe"),
+    `switching compilers must rebuild instead of reporting Fresh:\n${
+      switched.stderr
+    }`,
+  );
+  T.expectTrue(
+    !switched.stderr.contains("Fresh: fp-probe"),
+    `switching compilers must not report fp-probe Fresh:\n${switched.stderr}`,
+  );
+  T.expectTrue(
+    switched.stderr.contains("Discarding:"),
+    `switching compilers must discard foreign state.db:\n${switched.stderr}`,
+  );
+
+  // 4. Repeating with compiler B is now Fresh again.
+  after = build_with_skc(skargo, app_dir, target_dir, skc_b);
+  T.expectTrue(after.success(), after.stderr);
+  T.expectTrue(
+    after.stderr.contains("Fresh: fp-probe"),
+    `expected repeat build with compiler B to be Fresh:\n${after.stderr}`,
+  )
+}
+
+module end;
