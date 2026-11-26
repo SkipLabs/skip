@@ -748,36 +748,48 @@ ensure_clone() {
 }
 
 # --- self-update --------------------------------------------------------------
-# When a newer version of this script has been pushed to origin/$BASE_BRANCH,
-# download it, sanity-check it, and re-exec it with the same arguments (exec
-# keeps the pid, so the lock stays valid). Skipped when the running file has
-# uncommitted local modifications (dev mode) or MERGE_BOT_NO_SELF_UPDATE is set.
+# When a newer version of this script has been pushed to origin/$BASE_BRANCH of
+# the repo that CONTAINS the script (not $REPO: skjs et al. run a thin wrapper
+# that execs this script, so cwd/$CLONE may belong to a different repo —
+# comparing against $CLONE there would "update" to the wrapper forever), the
+# bot downloads it, sanity-checks it, and re-execs it with the same arguments
+# (exec keeps the pid, so the lock stays valid). Skipped when the running file
+# has uncommitted local modifications (dev mode), when the running file is the
+# downloaded copy itself (loop breaker), or when MERGE_BOT_NO_SELF_UPDATE=1.
+
+self_update_repo() { # echoes the toplevel of the repo containing the running script
+    git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null
+}
 
 self_update_plan() { # echoes the remote blob sha when an update is available; else empty
-    local rel script_rel local_blob head_blob remote_blob
+    local srepo rel script_rel local_blob head_blob remote_blob
     [ -n "$CLONE" ] || return 0
+    srepo=$(self_update_repo) || return 0
+    # loop breaker: the downloaded copy in the state dir is the newest we know
+    [ "$(cd "$SCRIPT_DIR" && pwd -P)" = "$(cd "$STATE_DIR" 2>/dev/null && pwd -P)" ] && return 0
     rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
     script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
     local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null) || return 0
-    head_blob=$(git -C "$SCRIPT_DIR" rev-parse "HEAD:$script_rel" 2>/dev/null) || head_blob=""
+    head_blob=$(git -C "$srepo" rev-parse "HEAD:$script_rel" 2>/dev/null) || head_blob=""
     if [ -n "$head_blob" ] && [ "$local_blob" != "$head_blob" ]; then
         return 0 # running with local modifications: do not auto-update
     fi
-    git -C "$CLONE" fetch -q origin "$BASE_BRANCH" >>"$LOG_FILE" 2>&1 || return 0
-    remote_blob=$(git -C "$CLONE" rev-parse "origin/$BASE_BRANCH:$script_rel" 2>/dev/null) || return 0
+    git -C "$srepo" fetch -q origin "$BASE_BRANCH" >>"$LOG_FILE" 2>&1 || return 0
+    remote_blob=$(git -C "$srepo" rev-parse "origin/$BASE_BRANCH:$script_rel" 2>/dev/null) || return 0
     [ "$remote_blob" = "$local_blob" ] && return 0
     echo "$remote_blob"
 }
 
 maybe_self_update() {
     [ -n "${MERGE_BOT_NO_SELF_UPDATE:-}" ] && return 0
-    local blob rel script_rel next local_blob
+    local blob srepo rel script_rel next local_blob
     blob=$(self_update_plan) || return 0
     [ -z "$blob" ] && return 0
+    srepo=$(self_update_repo) || return 0
     rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
     script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
     next="$STATE_DIR/merge-bot-next.sh"
-    git -C "$CLONE" show "origin/$BASE_BRANCH:$script_rel" >"$next" 2>>"$LOG_FILE" || return 0
+    git -C "$srepo" show "origin/$BASE_BRANCH:$script_rel" >"$next" 2>>"$LOG_FILE" || return 0
     if ! bash -n "$next" 2>>"$LOG_FILE"; then
         log "self-update: fetched $script_rel fails bash -n; keeping current version"
         rm -f "$next"
@@ -789,7 +801,7 @@ maybe_self_update() {
     export MERGE_BOT_STATE_DIR="$STATE_DIR"
     export MERGE_BOT_REPO="$REPO"
     local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null || echo '?')
-    log "self-update: $local_blob -> $blob ($script_rel @ origin/$BASE_BRANCH); re-exec"
+    log "self-update: $local_blob -> $blob ($script_rel @ $srepo origin/$BASE_BRANCH); re-exec"
     exec bash "$next" "${SELF_ARGS[@]}"
 }
 
@@ -1919,6 +1931,21 @@ EOF
     git -C "$su/run" fetch -q origin main
     git -C "$su/run" reset -q --hard origin/main
     check "self-update: empty when running version matches origin/main" "" "$(self_update_plan)"
+    # wrapper scenario (skjs): the script lives in repo A, but cwd/$CLONE is
+    # repo B whose origin/main has a DIFFERENT bin/merge-bot.sh (the wrapper).
+    # The plan must compare against the script's own repo (A), not $CLONE (B).
+    git -C "$su" init -q -b main other
+    mkdir -p "$su/other/bin"
+    printf '#!/bin/sh\nexec ../skip/bin/merge-bot.sh "$@"\n' >"$su/other/bin/merge-bot.sh"
+    $g -C "$su/other" add . && $g -C "$su/other" commit -qm wrapper
+    git -C "$su" clone -q --bare other other.git
+    git -C "$su/other" remote add origin "$su/other.git"
+    CLONE="$su/other"
+    check "self-update: ignores \$CLONE repo when script lives elsewhere (wrapper loop)" "" "$(self_update_plan)"
+    # loop breaker: running the downloaded copy in the state dir never re-updates
+    SCRIPT_DIR="$su/state" CLONE="$su/other"
+    check "self-update: loop breaker on the downloaded copy in the state dir" "" "$(self_update_plan)"
+    CLONE="$su/clone"
     SCRIPT_DIR=$saved_sd CLONE=$saved_clone STATE_DIR=$saved_state LOG_FILE="$tdir/selftest.log"
     rm -rf "$su"
     unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
