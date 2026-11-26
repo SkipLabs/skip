@@ -44,31 +44,29 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 ### Pure `~>` closures cannot capture mutable variables; use `->`
 
-Source: review (mixed positional/named params work, PR #1738). A pure lambda (`~>`) may not capture a mutable variable (e.g. a `BufferedPrinter.Out`) — declare the lambda `->` instead. Related: a plain `fun` helper invoked on a mutable object must be declared `readonly fun`.
+A pure lambda (`~>`) may not capture a mutable variable — declare it `->` instead. A plain `fun` helper invoked on a mutable object must be `readonly fun`.
 
 ### Write non-terminating loops with `loop`, not `while (true)`
 
-Source: review (PR #1738). `while (true)` is rejected by the compiler; use `loop { ... }` for non-terminating loops.
+`while (true)` is rejected; use `loop { ... }` for non-terminating loops.
 
 ### `values()` returns a mutable `Iterator`, not a collection; `Array` has `zip`, not `combine`
 
-Source: review (PR #1738). `UMap.values()` returns a mutable `Iterator`, and iterators have no `.toArray()` — use `.items().map(...)` / `.collect(Array)` to get a collection. `Array` has `.zip`; `.combine` exists only on `Parameters`.
+`UMap.values()` returns a mutable `Iterator`; iterators have no `.toArray()` — use `.items().map(...)` / `.collect(Array)` to get a collection. `Array` has `.zip`; `.combine` is on `Parameters`.
 
 ### Lambda parameters cannot have default values
 
-Source: review (PR #1738). Lambdas reject default parameter values language-wide (`(x = 1) => ...`); any new lambda parse path must reject `=` explicitly, or it ICEs later in `ensureIsExpression`.
+Lambda parameters cannot have default values — `(x = 1) => ...` is rejected.
 
 ### `Ref(42)` const-folds to one shared image constant
 
-Source: review (triage of #1724). Two `Ref(42)` are the *same* pointer — use `Array::mfill` when a test needs distinct objects.
+Two `Ref(42)` are the *same* pointer — use `Array::mfill` when a test needs distinct objects.
 
 ### The void literal is `void`, not `()`
 
-Source: review (triage of #1724).
-
 ### `--export-function-as` needs the module-qualified name
 
-Source: review (triage of #1724). Pass e.g. `Runtime_PhysEq.main=skip_main`; otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
+Pass e.g. `Runtime_PhysEq.main=skip_main`; otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
 
 ### 2026-11-26 — Initialize config-like state in the constructor, not by assigning a mutable field after construction
 
