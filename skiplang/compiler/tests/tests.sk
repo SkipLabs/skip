@@ -2,20 +2,33 @@ module alias T = SKTest;
 
 module SkcTests;
 
+// Commands that invoke `skc` are prefixed with `env SKARGO_BIN=skc` (see
+// kSkcDispatch): in merged dev builds the `skc` on PATH is a hardlink to the
+// package's merged binary, whose generated dispatcher prefers SKARGO_BIN over
+// argv[0]. `skargo test` sets SKARGO_BIN=test in this process's environment, so
+// a bare `skc` subprocess would inherit it and be dispatched to the *test*
+// harness instead of the compiler — `skc --batch` then fails with "Invalid
+// argument --batch", writes no `.err` sidecars, and the workers reading them
+// crash (exit 45, surfaced as SubprocessCrash, #1451). Standalone binaries
+// (release profile, freshly compiled test bins) ignore the variable.
+const kSkcDispatch: Array<String> = Array["env", "SKARGO_BIN=skc"];
+
 private fun compile_cmd(
   files: readonly Sequence<String>,
   output: String,
   mainFn: String = "main",
 ): Array<String> {
-  Array[
-    "skc",
-    "-O0",
-    "--no-inline",
-    "--export-function-as",
-    mainFn + "=skip_main",
-    "-o",
-    output,
-  ].concat(files.collect(Array))
+  kSkcDispatch.concat(
+    Array[
+      "skc",
+      "-O0",
+      "--no-inline",
+      "--export-function-as",
+      mainFn + "=skip_main",
+      "-o",
+      output,
+    ].concat(files.collect(Array)),
+  )
 }
 
 private fun genValidTest(basename: String, mainFn: String): void {
@@ -86,10 +99,21 @@ private fun runInvalidFromBatch(basename: String): void {
     // It produced an artifact — an invalid test must fail to compile.
     T.fail("Expected compile error")
   };
+  errFile = output + ".err";
+  if (!FileSystem.exists(errFile)) {
+    // Guard the read: FileSystem.readTextFile hard-exits the whole worker
+    // process (runtime ERROR_FILE_IO, exit code 45) when the file is missing,
+    // which the harness then reports as a SubprocessCrash for every unreported
+    // test of that worker (#1451). Fail this one test properly instead.
+    T.fail(
+      `Missing batch result ${errFile}: the batch compile did not produce ` +
+        `it (rerun the shard's \`skc --batch\` manifest by hand to see why)`,
+    )
+  };
   // NOTE: The `.trim()` is needed because error messages seem to currently
   // have an extra newline. The `.err` sidecar holds the same rendered errors a
   // one-shot `skc` writes to stderr, so this matches the old comparison.
-  actual = FileSystem.readTextFile(output + ".err").trim();
+  actual = FileSystem.readTextFile(errFile).trim();
   expected = FileSystem.readTextFile(basename + ".exp_err").trim();
 
   T.expectEq(actual, expected)
@@ -134,13 +158,39 @@ private fun batchCompileInvalid(
       FileSystem.writeTextFile(manifest, shard.join("\n"));
       // `--batch` exits 2 when units fail (expected here) and prints their
       // errors to stderr; we read results from the scratch dir, so discard it.
-      cmds.push(`skc --batch '${manifest}' -O0 --no-inline >/dev/null 2>&1`)
+      cmds.push(
+        `env SKARGO_BIN=skc skc --batch '${manifest}' -O0 --no-inline >/dev/null 2>&1`,
+      )
     }
   };
 
   if (!cmds.isEmpty()) {
     // Run the shards concurrently and wait for all of them.
-    _ = System.subprocess(Array["sh", "-c", cmds.join(" & ") + " & wait"])
+    _ = System.subprocess(Array["sh", "-c", cmds.join(" & ") + " & wait"]);
+    // Diagnose a batch that produced no results at all (e.g. the `skc` on PATH
+    // got dispatched to the wrong entry and exited immediately): the shard
+    // stderr is discarded above, so without this the cause is invisible and
+    // every invalid test just reports a missing batch result (#1451).
+    missing = 0;
+    for (b in basenames) {
+      (suite, name) = b.stripPrefix("invalid_tests/").splitLast("/");
+      if (!shouldRun(suite, name)) continue;
+      out = batchOutput(b);
+      if (!FileSystem.exists(out) && !FileSystem.exists(out + ".err")) {
+        !missing = missing + 1
+      }
+    };
+    if (missing > 0) {
+      print_error(
+        `batchCompileInvalid: ${missing} unit(s) have neither artifact nor ` +
+          `.err sidecar in ${outDir}; the batch compile itself failed — ` +
+          `rerun \`skc --batch '${Path.join(
+            outDir,
+            "shard_0.manifest",
+          )}' -O0 --no-inline\` ` +
+          `from the package directory to see the error\n`,
+      )
+    }
   }
 }
 
@@ -327,9 +377,10 @@ private fun boundsPassEliminatesCheck(): void {
   );
   compile = (output, extra) ~>
     System.subprocess(
-      Array["skc", "--emit=llvm-ir", "-o", output].concat(extra).concat(
-        Array[source],
-      ),
+      kSkcDispatch
+        .concat(Array["skc", "--emit=llvm-ir", "-o", output])
+        .concat(extra)
+        .concat(Array[source]),
     ).fromSuccess();
   on = compile(onLl, Array<String>[]);
   T.expectTrue(on.success(), "compile with bounds: " + on.stderr);
@@ -3328,7 +3379,9 @@ untracked fun main(): void {
         T.Test{
           name => "CompilerVersionCheck",
           func => () ~> {
-            p = System.subprocess(Array["skc", "--version"]).fromSuccess();
+            p = System.subprocess(
+              kSkcDispatch.concat(Array["skc", "--version"]),
+            ).fromSuccess();
             invariant(
               p.stdout.contains(compiledBy),
               `Test binary compiled by skc (${compiledBy}) but PATH skc ` +
