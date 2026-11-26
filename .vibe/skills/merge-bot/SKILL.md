@@ -61,6 +61,11 @@ action=$(jq -r .action <<<"$dec")
      - rc 11 → not processable (draft / no auto-merge / fork / rebase stuck
        without conflicts): note it, back to `pick`.
      - rc 0 → rebased cleanly; `out` is JSON with `new_head`. Go to step 3.
+       (Conflicts that only touch `version = "..."` lines in `Skargo.toml`
+       files are auto-resolved by `prepare` itself — the PR's intended bump
+       kind (patch/minor/major vs the merge-base version) is applied on top of
+       main's version — so
+       rc 0 can also mean "version bump clash handled scriptedly".)
      - rc 10 → conflicts; `out` is JSON with `worktree`, `conflicted`,
        `verdict_file`. Go to step 2.
   2. **Conflicts — spawn a sub-agent.** Spawn a child session whose first

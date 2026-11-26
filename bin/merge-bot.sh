@@ -59,6 +59,11 @@
 #                        ignored-red), in-flight worktrees, recent log lines
 #   watch [seconds]      Refreshing dashboard (default 15s); Ctrl-C to stop
 #   prepare <pr>         Rebase the PR onto origin/main in the bot's worktree.
+#                        Conflicts that only touch `version = "..."` lines in
+#                        Skargo.toml files are resolved automatically (the PR's
+#                        intended bump kind vs the merge-base version is applied
+#                        on top of main's version) and the rebase is continued;
+#                        anything else is left for the conflict fixer
 #                        Exit 0 = rebased cleanly (JSON on stdout);
 #                        exit 10 = conflicts, worktree left mid-rebase (JSON
 #                        with worktree/conflicted/verdict_file on stdout);
@@ -603,6 +608,133 @@ pr_guard() { # $1 = pr json; sets PR_BRANCH/PR_BASE/PR_FORK/PR_HEAD_URL; exits N
     if [ "$auto" != "true" ]; then log "PR $n: auto-merge not enabled, skipping"; exit "$EXIT_NOT_READY"; fi
 }
 
+# --- scripted fast path: version-only Skargo.toml conflicts ------------------
+# A rebase commonly clashes on Skargo.toml `version = "..."` lines when both
+# sides bumped the same package's semver. When every conflicted file is a
+# Skargo.toml whose conflict blocks touch nothing but version lines, resolve
+# them in place (applying the PR's intended bump kind — patch/minor/major vs
+# the merge-base version — on top of main's version) and continue the rebase without
+# spawning a fixer agent.
+
+skargo_version_resolve() { # $1 = worktree ("-" = no git, no base version) $2 = repo-relative conflicted Skargo.toml
+    # Rewrites in place; rc 0 = resolved. Resolution rule: the PR side
+    # ("theirs") intended some semver bump relative to the merge-base version
+    # (git stage 1); apply that same bump kind on top of main's ("ours")
+    # version. Without a base version, fall back to the higher version.
+    local work=$1 f=$2 tmp base
+    tmp="$work/$f.mb-fastpath"
+    base=""
+    if [ "$work" != "-" ]; then
+        base=$(git -C "$work" show ":1:$f" 2>/dev/null |
+            sed -n 's/^[ \t]*version[ \t]*=[ \t]*"\([^"]*\)".*/\1/p' | head -1)
+    fi
+    # shellcheck disable=SC2016 # single quotes intentional: perl program
+    perl -0777 -e '
+        sub vcmp { # dotted-numeric compare (1.10.0 > 1.2.0)
+            my ($a, $b) = @_;
+            my @a = split /\./, $a;
+            my @b = split /\./, $b;
+            my $n = @a > @b ? scalar @a : scalar @b;
+            for my $i (0 .. $n - 1) {
+                my $x = defined $a[$i] ? $a[$i] : "0";
+                my $y = defined $b[$i] ? $b[$i] : "0";
+                if ($x =~ /^\d+$/ && $y =~ /^\d+$/) {
+                    return $x <=> $y if $x != $y;
+                } else {
+                    my $c = $x cmp $y;
+                    return $c if $c;
+                }
+            }
+            return 0;
+        }
+        sub bump_kind { # "major"/"minor"/"patch" of $v relative to base $b
+            my ($b, $v) = @_;
+            my @b = split /\./, $b;
+            my @v = split /\./, $v;
+            return "major" if ($b[0] // 0) != ($v[0] // 0);
+            return "minor" if ($b[1] // 0) != ($v[1] // 0);
+            return "patch";
+        }
+        sub apply_bump { # apply bump kind $k to version $o
+            my ($o, $k) = @_;
+            my @o = split /\./, $o;
+            if ($k eq "major") { $o[0] = ($o[0] // 0) + 1; $o[1] = 0; $o[2] = 0; }
+            elsif ($k eq "minor") { $o[1] = ($o[1] // 0) + 1; $o[2] = 0; }
+            else { $o[2] = ($o[2] // 0) + 1; }
+            return join ".", map { defined $_ ? $_ : 0 } @o[0 .. 2];
+        }
+        my $f = $ARGV[0];
+        my $base = $ARGV[1] // "";
+        open my $fh, "<", $f or exit 1;
+        my $c = do { local $/; <$fh> };
+        close $fh;
+        my $out = "";
+        while (length $c) {
+            if ($c =~ s/\A(.*?)^<<<<<<< [^\n]*\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]*(\n?)//ms) {
+                my ($pre, $ours, $theirs, $nl) = ($1, $2, $3, $4);
+                $out .= $pre;
+                my @ol = grep { /\S/ } split /\n/, $ours;
+                my @tl = grep { /\S/ } split /\n/, $theirs;
+                my ($ind, $ov, $tv);
+                if (@ol == 1 && $ol[0] =~ /^([ \t]*)version[ \t]*=[ \t]*"([^"]+)"[ \t]*$/) {
+                    ($ind, $ov) = ($1, $2);
+                } else {
+                    exit 1; # not a version-only conflict: leave the file alone
+                }
+                if (@tl == 1 && $tl[0] =~ /^[ \t]*version[ \t]*=[ \t]*"([^"]+)"[ \t]*$/) {
+                    ($tv) = ($1);
+                } else {
+                    exit 1;
+                }
+                my $keep;
+                if ($base ne "" && $ov =~ /^\d+\.\d+\.\d+$/ && $tv =~ /^\d+\.\d+\.\d+$/ && $base =~ /^\d+\.\d+\.\d+$/) {
+                    if (vcmp($tv, $base) <= 0) {
+                        $keep = $ov; # PR side did not bump: keep the ours version
+                    } else {
+                        # apply the intended bump kind of the PR side on top of the ours version
+                        $keep = apply_bump($ov, bump_kind($base, $tv));
+                    }
+                } else {
+                    $keep = vcmp($ov, $tv) >= 0 ? $ov : $tv; # no base: higher wins
+                }
+                $out .= "${ind}version = \"$keep\"$nl";
+            } else {
+                $out .= $c;
+                last;
+            }
+        }
+        print $out;
+    ' "$work/$f" "$base" >"$tmp" || { rm -f "$tmp"; return 1; }
+    mv "$tmp" "$work/$f"
+}
+
+try_skargo_version_fastpath() { # $1 = worktree stopped mid-rebase; rc 0 = rebase completed
+    local work=$1 round=0 conflicted f bad
+    while :; do
+        round=$((round + 1))
+        [ "$round" -gt 100 ] && return 1
+        conflicted=$(git -C "$work" diff --name-only --diff-filter=U) || return 1
+        [ -z "$conflicted" ] && return 0
+        bad=0
+        while IFS= read -r f; do
+            case "$f" in
+                Skargo.toml | */Skargo.toml) skargo_version_resolve "$work" "$f" || { bad=1; break; } ;;
+                *) bad=1; break ;;
+            esac
+        done <<<"$conflicted"
+        [ "$bad" = 1 ] && return 1
+        while IFS= read -r f; do git -C "$work" add -- "$f"; done <<<"$conflicted"
+        if GIT_EDITOR=true git "${GIT_SIGN_OPTS[@]}" -C "$work" rebase --continue >>"$LOG_FILE" 2>&1; then
+            return 0
+        fi
+        if [ -d "$(git -C "$work" rev-parse --git-path rebase-merge)" ] ||
+            [ -d "$(git -C "$work" rev-parse --git-path rebase-apply)" ]; then
+            continue # stopped on a later commit's conflicts; re-validate those
+        fi
+        return 1
+    done
+}
+
 cmd_prepare() {
     local n=$1
     resolve_repo
@@ -628,21 +760,27 @@ cmd_prepare() {
     git "${GIT_SIGN_OPTS[@]}" -C "$work" rebase "origin/$PR_BASE" >>"$LOG_FILE" 2>&1 || rc=$?
     if [ "$rc" -ne 0 ]; then
         conflicted=$(git -C "$work" diff --name-only --diff-filter=U | jq -R . | jq -s .)
-        if [ "$conflicted" = "[]" ]; then
-            # stopped for a non-conflict reason (e.g. commit became empty)
-            git -C "$work" rebase --skip >>"$LOG_FILE" 2>&1 || true
-            if [ -d "$(git -C "$work" rev-parse --git-path rebase-merge)" ] ||
-                [ -d "$(git -C "$work" rev-parse --git-path rebase-apply)" ]; then
-                log "PR $n: rebase stopped without conflicts (rc=$rc), skipping"
-                exit "$EXIT_NOT_READY"
-            fi
+        if [ "$conflicted" != "[]" ] && try_skargo_version_fastpath "$work"; then
+            log "PR $n: version-only Skargo.toml conflicts auto-resolved; rebase complete"
+            rc=0
         else
-            mkdir -p "$STATE_DIR/verdicts" "$STATE_DIR/prompts"
-            local verdict="$STATE_DIR/verdicts/pr-$n"
-            rm -f "$verdict"
-            log "PR $n: rebase conflicts in: $(jq -r 'join(", ")' <<<"$conflicted") (worktree: $work)"
-            printf '%s' "{\"pr\":$n,\"worktree\":\"$work\",\"branch\":\"$PR_BRANCH\",\"base\":\"$PR_BASE\",\"conflicted\":$conflicted,\"verdict_file\":\"$verdict\",\"old_head\":\"$old\"}"
-            exit "$EXIT_CONFLICT"
+            conflicted=$(git -C "$work" diff --name-only --diff-filter=U | jq -R . | jq -s .)
+            if [ "$conflicted" = "[]" ]; then
+                # stopped for a non-conflict reason (e.g. commit became empty)
+                git -C "$work" rebase --skip >>"$LOG_FILE" 2>&1 || true
+                if [ -d "$(git -C "$work" rev-parse --git-path rebase-merge)" ] ||
+                    [ -d "$(git -C "$work" rev-parse --git-path rebase-apply)" ]; then
+                    log "PR $n: rebase stopped without conflicts (rc=$rc), skipping"
+                    exit "$EXIT_NOT_READY"
+                fi
+            else
+                mkdir -p "$STATE_DIR/verdicts" "$STATE_DIR/prompts"
+                local verdict="$STATE_DIR/verdicts/pr-$n"
+                rm -f "$verdict"
+                log "PR $n: rebase conflicts in: $(jq -r 'join(", ")' <<<"$conflicted") (worktree: $work)"
+                printf '%s' "{\"pr\":$n,\"worktree\":\"$work\",\"branch\":\"$PR_BRANCH\",\"base\":\"$PR_BASE\",\"conflicted\":$conflicted,\"verdict_file\":\"$verdict\",\"old_head\":\"$old\"}"
+                exit "$EXIT_CONFLICT"
+            fi
         fi
     fi
     new=$(git -C "$work" rev-parse HEAD)
@@ -1429,6 +1567,107 @@ cmd_selftest() {
     PATH_EST_BODY=$saved_body
     build_jq_defs "$PATH_EST_BODY"
     build_jq_programs
+
+    # Skargo.toml version fast-path: unit tests on synthetic conflicted files
+    local tdir g
+    tdir=$(mktemp -d)
+    LOG_FILE="$tdir/selftest.log"
+    # the e2e rebases below continue rebases (new commits): CI containers have
+    # no git identity configured, so provide one for the selftest
+    export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@t
+    export GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@t
+    cat >"$tdir/Skargo.toml" <<'EOF'
+[package]
+name = "foo"
+<<<<<<< HEAD
+version = "1.2.0"
+=======
+version = "1.10.0"
+>>>>>>> feat
+EOF
+    if skargo_version_resolve "$tdir" Skargo.toml; then
+        check "fastpath: version-only conflict resolved to higher semver (numeric, not lexical)" \
+            "1.10.0" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/Skargo.toml")"
+    else
+        check "fastpath: version-only conflict resolved to higher semver (numeric, not lexical)" "resolved" "rejected"
+    fi
+    cat >"$tdir/Skargo.toml" <<'EOF'
+[package]
+<<<<<<< HEAD
+name = "a"
+=======
+name = "b"
+>>>>>>> feat
+EOF
+    if skargo_version_resolve "$tdir" Skargo.toml; then
+        check "fastpath: non-version conflict is rejected" "rejected" "resolved"
+    else
+        check "fastpath: non-version conflict is rejected" "rejected" "rejected"
+    fi
+    check "fastpath: rejected file left untouched" "1" "$(grep -c '^<<<<<<<' "$tdir/Skargo.toml")"
+
+    # end-to-end: rebase conflicting only on Skargo.toml version -> completes
+    g="git -c user.email=t@t -c user.name=t -c commit.gpgsign=false"
+    mkdir -p "$tdir/repo"
+    git -C "$tdir/repo" init -q -b main
+    printf '[package]\nname = "x"\nversion = "1.0.0"\n' >"$tdir/repo/Skargo.toml"
+    $g -C "$tdir/repo" add . && $g -C "$tdir/repo" commit -qm base
+    $g -C "$tdir/repo" checkout -qb feat
+    printf '[package]\nname = "x"\nversion = "1.2.0"\n' >"$tdir/repo/Skargo.toml"
+    $g -C "$tdir/repo" commit -qam bump-feat
+    $g -C "$tdir/repo" checkout -q main
+    printf '[package]\nname = "x"\nversion = "1.1.0"\n' >"$tdir/repo/Skargo.toml"
+    $g -C "$tdir/repo" commit -qam bump-main
+    $g -C "$tdir/repo" checkout -q feat
+    $g -C "$tdir/repo" rebase main >/dev/null 2>&1 || true # stops on the version conflict
+    if try_skargo_version_fastpath "$tdir/repo"; then
+        check "fastpath: e2e rebase completed with higher version" \
+            "1.2.0" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/repo/Skargo.toml")"
+    else
+        check "fastpath: e2e rebase completed with higher version" "completed" "failed"
+    fi
+    # end-to-end bump-kind: base 1.0.0, main bumps minor (1.1.0), PR bumps patch
+    # (1.0.1) -> the PR's patch bump is applied on top of main's version (1.1.1),
+    # not dropped by a plain "higher wins" (which would give 1.1.0)
+    mkdir -p "$tdir/repo2"
+    git -C "$tdir/repo2" init -q -b main
+    printf '[package]\nname = "x"\nversion = "1.0.0"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" add . && $g -C "$tdir/repo2" commit -qm base
+    $g -C "$tdir/repo2" checkout -qb feat
+    printf '[package]\nname = "x"\nversion = "1.0.1"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" commit -qam bump-feat-patch
+    $g -C "$tdir/repo2" checkout -q main
+    printf '[package]\nname = "x"\nversion = "1.1.0"\n' >"$tdir/repo2/Skargo.toml"
+    $g -C "$tdir/repo2" commit -qam bump-main-minor
+    $g -C "$tdir/repo2" checkout -q feat
+    $g -C "$tdir/repo2" rebase main >/dev/null 2>&1 || true
+    if try_skargo_version_fastpath "$tdir/repo2"; then
+        check "fastpath: PR's bump kind applied on top of main's version (patch over minor -> 1.1.1)" \
+            "1.1.1" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/repo2/Skargo.toml")"
+    else
+        check "fastpath: PR's bump kind applied on top of main's version (patch over minor -> 1.1.1)" "completed" "failed"
+    fi
+    # end-to-end negative: conflict on a non-Skargo.toml file -> not touched
+    git -C "$tdir/repo" rebase --abort 2>/dev/null || true
+    $g -C "$tdir/repo" checkout -q main
+    printf 'base\n' >"$tdir/repo/README.md"
+    $g -C "$tdir/repo" add . && $g -C "$tdir/repo" commit -qm readme-base
+    $g -C "$tdir/repo" checkout -q feat
+    printf 'feat\n' >"$tdir/repo/README.md"
+    $g -C "$tdir/repo" add . && $g -C "$tdir/repo" commit -qm readme-feat
+    $g -C "$tdir/repo" checkout -q main
+    printf 'main\n' >"$tdir/repo/README.md"
+    $g -C "$tdir/repo" add . && $g -C "$tdir/repo" commit -qm readme-main
+    $g -C "$tdir/repo" checkout -q feat
+    $g -C "$tdir/repo" rebase main >/dev/null 2>&1 || true
+    if try_skargo_version_fastpath "$tdir/repo"; then
+        check "fastpath: non-Skargo conflict left for the fixer" "left" "resolved"
+    else
+        check "fastpath: non-Skargo conflict left for the fixer" "left" "left"
+    fi
+    git -C "$tdir/repo" rebase --abort 2>/dev/null || true
+    rm -rf "$tdir"
+    unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 
     if [ "$fails" -gt 0 ]; then
         echo "selftest: $fails failure(s)"
