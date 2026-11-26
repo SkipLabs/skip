@@ -274,8 +274,8 @@ if [[ -n "${STAGE:-}" ]]; then
 fi
 
 # Forward SKIP_CAPACITY to targets that invoke the Skip toolchain at build
-# time. Required on memory-constrained hosts (e.g. gen2 CircleCI builders)
-# where the runtime's 16 GiB default mapping would fail.
+# time, to raise or lower the capacity bound on memory-constrained hosts
+# (e.g. gen2 CircleCI builders).
 if [[ -n "${SKIP_CAPACITY:-}" ]]; then
     BAKE_ARGS+=(
         --set "skiplang.args.SKIP_CAPACITY=$SKIP_CAPACITY"

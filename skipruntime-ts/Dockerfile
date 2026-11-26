@@ -5,7 +5,7 @@ FROM skiplabs/skiplang-bin-builder AS build
 
 # Override at build time with --build-arg SKIP_CAPACITY=<value> to fit the
 # build host's memory budget. Empty (the default) preserves the runtime's
-# own 16 GiB sparse default for local dev builds.
+# own default: a small initial mapping that grows on demand up to 16 GiB.
 ARG SKIP_CAPACITY=
 ENV SKIP_CAPACITY=$SKIP_CAPACITY
 
