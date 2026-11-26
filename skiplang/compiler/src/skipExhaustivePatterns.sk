@@ -609,11 +609,11 @@ fun normalize_positional_params(
   params_of = cd -> {
     cd.params match {
     | N.NoParams()
-    | N.NativeConstruct _
-    | N.HasParams(N.Class_params{params => Named _}) ->
+    | N.NativeConstruct _ ->
       invariant_violation(
         "Internal error: encountered named parameters but was expecting positional",
       )
+    | N.HasParams(N.Class_params{params => Named _}) -> Array[]
     | N.HasParams(N.Class_params{params => Mixed(class_params, _, _)}) ->
       class_params
     | N.HasParams(N.Class_params{params => Positional(class_params)}) ->
@@ -901,7 +901,6 @@ fun print_pattern(
         acc1 + "{" + pats.join(", ") + "}"
       | Mixed(pats, map, nf) ->
         pos_str =
-          acc1 +
           "(" +
           pats
             .map(cur1 -> print_pattern(context, env, "", cur1.i1))
@@ -909,7 +908,6 @@ fun print_pattern(
           ")";
         named_values = canonicalize_params(context, env, tid, map);
         named_str =
-          acc1 +
           "{" +
           named_values
             .map(nm_pat -> {
@@ -920,7 +918,7 @@ fun print_pattern(
             })
             .join(", ") +
           "}";
-        if (nf) named_str + pos_str else pos_str + named_str
+        acc1 + (if (nf) named_str + pos_str else pos_str + named_str)
       }
     }
   | TAst.Pat_var((_, x, _)) -> acc + AUtils.string_of_name(x)
@@ -1084,21 +1082,60 @@ fun normalize_param_patterns(
   parent_tid: TAst.Type_identifier,
   other_pats: Parameters<TAst.ParamPattern>,
 ): Parameters<TAst.ParamPattern> {
-  other_pats match {
-  | Named _ -> normalize_params_if_named(context, pos, child_tid, other_pats)
-  | Positional(lpats) ->
-    Positional(
-      normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
-    )
-  | Mixed(lpats, nmap, nf) ->
-    normalize_params_if_named(context, pos, child_tid, Named(nmap)) match {
-    | Named(normalized_named) ->
+  // The pattern carries the parent's parameter shape, but the result must
+  // have the child's shape. When the child is mixed, keep the supplied group
+  // and fill the other group with wildcards.
+  child_params = SkipNaming.getClass(context, resolve_tid(child_tid)).params;
+  child_params match {
+  | N.HasParams(N.Class_params{params => Mixed(_, _, nf)}) ->
+    (pos_part, named_part) = other_pats match {
+    | Positional(l) -> (l, UMap[])
+    | Named(m) -> (Array[], m)
+    | Mixed(l, m, _) -> (l, m)
+    };
+    normalize_params_if_named(
+      context,
+      pos,
+      child_tid,
+      Named(named_part),
+    ) match {
+    | Named(nm) ->
       Mixed(
-        normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
-        normalized_named,
+        normalize_positional_params(
+          context,
+          pos,
+          child_tid,
+          parent_tid,
+          pos_part,
+        ),
+        nm,
         nf,
       )
     | _ -> invariant_violation("ICE normalize mixed named params")
+    }
+  | _ ->
+    other_pats match {
+    | Named _ -> normalize_params_if_named(context, pos, child_tid, other_pats)
+    | Positional(lpats) ->
+      Positional(
+        normalize_positional_params(context, pos, child_tid, parent_tid, lpats),
+      )
+    | Mixed(lpats, nmap, nf) ->
+      normalize_params_if_named(context, pos, child_tid, Named(nmap)) match {
+      | Named(normalized_named) ->
+        Mixed(
+          normalize_positional_params(
+            context,
+            pos,
+            child_tid,
+            parent_tid,
+            lpats,
+          ),
+          normalized_named,
+          nf,
+        )
+      | _ -> invariant_violation("ICE normalize mixed named params")
+      }
     }
   }
 }
@@ -1334,18 +1371,11 @@ fun expand_no_params(
   cd = SkipNaming.getClass(context, resolve_tid(tid));
   (param_opt, cd.params) match {
   | (None(), N.HasParams(cp)) ->
-    if (cp.params is Mixed _) {
-      // A type-only pattern on a class with mixed constructor parameters
-      // matches opaquely: no fields are destructured (mixed patterns are
-      // rejected during typing).
-      Some((Positional(Array[]) : Parameters<TAst.ParamPattern>))
-    } else {
-      wild_params = cp.params.map(_ -> {
-        wc_pat = make_wildcard_pat(pos);
-        (wc_pat.i0, wc_pat)
-      });
-      Some(wild_params)
-    }
+    wild_params = cp.params.map(_ -> {
+      wc_pat = make_wildcard_pat(pos);
+      (wc_pat.i0, wc_pat)
+    });
+    Some(wild_params)
   | _ -> param_opt
   }
 }
