@@ -156,7 +156,7 @@ logs, prompts, verdicts) also lives under the state dir, outside the repo.
 
 - `bin/merge-bot.sh --help` — commands and exit codes (10 conflicts /
   non-trivial skip, 11 not processable, 12 required CI failed, 13 wait
-  timeout, 14 auto-merge off).
+  timeout, 14 auto-merge off, 15 staled/`BEHIND`).
 - `references/fix-conflicts.md` — conflict-fixer brief.
 - `references/fix-ci.md` — CI-fixer brief.
 - this repo's contributor docs, "Merge bot" section (HACKING.md here).

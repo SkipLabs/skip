@@ -28,13 +28,20 @@ follow it.
    from the `ci/circleci:` job names to local commands:
    - `fast-checks` → `make check-fmt` and `make check-sh`
    - `compiler` / `compiler-tests` → `cd skiplang/compiler && make STAGE=1` and
-     `SKTEST_JOBS=8 ../../bin/run-sktest.sh`
-   - `prelude` → `cd skiplang/prelude && SKTEST_JOBS=8 ../../bin/run-sktest.sh`
-   - `skargo` / `skdb` / `skdb-wasm` / `skipruntime` / `skipruntime-bun` /
-     `skdate` / `skjson` / `cli` / `toml` / `semver` / `sktest` / `arparser` /
-     `sqlparser` / `check-ts` → the matching `make` target / `run-sktest.sh`
-     suite in that package (see HACKING.md)
-   - `backend-regressions` → `skiplang/compiler/tools/run_backend_tests.py`
+     `SKTEST_PROFILE=release SKTEST_JOBS=8 PATH=$PWD/stage1/bin:$PATH ../../bin/run-sktest.sh`
+     (plus `bash ../prelude/runtime/tests/run.sh` for runtime C/Wasm failures)
+   - `backend-regressions` →
+     `cd skiplang/compiler && python3 tools/run_backend_tests.py --compiler stage1/bin/skc --sysroot stage1/target/host/release/deps --legacy-compiler stage0/bin/skc --scratch /tmp/skc-backend-checks`
+   - `skargo` → `cd skiplang/compiler && make STAGE=1`, then
+     `cd ../skargo && PATH="$PWD/../compiler/stage1/bin:$PATH" SKTEST_SKCOPT=--release SKTEST_JOBS=4 ../../bin/run-sktest.sh`
+   - `prelude` / `skbigint` / `skdate` / `skjson` / `cli` / `toml` / `semver` /
+     `sktest` / `arparser` → `cd skiplang/<pkg> && SKTEST_JOBS=8 ../../bin/run-sktest.sh`
+   - `cc` / `pkg-config` / `sqlparser` → `cd skiplang/<pkg> && skargo build --all-targets`
+   - `check-ts` → `make check-ts`
+   - `skipruntime` / `skipruntime-bun` → `make test-skipruntime-ts` / `make test-skipruntime-ts-bun`
+   - `native-addon-unreleased` → `cd skipruntime-ts/tests/native_addon_unreleased && ./run.sh`
+   - `skdb` / `skdb-wasm` → `make test-native` / `make test-wasm`
+   - `check-examples` → `docker compose build && docker compose up --wait` in `examples/<name>`
    If a failing check is a GitHub Actions check (actionlint, docs,
    check-images), reproduce with the equivalent local command. Do not run the
    full CI matrix locally; fix the failing jobs only.
