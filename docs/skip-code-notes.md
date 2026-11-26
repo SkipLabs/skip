@@ -42,6 +42,32 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### Pure `~>` closures cannot capture mutable variables; use `->`
+
+A pure lambda (`~>`) may not capture a mutable variable — declare it `->` instead. A plain `fun` helper invoked on a mutable object must be `readonly fun`.
+
+### Write non-terminating loops with `loop`, not `while (true)`
+
+`while (true)` is rejected; use `loop { ... }` for non-terminating loops.
+
+### `values()` returns a mutable `Iterator`, not a collection; `Array` has `zip`, not `combine`
+
+`UMap.values()` returns a mutable `Iterator`; iterators have no `.toArray()` — use `.items().map(...)` / `.collect(Array)` to get a collection. `Array` has `.zip`; `.combine` is on `Parameters`.
+
+### Lambda parameters cannot have default values
+
+Lambda parameters cannot have default values — `(x = 1) => ...` is rejected.
+
+### `Ref(42)` const-folds to one shared image constant
+
+Two `Ref(42)` are the *same* pointer — use `Array::mfill` when a test needs distinct objects.
+
+### The void literal is `void`, not `()`
+
+### `--export-function-as` needs the module-qualified name
+
+Pass e.g. `Runtime_PhysEq.main=skip_main`; otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
+
 ### 2026-11-26 — Initialize config-like state in the constructor, not by assigning a mutable field after construction
 
 Source: user correction, from SkipLabs/skjs#1147 (`Parser.userLiteralSpelling`). When a class needs a piece of per-run configuration, make it a **non-mutable constructor field** with a default and pass it at the construction site, instead of declaring a `mutable` field and assigning it with `!x = ...` right after `Class(...)`. The mutable-field version leaves a window where the object exists with the wrong value, invites later mutation, and (because an updated variable cannot be captured by a pure lambda) can break closures that reference the variable. Note that class constructor arguments are positional (`Name => v` record syntax is for records only), so place the field where the call site can pass it — e.g. right after the first parameter — or rely on its default at sites that don't care.
@@ -65,7 +91,7 @@ Source: user correction, from SkipLabs/skjs#1147 (`Parser.userLiteralSpelling`).
 
 ### 2026-11-25 — Match extern return types to the C ABI; wrap an Int32-returning extern in an always-inlined Bool wrapper
 
-Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments.
+Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments. When argument *representation* matters on wasm32, prefer a compiler intrinsic over a generic `@cpp_extern` — the `Int32`+wrapper pattern above is the fallback.
 
     // worse: i1 return mismatches the C i32 return -> traps on wasm32
     @cpp_extern("SKIP_physEq")
