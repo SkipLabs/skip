@@ -1,0 +1,29 @@
+module Runtime_PhysEq;
+
+value class Pair(a: Int, b: Float)
+
+@exptest
+fun main(): void {
+  // NOTE: Ref(42) const-folds to a shared image constant, so use Arrays to
+  // get two distinct runtime objects with equal contents.
+  a1 = Array<Int>::mfill(1, 42);
+  a2 = Array<Int>::mfill(1, 42);
+  // Pointer-represented: identity, not value equality.
+  print_raw(Runtime.phys_eq(a1, a1).toString() + "\n");
+  print_raw(Runtime.phys_eq(a1, a2).toString() + "\n");
+  // Primitives: compared directly, never routed through the C extern
+  // (which would erase the arguments on wasm32).
+  print_raw(Runtime.phys_eq(1, 1).toString() + "\n");
+  print_raw(Runtime.phys_eq(1, 2).toString() + "\n");
+  print_raw(Runtime.phys_eq(true, false).toString() + "\n");
+  print_raw(Runtime.phys_eq(1.5, 1.5).toString() + "\n");
+  print_raw(Runtime.phys_eq(1.5, 2.5).toString() + "\n");
+  // Void: folds to true.
+  print_raw(Runtime.phys_eq(void, void).toString() + "\n");
+  // Multi-slot value class: slot-wise comparison.
+  print_raw(Runtime.phys_eq(Pair(1, 2.0), Pair(1, 2.0)).toString() + "\n");
+  print_raw(Runtime.phys_eq(Pair(1, 2.0), Pair(1, 3.0)).toString() + "\n");
+  print_raw(Runtime.phys_eq(Pair(1, 2.0), Pair(2, 2.0)).toString() + "\n")
+}
+
+module end;

@@ -359,7 +359,134 @@ mutable class .IntrinsicsInliner{
       };
 
       this.jumpIfInvoke(call)
+    | "Runtime.phys_eq" ->
+      // Physical (pointer) equality, differentiated by argument
+      // representation: pointer-represented arguments are compared with a
+      // plain LLVM pointer comparison (ptrtoint + icmp), and primitive
+      // arguments (Int, Bool, Float, ...) are compared directly in LLVM IR
+      // as well — no C call at all, since routing value-class arguments
+      // through an extern erases them from the call on wasm32 and traps at
+      // link time (bitcast_invalid). Multi-slot value classes compare slot
+      // by slot; void folds to true.
+      paramTypes = calledFunction.funType.params;
+      pos.invariant(
+        paramTypes.size() == a.size() && a.size() % 2 == 0,
+        "Runtime.phys_eq expects two arguments of the same type",
+      );
+      n = a.size() / 2;
+      if (n == 0) {
+        // T is void: the only value, (), is physically equal to itself.
+        this.optinfo.idToInstr.set(call.id, this.constantBool(true));
+        this.jumpIfInvoke(call)
+      } else {
+        // Fold the slot-wise comparisons into an i64 conjunction (each slot
+        // comparison is zero-extended), then compare against 0; the binop
+        // steals the call's ID so its users don't need to be modified.
+        acc = this.emitPhysEqSlots(paramTypes, a, n, 0, pos);
+        this.makeBinOp(IntCmpNe, call, acc, this.constantInt(0).id)
+      }
     | _ -> false
+    }
+  }
+
+  // Emits the conjunction of the slot-wise comparisons of the two phys_eq
+  // arguments (slots i and n+i of a), zero-extended to i64; returns the ID
+  // of an i64 instr that is nonzero iff every compared slot pair matched.
+  private mutable fun emitPhysEqSlots(
+    paramTypes: readonly Array<Type>,
+    a: readonly Array<InstrID>,
+    n: Int,
+    i: Int,
+    pos: Pos,
+  ): InstrID {
+    if (i == n) {
+      this.constantInt(1).id
+    } else {
+      slotEq = this.emitPhysEqSlot(paramTypes[i], a[i], a[n + i], pos);
+      rest = this.emitPhysEqSlots(paramTypes, a, n, i + 1, pos);
+      lhs = this.emitZeroExtend{typ => tInt, pos, value => slotEq}.id;
+      this.emitInstr(
+        IntAnd{
+          id => this.iid(),
+          typ => tInt,
+          pos,
+          prettyName => "phys_eq",
+          lhs,
+          rhs => rest,
+        },
+      ).id
+    }
+  }
+
+  // Emits the comparison of one slot of a phys_eq argument pair, returning
+  // the ID of an i1 instr holding the result.
+  private mutable fun emitPhysEqSlot(
+    typ: Type,
+    lhs: InstrID,
+    rhs: InstrID,
+    pos: Pos,
+  ): InstrID {
+    typ.maybeGetScalarType(this.env) match {
+    | Some(st) ->
+      st.kind match {
+      | GCPointerScalarKind _
+      | NonGCPointerScalarKind _ ->
+        // Pointer identity: reinterpret both sides as integers (ptrtoint)
+        // and compare — pure LLVM IR, no runtime call. The integer type
+        // must match the pointer bit size (i64 on 64-bit, i32 on wasm32).
+        ptrIntTyp = if (this.config.ptrBitSize == 64) tInt else tInt32;
+        l = this.emitReinterpret{value => lhs, typ => ptrIntTyp, pos}.id;
+        r = this.emitReinterpret{value => rhs, typ => ptrIntTyp, pos}.id;
+        this.emitInstr(
+          IntCmpEq{
+            id => this.iid(),
+            typ => tBool,
+            pos,
+            prettyName => "phys_eq",
+            lhs => l,
+            rhs => r,
+          },
+        ).id
+      | IntegerScalarKind _ ->
+        // IntCmpEq rejects i1 operands, so compare Bools with BoolCmpEq.
+        if (typ == tBool) {
+          this.emitInstr(
+            BoolCmpEq{
+              id => this.iid(),
+              typ => tBool,
+              pos,
+              prettyName => "phys_eq",
+              lhs,
+              rhs,
+            },
+          ).id
+        } else {
+          this.emitInstr(
+            IntCmpEq{
+              id => this.iid(),
+              typ => tBool,
+              pos,
+              prettyName => "phys_eq",
+              lhs,
+              rhs,
+            },
+          ).id
+        }
+      | FloatScalarKind _ ->
+        this.emitInstr(
+          FloatCmpEq{
+            id => this.iid(),
+            typ => tBool,
+            pos,
+            prettyName => "phys_eq",
+            lhs,
+            rhs,
+          },
+        ).id
+      }
+    | None() ->
+      // No runtime representation (e.g. void): nothing to compare.
+      this.constantBool(true).id
     }
   }
 
