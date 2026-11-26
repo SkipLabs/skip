@@ -44,7 +44,7 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # Sparse heap without a persistent file
 
-Without a persistent file, the runtime reserves its whole capacity (64 GiB by
+Without a persistent file, the runtime reserves its whole capacity (16 GiB by
 default) as one anonymous mapping. It must use `MAP_NORESERVE`, or heuristic
 overcommit refuses it on hosts with less RAM plus swap (#1589). This test
 checks the kernel's `nr` flag on the mapping, which does not depend on the
@@ -56,6 +56,20 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   skiplang/prelude/runtime/tests/no_file_mapping_noreserve.c \
   -o /tmp/test-no-file-mapping-noreserve
 /tmp/test-no-file-mapping-noreserve
+```
+
+# Default capacity and its overrides
+
+The runtime's default mapping capacity is 16 GiB. `SKIP_CAPACITY` raises it
+when a workload needs more, and `--capacity` wins over the environment. This
+test pins the default value and both override paths.
+
+```sh
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread \
+  skiplang/prelude/runtime/tests/default_capacity.c \
+  -o /tmp/test-default-capacity
+/tmp/test-default-capacity
 ```
 
 # Persistent file lock under signals

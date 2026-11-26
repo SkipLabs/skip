@@ -27,7 +27,7 @@
 #include "alloc_size_classes.h"
 #include "runtime.h"
 
-#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 64L)
+#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
 #ifdef __APPLE__
 // macOS refuses fixed mappings below 0x7000000000 with EPERM.
 #define BOTTOM_ADDR ((void*)0x0000010000000000)
@@ -741,7 +741,7 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
   if (fileName == NULL) {
-    // The capacity is a sparse upper bound (64 GiB by default), not memory to
+    // The capacity is a sparse upper bound (16 GiB by default), not memory to
     // commit up front. Without MAP_NORESERVE, heuristic overcommit refuses a
     // private writable mapping larger than RAM plus swap.
     mapping = mmap(NULL, icapacity, prot,

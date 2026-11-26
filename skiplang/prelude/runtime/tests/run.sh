@@ -36,6 +36,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 "$runtime_test_dir/noreserve"
 
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+  -Wl,--gc-sections -pthread "$runtime_test_sources/default_capacity.c" \
+  -o "$runtime_test_dir/default-capacity"
+"$runtime_test_dir/default-capacity"
+
+clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Wl,--gc-sections -pthread "$runtime_test_sources/persistent_flock_eintr.c" \
   -o "$runtime_test_dir/flock-eintr"
 "$runtime_test_dir/flock-eintr"
