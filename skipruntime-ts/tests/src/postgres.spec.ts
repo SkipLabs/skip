@@ -631,4 +631,54 @@ describe("PostgresExternalService unit tests", function () {
 
     await service.shutdown();
   });
+
+  it("serializes callbacks.update across multiple instances watching the same table", async function () {
+    const service = new PostgresExternalService(dummyConfig);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const events: string[] = [];
+
+    const makeUpdate = (label: string) => async () => {
+      inFlight++;
+      if (inFlight > maxInFlight) maxInFlight = inFlight;
+      events.push(`start:${label}`);
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      events.push(`end:${label}`);
+      inFlight--;
+    };
+
+    await service.subscribe(
+      "inst_shared_1",
+      "items",
+      { ...defaultParams, syncHistoricData: false },
+      { update: makeUpdate("1"), error: () => {} },
+    );
+    await service.subscribe(
+      "inst_shared_2",
+      "items",
+      { ...defaultParams, syncHistoricData: false },
+      { update: makeUpdate("2"), error: () => {} },
+    );
+    events.length = 0;
+    maxInFlight = 0;
+
+    // Both instances receive TRUNCATE notifications back-to-back on the same pg.Client.
+    service.getClient().emit("notification", {
+      processId: 1,
+      channel: "inst_shared_1",
+      payload: "T",
+    });
+    service.getClient().emit("notification", {
+      processId: 1,
+      channel: "inst_shared_2",
+      payload: "T",
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    expect(maxInFlight).toEqual(1);
+    expect(events).toEqual(["start:1", "end:1", "start:2", "end:2"]);
+
+    await service.shutdown();
+  });
 });

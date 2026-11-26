@@ -36,6 +36,7 @@ export class PostgresExternalService implements ExternalService {
     string,
     Promise<void>
   >();
+  private update_queue: Promise<void> = Promise.resolve();
   private broken: boolean = false;
   private shutting_down: boolean = false;
 
@@ -55,6 +56,16 @@ export class PostgresExternalService implements ExternalService {
         if (this.instance_ops.get(instance) === next)
           this.instance_ops.delete(instance);
       });
+    return next;
+  }
+
+  // Serialize callbacks.update calls across all instances on this service:
+  // each CollectionWriter.update forks and merges the runtime context, so
+  // concurrent updates from two watched instances (e.g. both firing on the
+  // same TRUNCATE statement) would otherwise collide with ConcurrentFork.
+  private enqueueUpdate(op: () => Promise<void>): Promise<void> {
+    const next = this.update_queue.then(op, op);
+    this.update_queue = next.catch(() => {});
     return next;
   }
 
@@ -177,7 +188,7 @@ export class PostgresExternalService implements ExternalService {
     const initData = async () => {
       try {
         if (!(params.syncHistoricData ?? true)) {
-          await callbacks.update([], true);
+          await this.enqueueUpdate(() => callbacks.update([], true));
         } else {
           const init = await this.client.query(
             format("SELECT * FROM %I;", table),
@@ -188,7 +199,9 @@ export class PostgresExternalService implements ExternalService {
             if (entries.has(k)) entries.get(k)!.push(row);
             else entries.set(k, [row]);
           }
-          await callbacks.update(Array.from(entries), true);
+          await this.enqueueUpdate(() =>
+            callbacks.update(Array.from(entries), true),
+          );
         }
       } catch (e) {
         error(
@@ -280,13 +293,14 @@ FOR EACH STATEMENT EXECUTE FUNCTION %I();`,
       ) {
         const payload = msg.payload;
         if (payload === "T") {
-          // Serialize with row-change notifications on this instance so a
-          // TRUNCATE can never overtake an earlier in-flight SELECT/update
-          // (or be overtaken by a later one).
+          // Serialize with row-change notifications on this instance (so a
+          // TRUNCATE can never overtake an earlier in-flight SELECT/update)
+          // and across instances via enqueueUpdate (so two instances watching
+          // the same table never issue concurrent CollectionWriter.update forks).
           void this.chainInstanceOp(instance, async () => {
             if (!this.open_instances.has(instance)) return;
             try {
-              await callbacks.update([], true);
+              await this.enqueueUpdate(() => callbacks.update([], true));
             } catch (e: unknown) {
               error(
                 `Uncaught error triggered by Postgres adapter truncate (table ${table}):`,
@@ -318,7 +332,9 @@ FOR EACH STATEMENT EXECUTE FUNCTION %I();`,
           try {
             const changes = await this.client.query(query);
             ok = true;
-            await callbacks.update([[k, changes.rows as Json[]]], false);
+            await this.enqueueUpdate(() =>
+              callbacks.update([[k, changes.rows as Json[]]], false),
+            );
           } catch (e: unknown) {
             if (ok) {
               error(
