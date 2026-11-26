@@ -58,9 +58,17 @@ Source: review (PR #1738). `UMap.values()` returns a mutable `Iterator`, and ite
 
 Source: review (PR #1738). Lambdas reject default parameter values language-wide (`(x = 1) => ...`); any new lambda parse path must reject `=` explicitly, or it ICEs later in `ensureIsExpression`.
 
-### 2026-11-26 — `Ref(42)` const-folds to one shared constant; the void literal is `void`; qualify `--export-function-as`
+### 2026-11-26 — `Ref(42)` const-folds to one shared image constant
 
-Source: review (triage of #1724). In tests, `Ref(42)` const-folds to a shared image constant — two `Ref(42)` are the *same* pointer, so use `Array::mfill` when a test needs distinct objects. The void literal is `void`, not `()`. `--export-function-as` needs the module-qualified name (e.g. `Runtime_PhysEq.main=skip_main`), otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
+Source: review (triage of #1724). Two `Ref(42)` are the *same* pointer — use `Array::mfill` when a test needs distinct objects.
+
+### 2026-11-26 — The void literal is `void`, not `()`
+
+Source: review (triage of #1724).
+
+### 2026-11-26 — `--export-function-as` needs the module-qualified name
+
+Source: review (triage of #1724). Pass e.g. `Runtime_PhysEq.main=skip_main`; otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
 
 ### 2026-11-26 — Initialize config-like state in the constructor, not by assigning a mutable field after construction
 
