@@ -181,7 +181,10 @@ retries red PRs whose auto-merge the bot itself disabled (recognizable by the
 bot's "disabled auto-merge" comment): auto-merge is re-enabled for them first,
 then they go through the same rebase+push+wait loop. `bin/merge-bot.sh board` prints a one-shot dashboard (bot
 alive?, scheduling decision, queue with per-PR buckets, in-flight worktrees,
-recent log); `bin/merge-bot.sh watch [seconds]` refreshes it live.
+recent log); `bin/merge-bot.sh watch [seconds]` shows it as a live full-screen
+TUI (q to quit). While `run`/`process` is going, the bot auto-updates itself:
+when a newer `bin/merge-bot.sh` lands on `origin/main`, it re-execs the new
+version mid-loop (set `MERGE_BOT_NO_SELF_UPDATE=1` to disable).
 `bin/merge-bot.sh --selftest` unit-tests the
 readiness/CI-estimate logic and runs as part of `make check-sh`.
 

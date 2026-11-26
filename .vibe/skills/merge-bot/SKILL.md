@@ -145,6 +145,9 @@ logs, prompts, verdicts) also lives under the state dir, outside the repo.
 - Never touch a PR whose CI is red, or that has no auto-merge, is a draft, or
   is a fork-headed PR without "Allow edits from maintainers".
 - After changing the bot itself, preview with `--dry-run` first.
+- `bin/merge-bot.sh watch` is the live TUI while `run` is going (q quits);
+  `run` re-execs itself automatically when a newer bot version lands on
+  `origin/main` (`MERGE_BOT_NO_SELF_UPDATE=1` disables that).
 - All bot state (dedicated clone, worktrees, logs, lock) lives under
   `${XDG_CACHE_HOME:-~/.cache}/<repo>-merge-bot` (e.g. `~/.cache/skip-merge-bot` here; `--state-dir` to override),
   never in your own checkout.
