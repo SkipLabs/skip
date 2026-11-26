@@ -1855,12 +1855,16 @@ EOF
     git -C "$tdir/repo" rebase --abort 2>/dev/null || true
     rm -rf "$tdir"
 
-    # TUI helpers
+    # TUI helpers (force a UTF-8 locale: box-drawing chars are multibyte and
+    # bash string length/truncation is locale-dependent; CI runs in C locale)
+    local saved_lc_all=${LC_ALL:-}
+    export LC_ALL=C.UTF-8
     check "tui_fit truncates" "hel" "$(tui_fit "hello" 3)"
     check "tui_fit pads" "hi  " "$(tui_fit "hi" 4)"
     check "tui_fit exact" "abc" "$(tui_fit "abc" 3)"
     check "tui_hline width (chars)" "20" "$(tui_hline '├' ' Q ' '┤' 20 | wc -m | tr -d ' ')"
     check "tui_hline corners" "├─ Q  ─────┤" "$(tui_hline '├' ' Q ' '┤' 12)"
+    if [ -n "$saved_lc_all" ]; then export LC_ALL=$saved_lc_all; else unset LC_ALL; fi
 
     # self-update plan: origin has a newer script than the running one
     local su saved_sd saved_clone saved_state
