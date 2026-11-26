@@ -39,6 +39,38 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-26 — `skargo check` roots that are linked against must still emit their .sklib — skargo error (skip#1490)
+
+Source: skargo error (skip#1490). In check mode skargo runs root units as
+`skc --check` with no `-o`, so they emit no `.sklib` — but same-package
+dependents (the test target, or a dev-dependency chain like prelude → sktest
+→ std) still pass that archive via `-l <pkg>=<path>` and skc's frontend opens
+it, failing from a clean tree with `Could not open file:`. `skc --check`
+cannot emit the archive itself (the backend phase returns before
+`compile_sklib`), so skargo now compiles such roots fully (lib targets only
+ever get `-l`'d; sklib emission has no LLVM codegen). Rule of thumb: a checked
+root must be a leaf of the unit graph; if any compiled unit depends on it,
+it is built, not checked.
+
+### 2026-11-25 — Merged dev binaries dispatch on SKARGO_BIN, which leaks into child processes; pin it when spawning a bin by name
+
+Source: test failure (issue #1451). In the dev profile skargo merges a package's
+bins+test into one `__merged` binary hardlinked under each target name, and the
+generated dispatcher picks the entry from `SKARGO_BIN` **first**, falling back
+to `basename(argv[0])`. `skargo test` sets `SKARGO_BIN=test` in the test
+process's environment, so any `skc` subprocess the test harness spawns by name
+inherits it and is dispatched to the *test* harness ("Invalid argument
+--batch", exit 1) instead of the compiler. That made the invalid-test batch
+produce no `.err` sidecars, and the sktest workers reading them died with exit
+45 (`ERROR_FILE_IO` from `SKIP_open_file` on the missing file — a hard
+`exit()`, uncatchable in Skip), cascading into a SubprocessCrash for every
+unreported test of the worker. Release was unaffected (no merging, no
+SKARGO_BIN). Fix: when spawning a merged binary by name from a test, pin the
+dispatch env for the child (`env SKARGO_BIN=skc skc ...`), and never
+`FileSystem.readTextFile` a file whose absence should be a test failure —
+check `FileSystem.exists` first and fail the test instead, because a missing
+file kills the whole worker process with exit 45.
+
 ### 2026-11-25 — Match extern return types to the C ABI; wrap an Int32-returning extern in an always-inlined Bool wrapper
 
 Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments.
