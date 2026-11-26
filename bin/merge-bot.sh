@@ -44,7 +44,12 @@
 #   board                One-shot dashboard: bot alive?, scheduling decision,
 #                        queue (per-PR bucket: rebase / wait-merge / ci-running /
 #                        ignored-red), in-flight worktrees, recent log lines
-#   watch [seconds]      Refreshing dashboard (default 15s); Ctrl-C to stop
+#   watch [seconds]      Full-screen TUI dashboard (default 5s refresh, q or
+#                        Ctrl-C to stop); falls back to the plain refreshing
+#                        board when stdout/stdin is not a terminal or NO_COLOR
+#                        is set. `run`/`process` also self-update: when a newer
+#                        version of this script is pushed to origin/main, the
+#                        bot re-execs it (disable with MERGE_BOT_NO_SELF_UPDATE=1)
 #   prepare <pr>         Rebase the PR onto origin/main in the bot's worktree.
 #                        Conflicts that only touch `version = "..."` lines in
 #                        Skargo.toml files are resolved automatically (the PR's
@@ -124,6 +129,7 @@ SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 REPO=${MERGE_BOT_REPO:-}
 REPO_DIR="" # set when cwd is already a checkout of REPO (reuse it via worktrees)
+CLONE="" # set by ensure_clone
 STATE_DIR=${MERGE_BOT_STATE_DIR:-} # empty -> derived from repo name in resolve_repo
 STATE_DIR_EXPLICIT=${MERGE_BOT_STATE_DIR:+1}
 REFERENCES_DIR=${MERGE_BOT_REFERENCES_DIR:-} # empty -> bundled .vibe/skills/merge-bot/references
@@ -158,6 +164,16 @@ GIT_SIGN_OPTS=(-c commit.gpgsign=false -c tag.gpgsign=false)
 # session is grouped under its own folder in the Vibe sessions list instead of
 # the repo's project; the prompt tells the agent to `cd __WORKTREE__`.
 DEFAULT_AGENT_CMD='vibe --workdir __FIXER_HOME__ --add-dir __WORKTREE__ --prompt-file __PROMPT__ --output-dir __STATE_DIR__/agent-runs/pr-__PR__ --max-turns 120 --time-limit 3600'
+
+# ANSI palette for the TUI (`watch`); empty when NO_COLOR is set or stdout is
+# not a terminal, so plain `board` output stays clean.
+if [ -n "${NO_COLOR:-}" ] || [ ! -t 1 ]; then
+    C_RESET="" C_BOLD="" C_DIM="" C_RED="" C_GREEN="" C_YELLOW="" C_BLUE="" C_CYAN=""
+else
+    C_RESET=$'\033[0m' C_BOLD=$'\033[1m' C_DIM=$'\033[2m'
+    C_RED=$'\033[31m' C_GREEN=$'\033[32m' C_YELLOW=$'\033[33m'
+    C_BLUE=$'\033[34m' C_CYAN=$'\033[36m'
+fi
 
 die() { echo "error: $*" >&2; exit 1; }
 usage() { sed -n '3,/^set -euo pipefail/{/^set -euo pipefail/d;s/^#\{0,1\} \{0,1\}//;p;}' "$0"; }
@@ -415,12 +431,12 @@ cmd_status() {
 }
 
 # ---------------------------------------------------------------------------
-# dashboard: board (one-shot) / watch (refreshing)
+# dashboard: board_data (JSON snapshot) / board (plain) / watch (TUI)
 # ---------------------------------------------------------------------------
 
-cmd_board() {
+board_data() { # echoes one JSON blob: now/repo/alive/state_dir/decision/dash/work/log
     resolve_repo
-    local now lockdir pid alive dec prs dash w
+    local now lockdir pid alive dec prs dash works w head branch dirty logj
     now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     alive="not running (no lock)"
     lockdir="$STATE_DIR/lock.d"
@@ -433,54 +449,177 @@ cmd_board() {
         fi
     fi
     dec=$(cmd_pick 2>/dev/null || echo '{"action":"error"}')
-    echo "merge-bot board — $now  repo=$REPO"
-    echo "bot: $alive   state-dir: $STATE_DIR"
-    echo "decision: $(printf '%s' "$dec" | jq -c .)"
-    echo
-    echo "queue (open PRs with auto-merge):"
     prs=$(ghw pr list --state open --limit 100 \
         --json number,title,headRefName,autoMergeRequest,isDraft,mergeStateStatus,mergeable,statusCheckRollup,files)
-    dash=$(printf '%s' "$prs" | jq "$JQ_DASH")
-    if [ "$(jq 'length' <<<"$dash")" = "0" ]; then
-        echo "  (none)"
-    else
-        printf '%s' "$dash" | jq -r '.[] |
-            "  #\(.number)  \(.bucket)\t" +
-            (if .bucket == "ignored-red" then "failed: \(.failed | join(","))"
-             else "est-CI=\(.est)s" end) +
-            "\t\(.mss)\t\(.title)"'
-    fi
-    echo
-    echo "in-flight worktrees:"
-    if [ -d "$STATE_DIR/work" ] && [ -n "$(ls -A "$STATE_DIR/work" 2>/dev/null)" ]; then
+    dash=$(printf '%s' "$prs" | jq "$JQ_DASH" 2>/dev/null || echo '[]')
+    works='[]'
+    if [ -d "$STATE_DIR/work" ]; then
         for w in "$STATE_DIR/work"/*/; do
             [ -d "$w" ] || continue
-            local head branch dirty
             head=$(git -C "$w" rev-parse --short HEAD 2>/dev/null || echo '?')
             branch=$(git -C "$w" branch --show-current 2>/dev/null || true)
             dirty=no
-            if [ -n "$(git -C "$w" status --porcelain 2>/dev/null)" ]; then dirty=yes; fi
-            echo "  $(basename "$w")  head=$head  branch=${branch:-<detached>}  dirty=$dirty"
+            [ -n "$(git -C "$w" status --porcelain 2>/dev/null)" ] && dirty=yes
+            works=$(jq -c --arg n "$(basename "$w")" --arg h "$head" --arg b "${branch:-<detached>}" --arg d "$dirty" \
+                '. + [{name:$n, head:$h, branch:$b, dirty:$d}]' <<<"$works")
         done
-    else
+    fi
+    logj='[]'
+    if [ -f "$LOG_FILE" ]; then
+        logj=$(tail -n 80 "$LOG_FILE" 2>/dev/null | jq -R . | jq -s .)
+    fi
+    jq -n --arg now "$now" --arg repo "$REPO" --arg alive "$alive" --arg sd "$STATE_DIR" \
+        --argjson dec "$dec" --argjson dash "$dash" --argjson works "$works" --argjson log "$logj" \
+        '{now:$now, repo:$repo, alive:$alive, state_dir:$sd, decision:$dec, dash:$dash, work:$works, log:$log}'
+}
+
+cmd_board() {
+    local d
+    d=$(board_data)
+    echo "merge-bot board — $(jq -r .now <<<"$d")  repo=$(jq -r .repo <<<"$d")"
+    echo "bot: $(jq -r .alive <<<"$d")   state-dir: $(jq -r .state_dir <<<"$d")"
+    echo "decision: $(jq -c .decision <<<"$d")"
+    echo
+    echo "queue (open PRs with auto-merge):"
+    if [ "$(jq '.dash | length' <<<"$d")" = "0" ]; then
         echo "  (none)"
+    else
+        jq -r '.dash[] |
+            "  #\(.number)  \(.bucket)\t" +
+            (if .bucket == "ignored-red" then "failed: \(.failed | join(","))"
+             else "est-CI=\(.est)s" end) +
+            "\t\(.mss)\t\(.title)"' <<<"$d"
+    fi
+    echo
+    echo "in-flight worktrees:"
+    if [ "$(jq '.work | length' <<<"$d")" = "0" ]; then
+        echo "  (none)"
+    else
+        jq -r '.work[] | "  \(.name)  head=\(.head)  branch=\(.branch)  dirty=\(.dirty)"' <<<"$d"
     fi
     echo
     echo "last log lines:"
-    if [ -f "$LOG_FILE" ]; then
-        tail -n 12 "$LOG_FILE" | sed 's/^/  /'
-    else
+    if [ "$(jq '.log | length' <<<"$d")" = "0" ]; then
         echo "  (no log yet)"
+    else
+        jq -r '.log[] | "  " + .' <<<"$d"
     fi
 }
 
+tui_fit() { # $1=string $2=width -> string truncated/padded to exactly width chars
+    local s=$1 w=$2
+    if [ "${#s}" -gt "$w" ]; then s="${s:0:$w}"; fi
+    printf '%s%*s' "$s" "$((w - ${#s}))" ""
+}
+
+tui_hline() { # $1=left corner $2=title (with surrounding spaces) $3=right corner $4=width
+    local left=$1 title=$2 right=$3 w=$4 t
+    t="─$title "
+    if [ "${#t}" -gt $((w - 2)) ]; then t="${t:0:$((w - 2))}"; fi
+    printf '%s%s%s%s' "$left" "$t" "$(printf '%*s' "$((w - 2 - ${#t}))" '' | tr ' ' '─')" "$right"
+}
+
+tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen frame
+    local d=$1 interval=$2 W H cw
+    W=${COLUMNS:-80}
+    H=${LINES:-24}
+    [ "$W" -lt 40 ] && W=40
+    [ "$H" -lt 10 ] && H=10
+    cw=$((W - 4)) # inner width: │ + space + content + space + │
+    local ver
+    ver=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')
+    local -a frame=()
+    local act pr est bucket num mss title line plain col wname head branch dirty
+    # decision line
+    act=$(jq -r '.decision.action' <<<"$d")
+    case "$act" in
+        rebase)
+            pr=$(jq -r '.decision.pr' <<<"$d"); est=$(jq -r '.decision.est // "?"' <<<"$d")
+            frame+=("${C_YELLOW}$(tui_fit "▶ decision: REBASE #$pr (est-CI ${est}s)" "$cw")${C_RESET}") ;;
+        wait)
+            pr=$(jq -r '.decision.pr' <<<"$d")
+            frame+=("${C_GREEN}$(tui_fit "▶ decision: WAIT — #$pr is green+up-to-date, expecting merge" "$cw")${C_RESET}") ;;
+        idle)
+            frame+=("${C_DIM}$(tui_fit "▶ decision: idle — no green+auto-merge PRs right now" "$cw")${C_RESET}") ;;
+        *)
+            frame+=("$(tui_fit "▶ decision: $act" "$cw")") ;;
+    esac
+    frame+=("$(tui_hline '├' ' QUEUE (open PRs with auto-merge) ' '┤' "$W")")
+    local -a rows=()
+    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '.dash[] | [.bucket, (.number|tostring), ((.est // 0)|tostring), .mss, .title] | @tsv' <<<"$d")
+    if [ "${#rows[@]}" = "0" ]; then
+        frame+=("│ $(tui_fit '  (none)' "$cw") │")
+    else
+        for line in "${rows[@]}"; do
+            IFS=$'\t' read -r bucket num est mss title <<<"$line"
+            local col="$C_RESET"
+            case "$bucket" in
+                rebase) col="$C_YELLOW" ;;
+                wait-merge) col="$C_GREEN" ;;
+                ci-running) col="$C_BLUE" ;;
+                ignored-red) col="$C_RED" ;;
+            esac
+            if [ "$bucket" = "ignored-red" ]; then
+                plain="  #$num  $bucket  mss=$mss  $title"
+            else
+                plain="  #$num  $bucket  est=${est}s  mss=$mss  $title"
+            fi
+            frame+=("│ ${col}$(tui_fit "$plain" "$cw")${C_RESET} │")
+        done
+    fi
+    frame+=("$(tui_hline '├' ' IN-FLIGHT WORKTREES ' '┤' "$W")")
+    rows=()
+    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '.work[] | [.name, .head, .branch, .dirty] | @tsv' <<<"$d")
+    if [ "${#rows[@]}" = "0" ]; then
+        frame+=("│ $(tui_fit '  (none)' "$cw") │")
+    else
+        for line in "${rows[@]}"; do
+            IFS=$'\t' read -r wname head branch dirty <<<"$line"
+            frame+=("│ ${C_CYAN}$(tui_fit "  $wname  head=$head  branch=$branch  dirty=$dirty" "$cw")${C_RESET} │")
+        done
+    fi
+    # log fills whatever height remains
+    local logroom=$((H - 2 - ${#frame[@]} - 1)) # -2 borders, -1 log separator
+    [ "$logroom" -lt 0 ] && logroom=0
+    frame+=("$(tui_hline '├' ' LOG ' '┤' "$W")")
+    local -a logrows=()
+    local -a logrows=()
+    while IFS= read -r line; do logrows+=("$line"); done < <(jq -r '.log[]' <<<"$d" | tail -n "$logroom")
+    for line in "${logrows[@]}"; do
+        frame+=("│ ${C_DIM}$(tui_fit "$line" "$cw")${C_RESET} │")
+    done
+    # render: top border, body (truncated to H-2), bottom border
+    printf '\033[H'
+    printf '%s\n' "${C_BOLD}$(tui_hline '┌' " merge-bot  $(jq -r .repo <<<"$d")  $(jq -r .now <<<"$d")  bot: $(jq -r .alive <<<"$d")  v$ver " '┐' "$W")${C_RESET}"
+    local i
+    for i in "${!frame[@]}"; do
+        [ "$i" -ge $((H - 2)) ] && break
+        printf '%s\n' "${frame[$i]}"
+    done
+    printf '%s\n' "$(tui_hline '└' " q: quit · refresh ${interval}s " '┘' "$W")"
+    printf '\033[J'
+}
+
 cmd_watch() {
-    local interval=${1:-15}
-    trap 'echo; exit 0' INT TERM
+    local interval=${1:-5}
+    if [ ! -t 1 ] || [ ! -t 0 ] || [ -n "${NO_COLOR:-}" ]; then
+        # no terminal (or NO_COLOR): plain refreshing board
+        trap 'echo; exit 0' INT TERM
+        while :; do
+            printf '\033[2J\033[H'
+            cmd_board
+            sleep "$interval"
+        done
+    fi
+    printf '\033[?1049h\033[?25l' # alternate screen, hide cursor
+    trap 'printf "\033[?25h\033[?1049l"; echo; exit 0' INT TERM
+    trap 'printf "\033[?25h\033[?1049l"' EXIT
+    local key
     while :; do
-        printf '\033[2J\033[H'
-        cmd_board
-        sleep "$interval"
+        tui_draw "$(board_data)" "$interval"
+        key=""
+        IFS= read -r -t "$interval" -n 1 -s key || true
+        [ "$key" = "q" ] && break
     done
 }
 
@@ -517,6 +656,52 @@ ensure_clone() {
         git -C "$CLONE" config commit.gpgsign false
         git -C "$CLONE" config tag.gpgsign false
     fi
+}
+
+# --- self-update --------------------------------------------------------------
+# When a newer version of this script has been pushed to origin/$BASE_BRANCH,
+# download it, sanity-check it, and re-exec it with the same arguments (exec
+# keeps the pid, so the lock stays valid). Skipped when the running file has
+# uncommitted local modifications (dev mode) or MERGE_BOT_NO_SELF_UPDATE is set.
+
+self_update_plan() { # echoes the remote blob sha when an update is available; else empty
+    local rel script_rel local_blob head_blob remote_blob
+    [ -n "$CLONE" ] || return 0
+    rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
+    script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
+    local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null) || return 0
+    head_blob=$(git -C "$SCRIPT_DIR" rev-parse "HEAD:$script_rel" 2>/dev/null) || head_blob=""
+    if [ -n "$head_blob" ] && [ "$local_blob" != "$head_blob" ]; then
+        return 0 # running with local modifications: do not auto-update
+    fi
+    git -C "$CLONE" fetch -q origin "$BASE_BRANCH" >>"$LOG_FILE" 2>&1 || return 0
+    remote_blob=$(git -C "$CLONE" rev-parse "origin/$BASE_BRANCH:$script_rel" 2>/dev/null) || return 0
+    [ "$remote_blob" = "$local_blob" ] && return 0
+    echo "$remote_blob"
+}
+
+maybe_self_update() {
+    [ -n "${MERGE_BOT_NO_SELF_UPDATE:-}" ] && return 0
+    local blob rel script_rel next local_blob
+    blob=$(self_update_plan) || return 0
+    [ -z "$blob" ] && return 0
+    rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
+    script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
+    next="$STATE_DIR/merge-bot-next.sh"
+    git -C "$CLONE" show "origin/$BASE_BRANCH:$script_rel" >"$next" 2>>"$LOG_FILE" || return 0
+    if ! bash -n "$next" 2>>"$LOG_FILE"; then
+        log "self-update: fetched $script_rel fails bash -n; keeping current version"
+        rm -f "$next"
+        return 0
+    fi
+    # the re-exec'd copy lives in the state dir, outside the repo: point it at
+    # the current references/state explicitly
+    export MERGE_BOT_REFERENCES_DIR="$SCRIPT_DIR/../.vibe/skills/merge-bot/references"
+    export MERGE_BOT_STATE_DIR="$STATE_DIR"
+    export MERGE_BOT_REPO="$REPO"
+    local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null || echo '?')
+    log "self-update: $local_blob -> $blob ($script_rel @ origin/$BASE_BRANCH); re-exec"
+    exec bash "$next" "${SELF_ARGS[@]}"
 }
 
 pr_guard() { # $1 = pr json; sets PR_BRANCH/PR_BASE/PR_FORK/PR_HEAD_URL; exits NOT_READY when not processable
@@ -1166,6 +1351,7 @@ cmd_process() {
     local rattempts=0 out rc wrc body
     while :; do
         rattempts=$((rattempts + 1))
+        maybe_self_update # re-exec if a newer bot version was pushed meanwhile
         rc=0
         out=$(cmd_prepare "$n") || rc=$?
         case $rc in
@@ -1227,6 +1413,7 @@ cmd_run() {
     log "merge-bot run: repo=$REPO poll=${POLL_SECONDS}s ci-timeout=${CI_TIMEOUT}s ci-fix-attempts=$CI_FIX_ATTEMPTS dry-run=$DRY_RUN agent=${AGENT_CMD:-<default vibe>}"
     while :; do
         local dec action pr rc
+        maybe_self_update # re-exec if a newer bot version was pushed to origin/$BASE_BRANCH
         dec=$(cmd_pick)
         action=$(jq -r .action <<<"$dec")
         case "$action" in
@@ -1542,6 +1729,44 @@ EOF
     fi
     git -C "$tdir/repo" rebase --abort 2>/dev/null || true
     rm -rf "$tdir"
+
+    # TUI helpers
+    check "tui_fit truncates" "hel" "$(tui_fit "hello" 3)"
+    check "tui_fit pads" "hi  " "$(tui_fit "hi" 4)"
+    check "tui_fit exact" "abc" "$(tui_fit "abc" 3)"
+    check "tui_hline width (chars)" "20" "$(tui_hline '├' ' Q ' '┤' 20 | wc -m | tr -d ' ')"
+    check "tui_hline corners" "├─ Q  ─────┤" "$(tui_hline '├' ' Q ' '┤' 12)"
+
+    # self-update plan: origin has a newer script than the running one
+    local su saved_sd saved_clone saved_state
+    su=$(mktemp -d)
+    git -C "$su" init -q -b main work
+    mkdir -p "$su/work/bin"
+    printf '#!/bin/sh\necho v1\n' >"$su/work/bin/merge-bot.sh"
+    $g -C "$su/work" add . && $g -C "$su/work" commit -qm v1
+    git -C "$su" clone -q --bare work bare.git
+    git -C "$su" clone -q bare.git clone
+    git -C "$su" clone -q bare.git run
+    # push v2 to the bare origin
+    printf '#!/bin/sh\necho v2\n' >"$su/work/bin/merge-bot.sh"
+    $g -C "$su/work" commit -qam v2
+    git -C "$su/work" push -q "$su/bare.git" main
+    saved_sd=$SCRIPT_DIR saved_clone=$CLONE saved_state=$STATE_DIR
+    SCRIPT_DIR="$su/run/bin" CLONE="$su/clone" STATE_DIR="$su/state" LOG_FILE="$su/state.log"
+    mkdir -p "$STATE_DIR"
+    local plan
+    plan=$(self_update_plan)
+    check "self-update: detects newer script on origin/main" \
+        "$(git -C "$su/bare.git" rev-parse main:bin/merge-bot.sh)" "$plan"
+    # local uncommitted modifications -> no auto-update
+    printf '#!/bin/sh\necho local\n' >"$su/run/bin/merge-bot.sh"
+    check "self-update: skipped when running file has local modifications" "" "$(self_update_plan)"
+    # running exactly origin/main's version -> no update
+    git -C "$su/run" fetch -q origin main
+    git -C "$su/run" reset -q --hard origin/main
+    check "self-update: empty when running version matches origin/main" "" "$(self_update_plan)"
+    SCRIPT_DIR=$saved_sd CLONE=$saved_clone STATE_DIR=$saved_state LOG_FILE="$tdir/selftest.log"
+    rm -rf "$su"
     unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 
     if [ "$fails" -gt 0 ]; then
@@ -1557,6 +1782,7 @@ EOF
 # ---------------------------------------------------------------------------
 
 main() {
+    SELF_ARGS=("$@") # preserved across self-update re-exec
     while [ $# -gt 0 ]; do
         case "$1" in
             --repo) REPO=$2; shift 2 ;;

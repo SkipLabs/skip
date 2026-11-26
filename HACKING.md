@@ -173,7 +173,10 @@ Run it interactively through the `merge-bot` skill, or unattended with
 `bin/merge-bot.sh run` (see `bin/merge-bot.sh --help`; `--dry-run` previews
 without pushing). `bin/merge-bot.sh board` prints a one-shot dashboard (bot
 alive?, scheduling decision, queue with per-PR buckets, in-flight worktrees,
-recent log); `bin/merge-bot.sh watch [seconds]` refreshes it live.
+recent log); `bin/merge-bot.sh watch [seconds]` shows it as a live full-screen
+TUI (q to quit). While `run`/`process` is going, the bot auto-updates itself:
+when a newer `bin/merge-bot.sh` lands on `origin/main`, it re-execs the new
+version mid-loop (set `MERGE_BOT_NO_SELF_UPDATE=1` to disable).
 `bin/merge-bot.sh --selftest` unit-tests the
 readiness/CI-estimate logic and runs as part of `make check-sh`.
 
