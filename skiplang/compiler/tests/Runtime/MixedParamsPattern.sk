@@ -28,6 +28,31 @@ fun h(c: C): String {
   }
 }
 
+// Named-first mixed constructor, matched in both group orders.
+class N{b: Int}(a: Int) {
+  fun get(): String {
+    `${this.a}-${this.b}`
+  }
+}
+
+fun k(c: N): String {
+  c match {
+  | N{b => 1}(a) -> `nf-${a}`
+  | N{b => _}(_) -> "other"
+  }
+}
+
+// Matching a parent pattern when a child constructor is mixed.
+base class B2(a: Bool)
+class C2(y: Bool){x: Bool} extends B2
+
+fun m2(b: B2): String {
+  b match {
+  | B2(true) -> "1"
+  | B2(false) -> "2"
+  }
+}
+
 @exptest
 fun main(): void {
   print_raw(`[${f(C(1){b => 2})}]\n`);
@@ -40,5 +65,9 @@ fun main(): void {
   print_raw(`[${if (x is C(9){b => 10}) "is-ok" else "is-bad"}]\n`);
   print_raw(`[${if (x is C{b => 10}(9)) "is-nf" else "is-nf-bad"}]\n`);
   print_raw(`[${if (x is C(8){b => 10}) "is-bad" else "is-no"}]\n`);
+  print_raw(`[${k(N{b => 1}(5))}]\n`);
+  print_raw(`[${k(N{b => 2}(6))}]\n`);
+  print_raw(`[${m2(C2(true, true){x => false})}]\n`);
+  print_raw(`[${m2(C2(false, false){x => true})}]\n`);
 }
 module end;
