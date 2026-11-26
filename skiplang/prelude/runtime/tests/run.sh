@@ -18,6 +18,11 @@ if [ "$(uname -s)" = Darwin ]; then
     -Wl,-dead_strip -pthread "$runtime_test_sources/macos_persistent_heap.c" \
     -o "$runtime_test_dir/macos-persistent-heap"
   "$runtime_test_dir/macos-persistent-heap"
+
+  clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    -Wl,-dead_strip -pthread "$runtime_test_sources/mapping_growth.c" \
+    -o "$runtime_test_dir/mapping-growth"
+  "$runtime_test_dir/mapping-growth"
   exit 0
 fi
 

@@ -61,15 +61,17 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # On-demand file growth and the capacity bound
 
-A persistent file starts at 1 GiB (`INITIAL_CAPACITY`) and grows on demand —
-doubling, in place at the same base address via `ftruncate` plus one
-`MAP_FIXED` mmap — up to the capacity bound (64 GiB by default). The
-anonymous heap has no file, so it is mapped at the full bound up front
-(sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` raises the bound when a workload
-needs more, with `--capacity` winning over the environment. This test pins
-the default bound and both override paths, checks that the file grows without
-losing contents and that reloading maps the grown size, and checks that
-hitting the bound exits with `ERROR_OUT_OF_MEMORY`.
+A persistent file starts at 1 GiB (`INITIAL_CAPACITY`) with the full
+`[BOTTOM_ADDR, BOTTOM_ADDR + capacity)` VA range reserved as `PROT_NONE`, and
+grows on demand — doubling, extending the sparse file with `ftruncate` and
+mapping only the newly grown tail with `MAP_FIXED` — up to the capacity bound
+(64 GiB by default). The anonymous heap has no file, so it is mapped at the
+full bound up front (sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` adjusts the
+bound per workload, with `--capacity` winning over the environment. This test
+pins the default bound and both override paths, checks that the file grows
+without losing contents, that reloading maps the grown size, that a second
+process catches up on its next lock, and that hitting the bound exits with
+`ERROR_OUT_OF_MEMORY`.
 
 ```sh
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \

@@ -67,7 +67,7 @@ static char* sk_mapping_base = NULL;
 static size_t sk_mapped_size = 0;
 static int sk_data_fd = -1;
 
-static void sk_sync_mapping(void);
+static void sk_sync_mapping(int check_file);
 
 /*****************************************************************************/
 /* Gensym. */
@@ -169,7 +169,7 @@ void sk_global_lock() {
   }
   sk_is_locked = 1;
   sk_thread_has_lock = 1;
-  sk_sync_mapping();
+  sk_sync_mapping(0);
 }
 
 void sk_global_unlock() {
@@ -204,16 +204,17 @@ void sk_global_lock() {
   }
 
   int code = pthread_mutex_lock(gmutex);
-  sk_is_locked = 1;
-  sk_sync_mapping();
-
   if (code == 0) {
+    sk_is_locked = 1;
+    sk_sync_mapping(0);
     return;
   }
 
 #ifndef __APPLE__
   if (code == EOWNERDEAD) {
     pthread_mutex_consistent(gmutex);
+    sk_is_locked = 1;
+    sk_sync_mapping(1);
     return;
   }
 #endif
@@ -596,11 +597,11 @@ void sk_commit(Contexts new_root, uint32_t sync) {
 
   __sync_synchronize();
   if (sync) {
-    msync(BOTTOM_ADDR, sk_mapped_size, MS_SYNC);
+    msync(sk_mapping_base, sk_mapped_size, MS_SYNC);
   }
   sk_contexts_set_unsafe(new_root);
   if (sync) {
-    msync(BOTTOM_ADDR, sk_mapped_size, MS_SYNC);
+    msync(sk_mapping_base, sk_mapped_size, MS_SYNC);
   }
 }
 
@@ -755,34 +756,56 @@ static void sk_mapping_identity(file_mapping_header_t* header) {
 /* Growing the mapping on demand. */
 /*****************************************************************************/
 
-// Extends the file-backed mapping to new_size bytes (never past *capacity),
-// in place: ftruncate grows the sparse file and a single MAP_FIXED mmap over
-// the existing VMA extends the mapping atomically at the same base address,
-// so every pointer into it stays valid. Returns 0 on success.
-static int sk_extend_mapping(size_t new_size) {
-  if (ftruncate(sk_data_fd, (off_t)new_size + 1) != 0) return -1;
-  void* m = mmap(sk_mapping_base, new_size, PROT_READ | PROT_WRITE,
-                 MAP_SHARED | MAP_FIXED, sk_data_fd, 0);
+// Maps the newly grown tail into the VA range already reserved at
+// [sk_mapping_base, sk_mapping_base + *capacity). Mapping only the new tail
+// leaves the existing prefix VMA untouched, so concurrent reader threads in
+// this process never observe a transient unmap of pages they are reading.
+// If sk_mapped_size is not page-aligned, start at the page containing it so
+// mmap's addr and offset stay page-aligned. Returns 0 on success.
+static int sk_map_tail(size_t new_size) {
+  if (new_size <= sk_mapped_size) return 0;
+  size_t page_size = (size_t)sysconf(_SC_PAGESIZE);
+  size_t offset =
+      page_size > 0 ? sk_mapped_size & ~(page_size - 1) : sk_mapped_size;
+  void* m =
+      mmap(sk_mapping_base + offset, new_size - offset, PROT_READ | PROT_WRITE,
+           MAP_SHARED | MAP_FIXED, sk_data_fd, (off_t)offset);
   if (m == MAP_FAILED) return -1;
   sk_mapped_size = new_size;
+  return 0;
+}
+
+// Extends the file-backed mapping to new_size bytes (never past *capacity)
+// in place: ftruncate grows the sparse file and sk_map_tail maps the new
+// tail into the reserved VA range at the same base address, so every pointer
+// into the mapping stays valid. Returns 0 on success.
+static int sk_extend_mapping(size_t new_size) {
+  if (ftruncate(sk_data_fd, (off_t)new_size + 1) != 0) return -1;
+  if (sk_map_tail(new_size) != 0) return -1;
   ginfo->end = sk_mapping_base + new_size;
   return 0;
 }
 
-// Grows the mapping so that `size` more bytes fit past the current head,
-// doubling the mapped size each time, never past the *capacity bound.
-// Returns 1 when the mapping was extended, 0 when the bound is reached.
-// The anonymous heap is mapped at its full capacity up front (sparse, with
-// MAP_NORESERVE), so there is nothing to grow there.
+// Grows the mapping so that `size` more bytes fit strictly before ginfo->end
+// (sk_palloc checks `head + size >= end`), doubling the mapped size each time,
+// never past the *capacity bound. Returns 1 when the mapping was extended, 0
+// when the bound is reached. The anonymous heap is mapped at its full capacity
+// up front (sparse, with MAP_NORESERVE), so there is nothing to grow there.
 static int sk_grow_mapping(size_t size) {
   if (ginfo->fileName == NULL) return 0;
   size_t cap = *capacity;
   size_t current = sk_mapped_size;
   if (current >= cap) return 0;
-  size_t needed = (size_t)(ginfo->head - sk_mapping_base) + size;
-  size_t target = current * 2;
+  size_t used = (size_t)(ginfo->head - sk_mapping_base);
+  if (size >= SIZE_MAX - used) return 0;
+  size_t needed = used + size + 1;
+  if (needed > cap) return 0;
+  size_t target = (current <= cap / 2) ? current * 2 : cap;
   if (target < needed) target = needed;
-  target = (target + 2 * 1024 * 1024 - 1) & ~((size_t)2 * 1024 * 1024 - 1);
+  const size_t granularity = (size_t)2 * 1024 * 1024;
+  if (target <= SIZE_MAX - (granularity - 1)) {
+    target = (target + granularity - 1) & ~(granularity - 1);
+  }
   if (target > cap) target = cap;
   if (target <= current) return 0;
   if (sk_extend_mapping(target) != 0) {
@@ -793,25 +816,36 @@ static int sk_grow_mapping(size_t size) {
 }
 
 // After acquiring the global lock, a file-backed mapping may need to catch up
-// with a file another process grew: extend our VMA to the file size. The
-// header (ginfo->end, *capacity) is in the shared first page and already up
-// to date.
-static void sk_sync_mapping(void) {
+// with a file another process grew (or finish an interrupted growth if a
+// previous holder died between ftruncate and updating ginfo->end): map the
+// new tail into our reserved VA range and ensure ginfo->end matches.
+// Fast path: when ginfo->end already matches sk_mapped_size (the common case,
+// no growth since our last lock), no syscall is made. Only when another
+// process advanced ginfo->end — or on crash recovery (check_file != 0) — do
+// we inspect the file / map the new tail.
+static void sk_sync_mapping(int check_file) {
   if (ginfo->fileName == NULL || sk_data_fd < 0) return;
-  struct stat st;
-  if (fstat(sk_data_fd, &st) != 0) {
-    perror("ERROR: could not stat persistent mapping");
-    exit(ERROR_FILE_IO);
+  size_t target = (size_t)(ginfo->end - sk_mapping_base);
+  if (check_file) {
+    struct stat st;
+    if (fstat(sk_data_fd, &st) != 0) {
+      perror("ERROR: could not stat persistent mapping");
+      exit(ERROR_FILE_IO);
+    }
+    if (st.st_size > 1) {
+      size_t fsize = (size_t)(st.st_size - 1);
+      if (fsize > *capacity) fsize = *capacity;
+      if (fsize > target) target = fsize;
+    }
   }
-  size_t fsize = (size_t)st.st_size - 1;
-  if (fsize > sk_mapped_size) {
-    void* m = mmap(sk_mapping_base, fsize, PROT_READ | PROT_WRITE,
-                   MAP_SHARED | MAP_FIXED, sk_data_fd, 0);
-    if (m == MAP_FAILED) {
+  if (target > sk_mapped_size) {
+    if (sk_map_tail(target) != 0) {
       perror("ERROR (MAP FAILED)");
       exit(ERROR_MAPPING_FAILED);
     }
-    sk_mapped_size = fsize;
+  }
+  if (ginfo->end < sk_mapping_base + sk_mapped_size) {
+    ginfo->end = sk_mapping_base + sk_mapped_size;
   }
 }
 
@@ -825,13 +859,23 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
   memset(&identity, 0, sizeof(identity));
   int fd = -1;
   int prot = PROT_READ | PROT_WRITE;
+  // Reserve the full [BOTTOM_ADDR, BOTTOM_ADDR + icapacity) VA range up front
+  // with PROT_NONE so nothing else can be mapped inside it before the file
+  // grows into it. PROT_NONE + MAP_NORESERVE commits no RAM or swap.
   // The capacity is the upper bound. A persistent file starts small
   // (INITIAL_CAPACITY) and grows on demand (sk_grow_mapping), so it commits
   // little disk up front; the file is sparse. The anonymous heap has no
   // file, so it is mapped at the full capacity up front; MAP_NORESERVE keeps
   // that sparse (without it, heuristic overcommit refuses a private writable
   // mapping larger than RAM plus swap).
+  // Page-align initial so sk_map_tail's mmap offset is always page-aligned
+  // even when icapacity is not a multiple of the page size.
+  size_t page_size = (size_t)sysconf(_SC_PAGESIZE);
   size_t initial = icapacity < INITIAL_CAPACITY ? icapacity : INITIAL_CAPACITY;
+  if (fileName != NULL && initial < icapacity && page_size > 0) {
+    initial = (initial + page_size - 1) & ~(page_size - 1);
+    if (initial > icapacity) initial = icapacity;
+  }
   if (fileName == NULL) {
     initial = icapacity;
     mapping = mmap(NULL, initial, prot,
@@ -849,10 +893,17 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
       perror("ERROR: could not lock persistent mapping");
       exit(ERROR_LOCKING);
     }
-    lseek(fd, initial, SEEK_SET);
-    (void)write(fd, "", 1);
+    if (ftruncate(fd, (off_t)initial + 1) != 0) {
+      perror("ERROR: could not size persistent mapping");
+      exit(ERROR_FILE_IO);
+    }
+    if (mmap(BOTTOM_ADDR, icapacity, PROT_NONE,
+             MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED, -1,
+             0) == MAP_FAILED) {
+      perror("ERROR (MAP FAILED)");
+      exit(ERROR_MAPPING_FAILED);
+    }
     mapping = mmap(BOTTOM_ADDR, initial, prot, MAP_SHARED | MAP_FIXED, fd, 0);
-    sk_data_fd = fd;
   }
 
   if (mapping == MAP_FAILED) {
@@ -860,8 +911,13 @@ void sk_create_mapping(char* fileName, size_t icapacity) {
     exit(ERROR_MAPPING_FAILED);
   }
 
+  if (sk_data_fd >= 0) {
+    close(sk_data_fd);
+    sk_data_fd = -1;
+  }
   sk_mapping_base = (char*)mapping;
   sk_mapped_size = initial;
+  sk_data_fd = fd;
 
   mapping->header = identity;
   mapping->header.bottom_addr = mapping;
@@ -964,7 +1020,12 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_MAPPING_VERSION);
   }
 
-  size_t fsize = lseek(fd, 0, SEEK_END) - 1;
+  off_t raw_size = lseek(fd, 0, SEEK_END);
+  if (raw_size <= 1) {
+    fprintf(stderr, "Error: persistent mapping file is truncated\n");
+    exit(ERROR_MAPPING_MEMORY);
+  }
+  size_t fsize = (size_t)(raw_size - 1);
   int prot = PROT_READ | PROT_WRITE;
   file_mapping_t* mapping =
       mmap(header.bottom_addr, fsize, prot, MAP_SHARED | MAP_FIXED, fd, 0);
@@ -974,6 +1035,25 @@ void sk_load_mapping(char* fileName) {
     exit(ERROR_MAPPING_FAILED);
   }
 
+  // Reserve the remaining [fsize, capacity) tail of the VA range with
+  // PROT_NONE so later growth cannot collide with other mappings. The tail
+  // starts at the page boundary at or above fsize (the file mapping already
+  // covers the partial last page if fsize is not page-aligned).
+  size_t page_size = (size_t)sysconf(_SC_PAGESIZE);
+  size_t aligned_fsize =
+      page_size > 0 ? (fsize + page_size - 1) & ~(page_size - 1) : fsize;
+  if (mapping->capacity > aligned_fsize) {
+    if (mmap((char*)mapping + aligned_fsize, mapping->capacity - aligned_fsize,
+             PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE | MAP_FIXED,
+             -1, 0) == MAP_FAILED) {
+      perror("ERROR (MAP FAILED)");
+      exit(ERROR_MAPPING_FAILED);
+    }
+  }
+
+  if (sk_data_fd >= 0) {
+    close(sk_data_fd);
+  }
   sk_mapping_base = (char*)mapping;
   sk_mapped_size = fsize;
   sk_data_fd = fd;
@@ -986,6 +1066,9 @@ void sk_load_mapping(char* fileName) {
   pconsts = &mapping->pconsts;
   if (first_user) {
     sk_global_lock_init();
+    if (ginfo->end < sk_mapping_base + sk_mapped_size) {
+      ginfo->end = sk_mapping_base + sk_mapped_size;
+    }
     if (sk_flock(fd, LOCK_SH) != 0) {
       perror("ERROR: could not share persistent mapping lock");
       exit(ERROR_LOCKING);
