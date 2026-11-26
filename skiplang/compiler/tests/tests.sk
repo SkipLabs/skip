@@ -2,20 +2,33 @@ module alias T = SKTest;
 
 module SkcTests;
 
+// Commands that invoke `skc` are prefixed with `env SKARGO_BIN=skc` (see
+// kSkcDispatch): in merged dev builds the `skc` on PATH is a hardlink to the
+// package's merged binary, whose generated dispatcher prefers SKARGO_BIN over
+// argv[0]. `skargo test` sets SKARGO_BIN=test in this process's environment, so
+// a bare `skc` subprocess would inherit it and be dispatched to the *test*
+// harness instead of the compiler — `skc --batch` then fails with "Invalid
+// argument --batch", writes no `.err` sidecars, and the workers reading them
+// crash (exit 45, surfaced as SubprocessCrash, #1451). Standalone binaries
+// (release profile, freshly compiled test bins) ignore the variable.
+const kSkcDispatch: Array<String> = Array["env", "SKARGO_BIN=skc"];
+
 private fun compile_cmd(
   files: readonly Sequence<String>,
   output: String,
   mainFn: String = "main",
 ): Array<String> {
-  Array[
-    "skc",
-    "-O0",
-    "--no-inline",
-    "--export-function-as",
-    mainFn + "=skip_main",
-    "-o",
-    output,
-  ].concat(files.collect(Array))
+  kSkcDispatch.concat(
+    Array[
+      "skc",
+      "-O0",
+      "--no-inline",
+      "--export-function-as",
+      mainFn + "=skip_main",
+      "-o",
+      output,
+    ].concat(files.collect(Array)),
+  )
 }
 
 private fun genValidTest(basename: String, mainFn: String): void {
@@ -134,7 +147,9 @@ private fun batchCompileInvalid(
       FileSystem.writeTextFile(manifest, shard.join("\n"));
       // `--batch` exits 2 when units fail (expected here) and prints their
       // errors to stderr; we read results from the scratch dir, so discard it.
-      cmds.push(`skc --batch '${manifest}' -O0 --no-inline >/dev/null 2>&1`)
+      cmds.push(
+        `env SKARGO_BIN=skc skc --batch '${manifest}' -O0 --no-inline >/dev/null 2>&1`,
+      )
     }
   };
 
@@ -327,9 +342,10 @@ private fun boundsPassEliminatesCheck(): void {
   );
   compile = (output, extra) ~>
     System.subprocess(
-      Array["skc", "--emit=llvm-ir", "-o", output].concat(extra).concat(
-        Array[source],
-      ),
+      kSkcDispatch
+        .concat(Array["skc", "--emit=llvm-ir", "-o", output])
+        .concat(extra)
+        .concat(Array[source]),
     ).fromSuccess();
   on = compile(onLl, Array<String>[]);
   T.expectTrue(on.success(), "compile with bounds: " + on.stderr);
@@ -3328,7 +3344,9 @@ untracked fun main(): void {
         T.Test{
           name => "CompilerVersionCheck",
           func => () ~> {
-            p = System.subprocess(Array["skc", "--version"]).fromSuccess();
+            p = System.subprocess(
+              kSkcDispatch.concat(Array["skc", "--version"]),
+            ).fromSuccess();
             invariant(
               p.stdout.contains(compiledBy),
               `Test binary compiled by skc (${compiledBy}) but PATH skc ` +
