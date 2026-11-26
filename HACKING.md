@@ -171,7 +171,12 @@ before moving to the next one.
 
 Run it interactively through the `merge-bot` skill, or unattended with
 `bin/merge-bot.sh run` (see `bin/merge-bot.sh --help`; `--dry-run` previews
-without pushing). `bin/merge-bot.sh board` prints a one-shot dashboard (bot
+without pushing). After landing a CI fix on `main`, `bin/merge-bot.sh
+retry-red` retries the open auto-merge PRs whose CI is currently red: it
+rebases each onto `main` and pushes (re-triggering CI on the new head), one
+at a time, then runs the normal process loop — red-CI PRs are otherwise never
+considered. PRs already up-to-date with a still-red head are only reported
+(their CI must be re-run by hand). `bin/merge-bot.sh board` prints a one-shot dashboard (bot
 alive?, scheduling decision, queue with per-PR buckets, in-flight worktrees,
 recent log); `bin/merge-bot.sh watch [seconds]` refreshes it live.
 `bin/merge-bot.sh --selftest` unit-tests the

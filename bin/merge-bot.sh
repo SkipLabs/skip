@@ -40,6 +40,14 @@
 #                        {"action":"rebase","pr":N} green but needs rebase,
 #                                                    fastest expected CI first
 #                        {"action":"idle"}         nothing ready
+#   retry-red            Retry PRs whose CI is currently RED (auto-merge on):
+#                        rebase each onto origin/main and push (the push
+#                        re-triggers CI on the new head), one at a time, then
+#                        run the normal process loop. Use after landing a CI
+#                        fix on main: red-CI PRs are otherwise never
+#                        considered. PRs already up-to-date whose CI is still
+#                        red need a manual CI re-run (head unchanged -> no
+#                        push -> no new CI); those are only reported.
 #   status <pr>          Print the PR's current state as JSON
 #   board                One-shot dashboard: bot alive?, scheduling decision,
 #                        queue (per-PR bucket: rebase / wait-merge / ci-running /
@@ -339,6 +347,32 @@ JQ_SCAN="$JQ_DEFS"'
     }
 ] | sort_by(if .upToDate then 0 else 1 end, .expectedCiSeconds, .number)'
 
+# Input: array of PR objects; args: --arg owner, --argjson skip.
+# Output: red-CI auto-merge PRs (retry-red candidates), fastest expected CI
+# first. Same eligibility filters as JQ_SCAN, but selects red instead of
+# green — retry-red is the explicit override of the "red CI -> never
+# considered" rule.
+# shellcheck disable=SC2016
+JQ_SCAN_RED="$JQ_DEFS"'
+[ .[]
+  | select(.autoMergeRequest != null and (.isDraft | not))
+  | select((.headRepositoryOwner.login // "") == $owner or (.maintainerCanModify == true))
+  | select(($skip | length) == 0
+           or ([.labels[]?.name // ""] as $ls | $ls | all(. as $l | $skip | index($l) == null)))
+  | . as $pr
+  | ($pr | ci_state) as $cs
+  | select($cs == "red")
+  | {
+      number, title,
+      branch: .headRefName,
+      mergeStateStatus, mergeable,
+      ciState: $cs,
+      failed_checks: ($pr | failed_checks),
+      expectedCiSeconds: ($pr | ci_est),
+      fork: ((.headRepositoryOwner.login // "") != $owner)
+    }
+] | sort_by(.expectedCiSeconds, .number)'
+
 # Input: scan output array. Output: scheduling decision.
 # shellcheck disable=SC2016
 JQ_PICK="$JQ_DEFS"'
@@ -380,9 +414,8 @@ build_jq_programs
 # read-only commands
 # ---------------------------------------------------------------------------
 
-cmd_scan() {
-    resolve_repo
-    local owner skip_json prs tmp
+scan_json() { # $1 = jq selection program (JQ_SCAN / JQ_SCAN_RED / ...); echoes the selected PR array
+    local jqprog=$1 owner skip_json prs
     owner=${REPO%%/*}
     if [ -n "$SKIP_LABELS" ]; then
         skip_json=$(printf '%s' "$SKIP_LABELS" | tr ',' '\n' | jq -R . | jq -s .)
@@ -391,11 +424,15 @@ cmd_scan() {
     fi
     prs=$(ghw pr list --state open --limit 100 \
         --json number,title,headRefName,headRepository,headRepositoryOwner,author,isDraft,autoMergeRequest,maintainerCanModify,mergeStateStatus,mergeable,headRefOid,statusCheckRollup,files,labels)
-    tmp=$(mktemp)
-    printf '%s' "$prs" | jq --arg owner "$owner" --argjson skip "$skip_json" "$JQ_SCAN" >"$tmp"
-    jq -r '.[] | "PR #\(.number)\t\(if .upToDate then "up-to-date" else "needs-rebase" end)\test-CI=\(.expectedCiSeconds)s\t\(.mergeStateStatus)\t\(.title)"' "$tmp" >&2
-    cat "$tmp"
-    rm -f "$tmp"
+    printf '%s' "$prs" | jq --arg owner "$owner" --argjson skip "$skip_json" "$jqprog"
+}
+
+cmd_scan() {
+    resolve_repo
+    local out
+    out=$(scan_json "$JQ_SCAN")
+    jq -r '.[] | "PR #\(.number)\t\(if .upToDate then "up-to-date" else "needs-rebase" end)\test-CI=\(.expectedCiSeconds)s\t\(.mergeStateStatus)\t\(.title)"' <<<"$out" >&2
+    printf '%s' "$out"
 }
 
 cmd_pick() {
@@ -1129,6 +1166,25 @@ cmd_run() {
     done
 }
 
+cmd_retry_red() {
+    resolve_repo
+    acquire_lock
+    ensure_clone
+    local prs n rc
+    prs=$(scan_json "$JQ_SCAN_RED")
+    if [ "$(jq length <<<"$prs")" = "0" ]; then
+        log "retry-red: nothing to retry (no red-CI auto-merge PRs)"
+        return 0
+    fi
+    log "retry-red: retrying $(jq length <<<"$prs") red-CI auto-merge PR(s): $(jq -r '[.[].number] | join(",")' <<<"$prs") — each rebase+push re-triggers CI on the new head"
+    for n in $(jq -r '.[].number' <<<"$prs"); do
+        rc=0
+        cmd_process "$n" || rc=$?
+        log "PR $n: retry process rc=$rc"
+    done
+    return 0
+}
+
 # ---------------------------------------------------------------------------
 # selftest: exercise the jq classification/estimate/scan/pick logic on fixtures
 # ---------------------------------------------------------------------------
@@ -1288,6 +1344,11 @@ cmd_selftest() {
     check "pick: nothing ready -> idle" \
         '{"action":"idle"}' "$(jq -c "$JQ_PICK" <<<"[]")"
 
+    check "scan-red keeps only red-CI auto-merge PRs (fixture #3)" \
+        "[3]" "$(jq --arg owner SkipLabs --argjson skip '["do-not-merge"]' "$JQ_SCAN_RED" <<<"$fx" | jq -c '[.[].number]')"
+    check "scan-red marks the failing checks" \
+        '["ci/circleci: compiler","actionlint"]' "$(jq --arg owner SkipLabs --argjson skip '[]' "$JQ_SCAN_RED" <<<"$fx" | jq -c '.[0].failed_checks')"
+
     check "board: buckets (rebase first by est, then wait-merge, ci-running, ignored-red)" \
         "6,13,2,9,8,7,1,11,10,12,3|rebase,rebase,rebase,rebase,rebase,rebase,wait-merge,ci-running,ci-running,ci-running,ignored-red" \
         "$(jq "$JQ_DASH" <<<"$fx" | jq -r '[.[] | {n: .number, b: .bucket}] | ([.[].n] | join(",")) + "|" + ([.[].b] | join(","))')"
@@ -1353,6 +1414,7 @@ main() {
         comment) cmd_comment "$@" ;;
         unauto) cmd_unauto "$@" ;;
         process) cmd_process "$@" ;;
+        retry-red) cmd_retry_red "$@" ;;
         run) cmd_run "$@" ;;
         selftest) cmd_selftest ;;
         "") usage; return 1 ;;
