@@ -176,7 +176,10 @@ retry-red` retries the open auto-merge PRs whose CI is currently red: it
 rebases each onto `main` and pushes (re-triggering CI on the new head), one
 at a time, then runs the normal process loop — red-CI PRs are otherwise never
 considered. PRs already up-to-date with a still-red head are only reported
-(their CI must be re-run by hand). `bin/merge-bot.sh board` prints a one-shot dashboard (bot
+(their CI must be re-run by hand). `retry-red --include-unautod` additionally
+retries red PRs whose auto-merge the bot itself disabled (recognizable by the
+bot's "disabled auto-merge" comment): auto-merge is re-enabled for them first,
+then they go through the same rebase+push+wait loop. `bin/merge-bot.sh board` prints a one-shot dashboard (bot
 alive?, scheduling decision, queue with per-PR buckets, in-flight worktrees,
 recent log); `bin/merge-bot.sh watch [seconds]` refreshes it live.
 `bin/merge-bot.sh --selftest` unit-tests the

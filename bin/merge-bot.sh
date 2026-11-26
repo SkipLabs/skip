@@ -40,7 +40,8 @@
 #                        {"action":"rebase","pr":N} green but needs rebase,
 #                                                    fastest expected CI first
 #                        {"action":"idle"}         nothing ready
-#   retry-red            Retry PRs whose CI is currently RED (auto-merge on):
+#   retry-red [--include-unautod]
+#                        Retry PRs whose CI is currently RED (auto-merge on):
 #                        rebase each onto origin/main and push (the push
 #                        re-triggers CI on the new head), one at a time, then
 #                        run the normal process loop. Use after landing a CI
@@ -48,6 +49,10 @@
 #                        considered. PRs already up-to-date whose CI is still
 #                        red need a manual CI re-run (head unchanged -> no
 #                        push -> no new CI); those are only reported.
+#                        --include-unautod also retries red-CI PRs whose
+#                        auto-merge the bot itself disabled (it comments
+#                        "disabled auto-merge" when it does): auto-merge is
+#                        re-enabled for them first (MERGE_BOT_INCLUDE_UNAUTOD=1)
 #   status <pr>          Print the PR's current state as JSON
 #   board                One-shot dashboard: bot alive?, scheduling decision,
 #                        queue (per-PR bucket: rebase / wait-merge / ci-running /
@@ -371,6 +376,25 @@ JQ_SCAN_RED="$JQ_DEFS"'
       expectedCiSeconds: ($pr | ci_est),
       fork: ((.headRepositoryOwner.login // "") != $owner)
     }
+] | sort_by(.expectedCiSeconds, .number)'
+
+# Input: array of PR objects; args: --arg owner, --argjson skip.
+# Output: red-CI PRs WITHOUT auto-merge (retry-red --include-unautod
+# candidates: PRs the bot itself disabled auto-merge on). Same filters as
+# JQ_SCAN_RED minus the autoMergeRequest requirement.
+# shellcheck disable=SC2016
+JQ_SCAN_RED_NOAUTO="$JQ_DEFS"'
+[ .[]
+  | select((.isDraft | not))
+  | select((.headRepositoryOwner.login // "") == $owner or (.maintainerCanModify == true))
+  | select(($skip | length) == 0
+           or ([.labels[]?.name // ""] as $ls | $ls | all(. as $l | $skip | index($l) == null)))
+  | select(.autoMergeRequest == null)
+  | . as $pr
+  | ($pr | ci_state) as $cs
+  | select($cs == "red")
+  | { number, title, branch: .headRefName, mergeStateStatus, mergeable, ciState: $cs,
+      failed_checks: ($pr | failed_checks), expectedCiSeconds: ($pr | ci_est) }
 ] | sort_by(.expectedCiSeconds, .number)'
 
 # Input: scan output array. Output: scheduling decision.
@@ -1166,18 +1190,56 @@ cmd_run() {
     done
 }
 
-cmd_retry_red() {
+bot_disabled_auto_merge() { # $1=pr; rc 0 iff the bot left a "disabled auto-merge" comment
+    local n=$1
+    [ "$(gha "repos/$REPO/issues/$n/comments?per_page=100"         --jq '[.[] | select((.body // "") | test("merge-bot") and test("disabled auto-merge"))] | length')" -gt 0 ]
+}
+
+enable_auto_merge() { # $1=pr — re-enable auto-merge (MERGE); respects DRY_RUN
+    local n=$1 id
+    if [ "$DRY_RUN" = "1" ]; then
+        log "DRY-RUN: would re-enable auto-merge on PR $n"
+        return 0
+    fi
+    id=$(ghw pr view "$n" --json id --jq .id)
+    # shellcheck disable=SC2016 # single quotes intentional: GraphQL query
+    gha graphql \
+        -f query='mutation($id:ID!){enablePullRequestAutoMerge(input:{pullRequestId:$id, mergeMethod:MERGE}){pullRequest{number}}}' \
+        -F id="$id" >/dev/null
+    log "PR $n: auto-merge re-enabled"
+}
+
+cmd_retry_red() { # [--include-unautod]
     resolve_repo
     acquire_lock
     ensure_clone
-    local prs n rc
+    local include_unautod=${MERGE_BOT_INCLUDE_UNAUTOD:-0}
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --include-unautod) include_unautod=1; shift ;;
+            *) shift ;;
+        esac
+    done
+    local prs n rc unautod=""
     prs=$(scan_json "$JQ_SCAN_RED")
+    if [ "$include_unautod" = "1" ]; then
+        # also PRs whose auto-merge the bot itself disabled (it comments
+        # "disabled auto-merge" when it does): re-enable, then retry
+        for n in $(scan_json "$JQ_SCAN_RED_NOAUTO" | jq -r '.[].number'); do
+            if bot_disabled_auto_merge "$n"; then
+                log "PR $n: red CI and auto-merge was disabled by the bot; including in retry"
+                unautod="$unautod $n"
+                prs=$(jq --argjson n "$n" --argjson t "$(ghw pr view "$n" --json title --jq '{number: '"$n"', title}')" '. + [$t]' <<<"$prs")
+            fi
+        done
+    fi
     if [ "$(jq length <<<"$prs")" = "0" ]; then
         log "retry-red: nothing to retry (no red-CI auto-merge PRs)"
         return 0
     fi
-    log "retry-red: retrying $(jq length <<<"$prs") red-CI auto-merge PR(s): $(jq -r '[.[].number] | join(",")' <<<"$prs") — each rebase+push re-triggers CI on the new head"
+    log "retry-red: retrying $(jq length <<<"$prs") red-CI PR(s): $(jq -r '[.[].number] | join(",")' <<<"$prs") — each rebase+push re-triggers CI on the new head"
     for n in $(jq -r '.[].number' <<<"$prs"); do
+        case " $unautod " in *" $n "*) enable_auto_merge "$n" ;; esac
         rc=0
         cmd_process "$n" || rc=$?
         log "PR $n: retry process rc=$rc"
@@ -1348,6 +1410,8 @@ cmd_selftest() {
         "[3]" "$(jq --arg owner SkipLabs --argjson skip '["do-not-merge"]' "$JQ_SCAN_RED" <<<"$fx" | jq -c '[.[].number]')"
     check "scan-red marks the failing checks" \
         '["ci/circleci: compiler","actionlint"]' "$(jq --arg owner SkipLabs --argjson skip '[]' "$JQ_SCAN_RED" <<<"$fx" | jq -c '.[0].failed_checks')"
+    check "scan-red-noauto also selects red PRs without auto-merge" \
+        "[99]" "$(jq --arg owner SkipLabs --argjson skip '[]' "$JQ_SCAN_RED_NOAUTO" <<<"$(jq '. + [{number: 99, title: "red no-auto", headRefName: "x", headRepositoryOwner: {login: "SkipLabs"}, labels: [], isDraft: false, autoMergeRequest: null, mergeStateStatus: "BLOCKED", mergeable: "MERGEABLE", statusCheckRollup: [{__typename: "StatusContext", context: "ci/circleci: build", state: "FAILURE"}], files: []}]' <<<"$fx")" | jq -c '[.[].number]')"
 
     check "board: buckets (rebase first by est, then wait-merge, ci-running, ignored-red)" \
         "6,13,2,9,8,7,1,11,10,12,3|rebase,rebase,rebase,rebase,rebase,rebase,wait-merge,ci-running,ci-running,ci-running,ignored-red" \
