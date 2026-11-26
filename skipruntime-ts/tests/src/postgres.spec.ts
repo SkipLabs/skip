@@ -2,7 +2,10 @@ import { expect } from "earl";
 import type { Entry, Json } from "@skipruntime/core";
 import { describe, it, beforeEach, afterEach } from "mocha";
 import pg from "pg";
-import { PostgresExternalService } from "@skip-adapter/postgres";
+import {
+  pgTimestampToISO,
+  PostgresExternalService,
+} from "@skip-adapter/postgres";
 
 type QueryResult = { rows: Record<string, Json>[] };
 type QueryHandler = (sql: string) => Promise<QueryResult> | QueryResult;
@@ -249,5 +252,323 @@ describe("PostgresExternalService unit tests", function () {
     });
 
     await service.shutdown();
+  });
+});
+
+type RawField = { name: string; dataTypeID: number };
+
+// Parse a raw wire-format Postgres row using the `pg.Client`'s registered type
+// parsers, mirroring `pg/lib/result.js` (`Result.prototype.parseRow`) so tests
+// exercise the exact parser wiring configured by `PostgresExternalService`
+// without requiring a running Postgres server.
+function parseWireRow(
+  client: pg.Client,
+  fields: RawField[],
+  values: (string | null)[],
+): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (let i = 0; i < fields.length; i++) {
+    const field = fields[i]!;
+    const raw = values[i] ?? null;
+    if (raw === null) {
+      row[field.name] = null;
+    } else {
+      const parser = client.getTypeParser(field.dataTypeID, "text");
+      row[field.name] = parser(raw);
+    }
+  }
+  return row;
+}
+
+describe("Postgres adapter timestamp normalization", () => {
+  describe("pgTimestampToISO", () => {
+    it("normalizes TIMESTAMP (without timezone) strings to ISO 8601 UTC", () => {
+      expect(pgTimestampToISO("2024-01-15 10:30:00")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00.1")).toEqual(
+        "2024-01-15T10:30:00.100Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00.12")).toEqual(
+        "2024-01-15T10:30:00.120Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00.123456")).toEqual(
+        "2024-01-15T10:30:00.123Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00.005999")).toEqual(
+        "2024-01-15T10:30:00.005Z",
+      );
+    });
+
+    it("normalizes TIMESTAMPTZ strings with UTC and non-UTC offsets to ISO 8601 UTC", () => {
+      expect(pgTimestampToISO("2024-01-15 10:30:00+00")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00.456789+00")).toEqual(
+        "2024-01-15T10:30:00.456Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 12:30:00+02")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 16:00:00+05:30")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 05:30:00-05")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 05:30:00-05:00")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("2024-01-15 10:30:00+00:00:30")).toEqual(
+        "2024-01-15T10:29:30.000Z",
+      );
+    });
+
+    it("preserves already-ISO timestamps, special values, and non-date strings", () => {
+      expect(pgTimestampToISO("2024-01-15T10:30:00.000Z")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(pgTimestampToISO("infinity")).toEqual("infinity");
+      expect(pgTimestampToISO("-infinity")).toEqual("-infinity");
+      expect(pgTimestampToISO("not a date")).toEqual("not a date");
+      expect(pgTimestampToISO("")).toEqual("");
+      expect(pgTimestampToISO("2024-02-30 10:30:00+00")).toEqual(
+        "2024-02-30 10:30:00+00",
+      );
+    });
+
+    it("handles early CE and BC timestamps", () => {
+      expect(pgTimestampToISO("0001-01-01 00:00:00+00")).toEqual(
+        "0001-01-01T00:00:00.000Z",
+      );
+      expect(pgTimestampToISO("1999-01-08 04:05:06+00 BC")).toEqual(
+        "-001998-01-08T04:05:06.000Z",
+      );
+    });
+  });
+
+  describe("PostgresExternalService type parsers and subscription flow", () => {
+    it("registers ISO 8601 parsers on pg.types for TIMESTAMP and TIMESTAMPTZ", () => {
+      const tsParser = pg.types.getTypeParser(
+        pg.types.builtins.TIMESTAMP,
+        "text",
+      );
+      const tstzParser = pg.types.getTypeParser(
+        pg.types.builtins.TIMESTAMPTZ,
+        "text",
+      );
+      expect(tsParser("2024-01-15 10:30:00")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+      expect(tstzParser("2024-01-15 10:30:00+00")).toEqual(
+        "2024-01-15T10:30:00.000Z",
+      );
+    });
+
+    it("normalizes TIMESTAMP and TIMESTAMPTZ on initial load and NOTIFY updates while preserving nulls and TEXT strings", async () => {
+      // Stub pg.Client.prototype.connect so constructing the service does not
+      // attempt a network connection during this unit test.
+      const origConnectDesc = Object.getOwnPropertyDescriptor(
+        pg.Client.prototype,
+        "connect",
+      )!;
+      const origProcessOnDesc = Object.getOwnPropertyDescriptor(
+        Object.getPrototypeOf(process),
+        "on",
+      );
+      const origOwnProcessOn = Object.getOwnPropertyDescriptor(process, "on");
+      const addedListeners: [string | symbol, (...args: unknown[]) => void][] =
+        [];
+
+      pg.Client.prototype.connect = function () {
+        return Promise.resolve();
+      } as typeof pg.Client.prototype.connect;
+      Object.defineProperty(process, "on", {
+        configurable: true,
+        writable: true,
+        value: function (
+          this: NodeJS.Process,
+          event: string | symbol,
+          listener: (...args: unknown[]) => void,
+        ) {
+          addedListeners.push([event, listener]);
+          return this;
+        },
+      });
+
+      let service: PostgresExternalService | undefined;
+      try {
+        service = new PostgresExternalService({
+          host: "localhost",
+          port: 5432,
+          database: "test",
+          user: "test",
+          password: "test",
+        });
+        const client = service.getClient();
+
+        const fields: RawField[] = [
+          { name: "id", dataTypeID: pg.types.builtins.TEXT },
+          { name: "caption", dataTypeID: pg.types.builtins.TEXT },
+          { name: "created_at", dataTypeID: pg.types.builtins.TIMESTAMPTZ },
+          { name: "taken_at", dataTypeID: pg.types.builtins.TIMESTAMP },
+          { name: "deleted_at", dataTypeID: pg.types.builtins.TIMESTAMPTZ },
+        ];
+
+        const initRawRows: (string | null)[][] = [
+          [
+            "p1",
+            "2024-01-15 10:30:00+00", // TEXT column that looks like a PG timestamp must stay untouched
+            "2024-01-15 10:30:00+00",
+            "2024-01-15 08:15:30.25",
+            null,
+          ],
+          [
+            "p2",
+            "sunset over ocean",
+            "2024-06-01 23:30:00+02",
+            null,
+            "2024-06-02 01:00:00.123456-05:00",
+          ],
+        ];
+
+        const notifyRawRows: (string | null)[][] = [
+          [
+            "p3",
+            "2024-07-04 12:00:00", // TEXT column must stay untouched
+            "2024-07-04 14:45:00.5-04",
+            "2024-07-04 18:45:00",
+            null,
+          ],
+        ];
+
+        client.query = ((sql: unknown) => {
+          const text = String(sql);
+          if (text.startsWith("SELECT * FROM photos;")) {
+            return Promise.resolve({
+              rows: initRawRows.map((vals) =>
+                parseWireRow(client, fields, vals),
+              ),
+            });
+          }
+          if (text.startsWith("SELECT * FROM photos WHERE id = 'p3';")) {
+            return Promise.resolve({
+              rows: notifyRawRows.map((vals) =>
+                parseWireRow(client, fields, vals),
+              ),
+            });
+          }
+          return Promise.resolve({ rows: [] });
+        }) as unknown as typeof client.query;
+
+        const received: {
+          entries: Entry<Json, Json>[];
+          isInit: boolean;
+        }[] = [];
+        const errors: Json[] = [];
+        let resolveNotify!: () => void;
+        const notifyDone = new Promise<void>((resolve) => {
+          resolveNotify = resolve;
+        });
+
+        await service.subscribe(
+          "photos_inst",
+          "photos",
+          { key: { col: "id", type: "TEXT" } },
+          {
+            update: (updates, isInit) => {
+              received.push({ entries: updates, isInit });
+              if (!isInit) resolveNotify();
+              return Promise.resolve();
+            },
+            error: (err) => {
+              errors.push(err);
+            },
+          },
+        );
+
+        expect(errors).toEqual([]);
+        expect(received).toHaveLength(1);
+        expect(received[0]).toEqual({
+          isInit: true,
+          entries: [
+            [
+              "p1",
+              [
+                {
+                  id: "p1",
+                  caption: "2024-01-15 10:30:00+00",
+                  created_at: "2024-01-15T10:30:00.000Z",
+                  taken_at: "2024-01-15T08:15:30.250Z",
+                  deleted_at: null,
+                },
+              ],
+            ],
+            [
+              "p2",
+              [
+                {
+                  id: "p2",
+                  caption: "sunset over ocean",
+                  created_at: "2024-06-01T21:30:00.000Z",
+                  taken_at: null,
+                  deleted_at: "2024-06-02T06:00:00.123Z",
+                },
+              ],
+            ],
+          ],
+        });
+
+        // Simulate a LISTEN/NOTIFY event emitted by the Postgres trigger
+        client.emit("notification", {
+          processId: 1,
+          channel: "photos_inst",
+          payload: "p3",
+        });
+        await notifyDone;
+
+        expect(errors).toEqual([]);
+        expect(received).toHaveLength(2);
+        expect(received[1]).toEqual({
+          isInit: false,
+          entries: [
+            [
+              "p3",
+              [
+                {
+                  id: "p3",
+                  caption: "2024-07-04 12:00:00",
+                  created_at: "2024-07-04T18:45:00.500Z",
+                  taken_at: "2024-07-04T18:45:00.000Z",
+                  deleted_at: null,
+                },
+              ],
+            ],
+          ],
+        });
+      } finally {
+        Object.defineProperty(pg.Client.prototype, "connect", origConnectDesc);
+        if (origOwnProcessOn) {
+          Object.defineProperty(process, "on", origOwnProcessOn);
+        } else {
+          delete (process as { on?: unknown }).on;
+          if (origProcessOnDesc) {
+            Object.defineProperty(
+              Object.getPrototypeOf(process),
+              "on",
+              origProcessOnDesc,
+            );
+          }
+        }
+        for (const [ev, fn] of addedListeners) {
+          process.removeListener(ev, fn);
+        }
+        if (service) {
+          const client = service.getClient();
+          client.end = (() => Promise.resolve()) as typeof client.end;
+          await service.shutdown();
+        }
+      }
+    });
   });
 });

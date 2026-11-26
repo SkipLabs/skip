@@ -817,19 +817,27 @@ const multipleResourcesService: SkipService<
 
 //// testPostgres
 
-type PostgresRow = { id: number; x: number; createdAt: string };
+type PostgresRow = {
+  id: number;
+  x: number;
+  createdAt: string;
+  updatedAt: string;
+};
 
-// The last number has not always 6 digits
-const pgDateFmt = /\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d.\d/;
+const isoDateFmt = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
 class PostgresRowExtract
   implements Mapper<number, PostgresRow, number, number>
 {
   mapEntry(key: number, rows: Values<PostgresRow>): Iterable<[number, number]> {
     return rows.toArray().map((row) => {
-      if (!pgDateFmt.test(row.createdAt))
+      if (!isoDateFmt.test(row.createdAt))
         throw new Error(
           "Malformed timestamp string from postgres: " + row.createdAt,
+        );
+      if (!isoDateFmt.test(row.updatedAt))
+        throw new Error(
+          "Malformed timestamptz string from postgres: " + row.updatedAt,
         );
       return [key, row.x];
     });
@@ -941,10 +949,10 @@ async function trySetupDB(
   if (!pgIsSetup) {
     await pgSetupClient.query(`
 DROP TABLE IF EXISTS skip_test;
-CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);
 DROP TABLE IF EXISTS skip_test2;
-CREATE TABLE skip_test2 (id INTEGER, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE skip_test2 (id INTEGER, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO skip_test2 (id, x) VALUES (1, 100), (2, 100), (2, 100), (3, 100), (3, 100), (3, 100);`);
     await pgSetupClient.end();
     pgIsSetup = true;
@@ -2167,7 +2175,7 @@ export function initTests(
     } finally {
       await pgClient.query(`
 DROP TABLE IF EXISTS skip_test;
-CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE skip_test (id INTEGER PRIMARY KEY, x INTEGER, "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "updatedAt" TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);
 INSERT INTO skip_test (id, x) VALUES (1, 1), (2, 2), (3, 3);`);
       await pgClient.end();
       await service.close();

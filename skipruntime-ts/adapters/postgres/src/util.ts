@@ -1,6 +1,89 @@
 import { type Json, SkipError } from "@skipruntime/core";
 import format from "pg-format";
 
+const PG_TIMESTAMP_RE =
+  /^(\d{4,})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})(\.\d+)?(?:Z|([+-])(\d{2})(?::?(\d{2}))?(?::(\d{2}))?)?( BC)?$/;
+
+/**
+ * Normalize a PostgreSQL `TIMESTAMP` or `TIMESTAMPTZ` text-format value to an
+ * ECMAScript-compatible ISO 8601 UTC string (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+ *
+ * Values without an explicit timezone offset (`TIMESTAMP` without time zone)
+ * are interpreted as UTC so the output is independent of the host timezone.
+ * Special values such as `infinity` / `-infinity` or unrecognized strings are
+ * returned unchanged.
+ *
+ * @param value - Raw timestamp string returned by PostgreSQL.
+ * @returns The normalized ISO 8601 UTC string, or `value` unchanged if unrecognized.
+ */
+export function pgTimestampToISO(value: string): string {
+  const match = PG_TIMESTAMP_RE.exec(value);
+  if (!match) return value;
+
+  const [
+    ,
+    yearStr,
+    monthStr,
+    dayStr,
+    hourStr,
+    minStr,
+    secStr,
+    fracStr,
+    tzSign,
+    tzHour,
+    tzMin,
+    tzSec,
+    bc,
+  ] = match;
+
+  let year = Number(yearStr);
+  if (bc) year = -(year - 1);
+
+  const month = Number(monthStr);
+  const day = Number(dayStr);
+  const hour = Number(hourStr);
+  const minute = Number(minStr);
+  const second = Number(secStr);
+  const ms = fracStr ? Number(fracStr.slice(1, 4).padEnd(3, "0")) : 0;
+
+  if (
+    month < 1 ||
+    month > 12 ||
+    day < 1 ||
+    day > 31 ||
+    hour > 23 ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return value;
+  }
+
+  const date = new Date(
+    Date.UTC(year, month - 1, day, hour, minute, second, ms),
+  );
+  if (year >= 0 && year < 100) {
+    date.setUTCFullYear(year);
+  }
+  if (
+    Number.isNaN(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return value;
+  }
+  if (tzSign) {
+    const tzH = Number(tzHour);
+    const tzM = Number(tzMin ?? "0");
+    const tzS = Number(tzSec ?? "0");
+    if (tzH > 23 || tzM > 59 || tzS > 59) return value;
+    const sign = tzSign === "-" ? -1 : 1;
+    const offsetMs = (tzH * 3600 + tzM * 60 + tzS) * 1000 * sign;
+    date.setTime(date.getTime() - offsetMs);
+  }
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
 /**
  * Exception indicating an error while establishing the connection between PostgreSQL and Skip.
  * @hideconstructor
