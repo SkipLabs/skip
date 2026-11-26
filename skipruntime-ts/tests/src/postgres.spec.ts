@@ -250,4 +250,73 @@ describe("PostgresExternalService unit tests", function () {
 
     await service.shutdown();
   });
+
+  it("preserves boolean column values on initial load and NOTIFY updates (#1150)", async function () {
+    // Verify the pg BOOL type parser was not clobbered by adapter setup.
+    const boolParser = pg.types.getTypeParser(pg.types.builtins.BOOL);
+    expect(boolParser("t") === true).toEqual(true);
+    expect(boolParser("f") === false).toEqual(true);
+
+    let updatedRow: Record<string, Json> = {
+      id: 1,
+      username: "alice",
+      is_test_user: true,
+    };
+    queryHandler = (sql) => {
+      if (sql.includes("SELECT * FROM items WHERE id = 1;")) {
+        return { rows: [updatedRow] };
+      }
+      if (sql.includes("SELECT * FROM items;")) {
+        return {
+          rows: [
+            { id: 1, username: "alice", is_test_user: true },
+            { id: 2, username: "bob", is_test_user: false },
+          ],
+        };
+      }
+      return { rows: [] };
+    };
+
+    const service = new PostgresExternalService(dummyConfig);
+    const updates: { entries: Entry<Json, Json>[]; isInit: boolean }[] = [];
+    let notifyUpdateDone: (() => void) | undefined;
+    const notifyUpdatePromise = new Promise<void>((resolve) => {
+      notifyUpdateDone = resolve;
+    });
+
+    await service.subscribe("inst_bool", "items", defaultParams, {
+      update: (entries, isInit) => {
+        updates.push({ entries, isInit });
+        if (!isInit) notifyUpdateDone?.();
+        return Promise.resolve();
+      },
+      error: () => {},
+    });
+
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.isInit).toEqual(true);
+    const initAlice = updates[0]!.entries[0]![1][0] as Record<string, Json>;
+    const initBob = updates[0]!.entries[1]![1][0] as Record<string, Json>;
+    expect(typeof initAlice["is_test_user"]).toEqual("boolean");
+    expect(initAlice["is_test_user"] === true).toEqual(true);
+    expect(typeof initBob["is_test_user"]).toEqual("boolean");
+    expect(initBob["is_test_user"] === false).toEqual(true);
+
+    // Flip true -> false via LISTEN/NOTIFY update.
+    updatedRow = { id: 1, username: "alice", is_test_user: false };
+    service.getClient().emit("notification", {
+      processId: 1,
+      channel: "inst_bool",
+      payload: "1",
+    });
+    await notifyUpdatePromise;
+
+    expect(updates).toHaveLength(2);
+    expect(updates[1]!.isInit).toEqual(false);
+    const updatedAlice = updates[1]!.entries[0]![1][0] as Record<string, Json>;
+    expect(typeof updatedAlice["is_test_user"]).toEqual("boolean");
+    expect(updatedAlice["is_test_user"] === false).toEqual(true);
+
+    await service.shutdown();
+  });
 });
