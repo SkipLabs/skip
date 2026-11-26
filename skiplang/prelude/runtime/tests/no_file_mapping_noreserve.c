@@ -1,5 +1,5 @@
 // Standalone regression test: the anonymous heap created without a persistent
-// file must be mapped with MAP_NORESERVE. Its default capacity (16 GiB) is a
+// file must be mapped with MAP_NORESERVE. Its default capacity (64 GiB) is a
 // sparse bound; without the flag, heuristic overcommit refuses it on hosts
 // with less RAM plus swap. The kernel marks such mappings "nr" in smaps, which
 // holds regardless of the host's overcommit policy. Build with section GC so

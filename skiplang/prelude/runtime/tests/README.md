@@ -44,11 +44,11 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # Sparse heap without a persistent file
 
-Without a persistent file, the runtime's anonymous heap must be mapped with
-`MAP_NORESERVE`, even after growing on demand up to the capacity bound (16 GiB
-by default): without the flag, heuristic overcommit refuses such a private
-writable mapping on hosts with less RAM plus swap (#1589). This test checks
-the kernel's `nr` flag on the grown mapping, which does not depend on the
+Without a persistent file, the runtime's anonymous heap (mapped at the full
+capacity bound, 64 GiB by default) must be mapped with
+`MAP_NORESERVE`: without the flag, heuristic overcommit refuses such a
+private writable mapping on hosts with less RAM plus swap (#1589). This test
+checks the kernel's `nr` flag on the mapping, which does not depend on the
 host's overcommit policy.
 
 ```sh
@@ -63,7 +63,7 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 A persistent file starts at 1 GiB (`INITIAL_CAPACITY`) and grows on demand —
 doubling, in place at the same base address via `ftruncate` plus one
-`MAP_FIXED` mmap — up to the capacity bound (16 GiB by default). The
+`MAP_FIXED` mmap — up to the capacity bound (64 GiB by default). The
 anonymous heap has no file, so it is mapped at the full bound up front
 (sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` raises the bound when a workload
 needs more, with `--capacity` winning over the environment. This test pins

@@ -28,9 +28,10 @@
 #include "runtime.h"
 
 // The default maximum mapping capacity: a persistent file grows on demand up
-// to this bound (see sk_grow_mapping). SKIP_CAPACITY / --capacity raise the
-// bound when a workload needs more.
-#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 16L)
+// to this bound (see sk_grow_mapping). The bound costs nothing up front —
+// files start at INITIAL_CAPACITY and grow sparsely — so it can stay large.
+// SKIP_CAPACITY / --capacity lower or raise the bound per workload.
+#define DEFAULT_CAPACITY (1024L * 1024L * 1024L * 64L)
 // A persistent file starts this small (or at the requested capacity when it
 // is smaller) and grows on demand, so starting a process commits little
 // disk up front. The anonymous heap has no file, so it is mapped at the full

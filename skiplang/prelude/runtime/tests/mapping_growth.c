@@ -20,9 +20,9 @@ int main(void) {
   char* argv_default[] = {"test", NULL};
   char* argv_flag[] = {"test", "--capacity", "2G", NULL};
   unsetenv("SKIP_CAPACITY");
-  // --capacity > SKIP_CAPACITY > default bound of 16 GiB.
+  // --capacity > SKIP_CAPACITY > default bound of 64 GiB.
   if (parse_capacity(1, argv_default) != DEFAULT_CAPACITY) return 1;
-  if (DEFAULT_CAPACITY != 16L * 1024L * 1024L * 1024L) return 2;
+  if (DEFAULT_CAPACITY != 64L * 1024L * 1024L * 1024L) return 2;
   setenv("SKIP_CAPACITY", "64G", 1);
   if (parse_capacity(1, argv_default) != 64L * 1024L * 1024L * 1024L) return 3;
   if (parse_capacity(3, argv_flag) != 2L * 1024L * 1024L * 1024L) return 4;
