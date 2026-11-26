@@ -20,12 +20,29 @@
   font-family: "Space Mono";
   font-display: swap;
   src: url("/fonts/SpaceMono-Regular.ttf") format("truetype");
-  /* this doesn't work, but setting it on `code` below does */
+}
+
+/* Disable ligatures in Space Mono across inline code, fenced code blocks
+ * (whose `.codeBlockLines` sets `font: inherit`, inheriting from `pre`),
+ * and other monospace elements. Keep `font-feature-settings` in its own
+ * rule because Docusaurus's `postcss-font-variant` appends `, none` to any
+ * `font-feature-settings` in the same rule as `font-variant-ligatures: none`,
+ * making the declaration invalid. */
+code,
+pre,
+kbd,
+samp {
   font-variant-ligatures: none;
 }
 
-code {
-  font-variant-ligatures: none;
+code,
+pre,
+kbd,
+samp {
+  font-feature-settings:
+    "liga" 0,
+    "clig" 0,
+    "calt" 0;
 }
 
 /* You can override the default Infima variables here. */
