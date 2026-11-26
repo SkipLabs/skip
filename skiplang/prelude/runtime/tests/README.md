@@ -61,7 +61,7 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # On-demand file growth and the capacity bound
 
-A persistent file is truncated to 1 GiB (`INITIAL_CAPACITY`, or the requested
+A persistent file is truncated to 64 MiB (`INITIAL_CAPACITY`, or the requested
 capacity when smaller) while its virtual mapping spans the full capacity bound
 (64 GiB by default) up front with `MAP_SHARED | MAP_FIXED`. On demand, the
 runtime doubles the file size with `ftruncate` alone (up to the capacity

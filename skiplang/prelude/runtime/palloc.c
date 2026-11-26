@@ -35,7 +35,7 @@
 // is smaller) and grows on demand, so starting a process commits little
 // disk up front. The anonymous heap has no file, so it is mapped at the full
 // capacity up front; MAP_NORESERVE keeps that sparse.
-#define INITIAL_CAPACITY (1024L * 1024L * 1024L)
+#define INITIAL_CAPACITY (1024L * 1024L * 64L)
 #ifdef __APPLE__
 // macOS refuses fixed mappings below 0x7000000000 with EPERM.
 #define BOTTOM_ADDR ((void*)0x0000010000000000)

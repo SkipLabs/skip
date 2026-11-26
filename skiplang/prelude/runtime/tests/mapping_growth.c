@@ -39,9 +39,9 @@ int main(void) {
     return 6;
 
   // File-backed heap: the VA mapping spans the full capacity up front, while
-  // the backing file starts at INITIAL_CAPACITY and grows via ftruncate on
-  // demand, never past the bound; the header keeps the capacity bound.
-  // Contents survive the growth.
+  // the backing file starts at INITIAL_CAPACITY (64 MiB) and grows via
+  // ftruncate on demand, never past the bound; the header keeps the capacity
+  // bound. Contents survive the growth.
   char dir[] = "/tmp/skip-mapping-growth-XXXXXX";
   if (mkdtemp(dir) == NULL) return 7;
   char path[sizeof(dir) + 4];
