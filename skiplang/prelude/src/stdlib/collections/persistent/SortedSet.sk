@@ -31,7 +31,9 @@ class .SortedSet<+T: Orderable>(
   }
 
   fun set<U: Orderable>[T: U](s: U): SortedSet<U> {
-    SortedSet(this.inner.set(s, void))
+    // Setting an existing element is a no-op: return this instead of
+    // allocating a new wrapper (and a new tree node) for nothing.
+    if (this.contains(s)) this else SortedSet(this.inner.set(s, void))
   }
 
   fun remove<U: Orderable>[T: U](s: U): SortedSet<U> {
