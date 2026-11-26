@@ -48,13 +48,16 @@ define linkonce_odr void @SKIP_Obstack_vectorUnsafeSet(ptr %arr, ptr %x) alwaysi
   store ptr %x, ptr %arr
   ret void
 }
-; WARNING: SKIP_Obstack_collect is the moving-GC relocation hook (emitted by
-; LowerLocalGC in gc.sk with mayRelocatePointers). Its C body is a no-op today
-; (runtime.c: the collector is disabled), so only `nounwind willreturn` are sound.
-; When the moving collector is re-enabled it will READ the root buffer and WRITE
-; relocated pointers back, and may OOM-throw -- at which point `nounwind` becomes a
-; SILENT MISCOMPILE. Revisit these attributes (drop nounwind; do NOT add
-; memory()/nofree/captures) together with any GC re-enablement.
+; WARNING: SKIP_Obstack_collect{,0,1} are the moving-GC relocation hooks
+; (emitted by LowerLocalGC in gc.sk with mayRelocatePointers). Their C bodies
+; are no-ops today (obstack.c / runtime.c: the collector is disabled), so only
+; `nounwind willreturn` are sound. When the moving collector is re-enabled they
+; will READ/WRITE relocated pointers and may OOM-throw -- at which point
+; `nounwind` becomes a SILENT MISCOMPILE. Revisit these attributes (drop
+; nounwind; do NOT add memory()/nofree/captures) together with any GC
+; re-enablement.
+declare void @SKIP_Obstack_collect0(ptr) nounwind willreturn
+declare ptr @SKIP_Obstack_collect1(ptr, ptr) nounwind willreturn
 declare void @SKIP_Obstack_collect(ptr, ptr, i64) nounwind willreturn
 declare noalias align 8 ptr @SKIP_Obstack_shallowClone(i64, ptr readonly captures(none) nonnull) nofree
 
