@@ -2138,6 +2138,19 @@ export function initTests(
       await pgClient.query("INSERT INTO skip_test (id, x) VALUES (5, 5);");
       await notifier2.wait([[false, [[5, [5]]]]]);
       expect(await service.getAll(streamingResource)).toEqual([[5, [5]]]);
+
+      await pgClient.query("TRUNCATE skip_test;");
+      await notifier2.wait([[false, [[5, []]]]]);
+      expect(await service.getAll(streamingResource)).toEqual([]);
+      expect(await service.getAll(resource)).toEqual([
+        [1, [110]],
+        [2, [220]],
+        [3, [330]],
+      ]);
+
+      await pgClient.query("INSERT INTO skip_test (id, x) VALUES (6, 6);");
+      await notifier2.wait([[false, [[6, [6]]]]]);
+      expect(await service.getAll(streamingResource)).toEqual([[6, [6]]]);
       notifier2.close();
 
       await service.instantiateResource(
