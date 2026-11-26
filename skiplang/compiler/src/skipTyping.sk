@@ -2594,17 +2594,18 @@ fun is_magic_call_name(name: String): Bool {
 
 fun is_mixed_call_shape(nbase: N.Expr, args: N.Call_args): Bool {
   nbase match {
-  // In a chain of three or more calls, the innermost opposite-kind pair fuses
-  // first ('f(1){b => 2}(3)' chains '(3)' on the result of the mixed call), so
-  // an outer pair only fuses when the inner call is not itself a mixed pair.
-  // This also lets a mixed call sit directly on a call result:
-  // 'id(g)(2){b => 3}' fuses '(2){b => 3}' onto 'id(g)'.
-  | (_, N.Call(_, (_, N.Call(_, _, _, inner_inner_args)), _, inner_args)) ->
-    !is_opposite_kind_args(inner_inner_args, inner_args) &&
-      is_opposite_kind_args(inner_args, args)
   | (_, N.Call(_, (_, N.Var((_, name))), _, _)) if (is_magic_call_name(name)) ->
     false
-  | (_, N.Call(_, _, _, inner_args)) -> is_opposite_kind_args(inner_args, args)
+  | (_, N.Call(_, inner_base, _, inner_args)) ->
+    // Fuse the innermost opposite-kind pair first: an outer pair only fuses
+    // when the inner call is not itself a mixed pair ('f(1){b => 2}(3)'
+    // chains '(3)' on the mixed result). This also lets a mixed call sit
+    // directly on a call result: 'id(g)(2){b => 3}' fuses '(2){b => 3}'
+    // onto 'id(g)', and 'f(1){b => 2}(3){c => 4}' fuses '(3){c => 4}' onto
+    // the result of 'f(1){b => 2}'.
+    is_opposite_kind_args(inner_args, args) &&
+      !is_mixed_call_shape(inner_base, inner_args)
+  | (_, N.Object(_, _, _, obj_args)) -> is_opposite_kind_args(obj_args, args)
   | _ -> false
   }
 }

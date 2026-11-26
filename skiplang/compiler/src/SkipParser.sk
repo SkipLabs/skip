@@ -1502,8 +1502,7 @@ mutable class SkipParser{
     peekParser.peek() match {
     | TokenKind.OPEN_CURLY() ->
       _ = peekParser.advance();
-      peekParser.peekClassMember() &&
-        !peekParser.peekParse(parser -> parser.parseNamedCtorParameter())
+      peekParser.peekClassMember() && !peekParser.peekNamedCtorParamHeadAt(0)
     | _ -> false
     }
   }
@@ -1527,23 +1526,75 @@ mutable class SkipParser{
   }
 
   // A '{' after positional constructor parameters starts a named constructor
-  // parameter group when it contains at least one named ctor parameter
-  // (modifiers and annotations allowed); an empty '{' is a class body.
+  // parameter group iff its first tokens form a named ctor parameter head
+  // ('[modifiers | @annotation(...)]* ident :''); an empty '{' or a class
+  // body does not. Token-level only, so parameter default expressions are
+  // never parsed speculatively (no exponential lookahead, and syntax errors
+  // inside them are reported where they occur).
   mutable fun ctorNamedGroupStartsHere(): Bool {
-    this.peekKind(TokenKind.OPEN_CURLY()) &&
-      this.peekParse(parser -> parser.peekNamedCtorGroup())
+    this.peekKind(TokenKind.OPEN_CURLY()) && this.peekNamedCtorParamHeadAt(1)
   }
 
-  // Used in peekParse only
-  mutable fun peekNamedCtorGroup(): ParseTree {
-    _openBrace = this.eatTree(TokenKind.OPEN_CURLY());
-    if (this.peekKind(TokenKind.CLOSE_CURLY())) {
-      this.errorResult(
-        errorExpectedToken,
-        "Expected named constructor parameter",
-      )
-    } else {
-      this.parseNamedCtorParameter()
+  // Token-level check whether the token stream at offset `start` begins a
+  // named constructor parameter head: [modifiers | @annotation(...)]* then
+  // 'ident :'. A class body member can never have that shape.
+  mutable fun peekNamedCtorParamHeadAt(start: Int): Bool {
+    i = start;
+    loop {
+      this.peekOffset(i) match {
+      | TokenKind.PROTECTED()
+      | TokenKind.PRIVATE()
+      | TokenKind.DEFERRED()
+      | TokenKind.MUTABLE() ->
+        !i = i + 1
+      | TokenKind.AT() ->
+        if (this.peekOffset(i + 1) != TokenKind.NONTYPE_IDENTIFIER()) {
+          return false
+        };
+        !i = i + 2;
+        if (this.peekOffset(i) == TokenKind.OPEN_PAREN()) {
+          next = this.peekSkipBalanced(
+            TokenKind.OPEN_PAREN(),
+            TokenKind.CLOSE_PAREN(),
+            i,
+          );
+          if (next < 0) {
+            return false
+          };
+          !i = next
+        }
+      | TokenKind.NONTYPE_IDENTIFIER() ->
+        return this.peekOffset(i + 1) == TokenKind.COLON()
+      | _ -> return false
+      }
+    }
+  }
+
+  // Token-level balanced-delimiter scan starting at offset `start` (which
+  // must be `open`); returns the offset just past the matching `close`, or
+  // -1 at EOF/unbalanced. Strings, chars and template literals are single
+  // tokens, so delimiters inside them are not counted.
+  mutable fun peekSkipBalanced(
+    open: TokenKind.TokenKind,
+    close: TokenKind.TokenKind,
+    start: Int,
+  ): Int {
+    depth = 0;
+    i = start;
+    loop {
+      kind = this.peekOffset(i);
+      if (kind == open) {
+        !depth = depth + 1
+      } else if (kind == close) {
+        !depth = depth - 1;
+        if (depth == 0) {
+          return i + 1
+        }
+      };
+      if (kind == TokenKind.END_OF_FILE()) {
+        return -1
+      };
+      !i = i + 1
     }
   }
 
@@ -2769,7 +2820,9 @@ mutable class SkipParser{
 
   mutable fun parseLambdaParameter(): ParseTree {
     start = this.mark();
-    name = this.eatTree(TokenKind.NONTYPE_IDENTIFIER());
+    // eatId (not eatTree) so that '_' is rejected, as in function and
+    // constructor parameter names.
+    name = this.eatId();
     colonTypeSpecifier = this.parseColonTypeSpecifierOpt();
     if (this.peekKind(TokenKind.EQUAL())) {
       // Lambda parameters cannot have default values (unlike function and
