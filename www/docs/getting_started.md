@@ -1,10 +1,19 @@
 # Getting started
 
+This guide is for using the published Skip packages in your own project — no checkout of the [`SkipLabs/skip`](https://github.com/SkipLabs/skip) repository is needed.
+
 ## Installation
 
-Before you begin, we recommend installing the NPM packages for the Skip Framework.
+In your own Node.js or Bun project directory, install the npm packages for the Skip Framework:
 
-```npm install @skiplabs/skip```
+```sh
+npm install @skiplabs/skip
+```
+
+:::caution Contributing or building from source?
+Do **not** run `npm install @skiplabs/skip` inside a checkout of `SkipLabs/skip`: the repository's local npm workspaces shadow the published packages and will attempt to link the unreleased native runtime addon from source.
+If you want to build Skip from source or contribute to the framework itself, follow [`INSTALL.md`](https://github.com/SkipLabs/skip/blob/main/INSTALL.md) and [`HACKING.md`](https://github.com/SkipLabs/skip/blob/main/HACKING.md) instead (using `make` rather than invoking `npm` directly).
+:::
 
 The `@skiplabs/skip` package just depends on the separate component packages:
 - `@skipruntime/core`: The Skip Runtime public API
@@ -30,7 +39,10 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Finally, if you'd like to just dive into the code, you can explore the [API docs](api/core), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database, including a version with a distributed leader-follower configuration.
+Finally, if you'd like to dive straight into code, you can explore:
+- the [API docs](api/core);
+- self-contained example applications under [`examples/`](https://github.com/SkipLabs/skip/tree/main/examples) (such as [`examples/blogger`](https://github.com/SkipLabs/skip/tree/main/examples/blogger), [`examples/chatroom`](https://github.com/SkipLabs/skip/tree/main/examples/chatroom), [`examples/cache_invalidation`](https://github.com/SkipLabs/skip/tree/main/examples/cache_invalidation), and [`examples/hackernews`](https://github.com/SkipLabs/skip/tree/main/examples/hackernews)), complete with reverse proxy, database or Kafka broker, and Docker Compose setups (including distributed leader-follower configurations) using the published Skip packages;
+- smaller in-repo reactive service snippets under [`skipruntime-ts/examples/`](https://github.com/SkipLabs/skip/tree/main/skipruntime-ts/examples), which double as integration tests against the local unpublished workspace build (see [`HACKING.md`](https://github.com/SkipLabs/skip/blob/main/HACKING.md) if you want to build and run them from a checkout).
 
 ## Tutorial
 
@@ -253,22 +265,23 @@ const initialData: InitialData<ServiceInputs> = {
 ### See it in action
 
 This guide aims to give the high-level ideas of how to write and reason about a Skip reactive service.
-You can see and run the full example [here](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups.ts), along with a corresponding [web application](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-server.ts) and [client](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-client.ts).
 
-Run the service and web app as follows:
+To run complete, self-contained example applications powered by the published Skip packages (without building the Skip runtime from source), see the apps under [`examples/`](https://github.com/SkipLabs/skip/tree/main/examples) — such as [`examples/blogger`](https://github.com/SkipLabs/skip/tree/main/examples/blogger), [`examples/chatroom`](https://github.com/SkipLabs/skip/tree/main/examples/chatroom), [`examples/cache_invalidation`](https://github.com/SkipLabs/skip/tree/main/examples/cache_invalidation), and [`examples/hackernews`](https://github.com/SkipLabs/skip/tree/main/examples/hackernews) — each of which can be started with `docker compose up --build`.
 
+You can also browse the full source for the groups service above in [`skipruntime-ts/examples/groups.ts`](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups.ts), along with its corresponding [web application](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-server.ts) and [client](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-client.ts).
+Note that `skipruntime-ts/examples/` lives inside the `SkipLabs/skip` monorepo and serves as an integration test suite against the local unpublished workspace build rather than a standalone project: to run it from a repository checkout, build the workspace with `make` (see [`INSTALL.md`](https://github.com/SkipLabs/skip/blob/main/INSTALL.md) and [`HACKING.md`](https://github.com/SkipLabs/skip/blob/main/HACKING.md)) instead of running `npm install @skiplabs/skip`:
+
+```sh
+make -C skipruntime-ts build-examples
+node skipruntime-ts/examples/dist/groups-server.js &
+node skipruntime-ts/examples/dist/groups.js &
 ```
-cd skipruntime-ts/examples
-npm run build
-node dist/groups-server.js &
-node dist/groups.js &
-```
 
-With the reactive service running, you can run the client script with `node dist/groups-client.js` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
+With the reactive service running, you can run the client script with `node skipruntime-ts/examples/dist/groups-client.js` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
 
 Alternatively, use curl to listen for updates, e.g. with
 
-```
+```sh
 curl -LN http://localhost:8082/active_friends/0
 ```
 

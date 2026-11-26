@@ -33,15 +33,17 @@ TypeScript interfaces and abstractions are provided so that you can write a reac
 
 ### Installation
 
-To get started, install the skip NPM package:
+To use Skip in your own project (no checkout of this repository needed), install the skip npm package:
 
-```
+```sh
 npm install @skiplabs/skip
 ```
 
+> **Note:** Do not run `npm install @skiplabs/skip` inside a checkout of `SkipLabs/skip` — local workspaces shadow the published packages and try to link the unreleased native runtime from source. To build or develop Skip from source, see [INSTALL.md](./INSTALL.md) and [HACKING.md](./HACKING.md).
+
 Two versions of the runtime are available, a Wasm `@skipruntime/wasm` and a native `@skipruntime/native`.
 The Wasm runtime is installed by default. It works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
-The native runtime does not have this limitation, but it is a bit more involved to install (see [instructions](./INSTALL.md)).
+The native runtime does not have this limitation, but it is a bit more involved to install (see [instructions](./skipruntime-ts/addon/README.md#installation)).
 
 From there, you're ready to start building a reactive service!
 See the [getting started guide](https://skiplabs.io/docs/getting_started) to walk through some of Skip's core concepts by example and get up to speed.
@@ -52,8 +54,9 @@ See our documentation [here](https://skiplabs.io/docs) for introductions to the 
 
 ### Examples
 
-Some small examples of reactive services are [available](./skipruntime-ts/examples), demonstrating patterns of reactive programming.
-Another [example](./examples/hackernews) is designed to serve as an example of how to deploy and configure a reactive service, using Docker compose to package and orchestrate a backend complete with a reactive service, database, backend web service, and reverse proxy.
+Self-contained example applications using the published Skip packages live under [`examples/`](./examples) (including [`blogger`](./examples/blogger), [`chatroom`](./examples/chatroom), [`cache_invalidation`](./examples/cache_invalidation), and [`hackernews`](./examples/hackernews)), using Docker Compose to package and orchestrate a reactive service with a database or Kafka broker, web backend, frontend, and reverse proxy.
+
+Smaller reactive service examples are also available in [`skipruntime-ts/examples/`](./skipruntime-ts/examples); these double as integration tests built against the local unpublished workspace packages (see [HACKING.md](./HACKING.md)).
 
 ## Skiplang toolchain
 
