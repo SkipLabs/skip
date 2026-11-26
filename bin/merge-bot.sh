@@ -1409,6 +1409,10 @@ cmd_selftest() {
     local tdir g
     tdir=$(mktemp -d)
     LOG_FILE="$tdir/selftest.log"
+    # the e2e rebases below continue rebases (new commits): CI containers have
+    # no git identity configured, so provide one for the selftest
+    export GIT_AUTHOR_NAME=selftest GIT_AUTHOR_EMAIL=selftest@t
+    export GIT_COMMITTER_NAME=selftest GIT_COMMITTER_EMAIL=selftest@t
     cat >"$tdir/Skargo.toml" <<'EOF'
 [package]
 name = "foo"
@@ -1479,6 +1483,7 @@ EOF
     fi
     git -C "$tdir/repo" rebase --abort 2>/dev/null || true
     rm -rf "$tdir"
+    unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
 
     if [ "$fails" -gt 0 ]; then
         echo "selftest: $fails failure(s)"
