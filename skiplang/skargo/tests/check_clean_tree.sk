@@ -1,0 +1,88 @@
+module alias T = SKTest;
+
+module SkargoCheckCleanTreeTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+private fun write_file(path: String, contents: String): void {
+  _ = system(`mkdir -p ${Path.dirname(path)}`);
+  FileSystem.writeTextFile(path, contents)
+}
+
+// Regression test for #1490: `skargo check` from a clean tree used to fail
+// with "Could not open file" on the package's own .sklib — in check mode the
+// root lib ran `skc --check` only and emitted no .sklib, while the
+// same-package test target still linked against it via `-l`. A lib root that
+// a compiled unit links against must now compile fully and emit its .sklib.
+@test
+fun test_check_from_clean_tree_emits_needed_sklib(): void {
+  skargo = Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> executable
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) return void;
+    Environ.current_exe()
+  };
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  root = Path.join(kManifestDir, "target", "it-check-clean-tree");
+  _ = system(`rm -rf ${root}`);
+
+  // A lib + test package with no bins, like skiplang/sktest: the test target
+  // depends on the package's own lib unit.
+  write_file(
+    Path.join(root, "Skargo.toml"),
+    `[package]\nname = "checkclean"\nversion = "0.1.0"\n\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+  );
+  write_file(
+    Path.join(root, "src/lib.sk"),
+    "module CheckClean;\nfun value(): Int { 42 }\nmodule end;\n",
+  );
+  write_file(
+    Path.join(root, "tests/lib.sk"),
+    "module CheckCleanTests;\nfun check_value(): Int { CheckClean.value() }\nmodule end;\n",
+  );
+
+  check = () -> {
+    System.popen{
+      args => Array[skargo, "check", "-v"],
+      env => Map["SKARGO_BIN" => "skargo"],
+      cwd => Some(root),
+    }.fromSuccess()
+  };
+
+  first = check();
+  T.expectTrue(first.success(), first.stderr);
+
+  lines = first.stderr.split("\n").collect(Array);
+  // The lib root is linked against by the test target, so it compiled fully:
+  // one command with the sklib output, and no `--check`.
+  lib_cmds = lines
+    .filter(line -> line.contains("--sklib-name=checkclean"))
+    .collect(Array);
+  T.expectEq(lib_cmds.size(), 1, first.stderr);
+  T.expectTrue(!lib_cmds[0].contains("--check"), first.stderr);
+  T.expectTrue(lib_cmds[0].contains("-o "), first.stderr);
+  // The test target is a checked root: exactly one `--check` command without a
+  // sklib name.
+  test_cmds = lines
+    .filter(line -> line.contains("--check") && !line.contains("--sklib-name"))
+    .collect(Array);
+  T.expectEq(test_cmds.size(), 1, first.stderr);
+  // The .sklib the test target links against was actually emitted.
+  link_arg = lines
+    .flatMap(line -> line.split(" "))
+    .find(token -> token.startsWith("checkclean="))
+    .fromSome();
+  sklib_path = link_arg.splitFirst("=").i1;
+  T.expectTrue(
+    FileSystem.exists(sklib_path),
+    `check-mode dependent links against missing ${sklib_path}:\n${
+      first.stderr
+    }`,
+  );
+
+  // A second check on the now-warm tree still succeeds.
+  second = check();
+  T.expectTrue(second.success(), second.stderr)
+}
+
+module end;

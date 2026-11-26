@@ -111,6 +111,10 @@ mutable class BuildRunner(
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
   mutable checking: Bool = false,
   mutable skc_identity: ?String = None(),
+  // Lib units whose .sklib at least one compiled unit links against via
+  // `-l <pkg>=<sklib>`. Filled by compile(): in check mode a root in this set
+  // must still emit its .sklib, so it compiles fully instead of `--check`.
+  mutable sklib_needed: mutable Map<Unit, Bool> = mutable Map[],
 ) {
   // Identity of the skc executable actually used (version string, resolved
   // path, mtime), computed once per run. Part of every unit's fingerprint so
@@ -296,6 +300,7 @@ mutable class BuildRunner(
 
   mutable fun compile(check: Bool = false, jobs: Int = 1): void {
     this.!checking = check;
+    this.!sklib_needed = this.compute_sklib_needed(check);
     if (jobs > 1) {
       this.compile_parallel(this.build_plan(), check, jobs)
     } else {
@@ -328,7 +333,7 @@ mutable class BuildRunner(
       };
 
       if (this.unit_is_dirty(unit)) {
-        if (check && this.bctx.roots.contains(unit)) {
+        if (this.checks_unit(unit, check)) {
           this.bctx.gctx.console.status("Checking", unit_name);
           this.create_dir(this.layout_for(unit).build);
           this.skc(unit, /* check = */ true)
@@ -515,6 +520,39 @@ mutable class BuildRunner(
     true
   }
 
+  // Whether `unit` runs as `skc --check` in a check-mode compile: a root unit
+  // whose .sklib no compiled unit links against. A checked root emits no
+  // .sklib, but same-package dependents (e.g. the test target, or a
+  // dev-dependency chain) pass it via `-l`, so a lib root that is still needed
+  // must compile fully and emit its .sklib (#1490).
+  private readonly fun checks_unit(unit: Unit, check: Bool): Bool {
+    check &&
+      this.bctx.roots.contains(unit) &&
+      !this.sklib_needed.containsKey(unit)
+  }
+
+  // The lib units that at least one unit compiled in a check-mode run links
+  // against via `-l <pkg>=<sklib>`. Bin roots are skipped in check mode, so
+  // they never link against anything.
+  private mutable fun compute_sklib_needed(
+    check: Bool,
+  ): mutable Map<Unit, Bool> {
+    res = mutable Map[];
+    for (unit in this.build_plan()) {
+      if (
+        check &&
+        this.bctx.roots.contains(unit) &&
+        unit.target.kind is BinTarget _
+      ) {
+        continue
+      };
+      for (dep in this.bctx.unit_graph[unit]) {
+        if (dep.target.is_lib()) res.set(dep, true)
+      }
+    };
+    res
+  }
+
   private mutable fun complete_fresh_unit(unit: Unit, unit_name: String): void {
     if (
       unit.target.is_build_script() &&
@@ -558,10 +596,11 @@ mutable class BuildRunner(
       )
     } else {
       this.bctx.gctx.console.status("Compiling", unit_name);
-      // Only root units are checked; other units compile fully in check mode.
+      // Root units nothing links against are only checked; other units
+      // compile fully in check mode.
       (skc_cmd, separate_link) = this.skc_cmd(
         unit,
-        check && this.bctx.roots.contains(unit),
+        this.checks_unit(unit, check),
       );
       fingerprint_dir_rel = this.fingerprint_dir_for(unit);
       fingerprint_dir = FileSystem.realpath(fingerprint_dir_rel).default(
@@ -641,14 +680,14 @@ mutable class BuildRunner(
       }
     };
     // Check-mode roots only run `skc --check`: no link, no fingerprint.
-    if (!(check && this.bctx.roots.contains(inf.unit))) {
+    if (!this.checks_unit(inf.unit, check)) {
       this.finish_unit(inf.unit, check)
     };
     ReapDone()
   }
 
   private mutable fun finish_unit(unit: Unit, check: Bool): void {
-    if (check && this.bctx.roots.contains(unit)) return void;
+    if (this.checks_unit(unit, check)) return void;
     this.link_targets(unit);
     FileSystem.writeTextFile(
       this.fingerprint_file_for(unit),
