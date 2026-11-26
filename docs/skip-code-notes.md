@@ -42,6 +42,26 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### 2026-11-26 — Pure `~>` closures cannot capture mutable variables; use `->`
+
+Source: review (mixed positional/named params work, PR #1738). A pure lambda (`~>`) may not capture a mutable variable (e.g. a `BufferedPrinter.Out`) — declare the lambda `->` instead. Related: a plain `fun` helper invoked on a mutable object must be declared `readonly fun`.
+
+### 2026-11-26 — Write non-terminating loops with `loop`, not `while (true)`
+
+Source: review (PR #1738). `while (true)` is rejected by the compiler; use `loop { ... }` for non-terminating loops.
+
+### 2026-11-26 — `values()` returns a mutable `Iterator`, not a collection; `Array` has `zip`, not `combine`
+
+Source: review (PR #1738). `UMap.values()` returns a mutable `Iterator`, and iterators have no `.toArray()` — use `.items().map(...)` / `.collect(Array)` to get a collection. `Array` has `.zip`; `.combine` exists only on `Parameters`.
+
+### 2026-11-26 — Lambda parameters cannot have default values
+
+Source: review (PR #1738). Lambdas reject default parameter values language-wide (`(x = 1) => ...`); any new lambda parse path must reject `=` explicitly, or it ICEs later in `ensureIsExpression`.
+
+### 2026-11-26 — `Ref(42)` const-folds to one shared constant; the void literal is `void`; qualify `--export-function-as`
+
+Source: review (triage of #1724). In tests, `Ref(42)` const-folds to a shared image constant — two `Ref(42)` are the *same* pointer, so use `Array::mfill` when a test needs distinct objects. The void literal is `void`, not `()`. `--export-function-as` needs the module-qualified name (e.g. `Runtime_PhysEq.main=skip_main`), otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
+
 ### 2026-11-26 — Initialize config-like state in the constructor, not by assigning a mutable field after construction
 
 Source: user correction, from SkipLabs/skjs#1147 (`Parser.userLiteralSpelling`). When a class needs a piece of per-run configuration, make it a **non-mutable constructor field** with a default and pass it at the construction site, instead of declaring a `mutable` field and assigning it with `!x = ...` right after `Class(...)`. The mutable-field version leaves a window where the object exists with the wrong value, invites later mutation, and (because an updated variable cannot be captured by a pure lambda) can break closures that reference the variable. Note that class constructor arguments are positional (`Name => v` record syntax is for records only), so place the field where the call site can pass it — e.g. right after the first parameter — or rely on its default at sites that don't care.
@@ -65,7 +85,7 @@ Source: user correction, from SkipLabs/skjs#1147 (`Parser.userLiteralSpelling`).
 
 ### 2026-11-25 — Match extern return types to the C ABI; wrap an Int32-returning extern in an always-inlined Bool wrapper
 
-Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments.
+Source: user correction, from a `skdb-wasm` CI failure (PR #1766). A `@cpp_extern` whose C function returns `uint32_t` must be declared `Int32` in `.sk` — declaring it `Bool` (i1) mismatches the C i32 return and links as a trapping `bitcast_invalid` stub on wasm32. If you want a `Bool`, declare the raw extern with the C-matching type and write a small `@always_inline` wrapper around it. Related: never call a pointer-signature extern (e.g. `SKIP_physEq(char*, char*)`) with value-class arguments (`void`, `Int`, `Bool`) — on wasm32 those arguments are erased, producing a zero-arg call that mismatches the declare and traps; only call such externs with pointer-represented arguments. When argument *representation* matters on wasm32, prefer a compiler intrinsic over a generic `@cpp_extern` — the `Int32`+wrapper pattern above is the fallback.
 
     // worse: i1 return mismatches the C i32 return -> traps on wasm32
     @cpp_extern("SKIP_physEq")
