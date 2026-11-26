@@ -138,6 +138,18 @@
 #
 set -euo pipefail
 
+# The TUI draws box-drawing (multibyte) characters; in the C locale bash string
+# ops are byte-based and would mangle them, so switch to C.UTF-8 when the
+# current locale is not UTF-8 and the locale exists.
+case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
+    *[Uu][Tt][Ff]*8* | *UTF8* | *utf8*) : ;;
+    *)
+        if locale -a 2>/dev/null | grep -qi '^C\.UTF-8$'; then
+            export LC_ALL=C.UTF-8
+        fi
+        ;;
+esac
+
 SCRIPT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 REPO=${MERGE_BOT_REPO:-}
@@ -573,11 +585,11 @@ tui_fit() { # $1=string $2=width -> string truncated/padded to exactly width cha
     printf '%s%*s' "$s" "$((w - ${#s}))" ""
 }
 
-tui_hline() { # $1=left corner $2=title (with surrounding spaces) $3=right corner $4=width
-    local left=$1 title=$2 right=$3 w=$4 t
-    t="─$title "
+tui_hline() { # $1=left $2=title (with spaces) $3=right $4=width [$5=dash char, default ─]
+    local left=$1 title=$2 right=$3 w=$4 dash=${5:-─} t
+    t="$dash$title "
     if [ "${#t}" -gt $((w - 2)) ]; then t="${t:0:$((w - 2))}"; fi
-    printf '%s%s%s%s' "$left" "$t" "$(printf '%*s' "$((w - 2 - ${#t}))" '' | tr ' ' '─')" "$right"
+    printf '%s%s%s%s' "$left" "$t" "$(printf '%*s' "$((w - 2 - ${#t}))" '' | tr ' ' "$dash")" "$right"
 }
 
 tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen frame
@@ -1855,16 +1867,13 @@ EOF
     git -C "$tdir/repo" rebase --abort 2>/dev/null || true
     rm -rf "$tdir"
 
-    # TUI helpers (force a UTF-8 locale: box-drawing chars are multibyte and
-    # bash string length/truncation is locale-dependent; CI runs in C locale)
-    local saved_lc_all=${LC_ALL:-}
-    export LC_ALL=C.UTF-8
+    # TUI helpers (ASCII dash char: locale-independent — in the C locale bash
+    # counts string length in bytes and multibyte box chars would break)
     check "tui_fit truncates" "hel" "$(tui_fit "hello" 3)"
     check "tui_fit pads" "hi  " "$(tui_fit "hi" 4)"
     check "tui_fit exact" "abc" "$(tui_fit "abc" 3)"
-    check "tui_hline width (chars)" "20" "$(tui_hline '├' ' Q ' '┤' 20 | wc -m | tr -d ' ')"
-    check "tui_hline corners" "├─ Q  ─────┤" "$(tui_hline '├' ' Q ' '┤' 12)"
-    if [ -n "$saved_lc_all" ]; then export LC_ALL=$saved_lc_all; else unset LC_ALL; fi
+    check "tui_hline width (chars)" "20" "$(tui_hline '+' ' Q ' '+' 20 '-' | wc -m | tr -d ' ')"
+    check "tui_hline corners" "+- Q  -------+" "$(tui_hline '+' ' Q ' '+' 14 '-')"
 
     # self-update plan: origin has a newer script than the running one
     local su saved_sd saved_clone saved_state
