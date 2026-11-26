@@ -175,19 +175,26 @@ export class PostgresExternalService implements ExternalService {
     };
 
     const initData = async () => {
-      if (!(params.syncHistoricData ?? true)) {
-        await callbacks.update([], true);
-      } else {
-        const init = await this.client.query(
-          format("SELECT * FROM %I;", table),
-        );
-        const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
-        for (const row of init.rows as { [col: string]: Json }[]) {
-          const k = row[key.col]!;
-          if (entries.has(k)) entries.get(k)!.push(row);
-          else entries.set(k, [row]);
+      try {
+        if (!(params.syncHistoricData ?? true)) {
+          await callbacks.update([], true);
+        } else {
+          const init = await this.client.query(
+            format("SELECT * FROM %I;", table),
+          );
+          const entries: Map<Json, Json[]> = new Map<Json, Json[]>();
+          for (const row of init.rows as { [col: string]: Json }[]) {
+            const k = row[key.col]!;
+            if (entries.has(k)) entries.get(k)!.push(row);
+            else entries.set(k, [row]);
+          }
+          await callbacks.update(Array.from(entries), true);
         }
-        await callbacks.update(Array.from(entries), true);
+      } catch (e) {
+        error(
+          `Error loading initial Postgres data for resource instance ${instance} (table ${table}):`,
+        )(e);
+        throw e;
       }
     };
 
