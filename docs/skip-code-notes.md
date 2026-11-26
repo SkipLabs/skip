@@ -42,31 +42,31 @@ sentences, a source tag, and a before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
-### 2026-11-26 — Pure `~>` closures cannot capture mutable variables; use `->`
+### Pure `~>` closures cannot capture mutable variables; use `->`
 
 Source: review (mixed positional/named params work, PR #1738). A pure lambda (`~>`) may not capture a mutable variable (e.g. a `BufferedPrinter.Out`) — declare the lambda `->` instead. Related: a plain `fun` helper invoked on a mutable object must be declared `readonly fun`.
 
-### 2026-11-26 — Write non-terminating loops with `loop`, not `while (true)`
+### Write non-terminating loops with `loop`, not `while (true)`
 
 Source: review (PR #1738). `while (true)` is rejected by the compiler; use `loop { ... }` for non-terminating loops.
 
-### 2026-11-26 — `values()` returns a mutable `Iterator`, not a collection; `Array` has `zip`, not `combine`
+### `values()` returns a mutable `Iterator`, not a collection; `Array` has `zip`, not `combine`
 
 Source: review (PR #1738). `UMap.values()` returns a mutable `Iterator`, and iterators have no `.toArray()` — use `.items().map(...)` / `.collect(Array)` to get a collection. `Array` has `.zip`; `.combine` exists only on `Parameters`.
 
-### 2026-11-26 — Lambda parameters cannot have default values
+### Lambda parameters cannot have default values
 
 Source: review (PR #1738). Lambdas reject default parameter values language-wide (`(x = 1) => ...`); any new lambda parse path must reject `=` explicitly, or it ICEs later in `ensureIsExpression`.
 
-### 2026-11-26 — `Ref(42)` const-folds to one shared image constant
+### `Ref(42)` const-folds to one shared image constant
 
 Source: review (triage of #1724). Two `Ref(42)` are the *same* pointer — use `Array::mfill` when a test needs distinct objects.
 
-### 2026-11-26 — The void literal is `void`, not `()`
+### The void literal is `void`, not `()`
 
 Source: review (triage of #1724).
 
-### 2026-11-26 — `--export-function-as` needs the module-qualified name
+### `--export-function-as` needs the module-qualified name
 
 Source: review (triage of #1724). Pass e.g. `Runtime_PhysEq.main=skip_main`; otherwise `main` is DCE'd under `--emit=llvm-ir --no-link`.
 
