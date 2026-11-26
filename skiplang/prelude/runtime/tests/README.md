@@ -44,9 +44,10 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 
 # Sparse heap without a persistent file
 
-Without a persistent file, the runtime reserves its whole capacity (16 GiB by
-default) as one anonymous mapping. It must use `MAP_NORESERVE`, or heuristic
-overcommit refuses it on hosts with less RAM plus swap (#1589). This test
+Without a persistent file, the runtime's anonymous heap (mapped at the full
+capacity bound, 64 GiB by default) must be mapped with
+`MAP_NORESERVE`: without the flag, heuristic overcommit refuses such a
+private writable mapping on hosts with less RAM plus swap (#1589). This test
 checks the kernel's `nr` flag on the mapping, which does not depend on the
 host's overcommit policy.
 
@@ -58,18 +59,28 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 /tmp/test-no-file-mapping-noreserve
 ```
 
-# Default capacity and its overrides
+# On-demand file growth and the capacity bound
 
-The runtime's default mapping capacity is 16 GiB. `SKIP_CAPACITY` raises it
-when a workload needs more, and `--capacity` wins over the environment. This
-test pins the default value and both override paths.
+A persistent file is truncated to 1 GiB (`INITIAL_CAPACITY`, or the requested
+capacity when smaller) while its virtual mapping spans the full capacity bound
+(64 GiB by default) up front with `MAP_SHARED | MAP_FIXED`. On demand, the
+runtime doubles the file size with `ftruncate` alone (up to the capacity
+bound); because POSIX `MAP_SHARED` allows mapping past EOF, newly backed pages
+become accessible in all processes immediately with no remap or per-lock sync.
+The anonymous heap has no file, so it is mapped at the full bound up front
+(sparse, `MAP_NORESERVE`). `SKIP_CAPACITY` adjusts the bound per workload, with
+`--capacity` winning over the environment. This test pins the default bound and
+both override paths, checks that the file grows without losing contents, that
+reloading preserves the grown size and bound, that a peer process reads newly
+grown pages directly without syncing, and that hitting the bound exits with
+`ERROR_OUT_OF_MEMORY`.
 
 ```sh
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Wl,--gc-sections -pthread \
-  skiplang/prelude/runtime/tests/default_capacity.c \
-  -o /tmp/test-default-capacity
-/tmp/test-default-capacity
+  skiplang/prelude/runtime/tests/mapping_growth.c \
+  -o /tmp/test-mapping-growth
+/tmp/test-mapping-growth
 ```
 
 # Persistent file lock under signals

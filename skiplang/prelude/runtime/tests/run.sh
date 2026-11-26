@@ -18,6 +18,11 @@ if [ "$(uname -s)" = Darwin ]; then
     -Wl,-dead_strip -pthread "$runtime_test_sources/macos_persistent_heap.c" \
     -o "$runtime_test_dir/macos-persistent-heap"
   "$runtime_test_dir/macos-persistent-heap"
+
+  clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
+    -Wl,-dead_strip -pthread "$runtime_test_sources/mapping_growth.c" \
+    -o "$runtime_test_dir/mapping-growth"
+  "$runtime_test_dir/mapping-growth"
   exit 0
 fi
 
@@ -36,9 +41,9 @@ clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
 "$runtime_test_dir/noreserve"
 
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
-  -Wl,--gc-sections -pthread "$runtime_test_sources/default_capacity.c" \
-  -o "$runtime_test_dir/default-capacity"
-"$runtime_test_dir/default-capacity"
+  -Wl,--gc-sections -pthread "$runtime_test_sources/mapping_growth.c" \
+  -o "$runtime_test_dir/mapping-growth"
+"$runtime_test_dir/mapping-growth"
 
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \
   -Wl,--gc-sections -pthread "$runtime_test_sources/persistent_flock_eintr.c" \
