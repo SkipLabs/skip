@@ -107,41 +107,15 @@ mutable class BuildRunner(
   target_layout: Layout,
   fingerprint_dir: String,
   hashes: Map<Unit, Int>,
+  skc_identity: String,
   fingerprints: mutable Map<Unit, Int> = mutable Map[],
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
   mutable checking: Bool = false,
-  mutable skc_identity: ?String = None(),
   // Lib units whose .sklib at least one compiled unit links against via
   // `-l <pkg>=<sklib>`. Filled by compile(): in check mode a root in this set
   // must still emit its .sklib, so it compiles fully instead of `--check`.
   mutable sklib_needed: mutable Map<Unit, Bool> = mutable Map[],
 ) {
-  // Identity of the skc executable actually used (version string, resolved
-  // path, mtime), computed once per run. Part of every unit's fingerprint so
-  // that switching toolchains on a shared target dir invalidates the cached
-  // artifacts instead of reusing them silently (#1500).
-  private mutable fun skcIdentity(): String {
-    if (this.skc_identity.isNone()) {
-      cmd = this.bctx.target_data.skc.cmd;
-      version = System.subprocess(Array[cmd, "--version"]) match {
-      | Success(p) if (p.success()) -> p.stdout.trim()
-      | _ -> "unknown-version"
-      };
-      resolved = System.subprocess(
-        Array["sh", "-c", `command -v ${cmd}`],
-      ) match {
-      | Success(p) if (p.success()) -> Some(p.stdout.trim())
-      | _ -> None()
-      };
-      mtime = resolved match {
-      | Some(path) -> FileSystem.getLastModificationTime(path).toString()
-      | None() -> "unknown-path"
-      };
-      !this.skc_identity = Some(`${version}|${resolved.default("")}|${mtime}`)
-    };
-    this.skc_identity.fromSome()
-  }
-
   static fun create(bctx: BuildContext): mutable BuildRunner {
     host_layout = Layout::create(bctx, "host", "dev");
     target_layout_dest = bctx.build_config.requested_arch match {
@@ -170,6 +144,7 @@ mutable class BuildRunner(
       target_layout,
       fingerprint_dir,
       hashes.chill(),
+      compute_skc_identity(bctx.target_data.skc.cmd),
     )
   }
 
@@ -232,7 +207,7 @@ mutable class BuildRunner(
         // The compiler's own identity, so pointing a different skc at an
         // existing target dir rebuilds instead of silently reusing artifacts
         // produced by another compiler (#1500).
-        this.skcIdentity(),
+        this.skc_identity,
         srcs
           .map(f ->
             (
@@ -1288,6 +1263,37 @@ mutable class BuildRunner(
 
     Path.join(this.fingerprint_dir, `${name}-${hash}`)
   }
+}
+
+// Identity of the `skc` executable actually used (version string, canonical
+// path, mtime, and file size), computed once per build run. Folded into every
+// unit's fingerprint so switching toolchains on a shared target dir
+// invalidates cached artifacts instead of reusing them silently (#1500).
+// `untracked` so repeated calls in tests observe filesystem changes instead of
+// being CSE'd.
+@allow_tracked_call
+untracked fun compute_skc_identity(cmd: String): String {
+  version = System.subprocess(Array[cmd, "--version"]) match {
+  | Success(p) if (p.success()) -> p.stdout.trim()
+  | _ -> "unknown-version"
+  };
+  resolved = System.subprocess(
+    Array["sh", "-c", "command -v \"$1\"", "sh", cmd],
+  ) match {
+  | Success(p) if (p.success()) ->
+    path = p.stdout.trim();
+    Some(FileSystem.realpath(path).default(path))
+  | _ -> None()
+  };
+  (mtime, size) = resolved match {
+  | Some(path) ->
+    FileSystem.stat(path) match {
+    | Some(st) -> (st.mtime.toString(), st.size.toString())
+    | None() -> (FileSystem.getLastModificationTime(path).toString(), "")
+    }
+  | None() -> ("unknown-path", "")
+  };
+  `${version}|${resolved.default("")}|${mtime}|${size}`
 }
 
 // An argv running `argv` with its stdout and stderr redirected to the given
