@@ -110,7 +110,34 @@ mutable class BuildRunner(
   fingerprints: mutable Map<Unit, Int> = mutable Map[],
   build_script_outputs: mutable Map<Unit, BuildScriptOutput> = mutable Map[],
   mutable checking: Bool = false,
+  mutable skc_identity: ?String = None(),
 ) {
+  // Identity of the skc executable actually used (version string, resolved
+  // path, mtime), computed once per run. Part of every unit's fingerprint so
+  // that switching toolchains on a shared target dir invalidates the cached
+  // artifacts instead of reusing them silently (#1500).
+  private mutable fun skcIdentity(): String {
+    if (this.skc_identity.isNone()) {
+      cmd = this.bctx.target_data.skc.cmd;
+      version = System.subprocess(Array[cmd, "--version"]) match {
+      | Success(p) if (p.success()) -> p.stdout.trim()
+      | _ -> "unknown-version"
+      };
+      resolved = System.subprocess(
+        Array["sh", "-c", `command -v ${cmd}`],
+      ) match {
+      | Success(p) if (p.success()) -> Some(p.stdout.trim())
+      | _ -> None()
+      };
+      mtime = resolved match {
+      | Some(path) -> FileSystem.getLastModificationTime(path).toString()
+      | None() -> "unknown-path"
+      };
+      !this.skc_identity = Some(`${version}|${resolved.default("")}|${mtime}`)
+    };
+    this.skc_identity.fromSome()
+  }
+
   static fun create(bctx: BuildContext): mutable BuildRunner {
     host_layout = Layout::create(bctx, "host", "dev");
     target_layout_dest = bctx.build_config.requested_arch match {
@@ -198,6 +225,10 @@ mutable class BuildRunner(
         // Explicit options must invalidate artifacts even when every source
         // timestamp is unchanged. They are applied to every compiler command.
         this.bctx.build_config.skc_extra_options,
+        // The compiler's own identity, so pointing a different skc at an
+        // existing target dir rebuilds instead of silently reusing artifacts
+        // produced by another compiler (#1500).
+        this.skcIdentity(),
         srcs
           .map(f ->
             (
