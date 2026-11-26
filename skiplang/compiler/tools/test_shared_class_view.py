@@ -60,6 +60,26 @@ class SharedClassViewTests(headers.ClassHeadersTests):
                 )
             )
 
+    def test_phys_eq_uses_class_reader(self):
+        source = (
+            "value class PhysEqPair(a: Int, b: Float)\n"
+            "untracked fun main(): void {\n"
+            " a1 = Array<Int>::mfill(1, 42);\n"
+            " a2 = Array<Int>::mfill(1, 42);\n"
+            " print_raw(\n"
+            '  Runtime.phys_eq(a1, a1).toString() + " " +\n'
+            '  Runtime.phys_eq(a1, a2).toString() + " " +\n'
+            '  Runtime.phys_eq(1, 1).toString() + " " +\n'
+            '  Runtime.phys_eq(true, false).toString() + " " +\n'
+            '  Runtime.phys_eq(1.5, 1.5).toString() + " " +\n'
+            '  Runtime.phys_eq(void, void).toString() + " " +\n'
+            "  Runtime.phys_eq(PhysEqPair(1, 2.0), PhysEqPair(1, 2.0)).toString()\n"
+            " )\n}\n"
+        )
+        expected = "true false true false true true true"
+        self.compile(source, expected)
+        self.compile(source.replace("1, 42", "1, 43"), expected)
+
 
 if __name__ == "__main__":
     unittest.main()
