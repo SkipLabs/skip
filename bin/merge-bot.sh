@@ -549,15 +549,15 @@ board_data() { # echoes one JSON blob: now/repo/alive/state_dir/decision/dash/wo
 cmd_board() {
     local d
     d=$(board_data)
-    echo "merge-bot board — $(jq -r .now <<<"$d")  repo=$(jq -r .repo <<<"$d")"
-    echo "bot: $(jq -r .alive <<<"$d")   state-dir: $(jq -r .state_dir <<<"$d")"
+    echo "merge-bot board — $(jq -r '.now // ""' <<<"$d")  repo=$(jq -r '.repo // "?"' <<<"$d")"
+    echo "bot: $(jq -r '.alive // "?"' <<<"$d")   state-dir: $(jq -r .state_dir <<<"$d")"
     echo "decision: $(jq -c .decision <<<"$d")"
     echo
     echo "queue (open PRs with auto-merge):"
     if [ "$(jq '.dash | length' <<<"$d")" = "0" ]; then
         echo "  (none)"
     else
-        jq -r '.dash[] |
+        jq -r '(.dash // [])[] |
             "  #\(.number)  \(.bucket)\t" +
             (if .bucket == "ignored-red" then "failed: \(.failed | join(","))"
              else "est-CI=\(.est)s" end) +
@@ -568,7 +568,7 @@ cmd_board() {
     if [ "$(jq '.work | length' <<<"$d")" = "0" ]; then
         echo "  (none)"
     else
-        jq -r '.work[] | "  \(.name)  head=\(.head)  branch=\(.branch)  dirty=\(.dirty)"' <<<"$d"
+        jq -r '(.work // [])[] | "  \(.name)  head=\(.head)  branch=\(.branch)  dirty=\(.dirty)"' <<<"$d"
     fi
     echo
     echo "last log lines:"
@@ -604,13 +604,16 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
     local -a frame=()
     local act pr est bucket num mss title line plain col wname head branch dirty
     # decision line
-    act=$(jq -r '.decision.action' <<<"$d")
+    act=$(jq -r '.decision.action // "error"' <<<"$d")
+    if [ "$act" = "error" ] && jq -e 'has("error")' <<<"$d" >/dev/null 2>&1; then
+        frame+=("${C_RED}$(tui_fit "⚠ $(jq -r .error <<<"$d") — retrying; see $LOG_FILE" "$cw")${C_RESET}")
+    fi
     case "$act" in
         rebase)
-            pr=$(jq -r '.decision.pr' <<<"$d"); est=$(jq -r '.decision.est // "?"' <<<"$d")
+            pr=$(jq -r '.decision.pr // "?"' <<<"$d"); est=$(jq -r '.decision.est // "?"' <<<"$d")
             frame+=("${C_YELLOW}$(tui_fit "▶ decision: REBASE #$pr (est-CI ${est}s)" "$cw")${C_RESET}") ;;
         wait)
-            pr=$(jq -r '.decision.pr' <<<"$d")
+            pr=$(jq -r '.decision.pr // "?"' <<<"$d")
             frame+=("${C_GREEN}$(tui_fit "▶ decision: WAIT — #$pr is green+up-to-date, expecting merge" "$cw")${C_RESET}") ;;
         idle)
             frame+=("${C_DIM}$(tui_fit "▶ decision: idle — no green+auto-merge PRs right now" "$cw")${C_RESET}") ;;
@@ -619,11 +622,11 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
     esac
     frame+=("$(tui_hline '├' ' QUEUE (open PRs with auto-merge) ' '┤' "$W")")
     local -a rows=()
-    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '.dash[] | [.bucket, (.number|tostring), ((.est // 0)|tostring), .mss, .title] | @tsv' <<<"$d")
+    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '(.dash // [])[] | [.bucket, (.number|tostring), ((.est // 0)|tostring), .mss, .title] | @tsv' <<<"$d")
     if [ "${#rows[@]}" = "0" ]; then
         frame+=("│ $(tui_fit '  (none)' "$cw") │")
     else
-        for line in "${rows[@]}"; do
+        for line in ${rows[@]+"${rows[@]}"}; do
             IFS=$'\t' read -r bucket num est mss title <<<"$line"
             local col="$C_RESET"
             case "$bucket" in
@@ -642,11 +645,11 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
     fi
     frame+=("$(tui_hline '├' ' IN-FLIGHT WORKTREES ' '┤' "$W")")
     rows=()
-    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '.work[] | [.name, .head, .branch, .dirty] | @tsv' <<<"$d")
+    while IFS= read -r line; do rows+=("$line"); done < <(jq -r '(.work // [])[] | [.name, .head, .branch, .dirty] | @tsv' <<<"$d")
     if [ "${#rows[@]}" = "0" ]; then
         frame+=("│ $(tui_fit '  (none)' "$cw") │")
     else
-        for line in "${rows[@]}"; do
+        for line in ${rows[@]+"${rows[@]}"}; do
             IFS=$'\t' read -r wname head branch dirty <<<"$line"
             frame+=("│ ${C_CYAN}$(tui_fit "  $wname  head=$head  branch=$branch  dirty=$dirty" "$cw")${C_RESET} │")
         done
@@ -657,19 +660,30 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
     frame+=("$(tui_hline '├' ' LOG ' '┤' "$W")")
     local -a logrows=()
     local -a logrows=()
-    while IFS= read -r line; do logrows+=("$line"); done < <(jq -r '.log[]' <<<"$d" | tail -n "$logroom")
-    for line in "${logrows[@]}"; do
+    while IFS= read -r line; do logrows+=("$line"); done < <(jq -r '(.log // [])[]' <<<"$d" | tail -n "$logroom")
+    for line in ${logrows[@]+"${logrows[@]}"}; do
         frame+=("│ ${C_DIM}$(tui_fit "$line" "$cw")${C_RESET} │")
     done
     # render: top border, body (truncated to H-2), bottom border
     printf '\033[H'
-    printf '%s\n' "${C_BOLD}$(tui_hline '┌' " merge-bot  $(jq -r .repo <<<"$d")  $(jq -r .now <<<"$d")  bot: $(jq -r .alive <<<"$d")  v$ver " '┐' "$W")${C_RESET}"
+    printf '%s\n' "${C_BOLD}$(tui_hline '┌' " merge-bot  $(jq -r '.repo // "?"' <<<"$d")  $(jq -r '.now // ""' <<<"$d")  bot: $(jq -r '.alive // "?"' <<<"$d")  v$ver " '┐' "$W")${C_RESET}"
     local i
     for i in "${!frame[@]}"; do
         [ "$i" -ge $((H - 2)) ] && break
         printf '%s\n' "${frame[$i]}"
     done
     printf '%s\n' "$(tui_hline '└' " q: quit · refresh ${interval}s " '┘' "$W")"
+    printf '\033[J'
+}
+
+tui_draw_loading() { # $1=refresh seconds; immediate frame so the screen is never blank while gh queries run
+    local W=${COLUMNS:-80} H=${LINES:-24}
+    [ "$W" -lt 40 ] && W=40
+    [ "$H" -lt 10 ] && H=10
+    printf '\033[H'
+    printf '%s\n' "${C_BOLD}$(tui_hline '┌' " merge-bot  loading… " '┐' "$W")${C_RESET}"
+    printf '%s\n' "│ $(tui_fit " gathering PR state (gh api) — press q to quit " "$((W - 4))") │"
+    printf '%s\n' "$(tui_hline '└' " refresh ${1}s " '┘' "$W")"
     printf '\033[J'
 }
 
@@ -680,16 +694,18 @@ cmd_watch() {
         trap 'echo; exit 0' INT TERM
         while :; do
             printf '\033[2J\033[H'
-            cmd_board
+            cmd_board || echo "board failed; see ${LOG_FILE:-the state-dir log}"
             sleep "$interval"
         done
     fi
     printf '\033[?1049h\033[?25l' # alternate screen, hide cursor
     trap 'printf "\033[?25h\033[?1049l"; echo; exit 0' INT TERM
     trap 'printf "\033[?25h\033[?1049l"' EXIT
-    local key
+    local key d
     while :; do
-        tui_draw "$(board_data)" "$interval"
+        tui_draw_loading "$interval"
+        d=$(board_data 2>>"$LOG_FILE") || d='{"error":"board_data failed (gh/jq?)"}'
+        tui_draw "$d" "$interval"
         key=""
         IFS= read -r -t "$interval" -n 1 -s key || true
         [ "$key" = "q" ] && break
