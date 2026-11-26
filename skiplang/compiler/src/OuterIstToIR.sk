@@ -1486,10 +1486,29 @@ class Converter private (
   fun getGClass(
     context: mutable SKStore.Context,
     gid: LazyGClass,
-    _pos: Pos,
+    pos: Pos,
   ): GClass {
     gid match {
     | LiteralLazyGClass(cls) -> cls
+    | FrontEndLazyGClass(
+      name,
+    ) if (name == "Awaitable" || name.startsWith("Awaitable.")) ->
+      // Backstop for the #1344 diagnostic: if something resolves an
+      // Awaitable-named class before the async function's body is compiled
+      // (e.g. the caller's `^T` result type), report the unsupported
+      // feature instead of the "Class definition not found" invariant.
+      pos match {
+      | fr @ FileRange _ ->
+        SkipError.fatalError(
+          context,
+          fr,
+          `async is not supported by the compiler backend yet: this use ` +
+            `of an awaitable ('^T') needs an 'Awaitable' class, which the ` +
+            `standard library does not provide. Remove the call to the ` +
+            `'async' function (or the 'async' modifier itself).`,
+        )
+      | _ -> this.getGClassImpl(context, gid)
+      }
     | _ -> this.getGClassImpl(context, gid)
     }
   }
@@ -3229,9 +3248,21 @@ mutable class OuterIstEmitter{
         funInfo,
       )
     } else if (funInfo.isAsync) {
-      !funInfo.funType.returnType = converter.createAwaitableClass(
+      // `async` parses and type-checks, but the backend cannot lower it
+      // yet: there is no `Awaitable` class in the standard library, so any
+      // attempt to resolve one dies with an internal error (see #1344).
+      // Async bodies are compiled lazily, only once the function is
+      // actually called, so dying here turns that ICE into a proper
+      // diagnostic pointing at the async definition (dead async functions
+      // are eliminated before this point and keep compiling fine).
+      SkipError.fatalError(
         context,
-        funInfo,
+        funInfo.pos,
+        `async is not supported by the compiler backend yet: ` +
+          `'${funInfo.gfunction.id}' is declared 'async', but there is no ` +
+          `'Awaitable' class in the standard library to lower it to. ` +
+          `Remove the 'async' modifier (and any 'await' of its result), ` +
+          `or leave this function uncalled.`,
       )
     };
 

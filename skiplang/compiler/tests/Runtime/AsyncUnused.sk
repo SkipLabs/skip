@@ -1,0 +1,14 @@
+module Runtime_AsyncUnused;
+
+// An async function that is never called is dead-code eliminated before
+// the backend lowers it, so its mere declaration must not break the build
+// (calling one is a compile error: see invalid_tests/runtime/async_call).
+async fun unused_fetch(x: Int): ^Int {
+  x + 1
+}
+
+fun main(): void {
+  print_raw("Pass\n")
+}
+
+module end;

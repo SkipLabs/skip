@@ -242,9 +242,12 @@ user-defined annotations; see below.
 ### `async`
 
 > **`async` is not currently usable.** It parses and type-checks, but it does not
-> codegen: actually calling and awaiting an async function fails with an internal
-> compiler error. There is no `Awaitable` class in the standard library, and the
-> async compiler tests are disabled (`tests/Typechecking/Async*.disabled_async`).
+> codegen: there is no `Awaitable` class in the standard library, so calling an
+> async function is rejected with a compile error at the call site (or at the
+> `async` declaration itself) — "async is not supported by the compiler backend
+> yet" — instead of an internal error. Declaring an async function that is never
+> called is fine (it is dead-code eliminated before codegen). The async compiler
+> tests are disabled (`tests/Typechecking/Async*.disabled_async`).
 > The rest of this section describes the intended design.
 
 An `async fun` returns an awaitable type, written `^T`, and its result is
