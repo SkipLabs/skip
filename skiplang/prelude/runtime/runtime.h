@@ -124,7 +124,6 @@ typedef struct {
   size_t head;
   size_t capacity;
   sk_value_t* values;
-  sk_value_t* inline_values;
 } sk_stack_t;
 
 void sk_stack_init(sk_stack_t* st, size_t capacity);
