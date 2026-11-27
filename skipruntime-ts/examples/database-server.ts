@@ -1,3 +1,4 @@
+import type { Json } from "@skipruntime/core";
 import { SkipServiceBroker } from "@skipruntime/helpers";
 
 import express from "express";
@@ -17,8 +18,9 @@ const service = new SkipServiceBroker({
 const Database = await getDatabase();
 
 type User = {
-  name: string;
-  country: string;
+  readonly name: string;
+  readonly country: string;
+  readonly [key: string]: Json | null;
 };
 
 const db = new Database("./db.sqlite");

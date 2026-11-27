@@ -26,7 +26,7 @@ class ComputeExpression implements LazyCompute<string, string | number> {
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
-        if (!isNaN(nv)) return nv;
+        if (!Number.isNaN(nv)) return nv;
       }
       throw new Error(`Invalid value for cell '${key}'`);
     };
@@ -90,7 +90,8 @@ const service = {
   createGraph: (inputCollections: Inputs, context: Context): Outputs => {
     const cells = inputCollections.cells;
     // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
-    const evaluator = context.createLazyCollection(ComputeExpression, cells);
+    const evaluator: LazyCollection<string, number | string> =
+      context.createLazyCollection(ComputeExpression, cells);
     // Produce eager collection for output resource
     return { output: cells.map(CallCompute, evaluator) };
   },

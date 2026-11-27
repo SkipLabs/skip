@@ -1,5 +1,6 @@
 import type {
   EagerCollection,
+  Json,
   SkipService,
   Resource,
   Entry,
@@ -49,7 +50,11 @@ function initDB(): SqliteDatabase {
 // The read path, we want to find a user
 /*****************************************************************************/
 
-type User = { name: string; country: string };
+type User = {
+  readonly name: string;
+  readonly country: string;
+  readonly [key: string]: Json | null;
+};
 
 type UsersInputs = {
   readonly users: InputDefinition<string, User>;

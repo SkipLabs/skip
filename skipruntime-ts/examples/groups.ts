@@ -14,8 +14,17 @@ const platform: "wasm" | "native" =
 
 type UserID = number;
 type GroupID = number;
-type User = { name: string; active?: boolean; friends: UserID[] };
-type Group = { name: string; members: UserID[] };
+type User = {
+  readonly name: string;
+  readonly active: boolean;
+  readonly friends: readonly UserID[];
+  readonly [key: string]: Json | null;
+};
+type Group = {
+  readonly name: string;
+  readonly members: readonly UserID[];
+  readonly [key: string]: Json | null;
+};
 
 // Type alias for inputs to our service
 type ServiceInputs = {

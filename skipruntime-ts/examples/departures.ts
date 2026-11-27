@@ -12,14 +12,15 @@ const platform: "wasm" | "native" =
   process.env["SKIP_PLATFORM"] == "native" ? "native" : "wasm";
 
 type Departure = {
-  year: string;
-  origin: string;
-  origin_name: string;
-  asylum: string;
-  asylum_name: string;
-  destination: string;
-  destination_name: string;
-  persons: string;
+  readonly year: string;
+  readonly origin: string;
+  readonly origin_name: string;
+  readonly asylum: string;
+  readonly asylum_name: string;
+  readonly destination: string;
+  readonly destination_name: string;
+  readonly persons: string;
+  readonly [key: string]: Json | null;
 };
 
 type Result = {
