@@ -34,6 +34,6 @@ Always use `make` targets rather than bare `npm` commands — `Makefile` exports
 
 - **Errors**: `make -C skipruntime-ts test-error-types` fails if runtime source throws generic `new Error(...)`; throw a `SkipError` subclass from `core/src/errors.ts`.
 - **Native artifact cache in CI**: `skipruntime` / `skipruntime-bun` cache `libskipruntime.{so,wasm}` and `addon/build` via `bin/native_artifacts_cache_key.sh` (`SKIP_NATIVE_BUILDS_IF_PRESENT=1`). Pure-TS PRs skip rebuilding native artifacts.
-- **TypeScript matrix**: CI `check-ts` verifies against locked TS 5.7.x plus `~5.8.0` and `~6.0.0`.
+- **TypeScript matrix**: CI `check-ts` verifies against locked TS 5.7.x plus `~5.8.0`, `~6.0.0`, and `~7.0.0`.
 - **Versioning**: changes under `skiplang/{core,ffi}/` require bumping `Skargo.toml` `version` in the same PR. All public `@skipruntime/*`, `@skiplabs/skip`, `@skip-adapter/*` NPM versions stay locked together on release — see [bin/README.md](../bin/README.md#release-npm-packages).
 - **External services for integration tests**: `postgres.spec.ts` and Kafka example tests expect Postgres (`localhost:5432`, user `postgres`, password `secret`) and Kafka (`127.0.0.1:9092`).
