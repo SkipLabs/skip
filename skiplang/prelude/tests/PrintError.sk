@@ -1,0 +1,42 @@
+module alias T = SKTest;
+
+module PrintErrorTest;
+
+@allow_tracked_call
+untracked fun captureStderr(f: () -> void): String {
+  flushStdout();
+  saved = Posix.dup(IO.stderr().fileno);
+  tmp = Posix.mkstemp(Path.join(Environ.temp_dir(), "XXXXXX"));
+  actual = try {
+    Posix.dup2(tmp.fileno, IO.stderr().fileno);
+    f();
+    flushStdout();
+    _ = Posix.lseek(tmp.fileno, 0, Posix.SeekSet());
+    tmp.read_to_string().fromSuccess()
+  } catch {
+  | exn ->
+    Posix.dup2(saved, IO.stderr().fileno);
+    Posix.close(saved);
+    tmp.close();
+    throw exn
+  };
+  Posix.dup2(saved, IO.stderr().fileno);
+  Posix.close(saved);
+  tmp.close();
+  actual
+}
+
+@test
+fun testPrintErrorLnSingleNewline(): void {
+  T.expectEq(captureStderr(() -> print_error_ln("foo")), "foo\n");
+  T.expectEq(captureStderr(() -> print_error_ln(42)), "42\n");
+  T.expectEq(captureStderr(() -> print_error_ln("")), "\n");
+}
+
+@test
+fun testPrintErrorAndRaw(): void {
+  T.expectEq(captureStderr(() -> print_error("bar")), "bar\n");
+  T.expectEq(captureStderr(() -> print_error_raw("baz")), "baz");
+}
+
+module end;
