@@ -20,10 +20,42 @@ fun clean(): (Cli.Command, (GlobalContext, Cli.ParseResults) ~> void) {
   )
 }
 
+fun clean_target_dir_name(
+  target: TargetTriple,
+  host_target: TargetTriple,
+): String {
+  if (target == host_target) kDefaultTarget else target.toString()
+}
+
+fun clean_path(
+  target_dir: String,
+  target_opt: ?TargetTriple,
+  profile_opt: ?String,
+  host_target: () -> TargetTriple,
+): String {
+  (target_opt, profile_opt) match {
+  | (None(), None()) -> target_dir
+  | (Some(t), None()) ->
+    Path.join(target_dir, clean_target_dir_name(t, host_target()))
+  | (Some(t), Some(profile)) ->
+    Path.join(target_dir, clean_target_dir_name(t, host_target()), profile)
+  | (None(), Some(profile)) -> Path.join(target_dir, kDefaultTarget, profile)
+  }
+}
+
 fun execClean(gctx: GlobalContext, args: Cli.ParseResults): void {
   ws = workspace(args, gctx);
-  // TODO: Clean only for a specific arch specified with `--target`?
-  p = System.subprocess(Array["rm", "-rf", ws.target_dir()]).fromSuccess();
+  target_opt = args.maybeGetString("target", false).map(t ->
+    TargetTriple::fromString(t)
+  );
+  profile_opt = resolve_profile(
+    args.maybeGetString("profile"),
+    args.getBool("release"),
+  );
+  path = clean_path(ws.target_dir(), target_opt, profile_opt, () ->
+    get_host_target(gctx)
+  );
+  p = System.subprocess(Array["rm", "-rf", path]).fromSuccess();
   if (!p.success()) {
     gctx.console.error(subprocess_error_message(p));
     skipExit(2);
