@@ -80,8 +80,13 @@ class Table(map: .Map<.String, TOML.Value>) extends Value {
     this.maybeGet(key).map(v -> v.expectBool())
   }
 
-  fun maybeGetDate(key: .String): ?LocalDate {
+  fun maybeGetLocalDate(key: .String): ?LocalDate {
     this.maybeGet(key).map(v -> v.expectLocalDate())
+  }
+
+  // Backwards-compatible alias for `maybeGetLocalDate`.
+  fun maybeGetDate(key: .String): ?LocalDate {
+    this.maybeGetLocalDate(key)
   }
 
   fun maybeGetLocalTime(key: .String): ?LocalTime {

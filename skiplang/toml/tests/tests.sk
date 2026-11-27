@@ -110,12 +110,42 @@ fun runFloatBitsTest(): void {
   }
 }
 
+fun runLocalDateGettersTest(): void {
+  table = TOML.decode("d = 2024-03-15\ns = \"not a date\"");
+  expected = TOML.LocalDate(2024, 3, 15);
+
+  T.expectEq(table.maybeGetLocalDate("d"), Some(expected));
+  T.expectEq(table.maybeGetLocalDate("missing"), None());
+  T.expectEq(table.maybeGetDate("d"), Some(expected));
+  T.expectEq(table.maybeGetDate("missing"), None());
+  T.expectEq(table.getLocalDate("d"), expected);
+
+  T.expectThrow(() -> {
+    _ = table.maybeGetLocalDate("s")
+  });
+  T.expectThrow(() -> {
+    _ = table.maybeGetDate("s")
+  });
+  T.expectThrow(() -> {
+    _ = table.getLocalDate("missing")
+  });
+  T.expectThrow(() -> {
+    _ = table.getLocalDate("s")
+  });
+}
+
 untracked fun main(): void {
   tests = mutable Map[];
   tests.set(
     "float-bits",
     mutable Vector[
       T.Test{name => "nearest double", func => () ~> runFloatBitsTest()},
+    ],
+  );
+  tests.set(
+    "table-getters",
+    mutable Vector[
+      T.Test{name => "local date", func => () ~> runLocalDateGettersTest()},
     ],
   );
 
