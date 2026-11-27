@@ -25,7 +25,8 @@ CFILES=\
 	string.c \
 	native_eq.c \
 	splitmix64.c \
-	xoroshiro128plus.c
+	xoroshiro128plus.c \
+	xxhash64.c
 
 NATIVE_FILES=\
 	consts.c \
