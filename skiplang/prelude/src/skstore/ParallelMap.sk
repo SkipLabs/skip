@@ -22,6 +22,13 @@ class ParallelSnapshot(
     this.resolve(dirName)
   }
 
+  fun isLazy(dirName: DirName): Bool {
+    this.template.unsafeMaybeGetDir(dirName) match {
+    | Some(LazyDir _) -> true
+    | _ -> false
+    }
+  }
+
   fun readContext(): mutable Context {
     this.template.mclone()
   }
@@ -30,12 +37,18 @@ class ParallelSnapshot(
 // One reader per source row. Its log and all scratch allocation are local.
 mutable class ParallelReader private {
   private snapshot: ParallelSnapshot,
+  private readerKey: ?ArrowKey = None(),
+  private atomicTable: Int = 0,
   private mutable requests: SortedSet<Path> = SortedSet[],
   private mutable contextRequests: SortedSet<Path> = SortedSet[],
   private mutable filters: List<ParallelContextFilter> = List[],
 } {
-  static fun create(snapshot: ParallelSnapshot): mutable this {
-    mutable static{snapshot}
+  static fun create(
+    snapshot: ParallelSnapshot,
+    readerKey: ?ArrowKey = None(),
+  ): mutable this {
+    table = snapshot.readContext().getAtomicDepsTable();
+    mutable static{snapshot, readerKey, atomicTable => table}
   }
 
   mutable fun getArray<K: Key, V: File>(
@@ -43,7 +56,20 @@ mutable class ParallelReader private {
     key: K,
   ): Array<V> {
     dir = this.snapshot.get(handle.dirName);
-    this.!requests = this.requests.set(Path::create(handle.dirName, key));
+    path = Path::create(handle.dirName, key);
+    (this.atomicTable > 0, this.readerKey) match {
+    | (true, Some(rk)) ->
+      // Direct atomic dependency write from worker thread (no serial replay!).
+      rh = hash(rk);
+      atomicDepsInsert(this.atomicTable, hash(path), rh, rk);
+      atomicDepsInsert(
+        this.atomicTable,
+        hash(Path::dirTag(handle.dirName)),
+        rh,
+        rk,
+      )
+    | _ -> this.!requests = this.requests.set(path)
+    };
     dir.getArrayRaw(key).map(handle.type)
   }
 
@@ -52,12 +78,27 @@ mutable class ParallelReader private {
   }
 
   readonly fun readContext(): mutable Context {
-    this.snapshot.readContext()
+    ctx = this.snapshot.readContext();
+    ctx.setParallelReaderKey(this.readerKey);
+    ctx
   }
 
   mutable fun recordContext(context: readonly Context): void {
     log = context.parallelReadLog();
-    this.!contextRequests = this.contextRequests.union(log.reads);
+    (this.atomicTable > 0, this.readerKey) match {
+    | (true, Some(rk)) ->
+      rh = hash(rk);
+      for (path in log.reads) {
+        atomicDepsInsert(this.atomicTable, hash(path), rh, rk);
+        // Preserve lazy-cache retention bookkeeping on the main thread when
+        // the read was on a LazyDir.
+        this.snapshot.isLazy(path.dirName) match {
+        | true -> this.!contextRequests = this.contextRequests.set(path)
+        | false -> void
+        }
+      }
+    | _ -> this.!contextRequests = this.contextRequests.union(log.reads)
+    };
     this.!filters = log.filters.concat(this.filters);
   }
 
@@ -118,6 +159,7 @@ class ParallelOutcome(result: ?ParallelRowResult, exception: ?.Exception)
 class ParallelMapJob(
   snapshot: ParallelSnapshot,
   parent: EagerDir,
+  childName: DirName,
   keys: Array<Key>,
   lambda: RawParallelMapFun,
   inputs: ?Array<Array<File>> = None(),
@@ -125,9 +167,14 @@ class ParallelMapJob(
 ) {
   fun evaluate(index: Int): ParallelOutcome {
     try {
-      reader = ParallelReader::create(this.snapshot);
-      writer = mutable Writer{};
       key = this.keys[index];
+      arrow = TArrowKey::create{
+        parentName => this.parent.dirName,
+        childName => this.childName,
+        key,
+      };
+      reader = ParallelReader::create(this.snapshot, Some(arrow));
+      writer = mutable Writer{};
       values = this.inputs match {
       | Some(inputs) -> inputs[index]
       | None() -> this.parent.getArrayRaw(key)
@@ -268,6 +315,7 @@ class ParallelMapper(
     job = ParallelMapJob(
       context.parallelSnapshot(),
       parent,
+      childName,
       selected,
       this.lambda,
       preparations.map(rows -> rows.map(row -> row.inputs)),

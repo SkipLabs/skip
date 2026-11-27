@@ -190,7 +190,40 @@ class ReadFilter(
 }
 
 // Internal comparison control; each saved context keeps its selected strategy.
-// The normal mode updates only dependency edges whose logical paths changed.
+// Bit 0 (1): incremental diff-based dependency updates (default).
+// Bit 1 (2): append-only atomic dependency hash table (SKSTORE_DEPENDENCY_MODE=3
+// or Context::create{atomicDeps => true}). Workers write dependency edges
+// directly into a lock-free C++ hash table without serial replay or edge
+// deletion.
+@allow_tracked_call
+@cpp_extern("SKIP_skstore_atomic_deps_create")
+untracked native fun atomicDepsCreate(): Int;
+
+@allow_tracked_call
+@cpp_extern("SKIP_skstore_atomic_deps_insert")
+untracked native fun atomicDepsInsert(
+  tableId: Int,
+  pathHash: Int,
+  readerHash: Int,
+  reader: ArrowKey,
+): void;
+
+@allow_tracked_call
+@cpp_extern("SKIP_skstore_atomic_deps_count")
+untracked native fun atomicDepsCount(tableId: Int, pathHash: Int): Int;
+
+@allow_tracked_call
+@cpp_extern("SKIP_skstore_atomic_deps_get")
+untracked native fun atomicDepsGet(
+  tableId: Int,
+  pathHash: Int,
+  index: Int,
+): ArrowKey;
+
+@allow_tracked_call
+@cpp_extern("SKIP_skstore_atomic_deps_clear")
+untracked native fun atomicDepsClear(tableId: Int): void;
+
 fun defaultDependencyMode(): Int {
   Environ.varOpt("SKSTORE_DEPENDENCY_MODE")
     .map(value -> value.toInt())
@@ -819,6 +852,8 @@ mutable base class WriteChecker {
 mutable class Context private {
   private mutable parallelReadOnly: Bool = false,
   private mutable parallelFilters: List<ParallelContextFilter> = List[],
+  private mutable parallelReaderKey: ?ArrowKey = None(),
+  private mutable atomicDepsTable: Int = 0,
   private mutable toPurge: SortedSet<DirName> = SortedSet[],
   private mutable dirs: Dirs = Dirs{},
   mutable reads: SortedSet<Path> = SortedSet[],
@@ -862,31 +897,55 @@ mutable class Context private {
   static fun create{
     canReuse: CanReuse = CRIfMatch(),
     dependencyMode: Int = defaultDependencyMode(),
+    atomicDeps: Bool = false,
     compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
     canonicalReadPaths: Bool = Environ.varOpt(
       "SKSTORE_CANONICAL_READ_PATHS",
     ).isSome(),
     blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
   }: this {
+    mode = if (atomicDeps) dependencyMode.or(2) else dependencyMode;
+    table = if (mode.and(2) != 0) atomicDepsCreate() else 0;
     static{
       canReuse,
-      dependencyMode,
+      dependencyMode => mode,
+      atomicDepsTable => table,
       deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
     }
   }
 
   static fun mcreate{
     dependencyMode: Int = defaultDependencyMode(),
+    atomicDeps: Bool = false,
     compactReaders: Bool = Environ.varOpt("SKSTORE_COMPACT_READERS").isSome(),
     canonicalReadPaths: Bool = Environ.varOpt(
       "SKSTORE_CANONICAL_READ_PATHS",
     ).isSome(),
     blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
   }: mutable this {
+    mode = if (atomicDeps) dependencyMode.or(2) else dependencyMode;
+    table = if (mode.and(2) != 0) atomicDepsCreate() else 0;
     mutable static{
-      dependencyMode,
+      dependencyMode => mode,
+      atomicDepsTable => table,
       deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
     }
+  }
+
+  readonly fun usesAtomicDeps(): Bool {
+    this.atomicDepsTable > 0
+  }
+
+  readonly fun getAtomicDepsTable(): Int {
+    this.atomicDepsTable
+  }
+
+  mutable fun setParallelReaderKey(key: ?ArrowKey): void {
+    this.!parallelReaderKey = key
+  }
+
+  mutable fun clearAtomicDeps(): void {
+    if (this.atomicDepsTable > 0) atomicDepsClear(this.atomicDepsTable)
   }
 
   readonly fun isParallelReadOnly(): Bool {
@@ -1032,6 +1091,8 @@ mutable class Context private {
     mutable static{
       parallelReadOnly => this.parallelReadOnly,
       parallelFilters => this.parallelFilters,
+      parallelReaderKey => this.parallelReaderKey,
+      atomicDepsTable => this.atomicDepsTable,
       toPurge => this.toPurge,
       dirs => this.dirs,
       reads => this.reads,
@@ -1070,6 +1131,8 @@ mutable class Context private {
     this.requireWritable();
     this.!parallelReadOnly = ctx.parallelReadOnly;
     this.!parallelFilters = ctx.parallelFilters;
+    this.!parallelReaderKey = ctx.parallelReaderKey;
+    this.!atomicDepsTable = ctx.atomicDepsTable;
     invariant(this.dependencyMode == ctx.dependencyMode);
     this.!toPurge = ctx.toPurge;
     this.!dirs = ctx.dirs;
@@ -1136,10 +1199,29 @@ mutable class Context private {
   }
 
   private readonly fun getDeps(path: Path): mutable Iterator<ArrowKey> {
+    if (this.atomicDepsTable > 0) {
+      ph = hash(path);
+      n = atomicDepsCount(this.atomicDepsTable, ph);
+      if (n == 0) return this.deps.readers(path);
+      out = mutable Vector<ArrowKey>[];
+      for (i in Range(0, n)) {
+        out.push(atomicDepsGet(this.atomicDepsTable, ph, i))
+      };
+      // Include any edges in `this.deps` as well (e.g. from pre-existing state).
+      for (r in this.deps.readers(path)) out.push(r);
+      return out.values()
+    };
     this.deps.readers(path)
   }
 
   mutable fun updateNewDeps(reader: ArrowKey, reads: SortedSet<Path>): void {
+    if (this.atomicDepsTable > 0) {
+      rh = hash(reader);
+      for (path in reads) {
+        atomicDepsInsert(this.atomicDepsTable, hash(path), rh, reader)
+      };
+      return void
+    };
     for (path in reads) {
       this.!deps = this.deps.set(path, reader);
     };
@@ -1153,6 +1235,14 @@ mutable class Context private {
     oldReads: Array<Path>,
     newReads: SortedSet<Path>,
   ): void {
+    if (this.atomicDepsTable > 0) {
+      // Append-only atomic mode: insert new edges directly; never remove old edges.
+      rh = hash(reader);
+      for (path in newReads) {
+        atomicDepsInsert(this.atomicDepsTable, hash(path), rh, reader)
+      };
+      return void
+    };
     if (this.dependencyMode.and(1) == 0) {
       this.updateNewDeps(reader, newReads);
       this.removeDeps(
@@ -1190,6 +1280,14 @@ mutable class Context private {
     reader: ArrowKey,
     reads: SortedSet<Path>,
   ): void {
+    if (this.atomicDepsTable > 0) {
+      rh = hash(reader);
+      for (path in reads) {
+        this.!deps = this.deps.importFilter(from.deps, path);
+        atomicDepsInsert(this.atomicDepsTable, hash(path), rh, reader);
+      };
+      return void
+    };
     for (path in reads) {
       this.!deps = this.deps.importFilter(from.deps, path).set(path, reader);
     };
@@ -1199,6 +1297,7 @@ mutable class Context private {
     reader: ArrowKey,
     reads: mutable Iterator<Path>,
   ): void {
+    if (this.atomicDepsTable > 0) return void;
     for (path in reads) {
       this.!deps = this.deps.remove(path, reader);
     }
@@ -1767,6 +1866,7 @@ mutable class Context private {
       globals => this.globals,
       persistents => this.persistents,
       parallelReadOnly => true,
+      atomicDepsTable => this.atomicDepsTable,
       debugMode => this.debugMode,
       dependencyMode => this.dependencyMode,
       deps => Deps::empty(

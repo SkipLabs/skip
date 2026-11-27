@@ -335,3 +335,28 @@ int64_t SKIP_parallel_map_worker_id(void) {
 _Bool SKIP_parallel_map_native(void) {
   return 0;
 }
+int64_t SKIP_skstore_atomic_deps_create(void) {
+  return 0;
+}
+void SKIP_skstore_atomic_deps_insert(int64_t table_id, int64_t path_hash,
+                                     int64_t reader_hash, void* reader) {
+  (void)table_id;
+  (void)path_hash;
+  (void)reader_hash;
+  (void)reader;
+}
+int64_t SKIP_skstore_atomic_deps_count(int64_t table_id, int64_t path_hash) {
+  (void)table_id;
+  (void)path_hash;
+  return 0;
+}
+void* SKIP_skstore_atomic_deps_get(int64_t table_id, int64_t path_hash,
+                                   int64_t index) {
+  (void)table_id;
+  (void)path_hash;
+  (void)index;
+  return NULL;
+}
+void SKIP_skstore_atomic_deps_clear(int64_t table_id) {
+  (void)table_id;
+}
