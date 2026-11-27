@@ -54,6 +54,11 @@ encourages batching unrelated changes.
 - Long Python test suites should report per-test durations (as
   `skiplang/compiler/tools/run_backend_tests.py` does) so regressions in a
   single test are visible in the CI log.
+- `compiler-tests` is split across 2 parallel containers balanced by test
+  timings (`parallelism: 2` in `.circleci/base.yml`, with `--split-by=timings`
+  in `bin/run-sktest.sh`). On a first run with no timing data, CircleCI falls
+  back to splitting by name while `store_test_results` accumulates timings for
+  subsequent runs.
 - `backend-regressions` is split across parallel containers; the count is its
   `shards` parameter in `.circleci/base.yml`. See
   [`skiplang/compiler/tools/README.md`](skiplang/compiler/tools/README.md#sharding-in-ci)

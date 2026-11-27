@@ -46,8 +46,12 @@ if [ "$#" -eq 0 ]; then
     # names are safe today, but this stops xargs word-splitting/quote-processing
     # them). Single-quote $self so it survives the shell re-parse inside
     # `circleci tests run`.
+    run_args=(--command="xargs -r -d '\n' '$self'" --verbose)
+    if [ "${CIRCLE_NODE_TOTAL:-1}" -gt 1 ]; then
+        run_args+=(--split-by=timings)
+    fi
     printf '%s\n' "$suites" \
-        | circleci tests run --command="xargs -r -d '\n' '$self'" --verbose
+        | circleci tests run "${run_args[@]}"
 else
     # Inner: run only the given suites, passed to the harness via SKTEST_FILTERS.
     SKTEST_FILTERS=$(printf '%s\n' "$@")

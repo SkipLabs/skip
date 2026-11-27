@@ -364,7 +364,13 @@ jobs:
   # The language suite, on the compiler job's stage1 build. It runs beside the
   # other jobs that wait for that build (skargo, backend-regressions) instead
   # of extending the compiler job, which is on the critical path.
+  # Split across 2 containers balanced by test timings via --split-by=timings
+  # in bin/run-sktest.sh (a first run on a new shard count falls back to
+  # name-based splitting; timings accumulate via store_test_results, which
+  # merges per-container ~/test-results automatically). Each container still
+  # runs SKTEST_JOBS=8 inside its own incremental_profile RSS guard.
   compiler-tests:
+    parallelism: 2
     docker:
       - image: skiplabs/skip:latest
     resource_class: xlarge.gen2
