@@ -35,7 +35,7 @@ Global flags: `-V`/`--version`, `-q`/`--quiet`, `-v`/`--verbose` (repeatable), `
 | `skargo test [filter]` | `t` | Same + `-j`/`--jobs <N>` (default `nproc`), `--build-jobs <N>` (default `min(jobs, 4)`), `--list`, `--junitxml <PATH>`, `-- <ARGS>`. On `wasm32*`, builds `.wasm` test binary without executing it. |
 | `skargo run` | `r` | `--manifest-path`, `--target-dir`, `--profile`, `-r`/`--release`, `--bin <NAME>`, `--skcopt`, `-- <ARGS>`. Host only; `--bin` required when >1 `[[bin]]` exists. |
 | `skargo fmt` | — | Runs `skfmt -i` on all `*.sk` under package root (skips `target/` and `node_modules/`). |
-| `skargo clean` | — | Runs `rm -rf <target_dir>` (ignores `--target`/`--profile`). |
+| `skargo clean` | — | `--manifest-path`, `--target`, `--target-dir`, `--profile`, `-r`/`--release`. Removes `<target_dir>`, or only the matching target/profile subdir when `--target` and/or `--profile`/`--release` is given. |
 | `skargo init [path]` | — | `-t`/`--test-harness <FN>`. Creates `Skargo.toml` + `src/`. (No `new` subcommand.) |
 
 ### `Skargo.toml` Schema

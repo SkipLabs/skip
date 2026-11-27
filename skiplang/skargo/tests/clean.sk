@@ -1,0 +1,262 @@
+module alias T = SKTest;
+
+module SkargoCleanTests;
+
+const kManifestDir: String = #env ("SKARGO_MANIFEST_DIR");
+
+@allow_tracked_call
+untracked fun write_file(path: String, contents: String): void {
+  T.expectTrue(
+    System.subprocess(Array["mkdir", "-p", Path.dirname(path)])
+      .fromSuccess()
+      .success(),
+  );
+  FileSystem.writeTextFile(path, contents)
+}
+
+@allow_tracked_call
+untracked fun skargo_exe(): ?String {
+  Environ.varOpt("SKARGO_UNDER_TEST") match {
+  | Some(executable) -> Some(executable)
+  | None() ->
+    if (Environ.varOpt("SKARGO_BIN") != Some("test")) {
+      None()
+    } else {
+      Some(Environ.current_exe())
+    }
+  }
+}
+
+@allow_tracked_call
+untracked fun run_clean(
+  skargo: String,
+  root: String,
+  extra: Array<String> = Array[],
+): System.CompletedProcess {
+  System.popen{
+    args => Array[skargo, "clean"].concat(extra),
+    env => Map["SKARGO_BIN" => "skargo"],
+    cwd => Some(root),
+  }.fromSuccess()
+}
+
+@allow_tracked_call
+untracked fun host_triple(): String {
+  p = System.subprocess(Array["llvm-config", "--host-target"]).fromSuccess();
+  T.expectTrue(p.success(), p.stderr);
+  p.stdout.trim()
+}
+
+// Populates a fake target directory containing host/dev, host/release,
+// wasm32-unknown-unknown/dev, wasm32-unknown-unknown/release, and
+// .fingerprints so each clean invocation can be verified independently.
+@allow_tracked_call
+untracked fun setup_fixture(root: String): String {
+  _ = System.subprocess(Array["rm", "-rf", root]).fromSuccess();
+  prelude = Path.join(Path.dirname(kManifestDir), "prelude");
+  write_file(
+    Path.join(root, "Skargo.toml"),
+    `[package]\nname = "clean-fixture"\nversion = "0.1.0"\n[dependencies]\nstd = { path = "${prelude}" }\n`,
+  );
+  write_file(
+    Path.join(root, "src/lib.sk"),
+    "module CleanFixture;\nfun v(): Int { 1 }\nmodule end;\n",
+  );
+  target = Path.join(root, "target");
+  for (rel in Array[
+    "host/dev/artifact",
+    "host/release/artifact",
+    "wasm32-unknown-unknown/dev/artifact",
+    "wasm32-unknown-unknown/release/artifact",
+    ".fingerprints/marker",
+  ]) {
+    write_file(Path.join(target, rel), "x")
+  };
+  target
+}
+
+@test
+fun test_clean_path_resolution(): void {
+  host = Skargo.TargetTriple::fromString("aarch64-apple-darwin");
+  wasm = Skargo.TargetTriple::fromString("wasm32-unknown-unknown");
+  get_host = () -> host;
+
+  T.expectEq(Skargo.clean_path("/t", None(), None(), get_host), "/t");
+  T.expectEq(
+    Skargo.clean_path("/t", Some(wasm), None(), get_host),
+    "/t/wasm32-unknown-unknown",
+  );
+  T.expectEq(Skargo.clean_path("/t", Some(host), None(), get_host), "/t/host");
+  T.expectEq(
+    Skargo.clean_path("/t", None(), Some("dev"), get_host),
+    "/t/host/dev",
+  );
+  T.expectEq(
+    Skargo.clean_path("/t", None(), Some("release"), get_host),
+    "/t/host/release",
+  );
+  T.expectEq(
+    Skargo.clean_path("/t", Some(wasm), Some("release"), get_host),
+    "/t/wasm32-unknown-unknown/release",
+  );
+  T.expectEq(
+    Skargo.clean_path("/t", Some(host), Some("dev"), get_host),
+    "/t/host/dev",
+  );
+}
+
+@test
+fun test_clean_default_removes_whole_target_dir(): void {
+  skargo = skargo_exe() match {
+  | Some(exe) -> exe
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target", "it-clean-default");
+  target = setup_fixture(root);
+
+  res = run_clean(skargo, root);
+  T.expectTrue(res.success(), res.stderr);
+  T.expectFalse(FileSystem.exists(target), "expected whole target dir removed");
+
+  // Re-running on a non-existent target dir succeeds cleanly.
+  again = run_clean(skargo, root);
+  T.expectTrue(again.success(), again.stderr)
+}
+
+@test
+fun test_clean_target_only_removes_target_subdir(): void {
+  skargo = skargo_exe() match {
+  | Some(exe) -> exe
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target", "it-clean-target");
+  target = setup_fixture(root);
+
+  // Cross target removes only target/<triple>.
+  res = run_clean(skargo, root, Array["--target", "wasm32-unknown-unknown"]);
+  T.expectTrue(res.success(), res.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown")),
+    "expected wasm32 target dir removed",
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/dev/artifact")));
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/release/artifact")));
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // Host triple maps to target/host.
+  res_host = run_clean(skargo, root, Array["--target", host_triple()]);
+  T.expectTrue(res_host.success(), res_host.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "host")),
+    "expected host target dir removed",
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // Non-existent target dir succeeds cleanly.
+  res_missing = run_clean(
+    skargo,
+    root,
+    Array["--target", "x86_64-unknown-linux-gnu"],
+  );
+  T.expectTrue(res_missing.success(), res_missing.stderr)
+}
+
+@test
+fun test_clean_profile_and_release_only_removes_profile_subdir(): void {
+  skargo = skargo_exe() match {
+  | Some(exe) -> exe
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target", "it-clean-profile");
+  target = setup_fixture(root);
+
+  // --release removes only target/host/release.
+  res_rel = run_clean(skargo, root, Array["--release"]);
+  T.expectTrue(res_rel.success(), res_rel.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "host/release")),
+    "expected host/release removed",
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/dev/artifact")));
+  T.expectTrue(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown/dev/artifact")),
+  );
+  T.expectTrue(
+    FileSystem.exists(
+      Path.join(target, "wasm32-unknown-unknown/release/artifact"),
+    ),
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // --profile dev removes only target/host/dev.
+  res_dev = run_clean(skargo, root, Array["--profile", "dev"]);
+  T.expectTrue(res_dev.success(), res_dev.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "host/dev")),
+    "expected host/dev removed",
+  );
+  T.expectTrue(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown/dev/artifact")),
+  );
+  T.expectTrue(
+    FileSystem.exists(
+      Path.join(target, "wasm32-unknown-unknown/release/artifact"),
+    ),
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // Cleaning an already-absent profile dir succeeds cleanly.
+  res_again = run_clean(skargo, root, Array["--release"]);
+  T.expectTrue(res_again.success(), res_again.stderr)
+}
+
+@test
+fun test_clean_target_and_profile_removes_only_matching_subdir(): void {
+  skargo = skargo_exe() match {
+  | Some(exe) -> exe
+  | None() -> return void
+  };
+  root = Path.join(kManifestDir, "target", "it-clean-target-profile");
+  target = setup_fixture(root);
+
+  // --target + --release removes only target/<triple>/release.
+  res1 = run_clean(
+    skargo,
+    root,
+    Array["--target", "wasm32-unknown-unknown", "--release"],
+  );
+  T.expectTrue(res1.success(), res1.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown/release")),
+    "expected wasm32/release removed",
+  );
+  T.expectTrue(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown/dev/artifact")),
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/dev/artifact")));
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/release/artifact")));
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // --target <host> + --profile dev removes only target/host/dev.
+  res2 = run_clean(
+    skargo,
+    root,
+    Array["--target", host_triple(), "--profile", "dev"],
+  );
+  T.expectTrue(res2.success(), res2.stderr);
+  T.expectFalse(
+    FileSystem.exists(Path.join(target, "host/dev")),
+    "expected host/dev removed",
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, "host/release/artifact")));
+  T.expectTrue(
+    FileSystem.exists(Path.join(target, "wasm32-unknown-unknown/dev/artifact")),
+  );
+  T.expectTrue(FileSystem.exists(Path.join(target, ".fingerprints/marker")));
+
+  // Conflicting --release and --profile dev fails cleanly.
+  res_bad = run_clean(skargo, root, Array["--release", "--profile", "dev"]);
+  T.expectFalse(res_bad.success(), "expected --release + --profile dev to fail")
+}
+
+module end;
