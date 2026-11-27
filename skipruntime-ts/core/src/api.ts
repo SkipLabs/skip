@@ -533,7 +533,7 @@ export type InputCollections<Defs> = {
     infer Val
   >
     ? EagerCollection<Key, Val>
-    : never;
+    : AbstractEagerCollection;
 };
 
 /**
