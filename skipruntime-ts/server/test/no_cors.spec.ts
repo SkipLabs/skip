@@ -1,14 +1,15 @@
 import { runService, type SkipServer } from "../src/server.js";
-import type { EagerCollection, Resource } from "@skipruntime/core";
+import type { EagerCollection, Json, Resource } from "@skipruntime/core";
 import { InputDefinition } from "@skipruntime/core";
 import { expect } from "chai";
 
 type Post = {
-  author_id: number;
-  title: string;
-  url: string;
-  body: string;
-  date: number;
+  readonly author_id: number;
+  readonly title: string;
+  readonly url: string;
+  readonly body: string;
+  readonly date: number;
+  readonly [key: string]: Json | null;
 };
 
 type PostsResourceInputs = {
