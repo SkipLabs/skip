@@ -894,6 +894,7 @@ mutable class Context private {
   private mutable toUpdate: SortedMap<(TimeStack, Time), Arrow> = SortedMap[],
   private mutable deps: Deps = Deps::empty(),
   mutable debugMode: Bool = debugMode,
+  mutable checkReducers: Bool = false,
   private mutable hasPre: SortedSet<DirName> = SortedSet[],
   mutable newDirs: SortedSet<DirName> = SortedSet[],
   mutable globals: SortedMap<String, File> = SortedMap[],
@@ -930,11 +931,13 @@ mutable class Context private {
       "SKSTORE_CANONICAL_READ_PATHS",
     ).isSome(),
     blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
+    checkReducers: Bool = Environ.varOpt("SKSTORE_CHECK_REDUCERS").isSome(),
   }: this {
     static{
       canReuse,
       dependencyMode,
       deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+      checkReducers,
     }
   }
 
@@ -945,10 +948,12 @@ mutable class Context private {
       "SKSTORE_CANONICAL_READ_PATHS",
     ).isSome(),
     blockReaders: Bool = Environ.varOpt("SKSTORE_BLOCK_READERS").isSome(),
+    checkReducers: Bool = Environ.varOpt("SKSTORE_CHECK_REDUCERS").isSome(),
   }: mutable this {
     mutable static{
       dependencyMode,
       deps => Deps::empty(compactReaders, canonicalReadPaths, blockReaders),
+      checkReducers,
     }
   }
 
@@ -1106,6 +1111,7 @@ mutable class Context private {
       toUpdate => this.toUpdate,
       deps => this.deps,
       debugMode => this.debugMode,
+      checkReducers => this.checkReducers,
       hasPre => this.hasPre,
       newDirs => this.newDirs,
       globals => this.globals,
@@ -1144,6 +1150,7 @@ mutable class Context private {
     this.!toUpdate = ctx.toUpdate;
     this.!deps = ctx.deps;
     this.!debugMode = ctx.debugMode;
+    this.!checkReducers = ctx.checkReducers;
     this.!hasPre = ctx.hasPre;
     this.!newDirs = ctx.newDirs;
     this.!globals = ctx.globals;
@@ -1831,6 +1838,7 @@ mutable class Context private {
       persistents => this.persistents,
       parallelReadOnly => true,
       debugMode => this.debugMode,
+      checkReducers => this.checkReducers,
       dependencyMode => this.dependencyMode,
       deps => Deps::empty(
         this.deps.compactReaders,
