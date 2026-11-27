@@ -23,7 +23,7 @@ SKService SkipRuntime_createService(int32_t ref);
 SKNotifier SkipRuntime_createNotifier(int32_t ref);
 SKReducer SkipRuntime_createReducer(int32_t ref);
 
-CJSON SkipRuntime_initService(SKService service);
+CJSON SkipRuntime_initService(SKService service, int32_t checkReducers);
 double SkipRuntime_closeService();
 CJArray SkipRuntime_Collection__getArray(char* collection, CJSON key);
 char* SkipRuntime_Collection__map(char* collection, SKMapper mapper);
@@ -258,16 +258,20 @@ Napi::Value CreateReducer(const Napi::CallbackInfo& info) {
 
 Napi::Value InitService(const Napi::CallbackInfo& info) {
   Napi::Env env = info.Env();
-  if (info.Length() != 1) {
-    throw Napi::TypeError::New(env, "Must have one parameter.");
+  if (info.Length() != 2) {
+    throw Napi::TypeError::New(env, "Must have two parameters.");
   }
   if (!info[0].IsExternal()) {
-    throw Napi::TypeError::New(env, "The parameter must be a pointer.");
+    throw Napi::TypeError::New(env, "The first parameter must be a pointer.");
+  }
+  if (!info[1].IsBoolean()) {
+    throw Napi::TypeError::New(env, "The second parameter must be a boolean.");
   }
   Napi::Value result;
   NatTryCatch(env, [&result, &info, env](Napi::Env) {
-    CJSON skresult =
-        SkipRuntime_initService(info[0].As<Napi::External<void>>().Data());
+    int32_t checkReducers = info[1].As<Napi::Boolean>().Value() ? 1 : 0;
+    CJSON skresult = SkipRuntime_initService(
+        info[0].As<Napi::External<void>>().Data(), checkReducers);
     result = Napi::External<void>::New(env, skresult);
   });
   return result;

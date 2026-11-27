@@ -202,6 +202,7 @@ export interface FromBinding {
   // initService
   SkipRuntime_initService(
     service: Pointer<Internal.Service>,
+    checkReducers: boolean,
   ): Pointer<Internal.CJSON>;
 
   // closeClose

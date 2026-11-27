@@ -100,6 +100,7 @@ export type SkipServer = {
  * @param options.streaming_port - Port on which streaming service will listen.
  * @param options.platform - Skip runtime platform to be used to run the service: either `wasm` (the default) or `native`.
  * @param options.no_cors - Disable CORS for the streaming endpoint.
+ * @param options.checkReducers - When enabled, verifies that every non-`null` result returned by a `Reducer`'s `remove` method matches recomputing with `add`.
  * @returns Object to manage the running server.
  */
 export async function runService(
@@ -109,6 +110,7 @@ export async function runService(
     control_port: number;
     platform?: "wasm" | "native";
     no_cors?: boolean;
+    checkReducers?: boolean;
   } = {
     streaming_port: 8080,
     control_port: 8081,
@@ -136,10 +138,16 @@ export async function runService(
       throw e;
     }
   }
-  const instance = await runtime.initService(service).catch((e: unknown) => {
-    console.error("Service could not be initialized; reason: ", e);
-    throw e;
-  });
+  const initOptions =
+    options.checkReducers !== undefined
+      ? { checkReducers: options.checkReducers }
+      : undefined;
+  const instance = await runtime
+    .initService(service, initOptions)
+    .catch((e: unknown) => {
+      console.error("Service could not be initialized; reason: ", e);
+      throw e;
+    });
 
   const controlApp = express();
   controlApp.use(logger_middleware);
