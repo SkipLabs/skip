@@ -19,6 +19,27 @@ class InputDirCannotBeWrittenDuringUpdate(dirName: DirName) extends Exception {
   }
 }
 
+class ReducerMismatchException(
+  reducerName: String,
+  key: String,
+  incremental: String,
+  expected: String,
+) extends Exception {
+  fun getMessage(): String {
+    `Reducer '${
+      this.reducerName
+    }' produced inconsistent result on remove for key ${
+      this.key
+    }: incremental update returned ${
+      this.incremental
+    }, but recomputing with add returned ${this.expected}.`
+  }
+
+  fun toString(): String {
+    this.getMessage()
+  }
+}
+
 /*****************************************************************************/
 /* The class handed over to the closures mapping over a directory. */
 /*****************************************************************************/
@@ -258,9 +279,31 @@ class Reducer<K: Orderable, F: frozen>{
   }
 }
 
-base class IReducer<F> uses Unsafe.Downcastable, Equality {
+base class IReducer<F: frozen> uses Unsafe.Downcastable, Equality {
   fun init(mutable Iterator<F>): Array<F>;
   fun update(Array<F>, Array<F>, Array<F>): ?Array<F>;
+
+  overridable fun checkUpdate(
+    dirName: DirName,
+    key: Key,
+    incremental: Array<F>,
+    expected: Array<F>,
+  ): void {
+    if (
+      incremental.size() == expected.size() &&
+      Range(0, incremental.size()).all(i ->
+        native_eq(incremental[i], expected[i]) == 0
+      )
+    ) {
+      return void;
+    };
+    throw ReducerMismatchException(
+      dirName.toString(),
+      key.toString(),
+      inspect(incremental).toString(),
+      inspect(expected).toString(),
+    )
+  }
 }
 
 mutable class IntRef(mutable value: Int) {
@@ -2076,7 +2119,16 @@ base class EagerDir protected {
               .map(x -> x.i2.iterator())
               .flatten(),
           )
-        | Some(new) -> !cdata.modified[k] = new
+        | Some(new) ->
+          if (context.checkReducers && !oldValues.isEmpty()) {
+            expected = cdata.reducer.init(
+              this.unsafeGetDataIterWithoutTombs(k)
+                .map(x -> x.i2.iterator())
+                .flatten(),
+            );
+            cdata.reducer.checkUpdate(this.dirName, k, new, expected);
+          };
+          !cdata.modified[k] = new
         }
       };
       Some(cdata)
