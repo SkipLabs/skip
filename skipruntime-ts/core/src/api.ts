@@ -413,7 +413,7 @@ export interface Context {
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
 /**
- * Opaque type used as a measure of abstract time.
+ * Nominal wrapper around an abstract-time watermark token.
  */
 export class Watermark {
   private readonly value: string;
@@ -423,6 +423,10 @@ export class Watermark {
   }
 
   toString(): string {
+    return this.value;
+  }
+
+  toJSON(): string {
     return this.value;
   }
 }

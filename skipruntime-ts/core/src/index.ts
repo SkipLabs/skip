@@ -627,6 +627,9 @@ export class ServiceInstanceFactory {
   }
 }
 
+/**
+ * Nominal wrapper around a reactive subscription identifier.
+ */
 export class SubscriptionID {
   private readonly id: string;
 
@@ -635,6 +638,10 @@ export class SubscriptionID {
   }
 
   toString(): string {
+    return this.id;
+  }
+
+  toJSON(): string {
     return this.id;
   }
 }
@@ -845,7 +852,7 @@ export class ServiceInstanceImpl implements ServiceInstance {
       return this.refs.binding.SkipRuntime_Runtime__subscribe(
         resourceInstanceId,
         sknotifier,
-        watermark !== undefined ? watermark.toString() : null,
+        watermark?.toString() ?? null,
       );
     });
     if (session == -1n) {
