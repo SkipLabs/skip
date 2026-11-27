@@ -22,8 +22,8 @@ follow it.
 
 ## Task
 
-1. `cd __WORKTREE__` and create a local branch, e.g.
-   `git switch -c mergebot-fix-pr-__PR__`.
+1. `cd __WORKTREE__` and create/reset a local branch, e.g.
+   `git switch -C mergebot-fix-pr-__PR__`.
 2. Reproduce the failures locally with the narrowest relevant suite. Mapping
    from the `ci/circleci:` job names to local commands:
    - `fast-checks` → `make check-fmt` and `make check-sh`

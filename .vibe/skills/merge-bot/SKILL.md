@@ -38,7 +38,7 @@ operator manual that drives it.
     ties → oldest PR).
 
 `bin/merge-bot.sh pick` prints the scheduling decision as JSON:
-`{"action":"wait","pr":N}` / `{"action":"rebase","pr":N}` / `{"action":"idle"}`.
+`{"action":"wait","pr":N}` / `{"action":"rebase","pr":N,"est":S}` / `{"action":"idle"}`.
 
 ## The loop (one PR at a time)
 
