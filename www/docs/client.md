@@ -103,7 +103,9 @@ Managing these UUIDs is straightforward, but is best done using a traditional we
 A simple explanatory example is given here using the [Express](https://expressjs.com) web framework, but any web framework will do -- Skip is designed to work over HTTP with whatever backend framework you like.
 
 ```typescript
+import { SkipServiceBroker } from "@skipruntime/helpers";
 import express from "express";
+
 const app = express();
 app.use(express.json());
 
@@ -118,25 +120,38 @@ const reactive_service = new SkipServiceBroker({
 });
 
 // On receiving a GET request for a reactive resource instance,
-//  1. Parse out any params from the request
+//  1. Parse and validate any params from the request
 //  2. Request a stream identifier with those parameters from the reactive service
 //  3. Redirect the client to the corresponding stream address
 app.get("/my_resource/:id", (req, res) => {
-  const params = { id: req.params.id, foo: req.params.bar, ... };
+  const filter =
+    typeof req.query["filter"] === "string" ? req.query["filter"] : "";
+  const params = { id: req.params.id, filter };
   reactive_service
     .getStreamUUID("my_resource", params)
     .then((uuid) => {
-      res.redirect(301, `http://${reactive_host}:${streaming_port}/v1/streams/${uuid}`);
+      res.redirect(
+        301,
+        `http://${reactive_host}:${streaming_port}/v1/streams/${uuid}`,
+      );
     })
+    .catch((e: unknown) => {
+      res.status(500).json({ error: String(e) });
+    });
 });
 
 // Synchronous read of a specific key in a resource instance
 app.get("/my_resource/:id/:key", (req, res) => {
-  const params = { id: req.params.id, foo: req.params.bar, ... };
+  const filter =
+    typeof req.query["filter"] === "string" ? req.query["filter"] : "";
+  const params = { id: req.params.id, filter };
   reactive_service
     .getArray("my_resource", params, req.params.key)
     .then((data) => {
       res.status(200).json(data);
+    })
+    .catch((e: unknown) => {
+      res.status(500).json({ error: String(e) });
     });
 });
 ```
