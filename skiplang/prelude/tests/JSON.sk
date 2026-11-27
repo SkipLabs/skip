@@ -1,0 +1,89 @@
+module alias T = SKTest;
+
+module JSONTest;
+
+@test
+fun testDecodeWhitespaceTopLevel(): void {
+  T.expectEq(JSON.decode("\t42\t").expectInt(), 42);
+  T.expectEq(JSON.decode("\r\n42\r\n").expectInt(), 42);
+  T.expectEq(JSON.decode("\r42\r").expectInt(), 42);
+  T.expectEq(JSON.decode(" \t\r\n\"hello\"\r\n\t ").expectString(), "hello");
+  T.expectEq(JSON.decode("\t\r\n true \r\n\t").expectBool(), true);
+  T.expectEq(JSON.decode("\r\t\nfalse\n\t\r").expectBool(), false);
+  T.expectEq(JSON.decode("\t\r\nnull\r\n\t").encode(), "null");
+  T.expectEq(JSON.decode("\t\r\n3.5\r\n\t").expectFloat(), 3.5);
+}
+
+@test
+fun testDecodeWhitespaceArray(): void {
+  arr1 = JSON.decode("[\t1,\t2,\t3\t]").expectVector();
+  T.expectEq(arr1.size(), 3);
+  T.expectEq(arr1[0].expectInt(), 1);
+  T.expectEq(arr1[1].expectInt(), 2);
+  T.expectEq(arr1[2].expectInt(), 3);
+
+  arr2 = JSON.decode("[\r\n  1,\r\n  2,\r\n  3\r\n]").expectVector();
+  T.expectEq(arr2.size(), 3);
+  T.expectEq(arr2[0].expectInt(), 1);
+  T.expectEq(arr2[1].expectInt(), 2);
+  T.expectEq(arr2[2].expectInt(), 3);
+
+  arr3 = JSON.decode("[\r1\r,\r2\r]").expectVector();
+  T.expectEq(arr3.size(), 2);
+  T.expectEq(arr3[0].expectInt(), 1);
+  T.expectEq(arr3[1].expectInt(), 2);
+
+  empty = JSON.decode("[ \t\r\n ]").expectVector();
+  T.expectEq(empty.size(), 0);
+}
+
+@test
+fun testDecodeWhitespaceObject(): void {
+  obj1 = JSON.decode("{\t\"a\"\t:\t1\t,\t\"b\"\t:\t\"two\"\t}").expectObject();
+  T.expectEq(obj1.getInt("a"), 1);
+  T.expectEq(obj1.getString("b"), "two");
+
+  obj2 = JSON.decode(
+    "{\r\n\t\"a\": 1,\r\n\t\"b\": [\r\n\t\ttrue,\r\n\t\tfalse\r\n\t]\r\n}",
+  ).expectObject();
+  T.expectEq(obj2.getInt("a"), 1);
+  b = obj2.getArray("b").value;
+  T.expectEq(b.size(), 2);
+  T.expectEq(b[0].expectBool(), true);
+  T.expectEq(b[1].expectBool(), false);
+
+  obj3 = JSON.decode("{\r\"x\"\r:\r10\r,\r\"y\"\r:\r20\r}").expectObject();
+  T.expectEq(obj3.getInt("x"), 10);
+  T.expectEq(obj3.getInt("y"), 20);
+
+  empty = JSON.decode("{ \t\r\n }").expectObject();
+  T.expectEq(empty.value.size(), 0);
+}
+
+@test
+fun testDecodeWhitespaceInvalid(): void {
+  // RFC 8259 §2 only allows space (0x20), tab (0x09), LF (0x0A), and CR (0x0D).
+  // Form feed (0x0C) and vertical tab (0x0B) are not valid JSON whitespace.
+  T.expectThrow(() -> {
+    _ = JSON.decode("\f42");
+  });
+  T.expectThrow(() -> {
+    _ = JSON.decode("\u000b42");
+  });
+}
+
+@test
+fun testDeserializeWhitespace(): void {
+  res = JSON.deserialize(
+    "\r\n{\r\n\t\"a\"\t:\t[\r\n\t\t1,\r\n\t\t2\r\n\t]\r\n}\r\n",
+    Map::meta(String::meta, Array::meta(Int::meta)),
+  );
+  res match {
+  | Success(m) ->
+    T.expectEq(m.size(), 1);
+    T.expectEq(m["a"], Array[1, 2])
+  | Failure(err) -> T.fail(`Unexpected failure: ${err.getMessage()}`)
+  }
+}
+
+module end;

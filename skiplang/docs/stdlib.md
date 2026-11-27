@@ -178,7 +178,7 @@ fun topKeys(m: Map<String, Int>, minCount: Int): Array<String> {
   - Literals: `JSON.Object["k" => JSON.IntNumber(1)]`, `JSON.Array[JSON.Null()]`.
   - Parse/encode: `JSON.decode(str): JSON.Value`, `val.encode(): String`, `val.print(space = 2)`.
   - Typed accessors: `expectObject`/`Array`/`Int`/`Float`/`String`/`Bool`; `obj.getString(k)` / `obj.maybeGetString(k)`.
-  - **Gotcha**: `JSON.decode`'s `eatWhitespace` skips only `' '` and `'\n'` (not `'\t'` or `'\r'`), and `JSON.Object` throws `InvalidJSONError` on duplicate keys.
+  - **Gotcha**: `JSON.Object` throws `InvalidJSONError` on duplicate keys.
   - Typed serde: `JSON.serialize(v, serializer)` / `JSON.deserialize(s, serializer)` using `T::meta` (`Int::meta`, `String::meta`, `Option::meta`, `Array::meta`, `Map::meta`, etc.).
 - **Testing in prelude (`stdlib/testing/`)**: `Assert.sk` (`assertEqual`, `assertTrue`, `assertThrows`, …) and `QuickCheck` (`QuickCheck.assert(gen, prop)`). Prefer `sktest` (`@test`, `SKTest.expectEq`) for package test suites — see [tooling-and-ffi.md](tooling-and-ffi.md).
 
