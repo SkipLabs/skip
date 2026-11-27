@@ -968,7 +968,7 @@ class KafkaResource implements Resource<Input_NN> {
     context: Context,
   ): EagerCollection<string, number> {
     return context
-      .useExternalResource({
+      .useExternalResource<string, string>({
         service: "kafka",
         identifier: "skip-test-topic",
         params: {},

@@ -66,7 +66,11 @@ export interface Mapper<
    * @param context - The Skip runtime context, which can be used to create/access new collections during the map
    * @returns Key-value pairs to associate in the output collection.
    */
-  mapEntry(key: K1, values: Values<V1>, context: Context): Iterable<[K2, V2]>;
+  readonly mapEntry: (
+    key: K1,
+    values: Values<V1>,
+    context: Context,
+  ) => Iterable<[K2, V2]>;
 }
 
 /**
@@ -91,7 +95,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
-  add(accum: A | null, value: V & DepSafe): A;
+  readonly add: (accum: A | null, value: V & DepSafe) => A;
 
   /**
    * Exclude a previously added value from the accumulated value.
@@ -105,7 +109,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The removed value.
    * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
-  remove(accum: A, value: V & DepSafe): A | null;
+  readonly remove: (accum: A, value: V & DepSafe) => A | null;
 }
 
 /**
@@ -350,7 +354,11 @@ export interface LazyCompute<K extends Json, V extends Json> {
    * @param key - The requested key / input.
    * @returns The values of the lazy function for `key`.
    */
-  compute(self: LazyCollection<K, V>, key: K, context: Context): Iterable<V>;
+  readonly compute: (
+    self: LazyCollection<K, V>,
+    key: K,
+    context: Context,
+  ) => Iterable<V>;
 }
 
 /**
@@ -560,10 +568,10 @@ export interface Resource<
    * @param context - Skip Runtime internal state.
    * @returns An eager collection containing the outputs of this resource for the given parameters, produced from the shared reactive compute graph output collections of the service's `createGraph`.
    */
-  instantiate(
+  readonly instantiate: (
     collections: Collections,
     context: Context,
-  ): AbstractEagerCollection;
+  ) => AbstractEagerCollection;
 }
 
 /**
