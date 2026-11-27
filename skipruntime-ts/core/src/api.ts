@@ -561,18 +561,26 @@ export type InputCollections<Defs> = {
 
 /**
  * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
+ *
+ * `T` must be a plain record: arrays (and tuples) are rejected via the
+ * `length?: never` member, since the runtime builds plain objects keyed by
+ * collection name.
  */
 export type AllInputDefs<T> = {
   readonly [K in keyof T]: AbstractInputDefinition;
-};
+} & { readonly length?: never };
 
 /**
  * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
  * `AbstractLazyCollection`.
+ *
+ * `T` must be a plain record: arrays (and tuples) are rejected via the
+ * `length?: never` member, since the runtime builds plain objects keyed by
+ * collection name.
  */
 export type AllSharedCollections<T> = {
   readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
-};
+} & { readonly length?: never };
 
 /**
  * Resource provided by a `SkipService`.
