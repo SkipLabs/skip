@@ -709,11 +709,14 @@ private fun createStaticImageFields(
     | Some(StaticImageField(value, vbo)) ->
       invariant(vbo >= bitOffset, "Bit offset ordering problem");
 
-      // Integers can tolerate shifting around within an entire int64, and
-      // we need that to handle arbitrary bitfields someday, but everything
-      // else should be padded out exactly to its starting offset.
-      isConstantInteger = value.constantInteger().isSome();
-      containingBitOffset = if (isConstantInteger) {
+      // Integers up to 64 bits can tolerate shifting around within an entire
+      // int64, and we need that to handle arbitrary bitfields someday, but
+      // wider integers (Int128) and everything else should be padded out
+      // exactly to their starting offset.
+      isSub64Integer =
+        value.constantInteger().isSome() &&
+        valueBitSize(value) <= 64;
+      containingBitOffset = if (isSub64Integer) {
         vbo.and(-64)
       } else {
         invariant(vbo.and(7) == 0, "Unexpectedly not byte aligned");
@@ -730,8 +733,14 @@ private fun createStaticImageFields(
         !bitOffset = bitOffset + padBitSize
       };
 
-      if (!isConstantInteger) {
-        !i = i + 1
+      if (!isSub64Integer) {
+        !i = i + 1;
+        if (valueBitSize(value) == 128) {
+          v = value.constantInteger().fromSome();
+          fields.push(pad64 with {value => v});
+          !value = pad64 with {value => v.shr(63)};
+          !bitOffset = bitOffset + 64
+        }
       } else {
         // Keep absorbing integer values into a larger integer value, e.g.
         // a collection of adjacent 1-bit values can get grouped into an
@@ -1695,6 +1704,8 @@ private fun prettyWriteName(instr: Instr, out: mutable PrettyDefBuilder): void {
   | IntSub _
   | IntSwitch _
   | IntToFloat _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | Intern _
   | InvokeFunction _
@@ -1895,6 +1906,8 @@ private fun debugWriteName(instr: Instr, out: mutable PrettyDefBuilder): void {
   | IntSub _
   | IntSwitch _
   | IntToFloat _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | Intern _
   | InvokeFunction _
@@ -2089,6 +2102,8 @@ private fun debugWriteExtraOperands(
   | IntSra _
   | IntSrl _
   | IntSub _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | LocalGC _
   | NamedCall _

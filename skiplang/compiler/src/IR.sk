@@ -1179,7 +1179,7 @@ base class BinOp final {lhs: InstrID, rhs: InstrID} extends Stmt {
 }
 
 base class IntBinOp extends BinOp {
-  // NOTE: IntDiv and IntRem are guaranteed the second operand is nonzero.
+  // NOTE: IntDiv, IntRem, IntUDiv, and IntURem are guaranteed the second operand is nonzero.
   // If it might be zero an external "If" needs to check it first.
   children =
   | IntAdd
@@ -1198,6 +1198,8 @@ base class IntBinOp extends BinOp {
   | IntSra
   | IntSrl
   | IntSub
+  | IntUDiv
+  | IntURem
   | IntXor
 
   fun isCommutative(): Bool
@@ -1218,7 +1220,9 @@ base class IntBinOp extends BinOp {
   | IntSll _
   | IntSra _
   | IntSrl _
-  | IntSub _ ->
+  | IntSub _
+  | IntUDiv _
+  | IntURem _ ->
     false
 }
 

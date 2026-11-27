@@ -471,7 +471,7 @@ mutable private class Verifier(
     if (out.bitSize <= in_.bitSize) {
       this.die("Extend " + e + " must increase width")
     };
-    this.invariant(out.bitSize > 1 && out.bitSize <= 64, "Bad bit size")
+    this.invariant(out.bitSize > 1 && out.bitSize <= 128, "Bad bit size")
   }
 
   private mutable fun verifySetField(s: SetField): void {
@@ -561,7 +561,7 @@ mutable private class Verifier(
     if (out.bitSize >= in_.bitSize) {
       this.die("Truncate " + e + " must decrease width")
     };
-    this.invariant(out.bitSize >= 1 && out.bitSize < 64, "Bad bit size")
+    this.invariant(out.bitSize >= 1 && out.bitSize <= 64, "Bad bit size")
   }
 
   private mutable fun verifyIsArrayType(t: Type): void {
@@ -616,7 +616,11 @@ mutable private class Verifier(
     | IntCmpNe _
     | IntCmpUle _
     | IntCmpUlt _ ->
-      this.verifySimplish(instr, Array[tInt, tInt8, tInt16, tInt32], tBool)
+      this.verifySimplish(
+        instr,
+        Array[tInt, tInt8, tInt16, tInt32, tInt128],
+        tBool,
+      )
 
     | IntAdd _
     | IntAnd _
@@ -631,8 +635,15 @@ mutable private class Verifier(
     | IntSra _
     | IntSrl _
     | IntSub _
+    | IntUDiv _
+    | IntURem _
     | IntXor _ ->
-      this.verifySimple(instr, tInt, tInt)
+      if (instr.typ != tInt && instr.typ != tInt128) {
+        this.die(
+          "Expected " + instr + " to have type Int or Int128, got " + instr.typ,
+        )
+      };
+      this.verifySimple(instr, instr.typ, instr.typ)
 
     | Freeze{value} ->
       // allow any Mutability, since Freeze(x) -> x, if x is frozen

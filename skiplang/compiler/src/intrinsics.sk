@@ -59,6 +59,42 @@ mutable class .IntrinsicsInliner{
     this.makeBinOp(binop, call, call.args[0], shift.id)
   }
 
+  private mutable fun emitShift128(
+    binop: Concrete<BinOp>,
+    call: CallFunctionBase,
+  ): Bool {
+    // Shift counts are automatically taken mod 128 and zero-extended to i128
+    // since LLVM requires both shift operands to have the same integer width.
+    shift64 = this.emitIntAnd{
+      lhs => call.args[1],
+      rhs => this.constantInt(127).id,
+      pos => call.pos,
+    };
+    shift128 = this.emitZeroExtend{
+      value => shift64.id,
+      typ => tInt128,
+      pos => call.pos,
+    };
+    this.makeBinOp(binop, call, call.args[0], shift128.id)
+  }
+
+  private mutable fun emitInt128BitCount(
+    unop: Concrete<SimpleUnaryStmt>,
+    call: CallFunctionBase,
+  ): Bool {
+    // LLVM ctlz/cttz/ctpop on i128 return i128; truncate to i64 for Int.
+    res128 = this.emitInstr(
+      unop{
+        id => this.iid(),
+        typ => tInt128,
+        pos => call.pos,
+        prettyName => call.prettyName,
+        value => call.args[0],
+      },
+    );
+    this.makeUnaryOp(Truncate, call, res128.id)
+  }
+
   // Try to inline either a Call or an Invoke. If it's a Call, invokeSuccessors
   // will be an empty array, else it will be the Invoke's two successors.
   private mutable fun maybeInlineIntrinsic(call: CallFunctionBase): Bool {
@@ -167,6 +203,48 @@ mutable class .IntrinsicsInliner{
     | "Int8::.ConcreteMetaImpl::truncate" | "Int16::.ConcreteMetaImpl::truncate"
     | "Int32::.ConcreteMetaImpl::truncate" ->
       this.makeUnaryOp(Truncate, call, a[1])
+    | "Int128::.ConcreteMetaImpl::fromInt" ->
+      this.makeUnaryOp(SignExtend, call, a[1])
+    | "Int128::.ConcreteMetaImpl::fromUInt64" ->
+      this.makeUnaryOp(ZeroExtend, call, a[1])
+    | "Int128::lo" | "Int128::toInt" -> this.makeUnaryOp(Truncate, call, a[0])
+    | "Int128::hi" ->
+      shifted = this.emitInstr(
+        IntSrl{
+          id => this.iid(),
+          typ => tInt128,
+          pos,
+          lhs => a[0],
+          rhs => this.constantTypedInt(tInt128, 64).id,
+        },
+      );
+      this.makeUnaryOp(Truncate, call, shifted.id)
+    | "Int128::eqImpl" -> this.makeBinOp(IntCmpEq, call, a[0], a[1])
+    | "Int128::neImpl" -> this.makeBinOp(IntCmpNe, call, a[0], a[1])
+    | "Int128::ltImpl" -> this.makeBinOp(IntCmpLt, call, a[0], a[1])
+    | "Int128::leImpl" -> this.makeBinOp(IntCmpLe, call, a[0], a[1])
+    | "Int128::gtImpl" -> this.makeBinOp(IntCmpLt, call, a[1], a[0])
+    | "Int128::geImpl" -> this.makeBinOp(IntCmpLe, call, a[1], a[0])
+    | "Int128::uleImpl" -> this.makeBinOp(IntCmpUle, call, a[0], a[1])
+    | "Int128::ultImpl" -> this.makeBinOp(IntCmpUlt, call, a[0], a[1])
+    | "Int128::ugeImpl" -> this.makeBinOp(IntCmpUle, call, a[1], a[0])
+    | "Int128::ugtImpl" -> this.makeBinOp(IntCmpUlt, call, a[1], a[0])
+    | "Int128::plusImpl" -> this.makeBinOp(IntAdd, call, a[0], a[1])
+    | "Int128::minusImpl" -> this.makeBinOp(IntSub, call, a[0], a[1])
+    | "Int128::timesImpl" -> this.makeBinOp(IntMul, call, a[0], a[1])
+    | "Int128::unsafe_divImpl" -> this.makeBinOp(IntDiv, call, a[0], a[1])
+    | "Int128::unsafe_remImpl" -> this.makeBinOp(IntRem, call, a[0], a[1])
+    | "Int128::unsafe_udivImpl" -> this.makeBinOp(IntUDiv, call, a[0], a[1])
+    | "Int128::unsafe_uremImpl" -> this.makeBinOp(IntURem, call, a[0], a[1])
+    | "Int128::andImpl" -> this.makeBinOp(IntAnd, call, a[0], a[1])
+    | "Int128::orImpl" -> this.makeBinOp(IntOr, call, a[0], a[1])
+    | "Int128::xorImpl" -> this.makeBinOp(IntXor, call, a[0], a[1])
+    | "Int128::shlImpl" -> this.emitShift128(IntSll, call)
+    | "Int128::shrImpl" -> this.emitShift128(IntSra, call)
+    | "Int128::ushrImpl" -> this.emitShift128(IntSrl, call)
+    | "Int128::clzImpl" -> this.emitInt128BitCount(IntClz, call)
+    | "Int128::ctzImpl" -> this.emitInt128BitCount(IntCtz, call)
+    | "Int128::popcountImpl" -> this.emitInt128BitCount(IntPopcount, call)
     | "localGC" ->
       _ = this.emitInstr(
         LocalGC{

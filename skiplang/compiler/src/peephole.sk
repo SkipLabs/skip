@@ -466,6 +466,8 @@ private fun canModifyExistingMemory(
   | IntSub _
   | IntSwitch _
   | IntToFloat _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | Intern _
   | Jump _
@@ -573,6 +575,8 @@ private fun canCSE(
   | IntSrl _
   | IntSub _
   | IntToFloat _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | LoadVTableEntry _
   | Reinterpret _
@@ -1156,8 +1160,19 @@ private fun peepholeZeroExtend(peep: ZeroExtend, s: mutable Peephole): Instr {
     obj.constantInteger() match {
     | Some(value) ->
       inSize = ClassInputs.getScalarType(obj.typ, s.env, s.classReader).bitSize;
-      shift = 64 - inSize;
-      s.constantTypedInt(peep.typ, value.shl(shift).ushr(shift))
+      outSize = ClassInputs.getScalarType(
+        peep.typ,
+        s.env,
+        s.classReader,
+      ).bitSize;
+      // ConstantInt stores a sign-extended 64-bit Int, so a negative 64-bit
+      // value zero-extended to 128 bits cannot be represented as ConstantInt.
+      if (outSize > 64 && inSize == 64 && value < 0) {
+        peep
+      } else {
+        shift = 64 - inSize;
+        s.constantTypedInt(peep.typ, value.shl(shift).ushr(shift))
+      }
     | None() -> peep
     }
   }
@@ -1247,12 +1262,15 @@ private fun peepholeBinOpSame(peep: BinOp, s: mutable Peephole): Instr {
   | IntCmpLt _
   | IntCmpUlt _ ->
     s.constantBool(false)
-  | IntDiv _ -> s.constantInt(1)
+  | IntDiv _
+  | IntUDiv _ ->
+    s.constantTypedInt(peep.typ, 1)
   | IntRem _
+  | IntURem _
   | IntSub _
   | IntXor _
   | StringCmp _ ->
-    s.constantInt(0)
+    s.constantTypedInt(peep.typ, 0)
   | FloatNextAfter _
   | IntAnd _
   | IntOr _ ->
@@ -1313,6 +1331,9 @@ private fun peepholeBinOpDefault(
 }
 
 private fun peepholeIntClz(peep: IntClz, s: mutable Peephole): Instr {
+  if (peep.typ != tInt) {
+    return peep
+  };
   s.getInstr(peep.value).constantInteger() match {
   | Some(n) -> s.constantInt(n.clz())
   | None() -> peep
@@ -1320,6 +1341,9 @@ private fun peepholeIntClz(peep: IntClz, s: mutable Peephole): Instr {
 }
 
 private fun peepholeIntCtz(peep: IntCtz, s: mutable Peephole): Instr {
+  if (peep.typ != tInt) {
+    return peep
+  };
   s.getInstr(peep.value).constantInteger() match {
   | Some(n) -> s.constantInt(n.ctz())
   | None() -> peep
@@ -1327,6 +1351,9 @@ private fun peepholeIntCtz(peep: IntCtz, s: mutable Peephole): Instr {
 }
 
 private fun peepholeIntPopcount(peep: IntPopcount, s: mutable Peephole): Instr {
+  if (peep.typ != tInt) {
+    return peep
+  };
   s.getInstr(peep.value).constantInteger() match {
   | Some(n) -> s.constantInt(n.popcount())
   | None() -> peep
@@ -1367,6 +1394,9 @@ private fun peepholeIntBinOpConstConst(
         l % r
       },
     )
+  | IntUDiv _
+  | IntURem _ ->
+    peep
   | IntAnd _ -> s.constantInt(l.and(r))
   | IntOr _ -> s.constantInt(l.or(r))
   | IntXor _ -> s.constantInt(l.xor(r))
@@ -1457,6 +1487,18 @@ private fun peepholeIntBinOpVarConst(
     } else {
       s.constantInt(0)
     }
+  | IntUDiv _ ->
+    if (r == 1) {
+      s.getInstr(peep.lhs)
+    } else {
+      peep
+    }
+  | IntURem _ ->
+    if (r == 1) {
+      s.constantInt(0)
+    } else {
+      peep
+    }
   | IntAnd _ ->
     if (r == 0) {
       s.getInstr(peep.rhs)
@@ -1512,6 +1554,8 @@ private fun peepholeIntBinOpConstVar(
     }
   | IntDiv _
   | IntRem _
+  | IntUDiv _
+  | IntURem _
   | IntSrl _
   | IntSll _ ->
     if (l != 0) {
@@ -1541,18 +1585,25 @@ private fun peepholeIntBinOp(peep: IntBinOp, s: mutable Peephole): Instr {
   lhs = s.getInstr(peep.lhs);
   rhs = s.getInstr(peep.rhs);
 
-  val = lhs match {
-  | ConstantInt{value => lhsValue} ->
-    rhs match {
-    | ConstantInt{value => rhsValue} ->
-      peepholeIntBinOpConstConst(peep, s, lhsValue, rhsValue)
-    | _ -> peepholeIntBinOpConstVar(peep, s, lhsValue)
-    }
-  | _ ->
-    rhs match {
-    | ConstantInt{value => rhsValue} ->
-      peepholeIntBinOpVarConst(peep, s, rhsValue)
-    | _ -> peep
+  // Constant folding helpers above assume 64-bit Int semantics (wraparound,
+  // shift mask 63, Int::min/Int::max, constantInt results). Skip them for
+  // wider integer types like Int128 and let LLVM fold those instead.
+  val = if (lhs.typ != tInt) {
+    peep
+  } else {
+    lhs match {
+    | ConstantInt{value => lhsValue} ->
+      rhs match {
+      | ConstantInt{value => rhsValue} ->
+        peepholeIntBinOpConstConst(peep, s, lhsValue, rhsValue)
+      | _ -> peepholeIntBinOpConstVar(peep, s, lhsValue)
+      }
+    | _ ->
+      rhs match {
+      | ConstantInt{value => rhsValue} ->
+        peepholeIntBinOpVarConst(peep, s, rhsValue)
+      | _ -> peep
+      }
     }
   };
 
