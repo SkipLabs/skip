@@ -1069,6 +1069,8 @@ fun printTree(ctx: Context, t: ParseTree): Doc {
       Doc.space,
       print(ctx, typeSpecifier),
     ]
+  | ParseTree.OrPatternTree{patterns} ->
+    Doc.Group[printBarList(ctx, None(), patterns, Doc.Line())]
   | ParseTree.ParenPatternTree{openParen, pattern, closeParen} ->
     Doc.Concat[
       print(ctx, openParen),

@@ -2686,7 +2686,7 @@ mutable class SkipParser{
   // parse of a valid program.
   mutable fun peekParseLikelyPatternBranch(): ParseTree {
     _ = this.parseSeparatedList(TokenKind.BAR(), parser ->
-      parser.parsePattern()
+      parser.parseAtomicPattern()
     );
 
     // Stripped down parseIfClauseOpt
@@ -3629,6 +3629,10 @@ mutable class SkipParser{
       )
     | ParseTree.ParenPatternTree{pattern} ->
       this.reportBindingsInIsAsPattern(pattern, action)
+    | ParseTree.OrPatternTree{patterns} ->
+      patterns.getList().each((x) ->
+        this.reportBindingsInIsAsPattern(x, action)
+      )
     | ParseTree.ClassPatternTree{arguments => classArguments} ->
       classArguments match {
       | ParseTree.PositionalPatternArgumentsTree{arguments} ->
@@ -3681,7 +3685,7 @@ mutable class SkipParser{
         "Expected pattern after 'is'. Did you mean 'match' or to remove the '{}'s?",
       );
     };
-    pattern = this.parsePattern();
+    pattern = this.parseAtomicPattern();
     this.reportBindingsInIsAsPattern(pattern, PredefinedName.is);
     ParseTree.IsExpressionTree{
       range => Parser.createRangeOfTreeAndCurrent(value, this),
@@ -3701,7 +3705,7 @@ mutable class SkipParser{
         "Expected pattern after 'as'. Did you mean 'match' or to remove the '{}'s?",
       );
     };
-    pattern = this.parsePattern();
+    pattern = this.parseAtomicPattern();
     this.reportBindingsInIsAsPattern(pattern, TokenKind.AS().toString());
     ParseTree.AsExpressionTree{
       range => Parser.createRangeOfTreeAndCurrent(value, this),
@@ -4706,12 +4710,12 @@ mutable class SkipParser{
   }
 
   // at-pattern:
-  //    non-type-identifier at pattern
+  //    non-type-identifier at atomic-pattern
   mutable fun parseAt(): ParseTree {
     start = this.mark();
     identifier = this.eatId();
     at = this.eatTree(TokenKind.AT());
-    pattern = this.parsePattern();
+    pattern = this.parseAtomicPattern();
     ParseTree.AtPatternTree{
       range => this.createRange(start),
       identifier,
@@ -4729,7 +4733,7 @@ mutable class SkipParser{
     }
   }
 
-  // pattern:
+  // atomic-pattern:
   //    literal-pattern
   //    negative-literal-pattern
   //    constant-pattern
@@ -4738,9 +4742,8 @@ mutable class SkipParser{
   //    tuple-pattern
   //    class-pattern
   //    this-prefixed-pattern
-  //    as-pattern
   //    at-pattern
-  mutable fun parsePattern(): ParseTree {
+  mutable fun parseAtomicPattern(): ParseTree {
     pattern = this.peek() match {
     | TokenKind.VOID() -> this.parseVoidPattern()
     | TokenKind.TRUE() -> this.parseLiteralPattern()
@@ -4760,6 +4763,37 @@ mutable class SkipParser{
     | _ -> this.errorResult(errorPatternExpected, "Pattern expected")
     };
     pattern
+  }
+
+  // pattern:
+  //    atomic-pattern
+  //    pattern  |  atomic-pattern
+  mutable fun parsePattern(): ParseTree {
+    start = this.mark();
+    first = this.parseAtomicPattern();
+    if (!this.peekKind(TokenKind.BAR())) {
+      return first;
+    };
+    elements = mutable Vector[first];
+    separators = mutable Vector[];
+    while ({
+      separator = this.eatTreeOpt(TokenKind.BAR());
+      if (!separator.isEmpty()) {
+        separators.push(separator);
+        elements.push(this.parseAtomicPattern());
+        true;
+      } else {
+        false;
+      }
+    }) void;
+    elems = elements.collect(Array);
+    patterns = ParseTree.ParseTreeList::makeSeparatedList{
+      range => Parser.createRangeOfList(elems),
+      elements => elems,
+      separators => separators.collect(Array),
+      separatorKind => TokenKind.BAR(),
+    };
+    ParseTree.OrPatternTree{range => this.createRange(start), patterns}
   }
 
   // if-clause:
@@ -4791,7 +4825,7 @@ mutable class SkipParser{
   mutable fun parsePatternBranch(): ParseTree {
     start = this.mark();
     patterns = this.parseSeparatedList(TokenKind.BAR(), parser ->
-      parser.parsePattern()
+      parser.parseAtomicPattern()
     );
 
     if (
