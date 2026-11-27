@@ -192,7 +192,13 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
           if ((ty->m_refMask[mask_slot] >> i) & 1) {
             void** ptr = (void**)ohead;
             if (*ptr != NULL) {
+              // Mix a distinct non-NULL marker so ref-slot presence/position
+              // is preserved when NULL and non-NULL slots are swapped (e.g.
+              // Foo(None(), Some(x)) vs Foo(Some(x), None())).
+              h = sk_hash_u64(h, UINT64_C(1));
               sk_stack_push(st, ptr, ptr);
+            } else {
+              h = sk_hash_u64(h, UINT64_C(0));
             }
           } else {
             h = sk_hash_word(h, ohead);
@@ -205,6 +211,9 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
     }
   }
 
+  // Mix element length so empty vs non-empty arrays and different array shapes
+  // with identical concatenated fields remain distinct.
+  h = sk_hash_u64(h, (uint64_t)len);
   h = sk_hash_u64(h, (uint64_t)(uintptr_t)ty);
 
   return h;
