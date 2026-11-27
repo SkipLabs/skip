@@ -193,12 +193,15 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
   return crc;
 }
 
+#define HASH_INLINE_STACK_CAPACITY 64
+
 uint64_t SKIP_hash(void* obj) {
+  sk_value_t inline_buf[HASH_INLINE_STACK_CAPACITY];
   sk_stack_t st_holder;
   sk_stack_t* st = &st_holder;
   uint64_t crc = CRC_INIT;
 
-  sk_stack_init(st, STACK_INIT_CAPACITY);
+  sk_stack_init_inline(st, inline_buf, HASH_INLINE_STACK_CAPACITY);
   sk_stack_push(st, &obj, 0);
 
   while (st->head > 0) {

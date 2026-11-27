@@ -8,10 +8,20 @@ void sk_stack_init(sk_stack_t* st, size_t capacity) {
   st->head = 0;
   st->capacity = capacity;
   st->values = (sk_value_t*)sk_malloc(sizeof(sk_value_t) * capacity);
+  st->inline_values = NULL;
+}
+
+void sk_stack_init_inline(sk_stack_t* st, sk_value_t* buf, size_t capacity) {
+  st->head = 0;
+  st->capacity = capacity;
+  st->values = buf;
+  st->inline_values = buf;
 }
 
 void sk_stack_free(sk_stack_t* st) {
-  sk_free_size(st->values, sizeof(sk_value_t) * st->capacity);
+  if (st->values != st->inline_values) {
+    sk_free_size(st->values, sizeof(sk_value_t) * st->capacity);
+  }
 }
 
 void sk_stack_grow(sk_stack_t* st) {
@@ -22,7 +32,9 @@ void sk_stack_grow(sk_stack_t* st) {
   for (; new_st.head < st->capacity; new_st.head++) {
     new_st.values[new_st.head] = st->values[new_st.head];
   }
-  sk_free_size(st->values, sizeof(sk_value_t) * st->capacity);
+  if (st->values != st->inline_values) {
+    sk_free_size(st->values, sizeof(sk_value_t) * st->capacity);
+  }
   st->head = new_st.head;
   st->capacity = new_st.capacity;
   st->values = new_st.values;
