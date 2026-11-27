@@ -1,6 +1,6 @@
 # skiplang/skargo — agent instructions
 
-`skargo` build tool and package manager for Skiplang. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply.
+`skargo` build tool and package manager for Skiplang. Root [AGENTS.md](../../AGENTS.md), [docs/skip-code-notes.md](../../docs/skip-code-notes.md), and [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md) apply.
 
 ## Layout
 
@@ -25,4 +25,5 @@
 - **`SKARGO_BIN` in test subprocesses**: in merged dev builds, `skargo` and `test` share one hardlinked binary dispatched by `SKARGO_BIN`. Always pass `env => Map["SKARGO_BIN" => "skargo"]` (or `"skc"` / the binary name) when spawning child processes from tests.
 - **Per-unit `state.db` & parallelism**: concurrent `skargo` invocations must not share a `--target-dir` (they race on per-unit `state.db`, #1581). Inside one invocation, `--jobs` parallelizes independent units while keeping heavy units (>=100 sources) exclusive.
 - **Release vs dev**: `skargo check --release` keeps incremental frontend DBs; `skargo build --release` uses `skc --one-shot`.
+- **Docs maintenance**: when changing `skargo` subcommands, flags, `Skargo.toml` schema, `build.sk` directives, profiles, or `state.db`/`SKARGO_BIN` behavior, update [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md) in the same PR.
 - **Semver**: bump `version` in `Skargo.toml` in the same PR.
