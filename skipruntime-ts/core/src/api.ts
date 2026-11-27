@@ -32,8 +32,9 @@ import type {
  * types can be stored together in a `NamedEagerCollections` map.
  *
  * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
- * so only collections created by the Skip runtime (or explicit casts) inhabit
- * this type; object literals and other structural look-alikes are rejected.
+ * so only subclasses (such as runtime-created `EagerCollection` instances)
+ * inhabit this type; object literals and other structural look-alikes are
+ * rejected.
  */
 export abstract class AbstractEagerCollection {
   declare readonly [eagerCollectionBrand]: never;
@@ -43,8 +44,9 @@ export abstract class AbstractEagerCollection {
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
  * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
- * so only collections created by the Skip runtime (or explicit casts) inhabit
- * this type; object literals and other structural look-alikes are rejected.
+ * so only subclasses (such as runtime-created `LazyCollection` instances)
+ * inhabit this type; object literals and other structural look-alikes are
+ * rejected.
  */
 export abstract class AbstractLazyCollection {
   declare readonly [lazyCollectionBrand]: never;
