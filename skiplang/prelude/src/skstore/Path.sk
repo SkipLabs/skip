@@ -86,13 +86,10 @@ class Path private (dirName: DirName, baseName: Key) uses Orderable {
 
 class DirName private (
   private dirName: String,
-  private hashTag1: Int,
-  private hashTag2: Int,
+  private hashTag: Int,
 ) extends Key uses Hashable, Show {
   private static fun create_no_validate(dirName: String): this {
-    dirNameHash1 = hash(dirName);
-    dirNameHash2 = hash((1, dirName));
-    static(dirName, dirNameHash1, dirNameHash2)
+    static(dirName, hash(dirName))
   }
 
   static fun create(dirName: String): DirName {
@@ -114,8 +111,8 @@ class DirName private (
   fun compare(base: Key): Order {
     base match {
     | dir @ DirName _ ->
-      this.hashTag1.compare(dir.hashTag1) match {
-      | EQ() -> this.hashTag2.compare(dir.hashTag2)
+      this.hashTag.compare(dir.hashTag) match {
+      | EQ() -> this.dirName.compare(dir.dirName)
       | x -> x
       }
     | _ -> invariant_violation("Expected a DirName")
@@ -123,7 +120,7 @@ class DirName private (
   }
 
   fun hash(): Int {
-    this.hashTag1
+    this.hashTag
   }
 
   fun pre(): this {

@@ -33,7 +33,7 @@ Read these before writing any SKStore pipeline:
 - **`DirName`** (`Path.sk`): created with `SKStore.DirName::create("/my/dir/")`.
   - **Must start and end with `/`**; non-empty segments matching `[0-9-]+` or `[a-zA-Z_-][a-zA-Z0-9_-]*`. Automatically lowercased. Invalid names throw.
   - Extend paths with `dirName.sub("child")` (validates and appends `"child/"`).
-  - Note: `DirName.compare` orders by 128-bit hash (fast $O(1)$), not lexicographically.
+  - Note: `DirName.compare` orders by cached 64-bit hash (fast $O(1)$) with `dirName` string tie-breaking on collision, not lexicographically.
 - **`Key`** (`base class SKStore.Key uses Orderable, Show`):
   - Every concrete subclass inherits `MyKey::keyType` (used when constructing typed handles).
   - Built-ins: `SKStore.IID(value: Int)`, `SKStore.SID(value: String)` (`SID::create`), `SKStore.UnitID::singleton`, `SKStore.DirName`.
