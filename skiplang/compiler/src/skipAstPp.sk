@@ -1181,6 +1181,13 @@ fun pattern(o: mutable BufferedPrinter.Out, x: SkipAst.Pattern): void {
     name(o, y);
     o.out(" @ ");
     pattern(o, pat)
+  | (_, SkipAst.Pat_or(pats)) ->
+    o.out("(");
+    pats.eachWithIndex((i, p) -> {
+      if (i > 0) o.out(" | ");
+      pattern(o, p)
+    });
+    o.out(")")
   }
 }
 

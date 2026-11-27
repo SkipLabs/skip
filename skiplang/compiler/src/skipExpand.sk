@@ -2073,6 +2073,8 @@ fun malias_pattern_(
   | A.Pat_tuple(pats) ->
     A.Pat_tuple(pats.map(cur1 -> malias_pattern(context, env, cur1)))
   | A.Pat_as(p, n) -> A.Pat_as(malias_pattern(context, env, p), n)
+  | A.Pat_or(pats) ->
+    A.Pat_or(pats.map(cur1 -> malias_pattern(context, env, cur1)))
   | A.Pat_const(ex) -> A.Pat_const(malias_expr(context, env, ex))
   | A.Pat_var _
   | A.Pat_literal _ ->
@@ -2541,6 +2543,8 @@ fun ext_class_tparams_pattern_(
   | A.Pat_tuple(pats) ->
     A.Pat_tuple(pats.map(cur1 -> ext_class_tparams_pattern(subst, cur1)))
   | A.Pat_as(p, n) -> A.Pat_as(ext_class_tparams_pattern(subst, p), n)
+  | A.Pat_or(pats) ->
+    A.Pat_or(pats.map(cur1 -> ext_class_tparams_pattern(subst, cur1)))
   | A.Pat_const(ex) -> A.Pat_const(ext_class_tparams_expr(subst, ex))
   | A.Pat_var _
   | A.Pat_literal _ ->
@@ -2957,6 +2961,11 @@ fun check_valid_algebraic_branch(
       "Type constants are not valid for Algebraic method branches",
     )
   | (_, A.Pat_tuple _) -> void
+  | (pos, A.Pat_or _) ->
+    SkipError.error(
+      pos,
+      "Nested or-patterns are not valid for Algebraic method branches",
+    )
   }
 }
 
@@ -3720,6 +3729,9 @@ fun pattern_(
     (env1, p1) = pattern(context, env, p);
     env2 = bind_local(env1, n);
     (env2, A.Pat_as(p1, n))
+  | A.Pat_or(pats) ->
+    (env1, pats1) = pats.mapAcc((x, y) -> pattern(context, x, y), env);
+    (env1, A.Pat_or(pats1))
   }
 }
 

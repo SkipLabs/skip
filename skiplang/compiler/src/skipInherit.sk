@@ -132,6 +132,7 @@ fun empty_algebraic_(child_str: String, x: A.Pattern_): Bool {
   | A.Pat_type(tid, _, _) -> empty_algebraic_type_identifier(child_str, tid)
   | A.Pat_as((_, p), _) -> empty_algebraic_(child_str, p)
   | A.Pat_tuple(_) -> invariant_violation("ICE tuple in algebraic")
+  | A.Pat_or(_) -> invariant_violation("ICE or-pattern in algebraic")
   }
 }
 
@@ -1511,6 +1512,7 @@ fun replace_inst_pattern(cd: A.Class_def, p: A.Pattern): A.Pattern {
       A.Pat_type(tid, params_opt.map(params -> params.map(kpat)), complete)
     | A.Pat_tuple(pats) -> A.Pat_tuple(pats.map(kpat))
     | A.Pat_as(pat, n) -> A.Pat_as(kpat(pat), n)
+    | A.Pat_or(pats) -> A.Pat_or(pats.map(kpat))
     | A.Pat_var _
     | A.Pat_literal _ ->
       p.i1
