@@ -407,7 +407,17 @@ export type Entry<K extends Json, V extends Json> = [K, V[]];
 /**
  * Opaque type used as a measure of abstract time.
  */
-export type Watermark = Opaque<string, "watermark">;
+export class Watermark {
+  private readonly value: string;
+
+  constructor(value: string) {
+    this.value = value;
+  }
+
+  toString(): string {
+    return this.value;
+  }
+}
 
 /**
  * Partial update to a collection

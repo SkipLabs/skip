@@ -4,7 +4,6 @@
  * @packageDocumentation
  */
 
-import type { Opaque } from "../skiplang-std/index.js";
 import type {
   Pointer,
   Nullable,
@@ -40,7 +39,7 @@ import {
   type Resource,
   type AnySkipService,
   type SkipService,
-  type Watermark,
+  Watermark,
   type ExternalService,
   InputDefinition,
   AbstractEagerCollection,
@@ -628,7 +627,17 @@ export class ServiceInstanceFactory {
   }
 }
 
-export type SubscriptionID = Opaque<string, "subscription">;
+export class SubscriptionID {
+  private readonly id: string;
+
+  constructor(id: string) {
+    this.id = id;
+  }
+
+  toString(): string {
+    return this.id;
+  }
+}
 
 /**
  * A `ServiceInstance` is a running instance of a `SkipService`, providing access to its resources
@@ -697,7 +706,7 @@ export interface ServiceInstance {
       notify: (update: CollectionUpdate<K, V>) => void;
       close: () => void;
     },
-    watermark?: string,
+    watermark?: string | Watermark,
   ): SubscriptionID;
 
   /**
@@ -826,7 +835,7 @@ export class ServiceInstanceImpl implements ServiceInstance {
       notify: (update: CollectionUpdate<K, V>) => void;
       close: () => void;
     },
-    watermark?: string,
+    watermark?: string | Watermark,
   ): SubscriptionID {
     this.refs.setFork(this.forkName);
     const session = this.refs.runWithGC(() => {
@@ -836,7 +845,7 @@ export class ServiceInstanceImpl implements ServiceInstance {
       return this.refs.binding.SkipRuntime_Runtime__subscribe(
         resourceInstanceId,
         sknotifier,
-        watermark ?? null,
+        watermark !== undefined ? watermark.toString() : null,
       );
     });
     if (session == -1n) {
@@ -850,13 +859,13 @@ export class ServiceInstanceImpl implements ServiceInstance {
     } else if (session < 0n) {
       throw this.refs.handles.deleteHandle(Number(-session) as Handle<Error>);
     }
-    return resourceInstanceId as SubscriptionID;
+    return new SubscriptionID(resourceInstanceId);
   }
 
   unsubscribe(id: SubscriptionID): void {
     this.refs.setFork(this.forkName);
     const errorHdl = this.refs.runWithGC(() => {
-      return this.refs.binding.SkipRuntime_Runtime__unsubscribe(id);
+      return this.refs.binding.SkipRuntime_Runtime__unsubscribe(id.toString());
     });
     if (errorHdl) {
       throw this.refs.handles.deleteHandle(errorHdl);
@@ -1405,7 +1414,7 @@ export class ToBinding {
   SkipRuntime_Notifier__notify<K extends Json, V extends Json>(
     sknotifier: Handle<Notifier<K, V>>,
     skvalues: Pointer<Internal.CJArray<Internal.CJArray<Internal.CJSON>>>,
-    watermark: Watermark,
+    watermark: string,
     isUpdates: number,
   ) {
     const skjson = this.getJsonConverter();
@@ -1414,7 +1423,7 @@ export class ToBinding {
     const isInitial = isUpdates ? false : true;
     notifier.notify({
       values,
-      watermark,
+      watermark: new Watermark(watermark),
       isInitial,
     });
   }

@@ -17,7 +17,6 @@ import type {
   ExternalService,
   SharedCollections,
   Resource,
-  Watermark,
   HandlerInfo,
   ServiceDefinition,
   ChangeManager,
@@ -1027,7 +1026,7 @@ class LinksImpl implements Links {
     this.tobinding.SkipRuntime_Notifier__notify(
       sknotifier,
       skvalues,
-      this.utils.importString(watermark) as Watermark,
+      this.utils.importString(watermark),
       isUpdates,
     );
   }
