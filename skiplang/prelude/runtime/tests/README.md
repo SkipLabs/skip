@@ -252,3 +252,26 @@ wasm-ld --no-entry --export-memory --export=SKIP_Float_toStringShortest \
   /tmp/float-to-string.o -o /tmp/float-to-string.wasm
 node skiplang/prelude/runtime/tests/float_to_string.mjs /tmp/float-to-string.wasm
 ```
+
+# Runtime SKIP_hash (native and Wasm)
+
+`hash.c` exercises `SKIP_hash` and `SKIP_hash_combine` on both native (under
+UBSan at `-O0` and `-O2`) and Wasm (`--target=wasm32 -DSKIP32 -nostdlibinc`,
+checking that no `__multi3` import is emitted). It covers rapidhash across all
+length branches, zero-allocation inline stack traversal and heap spill (> 64
+references), `NULL` ref-slot disambiguation, array length sensitivity, and
+nominal `m_typeIdentity` hashing independent of GC type pointer addresses.
+
+```sh
+clang -std=c2x -O2 -g -Wall -Wextra -Werror -Iskiplang/prelude/runtime \
+  -fsanitize=undefined -fsanitize-trap=all \
+  skiplang/prelude/runtime/tests/hash.c -o /tmp/hash-test
+/tmp/hash-test
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -Iskiplang/prelude/runtime -c skiplang/prelude/runtime/tests/hash.c \
+  -o /tmp/hash-test.o
+wasm-ld --no-entry --export-memory --export=run_hash_tests \
+  /tmp/hash-test.o -o /tmp/hash-test.wasm
+node skiplang/prelude/runtime/tests/hash.mjs /tmp/hash-test.wasm
+```

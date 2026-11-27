@@ -1,0 +1,135 @@
+module alias T = SKTest;
+
+module RuntimeHashTest;
+
+private class OptPair<V>(first: ?V, second: ?V)
+
+private class Node(label: String, left: ?Node, right: ?Node)
+
+private base class Kind
+private class KindA(value: Int) extends Kind
+private class KindB(value: Int) extends Kind
+
+@test
+fun testDeterminism(): void {
+  T.expectEq(hash(0), hash(0));
+  T.expectEq(hash(42), hash(42));
+  T.expectEq(hash(""), hash(""));
+  T.expectEq(hash("hello"), hash("hello"));
+  T.expectEq(hash((1, "a", true)), hash((1, "a", true)));
+  T.expectEq(hash(Array[1, 2, 3]), hash(Array[1, 2, 3]));
+  T.expectEq(
+    hash(OptPair(None(), Some("x"))),
+    hash(OptPair(None(), Some("x"))),
+  );
+}
+
+@test
+fun testNullRefSlotDisambiguation(): void {
+  // Reference-typed options use NULL for None(); swapping None() and Some(x)
+  // must not collide.
+  a = OptPair(None(), Some("hello"));
+  b = OptPair(Some("hello"), None());
+  c = OptPair<String>(None(), None());
+  d = OptPair(Some("hello"), Some("hello"));
+
+  T.expectTrue(hash(a) != hash(b));
+  T.expectTrue(hash(a) != hash(c));
+  T.expectTrue(hash(b) != hash(c));
+  T.expectTrue(hash(a) != hash(d));
+  T.expectTrue(hash(b) != hash(d));
+  T.expectEq(hash(a), hash(OptPair(None(), Some("hello"))));
+
+  // Also test with boxed/class option fields.
+  na = Node("root", Some(Node("leaf", None(), None())), None());
+  nb = Node("root", None(), Some(Node("leaf", None(), None())));
+  T.expectTrue(hash(na) != hash(nb));
+}
+
+@test
+fun testNestedObjectsAndArrays(): void {
+  t1 = Node(
+    "r",
+    Some(Node("a", Some(Node("x", None(), None())), None())),
+    None(),
+  );
+  t2 = Node(
+    "r",
+    Some(Node("a", None(), Some(Node("x", None(), None())))),
+    None(),
+  );
+  t3 = Node(
+    "r",
+    None(),
+    Some(Node("a", Some(Node("x", None(), None())), None())),
+  );
+  T.expectTrue(hash(t1) != hash(t2));
+  T.expectTrue(hash(t1) != hash(t3));
+  T.expectTrue(hash(t2) != hash(t3));
+
+  // Arrays of different lengths and element orders.
+  T.expectTrue(hash(Array<Int>[]) != hash(Array[0]));
+  T.expectTrue(hash(Array[0]) != hash(Array[0, 0]));
+  T.expectTrue(hash(Array[1, 2]) != hash(Array[2, 1]));
+
+  // Arrays of reference options (including NULL elements).
+  T.expectTrue(hash(Array<?String>[]) != hash(Array<?String>[None()]));
+  T.expectTrue(
+    hash(Array<?String>[None()]) != hash(Array<?String>[None(), None()]),
+  );
+  T.expectTrue(
+    hash(Array<?String>[None(), Some("a")]) !=
+      hash(Array<?String>[Some("a"), None()]),
+  );
+
+  // Large array (> 64 reference elements) exercises stack spill to heap.
+  big1 = Array::fillBy(100, i -> Some(`item-${i}`));
+  big2 = Array::fillBy(100, i -> Some(`item-${i}`));
+  big3 = Array::fillBy(100, i -> Some(if (i == 99) "changed" else `item-${i}`));
+  T.expectEq(hash(big1), hash(big2));
+  T.expectTrue(hash(big1) != hash(big3));
+}
+
+@test
+fun testStringsAcrossLengths(): void {
+  // Covers empty string and all rapidhash length regimes (1..3, 4..16, 17..32,
+  // 33..48, >48, large strings).
+  empty = "";
+  short1 = "a";
+  short3 = "abc";
+  med8 = "abcdefgh";
+  med16 = "0123456789abcdef";
+  med24 = "0123456789abcdefghijklmn";
+  med40 = "0123456789abcdefghijklmnopqrstuvwxyz0123";
+  large = "0123456789abcdef".repeat(20);
+  largeMut = "0123456789abcdef".repeat(19) + "0123456789abcdeX";
+
+  samples = Array[
+    empty,
+    short1,
+    short3,
+    med8,
+    med16,
+    med24,
+    med40,
+    large,
+    largeMut,
+  ];
+  hashes = samples.map(s -> hash(s));
+
+  for (i in Range(0, hashes.size())) {
+    T.expectEq(hash(samples[i]), hashes[i]);
+    for (j in Range(i + 1, hashes.size())) {
+      T.expectTrue(hashes[i] != hashes[j]);
+    }
+  }
+}
+
+@test
+fun testDistinctTypesWithSamePayload(): void {
+  a: Kind = KindA(7);
+  b: Kind = KindB(7);
+  T.expectTrue(hash(a) != hash(b));
+}
+
+module end;
