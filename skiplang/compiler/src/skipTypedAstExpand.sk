@@ -683,6 +683,7 @@ fun pattern__(
     T.Pat_type(tid, type(context, env, subst, castType), new_params)
   | T.Pat_as(p, v) ->
     T.Pat_as(pattern(context, env, subst, p), binding(context, env, subst, v))
+  | T.Pat_or(pats) -> T.Pat_or(pats.map(p -> pattern(context, env, subst, p)))
   }
 }
 

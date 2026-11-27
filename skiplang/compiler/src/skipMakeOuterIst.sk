@@ -1522,29 +1522,73 @@ fun match_branch(
 }
 
 fun patterns(pats: List<TAst.Pattern>): List<O.Pattern> {
-  pats.map(pattern)
+  pats.map(pattern).flatten()
 }
 
-fun pattern(pat: TAst.Pattern): O.Pattern {
-  (ty, (pos, pat__)) = pat;
-  O.Pattern(expr_type_(ty), pos, pattern_(pat__))
+fun expand_param_list(
+  params: Array<(O.Type, List<O.Pattern>)>,
+): List<Array<O.ParamPattern>> {
+  res: List<List<O.ParamPattern>> = List[List[]];
+  for (i in Range(0, params.size())) {
+    (pty, alts) = params[params.size() - 1 - i];
+    !res = alts
+      .map(alt -> res.map(tail -> List.Cons(O.ParamPattern(pty, alt), tail)))
+      .flatten();
+  };
+  res.map(Array::createFromItems)
 }
 
-fun pattern_(x: TAst.Pattern__): O.Pattern_ {
-  x match {
-  | TAst.Pat_var(v) -> O.Pat_var(binding(v))
-  | TAst.Pat_literal(SkipAst.VoidLiteral()) -> O.Pat_all()
-  | TAst.Pat_literal(l) -> O.Pat_literal(literal(l))
-  | TAst.Pat_type(tid, castType, params) ->
-    params1 = params.map(x -> x.map(y -> param_pattern(y)));
-    O.Pat_type(type_identifier(tid), expr_type_(castType), params1)
-  | TAst.Pat_as(pat, v) -> O.Pat_as(pattern(pat), binding(v))
+fun expand_named_params(
+  named: UMap<(O.Type, List<O.Pattern>)>,
+): List<UMap<O.ParamPattern>> {
+  items = named.items().collect(Array);
+  res: List<UMap<O.ParamPattern>> = List[UMap[]];
+  for (item in items) {
+    (k, (pty, alts)) = item;
+    !res = alts
+      .map(alt -> res.map(m -> m.add(k, O.ParamPattern(pty, alt))))
+      .flatten();
+  };
+  res
+}
+
+fun expand_parameters(
+  params: Parameters<(O.Type, List<O.Pattern>)>,
+): List<Parameters<O.ParamPattern>> {
+  params match {
+  | Positional(pos) -> expand_param_list(pos).map(p -> Positional(p))
+  | Named(named) -> expand_named_params(named).map(m -> Named(m))
+  | Mixed(pos, named, nf) ->
+    pos_expanded = expand_param_list(pos);
+    named_expanded = expand_named_params(named);
+    pos_expanded.map(p -> named_expanded.map(n -> Mixed(p, n, nf))).flatten()
   }
 }
 
-fun param_pattern(param_pat: TAst.ParamPattern): O.ParamPattern {
-  (ty, pat) = param_pat;
-  O.ParamPattern(expr_type_(ty), pattern(pat))
+fun pattern(pat: TAst.Pattern): List<O.Pattern> {
+  (ty, (pos, pat__)) = pat;
+  oty = expr_type_(ty);
+  pat__ match {
+  | TAst.Pat_var(v) -> List[O.Pattern(oty, pos, O.Pat_var(binding(v)))]
+  | TAst.Pat_literal(SkipAst.VoidLiteral()) ->
+    List[O.Pattern(oty, pos, O.Pat_all())]
+  | TAst.Pat_literal(l) -> List[O.Pattern(oty, pos, O.Pat_literal(literal(l)))]
+  | TAst.Pat_type(tid, castType, params) ->
+    otid = type_identifier(tid);
+    ocast = expr_type_(castType);
+    params match {
+    | None() -> List[O.Pattern(oty, pos, O.Pat_type(otid, ocast, None()))]
+    | Some(ps) ->
+      expanded_ps = ps.map(p -> (expr_type_(p.i0), pattern(p.i1)));
+      expand_parameters(expanded_ps).map(ep ->
+        O.Pattern(oty, pos, O.Pat_type(otid, ocast, Some(ep)))
+      )
+    }
+  | TAst.Pat_as(inner, v) ->
+    b = binding(v);
+    pattern(inner).map(p -> O.Pattern(oty, pos, O.Pat_as(p, b)))
+  | TAst.Pat_or(pats) -> List::createFromItems(pats).map(pattern).flatten()
+  }
 }
 
 fun type_identifier(x: TAst.Type_identifier): O.TypeIdentifier {

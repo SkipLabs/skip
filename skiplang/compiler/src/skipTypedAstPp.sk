@@ -789,6 +789,13 @@ fun match_pattern_(o: mutable BufferedPrinter.Out, x: T.Pattern_): void {
     binding(o, y);
     o.out(" @ ");
     match_pattern(o, pat)
+  | (_, T.Pat_or(pats)) ->
+    o.out("(");
+    pats.eachWithIndex((i, p) -> {
+      if (i > 0) o.out(" | ");
+      match_pattern(o, p)
+    });
+    o.out(")")
   }
 }
 

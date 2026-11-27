@@ -539,10 +539,12 @@ fun constructor_arity(
   | TAst.Pat_type(_, _castType, None()) -> 0
   | TAst.Pat_type(tid, _castType, Some _) ->
     parameters_length_of_type(context, tid)
-  /* Since we remove Pat_as from our internal representation of patterns, we
-   * should never encounter one here. */
+  /* Since we remove Pat_as and expand Pat_or from our internal representation
+   * of patterns, we should never encounter them here. */
   | TAst.Pat_as _ ->
     invariant_violation("Internal error: encountered as-pattern")
+  | TAst.Pat_or _ ->
+    invariant_violation("Internal error: encountered or-pattern")
   }
 }
 
@@ -641,30 +643,71 @@ fun normalize_positional_params(
   })
 }
 
-/* To prepare a pattern for exhaustiveness checking, we remove all Pat_as. */
+/* Expand a list of per-slot alternative lists into their Cartesian product. */
+fun expand_param_list(
+  params: Array<(TAst.Type_, List<TAst.Pattern>)>,
+): List<Array<TAst.ParamPattern>> {
+  res: List<List<TAst.ParamPattern>> = List[List[]];
+  for (i in Range(0, params.size())) {
+    (pty, alts) = params[params.size() - 1 - i];
+    !res = alts
+      .map(alt -> res.map(tail -> List.Cons((pty, alt), tail)))
+      .flatten();
+  };
+  res.map(Array::createFromItems)
+}
+
+fun expand_named_params(
+  named: UMap<(TAst.Type_, List<TAst.Pattern>)>,
+): List<UMap<TAst.ParamPattern>> {
+  items = named.items().collect(Array);
+  res: List<UMap<TAst.ParamPattern>> = List[UMap[]];
+  for (item in items) {
+    (k, (pty, alts)) = item;
+    !res = alts.map(alt -> res.map(m -> m.add(k, (pty, alt)))).flatten();
+  };
+  res
+}
+
+fun expand_parameters(
+  params: Parameters<(TAst.Type_, List<TAst.Pattern>)>,
+): List<Parameters<TAst.ParamPattern>> {
+  params match {
+  | Positional(pos) -> expand_param_list(pos).map(p -> Positional(p))
+  | Named(named) -> expand_named_params(named).map(m -> Named(m))
+  | Mixed(pos, named, nf) ->
+    pos_expanded = expand_param_list(pos);
+    named_expanded = expand_named_params(named);
+    pos_expanded.map(p -> named_expanded.map(n -> Mixed(p, n, nf))).flatten()
+  }
+}
+
+/* To prepare a pattern for exhaustiveness checking, we remove all Pat_as and
+ * expand all nested Pat_or into a flat list of patterns. */
 fun prep_pattern(
   context: mutable SKStore.Context,
   env: mutable Env,
   pat: TAst.Pattern,
-): TAst.Pattern {
+): List<TAst.Pattern> {
   TAstUtils.pattern_of__(pat) match {
   | TAst.Pat_literal _
   | TAst.Pat_var _ ->
-    pat
-  | TAst.Pat_type(_tid, _castType, None()) -> pat
+    List[pat]
+  | TAst.Pat_type(_tid, _castType, None()) -> List[pat]
   | TAst.Pat_type(tid, castType, Some(params)) ->
     pos = TAstUtils.pattern_pos(pat);
-    prepped_params = params.map(param ->
+    normalized_params = normalize_params_if_named(context, pos, tid, params);
+    prepped_params = normalized_params.map(param ->
       (param.i0, prep_pattern(context, env, param.i1))
     );
-    normalized_params = normalize_params_if_named(
-      context,
-      pos,
-      tid,
-      prepped_params,
-    );
-    update_pat(pat, TAst.Pat_type(tid, castType, Some(normalized_params)))
+    expand_parameters(prepped_params).map(expanded ->
+      update_pat(pat, TAst.Pat_type(tid, castType, Some(expanded)))
+    )
   | TAst.Pat_as(p, _) -> prep_pattern(context, env, p)
+  | TAst.Pat_or(pats) ->
+    List::createFromItems(pats)
+      .map(p -> prep_pattern(context, env, p))
+      .flatten()
   }
 }
 
@@ -740,11 +783,15 @@ fun rebuild_constr(
         ),
       )
     }
-  /* Since we remove Pat_as from our internal representation of patterns, we
-   * should never encounter one here. */
+  /* Since we remove Pat_as and expand Pat_or from our internal representation
+   * of patterns, we should never encounter them here. */
   | TAst.Pat_as _ ->
     invariant_violation(
       "Internal error: encountered as-pattern when trying to rebuild pattern",
+    )
+  | TAst.Pat_or _ ->
+    invariant_violation(
+      "Internal error: encountered or-pattern when trying to rebuild pattern",
     )
   }
 }
@@ -926,6 +973,11 @@ fun print_pattern(
     acc + BufferedPrinter.pp_to_string(SkipAstPp.literal, l)
   | TAst.Pat_as(pat1, (_, (_, nm), _)) ->
     nm + " @ " + print_pattern(context, env, acc, pat1)
+  | TAst.Pat_or(pats) ->
+    acc +
+      "(" +
+      pats.map(p -> print_pattern(context, env, "", p)).join(" | ") +
+      ")"
   }
 }
 
@@ -1322,6 +1374,7 @@ value class WeakKeyIxPat(ipat: Indexed_pattern) uses Hashable, Equality {
     | TAst.Pat_literal(lit) -> lit.hash()
     | TAst.Pat_type(tid, _, _) -> str_of_tid(tid).hash()
     | TAst.Pat_as _ -> this.ipat.i0.i1.i0.die("unexpected Pat_as")
+    | TAst.Pat_or _ -> this.ipat.i0.i1.i0.die("unexpected Pat_or")
     }
   }
 
@@ -1760,6 +1813,7 @@ fun is_complete_sig(
         is_complete_data_sig(context, env, class_set, ctor, ctors),
       )
     | TAst.Pat_as _
+    | TAst.Pat_or _
     | TAst.Pat_var _ ->
       invariant_violation(
         "Internal error: encountered invalid pattern for completeness checking " +
@@ -2198,34 +2252,35 @@ fun check_useful(
   for (patval in pat) {
     (orig_pat, is_when_pat) = patval;
 
-    inner_pat = prep_pattern(context, env, orig_pat);
-    pat1 = List[inner_pat];
-    (is_useful_res, ret_env) = is_useful(
-      context,
-      next_id,
-      env,
-      inner_pat,
-      ety,
-      pm,
-      pat1,
-    );
-    /* Note: ret_env will have picked up new typing constraints that aren't
-     * present in env. We want to use ret_env in errors, but continue to use
-     * env for checking subsequent patterns. env and ret_env share the same
-     * class_sets object, so we'll pick up changes to that automatically. */
-    if (!is_useful_res) {
-      npos = TAstUtils.pattern_pos(inner_pat);
+    for (inner_pat in prep_pattern(context, env, orig_pat)) {
+      pat1 = List[inner_pat];
+      (is_useful_res, ret_env) = is_useful(
+        context,
+        next_id,
+        env,
+        inner_pat,
+        ety,
+        pm,
+        pat1,
+      );
+      /* Note: ret_env will have picked up new typing constraints that aren't
+       * present in env. We want to use ret_env in errors, but continue to use
+       * env for checking subsequent patterns. env and ret_env share the same
+       * class_sets object, so we'll pick up changes to that automatically. */
+      if (!is_useful_res) {
+        npos = TAstUtils.pattern_pos(inner_pat);
 
-      throw Unused_pattern(npos, ret_env.chill(), List[orig_pat])
-    } else if (!is_when_pat) {
-      /* We don't put in the when patterns for exhaustiveness checking. */
+        throw Unused_pattern(npos, ret_env.chill(), List[orig_pat])
+      } else if (!is_when_pat) {
+        /* We don't put in the when patterns for exhaustiveness checking. */
 
-      /* Since we are building the matrix up from the topmost pattern
-       * the order of patterns within the matrix doesn't matter for
-       * dead-pattern and exhaustiveness checking. However, the order of the
-       * patterns in the matrix _does_ matter for counterexample generation. */
-      !pm = List.Cons((pat1, idx), pm);
-      !idx = idx + 1
+        /* Since we are building the matrix up from the topmost pattern
+         * the order of patterns within the matrix doesn't matter for
+         * dead-pattern and exhaustiveness checking. However, the order of the
+         * patterns in the matrix _does_ matter for counterexample generation. */
+        !pm = List.Cons((pat1, idx), pm);
+        !idx = idx + 1
+      }
     }
   };
 
@@ -2434,6 +2489,7 @@ fun check_exhaustive_match_as(
   | Unused_pattern(pos1, _, _) ->
     pat_ty = mbl.getHead().i0.getHead().i1.i1 match {
     | TAst.Pat_as((_, (_, t @ TAst.Pat_type _)), _) -> t.castType
+    | TAst.Pat_as(inner_pat, _) -> TAstUtils.get_type_of_pattern(inner_pat)
     | _ ->
       invariant_violation(
         "ICE Unexpected structure of desugared 'as' expression.",
