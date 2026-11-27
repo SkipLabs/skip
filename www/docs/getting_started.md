@@ -1,10 +1,20 @@
 # Getting started
 
+This guide is for using the published Skip packages in your own project — no checkout of the [`SkipLabs/skip`](https://github.com/SkipLabs/skip) repository is needed.
+
 ## Installation
 
-Before you begin, we recommend installing the NPM packages for the Skip Framework.
+In your own Node.js or Bun project directory, install the npm packages for the Skip Framework:
 
-```npm install @skiplabs/skip```
+```sh
+npm install @skiplabs/skip
+```
+
+:::caution Contributing or building from source?
+Do **not** run `npm install @skiplabs/skip` inside a checkout of `SkipLabs/skip`: the repository's local npm workspaces shadow the published packages, and the install tries to build the native runtime addon from source.
+It fails with a linker error on Linux (`cannot find -lskipruntime-…`) and with `EBADPLATFORM` on macOS.
+If you want to build Skip from source or contribute to the framework itself, follow [`INSTALL.md`](https://github.com/SkipLabs/skip/blob/main/INSTALL.md) and [`HACKING.md`](https://github.com/SkipLabs/skip/blob/main/HACKING.md) instead (using `make` rather than invoking `npm` directly).
+:::
 
 The `@skiplabs/skip` package just depends on the separate component packages:
 - `@skipruntime/core`: The Skip Runtime public API
@@ -19,7 +29,7 @@ and optionally:
 
 Note that two versions of the runtime are available, Wasm `@skipruntime/wasm` and native `@skipruntime/native`.
 The Wasm runtime works with both `node` and `bun`, but is limited to Wasm's 32-bit memory address space.
-The native runtime does not have this limitation, but it is a bit more involved to install.
+The native runtime does not have this limitation, but it runs on Linux (glibc, x64 or arm64) only and is a bit more involved to install.
 
 The Wasm runtime is installed by default, but a package using Skip can choose to explicitly depend on only `@skipruntime/core`, `@skipruntime/server`, and `@skipruntime/native` to reduce weight.
 The Wasm runtime can be installed separately with `npm install @skipruntime/wasm` and the native runtime by following the [instructions](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/addon/README.md#installation).
@@ -30,7 +40,10 @@ We have several resources available to help you learn the Skip framework, depend
 
 This guide takes a "top-down" approach, showing you how to use our APIs in an idiomatic and practical way.  We recommend that most users start here.
 
-Finally, if you'd like to just dive into the code, you can explore the [API docs](api/core), [examples](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples) of reactive services, or an [example configuration](https://github.com/SkipLabs/skip/blob/main/examples/hackernews) complete with reverse proxy and database, including a version with a distributed leader-follower configuration.
+Finally, if you'd like to dive straight into code, you can explore:
+- the [API docs](api/core);
+- self-contained example applications under [`examples/`](https://github.com/SkipLabs/skip/tree/main/examples) (such as [`examples/blogger`](https://github.com/SkipLabs/skip/tree/main/examples/blogger), [`examples/chatroom`](https://github.com/SkipLabs/skip/tree/main/examples/chatroom), [`examples/cache_invalidation`](https://github.com/SkipLabs/skip/tree/main/examples/cache_invalidation), and [`examples/hackernews`](https://github.com/SkipLabs/skip/tree/main/examples/hackernews)), complete with reverse proxy, database or Kafka broker, and Docker Compose setups (including distributed leader-follower configurations) using the published Skip packages;
+- smaller in-repo reactive service snippets under [`skipruntime-ts/examples/`](https://github.com/SkipLabs/skip/tree/main/skipruntime-ts/examples), which double as integration tests against the local unpublished workspace build (see [See it in action](#see-it-in-action) for how to run one).
 
 ## Tutorial
 
@@ -253,26 +266,60 @@ const initialData: InitialData<ServiceInputs> = {
 ### See it in action
 
 This guide aims to give the high-level ideas of how to write and reason about a Skip reactive service.
-You can see and run the full example [here](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups.ts), along with a corresponding [web application](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-server.ts) and [client](https://github.com/SkipLabs/skip/blob/main/skipruntime-ts/examples/groups-client.ts).
 
-Run the service and web app as follows:
+#### In your own project
 
+The following commands run the groups service in a fresh project using the published packages, on macOS or Linux.
+They fetch the example sources as of the `0.0.23` release: the [service](https://github.com/SkipLabs/skip/blob/66d2d452e5096109b664b7064b609d12c1c7ca16/skipruntime-ts/examples/groups.ts), a [web application](https://github.com/SkipLabs/skip/blob/66d2d452e5096109b664b7064b609d12c1c7ca16/skipruntime-ts/examples/groups-server.ts) in front of it, and a [client](https://github.com/SkipLabs/skip/blob/66d2d452e5096109b664b7064b609d12c1c7ca16/skipruntime-ts/examples/groups-client.ts).
+Ports 8080, 8081 and 8082 must be free.
+`@skipruntime/helpers@0.0.23` declares Node.js 22 in its `engines` field, so other Node.js versions get an `EBADENGINE` warning from npm; the warning does not stop the install.
+
+```sh
+mkdir skip-groups && cd skip-groups
+npm init -y
+npm pkg set type=module
+npm install @skiplabs/skip@0.0.23 express@4 eventsource@2 tsx
+for f in groups.ts groups-server.ts groups-client.ts utils.ts; do
+  curl -fsSLO "https://raw.githubusercontent.com/SkipLabs/skip/66d2d452e5096109b664b7064b609d12c1c7ca16/skipruntime-ts/examples/$f"
+done
+npx tsx groups.ts &
+npx tsx groups-server.ts &
 ```
-cd skipruntime-ts/examples
-npm run build
-node dist/groups-server.js &
-node dist/groups.js &
+
+Once the service prints `Skip control service listening on port 8081` and the web application prints `Groups REST wrapper listening at port 8082`, run the client script:
+
+```sh
+npx tsx groups-client.ts
 ```
 
-With the reactive service running, you can run the client script with `node dist/groups-client.js` and see changes in `active_friends` reflected in real time as users' friend lists, `active` status, and group memberships change.
+Against a freshly started service, it prints the changes in `active_friends` in real time as users' friend lists, `active` status, and group memberships change; later runs start from the state the previous run left and print fewer updates.
+Stop the two background processes with `kill %1 %2`.
 
 Alternatively, use curl to listen for updates, e.g. with
 
-```
+```sh
 curl -LN http://localhost:8082/active_friends/0
 ```
 
-and see the raw event stream as you issue updates to the input `users` and `groups` data from another shell.
+and see the raw event stream as you issue updates to the input `users` and `groups` data from another shell, for example by running the client script again.
+
+#### Complete applications
+
+The apps under [`examples/`](https://github.com/SkipLabs/skip/tree/main/examples) — [`examples/blogger`](https://github.com/SkipLabs/skip/tree/main/examples/blogger), [`examples/chatroom`](https://github.com/SkipLabs/skip/tree/main/examples/chatroom), [`examples/cache_invalidation`](https://github.com/SkipLabs/skip/tree/main/examples/cache_invalidation), and [`examples/hackernews`](https://github.com/SkipLabs/skip/tree/main/examples/hackernews) — are self-contained applications built on the published Skip packages.
+Each one starts with `docker compose up --build` from its directory.
+
+#### From a checkout of the repository
+
+`skipruntime-ts/examples/` in the `SkipLabs/skip` monorepo is an integration test suite for the unreleased workspace packages, and its sources on `main` use APIs newer than the published packages.
+Building it requires Linux (glibc) and the Skiplang toolchain from [`INSTALL.md`](https://github.com/SkipLabs/skip/blob/main/INSTALL.md), and goes through `make` (see [`HACKING.md`](https://github.com/SkipLabs/skip/blob/main/HACKING.md)):
+
+```sh
+make -C skipruntime-ts install-all
+make -C skipruntime-ts build-examples
+node skipruntime-ts/examples/dist/groups.js &
+node skipruntime-ts/examples/dist/groups-server.js &
+node skipruntime-ts/examples/dist/groups-client.js
+```
 
 ### Next steps
 
