@@ -1,0 +1,138 @@
+module Runtime_PatternMatchNestedOr2;
+
+base class Shape {
+  children =
+  | C(String)
+}
+
+base class AB extends Shape {
+  children =
+  | A(Int)
+  | B(Int)
+}
+
+base class Node {
+  children =
+  | Left(Int)
+  | Right(Int)
+  | Empty()
+}
+
+class Box{x: Int, y: String}
+
+const kOne: Int = 1;
+const kTwo: Int = 2;
+
+fun testOption(x: ?Int): String {
+  x match {
+  | Some(1 | 2) -> "small"
+  | Some(3 | 4 | 5) -> "mid"
+  | Some(_) -> "other"
+  | None() -> "none"
+  }
+}
+
+fun testIsAs(s: Shape): (Bool, String) {
+  isAB = s is (A _ | B _);
+  isVal12 = s is (A(1 | 2) | B(1 | 2));
+  label = if (isAB) {
+    ab = s as (A _ | B _);
+    ab match {
+    | A(n)
+    | B(n) ->
+      `ab:${n}:${isVal12}`
+    }
+  } else {
+    `other:${isVal12}`
+  };
+  (isAB, label)
+}
+
+fun testBindings(x: ?Shape): Int {
+  x match {
+  | Some(A(v) | B(v)) -> v
+  | Some(C(_))
+  | None() ->
+    -1
+  }
+}
+
+fun testAtPattern(x: ?Shape): String {
+  x match {
+  | Some(s @ (A(v) | B(v))) ->
+    tag = s match {
+    | A _ -> "A"
+    | B _ -> "B"
+    };
+    `${tag}:${v}`
+  | _ -> "none"
+  }
+}
+
+fun testTupleAndNamed(p: (Int, Int), b: Box): Int {
+  t = p match {
+  | (1 | 2, 3 | 4) -> 10
+  | (1 | 2, _) -> 20
+  | _ -> 30
+  };
+  n = b match {
+  | Box{
+    x => Runtime_PatternMatchNestedOr2.kOne
+    | Runtime_PatternMatchNestedOr2.kTwo,
+    y => "a" | "b",
+  } ->
+    1
+  | _ -> 2
+  };
+  t + n
+}
+
+fun testGuard(x: ?Int): String {
+  x match {
+  | Some(v @ (1 | 2 | 3)) if (v > 1) -> `gt1:${v}`
+  | Some(1 | 2 | 3) -> "one"
+  | _ -> "other"
+  }
+}
+
+fun testExhaustive(n: Node): Int {
+  (n, true) match {
+  | (Left(v) | Right(v), true | false) -> v
+  | (Empty(), true | false) -> 0
+  }
+}
+
+@exptest
+fun main(): void {
+  print_string(testOption(Some(1)));
+  print_string(testOption(Some(2)));
+  print_string(testOption(Some(4)));
+  print_string(testOption(Some(9)));
+  print_string(testOption(None()));
+
+  print_string(testIsAs(A(2)).toString());
+  print_string(testIsAs(B(5)).toString());
+  print_string(testIsAs(C("hi")).toString());
+
+  print_string(testBindings(Some(A(10))).toString());
+  print_string(testBindings(Some(B(20))).toString());
+  print_string(testBindings(Some(C("x"))).toString());
+  print_string(testBindings(None()).toString());
+
+  print_string(testAtPattern(Some(A(7))));
+  print_string(testAtPattern(Some(B(8))));
+  print_string(testAtPattern(None()));
+
+  print_string(testTupleAndNamed((2, 3), Box{x => 1, y => "b"}).toString());
+  print_string(testTupleAndNamed((1, 9), Box{x => 3, y => "a"}).toString());
+
+  print_string(testGuard(Some(1)));
+  print_string(testGuard(Some(2)));
+  print_string(testGuard(Some(4)));
+
+  print_string(testExhaustive(Left(11)).toString());
+  print_string(testExhaustive(Right(22)).toString());
+  print_string(testExhaustive(Empty()).toString());
+}
+
+module end;
