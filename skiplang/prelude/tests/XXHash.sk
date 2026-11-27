@@ -2,22 +2,199 @@ module alias T = SKTest;
 
 module XXHashTest;
 
+private class DerivedPair(x: Int, y: String) uses XXHashable
+
+private class DerivedPairAlt(x: Int, y: String) uses XXHashable
+
+private base class DerivedVariant uses XXHashable {
+  children =
+  | VariantA(v: Int)
+  | VariantB(v: Int)
+}
+
 @test
-fun testOptionBoolXXHash(): void {
+fun testXXHash64StringVectors(): void {
+  seedP = 2654435761;
+  s31 = "abcdefghijklmnopqrstuvwxyz01234";
+  s32 = "abcdefghijklmnopqrstuvwxyz012345";
+  s33 = "abcdefghijklmnopqrstuvwxyz0123456";
+  s64 = "0123456789abcdef".repeat(4);
+  s100 = "0123456789".repeat(10);
+  sUtf8 = "héllo 🌍";
+
+  // Reference XXH64 vectors (verified against standard xxh64sum), seed = 0
+  // Lengths: 0, 1, 3, 4, 7, 8, 12, 14, 31, 32, 33, 64, 100, plus multi-byte UTF-8
+  T.expectEq(XXHash64.xxHash64String(""), -1205034819632174695);
+  T.expectEq(XXHash64.xxHash64String("a"), -3292477735350538661);
+  T.expectEq(XXHash64.xxHash64String("abc"), 4952883123889572249);
+  T.expectEq(XXHash64.xxHash64String("abcd"), -2449070131962342708);
+  T.expectEq(XXHash64.xxHash64String("abcdefg"), 1756566643212976685);
+  T.expectEq(XXHash64.xxHash64String("abcdefgh"), 4238821247360054455);
+  T.expectEq(XXHash64.xxHash64String("abcdefghijkl"), 5407054947222279347);
+  T.expectEq(XXHash64.xxHash64String("message digest"), 463544382707905470);
+  T.expectEq(XXHash64.xxHash64String(s31), 1586828906118095159);
+  T.expectEq(XXHash64.xxHash64String(s32), -4671123170167342208);
+  T.expectEq(XXHash64.xxHash64String(s33), 5731362724551325299);
+  T.expectEq(XXHash64.xxHash64String(s64), 1942085286896742277);
+  T.expectEq(XXHash64.xxHash64String(s100), -572384217626116102);
+  T.expectEq(XXHash64.xxHash64String(sUtf8), -7561331605950182110);
+
+  // Reference XXH64 vectors, non-zero seed = 2654435761 (PRIME32)
+  T.expectEq(XXHash64.xxHash64String("", seedP), -6019626452224632849);
+  T.expectEq(XXHash64.xxHash64String("a", seedP), 4124638339981780891);
+  T.expectEq(XXHash64.xxHash64String("abc", seedP), 1376095083568989693);
+  T.expectEq(XXHash64.xxHash64String("abcd", seedP), 7355800205615274222);
+  T.expectEq(XXHash64.xxHash64String("abcdefg", seedP), -1421117559939584836);
+  T.expectEq(XXHash64.xxHash64String("abcdefgh", seedP), -2524615127430724081);
+  T.expectEq(
+    XXHash64.xxHash64String("abcdefghijkl", seedP),
+    -601332047403710956,
+  );
+  T.expectEq(
+    XXHash64.xxHash64String("message digest", seedP),
+    -6832327093462858866,
+  );
+  T.expectEq(XXHash64.xxHash64String(s31, seedP), 7634951903958437544);
+  T.expectEq(XXHash64.xxHash64String(s32, seedP), 6428530720109514939);
+  T.expectEq(XXHash64.xxHash64String(s33, seedP), 6144357945595174288);
+  T.expectEq(XXHash64.xxHash64String(s64, seedP), 4778403215664779183);
+  T.expectEq(XXHash64.xxHash64String(s100, seedP), -8142644455156642533);
+  T.expectEq(XXHash64.xxHash64String(sUtf8, seedP), -3041882020298601403);
+
+  // String.xxhash() agrees with xxHash64String(s, 0)
+  T.expectEq("message digest".xxhash(), XXHash(463544382707905470));
+  T.expectEq(s100.xxhash(), XXHash(-572384217626116102));
+}
+
+@test
+fun testXXHash64IntAndCombine(): void {
+  seedP = 2654435761;
+  T.expectEq(XXHash64.xxHash64(0), 3803688792395291579);
+  T.expectEq(XXHash64.xxHash64(0, seedP), -2731806756500811730);
+  T.expectEq(XXHash64.xxHash64(42), -5379971487550586029);
+  T.expectEq(XXHash64.xxHash64(42, seedP), -7074050055986655714);
+  T.expectEq(XXHash64.xxHash64(-1, -1), 1879562989665167537);
+
+  // combine(seed, value) passes value as data and seed as seed
+  T.expectEq(XXHash64.combine(seedP, 42), XXHash64.xxHash64(42, seedP));
+  T.expectEq(XXHash64.combine(-1, 0), XXHash64.xxHash64(0, -1));
+  T.expectTrue(XXHash64.combine(1, 2) != XXHash64.combine(2, 1));
+
+  // Array and Vector hash sequences identically using combine(seed, elem)
+  expectedArr = XXHash64.combine(XXHash64.combine(-1, 10), 20);
+  T.expectEq(Array[10, 20].xxhash(), XXHash(expectedArr));
+  T.expectEq(Vector[10, 20].xxhash(), XXHash(expectedArr));
+  T.expectTrue(Array[10, 20].xxhash() != Array[20, 10].xxhash());
+}
+
+@test
+fun testOptionXXHash(): void {
+  // Bool (FlagOption)
   someTrueHash = Some(true).xxhash();
   someFalseHash = Some(false).xxhash();
-  noneHash = (None() : ?Bool).xxhash();
-
-  // Some(true) and Some(false) should produce different hashes
+  noneBoolHash = (None() : ?Bool).xxhash();
   T.expectTrue(someTrueHash != someFalseHash);
-
-  // Some(_) and None should produce different hashes
-  T.expectTrue(someTrueHash != noneHash);
-  T.expectTrue(someFalseHash != noneHash);
-
-  // Same input should produce same hash (deterministic)
+  T.expectTrue(someTrueHash != noneBoolHash);
+  T.expectTrue(someFalseHash != noneBoolHash);
   T.expectEq(Some(true).xxhash(), someTrueHash);
-  T.expectEq((None() : ?Bool).xxhash(), noneHash);
+  T.expectEq((None() : ?Bool).xxhash(), noneBoolHash);
+
+  // Int (FlagOption): Some(0) must not collide with 1, nor Some(none-1) with None()
+  T.expectTrue(Some(0).xxhash() != 1.xxhash());
+  T.expectTrue(Some(1027410260).xxhash() != (None() : ?Int).xxhash());
+  T.expectTrue(Some(0).xxhash() != (None() : ?Int).xxhash());
+  T.expectTrue(Some(1).xxhash() != Some(2).xxhash());
+
+  // String (SentinelOption): must match the same hashing formula as Option / FlagOption
+  someStr: ?String = Some("hello");
+  noneStr: ?String = None();
+  T.expectEq(
+    someStr.xxhash(),
+    XXHash(XXHash64.xxHash64("hello".xxhash().value, XXHash64.optionSomeSeed)),
+  );
+  T.expectEq(noneStr.xxhash(), XXHash(XXHash64.optionNoneHash));
+  T.expectEq((None() : ?Int).xxhash(), noneStr.xxhash());
+  T.expectTrue(someStr.xxhash() != "hello".xxhash());
+  T.expectTrue(someStr.xxhash() != noneStr.xxhash());
+
+  // Nested Option (FlagOption over SentinelOption)
+  nestedSome: ??String = Some(Some("hello"));
+  nestedNone: ??String = Some(None());
+  outerNone: ??String = None();
+  T.expectTrue(nestedSome.xxhash() != nestedNone.xxhash());
+  T.expectTrue(nestedNone.xxhash() != outerNone.xxhash());
+  T.expectTrue(nestedSome.xxhash() != someStr.xxhash());
+}
+
+@test
+fun testMapXXHashOrderIndependence(): void {
+  m1 = Map["a" => 1, "b" => 2, "c" => 3, "d" => 4];
+  m2 = Map["d" => 4, "b" => 2, "a" => 1, "c" => 3];
+  m3 = Map["c" => 3, "a" => 1, "d" => 4, "b" => 2];
+
+  // Equal maps with different insertion orders must hash identically
+  T.expectEq(m1.xxhash(), m2.xxhash());
+  T.expectEq(m1.xxhash(), m3.xxhash());
+
+  // Inserting and removing extra keys should not affect the hash
+  m4 = mutable Map[];
+  m4.set("z", 99);
+  m4.set("c", 3);
+  m4.set("a", 1);
+  m4.remove("z");
+  m4.set("d", 4);
+  m4.set("b", 2);
+  T.expectEq(m1.xxhash(), m4.chill().xxhash());
+
+  // Different maps must produce different hashes
+  mDiffVal = Map["a" => 1, "b" => 2, "c" => 3, "d" => 5];
+  mDiffKey = Map["a" => 1, "b" => 2, "c" => 3, "e" => 4];
+  mSwapped = Map["a" => 2, "b" => 1, "c" => 3, "d" => 4];
+  mSubset = Map["a" => 1, "b" => 2, "c" => 3];
+  mEmpty: Map<String, Int> = Map[];
+
+  T.expectTrue(m1.xxhash() != mDiffVal.xxhash());
+  T.expectTrue(m1.xxhash() != mDiffKey.xxhash());
+  T.expectTrue(m1.xxhash() != mSwapped.xxhash());
+  T.expectTrue(m1.xxhash() != mSubset.xxhash());
+  T.expectTrue(m1.xxhash() != mEmpty.xxhash());
+
+  // Maps with identical key/value hashes across distinct entries do not cancel out
+  // (unlike XOR accumulation where two equal hashes would cancel to 0)
+  mOne = Map[1 => 1];
+  mTwo = Map[1 => 1, 2 => 2];
+  T.expectTrue(mOne.xxhash() != mEmpty.xxhash());
+  T.expectTrue(mTwo.xxhash() != mEmpty.xxhash());
+  T.expectTrue(mOne.xxhash() != mTwo.xxhash());
+}
+
+@test
+fun testDerivedXXHashable(): void {
+  p1 = DerivedPair(1, "foo");
+  p2 = DerivedPair(1, "foo");
+  p3 = DerivedPair(2, "foo");
+  p4 = DerivedPair(1, "bar");
+  pAlt = DerivedPairAlt(1, "foo");
+
+  // Deterministic and field-sensitive
+  T.expectEq(p1.xxhash(), p2.xxhash());
+  T.expectTrue(p1.xxhash() != p3.xxhash());
+  T.expectTrue(p1.xxhash() != p4.xxhash());
+
+  // Distinct classes with identical fields hash differently (class name included)
+  T.expectTrue(p1.xxhash() != pAlt.xxhash());
+
+  // Distinct variants with identical payload hash differently
+  va: DerivedVariant = VariantA(7);
+  vb: DerivedVariant = VariantB(7);
+  T.expectTrue(va.xxhash() != vb.xxhash());
+
+  // Derived macro uses combine(h, field) in declaration order
+  expected = XXHash64.combine(
+    XXHash64.combine("XXHashTest.DerivedPair".xxhash().value, 1.xxhash().value),
+    "foo".xxhash().value,
+  );
+  T.expectEq(p1.xxhash(), XXHash(expected));
 }
 
 module end;

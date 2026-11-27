@@ -83,7 +83,7 @@ fun parsePositiveSum(items: Array<String>): Result<Int, String> {
 | `Equality` | — | Yes (`macro readonly fun ==(other: inst): Bool`, plus `!=`) | Structural field-by-field via `#forEachField`. Override `fun ==(other: BaseClass): Bool` on base classes when custom equality is needed. |
 | `Orderable` | — | Yes (`macro readonly fun compare(other: inst): Order`, `<`, `>`, `<=`, `>=`, `==`) | `extends Equality, HasClassName`. Compares class names across subclasses, then fields. Conflicts with explicit `uses Equality` on `==`. |
 | `Hashable` | — | Yes (`macro fun hash(): Int`) | Combines `#thisClassName.hash()` with `#forEachField`. **Not `readonly`**. |
-| `XXHashable` | — | Yes (`macro fun xxhash(): XXHash`) | Deterministic 64-bit hash (`XXHash(value: Int)`). Implemented for primitives, `Option`, `Array`, `Vector`, `Map`, tuples. |
+| `XXHashable` | — | Yes (`macro fun xxhash(): XXHash`) | Deterministic 64-bit hash (`XXHash(value: Int)`). Implemented for primitives, `Option`, `Array`, `Vector`, `Map` (order-independent), tuples. Module `XXHash64` exposes `xxHash64(data, seed = 0)`, `xxHash64String(data, seed = 0)` (standard XXH64 in C), and `combine(seed, value)`. |
 | `Show` | `readonly fun toString(): String` | **No** | Required for string interpolation `` `${x}` `` and `print_string(x)`. |
 | `HasClassName` | — | Yes (`macro readonly fun getClassName(): String`) | Inherited by `Orderable` and `Exception`. |
 | `IntoIterator<+T>` | `readonly fun iterator(): mutable Iterator<T>` | No | — |

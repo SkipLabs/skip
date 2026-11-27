@@ -10,10 +10,12 @@ extension class SentinelOption uses XXHashable[T: XXHashable] {
   fun xxhash[T: XXHashable](): XXHash {
     XXHash(
       if (this.isSome()) {
-        this.unsafeFromSome().xxhash().value + 1
+        XXHash64.xxHash64(
+          this.unsafeFromSome().xxhash().value,
+          XXHash64.optionSomeSeed,
+        )
       } else {
-        // Arbitrary hash value for None(), copied from Option.sk.
-        1027410261
+        XXHash64.optionNoneHash
       },
     )
   }
@@ -23,10 +25,12 @@ extension class FlagOption uses XXHashable[T: XXHashable] {
   fun xxhash[T: XXHashable](): XXHash {
     XXHash(
       if (this.isSome()) {
-        this.unsafeFromSome().xxhash().value + 1
+        XXHash64.xxHash64(
+          this.unsafeFromSome().xxhash().value,
+          XXHash64.optionSomeSeed,
+        )
       } else {
-        // Arbitrary hash value for None(), copied from Option.sk.
-        1027410261
+        XXHash64.optionNoneHash
       },
     )
   }
@@ -35,6 +39,9 @@ extension class FlagOption uses XXHashable[T: XXHashable] {
 module end;
 
 module XXHash64;
+
+const optionNoneHash: Int = 1027410261;
+const optionSomeSeed: Int = 0x536F6D6520546167;
 
 extension class .Int uses XXHashable {
   fun xxhash(): XXHash {
@@ -59,38 +66,34 @@ extension class .Void uses XXHashable {
 extension base class .Option uses XXHashable[T: XXHashable] {
   fun xxhash[T: XXHashable](): XXHash {
     XXHash(
-      if (this.isSome()) {
-        this.fromSome().xxhash().value + 1
-      } else {
-        // Arbitrary hash value for None(), copied from Option.sk.
-        1027410261
+      this match {
+      | Some(v) -> xxHash64(v.xxhash().value, optionSomeSeed)
+      | None() -> optionNoneHash
       },
     )
   }
 }
 extension class .Vector uses XXHashable[T: XXHashable] {
   readonly fun xxhash[T: XXHashable](): XXHash {
-    XXHash(this.foldl((seed, v) -> xxHash64(seed, v.xxhash().value), -1))
+    XXHash(this.foldl((seed, v) -> combine(seed, v.xxhash().value), -1))
   }
 }
 extension class .Array uses XXHashable[T: XXHashable] {
   readonly fun xxhash[T: XXHashable](): XXHash {
-    XXHash(this.foldl((seed, v) -> xxHash64(seed, v.xxhash().value), -1))
+    XXHash(this.foldl((seed, v) -> combine(seed, v.xxhash().value), -1))
   }
 }
 
 extension class .Map uses XXHashable[K: XXHashable, V: XXHashable] {
   readonly fun xxhash[K: XXHashable, V: XXHashable](): XXHash {
-    XXHash(
-      this.items().foldl(
-        (seed, kv) -> {
-          k = kv.i0.xxhash().value;
-          v = kv.i1.xxhash().value;
-          xxHash64(xxHash64(seed, k), v)
-        },
-        -1,
-      ),
-    )
+    acc = 0;
+    count = 0;
+    for (k => v in this) {
+      pairHash = combine(k.xxhash().value, v.xxhash().value);
+      !acc = acc + pairHash;
+      !count = count + 1;
+    };
+    XXHash(xxHash64(acc, count))
   }
 }
 
@@ -185,17 +188,24 @@ trait .XXHashable {
   overridable macro fun xxhash(): XXHash {
     h = #thisClassName.xxhash();
     #forEachField (#field, #fieldName) {
-      !h = XXHash(xxHash64(h.value, this.#field.xxhash().value))
+      !h = XXHash(XXHash64.combine(h.value, this.#field.xxhash().value))
     };
     h
   }
 }
 
-const prime1: Int = -7046029254386353131; // 0x9E3779B185EBCA87
-const prime2: Int = -4417276706812531889; // 0xC2B2AE3D27D4EB4F
-const prime3: Int = 1609587929392839161; // 0x165667B19E3779F9
-const prime4: Int = -8796714831421723037; // 0x85EBCA77C2B2AE63
-const prime5: Int = 2870177450012600261; // 0x27D4EB2F165667C5
+const prime1: Int = 0x9E3779B185EBCA87; // -7046029288634856825
+const prime2: Int = 0xC2B2AE3D27D4EB4F; // -4417276706812531889
+const prime3: Int = 0x165667B19E3779F9; //  1609587929392839161
+const prime4: Int = 0x85EBCA77C2B2AE63; // -8796714831421723037
+const prime5: Int = 0x27D4EB2F165667C5; //  2870177450012600261
+
+// Combine an accumulated hash seed with a new 64-bit value.
+// Unlike xxHash64(data, seed), the accumulator comes first so fold/combine
+// call sites match Hashable.combine(seed, value).
+fun combine(seed: Int, value: Int): Int {
+  xxHash64(value, seed)
+}
 
 fun xxHash64(data: Int, seed: Int = 0): Int {
   // For a single Int (8 bytes), we don't have enough data for a full block
@@ -218,126 +228,21 @@ fun xxHash64(data: Int, seed: Int = 0): Int {
   hash
 }
 
+@cpp_extern("SKIP_xxhash64_string")
+@no_alloc
+@no_throw
+private native fun xxHash64StringRaw(data: String, seed: Int): Int;
+
 fun xxHash64String(data: String, seed: Int = 0): Int {
-  // Convert string to bytes and process them
-  bytes = data.bytes();
-  length = bytes.size();
-
-  if (length >= 32) {
-    // For large strings, use the full xxHash64 algorithm
-    xxHash64StringLarge(bytes, seed)
-  } else {
-    // For small strings, use simplified processing
-    xxHash64StringSmall(bytes, seed)
-  }
-}
-
-fun xxHash64StringSmall(bytes: readonly Bytes, seed: Int): Int {
-  length = bytes.size();
-  hash = seed + prime5 + length;
-
-  // Process 8-byte chunks
-  i = 0;
-  while (i + 8 <= length) {
-    // Combine 8 bytes into a single Int (little-endian)
-    value = 0;
-    for (j in Range(0, 8)) {
-      !value = value.or(bytes[i + j].toInt().shl(j * 8));
-    };
-    !hash = hash.xor(round(0, value));
-    !hash = rotateLeft(hash, 27) * prime1 + prime4;
-    !i = i + 8;
-  };
-
-  // Process remaining bytes
-  while (i < length) {
-    !hash = hash.xor(bytes[i].toInt() * prime5);
-    !hash = rotateLeft(hash, 11) * prime1;
-    !i = i + 1;
-  };
-
-  // Final mix
-  !hash = hash.xor(hash.ushr(33));
-  !hash = hash * prime2;
-  !hash = hash.xor(hash.ushr(29));
-  !hash = hash * prime3;
-  !hash = hash.xor(hash.ushr(32));
-
-  hash
-}
-
-fun xxHash64StringLarge(bytes: readonly Bytes, seed: Int): Int {
-  length = bytes.size();
-
-  // Initialize accumulators
-  acc1 = seed + prime1 + prime2;
-  acc2 = seed + prime2;
-  acc3 = seed;
-  acc4 = seed - prime1;
-
-  // Process 32-byte blocks
-  i = 0;
-  while (i + 32 <= length) {
-    // Process 4 x 8-byte chunks
-    for (j in Range(0, 4)) {
-      value = 0;
-      for (k in Range(0, 8)) {
-        !value = value.or(bytes[i + j * 8 + k].toInt().shl(k * 8));
-      };
-      if (j == 0) !acc1 = round(acc1, value);
-      if (j == 1) !acc2 = round(acc2, value);
-      if (j == 2) !acc3 = round(acc3, value);
-      if (j == 3) !acc4 = round(acc4, value);
-    };
-    !i = i + 32;
-  };
-
-  // Merge accumulators
-  hash =
-    rotateLeft(acc1, 1) +
-    rotateLeft(acc2, 7) +
-    rotateLeft(acc3, 12) +
-    rotateLeft(acc4, 18);
-  !hash = (hash.xor(round(0, acc1)) * prime1 + prime4);
-  !hash = (hash.xor(round(0, acc2)) * prime1 + prime4);
-  !hash = (hash.xor(round(0, acc3)) * prime1 + prime4);
-  !hash = (hash.xor(round(0, acc4)) * prime1 + prime4);
-
-  !hash = hash + length;
-
-  // Process remaining bytes (similar to small version)
-  while (i + 8 <= length) {
-    value = 0;
-    for (j in Range(0, 8)) {
-      !value = value.or(bytes[i + j].toInt().shl(j * 8));
-    };
-    !hash = hash.xor(round(0, value));
-    !hash = rotateLeft(hash, 27) * prime1 + prime4;
-    !i = i + 8;
-  };
-
-  while (i < length) {
-    !hash = hash.xor(bytes[i].toInt() * prime5);
-    !hash = rotateLeft(hash, 11) * prime1;
-    !i = i + 1;
-  };
-
-  // Final mix
-  !hash = hash.xor(hash.ushr(33));
-  !hash = hash * prime2;
-  !hash = hash.xor(hash.ushr(29));
-  !hash = hash * prime3;
-  !hash = hash.xor(hash.ushr(32));
-
-  hash
+  xxHash64StringRaw(data, seed)
 }
 
 // Helper functions for xxHash64
-fun rotateLeft(value: Int, bits: Int): Int {
+private fun rotateLeft(value: Int, bits: Int): Int {
   (value.shl(bits)).or(value.ushr(64 - bits))
 }
 
-fun round(acc: Int, value: Int): Int {
+private fun round(acc: Int, value: Int): Int {
   acc2 = acc + value * prime2;
   acc3 = rotateLeft(acc2, 31);
   acc3 * prime1
