@@ -16,7 +16,7 @@ Monorepo for the **Skip** reactive framework (`skipruntime-ts/`), the **Skiplang
 | `skiplang/prelude/` | `std` library (`src/core/`, `src/stdlib/`, `src/skstore/`), C/Wasm runtime (`runtime/`), TS bindings (`ts/`) |
 | `skiplang/skargo/` | `skargo` build/test driver (`src/`, `tests/`) |
 | `skiplang/{arparser,cc,cli,pkg-config,semver,skbigint,skdate,skjson,sktest,sqlparser,toml}/` | Supporting Skiplang packages |
-| `skiplang/docs/` | Language & compiler internals: [modifiers-and-annotations.md](skiplang/docs/modifiers-and-annotations.md), [SKStore.md](skiplang/docs/SKStore.md), incremental backend notes |
+| `skiplang/docs/` | Agent-oriented Skiplang references: [language.md](skiplang/docs/language.md), [stdlib.md](skiplang/docs/stdlib.md), [tooling-and-ffi.md](skiplang/docs/tooling-and-ffi.md), [SKStore.md](skiplang/docs/SKStore.md), [modifiers-and-annotations.md](skiplang/docs/modifiers-and-annotations.md), plus compiler internals |
 | `skipruntime-ts/` | `@skipruntime/*`, `@skip-adapter/*`, `@skiplabs/skip` workspaces + `skiplang/{core,ffi}/` |
 | `sql/` | SKDB native/Wasm engine (`src/`), TS client (`ts/`), Java server (`server/`), SQL tests |
 | `examples/` | End-to-end Docker apps (`hackernews`, `chatroom`, `blogger`, `cache_invalidation`) |
@@ -43,7 +43,12 @@ Monorepo for the **Skip** reactive framework (`skipruntime-ts/`), the **Skiplang
 
 ## Do / don't
 
-- **Before writing `.sk` code**: read [docs/skip-code-notes.md](docs/skip-code-notes.md) (language/style lessons). Append new lessons — especially user corrections — in their own commit/PR when appropriate; report bugs as GitHub issues, not notes.
+- **Before writing `.sk` code**: consult the relevant reference(s) under `skiplang/docs/` ([language.md](skiplang/docs/language.md), [stdlib.md](skiplang/docs/stdlib.md), [tooling-and-ffi.md](skiplang/docs/tooling-and-ffi.md), [SKStore.md](skiplang/docs/SKStore.md), [modifiers-and-annotations.md](skiplang/docs/modifiers-and-annotations.md)) and [docs/skip-code-notes.md](docs/skip-code-notes.md) (house style & recent lessons). Append new style/workflow lessons — especially user corrections — to `docs/skip-code-notes.md` in their own commit/PR; report bugs as GitHub issues, not notes.
+- **Keep `skiplang/docs/` in sync**: whenever a PR changes user-visible language rules, modifiers/annotations, `std` APIs, `SKStore` semantics/performance invariants, `skargo`/`skc`/`sktest`/`skfmt` flags, or C/Wasm FFI contracts, update the corresponding doc(s) under `skiplang/docs/` in the same PR and compile-check any added/edited `.sk` snippets:
+  - `skiplang/compiler/src/` -> `language.md`, `modifiers-and-annotations.md`, `tooling-and-ffi.md`
+  - `skiplang/prelude/src/{core,stdlib}/`, first-party `skiplang/*` packages -> `stdlib.md`
+  - `skiplang/prelude/src/skstore/` -> `SKStore.md`
+  - `skiplang/skargo/`, `skiplang/sktest/`, `skiplang/prelude/{runtime,preamble,ts}/` -> `tooling-and-ffi.md`
 - **Tests**: add or update tests with every code change. Run only the narrowest relevant suite locally; don't run full CI unless needed.
 - **Commits**: one logical change per commit (an "and"/"also"/";" in the subject is a red flag).
 - **Never commit build artifacts or caches**: `skiplang/compiler/{build,stage*,runs,tools/runs}/`, `**/state.db`, `target/`, `build/`, `.env` — all gitignored.

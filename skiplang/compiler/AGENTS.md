@@ -1,6 +1,6 @@
 # skiplang/compiler — agent instructions
 
-`skc` compiler and `skfmt` formatter: sources in `src/`, language tests in `tests/` and `invalid_tests/`, Python backend/profiling tools in `tools/`, bootstrap IR in the `bootstrap/` submodule. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply; see [skiplang/docs/modifiers-and-annotations.md](../docs/modifiers-and-annotations.md) for modifiers/annotations and [skiplang/docs/compiler-incremental-backend-review.md](../docs/compiler-incremental-backend-review.md) for backend architecture.
+`skc` compiler and `skfmt` formatter: sources in `src/`, language tests in `tests/` and `invalid_tests/`, Python backend/profiling tools in `tools/`, bootstrap IR in the `bootstrap/` submodule. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply; see [skiplang/docs/language.md](../docs/language.md), [skiplang/docs/modifiers-and-annotations.md](../docs/modifiers-and-annotations.md), [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md), and [skiplang/docs/compiler-incremental-backend-review.md](../docs/compiler-incremental-backend-review.md).
 
 ## Source pipeline map (`src/`)
 
@@ -41,4 +41,5 @@
 - **`state.db` identity**: per-unit persistent caches check the executable's GNU build-id (macOS: `LC_UUID`) and exit 43 on mismatch; `skargo` discards stale `state.db` and rebuilds with `--init`.
 - **Release vs incremental builds**: `skargo check --release` keeps incremental frontend DBs; `skargo build --release` uses `skc --one-shot` (disposable phases, rejects `--init`/`--data`/`--batch`).
 - **Merged dev-build `SKARGO_BIN`**: when invoking `skc` from a `skargo test` subprocess, prefix with `env SKARGO_BIN=skc` so dev hardlinks don't dispatch back to the test harness (#1451).
+- **Docs maintenance**: when changing grammar, type/visibility/pattern/macro semantics, modifiers/annotations, or `skc`/`skfmt` CLI flags, update [skiplang/docs/language.md](../docs/language.md), [skiplang/docs/modifiers-and-annotations.md](../docs/modifiers-and-annotations.md), and/or [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md) in the same PR.
 - **Downstream & CI**: changes here also trigger `skargo` tests in CI; test [skjs](../../HACKING.md#downstream-skjs) before merging toolchain-breaking changes, and bump `Skargo.toml` `version` in the same PR.

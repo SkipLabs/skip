@@ -1,6 +1,6 @@
 # skiplang/prelude — agent instructions
 
-Standard library (`std`), SKStore reactive engine, C/C++ native + Wasm runtime, and TS runtime bindings. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply; see [skiplang/docs/SKStore.md](../docs/SKStore.md) for SKStore concepts.
+Standard library (`std`), SKStore reactive engine, C/C++ native + Wasm runtime, and TS runtime bindings. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply; see [skiplang/docs/stdlib.md](../docs/stdlib.md), [skiplang/docs/SKStore.md](../docs/SKStore.md), and [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md).
 
 ## Layout
 
@@ -27,5 +27,6 @@ Standard library (`std`), SKStore reactive engine, C/C++ native + Wasm runtime, 
 - **Every package depends on `std`**: changes to `src/` or `runtime/` (outside `tests/` and `runtime/tests/`) trigger nearly the full CI matrix, and runtime/Makefile/libbacktrace edits enable `candidate_toolchain: true` (waiting on `compiler`).
 - **CI Docker image input**: all of `skiplang/prelude/` (`src/`, `build.sk`, `Makefile`, `runtime/`, `libbacktrace/`) is baked into `skiplabs/*:latest` via `make STAGE=0`. Merging a change triggers `docker-publish` on `main`; also check downstream [skjs](../../HACKING.md#downstream-skjs).
 - **Dual build files for runtime C files**: when adding/removing runtime `.c` files, update **both** `build.sk` and `runtime/Makefile` (and `preamble/` if adding new `@cpp_extern` intrinsics).
-- **Wasm ABI**: match `@cpp_extern` return/argument types to the C ABI (e.g. `Int32` for `uint32_t`, never `Bool`); see [docs/skip-code-notes.md](../../docs/skip-code-notes.md).
+- **Wasm ABI**: match `@cpp_extern` return/argument types to the C ABI (e.g. `Int32` for `uint32_t`, never `Bool`); see [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md).
+- **Docs maintenance**: when changing public `std` APIs (`src/{core,stdlib}/`), `SKStore` APIs/invariants (`src/skstore/`), or C/Wasm runtime FFI contracts (`runtime/`, `preamble/`, `ts/`), update [skiplang/docs/stdlib.md](../docs/stdlib.md), [skiplang/docs/SKStore.md](../docs/SKStore.md), or [skiplang/docs/tooling-and-ffi.md](../docs/tooling-and-ffi.md) in the same PR.
 - **Semver**: bump `version` in `Skargo.toml` in the same PR.
