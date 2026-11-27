@@ -19,7 +19,6 @@ Companion docs:
 - **`String` has no `[]` indexing**: `s.length()` is O(n) Unicode scalar count; byte size is `String.byteSize(s): UInt32` or `s.bytes().size()`. `toInt()`/`toFloat()` crash on invalid input — use `toIntOption()` / `toFloatOption()`.
 - **Iterator consumption**: `.values()`/`.items()`/`.keys()` return a single-use `mutable Iterator`. Materialize with `.collect(Array)`, `.collect(Vector)`, `.collect(Map)`, or `.toArray()`.
 - **`List` and `SortedMap` do not declare `uses FromIterator`**: `iter.collect(List)` and `iter.collect(SortedMap)` fail typechecking — use `List::createFromIterator(iter)` / `SortedMap::createFromIterator(iter)` instead.
-- **`Result` does not declare `uses Equality`/`Orderable`/`Show`** in its header (even though it defines `==`, `!=`, and `compare`).
 - **`print_error(s)` already appends `\n`** (as does `print_error_ln(v)` for any `Show` value). Use `print_error_raw(s)` for no newline.
 - **No built-in `Regex` engine**: `Regex.sk` in prelude is empty.
 
@@ -48,7 +47,7 @@ Companion docs:
 
 - **`Option<+T>` (`?T`)** — `Some(value: T) | None()`. Conditional `Show`, `Hashable`, `Orderable`, `Equality`; `IntoIterator<T>`.
   - Methods: `isSome()`, `isNone()`, `default(fallback)`, `fromSome(msg?)` (crashes on `None`), `map(f)`, `flatMap(f)`, `maybe(nothing, just)`, `test(pred)`, `each(f)`. Supports postfix `?` propagation.
-- **`Result<+T, +E>`** — `Success(value: T) | Failure(error: E)`.
+- **`Result<+T, +E>`** — `Success(value: T) | Failure(error: E)`. Conditional `Show`, `Hashable`, `Orderable`, `Equality`.
   - Methods: `Result::guard(() -> expr)` (catches `Exception` into `Result<T, Exception>`), `isSuccess()`, `isFailure()`, `fromSuccess()`, `fromFailure()`, `maybeSuccess()`, `maybeFailure()`, `map(f)`, `flatMap(f)`. Supports postfix `?` propagation.
 - **`Order`** — `LT() | EQ() | GT()`, with `isLT`/`isLTE`/`isEQ`/`isGT`/`isGTE`.
 - **`InclusiveOr<+A, +B>`** — `Left(A) | Right(B) | Both(A, B)` (returned by `Iterator.zipSorted`).
