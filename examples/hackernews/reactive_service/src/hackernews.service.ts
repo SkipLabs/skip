@@ -1,10 +1,11 @@
-import type {
-  Context,
-  EagerCollection,
-  Json,
-  Values,
-  Resource,
-  SkipService,
+import {
+  type Context,
+  type EagerCollection,
+  type Json,
+  type Values,
+  type Resource,
+  type SkipService,
+  InputDefinition,
 } from "@skipruntime/core";
 
 import { PostgresExternalService } from "@skip-adapter/postgres";
@@ -12,6 +13,7 @@ import type {
   Post,
   PostWithUpvoteIds,
   PostWithUpvoteCount,
+  PostsServiceInputDefs,
   PostsServiceInputs,
   SessionsResourceInputs,
   PostsResourceInputs,
@@ -26,11 +28,11 @@ const unknownUser: User = { name: "unknown author", email: "unknown email" };
 
 // Initialize PostgreSQL connection
 const postgres = new PostgresExternalService({
-  host: process.env["PG_HOST"] || "db",
-  port: Number(process.env["PG_PORT"]) || 5432,
-  database: process.env["PG_DATABASE"] || "postgres",
-  user: process.env["PG_USER"] || "postgres",
-  password: process.env["PG_PASSWORD"] || "change_me",
+  host: process.env["PG_HOST"] ?? "db",
+  port: Number(process.env["PG_PORT"] ?? 5432),
+  database: process.env["PG_DATABASE"] ?? "postgres",
+  user: process.env["PG_USER"] ?? "postgres",
+  password: process.env["PG_PASSWORD"] ?? "change_me",
 });
 
 /**
@@ -120,7 +122,7 @@ class PostsResource implements Resource<PostsResourceInputs> {
     else this.limit = params.limit;
     if (params.session_id === undefined)
       throw new Error("Missing required session_id.");
-    else this.session_id = params.session_id as string;
+    else this.session_id = params.session_id;
   }
 
   instantiate(
@@ -165,7 +167,7 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
     const params = jsonParams as PostsResourceParams;
     if (params.session_id === undefined)
       throw new Error("Missing required session_id.");
-    else this.session_id = params.session_id as string;
+    else this.session_id = params.session_id;
   }
 
   instantiate(
@@ -179,9 +181,13 @@ class SessionsResource implements Resource<SessionsResourceInputs> {
  * Main service definition
  * Configures resources, external services, and data flow
  */
-export const service: SkipService<PostsServiceInputs, PostsResourceInputs> = {
-  initialData: {
-    sessions: [],
+export const service: SkipService<
+  PostsServiceInputDefs,
+  PostsServiceInputs,
+  PostsResourceInputs
+> = {
+  inputs: {
+    sessions: new InputDefinition([]),
   },
   resources: { posts: PostsResource, sessions: SessionsResource },
   externalServices: { postgres },
