@@ -13,8 +13,8 @@ export class Sum implements /* NativeStub, */ Reducer<number, number> {
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
   // since we provide a native implementation.
   initial!: number;
-  add!: (accum: number) => number;
-  remove!: (accum: number) => Nullable<number>;
+  add!: (accum: number | null, value: number) => number;
+  remove!: (accum: number, value: number) => Nullable<number>;
 }
 
 /**
@@ -29,8 +29,8 @@ export class Min implements /* NativeStub, */ Reducer<number, number> {
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
   // since we provide a native implementation.
   initial!: number;
-  add!: (accum: number) => number;
-  remove!: (accum: number) => Nullable<number>;
+  add!: (accum: number | null, value: number) => number;
+  remove!: (accum: number, value: number) => Nullable<number>;
 }
 
 /**
@@ -45,8 +45,8 @@ export class Max implements /* NativeStub, */ Reducer<number, number> {
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
   // since we provide a native implementation.
   initial!: number;
-  add!: (accum: number) => number;
-  remove!: (accum: number) => Nullable<number>;
+  add!: (accum: number | null, value: number) => number;
+  remove!: (accum: number, value: number) => Nullable<number>;
 }
 
 /**
@@ -63,6 +63,6 @@ export class Count<T extends Json>
   // Lie to TypeScript that this implements Reducer, but leave out any implementations
   // since we provide a native implementation.
   initial!: number;
-  add!: (accum: number) => number;
-  remove!: (accum: number) => Nullable<number>;
+  add!: (accum: number | null, value: T) => number;
+  remove!: (accum: number, value: T) => Nullable<number>;
 }

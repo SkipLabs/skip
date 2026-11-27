@@ -26,7 +26,7 @@ class ComputeExpression implements LazyCompute<string, string | number> {
       if (typeof v == "number") return v;
       if (typeof v == "string") {
         const nv = parseFloat(v);
-        if (!isNaN(nv)) return nv;
+        if (!Number.isNaN(nv)) return nv;
       }
       throw new Error(`Invalid value for cell '${key}'`);
     };
@@ -76,8 +76,8 @@ class CallCompute
   }
 }
 
-type Inputs = { cells: EagerCollection<string, number | string> };
-type Outputs = { output: EagerCollection<string, number | string> };
+type Inputs = { readonly cells: EagerCollection<string, number | string> };
+type Outputs = { readonly output: EagerCollection<string, number | string> };
 
 class ComputedCells implements Resource<Outputs> {
   instantiate(collections: Outputs): EagerCollection<string, number | string> {
@@ -85,12 +85,13 @@ class ComputedCells implements Resource<Outputs> {
   }
 }
 const service = {
-  inputs: { cells: new InputDefinition() },
+  inputs: { cells: new InputDefinition<string, number | string>() },
   resources: { computed: ComputedCells },
-  createGraph(inputCollections: Inputs, context: Context): Outputs {
+  createGraph: (inputCollections: Inputs, context: Context): Outputs => {
     const cells = inputCollections.cells;
     // Create evaluation dependency graph as _lazy_ collection, calling itself to access other cells
-    const evaluator = context.createLazyCollection(ComputeExpression, cells);
+    const evaluator: LazyCollection<string, number | string> =
+      context.createLazyCollection(ComputeExpression, cells);
     // Produce eager collection for output resource
     return { output: cells.map(CallCompute, evaluator) };
   },

@@ -1,12 +1,16 @@
 import express from "express";
 import type { Express } from "express";
 import {
-  ServiceInstance,
   SkipUnknownCollectionError,
   SkipResourceInstanceInUseError,
   SkipRESTError,
 } from "@skipruntime/core";
-import type { CollectionUpdate, Entry, Json } from "@skipruntime/core";
+import type {
+  CollectionUpdate,
+  Entry,
+  Json,
+  ServiceInstance,
+} from "@skipruntime/core";
 
 export function registerControlServiceRoutes(
   app: Express,
@@ -132,7 +136,7 @@ export function registerStreamingServiceRoutes(
           } else {
             res.write(`event: update\n`);
           }
-          res.write(`id: ${update.watermark}\n`);
+          res.write(`id: ${update.watermark.toString()}\n`);
           res.write(`data: ${JSON.stringify(update.values)}\n\n`);
         },
         close: () => {

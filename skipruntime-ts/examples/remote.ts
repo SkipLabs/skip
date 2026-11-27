@@ -53,26 +53,25 @@ class MultResource implements Resource<NamedEagerCollections> {
     return sub.merge(add).map(Mult);
   }
 }
-const service = {
-  inputs: {},
-  resources: { data: MultResource },
-  externalServices: {
-    sumexample: SkipExternalService.direct({
-      host: "localhost",
-      streaming_port: 3587,
-      control_port: 3588,
-    }),
+const server = await runService(
+  {
+    inputs: {},
+    resources: { data: MultResource },
+    externalServices: {
+      sumexample: SkipExternalService.direct({
+        host: "localhost",
+        streaming_port: 3587,
+        control_port: 3588,
+      }),
+    },
+    createGraph: (ic) => ic,
   },
-
-  createGraph(inputCollections: NamedEagerCollections) {
-    return inputCollections;
+  {
+    streaming_port: 3589,
+    control_port: 3590,
+    platform,
   },
-};
-const server = await runService(service, {
-  streaming_port: 3589,
-  control_port: 3590,
-  platform,
-});
+);
 
 async function shutdown() {
   await server.close();

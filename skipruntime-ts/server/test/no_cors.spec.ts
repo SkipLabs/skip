@@ -1,18 +1,19 @@
 import { runService, type SkipServer } from "../src/server.js";
-import type { Context, EagerCollection, Resource } from "@skipruntime/core";
+import type { EagerCollection, Json, Resource } from "@skipruntime/core";
 import { InputDefinition } from "@skipruntime/core";
 import { expect } from "chai";
 
 type Post = {
-  author_id: number;
-  title: string;
-  url: string;
-  body: string;
-  date: number;
+  readonly author_id: number;
+  readonly title: string;
+  readonly url: string;
+  readonly body: string;
+  readonly date: number;
+  readonly [key: string]: Json | null;
 };
 
 type PostsResourceInputs = {
-  posts: EagerCollection<number, Post>;
+  readonly posts: EagerCollection<number, Post>;
 };
 
 class PostsResource implements Resource<PostsResourceInputs> {
@@ -26,16 +27,9 @@ describe("runService({ no_cors: true })", function () {
   before(async function () {
     service = await runService(
       {
-        inputs: { posts: new InputDefinition() },
+        inputs: { posts: new InputDefinition<number, Post>() },
         resources: { posts: PostsResource },
-        createGraph(
-          inputs: { posts: EagerCollection<number, Post> },
-          _context: Context,
-        ): PostsResourceInputs {
-          return {
-            posts: inputs.posts,
-          };
-        },
+        createGraph: (ic) => ic,
       },
       {
         control_port: 8081,

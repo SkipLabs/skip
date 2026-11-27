@@ -29,3 +29,5 @@ do
         "$SCRIPT_DIR"/cd_sh "$dir" "npm run build --if-present$LINT"
     fi
 done
+
+"$SCRIPT_DIR"/cd_sh "skipruntime-ts/typesafety" "npm run typecheck"

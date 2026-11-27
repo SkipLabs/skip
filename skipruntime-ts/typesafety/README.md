@@ -1,0 +1,45 @@
+# Skip Service API Type-Safety Probes
+
+Positive and negative TypeScript probes exercising the `SkipService<InputDefs, ResourceInputs>` API (`InputCollections`, `AllInputDefs`, `AllSharedCollections`, `ResourceClass<ResourceInputs, Json>`, `asLeader`, `asFollower`, `initService`, `ServiceInstance`, `Watermark`, and `SubscriptionID`).
+
+This directory is excluded from npm workspaces because the negative probes intentionally violate type safety; `bin/check-ts.sh` runs `npm run typecheck` (`node check.mjs`) here to verify that all positive probes compile cleanly and all required negative probes fail type-checking.
+
+## Positive Probes
+
+All 6 positive probes pass `tsc --strict` (verified on TypeScript 5.7.x; CI also runs against ~5.8.0 and ~6.0.0) and verify under TScert (an external sound-subtyping verifier, not bundled in this repo).
+
+Note on `p05`/`p05b`: when defining a service as a standalone unannotated `const service = { ... }` (rather than inline in `runService({ ... })`), TypeScript has no contextual type for `createGraph`, so `createGraph`'s parameter and return types must be annotated explicitly.
+
+| Probe | `tsc --strict` (5.7 / 5.8 / 6.0) | TScert | Coverage |
+| --- | --- | --- | --- |
+| `p01-matched-inferred.ts` | pass | verified | Inferred `runService`, pass-through `(ic) => ic`, `Resource.instantiate` and `Mapper.mapEntry` omitting `_context` |
+| `p02-derived-graph.ts` | pass | verified | `Mapper`, `LazyCompute`, `Reducer`, runtime-validated `Resource(params: Json)`, and indexed `JsonObject` record |
+| `p03-asleader-asfollower.ts` | pass | verified | `asLeader`, `asFollower` with `collections`, and `asFollower` with `lazies` |
+| `p04-initservice.ts` | pass | verified | `initService`, `ServiceInstance.subscribe`/`unsubscribe`/`reload`, `Watermark`, and `SubscriptionID` |
+| `p05-unannotated-const-service.ts` | pass | verified | Function-local unannotated `const service` (explicit `createGraph` param types) passed to `asLeader` and `asFollower` |
+| `p05b-unannotated-module-const-service.ts` | pass | verified | Module-level unannotated `const service` (explicit `createGraph` param types) passed to `asLeader` and `asFollower` |
+
+## Negative Probes
+
+All 16 negative probes are refused under TScert. Under `tsc --strict`:
+- 15 of 16 are rejected on TypeScript 5.7.x, 5.8.x, and 6.0.x (enforced by `check.mjs` in `bin/check-ts.sh`).
+- `n10-open-resources-param.ts` passes on TypeScript 5.7.x/5.8.x due to structural open-record assignability to readonly index signatures and is rejected on TypeScript 6.0.x and TScert.
+
+| Probe | `tsc` 5.7 / 5.8 | `tsc` 6.0 | TScert | Fault |
+| --- | --- | --- | --- | --- |
+| `n01a-input-type-mismatch-annotated.ts` | reject | reject | refused | `InputDefinition<string, number>` into annotated `EagerCollection<string, string>` `createGraph` |
+| `n01b-input-type-mismatch-inferred.ts` | reject | reject | refused | `InputDefinition<string, number>` flowing via `(ic) => ic` into `Resource<{ names: EagerCollection<string, string> }>` |
+| `n02-extra-resource-field.ts` | reject | reject | refused | Resource reading `c.extra` absent from `createGraph` output |
+| `n03-narrow-mapper-on-json.ts` | reject | reject | refused | `Mapper<string, number, ...>` applied to `EagerCollection<string, Json>` |
+| `n04-narrow-reducer-on-json.ts` | reject | reject | refused | `Reducer<number, number>` applied to `EagerCollection<string, Json>` |
+| `n05-non-inputdef.ts` | reject | reject | refused | Non-`InputDefinition` value (`42`) in `inputs` |
+| `n06-non-collection-output.ts` | reject | reject | refused | Non-collection output (`{ count: 42 }`) with `Resource<{ count: number }>` |
+| `n06b-non-collection-output-bare.ts` | reject | reject | refused | Non-collection output (`{ count: 42 }`) with empty `resources` |
+| `n07-unvalidated-resource-params.ts` | reject | reject | refused | Resource constructor requiring narrow `{ userId: number }` instead of `Json` |
+| `n08-asfollower-typo.ts` | reject | reject | refused | Unknown collection name in `asFollower(..., { collections: ["typo_not_names"] })` |
+| `n08b-asfollower-lazy-in-collections.ts` | reject | reject | refused | Lazy collection name placed in `asFollower` `collections` instead of `lazies` |
+| `n08c-asfollower-wrong-lazy-type.ts` | reject | reject | refused | `asFollower` `lazies` factory returning mismatched `LazyCollection<K, V>` |
+| `n09-default-inputdef-to-narrow.ts` | reject | reject | refused | Default `new InputDefinition()` (`Json`) flowing into narrow `Resource` |
+| `n09b-explicit-json-inputdef-to-narrow.ts` | reject | reject | refused | Explicit `new InputDefinition<Json, Json>()` flowing into narrow `Resource` |
+| `n10-open-resources-param.ts` | pass (unsound) | reject | refused | Open record parameter passed as `resources` (may hold extra non-`ResourceClass` keys at runtime) |
+| `n11-custom-abstract-inputdef.ts` | reject | reject | refused | Subclass of `AbstractInputDefinition` must not map to `never` in `InputCollections` |

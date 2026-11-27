@@ -66,7 +66,11 @@ export interface Mapper<
    * @param context - The Skip runtime context, which can be used to create/access new collections during the map
    * @returns Key-value pairs to associate in the output collection.
    */
-  mapEntry(key: K1, values: Values<V1>, context: Context): Iterable<[K2, V2]>;
+  readonly mapEntry: (
+    key: K1,
+    values: Values<V1>,
+    context: Context,
+  ) => Iterable<[K2, V2]>;
 }
 
 /**
@@ -91,7 +95,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The added value.
    * @returns The updated accumulated value.
    */
-  add(accum: A | null, value: V & DepSafe): A;
+  readonly add: (accum: A | null, value: V & DepSafe) => A;
 
   /**
    * Exclude a previously added value from the accumulated value.
@@ -105,7 +109,7 @@ export interface Reducer<V extends Json, A extends Json> {
    * @param value - The removed value.
    * @returns The updated accumulated value, or `null` indicating that the accumulated value should be recomputed using `add` and `initial`.
    */
-  remove(accum: A, value: V & DepSafe): A | null;
+  readonly remove: (accum: A, value: V & DepSafe) => A | null;
 }
 
 /**
@@ -350,7 +354,11 @@ export interface LazyCompute<K extends Json, V extends Json> {
    * @param key - The requested key / input.
    * @returns The values of the lazy function for `key`.
    */
-  compute(self: LazyCollection<K, V>, key: K, context: Context): Iterable<V>;
+  readonly compute: (
+    self: LazyCollection<K, V>,
+    key: K,
+    context: Context,
+  ) => Iterable<V>;
 }
 
 /**
@@ -379,6 +387,8 @@ export interface Context {
   /**
    * Create an eager reactive collection populated from a resource managed by an external service.
    *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime against the external service's wire payload.
+   *
    * @typeParam K - Type of keys.
    * @typeParam V - Type of values.
    * @param resource - External resource configuration.
@@ -405,9 +415,23 @@ export interface Context {
 export type Entry<K extends Json, V extends Json> = [K, V[]];
 
 /**
- * Opaque type used as a measure of abstract time.
+ * Nominal wrapper around an abstract-time watermark token.
  */
-export type Watermark = Opaque<string, "watermark">;
+export class Watermark {
+  private readonly value: string;
+
+  constructor(value: string) {
+    this.value = value;
+  }
+
+  toString(): string {
+    return this.value;
+  }
+
+  toJSON(): string {
+    return this.value;
+  }
+}
 
 /**
  * Partial update to a collection
@@ -501,8 +525,44 @@ export type NamedEagerCollections = {
   readonly [name: string]: AbstractEagerCollection;
 };
 
+/**
+ * Type-erased map of shared collections (eager or lazy).
+ *
+ * @remarks
+ * Annotating a `SkipService`'s second type parameter with `SharedCollections`
+ * explicitly opts out of static checking between `createGraph` outputs and
+ * `Resource` collection inputs.
+ */
 export type SharedCollections = {
   readonly [name: string]: AbstractEagerCollection | AbstractLazyCollection;
+};
+
+/**
+ * Map a record of `InputDefinition`s to the corresponding record of
+ * `EagerCollection`s passed to `SkipService.createGraph`.
+ */
+export type InputCollections<Defs> = {
+  readonly [K in keyof Defs]: Defs[K] extends InputDefinition<
+    infer Key,
+    infer Val
+  >
+    ? EagerCollection<Key, Val>
+    : AbstractEagerCollection;
+};
+
+/**
+ * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
+ */
+export type AllInputDefs<T> = {
+  readonly [K in keyof T]: AbstractInputDefinition;
+};
+
+/**
+ * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
+ * `AbstractLazyCollection`.
+ */
+export type AllSharedCollections<T> = {
+  readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
 };
 
 /**
@@ -512,7 +572,9 @@ export type SharedCollections = {
  *
  * @typeParam Collections - Collections provided to the resource computation by the service's `createGraph`.
  */
-export interface Resource<Collections extends SharedCollections> {
+export interface Resource<
+  Collections extends AllSharedCollections<Collections>,
+> {
   /**
    * Build the reactive compute graph of the reactive resource.
    *
@@ -520,24 +582,26 @@ export interface Resource<Collections extends SharedCollections> {
    * @param context - Skip Runtime internal state.
    * @returns An eager collection containing the outputs of this resource for the given parameters, produced from the shared reactive compute graph output collections of the service's `createGraph`.
    */
-  instantiate(
+  readonly instantiate: (
     collections: Collections,
     context: Context,
-  ): AbstractEagerCollection;
+  ) => AbstractEagerCollection;
 }
 
 /**
- * Constructor type for a `Resource`, enabling sound typing of resource constructor parameters.
+ * Constructor type for a `Resource`.
  *
- * Using `never` for the `Params` position leverages function parameter contravariance:
- * `new (params: SpecificType) => R` is assignable to `new (params: never) => R`.
+ * `Params` defaults to `Json` so resource constructors accept arbitrary JSON
+ * request parameters and validate them at runtime before narrowing. Constructors
+ * that require a narrower parameter type (such as `JsonObject`) are rejected by
+ * `SkipService.resources` unless they accept `Json` and narrow at runtime.
  *
  * @typeParam Collections - Collections provided to the resource computation.
  * @typeParam Params - Type of the constructor parameter.
  */
 export type ResourceClass<
-  Collections extends SharedCollections,
-  Params extends Json,
+  Collections extends AllSharedCollections<Collections>,
+  Params extends Json = Json,
 > = new (params: Params) => Resource<Collections>;
 
 /**
@@ -596,8 +660,8 @@ export type NamedInputDefinitions = {
  * Skip services operate over data organized into _collections_, each of which has a unique string name and associates _keys_ to one or more _values_.
  * The contents of collections are computed from initial data, other collections, or reactive or non-reactive external resources.
  *
- * A Skip service's `Inputs` are collections that start populated with the initial data of the corresponding `inputs` definitions.
- * The input collections is the mechanism by which a Skip service can accept writes.
+ * A Skip service's input collections are defined by `inputs` (typed by `InputDefs`) and start populated with the initial data of each corresponding `InputDefinition`.
+ * Their collection types are derived via `InputCollections<InputDefs>`, and input collections are the mechanism by which a Skip service can accept writes.
  * See `runService` for the write requests of the HTTP API, and `SkipServiceBroker` for the write operations of the method-call API.
  *
  * It can be useful to think of the structure of a service's computation as a directed acyclic graph, the _reactive computation graph_, where the vertices are the named collections, and the edges are the functions (`Mapper`s and `Reducer`s) that produce collections from other collections.
@@ -631,13 +695,11 @@ export type NamedInputDefinitions = {
  * The resulting eager collection can then be incorporated into the reactive computation graph just like any other.
  *
  * @typeParam InputDefs - Definitions of the service's input collections, including their initial data.
- * @typeParam Inputs - The service's input collections.
  * @typeParam ResourceInputs - Collections provided to the resource computation by the service's `createGraph`.
  */
 export interface SkipService<
-  InputDefs extends NamedInputDefinitions,
-  Inputs extends NamedEagerCollections,
-  ResourceInputs extends SharedCollections,
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
 > {
   /**
    * Input definitions for this service's input collections, including initial data.
@@ -651,17 +713,19 @@ export interface SkipService<
 
   /** Reactive resources which constitute the public interface of this reactive service. */
   readonly resources: {
-    readonly [name: string]: ResourceClass<ResourceInputs, never>;
+    readonly [name: string]: ResourceClass<ResourceInputs, Json>;
   };
 
   /**
    * Build the shared reactive computation graph by defining collections to be passed to resources.
    *
-   * @param inputCollections - The service's input collections.
-   * @param context - Skip Runtime internal state.
-   * @returns Reactive collections accessible to the resources.
+   * Receives `InputCollections<InputDefs>` (key/value types derived from `inputs`) and the Skip Runtime `Context`,
+   * returning the reactive collections accessible to the service's resources.
    */
-  createGraph(inputCollections: Inputs, context: Context): ResourceInputs;
+  readonly createGraph: (
+    inputs: InputCollections<InputDefs>,
+    context: Context,
+  ) => ResourceInputs;
 }
 
 /**
@@ -670,6 +734,5 @@ export interface SkipService<
  */
 export type AnySkipService = SkipService<
   NamedInputDefinitions,
-  NamedEagerCollections,
   SharedCollections
 >;

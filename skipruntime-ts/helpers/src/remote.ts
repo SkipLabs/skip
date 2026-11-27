@@ -3,15 +3,16 @@
 import { EventSource } from "eventsource";
 
 import {
-  type AnySkipService,
+  type AllInputDefs,
+  type AllSharedCollections,
   type AbstractEagerCollection,
   type AbstractLazyCollection,
   type Entry,
   type ExternalService,
   type Json,
-  type NamedEagerCollections,
   type Resource,
   type SharedCollections,
+  type SkipService,
   type Context,
   EagerCollectionImpl,
 } from "@skipruntime/core";
@@ -147,13 +148,45 @@ class LeaderResource implements Resource<SharedCollections> {
  *
  * @returns The *leader* component to run `service` in such a configuration.
  */
-export function asLeader(service: AnySkipService): AnySkipService {
+export function asLeader<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(
+  service: SkipService<InputDefs, ResourceInputs>,
+): SkipService<InputDefs, SharedCollections> {
   //TODO: add mechanism to split externals between leader/follower
   return {
-    ...service,
+    inputs: service.inputs,
+    ...(service.externalServices !== undefined
+      ? { externalServices: service.externalServices }
+      : {}),
     resources: { leader: LeaderResource },
+    createGraph: (inputs, ctx) =>
+      service.createGraph(inputs, ctx) as unknown as SharedCollections,
   };
 }
+
+/** Keys of `T` whose values are eager collections. */
+type EagerKeys<T> = {
+  [K in keyof T & string]: T[K] extends AbstractEagerCollection ? K : never;
+}[keyof T & string];
+
+/** Keys of `T` whose values are lazy collections. */
+type LazyKeys<T> = {
+  [K in keyof T & string]: T[K] extends AbstractLazyCollection ? K : never;
+}[keyof T & string];
+
+type FollowerLazies<ResourceInputs> = [LazyKeys<ResourceInputs>] extends [never]
+  ? {
+      readonly lazies?: { readonly [K in never]: never };
+    }
+  : {
+      readonly lazies: {
+        readonly [K in LazyKeys<ResourceInputs>]: (
+          context: Context,
+        ) => ResourceInputs[K];
+      };
+    };
 
 /**
  * Run a `SkipService` as a *follower* in a leader-follower topology.
@@ -162,29 +195,33 @@ export function asLeader(service: AnySkipService): AnySkipService {
  *
  * The two kinds of shared collection are obtained differently. Eager collections, named in `collections`, are *mirrored* from the leader: the leader maintains them and streams their updates to the follower. Lazy collections cannot be mirrored, since they hold no maintained state to stream; each is instead *rebuilt locally* by the follower, `lazies` mapping its shared name to a function which, given the follower's `Context`, produces the corresponding lazy collection. Together, the two are expected to cover the `ResourceInputs` of `service`.
  *
+ * @remarks
+ * `collections` is checked to contain only eager collection names from `ResourceInputs`, and `lazies` must provide a typed factory for every lazy collection in `ResourceInputs`. The follower still trusts that `collections` covers all eager keys of `ResourceInputs` and that the leader serves mirrored collections matching their key/value types.
+ *
  * @returns The *follower* component to run `service` in such a configuration.
  */
-export function asFollower(
-  service: AnySkipService,
+export function asFollower<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(
+  service: SkipService<InputDefs, ResourceInputs>,
   leader: {
-    leader: { host: string; streaming_port: number; control_port: number };
-    collections: string[];
-    lazies?: {
-      [name: string]: (context: Context) => AbstractLazyCollection;
+    readonly leader: {
+      host: string;
+      streaming_port: number;
+      control_port: number;
     };
-  },
-): AnySkipService {
+    readonly collections: readonly EagerKeys<ResourceInputs>[];
+  } & FollowerLazies<ResourceInputs>,
+): SkipService<Record<string, never>, ResourceInputs> {
   return {
-    ...service,
     inputs: {},
     externalServices: {
       ...service.externalServices,
       __skip_leader: SkipExternalService.direct(leader.leader),
     },
-    createGraph(
-      _inputs: NamedEagerCollections,
-      context: Context,
-    ): SharedCollections {
+    resources: service.resources,
+    createGraph: (_inputs, context: Context): ResourceInputs => {
       const mirroredCollections: {
         [name: string]: AbstractEagerCollection | AbstractLazyCollection;
       } = {};
@@ -196,13 +233,21 @@ export function asFollower(
         });
       }
       if (leader.lazies) {
-        for (const [collection, lCollectionGetter] of Object.entries(
-          leader.lazies,
-        )) {
-          mirroredCollections[collection] = lCollectionGetter(context);
+        const lazies = leader.lazies as Readonly<
+          Record<
+            string,
+            ((context: Context) => AbstractLazyCollection) | undefined
+          >
+        >;
+        for (const [collection, lCollectionGetter] of Object.entries(lazies)) {
+          if (lCollectionGetter) {
+            mirroredCollections[collection] = lCollectionGetter(context);
+          }
         }
       }
-      return mirroredCollections;
+      // The follower trusts the leader's runtime collection types (and that
+      // `collections` covers all eager keys of `ResourceInputs`).
+      return mirroredCollections as unknown as ResourceInputs;
     },
   };
 }

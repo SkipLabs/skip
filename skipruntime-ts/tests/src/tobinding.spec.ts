@@ -3,12 +3,13 @@ import {
   InputDefinition,
   LoadStatus,
   ServiceDefinition,
-  ServiceInstance,
+  ServiceInstanceImpl,
+  SubscriptionID,
   ToBinding,
+  Watermark,
   type AnySkipService,
   type ChangeManager,
   type ExternalService,
-  type NamedEagerCollections,
 } from "@skipruntime/core";
 import type { FromBinding, Handle } from "@skipruntime/core/binding.js";
 import type { Json, JsonConverter, Pointer } from "@skipruntime/core/json.js";
@@ -62,9 +63,7 @@ function makeService(externalServices?: {
     inputs: { input: new InputDefinition() },
     resources: {},
     externalServices,
-    createGraph(inputCollections: NamedEagerCollections) {
-      return inputCollections;
-    },
+    createGraph: (ic) => ic,
   };
 }
 
@@ -208,7 +207,7 @@ describe("ToBinding", () => {
       });
 
       const def = new ServiceDefinition(makeService());
-      const instance = new ServiceInstance(toBinding, null, def);
+      const instance = new ServiceInstanceImpl(toBinding, null, def);
 
       await expect(instance.update("input", [])).toBeRejectedWith(
         "original update failure",
@@ -234,7 +233,7 @@ describe("ToBinding", () => {
 
       const service = makeService();
       const def = new ServiceDefinition(service);
-      const instance = new ServiceInstance(toBinding, null, def);
+      const instance = new ServiceInstanceImpl(toBinding, null, def);
       const changes: ChangeManager = {
         needInputReload: () => false,
         needResourceReload: () => LoadStatus.Same,
@@ -296,6 +295,42 @@ describe("ToBinding", () => {
         "original writer update failure",
       );
       expect(abortCalls).toEqual(1);
+    });
+  });
+
+  describe("Watermark and SubscriptionID compatibility", () => {
+    it("serializes Watermark and SubscriptionID as plain JSON strings", () => {
+      const wm = new Watermark("wm-42");
+      const subId = new SubscriptionID("sub-99");
+      expect(JSON.stringify({ watermark: wm, subId })).toEqual(
+        '{"watermark":"wm-42","subId":"sub-99"}',
+      );
+    });
+
+    it("handles null, undefined, string, and Watermark in subscribe", () => {
+      const seenWatermarks: (string | null)[] = [];
+      const { toBinding } = makeBinding({
+        SkipRuntime_createNotifier: () =>
+          1 as unknown as Pointer<Internal.Notifier>,
+        SkipRuntime_Runtime__subscribe: (_id, _notifier, watermark) => {
+          seenWatermarks.push(watermark);
+          return 1n;
+        },
+      });
+      const def = new ServiceDefinition(makeService());
+      const instance = new ServiceInstanceImpl(toBinding, null, def);
+      const notifier = {
+        subscribed: () => {},
+        notify: () => {},
+        close: () => {},
+      };
+
+      instance.subscribe("res-1", notifier, undefined);
+      instance.subscribe("res-2", notifier, null as unknown as undefined);
+      instance.subscribe("res-3", notifier, "wm-str");
+      instance.subscribe("res-4", notifier, new Watermark("wm-obj"));
+
+      expect(seenWatermarks).toEqual([null, null, "wm-str", "wm-obj"]);
     });
   });
 });

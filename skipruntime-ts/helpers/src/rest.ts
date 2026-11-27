@@ -85,6 +85,11 @@ export async function fetchJSON<V extends Json>(
  *
  * Skip services, as started by `runService`, support an HTTP interface for reading from resources and writing to input collections.
  * `SkipServiceBroker` provides a method-call interface to the backing HTTP interface.
+ *
+ * @remarks
+ * Because the broker talks to a remote service over HTTP, the `K` and `V` type
+ * parameters on its read/write methods are caller-asserted and not validated at
+ * runtime against the remote service's schema.
  */
 export class SkipServiceBroker {
   private readonly entrypoint: string;
@@ -179,7 +184,7 @@ export class SkipServiceBroker {
    *
    * @typeParam K - Type of keys.
    * @typeParam V - Type of values.
-   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param collection - Name of the input collection to update, must be a key of the `inputs` field (`InputDefs`) of the `SkipService` running at `entrypoint`.
    * @param entries - Entries to write.
    * @returns {void}
    */
@@ -197,7 +202,7 @@ export class SkipServiceBroker {
    * Remove all values associated with a key in a collection.
    *
    * @typeParam K - Type of keys.
-   * @param collection - Name of the input collection to update, must be a key of the `Inputs` type parameter of the `SkipService` running at `entrypoint`.
+   * @param collection - Name of the input collection to update, must be a key of the `inputs` field (`InputDefs`) of the `SkipService` running at `entrypoint`.
    * @param key - Key of entry to delete.
    * @returns {void}
    */

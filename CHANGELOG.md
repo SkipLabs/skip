@@ -8,9 +8,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
- - `SkipService` takes a third type parameter, for the definitions of its input
-   collections, and seeds those collections through `inputs` — one
-   `InputDefinition` per collection — in place of `initialData` (#1162)
+ - `SkipService` now takes two type parameters (`<InputDefs, ResourceInputs>`)
+   and derives `createGraph`'s input collection types via
+   `InputCollections<InputDefs>`, replacing `initialData` with `inputs`
+   (`InputDefinition` instances per collection) (#1162, #1811)
+ - `Resource.instantiate`, `Mapper.mapEntry`, `Reducer.add`/`remove`, and
+   `LazyCompute.compute` use function-typed properties so contravariant
+   parameter checking is enforced under TypeScript's `strictFunctionTypes`;
+   `Resource` constructors now receive `Json` parameters by default and must
+   validate before narrowing (#1811)
+ - `Watermark` and `SubscriptionID` are now nominal wrapper classes (exposing
+   `toString()` and `toJSON()`) instead of `Opaque<string>` aliases; note that
+   `===` and `Map` keys compare by object identity rather than string value (#1811)
+ - `ServiceInstance` is now exported as a TypeScript interface (with
+   `ServiceInstanceImpl` as the concrete runtime class) instead of a class
+   value export (#1811)
+ - `asFollower` now restricts `collections` to eager collection keys and
+   requires typed `lazies` factories matching each lazy collection in
+   `ResourceInputs` (#1811)
 
 ## [0.0.23] - 2026-05-28
 

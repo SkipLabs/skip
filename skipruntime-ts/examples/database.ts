@@ -1,6 +1,7 @@
 import type {
   EagerCollection,
-  AnySkipService,
+  Json,
+  SkipService,
   Resource,
   Entry,
 } from "@skipruntime/core";
@@ -49,13 +50,22 @@ function initDB(): SqliteDatabase {
 // The read path, we want to find a user
 /*****************************************************************************/
 
-type User = { name: string; country: string };
+type User = {
+  readonly name: string;
+  readonly country: string;
+  readonly [key: string]: Json | null;
+};
+
+type UsersInputs = {
+  readonly users: InputDefinition<string, User>;
+};
 
 type UsersCollection = {
-  users: EagerCollection<string, User>;
+  readonly users: EagerCollection<string, User>;
 };
+
 class UsersResource implements Resource<UsersCollection> {
-  instantiate(cs: UsersCollection): UsersCollection["users"] {
+  instantiate(cs: UsersCollection): EagerCollection<string, User> {
     return cs.users;
   }
 }
@@ -64,11 +74,13 @@ class UsersResource implements Resource<UsersCollection> {
 // Setting up the service
 /*****************************************************************************/
 
-function serviceWithInitialData(users: Entry<string, User>[]): AnySkipService {
+function serviceWithInitialData(
+  users: Entry<string, User>[],
+): SkipService<UsersInputs, UsersCollection> {
   return {
     inputs: { users: new InputDefinition(users) },
     resources: { users: UsersResource },
-    createGraph: (inputCollections) => inputCollections,
+    createGraph: (ic) => ic,
   };
 }
 

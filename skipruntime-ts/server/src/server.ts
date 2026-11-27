@@ -4,7 +4,11 @@
  * @packageDocumentation
  */
 
-import type { AnySkipService } from "@skipruntime/core";
+import type {
+  AllInputDefs,
+  AllSharedCollections,
+  SkipService,
+} from "@skipruntime/core";
 import {
   registerControlServiceRoutes,
   registerStreamingServiceRoutes,
@@ -52,7 +56,7 @@ export type SkipServer = {
  * - `PATCH /v1/inputs/:collection`:
  *   Partial write (update only the specified keys) of an input collection.
  *
- *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of the `Inputs` type parameter.
+ *   The `collection` must be the name of one of the service's input collections, that is, one of the keys of `service.inputs` (`InputDefs`).
  *   The body of the request must be a JSON-encoded value of type `CollectionUpdate.values`, that is `[Json, Json[]][]`: an array of entries each of which associates a key to an array of its new values.
  *   Updates the named `collection` with the key-values entries in the request body.
  *
@@ -92,7 +96,7 @@ export type SkipServer = {
  *   Check that the Skip service is running normally.
  *   Returns HTTP 200 if the service is healthy, for use in monitoring, deployments, and the like.
  *
- * @typeParam Inputs - Named collections from which the service computes.
+ * @typeParam InputDefs - Definitions of the service's input collections (mapped to `InputCollections<InputDefs>` for `createGraph`).
  * @typeParam ResourceInputs - Named collections provided to resource computations.
  * @param service - The SkipService definition to run.
  * @param options - Service configuration options.
@@ -102,8 +106,11 @@ export type SkipServer = {
  * @param options.no_cors - Disable CORS for the streaming endpoint.
  * @returns Object to manage the running server.
  */
-export async function runService(
-  service: AnySkipService,
+export async function runService<
+  InputDefs extends AllInputDefs<InputDefs>,
+  ResourceInputs extends AllSharedCollections<ResourceInputs>,
+>(
+  service: SkipService<InputDefs, ResourceInputs>,
   options: {
     streaming_port: number;
     control_port: number;
