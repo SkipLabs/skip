@@ -166,6 +166,28 @@ export function asLeader<
   };
 }
 
+/** Keys of `T` whose values are eager collections. */
+type EagerKeys<T> = {
+  [K in keyof T & string]: T[K] extends AbstractEagerCollection ? K : never;
+}[keyof T & string];
+
+/** Keys of `T` whose values are lazy collections. */
+type LazyKeys<T> = {
+  [K in keyof T & string]: T[K] extends AbstractLazyCollection ? K : never;
+}[keyof T & string];
+
+type FollowerLazies<ResourceInputs> = [LazyKeys<ResourceInputs>] extends [never]
+  ? {
+      readonly lazies?: { readonly [K in never]: never };
+    }
+  : {
+      readonly lazies: {
+        readonly [K in LazyKeys<ResourceInputs>]: (
+          context: Context,
+        ) => ResourceInputs[K];
+      };
+    };
+
 /**
  * Run a `SkipService` as a *follower* in a leader-follower topology.
  *
@@ -174,7 +196,7 @@ export function asLeader<
  * The two kinds of shared collection are obtained differently. Eager collections, named in `collections`, are *mirrored* from the leader: the leader maintains them and streams their updates to the follower. Lazy collections cannot be mirrored, since they hold no maintained state to stream; each is instead *rebuilt locally* by the follower, `lazies` mapping its shared name to a function which, given the follower's `Context`, produces the corresponding lazy collection. Together, the two are expected to cover the `ResourceInputs` of `service`.
  *
  * @remarks
- * The follower trusts that the leader serves mirrored collections matching the key/value types expected by `service`'s `ResourceInputs`, and that `collections` and `lazies` together cover all keys of `ResourceInputs`.
+ * `collections` is checked to contain only eager collection names from `ResourceInputs`, and `lazies` must provide a typed factory for every lazy collection in `ResourceInputs`. The follower still trusts that `collections` covers all eager keys of `ResourceInputs` and that the leader serves mirrored collections matching their key/value types.
  *
  * @returns The *follower* component to run `service` in such a configuration.
  */
@@ -184,15 +206,13 @@ export function asFollower<
 >(
   service: SkipService<InputDefs, ResourceInputs>,
   leader: {
-    leader: { host: string; streaming_port: number; control_port: number };
-    collections: readonly (keyof ResourceInputs & string)[];
-    lazies?: Partial<
-      Record<
-        keyof ResourceInputs & string,
-        (context: Context) => AbstractLazyCollection
-      >
-    >;
-  },
+    readonly leader: {
+      host: string;
+      streaming_port: number;
+      control_port: number;
+    };
+    readonly collections: readonly EagerKeys<ResourceInputs>[];
+  } & FollowerLazies<ResourceInputs>,
 ): SkipService<Record<string, never>, ResourceInputs> {
   return {
     inputs: {},
@@ -213,16 +233,20 @@ export function asFollower<
         });
       }
       if (leader.lazies) {
-        for (const [collection, lCollectionGetter] of Object.entries<
-          ((context: Context) => AbstractLazyCollection) | undefined
-        >(leader.lazies)) {
+        const lazies = leader.lazies as Readonly<
+          Record<
+            string,
+            ((context: Context) => AbstractLazyCollection) | undefined
+          >
+        >;
+        for (const [collection, lCollectionGetter] of Object.entries(lazies)) {
           if (lCollectionGetter) {
             mirroredCollections[collection] = lCollectionGetter(context);
           }
         }
       }
       // The follower trusts the leader's runtime collection types (and that
-      // `collections` + `lazies` cover all keys of `ResourceInputs`).
+      // `collections` covers all eager keys of `ResourceInputs`).
       return mirroredCollections as unknown as ResourceInputs;
     },
   };
