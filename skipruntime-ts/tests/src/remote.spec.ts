@@ -6,13 +6,14 @@ import {
   type Resource,
   InputDefinition,
   ServiceDefinition,
+  SkipError,
   ToBinding,
 } from "@skipruntime/core";
 import { eraseService } from "@skipruntime/core/binding.js";
 import type { FromBinding, Handle } from "@skipruntime/core/binding.js";
 import type { JsonConverter, Pointer } from "@skipruntime/core/json.js";
 import type * as Internal from "@skipruntime/core/internal.js";
-import { asLeader } from "@skipruntime/helpers";
+import { asFollower, asLeader } from "@skipruntime/helpers";
 
 // Pure-JS unit tests for `asLeader` / `asFollower` that run against a mocked
 // binding (no Wasm or native runtime needed), like tobinding.spec.ts.
@@ -93,5 +94,61 @@ describe("asLeader", () => {
       names: { type: "eager", name: "names_collection" },
     });
     expect(Object.keys(leader.resources)).toEqual(["leader"]);
+  });
+});
+
+describe("asFollower", () => {
+  const leader = {
+    host: "localhost",
+    streaming_port: 8080,
+    control_port: 8081,
+  };
+  const service = {
+    inputs: { names: new InputDefinition<string, string>() },
+    resources: { names: Names },
+    createGraph: (ic: ResourceInputs): ResourceInputs => ic,
+  };
+
+  it("accepts a configuration covering every eager collection", () => {
+    expect(() =>
+      asFollower(service, { leader, collections: ["names"] }),
+    ).not.toThrow();
+  });
+
+  it("rejects a collection listed in both `collections` and `lazies`", () => {
+    // Statically rejected; exercises the runtime check for untyped callers.
+    const config = {
+      leader,
+      collections: ["names"],
+      lazies: { names: () => null },
+    } as unknown as Parameters<
+      typeof asFollower<
+        typeof service.inputs,
+        ResourceInputs,
+        readonly ["names"]
+      >
+    >[1];
+    expect(() => asFollower(service, config)).toThrow(
+      SkipError,
+      "asFollower: shared collection(s) listed in both `collections` and `lazies`: names.",
+    );
+  });
+
+  it("rejects a non-function `lazies` entry", () => {
+    const config = {
+      leader,
+      collections: ["names"],
+      lazies: { other: 42 },
+    } as unknown as Parameters<
+      typeof asFollower<
+        typeof service.inputs,
+        ResourceInputs,
+        readonly ["names"]
+      >
+    >[1];
+    expect(() => asFollower(service, config)).toThrow(
+      SkipError,
+      "asFollower: `lazies` entries must be functions producing a lazy collection: other.",
+    );
   });
 });

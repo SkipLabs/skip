@@ -21,8 +21,8 @@ Note on `p05`/`p05b`: when defining a service as a standalone unannotated `const
 
 ## Negative Probes
 
-All 18 negative probes are refused under TScert. Under `tsc --strict`:
-- 17 of 18 are rejected on TypeScript 5.7.x, 5.8.x, and 6.0.x (enforced by `check.mjs` in `bin/check-ts.sh`).
+All 20 negative probes are refused under TScert. Under `tsc --strict`:
+- 19 of 20 are rejected on TypeScript 5.7.x, 5.8.x, and 6.0.x (enforced by `check.mjs` in `bin/check-ts.sh`).
 - `n10-open-resources-param.ts` passes on TypeScript 5.7.x/5.8.x due to structural open-record assignability to readonly index signatures and is rejected on TypeScript 6.0.x and TScert.
 
 | Probe | `tsc` 5.7 / 5.8 | `tsc` 6.0 | TScert | Fault |
@@ -39,6 +39,8 @@ All 18 negative probes are refused under TScert. Under `tsc --strict`:
 | `n08-asfollower-typo.ts` | reject | reject | refused | Unknown collection name in `asFollower(..., { collections: ["typo_not_names"] })` |
 | `n08b-asfollower-lazy-in-collections.ts` | reject | reject | refused | Lazy collection name placed in `asFollower` `collections` instead of `lazies` |
 | `n08c-asfollower-wrong-lazy-type.ts` | reject | reject | refused | `asFollower` `lazies` factory returning mismatched `LazyCollection<K, V>` |
+| `n08d-asfollower-missing-eager.ts` | reject | reject | n/a | `asFollower` `collections` omitting an eager shared collection (error names it via `missingEagerCollections`) |
+| `n08e-asfollower-empty-collections.ts` | reject | reject | n/a | `asFollower` with `collections: []` on a service with an eager shared collection |
 | `n09-default-inputdef-to-narrow.ts` | reject | reject | refused | Default `new InputDefinition()` (`Json`) flowing into narrow `Resource` |
 | `n09b-explicit-json-inputdef-to-narrow.ts` | reject | reject | refused | Explicit `new InputDefinition<Json, Json>()` flowing into narrow `Resource` |
 | `n10-open-resources-param.ts` | pass (unsound) | reject | refused | Open record parameter passed as `resources` (may hold extra non-`ResourceClass` keys at runtime) |
