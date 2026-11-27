@@ -23,7 +23,12 @@
 // };
 // ```
 //
-base class Result<+T, +E> {
+base class Result<+T, +E> uses
+  Show[T: readonly Show, E: readonly Show],
+  Hashable[T: Hashable, E: Hashable],
+  Orderable[T: Orderable, E: Orderable],
+  Equality[T: Equality, E: Equality],
+{
   children =
   | Failure(error: E)
   | Success(value: T)
@@ -111,6 +116,30 @@ base class Result<+T, +E> {
     !(this == other)
   }
 
+  fun <<T2: Orderable, E2: Orderable>[T: T2, E: E2](
+    other: Result<T2, E2>,
+  ): Bool {
+    this.compare(other) == LT()
+  }
+
+  fun ><T2: Orderable, E2: Orderable>[T: T2, E: E2](
+    other: Result<T2, E2>,
+  ): Bool {
+    this.compare(other) == GT()
+  }
+
+  fun <=<T2: Orderable, E2: Orderable>[T: T2, E: E2](
+    other: Result<T2, E2>,
+  ): Bool {
+    this.compare(other) != GT()
+  }
+
+  fun >=<T2: Orderable, E2: Orderable>[T: T2, E: E2](
+    other: Result<T2, E2>,
+  ): Bool {
+    this.compare(other) != LT()
+  }
+
   // Failure() is less than Success().
   fun compare<T2: Orderable, E2: Orderable>[T: T2, E: E2](
     other: Result<T2, E2>,
@@ -118,11 +147,19 @@ base class Result<+T, +E> {
   | Failure(error1) ->
     other match {
     | Failure(error2) -> compare(error1, error2)
-    | _ -> LT()
+    | Success _ -> LT()
     }
   | Success(value1) ->
     other match {
     | Success(value2) -> compare(value1, value2)
-    | _ -> GT()
+    | Failure _ -> GT()
     }
+
+  fun hash[T: Hashable, E: Hashable](): Int
+  | Failure(error) -> Hashable.combine(1027410261, error)
+  | Success(value) -> Hashable.combine(2054820523, value)
+
+  fun toString[T: readonly Show, E: readonly Show](): String
+  | Failure(error) -> `Failure(${error.toString()})`
+  | Success(value) -> `Success(${value.toString()})`
 }

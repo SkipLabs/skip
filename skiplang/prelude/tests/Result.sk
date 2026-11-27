@@ -1,0 +1,120 @@
+module alias T = SKTest;
+
+module ResultTest;
+
+private fun checkEquality<V: Equality>(a: V, b: V): Bool {
+  a == b
+}
+
+private fun checkCompare<V: Orderable>(a: V, b: V): Order {
+  a.compare(b)
+}
+
+private fun checkHash<V: Hashable>(a: V): Int {
+  a.hash()
+}
+
+private fun checkShow<V: readonly Show>(a: V): String {
+  a.toString()
+}
+
+@test
+fun testEquality(): void {
+  s1: Result<Int, String> = Success(1);
+  s1b: Result<Int, String> = Success(1);
+  s2: Result<Int, String> = Success(2);
+  f1: Result<Int, String> = Failure("a");
+  f1b: Result<Int, String> = Failure("a");
+  f2: Result<Int, String> = Failure("b");
+
+  // Works with SKTest.expectEq / expectNe (requires Equality)
+  T.expectEq(s1, s1b);
+  T.expectEq(f1, f1b);
+  T.expectNe(s1, s2);
+  T.expectNe(f1, f2);
+  T.expectNe(s1, f1);
+
+  // Works via generic Equality constraint
+  T.expectTrue(checkEquality(s1, s1b));
+  T.expectFalse(checkEquality(s1, s2));
+  T.expectTrue(checkEquality(f1, f1b));
+  T.expectFalse(checkEquality(f1, f2));
+  T.expectFalse(checkEquality(s1, f1));
+
+  // Direct == and != including concrete child types
+  T.expectTrue(Success(1) == Success(1));
+  T.expectTrue(Failure("a") == Failure("a"));
+  T.expectTrue(Success(1) != Success(2));
+  T.expectTrue(Failure("a") != Failure("b"));
+  T.expectTrue(s1 != f1);
+}
+
+@test
+fun testOrderable(): void {
+  f1: Result<Int, String> = Failure("a");
+  f2: Result<Int, String> = Failure("b");
+  s1: Result<Int, String> = Success(1);
+  s2: Result<Int, String> = Success(2);
+
+  // Generic Orderable constraint: Failure < Success
+  T.expectEq(checkCompare(f1, f1), EQ());
+  T.expectEq(checkCompare(f1, f2), LT());
+  T.expectEq(checkCompare(f2, f1), GT());
+  T.expectEq(checkCompare(s1, s1), EQ());
+  T.expectEq(checkCompare(s1, s2), LT());
+  T.expectEq(checkCompare(s2, s1), GT());
+  T.expectEq(checkCompare(f2, s1), LT());
+  T.expectEq(checkCompare(s1, f2), GT());
+
+  // Comparison operators
+  T.expectTrue(f1 < f2);
+  T.expectTrue(f2 < s1);
+  T.expectTrue(s1 < s2);
+  T.expectTrue(s2 > s1);
+  T.expectTrue(s1 > f2);
+  T.expectTrue(f1 <= f1);
+  T.expectTrue(f1 <= f2);
+  T.expectTrue(s1 >= s1);
+  T.expectTrue(s2 >= s1);
+  T.expectFalse(s1 < f1);
+  T.expectFalse(f1 > s1);
+
+  // Works as SortedMap key (requires Orderable)
+  m = SortedMap::createFromItems(
+    Array[(s2, "s2"), (f2, "f2"), (s1, "s1"), (f1, "f1")],
+  );
+  T.expectEq(m.keys().collect(Array), Array[f1, f2, s1, s2]);
+  T.expectEq(m.get(f1), "f1");
+  T.expectEq(m.get(s2), "s2");
+}
+
+@test
+fun testHashable(): void {
+  s1: Result<Int, Int> = Success(42);
+  s1b: Result<Int, Int> = Success(42);
+  f1: Result<Int, Int> = Failure(42);
+  f1b: Result<Int, Int> = Failure(42);
+
+  T.expectEq(checkHash(s1), checkHash(s1b));
+  T.expectEq(checkHash(f1), checkHash(f1b));
+  T.expectNe(checkHash(s1), checkHash(f1));
+
+  // Works as UnorderedMap key (requires Hashable & Equality)
+  m = UnorderedMap::createFromItems(Array[(s1, "ok"), (f1, "err")]);
+  T.expectEq(m.size(), 2);
+  T.expectEq(m.get(s1b), "ok");
+  T.expectEq(m.get(f1b), "err");
+}
+
+@test
+fun testShow(): void {
+  s: Result<Int, String> = Success(42);
+  f: Result<Int, String> = Failure("oops");
+
+  T.expectEq(checkShow(s), "Success(42)");
+  T.expectEq(checkShow(f), "Failure(oops)");
+  T.expectEq(`${s}`, "Success(42)");
+  T.expectEq(`${f}`, "Failure(oops)");
+}
+
+module end;
