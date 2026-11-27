@@ -9,7 +9,11 @@ module Iterator;
 
 // A type that can be created from an iterator.
 trait .FromIterator<+T> {
-  static fun createFromIterator<I: mutable Iterator<T>>(iterator: I): inst;
+  static overridable fun createFromIterator<I: mutable Iterator<T>>(
+    _iterator: I,
+  ): inst {
+    invariant_violation("FromIterator::createFromIterator not implemented")
+  }
 }
 
 module end;

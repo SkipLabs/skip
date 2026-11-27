@@ -8,6 +8,8 @@
 module SortedMap;
 
 base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
+  IntoIterator<(K, V)>,
+  FromIterator<(K, V)>,
   Show[K: readonly Show, V: readonly Show],
   Hashable[K: Hashable, V: Hashable],
   Equality[K: Equality, V: Equality],
@@ -50,13 +52,9 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
     )
   }
 
-  static fun createFromIterator<
-    K2: Orderable,
-    V2,
-    I: mutable Iterator<(K2, V2)>,
-  >[K: K2, V: V2](
+  static fun createFromIterator<I: mutable Iterator<(K, V)>>(
     items: I,
-  ): SortedMap<K2, V2> {
+  ): SortedMap<K, V> {
     items.foldl(
       (m, p) -> {
         (k, v) = p;
@@ -576,6 +574,10 @@ base class .SortedMap<+K: Orderable, +V> uses  //  extends KeyedSequence<K, V>
 
   fun items(): mutable Iterator<(K, V)> {
     ItemsIterator::make(this)
+  }
+
+  fun iterator(): mutable Iterator<(K, V)> {
+    this.items()
   }
 
   fun keys(): mutable Iterator<K> {

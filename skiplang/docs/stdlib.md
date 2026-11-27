@@ -17,8 +17,7 @@ Companion docs:
 - **`uses Orderable, Equality` conflicts on `==`**: both traits define `==`. Override `fun ==(other: MyClass): Bool` explicitly; `!=` is inherited from `Equality`.
 - **`Hashable.hash()` is NOT `readonly`**: it requires an immutable receiver. Global `hash<T>(v: T): Int` works on any value via runtime `SKIP_hash`.
 - **`String` has no `[]` indexing**: `s.length()` is O(n) Unicode scalar count; byte size is `String.byteSize(s): UInt32` or `s.bytes().size()`. `toInt()`/`toFloat()` crash on invalid input — use `toIntOption()` / `toFloatOption()`.
-- **Iterator consumption**: `.values()`/`.items()`/`.keys()` return a single-use `mutable Iterator`. Materialize with `.collect(Array)`, `.collect(Vector)`, `.collect(Map)`, or `.toArray()`.
-- **`List` and `SortedMap` do not declare `uses FromIterator`**: `iter.collect(List)` and `iter.collect(SortedMap)` fail typechecking — use `List::createFromIterator(iter)` / `SortedMap::createFromIterator(iter)` instead.
+- **Iterator consumption**: `.values()`/`.items()`/`.keys()` return a single-use `mutable Iterator`. Materialize with `.collect(Array)`, `.collect(Vector)`, `.collect(Map)`, `.collect(List)`, `.collect(SortedMap)`, or `.toArray()`.
 - **`Result` does not declare `uses Equality`/`Orderable`/`Show`** in its header (even though it defines `==`, `!=`, and `compare`).
 - **`print_error(s)` already appends `\n`**; `print_error_ln(v)` appends two newlines on native. Use `print_error_raw(s)` for no newline.
 - **No built-in `Regex` engine**: `Regex.sk` in prelude is empty.
@@ -107,7 +106,7 @@ value class Point(x: Int, y: Int) uses Orderable, Hashable, Show {
 ### `Iterator<+T>` & `Sequence<+T>`
 
 - **`mutable base class Iterator<+T>`**:
-  - Core: `next(): ?T`, `sizeHint(): ?Int`, `collect(Concrete<C>)`, `toArray(): Array<T>`.
+  - Core: `next(): ?T`, `sizeHint(): ?Int`, `collect(Class<C>)`, `toArray(): Array<T>`.
   - Lazy combinators: `map`, `flatMap`, `flatten`, `concat`, `filter`, `filterNone`, `filterMap`, `unique`, `zip`, `zipLongest`, `zipWith`, `zipSorted`, `zipSortedBy`, `drop`, `dropWhile`, `take`, `takeWhile`, `enumerated()`.
   - Consumers: `each`, `eachWithIndex`, `find`, `findMap`, `all`, `any`, `reduce(f, init)`, `min{default}`.
 - **`mutable base class Sequence<+T> uses IntoIterator<T>`**:
@@ -123,9 +122,9 @@ value class Point(x: Int, y: Int) uses Orderable, Hashable, Show {
 | `UnorderedMap<+K, +V>` | Unordered Robin Hood hash table | O(1) lookup/update/amort. insert (faster & smaller than `Map`) | Same `MutableKeyedSequence` API as `Map`. |
 | `Set<+T>` | Insertion-ordered hash set (`T: Hashable & Equality`) | O(1) lookup/amort. insert | `Set[1, 2]`, `mutable Set[]`. `UniqueSequence`, `FromIterator`. `contains`, `add`, `insert`, `remove`, `maybeRemove`, `union`, `intersection`, `difference`, `subtract`. |
 | `UnorderedSet<+T>` | Unordered hash set | O(1) lookup/amort. insert | Same `UniqueSequence` API as `Set`. |
-| `SortedMap<+K, +V>` | Persistent balanced BST (`K: Orderable`) | O(log n) `get`/`set`/`remove`/`min`/`max` | Purely persistent (`set`/`remove` return a new `SortedMap`). Has `itemsAfter(start)`, `minimum()`, `maximum()`, `merge`, `mergeWith`. **Does not declare `FromIterator`/`IntoIterator`**; use `SortedMap::createFromItems` / `SortedMap::createFromIterator`. |
+| `SortedMap<+K, +V>` | Persistent balanced BST (`K: Orderable`) | O(log n) `get`/`set`/`remove`/`min`/`max` | Purely persistent (`set`/`remove` return a new `SortedMap`); `uses IntoIterator<(K, V)>, FromIterator<(K, V)>`. Has `itemsAfter(start)`, `minimum()`, `maximum()`, `merge`, `mergeWith`. |
 | `SortedSet<+T>` | Persistent balanced BST (`T: Orderable`) | O(log n) ops | Purely persistent; `uses IntoIterator<T>, FromIterator<T>`. `add`, `set`, `remove`, `min`, `max`. |
-| `List<+T>` | Singly linked list (`Nil() \| Cons(head, tail)`) | O(1) cons/head/tail; O(n) `size()` | `List[1, 2]`. **Does not declare `FromIterator`**; use `List::createFromIterator`. |
+| `List<+T>` | Singly linked list (`Nil() \| Cons(head, tail)`) | O(1) cons/head/tail; O(n) `size()` | `List[1, 2]`. Extends `Sequence<T>`, `uses FromIterator<T>`. |
 | `Queue<+T>` | Persistent two-list FIFO queue | Amort. O(1) `push`/`pop` | `Queue::empty()`, `push(x)`, `pop(): ?(this, T)`. |
 | `Persistent.RadixTreeVector<+T>` | 32-way persistent radix tree | O(log₃₂ n) ops; **O(1) `clone()` and `chill()`** | Implements `MutableIndexedSequence<T>`. |
 | `Rope<+T>` (`skstore/Rope.sk`) | Tree rope (`Nil \| Union \| Cons`) | O(1) `+` / `union` / `append` | Immutable; `values()`, `toArray()`. |
