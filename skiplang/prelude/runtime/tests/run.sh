@@ -5,12 +5,20 @@ runtime_test_sources=$(cd "$(dirname "$0")" && pwd)
 runtime_test_dir=$(mktemp -d "${TMPDIR:-/tmp}/skip-runtime-tests.XXXXXXXX")
 trap 'rm -rf "$runtime_test_dir"' EXIT
 
-# Portable native check: runs on every platform.
+# Portable native checks: run on every platform.
 clang -std=c2x -O2 -g -Wall -Wextra -Werror \
   -I"$runtime_test_sources/.." \
   -fsanitize=undefined -fsanitize-trap=all \
   "$runtime_test_sources/to_float_raw_native.c" -o "$runtime_test_dir/to-float-raw-native"
 "$runtime_test_dir/to-float-raw-native"
+
+for runtime_test_opt in -O0 -O2; do
+  clang -std=c2x "$runtime_test_opt" -g -Wall -Wextra -Werror \
+    -I"$runtime_test_sources/.." \
+    -fsanitize=undefined -fsanitize-trap=all \
+    "$runtime_test_sources/hash.c" -o "$runtime_test_dir/hash"
+  "$runtime_test_dir/hash"
+done
 
 # The checks below are Linux-specific (glibc mutex internals, GNU ld flags).
 if [ "$(uname -s)" = Darwin ]; then
@@ -120,3 +128,12 @@ clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
   --export=SKIP_Float_toStringShortest \
   "$runtime_test_dir/float-to-string.o" -o "$runtime_test_dir/float-to-string.wasm"
 node "$runtime_test_sources/float_to_string.mjs" "$runtime_test_dir/float-to-string.wasm"
+
+clang --target=wasm32 -DSKIP32 -O2 -nostdlib -nostdlibinc \
+  -Wall -Wextra -Werror -Wno-c2x-extensions \
+  -I"$runtime_test_sources/.." -c "$runtime_test_sources/hash.c" \
+  -o "$runtime_test_dir/hash.o"
+"$runtime_test_linker" --no-entry --export-memory \
+  --export=run_hash_tests \
+  "$runtime_test_dir/hash.o" -o "$runtime_test_dir/hash.wasm"
+node "$runtime_test_sources/hash.mjs" "$runtime_test_dir/hash.wasm"
