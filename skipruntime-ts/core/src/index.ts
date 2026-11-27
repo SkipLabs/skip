@@ -46,6 +46,7 @@ import {
   AbstractLazyCollection,
   type SharedCollections,
 } from "./api.js";
+import type { eagerCollectionBrand, lazyCollectionBrand } from "./brands.js";
 
 import {
   SkipClassNameError,
@@ -278,7 +279,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements LazyCollection<K, V>
 {
-  readonly __sk_lazyCollectionBrand: undefined;
+  declare readonly [lazyCollectionBrand]: never;
 
   constructor(
     readonly lazyCollection: string,
@@ -322,7 +323,7 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements EagerCollection<K, V>
 {
-  readonly __sk_collectionBrand: undefined;
+  declare readonly [eagerCollectionBrand]: never;
 
   constructor(
     public readonly collection: string,

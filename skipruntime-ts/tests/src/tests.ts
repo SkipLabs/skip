@@ -1,5 +1,6 @@
 import { expect, isEqual } from "earl";
 import type {
+  AbstractInputDefinition,
   AllInputDefs,
   AllSharedCollections,
   Context,
@@ -1333,9 +1334,10 @@ export function initTests(
 
   it("testNonInputDefinitionInputRejected", async () => {
     const invalidService: AnySkipService = {
-      // Type-checks: the brand field is structural, but only `InputDefinition`
-      // carries the initial data the runtime needs.
-      inputs: { input: { __sk_inputDefBrand: undefined } },
+      // `AbstractInputDefinition` is nominal, so a forged input definition
+      // needs a cast (as untyped JavaScript callers could produce); the
+      // runtime must still reject it since it carries no initial data.
+      inputs: { input: {} as unknown as AbstractInputDefinition },
       resources: {},
       createGraph: (inputCollections: NamedEagerCollections) =>
         inputCollections,
@@ -1353,11 +1355,10 @@ export function initTests(
   });
 
   it("testForeignCollectionRejected", async () => {
-    // Type-checks: the brand field is structural, but only collections
+    // `AbstractEagerCollection` is nominal, so a forged collection needs a
+    // cast (as untyped JavaScript callers could produce); only collections
     // created by the runtime can be merged into the computation graph.
-    const forged = {
-      __sk_collectionBrand: undefined,
-    } as unknown as EagerCollection<Json, Json>;
+    const forged = {} as unknown as EagerCollection<Json, Json>;
     const forgingService = {
       inputs: { input: new InputDefinition<Json, Json>() },
       resources: {},

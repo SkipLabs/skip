@@ -16,6 +16,11 @@ export * from "./errors.js";
 export type { Managed, Json, JsonObject, Opaque, DepSafe };
 export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
+import type {
+  eagerCollectionBrand,
+  lazyCollectionBrand,
+  inputDefinitionBrand,
+} from "./brands.js";
 
 /**
  * Type-erased base for eager collections, enabling sound typing in collection maps.
@@ -26,19 +31,23 @@ export type { Nullable };
  * erases the type parameters so that collections with different key/value
  * types can be stored together in a `NamedEagerCollections` map.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only collections created by the Skip runtime (or explicit casts) inhabit
+ * this type; object literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractEagerCollection {
-  readonly __sk_collectionBrand: undefined;
+  declare readonly [eagerCollectionBrand]: never;
 }
 
 /**
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only collections created by the Skip runtime (or explicit casts) inhabit
+ * this type; object literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractLazyCollection {
-  readonly __sk_lazyCollectionBrand: undefined;
+  declare readonly [lazyCollectionBrand]: never;
 }
 
 /**
@@ -621,10 +630,12 @@ export type InitialData<Inputs extends NamedEagerCollections> = {
 /**
  * Type-erased base for input definitions, enabling sound typing in input maps.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only subclasses (such as `InputDefinition`) inhabit this type; object
+ * literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractInputDefinition {
-  readonly __sk_inputDefBrand: undefined;
+  declare readonly [inputDefinitionBrand]: never;
 }
 
 /**

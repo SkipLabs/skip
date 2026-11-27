@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `asFollower` now restricts `collections` to eager collection keys and
    requires typed `lazies` factories matching each lazy collection in
    `ResourceInputs` (#1811)
+ - `AbstractEagerCollection`, `AbstractLazyCollection`, and
+   `AbstractInputDefinition` are now nominal (branded with a `unique symbol`
+   key private to `@skipruntime/core`) instead of carrying public
+   `__sk_*Brand: undefined` fields; object literals or other structural
+   implementations are no longer accepted and must be replaced by runtime-created
+   collections / `InputDefinition` instances
 
 ## [0.0.23] - 2026-05-28
 

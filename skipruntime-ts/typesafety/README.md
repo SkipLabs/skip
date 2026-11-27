@@ -21,8 +21,8 @@ Note on `p05`/`p05b`: when defining a service as a standalone unannotated `const
 
 ## Negative Probes
 
-All 16 negative probes are refused under TScert. Under `tsc --strict`:
-- 15 of 16 are rejected on TypeScript 5.7.x, 5.8.x, and 6.0.x (enforced by `check.mjs` in `bin/check-ts.sh`).
+All 17 negative probes are refused under TScert. Under `tsc --strict`:
+- 16 of 17 are rejected on TypeScript 5.7.x, 5.8.x, and 6.0.x (enforced by `check.mjs` in `bin/check-ts.sh`).
 - `n10-open-resources-param.ts` passes on TypeScript 5.7.x/5.8.x due to structural open-record assignability to readonly index signatures and is rejected on TypeScript 6.0.x and TScert.
 
 | Probe | `tsc` 5.7 / 5.8 | `tsc` 6.0 | TScert | Fault |
@@ -43,3 +43,4 @@ All 16 negative probes are refused under TScert. Under `tsc --strict`:
 | `n09b-explicit-json-inputdef-to-narrow.ts` | reject | reject | refused | Explicit `new InputDefinition<Json, Json>()` flowing into narrow `Resource` |
 | `n10-open-resources-param.ts` | pass (unsound) | reject | refused | Open record parameter passed as `resources` (may hold extra non-`ResourceClass` keys at runtime) |
 | `n11-custom-abstract-inputdef.ts` | reject | reject | refused | Subclass of `AbstractInputDefinition` must not map to `never` in `InputCollections` |
+| `n12-brand-fake.ts` | reject | reject | n/a | Structural look-alike objects (formerly public `__sk_*Brand` fields) assigned to the nominal `AbstractInputDefinition` / `AbstractEagerCollection` / `AbstractLazyCollection` |
