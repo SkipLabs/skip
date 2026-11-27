@@ -222,7 +222,8 @@ and, lacking robust mutexes, takes the global lock with an `flock` on
 `<file>.lock`, which the kernel releases when its holder dies. This test checks
 that a stored code pointer survives a later run, that a dead lock holder does
 not block later users while a live one does, and that a heap from another
-executable is rejected. `run.sh` runs only this check on macOS.
+executable is rejected. On macOS, `run.sh` runs the portable native float check
+(`to_float_raw_native.c`), this check, and `mapping_growth.c`.
 
 ```sh
 clang -O0 -g -Wall -Wextra -Werror -ffunction-sections -fdata-sections \

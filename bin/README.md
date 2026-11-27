@@ -30,10 +30,11 @@ Convenience wrappers are provided for common workflows:
 ## Publish the CI images
 
 The images in the `ci` group of `docker-bake.hcl` are published to Docker Hub by
-`.github/workflows/docker-publish.yml` — on demand (`workflow_dispatch`) and
-weekly, so base image security updates land without anyone remembering. Publish
-after landing an image-affecting change by triggering it manually; it does not
-publish automatically on merge.
+`.github/workflows/docker-publish.yml` — on every push to `main` that touches an
+image input (see the `push.paths` filter in that workflow), weekly on Monday,
+and on demand (`workflow_dispatch`, or by labeling a PR `docker-publish`). See
+[HACKING.md](../HACKING.md#publishing-ci-docker-images) for the full input list
+and manual-trigger criteria.
 
 That group is the single source of truth: the workflow and
 `release_docker_ci_images.sh` both take their image list from it, and
@@ -99,7 +100,7 @@ changes, the addon package version must be bumped.)  To update from version
    auth to publish the new package versions.
 
 7. Update docker-compose `./examples` package dependencies to the now-released
-   `$NEW` versions (e.g. with `sed -i '' 's/$OLD/$NEW/g' $(g grep -l $OLD
+   `$NEW` versions (e.g. with `sed -i '' 's/$OLD/$NEW/g' $(git grep -l $OLD
    examples/**/package.json)`), make any necessary changes to keep them
    building/running with the new versions, add those changes to your PR, and
    land it!

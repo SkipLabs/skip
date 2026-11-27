@@ -1,39 +1,44 @@
 # skiplang/compiler — agent instructions
 
-The `skc` compiler: Skip sources in `src/`, tests in `tests/`, bootstrap IR in
-the `bootstrap` submodule. The root [AGENTS.md](../../AGENTS.md) applies too. For a repo-wide living log of
-lessons about writing `.sk` code, see
-[docs/skip-code-notes.md](../../docs/skip-code-notes.md) — read it before
-writing `.sk` and append whenever you learn a lesson.
+`skc` compiler and `skfmt` formatter: sources in `src/`, language tests in `tests/` and `invalid_tests/`, Python backend/profiling tools in `tools/`, bootstrap IR in the `bootstrap/` submodule. Root [AGENTS.md](../../AGENTS.md) and [docs/skip-code-notes.md](../../docs/skip-code-notes.md) apply; see [skiplang/docs/modifiers-and-annotations.md](../docs/modifiers-and-annotations.md) for modifiers/annotations and [skiplang/docs/compiler-incremental-backend-review.md](../docs/compiler-incremental-backend-review.md) for backend architecture.
+
+## Source pipeline map (`src/`)
+
+| Stage | Key files |
+| --- | --- |
+| Entry & orchestration | `main.sk`, `Config.sk`, `compile.sk`, `ReleaseBuild.sk`, `sklib.sk`, `skfmt.sk` |
+| Lex & parse | `SkipLexer.sk`, `SkipParser.sk`, `SkipParseTree.sk`, `skipParse.sk`, `convertTree.sk` |
+| Naming & inheritance | `skipNaming.sk`, `skipInherit.sk`, `skipExpand.sk`, `skipCheckVariance.sk` |
+| Typechecking & patterns | `skipTypes.sk`, `skipTyping.sk`, `skipTypingUtils.sk`, `skipExhaustivePatterns.sk` |
+| OuterIst lowering | `skipMakeOuterIst.sk`, `skipLowerMatches.sk`, `skipLowerOuterIst.sk`, `skipOptimizeLocals.sk`, `skipValidateOuterIst.sk` |
+| Specialization & IR | `OuterIstToIR.sk`, `specialize.sk`, `IR.sk`, `GIR.sk`, `Layout.sk`, `vtable.sk`, `ClassInputs.sk` |
+| Optimization & lowering | `optimize.sk`, `bounds.sk`, `const.sk`, `deadcode.sk`, `inline.sk`, `ipa.sk`, `peephole.sk`, `escape.sk`, `gc.sk`, `lower.sk`, `verify.sk` |
+| LLVM graph & emission | `AsmGraph.sk`, `AsmEmit.sk`, `AsmOutput.sk`, `AsmArtifacts.sk`, `Emitter.sk`, `skipEmitLLVM.sk` |
 
 ## Build
 
-- `make STAGE=1` — parallel by default (`JOBS` = min(nproc, 8); `JOBS=1` forces
-  the old fully serial build). Safe under `-j`: stage0's links and prelude
-  build are independent, and the stageN skargo invocations are ordered so no
-  two ever share a target dir concurrently — concurrent skargo processes
-  sharing one race on the per-unit `state.db` files (#1581). The bins build
-  runs first and alone (its self-compile peaks near the CI job's 14 GiB
-  memory guard, so it must not overlap the other builds); the lib and skargo
-  builds then run concurrently, the lib build in its own `stageN/target-lib`.
-  Each invocation passes `--jobs $(SKARGO_JOBS)` (the pinned bootstrap skargo
-  supports it). The prelude Makefile also flocks its in-source-tree runtime
-  compiles.
-- `make` refuses to build when the `bootstrap` submodule is out of sync — run
-  `git submodule update --init skiplang/compiler/bootstrap` first.
-- Never edit `bootstrap/*.ll.gz` by hand; bump the submodule via
-  `bin/bump_bootstrap.sh` only.
+- `make STAGE=1` — builds `stage0` (from `bootstrap/*.ll.gz`) then `stage1/{bin,lib}` in parallel (`JOBS=min(nproc,8)`, `JOBS=1` for serial; `--jobs $(SKARGO_JOBS)` inside skargo). Stage skargo builds are prerequisite-ordered so no two share a target dir (`state.db` race, #1581): bins runs first alone (peaks near CI's 14 GiB RSS guard), then lib (in `stageN/target-lib`) and skargo run concurrently.
+- `make` refuses to build if the `bootstrap` submodule is out of sync — run `git submodule update --init skiplang/compiler/bootstrap` first.
+- Never edit `bootstrap/*.ll.gz` by hand; bump via `bin/bump_bootstrap.sh` only.
 
 ## Test
 
-- Language suite (needs `make STAGE=1` first):
+- **Language suite** (needs `make STAGE=1` first; use `SKTEST_PROFILE=release` — dev merged binary exceeds CI memory budget):
   `SKTEST_PROFILE=release SKTEST_JOBS=8 PATH=$PWD/stage1/bin:$PATH ../../bin/run-sktest.sh`
-- Backend regressions (needs `make STAGE=1` first):
+  Filter a single test/suite: `PATH=$PWD/stage1/bin:$PATH skargo test --profile release <filter>`
+- **Test layout**:
+  - `tests/<Suite>/<Name>.sk` + `<Name>.exp` — valid tests (`@exptest`, stdout compared to `.exp`).
+  - `invalid_tests/<suite>/<name>.sk` + `.exp_err` (and `.exp`) — compile-error tests, batch-compiled via `skc --batch`.
+  - Both directories are excluded from `skfmt` (`fmt-sk`) and from `docs/skip-code-notes.md` style rules.
+- **Backend regressions** (needs `make STAGE=1` first; see [tools/README.md](tools/README.md) for profiling/sharding):
   `python3 tools/run_backend_tests.py --compiler stage1/bin/skc --sysroot stage1/target/host/release/deps --legacy-compiler stage0/bin/skc --scratch /tmp/skc-backend-checks`
-- Runtime C tests: `bash ../prelude/runtime/tests/run.sh`
+  Do not run `python3 -m unittest` directly without the wrapper env vars — it skips compiler regressions.
+- **Runtime C/Wasm tests**: `bash ../prelude/runtime/tests/run.sh`
 
 ## Gotchas
 
-- `build/`, `stage0/`, `stage1/`, `runs/`, `tools/runs/`, `tools/__pycache__/` are gitignored — never commit them. `runs/` and `tools/runs/` hold `tools/incremental_profile.py` evidence.
-- `state.db` persistent caches are per-unit and only reopen with the exact `skc` executable that wrote them: the runtime compares the executable's GNU build-id with the header and exits 43 on a mismatch. skargo then discards the stale `state.db` and rebuilds with `--init`. A cache survives a fresh checkout only if the rebuilt `skc` is byte-identical (same inputs, flags and paths).
-- The compiler self-build needs a large heap; CI bounds it with `tools/incremental_profile.py` (RSS/disk/timeout). The dev-profile merged test binary exceeds the CI memory budget — use `SKTEST_PROFILE=release` for the language suite.
+- **Gitignored outputs**: `build/`, `stage0/`, `stage1/`, `runs/`, `tools/runs/`, `tools/__pycache__/` — never commit them.
+- **`state.db` identity**: per-unit persistent caches check the executable's GNU build-id (macOS: `LC_UUID`) and exit 43 on mismatch; `skargo` discards stale `state.db` and rebuilds with `--init`.
+- **Release vs incremental builds**: `skargo check --release` keeps incremental frontend DBs; `skargo build --release` uses `skc --one-shot` (disposable phases, rejects `--init`/`--data`/`--batch`).
+- **Merged dev-build `SKARGO_BIN`**: when invoking `skc` from a `skargo test` subprocess, prefix with `env SKARGO_BIN=skc` so dev hardlinks don't dispatch back to the test harness (#1451).
+- **Downstream & CI**: changes here also trigger `skargo` tests in CI; test [skjs](../../HACKING.md#downstream-skjs) before merging toolchain-breaking changes, and bump `Skargo.toml` `version` in the same PR.

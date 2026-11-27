@@ -1,6 +1,16 @@
 # Hacking on skip
 
-This document is a perpetually under construction collection of tips and potentially useful information for people hacking on the skip implementation.
+Contributor guide for CI, Docker image publishing, the merge bot, and local packaging workflows. For quick build/test commands, repo layout, and commit/PR policy, see [AGENTS.md](AGENTS.md).
+
+## Contents
+
+- [Developer workflow](#developer-workflow)
+- [Code formatting](#code-formatting)
+- [Continuous integration](#continuous-integration)
+- [Publishing CI Docker images](#publishing-ci-docker-images)
+- [Merge bot](#merge-bot)
+- [Building skip client in Docker against unreleased skip packages](#building-skip-client-in-docker-against-unreleased-skip-packages)
+- [Migrating branches from before the history rewrite](#migrating-branches-from-before-the-history-rewrite)
 
 ### Developer workflow
 
@@ -10,14 +20,12 @@ The npm package configuration files are set up to optimize the end-user scenario
 
 ### Code formatting
 
-There is a CI job that checks that code is auto-formatted by running `make check-fmt`.
-This can be run manually prior to submitting a PR if desired.
-If desired, a git pre-commit hook that automatically formats changed files when committing can be installed by running `make setup-git-hooks`.
+CI (`fast-checks`) runs `make check-fmt` (`skfmt`, `clang-format`, `prettier`, `black`) and `make check-sh` (`shellcheck` + `bin/merge-bot.sh --selftest`).
+Run `make fmt` then `make check-fmt` locally before pushing, or install the git pre-commit hook with `make setup-git-hooks`.
 
 ### Continuous integration
 
-Pull requests are gated by CircleCI (`.circleci/`): the required `ci/circleci: *`
-statuses run the compiler, prelude, skargo, skdb and runtime test suites.
+Pull requests are gated by CircleCI (`.circleci/`): `generate_config.sh` dynamically schedules only the jobs affected by the diff (plus reverse dependencies), and `ci/circleci: ci/all-checks` aggregates them as the single required check.
 
 GitHub Actions (`.github/workflows/`) complements CircleCI but does not gate
 PRs. Only `actionlint`, `docs` and the docker `check-images` job run on pull
@@ -224,7 +232,7 @@ An alternative is to use `npm pack`. For example:
 This creates a tarball of the `@skipruntime/core` package in `path/to/client/pack` directory.
 Any other packages desired from the list of workspaces in `skip/package.json` can be added with `-w` flags.
 Then the client's `package.json` needs to be modified to install from the tarball instead of the network.
-Modify `packages.json` replacing a line such as:
+Modify `package.json` replacing a line such as:
 ```
     "@skipruntime/core": "0.0.12",
 ```
