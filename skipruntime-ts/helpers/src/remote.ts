@@ -189,20 +189,28 @@ type FollowerLazies<ResourceInputs> = [LazyKeys<ResourceInputs>] extends [never]
     };
 
 /**
+ * Uninhabited brand attached to `FollowerCoverage`'s error sentinel so callers
+ * cannot bypass the missing-collections check by supplying a dummy
+ * `missingEagerCollections` property.
+ */
+declare const _missingEagerCollectionsBrand: unique symbol;
+
+/**
  * Static exhaustiveness check for `asFollower`'s `collections`: when some eager
  * key of `ResourceInputs` is missing from `Eager`, requires a property whose
- * type names the missing keys, so the call fails to type-check with an error
- * listing them.
+ * type names the missing keys inside an uninhabited branded tuple, so the call
+ * fails to type-check with an error listing them and no cast-free value can
+ * satisfy it.
  */
 type FollowerCoverage<ResourceInputs, Eager extends readonly string[]> = [
   Exclude<EagerKeys<ResourceInputs>, Eager[number]>,
 ] extends [never]
   ? unknown
   : {
-      readonly missingEagerCollections: Exclude<
-        EagerKeys<ResourceInputs>,
-        Eager[number]
-      >;
+      readonly missingEagerCollections: readonly [
+        typeof _missingEagerCollectionsBrand,
+        Exclude<EagerKeys<ResourceInputs>, Eager[number]>,
+      ];
     };
 
 /**
