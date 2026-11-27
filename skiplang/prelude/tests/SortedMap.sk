@@ -1,0 +1,55 @@
+module alias T = SKTest;
+
+module SortedMapTest;
+
+@test
+fun testCollectFromIterator(): void {
+  empty: Array<(String, Int)> = Array[];
+  T.expectEq(empty.values().collect(SortedMap), SortedMap<String, Int>[]);
+
+  m = Array[("c", 3), ("a", 1), ("b", 2)].values().collect(SortedMap);
+  T.expectEq(m, SortedMap["a" => 1, "b" => 2, "c" => 3]);
+  T.expectEq(m.items().collect(Array), Array[("a", 1), ("b", 2), ("c", 3)]);
+
+  // Duplicate keys keep the last value
+  dups = Array[("a", 1), ("b", 2), ("a", 99)].values().collect(SortedMap);
+  T.expectEq(dups, SortedMap["a" => 99, "b" => 2]);
+
+  // Chained iterator combinators
+  filtered = Array[1, 2, 3, 4].values()
+    .filter(x -> x % 2 == 0)
+    .map(x -> (x, x * x))
+    .collect(SortedMap);
+  T.expectEq(filtered, SortedMap[2 => 4, 4 => 16]);
+}
+
+@test
+fun testCollectFromSequenceAndMap(): void {
+  pairs = Vector[("z", 26), ("m", 13), ("a", 1)];
+  T.expectEq(
+    pairs.collect(SortedMap),
+    SortedMap["a" => 1, "m" => 13, "z" => 26],
+  );
+
+  src = Map["b" => 2, "a" => 1, "c" => 3];
+  sm = src.items().collect(SortedMap);
+  T.expectEq(sm, SortedMap["a" => 1, "b" => 2, "c" => 3]);
+
+  // Round-trip SortedMap -> SortedMap / Map / Array via items() and iterator()
+  T.expectEq(sm.items().collect(SortedMap), sm);
+  T.expectEq(sm.iterator().collect(SortedMap), sm);
+  T.expectEq(sm.iterator().collect(Map), Map["a" => 1, "b" => 2, "c" => 3]);
+  T.expectEq(sm.iterator().collect(Array), Array[("a", 1), ("b", 2), ("c", 3)]);
+}
+
+fun collectIntoArray<E, I: readonly IntoIterator<E>>(xs: I): Array<E> {
+  xs.iterator().collect(Array)
+}
+
+@test
+fun testIntoIterator(): void {
+  sm = SortedMap["b" => 2, "a" => 1];
+  T.expectEq(collectIntoArray(sm), Array[("a", 1), ("b", 2)]);
+}
+
+module end;
