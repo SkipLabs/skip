@@ -85,6 +85,11 @@ export async function fetchJSON<V extends Json>(
  *
  * Skip services, as started by `runService`, support an HTTP interface for reading from resources and writing to input collections.
  * `SkipServiceBroker` provides a method-call interface to the backing HTTP interface.
+ *
+ * @remarks
+ * Because the broker talks to a remote service over HTTP, the `K` and `V` type
+ * parameters on its read/write methods are caller-asserted and not validated at
+ * runtime against the remote service's schema.
  */
 export class SkipServiceBroker {
   private readonly entrypoint: string;

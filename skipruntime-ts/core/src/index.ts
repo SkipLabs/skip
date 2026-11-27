@@ -667,7 +667,10 @@ export interface ServiceInstance {
   ): Promise<void>;
 
   /**
-   * Creates if not exists and get all current values of specified resource
+   * Creates if not exists and get all current values of specified resource.
+   *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime.
+   *
    * @param resource - the resource name corresponding to a key in remotes field of SkipService
    * @param params - the parameters of the resource used to build the resource with the corresponding constructor specified in remotes field of SkipService
    * @returns The current values of the corresponding resource with reactive response token to allow subscription
@@ -678,7 +681,10 @@ export interface ServiceInstance {
   ): Promise<Entry<K, V>[]>;
 
   /**
-   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist
+   * Get the current value of a key in the specified resource instance, creating it if it doesn't already exist.
+   *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime.
+   *
    * @param resource - A resource name, which must correspond to a key in this `SkipService`'s `resources` field
    * @param key - A key to look up in the resource instance
    * @param params - Resource parameters, passed to the resource constructor specified in this `SkipService`'s `resources` field
@@ -697,7 +703,10 @@ export interface ServiceInstance {
   closeResourceInstance(resourceInstanceId: string): void;
 
   /**
-   * Initiate reactive subscription on a resource instance
+   * Initiate reactive subscription on a resource instance.
+   *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime.
+   *
    * @param resourceInstanceId - the resource instance identifier
    * @param notifier - the object containing subscription callbacks
    * @param notifier.subscribed - A callback to execute when subscription effectively done
@@ -723,7 +732,10 @@ export interface ServiceInstance {
   unsubscribe(id: SubscriptionID): void;
 
   /**
-   * Update an input collection
+   * Update an input collection.
+   *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime against the service's `InputDefinition`.
+   *
    * @param collection - the name of the input collection to update
    * @param entries - entries to update in the collection.
    */
@@ -739,6 +751,13 @@ export interface ServiceInstance {
    */
   close(): Promise<unknown>;
 
+  /**
+   * Hot-reload the running service with a new `SkipService` definition.
+   *
+   * @remarks The replacement service may have a different `InputDefs` or
+   * `ResourceInputs` shape from the service originally passed to `initService`;
+   * `changes` controls which inputs, resources, and computations are reloaded.
+   */
   reload<
     InputDefs extends AllInputDefs<InputDefs>,
     ResourceInputs extends AllSharedCollections<ResourceInputs>,

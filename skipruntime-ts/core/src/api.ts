@@ -387,6 +387,8 @@ export interface Context {
   /**
    * Create an eager reactive collection populated from a resource managed by an external service.
    *
+   * @remarks `K` and `V` are caller-asserted and not validated at runtime against the external service's wire payload.
+   *
    * @typeParam K - Type of keys.
    * @typeParam V - Type of values.
    * @param resource - External resource configuration.
@@ -523,6 +525,14 @@ export type NamedEagerCollections = {
   readonly [name: string]: AbstractEagerCollection;
 };
 
+/**
+ * Type-erased map of shared collections (eager or lazy).
+ *
+ * @remarks
+ * Annotating a `SkipService`'s second type parameter with `SharedCollections`
+ * explicitly opts out of static checking between `createGraph` outputs and
+ * `Resource` collection inputs.
+ */
 export type SharedCollections = {
   readonly [name: string]: AbstractEagerCollection | AbstractLazyCollection;
 };
@@ -582,7 +592,9 @@ export interface Resource<
  * Constructor type for a `Resource`.
  *
  * `Params` defaults to `Json` so resource constructors accept arbitrary JSON
- * request parameters and validate them at runtime before narrowing.
+ * request parameters and validate them at runtime before narrowing. Constructors
+ * that require a narrower parameter type (such as `JsonObject`) are rejected by
+ * `SkipService.resources` unless they accept `Json` and narrow at runtime.
  *
  * @typeParam Collections - Collections provided to the resource computation.
  * @typeParam Params - Type of the constructor parameter.
