@@ -643,57 +643,90 @@ fun normalize_positional_params(
   })
 }
 
-/* Expand a list of per-slot alternative lists into their Cartesian product. */
+/* Expand a list of per-slot alternative lists into their Cartesian product,
+ * tracking the tightest FileRange of any expanded Pat_or alternative. */
+fun combine_err_pos(p1: ?FileRange, p2: ?FileRange): ?FileRange {
+  (p1, p2) match {
+  | (None(), p) -> p
+  | (p, None()) -> p
+  | (Some(r1), Some _) -> Some(r1)
+  }
+}
+
 fun expand_param_list(
-  params: Array<(TAst.Type_, List<TAst.Pattern>)>,
-): List<Array<TAst.ParamPattern>> {
-  res: List<List<TAst.ParamPattern>> = List[List[]];
+  params: Array<(TAst.Type_, List<(TAst.Pattern, ?FileRange)>)>,
+): List<(Array<TAst.ParamPattern>, ?FileRange)> {
+  res: List<(List<TAst.ParamPattern>, ?FileRange)> = List[(List[], None())];
   for (i in Range(0, params.size())) {
     (pty, alts) = params[params.size() - 1 - i];
     !res = alts
-      .map(alt -> res.map(tail -> List.Cons((pty, alt), tail)))
+      .map(alt -> {
+        (alt_pat, alt_pos) = alt;
+        res.map(tail ->
+          (
+            List.Cons((pty, alt_pat), tail.i0),
+            combine_err_pos(alt_pos, tail.i1),
+          )
+        )
+      })
       .flatten();
   };
-  res.map(Array::createFromItems)
+  res.map(r -> (Array::createFromItems(r.i0), r.i1))
 }
 
 fun expand_named_params(
-  named: UMap<(TAst.Type_, List<TAst.Pattern>)>,
-): List<UMap<TAst.ParamPattern>> {
+  named: UMap<(TAst.Type_, List<(TAst.Pattern, ?FileRange)>)>,
+): List<(UMap<TAst.ParamPattern>, ?FileRange)> {
   items = named.items().collect(Array);
-  res: List<UMap<TAst.ParamPattern>> = List[UMap[]];
+  res: List<(UMap<TAst.ParamPattern>, ?FileRange)> = List[(UMap[], None())];
   for (item in items) {
     (k, (pty, alts)) = item;
-    !res = alts.map(alt -> res.map(m -> m.add(k, (pty, alt)))).flatten();
+    !res = alts
+      .map(alt -> {
+        (alt_pat, alt_pos) = alt;
+        res.map(m ->
+          (m.i0.add(k, (pty, alt_pat)), combine_err_pos(m.i1, alt_pos))
+        )
+      })
+      .flatten();
   };
   res
 }
 
 fun expand_parameters(
-  params: Parameters<(TAst.Type_, List<TAst.Pattern>)>,
-): List<Parameters<TAst.ParamPattern>> {
+  params: Parameters<(TAst.Type_, List<(TAst.Pattern, ?FileRange)>)>,
+): List<(Parameters<TAst.ParamPattern>, ?FileRange)> {
   params match {
-  | Positional(pos) -> expand_param_list(pos).map(p -> Positional(p))
-  | Named(named) -> expand_named_params(named).map(m -> Named(m))
+  | Positional(pos) -> expand_param_list(pos).map(p -> (Positional(p.i0), p.i1))
+  | Named(named) -> expand_named_params(named).map(m -> (Named(m.i0), m.i1))
   | Mixed(pos, named, nf) ->
     pos_expanded = expand_param_list(pos);
     named_expanded = expand_named_params(named);
-    pos_expanded.map(p -> named_expanded.map(n -> Mixed(p, n, nf))).flatten()
+    pos_expanded
+      .map(p ->
+        named_expanded.map(n ->
+          (Mixed(p.i0, n.i0, nf), combine_err_pos(p.i1, n.i1))
+        )
+      )
+      .flatten()
   }
 }
 
 /* To prepare a pattern for exhaustiveness checking, we remove all Pat_as and
- * expand all nested Pat_or into a flat list of patterns. */
+ * expand all nested Pat_or into a flat list of (pattern, optional_or_alt_pos).
+ * When a pattern originates from a nested Pat_or, the FileRange records the
+ * specific alternative so unused-pattern errors point to it rather than the
+ * entire enclosing pattern. */
 fun prep_pattern(
   context: mutable SKStore.Context,
   env: mutable Env,
   pat: TAst.Pattern,
-): List<TAst.Pattern> {
+): List<(TAst.Pattern, ?FileRange)> {
   TAstUtils.pattern_of__(pat) match {
   | TAst.Pat_literal _
   | TAst.Pat_var _ ->
-    List[pat]
-  | TAst.Pat_type(_tid, _castType, None()) -> List[pat]
+    List[(pat, None())]
+  | TAst.Pat_type(_tid, _castType, None()) -> List[(pat, None())]
   | TAst.Pat_type(tid, castType, Some(params)) ->
     pos = TAstUtils.pattern_pos(pat);
     normalized_params = normalize_params_if_named(context, pos, tid, params);
@@ -701,12 +734,20 @@ fun prep_pattern(
       (param.i0, prep_pattern(context, env, param.i1))
     );
     expand_parameters(prepped_params).map(expanded ->
-      update_pat(pat, TAst.Pat_type(tid, castType, Some(expanded)))
+      (
+        update_pat(pat, TAst.Pat_type(tid, castType, Some(expanded.i0))),
+        expanded.i1,
+      )
     )
   | TAst.Pat_as(p, _) -> prep_pattern(context, env, p)
   | TAst.Pat_or(pats) ->
     List::createFromItems(pats)
-      .map(p -> prep_pattern(context, env, p))
+      .map(p -> {
+        alt_pos = TAstUtils.pattern_pos(p);
+        prep_pattern(context, env, p).map(inner ->
+          (inner.i0, combine_err_pos(inner.i1, Some(alt_pos)))
+        )
+      })
       .flatten()
   }
 }
@@ -2252,7 +2293,8 @@ fun check_useful(
   for (patval in pat) {
     (orig_pat, is_when_pat) = patval;
 
-    for (inner_pat in prep_pattern(context, env, orig_pat)) {
+    for (prepped in prep_pattern(context, env, orig_pat)) {
+      (inner_pat, err_pos_opt) = prepped;
       pat1 = List[inner_pat];
       (is_useful_res, ret_env) = is_useful(
         context,
@@ -2268,9 +2310,12 @@ fun check_useful(
        * env for checking subsequent patterns. env and ret_env share the same
        * class_sets object, so we'll pick up changes to that automatically. */
       if (!is_useful_res) {
-        npos = TAstUtils.pattern_pos(inner_pat);
+        (npos, reported_pat) = err_pos_opt match {
+        | Some(alt_pos) -> (alt_pos, inner_pat)
+        | None() -> (TAstUtils.pattern_pos(inner_pat), orig_pat)
+        };
 
-        throw Unused_pattern(npos, ret_env.chill(), List[orig_pat])
+        throw Unused_pattern(npos, ret_env.chill(), List[reported_pat])
       } else if (!is_when_pat) {
         /* We don't put in the when patterns for exhaustiveness checking. */
 
@@ -2504,7 +2549,7 @@ fun check_exhaustive_match_as(
         TUtils.promote(context, env.typing_env, env.typing_acc, ety),
         TUtils.contra_promote(context, env.typing_env, env.typing_acc, pat_ty),
       );
-      message = `If you want an explicit upcast (which isn't always necessary), try adding a type annotation instead, e.g. '(_ : ${Types.to_string(
+      message = `Unnecessary 'as' expression. The value will always match the pattern given. If you want an explicit upcast (which isn't always necessary), try adding a type annotation instead, e.g. '(_ : ${Types.to_string(
         env.typing_env.this_class,
         env.typing_acc.subst,
         pat_ty,
