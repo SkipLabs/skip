@@ -129,10 +129,6 @@ static uint64_t sk_crc64_combine(uint64_t crc, void* p) {
 #endif
 }
 
-SkipInt SKIP_hash_combine(SkipInt crc1, SkipInt crc2) {
-  return (SkipInt)sk_crc64((uint64_t)crc1, &crc2, sizeof(SkipInt));
-}
-
 /*****************************************************************************/
 /* Hashing of SKIP objects. */
 /*****************************************************************************/

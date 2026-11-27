@@ -17,4 +17,85 @@ fun testDirName(): void {
   _ = SKStore.DirName::create("/dir1/dir2/");
 }
 
+@test
+fun testDirNameOrderingEqualityAndHash(): void {
+  names = Array[
+    "/",
+    "/a/",
+    "/b/",
+    "/dir/",
+    "/dir1/",
+    "/dir1/dir2/",
+    "/1223/",
+    "/foo/bar/baz/",
+    "/foo/bar/qux/",
+  ];
+  dirs = names.map(SKStore.DirName::create);
+
+  // Case-insensitive normalization and construction equivalence (.sub vs ::create)
+  upper = SKStore.DirName::create("/DIR1/DIR2/");
+  lower = SKStore.DirName::create("/dir1/dir2/");
+  viaSub = SKStore.DirName::create("/dir1/").sub("DIR2");
+  T.expectEq(upper, lower);
+  T.expectEq(upper.compare(lower), EQ());
+  T.expectEq(upper.hash(), lower.hash());
+  T.expectEq(viaSub, lower);
+  T.expectEq(viaSub.compare(lower), EQ());
+  T.expectEq(viaSub.hash(), lower.hash());
+
+  // Hash consistency: hash() matches cached 64-bit hash(toString())
+  for (d in dirs) {
+    T.expectEq(d.hash(), hash(d.toString()));
+    T.expectEq(d, d);
+    T.expectEq(d.compare(d), EQ());
+  };
+
+  // Total order: reflexivity, antisymmetry, transitivity, and strict inequality
+  // for distinct directory names, plus consistency with hash() ordering.
+  for (i in Range(0, dirs.size())) {
+    a = dirs[i];
+    for (j in Range(0, dirs.size())) {
+      b = dirs[j];
+      cmp = a.compare(b);
+      if (i == j) {
+        T.expectEq(cmp, EQ());
+        T.expectTrue(a == b);
+      } else {
+        T.expectTrue(cmp != EQ());
+        T.expectTrue(a != b);
+      };
+      // Antisymmetry
+      expectedReverse = cmp match {
+      | LT() -> GT()
+      | EQ() -> EQ()
+      | GT() -> LT()
+      };
+      T.expectEq(b.compare(a), expectedReverse);
+      // Order agrees with hash() whenever hashes differ
+      if (a.hash() < b.hash()) {
+        T.expectEq(cmp, LT());
+      } else if (a.hash() > b.hash()) {
+        T.expectEq(cmp, GT());
+      };
+      // Transitivity
+      for (k in Range(0, dirs.size())) {
+        c = dirs[k];
+        if (a <= b && b <= c) {
+          T.expectTrue(a <= c);
+        };
+      };
+    };
+  };
+
+  // SortedMap / SortedSet round-trip with DirName keys
+  m = SortedMap<SKStore.DirName, Int>[];
+  for (i in Range(0, dirs.size())) {
+    !m = m.set(dirs[i], i);
+  };
+  T.expectEq(m.size(), dirs.size());
+  for (i in Range(0, dirs.size())) {
+    T.expectEq(m.maybeGet(dirs[i]), Some(i));
+  };
+}
+
 module end;
