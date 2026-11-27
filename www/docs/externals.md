@@ -27,7 +27,7 @@ To receive data from another Skip service, specify it in the `externalServices` 
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -76,7 +76,7 @@ A complete example is available [here](https://github.com/SkipLabs/skip/tree/mai
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -108,7 +108,7 @@ An example can be seen [here](https://github.com/SkipLabs/skip/tree/main/example
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -139,9 +139,9 @@ To specify a polled external dependency, specify it in your service definition, 
 
 ```typescript
 const service = {
-  initialData: ...
-  resources: ...
-  createGraph: ...
+  inputs: ...,
+  resources: ...,
+  createGraph: ...,
   externalServices: {
     myExternalService: new PolledExternalService({
       my_resource: {
@@ -149,9 +149,14 @@ const service = {
         url: "https://api.example.com/my_resource",
         // Polling interval, in milliseconds
         interval: 5000,
-        // data processing into `Entry<K, V>[]` key/values structure
-        conv: (data: Json) => Array.from(data, (v, k) => [k, [v]])
-      }
+        // Convert the JSON response into `Entry<Json, Json>[]` key/values entries
+        conv: (data: Json) => {
+          if (!Array.isArray(data)) {
+            throw new Error("Expected JSON array from polled endpoint");
+          }
+          return data.map((v, k) => [k, v === null ? [] : [v]]);
+        },
+      },
     }),
   },
 };

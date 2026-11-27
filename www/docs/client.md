@@ -31,7 +31,8 @@ The `init` event contains all available data for the resource when the connectio
 
 Subsequent `update` events indicate changes _only_ at the included keys: the first update here removes `"value3"` from `"key2"`, while the second adds a new entry associating `"key3"` to `"value4"`.
 
-All events include an `id` metadata field which should mostly be ignored, but can be useful for debugging, replay, and similar purposes.
+Data events (`init` and non-empty `update`) include an `id` field containing the update's watermark string; periodic heartbeat frames (`event: update` with `data:[]`) omit `id`.
+Note that the SSE endpoint does not read `Last-Event-ID`, so reconnecting to a stream receives a fresh `init` event rather than replaying missed updates.
 
 In practice, client apps don't need to interact with this raw data stream: JavaScript provides a useful `EventSource` interface to maintain the connection and register event-handler callbacks.
 
@@ -85,7 +86,14 @@ Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.servi
 Synchronous writes and other reactive service operations can be exposed analogously, by calling [`update`](api/helpers/classes/SkipServiceBroker#update) on the reactive service from your web backend.
 
 Note that, though `SkipServiceBroker` offers a convenient programmatic interface to the underlying reactive service operations, it is a thin wrapper around the HTTP interface documented [here](api/server/functions/runService).
-If your web backend is written in a different language, then you can construct and send equivalent requests, accessing the `/v1/snapshot` route for synchronous resource reads and `/v1/resources/:collection` for synchronous input collection writes.
+If your web backend is written in a different language, then you can construct and send equivalent requests:
+- `POST /v1/streams/:resource` with JSON-encoded resource parameters in the body creates a resource instance and returns HTTP `201` with a plain-text UUID token to pass to `GET /v1/streams/:uuid`.
+- `POST /v1/snapshot/:resource` with raw JSON-encoded resource parameters in the body (for example, the numeric user ID `0` for the getting-started `active_friends` resource, which validates `typeof params == "number"` rather than reading a query parameter) returns the full snapshot as `[key, values[]][]`.
+- `POST /v1/snapshot/:resource/lookup` with `{ "key": ..., "params": ... }` in the JSON body returns the `V[]` values associated with `key`.
+- `PATCH /v1/inputs/:collection` with `[key, values[]][]` entries updates an input collection.
+
+When interacting with a service in-process via `ServiceInstance` (returned by `initService` from `@skipruntime/wasm` or `@skipruntime/native`), subscriptions use nominal `SubscriptionID` and `Watermark` wrapper classes — both expose `toString()` and serialize to plain strings via `toJSON()`.
+`subscribe` accepts an optional `string | Watermark` (a best-effort starting watermark; if it does not match the current session, the runtime sends a fresh initial snapshot rather than guaranteeing replay) and returns an in-process `SubscriptionID` passed to `unsubscribe` (not an SSE field).
 
 ## Example web service configuration
 
@@ -95,7 +103,9 @@ Managing these UUIDs is straightforward, but is best done using a traditional we
 A simple explanatory example is given here using the [Express](https://expressjs.com) web framework, but any web framework will do -- Skip is designed to work over HTTP with whatever backend framework you like.
 
 ```typescript
+import { SkipServiceBroker } from "@skipruntime/helpers";
 import express from "express";
+
 const app = express();
 app.use(express.json());
 
@@ -110,25 +120,38 @@ const reactive_service = new SkipServiceBroker({
 });
 
 // On receiving a GET request for a reactive resource instance,
-//  1. Parse out any params from the request
+//  1. Parse and validate any params from the request
 //  2. Request a stream identifier with those parameters from the reactive service
 //  3. Redirect the client to the corresponding stream address
 app.get("/my_resource/:id", (req, res) => {
-  const params = { id: req.params.id, foo: req.params.bar, ... };
+  const filter =
+    typeof req.query["filter"] === "string" ? req.query["filter"] : "";
+  const params = { id: req.params.id, filter };
   reactive_service
     .getStreamUUID("my_resource", params)
     .then((uuid) => {
-      res.redirect(301, `http://${reactive_host}:${streaming_port}/v1/streams/${uuid}`);
+      res.redirect(
+        301,
+        `http://${reactive_host}:${streaming_port}/v1/streams/${uuid}`,
+      );
     })
+    .catch((e: unknown) => {
+      res.status(500).json({ error: String(e) });
+    });
 });
 
 // Synchronous read of a specific key in a resource instance
 app.get("/my_resource/:id/:key", (req, res) => {
-  const params = { id: req.params.id, foo: req.params.bar, ... };
+  const filter =
+    typeof req.query["filter"] === "string" ? req.query["filter"] : "";
+  const params = { id: req.params.id, filter };
   reactive_service
     .getArray("my_resource", params, req.params.key)
     .then((data) => {
       res.status(200).json(data);
+    })
+    .catch((e: unknown) => {
+      res.status(500).json({ error: String(e) });
     });
 });
 ```
