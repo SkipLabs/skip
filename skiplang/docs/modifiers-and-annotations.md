@@ -9,9 +9,9 @@ differently:
 - **Annotations** are `@name` or `@name("param")`. They are stored as plain
   strings and are mostly directives to the optimizer and the back end.
   User-defined annotations (enumerated with `#forEachFunction`, e.g. sktest's
-  `@test`) are still allowed, but an unrecognized name that looks like a typo
-  of a compiler-known annotation (e.g. `@debbug` for `@debug`) is an error
-  with a "did you mean" suggestion — see #1345.
+  `@test`) are allowed, but an unrecognized name that looks like a typo of a
+  compiler-known annotation (e.g. `@debbug` for `@debug`) is an error with a
+  "did you mean" suggestion — see [#1345].
 
 This document lists both, and what each one actually does.
 
@@ -192,16 +192,15 @@ where it is solved, so solve order cannot silently change what is checked.
 ### `native`
 
 Declares a function, method or constant with no body, implemented outside Skip.
-A `native` declaration must also carry `@cpp_extern`, `@cpp_runtime` or
-`@intrinsic`; if it does not, the compiler fails with an internal error rather
-than a clean diagnostic:
+A `native` function or method must also carry `@cpp_extern`, `@cpp_runtime` or
+`@intrinsic`; omitting all three is a compile error during naming (caught by
+`skargo check`):
 
 ```text
-Internal error: Native functions must be declared with @cpp_extern, @cpp_runtime, or @intrinsic
+Native functions must be declared with @cpp_extern, @cpp_runtime, or @intrinsic
 ```
 
-(and the same with "methods" for a method). This is a back-end check, so
-`skargo check` does not reach it.
+(and the same with "methods" for a method).
 
 `native` on a *class* means something else: the class gets an opaque constructor
 and has no Skip-visible fields. You may not write a parameter list on it —
@@ -278,26 +277,31 @@ Unlike `async`, generators work.
 An annotation is `@name`, optionally with a single string argument,
 `@name("param")`. They are stored as raw strings and matched exactly.
 
-### Annotations are not validated
+### Open annotation names and typo checking
 
-The parser accepts `@` followed by any identifier, and there is no whitelist and
-no "unknown annotation" diagnostic. **A misspelled annotation is silently
-accepted and does nothing.** This compiles without a warning:
+The parser accepts `@` followed by any identifier, and there is no strict
+whitelist because user-defined annotations are a deliberate feature: the
+compiler indexes every top-level function by the annotations it carries, and
+`#forEachFunction (@foo, ...)` enumerates them. That is how a library defines
+its own annotation without compiler support — sktest's `@test` is not known to
+the compiler at all.
+
+To catch accidental typos of compiler-known annotations (such as `@debbug` for
+`@debug`, which would otherwise silently re-enable CSE), naming runs a
+did-you-mean check (`checkAnnotationNames` in `skipAst.sk`) against the
+compiler's known annotations on functions, methods, classes, and type aliases.
+An unrecognized name close to a compiler-known annotation is rejected with a
+compile error:
 
 ```skip
-@totally_bogus_annotation
-@debbug                    // typo for @debug — silently does nothing
+@debbug                    // error: Unknown annotation @debbug. Did you mean @debug?
 fun helper(): Int { 42 }
 ```
 
-This matters because several annotations are load-bearing for correctness — a
-typo in `@debug` silently restores CSE, quietly reintroducing exactly the merge
-of side-effecting calls it exists to prevent.
-
-The openness is deliberate, though: the compiler indexes every function by the
-annotations it carries, and `#forEachFunction (@foo, ...)` enumerates them. That
-is how a library defines its own annotation without any compiler support —
-sktest's `@test` is exactly this, and is not known to the compiler at all.
+Unrecognized names that do not resemble any compiler-known annotation (like
+`@test` or `@totally_bogus_annotation`) are accepted as user-defined
+annotations and have no built-in compiler effect unless consumed via
+`#forEachFunction`.
 
 ### Tracking and optimization
 
@@ -336,8 +340,10 @@ that is not `untracked`. The back end deliberately ignores it and still treats
 the function as untracked, so it still does not CSE.
 
 **`@always_inline`** is not a guarantee — it only suppresses the size/`returns`
-heuristic, and is still subject to the normal legality check, so `@no_inline` or
-`@gc` silently defeat it.
+heuristic, and is still subject to the normal legality check. On top-level
+functions, the naming pass rejects the directly contradictory cases
+(`@always_inline` combined with `@no_inline` or `@gc`, or on a bodyless `native`
+function); on methods, `@no_inline` or `@gc` still defeat it in the inliner.
 
 ### Native declarations
 
@@ -513,8 +519,9 @@ only `@wasm_export` is not exported in a native build and may be eliminated.
 `@cpp_export` on a **class** means something different: it pins the field layout
 (declaration order, naturally aligned) instead of letting the compiler choose,
 and keeps the object a real heap object. Such a class must be final and may not
-extend a base class — violating that is a back-end internal error rather than a
-clean diagnostic, so `skargo check` does not catch it.
+extend a base class — violating that is a compile error during naming (caught by
+`skargo check`):
+`@cpp_export classes must be final and may not extend any base classes`.
 
 ### Garbage collection
 
@@ -551,8 +558,8 @@ force-compiled and emitted with machine-readable markers.
 
 ### Not annotations
 
-`@anything` and `@param` look like annotations but are not, and cannot be
-written:
+`@anything` and `@param` look like annotations but are compiler-internal
+spellings, not built-in annotations:
 
 - `@anything` is how the pretty-printer renders the type checker's internal
   "unconstrained" type. You only ever see it in a compiler type dump.
@@ -560,6 +567,9 @@ written:
   parameters. The leading `@` is deliberate: no user identifier can start with
   `@`, so the names cannot collide.
 
-Writing either one parses as an unknown annotation and is silently ignored.
+Neither has any meaning as a source annotation (the compiler does not recognize
+them as built-in annotations, and neither triggers the typo check, so writing
+them on a declaration only attaches an unused user-defined annotation).
 
 [#1182]: https://github.com/SkipLabs/skip/issues/1182
+[#1345]: https://github.com/SkipLabs/skip/issues/1345
