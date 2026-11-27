@@ -16,6 +16,11 @@ export * from "./errors.js";
 export type { Managed, Json, JsonObject, Opaque, DepSafe };
 export { deepFreeze } from "../skiplang-json/index.js";
 export type { Nullable };
+import type {
+  eagerCollectionBrand,
+  lazyCollectionBrand,
+  inputDefinitionBrand,
+} from "./brands.js";
 
 /**
  * Type-erased base for eager collections, enabling sound typing in collection maps.
@@ -26,19 +31,23 @@ export type { Nullable };
  * erases the type parameters so that collections with different key/value
  * types can be stored together in a `NamedEagerCollections` map.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only collections created by the Skip runtime (or explicit casts) inhabit
+ * this type; object literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractEagerCollection {
-  readonly __sk_collectionBrand: undefined;
+  declare readonly [eagerCollectionBrand]: never;
 }
 
 /**
  * Type-erased base for lazy collections, enabling sound typing in collection maps.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only collections created by the Skip runtime (or explicit casts) inhabit
+ * this type; object literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractLazyCollection {
-  readonly __sk_lazyCollectionBrand: undefined;
+  declare readonly [lazyCollectionBrand]: never;
 }
 
 /**
@@ -552,18 +561,26 @@ export type InputCollections<Defs> = {
 
 /**
  * Constraint ensuring every property of `T` is an `AbstractInputDefinition`.
+ *
+ * `T` must be a plain record: arrays (and tuples) are rejected via the
+ * `length?: never` member, since the runtime builds plain objects keyed by
+ * collection name.
  */
 export type AllInputDefs<T> = {
   readonly [K in keyof T]: AbstractInputDefinition;
-};
+} & { readonly length?: never };
 
 /**
  * Constraint ensuring every property of `T` is an `AbstractEagerCollection` or
  * `AbstractLazyCollection`.
+ *
+ * `T` must be a plain record: arrays (and tuples) are rejected via the
+ * `length?: never` member, since the runtime builds plain objects keyed by
+ * collection name.
  */
 export type AllSharedCollections<T> = {
   readonly [K in keyof T]: AbstractEagerCollection | AbstractLazyCollection;
-};
+} & { readonly length?: never };
 
 /**
  * Resource provided by a `SkipService`.
@@ -621,10 +638,12 @@ export type InitialData<Inputs extends NamedEagerCollections> = {
 /**
  * Type-erased base for input definitions, enabling sound typing in input maps.
  *
- * Uses a brand field to keep the type-erased bases distinct from each other and from unrelated types.
+ * Nominally branded with a `unique symbol` key private to `@skipruntime/core`,
+ * so only subclasses (such as `InputDefinition`) inhabit this type; object
+ * literals and other structural look-alikes are rejected.
  */
 export abstract class AbstractInputDefinition {
-  readonly __sk_inputDefBrand: undefined;
+  declare readonly [inputDefinitionBrand]: never;
 }
 
 /**
@@ -729,8 +748,16 @@ export interface SkipService<
 }
 
 /**
- * Type-erased SkipService, for use in internal runtime code and consumers
- * that don't need specific type parameters.
+ * Type-erased `SkipService`, for use by the Skip runtime internals only.
+ *
+ * Exported so that the runtime packages (`@skipruntime/wasm`,
+ * `@skipruntime/native`) can share the type across the FFI boundary. It erases
+ * the link between `inputs`, `createGraph`, and `resources`, so annotating a
+ * service with it opts out of all static checking between them. Service
+ * authors must not use it: write services against
+ * `SkipService<InputDefs, ResourceInputs>` (or let it be inferred) instead.
+ *
+ * @internal
  */
 export type AnySkipService = SkipService<
   NamedInputDefinitions,

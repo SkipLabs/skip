@@ -46,6 +46,7 @@ import {
   AbstractLazyCollection,
   type SharedCollections,
 } from "./api.js";
+import type { eagerCollectionBrand, lazyCollectionBrand } from "./brands.js";
 
 import {
   SkipClassNameError,
@@ -278,7 +279,7 @@ class LazyCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements LazyCollection<K, V>
 {
-  readonly __sk_lazyCollectionBrand: undefined;
+  declare readonly [lazyCollectionBrand]: never;
 
   constructor(
     readonly lazyCollection: string,
@@ -322,7 +323,7 @@ export class EagerCollectionImpl<K extends Json, V extends Json>
   extends SkManaged
   implements EagerCollection<K, V>
 {
-  readonly __sk_collectionBrand: undefined;
+  declare readonly [eagerCollectionBrand]: never;
 
   constructor(
     public readonly collection: string,
@@ -1044,6 +1045,18 @@ export class ServiceInstanceImpl implements ServiceInstance {
     if (errorHdl) throw this.refs.handles.deleteHandle(errorHdl);
   }
 }
+
+/**
+ * Runtime value alias of `ServiceInstanceImpl`, kept so that existing value
+ * imports of `ServiceInstance` (e.g. `x instanceof ServiceInstance`) keep
+ * working now that `ServiceInstance` is also an interface.
+ *
+ * Deprecated: use `ServiceInstanceImpl` (or type-only `ServiceInstance`)
+ * instead. (Not tagged `@deprecated`: this const merges with the
+ * `ServiceInstance` interface, and the tag would mark every type-only use of
+ * the interface as deprecated too.)
+ */
+export const ServiceInstance = ServiceInstanceImpl;
 
 class ValuesImpl<T> implements Values<T> {
   /* Lazy Iterable/Sequence: values are generated from

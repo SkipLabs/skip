@@ -189,6 +189,23 @@ type FollowerLazies<ResourceInputs> = [LazyKeys<ResourceInputs>] extends [never]
     };
 
 /**
+ * Static exhaustiveness check for `asFollower`'s `collections`: when some eager
+ * key of `ResourceInputs` is missing from `Eager`, requires a property whose
+ * type names the missing keys, so the call fails to type-check with an error
+ * listing them.
+ */
+type FollowerCoverage<ResourceInputs, Eager extends readonly string[]> = [
+  Exclude<EagerKeys<ResourceInputs>, Eager[number]>,
+] extends [never]
+  ? unknown
+  : {
+      readonly missingEagerCollections: Exclude<
+        EagerKeys<ResourceInputs>,
+        Eager[number]
+      >;
+    };
+
+/**
  * Run a `SkipService` as a *follower* in a leader-follower topology.
  *
  * Instead of running a `service` on one machine, it can be distributed across multiple in a leader-follower architecture, with one "leader" maintaining the shared computation graph and one or more "followers" across which client-requested resource instances are distributed.
@@ -196,13 +213,14 @@ type FollowerLazies<ResourceInputs> = [LazyKeys<ResourceInputs>] extends [never]
  * The two kinds of shared collection are obtained differently. Eager collections, named in `collections`, are *mirrored* from the leader: the leader maintains them and streams their updates to the follower. Lazy collections cannot be mirrored, since they hold no maintained state to stream; each is instead *rebuilt locally* by the follower, `lazies` mapping its shared name to a function which, given the follower's `Context`, produces the corresponding lazy collection. Together, the two are expected to cover the `ResourceInputs` of `service`.
  *
  * @remarks
- * `collections` is checked to contain only eager collection names from `ResourceInputs`, and `lazies` must provide a typed factory for every lazy collection in `ResourceInputs`. The follower still trusts that `collections` covers all eager keys of `ResourceInputs` and that the leader serves mirrored collections matching their key/value types.
+ * `collections` is checked statically to contain only eager collection names from `ResourceInputs` and, when given as a literal, to list every one of them (a missing name is reported as a `missingEagerCollections` type error naming it); `lazies` must provide a typed factory for every lazy collection in `ResourceInputs`. At runtime, `asFollower` throws a `SkipError` if a name appears in both `collections` and `lazies` or a `lazies` entry is not a function. Since `ResourceInputs` is a compile-time type only, coverage cannot be re-checked at runtime for non-literal `collections`, and the follower trusts that the leader serves mirrored collections matching their key/value types.
  *
  * @returns The *follower* component to run `service` in such a configuration.
  */
 export function asFollower<
   InputDefs extends AllInputDefs<InputDefs>,
   ResourceInputs extends AllSharedCollections<ResourceInputs>,
+  const Eager extends readonly EagerKeys<ResourceInputs>[],
 >(
   service: SkipService<InputDefs, ResourceInputs>,
   leader: {
@@ -211,9 +229,11 @@ export function asFollower<
       streaming_port: number;
       control_port: number;
     };
-    readonly collections: readonly EagerKeys<ResourceInputs>[];
-  } & FollowerLazies<ResourceInputs>,
+    readonly collections: Eager;
+  } & FollowerLazies<ResourceInputs> &
+    FollowerCoverage<ResourceInputs, Eager>,
 ): SkipService<Record<string, never>, ResourceInputs> {
+  checkFollowerConfig(leader.collections, leader.lazies);
   return {
     inputs: {},
     externalServices: {
@@ -250,4 +270,31 @@ export function asFollower<
       return mirroredCollections as unknown as ResourceInputs;
     },
   };
+}
+
+/**
+ * Runtime validation of the parts of `asFollower`'s configuration that can be
+ * checked without the (compile-time only) `ResourceInputs` type.
+ */
+function checkFollowerConfig(
+  collections: readonly string[],
+  lazies: { readonly [name: string]: unknown } | undefined,
+): void {
+  if (lazies === undefined) return;
+  const eager = new Set(collections);
+  const both: string[] = [];
+  const notFunctions: string[] = [];
+  for (const [name, factory] of Object.entries(lazies)) {
+    if (eager.has(name)) both.push(name);
+    if (factory !== undefined && typeof factory !== "function")
+      notFunctions.push(name);
+  }
+  if (both.length > 0)
+    throw new SkipError(
+      `asFollower: shared collection(s) listed in both \`collections\` and \`lazies\`: ${both.join(", ")}.`,
+    );
+  if (notFunctions.length > 0)
+    throw new SkipError(
+      `asFollower: \`lazies\` entries must be functions producing a lazy collection: ${notFunctions.join(", ")}.`,
+    );
 }

@@ -21,11 +21,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    `toString()` and `toJSON()`) instead of `Opaque<string>` aliases; note that
    `===` and `Map` keys compare by object identity rather than string value (#1811)
  - `ServiceInstance` is now exported as a TypeScript interface (with
-   `ServiceInstanceImpl` as the concrete runtime class) instead of a class
-   value export (#1811)
- - `asFollower` now restricts `collections` to eager collection keys and
-   requires typed `lazies` factories matching each lazy collection in
-   `ResourceInputs` (#1811)
+   `ServiceInstanceImpl` as the concrete runtime class); a deprecated
+   `ServiceInstance` value alias of `ServiceInstanceImpl` keeps existing
+   value imports (e.g. `instanceof ServiceInstance`) working (#1811)
+ - `asFollower` now restricts `collections` to eager collection keys, requires
+   a literal `collections` to list every eager collection in `ResourceInputs`,
+   and requires typed `lazies` factories matching each lazy collection; it
+   throws a `SkipError` at runtime if a name is in both `collections` and
+   `lazies` or a `lazies` entry is not a function (#1811)
+ - `AbstractEagerCollection`, `AbstractLazyCollection`, and
+   `AbstractInputDefinition` are now nominal (branded with a `unique symbol`
+   key private to `@skipruntime/core`) instead of carrying public
+   `__sk_*Brand: undefined` fields; object literals or other structural
+   implementations are no longer accepted and must be replaced by runtime-created
+   collections / `InputDefinition` instances
 
 ## [0.0.23] - 2026-05-28
 
