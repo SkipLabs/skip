@@ -29,8 +29,14 @@ export type Handle<T> = Internal.Opaque<number, { handle_for: T }>;
  * constructing input collections for `service.inputs` and passing the output of
  * `service.createGraph` to `service.resources`.
  *
+ * Exported (via `@skipruntime/core/binding.js`) only for the Skip runtime
+ * packages (`@skipruntime/wasm`, `@skipruntime/native`) to call at their entry
+ * points. Service authors must not use it: pass typed services directly to
+ * `runService` / `initService`.
+ *
  * @param service - The typed `SkipService` to erase.
  * @returns The type-erased `AnySkipService`.
+ * @internal
  */
 export function eraseService<
   InputDefs extends AllInputDefs<InputDefs>,

@@ -740,8 +740,16 @@ export interface SkipService<
 }
 
 /**
- * Type-erased SkipService, for use in internal runtime code and consumers
- * that don't need specific type parameters.
+ * Type-erased `SkipService`, for use by the Skip runtime internals only.
+ *
+ * Exported so that the runtime packages (`@skipruntime/wasm`,
+ * `@skipruntime/native`) can share the type across the FFI boundary. It erases
+ * the link between `inputs`, `createGraph`, and `resources`, so annotating a
+ * service with it opts out of all static checking between them. Service
+ * authors must not use it: write services against
+ * `SkipService<InputDefs, ResourceInputs>` (or let it be inferred) instead.
+ *
+ * @internal
  */
 export type AnySkipService = SkipService<
   NamedInputDefinitions,
