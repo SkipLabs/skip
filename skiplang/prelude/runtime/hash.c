@@ -214,7 +214,13 @@ static uint64_t sk_hash_obj(sk_stack_t* st, char* obj) {
   // Mix element length so empty vs non-empty arrays and different array shapes
   // with identical concatenated fields remain distinct.
   h = sk_hash_u64(h, (uint64_t)len);
-  h = sk_hash_u64(h, (uint64_t)(uintptr_t)ty);
+  // Hash the compiler-assigned nominal type identity (deterministic across
+  // runs/ASLR in both debug and release builds, unlike the raw `ty` pointer).
+  // Fall back to `ty` only for synthetic C test structs that leave
+  // m_typeIdentity zeroed.
+  uint64_t type_tag = ty->m_typeIdentity != 0 ? (uint64_t)ty->m_typeIdentity
+                                              : (uint64_t)(uintptr_t)ty;
+  h = sk_hash_u64(h, type_tag);
 
   return h;
 }

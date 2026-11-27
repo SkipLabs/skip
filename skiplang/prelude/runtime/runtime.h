@@ -170,7 +170,9 @@ typedef struct {
   uint16_t m_uninternedMetadataByteSize;
   uint16_t m_unused_internedMetadataByteSize;
   SkipInt m_userByteSize;
-  SkipInt m_unused_padding;
+  // Nominal type identity assigned by createVTableBuilders in vtable.sk
+  // (1-based; 0 only for synthetic test structs).
+  SkipInt m_typeIdentity;
   SkipInt m_refMask[0];
   // a 0-terminated name follows if m_hasName is true
 } SKIP_gc_type_t;
