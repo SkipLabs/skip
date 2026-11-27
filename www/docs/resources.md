@@ -8,27 +8,27 @@ This page describes the concepts and abstractions that make up the _inter_-servi
 
 ## Overview
 
-A Skip [reactive service](api/core/interfaces/SkipService) describes a reactive computation from some set of inputs to some set of outputs.
+A Skip [reactive service](api/core/interfaces/SkipService) (`SkipService<InputDefs, ResourceInputs>`) describes a reactive computation from typed input collections to shared collections and parameterized output resources.
 
-A service's inputs are its *input collections* (data owned by the service that can be freely read/written/mapped over) and its *external services* (any dependencies on outside systems or APIs).
+A service's inputs are its *input collections* — declared in `inputs` as [`InputDefinition<K, V>`](api/core/classes/InputDefinition) values whose key/value types determine the `InputCollections<InputDefs>` passed to `createGraph` — and its optional *external services* (dependencies on outside systems or APIs).
 
-A service's outputs are its *resources*, which define the types of requests that the service can handle, either by accessing data from its shared computation graph or by dynamically extending it with further reactive computation as needed to handle the request.
-In this way, we can think of resources as parameterized outputs; request parameters are used to instantiate the resource and produce a *resource instance* containing the requested data.
+A service's outputs are its *resources* — constructors of type `ResourceClass<ResourceInputs, Json>` that accept `Json` request parameters, validate them, and implement `Resource<ResourceInputs>` to access or extend the shared computation graph produced by `createGraph`.
+In this way, resources act as parameterized outputs; request parameters instantiate a resource to produce a *resource instance* containing the requested data.
 
 For a concrete example, take the "active friends" resource from the getting-started [example](getting_started.md#the-anatomy-of-a-skip-service) service:
 
 ```typescript
-// Load initial data from a source-of-truth database (mocked for simplicity)
-const initialData: InitialData<ServiceInputs> = {
-  users: ... ,
-  groups: ... ,
+// Define input collections and initial data (mocked for simplicity)
+const inputs = {
+  users: new InputDefinition<UserID, User>(/* ... */),
+  groups: new InputDefinition<GroupID, Group>(/* ... */),
 };
 
 // Specify and run the reactive service
 const service = {
-  initialData,
+  inputs,
   resources: { active_friends: ActiveFriends },
-  createGraph(input: ServiceInputs): ResourceInputs {
+  createGraph: (input: ServiceInputs): ResourceInputs => {
     const users = input.users;
     const activeMembers = input.groups.map(ActiveMembers, users);
     return { users, activeMembers };
@@ -63,7 +63,7 @@ The eager collection returned by the `instantiate` function is the output served
 This _resource instance_ can be explicitly closed by the client, or it will be garbage collected by the Skip framework after a period of inactivity.
 
 When a Skip service depends on the output of another Skip service, its "request" for a resource instance is made using the [`Context#useExternalResource`](api/core/interfaces/Context#useexternalresource) API.
-After registering an external service `"myOtherService"` (as described [here](externals.md)) with some `"my_resource"`, your service can call `context.useExternalResource("myOtherService", "my_resource", params)` to access that resource with the given parameters, allowing reactive computation to propagate through multiple services.
+After registering an external service `"myOtherService"` (as described [here](externals.md)) with some `"my_resource"`, your service can call `context.useExternalResource({ service: "myOtherService", identifier: "my_resource", params })` to access that resource with the given parameters, allowing reactive computation to propagate through multiple services.
 
 ## Resource HTTP API
 

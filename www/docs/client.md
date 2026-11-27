@@ -85,7 +85,9 @@ Then, from your client, issue HTTP `GET` requests to e.g. `http://reactive.servi
 Synchronous writes and other reactive service operations can be exposed analogously, by calling [`update`](api/helpers/classes/SkipServiceBroker#update) on the reactive service from your web backend.
 
 Note that, though `SkipServiceBroker` offers a convenient programmatic interface to the underlying reactive service operations, it is a thin wrapper around the HTTP interface documented [here](api/server/functions/runService).
-If your web backend is written in a different language, then you can construct and send equivalent requests, accessing the `/v1/snapshot` route for synchronous resource reads and `/v1/resources/:collection` for synchronous input collection writes.
+If your web backend is written in a different language, then you can construct and send equivalent requests, accessing the `/v1/snapshot` route for synchronous resource reads and `/v1/inputs/:collection` for synchronous input collection writes.
+
+When interacting with a service in-process via `ServiceInstance` (returned by `initService`), subscriptions use nominal `SubscriptionID` and `Watermark` wrapper classes (each exposing `toString()`): `subscribe` accepts an optional `string | Watermark` to resume from a watermark and returns a `SubscriptionID` passed to `unsubscribe`.
 
 ## Example web service configuration
 

@@ -27,7 +27,7 @@ To receive data from another Skip service, specify it in the `externalServices` 
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -76,7 +76,7 @@ A complete example is available [here](https://github.com/SkipLabs/skip/tree/mai
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -108,7 +108,7 @@ An example can be seen [here](https://github.com/SkipLabs/skip/tree/main/example
 
 ```typescript
 const service = {
-  initialData: ...,
+  inputs: ...,
   resources: ...,
   createGraph: ...,
   externalServices: {
@@ -139,9 +139,9 @@ To specify a polled external dependency, specify it in your service definition, 
 
 ```typescript
 const service = {
-  initialData: ...
-  resources: ...
-  createGraph: ...
+  inputs: ...,
+  resources: ...,
+  createGraph: ...,
   externalServices: {
     myExternalService: new PolledExternalService({
       my_resource: {

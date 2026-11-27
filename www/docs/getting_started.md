@@ -86,10 +86,21 @@ Some examples of Mappers are shown [below](getting_started#the-anatomy-of-a-skip
 Let's consider an example reactive service, powering a real-time feature in a social media application with the following types.
 
 ```typescript
+import type { Json } from "@skipruntime/core";
+
 type UserID = number;
 type GroupID = number;
-type User = { name: string; active?: boolean; friends: UserID[] };
-type Group = { name: string; members: UserID[] };
+type User = {
+  readonly name: string;
+  readonly active: boolean;
+  readonly friends: readonly UserID[];
+  readonly [key: string]: Json | null;
+};
+type Group = {
+  readonly name: string;
+  readonly members: readonly UserID[];
+  readonly [key: string]: Json | null;
+};
 ```
 
 Suppose we want to display to users which of their currently-active friends are members of some group(s).
@@ -101,29 +112,29 @@ Skip is designed to bridge this gap, letting you express the moment-in-time logi
 At its core, a Skip service is a reactive computation graph describing how to compute some output _resources_ from some input data and/or external API inputs.
 
 A service is specified by an object passed to `runService`, which will then spin up a Skip runtime and server.
-That object consists of `initialData` used to populate the service's input collections, some `resources` to make available over HTTP, and a function `createGraph` defining a shared computation graph mapping the `ServiceInputs` to `ResourceInputs`.
+That object implements `SkipService<InputDefs, ResourceInputs>`: it provides `inputs` (each entry an `InputDefinition<K, V>` specifying an input collection's key/value types and initial entries), `resources` (constructors accepting `Json` parameters to expose over HTTP), and a function `createGraph` mapping `InputCollections<InputDefs>` to `ResourceInputs`.
 This shared computation graph will be maintained up-to-date at all times, and can be an arbitrarily complex computation graph or as simple as returning the input collections directly, depending on the service.
 
 In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `activeFriends`, and define a reactive computation of the active users in each group. 
 
 ```typescript
 import {
-    type EagerCollection,
-    type InitialData,
-    type Mapper,
-    type Values,
+  type EagerCollection,
+  type Mapper,
+  type Values,
+  InputDefinition,
 } from "@skipruntime/core";
 
 // Type alias for inputs to our service
 type ServiceInputs = {
-  users: EagerCollection<UserID, User>;
-  groups: EagerCollection<GroupID, Group>;
+  readonly users: EagerCollection<UserID, User>;
+  readonly groups: EagerCollection<GroupID, Group>;
 };
 
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
-  users: EagerCollection<UserID, User>;
-  activeMembers: EagerCollection<GroupID, UserID>;
+  readonly users: EagerCollection<UserID, User>;
+  readonly activeMembers: EagerCollection<GroupID, UserID>;
 };
 
 // Mapper function to compute the active users of each group
@@ -139,17 +150,17 @@ class ActiveMembers implements Mapper<GroupID, Group, GroupID, UserID> {
   }
 }
 
-// Load initial data from a source-of-truth database (empty for now for simplicity)
-const initialData: InitialData<ServiceInputs> = {
-  users: [],
-  groups: [],
+// Define input collections and their initial data (empty for now for simplicity)
+const inputs = {
+  users: new InputDefinition<UserID, User>(),
+  groups: new InputDefinition<GroupID, Group>(),
 };
 
 // Specify and run the reactive service
 const service = {
-  initialData,
+  inputs,
   resources: {},
-  createGraph(input: ServiceInputs): ResourceInputs {
+  createGraph: (input: ServiceInputs): ResourceInputs => {
     const activeMembers = input.groups.map(ActiveMembers, input.users);
     return { users: input.users, activeMembers };
   },
@@ -167,13 +178,12 @@ Resources are parameterized by some input HTTP `params` and use an `instantiate`
 
 ```typescript
 import {
-    type EagerCollection,
-    type InitialData,
-    type Mapper,
-    type Values,
-    // two more types to import here
-    type Json,
-    type Resource,
+  type EagerCollection,
+  type Json,
+  type Mapper,
+  type Resource,
+  type Values,
+  InputDefinition,
 } from "@skipruntime/core";
 
 // ... rest of your code so far
@@ -213,16 +223,16 @@ import { runService } from "@skipruntime/server";
 
 // Service definition
 const service = {
-    initialData,
-    resources: { active_friends: ActiveFriends },
-    createGraph(input: ServiceInputs): ResourceInputs {
-        const users = input.users;
-        const activeMembers = input.groups.map(ActiveMembers, users);
-        const _groupsPerUser = input.groups.map(GroupsPerUser);
-        const _numFriendsPerUser = users.map(NumFriendsPerUser);
-        const _numActiveMembers = activeMembers.map(NumActiveMembers);
-        return { users, activeMembers };
-    },
+  inputs,
+  resources: { active_friends: ActiveFriends },
+  createGraph: (input: ServiceInputs): ResourceInputs => {
+    const users = input.users;
+    const activeMembers = input.groups.map(ActiveMembers, users);
+    const _groupsPerUser = input.groups.map(GroupsPerUser);
+    const _numFriendsPerUser = users.map(NumFriendsPerUser);
+    const _numActiveMembers = activeMembers.map(NumActiveMembers);
+    return { users, activeMembers };
+  },
 };
 
 // Run the reactive service
@@ -246,20 +256,20 @@ Skip control service listening on port 8081
 Skip streaming service listening on port 8080
 ```
 
-For the sake of the example, you may want to change `initialData` for some mock data e.g.
+For the sake of the example, you may populate `inputs` with mock data:
 
 ```typescript
-const initialData: InitialData<ServiceInputs> = {
-    users: [
-        [0, [{ name: "Bob", active: true, friends: [1, 2] }]],
-        [1, [{ name: "Alice", active: true, friends: [0, 2] }]],
-        [2, [{ name: "Carol", active: false, friends: [0, 1] }]],
-        [3, [{ name: "Eve", active: true, friends: [] }]],
-    ],
-    groups: [
-        [1001, [{ name: "Group 1", members: [1, 2, 3] }]],
-        [1002, [{ name: "Group 2", members: [0, 2] }]],
-    ],
+const inputs = {
+  users: new InputDefinition<UserID, User>([
+    [0, [{ name: "Bob", active: true, friends: [1, 2] }]],
+    [1, [{ name: "Alice", active: true, friends: [0, 2] }]],
+    [2, [{ name: "Carol", active: false, friends: [0, 1] }]],
+    [3, [{ name: "Eve", active: true, friends: [] }]],
+  ]),
+  groups: new InputDefinition<GroupID, Group>([
+    [1001, [{ name: "Group 1", members: [1, 2, 3] }]],
+    [1002, [{ name: "Group 2", members: [0, 2] }]],
+  ]),
 };
 ```
 
