@@ -150,16 +150,29 @@ A helper that classifies, compares, or projects the variants of a value class be
     }                                }
                                      r.collect(Array)
 
-### Use `.any()` / `.all()` instead of flag-and-full-scan loops
+### Use `.any()` / `.all()` (including on `Range`) or loop return values instead of flag loops
 
-`.any(p)` short-circuits on the first match and `.all(p)` on the first failure; a manual flag loop always scans everything. Keep a manual flag only when the loop body must do real work per element.
+`.any(p)` short-circuits on the first match and `.all(p)` on the first failure — and `Range` is a `Sequence`, so index-based checks can use `Range(0, n).all(i -> ...)` directly instead of a mutable flag. When you genuinely need a loop, return a value from it with `for (...) { if (...) break false } else { true }` rather than mutating a boolean flag before `break void`.
 
-    // worse                          // better
-    found = false;                   hasCmp = xs.any(x -> x is IntCmpUle _);
-    for (x in xs) {                  if (hasCmp) { ... }
-      if (p(x)) !found = true
-    };                               // or: xs.all(x -> p(x))
-    if (found) { ... }
+    // worse
+    equal = true;
+    for (i in Range(0, n)) {
+      if (native_eq(a[i], b[i]) != 0) {
+        !equal = false;
+        break void;
+      }
+    };
+    if (equal) return void;
+
+    // better (Sequence / Range)
+    if (Range(0, n).all(i -> native_eq(a[i], b[i]) == 0)) return void;
+
+    // better (when a loop is needed)
+    equal = for (i in Range(0, n)) {
+      if (native_eq(a[i], b[i]) != 0) break false;
+    } else {
+      true
+    };
 
 ### Style rules don't apply to tests
 
