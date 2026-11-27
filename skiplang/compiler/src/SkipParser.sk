@@ -3687,6 +3687,18 @@ mutable class SkipParser{
     };
     pattern = this.parseAtomicPattern();
     this.reportBindingsInIsAsPattern(pattern, PredefinedName.is);
+    if (
+      this.peekKind(TokenKind.BAR()) &&
+      !this.peekParse(parser -> {
+        _ = parser.eatTree(TokenKind.BAR());
+        parser.peekParseLikelyPatternBranch()
+      })
+    ) {
+      this.addErrorAtCurrent(
+        errorIsAsOrPatternRequiresParens,
+        "Or-patterns after 'is' must be parenthesized, e.g. 'is (A() | B())'.",
+      );
+    };
     ParseTree.IsExpressionTree{
       range => Parser.createRangeOfTreeAndCurrent(value, this),
       value,
@@ -3707,6 +3719,18 @@ mutable class SkipParser{
     };
     pattern = this.parseAtomicPattern();
     this.reportBindingsInIsAsPattern(pattern, TokenKind.AS().toString());
+    if (
+      this.peekKind(TokenKind.BAR()) &&
+      !this.peekParse(parser -> {
+        _ = parser.eatTree(TokenKind.BAR());
+        parser.peekParseLikelyPatternBranch()
+      })
+    ) {
+      this.addErrorAtCurrent(
+        errorIsAsOrPatternRequiresParens,
+        "Or-patterns after 'as' must be parenthesized, e.g. 'as (A() | B())'.",
+      );
+    };
     ParseTree.AsExpressionTree{
       range => Parser.createRangeOfTreeAndCurrent(value, this),
       value,
@@ -5719,5 +5743,6 @@ const errorLambdaTypeExpected: Int = 193;
 const errorExpectedLogArguments: Int = 194;
 const errorTooManyLogArguments: Int = 195;
 const errorInvalidEnvMacroArgument: Int = 196;
+const errorIsAsOrPatternRequiresParens: Int = 197;
 
 module end;
