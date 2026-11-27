@@ -1112,12 +1112,13 @@ fun strongFinalizeHash(h: Int): Int {
 */
 
 // Quickly mixes up the hash bits, especially into the high bits, which are
-// used as the hash table index, using an even number to force the low bit
-// to be zero, indicating non-empty. This simple function doesn't hit
-// avalanche but we don't need that for all bits, just good data in the
-// high bits.
+// used as the hash table index. Fold high bits down before multiplying by an
+// odd Murmur3 constant so keys that differ only in upper bits (e.g. Float
+// sign/exponent bits or bit 63) still disperse well, then clear bit 0 to
+// reserve odd hashes for empty-slot sentinels.
 private fun finalizeHash(h: Int): Int {
-  h * 0xc4ceb9fe1a85ec52
+  x = h.xor(h.ushr(33));
+  (x * 0xc4ceb9fe1a85ec53).and(-2)
 }
 
 // Compute log2 of the number of slots necessary to hold the given capacity.

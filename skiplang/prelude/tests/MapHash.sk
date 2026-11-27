@@ -1,0 +1,283 @@
+module alias T = SKTest;
+
+module MapHashTest;
+
+// Keys that collide in low bits and differ only in high bits:
+// - 0 vs Int::min (1 << 63)
+// - 1.0 vs -1.0 (IEEE 754 sign bit 63)
+// - powers of 2 / sequential values shifted into the top 16 bits
+//
+// Previously, `finalizeHash(h) = h * 0xc4ceb9fe1a85ec52` discarded bit 63
+// completely (even multiplier + upward-only bit propagation) and poorly mixed
+// upper-bit-only differences into the high-bit table index.
+
+@test
+fun testMapIntBit63Distinct(): void {
+  m = mutable Map<Int, String>[];
+  m.set(0, "zero");
+  m.set(Int::min, "min");
+
+  T.expectEq(m.size(), 2);
+  T.expectEq(m.maybeGet(0), Some("zero"));
+  T.expectEq(m.maybeGet(Int::min), Some("min"));
+  T.expectTrue(m.containsKey(0));
+  T.expectTrue(m.containsKey(Int::min));
+
+  // Updating one does not clobber the other
+  m.set(Int::min, "min-updated");
+  T.expectEq(m.maybeGet(0), Some("zero"));
+  T.expectEq(m.maybeGet(Int::min), Some("min-updated"));
+
+  // Removing one preserves the other
+  T.expectTrue(m.maybeRemove(0));
+  T.expectEq(m.size(), 1);
+  T.expectEq(m.maybeGet(0), None());
+  T.expectEq(m.maybeGet(Int::min), Some("min-updated"));
+
+  T.expectTrue(m.maybeRemove(Int::min));
+  T.expectTrue(m.isEmpty());
+  T.expectEq(m.maybeGet(Int::min), None());
+}
+
+@test
+fun testUnorderedMapIntBit63Distinct(): void {
+  m = mutable UnorderedMap<Int, String>[];
+  m.set(0, "zero");
+  m.set(Int::min, "min");
+
+  T.expectEq(m.size(), 2);
+  T.expectEq(m.maybeGet(0), Some("zero"));
+  T.expectEq(m.maybeGet(Int::min), Some("min"));
+  T.expectTrue(m.containsKey(0));
+  T.expectTrue(m.containsKey(Int::min));
+
+  // Updating one does not clobber the other
+  m.set(Int::min, "min-updated");
+  T.expectEq(m.maybeGet(0), Some("zero"));
+  T.expectEq(m.maybeGet(Int::min), Some("min-updated"));
+
+  // Removing one preserves the other
+  T.expectTrue(m.maybeRemove(0));
+  T.expectEq(m.size(), 1);
+  T.expectEq(m.maybeGet(0), None());
+  T.expectEq(m.maybeGet(Int::min), Some("min-updated"));
+
+  T.expectTrue(m.maybeRemove(Int::min));
+  T.expectTrue(m.isEmpty());
+  T.expectEq(m.maybeGet(Int::min), None());
+}
+
+@test
+fun testMapFloatSignAndExponentBits(): void {
+  m = mutable Map<Float, Int>[];
+  values = Array[0.0, 1.0, -1.0, 2.0, -2.0, 0.5, -0.5, Float::inf, -Float::inf];
+  for (i => v in values) {
+    m.set(v, i);
+  };
+
+  T.expectEq(m.size(), values.size());
+  // -0.0 == 0.0 and shares its hash, so looking up -0.0 finds 0.0's entry
+  T.expectEq(m.maybeGet(-0.0), Some(0));
+  for (i => v in values) {
+    T.expectEq(m.maybeGet(v), Some(i));
+  };
+
+  // Remove negative entries and ensure positive counterparts remain intact
+  for (v in Array[-1.0, -2.0, -0.5, -Float::inf]) {
+    T.expectTrue(m.maybeRemove(v));
+    T.expectEq(m.maybeGet(v), None());
+  };
+  T.expectEq(m.maybeGet(1.0), Some(1));
+  T.expectEq(m.maybeGet(2.0), Some(3));
+  T.expectEq(m.maybeGet(0.5), Some(5));
+  T.expectEq(m.maybeGet(Float::inf), Some(7));
+  T.expectEq(m.size(), 5);
+}
+
+@test
+fun testUnorderedMapFloatSignAndExponentBits(): void {
+  m = mutable UnorderedMap<Float, Int>[];
+  values = Array[0.0, 1.0, -1.0, 2.0, -2.0, 0.5, -0.5, Float::inf, -Float::inf];
+  for (i => v in values) {
+    m.set(v, i);
+  };
+
+  T.expectEq(m.size(), values.size());
+  T.expectEq(m.maybeGet(-0.0), Some(0));
+  for (i => v in values) {
+    T.expectEq(m.maybeGet(v), Some(i));
+  };
+
+  for (v in Array[-1.0, -2.0, -0.5, -Float::inf]) {
+    T.expectTrue(m.maybeRemove(v));
+    T.expectEq(m.maybeGet(v), None());
+  };
+  T.expectEq(m.maybeGet(1.0), Some(1));
+  T.expectEq(m.maybeGet(2.0), Some(3));
+  T.expectEq(m.maybeGet(0.5), Some(5));
+  T.expectEq(m.maybeGet(Float::inf), Some(7));
+  T.expectEq(m.size(), 5);
+}
+
+@test
+fun testMapHighBitsKeysInsertLookupRemove(): void {
+  // 2048 keys differing only in the top 16 bits (including bit 63).
+  // With the old finalizeHash, bit 63 was dropped and high bits did not mix
+  // into lower-shifted table indices, causing severe probe clustering.
+  n = 2048;
+  m = mutable Map<Int, Int>[];
+
+  // Also test single-bit powers of 2 in the top 16 bits (bits 48..63)
+  for (bit in Range(48, 64)) {
+    k = 1.shl(bit);
+    m.set(k, bit);
+  };
+  for (bit in Range(48, 64)) {
+    T.expectEq(m.maybeGet(1.shl(bit)), Some(bit));
+  };
+  for (bit in Range(48, 64)) {
+    T.expectTrue(m.maybeRemove(1.shl(bit)));
+  };
+  T.expectTrue(m.isEmpty());
+
+  // Bulk insert, lookup, update, and removal of high-bit keys
+  for (i in Range(0, n)) {
+    k = i.shl(48);
+    m.set(k, i);
+  };
+  T.expectEq(m.size(), n);
+  for (i in Range(0, n)) {
+    T.expectEq(m.maybeGet(i.shl(48)), Some(i));
+  };
+
+  // Remove even indices, verify odd remain and even are absent
+  for (i in Range(0, n)) {
+    if (i % 2 == 0) {
+      T.expectTrue(m.maybeRemove(i.shl(48)));
+    }
+  };
+  T.expectEq(m.size(), n / 2);
+  for (i in Range(0, n)) {
+    if (i % 2 == 0) {
+      T.expectEq(m.maybeGet(i.shl(48)), None());
+    } else {
+      T.expectEq(m.maybeGet(i.shl(48)), Some(i));
+    }
+  };
+
+  // Also verify pairs differing only in bit 63 across many base keys
+  m.clear();
+  for (i in Range(0, 512)) {
+    base = i.shl(48);
+    flipped = base.xor(Int::min);
+    m.set(base, i);
+    m.set(flipped, -i - 1);
+  };
+  T.expectEq(m.size(), 1024);
+  for (i in Range(0, 512)) {
+    base = i.shl(48);
+    flipped = base.xor(Int::min);
+    T.expectEq(m.maybeGet(base), Some(i));
+    T.expectEq(m.maybeGet(flipped), Some(-i - 1));
+  };
+}
+
+@test
+fun testUnorderedMapHighBitsKeysInsertLookupRemove(): void {
+  n = 2048;
+  m = mutable UnorderedMap<Int, Int>[];
+
+  // Single-bit powers of 2 in the top 16 bits (bits 48..63)
+  for (bit in Range(48, 64)) {
+    k = 1.shl(bit);
+    m.set(k, bit);
+  };
+  for (bit in Range(48, 64)) {
+    T.expectEq(m.maybeGet(1.shl(bit)), Some(bit));
+  };
+  for (bit in Range(48, 64)) {
+    T.expectTrue(m.maybeRemove(1.shl(bit)));
+  };
+  T.expectTrue(m.isEmpty());
+
+  // Bulk insert, lookup, update, and removal of high-bit keys
+  for (i in Range(0, n)) {
+    k = i.shl(48);
+    m.set(k, i);
+  };
+  T.expectEq(m.size(), n);
+  for (i in Range(0, n)) {
+    T.expectEq(m.maybeGet(i.shl(48)), Some(i));
+  };
+
+  // Remove even indices, verify odd remain and even are absent
+  for (i in Range(0, n)) {
+    if (i % 2 == 0) {
+      T.expectTrue(m.maybeRemove(i.shl(48)));
+    }
+  };
+  T.expectEq(m.size(), n / 2);
+  for (i in Range(0, n)) {
+    if (i % 2 == 0) {
+      T.expectEq(m.maybeGet(i.shl(48)), None());
+    } else {
+      T.expectEq(m.maybeGet(i.shl(48)), Some(i));
+    }
+  };
+
+  // Verify pairs differing only in bit 63 across many base keys
+  m.clear();
+  for (i in Range(0, 512)) {
+    base = i.shl(48);
+    flipped = base.xor(Int::min);
+    m.set(base, i);
+    m.set(flipped, -i - 1);
+  };
+  T.expectEq(m.size(), 1024);
+  for (i in Range(0, 512)) {
+    base = i.shl(48);
+    flipped = base.xor(Int::min);
+    T.expectEq(m.maybeGet(base), Some(i));
+    T.expectEq(m.maybeGet(flipped), Some(-i - 1));
+  };
+}
+
+@test
+fun testUnorderedMapBit63DistributionNoDegenerateOrdering(): void {
+  // UnorderedMap iterates in bucket order (determined by finalized hash's top
+  // bits). With the old finalizeHash, `0` and `Int::min` produced identical
+  // finalized hashes (0), and `1.0` and `-1.0` produced identical finalized
+  // hashes, so every pair (k, k ^ Int::min) collided in the exact same bucket
+  // and always appeared adjacent in iteration order.
+  // With the fixed finalizeHash, pairs (k, k ^ Int::min) should land in
+  // distinct buckets across a table of 256 keys (not all adjacent).
+  m = mutable UnorderedMap<Int, Int>[];
+  for (i in Range(0, 128)) {
+    m.set(i, i);
+    m.set(i.xor(Int::min), i);
+  };
+  T.expectEq(m.size(), 256);
+
+  // Record each key's position in UnorderedMap bucket iteration order.
+  positions = mutable Map<Int, Int>[];
+  pos = 0;
+  for (k => _ in m) {
+    positions.set(k, pos);
+    !pos = pos + 1;
+  };
+
+  nonAdjacentPairs = 0;
+  for (i in Range(0, 128)) {
+    p0 = positions[i];
+    p1 = positions[i.xor(Int::min)];
+    diff = if (p0 > p1) p0 - p1 else p1 - p0;
+    if (diff > 1) {
+      !nonAdjacentPairs = nonAdjacentPairs + 1;
+    }
+  };
+  // If bit 63 were discarded, every pair would collide and be adjacent (0
+  // non-adjacent pairs). With proper mixing, almost all pairs are separated.
+  T.expectTrue(nonAdjacentPairs > 100);
+}
+
+module end;
