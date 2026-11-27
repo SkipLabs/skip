@@ -495,4 +495,37 @@ fun minus_seconds2(): void {
   T.expectEq(got, expect)
 }
 
+@test
+fun timeIsMidnight(): void {
+  T.expectTrue(SKDate.Time::create().isMidnight());
+  T.expectTrue(SKDate.Time::create(0, 0, 0, 0).isMidnight());
+  T.expectFalse(SKDate.Time::create(1, 0, 0, 0).isMidnight());
+  T.expectFalse(SKDate.Time::create(0, 1, 0, 0).isMidnight());
+  T.expectFalse(SKDate.Time::create(0, 0, 1, 0).isMidnight());
+  T.expectFalse(SKDate.Time::create(0, 0, 0, 1).isMidnight());
+}
+
+@test
+fun calendarIsDay(): void {
+  date = SKDate.Date::create(2023, 9, 18);
+  T.expectTrue(SKDate.Calendar::forDate(2023, 9, 18).isDay());
+  T.expectTrue(
+    SKDate.Calendar::create(date, SKDate.Time::create(), SKDate.utc).isDay(),
+  );
+  T.expectFalse(
+    SKDate.Calendar::create(
+      date,
+      SKDate.Time::create(12, 0, 0, 0),
+      SKDate.utc,
+    ).isDay(),
+  );
+  T.expectFalse(
+    SKDate.Calendar::create(
+      date,
+      SKDate.Time::create(0, 0, 0, 1),
+      SKDate.utc,
+    ).isDay(),
+  );
+}
+
 module end;
