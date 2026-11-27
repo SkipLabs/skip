@@ -29,7 +29,11 @@ interface Mapper<
   K2 extends Json,
   V2 extends Json,
 > {
-  mapEntry(key: K1, values: Values<V1>): Iterable<[K2, V2]>;
+  readonly mapEntry: (
+    key: K1,
+    values: Values<V1>,
+    context: Context,
+  ) => Iterable<[K2, V2]>;
 }
 ```
 
