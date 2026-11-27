@@ -20,7 +20,7 @@ Companion docs:
 - **Iterator consumption**: `.values()`/`.items()`/`.keys()` return a single-use `mutable Iterator`. Materialize with `.collect(Array)`, `.collect(Vector)`, `.collect(Map)`, or `.toArray()`.
 - **`List` and `SortedMap` do not declare `uses FromIterator`**: `iter.collect(List)` and `iter.collect(SortedMap)` fail typechecking — use `List::createFromIterator(iter)` / `SortedMap::createFromIterator(iter)` instead.
 - **`Result` does not declare `uses Equality`/`Orderable`/`Show`** in its header (even though it defines `==`, `!=`, and `compare`).
-- **`print_error(s)` already appends `\n`**; `print_error_ln(v)` appends two newlines on native. Use `print_error_raw(s)` for no newline.
+- **`print_error(s)` already appends `\n`** (as does `print_error_ln(v)` for any `Show` value). Use `print_error_raw(s)` for no newline.
 - **No built-in `Regex` engine**: `Regex.sk` in prelude is empty.
 
 ---
@@ -154,7 +154,7 @@ fun topKeys(m: Map<String, Int>, minCount: Int): Array<String> {
 ### Global Functions (`System.sk`, `Debug.sk`, `Util.sk`)
 
 - **Assertions & exits**: `invariant(cond, msg = "assert")`, `invariant_violation(msg)`, `assert(cond)`, `exit(code)`, `skipExit(code)` (`@no_return`).
-- **Stdout / stderr / stdin**: `print_string(v)` (appends `\n`), `print_raw(s)`, `print_newline()`, `print_error(s)` (appends `\n`), `print_error_raw(s)`, `flushStdout()`, `read_line(): ?String`, `read_to_end(): String`.
+- **Stdout / stderr / stdin**: `print_string(v)` (appends `\n`), `print_raw(s)`, `print_newline()`, `print_error(s)` (appends `\n`), `print_error_ln(v)` (appends `\n`), `print_error_raw(s)`, `flushStdout()`, `read_line(): ?String`, `read_to_end(): String`.
 - **Debug**: `debug(x)`, `debug_json(x)`, `inspect(x): Inspect`, `print_stack_trace()`.
 - **Utilities**: `min(a, b)`, `max(a, b)`, `id(x)`, `ignore(x)`, `intern(x)`, `localGC()`.
 - **Low-level identity**: `Runtime.phys_eq(a, b): Bool`, `native_eq(a, b): Int` (`0` means equal).
