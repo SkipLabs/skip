@@ -363,7 +363,7 @@ mutable class .BoundsCheckElimination{
       | ZeroExtend _
       | ArraySize _ ->
         into.addNonneg(instr.id)
-      | IntAdd{lhs, rhs} ->
+      | IntAdd{lhs, rhs} if (instr.typ == tInt) ->
         // IntAdd wraps modulo 2^64 (plain `add i64`), so nonneg(a) and
         // nonneg(b) alone do not imply nonneg(a+b). But if one operand is a
         // constant 0 or 1 and the other has an unsigned bound B with
@@ -390,13 +390,16 @@ mutable class .BoundsCheckElimination{
     p.terminator() match {
     | If{predicate} ->
       this.optinfo.getInstr(predicate) match {
-      | IntCmpUlt{lhs, rhs} -> if (succIndex == 0) into.addLessU(lhs, rhs)
-      | IntCmpUle{lhs, rhs} ->
+      | IntCmpUlt{lhs, rhs} if (this.optinfo.getInstr(lhs).typ == tInt) ->
+        if (succIndex == 0) into.addLessU(lhs, rhs)
+      | IntCmpUle{lhs, rhs} if (this.optinfo.getInstr(lhs).typ == tInt) ->
         if (succIndex == 1) {
           into.addLessU(rhs, lhs) // a >u b  =>  b <u a
         }
-      | IntCmpLt{lhs, rhs} -> if (succIndex == 0) into.addLessS(lhs, rhs)
-      | IntCmpLe{lhs, rhs} -> if (succIndex == 1) into.addLessS(rhs, lhs)
+      | IntCmpLt{lhs, rhs} if (this.optinfo.getInstr(lhs).typ == tInt) ->
+        if (succIndex == 0) into.addLessS(lhs, rhs)
+      | IntCmpLe{lhs, rhs} if (this.optinfo.getInstr(lhs).typ == tInt) ->
+        if (succIndex == 1) into.addLessS(rhs, lhs)
       | _ -> void
       }
     | _ -> void
@@ -583,7 +586,8 @@ mutable class .BoundsCheckElimination{
     g = FactSet::empty();
     for (c in func.constants) {
       c match {
-      | ConstantInt{value => v} -> if (v >= 0) g.addNonneg(c.id)
+      | ConstantInt{value => v} if (c.typ == tInt) ->
+        if (v >= 0) g.addNonneg(c.id)
       | _ -> void
       }
     };

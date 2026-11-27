@@ -155,6 +155,7 @@ Precedence when multiple export annotations exist: target-specific (`@cpp_export
 | Skip Type | LLVM IR | C (`runtime.h`) | Notes |
 | --- | --- | --- | --- |
 | `Int` | `i64` | `int64_t` (`SkipInt`) | Always 64-bit, even on `wasm32`. |
+| `Int128` / `UInt128` | `i128` | `__int128` / `unsigned __int128` | 8-byte aligned in Skip heap objects (`align 8`). For portable `@cpp_extern` across `x86_64`, `aarch64`, and `wasm32`, prefer passing/returning 64-bit halves or out-pointers rather than direct `i128` C ABI returns (`wasm32` uses indirect `sret` for `i128`, and `x86_64` Clang lowers `__int128` returns as `{i64, i64}`). On `wasm32`, compiler-rt `i128` helpers (`__multi3`, `__divti3`, `__udivti3`, `__modti3`, `__umodti3`, `__ashlti3`, `__lshrti3`, `__ashrti3`) are provided in `runtime32_specific.c`. |
 | `Int32` / `UInt32` | `i32` | `int32_t` / `uint32_t` | Exact 32-bit match. Use for C `uint32_t` bool returns! |
 | `Int16` / `UInt16` | `i16 zeroext` | `int16_t` / `uint16_t` | Zero-extended. |
 | `Int8` / `UInt8` | `i8 zeroext` | `int8_t` / `uint8_t` | Zero-extended. |

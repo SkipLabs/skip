@@ -3114,6 +3114,9 @@ mutable class Specializer{
         | "Int8" -> Some(ScalarType(8, 8, "i8", IntegerScalarKind()))
         | "Int16" -> Some(ScalarType(16, 16, "i16", IntegerScalarKind()))
         | "Int32" -> Some(ScalarType(32, 32, "i32", IntegerScalarKind()))
+        // Obstack allocations are 8-byte aligned (64 bits), not 16-byte aligned,
+        // so Int128 fields/slots must use 64-bit alignment to emit `align 8` loads/stores.
+        | "Int128" -> Some(ScalarType(128, 64, "i128", IntegerScalarKind()))
         | "Float" -> Some(ScalarType(64, 64, "double", FloatScalarKind()))
         | "Runtime.GCPointer" ->
           Some(ScalarType::gcPointer(sp.config.ptrBitSize))

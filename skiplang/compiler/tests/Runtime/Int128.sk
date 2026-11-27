@@ -1,0 +1,379 @@
+module Runtime_Int128;
+
+class MixedLayout(
+  flag: Bool,
+  byte: Int8,
+  a: Int128,
+  small: Int32,
+  b: Int128,
+  tag: String,
+) uses Equality
+
+value class Pair128(x: Int128, y: UInt128) uses Orderable, Hashable
+
+const kConstZero: Int128 = Int128::zero();
+const kConstNeg: Int128 = Int128::fromInt(-42);
+const kConstBig: Int128 = Int128::fromHalves(
+  0x123456789ABCDEF0,
+  0x0FEDCBA987654321,
+);
+const kConstBox: MixedLayout = MixedLayout(
+  true,
+  Int8::truncate(7),
+  Int128::fromHalves(-1, 1),
+  Int32::truncate(99),
+  Int128::fromInt(-7),
+  "const-ok",
+);
+
+fun check(label: String, cond: Bool): void {
+  if (!cond) {
+    print_string("FAIL: " + label)
+  }
+}
+
+fun testConstructionAndHalves(): void {
+  z = Int128::zero();
+  check("zero lo/hi", z.lo() == 0 && z.hi() == 0 && z.toInt() == 0);
+
+  p = Int128::fromInt(42);
+  check("fromInt pos", p.lo() == 42 && p.hi() == 0 && p.toInt() == 42);
+
+  n = Int128::fromInt(-1);
+  check("fromInt -1 sign-ext", n.lo() == -1 && n.hi() == -1 && n.toInt() == -1);
+
+  n2 = Int128::fromInt(Int::min);
+  check("fromInt Int::min sign-ext", n2.lo() == Int::min && n2.hi() == -1);
+
+  u = Int128::fromUInt64(-1);
+  check("fromUInt64 -1 zero-ext", u.lo() == -1 && u.hi() == 0);
+
+  u2 = Int128::fromUInt64(Int::min);
+  check("fromUInt64 Int::min zero-ext", u2.lo() == Int::min && u2.hi() == 0);
+
+  h = Int128::fromHalves(0x1122334455667788, 0x99AABBCCDDEEFF00);
+  check(
+    "fromHalves roundtrip",
+    h.lo() == 0x1122334455667788 && h.hi() == 0x99AABBCCDDEEFF00,
+  );
+}
+
+fun testArithmetic(): void {
+  // Carry across 64-bit boundary: (2^64 - 1) + 1 = 2^64
+  maxU64 = Int128::fromUInt64(-1);
+  two64 = maxU64 + Int128::one();
+  check("carry 64->65", two64.lo() == 0 && two64.hi() == 1);
+
+  // Borrow across 64-bit boundary: 2^64 - 1 = (0xFFFF..FFFF, 0)
+  back = two64 - Int128::one();
+  check("borrow 65->64", back.lo() == -1 && back.hi() == 0);
+
+  // Wrap around min/max
+  check("max + 1 == min", Int128::max() + Int128::one() == Int128::min());
+  check("min - 1 == max", Int128::min() - Int128::one() == Int128::max());
+  check("negate", -Int128::fromInt(12345) == Int128::fromInt(-12345));
+  check("negate min wraps", -Int128::min() == Int128::min());
+
+  // 64x64 -> 128 multiplication across boundary
+  a = Int128::fromUInt64(0x100000000); // 2^32
+  b = Int128::fromUInt64(0x100000000); // 2^32
+  check("2^32 * 2^32 == 2^64", a * b == two64);
+
+  // (2^64 - 1) * (2^64 - 1) = 2^128 - 2^65 + 1 -> lo = 1, hi = -2
+  sq = maxU64 * maxU64;
+  check("(2^64-1)^2", sq.lo() == 1 && sq.hi() == -2);
+
+  // Signed multiplication
+  check(
+    "signed mul",
+    Int128::fromInt(-7) * Int128::fromHalves(0, 3) ==
+      Int128::fromHalves(0, -21),
+  );
+
+  // Signed & unsigned division and remainder
+  big = Int128::fromHalves(0, 100) + Int128::fromInt(7); // 100 * 2^64 + 7
+  ten = Int128::fromInt(10);
+  check("sdiv", big / ten == Int128::fromHalves(0, 10));
+  check("srem", big % ten == Int128::fromInt(7));
+
+  negBig = -big;
+  check("sdiv neg", negBig / ten == Int128::fromHalves(0, -10));
+  check("srem neg", negBig % ten == Int128::fromInt(-7));
+
+  // Unsigned division of value with bit 127 set: 2^127 / 2 = 2^126
+  two127 = Int128::min();
+  two126 = Int128::fromHalves(0, 0x4000000000000000);
+  check("udiv 2^127 / 2", two127.udiv(Int128::fromInt(2)) == two126);
+  check(
+    "urem 2^127 % 3",
+    two127.urem(Int128::fromInt(3)) == Int128::fromInt(2),
+  );
+
+  // Division by zero throws
+  threw = false;
+  try {
+    _ = Int128::one() / Int128::zero()
+  } catch {
+  | DivisionByZeroException _ -> !threw = true
+  | _ -> void
+  };
+  check("div by zero throws", threw);
+
+  threwU = false;
+  try {
+    _ = Int128::one().udiv(Int128::zero())
+  } catch {
+  | DivisionByZeroException _ -> !threwU = true
+  | _ -> void
+  };
+  check("udiv by zero throws", threwU);
+}
+
+fun testBitwiseAndShifts(): void {
+  x = Int128::fromHalves(0x00FF00FF00FF00FF, 0xFF00FF00FF00FF00);
+  y = Int128::fromHalves(0x0F0F0F0F0F0F0F0F, 0xF0F0F0F0F0F0F0F0);
+  check(
+    "and",
+    x.and(y) == Int128::fromHalves(0x000F000F000F000F, 0xF000F000F000F000),
+  );
+  check(
+    "or",
+    x.or(y) == Int128::fromHalves(0x0FFF0FFF0FFF0FFF, 0xFFF0FFF0FFF0FFF0),
+  );
+  check(
+    "xor",
+    x.xor(y) == Int128::fromHalves(0x0FF00FF00FF00FF0, 0x0FF00FF00FF00FF0),
+  );
+  check(
+    "not",
+    x.not() == Int128::fromHalves(0xFF00FF00FF00FF00, 0x00FF00FF00FF00FF),
+  );
+
+  // Constant shifts
+  one = Int128::one();
+  check("shl 0", one.shl(0) == one);
+  check("shl 63", one.shl(63) == Int128::fromHalves(Int::min, 0));
+  check("shl 64", one.shl(64) == Int128::fromHalves(0, 1));
+  check("shl 127", one.shl(127) == Int128::min());
+  check("shl 128 wraps mod 128", one.shl(128) == one);
+
+  top = Int128::min();
+  check("ushr 1", top.ushr(1) == Int128::fromHalves(0, 0x4000000000000000));
+  check("ushr 64", top.ushr(64) == Int128::fromHalves(Int::min, 0));
+  check("ushr 127", top.ushr(127) == one);
+  check(
+    "shr 1 sign-ext",
+    top.shr(1) == Int128::fromHalves(0, 0xC000000000000000),
+  );
+  check("shr 64 sign-ext", top.shr(64) == Int128::fromHalves(Int::min, -1));
+  check("shr 127 sign-ext", top.shr(127) == Int128::fromInt(-1));
+
+  // Variable shifts (runtime shift counts across 0, 1, 63, 64, 65, 127, 128)
+  counts = Array[0, 1, 7, 63, 64, 65, 127, 128];
+  for (c in counts) {
+    s = c.and(127);
+    shifted = one.shl(c);
+    if (s < 64) {
+      check("var shl <64", shifted.lo() == 1.shl(s) && shifted.hi() == 0)
+    } else {
+      check("var shl >=64", shifted.lo() == 0 && shifted.hi() == 1.shl(s - 64))
+    };
+    check("var ushr inverse", shifted.ushr(c) == one);
+  };
+  for (c in Array[1, 63, 64, 65, 127]) {
+    check("var shr neg stays neg", top.shr(c) < Int128::zero())
+  };
+
+  // clz / ctz / popcount
+  check("clz 0", Int128::zero().clz() == 128);
+  check("ctz 0", Int128::zero().ctz() == 128);
+  check("popcount 0", Int128::zero().popcount() == 0);
+  check("clz 1", one.clz() == 127);
+  check("ctz 1", one.ctz() == 0);
+  check("popcount 1", one.popcount() == 1);
+  check("clz 2^64", one.shl(64).clz() == 63);
+  check("ctz 2^64", one.shl(64).ctz() == 64);
+  check("clz min", Int128::min().clz() == 0);
+  check("ctz min", Int128::min().ctz() == 127);
+  check("popcount -1", Int128::fromInt(-1).popcount() == 128);
+  check("popcount mixed", Int128::fromHalves(0xFF, 0xF0F0).popcount() == 16);
+}
+
+fun testComparisonsAndOrder(): void {
+  z = Int128::zero();
+  neg1 = Int128::fromInt(-1);
+  pos1 = Int128::one();
+  minV = Int128::min();
+  maxV = Int128::max();
+
+  check("signed <", minV < neg1 && neg1 < z && z < pos1 && pos1 < maxV);
+  check("signed <=", minV <= minV && minV <= maxV);
+  check("signed >", maxV > pos1 && pos1 > z && z > neg1 && neg1 > minV);
+  check("signed >=", maxV >= maxV && maxV >= minV);
+  check("compare", compare(neg1, pos1) == LT() && compare(pos1, pos1) == EQ());
+
+  // Unsigned comparisons: 0 < 1 < max < min < -1
+  check(
+    "unsigned ult",
+    z.ult(pos1) && pos1.ult(maxV) && maxV.ult(minV) && minV.ult(neg1),
+  );
+  check("unsigned ugt", neg1.ugt(minV) && minV.ugt(maxV) && maxV.ugt(z));
+  check("unsigned ule/uge", neg1.ule(neg1) && neg1.uge(neg1) && z.ule(neg1));
+}
+
+fun testUInt128(): void {
+  z = UInt128::zero();
+  o = UInt128::one();
+  m = UInt128::max();
+  check("u128 min/max", UInt128::min() == z && m.lo() == -1 && m.hi() == -1);
+  check("u128 wrap", m + o == z && z - o == m);
+  check("u128 order", z < o && o < m && m > z);
+  check("u128 shr is logical", m.shr(1) == UInt128::fromHalves(-1, Int::max));
+  check(
+    "u128 div/rem",
+    m / UInt128::fromUInt64(2) == UInt128::fromHalves(-1, Int::max),
+  );
+  check("u128 rem", m % UInt128::fromUInt64(10) == UInt128::fromUInt64(5));
+  check("u128 toString 0", z.toString() == "0");
+  check(
+    "u128 toString max",
+    m.toString() == "340282366920938463463374607431768211455",
+  );
+  check(
+    "u128 toStringHex",
+    m.toStringHex() == "ffffffffffffffffffffffffffffffff",
+  );
+}
+
+fun testFormatting(): void {
+  check("i128 toString 0", Int128::zero().toString() == "0");
+  check("i128 toString -1", Int128::fromInt(-1).toString() == "-1");
+  check("i128 toString 42", Int128::fromInt(42).toString() == "42");
+  check(
+    "i128 toString max",
+    Int128::max().toString() == "170141183460469231731687303715884105727",
+  );
+  check(
+    "i128 toString min",
+    Int128::min().toString() == "-170141183460469231731687303715884105728",
+  );
+  check(
+    "i128 toStringHex",
+    Int128::fromHalves(0x0123456789ABCDEF, 0xFEDCBA9876543210).toStringHex() ==
+      "fedcba98765432100123456789abcdef",
+  );
+}
+
+fun testStorageAndRuntime(): void {
+  // Consts & static images
+  check("const zero", kConstZero == Int128::zero());
+  check("const neg", kConstNeg == Int128::fromInt(-42));
+  check(
+    "const big",
+    kConstBig.lo() == 0x123456789ABCDEF0 &&
+      kConstBig.hi() == 0x0FEDCBA987654321,
+  );
+  check(
+    "const box",
+    kConstBox.flag &&
+      kConstBox.byte == Int8::truncate(7) &&
+      kConstBox.a == Int128::fromHalves(-1, 1) &&
+      kConstBox.small == Int32::truncate(99) &&
+      kConstBox.b == Int128::fromInt(-7) &&
+      kConstBox.tag == "const-ok",
+  );
+
+  // Heap objects with mixed-alignment fields before/after Int128
+  obj = MixedLayout(
+    false,
+    Int8::truncate(-5),
+    Int128::fromHalves(0x1111, 0x2222),
+    Int32::truncate(123456),
+    Int128::fromHalves(0x3333, 0x4444),
+    "heap-ok",
+  );
+  interned = intern(obj);
+  check("interned eq", interned == obj);
+  check(
+    "interned fields",
+    interned.a.lo() == 0x1111 &&
+      interned.a.hi() == 0x2222 &&
+      interned.b.lo() == 0x3333 &&
+      interned.b.hi() == 0x4444,
+  );
+
+  // Arrays of Int128 and UInt128
+  arr = Array::fillBy(16, i -> Int128::fromHalves(i, i * 100));
+  for (i in Range(0, 16)) {
+    check("arr elem", arr[i] == Int128::fromHalves(i, i * 100))
+  };
+  marr = Array<Int128>::mfill(4, Int128::zero());
+  marr.set(2, Int128::fromHalves(0xAAAA, 0xBBBB));
+  check(
+    "marr set/get",
+    marr[2] == Int128::fromHalves(0xAAAA, 0xBBBB) && marr[1] == Int128::zero(),
+  );
+
+  // Option<Int128> & Tuples & Value classes
+  optSome: ?Int128 = Some(Int128::fromHalves(1, 2));
+  optNone: ?Int128 = None();
+  check("optSome", optSome == Some(Int128::fromHalves(1, 2)));
+  check("optNone", optNone is None());
+  pair = Pair128(Int128::fromInt(-5), UInt128::fromUInt64(99));
+  check(
+    "value class pair",
+    pair.x == Int128::fromInt(-5) && pair.y == UInt128::fromUInt64(99),
+  );
+
+  // UnorderedMap & SortedMap keyed by Int128 / UInt128
+  umap = mutable UnorderedMap<Int128, String>[];
+  k1 = Int128::fromHalves(1, 0);
+  k2 = Int128::fromHalves(1, 1);
+  k3 = Int128::fromHalves(0, 1);
+  umap.set(k1, "k1");
+  umap.set(k2, "k2");
+  umap.set(k3, "k3");
+  check(
+    "umap lookup",
+    umap[k1] == "k1" && umap[k2] == "k2" && umap[k3] == "k3",
+  );
+
+  smap = SortedMap<UInt128, Int>[
+    UInt128::max() => 3,
+    UInt128::zero() => 1,
+    UInt128::fromHalves(0, 1) => 2,
+  ];
+  check("smap order", smap.values().collect(Array) == Array[1, 2, 3]);
+
+  // phys_eq on Int128 & Pair128
+  check("phys_eq equal", Runtime.phys_eq(k1, Int128::fromHalves(1, 0)));
+  check("phys_eq unequal", !Runtime.phys_eq(k1, k2));
+  check(
+    "phys_eq pair",
+    Runtime.phys_eq(
+      pair,
+      Pair128(Int128::fromInt(-5), UInt128::fromUInt64(99)),
+    ),
+  );
+  check(
+    "phys_eq pair diff",
+    !Runtime.phys_eq(
+      pair,
+      Pair128(Int128::fromInt(-5), UInt128::fromUInt64(100)),
+    ),
+  );
+}
+
+@exptest
+fun main(): void {
+  testConstructionAndHalves();
+  testArithmetic();
+  testBitwiseAndShifts();
+  testComparisonsAndOrder();
+  testUInt128();
+  testFormatting();
+  testStorageAndRuntime();
+  print_string("PASS")
+}
+
+module end;

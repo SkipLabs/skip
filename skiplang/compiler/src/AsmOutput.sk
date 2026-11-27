@@ -1383,11 +1383,14 @@ private fun createStaticImageFields(
     | Some(StaticImageField(value, vbo)) ->
       invariant(vbo >= bitOffset, "Bit offset ordering problem");
 
-      // Integers can tolerate shifting around within an entire int64, and
-      // we need that to handle arbitrary bitfields someday, but everything
-      // else should be padded out exactly to its starting offset.
-      isConstantInteger = value.constantInteger().isSome();
-      containingBitOffset = if (isConstantInteger) {
+      // Integers up to 64 bits can tolerate shifting around within an entire
+      // int64, and we need that to handle arbitrary bitfields someday, but
+      // wider integers (Int128) and everything else should be padded out
+      // exactly to their starting offset.
+      isSub64Integer =
+        value.constantInteger().isSome() &&
+        valueBitSize(value) <= 64;
+      containingBitOffset = if (isSub64Integer) {
         vbo.and(-64)
       } else {
         invariant(vbo.and(7) == 0, "Unexpectedly not byte aligned");
@@ -1404,8 +1407,17 @@ private fun createStaticImageFields(
         !bitOffset = bitOffset + padBitSize
       };
 
-      if (!isConstantInteger) {
-        !i = i + 1
+      if (!isSub64Integer) {
+        !i = i + 1;
+        // Split 128-bit ConstantInt into two little-endian 64-bit i64 fields
+        // so that the LLVM static struct never contains an `i128` (whose ABI
+        // alignment is 16 bytes and would insert implicit padding holes).
+        if (valueBitSize(value) == 128) {
+          v = value.constantInteger().fromSome();
+          fields.push(pad64 with {value => v});
+          !value = pad64 with {value => v.shr(63)};
+          !bitOffset = bitOffset + 64
+        }
       } else {
         // Keep absorbing integer values into a larger integer value, e.g.
         // a collection of adjacent 1-bit values can get grouped into an
@@ -2783,6 +2795,8 @@ private fun llvmWriteName(instr: Instr, asm: mutable AsmDefBuilder): void {
   | IntSub _
   | IntSwitch _
   | IntToFloat _
+  | IntUDiv _
+  | IntURem _
   | IntXor _
   | Intern _
   | InvokeFunction _
@@ -2959,7 +2973,9 @@ private fun llvmGetAddr(
   loadTypeName = loadType.llvmTypeName;
   firstByteOffset = bo.shr(3);
 
-  normal = (bs == 8 || bs == 16 || bs == 32 || bs == 64) && bo % 8 == 0;
+  normal =
+    (bs == 8 || bs == 16 || bs == 32 || bs == 64 || bs == 128) &&
+    bo % 8 == 0;
 
   if (!normal) {
     // Some kind of bitfield.
@@ -3532,7 +3548,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     llvmWriteIntrinsicCall(
       asm,
       instr,
-      "llvm.ctlz.i64",
+      "llvm.ctlz." + asm.getScalarType(instr.typ).llvmTypeName,
       Array[
         value,
         optinfo.getConstant(
@@ -3544,7 +3560,7 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
     llvmWriteIntrinsicCall(
       asm,
       instr,
-      "llvm.cttz.i64",
+      "llvm.cttz." + asm.getScalarType(instr.typ).llvmTypeName,
       Array[
         value,
         optinfo.getConstant(
@@ -3553,7 +3569,12 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       ],
     )
   | IntPopcount{value} ->
-    llvmWriteIntrinsicCall(asm, instr, "llvm.ctpop.i64", Array[value])
+    llvmWriteIntrinsicCall(
+      asm,
+      instr,
+      "llvm.ctpop." + asm.getScalarType(instr.typ).llvmTypeName,
+      Array[value],
+    )
   | IntToFloat{value} ->
     asm.print("  %n = sitofp i64 %n to double, %D\n" % instr % value % instr)
   | IntSwitch{value, cases, successors} ->
@@ -3849,23 +3870,90 @@ private fun llvmWrite(instr: Stmt, asm: mutable FunAsmDefBuilder): void {
       asm.print("%N" % s.target)
     });
     asm.print(" ], %D\n" % instr)
-  | IntAdd _ -> llvmWriteDefault(instr, asm, "add i64")
-  | IntAnd _ -> llvmWriteDefault(instr, asm, "and i64")
+  | IntAdd _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "add " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntAnd _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "and " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
   | cmp @ IntCmpEq _ -> llvmWriteCmp(cmp, asm, "eq")
   | cmp @ IntCmpLe _ -> llvmWriteCmp(cmp, asm, "sle")
   | cmp @ IntCmpLt _ -> llvmWriteCmp(cmp, asm, "slt")
   | cmp @ IntCmpNe _ -> llvmWriteCmp(cmp, asm, "ne")
   | cmp @ IntCmpUle _ -> llvmWriteCmp(cmp, asm, "ule")
   | cmp @ IntCmpUlt _ -> llvmWriteCmp(cmp, asm, "ult")
-  | IntDiv _ -> llvmWriteDefault(instr, asm, "sdiv i64")
-  | IntMul _ -> llvmWriteDefault(instr, asm, "mul i64")
-  | IntOr _ -> llvmWriteDefault(instr, asm, "or i64")
-  | IntRem _ -> llvmWriteDefault(instr, asm, "srem i64")
-  | IntSll _ -> llvmWriteDefault(instr, asm, "shl i64")
-  | IntSra _ -> llvmWriteDefault(instr, asm, "ashr i64")
-  | IntSrl _ -> llvmWriteDefault(instr, asm, "lshr i64")
-  | IntSub _ -> llvmWriteDefault(instr, asm, "sub i64")
-  | IntXor _ -> llvmWriteDefault(instr, asm, "xor i64")
+  | IntDiv _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "sdiv " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntMul _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "mul " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntOr _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "or " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntRem _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "srem " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntSll _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "shl " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntSra _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "ashr " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntSrl _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "lshr " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntSub _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "sub " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntUDiv _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "udiv " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntURem _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "urem " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
+  | IntXor _ ->
+    llvmWriteDefault(
+      instr,
+      asm,
+      "xor " + asm.getScalarType(instr.typ).llvmTypeName,
+    )
   | Jump _ -> llvmWriteDefault(instr, asm, "br")
   | land @ LandingPad _ -> llvmWriteLandingPad(land, asm)
   | x @ Store _ -> llvmWriteStore(x, x, asm)

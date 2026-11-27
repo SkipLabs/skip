@@ -82,8 +82,10 @@ mutable base class .RewriteBase{
 
   mutable fun constantTypedInt(typ: Type, value: Int): Constant {
     // We canonicalize N-bit ints to use a sign-extended 64-bit value.
-    // Picking a canonical form allows CSE.
-    canonicalized = sext(value, this.getScalarType(typ).bitSize);
+    // Picking a canonical form allows CSE. For widths >= 64 (e.g. Int128),
+    // the 64-bit value is already sign-extended.
+    bitSize = this.getScalarType(typ).bitSize;
+    canonicalized = if (bitSize < 64) sext(value, bitSize) else value;
 
     this.getConstant(ConstantInt{id => this.iid(), typ, value => canonicalized})
   }

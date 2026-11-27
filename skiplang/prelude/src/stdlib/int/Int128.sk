@@ -1,0 +1,280 @@
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+native value class Int128 uses Orderable, Show, Hashable {
+  @intrinsic
+  native static fun fromInt(n: Int): Int128;
+
+  @intrinsic
+  native static fun fromUInt64(n: Int): Int128;
+
+  static fun fromHalves(lo: Int, hi: Int): Int128 {
+    static::fromUInt64(lo).or(static::fromUInt64(hi).shl(64))
+  }
+
+  @intrinsic
+  native fun lo(): Int;
+
+  @intrinsic
+  native fun hi(): Int;
+
+  @intrinsic
+  native fun toInt(): Int;
+
+  static fun zero(): Int128 {
+    static::fromInt(0)
+  }
+
+  static fun one(): Int128 {
+    static::fromInt(1)
+  }
+
+  static fun min(): Int128 {
+    static::fromHalves(0, Int::min)
+  }
+
+  static fun max(): Int128 {
+    static::fromHalves(-1, Int::max)
+  }
+
+  fun ==(other: Int128): Bool {
+    this.eqImpl(other)
+  }
+  @intrinsic
+  private native fun eqImpl(other: Int128): Bool;
+
+  fun !=(other: Int128): Bool {
+    this.neImpl(other)
+  }
+  @intrinsic
+  private native fun neImpl(other: Int128): Bool;
+
+  fun +(other: Int128): Int128 {
+    this.plusImpl(other)
+  }
+  @intrinsic
+  private native fun plusImpl(other: Int128): Int128;
+
+  fun -(other: Int128): Int128 {
+    this.minusImpl(other)
+  }
+  @intrinsic
+  private native fun minusImpl(other: Int128): Int128;
+
+  fun *(other: Int128): Int128 {
+    this.timesImpl(other)
+  }
+  @intrinsic
+  private native fun timesImpl(other: Int128): Int128;
+
+  fun /(other: Int128): Int128 {
+    if (other == static::zero()) {
+      throw DivisionByZeroException()
+    } else {
+      this.unsafe_divImpl(other)
+    }
+  }
+  // Behavior is undefined if the argument is zero (or min / -1).
+  @intrinsic
+  private native fun unsafe_divImpl(other: Int128): Int128;
+
+  fun %(other: Int128): Int128 {
+    if (other == static::zero()) {
+      throw DivisionByZeroException()
+    } else {
+      this.unsafe_remImpl(other)
+    }
+  }
+  // Behavior is undefined if the argument is zero (or min % -1).
+  @intrinsic
+  private native fun unsafe_remImpl(other: Int128): Int128;
+
+  // Unsigned division and remainder (treats both operands as unsigned 128-bit integers).
+  fun udiv(other: Int128): Int128 {
+    if (other == static::zero()) {
+      throw DivisionByZeroException()
+    } else {
+      this.unsafe_udivImpl(other)
+    }
+  }
+  @intrinsic
+  private native fun unsafe_udivImpl(other: Int128): Int128;
+
+  fun urem(other: Int128): Int128 {
+    if (other == static::zero()) {
+      throw DivisionByZeroException()
+    } else {
+      this.unsafe_uremImpl(other)
+    }
+  }
+  @intrinsic
+  private native fun unsafe_uremImpl(other: Int128): Int128;
+
+  fun <(other: Int128): Bool {
+    this.ltImpl(other)
+  }
+  @intrinsic
+  private native fun ltImpl(other: Int128): Bool;
+
+  fun >(other: Int128): Bool {
+    this.gtImpl(other)
+  }
+  @intrinsic
+  private native fun gtImpl(other: Int128): Bool;
+
+  fun <=(other: Int128): Bool {
+    this.leImpl(other)
+  }
+  @intrinsic
+  private native fun leImpl(other: Int128): Bool;
+
+  fun >=(other: Int128): Bool {
+    this.geImpl(other)
+  }
+  @intrinsic
+  private native fun geImpl(other: Int128): Bool;
+
+  // Unsigned comparison operators (treats both operands as unsigned 128-bit integers).
+  fun ult(other: Int128): Bool {
+    this.ultImpl(other)
+  }
+  @intrinsic
+  private native fun ultImpl(other: Int128): Bool;
+
+  fun ugt(other: Int128): Bool {
+    this.ugtImpl(other)
+  }
+  @intrinsic
+  private native fun ugtImpl(other: Int128): Bool;
+
+  fun ule(other: Int128): Bool {
+    this.uleImpl(other)
+  }
+  @intrinsic
+  private native fun uleImpl(other: Int128): Bool;
+
+  fun uge(other: Int128): Bool {
+    this.ugeImpl(other)
+  }
+  @intrinsic
+  private native fun ugeImpl(other: Int128): Bool;
+
+  // Bitwise operations
+  fun and(other: Int128): Int128 {
+    this.andImpl(other)
+  }
+  @intrinsic
+  private native fun andImpl(other: Int128): Int128;
+
+  fun or(other: Int128): Int128 {
+    this.orImpl(other)
+  }
+  @intrinsic
+  private native fun orImpl(other: Int128): Int128;
+
+  fun xor(other: Int128): Int128 {
+    this.xorImpl(other)
+  }
+  @intrinsic
+  private native fun xorImpl(other: Int128): Int128;
+
+  fun not(): Int128 {
+    this.xor(static::fromInt(-1))
+  }
+
+  fun negate(): Int128 {
+    static::zero() - this
+  }
+
+  // Shift operations (shift count taken mod 128)
+  fun shl<I: Integral>(count: I): Int128 {
+    this.shlImpl(count.toInt())
+  }
+  @intrinsic
+  private native fun shlImpl(count: Int): Int128;
+
+  fun shr<I: Integral>(count: I): Int128 {
+    this.shrImpl(count.toInt())
+  }
+  @intrinsic
+  private native fun shrImpl(count: Int): Int128;
+
+  fun ushr<I: Integral>(count: I): Int128 {
+    this.ushrImpl(count.toInt())
+  }
+  @intrinsic
+  private native fun ushrImpl(count: Int): Int128;
+
+  // Returns number of leading zeroes (MSB), or 128 if the value is 0.
+  fun clz(): Int {
+    this.clzImpl()
+  }
+  @intrinsic
+  private native fun clzImpl(): Int;
+
+  // Returns number of trailing zeroes (LSB), or 128 if the value is 0.
+  fun ctz(): Int {
+    this.ctzImpl()
+  }
+  @intrinsic
+  private native fun ctzImpl(): Int;
+
+  // Returns the number of "one" bits in the value.
+  fun popcount(): Int {
+    this.popcountImpl()
+  }
+  @intrinsic
+  private native fun popcountImpl(): Int;
+
+  fun compare(other: Int128): Order {
+    if (this < other) LT() else if (this == other) EQ() else GT()
+  }
+
+  fun hash(): Int {
+    Hashable.combine(this.lo(), this.hi())
+  }
+
+  fun toStringHex(): String {
+    this.hi().toStringHex() + this.lo().toStringHex()
+  }
+
+  fun toStringBinary(): String {
+    this.hi().toStringBinary() + this.lo().toStringBinary()
+  }
+
+  fun toString(): String {
+    if (this == static::zero()) {
+      "0"
+    } else if (this < static::zero()) {
+      "-" + static::unsignedToString(static::zero() - this)
+    } else {
+      static::unsignedToString(this)
+    }
+  }
+
+  // Format bits as an unsigned base-10 integer. Works even for Int128::min()
+  // (where `0 - min == min`, whose unsigned value is 2^127).
+  static fun unsignedToString(n: Int128): String {
+    if (n == static::zero()) {
+      return "0"
+    };
+    ten = static::fromInt(10);
+    digits = mutable Vector<Char>[];
+    cur = n;
+    while (cur != static::zero()) {
+      rem = cur.urem(ten).lo();
+      digits.push(Char::fromCode('0'.code() + rem));
+      !cur = cur.udiv(ten);
+    };
+    digits.reverse();
+    String::fromChars(digits.toArray())
+  }
+
+  fun inspect(): Inspect {
+    InspectLiteral(this.toString())
+  }
+}
