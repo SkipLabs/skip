@@ -106,6 +106,9 @@
 #   --rebase-attempts N  Max prepare+push rounds per PR (re-rebase when staled
 #                        while waiting, re-prepare when the push lease is
 #                        rejected) (default 3; MERGE_BOT_REBASE_ATTEMPTS)
+#   --push-settle N      Seconds after a push to ignore stale GitHub mergeability
+#                        or failure snapshots while CI/merge-commit recompute
+#                        (default 15; MERGE_BOT_PUSH_SETTLE_SECONDS)
 #   --agent-cmd CMD      Fixer command template for `process`/`run`. Tokens
 #                        __WORKTREE__ __PROMPT__ __PR__ __VERDICT__ __STATE_DIR__
 #                        __FIXER_HOME__ are substituted. Default: headless
@@ -167,6 +170,7 @@ AGENT_CMD=${MERGE_BOT_AGENT_CMD:-}
 DRY_RUN=${MERGE_BOT_DRY_RUN:-0}
 SKIP_LABELS=${MERGE_BOT_SKIP_LABELS:-}
 BASE_BRANCH=main
+PUSH_SETTLE_SECONDS=${MERGE_BOT_PUSH_SETTLE_SECONDS:-15} # grace window for GitHub to recompute mergeability after a push
 # Branch protection on main requires the `ci/circleci: setup` and
 # `ci/circleci: ci/all-checks` contexts (see .circleci/base.yml). Note the
 # aggregate all-checks context is a no-op job and may be absent from the
@@ -209,6 +213,15 @@ log() {
     line="[$(date -u +%Y-%m-%dT%H:%M:%SZ)] $*"
     echo "$line" >&2
     if [ -n "$LOG_FILE" ]; then echo "$line" >>"$LOG_FILE"; fi
+}
+
+rotate_log_if_large() { # keep the log bounded (~2 MiB -> rotate once to .log.1)
+    [ -n "$LOG_FILE" ] && [ -f "$LOG_FILE" ] || return 0
+    local sz
+    sz=$(wc -c <"$LOG_FILE" 2>/dev/null | tr -d ' ' || echo 0)
+    if [ "${sz:-0}" -gt 2097152 ]; then
+        mv -f "$LOG_FILE" "${LOG_FILE}.1" 2>/dev/null || true
+    fi
 }
 
 parse_repo_url() { # echoes OWNER/REPO for a github remote url, or empty
@@ -274,6 +287,7 @@ acquire_lock() {
         mkdir "$lockdir" || die "cannot acquire lock $lockdir"
     fi
     echo $$ >"$lockdir/pid"
+    trap 'if [ "$(cat "'"$lockdir"'/pid" 2>/dev/null || true)" = "$$" ]; then rm -rf "'"$lockdir"'"; fi' EXIT
 }
 
 # ---------------------------------------------------------------------------
@@ -400,11 +414,14 @@ JQ_SCAN_RED="$JQ_DEFS"'
   | . as $pr
   | ($pr | ci_state) as $cs
   | select($cs == "red")
+  | ($pr | needs_rebase) as $nr
   | {
       number, title,
       branch: .headRefName,
       mergeStateStatus, mergeable,
       ciState: $cs,
+      needsRebase: $nr,
+      upToDate: ($nr | not),
       failed_checks: ($pr | failed_checks),
       expectedCiSeconds: ($pr | ci_est),
       fork: ((.headRepositoryOwner.login // "") != $owner)
@@ -426,7 +443,9 @@ JQ_SCAN_RED_NOAUTO="$JQ_DEFS"'
   | . as $pr
   | ($pr | ci_state) as $cs
   | select($cs == "red")
+  | ($pr | needs_rebase) as $nr
   | { number, title, branch: .headRefName, mergeStateStatus, mergeable, ciState: $cs,
+      needsRebase: $nr, upToDate: ($nr | not),
       failed_checks: ($pr | failed_checks), expectedCiSeconds: ($pr | ci_est) }
 ] | sort_by(.expectedCiSeconds, .number)'
 
@@ -436,10 +455,75 @@ JQ_PICK="$JQ_DEFS"'
 if ([.[] | select(.upToDate)] | length) > 0 then
   {action: "wait", pr: ([.[] | select(.upToDate)] | min_by(.number) | .number)}
 elif ([.[] | select(.needsRebase)] | length) > 0 then
-  {action: "rebase", pr: ([.[] | select(.needsRebase)] | sort_by(.expectedCiSeconds, .number) | .[0] | .number)}
+  ([.[] | select(.needsRebase)] | sort_by(.expectedCiSeconds, .number) | .[0]) as $p |
+  {action: "rebase", pr: $p.number, est: $p.expectedCiSeconds}
 else
   {action: "idle"}
 end'
+
+# Input: one PR object (cmd_wait poll). Args: --arg head, --argjson head_seen,
+# --argjson push_lag (1 while still within the post-push grace window).
+# Output: {action: "merged"|"closed"|"auto-merge-off"|"ci-failed"|"stale"|"wait",
+#          failed: "...", mss: "...", mergeable: "...", pending: N,
+#          head_matches: bool, rollup_len: N}.
+#
+# Guard against GitHub's post-push recomputation lag:
+#   - After we push a new head $head, GitHub takes a few seconds to update
+#     headRefOid, recompute mergeStateStatus/mergeable, and register new CI
+#     checks. While $head is given and .headRefOid != $head (and we have not
+#     yet observed .headRefOid == $head), the rollup and DIRTY/CONFLICTING/
+#     BEHIND fields still describe the OLD head — keep waiting instead of
+#     falsely triggering CI-fix or re-rebase!
+#   - Even once .headRefOid == $head, GitHub may still show the old head's
+#     DIRTY/CONFLICTING status for a few seconds until its merge-commit
+#     recomputation finishes (during which mergeable is often UNKNOWN, or
+#     still CONFLICTING from before the push). While $push_lag == 1, suppress
+#     DIRTY/CONFLICTING until GitHub settles (typically 2-5s).
+#   - Once we HAVE seen $head (head_seen == 1) and later .headRefOid changes
+#     to a DIFFERENT sha, someone else force-pushed the branch: immediately
+#     treat DIRTY/CONFLICTING or CI failure normally (do not ignore it).
+#   - For BEHIND: only report stale once CI on the head is complete
+#     (pending == 0), rollup is non-empty, and (when $head is given)
+#     .headRefOid == $head.
+# shellcheck disable=SC2016
+JQ_WAIT_EVAL="$JQ_DEFS"'
+def wait_failed:
+  [ rollup[]?
+    | select((.__typename == "StatusContext"
+              and ((.context // "") | startswith("ci/circleci:"))
+              and (.state | IN("FAILURE", "ERROR")))
+             or (.__typename == "CheckRun"
+                 and ((.conclusion // "") | IN("FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STALE"))))
+    | (if .__typename == "StatusContext" then .context else .name end) ];
+(.state) as $st |
+(.mergeStateStatus // "") as $mss |
+(.mergeable // "") as $mbl |
+(pending_checks | length) as $pend |
+(rollup | length) as $rlen |
+(wait_failed | join(", ")) as $fail |
+($head == "" or .headRefOid == $head) as $head_ok |
+# Stale snapshot: we pushed $head, GitHub has not reported it yet
+($head != "" and ($head_seen == 0) and (.headRefOid != $head)) as $old_snap |
+# After pushing, GitHub may briefly show the previous head failure or
+# DIRTY/CONFLICTING state even right as headRefOid flips; suppress until
+# push_lag ends (default 15s).
+(if $st == "MERGED" then "merged"
+ elif $st == "CLOSED" then "closed"
+ elif (.autoMergeRequest == null) then "auto-merge-off"
+ elif $old_snap then "wait"
+ elif (($fail | length) > 0 and ($push_lag == 0)) then "ci-failed"
+ elif (($mbl == "CONFLICTING" or $mss == "DIRTY") and ($push_lag == 0)) then "stale"
+ elif ($pend == 0 and $mss == "BEHIND" and $rlen > 0 and $head_ok and ($push_lag == 0)) then "stale"
+ else "wait" end) as $act |
+{
+  action: $act,
+  failed: $fail,
+  mss: $mss,
+  mergeable: $mbl,
+  pending: $pend,
+  head_matches: $head_ok,
+  rollup_len: $rlen
+}'
 
 # Input: array of PR objects (gh pr list). Output: dashboard rows for all
 # auto-merge PRs: bucket = rebase | wait-merge | ci-running | ignored-red.
@@ -509,7 +593,7 @@ cmd_status() {
 
 board_data() { # echoes one JSON blob: now/repo/alive/state_dir/decision/dash/work/log
     resolve_repo
-    local now lockdir pid alive dec prs dash works w head branch dirty logj
+    local now lockdir pid alive owner skip_json prs scan dec dash works w head branch dirty logj
     now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
     alive="not running (no lock)"
     lockdir="$STATE_DIR/lock.d"
@@ -521,9 +605,16 @@ board_data() { # echoes one JSON blob: now/repo/alive/state_dir/decision/dash/wo
             alive="not running (stale lock, pid ${pid:-?})"
         fi
     fi
-    dec=$(cmd_pick 2>/dev/null || echo '{"action":"error"}')
+    owner=${REPO%%/*}
+    if [ -n "$SKIP_LABELS" ]; then
+        skip_json=$(printf '%s' "$SKIP_LABELS" | tr ',' '\n' | jq -R . | jq -s .)
+    else
+        skip_json='[]'
+    fi
     prs=$(ghw pr list --state open --limit 100 \
-        --json number,title,headRefName,autoMergeRequest,isDraft,mergeStateStatus,mergeable,statusCheckRollup,files)
+        --json number,title,headRefName,headRepository,headRepositoryOwner,author,isDraft,autoMergeRequest,maintainerCanModify,mergeStateStatus,mergeable,headRefOid,statusCheckRollup,files,labels)
+    scan=$(printf '%s' "$prs" | jq --arg owner "$owner" --argjson skip "$skip_json" "$JQ_SCAN" 2>/dev/null || echo '[]')
+    dec=$(printf '%s' "$scan" | jq "$JQ_PICK" 2>/dev/null || echo '{"action":"error"}')
     dash=$(printf '%s' "$prs" | jq "$JQ_DASH" 2>/dev/null || echo '[]')
     works='[]'
     if [ -d "$STATE_DIR/work" ]; then
@@ -539,7 +630,7 @@ board_data() { # echoes one JSON blob: now/repo/alive/state_dir/decision/dash/wo
     fi
     logj='[]'
     if [ -f "$LOG_FILE" ]; then
-        logj=$(tail -n 80 "$LOG_FILE" 2>/dev/null | jq -R . | jq -s .)
+        logj=$(tail -n 80 "$LOG_FILE" 2>/dev/null | perl -pe 's/^.*\r//' | jq -R . | jq -s .)
     fi
     jq -n --arg now "$now" --arg repo "$REPO" --arg alive "$alive" --arg sd "$STATE_DIR" \
         --argjson dec "$dec" --argjson dash "$dash" --argjson works "$works" --argjson log "$logj" \
@@ -592,33 +683,44 @@ tui_hline() { # $1=left $2=title (with spaces) $3=right $4=width [$5=dash char, 
     printf '%s%s%s%s' "$left" "$t" "$(printf '%*s' "$((w - 2 - ${#t}))" '' | tr ' ' "$dash")" "$right"
 }
 
+tui_size() { # sets TUI_W and TUI_H from current terminal size (handles resizes)
+    local cols="" lines=""
+    if [ -t 1 ] && command -v tput >/dev/null 2>&1; then
+        cols=$(tput cols 2>/dev/null || true)
+        lines=$(tput lines 2>/dev/null || true)
+    fi
+    TUI_W=${cols:-${COLUMNS:-80}}
+    TUI_H=${lines:-${LINES:-24}}
+    [ "$TUI_W" -lt 40 ] && TUI_W=40
+    [ "$TUI_H" -lt 10 ] && TUI_H=10
+}
+
 tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen frame
     local d=$1 interval=$2 W H cw
-    W=${COLUMNS:-80}
-    H=${LINES:-24}
-    [ "$W" -lt 40 ] && W=40
-    [ "$H" -lt 10 ] && H=10
+    tui_size
+    W=$TUI_W
+    H=$TUI_H
     cw=$((W - 4)) # inner width: │ + space + content + space + │
     local ver
-    ver=$(git -C "$SCRIPT_DIR" rev-parse --short HEAD 2>/dev/null || echo '?')
+    ver=$(git -C "${MERGE_BOT_SOURCE_REPO:-$SCRIPT_DIR}" rev-parse --short HEAD 2>/dev/null || echo '?')
     local -a frame=()
     local act pr est bucket num mss title line plain col wname head branch dirty
     # decision line
     act=$(jq -r '.decision.action // "error"' <<<"$d")
     if [ "$act" = "error" ] && jq -e 'has("error")' <<<"$d" >/dev/null 2>&1; then
-        frame+=("${C_RED}$(tui_fit "⚠ $(jq -r .error <<<"$d") — retrying; see $LOG_FILE" "$cw")${C_RESET}")
+        frame+=("│ ${C_RED}$(tui_fit "⚠ $(jq -r .error <<<"$d") — retrying; see $LOG_FILE" "$cw")${C_RESET} │")
     fi
     case "$act" in
         rebase)
             pr=$(jq -r '.decision.pr // "?"' <<<"$d"); est=$(jq -r '.decision.est // "?"' <<<"$d")
-            frame+=("${C_YELLOW}$(tui_fit "▶ decision: REBASE #$pr (est-CI ${est}s)" "$cw")${C_RESET}") ;;
+            frame+=("│ ${C_YELLOW}$(tui_fit "▶ decision: REBASE #$pr (est-CI ${est}s)" "$cw")${C_RESET} │") ;;
         wait)
             pr=$(jq -r '.decision.pr // "?"' <<<"$d")
-            frame+=("${C_GREEN}$(tui_fit "▶ decision: WAIT — #$pr is green+up-to-date, expecting merge" "$cw")${C_RESET}") ;;
+            frame+=("│ ${C_GREEN}$(tui_fit "▶ decision: WAIT — #$pr is green+up-to-date, expecting merge" "$cw")${C_RESET} │") ;;
         idle)
-            frame+=("${C_DIM}$(tui_fit "▶ decision: idle — no green+auto-merge PRs right now" "$cw")${C_RESET}") ;;
+            frame+=("│ ${C_DIM}$(tui_fit "▶ decision: idle — no green+auto-merge PRs right now" "$cw")${C_RESET} │") ;;
         *)
-            frame+=("$(tui_fit "▶ decision: $act" "$cw")") ;;
+            frame+=("│ $(tui_fit "▶ decision: $act" "$cw") │") ;;
     esac
     frame+=("$(tui_hline '├' ' QUEUE (open PRs with auto-merge) ' '┤' "$W")")
     local -a rows=()
@@ -659,8 +761,9 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
     [ "$logroom" -lt 0 ] && logroom=0
     frame+=("$(tui_hline '├' ' LOG ' '┤' "$W")")
     local -a logrows=()
-    local -a logrows=()
-    while IFS= read -r line; do logrows+=("$line"); done < <(jq -r '(.log // [])[]' <<<"$d" | tail -n "$logroom")
+    if [ "$logroom" -gt 0 ]; then
+        while IFS= read -r line; do logrows+=("$line"); done < <(jq -r '(.log // [])[]' <<<"$d" | tail -n "$logroom")
+    fi
     for line in ${logrows[@]+"${logrows[@]}"}; do
         frame+=("│ ${C_DIM}$(tui_fit "$line" "$cw")${C_RESET} │")
     done
@@ -677,9 +780,8 @@ tui_draw() { # $1=board_data json $2=refresh seconds; renders one full-screen fr
 }
 
 tui_draw_loading() { # $1=refresh seconds; immediate frame so the screen is never blank while gh queries run
-    local W=${COLUMNS:-80} H=${LINES:-24}
-    [ "$W" -lt 40 ] && W=40
-    [ "$H" -lt 10 ] && H=10
+    tui_size
+    local W=$TUI_W
     printf '\033[H'
     printf '%s\n' "${C_BOLD}$(tui_hline '┌' " merge-bot  loading… " '┐' "$W")${C_RESET}"
     printf '%s\n' "│ $(tui_fit " gathering PR state (gh api) — press q to quit " "$((W - 4))") │"
@@ -701,9 +803,9 @@ cmd_watch() {
     printf '\033[?1049h\033[?25l' # alternate screen, hide cursor
     trap 'printf "\033[?25h\033[?1049l"; echo; exit 0' INT TERM
     trap 'printf "\033[?25h\033[?1049l"' EXIT
+    tui_draw_loading "$interval"
     local key d
     while :; do
-        tui_draw_loading "$interval"
         d=$(board_data 2>>"$LOG_FILE") || d='{"error":"board_data failed (gh/jq?)"}'
         tui_draw "$d" "$interval"
         key=""
@@ -754,50 +856,80 @@ ensure_clone() {
 # comparing against $CLONE there would "update" to the wrapper forever), the
 # bot downloads it, sanity-checks it, and re-execs it with the same arguments
 # (exec keeps the pid, so the lock stays valid). Skipped when the running file
-# has uncommitted local modifications (dev mode), when the running file is the
-# downloaded copy itself (loop breaker), or when MERGE_BOT_NO_SELF_UPDATE=1.
+# has uncommitted local modifications (dev mode), when the running file already
+# matches origin/$BASE_BRANCH (or the blob sha we just updated to), or when
+# MERGE_BOT_NO_SELF_UPDATE=1.
 
-self_update_repo() { # echoes the toplevel of the repo containing the running script
+self_update_repo() { # echoes the toplevel of the repo containing the script
+    if [ -n "${MERGE_BOT_SOURCE_REPO:-}" ] && [ -d "$MERGE_BOT_SOURCE_REPO" ]; then
+        printf '%s\n' "$MERGE_BOT_SOURCE_REPO"
+        return 0
+    fi
     git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null
 }
 
+self_update_script_rel() { # echoes the repo-relative path of the script
+    if [ -n "${MERGE_BOT_SOURCE_REL:-}" ]; then
+        printf '%s\n' "$MERGE_BOT_SOURCE_REL"
+        return 0
+    fi
+    local rel
+    rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 1
+    printf '%s\n' "${rel}$(basename "${BASH_SOURCE[0]}")"
+}
+
 self_update_plan() { # echoes the remote blob sha when an update is available; else empty
-    local srepo rel script_rel local_blob head_blob remote_blob
+    local srepo script_rel local_blob head_blob remote_blob in_state=0
     [ -n "$CLONE" ] || return 0
     srepo=$(self_update_repo) || return 0
-    # loop breaker: the downloaded copy in the state dir is the newest we know
-    [ "$(cd "$SCRIPT_DIR" && pwd -P)" = "$(cd "$STATE_DIR" 2>/dev/null && pwd -P)" ] && return 0
-    rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
-    script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
+    script_rel=$(self_update_script_rel) || return 0
+    if [ "$(cd "$SCRIPT_DIR" && pwd -P)" = "$(cd "$STATE_DIR" 2>/dev/null && pwd -P)" ]; then
+        in_state=1
+    fi
     local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null) || return 0
-    head_blob=$(git -C "$srepo" rev-parse "HEAD:$script_rel" 2>/dev/null) || head_blob=""
-    if [ -n "$head_blob" ] && [ "$local_blob" != "$head_blob" ]; then
-        return 0 # running with local modifications: do not auto-update
+    if [ "$in_state" = "0" ]; then
+        head_blob=$(git -C "$srepo" rev-parse "HEAD:$script_rel" 2>/dev/null) || head_blob=""
+        if [ -n "$head_blob" ] && [ "$local_blob" != "$head_blob" ]; then
+            return 0 # running with local modifications: do not auto-update
+        fi
     fi
     git -C "$srepo" fetch -q origin "$BASE_BRANCH" >>"$LOG_FILE" 2>&1 || return 0
     remote_blob=$(git -C "$srepo" rev-parse "origin/$BASE_BRANCH:$script_rel" 2>/dev/null) || return 0
     [ "$remote_blob" = "$local_blob" ] && return 0
+    # Guard against an infinite re-exec loop if the downloaded copy somehow
+    # differs from origin/$BASE_BRANCH on the same blob sha we already tried.
+    if [ "$in_state" = "1" ] && [ "${MERGE_BOT_UPDATED_BLOB:-}" = "$remote_blob" ]; then
+        return 0
+    fi
     echo "$remote_blob"
 }
 
 maybe_self_update() {
     [ -n "${MERGE_BOT_NO_SELF_UPDATE:-}" ] && return 0
-    local blob srepo rel script_rel next local_blob
+    local blob srepo script_rel next tmp local_blob
     blob=$(self_update_plan) || return 0
     [ -z "$blob" ] && return 0
     srepo=$(self_update_repo) || return 0
-    rel=$(git -C "$SCRIPT_DIR" rev-parse --show-prefix 2>/dev/null) || return 0
-    script_rel="${rel}$(basename "${BASH_SOURCE[0]}")"
+    script_rel=$(self_update_script_rel) || return 0
     next="$STATE_DIR/merge-bot-next.sh"
-    git -C "$srepo" show "origin/$BASE_BRANCH:$script_rel" >"$next" 2>>"$LOG_FILE" || return 0
-    if ! bash -n "$next" 2>>"$LOG_FILE"; then
-        log "self-update: fetched $script_rel fails bash -n; keeping current version"
-        rm -f "$next"
+    tmp="$STATE_DIR/merge-bot-next.tmp.$$"
+    if ! git -C "$srepo" show "origin/$BASE_BRANCH:$script_rel" >"$tmp" 2>>"$LOG_FILE"; then
+        rm -f "$tmp"
         return 0
     fi
-    # the re-exec'd copy lives in the state dir, outside the repo: point it at
-    # the current references/state explicitly
-    export MERGE_BOT_REFERENCES_DIR="$SCRIPT_DIR/../.vibe/skills/merge-bot/references"
+    if ! bash -n "$tmp" 2>>"$LOG_FILE"; then
+        log "self-update: fetched $script_rel fails bash -n; keeping current version"
+        rm -f "$tmp"
+        return 0
+    fi
+    mv -f "$tmp" "$next"
+    # the re-exec'd copy lives in the state dir, outside the repo: preserve
+    # any caller-provided MERGE_BOT_REFERENCES_DIR (e.g. skjs wrapper), keep
+    # the source repo so subsequent updates still work, and pass state/repo.
+    export MERGE_BOT_REFERENCES_DIR="${REFERENCES_DIR:-$srepo/.vibe/skills/merge-bot/references}"
+    export MERGE_BOT_SOURCE_REPO="$srepo"
+    export MERGE_BOT_SOURCE_REL="$script_rel"
+    export MERGE_BOT_UPDATED_BLOB="$blob"
     export MERGE_BOT_STATE_DIR="$STATE_DIR"
     export MERGE_BOT_REPO="$REPO"
     local_blob=$(git hash-object "$SCRIPT_DIR/$(basename "${BASH_SOURCE[0]}")" 2>/dev/null || echo '?')
@@ -847,12 +979,26 @@ skargo_version_resolve() { # $1 = worktree ("-" = no git, no base version) $2 = 
     # (git stage 1); apply that same bump kind on top of main's ("ours")
     # version. Without a base version, fall back to the higher version.
     local work=$1 f=$2 tmp base
-    tmp="$work/$f.mb-fastpath"
+    # Rebase conflicts only need to check standard conflict markers; also
+    # guard against files where git recorded a non-content conflict or multiple
+    # commits stop for different reasons.
+    if [ "$work" != "-" ]; then
+        tmp="$work/$f.mb-fastpath"
+    else
+        tmp="$f.mb-fastpath"
+    fi
+    local target="$f"
+    if [ "$work" != "-" ]; then
+        target="$work/$f"
+    fi
     base=""
     if [ "$work" != "-" ]; then
         base=$(git -C "$work" show ":1:$f" 2>/dev/null |
             sed -n 's/^[ \t]*version[ \t]*=[ \t]*"\([^"]*\)".*/\1/p' | head -1)
     fi
+    # diff3 / zdiff3 conflict markers include an optional `||||||| ...` base block
+    # between `<<<<<<<` and `=======`; match it explicitly so it isn't swallowed
+    # into $ours.
     # shellcheck disable=SC2016 # single quotes intentional: perl program
     perl -0777 -e '
         sub vcmp { # dotted-numeric compare (1.10.0 > 1.2.0)
@@ -894,8 +1040,10 @@ skargo_version_resolve() { # $1 = worktree ("-" = no git, no base version) $2 = 
         my $c = do { local $/; <$fh> };
         close $fh;
         my $out = "";
+        my $conflicts = 0;
         while (length $c) {
-            if ($c =~ s/\A(.*?)^<<<<<<< [^\n]*\n(.*?)^=======\n(.*?)^>>>>>>> [^\n]*(\n?)//ms) {
+            if ($c =~ s/\A(.*?)^<<<<<<< [^\n]*\n(.*?)(?:^\|\|\|\|\|\|\|[^\n]*\n.*?)?^=======\n(.*?)^>>>>>>> [^\n]*(\n?)//ms) {
+                $conflicts++;
                 my ($pre, $ours, $theirs, $nl) = ($1, $2, $3, $4);
                 $out .= $pre;
                 my @ol = grep { /\S/ } split /\n/, $ours;
@@ -928,9 +1076,10 @@ skargo_version_resolve() { # $1 = worktree ("-" = no git, no base version) $2 = 
                 last;
             }
         }
+        exit 1 if $conflicts == 0; # no standard conflict markers (e.g. modify/delete)
         print $out;
-    ' "$work/$f" "$base" >"$tmp" || { rm -f "$tmp"; return 1; }
-    mv "$tmp" "$work/$f"
+    ' "$target" "$base" >"$tmp" || { rm -f "$tmp"; return 1; }
+    mv "$tmp" "$target"
 }
 
 try_skargo_version_fastpath() { # $1 = worktree stopped mid-rebase; rc 0 = rebase completed
@@ -940,12 +1089,18 @@ try_skargo_version_fastpath() { # $1 = worktree stopped mid-rebase; rc 0 = rebas
         [ "$round" -gt 100 ] && return 1
         conflicted=$(git -C "$work" diff --name-only --diff-filter=U) || return 1
         [ -z "$conflicted" ] && return 0
+        # Pre-check: only proceed if EVERY conflicted file is a Skargo.toml,
+        # so we never mutate one file before bailing out on a non-Skargo file.
         bad=0
         while IFS= read -r f; do
             case "$f" in
-                Skargo.toml | */Skargo.toml) skargo_version_resolve "$work" "$f" || { bad=1; break; } ;;
+                Skargo.toml | */Skargo.toml) ;;
                 *) bad=1; break ;;
             esac
+        done <<<"$conflicted"
+        [ "$bad" = 1 ] && return 1
+        while IFS= read -r f; do
+            skargo_version_resolve "$work" "$f" || { bad=1; break; }
         done <<<"$conflicted"
         [ "$bad" = 1 ] && return 1
         while IFS= read -r f; do git -C "$work" add -- "$f"; done <<<"$conflicted"
@@ -972,7 +1127,10 @@ cmd_prepare() {
     local work="$STATE_DIR/work/pr-$n"
     local head_remote=origin
     if [ "$PR_FORK" = true ]; then head_remote="$PR_HEAD_URL"; fi
-    git -C "$CLONE" fetch origin "+refs/heads/$PR_BASE:refs/remotes/origin/$PR_BASE" >>"$LOG_FILE" 2>&1
+    if ! git -C "$CLONE" fetch origin "+refs/heads/$PR_BASE:refs/remotes/origin/$PR_BASE" >>"$LOG_FILE" 2>&1; then
+        log "PR $n: failed to fetch origin/$PR_BASE"
+        exit 1
+    fi
     if ! git -C "$CLONE" fetch "$head_remote" "+refs/heads/$PR_BRANCH:$ref" >>"$LOG_FILE" 2>&1; then
         git -C "$CLONE" fetch origin "+refs/pull/$n/head:$ref" >>"$LOG_FILE" 2>&1
     fi
@@ -1003,7 +1161,10 @@ cmd_prepare() {
                 local verdict="$STATE_DIR/verdicts/pr-$n"
                 rm -f "$verdict"
                 log "PR $n: rebase conflicts in: $(jq -r 'join(", ")' <<<"$conflicted") (worktree: $work)"
-                printf '%s' "{\"pr\":$n,\"worktree\":\"$work\",\"branch\":\"$PR_BRANCH\",\"base\":\"$PR_BASE\",\"conflicted\":$conflicted,\"verdict_file\":\"$verdict\",\"old_head\":\"$old\"}"
+                jq -nc --argjson pr "$n" --arg worktree "$work" --arg branch "$PR_BRANCH" \
+                    --arg base "$PR_BASE" --argjson conflicted "$conflicted" \
+                    --arg verdict_file "$verdict" --arg old_head "$old" \
+                    '{pr:$pr, worktree:$worktree, branch:$branch, base:$base, conflicted:$conflicted, verdict_file:$verdict_file, old_head:$old_head}'
                 exit "$EXIT_CONFLICT"
             fi
         fi
@@ -1012,7 +1173,10 @@ cmd_prepare() {
     local up_to_date=false
     [ "$old" = "$new" ] && up_to_date=true
     log "PR $n: rebased onto origin/$PR_BASE: $old -> $new (up_to_date=$up_to_date)"
-    printf '%s' "{\"pr\":$n,\"worktree\":\"$work\",\"branch\":\"$PR_BRANCH\",\"base\":\"$PR_BASE\",\"old_head\":\"$old\",\"new_head\":\"$new\",\"up_to_date\":$up_to_date}"
+    jq -nc --argjson pr "$n" --arg worktree "$work" --arg branch "$PR_BRANCH" \
+        --arg base "$PR_BASE" --arg old_head "$old" --arg new_head "$new" \
+        --argjson up_to_date "$up_to_date" \
+        '{pr:$pr, worktree:$worktree, branch:$branch, base:$base, old_head:$old_head, new_head:$new_head, up_to_date:$up_to_date}'
 }
 
 cmd_push() {
@@ -1022,8 +1186,14 @@ cmd_push() {
     ensure_clone
     local work="$STATE_DIR/work/pr-$n"
     [ -d "$work" ] || die "no worktree for PR $n (run: prepare $n)"
-    local branch ref old new push_remote pj
-    pj=$(ghw pr view "$n" --json headRefName,headRepository,headRepositoryOwner,maintainerCanModify)
+    local branch ref old new push_remote pj state
+    pj=$(ghw pr view "$n" --json state,headRefName,headRepository,headRepositoryOwner,maintainerCanModify)
+    state=$(jq -r .state <<<"$pj")
+    if [ "$state" = "MERGED" ] || [ "$state" = "CLOSED" ]; then
+        log "PR $n: already $state; skipping push"
+        jq -nc --argjson pr "$n" --arg state "$state" '{pr:$pr, pushed:false, state:$state}'
+        return 0
+    fi
     branch=$(jq -r .headRefName <<<"$pj")
     push_remote=origin
     if [ "$(jq -r .headRepositoryOwner.login <<<"$pj")" != "${REPO%%/*}" ]; then
@@ -1035,7 +1205,10 @@ cmd_push() {
         fi
     fi
     ref="refs/remotes/mergebot/pr-$n-head"
-    git -C "$CLONE" fetch "$push_remote" "+refs/heads/$branch:$ref" >>"$LOG_FILE" 2>&1 || true
+    if ! git -C "$CLONE" fetch "$push_remote" "+refs/heads/$branch:$ref" >>"$LOG_FILE" 2>&1; then
+        log "PR $n: could not fetch $push_remote $branch (branch deleted?)"
+        return 1
+    fi
     old=$(git -C "$CLONE" rev-parse "$ref")
     if [ -n "$(git -C "$work" status --porcelain)" ] ||
         [ -d "$(git -C "$work" rev-parse --git-path rebase-merge)" ] ||
@@ -1045,17 +1218,17 @@ cmd_push() {
     new=$(git -C "$work" rev-parse HEAD)
     if [ "$old" = "$new" ]; then
         log "PR $n: head unchanged ($new), nothing to push"
-        printf '%s' "{\"pr\":$n,\"pushed\":false,\"head\":\"$new\"}"
+        jq -nc --argjson pr "$n" --arg head "$new" '{pr:$pr, pushed:false, head:$head}'
         return 0
     fi
     if [ "$DRY_RUN" = "1" ]; then
         log "DRY-RUN: would push $new -> $push_remote $branch (force-with-lease=$old)"
-        printf '%s' "{\"pr\":$n,\"pushed\":false,\"dry_run\":true,\"head\":\"$new\"}"
+        jq -nc --argjson pr "$n" --arg head "$new" '{pr:$pr, pushed:false, dry_run:true, head:$head}'
         return 0
     fi
     git -C "$work" push --force-with-lease="refs/heads/$branch:$old" "$push_remote" "HEAD:refs/heads/$branch" >>"$LOG_FILE" 2>&1
     log "PR $n: pushed $new to $push_remote $branch (lease $old)"
-    printf '%s' "{\"pr\":$n,\"pushed\":true,\"head\":\"$new\"}"
+    jq -nc --argjson pr "$n" --arg head "$new" '{pr:$pr, pushed:true, head:$head}'
 }
 
 cmd_abort() {
@@ -1064,11 +1237,14 @@ cmd_abort() {
     acquire_lock
     ensure_clone
     local work="$STATE_DIR/work/pr-$n"
-    [ -d "$work" ] || return 0
-    git -C "$work" rebase --abort >>"$LOG_FILE" 2>&1 || true
-    git -C "$CLONE" worktree remove --force "$work" 2>/dev/null || rm -rf "$work"
+    if [ -d "$work" ]; then
+        git -C "$work" rebase --abort >>"$LOG_FILE" 2>&1 || true
+        git -C "$CLONE" worktree remove --force "$work" 2>/dev/null || rm -rf "$work"
+    fi
     git -C "$CLONE" worktree prune
-    log "PR $n: rebase aborted, worktree removed"
+    git -C "$CLONE" update-ref -d "refs/remotes/mergebot/pr-$n-head" 2>/dev/null || true
+    git -C "$CLONE" branch -D "mergebot-fix-pr-$n" >/dev/null 2>&1 || true
+    log "PR $n: worktree and temp refs cleaned up"
 }
 
 # ---------------------------------------------------------------------------
@@ -1080,87 +1256,72 @@ cmd_wait() { # $1=pr [$2=timeout-seconds (default CI_TIMEOUT)] [$3=expected head
     local timeout=${2:-$CI_TIMEOUT}
     local head=${3:-}
     resolve_repo
+    local start_s=$SECONDS
     local deadline=$((SECONDS + timeout))
+    local head_seen=0
+    local settle_deadline=0
+    if [ -n "$head" ]; then
+        settle_deadline=$((start_s + PUSH_SETTLE_SECONDS))
+    fi
     while :; do
-        local j state failed mss mergeable pending stale
-        j=$(ghw pr view "$n" --json state,mergeStateStatus,mergeable,autoMergeRequest,statusCheckRollup,headRefOid)
-        state=$(jq -r .state <<<"$j")
-        mss=$(jq -r .mergeStateStatus <<<"$j")
-        mergeable=$(jq -r .mergeable <<<"$j")
-        if [ "$state" = "MERGED" ]; then
-            log "PR $n: MERGED"
-            printf '%s' "{\"pr\":$n,\"result\":\"merged\"}"
-            return 0
+        local j ev act failed mss mergeable pending head_matches push_lag
+        if ! j=$(ghw pr view "$n" --json state,mergeStateStatus,mergeable,autoMergeRequest,statusCheckRollup,headRefOid 2>>"$LOG_FILE"); then
+            log "PR $n: gh pr view failed (transient network error?); retrying in 15s"
+            sleep 15
+            continue
         fi
-        if [ "$state" = "CLOSED" ]; then
-            log "PR $n: closed without merging"
-            printf '%s' "{\"pr\":$n,\"result\":\"closed\"}"
-            return "$EXIT_NOT_READY"
+        push_lag=0
+        if [ "$settle_deadline" -gt 0 ] && [ "$SECONDS" -lt "$settle_deadline" ]; then
+            push_lag=1
         fi
-        if [ "$(jq -r '.autoMergeRequest != null' <<<"$j")" = "false" ]; then
-            log "PR $n: auto-merge was disabled while waiting"
-            printf '%s' "{\"pr\":$n,\"result\":\"auto-merge-off\"}"
-            return "$EXIT_AUTO_OFF"
+        ev=$(jq -c --arg head "$head" --argjson head_seen "$head_seen" --argjson push_lag "$push_lag" "$JQ_WAIT_EVAL" <<<"$j")
+        act=$(jq -r .action <<<"$ev")
+        mss=$(jq -r .mss <<<"$ev")
+        mergeable=$(jq -r .mergeable <<<"$ev")
+        pending=$(jq -r .pending <<<"$ev")
+        failed=$(jq -r .failed <<<"$ev")
+        head_matches=$(jq -r .head_matches <<<"$ev")
+        if [ -n "$head" ] && [ "$head_matches" = "true" ]; then
+            head_seen=1
         fi
-        # Any red CI counts (not just the two required contexts): the
-        # aggregating `ci/all-checks` context is a no-op job that may be absent
-        # from the rollup while individual jobs already failed.
-        failed=$(jq -r '
-            [.statusCheckRollup[]?
-              | select((.__typename == "StatusContext"
-                        and ((.context // "") | startswith("ci/circleci:"))
-                        and (.state | IN("FAILURE", "ERROR")))
-                       or (.__typename == "CheckRun"
-                           and ((.conclusion // "") | IN("FAILURE", "ERROR", "TIMED_OUT", "ACTION_REQUIRED", "CANCELLED", "STALE"))))
-              | (if .__typename == "StatusContext" then .context else .name end)]
-            | join(", ")' <<<"$j")
-        if [ -n "$failed" ]; then
-            log "PR $n: CI failed on head: $failed"
-            printf '%s' "{\"pr\":$n,\"result\":\"ci-failed\",\"failed\":\"$failed\"}"
-            return "$EXIT_CI_FAILED"
-        fi
-        # Stale/dirty detection, two cases:
-        #  - CONFLICTING / DIRTY: the head genuinely conflicts with main right
-        #    now, so CI can never make it mergeable — report STALE immediately,
-        #    even while CI is still pending and even if the head is not the one
-        #    we pushed (the branch may have been force-pushed back). Waiting
-        #    for CI here is pointless.
-        #  - BEHIND: main moved while we were waiting. Only report STALE once
-        #    CI on the head is complete (nothing pending), with guards against
-        #    the post-push recomputation lag (rollup may still show the
-        #    previous head's completed checks; GitHub may transiently report
-        #    BEHIND): require a non-empty rollup and, when an expected head
-        #    was given, that it is the current PR head.
-        pending=$(jq -r '[.statusCheckRollup[]?
-            | select((.__typename == "StatusContext" and ((.state // "") | IN("PENDING", "EXPECTED", "REQUESTED")))
-                     or (.__typename == "CheckRun" and ((.status // "") | IN("QUEUED", "IN_PROGRESS", "WAITING", "PENDING", "REQUESTED"))))]
-            | length' <<<"$j")
-        stale=false
-        if [ "$mergeable" = "CONFLICTING" ] || [ "$mss" = "DIRTY" ]; then
-            stale=true
-        elif [ "$pending" = "0" ] && [ "$mss" = "BEHIND" ]; then
-            local rollup_len head_ok
-            rollup_len=$(jq -r '(.statusCheckRollup // []) | length' <<<"$j")
-            head_ok=true
-            if [ -n "$head" ]; then
-                head_ok=$(jq -r --arg h "$head" '.headRefOid == $h' <<<"$j")
-            fi
-            if [ "$rollup_len" -gt 0 ] && [ "$head_ok" = true ]; then
-                stale=true
-            fi
-        fi
-        if [ "$stale" = true ]; then
-            log "PR $n: staled/dirty while waiting (mergeStateStatus=$mss mergeable=$mergeable pending=$pending)"
-            printf '%s' "{\"pr\":$n,\"result\":\"stale\"}"
-            return "$EXIT_STALE"
-        fi
+        case "$act" in
+            merged)
+                log "PR $n: MERGED"
+                jq -nc --argjson pr "$n" '{pr:$pr, result:"merged"}'
+                return 0
+                ;;
+            closed)
+                log "PR $n: closed without merging"
+                jq -nc --argjson pr "$n" '{pr:$pr, result:"closed"}'
+                return "$EXIT_NOT_READY"
+                ;;
+            auto-merge-off)
+                log "PR $n: auto-merge was disabled while waiting"
+                jq -nc --argjson pr "$n" '{pr:$pr, result:"auto-merge-off"}'
+                return "$EXIT_AUTO_OFF"
+                ;;
+            ci-failed)
+                log "PR $n: CI failed on head: $failed"
+                jq -nc --argjson pr "$n" --arg failed "$failed" '{pr:$pr, result:"ci-failed", failed:$failed}'
+                return "$EXIT_CI_FAILED"
+                ;;
+            stale)
+                log "PR $n: staled/dirty while waiting (mergeStateStatus=$mss mergeable=$mergeable pending=$pending)"
+                jq -nc --argjson pr "$n" '{pr:$pr, result:"stale"}'
+                return "$EXIT_STALE"
+                ;;
+        esac
         if [ "$SECONDS" -ge "$deadline" ]; then
             log "PR $n: timed out after ${timeout}s waiting for merge (state=$mss)"
-            printf '%s' "{\"pr\":$n,\"result\":\"timeout\"}"
+            jq -nc --argjson pr "$n" '{pr:$pr, result:"timeout"}'
             return "$EXIT_TIMEOUT"
         fi
         local s=$POLL_SECONDS
         if [ "$s" -gt 30 ]; then s=30; fi
+        # Poll quickly while waiting for GitHub to pick up a just-pushed head
+        if [ "$push_lag" = "1" ] && [ "$s" -gt 5 ]; then s=5; fi
+        local state
+        state=$(jq -r .state <<<"$j")
         log "PR $n: waiting for merge (state=$state mergeStateStatus=$mss, $((deadline - SECONDS))s left)"
         sleep "$s"
     done
@@ -1201,11 +1362,12 @@ cmd_unauto() {
 
 make_prompt() { # $1=template file name (references/*.md) $2=pr $3=info json; echoes prompt path
     local template=$1 n=$2 info=$3
-    local tmpl
+    local tmpl bundled_refs
+    bundled_refs="${MERGE_BOT_SOURCE_REPO:-$SCRIPT_DIR/..}/.vibe/skills/merge-bot/references"
     if [ -n "$REFERENCES_DIR" ] && [ -f "$REFERENCES_DIR/$template" ]; then
         tmpl="$REFERENCES_DIR/$template" # repo-specific override (MERGE_BOT_REFERENCES_DIR)
     else
-        tmpl="$SCRIPT_DIR/../.vibe/skills/merge-bot/references/$template"
+        tmpl="$bundled_refs/$template"
     fi
     local out="$STATE_DIR/prompts/${template%.md}-pr-$n.md"
     local work branch base conflicted failed verdict url
@@ -1370,18 +1532,22 @@ ci_fixer_info() { # $1=pr ; echoes info json for the fix-ci fixer
 # ---------------------------------------------------------------------------
 
 PUSH_OUT=""
-do_push() { # $1=pr ; on success sets PUSH_OUT to cmd_push's JSON
-    local n=$1 prc body
+do_push() { # $1=pr [$2=comment_on_fail (default 1)]; on success sets PUSH_OUT to cmd_push's JSON
+    local n=$1 comment_on_fail=${2:-1} prc body
     prc=0
     PUSH_OUT=$(cmd_push "$n") || prc=$?
     if [ "$prc" -ne 0 ]; then
-        log "PR $n: push failed rc=$prc; commenting + disabling auto-merge"
-        body=$(mktemp)
-        comment_push_failed "$n" "$prc" >"$body"
-        cmd_abort "$n" >/dev/null 2>&1 || true
-        cmd_comment "$n" "$body"
-        cmd_unauto "$n"
-        rm -f "$body"
+        if [ "$comment_on_fail" = "1" ]; then
+            log "PR $n: push failed rc=$prc; commenting + disabling auto-merge"
+            body=$(mktemp)
+            comment_push_failed "$n" "$prc" >"$body"
+            cmd_abort "$n" >/dev/null 2>&1 || true
+            cmd_comment "$n" "$body"
+            cmd_unauto "$n"
+            rm -f "$body"
+        else
+            log "PR $n: push failed rc=$prc (will retry)"
+        fi
         return 1
     fi
     return 0
@@ -1398,6 +1564,7 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
         case $wrc in
             0)
                 log "PR $n: merged"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return 0
                 ;;
             "$EXIT_STALE")
@@ -1412,13 +1579,28 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
                     cmd_comment "$n" "$body"
                     cmd_unauto "$n"
                     rm -f "$body"
+                    cmd_abort "$n" >/dev/null 2>&1 || true
                     log "PR $n: CI still red after $CI_FIX_ATTEMPTS fix attempt(s); commented + auto-merge disabled"
                     return "$EXIT_CI_FAILED"
                 fi
                 log "PR $n: CI red after our push (attempt $attempts/$CI_FIX_ATTEMPTS); spawning CI fixer"
                 cinfo=$(ci_fixer_info "$n")
                 if run_fixer fix-ci.md "$n" "$cinfo"; then
-                    do_push "$n" || return 1
+                    do_push "$n" 1 || return 1
+                    out=$PUSH_OUT
+                    # If the fixer made no new commit (e.g. PR already merged or
+                    # already green on the same head, or nothing left to fix),
+                    # check if it merged/closed, otherwise re-evaluate wait.
+                    if [ "$(jq -r '.state // ""' <<<"$out")" = "MERGED" ]; then
+                        log "PR $n: merged while fixer ran"
+                        cmd_abort "$n" >/dev/null 2>&1 || true
+                        return 0
+                    fi
+                    if [ "$(jq -r '.state // ""' <<<"$out")" = "CLOSED" ]; then
+                        log "PR $n: closed while fixer ran"
+                        cmd_abort "$n" >/dev/null 2>&1 || true
+                        return "$EXIT_NOT_READY"
+                    fi
                     continue
                 fi
                 body=$(mktemp)
@@ -1436,10 +1618,12 @@ wait_phase() { # $1=pr $2=pushed-info-json; rc: 0 merged, STALE, CI_FAILED, TIME
                 cmd_comment "$n" "$body"
                 cmd_unauto "$n"
                 rm -f "$body"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return "$EXIT_TIMEOUT"
                 ;;
             *)
                 log "PR $n: wait ended rc=$wrc ($wout)"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return "$wrc"
                 ;;
         esac
@@ -1458,6 +1642,7 @@ cmd_process() {
         case $rc in
             "$EXIT_NOT_READY")
                 log "PR $n: not processable, skipping"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return "$EXIT_NOT_READY"
                 ;;
             "$EXIT_CONFLICT")
@@ -1471,12 +1656,15 @@ cmd_process() {
             0) : ;;
             *)
                 log "PR $n: prepare failed rc=$rc"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return "$rc"
                 ;;
         esac
-        if ! do_push "$n"; then
-            # e.g. the PR head moved meanwhile (lease rejected): re-prepare
-            # from the fresh head instead of giving up
+        # Only comment + unauto on the final push attempt; earlier failures
+        # (e.g. lease rejected because PR head moved) retry via re-prepare.
+        local comment_on_fail=0
+        [ "$rattempts" -ge "$REBASE_ATTEMPTS" ] && comment_on_fail=1
+        if ! do_push "$n" "$comment_on_fail"; then
             if [ "$rattempts" -ge "$REBASE_ATTEMPTS" ]; then
                 log "PR $n: push kept failing after $rattempts attempt(s)"
                 return 1
@@ -1485,6 +1673,16 @@ cmd_process() {
             continue
         fi
         out=$PUSH_OUT
+        if [ "$(jq -r '.state // ""' <<<"$out")" = "MERGED" ]; then
+            log "PR $n: merged before push"
+            cmd_abort "$n" >/dev/null 2>&1 || true
+            return 0
+        fi
+        if [ "$(jq -r '.state // ""' <<<"$out")" = "CLOSED" ]; then
+            log "PR $n: closed before push"
+            cmd_abort "$n" >/dev/null 2>&1 || true
+            return "$EXIT_NOT_READY"
+        fi
         wrc=0
         wait_phase "$n" "$out" || wrc=$?
         if [ "$wrc" = "$EXIT_STALE" ]; then
@@ -1498,6 +1696,7 @@ cmd_process() {
                 cmd_comment "$n" "$body"
                 cmd_unauto "$n"
                 rm -f "$body"
+                cmd_abort "$n" >/dev/null 2>&1 || true
                 return "$EXIT_TIMEOUT"
             fi
             log "PR $n: staled while waiting (main moved); re-rebasing (attempt $rattempts/$REBASE_ATTEMPTS)"
@@ -1514,8 +1713,13 @@ cmd_run() {
     log "merge-bot run: repo=$REPO poll=${POLL_SECONDS}s ci-timeout=${CI_TIMEOUT}s ci-fix-attempts=$CI_FIX_ATTEMPTS dry-run=$DRY_RUN agent=${AGENT_CMD:-<default vibe>}"
     while :; do
         local dec action pr rc
+        rotate_log_if_large
         maybe_self_update # re-exec if a newer bot version was pushed to origin/$BASE_BRANCH
-        dec=$(cmd_pick)
+        dec=$(cmd_pick) || {
+            log "pick failed (transient gh/network error?); sleeping ${POLL_SECONDS}s"
+            sleep "$POLL_SECONDS"
+            continue
+        }
         action=$(jq -r .action <<<"$dec")
         case "$action" in
             idle)
@@ -1582,28 +1786,36 @@ cmd_retry_red() { # [--include-unautod]
     while [ $# -gt 0 ]; do
         case "$1" in
             --include-unautod) include_unautod=1; shift ;;
-            *) shift ;;
+            *) die "retry-red: unknown argument: $1" ;;
         esac
     done
-    local prs n rc unautod=""
+    local prs noauto item n rc unautod="" to_retry up_to_date
     prs=$(scan_json "$JQ_SCAN_RED")
     if [ "$include_unautod" = "1" ]; then
         # also PRs whose auto-merge the bot itself disabled (it comments
         # "disabled auto-merge" when it does): re-enable, then retry
-        for n in $(scan_json "$JQ_SCAN_RED_NOAUTO" | jq -r '.[].number'); do
+        noauto=$(scan_json "$JQ_SCAN_RED_NOAUTO")
+        while IFS= read -r item; do
+            [ -n "$item" ] || continue
+            n=$(jq -r .number <<<"$item")
             if bot_disabled_auto_merge "$n"; then
                 log "PR $n: red CI and auto-merge was disabled by the bot; including in retry"
                 unautod="$unautod $n"
-                prs=$(jq --argjson n "$n" --argjson t "$(ghw pr view "$n" --json title --jq '{number: '"$n"', title}')" '. + [$t]' <<<"$prs")
+                prs=$(jq --argjson it "$item" '. + [$it] | sort_by(.expectedCiSeconds, .number)' <<<"$prs")
             fi
-        done
+        done < <(jq -c '.[]' <<<"$noauto")
     fi
-    if [ "$(jq length <<<"$prs")" = "0" ]; then
-        log "retry-red: nothing to retry (no red-CI auto-merge PRs)"
+    up_to_date=$(jq '[.[] | select(.upToDate)]' <<<"$prs")
+    if [ "$(jq length <<<"$up_to_date")" != "0" ]; then
+        log "retry-red: already up-to-date red-CI PR(s) need manual CI re-run (skipping): $(jq -r '[.[].number] | join(",")' <<<"$up_to_date")"
+    fi
+    to_retry=$(jq '[.[] | select(.needsRebase)]' <<<"$prs")
+    if [ "$(jq length <<<"$to_retry")" = "0" ]; then
+        log "retry-red: nothing to retry (no behind red-CI PRs)"
         return 0
     fi
-    log "retry-red: retrying $(jq length <<<"$prs") red-CI PR(s): $(jq -r '[.[].number] | join(",")' <<<"$prs") — each rebase+push re-triggers CI on the new head"
-    for n in $(jq -r '.[].number' <<<"$prs"); do
+    log "retry-red: retrying $(jq length <<<"$to_retry") red-CI PR(s): $(jq -r '[.[].number] | join(",")' <<<"$to_retry") — each rebase+push re-triggers CI on the new head"
+    for n in $(jq -r '.[].number' <<<"$to_retry"); do
         case " $unautod " in *" $n "*) enable_auto_merge "$n" ;; esac
         rc=0
         cmd_process "$n" || rc=$?
@@ -1767,9 +1979,36 @@ cmd_selftest() {
     check "pick: up-to-date green PR wins (wait for merge before any rebase)" \
         '{"action":"wait","pr":1}' "$(jq -c "$JQ_PICK" <<<"$scan")"
     check "pick: without up-to-date PRs, fastest expected CI rebase first" \
-        '{"action":"rebase","pr":6}' "$(jq -c "$JQ_PICK" <<<"$(jq 'map(select(.number != 1))' <<<"$scan")")"
+        '{"action":"rebase","pr":6,"est":300}' "$(jq -c "$JQ_PICK" <<<"$(jq 'map(select(.number != 1))' <<<"$scan")")"
     check "pick: nothing ready -> idle" \
         '{"action":"idle"}' "$(jq -c "$JQ_PICK" <<<"[]")"
+
+    # wait evaluation: post-push lag guards against stale DIRTY / stale CI failure
+    local w_old_dirty w_new_dirty w_old_fail w_new_fail w_new_behind w_merged
+    w_old_dirty='{"state":"OPEN","mergeStateStatus":"DIRTY","mergeable":"CONFLICTING","autoMergeRequest":{"mergeMethod":"MERGE"},"headRefOid":"oldsha","statusCheckRollup":[]}'
+    w_new_dirty='{"state":"OPEN","mergeStateStatus":"DIRTY","mergeable":"CONFLICTING","autoMergeRequest":{"mergeMethod":"MERGE"},"headRefOid":"newsha","statusCheckRollup":[]}'
+    w_old_fail='{"state":"OPEN","mergeStateStatus":"BLOCKED","mergeable":"MERGEABLE","autoMergeRequest":{"mergeMethod":"MERGE"},"headRefOid":"oldsha","statusCheckRollup":[{"__typename":"StatusContext","context":"ci/circleci: build","state":"FAILURE"}]}'
+    w_new_fail='{"state":"OPEN","mergeStateStatus":"BLOCKED","mergeable":"MERGEABLE","autoMergeRequest":{"mergeMethod":"MERGE"},"headRefOid":"newsha","statusCheckRollup":[{"__typename":"StatusContext","context":"ci/circleci: build","state":"FAILURE"}]}'
+    w_new_behind='{"state":"OPEN","mergeStateStatus":"BEHIND","mergeable":"MERGEABLE","autoMergeRequest":{"mergeMethod":"MERGE"},"headRefOid":"newsha","statusCheckRollup":[{"__typename":"StatusContext","context":"ci/circleci: build","state":"SUCCESS"}]}'
+    w_merged='{"state":"MERGED","mergeStateStatus":"UNKNOWN","mergeable":"UNKNOWN","autoMergeRequest":null,"headRefOid":"newsha","statusCheckRollup":[]}'
+    check "wait-eval: ignores old head DIRTY before new headRefOid appears" \
+        "wait" "$(jq -r --arg head newsha --argjson head_seen 0 --argjson push_lag 1 "$JQ_WAIT_EVAL | .action" <<<"$w_old_dirty")"
+    check "wait-eval: ignores old head CI failure before new headRefOid appears" \
+        "wait" "$(jq -r --arg head newsha --argjson head_seen 0 --argjson push_lag 0 "$JQ_WAIT_EVAL | .action" <<<"$w_old_fail")"
+    check "wait-eval: suppresses DIRTY during post-push settle window" \
+        "wait" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 1 "$JQ_WAIT_EVAL | .action" <<<"$w_new_dirty")"
+    check "wait-eval: reports stale on DIRTY once settle window expires" \
+        "stale" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 0 "$JQ_WAIT_EVAL | .action" <<<"$w_new_dirty")"
+    check "wait-eval: suppresses CI failure during post-push settle window" \
+        "wait" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 1 "$JQ_WAIT_EVAL | .action" <<<"$w_new_fail")"
+    check "wait-eval: reports ci-failed once settle window expires" \
+        "ci-failed" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 0 "$JQ_WAIT_EVAL | .action" <<<"$w_new_fail")"
+    check "wait-eval: reports stale on BEHIND with completed rollup after settle" \
+        "stale" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 0 "$JQ_WAIT_EVAL | .action" <<<"$w_new_behind")"
+    check "wait-eval: reports merged immediately even during settle window" \
+        "merged" "$(jq -r --arg head newsha --argjson head_seen 0 --argjson push_lag 1 "$JQ_WAIT_EVAL | .action" <<<"$w_merged")"
+    check "wait-eval: if head was already seen and later force-pushed dirty, reports stale" \
+        "stale" "$(jq -r --arg head newsha --argjson head_seen 1 --argjson push_lag 0 "$JQ_WAIT_EVAL | .action" <<<"$w_old_dirty")"
 
     check "scan-red keeps only red-CI auto-merge PRs (fixture #3)" \
         "[3]" "$(jq --arg owner SkipLabs --argjson skip '["do-not-merge"]' "$JQ_SCAN_RED" <<<"$fx" | jq -c '[.[].number]')"
@@ -1832,6 +2071,33 @@ EOF
         check "fastpath: non-version conflict is rejected" "rejected" "rejected"
     fi
     check "fastpath: rejected file left untouched" "1" "$(grep -c '^<<<<<<<' "$tdir/Skargo.toml")"
+
+    # diff3/zdiff3 conflict markers (with ||||||| base section)
+    cat >"$tdir/Skargo.toml" <<'EOF'
+[package]
+name = "foo"
+<<<<<<< HEAD
+version = "1.2.0"
+||||||| parent of feat
+version = "1.1.0"
+=======
+version = "1.3.0"
+>>>>>>> feat
+EOF
+    if skargo_version_resolve "$tdir" Skargo.toml; then
+        check "fastpath: diff3 conflict markers resolved cleanly" \
+            "1.3.0" "$(sed -n 's/^version = "\(.*\)"/\1/p' "$tdir/Skargo.toml")"
+    else
+        check "fastpath: diff3 conflict markers resolved cleanly" "resolved" "rejected"
+    fi
+
+    # file without conflict markers (e.g. modify/delete) must be rejected
+    printf '[package]\nname = "foo"\nversion = "1.0.0"\n' >"$tdir/Skargo.toml"
+    if skargo_version_resolve "$tdir" Skargo.toml; then
+        check "fastpath: file with no conflict markers is rejected" "rejected" "resolved"
+    else
+        check "fastpath: file with no conflict markers is rejected" "rejected" "rejected"
+    fi
 
     # end-to-end: rebase conflicting only on Skargo.toml version -> completes
     g="git -c user.email=t@t -c user.name=t -c commit.gpgsign=false"
@@ -1942,9 +2208,21 @@ EOF
     git -C "$su/other" remote add origin "$su/other.git"
     CLONE="$su/other"
     check "self-update: ignores \$CLONE repo when script lives elsewhere (wrapper loop)" "" "$(self_update_plan)"
-    # loop breaker: running the downloaded copy in the state dir never re-updates
+    # loop breaker: downloaded copy in state dir skips when MERGE_BOT_UPDATED_BLOB matches
+    cp "$su/work/bin/merge-bot.sh" "$su/state/merge-bot.sh"
     SCRIPT_DIR="$su/state" CLONE="$su/other"
-    check "self-update: loop breaker on the downloaded copy in the state dir" "" "$(self_update_plan)"
+    MERGE_BOT_SOURCE_REPO="$su/run" MERGE_BOT_SOURCE_REL="bin/merge-bot.sh" \
+        MERGE_BOT_UPDATED_BLOB="$(git -C "$su/bare.git" rev-parse main:bin/merge-bot.sh)"
+    check "self-update: downloaded copy matching origin/main does not re-update" "" "$(self_update_plan)"
+    # push v3 to bare origin -> downloaded copy in state dir CAN update again!
+    printf '#!/bin/sh\necho v3\n' >"$su/work/bin/merge-bot.sh"
+    $g -C "$su/work" commit -qam v3
+    git -C "$su/work" push -q "$su/bare.git" main
+    check "self-update: downloaded copy updates again when v3 lands on origin/main" \
+        "$(git -C "$su/bare.git" rev-parse main:bin/merge-bot.sh)" "$(self_update_plan)"
+    # without MERGE_BOT_SOURCE_REPO (e.g. legacy state dir copy), stays safe
+    unset MERGE_BOT_SOURCE_REPO MERGE_BOT_SOURCE_REL MERGE_BOT_UPDATED_BLOB
+    check "self-update: loop breaker when state dir has no source repo" "" "$(self_update_plan)"
     CLONE="$su/clone"
     SCRIPT_DIR=$saved_sd CLONE=$saved_clone STATE_DIR=$saved_state LOG_FILE="$tdir/selftest.log"
     rm -rf "$su"
@@ -1974,6 +2252,7 @@ main() {
             --merge-wait) MERGE_WAIT=$2; shift 2 ;;
             --ci-fix-attempts) CI_FIX_ATTEMPTS=$2; shift 2 ;;
             --rebase-attempts) REBASE_ATTEMPTS=$2; shift 2 ;;
+            --push-settle) PUSH_SETTLE_SECONDS=$2; shift 2 ;;
             --agent-cmd) AGENT_CMD=$2; shift 2 ;;
             --skip-labels) SKIP_LABELS=$2; shift 2 ;;
             --selftest) cmd_selftest; return $? ;;
