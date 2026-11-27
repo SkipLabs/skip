@@ -381,6 +381,11 @@ base class Handle<K: Key, +V: File>(
     dir.getArray(context, key).map(this.type)
   }
 
+  fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
+    dir = context.getDir(this.dirName).typed();
+    dir.getIter(context, key).map(this.type)
+  }
+
   fun get(context: mutable Context, key: K): V {
     values = this.getArray(context, key);
     if (values.size() >= 2) {
@@ -780,11 +785,6 @@ class EHandle<K: Key, V: File> extends Handle<K, V> {
     dir.getIterator(context).map(kv ->
       (this.keyType(kv.i0), kv.i1.map(this.type))
     )
-  }
-
-  fun getIter(context: mutable Context, key: K): mutable Iterator<V> {
-    dir = context.unsafeGetDir(this.dirName).typed();
-    dir.getIter(context, key).map(this.type)
   }
 
   fun containsKey(context: mutable Context, key: K): Bool {

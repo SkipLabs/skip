@@ -274,4 +274,148 @@ fun testEagerReplacementChangesRanges(): void {
   context.update();
   T.expectEq(child.get(context, one).value, 21);
 }
+
+@test
+fun testGetIterTracksDirTagOnReplacementAndDeletion(): void {
+  key = SKStore.IID(0);
+  controlName = SKStore.DirName::create("/getiter-dirtag/control/");
+  leftName = SKStore.DirName::create("/getiter-dirtag/left/");
+  rightName = SKStore.DirName::create("/getiter-dirtag/right/");
+  childName = SKStore.DirName::create("/getiter-dirtag/child/");
+  lazyName = SKStore.DirName::create("/getiter-dirtag/lazy/");
+  triggerName = SKStore.DirName::create("/getiter-dirtag/trigger/");
+  observerName = SKStore.DirName::create("/getiter-dirtag/observer/");
+  lazyObserverName = SKStore.DirName::create("/getiter-dirtag/lazy-observer/");
+  control = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    controlName,
+  );
+  left = SKStore.EHandle(SKStore.IID::keyType, SKStore.IntFile::type, leftName);
+  right = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    rightName,
+  );
+  child = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    childName,
+  );
+  lazyHandle = SKStore.LHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    lazyName,
+  );
+  observer = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    observerName,
+  );
+  lazyObserver = SKStore.EHandle(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    lazyObserverName,
+  );
+  context = SKStore.run(context ~> {
+    for ((name, value) in Array[
+      (controlName, 0),
+      (leftName, 10),
+      (rightName, 20),
+      (triggerName, 0),
+    ]) {
+      _ = context.mkdir(
+        SKStore.IID::keyType,
+        SKStore.IntFile::type,
+        name,
+        Array[(key, SKStore.IntFile(value))],
+      );
+    };
+    _ = control.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      SKStore.DirName::create("/getiter-dirtag/driver/"),
+      (context, writer, key, values) ~> {
+        mode = values.first.value;
+        if (mode == 0) {
+          _ = left.map(
+            SKStore.IID::keyType,
+            SKStore.IntFile::type,
+            context,
+            childName,
+            (_, writer, key, values) ~> writer.set(key, values.first),
+          );
+          _ = SKStore.LHandle::create(
+            SKStore.IID::keyType,
+            SKStore.IntFile::type,
+            context,
+            lazyName,
+            (_, _, _) ~> Array[SKStore.IntFile(100)],
+          );
+        } else if (mode == 1) {
+          _ = right.map(
+            SKStore.IID::keyType,
+            SKStore.IntFile::type,
+            context,
+            childName,
+            (_, writer, key, values) ~> writer.set(key, values.first),
+          );
+          _ = SKStore.LHandle::create(
+            SKStore.IID::keyType,
+            SKStore.IntFile::type,
+            context,
+            lazyName,
+            (_, _, _) ~> Array[SKStore.IntFile(200)],
+          );
+        };
+        writer.set(key, values.first);
+      },
+    );
+    trigger = SKStore.EHandle(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      triggerName,
+    );
+    _ = trigger.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      observerName,
+      (context, writer, key, _) ~> {
+        sum = 0;
+        for (v in child.getIter(context, key)) {
+          !sum = sum + v.value;
+        };
+        writer.set(key, SKStore.IntFile(sum));
+      },
+    );
+    _ = trigger.map(
+      SKStore.IID::keyType,
+      SKStore.IntFile::type,
+      context,
+      lazyObserverName,
+      (context, writer, key, _) ~> {
+        sum = 0;
+        for (v in lazyHandle.getIter(context, key)) {
+          !sum = sum + v.value;
+        };
+        writer.set(key, SKStore.IntFile(sum));
+      },
+    );
+  });
+  T.expectEq(observer.get(context, key).value, 10);
+  T.expectEq(lazyObserver.get(context, key).value, 100);
+  // Replace both child (EHandle) and lazyHandle (LHandle) without writing
+  // to their rows directly; getIter readers must invalidate via Path::dirTag.
+  control.writeArray(context, key, Array[SKStore.IntFile(1)]);
+  context.update();
+  T.expectEq(observer.get(context, key).value, 20);
+  T.expectEq(lazyObserver.get(context, key).value, 200);
+  // Delete child (mode 2 does not recreate childName); the EHandle.getIter
+  // observer must invalidate via Path::dirTag and observe an empty iterator.
+  control.writeArray(context, key, Array[SKStore.IntFile(2)]);
+  context.update();
+  T.expectEq(observer.get(context, key).value, 0);
+}
 module end;
