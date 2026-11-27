@@ -42,6 +42,26 @@ before/after snippet when it helps.
 
 <!-- Newest entries first. Add yours at the top of this section. -->
 
+### Express variant subsets with multiple inheritance instead of runtime `invariant` checks
+
+Skip supports **multiple inheritance** of `base class`es (and `extension class Child extends SubsetBase`), so when a field or parameter only accepts a subset of a sum type's variants, introduce a narrower `base class` for that subset instead of typing it with the full base class and guarding with `invariant(!(k is Excluded()))` plus dead match arms. Pattern matches on the narrower base class stay exhaustive without unreachable arms, and the compiler rejects excluded variants statically at every construction site.
+
+    // worse: runtime invariant + dead match arms for an excluded variant
+    base class Kind { children = | A() | B() | C() }
+    class Holder(k: Kind) {
+      static fun make(k: Kind): Holder {
+        invariant(!(k is C()));
+        Holder(k)
+      }
+    }
+
+    // better: subset base class via multiple inheritance — C is statically impossible
+    base class Kind { children = | A() | B() | C() }
+    base class NonCKind extends Kind
+    extension class A extends NonCKind
+    extension class B extends NonCKind
+    class Holder(k: NonCKind)
+
 ### Initialize config-like state in the constructor, not by assigning a mutable field after construction
 
 Make per-run configuration a **non-mutable constructor field** with a default and pass it at the construction site, instead of a `mutable` field assigned with `!x = ...` after `Class(...)`. Constructor arguments are positional (`Name => v` is record-only syntax), so place the field where the call site can pass it.
