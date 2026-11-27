@@ -9,6 +9,7 @@ import type {
   LazyCollection,
   Values,
   AnySkipService,
+  ServiceOptions,
   Resource,
   Entry,
   ExternalService,
@@ -444,6 +445,62 @@ class UserMapReduceResource implements Resource<Input_NN> {
 const userMapReduceService: AnySkipService = {
   inputs: { input: new InputDefinition() },
   resources: { userMapReduce: UserMapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+//// testCheckReducers
+class BuggyUserSum implements Reducer<number, number> {
+  initial = 0;
+
+  add(accum: Nullable<number>, value: number): number {
+    return (accum ?? 0) + value;
+  }
+
+  remove(accum: number, value: number): Nullable<number> {
+    // Intentionally buggy: subtracts value + 1 instead of value.
+    return accum - value - 1;
+  }
+}
+
+class BuggyUserMapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven)(BuggyUserSum);
+  }
+}
+
+const buggyUserMapReduceService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { buggyUserMapReduce: BuggyUserMapReduceResource },
+
+  createGraph(inputCollections: Input_NN) {
+    return inputCollections;
+  },
+};
+
+class FallbackUserSum implements Reducer<number, number> {
+  initial = 0;
+
+  add(accum: Nullable<number>, value: number): number {
+    return (accum ?? 0) + value;
+  }
+
+  remove(_accum: number, _value: number): Nullable<number> {
+    return null;
+  }
+}
+
+class FallbackUserMapReduceResource implements Resource<Input_NN> {
+  instantiate(cs: Input_NN): EagerCollection<number, number> {
+    return cs.input.mapReduce(TestOddEven)(FallbackUserSum);
+  }
+}
+
+const fallbackUserMapReduceService: AnySkipService = {
+  inputs: { input: new InputDefinition() },
+  resources: { fallbackUserMapReduce: FallbackUserMapReduceResource },
 
   createGraph(inputCollections: Input_NN) {
     return inputCollections;
@@ -1345,7 +1402,10 @@ class WithChanges implements ChangeManager {
 
 export function initTests(
   category: string,
-  initService: (service: AnySkipService) => Promise<ServiceInstance>,
+  initService: (
+    service: AnySkipService,
+    options?: ServiceOptions,
+  ) => Promise<ServiceInstance>,
 ) {
   const it = (title: string, fn?: AsyncFunc) =>
     mit(`${title}[${category}]`, fn);
@@ -1665,6 +1725,140 @@ export function initTests(
         [1, [2]],
       ]);
     } finally {
+      await service.close();
+    }
+  });
+
+  it("testCheckReducersValid", async () => {
+    const service = await initService(userMapReduceService, {
+      checkReducers: true,
+    });
+    try {
+      const resource = "userMapReduce";
+      await service.update("input", [
+        [0, [1]],
+        [1, [1]],
+        [2, [1]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [2]],
+        [1, [1]],
+      ]);
+      await service.update("input", [
+        [0, [2]],
+        [1, [2]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [3]],
+        [1, [2]],
+      ]);
+      await service.update("input", [
+        [0, []],
+        [2, []],
+      ]);
+      expect(await service.getAll(resource)).toEqual([
+        [0, [0]],
+        [1, [2]],
+      ]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testCheckReducersDetectsBuggyRemove", async () => {
+    const service = await initService(buggyUserMapReduceService, {
+      checkReducers: true,
+    });
+    try {
+      const resource = "buggyUserMapReduce";
+      await service.update("input", [
+        [0, [10]],
+        [2, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([[0, [30]]]);
+      // Updating key 0 triggers BuggyUserSum.remove, which is not the inverse of add.
+      try {
+        await service.update("input", [[0, [5]]]);
+        throw new Error("Expected reducer mismatch error");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          /Reducer 'BuggyUserSum' produced inconsistent result on remove/,
+        );
+      }
+      // The aborted update leaves the previous state intact.
+      expect(await service.getAll(resource)).toEqual([[0, [30]]]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testCheckReducersDisabledByDefault", async () => {
+    const service = await initService(buggyUserMapReduceService);
+    try {
+      const resource = "buggyUserMapReduce";
+      await service.update("input", [
+        [0, [10]],
+        [2, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([[0, [30]]]);
+      await service.update("input", [[0, [5]]]);
+      // Without checkReducers, the buggy remove result (30 - 10 - 1 + 5 = 24) is accepted.
+      expect(await service.getAll(resource)).toEqual([[0, [24]]]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testCheckReducersFallbackNullPasses", async () => {
+    const service = await initService(fallbackUserMapReduceService, {
+      checkReducers: true,
+    });
+    try {
+      const resource = "fallbackUserMapReduce";
+      await service.update("input", [
+        [0, [10]],
+        [2, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([[0, [30]]]);
+      await service.update("input", [[0, [5]]]);
+      expect(await service.getAll(resource)).toEqual([[0, [25]]]);
+      await service.update("input", [
+        [0, []],
+        [2, []],
+      ]);
+      expect(await service.getAll(resource)).toEqual([[0, [0]]]);
+    } finally {
+      await service.close();
+    }
+  });
+
+  it("testCheckReducersEnvVar", async () => {
+    const prev = process.env["SKIP_CHECK_REDUCERS"];
+    process.env["SKIP_CHECK_REDUCERS"] = "1";
+    const service = await initService(buggyUserMapReduceService);
+    try {
+      const resource = "buggyUserMapReduce";
+      await service.update("input", [
+        [0, [10]],
+        [2, [20]],
+      ]);
+      expect(await service.getAll(resource)).toEqual([[0, [30]]]);
+      try {
+        await service.update("input", [[0, [5]]]);
+        throw new Error("Expected reducer mismatch error");
+      } catch (e: unknown) {
+        expect(e).toBeA(Error);
+        expect((e as Error).message).toMatchRegex(
+          /Reducer 'BuggyUserSum' produced inconsistent result on remove/,
+        );
+      }
+    } finally {
+      if (prev === undefined) {
+        delete process.env["SKIP_CHECK_REDUCERS"];
+      } else {
+        process.env["SKIP_CHECK_REDUCERS"] = prev;
+      }
       await service.close();
     }
   });

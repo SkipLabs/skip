@@ -298,4 +298,32 @@ describe("ToBinding", () => {
       expect(abortCalls).toEqual(1);
     });
   });
+
+  describe("initService checkReducers option", () => {
+    it("defaults checkReducers to false when options are omitted", async () => {
+      let receivedFlag: boolean | undefined;
+      const { toBinding, converter } = makeBinding({
+        SkipRuntime_initService: (_service, checkReducers) => {
+          receivedFlag = checkReducers;
+          return converter.exportJSON([]);
+        },
+      });
+
+      await toBinding.initService(makeService());
+      expect(receivedFlag).toEqual(false);
+    });
+
+    it("forwards checkReducers: true to SkipRuntime_initService", async () => {
+      let receivedFlag: boolean | undefined;
+      const { toBinding, converter } = makeBinding({
+        SkipRuntime_initService: (_service, checkReducers) => {
+          receivedFlag = checkReducers;
+          return converter.exportJSON([]);
+        },
+      });
+
+      await toBinding.initService(makeService(), { checkReducers: true });
+      expect(receivedFlag).toEqual(true);
+    });
+  });
 });
