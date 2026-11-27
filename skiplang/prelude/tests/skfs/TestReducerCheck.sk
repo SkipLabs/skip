@@ -1,0 +1,209 @@
+module alias T = SKTest;
+
+module SKStoreTest;
+
+private fun makeBuggySumReducer(): SKStore.EReducer<
+  SKStore.IntFile,
+  SKStore.IntFile,
+> {
+  SKStore.EReducer{
+    type => SKStore.IntFile::type,
+    canReset => false,
+    init => iter ~> {
+      sum = 0;
+      for (x in iter) {
+        !sum = sum + x.value;
+      };
+      Array[SKStore.IntFile(sum)]
+    },
+    update => (state, old, new) ~> {
+      // Intentionally buggy: forgets to subtract old values.
+      sum = state[0].value;
+      _ = old;
+      for (x in new) {
+        !sum = sum + x.value;
+      };
+      Some(Array[SKStore.IntFile(sum)])
+    },
+  }
+}
+
+private fun makeFallbackReducer(): SKStore.EReducer<
+  SKStore.IntFile,
+  SKStore.IntFile,
+> {
+  SKStore.EReducer{
+    type => SKStore.IntFile::type,
+    canReset => true,
+    init => iter ~> {
+      sum = 0;
+      for (x in iter) {
+        !sum = sum + x.value;
+      };
+      Array[SKStore.IntFile(sum)]
+    },
+    update => (_state, _old, _new) ~> None(),
+  }
+}
+
+@test
+fun testCheckReducersValid(): void {
+  context = SKStore.Context::mcreate{checkReducers => true};
+  inputDir = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/input/"),
+    Array[
+      (SKStore.IID(1), SKStore.IntFile(10)),
+      (SKStore.IID(2), SKStore.IntFile(20)),
+      (SKStore.IID(3), SKStore.IntFile(30)),
+    ],
+  );
+  reduced = inputDir.mapReduce(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/reduced/"),
+    (_ctx, writer, _key, values) ~> writer.set(SKStore.IID(0), values.first),
+    SKStore.sumReducer(),
+  );
+  context.initPre();
+
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[60],
+    "initial sum",
+  );
+
+  // Update an existing key (triggers remove + add).
+  inputDir.writeArray(context, SKStore.IID(2), Array[SKStore.IntFile(25)]);
+  context.update();
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[65],
+    "sum after update",
+  );
+
+  // Remove a key completely (triggers remove).
+  inputDir.writeArray(context, SKStore.IID(1), Array[]);
+  context.update();
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[55],
+    "sum after remove",
+  );
+
+  // Remove remaining keys down to empty.
+  inputDir.writeArray(context, SKStore.IID(2), Array[]);
+  inputDir.writeArray(context, SKStore.IID(3), Array[]);
+  context.update();
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[0],
+    "sum after removing all",
+  );
+}
+
+@test
+fun testCheckReducersDetectsBuggyRemove(): void {
+  context = SKStore.Context::mcreate{checkReducers => true};
+  inputDir = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/input/"),
+    Array[
+      (SKStore.IID(1), SKStore.IntFile(10)),
+      (SKStore.IID(2), SKStore.IntFile(20)),
+    ],
+  );
+  _reduced = inputDir.mapReduce(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/reduced/"),
+    (_ctx, writer, _key, values) ~> writer.set(SKStore.IID(0), values.first),
+    makeBuggySumReducer(),
+  );
+  context.initPre();
+
+  // Updating an existing key invokes update with non-empty oldValues.
+  inputDir.writeArray(context, SKStore.IID(1), Array[SKStore.IntFile(5)]);
+  threw = false;
+  try {
+    context.update();
+  } catch {
+  | ex @ SKStore.ReducerMismatchException _ ->
+    !threw = true;
+    T.expectTrue(
+      ex.getMessage().contains("/reduced/"),
+      "error message names reduced directory",
+    )
+  | ex -> throw ex
+  };
+  T.expectTrue(threw, "buggy reducer must throw ReducerMismatchException");
+}
+
+@test
+fun testCheckReducersDisabledByDefault(): void {
+  context = SKStore.Context::mcreate{checkReducers => false};
+  inputDir = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/input/"),
+    Array[
+      (SKStore.IID(1), SKStore.IntFile(10)),
+      (SKStore.IID(2), SKStore.IntFile(20)),
+    ],
+  );
+  reduced = inputDir.mapReduce(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/reduced/"),
+    (_ctx, writer, _key, values) ~> writer.set(SKStore.IID(0), values.first),
+    makeBuggySumReducer(),
+  );
+  context.initPre();
+
+  // With checkReducers disabled, the buggy update does not throw.
+  inputDir.writeArray(context, SKStore.IID(1), Array[SKStore.IntFile(5)]);
+  context.update();
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[35],
+    "buggy incremental result kept when checkReducers is false",
+  );
+}
+
+@test
+fun testCheckReducersFallbackNonePasses(): void {
+  context = SKStore.Context::mcreate{checkReducers => true};
+  inputDir = context.mkdir(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    SKStore.DirName::create("/input/"),
+    Array[
+      (SKStore.IID(1), SKStore.IntFile(10)),
+      (SKStore.IID(2), SKStore.IntFile(20)),
+    ],
+  );
+  reduced = inputDir.mapReduce(
+    SKStore.IID::keyType,
+    SKStore.IntFile::type,
+    context,
+    SKStore.DirName::create("/reduced/"),
+    (_ctx, writer, _key, values) ~> writer.set(SKStore.IID(0), values.first),
+    makeFallbackReducer(),
+  );
+  context.initPre();
+
+  inputDir.writeArray(context, SKStore.IID(1), Array[]);
+  context.update();
+  T.expectEq(
+    reduced.getArray(context, SKStore.IID(0)).map(x -> x.value),
+    Array[20],
+    "fallback None() recomputes cleanly when checkReducers is true",
+  );
+}
+
+module end;
