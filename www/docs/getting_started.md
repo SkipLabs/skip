@@ -112,24 +112,28 @@ Skip is designed to bridge this gap, letting you express the moment-in-time logi
 At its core, a Skip service is a reactive computation graph describing how to compute some output _resources_ from some input data and/or external API inputs.
 
 A service is specified by an object passed to `runService`, which will then spin up a Skip runtime and server.
-That object implements `SkipService<InputDefs, ResourceInputs>`: it provides `inputs` (each entry an `InputDefinition<K, V>` specifying an input collection's key/value types and initial entries), `resources` (constructors accepting `Json` parameters to expose over HTTP), and a function `createGraph` mapping `InputCollections<InputDefs>` to `ResourceInputs`.
+That object implements `SkipService<InputDefs, ResourceInputs>`: it provides `inputs` (each entry an `InputDefinition<K, V>` specifying an input collection's key/value types and initial entries), `resources` (constructors accepting `Json` parameters to expose over HTTP), and a function `createGraph(inputs, context)` mapping `InputCollections<InputDefs>` (and the Skip runtime `Context`, which can be used to create lazy collections or connect to external resources) to `ResourceInputs`.
 This shared computation graph will be maintained up-to-date at all times, and can be an arbitrarily complex computation graph or as simple as returning the input collections directly, depending on the service.
 
-In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `activeFriends`, and define a reactive computation of the active users in each group. 
+In this example, we pull initial user and group data from an external source-of-truth database, expose a single resource called `active_friends`, and define a reactive computation of the active users in each group.
 
 ```typescript
 import {
   type EagerCollection,
+  type InputCollections,
   type Mapper,
   type Values,
   InputDefinition,
 } from "@skipruntime/core";
 
-// Type alias for inputs to our service
-type ServiceInputs = {
-  readonly users: EagerCollection<UserID, User>;
-  readonly groups: EagerCollection<GroupID, Group>;
+// Define input collections and their initial data (empty for now for simplicity)
+const inputs = {
+  users: new InputDefinition<UserID, User>(),
+  groups: new InputDefinition<GroupID, Group>(),
 };
+
+// Derived collection types passed to `createGraph` (mirrors `inputs`)
+type ServiceInputs = InputCollections<typeof inputs>;
 
 // Type alias for inputs to the active friends resource
 type ResourceInputs = {
@@ -150,12 +154,6 @@ class ActiveMembers implements Mapper<GroupID, Group, GroupID, UserID> {
   }
 }
 
-// Define input collections and their initial data (empty for now for simplicity)
-const inputs = {
-  users: new InputDefinition<UserID, User>(),
-  groups: new InputDefinition<GroupID, Group>(),
-};
-
 // Specify and run the reactive service
 const service = {
   inputs,
@@ -168,7 +166,7 @@ const service = {
 await runService(service);
 ```
 
-This example service operates over two _input collections_ (one for users and one for groups, as specified by `ServiceInputs`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
+This example service operates over two _input collections_ (one for users and one for groups, derived from `inputs` via `InputCollections<typeof inputs>`) and passes some `ResourceInputs` to its resources: a reactively-computed collection `activeMembers` of the set of active users in each group, along with the `users` input collection.
 This `activeMembers` collection is the "output" of the shared computation graph, produced by mapping over the input groups and taking users that have the `active` flag set; since this only has to be done once for the entire service, it can be maintained at all times.
 
 Our service wants to expose a resource -- parameterized by a user ID -- which can be queried or subscribed to by clients to view that user's active friends in each group.
@@ -177,14 +175,7 @@ Maintaining this resource up-to-date for all users at all times would be infeasi
 Resources are parameterized by some input HTTP `params` and use an `instantiate` function to set up any reactive computation, operating over the service's `ResourceInputs` to produce a single output collection.
 
 ```typescript
-import {
-  type EagerCollection,
-  type Json,
-  type Mapper,
-  type Resource,
-  type Values,
-  InputDefinition,
-} from "@skipruntime/core";
+import type { Resource } from "@skipruntime/core";
 
 // ... rest of your code so far
 
@@ -217,8 +208,9 @@ class ActiveFriends implements Resource<ResourceInputs> {
 
 In this example, our `ActiveFriends` resource filters each groups' current active users to those users who are also currently friends with the given `uid`.
 
-Now, all we need to do is run the Skip service and broker. 
+Now, all we need to do is run the Skip service and broker.
 ```typescript
+import { SkipServiceBroker } from "@skipruntime/helpers";
 import { runService } from "@skipruntime/server";
 
 // Service definition
@@ -249,14 +241,14 @@ const serviceBroker = new SkipServiceBroker({
 });
 ```
 
-In your terminal, you should see the following: 
+In your terminal, you should see the following:
 
 ```console
 Skip control service listening on port 8081
 Skip streaming service listening on port 8080
 ```
 
-For the sake of the example, you may populate `inputs` with mock data:
+For the sake of the example, replace the empty `const inputs = { ... }` definition above with mock data:
 
 ```typescript
 const inputs = {
